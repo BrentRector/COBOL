@@ -1,0 +1,59 @@
+name: Wrong output
+description: A program compiles and runs, but its behavior or output is not what ISO/IEC 1989 requires.
+labels: ["bug", "wrong-answer", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Wrong-answer defects are the highest-priority bugs in this project.
+        Please reduce the program to the smallest one that still shows the problem.
+        **Security issues** go through private reporting instead — see SECURITY.md.
+  - type: textarea
+    id: program
+    attributes:
+      label: Program
+      description: A minimal, complete COBOL program (and any copybooks or input files it needs).
+      render: cobol
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command line
+      description: Exactly how you compiled and ran it, including `--std` and any other options.
+      placeholder: cobol prog.cob -o prog.dll --std 2023 && dotnet prog.dll
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen, and the clause of the standard that requires it (for example `§14.9.25.4 GR1`).
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead — paste the output verbatim.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: other-compilers
+    attributes:
+      label: Other compilers (optional)
+      description: What GnuCOBOL, IBM Enterprise COBOL or Micro Focus produce for the same program, if you know.
+  - type: input
+    id: version
+    attributes:
+      label: CobolSharp commit
+      description: Output of `git rev-parse --short HEAD` in your clone.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and `dotnet --version`.
+      placeholder: Windows 11 / .NET 10.0.100

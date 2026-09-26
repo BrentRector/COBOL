@@ -1,0 +1,71 @@
+name: Conformance finding
+description: The compiler rejects COBOL the standard allows, accepts COBOL it forbids, or gates a construct to the wrong edition.
+labels: ["conformance", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CobolSharp conforms to ISO/IEC 1989:2023 and to the 1985, 2002 and 2014 editions. The text of the standard
+        decides every case. Please cite the clause, and check the citation with
+        `python scripts/spec/cite.py --check <clause> "<quoted text>"`.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of finding
+      options:
+        - Rejects source the standard allows
+        - Accepts source the standard forbids (no diagnostic)
+        - Wrong edition gating (--std)
+        - Wrong or missing diagnostic
+        - Implementor-defined behavior not documented in docs/CONFORMANCE.md
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition (--std)
+      multiple: true
+      options:
+        - "85"
+        - "2002"
+        - "2014"
+        - "2023"
+    validations:
+      required: true
+  - type: input
+    id: citation
+    attributes:
+      label: Clause and rule
+      description: The section and syntax/general rule, for example `§13.18.40.3 SR1`.
+    validations:
+      required: true
+  - type: textarea
+    id: quote
+    attributes:
+      label: What the standard says
+      description: The relevant sentence(s), quoted briefly.
+    validations:
+      required: true
+  - type: textarea
+    id: program
+    attributes:
+      label: Program
+      description: A minimal COBOL program showing the finding.
+      render: cobol
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What the compiler does
+      description: The diagnostics or output, verbatim.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CobolSharp commit
+      description: Output of `git rev-parse --short HEAD` in your clone.
+    validations:
+      required: true

@@ -34,6 +34,13 @@
 | `CONSTRAINTS.md` | LIVE | Doctrine: anti-patterns, process rituals (some examples are byte-engine-era — the rules generalize). |
 | `PROMPT.md` | LIVE | Doctrine + the anti-pattern catalog (multi-session continuity; C# 14 / .NET 10 **or later** — a .NET 11 upgrade is pre-authorized when it helps the goals). |
 | `README.md` | LIVE | Repo front page. |
+| `CONTRIBUTING.md` | LIVE | Contributor guide (GitHub community standard): ways to contribute, the standard-is-authority rule with `cite.py --check`, the CLA, build + `build-local.ps1` gate, what a pull request needs, review and merge through `ci-gate`. |
+| `CLA.md` | LIVE | Individual Contributor License Agreement (modeled on the Apache ICLA; grant extended to BSL, its Change License and commercial licenses). Enforced on pull requests by CLA Assistant (cla-assistant.io), which reads the text from the gist https://gist.github.com/BrentRector/e56c12d819de9f018504a316cfcdbb62 — ⛔ every edit to `CLA.md` updates the gist in the same change (and bumps the version line), or signers agree to stale text. |
+| `CODE_OF_CONDUCT.md` | LIVE | Adopts the Contributor Covenant 2.1; private reporting contact. |
+| `SECURITY.md` | LIVE | Private vulnerability reporting (GitHub advisories), response targets, supported versions (`main`), scope. |
+| `.github/ISSUE_TEMPLATE/*.yml`, `.github/PULL_REQUEST_TEMPLATE.md` | LIVE | Issue forms by failure kind — wrong output, compiler crash, conformance finding (clause + rule required), feature/tooling — and the pull-request checklist (citation, root cause, goldens, sibling sweep, docs, CLA). |
+| `docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md` | LIVE | **User documentation, publication and distribution (owner decision R50):** the §4.2.16 obligations mapped to their sources, docs-as-code in `docs/manual/` published with Astro Starlight on wiseowlsoftware.com (`/cobol/docs/<version>/`) from per-release docs bundles, the hand-written vs GENERATED content map with drift tests, and NuGet distribution under `WiseOwl.` (`WiseOwl.Cobol` tool + `WiseOwl.Cobol.Runtime`). Work tracked in kb/Work PB1610–PB1614. |
+| `scripts/wsl/setup-wsl.sh` | LIVE | User-space WSL toolchain refresh (.NET 10 SDK, latest CPython via uv, PATH wiring) for local Linux runs; parity target is `scripts/cloud/setup-env.sh`. |
 
 ## COBOL.NET design corpus — one canonical deep-dive per subsystem
 

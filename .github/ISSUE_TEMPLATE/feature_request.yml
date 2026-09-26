@@ -1,0 +1,29 @@
+name: Feature or tooling request
+description: Suggest an improvement to the compiler's usability, diagnostics, tooling or documentation.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CobolSharp implements standard COBOL. A missing **standard** feature is a conformance finding — please use
+        that form instead. Non-standard dialect extensions are generally out of scope unless the standard leaves the
+        behavior to the implementor.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you would like to happen. Include an example command line or program where it helps.
+    validations:
+      required: true
+  - type: textarea
+    id: prior-art
+    attributes:
+      label: Prior art (optional)
+      description: How GnuCOBOL, IBM Enterprise COBOL, Micro Focus or other compilers handle this.

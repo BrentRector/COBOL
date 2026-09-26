@@ -1,0 +1,54 @@
+name: Compiler crash
+description: The `cobol` command threw an unhandled exception, printed a stack trace, or hung.
+labels: ["bug", "crash", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The compiler should never crash, whatever the input — even invalid COBOL must produce a diagnostic,
+        not an exception. Please reduce the source to the smallest input that still crashes.
+  - type: textarea
+    id: program
+    attributes:
+      label: Source that crashes the compiler
+      description: A minimal COBOL source file (and any copybooks it needs).
+      render: cobol
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command line
+      placeholder: cobol prog.cob -o prog.dll --std 2023
+    validations:
+      required: true
+  - type: textarea
+    id: trace
+    attributes:
+      label: Exception and stack trace
+      description: The full output, including the stack trace. For a hang, say how long you waited.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: When did it fail?
+      options:
+        - While compiling
+        - While running the compiled program
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CobolSharp commit
+      description: Output of `git rev-parse --short HEAD` in your clone.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Ubuntu 24.04 / .NET 10.0.100
