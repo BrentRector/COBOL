@@ -2364,6 +2364,33 @@ one-diagnostic count, and the 85 gate), the positive golden
 GR6 still gives each key its own clause's alphabet) and the negative
 `tests/conformance/negative/pb703-collating-key-in-two-clauses` (`*> reject-at: 2002 2014 2023`). (kb/Work PB703)
 
+**The sequence follows the KEY'S CLASS, and the alphabet operands are screened as written** (kb/Work PB1074).
+§12.4.5.7.4 GR2/GR3 give alphabet-name-1 to the keys of class alphanumeric and alphabet-name-2 to the keys of class
+national; GR4/GR5 give each class its own native sequence otherwise. `DataBinder.ResolveKeyCollating` therefore
+takes the resolved key ITEM and resolves `key-level ?? (national ? alphabet-name-2 : alphabet-name-1)`; it was
+key-class-blind (`key-level ?? alphabet-name-1` for every key), so an alphanumeric alphabet re-ordered and
+re-judged the uniqueness of a national key, and alphabet-name-2 was stored and never read. SR1, SR2 and SR7 are
+syntax rules about the CLAUSE, so `ResolveFileCollating` screens them before any key is resolved, through ONE class
+test (`CollatingAlphabetFault`) — never lazily inside the per-key resolution, where a shadowed alphabet-name-1
+escaped. A NATIVE or UCS-4 national alphabet is the native national sequence and resolves to it; a national
+alphabet defined by literals or LOCALE on a national key is Annex A.3 item 41, not provided, and is declined BY NAME
+through `EditionContext.Declined` (COBOLNET1584, severity Error — an inert compile would order by a different
+sequence than the one written). Witnesses: `2002/pb1074_file_collating_key_class`,
+`negative/pb1074-file-collating-alphabet-class`, `negative/pb1074-file-collating-national-declined`.
+
+## The SUPPRESS WHEN literal-1 — a literal POSITION, sized to the key at bind time
+
+`SUPPRESS WHEN literal-1` (§12.4.5.6.2) is read like every other literal position — the VALUE clause's literal-n
+and the PICTURE EDITING literals — through `DataBinder.RawValueOperandText`: the grammar takes `valueClauseOperand`,
+so a constant-name (§13.10.3 SR2) and a symbolic-character (§8.3.3.6.2 Format 7) are accepted and a concatenation
+expression folds (kb/Work PB1072). `DataBinder.ReadSuppressWhen` records the operand's SHAPE (`SuppressWhenOperand`),
+which §12.4.5.6.3 SR7's three `FileControlKeyRules` rows screen; `DataBinder.KeySuppressionOf` builds the §12.4.5.6.4
+GR6 value in the KEY'S OWN POSITIONS — a figurative in the key's category repeated to its size (§8.3.3.6.4 GR2), ALL
+literal-1 repeated, a short literal space-extended and a long one cut back only over spaces (§8.8.4.2.7 2)) — and
+the emitter encodes a national value through the one national serializer. The connector then compares two key
+images; sizing the relation's operands is the compiler's job because only it knows the literal's form and the key's
+category.
+
 ## ISO citations
 
 - ISO/IEC 1989:2023 section 12.4.5.7 COLLATING SEQUENCE clause: 12.4.5.7.2's two general formats (file-level and key-level), 12.4.5.7.3 SR3 (at most one file-level clause per file control entry), SR4/SR5 (a Format-2 name shall be a declared RECORD KEY or ALTERNATE RECORD KEY), SR8 (a key in at most one clause) and 12.4.5.7.4 GR2–GR6 (which sequence applies to which key), with 5.2.7 for the ellipsis that makes the Format-2 brace group repeatable.

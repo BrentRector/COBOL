@@ -17,16 +17,6 @@ namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
 
-/// <summary>The DATA DIVISION section a run of data-description entries belongs to — consumed by the
-/// section-scoped placement rules (e.g. CONSTANT RECORD is WS/LS-only, ISO §13.18.15.3 SR1).</summary>
-internal enum EntrySection
-{
-    WorkingStorage,
-    LocalStorage,
-    Linkage,
-    File,
-}
-
 /// <summary>
 /// Builds the bound DATA DIVISION model (a forest of <see cref="DataItem"/> trees, one per 01/77 item) from the
 /// parse tree, and indexes every named item for reference resolution. Pure syntactic/semantic analysis — no byte
@@ -822,6 +812,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // reported it), so a following 88 has no conditional variable rather than the previous entry's.
             if (BindEntry(entry, section) is not { } item) { lastDescribed = null; continue; }
             item.Uid = _uidCounter++;
+            if (item.Level is 1 or 77) item.RootSection = section;   // DataItem.Section — a subordinate reads its root's
 
             // Level 77 is an INDEPENDENT elementary item (ISO §13.18.38): always top-level, like 01, regardless of its
             // numeric value. Treat it as level 1 for the nesting pop so it attaches as a ROOT — never nested under an
@@ -1033,14 +1024,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     else if (ak.dataReference() is { } akRef)
                     {
                         var (an, aq) = ClauseDataName(akRef, "ALTERNATE RECORD KEY");
-                        // §12.4.5.6.4 GR6 — the SUPPRESS WHEN key suppression value (decoded literal; null when absent).
-                        string? suppress = ak.alternateKeySuppressWhen()?.literal() is { } sl ? CobolLiteral.Decode(sl.GetText()) : null;
                         using var __ = Edition.At(akRef);
-                        file.AlternateKeyNames.Add(new AlternateKeyClause
+                        var clause = new AlternateKeyClause
                         {
                             Name = an, Qualifiers = aq, Duplicates = ak.DUPLICATES() is not null,
-                            Suppress = suppress, At = Edition.Cursor,   // §12.4.5.6.3 reports here, from ResolveFiles
-                        });
+                            At = Edition.Cursor,   // §12.4.5.6.3 reports here, from ResolveFiles
+                        };
+                        file.AlternateKeyNames.Add(clause);
+                        // §12.4.5.6.2 SUPPRESS WHEN literal-1 — captured AS WRITTEN and read post-build by
+                        // ReadSuppressWhen: a constant-name operand is declared in the DATA DIVISION, after this entry.
+                        if (ak.alternateKeySuppressWhen()?.valueClauseOperand() is { } sw)
+                            _suppressWhenOperands[clause] = sw;
                     }
                 }
                 else if (clauses.relativeKeyClause()?.dataReference() is { } rlk)
@@ -1161,16 +1155,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <summary>Capture one file-control COLLATING SEQUENCE clause as written (ISO §12.4.5.7) — resolved to per-key
     /// weight tables post-build in <see cref="ResolveFileCollating"/> (the keys are not yet bound here). Format 2 is
     /// OF-led; Format 1 is the FOR-split or the IS alphabet-name-1 [alphabet-name-2] form.</summary>
-    private static void CaptureFileCollating(FileModel file, Core.FileCollatingSequenceClauseContext ctx)
+    private void CaptureFileCollating(FileModel file, Core.FileCollatingSequenceClauseContext ctx)
     {
+        using var _ = Edition.At(ctx);
         if (ctx.OF() is not null)   // Format 2 (key-level): OF {key}… IS alphabet-name-3
         {
             var words = ctx.cobolWord();
             var keyNames = words.Take(words.Length - 1).Select(w => w.GetText()).ToList();
-            file.KeyLevelCollating.Add((keyNames, words[^1].GetText()));
+            file.KeyLevelCollating.Add((keyNames, words[^1].GetText(), Edition.Cursor));
             return;
         }
-        file.FileLevelCollatingCount++;   // §12.4.5.7.3 SR3 — at most one file-level clause
+        if (file.FileLevelCollatingCount++ == 0) file.FileLevelCollatingAt = Edition.Cursor;   // §12.4.5.7.3 SR3 — at most one file-level clause
         string? alnum = null, nat = null;
         if (ctx.collatingForPhrase() is { Length: > 0 } fors)
             foreach (var f in fors)
@@ -1189,10 +1184,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>Resolve each INDEXED key's collating-weight table from the file's §12.4.5.7 COLLATING SEQUENCE
     /// clauses (post-build — the keys are bound by now). Per §12.4.5.7.4 the sequence for a key is, in order: (GR6)
-    /// a Format-2 clause naming it; else (GR2/GR3) the Format-1 default for the key's class; else (GR4/GR5) native
-    /// (null weights = ordinal). SR3 (single file-level clause), SR4/SR5 (Format-2 names shall be declared keys),
-    /// and SR1/SR2/SR7 (alphabet class) are enforced. A NATIONAL alphabet on a key is recognized-but-not-yet-
-    /// implemented (national-key collating is a documented P14 GAP — never silently applied).</summary>
+    /// a Format-2 clause naming it; else (GR2/GR3) the Format-1 default for the key's CLASS; else (GR4/GR5) the
+    /// native sequence of that class (null weights = ordinal) — see <see cref="ResolveKeyCollating"/>. The clause's
+    /// syntax rules are screened HERE, as written and before any key is resolved: SR3 (one file-level clause),
+    /// SR1/SR2 (the Format-1 alphabets' classes), SR4/SR5 (Format-2 names are declared keys), SR7 (alphabet-name-3
+    /// against each named key's class) and SR8 (a key in at most one clause).
+    /// <para>⛔ SR1/SR2 ARE RULES ABOUT THE CLAUSE, NOT ABOUT THE KEYS IT REACHES (kb/Work PB1074). They used to be
+    /// checked lazily, inside the per-key resolution, so an alphabet-name-1 that every key's Format-2 clause
+    /// shadowed was never looked at (`COLLATING SEQUENCE IS NOSUCH` compiled clean) and alphabet-name-2 was never
+    /// read at all.</para></summary>
     private void ResolveFileCollating(FileModel file)
     {
         if (file.FileLevelCollatingCount > 1)
@@ -1232,8 +1232,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // GR6 is unaffected by the repeat: ResolveKeyCollating takes the FIRST clause naming the key, and a key
         // listed twice in one clause is named by that one clause, so it resolves to that clause's alphabet-name-3.
         var namedIn = new ConstructOperandRegister<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (names, _) in file.KeyLevelCollating)
+        foreach (var (names, alphabet3, at) in file.KeyLevelCollating)
         {
+            using var _ = Edition.At(at);
             foreach (var n in names)
             {
                 if (!keyNames.Contains(n))
@@ -1245,44 +1246,114 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         + "in more than one COLLATING SEQUENCE clause (ISO §12.4.5.7.3 SR8)");
             }
             namedIn.EndConstruct();   // the clause is complete — a repeat from here on is across clauses
+            // SR7 — alphabet-name-3 against the class of EACH key the clause names: "When the class of data-name-1
+            // or record-key-name-1 is national, alphabet-name-3 shall reference an alphabet that defines a national
+            // collating sequence; otherwise, alphabet-name-3 shall reference an alphabet that defines an
+            // alphanumeric collating sequence." An undeclared alphabet breaks both halves and is said once.
+            if (!Alphabets.ContainsKey(alphabet3) && !NationalAlphabets.ContainsKey(alphabet3))
+            {
+                Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING SEQUENCE "
+                    + $"OF … IS '{alphabet3}' — alphabet-name-3 names no alphabet declared in SPECIAL-NAMES "
+                    + "(ISO §12.4.5.7.3 SR7)");
+                continue;
+            }
+            foreach (var n in names.Distinct(StringComparer.OrdinalIgnoreCase))
+                if (KeyItemNamed(file, n) is { } key && ItemCategory.IsAlphanumericOrNational(key)
+                    && CollatingAlphabetFault(alphabet3, IsNationalKey(key)) is { } fault)
+                    Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING "
+                        + $"SEQUENCE OF '{n}' IS '{alphabet3}' — '{n}' is of class "
+                        + $"{(IsNationalKey(key) ? "national" : "alphanumeric")}, so alphabet-name-3 shall reference an "
+                        + $"alphabet that defines {(IsNationalKey(key) ? "a national" : "an alphanumeric")} collating "
+                        + $"sequence; {fault} (ISO §12.4.5.7.3 SR7)");
         }
 
-        file.PrimeKeyCollation = ResolveKeyCollating(file, file.RecordKeyName);
+        // SR1/SR2 — the Format-1 alphabet names, screened as WRITTEN, whatever keys they end up reaching.
+        if (file.FileLevelCollating is var (alnum, nat))
+        {
+            using var _ = Edition.At(file.FileLevelCollatingAt);
+            if (alnum is not null && CollatingAlphabetFault(alnum, national: false) is { } f1)
+                Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING SEQUENCE "
+                    + $"'{alnum}' — alphabet-name-1 shall reference an alphabet that defines an alphanumeric collating "
+                    + $"sequence; {f1} (ISO §12.4.5.7.3 SR1)");
+            if (nat is not null && CollatingAlphabetFault(nat, national: true) is { } f2)
+                Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING SEQUENCE "
+                    + $"'{nat}' — alphabet-name-2 shall reference an alphabet that defines a national collating "
+                    + $"sequence; {f2} (ISO §12.4.5.7.3 SR2)");
+        }
+
+        file.PrimeKeyCollation = ResolveKeyCollating(file, file.RecordKeyName, file.RecordKeyItem);
         for (int i = 0; i < file.AlternateKeys.Count; i++)
-            file.AlternateKeyCollations.Add(ResolveKeyCollating(file, AltName(file, i)));
+            file.AlternateKeyCollations.Add(ResolveKeyCollating(file, AltName(file, i), file.AlternateKeys[i].Item));
     }
+
+    /// <summary>Why <paramref name="alphabet"/> does NOT define a collating sequence of the class asked for, as the
+    /// clause's diagnostics print it — or null when it does. ⛔ THE ONE CLASS TEST for the three alphabet operands
+    /// of §12.4.5.7.3 (SR1 alphabet-name-1 alphanumeric, SR2 alphabet-name-2 national, SR7 alphabet-name-3 of the
+    /// key's class). The two alphabet domains are disjoint (§12.3.7: an ALPHABET clause defines one class), so the
+    /// lookup IS the class test; a national alphabet naming a coded character set only (UTF-8 / UTF-16 — §12.3.7.4
+    /// Table 6's empty collating-sequence column) defines no sequence at all.</summary>
+    private string? CollatingAlphabetFault(string alphabet, bool national)
+    {
+        if (national)
+            return NationalAlphabets.TryGetValue(alphabet, out var nd)
+                ? nd.HasCollatingSequence ? null
+                    : $"'{alphabet}' ({nd.Phrase}) names a national coded character set only (ISO §12.3.7.4 Table 6)"
+                : Alphabets.ContainsKey(alphabet) ? $"'{alphabet}' is an alphanumeric alphabet"
+                : $"'{alphabet}' is not an alphabet declared in SPECIAL-NAMES";
+        return Alphabets.ContainsKey(alphabet) ? null
+            : NationalAlphabets.ContainsKey(alphabet) ? $"'{alphabet}' is defined FOR NATIONAL"
+            : $"'{alphabet}' is not an alphabet declared in SPECIAL-NAMES";
+    }
+
+    /// <summary>A record key's CLASS for §12.4.5.7 — national when the key is category national (a PIC N item or a
+    /// GROUP-USAGE NATIONAL group), alphanumeric otherwise. Only keys §12.4.5.12.3 SR2 / §12.4.5.6.3 SR2 admit
+    /// (alphanumeric or national) reach a caller.</summary>
+    private static bool IsNationalKey(DataItem key) => !ItemCategory.IsAlphanumeric(key);
+
+    /// <summary>The resolved item of the RECORD KEY or ALTERNATE RECORD KEY clause whose data-name is
+    /// <paramref name="name"/>, or null (not a key of this file, or unresolved — both already reported).</summary>
+    private static DataItem? KeyItemNamed(FileModel file, string name) =>
+        string.Equals(file.RecordKeyName, name, StringComparison.OrdinalIgnoreCase) ? file.RecordKeyItem
+        : file.AlternateKeyNames.FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Item;
 
     /// <summary>The declared name of the i-th resolved alternate key (index-aligned when all names resolve — the
     /// normal case; a name that failed to resolve has already errored).</summary>
     private static string? AltName(FileModel file, int i) =>
         i < file.AlternateKeyNames.Count ? file.AlternateKeyNames[i].Name : null;
 
-    /// <summary>Resolve one key's collating sequence (§12.4.5.7.4): a Format-2 alphabet naming the key wins (GR6),
-    /// else the file-level alphanumeric default (GR2), else native ordinal (null). An alphanumeric alphabet
-    /// resolves to its <see cref="AlphabetDef"/> — a literal-phrase table or, per owner decision Q3 (determination
-    /// L8), a LOCALE sequence (the key locale is captured when the connector is registered; a file written under one
-    /// locale and read under another is not guaranteed to be in key order — documented); a NATIONAL alphabet is the
-    /// recognized-not-implemented P14 GAP; an undeclared name errors.</summary>
-    private AlphabetDef? ResolveKeyCollating(FileModel file, string? keyName)
+    /// <summary>Resolve one key's collating sequence BY THE KEY'S CLASS (§12.4.5.7.4): a Format-2 alphabet naming
+    /// the key wins (GR6); else the Format-1 alphabet of the key's class — alphabet-name-1 for a key of class
+    /// alphanumeric (GR2), alphabet-name-2 for a key of class national (GR3); else that class's native sequence
+    /// (GR4/GR5 — null, ordinal). An alphabet whose class the screen above refused resolves to native (the compile
+    /// has already failed).
+    /// <para>⛔ KEY-CLASS-BLIND UNTIL kb/Work PB1074: every key took <c>keyLevel ?? FileLevelCollating.Alnum</c>, so an
+    /// alphanumeric alphabet re-ordered — and re-judged the uniqueness of — a NATIONAL key (a spurious '22' on a
+    /// legal WRITE), and <c>FOR NATIONAL IS alphabet-name-2</c> was stored and never read, silently.</para>
+    /// <para>An ALPHANUMERIC alphabet resolves to its <see cref="AlphabetDef"/> — a literal-phrase table or, per
+    /// owner decision Q3 (determination L8), a LOCALE sequence. A NATIONAL alphabet that is the native national
+    /// sequence (NATIVE, UCS-4 — <see cref="NationalAlphabetDef.IsIdentity"/>) resolves to native, which is exactly
+    /// GR3. One defined by literals or LOCALE is Annex A.3 item 41's processor-dependent capability, which this
+    /// implementation does not provide: it is DECLINED by name (COBOLNET1584), and refused rather than accepted
+    /// inert because an inert compile would order the key — and judge its uniqueness — by a different sequence
+    /// than the one written (docs/CONFORMANCE.md §2 rows 41–42).</para></summary>
+    private AlphabetDef? ResolveKeyCollating(FileModel file, string? keyName, DataItem? key)
     {
+        if (key is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;   // SR2 has refused it
+        bool national = IsNationalKey(key);
         string? alphabet = null;
+        var where = file.FileLevelCollatingAt;
         if (keyName is not null)
-            foreach (var (names, a) in file.KeyLevelCollating)
-                if (names.Any(n => n.Equals(keyName, StringComparison.OrdinalIgnoreCase))) { alphabet = a; break; }
-        alphabet ??= file.FileLevelCollating?.Alnum;   // GR2 file-level alphanumeric default
-        if (alphabet is null) return null;             // GR4/GR5 — native ordinal
+            foreach (var (names, a, at) in file.KeyLevelCollating)
+                if (names.Any(n => n.Equals(keyName, StringComparison.OrdinalIgnoreCase))) { alphabet = a; where = at; break; }
+        alphabet ??= national ? file.FileLevelCollating?.Nat : file.FileLevelCollating?.Alnum;   // GR3 / GR2
+        if (alphabet is null) return null;                                                       // GR5 / GR4
 
-        if (Alphabets.TryGetValue(alphabet, out var def))
-            return def.IsIdentity ? null : def;   // SR1 — alphanumeric collating (an identity alphabet ⇒ native)
-        if (NationalAlphabets.ContainsKey(alphabet))
-        {
-            Edition.Error(DiagnosticCatalog.FileCollatingNationalUnsupported, $"file '{file.CobolName}': COLLATING "
-                + $"SEQUENCE '{alphabet}' names a NATIONAL alphabet — national-key collating for indexed files is "
-                + "recognized but not yet implemented; the key orders natively (ISO §12.4.5.7).");
-            return null;
-        }
-        Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING SEQUENCE "
-            + $"'{alphabet}' does not name an alphabet declared in SPECIAL-NAMES (ISO §12.4.5.7.3 SR1)");
+        if (!national)
+            return Alphabets.TryGetValue(alphabet, out var def) && !def.IsIdentity ? def : null;
+        using var _ = Edition.At(where);
+        if (NationalAlphabets.TryGetValue(alphabet, out var nd) && nd.HasCollatingSequence && !nd.IsIdentity)
+            Edition.Declined(DiagnosticCatalog.FileCollatingNationalUnsupported, $"file '{file.CobolName}': national "
+                + $"record key '{key.CobolName}' under COLLATING SEQUENCE '{alphabet}' ({nd.Phrase})");
         return null;
     }
 
@@ -1652,6 +1723,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             CsName = Unique($"_impliedRecord{DataItem.Sanitize(fdName)}", rootNames),
         };
         record.Uid = _uidCounter++;
+        record.RootSection = EntrySection.File;   // §14.9.30.4 GR6's implied record is a FILE SECTION record
         rootNames.Add(record.CsName);
         var area = new DataItem
         {
@@ -1843,7 +1915,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         foreach (var file in Files)
         {
             if (file.FileStatusName is { } sn)
+            {
                 file.FileStatusItem = ResolveClauseOperand(sn, file.FileStatusQualifiers, "FILE STATUS", file.FileStatusAt);
+                ScreenFileStatusItem(file);   // §12.4.5.8.3 — the clause's own syntax rules over the resolved item
+            }
             // Keyed organizations: RECORD KEY / ALTERNATE RECORD KEY name items WITHIN the file's record
             // descriptions (ISO §12.4.5.12 SR2 / §12.4.5.6 SR2), possibly IN/OF-qualified (§8.4.2.2 — same-named
             // keys under different areas, IX215A); RELATIVE KEY is OUTSIDE the record (ISO §12.4.5.13 SR3) —
@@ -1878,8 +1953,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             if (file.RecordKeyName is { } rk)
                 file.RecordKeyItem = InRecords(rk, file.RecordKeyQualifiers, "RECORD KEY", file.RecordKeyAt);
             foreach (var clause in file.AlternateKeyNames)
+            {
+                clause.SuppressWhen = ReadSuppressWhen(clause);
                 if ((clause.Item = InRecords(clause.Name, clause.Qualifiers, "ALTERNATE RECORD KEY", clause.At)) is { } alt)
-                    file.AlternateKeys.Add((alt, clause.Duplicates, clause.Suppress));
+                    file.AlternateKeys.Add((alt, clause.Duplicates, KeySuppressionOf(alt, clause.SuppressWhen)));
+            }
             ResolveFileCollating(file);   // §12.4.5.7 — per-key collating weights (needs the resolved keys)
             if (file.RelativeKeyName is { } rl)
                 file.RelativeKeyItem = ResolveClauseOperand(rl, file.RelativeKeyQualifiers, "RELATIVE KEY", file.RelativeKeyAt);
@@ -1936,6 +2014,142 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                   : $"no declaration in this source element gives the name '{name}' (ISO §8.4.2.1: \"a statement "
                     + "shall contain a reference that uniquely identifies that resource\")"));
         return null;
+    }
+
+    /// <summary>Screen the FILE STATUS clause's data-name-1 against the clause's own syntax rules (ISO §12.4.5.8.3) —
+    /// the FILE-CONTROL twin of <see cref="ResolveLinage"/>'s operand screen, run post-build for the same reason: an
+    /// operand's OCCURS ancestry, category, size and section are known only once the data forest is bound.
+    /// <para>⛔ NONE OF THE FOUR RULES HAD A SITE (kb/Work PB1080), so every item compiled, and what happened next was
+    /// the emitter's accident: an OCCURS item died at OPEN ("not resolvable to storage"), a <c>PIC 99</c> item
+    /// crashed the C# backend (CS0029), a BASED item died EC-DATA-PTR-NULL at OPEN, and <c>PIC X</c> /
+    /// <c>PIC X(3)</c> / <c>PIC N(2)</c> / an FD record / a dynamic-length or variable-length item ran with a
+    /// truncated, padded or wrong-category status.</para>
+    /// <list type="bullet">
+    /// <item>SR1 — <i>"Data-name-1 shall not be subject to any OCCURS clauses"</i>: <see cref="RecordLayout.IsSubjectToOccurs"/>,
+    /// the reader §13.18.34.3 SR1 and the key clauses' SR1 share.</item>
+    /// <item>SR4 — <i>"shall not be subject to a BASED clause in its data description"</i>: the item or a group it is
+    /// subordinate to is BASED.</item>
+    /// <item>SR3 — <i>"shall not reference a dynamic-length elementary item or a variable-length group"</i> (§8.5.1.12's
+    /// definition, <see cref="VariableLengthCompatibility.IsVariableLength"/>).</item>
+    /// <item>SR2 — <i>"a two-character data item of the category alphanumeric, defined in the working-storage,
+    /// local-storage, or linkage section"</i>. The category is <see cref="ItemCategory.IsAlphanumeric"/>, so a
+    /// two-character alphanumeric GROUP qualifies — §13.18.29.4 GR3 makes a group with no GROUP-USAGE clause "an
+    /// alphanumeric group item", the reading §12.4.5.2 SR7's ASSIGN USING operand already takes. "Two-character" is
+    /// the item's size in character positions, fixed: a group whose size an OCCURS DEPENDING ON subordinate varies
+    /// is not a two-character data item. The section half reads <see cref="DataItem.Section"/>, the fact the item
+    /// carries from its root — so a GLOBAL item a contained program sees keeps the section its own program described
+    /// it in.</item>
+    /// </list>
+    /// One verdict per item, in the order a fix would address them (the first rule that fails).</summary>
+    private void ScreenFileStatusItem(FileModel file)
+    {
+        if (file.FileStatusItem is not { } item) return;   // unresolved — reported by the resolution, one verdict
+        using var _ = Edition.At(file.FileStatusAt);
+        string face = WrittenQualified(file.FileStatusName!, file.FileStatusQualifiers);
+        string? fault =
+            RecordLayout.IsSubjectToOccurs(item)
+                ? "is subject to an OCCURS clause; data-name-1 shall not be subject to any OCCURS clauses "
+                  + "(ISO §12.4.5.8.3 SR1)"
+            : SubjectToBased(item)
+                ? "is subject to a BASED clause; data-name-1 shall not be subject to a BASED clause in its data "
+                  + "description (ISO §12.4.5.8.3 SR4)"
+            : item.IsDynamicLength || VariableLengthCompatibility.IsVariableLength(item)
+                ? $"is {(item.IsDynamicLength ? "a dynamic-length elementary item" : "a variable-length group")}; "
+                  + "data-name-1 shall not reference a dynamic-length elementary item or a variable-length group "
+                  + "(ISO §12.4.5.8.3 SR3)"
+            : FileStatusShapeFault(item) is { } shape
+                ? $"is {shape}; data-name-1 shall reference a two-character data item of the category alphanumeric, "
+                  + "defined in the working-storage, local-storage, or linkage section (ISO §12.4.5.8.3 SR2)"
+            : null;
+        if (fault is not null)
+            Edition.Error(DiagnosticCatalog.FileStatusItemRule, $"file '{file.SelectName}': FILE STATUS '{face}' {fault}");
+    }
+
+    /// <summary>Which conjunct of §12.4.5.8.3 SR2 the FILE STATUS item breaks, as the phrase the diagnostic prints;
+    /// null when it satisfies all three (category, size, section) — asked in the rule's own word order.</summary>
+    private string? FileStatusShapeFault(DataItem item) =>
+        !ItemCategory.IsAlphanumeric(item) ? $"{ItemCategory.Face(item)}, not of the category alphanumeric"
+        : DataItem.HasOdoOnOrBeneath(item) ? "a group whose size an OCCURS DEPENDING ON clause varies, not a two-character data item"
+        : item.ByteWidth != 2 ? $"{item.ByteWidth} character position{(item.ByteWidth == 1 ? "" : "s")} long, not a two-character data item"
+        : item.Section is { } s and not (EntrySection.WorkingStorage or EntrySection.LocalStorage or EntrySection.Linkage)
+            ? $"defined in the {SectionWords(s)}"
+        : null;
+
+    /// <summary>The item, or a group it is subordinate to, carries a BASED clause (§13.18.5 — "subject to").</summary>
+    private static bool SubjectToBased(DataItem item)
+    {
+        for (DataItem? p = item; p is not null; p = p.Parent)
+            if (p.IsBased) return true;
+        return false;
+    }
+
+    /// <summary>The SUPPRESS WHEN operands as written, keyed by their clause (captured in BindFileControl, read by
+    /// <see cref="ReadSuppressWhen"/> once the data division's constant-names are declared).</summary>
+    private readonly Dictionary<AlternateKeyClause, Core.ValueClauseOperandContext> _suppressWhenOperands = [];
+
+    /// <summary>Read an ALTERNATE RECORD KEY clause's SUPPRESS WHEN literal-1 (ISO §12.4.5.6.2) — null when the
+    /// clause has none, or when the operand is no literal at all (reported here, once).
+    /// <para>⛔ ONE READING, THROUGH THE ONE LITERAL-POSITION CHOKEPOINT (kb/Work PB1072). The phrase used to be
+    /// read as <c>CobolLiteral.Decode(literal.GetText())</c>, which returns a figurative constant or an ALL literal
+    /// UNCHANGED as its source spelling: <c>SUPPRESS WHEN SPACES</c> suppressed the six-letter word "SPACES" and
+    /// indexed every blank key, and a constant-name or symbolic-character — both legal literal-1 spellings
+    /// (§13.10.3 SR2; §8.3.3.6.3 SR1 with §8.3.3.6.2 Format 7) — did not parse at all. <see cref="RawValueOperandText"/>
+    /// is the VALUE clause's and the EDITING phrase's own reader: it screens the literal position, substitutes a
+    /// constant-name's and a symbolic-character's literal, and folds a concatenation expression (§8.8.3.3 GR3), so
+    /// what reaches <see cref="FigurativeConstants.Classify"/> here is always ONE literal's raw text.</para>
+    /// <para>What is recorded is the operand's SHAPE, which is what §12.4.5.6.3 SR7 screens
+    /// (<c>FileControlKeyRules</c>); the key-sized value is <see cref="KeySuppressionOf"/>'s.</para></summary>
+    private SuppressWhenOperand? ReadSuppressWhen(AlternateKeyClause clause)
+    {
+        if (!_suppressWhenOperands.TryGetValue(clause, out var op)) return null;
+        using var _ = Edition.At(op);
+        if (RawValueOperandText(op, $"ALTERNATE RECORD KEY '{clause.Name}'", LiteralPosition.SuppressWhen) is not { } raw)
+            return null;
+        string written = AsWritten(op);
+        var form = CobolNet.CodeGen.FigurativeConstants.Classify(raw, includeNull: false);
+        if (form.Kind is { } kind)
+            return new(written, SuppressWhenForm.Figurative, null, "", kind);
+        if (form.AllLiteral is { } literal1)   // ALL literal-1, and a symbolic-character's ALL "c" substitution
+            return new(written, SuppressWhenForm.AllLiteral, CobolLiteral.ClassOf(literal1), CobolLiteral.Decode(literal1), null);
+        return CobolLiteral.ClassOf(raw) is { } cls
+            ? new(written, SuppressWhenForm.Literal, cls, CobolLiteral.Decode(raw), null)
+            // A numeric literal, or the figurative constant NULL, which has no character value.
+            : new(written, SuppressWhenForm.NotAlphanumericOrNational, null, "", null);
+    }
+
+    /// <summary>The §12.4.5.6.4 GR6 key suppression value of <paramref name="key"/>, in the key's own character
+    /// positions — the operand the relation condition compares the key with (§12.4.5.6.4 GR4: equality "based on
+    /// the collating sequence used for the file according to the rules for a relation condition"). Null when
+    /// there is no SUPPRESS WHEN phrase or the key is no key §12.4.5.6.3 SR2 admits (already refused).
+    /// <list type="bullet">
+    /// <item>A keyword figurative is repeated to the key's size (§8.3.3.6.4 GR2 — a figurative "compared with" a
+    /// fixed-length data item is associated with it, NOTE 1), its character taken in the key's category through
+    /// <see cref="FigurativeConstants.FillChar"/> — the fill a <c>MOVE</c> of the same figurative into the key
+    /// stores, so a program that moves SPACES into the key is exactly the program that suppressed it.</item>
+    /// <item>ALL literal-1 is repeated the same way (GR2 again).</item>
+    /// <item>A literal SHORTER than the key is extended with spaces (§8.8.4.2.7 2) — national spaces for a national
+    /// key, which the encoder writes as the byte pair <c>00 20</c>); a LONGER one is cut back to the key's size when
+    /// every excess position is a space (equal under the same rule) and otherwise kept whole — no key value can
+    /// equal it, so it never suppresses.</item>
+    /// </list>
+    /// An operand §12.4.5.6.3 SR7 refuses still gets a value: the screen's error has already failed the compile.</summary>
+    private KeySuppression? KeySuppressionOf(DataItem key, SuppressWhenOperand? operand)
+    {
+        if (operand is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;
+        bool national = !ItemCategory.IsAlphanumeric(key);
+        int positions = national ? key.ByteWidth / CobolNet.Runtime.CobolBits.BytesPerNational : key.ByteWidth;
+        var category = national ? PicCategory.National : PicCategory.Alphanumeric;
+        string value = operand.Form switch
+        {
+            SuppressWhenForm.Figurative => new string(CobolNet.CodeGen.FigurativeConstants.FillChar(
+                operand.FigurativeKind!.Value, Collating, category, NationalCollating), positions),
+            SuppressWhenForm.AllLiteral when operand.Characters.Length > 0 =>
+                string.Concat(Enumerable.Repeat(operand.Characters, positions / operand.Characters.Length + 1))[..positions],
+            _ when operand.Characters.Length <= positions => operand.Characters.PadRight(positions),
+            _ when operand.Characters.AsSpan(positions).IndexOfAnyExcept(' ') < 0 => operand.Characters[..positions],
+            _ => operand.Characters,
+        };
+        return new KeySuppression(value, national);
     }
 
     /// <summary>Resolve the LINAGE clause's data-name operands and screen the clause's own syntax rules
@@ -5141,14 +5355,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>WHICH general format a literal-position operand belongs to — the operand's name and the format's
     /// citation, which is all that differs between the positions sharing the one literal-position chokepoint
-    /// (<see cref="RawValueOperandText"/>): the VALUE clause's literal-n and, since kb/Work PB778, the PICTURE
-    /// EDITING phrase's literal-1/-2/-3. The screen, the substitutions and the diagnostic codes are one.</summary>
+    /// (<see cref="RawValueOperandText"/>): the VALUE clause's literal-n, since kb/Work PB778 the PICTURE
+    /// EDITING phrase's literal-1/-2/-3, and since kb/Work PB1072 the ALTERNATE RECORD KEY clause's SUPPRESS WHEN
+    /// literal-1. The screen, the substitutions and the diagnostic codes are one.</summary>
     private sealed record LiteralPosition(string Operand, string Format)
     {
         public static readonly LiteralPosition Value = new("the VALUE operand",
             "every format of the VALUE clause writes literal-n (ISO §13.18.63.2)");
         public static readonly LiteralPosition Editing = new("the PICTURE EDITING operand",
             "the EDITING phrase writes literal-1, literal-2 and literal-3 (ISO §13.18.40.2 Format 1)");
+        public static readonly LiteralPosition SuppressWhen = new("the SUPPRESS WHEN operand",
+            "the ALTERNATE RECORD KEY clause writes SUPPRESS WHEN literal-1 (ISO §12.4.5.6.2)");
     }
 
     /// <summary>The RAW single-literal text of a VALUE operand — the data path's currency (decoded at emit

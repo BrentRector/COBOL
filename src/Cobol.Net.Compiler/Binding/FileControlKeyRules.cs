@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
+using CobolNet.Common;
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 
@@ -71,9 +72,12 @@ internal enum FileKinds
 /// and contributes NO data-name, so <paramref name="Name"/> is null while the clause is plainly there. Only the
 /// §12.4.5.1 Format-1 requiredness row reads it, because that is the only rule whose subject is the clause's
 /// PRESENCE; every operand rule below it tests <paramref name="Item"/> or <paramref name="Name"/> and is
-/// correctly silent on a refused clause.</para></summary>
+/// correctly silent on a refused clause.</para>
+/// <para><paramref name="SuppressWhen"/> is an ALTERNATE RECORD KEY clause's SUPPRESS WHEN literal-1 as read
+/// (§12.4.5.6.3 SR7's subject); null on every other role and on a clause without the phrase.</para></summary>
 internal readonly record struct FileKeyOperand(
-    FileKeyRole Role, string ClauseFace, string? Name, DataItem? Item, DiagnosticCursor At, bool Written = true);
+    FileKeyRole Role, string ClauseFace, string? Name, DataItem? Item, DiagnosticCursor At, bool Written = true,
+    SuppressWhenOperand? SuppressWhen = null);
 
 /// <summary>ONE syntax rule of the file control entry stated about a key clause.</summary>
 /// <param name="RuleId">The traceability-inventory row this rule closes (<c>SR-12.4.5.12.3-1</c>), or null for a
@@ -152,9 +156,10 @@ internal sealed record FileControlKeyRule(
 /// ancestry, PICTURE and owning record description are unknown until the data forest is indexed. That is the
 /// whole criterion for which of the two a new entry rule joins — `COBOLNET_FILES_DESIGN.md` D19.</para>
 /// <para>NOT HERE, deliberately: the SEMANTIC rules of the same clauses — §12.4.5.12.3 SR3/SR4/SR5 and
-/// §12.4.5.6.3 SR3..SR7 — which need machinery this screen does not have (variable-length record geometry, the
+/// §12.4.5.6.3 SR3/SR4/SR6 — which need machinery this screen does not have (variable-length record geometry, the
 /// record-key-name-1 SOURCE phrase, which has no grammar carrier: Annex A.3 item 40). Each is one row when it is
-/// implemented; that is the point of the table.</para>
+/// implemented; that is the point of the table — §12.4.5.6.3 SR5 and SR7 became rows exactly that way (kb/Work
+/// PB1025, PB1072).</para>
 /// <para>ALSO NOT HERE, and the one place §12.4.5.2 SR8 is written down twice: the COLLATING SEQUENCE clause is a
 /// Format-1 clause too, and a file-level one on a non-indexed file is refused by
 /// <c>DataBinder.ResolveFileCollating</c> (COBOLNET1582) — because that test is ALSO the guard that stops the
@@ -283,6 +288,43 @@ internal static class FileControlKeyRules
             (f, op) => BeyondMinimum(f, op.Item) is not null,
             (f, op) => BeyondMinimumMessage(f, op, "x", "ISO §12.4.5.6.3 SR5")),
 
+        // SR7 — the SUPPRESS WHEN literal-1 (kb/Work PB1072). ONE numbered rule, THREE obligations, three rows with
+        // one rule-id: the operand's KIND, its CATEGORY against data-name-1's, and an ALL literal's length. Nothing
+        // screened any of them, so SUPPRESS WHEN 5 / B"1" / ALL "AB" and a national literal on an alphanumeric key
+        // compiled clean. The operand is read ONCE (DataBinder.ReadSuppressWhen, the literal-position chokepoint),
+        // so a constant-name, a symbolic-character and a concatenation expression arrive here as the literal they
+        // stand for. A keyword figurative has no category of its own (§8.3.3.6.4 GR1 — it takes the context's), so
+        // the category row asks only a literal.
+        new("SR-12.4.5.6.3-7", "12.4.5.6.3", "ISO §12.4.5.6.3 SR7",
+            "Literal-1 shall be an alphanumeric literal, a national literal, or a figurative constant",
+            FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
+            _ => true,
+            (_, op) => op.SuppressWhen is { } s
+                && (s.Form is SuppressWhenForm.NotAlphanumericOrNational || s.Class is LiteralClass.Boolean),
+            (_, op) => $"{op.ClauseFace} '{op.Name}': SUPPRESS WHEN {op.SuppressWhen?.Written} is "
+                + $"{SuppressWhenFace(op.SuppressWhen)}; literal-1 shall be an alphanumeric literal, a national literal, "
+                + "or a figurative constant (ISO §12.4.5.6.3 SR7)"),
+
+        new("SR-12.4.5.6.3-7", "12.4.5.6.3", "ISO §12.4.5.6.3 SR7",
+            "shall be of the same category as data-name-1 or data-name-2",
+            FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
+            _ => true,
+            (_, op) => op is { SuppressWhen.Class: LiteralClass.Alphanumeric or LiteralClass.National, Item: { } i }
+                && ItemCategory.IsAlphanumericOrNational(i)   // SR2 speaks about any other key
+                && (op.SuppressWhen!.Class is LiteralClass.National) != !ItemCategory.IsAlphanumeric(i),
+            (_, op) => $"{op.ClauseFace} '{op.Name}': SUPPRESS WHEN {op.SuppressWhen?.Written} is "
+                + $"{SuppressWhenFace(op.SuppressWhen)}, but '{op.Name}' is {ItemCategory.Face(op.Item!)}; literal-1 "
+                + "shall be of the same category as data-name-1 (ISO §12.4.5.6.3 SR7)"),
+
+        new("SR-12.4.5.6.3-7", "12.4.5.6.3", "ISO §12.4.5.6.3 SR7",
+            "If ALL literal is specified, the literal shall be one character long",
+            FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
+            _ => true,
+            (_, op) => op.SuppressWhen is { Form: SuppressWhenForm.AllLiteral, Characters.Length: not 1 },
+            (_, op) => $"{op.ClauseFace} '{op.Name}': SUPPRESS WHEN {op.SuppressWhen?.Written} is an ALL literal "
+                + $"{op.SuppressWhen?.Characters.Length} characters long; if ALL literal is specified, the literal "
+                + "shall be one character long (ISO §12.4.5.6.3 SR7)"),
+
         // SR8 sentence 1 over each ALTERNATE RECORD KEY clause. Every written clause violates it (the operand
         // list holds the clauses AS WRITTEN, so there is no absent case to exclude).
         new("SR-12.4.5.2-8", "12.4.5.2", "ISO §12.4.5.2 SR8",
@@ -401,6 +443,24 @@ internal static class FileControlKeyRules
         : f.RelativeKeyName is not null ? "a RELATIVE KEY clause"
         : null;
 
+    /// <summary>What a SUPPRESS WHEN operand IS, in the words §12.4.5.6.3 SR7 uses — the phrase its three rows
+    /// print.</summary>
+    private static string SuppressWhenFace(SuppressWhenOperand? s) => s switch
+    {
+        { Form: SuppressWhenForm.NotAlphanumericOrNational } =>
+            "neither an alphanumeric nor a national literal nor a character figurative constant",
+        { Form: SuppressWhenForm.Figurative } => "a figurative constant",
+        { Form: SuppressWhenForm.AllLiteral } => $"an ALL {ClassFace(s.Class)} literal",
+        _ => $"{(s?.Class is LiteralClass.Alphanumeric ? "an" : "a")} {ClassFace(s?.Class)} literal",
+    };
+
+    private static string ClassFace(LiteralClass? c) => c switch
+    {
+        LiteralClass.National => "national",
+        LiteralClass.Boolean => "boolean",
+        _ => "alphanumeric",
+    };
+
     private static bool SpecifiesIndexedFormat(FileModel f) => IndexedFormatMarker(f) is not null;
 
     /// <summary>The key's window when it reaches past the file's minimum record size (§12.4.5.12.3 SR4 /
@@ -507,7 +567,8 @@ internal static class FileControlKeyRules
                 // The clauses AS WRITTEN, not FileModel.AlternateKeys: a clause whose data-name-1 resolved to
                 // nothing is absent from the resolved list, and that is precisely the case SR2 speaks about.
                 foreach (var alt in file.AlternateKeyNames)
-                    yield return new FileKeyOperand(role, "ALTERNATE RECORD KEY", alt.Name, alt.Item, alt.At);
+                    yield return new FileKeyOperand(role, "ALTERNATE RECORD KEY", alt.Name, alt.Item, alt.At,
+                        SuppressWhen: alt.SuppressWhen);
                 break;
             case FileKeyRole.RelativeKey:
                 yield return new FileKeyOperand(role, "RELATIVE KEY", file.RelativeKeyName, file.RelativeKeyItem,

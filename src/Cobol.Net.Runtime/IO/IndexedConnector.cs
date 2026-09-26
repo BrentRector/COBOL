@@ -153,9 +153,12 @@ public sealed class IndexedConnector : KeyedConnector
     /// <summary>True when this record's <paramref name="keyIndex"/> alternate key equals that key's SUPPRESS WHEN
     /// value (ISO §12.4.5.6.4 GR6): the alternate access path to the record is NOT provided under this key, and
     /// the record "is not considered to exist" for READ/START (the GR6 NOTE). The comparison is the §14.9.51 GR35
-    /// relation condition — under this key's collating sequence (null weights = ordinal), the shorter operand
-    /// space-extended (<see cref="KeyEq"/>). The prime key (keyIndex &lt; 0) is NEVER suppressible (GR6 scopes
-    /// suppression to alternate keys).</summary>
+    /// relation condition under this key's collating sequence (null weights = ordinal, <see cref="KeyEq"/>). The
+    /// relation's operand SIZING is the compiler's, not this method's: the registered value is already the key's
+    /// own image (a figurative or ALL literal repeated to the key's size, a shorter literal space-extended, a
+    /// national value in national spaces — <c>DataBinder.KeySuppressionOf</c>, kb/Work PB1072), because only the
+    /// compiler knows the literal's form and the key's category. The prime key (keyIndex &lt; 0) is NEVER
+    /// suppressible (GR6 scopes suppression to alternate keys).</summary>
     private bool IsSuppressed(string image, RecordExtents? extents, int keyIndex)
     {
         if (keyIndex < 0 || _alts[keyIndex].Suppress is not { } lit) return false;

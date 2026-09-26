@@ -3,6 +3,7 @@
   "enabled": [
   "pb1354_copy_header_2002",
   "pb1277_record_size_in_bytes",
+  "pb1074_file_collating_key_class",
   "pb1033_integer_operand_full_value",
   "pb1549_set_program_address_fatal_resume",
   "l1c30_alphabet_named_locale_format_order",

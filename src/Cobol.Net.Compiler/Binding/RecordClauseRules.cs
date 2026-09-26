@@ -115,9 +115,10 @@ internal sealed record RecordClauseRule(
 /// LEXICAL permission, not a check: it is discharged by the grammar admitting both words in
 /// <c>CobolData.g4 recordClause</c>, with BYTES carried as the §8.10 context-sensitive word it is.</item>
 /// <item><b>SR6</b> (data-name-1 "shall describe an elementary unsigned integer in the working-storage,
-/// local-storage, or linkage section") states THREE obligations, and the third needs a fact the data model does
-/// not carry — which SECTION an item was described in. Screening two arms of three would be the very defect the
-/// SR4 split above exists to prevent, so this rule waits for the section fact and then becomes three rows.</item>
+/// local-storage, or linkage section") states THREE obligations, and the third needs which SECTION an item was
+/// described in. Screening two arms of three would be the very defect the SR4 split above exists to prevent, so
+/// this rule is not yet a row; the section fact now exists (<c>DataItem.Section</c>, kb/Work PB1080, read by the
+/// FILE STATUS screen's identical conjunct) and the rule's three rows are kb/Work PB858's.</item>
 /// <item><b>SR7 and SR8</b> ("Integer-2 / integer-4 shall be greater than or equal to zero") are discharged by
 /// the GENERAL FORMAT, and a row asserting them would be a dead lookup. §5.5 1) makes every <c>integer-n</c> "a
 /// fixed-point integer literal that shall be unsigned and nonzero unless otherwise specified in the associated

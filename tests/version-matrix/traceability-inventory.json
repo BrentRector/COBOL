@@ -16101,13 +16101,13 @@
   "ordinal": 7,
   "subject": "ALTERNATE RECORD KEY clause",
   "rule-digest": "d8c155a4e187",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileControlKeyRules.cs; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ReadSuppressWhen",
+  "test-ref": "conformance:negative/pb1072-suppress-when-sr7; conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072: cite.py --check 12.4.5.6.3 \"If ALL literal is specified, the literal shall be one character long\" -> OK SR7; --check \"shall be of the same category as data-name-1 or data-name-2\" -> OK SR7. The grammar's `alternateKeySuppressWhen : SUPPRESS WHEN? literal` admits every literal form and no binder/validator screens it (DataBinder.BindFileControl only decodes the text; FileControlKeyRules excludes SR3..SR7). Probes (2023, all exit 0, no diagnostic): sr7num.cob SUPPRESS WHEN 5 (numeric literal); sr7bool.cob SUPPRESS WHEN B\"1\" (boolean literal); sr7all.cob SUPPRESS WHEN ALL \"AB\" (two-character ALL literal); sr7cat.cob SUPPRESS WHEN N\"A\" on a PIC X key (national literal, alphanumeric key); sr7cat2.cob SUPPRESS WHEN \"A\" on a PIC N key. Each shall be diagnosed. sr7zero.cob (SUPPRESS WHEN ZERO, a figurative constant) is legal and correctly accepted. Under-rejects - and the accepted values then feed GR6's mis-decoding. [registrar 14a — editions as adjudicated: 2023 (Annex E.3.3 item 42 - the SUPPRESS WHEN phrase)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). cite.py --check 12.4.5.6.3 'Literal-1 shall be an alphanumeric literal, a national literal, or a figurative constant' / 'shall be of the same category as data-name-1 or data-name-2' / 'If ALL literal is specified, the literal shall be one character long' -> OK SR7. Three FileControlKeyRules rows, one rule-id: the operand's kind (numeric literal, boolean literal, NULL refused), its category against data-name-1's, and an ALL literal's length; COBOLNET0863. The operand is read ONCE by DataBinder.ReadSuppressWhen through the literal-position chokepoint RawValueOperandText (grammar alternateKeySuppressWhen now takes valueClauseOperand), so a constant-name (13.10.3 SR2) and a symbolic-character (8.3.3.6.2 Format 7) are accepted and a concatenation expression folds. Negative: SUPPRESS WHEN 5 / N\"A\" on PIC X / ALL \"AB\" each draw SR7; positive golden accepts figurative, ALL, national, constant-name, symbolic-character, concatenation.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.6.4-1",
@@ -16191,13 +16191,13 @@
   "ordinal": 6,
   "subject": "ALTERNATE RECORD KEY clause",
   "rule-digest": "5d0130576e23",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#Decode; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyCompare",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed",
+  "test-ref": "conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072: cite.py --check 12.4.5.6.4 \"shall not be provided when the value of data-name-1 or record-key-name-1 in that record is equal to literal-1\" -> OK GR6 (NOTE: \"It is as if they did not exist\", --find OK GR6). The EXACT-LENGTH alphanumeric case works (goldens altkey_suppress_when, pb695_alternate_suppress_no_when, l1_rewrite_alt_key_suppress). TWO defects in one mechanism: (1) DataBinder.BindFileControl stores `CobolLiteral.Decode(literal.GetText())`, and Decode returns a non-quoted token UNCHANGED, so a figurative constant (SPACES, ZERO, HIGH-VALUES, ...) or ALL \"x\" becomes its SOURCE TEXT (\"SPACES\", \"ALL\\\"*\\\"\"); (2) IndexedConnector.IsSuppressed -> KeyEq -> KeyCompare is string.CompareOrdinal when the key has no collating weights - no space-extension of a shorter literal (the method's own summary claims space-extension) and no figurative repetition to the key's length. Probe gr6b.cob (2023, SUPPRESS WHEN SPACES on PIC X(6)): key \"SPACES\" is suppressed (READ KEY \"SPACES\" -> '23', spec: found, record 01) while an all-space key is NOT (READ KEY spaces -> FOUND 02, spec: '23'), and the third all-space record's WRITE -> '22' (spec: '00', a suppressed key provides no access path, §14.9.51.4 GR41). Probe gr6.cob: SUPPRESS WHEN \"X\" on PIC X(3) key \"X  \" not suppressed; SUPPRESS WHEN ALL \"*\" on \"***\" not suppressed; SUPPRESS WHEN N\"Q\" on PIC N(2) \"Q \" not suppressed; a spurious '02' on WRITE of a record whose DUPLICATES key equals the suppression value. Wrong answers, silent. [registrar 14a — editions as adjudicated: 2023 (Annex E.3.3 item 42)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). cite.py --check 12.4.5.6.4 'shall not be provided when the value of data-name-1 or record-key-name-1 in that record is equal to literal-1' -> OK GR6. The suppression value is built at bind time in the key's own positions (DataBinder.KeySuppressionOf): a figurative repeated to the key size in the key's category via FigurativeConstants.FillChar (8.3.3.6.4 GR2), ALL literal-1 repeated, a shorter literal space-extended (8.8.4.2.7 2)), a longer one cut back when its excess is spaces and otherwise never equal; a national key's value is encoded through CobolBits.NatBytes. Golden pb1072_suppress_when_forms: SPACES/SPACE/short/ALL/N/constant-name/symbolic/concatenation/HIGH-VALUES/long-with-spaces suppress, long-non-space does not; READ KEY by the suppression value -> 23; walks omit suppressed records. retired-witness: src/Cobol.Net.Frontend/Common/CobolLiteral.cs#Decode (the SUPPRESS WHEN operand is no longer decoded raw; it is read by DataBinder.ReadSuppressWhen and sized by KeySuppressionOf (kb/Work PB1072))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.7.3-1",
@@ -16206,13 +16206,13 @@
   "ordinal": 1,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "ce36947e08d3",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CollatingAlphabetFault",
+  "test-ref": "conformance:negative/pb1074-file-collating-alphabet-class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.7.3 \"Alphabet-name-1 shall reference an alphabet that defines an alphanumeric collating sequence\" OK. alphabet-name-1 is validated only LAZILY, when ResolveKeyCollating reaches it for some key. Probe p9 (`COLLATING SEQUENCE IS NOSUCH` + `COLLATING SEQUENCE OF IX-KEY IX-ALT IS REV`, every key covered key-level) compiles and runs clean — undeclared alphabet-name-1 under-rejected. When reached, a NATIONAL alphabet as alphabet-name-1 (p4) is refused, but by COBOLNET1584 'recognized but not yet implemented; the key orders natively' — a non-support message (catalog severity Warning, emitted as error) for what is an SR1 violation. Undeclared+reached is COBOLNET1583 citing SR1 (correct). Finding M2. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.7.3 'Alphabet-name-1 shall reference an alphabet that defines an alphanumeric collating sequence' -> OK SR1. Screened EAGERLY on the clause as written (ResolveFileCollating through the one class test CollatingAlphabetFault), so an undeclared alphabet-name-1 shadowed by key-level clauses for every key (probe p9) and a FOR NATIONAL alphabet as alphabet-name-1 (p4, formerly mis-reported as the COBOLNET1584 decline) both draw COBOLNET1583 citing SR1. Negative pb1074-file-collating-alphabet-class (NOSUCH shadowed by OF IX-KEY). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating (SR1 is no longer checked lazily in the per-key resolution; ResolveFileCollating screens the clause as written (kb/Work PB1074))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.7.3-2",
@@ -16221,13 +16221,13 @@
   "ordinal": 2,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "7af61d2451db",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#CaptureFileCollating",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CollatingAlphabetFault",
+  "test-ref": "conformance:negative/pb1074-file-collating-alphabet-class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.7.3 \"Alphabet-name-2 shall reference an alphabet that defines a national collating sequence\" OK. alphabet-name-2 is captured and never resolved, so it is never checked: probe p3 `COLLATING SEQUENCE IS REV NOSUCH` (NOSUCH undeclared) compiles and runs with no diagnostic; `IS REV REV` (p7, alphanumeric alphabet as alphabet-name-2) likewise accepted. Expected: a compile-time diagnostic (SR2). Findings M1/M2. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.7.3 'Alphabet-name-2 shall reference an alphabet that defines a national collating sequence' -> OK SR2. alphabet-name-2 was stored and never read; now screened on the clause as written: undeclared (probe p3 'IS REV NOSUCH'), an alphanumeric alphabet (negative: 'IS NOSUCH REV'), or a coded-character-set-only national alphabet (UTF-8/UTF-16, Table 6) -> COBOLNET1583 citing SR2.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.7.3-3",
@@ -16296,13 +16296,13 @@
   "ordinal": 7,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "23b7145acfb7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CollatingAlphabetFault",
+  "test-ref": "conformance:negative/pb1074-file-collating-alphabet-class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.7.3 \"When the class of data-name-1 or record-key-name-1 is national, alphabet-name-3 shall reference an alphabet that defines a national collating sequence\" OK. The key's class is never compared with the alphabet's class. Probe p5: national prime key PIC N(1) with `COLLATING SEQUENCE OF IX-KEY IS REV` (alphanumeric alphabet) compiles clean AND applies REV (reads Z,M,A) — under-reject + wrong answer. Probe p6: alphanumeric key with a NATIONAL alphabet-name-3 is refused, but only via COBOLNET1584 'not yet implemented' (not SR7). Probe p10: the LEGAL pairing (national key, `OF IX-KEY IS NREV`) is refused with COBOLNET1584 as an error — the declared P14 GAP of CONFORMANCE row 41-42 (catalog lists 1584 as Warning 'the key orders natively', yet compilation fails). Undeclared alphabet-name-3 (p12) is refused with COBOLNET1583 citing SR1 (should be SR7). Finding M1. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.7.3 'When the class of data-name-1 or record-key-name-1 is national, alphabet-name-3 shall reference an alphabet that defines a national collating sequence' -> OK SR7. Each Format-2 clause's alphabet-name-3 is tested against the class of EACH key it names: an alphanumeric alphabet on a national key (p5, formerly accepted and applied) and a national alphabet on an alphanumeric key (p6, formerly the 1584 decline) draw COBOLNET1583 citing SR7; an undeclared alphabet-name-3 (p12) now cites SR7, not SR1. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating (SR7 is screened per Format-2 clause against each named key's class in ResolveFileCollating (kb/Work PB1074))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.7.3-8",
@@ -16341,13 +16341,13 @@
   "ordinal": 2,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "e50efa219369",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating",
+  "test-ref": "conformance:2002/pb1074_file_collating_key_class; conformance:2002/file_collating_seq",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.7.4 \"An alphanumeric collating sequence referenced by alphabet-name-1 applies to any record keys of class alphanumeric\" OK. Alphanumeric keys: correct (conformance:2002/file_collating_seq; probe p8 prime X key under REV reads Z,M,A). But ResolveKeyCollating never consults the key's class: `alphabet ??= file.FileLevelCollating?.Alnum` applies alphabet-name-1 to EVERY key not named key-level, national keys included. Probe p1 (national prime key PIC N(1), `COLLATING SEQUENCE FOR ALPHANUMERIC IS REV`, write A,M,Z) reads back Z,M,A; per GR2 (alnum keys only) + GR5 (national key with no alphabet-name-2 -> native national) the expected order is A,M,Z. Wrong answer, silent. Finding M1. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.7.4 'An alphanumeric collating sequence referenced by alphabet-name-1 applies to any record keys of class alphanumeric' -> OK GR2. ResolveKeyCollating takes the resolved key item and gives alphabet-name-1 only to keys of class alphanumeric: golden pb1074 FOR ALPHANUMERIC IS REV reverses the alphanumeric alternate key (Z M A) and leaves the national prime key alone (A M Z); probe p1 now A,M,Z.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.7.4-3",
@@ -16356,13 +16356,13 @@
   "ordinal": 3,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "de46ef663e2c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#CaptureFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating",
-  "test-ref": "",
+  "verdict": "DOCUMENTED-NON-SUPPORT",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating",
+  "test-ref": "conformance:negative/pb1074-file-collating-national-declined; conformance:2002/pb1074_file_collating_key_class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.7.4 \"A national collating sequence referenced by alphabet-name-2 applies to any record keys of class national\" OK. CaptureFileCollating stores alphabet-name-2 in FileLevelCollating.Nat and NOTHING reads it (only .Alnum is consulted in ResolveKeyCollating). Probe p2 (national prime key, `COLLATING SEQUENCE FOR NATIONAL IS NREV`, NREV = N\"Z..A\") compiles with NO diagnostic and reads A,M,Z; expected Z,M,A. docs/CONFORMANCE.md row 41-42 declares national-key collating 'NOT claimed — a documented P14 GAP' diagnosed by COBOLNET1584, but the file-level alphabet-name-2 path never emits 1584 — the declared non-support is not even the observed behavior (silent wrong answer). A.3 item 41's latitude covers only alphabets defined with LOCALE or literals, not a code-name national alphabet (e.g. UCS-4). No open kb/Work note owns this row. Finding M1. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.7.4 'A national collating sequence referenced by alphabet-name-2 applies to any record keys of class national' -> OK GR3; cite.py --check A.3 'defined in the SPECIAL-NAMES paragraph with the LOCALE phrase or with literals is dependent on the capabilities of the processor' -> OK A.3 41). alphabet-name-2 is now READ for national keys: a NATIVE/UCS-4 national alphabet IS the native national sequence and applies (golden FOR NATIONAL IS NNAT, prime walk A M Z); one defined by literals or LOCALE is the Annex A.3 item 41 processor-dependent capability this implementation does not provide (docs/CONFORMANCE.md section 2 rows 41-42) and is DECLINED BY NAME through EditionContext.Declined, COBOLNET1584, severity Error (refused: an inert compile would order by a different sequence). Formerly silently ignored with no diagnostic (probe p2/gr1n).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.7.4-4",
@@ -16386,13 +16386,13 @@
   "ordinal": 5,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "bde31a217823",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1074_file_collating_key_class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.7.4 \"the native national collating sequence applies to any record keys of class national\" OK. With alphabet-name-2 absent but alphabet-name-1 present, a national key receives alphabet-name-1's ALPHANUMERIC sequence instead of the native national one: probe p1 national prime key under `FOR ALPHANUMERIC IS REV` reads Z,M,A, expected A,M,Z (native national). Same class-blind resolution as GR2. Finding M1. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.7.4 'the native national collating sequence applies to any record keys of class national' -> OK GR5. A national key under a file-level alphanumeric alphabet with no alphabet-name-2 orders and compares natively: golden file G (COLLATING SEQUENCE IS EQV, 'A' ALSO 'B') writes N\"A\" and N\"B\" -> 00 00 (was 22); probe gr1na now GW2 00.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.7.4-6",
@@ -16416,13 +16416,13 @@
   "ordinal": 1,
   "subject": "FILE STATUS clause",
   "rule-digest": "190b9f9288ef",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveClauseOperand; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitStoreFileStatus",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenFileStatusItem",
+  "test-ref": "conformance:negative/pb1080-file-status-item-shape",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1080: cite.py --check 12.4.5.8.3 \"Data-name-1 shall not be subject to any OCCURS clauses.\" -> OK SR1. ResolveFiles resolves the FILE STATUS operand and runs no screen on it (compare ResolveLinage, which screens its own OCCURS SR via RecordLayout.IsSubjectToOccurs). Probe p1b.cob: `01 T. 05 FS PIC XX OCCURS 3.` + `FILE STATUS IS FS` compiles clean and the OPEN dies at run time with CobolNet.Runtime.NotImplementedCobolFeatureException \"FILE STATUS item 'FS' is not resolvable to storage (ISO §12.4.5.8)\" (the LoudStmt at SequentialIoEmitter.cs:799) — an unhandled process kill where the standard requires a compile-time rejection. The written-subscript form FS(1) IS refused (COBOLNET2024). Finding F1. [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023]",
-  "state": "GAP"
+  "notes": "kb/Work PB1080 landed (w61c). cite.py --check 12.4.5.8.3 'Data-name-1 shall not be subject to any OCCURS clauses' -> OK SR1. DataBinder.ScreenFileStatusItem (beside ResolveLinage's operand screen, run from ResolveFiles) refuses an item subject to OCCURS through RecordLayout.IsSubjectToOccurs, COBOLNET2455; formerly compiled and died at OPEN with NotImplementedCobolFeatureException (probe p1b). The negative also rejects at --std 85.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.8.3-2",
@@ -16431,13 +16431,13 @@
   "ordinal": 2,
   "subject": "FILE STATUS clause",
   "rule-digest": "b6f4249349cf",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveClauseOperand; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitStoreFileStatus",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenFileStatusItem; src/Cobol.Net.Compiler/Binding/DataBinder.cs#FileStatusShapeFault; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#Section",
+  "test-ref": "conformance:negative/pb1080-file-status-item-shape; conformance:85/pb1080_file_status_item_forms",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1080: cite.py --check 12.4.5.8.3 \"Data-name-1 shall reference a two-character data item of the category alphanumeric, defined in the working-storage, local-storage, or linkage section.\" -> OK SR2. No category, length or section screen exists in src/Cobol.Net.* (only the legacy CobolSharp.Compiler FileStatusValidator CBL3201-3204 has one). Probes (pinned cobol.exe, --std 2023): p2 `PIC 99` -> backend crash `error CS0029: Cannot implicitly convert type 'string' to 'long'` (generated C# fails); p3 `PIC X(3)` compiles, runs, FS='35 '; p4 `PIC X` compiles, runs, FS='3' (also at --std 85/2002/2014); p6 `PIC N(2)` (national) compiles, runs; p9 FS declared as a record of ANOTHER file's FD (FILE SECTION) compiles and runs. Positive halves verified: WORKING-STORAGE (ok.cob) and LOCAL-STORAGE (lsx.cob) PIC XX both work. Finding F1. [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023 (the local-storage alternative from 2002, where LOCAL-STORAGE exists)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1080 landed (w61c). cite.py --check 12.4.5.8.3 'Data-name-1 shall reference a two-character data item of the category alphanumeric, defined in the working-storage, local-storage, or linkage section' -> OK SR2. All three conjuncts: category (ItemCategory.IsAlphanumeric — PIC 99 formerly crashed Roslyn CS0029, PIC N(2) ran), size (exactly two character positions, fixed — PIC X / X(3) and an ODO-varied group refused), section (the new DataItem.Section fact, written on each root by BindEntries and read from the root, so a GLOBAL item keeps its own section; an FD record refused). Determination: a two-character alphanumeric GROUP qualifies (13.18.29.4 GR3 makes it an alphanumeric group item) — positive golden pb1080_file_status_item_forms updates both an elementary and a group status item.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.8.3-3",
@@ -16446,13 +16446,13 @@
   "ordinal": 3,
   "subject": "FILE STATUS clause",
   "rule-digest": "614442396e73",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveClauseOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenFileStatusItem",
+  "test-ref": "conformance:negative/pb1080-file-status-dynamic-based",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "kb/Work PB1080: cite.py --check 12.4.5.8.3 \"Data-name-1 shall not reference a dynamic-length elementary item or a variable-length group.\" -> OK SR3. No screen. Probe p7 `01 FS PIC X DYNAMIC LENGTH.` compiles and runs (FS='3'); probe p8 `01 FS. 05 E PIC X OCCURS 1 TO 2 DEPENDING ON N.` (a variable-length group) compiles and runs. Both should be compile-time rejections. Finding F1. [registrar 14a — editions as adjudicated: 2023 clause text; dynamic-length items exist only from 2014, variable-length groups (OCCURS DEPENDING) in every edition — per-edition presence of SR3 not verified from Annex E]",
-  "state": "GAP"
+  "notes": "kb/Work PB1080 landed (w61c). cite.py --check 12.4.5.8.3 'Data-name-1 shall not reference a dynamic-length elementary item or a variable-length group' -> OK SR3. DataItem.IsDynamicLength or VariableLengthCompatibility.IsVariableLength (8.5.1.12's definition) -> COBOLNET2455; formerly a PIC X DYNAMIC LENGTH status ran with a one-character status (probe p7).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.8.3-4",
@@ -16461,13 +16461,13 @@
   "ordinal": 4,
   "subject": "FILE STATUS clause",
   "rule-digest": "0f79ca63f955",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveClauseOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenFileStatusItem",
+  "test-ref": "conformance:negative/pb1080-file-status-dynamic-based",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1080: cite.py --check 12.4.5.8.3 \"Data-name-1 shall not be subject to a BASED clause in its data description.\" -> OK SR4 (sibling: §13.18.5 BASED clause SR10 at spec line 13918 states the same prohibition from the BASED side). No screen. Probe p5 `01 FS PIC XX BASED.` compiles and the OPEN terminates the run unit with EC-DATA-PTR-NULL (fatal) at run time — a compile-time violation turned into a runtime abend. Finding F1. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (BASED clause introduced 2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1080 landed (w61c). cite.py --check 12.4.5.8.3 'Data-name-1 shall not be subject to a BASED clause in its data description' -> OK SR4. The item or a group it is subordinate to carries BASED -> COBOLNET2455; formerly compiled and died EC-DATA-PTR-NULL at OPEN (probe p5).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.8.4-1",
@@ -16926,13 +16926,13 @@
   "ordinal": 1,
   "subject": "RECORD KEY clause",
   "rule-digest": "ac0fa43f5979",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyCompare",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveKeyCollating; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyCompare",
+  "test-ref": "conformance:2002/pb1074_file_collating_key_class; conformance:2002/file_collating_seq",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1074: cite.py --check 12.4.5.12.4 \"The value of the associated record key shall not be equal to the value of the same record key in another record in the file\" -> OK GR1; --check 12.4.5.12.4 \"The equality or inequality is based on the collating sequence used for the file according to the rules for a relation condition\" -> OK GR1; consequence --find \"to write a record that would create a duplicate prime record key in a physical indexed file\" -> §9.1.13.5 2) b) (status 22). UNIQUENESS HALF VERIFIED (probe gr1.cob, 2023): WRITE 'AB ' then 'AB' (space-padded equal) -> 22; 'ab ' -> 00 (native); national PIC N(2) key N\"XY\" twice -> 22. The alphanumeric-collating half is witnessed by conformance:2002/file_collating_seq (EQV alphabet 'A' ALSO 'B': second WRITE -> 22, expected derived from this GR). DEFECT, the collating-sequence half for NATIONAL keys: which sequence is 'the collating sequence used for the file' is fixed by §12.4.5.7.4 (--check 12.4.5.7.4 \"An alphanumeric collating sequence referenced by alphabet-name-1 applies to any record keys of class alphanumeric\" -> OK GR2; --check 12.4.5.7.4 \"the native national collating sequence applies to any record keys of class national\" -> OK GR5). DataBinder.ResolveKeyCollating does `alphabet ??= file.FileLevelCollating?.Alnum` for EVERY key regardless of class and never reads FileLevelCollating.Nat. Probe gr1na.cob: `COLLATING SEQUENCE IS EQV` (alphanumeric, 'A' ALSO 'B') with national prime key PIC N(1): WRITE N\"A\" -> 00, WRITE N\"B\" -> 22 (spec: native national sequence applies, the keys are unequal, 00). Probe gr1n.cob: `COLLATING SEQUENCE FOR NATIONAL IS NEQV` (N\"A\" ALSO N\"B\") -> compiles with NO diagnostic (exit 0) and WRITE N\"B\" -> 00: the file-level national alphabet is dropped silently, while docs/CONFORMANCE.md row 41-42 says national-key collating is not claimed and diagnosed by COBOLNET1584 (only the Format-2 key-level arm reaches that warning). See finding 1. Not owned by any kb/Work note (searched 12.4.5.7.4 / ResolveKeyCollating / COBOLNET1584).",
-  "state": "GAP"
+  "notes": "kb/Work PB1074 landed (w61c). cite.py --check 12.4.5.12.4 'The equality or inequality is based on the collating sequence used for the file according to the rules for a relation condition' -> OK GR1. The prime key's uniqueness is judged under the sequence of the KEY'S CLASS: a national prime key under an alphanumeric EQV alphabet no longer takes it (golden file G: N\"A\", N\"B\" both 00); the alphanumeric half stays witnessed by file_collating_seq (EQV: second WRITE 22). At --std 85 the COLLATING SEQUENCE clause does not exist, so the native sequence governs.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.12.4-2",
@@ -43776,13 +43776,13 @@
   "ordinal": 1,
   "subject": "REWRITE statement",
   "rule-digest": "a8749e0b35f6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed",
-  "test-ref": "conformance:2023/l1_rewrite_alt_key_suppress",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf",
+  "test-ref": "conformance:2023/l1_rewrite_alt_key_suppress; conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule (GR24, first SUPPRESS WHEN sub-rule, item 1): when the key is no longer equal to the suppression literal, 'an access path to this record using this key of reference shall be provided'. cite.py --check 14.9.35.4 -> OK 24); E.3.3 42) OK. IsSuppressed(new image) false -> the key takes part in uniqueness and READ/START again; AltChanged treats leaving suppression as a change. The code's equality is strictly narrower than the relation-condition equality (it can only miss an equality, never invent one), so whenever the spec's premise 'no longer equal' holds the code also sees 'not suppressed' - this sub-rule's outcome is always right; the equality defect bites the opposite transition (L4.x). Golden leg C: REWRITE 01 back from \"XX\" to AA -> C1 walk returns 03 AA then 01 AA. || REFUTED: DIVERGES — The adjudicator's 'code equality is strictly narrower, so it can only miss a suppression' premise is false for a FIGURATIVE suppression value (legal per 12.4.5.6.3 SR7). DataBinder passes the SUPPRESS WHEN literal through CobolLiteral.Decode, which returns raw token text for a figurative, so SUPPRESS WHEN SPACE stores the 5-char word 'SPACE' as the suppression value. A key that LEAVES suppression (spaces -> the word SPACE) is then treated as newly suppressed and no access path is provided, contrary to GR24 1. [editions as adjudicated: 2023 (SUPPRESS WHEN is new: Annex E.3.3 item 42)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). GR24 item 1 (key leaves suppression -> access path provided): golden REWRITE of record 03 moves R-NA from SPACES (suppressed by SUPPRESS WHEN SPACE) to 'OTHR1'; READ KEY IS R-NA finds 03 and the R-NA walk delivers it. The figurative is now the key-sized space value, so the refuter's 'raw word SPACE' premise no longer holds.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-L3.2",
@@ -43791,13 +43791,13 @@
   "ordinal": 2,
   "subject": "REWRITE statement",
   "rule-digest": "5de00c805566",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Stamp",
-  "test-ref": "conformance:2023/l1_rewrite_alt_key_suppress",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf",
+  "test-ref": "conformance:2023/l1_rewrite_alt_key_suppress; conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule (item 2): 'the record shall be logically positioned so that it will be found when accessed using the alternate record key' (the row's text also carries the lead-in of the second sub-rule, adjudicated under L4.x). cite.py --check 14.9.35.4 -> OK 24). AltChanged(i) is true when suppression state flips, so Stamp gives the record a fresh ordinal under that key = positioned last in its duplicate set (GR24 b)). Golden leg C: CW=02 (a duplicate created under a DUPLICATES key, 9.1.13.2 2 c)) and C1=03 AA 02 / 01 AA 00 - found, and last among the AA duplicates. || REFUTED: DIVERGES — Same mechanism as L3.1: with SUPPRESS WHEN <figurative> the suppression value is the raw token text, so a record whose key leaves suppression into a value equal to that text (e.g. the word SPACE) is NOT 'logically positioned so that it will be found when accessed using the alternate record key'. The golden leg C uses a quoted literal, which the Decode path handles, so it does not pin the figurative arm. [editions as adjudicated: 2023 (Annex E.3.3 item 42)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). GR24 item 2 (record logically positioned so it will be found under the alternate key after leaving suppression): golden 'NA: 04 03 01' — record 03 appears in key order after the REWRITE; the figurative arm is now pinned (the prior golden used only an exact-length quoted literal).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-L4.1",
@@ -43806,13 +43806,13 @@
   "ordinal": 1,
   "subject": "REWRITE statement",
   "rule-digest": "31870392df96",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyCompare; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DataBinder",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed",
+  "test-ref": "conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule (GR24 second SUPPRESS WHEN sub-rule, item 1): when 'the value of this alternate record key is now equal to its key suppression value', 'the access path to the record using this alternate record key shall no longer be provided'. cite.py --check 14.9.35.4 -> OK 24). 'Equal' is the relation-condition equality: GR24 closing sentence + 12.4.5.6.4 GR6 ('equal to literal-1', OK 6)), under which a shorter alphanumeric operand is space-extended (8.8.4.2.7 2), OK) and a figurative constant takes the associated item's length (8.3.3.6.4 GR2 + NOTE 1 'compared with it', OK). 12.4.5.6.3 SR7 (OK 7)) makes a figurative constant and a literal shorter than the key LEGAL. IsSuppressed compares KeyOf(image,i) with the raw decoded literal via KeyCompare, which is string.CompareOrdinal when the key has no COLLATING SEQUENCE - no space extension, no figurative expansion. Probe probe/rewrite-statement-p2/p3.cob (X-A1 PIC X(3) SUPPRESS WHEN \"XX\"; X-A2 PIC X(3) SUPPRESS WHEN SPACE): REWRITE record 01 to A1=\"XX \" / A2=spaces, then READ KEY X-A1 = \"XX\" -> A1RAND=00 (expected '23', the record 'is not considered to exist'); START/READ NEXT on X-A1 returns 01XX (expected: only 02); on X-A2 returns 01 (expected: only 02). The golden l1_rewrite_alt_key_suppress uses a literal exactly as long as its key, so it cannot see this. The WRITE twin (14.9.51 GR41) and the READ/START skip share IsSuppressed. Register: not owned by any listed note (PB702 landed with the equal-length golden) -> new finding. [editions as adjudicated: 2023 (Annex E.3.3 item 42)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). GR24 second sub-rule item 1 (key now equal to its suppression value -> access path no longer provided): golden REWRITE of record 03 moves R-SH from 'Z' to 'X' under SUPPRESS WHEN \"X\" on PIC X(3) — a literal shorter than the key, now space-extended — and the R-SH walk no longer delivers 03.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-L4.2",
@@ -43821,13 +43821,13 @@
   "ordinal": 2,
   "subject": "REWRITE statement",
   "rule-digest": "abf4f05a52eb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyCompare",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite",
+  "test-ref": "conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule (item 2 + closing sentences): the record 'shall be logically repositioned so that it will not be found' under that key; change detection uses the file's collating sequence per relation-condition rules; 'Any number of records may have the same alternate key value equal to its key suppression value without requiring the DUPLICATES phrase' and 'Key entries that are suppressed shall not cause a duplicate key condition to exist.' cite.py --check 14.9.35.4 -> OK 24). The collating-sequence change test (AltChanged -> KeyEq) is right, and exact-length suppression works (golden legs B/D: B1 skips 01; DW1=00 DW2=00 two records at \"ZZ\" on a no-DUPLICATES key). But the same IsSuppressed equality defect as L4.1 makes a legal REWRITE FAIL: probe probe/rewrite-statement-p2/p3.cob - after record 01 took A1=\"XX \" (suppressed by the relation rule), REWRITE of record 02 to A1=\"XX \" on the no-DUPLICATES key -> RW2=22 (expected '00': suppressed entries shall not cause a duplicate key condition), the update is refused, and both records stay found via the key (A1 walk returns 01XX). Also SUPPRESS WHEN SPACE never suppresses. Harm: wrong-answer (a spurious invalid key rejects a legal update and the INVALID KEY branch runs). [editions as adjudicated: 2023 (Annex E.3.3 item 42)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). Item 2 + closing sentences (repositioned so it will not be found; any number of records may have the suppression value): golden 'SH: 04' after the REWRITE, and SUPPRESS WHEN SPACES on a no-DUPLICATES key admits records 01 and 03 both at SPACES ('00').",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-25",
@@ -43836,13 +43836,13 @@
   "ordinal": 25,
   "subject": "REWRITE statement",
   "rule-digest": "d2228be59894",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyEq; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf",
+  "test-ref": "conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule: key equality by the file's collating sequence; invalid key a) '21', b) '23', c) no-DUPLICATES alternate key equal to another record's -> '22'; on invalid key no update and record area unaffected. cite.py --check 14.9.35.4 -> OK 25) c). a)/b) are the GR22/GR23 checks above; c) is pass 1 of Rewrite, which validates every alternate key against OTHER records (ReferenceEquals(r, target) excluded) under KeyEq before GR24's repositioning runs, so an early '22' leaves the file untouched. Probe probe/rewrite-statement-p2/p1.cob: READ K002, MOVE \"A03\" (K003's alternate) -> IK22, ALTDUP=22, record area unaffected, and READ3 shows K003 unchanged. Suppressed alternate keys are excluded from c) per GR24's closing sentence - but that exclusion inherits the SUPPRESS-equality defect recorded under GR-14.9.35.4-L4.2 (a key equal to its suppression value only after space-extension, or to a figurative SPACE, is not recognised as suppressed and yields a spurious '22'); that is GR24's rule, not this one's, so it is not charged here. No spec-derived golden pins '21'/'22'/'23' on REWRITE -> test-needed. || REFUTED: DIVERGES — GR25 c) requires '22' when a no-DUPLICATES alternate key of the replaced record equals another record's. With SUPPRESS WHEN SPACE the runtime's suppression value is the raw word 'SPACE' (figurative not expanded), so two records whose key is the non-suppressed value 'SPACE' are both skipped by pass 1 as 'suppressed' and the duplicate REWRITE succeeds with '00'. This is not the L4.2 'suppressed entries do not duplicate' exemption: per spec neither key is suppressed (neither equals spaces). [editions as adjudicated: 1985, 2002, 2014, 2023]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). GR25 c): golden REWRITE of record 04 sets R-NA (SUPPRESS WHEN SPACE, no DUPLICATES) to the WORD 'SPACE', which record 01 also holds; the word is not the suppression value (spaces), so the REWRITE is refused '22' (RW4 22). Before the fix the raw word 'SPACE' was the suppression value and both keys were skipped as suppressed. Rows below 2023 are unaffected (SUPPRESS WHEN is a 2023 introduction; the key-equality path is shared).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.36.3-1",
@@ -49956,13 +49956,13 @@
   "ordinal": 35,
   "subject": "WRITE statement",
   "rule-digest": "b7f0baeaa068",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyCompare; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyEq; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#KeyEq; src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf",
+  "test-ref": "conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule (cite.py --check 14.9.51.4 'The comparison used for ensuring uniqueness, for ordering records, or for suppressing records' -> OK 35)): the comparison follows the file's collating sequence and the rules for a relation condition. Uniqueness and ordering CONFORM: KeyCompare applies the key's CobolCollation (null means native ordinal, which is §12.4.5.7.4 GR6's default for a clause-less file). Probe idx1.cob, file COLLATING SEQUENCE IS ALPHA (\"A\" ALSO \"a\"): after A01, WRITE a01 is refused 'C2 INV 21', because a01 collates EQUAL, so it is not greater. B01 is then accepted. The SUPPRESSING arm DIVERGES. IsSuppressed calls KeyEq(KeyOf(image), lit) with lit = CobolLiteral.Decode(literal text). That value is not space-extended, although a relation condition extends the shorter operand (--check 8.8.4.2.7 'comparison proceeds as though the shorter operand were extended on the right by sufficient alphanumeric spaces to make the operands of equal length' -> OK 2)). A figurative constant or ALL literal is never expanded to the key's length either, although §12.4.5.6.3 SR7 admits both. Re-run of the sibling probe out/probe/alternate-record-key-clause/gr6.dll (SUPPRESS WHEN SPACES / \"X\" on PIC X(3) / ALL \"*\"): every alternate walk still returns records 01 and 03, whose key values equal the suppression value. The alternate-record-key-clause and rewrite-statement-p2 adjudications found the same mechanism. PARTIAL would understate it: one of the three comparisons the rule names gives the wrong answer. DIVERGES. [editions as adjudicated: 85, 2002, 2014, 2023 (the rule is in every edition's relative/indexed WRITE text; Annex E records no 2014->2023 change to it); the 'suppressing records' arm is 2023 only (SUPPRESS WHEN, Annex E.3.3 item 42)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). GR35: the comparison for suppressing records follows the relation-condition rules — a shorter literal is space-extended (SUPPRESS WHEN \"X\" on X(3), \"AB   \" on X(2)), a figurative takes the key's size, and an unequal longer literal (\"ABC\" on X(2)) never suppresses (golden LX walk 01 03 04). Uniqueness and ordering comparisons are unchanged.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-36",
@@ -50046,13 +50046,13 @@
   "ordinal": 41,
   "subject": "WRITE statement",
   "rule-digest": "46711ab53fed",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#IsSuppressed; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Compiler/Binding/DataBinder.cs#KeySuppressionOf",
+  "test-ref": "conformance:2023/pb1072_suppress_when_forms",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1072 (registrar 14c). Rule (cite.py --check 14.9.51.4 'Key entries that are suppressed shall not cause a duplicate key condition to exist' -> OK 41); --check 'the record shall be logically positioned so that it will not be found when accessed using the alternate record key' -> OK 41)). Code: Write skips a suppressed key in the uniqueness loop (`if (IsSuppressed(image, i)) continue;`). The structure is right, but IsSuppressed only matches a literal that is exactly the key's length. The binder stores CobolLiteral.Decode(literal text), which leaves a figurative constant or ALL literal as its source text, and KeyCompare with no collation is string.CompareOrdinal, with no space-extension (§8.8.4.2.7 2)). Measured by re-running out/probe/alternate-record-key-clause/gr6.dll: R-A1 (no DUPLICATES) has SUPPRESS WHEN SPACES, and the second record whose R-A1 is SPACES gets 'W2 22'. The spec requires '00', because both entries are suppressed and 'shall not cause a duplicate key condition'. The record is LOST. The walks under R-A2 (SUPPRESS WHEN \"X\", PIC X(3)) and R-A3 (SUPPRESS WHEN ALL \"*\") return 01 and 03, whose values equal the suppression value, which violates a) and b). A quoted literal of exactly the key's length does suppress (the l1_rewrite_alt_key_suppress golden exercises REWRITE with such a literal). DIVERGES, wrong answer. The sibling adjudications alternate-record-key-clause (GR-12.4.5.6.4-6) and rewrite-statement-p2 (GR-14.9.35.4-L4.x) filed the same mechanism, and no kb/Work note in the dossier owns it yet. [editions as adjudicated: 2023 (SUPPRESS WHEN is new in 2023: Annex E.3.3 item 42; VERSION_CHANGE_REFERENCE row 230)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1072 landed (w61c). GR41: suppressed entries shall not cause a duplicate key condition and are not found under the alternate key: golden W3 writes a second record with R-SP = SPACES on a no-DUPLICATES SUPPRESS WHEN SPACES key -> not '22' (W3 02 comes from an unsuppressed WITH DUPLICATES key), and every walk omits the suppressed records.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-42",

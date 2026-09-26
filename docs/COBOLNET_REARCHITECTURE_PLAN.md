@@ -2732,7 +2732,7 @@ result. Run the long legs ONE AT A TIME.
   syntax — legal source made to look illegal. Never derive a general format from prose alone, and treat any
   grammar rule, diagnostic or conformance expectation derived from a FIGURE before 2026-07-19 as suspect.
 - **Open GAPs carried into P14** (each a live COBOLNET0899 staging or a named gap — none is a silent hole):
-  PICTURE-EDITING multi-char-literal + floating render · national-key INDEXED-FILE collating (§12.4.5.7 — `DataBinder.ResolveKeyCollating` stages COBOLNET1584 loud and the key orders natively; the SORT/MERGE half of this GAP closed with kb/Work PB678) · `>>SOURCE FORMAT`/free-form not rejected at
+  PICTURE-EDITING multi-char-literal + floating render · national-key INDEXED-FILE collating (§12.4.5.7 — `DataBinder.ResolveKeyCollating` declines a literal/LOCALE national alphabet on a national key BY NAME and refuses it, COBOLNET1584 (Annex A.3 item 41; kb/Work PB1074); the SORT/MERGE half of this GAP closed with kb/Work PB678) · `>>SOURCE FORMAT`/free-form not rejected at
   `--std cobol85` (a VERSION-matrix/VCR gap). ⛔ Do NOT assert that out-of-range table occurrences default to
   spaces/zero — §13.18.63.4 leaves them UNDEFINED.
 - **Known-unenforced syntax rules, scheduled to P14 Step 0b** (the SR census, §11 A2): `OCCURS` on a level

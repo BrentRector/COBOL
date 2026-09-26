@@ -80,7 +80,10 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
                 continue;
             }
             var altCollation = i < file.AlternateKeyCollations.Count ? file.AlternateKeyCollations[i] : null;
-            string sup = suppress is null ? "null" : CsLiteral(suppress);
+            // §12.4.5.6.4 GR6 — the key suppression value, already sized to the key (DataBinder.KeySuppressionOf);
+            // the connector compares key IMAGES, so a national key's value rides the ONE national serializer.
+            string sup = suppress is not { } s ? "null"
+                : s.National ? RuntimeApi.NatBytes(CsLiteral(s.Value)) : CsLiteral(s.Value);
             w.Line($"{RuntimeApi.FileAddAlternateKey(name, $"{aOff}", alt.ByteWidth, dups ? "true" : "false", CollationLit(altCollation), sup, aLayout)};");   // bytes — see the prime key above (kb/Work PB327)
         }
         SequentialIoEmitter.EmitAreaRegistrations(w, file);   // §14.9.30.4 GR15 + §13.18.13.4 GR2

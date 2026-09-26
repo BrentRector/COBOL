@@ -923,12 +923,24 @@ public static class DiagnosticCatalog
         "ISO §12.4.5.7.3 SR3-SR8 / §12.4.5.2 SR8");
     public static readonly DiagnosticDescriptor FileCollatingAlphabet = new(
         "COBOLNET1583", "file-collating-alphabet", EditionSeverity.Error,
-        "A file-control COLLATING SEQUENCE clause names an alphabet that is not declared in SPECIAL-NAMES or is of "
-        + "the wrong class for the key.", "ISO §12.4.5.7.3 SR1/SR2/SR7");
+        "A file-control COLLATING SEQUENCE clause names an alphabet that is not declared in SPECIAL-NAMES or that "
+        + "defines no collating sequence of the class the rule requires: alphabet-name-1 alphanumeric (SR1), "
+        + "alphabet-name-2 national (SR2), alphabet-name-3 the class of each key it names (SR7). Screened on the "
+        + "clause as written, whatever keys it ends up reaching.", "ISO §12.4.5.7.3 SR1/SR2/SR7");
+    // kb/Work PB1074 — REFUSED, not accepted inert: the band's axis (EditionContext.Declined) is whether an inert
+    // reading exists, and ignoring the alphabet would order the key — and judge its uniqueness (§12.4.5.12.4 GR1)
+    // — by the native national sequence instead of the one written, which is a different ANSWER. The descriptor
+    // said Warning "orders natively" while its only site raised an Error; the site now asks Declined, and the
+    // severity lives here.
     public static readonly DiagnosticDescriptor FileCollatingNationalUnsupported = new(
-        "COBOLNET1584", "file-collating-national-unsupported", EditionSeverity.Warning,
-        "A NATIONAL alphabet on a file-control COLLATING SEQUENCE clause is recognized but national-key collating "
-        + "for indexed files is not yet implemented — the key orders natively.", "ISO §12.4.5.7", RecognizedNotImplemented);
+        "COBOLNET1584", "file-collating-national-unsupported", EditionSeverity.Error,
+        "a national collating sequence defined by literals or by the LOCALE phrase, applied to a national record "
+        + "key of an indexed file (ISO §12.4.5.7.4 GR3/GR6), is a processor-dependent capability (§4.2.6; Annex "
+        + "A.3 item 41) that this implementation does not provide. The clause is REFUSED rather than accepted "
+        + "inert, because an inert compile would order the key and judge its uniqueness by the native national "
+        + "sequence instead of the one written. A NATIVE or UCS-4 national alphabet, and every alphanumeric "
+        + "alphabet on an alphanumeric key, is supported. See docs/CONFORMANCE.md §2 rows 41-42.",
+        "ISO §4.2.6 ¶3 / Annex A.3 item 41 / §12.4.5.7.4", RecognizedNotImplemented, Annex: DeclinedAnnex.A3);
     public static readonly DiagnosticDescriptor DefineNoOverrideRedefinition = new(
         "COBOLNET1618", "define-no-override-redefinition", EditionSeverity.Error,
         "A >>DEFINE directive redefines a compilation variable to a different value without the OVERRIDE phrase "
@@ -5248,6 +5260,20 @@ public static class DiagnosticCatalog
         "COBOLNET2448", "new-without-base", EditionSeverity.Error,
         "INVOKE of the method New on a class that does not inherit from the standard class BASE.",
         "ISO §14.9.23.3 SR3/SR4 · §16.2 · §9.3.14.3");
+
+    /// <summary>COBOLNET2455 — the FILE STATUS clause's data-name-1 breaks one of the clause's four syntax rules
+    /// (kb/Work PB1080). None was screened: an OCCURS item compiled and died at OPEN, a PIC 99 item crashed the C#
+    /// backend, a BASED item died EC-DATA-PTR-NULL at OPEN, and a one-, three-character, national, FD-record,
+    /// dynamic-length or variable-length item ran with a truncated, padded or wrong-category status. The site names
+    /// the rule it caught; <c>DataBinder.ScreenFileStatusItem</c> is the one screen.</summary>
+    public static readonly DiagnosticDescriptor FileStatusItemRule = new(
+        "COBOLNET2455", "file-status-item-rule", EditionSeverity.Error,
+        "The FILE STATUS clause's data-name-1 breaks one of the clause's syntax rules (ISO §12.4.5.8.3): SR1 — it "
+        + "shall not be subject to any OCCURS clauses; SR2 — it shall reference a two-character data item of the "
+        + "category alphanumeric, defined in the working-storage, local-storage, or linkage section; SR3 — it shall "
+        + "not reference a dynamic-length elementary item or a variable-length group; SR4 — it shall not be subject "
+        + "to a BASED clause. The site names the rule it caught.",
+        "ISO §12.4.5.8.3");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

@@ -278,9 +278,15 @@ recordKeyName
 // 320 off the PDF's vector rectangles, not read off the OCR: SUPPRESS carries a rule at x 254.17–299.45 under a
 // box of 252.66–300.40 (94.8% cover) and DUPLICATES one at 95.8%, while WHEN's box 303.50–334.12 has NO
 // horizontal rule anywhere in its band — the nearest ends 4 pt to its left. SUPPRESS stays the required anchor,
-// so the phrase can never match empty, and `literal` cannot begin with the WHEN token.
+// so the phrase can never match empty, and the operand cannot begin with the WHEN token.
+// ⛔ literal-1 IS A LITERAL POSITION, SO IT IS THE VALUE CLAUSE'S OPERAND RULE, NOT `literal` (kb/Work PB1072).
+// §13.10.3 SR2 lets a constant-name stand "anywhere that a format specifies a literal", and §12.4.5.6.3 SR7 admits
+// every figurative constant, the Format-7 symbolic-character among them — both are spelled as ordinary WORDS, which
+// `literal` refused at parse time (COBOL0309). `valueClauseOperand` is the deliberate superset the data division's
+// ONE literal-position chokepoint (DataBinder.RawValueOperandText) screens by the symbol tables, exactly as it does
+// for the VALUE clause and the PICTURE EDITING phrase (kb/Work PB778).
 alternateKeySuppressWhen
-    : SUPPRESS WHEN? literal
+    : SUPPRESS WHEN? valueClauseOperand
     ;
 
 // ISO §12.4.5.8.2: only STATUS is a required keyword (FILE STATUS IS data-name-1, STATUS underlined);

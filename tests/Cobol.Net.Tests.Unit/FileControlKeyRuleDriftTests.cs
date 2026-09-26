@@ -188,7 +188,11 @@ public sealed class FileControlKeyRuleDriftTests
         var item = new DataItem { Level = 5, CobolName = "K", CsName = "K" };
         foreach (var rule in FileControlKeyRules.Catalog)
         {
-            var op = new FileKeyOperand(rule.Role, "KEY", "K", item, default);
+            // An ALTERNATE RECORD KEY operand carries a SUPPRESS WHEN literal-1 too, so the §12.4.5.6.3 SR7 rows
+            // render the operand they actually describe (kb/Work PB1072).
+            var op = new FileKeyOperand(rule.Role, "KEY", "K", item, default,
+                SuppressWhen: new SuppressWhenOperand("ALL 'AB'", SuppressWhenForm.AllLiteral,
+                    CobolNet.Common.LiteralClass.Alphanumeric, "AB", null));
             string message = rule.Message(file, op);
             Assert.Contains(rule.Citation, message);
         }

@@ -5,6 +5,17 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace CobolNet.Binding.Model;
 
+/// <summary>The DATA DIVISION section a data-description entry is written in — the argument of
+/// <c>DataBinder.BindEntries</c> (the section-scoped placement rules, e.g. CONSTANT RECORD is WS/LS-only, ISO
+/// §13.18.15.3 SR1) and, per root, <see cref="DataItem.Section"/> (the section-worded operand rules).</summary>
+public enum EntrySection
+{
+    WorkingStorage,
+    LocalStorage,
+    Linkage,
+    File,
+}
+
 /// <summary>The deferred declaration verdict <see cref="DataItem.Pending"/> carries between entry bind and the
 /// <c>DataBinder.ResolveIndexItems</c> adjudication (P5.11c — the explicit discriminant replacing the former
 /// reference-identity sentinel PicInfos <c>NationalUsagePending</c>/<c>BitUsagePending</c>/<c>RecoveryItem</c>).</summary>
@@ -690,6 +701,31 @@ public sealed class DataItem
         "structure — the copier sets it to the NEW parent")]
     public DataItem? Parent { get; set; }
 
+    /// <summary>The DATA DIVISION section this item is DESCRIBED in — the fact the section-worded syntax rules
+    /// read (ISO §12.4.5.8.3 SR2: the FILE STATUS item "defined in the working-storage, local-storage, or linkage
+    /// section"; §13.18.43.3 SR6 states the same set for RECORD … DEPENDING ON): its ROOT's
+    /// <see cref="RootSection"/>, because an entry subordinate to an 01 is described in the 01's section. Null for an
+    /// item no section describes (a compiler temporary). ⚠ Before kb/Work PB1080 the model had no such fact, and a
+    /// rule could only ask whether a root sat in THIS unit's section lists — which a GLOBAL item made visible from a
+    /// containing program never does. Stored on the item, the fact travels with it.</summary>
+    public EntrySection? Section
+    {
+        get
+        {
+            var root = this;
+            while (root.Parent is { } p) root = p;
+            return root.RootSection;
+        }
+    }
+
+    /// <summary>The section a level-1/77 ROOT is written in — written by <c>DataBinder.BindEntries</c> (and on the
+    /// synthesized implied FD record); null on every subordinate, which reads its root's through
+    /// <see cref="Section"/>.</summary>
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "where the SUBJECT entry is written, never where the type or model entry was: a TYPE / SAME AS subject in "
+        + "LINKAGE is described in LINKAGE whatever section declared its TYPEDEF")]
+    public EntrySection? RootSection { get; set; }
+
     /// <summary>True for a SYNTHESIZED compiler temp (a user-function result temp or an object-property temp —
     /// <c>DataBinder.CreateCompilerTemp</c>, THE ONE constructor, sets it). A temp wears the same bound shapes
     /// as declared data, so a rule whose text admits "a data item" and excludes functions (§15.43.3 r1's shape —
@@ -864,7 +900,7 @@ public sealed class DataItem
     /// current-extent composer must refuse (see <see cref="CurrentExtentImageCapable"/>). The sibling of
     /// <c>IntrinsicBinder.HasOdoBeneath</c>, which tests subordinates only (its callers already hold the
     /// operand); the composer screens MEMBERS, where the clause may sit on the member itself.</summary>
-    private static bool HasOdoOnOrBeneath(DataItem c) =>
+    internal static bool HasOdoOnOrBeneath(DataItem c) =>
         c.OccursSpec?.DependingName is not null
         || (c.IsGroup && c.Children.Any(m => m.RedefinesTargetName is null && HasOdoOnOrBeneath(m)));
 

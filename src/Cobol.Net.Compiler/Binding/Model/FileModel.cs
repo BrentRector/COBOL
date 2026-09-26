@@ -32,8 +32,11 @@ public sealed class AlternateKeyClause
     public required IReadOnlyList<string> Qualifiers { get; init; }
     public bool Duplicates { get; init; }
 
-    /// <summary>The decoded §12.4.5.6.4 GR6 key suppression value (null = no SUPPRESS WHEN phrase).</summary>
-    public string? Suppress { get; init; }
+    /// <summary>The SUPPRESS WHEN phrase's literal-1 as the literal position read it (ISO §12.4.5.6.2) — set by
+    /// <c>DataBinder.ResolveFiles</c>, because a constant-name operand (§13.10.3 SR2) is declared in the DATA
+    /// DIVISION, after the file control entry. Null when the clause has no SUPPRESS WHEN phrase, or when its
+    /// operand is no literal at all (already reported by the literal-position screen).</summary>
+    public SuppressWhenOperand? SuppressWhen { get; set; }
 
     /// <summary>Where data-name-1 is written — the cursor §12.4.5.6.3's post-build screens report at.</summary>
     public CobolNet.Editions.DiagnosticCursor At { get; init; }
@@ -42,6 +45,46 @@ public sealed class AlternateKeyClause
     /// references nothing describable — itself a §12.4.5.6.3 SR2 violation.</summary>
     public DataItem? Item { get; set; }
 }
+
+/// <summary>Which of the shapes ISO §12.4.5.6.3 SR7 names a SUPPRESS WHEN literal-1 was written in.</summary>
+public enum SuppressWhenForm
+{
+    /// <summary>An alphanumeric, national or boolean literal (a concatenation expression and a constant-name
+    /// arrive as the one literal they stand for — §8.8.3.3 GR3, §13.10.4 GR1).</summary>
+    Literal,
+    /// <summary>The Format-6 figurative <c>ALL literal-1</c>, or a symbolic-character (§8.3.3.6.2 Format 7),
+    /// which stands for the ALL form of its one character.</summary>
+    AllLiteral,
+    /// <summary>A keyword figurative constant — ZERO, SPACE, QUOTE, HIGH-VALUE or LOW-VALUE (§8.3.3.6.2
+    /// Formats 1–5), with or without the optional word ALL.</summary>
+    Figurative,
+    /// <summary>Neither an alphanumeric nor a national literal nor a character figurative: a numeric literal or
+    /// the pointer figurative NULL. SR7 refuses it.</summary>
+    NotAlphanumericOrNational,
+}
+
+/// <summary>The SUPPRESS WHEN literal-1 of one ALTERNATE RECORD KEY clause (ISO §12.4.5.6.2), read ONCE through the
+/// data division's literal-position chokepoint — the operand §12.4.5.6.3 SR7 screens and from which the §12.4.5.6.4
+/// GR6 key suppression value is built.</summary>
+/// <param name="Written">The operand as written, for diagnostics.</param>
+/// <param name="Form">Which SR7 shape it is.</param>
+/// <param name="Class">The literal's class for <see cref="SuppressWhenForm.Literal"/> and
+/// <see cref="SuppressWhenForm.AllLiteral"/>; null for a keyword figurative (§8.3.3.6.4 GR1 — it takes the class
+/// of the context) and for <see cref="SuppressWhenForm.NotAlphanumericOrNational"/>.</param>
+/// <param name="Characters">The decoded characters of literal-1 (the Format-6 literal-1 for ALL); empty for a
+/// keyword figurative.</param>
+/// <param name="FigurativeKind">The keyword figurative's kind (<c>FigurativeConstants.KindOf</c>'s letters);
+/// null otherwise.</param>
+public sealed record SuppressWhenOperand(string Written, SuppressWhenForm Form, CobolNet.Common.LiteralClass? Class,
+    string Characters, char? FigurativeKind);
+
+/// <summary>The §12.4.5.6.4 GR6 key suppression value of one resolved alternate key, as the relation condition
+/// compares it with the key: <paramref name="Value"/> is in the key's own character positions — a figurative or
+/// ALL literal repeated to the key's size (§8.3.3.6.4 GR2), a shorter literal extended with spaces (§8.8.4.2.7 2)),
+/// a longer one cut back to the key's size when every excess position is a space — and
+/// <paramref name="National"/> says those positions are national characters, which the record image carries as
+/// UTF-16BE byte pairs (determination D-N1).</summary>
+public readonly record struct KeySuppression(string Value, bool National);
 
 /// <summary>
 /// A bound file connector (COBOLNET_DESIGN §8): the SELECT clause's properties joined with the FD's record
@@ -188,8 +231,9 @@ public sealed class FileModel
     public List<AlternateKeyClause> AlternateKeyNames { get; } = [];
 
     /// <summary>The resolved alternate keys, in declaration order (the runtime key index is the list index).
-    /// <c>Suppress</c> is the decoded §12.4.5.6.4 GR6 key suppression value (null = no SUPPRESS WHEN phrase).</summary>
-    public List<(DataItem Item, bool Duplicates, string? Suppress)> AlternateKeys { get; } = [];
+    /// <c>Suppress</c> is the §12.4.5.6.4 GR6 key suppression value sized to the key (null = no SUPPRESS WHEN
+    /// phrase, or an operand §12.4.5.6.3 SR7 refused).</summary>
+    public List<(DataItem Item, bool Duplicates, KeySuppression? Suppress)> AlternateKeys { get; } = [];
 
     // ── §12.4.5.7 COLLATING SEQUENCE (INDEXED record-key collating) — raw capture, resolved post-build ──────────
 
@@ -199,9 +243,13 @@ public sealed class FileModel
     public (string? Alnum, string? Nat)? FileLevelCollating { get; set; }
     public int FileLevelCollatingCount { get; set; }
 
+    /// <summary>Where the (first) file-level clause is written — §12.4.5.7.3 SR1/SR2 report there.</summary>
+    public CobolNet.Editions.DiagnosticCursor FileLevelCollatingAt { get; set; }
+
     /// <summary>Format 2 (key-level) COLLATING SEQUENCE clauses as written: each names one or more RECORD KEY /
-    /// ALTERNATE RECORD KEY items and their alphabet-name-3 (§12.4.5.7.2 Format 2).</summary>
-    public List<(IReadOnlyList<string> KeyNames, string Alphabet)> KeyLevelCollating { get; } = [];
+    /// ALTERNATE RECORD KEY items and their alphabet-name-3 (§12.4.5.7.2 Format 2), and where the clause is written
+    /// (§12.4.5.7.3 SR4/SR5/SR7/SR8 report there).</summary>
+    public List<(IReadOnlyList<string> KeyNames, string Alphabet, CobolNet.Editions.DiagnosticCursor At)> KeyLevelCollating { get; } = [];
 
     /// <summary>The resolved PRIME key collating sequence (a literal-phrase table or a LOCALE sequence — the
     /// <see cref="AlphabetDef"/> the emitter renders as a runtime <c>CobolCollation</c>); null = native ordinal (no
