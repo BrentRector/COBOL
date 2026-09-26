@@ -213,9 +213,10 @@ folding an orthogonal rule into the edition pass silently widens a charter that 
 | `ExpressionFormationPass` | non-edition SYNTAX-RULE conformance (§8.8.1.2 Table 3, §8.8.2 Table 4) | Error | the parse tree alone — no edition, no directive state | post-bind |
 | `LiteralScreenPass` | a LITERAL's own syntax rules (§8.3.3.2.3 SR1/SR6, §8.3.3.4.3 SR1, §8.3.3.5.3 SR1/SR5 — length ≤ 8,191 positions of its class, COBOLNET0814; hexadecimal grouping, COBOLNET1635) | Error | every literal TOKEN of the raw tree, DEFAULT-mode and SUBSCRIPT-mode twins alike (a plain walk, not a visitor, so no override can hide a literal — kb/Work PB1393; `LiteralScreenDriftTests` derives the token set from the lexer) | post-bind |
 | `DeclinedFacilityPass` | Annex A.4 optional elements this implementation does not claim | Error | the claim register (`docs/CONFORMANCE.md` §5), not the edition | post-bind |
+| `ClosedFormatPass` | a CLOSED general format's residue (§4.2.2 — every `unrecognizedClause` the grammar reached, COBOLNET1941/1970/1971, named by its format and § from `ClosedFormats.ByContext`) | Error | the parse tree alone, at every edition and strictness (kb/Work PB829) | post-bind |
 | `LevelNumberPass` | the level-number's own syntax rules (§13.18.33.3 SR2/4/5/6, §13.18.33.4 GR2, §13.16.3 SR1/SR2) | Error | the parse tree alone — the entry's SECTION ancestry and its BODY | **pre-bind** |
 
-**`LevelNumberPass` is the one that runs FIRST, and deliberately.** The other three consume the bound model or sit
+**`LevelNumberPass` is the one that runs FIRST, and deliberately.** The others consume the bound model or sit
 with the edition pass by convention; this one reads a token, the section the entry is in, and the shape of the
 entry body, and needs nothing binding produces. Screening before the binder matters because a level-number outside
 its permitted set makes the storage tree it heads meaningless: `78 K VALUE 5.` bound as a memberless GROUP nested
