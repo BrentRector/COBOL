@@ -923,7 +923,9 @@ public sealed class IntrinsicFunctionDifferentialTests
     // ── kb/Work R10 (Phase-B F72): floats are LEGAL HIGHEST/LOWEST arguments under native arithmetic — the
     //    implementor usage latitude is SMALLEST-ALGEBRAIC's alone (§15.83.3 r4 / Annex A.1 item 180); §15.43.3
     //    r2 / §15.58.3 r2-r3 bar only the STANDARD float usages under the OPPOSITE standard mode. The value is
-    //    §15.43.4 r2's greatest finite magnitude of the carrier, negated for LOWEST (§15.58.4 r2). ──
+    //    §15.43.4 r2's greatest finite magnitude of the carrier, negated for LOWEST (§15.58.4 r2). That value IS the
+    //    carrier's, exactly, so a COMP-2 resultant holds it under the implied TRUNCATION (kb/Work PB1196): the binary32
+    //    extreme widens exactly and prints as the binary64 it is, −3.4028234663852886E+38 (−(2 − 2^−23) × 2^127). ──
 
     [Fact]
     public void Algebraic_FloatArguments_FoldToCarrierExtremes_2023()
@@ -933,7 +935,7 @@ public sealed class IntrinsicFunctionDifferentialTests
             "    COMPUTE R = FUNCTION HIGHEST-ALGEBRAIC(D).\n    DISPLAY R.\n"
             + "    COMPUTE R = FUNCTION LOWEST-ALGEBRAIC(S).\n    DISPLAY R.", "ALGF"));
         Assert.True(ok, detail);
-        Assert.Equal("1.7976931348623157E+308\n-3.4028235E+38", output);
+        Assert.Equal("1.7976931348623157E+308\n-3.4028234663852886E+38", output);
     }
 
     [Fact]

@@ -739,7 +739,7 @@ public static partial class CobolIntrinsics
                     "FUNCTION INTEGER-OF-BOOLEAN argument-1 is not of class boolean (§15.45.3 r1)");
             if (v > Int128.MaxValue >> 1)
                 throw new CobolSizeError("FUNCTION INTEGER-OF-BOOLEAN: the unsigned binary value exceeds "
-                    + "the Int128 intermediate (the D1 escape boundary — EC-SIZE-OVERFLOW)");
+                    + "the Int128 intermediate (the D1 escape boundary — EC-SIZE-OVERFLOW)", "EC-SIZE-OVERFLOW");
             v = (v << 1) | (uint)(c - '0');
         }
         return v;

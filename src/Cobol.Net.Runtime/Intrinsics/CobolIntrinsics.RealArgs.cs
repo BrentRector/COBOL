@@ -219,6 +219,16 @@ public static partial class CobolIntrinsics
         return Math.Pow(b, e);
     }
 
+    /// <summary><see cref="PowNativeReal"/> where size-error checking is ENABLED — the power is an operation on the
+    /// binary64 intermediate, so its result's range is §14.7.5 case 5 through the ONE check the other checked native
+    /// operators use (<see cref="CobolFloat.InBinary64Range"/>, kb/Work PB1581): <c>C ** 2</c> over a COMP-2 holding
+    /// 1.0E+300 is EC-SIZE-OVERFLOW, not +Infinity. A nonzero base's power is never zero.</summary>
+    public static double PowNativeRealChecked(double b, double e)
+    {
+        double r = PowNativeReal(b, e);
+        return double.IsFinite(b) && double.IsFinite(e) ? CobolFloat.InBinary64Range(r, nonzero: b != 0, "exponentiation") : r;
+    }
+
     /// <summary>Native <c>**</c> with an integer base and an integer exponent — EVERY shape (kb/Work PB69 — the
     /// literal-exponent Int128 twin <c>PowNativeInt</c> is gone: its past-the-carrier fallback saturated to
     /// Int128.MaxValue, a sentinel that FUNCTION MOD and every comparison consumed as a value). The owner-decided
@@ -297,17 +307,43 @@ public static partial class CobolIntrinsics
     /// <summary>§15.63 MIN — the least argument value.</summary>
     public static double MinReal(params double[] xs) { RequireArguments(xs.Length, "MIN"); return xs.Min(); }
 
+    // ⛔ THE binary64 LIST BODIES FORM THEIR EQUIVALENT ARITHMETIC EXPRESSION IN THE binary64 INTERMEDIATE (kb/Work
+    // PB1581), so a sum or a half-sum that leaves binary64's range is §14.7.5 case 5 — EC-SIZE-OVERFLOW, or
+    // EC-SIZE-UNDERFLOW for a nonzero value rounded to zero — through the ONE check the checked native operators
+    // and FUNCTION EXP use (CobolFloat.InBinary64Range), never a silent ±Infinity: SUM(C C) over a COMP-2 C
+    // holding 1.0E+308 printed Infinity. A list with a NON-FINITE argument keeps its DOC-A.1-70 disposition
+    // (ListInRange), exactly as a non-finite operand does.
+
+    /// <summary>A list body's binary64 value, range-checked when every argument is finite.</summary>
+    private static double ListInRange(double r, double[] xs, bool nonzero, string function)
+    {
+        foreach (double x in xs) if (!double.IsFinite(x)) return r;
+        return InBinary64Range(r, nonzero, function);
+    }
+
+    /// <summary>The half-sum <c>(a + b) / 2</c> a list body forms (MIDRANGE's EAE, MEDIAN's even-count middle), each
+    /// operation range-checked.</summary>
+    private static double HalfSumInRange(double a, double b, double[] xs, string function)
+    {
+        double s = ListInRange(a + b, xs, nonzero: false, function);
+        return ListInRange(s / 2.0, xs, nonzero: s != 0, function);
+    }
+
     /// <summary>§15.88 SUM.</summary>
     public static double SumReal(params double[] xs)
     {
         RequireArguments(xs.Length, "SUM");
         double t = 0;
         foreach (double x in xs) t += x;
-        return t;
+        return ListInRange(t, xs, nonzero: false, "SUM");
     }
 
     /// <summary>§15.76 RANGE — MAX minus MIN.</summary>
-    public static double RangeReal(params double[] xs) { RequireArguments(xs.Length, "RANGE"); return xs.Max() - xs.Min(); }
+    public static double RangeReal(params double[] xs)
+    {
+        RequireArguments(xs.Length, "RANGE");
+        return ListInRange(xs.Max() - xs.Min(), xs, nonzero: false, "RANGE");
+    }
 
     /// <summary>§15.61 MEDIAN — the middle value of the sorted arguments; the mean of the two middle values when
     /// the count is even (§15.61.4).</summary>
@@ -317,14 +353,14 @@ public static partial class CobolIntrinsics
         double[] s = [.. xs];
         Array.Sort(s);
         int m = s.Length / 2;
-        return (s.Length & 1) == 1 ? s[m] : (s[m - 1] + s[m]) / 2.0;
+        return (s.Length & 1) == 1 ? s[m] : HalfSumInRange(s[m - 1], s[m], xs, "MEDIAN");
     }
 
     /// <summary>§15.62 MIDRANGE — the mean of the greatest and least arguments.</summary>
     public static double MidrangeReal(params double[] xs)
     {
         RequireArguments(xs.Length, "MIDRANGE");
-        return (xs.Max() + xs.Min()) / 2.0;
+        return HalfSumInRange(xs.Max(), xs.Min(), xs, "MIDRANGE");
     }
 
     /// <summary>§15.60 MEAN — the arithmetic mean of the arguments.</summary>
@@ -333,7 +369,8 @@ public static partial class CobolIntrinsics
         RequireArguments(xs.Length, "MEAN");
         double t = 0;
         foreach (double x in xs) t += x;
-        return t / xs.Length;
+        _ = ListInRange(t, xs, nonzero: false, "MEAN");                  // the EAE's sum, then its quotient
+        return ListInRange(t / xs.Length, xs, nonzero: t != 0, "MEAN");
     }
 
     /// <summary>§15.71 ORD-MAX — the 1-based ORDINAL POSITION of the greatest argument, leftmost on a tie

@@ -340,4 +340,70 @@ public static class CobolFloat
         return !BigInteger.Remainder(num, den).IsZero;
     }
 
+    // ── THE binary64 INTERMEDIATE'S RANGE (kb/Work PB1566, PB1581, PB1147) ───────────────────────────────────
+    // Under native arithmetic an expression with a floating-point operand — or whose resultants are all
+    // floating-point — evaluates in binary64 (CONFORMANCE.md DOC-A.1-123), so binary64's range IS the intermediate
+    // data item's range, and §14.7.5 case 5 makes an operation leaving it the size error condition "if native
+    // arithmetic is in effect and the implementor defines that the range of values allowed for the intermediate
+    // data item is to be checked" — which COBOL.NET defines (DOC-A.1-179). The no-phrase rule 3 names the
+    // condition: "farther from zero or nearer to zero than is allowed for the intermediate data item" —
+    // EC-SIZE-OVERFLOW or EC-SIZE-UNDERFLOW (cite.py-verified). "Nearer to zero than allowed" is a nonzero exact
+    // result that ROUNDS to zero: a subnormal is a binary64 value (ISO/IEC 60559 gradual underflow), not an
+    // underflow. A NON-FINITE operand is not an operation leaving the range — a COMP-2 already holding ±Infinity
+    // or NaN keeps its DOC-A.1-70 disposition — so only an operation over finite operands is checked.
+
+    /// <summary>⛔ THE ONE range check of a binary64 intermediate whose exact value the caller KNOWS to be nonzero
+    /// or not (<paramref name="nonzero"/>): ±∞ is EC-SIZE-OVERFLOW, a nonzero value rounded to zero is
+    /// EC-SIZE-UNDERFLOW (§14.7.5 case 5 / no-phrase rule 3), each the <see cref="CobolSizeError"/> the statement's
+    /// SIZE ERROR phrase or EC-SIZE checking takes. <paramref name="what"/> names the operation for the message.
+    /// Shared by the float-family returned values (FUNCTION EXP, the list bodies) and the checked native
+    /// operations below, so an intrinsic and an operator cannot answer the same range question differently.</summary>
+    public static double InBinary64Range(double r, bool nonzero, string what)
+    {
+        if (double.IsInfinity(r))
+            throw new CobolSizeError($"{what}: the result is farther from zero than the binary64 intermediate "
+                + "allows (ISO §14.7.5 case 5; CONFORMANCE.md DOC-A.1-179)", "EC-SIZE-OVERFLOW");
+        if (r == 0 && nonzero)
+            throw new CobolSizeError($"{what}: the nonzero result is nearer to zero than the binary64 intermediate "
+                + "allows (ISO §14.7.5 case 5; CONFORMANCE.md DOC-A.1-179)", "EC-SIZE-UNDERFLOW");
+        return r;
+    }
+
+    /// <summary>The CHECKED native binary64 sum — emitted where size-error checking is enabled (an ON SIZE ERROR
+    /// phrase, EC-SIZE checking), the twin of <c>CobolNum.AddChecked</c> on the scaled carrier. A sum of finite
+    /// binary64 values that is nonzero is never rounded to zero (every such sum is a multiple of the smallest
+    /// subnormal), so only the overflow half applies.</summary>
+    public static double AddChecked(double a, double b)
+    {
+        double r = a + b;
+        return double.IsFinite(a) && double.IsFinite(b) ? InBinary64Range(r, nonzero: false, "addition") : r;
+    }
+
+    /// <inheritdoc cref="AddChecked"/>
+    public static double SubChecked(double a, double b)
+    {
+        double r = a - b;
+        return double.IsFinite(a) && double.IsFinite(b) ? InBinary64Range(r, nonzero: false, "subtraction") : r;
+    }
+
+    /// <summary>The CHECKED native binary64 product (the twin of <c>CobolNum.MulChecked</c>): overflow, and the
+    /// underflow of a product of two nonzero operands.</summary>
+    public static double MulChecked(double a, double b)
+    {
+        double r = a * b;
+        return double.IsFinite(a) && double.IsFinite(b) ? InBinary64Range(r, nonzero: a != 0 && b != 0, "multiplication") : r;
+    }
+
+    /// <summary>The CHECKED native binary64 quotient (the twin of <c>CobolNum.DivideOrThrow</c>): a zero divisor is
+    /// §14.7.5 case 2 — "if the divisor in a divide operation or in a DIVIDE statement is zero" (cite.py-verified),
+    /// EC-SIZE-ZERO-DIVIDE by the no-phrase rule 2 — whatever the dividend holds (a zero of either sign is zero);
+    /// then overflow, and the underflow of a nonzero dividend's quotient. Before it the floating arm rendered a bare
+    /// <c>/</c>: <c>COMPUTE FR = FL / FZ ON SIZE ERROR</c> took NOT ON SIZE ERROR and stored +Infinity (kb/Work
+    /// PB1147).</summary>
+    public static double DivChecked(double a, double b)
+    {
+        if (b == 0) throw new CobolSizeError("divide by zero", "EC-SIZE-ZERO-DIVIDE");
+        double r = a / b;
+        return double.IsFinite(a) && double.IsFinite(b) ? InBinary64Range(r, nonzero: a != 0, "division") : r;
+    }
 }

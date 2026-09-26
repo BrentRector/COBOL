@@ -16,10 +16,12 @@
       *>    them zero => +000000000.000000000. The fixed-point and floating spellings denote the
       *>    same value and MUST AGREE; BY VALUE (GR10) and BY CONTENT (GR9) MUST AGREE too - they
       *>    are the same COMPUTE into the same description.
-      *>  REF/VAL rows 4-5 - the binary64 lane. F holds the double nearest 10**30, whose exact
-      *>    value is 1000000000000000019884624838656; at scale 9 that is
-      *>    1000000000000000019884624838656000000000 and the low-order 18 digits are
-      *>    624838656000000000 => +624838656.000000000. The two arms MUST AGREE.
+      *>  REF/VAL rows 4-5 - the binary64 lane. COMPUTE F = 1.0E+30 has no ROUNDED phrase, so
+      *>    14.7.4.3 r2/r10 store the binary64 NEARER TO ZERO than 10**30 (kb/Work PB1196): the
+      *>    double nearest 10**30 is 1000000000000000019884624838656, above it, and its predecessor
+      *>    (one ulp = 2**47 below) is 999999999999999879147136483328. At scale 9 that is
+      *>    999999999999999879147136483328000000000 and the low-order 18 digits are
+      *>    136483328000000000 => +136483328.000000000. The two arms MUST AGREE.
       *>  SML - 123456789012345678 into PIC S9(4)V99: aligned at scale 2 that is
       *>    12345678901234567800, low-order 6 digits 567800 => +5678.00.
       *>  MOV/CMP - the inline comparators. GR9 names a COMPUTE, and 14.9.25.4 GR6's MOVE keeps the

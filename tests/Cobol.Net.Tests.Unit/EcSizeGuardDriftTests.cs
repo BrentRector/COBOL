@@ -58,7 +58,10 @@ public sealed class EcSizeGuardDriftTests
         Assert.True(typeof(CobolFatalException).IsAssignableFrom(typeof(CobolSizeError)));
         var e = new CobolSizeError("x", "EC-SIZE-ZERO-DIVIDE");
         Assert.Equal("EC-SIZE-ZERO-DIVIDE", e.EcName);
-        Assert.Equal("EC-SIZE-OVERFLOW", new CobolSizeError("y").EcName);
+        // The level-3 name is REQUIRED (kb/Work PB1147): a defaulted EC-SIZE-OVERFLOW is how the outermost-quotient
+        // PROHIBITED raise latched OVERFLOW where §14.7.4.3 r7 names EC-SIZE-TRUNCATION.
+        Assert.False(typeof(CobolSizeError).GetConstructors().Single().GetParameters()
+            .Single(p => p.Name == "ecName").HasDefaultValue);
         Assert.StartsWith("EC-SIZE-ZERO-DIVIDE (fatal): x", e.Message);
     }
 }

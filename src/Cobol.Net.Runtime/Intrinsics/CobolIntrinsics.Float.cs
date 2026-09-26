@@ -327,21 +327,13 @@ public static partial class CobolIntrinsics
     // nonzero value that ROUNDS to zero: a subnormal is a binary64 value (IEC 60559 gradual underflow), not an
     // underflow. A NON-FINITE argument is not an arithmetic operation leaving the range — a COMP-2 already holding
     // ±Infinity or NaN keeps its DOC-A.1-70 disposition — so only a finite argument's result is checked.
+    // ⛔ The check itself is CobolFloat.InBinary64Range — the SAME one the checked native binary64 operators use
+    // (kb/Work PB1581), so FUNCTION EXP(1000) and `C * C` over COMP-2 answer one range question one way.
 
-    /// <summary>The ONE range check of a float-family returned value the body KNOWS to be nonzero or not
-    /// (<paramref name="nonzero"/>): ±∞ is EC-SIZE-OVERFLOW, a nonzero value rounded to zero is EC-SIZE-UNDERFLOW
-    /// (§14.7.5 case 5 / no-phrase rule 3), each the <see cref="CobolSizeError"/> the statement's SIZE ERROR phrase
-    /// or EC-SIZE checking takes.</summary>
-    private static double InBinary64Range(double r, bool nonzero, string function)
-    {
-        if (double.IsInfinity(r))
-            throw new CobolSizeError($"FUNCTION {function}: the returned value is farther from zero than the binary64 "
-                + "intermediate allows (ISO §14.7.5 case 5; CONFORMANCE.md DOC-A.1-92)", "EC-SIZE-OVERFLOW");
-        if (r == 0 && nonzero)
-            throw new CobolSizeError($"FUNCTION {function}: the nonzero returned value is nearer to zero than the "
-                + "binary64 intermediate allows (ISO §14.7.5 case 5; CONFORMANCE.md DOC-A.1-92)", "EC-SIZE-UNDERFLOW");
-        return r;
-    }
+    /// <summary>A float-family returned value range-checked by the ONE binary64 intermediate check
+    /// (<see cref="CobolFloat.InBinary64Range"/>), named for the function.</summary>
+    private static double InBinary64Range(double r, bool nonzero, string function) =>
+        CobolFloat.InBinary64Range(r, nonzero, $"FUNCTION {function}");
 
     /// <summary>An EXACT returned value narrowed to the family's binary64, range-checked against its own value
     /// (<see cref="InBinary64Range"/>) — the one narrowing of an SDIDI-evaluated body.</summary>
@@ -445,7 +437,8 @@ public static partial class CobolIntrinsics
         // PB952): a legal rate just above −1 converts to −1.0, and a test here would raise on it.
         double pv = 0;
         for (int i = 0; i < amounts.Length; i++) pv += amounts[i] / Math.Pow(discountBase, i + 1);
-        return pv;
+        // The binary64 sum's range (kb/Work PB1581 — ListInRange); a zero-crossing sum is not known nonzero.
+        return double.IsFinite(discountBase) ? ListInRange(pv, amounts, nonzero: false, "PRESENT-VALUE") : pv;
     }
 
     /// <summary>PRESENT-VALUE's discount base <c>1 + argument-1</c> formed on the rate's EXACT carrier (an SDIDI, or
@@ -469,7 +462,17 @@ public static partial class CobolIntrinsics
         mean /= xs.Length;
         double sum = 0;
         foreach (double x in xs) sum += (x - mean) * (x - mean);
-        return sum / xs.Length;
+        // The binary64 value's range (kb/Work PB1581 — ListInRange): an overflowing mean or square reaches the
+        // result as ±∞; the variance is nonzero exactly when the arguments are not all equal.
+        double v = sum / xs.Length;
+        return ListInRange(v, xs, nonzero: v == 0 && !AllEqual(xs), "VARIANCE");
+    }
+
+    /// <summary>True when every argument has the first one's value — the only lists whose variance is exactly zero.</summary>
+    private static bool AllEqual(double[] xs)
+    {
+        foreach (double x in xs) if (x != xs[0]) return false;
+        return true;
     }
 
     /// <summary>STANDARD-DEVIATION (§15.86.4 r1): the equivalent arithmetic expression is literally

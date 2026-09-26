@@ -28,6 +28,9 @@ namespace CobolNet.Runtime;
 /// </list>
 /// <para><paramref name="ecName"/> is the precise Table 13 level-3 EC-SIZE-* name (§14.6.13.1.6): a zero divisor is
 /// EC-SIZE-ZERO-DIVIDE; an exponentiation-rule violation EC-SIZE-EXPONENTIATION; the PROHIBITED-inexact
-/// EC-SIZE-TRUNCATION; a range overflow EC-SIZE-OVERFLOW ("arithmetic overflow in calculation").</para>
+/// EC-SIZE-TRUNCATION; a range overflow EC-SIZE-OVERFLOW ("arithmetic overflow in calculation"). ⛔ It is REQUIRED —
+/// there is no default name: a defaulted EC-SIZE-OVERFLOW is how the outermost-quotient PROHIBITED raise
+/// (<c>CobolNum.DivideOrThrow</c>) latched the wrong level-3 name, so a USE AFTER EC-SIZE-TRUNCATION declarative
+/// never saw it (kb/Work PB1147). Every raise site now says which Table 13 condition it is.</para>
 /// </summary>
-public sealed class CobolSizeError(string detail, string ecName = "EC-SIZE-OVERFLOW") : CobolFatalException(ecName, detail);
+public sealed class CobolSizeError(string detail, string ecName) : CobolFatalException(ecName, detail);

@@ -648,6 +648,26 @@ internal static class RuntimeApi
     public static string FloatToScaled(string value, string scale, CobolRounding mode, bool checkedLanding) =>
         $"{nameof(CobolFloat)}.{(checkedLanding ? nameof(CobolFloat.ToScaled) : nameof(CobolFloat.ToScaledUnchecked))}({value}, {scale}, {RoundingText(mode)})";
 
+    /// <summary>An arithmetic value transferred into a FLOATING-POINT resultant identifier under the receiver's
+    /// §14.7.4.3 mode — <c>FloatResultant</c>'s entry for the value's carrier (binary64, SDIDI, scaled signed or
+    /// unsigned-wide). With <paramref name="tryOut"/> it is the CHECKED form, a <c>bool</c> (false = the size error
+    /// condition: past the format's range, or PROHIBITED and inexact) that declares the landed binary64 as
+    /// <paramref name="tryOut"/>; without it, the unchecked no-phrase landing's <c>double</c>. A binary32 receiver's
+    /// landed value is exactly representable, so the caller's <c>(float)</c> cast is exact (kb/Work PB1196).</summary>
+    public static string FloatResultantStore(Emit.NumX value, CobolRounding mode, bool single, string? tryOut = null)
+    {
+        const string T = nameof(Runtime.FloatResultant);
+        var (method, args) = value switch
+        {
+            { Real: true } => (nameof(Runtime.FloatResultant.FromReal), value.Expr),
+            { Dec: true } => (nameof(Runtime.FloatResultant.FromDec), value.Expr),
+            { U: true } => (nameof(Runtime.FloatResultant.FromUnsignedScaled), $"(UInt128)({value.Expr}), {value.Scale}"),
+            _ => (nameof(Runtime.FloatResultant.FromScaled), $"(Int128)({value.Expr}), {value.Scale}"),
+        };
+        string tail = $"{RoundingText(mode)}, {(single ? "true" : "false")}";
+        return tryOut is null ? $"{T}.{method}({args}, {tail})" : $"{T}.Try{method}({args}, {tail}, out double {tryOut})";
+    }
+
     /// <summary>The checked read of a standard-float SENDING operand — <c>CobolFloat.Sending(value)</c>: raises the
     /// fatal EC-DATA-NOT-FINITE for a NaN/±Infinity content under checking (ISO §14.6.13.2 item 3), else returns the
     /// value. Wrapped at both float read chokepoints (the numeric-value read and the string-image read); the exempt

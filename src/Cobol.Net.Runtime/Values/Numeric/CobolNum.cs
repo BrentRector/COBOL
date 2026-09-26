@@ -311,7 +311,7 @@ public static partial class CobolNum
         value <= (UInt128)Int128.MaxValue
             ? (Int128)value
             : throw new CobolSizeError("operand " + value + " exceeds the native arithmetic intermediate range "
-                + "(Int128 — the documented native technique, ISO §8.8.1.3 / CONFORMANCE.md §4.2.16)");
+                + "(Int128 — the documented native technique, ISO §8.8.1.3 / CONFORMANCE.md §4.2.16)", "EC-SIZE-OVERFLOW");
 
     /// <summary>Store an unsigned wide value (a 16-byte unsigned COMP-5 item's full-container value, or the
     /// HIGHEST-ALGEBRAIC fold of one — §15.43.4 r2) into the receiver: rescale to the receiver's scale, then the
@@ -401,7 +401,7 @@ public static partial class CobolNum
         // ask the same question and differ only in what they do with the answer.
         if (!WideningFits(value, toScale - fromScale))
             throw new CobolSizeError($"scale alignment to {toScale} fraction digits exceeds the Int128 "
-                + "intermediate (ISO §8.8.1 alignment at the D1 escape boundary — EC-SIZE-OVERFLOW)");
+                + "intermediate (ISO §8.8.1 alignment at the D1 escape boundary — EC-SIZE-OVERFLOW)", "EC-SIZE-OVERFLOW");
         return Rescale(value, fromScale, toScale, mode);
     }
 
@@ -605,7 +605,7 @@ public static partial class CobolNum
         // context under EC-SIZE checking (a condition, an argument, a subscript) the statement's ambient EC guard
         // dispatches it as the fatal EC-SIZE-OVERFLOW; a bare OverflowException escaped that guard as a crash.
         try { return checked(a * b); }
-        catch (OverflowException) { throw new CobolSizeError("intermediate product exceeds the Int128 carrier"); }
+        catch (OverflowException) { throw new CobolSizeError("intermediate product exceeds the Int128 carrier", "EC-SIZE-OVERFLOW"); }
     }
 
     /// <summary>The additive siblings of <see cref="MulChecked"/> (the same §14.7.5 case-5 mapping, kb/Work
@@ -619,14 +619,14 @@ public static partial class CobolNum
     public static Int128 AddChecked(Int128 a, Int128 b)
     {
         try { return checked(a + b); }
-        catch (OverflowException) { throw new CobolSizeError("intermediate sum exceeds the Int128 carrier"); }
+        catch (OverflowException) { throw new CobolSizeError("intermediate sum exceeds the Int128 carrier", "EC-SIZE-OVERFLOW"); }
     }
 
     /// <inheritdoc cref="AddChecked"/>
     public static Int128 SubChecked(Int128 a, Int128 b)
     {
         try { return checked(a - b); }
-        catch (OverflowException) { throw new CobolSizeError("intermediate difference exceeds the Int128 carrier"); }
+        catch (OverflowException) { throw new CobolSizeError("intermediate difference exceeds the Int128 carrier", "EC-SIZE-OVERFLOW"); }
     }
 
     /// <summary>
@@ -641,7 +641,8 @@ public static partial class CobolNum
         // division rounds directly at the receiver scale (the outermost-division case), the inexactness is consumed
         // inside Divide, so it must be detected here from the exact remainder rather than by the receiver's TryStore.
         if (mode == CobolRounding.Prohibited && DivisionLosesPrecision(a, aScale, b, bScale, resultScale))
-            throw new CobolSizeError("PROHIBITED rounding on an inexact quotient");
+            throw new CobolSizeError("ROUNDED MODE IS PROHIBITED on an inexact quotient (ISO §14.7.4.3 r7 — "
+                + "EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
         return Divide(a, aScale, b, bScale, resultScale, mode);
     }
 

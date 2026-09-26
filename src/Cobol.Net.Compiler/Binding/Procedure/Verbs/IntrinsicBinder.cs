@@ -2554,20 +2554,25 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     private BoundExpr FoldFrom(IntrinsicSig sig, PicInfo pic, AlgebraicRange? range)
     {
         if (range is not { } r) return AlgebraicArgError(sig);   // no numeric capacity — screened above, belt and braces
+        // A BINARY float usage's extreme is a carrier value the text only images (BoundNumLiteral.Carrier —
+        // kb/Work PB1196): §15.43.4 r2's "represented in argument-1" is that exact binary32/binary64 value.
+        BinaryFloatCarrier? carrier = pic.IsFloat && pic.ClrType is "float" or "double"
+            ? (pic.IsSingle ? BinaryFloatCarrier.Binary32 : BinaryFloatCarrier.Binary64)
+            : null;
         switch (sig.Name)
         {
             case "HIGHEST-ALGEBRAIC":
-                return new BoundNumLiteral(r.Farthest);
+                return new BoundNumLiteral(r.Farthest, carrier);
             case "SMALLEST-ALGEBRAIC":
                 // §15.83.3 r1 admits category numeric ONLY, so the edited descriptions whose Nearest is
                 // deliberately unmodelled are already refused above; this arm never sees one.
-                return r.Nearest is { } n ? new BoundNumLiteral(n) : AlgebraicArgError(sig);
+                return r.Nearest is { } n ? new BoundNumLiteral(n, carrier) : AlgebraicArgError(sig);
             default:
                 // LOWEST: sign-representable → −magnitude; else zero AT THE ITEM'S SCALE (§15.58.4 / Annex D.32).
                 // Routed through the range's own Zero rather than a bare "0" literal so the folded text carries
                 // the scale (a 9V99 item's lowest value is "0.00", not "0"), matching the runtime rule and
                 // keeping the literal's precision for any arithmetic it feeds.
-                return new BoundNumLiteral(r.FarthestNegative ?? r.Zero);
+                return new BoundNumLiteral(r.FarthestNegative ?? r.Zero, carrier);
         }
     }
 

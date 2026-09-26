@@ -173,8 +173,18 @@ public sealed record BoundParagraph(string CobolName, IReadOnlyList<IReadOnlyLis
 [BoundNode]
 public abstract record BoundExpr;
 
-/// <summary>A numeric literal, kept as raw source text (e.g. <c>"3.5"</c>, <c>"-12"</c>); the backend scales it.</summary>
-public sealed record BoundNumLiteral(string Text) : BoundExpr;
+/// <summary>A numeric literal, kept as raw source text (e.g. <c>"3.5"</c>, <c>"-12"</c>); the backend scales it.
+/// <paramref name="Carrier"/> is set only where the value is a BINARY floating-point carrier value that the text
+/// merely images — the §15.43 / §15.58 / §15.83 fold of a binary32 or binary64 usage's extreme (kb/Work PB1196).
+/// The text is then a decimal that ROUNDS to that value (the binary64 maximum's exact expansion has 309 digits, and
+/// the SDIDI carries 34), which round-to-nearest recovers and a directed §14.7.4.3 mode does not: stored into a
+/// COMP-2 under the implied TRUNCATION, <c>1.7976931348623157E+308</c> lands one ulp below the maximum it names.
+/// The backend therefore hands a floating-point resultant the carrier value itself.</summary>
+public sealed record BoundNumLiteral(string Text, BinaryFloatCarrier? Carrier = null) : BoundExpr;
+
+/// <summary>The ISO/IEC 60559 binary interchange format a <see cref="BoundNumLiteral"/>'s value is exactly a value
+/// of (binary32: COMP-1 / FLOAT-SHORT / FLOAT-BINARY-32; binary64: the other binary float usages).</summary>
+public enum BinaryFloatCarrier { Binary32, Binary64 }
 
 /// <summary>A reference to a numeric data item.</summary>
 public sealed record BoundNumRef(Place Place) : BoundExpr;

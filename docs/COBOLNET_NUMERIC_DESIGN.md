@@ -294,9 +294,17 @@ each operand not already a standard-decimal intermediate is converted to that fo
 between the two intermediates). Store to a FIXED receiver lands via a new
 `CobolFloat.ToScaled(double,scale,mode)` (double→unscaled Int128, rounded; ±Inf/overflow saturate so the existing
 capacity check fires SIZE ERROR; NaN→0+latch EC-SIZE) then the EXISTING `CobolNum.Store`/`TryStore` funnel (ROUNDED +
-SIZE ERROR for free; MOVE truncates toward zero §14.6.8.2, COMPUTE uses the receiver ROUNDED mode). Store INTO a float
-receiver = a native cast to `ClrType` (holds the algebraic value §14.6.8.3 GR1; NO size error — IEEE overflow is Inf,
-a valid value; ROUNDED is a no-op).
+SIZE ERROR for free; MOVE truncates toward zero §14.6.8.2, COMPUTE uses the receiver ROUNDED mode). An arithmetic
+store INTO a float receiver is the float arm of the same funnel (`FloatResultant`, kb/Work PB1196): the value — exact
+for a scaled/SDIDI carrier, the binary64 intermediate for a `Real` one — is rounded ONCE into the receiver's binary
+format under the receiver's §14.7.4.3 mode (implied TRUNCATION by rule 2, rules 3–10 alike; PROHIBITED an exactness
+test), and under ON SIZE ERROR / EC-SIZE checking a value past the format's largest finite magnitude after that
+rounding is §14.7.5 case 3 (EC-SIZE-TRUNCATION, receiver unchanged). A binary64 intermediate lands in a binary64
+receiver unchanged under every mode. **The binary64 lane's operations are checked like the scaled lane's** where
+size-error checking is enabled (`CobolFloat.AddChecked`/`SubChecked`/`MulChecked`/`DivChecked`,
+`PowNativeRealChecked`, kb/Work PB1147/PB1581): a zero divisor is EC-SIZE-ZERO-DIVIDE (§14.7.5 case 2) and a result
+outside binary64 is EC-SIZE-OVERFLOW / -UNDERFLOW (case 5) through the one `CobolFloat.InBinary64Range` the float
+intrinsic family shares; unchecked they are the bare IEEE operators.
 
 **MOVE/DISPLAY/compare.** literal→float = the fixed→float cast; float→fixed = `ToScaled`; float→float = a `ClrType`
 cast. DISPLAY = `CobolFloat.Display(float/double)` — invariant-culture shortest round-trip (§14.9.11 GR1

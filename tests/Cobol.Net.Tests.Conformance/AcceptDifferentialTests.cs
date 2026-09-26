@@ -255,7 +255,9 @@ public sealed class AcceptDifferentialTests
 
     // The ROUND TRIP the determination is chosen for: what DISPLAY writes for a float, ACCEPT reads back as the
     // same value (DOC-A.1-1 is defined as DOC-A.1-56's inverse). 1.0E-5 displays "1E-05"; fed back, it compares
-    // equal to the original.
+    // equal to the original. The original is set by a MOVE — the ONE correctly rounded (nearest) conversion of
+    // §14.6.8.3 (DOC-A.1-81) — because a COMPUTE without ROUNDED is §14.7.4.3 rule 2's TRUNCATION, which stores the
+    // binary64 just BELOW 1.0E-5 (kb/Work PB1196), a different value from the one ACCEPT's conversion reads.
     [Fact]
     public void Device_FloatReceiver_RoundTripsItsOwnDisplayImage()
         => AssertOutputs(
@@ -263,7 +265,7 @@ public sealed class AcceptDifferentialTests
                 01 F2 USAGE COMP-2.
                 01 G2 USAGE COMP-2.
                 """, """
-                COMPUTE G2 = 1.0E-5.
+                MOVE 1.0E-5 TO G2.
                 ACCEPT F2.
                 IF F2 = G2 DISPLAY "EQUAL " F2 ELSE DISPLAY "DIFFERENT " F2 " " G2.
             """),

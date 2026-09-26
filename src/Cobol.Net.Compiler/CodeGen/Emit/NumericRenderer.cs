@@ -126,7 +126,23 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     }
 
     // ── IBoundExprVisitor<NumX> ──────────────────────────────────────────────────────────────────────────────
-    public NumX Visit(BoundNumLiteral n) => LiteralNum(n.Text);
+    public NumX Visit(BoundNumLiteral n) =>
+        n.Carrier is { } carrier && _rcv.Real && !StandardDecimal ? CarrierLiteral(n.Text, carrier) : LiteralNum(n.Text);
+
+    /// <summary>A literal that DENOTES a binary float carrier value (<see cref="BoundNumLiteral.Carrier"/> — kb/Work
+    /// PB1196), rendered as that exact value on the binary64 lane where the expression evaluates there: under native
+    /// arithmetic into an all-floating-point resultant set (<see cref="ReceiverContext.Real"/>, D16). The text rounds
+    /// to the carrier value (it is that value's image), and the bits are materialized through the ONE opaque
+    /// from-bits call. Elsewhere — a relation, a fixed-point resultant, a standard mode — the literal keeps its
+    /// decimal lane, so an exact decimal comparison against the extreme is unchanged.</summary>
+    private static NumX CarrierLiteral(string text, BinaryFloatCarrier carrier)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        const System.Globalization.NumberStyles Float = System.Globalization.NumberStyles.Float;
+        return carrier == BinaryFloatCarrier.Binary32
+            ? new NumX($"(double){RuntimeApi.FloatFromBits(BitConverter.SingleToUInt32Bits(float.Parse(text, Float, inv)), single: true)}", 0, Real: true)
+            : new NumX(RuntimeApi.FloatFromBits(BitConverter.DoubleToUInt64Bits(double.Parse(text, Float, inv)), single: false), 0, Real: true);
+    }
 
     /// <summary>⛔ THE ONE numeric-literal → <see cref="NumX"/> rendering, for EVERY position and EVERY arithmetic
     /// mode (owner decision D-B, 2026-08-30; kb/Work PB156 + PB195). A FLOATING-POINT literal is its EXACT
@@ -575,8 +591,29 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // single-precision operand widens exactly) — native COBOL float arithmetic is IEEE binary, never decimal
         // (§8.8.1.3 implementor-defined; STANDARD-BINARY is obsolete, 2023 §8.8.1.4.1 NOTE). +,-,*,/ are native
         // double ops.
-        if (a.Real || b.Real || _rcv.Real) return new NumX($"({Real(a)} {op} {Real(b)})", 0, Real: true);
+        if (a.Real || b.Real || _rcv.Real) return CombineReal(a, op, b);
         return CombineNative(a, op, b);
+    }
+
+    /// <summary>The binary64 lane of <see cref="CombineCore"/> — the floating arm of the native dispatch whose other
+    /// arm is <see cref="CombineNative"/>, and it owes the SAME size-error rules (kb/Work PB1147, PB1581; the
+    /// two-arm shape). Where checking is enabled (<see cref="Checked"/>) each operation is the checked runtime twin
+    /// of the scaled carrier's: a zero divisor is EC-SIZE-ZERO-DIVIDE (§14.7.5 case 2, as <c>DivideOrThrow</c>), and
+    /// a result outside binary64 is EC-SIZE-OVERFLOW / -UNDERFLOW (case 5, as <c>MulChecked</c>/<c>AddChecked</c>).
+    /// Unchecked it is the bare IEEE operator, exactly as the scaled lane's unchecked operators wrap.</summary>
+    private NumX CombineReal(NumX a, string op, NumX b)
+    {
+        string x = Real(a), y = Real(b);
+        if (!Checked) return new NumX($"({x} {op} {y})", 0, Real: true);
+        string fn = op switch
+        {
+            "+" => nameof(CobolFloat.AddChecked),
+            "-" => nameof(CobolFloat.SubChecked),
+            "*" => nameof(CobolFloat.MulChecked),
+            "/" => nameof(CobolFloat.DivChecked),
+            _ => throw new InvalidOperationException($"no binary64 operator '{op}'"),
+        };
+        return new NumX($"{nameof(CobolFloat)}.{fn}({x}, {y})", 0, Real: true);
     }
 
     // Plain STANDARD arithmetic (2002; obsolete 2014, removed 2023 — Annex E.2 item 21) uses the standard
@@ -920,10 +957,13 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // so `COMPUTE R = FUNCTION SQRT(10) ** 2` landed 9.999999998 where a COMP-2 base gave 10.000000000.
         // The decision now carries `Quantize` and this arm reads it (feedback_two_arm_dispatch, sixth sighting).
         var landing = _rcv.FloatLanding(_outermost);
+        // Under size-error checking the binary64 power is range-checked like every other checked native operation
+        // (§14.7.5 case 5 — kb/Work PB1581); unchecked it stays the bare approximation.
+        string pow = RuntimeApi.Intrinsic(Checked ? "PowNativeRealChecked" : "PowNativeReal", $"{Real(b)}, {Real(e)}");
         if (b.Real || e.Real || !landing.Quantize)
-            return new NumX(RuntimeApi.Intrinsic("PowNativeReal", $"{Real(b)}, {Real(e)}"), 0, Real: true);
+            return new NumX(pow, 0, Real: true);
         return new NumX(RuntimeApi.Intrinsic("FromDouble",
-            $"{RuntimeApi.Intrinsic("PowNativeReal", $"{Real(b)}, {Real(e)}")}, {landing.Scale}, {RuntimeApi.RoundingText(landing.Mode)}{CheckedFlag}"), landing.Scale);
+            $"{pow}, {landing.Scale}, {RuntimeApi.RoundingText(landing.Mode)}{CheckedFlag}"), landing.Scale);
     }
 
     private static NumX Negate(NumX x) =>

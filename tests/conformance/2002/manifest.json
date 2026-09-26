@@ -34,6 +34,7 @@
   "pb999_log_trig_decimal_range",
   "pb1041_exp_and_wide_exact_argument",
   "pb1566_exp_result_range",
+  "pb1581_binary64_intermediate_range",
   "pb923_invoke_content_function_identifier",
   "pb1007_invoke_content_integer_function",
   "pb856_inspect_national_identifier_operands",

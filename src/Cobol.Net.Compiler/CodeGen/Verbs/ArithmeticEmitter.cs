@@ -470,18 +470,34 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormat(Aligned(false), $"{ms}", CsLiteral(mask), BwzFlag(target.Item) + EditCfg(target.Item.Pic))));
             return;
         }
-        // A float RECEIVER (COMP-1/2/FLOAT-*, D16) takes the algebraic value as a native cast — no PICTURE, no
-        // scaled store, no SIZE ERROR (IEEE overflow is Inf, a valid value; §14.6.8.3 GR1); ROUNDED is a no-op
-        // (the receiver holds the exact algebraic value). BEFORE the fixed-point guard below.
-        if (target.Item.Pic is { IsFloat: true })
+        // A FLOATING-POINT resultant identifier (COMP-1/2, FLOAT-*, D16) — the float arm of THIS store, sharing the
+        // fixed arm's two rules rather than restating them (kb/Work PB1196): the receiver's §14.7.4.3 mode rounds
+        // the value into the binary format (rule 10's implied TRUNCATION, rules 3–9, rule 7's PROHIBITED as an
+        // exactness test), and under ON SIZE ERROR / EC-SIZE checking a value further from zero than the format
+        // permits is the §14.7.5 case-3 size error, receiver unchanged, EC-SIZE-TRUNCATION (no-phrase rule 4) —
+        // the SAME condition name the fixed arm latches below. It used to be a bare IEEE round-to-nearest cast that
+        // ignored the mode and never raised. The rounding itself is ONE runtime rule, FloatResultant.
+        if (target.Item.Pic is { IsFloat: true } floatPic)
         {
             // A WINDOWED float receiver (Tier-B / image-stored — the Step D arm-1 dissolution) re-encodes the
-            // algebraic value as its IEEE window bytes; a native receiver keeps the bare cast (the scout's
-            // pre-loaded CS1503: a float expression assigned into a string window).
-            string algebraic = $"({target.Item.Pic.ClrType})({NumericRenderer.Real(value)})";
-            w.Line(PlaceRenderer.Write(target, target.Item.StoreAsImage
-                ? RuntimeApi.NumFormatImageFloat(algebraic, target.Item.ProfileName, target.Item.Pic.IsSingle)
-                : algebraic));
+            // landed value as its IEEE window bytes; a native receiver keeps the bare cast (the scout's pre-loaded
+            // CS1503: a float expression assigned into a string window).
+            string Encode(string landed)
+            {
+                string algebraic = $"({floatPic.ClrType})({landed})";
+                return target.Item.StoreAsImage
+                    ? RuntimeApi.NumFormatImageFloat(algebraic, target.Item.ProfileName, floatPic.IsSingle)
+                    : algebraic;
+            }
+            if (ecState.SizeErrVar is { } fflag)
+            {
+                string tmp = $"__sv{ctx.Names.NextStoreTmp()}";
+                string onFail = ecState.SizeErrEcVar is { } fecn ? $"{{ {fflag} = true; {fecn} = \"EC-SIZE-TRUNCATION\"; }}" : $"{fflag} = true;";
+                w.Line($"if (!{RuntimeApi.FloatResultantStore(value, mode, floatPic.IsSingle, tmp)}) {onFail}");
+                w.Line($"else {PlaceRenderer.Write(target, Encode(tmp))}");
+                return;
+            }
+            w.Line(PlaceRenderer.Write(target, Encode(RuntimeApi.FloatResultantStore(value, mode, floatPic.IsSingle))));
             return;
         }
         if (target.Item.Pic is not { Category: PicCategory.Numeric, IsFloat: false })

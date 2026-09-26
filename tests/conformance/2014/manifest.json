@@ -3,6 +3,7 @@
  "enabled": [
   "pb1276_varying_unstated_max_dynamic",
   "pb1556_elementary_record_area_2014",
+  "pb1196_float_resultant_rounded_mode",
   "pb460_ec_bound_set",
   "pb892_inline_invocation_resume",
   "pb829_dynamic_length_structure",
