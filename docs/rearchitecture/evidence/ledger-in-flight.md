@@ -18,9 +18,9 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Saturday 2026-09-26</h3>
-    <p><strong>Landed today.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test (37 goldens, 25 negatives, 5 witness classes). Of the lane's 120 input rows, 6 are held behind open defects and 54 were judged not closable by a test &mdash; an owner-facing question of its own.</p>
-    <p><strong>Implementing &mdash; wave 61</strong>, eight groups of wrong-answer defects, one per subsystem. Finished and awaiting the train lander: COPY/REPLACE text-words (PB1350, PB1354, PB1351 &mdash; 25 rows on its branch) and runtime I-O boundaries with owner decision R47 (PB1192, PB690, PB1098 &mdash; 13 rows). Still running: OO conformance and INVOKE arguments, file-control clause screens, floating-point ROUNDED and size error, record sizing, literal screens, and user-defined-function argument binding.</p>
+    <h3>In flight — Saturday 2026-09-26, afternoon</h3>
+    <p><strong>Landed today.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test. <span class="pill good">train 61</span> landed five groups of wrong-answer fixes in one CI-proven landing: COPY/REPLACE text-words, runtime I-O boundaries with owner decision R47 (Latin-1 files refuse characters above U+00FF), one PICTURE-clause identity for OO and CALL conformance, record sizing from the RECORD clause in bytes, and floating-point ROUNDED MODE and size-error handling.</p>
+    <p><strong>Still implementing &mdash; wave 61</strong>: literal syntax screens and user-defined-function argument binding are running; the file-control clause screens are complete and await their final gate; INVOKE's argument binder (PB1137) resumes Sunday. These ride train 62.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
