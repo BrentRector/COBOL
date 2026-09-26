@@ -61,7 +61,32 @@ The copybook mechanics stay in `CopyProcessor` (find/read, `NormalizeCopybook` f
 that expands ONE COPY statement at a given position — parse name + REPLACING (to the terminating period, possibly
 multi-line), resolve, normalize, apply REPLACING — and returns the copybook text (NOT recursively expanded; the
 merged driver recurses so nested COPY *and* nested CC both process). `alreadyIncluded` + `depth` thread through
-for the SR1 circular / depth-20 guards.
+for the GR12 circular / depth-20 guards.
+
+### §3.2a Text-words — the one scanner under COPY and REPLACE (kb/Work PB1350 / PB1351 / PB1354)
+
+Everything the text-manipulation stage does is decided over §7.2.2.5 TEXT-WORDS, and ONE type forms them:
+`TextWordScanner` (`src/Cobol.Net.Frontend/Preprocessor/TextWord.cs`). A space or a comment is no text-word; the
+colon and parentheses are separator text-words outside literals; a period, comma or semicolon separates only when
+a space (or a line end, or a closing `==`) follows (§8.3.5 2)/3)), so `Z,ZZ9` and `ZZ.ZZ` are one word; a literal
+is ONE word from its prefix (`X" N" NX" B" BX"`) through its closing delimiter with doubled quotes inside; `&` is a
+word of its own; `==` is the pseudo-text delimiter. Its three consumers:
+
+- **Locating COPY** — `FindCopyKeyword` returns the next text-word `COPY`, so it cannot fire in a literal, a comment
+  or a longer word; a `COPY` glued behind `.`/`,`/`;` forms no text-word and is reported (§7.2.3.3 SR2, COBOLNET2451).
+- **Parsing the statements** — `ParseCopyStatement` reads the §7.2.3.2 general format in order
+  (`{text-name-1 | literal-1} [{OF|IN} …] [SUPPRESS [PRINTING]] [REPLACING …] .`) through a `StatementCursor`, and
+  the REPLACE statement uses the same cursor and the same `ParseReplacingOperands`. A statement ends at its
+  SEPARATOR period (§7.2.3.4 GR6), never at a `.` inside pseudo-text or a literal; a word out of order is
+  COBOLNET2449, SR4/SR5 literal forms COBOLNET2450, a COPY within a COPY statement COBOLNET2451 (SR1).
+- **Matching** — `ApplyReplacements` compares text-words with `TextWord.MatchesForReplacing`, the ONE
+  implementation of §7.2.3.4 9) c) / §7.2.4.4 8) c): character-strings case-insensitively; literals by prefix
+  (case-insensitive), content un-doubled, the quotation symbol not compared, content case-SENSITIVE in `"…"` and
+  `N"…"` and insensitive in the hexadecimal and boolean formats. Separator commas/semicolons are dropped (c) 1.).
+
+A fixed-form debugging line reaches the stage as `ReferenceFormatProcessor.DebugLineCarrier` (a `*>` comment
+carrying the Unicode noncharacter U+FDD0) + its text; the scanner skips only the carrier, so the line's text-words
+take part in matching (the COBOL-85 rule) while no comment a programmer writes can be mistaken for one.
 
 ### §3.3 The `leave*` flags + the collection stages
 

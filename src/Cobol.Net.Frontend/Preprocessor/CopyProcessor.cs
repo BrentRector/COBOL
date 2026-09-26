@@ -113,7 +113,7 @@ public sealed class CopyProcessor(
     {
         string text = mapped.Text;
         var w = new OriginWriter();
-        var activeReplacements = new List<(string from, string to, ReplaceKind kind)>();
+        var activeReplacements = new List<Replacement>();
         int pos = 0;
 
         while (pos < text.Length)
@@ -127,22 +127,20 @@ public sealed class CopyProcessor(
 
             w.AppendMapped(ApplyReplacements(mapped.Slice(pos, replaceIdx - pos), activeReplacements));
 
-            int afterReplace = replaceIdx + "REPLACE".Length;
-            SkipWhitespace(text, ref afterReplace);
-
-            if (MatchWord(text, afterReplace, "OFF"))
-            {
-                afterReplace += "OFF".Length;
-                activeReplacements.Clear();
-            }
+            // The statement is parsed over text-words (§7.2.4.2 general format) through its separator period — a
+            // period INSIDE pseudo-text is a text-word of the operand, never the statement's end (kb/Work PB1354).
+            var statement = new StatementCursor(text, replaceIdx + "REPLACE".Length, (p, message) =>
+                diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.TextManipulationStatementSyntax.Code,
+                    "REPLACE statement: " + message + " (§7.2.4.2)", mapped.OriginAt(p).ToLocation(), default));
+            activeReplacements.Clear();
+            if (statement.TryPeek(out var first) && first.IsWord("OFF"))
+                statement.Advance(first);
             else
             {
-                activeReplacements.Clear();
-                bool flagged = false;   // one report per REPLACE statement
-                ParseReplacements(text, ref afterReplace, activeReplacements, p =>
+                ParseReplacingOperands(statement, activeReplacements, nestedCopy: null, nonPseudoText: p =>
                 {
-                    if (flagged || diagnostics is null) return;
-                    flagged = true;
+                    if (statement.HasError || diagnostics is null) return;   // one report per REPLACE statement
+                    statement.MarkError();
                     diagnostics.ReportError(
                         Editions.Diagnostics.DiagnosticCatalog.ReplaceOperandNotPseudoText.Code,
                         "a REPLACE statement operand is not pseudo-text — REPLACE admits ==pseudo-text== "
@@ -152,12 +150,8 @@ public sealed class CopyProcessor(
                         mapped.OriginAt(p).ToLocation(), default);
                 });
             }
-
-            while (afterReplace < text.Length && text[afterReplace] != '.')
-                afterReplace++;
-            if (afterReplace < text.Length) afterReplace++;
-
-            pos = afterReplace;
+            statement.ExpectSeparatorPeriod();
+            pos = statement.Pos;
         }
 
         return w.Finish();
@@ -189,72 +183,75 @@ public sealed class CopyProcessor(
         return map;
     }
 
-    /// <summary>A COBOL text-word (ISO §7.3.2) with its span in the source string.</summary>
-    private readonly record struct TextWord(string Value, int Start, int End);
-
     /// <summary>COPY/REPLACE replacement scope: a whole text-word sequence, or the LEADING/TRAILING characters of
-    /// a single text-word (ISO §7.2.3.4 GR 9 b / §7.2.4).</summary>
+    /// a single text-word (ISO §7.2.3.4 GR 9 b / §7.2.4.4 GR 8 b).</summary>
     private enum ReplaceKind { Whole, Leading, Trailing }
 
-    /// <summary>
-    /// Apply COBOL REPLACE / COPY REPLACING substitutions on a TEXT-WORD basis. Pseudo-text
-    /// matching ignores the amount of intervening white space and line breaks (ISO §7.2.4 /
-    /// §7.5): each operand is a sequence of text words, matched word-for-word against the source
-    /// words. A match's original span is replaced verbatim by the replacement text. Matching is
-    /// left-to-right; at each position the first operand (in source order) that matches wins, and
-    /// inserted text is not rescanned. This replaces a naive substring replace, which could not
-    /// match multi-line pseudo-text nor respect word boundaries (".", "(", ")" are their own words).
-    /// </summary>
-    private static string ApplyReplacements(string text, List<(string from, string to, ReplaceKind kind)> replacements)
-        => ApplyReplacements(MappedText.Identity(text, "<source>"), replacements).Text;
+    /// <summary>One REPLACING-phrase operand pair of a COPY (§7.2.3) or REPLACE (§7.2.4) statement: pseudo-text-1 or
+    /// partial-word-1 as the text-words it is compared by, and the replacement text exactly as written.</summary>
+    private readonly record struct Replacement(IReadOnlyList<TextWord> From, string To, ReplaceKind Kind);
 
-    /// <summary>The MAPPED word-replacement pass (kb/Work PB82) — the ONE implementation: unchanged text keeps its
-    /// origins; a replacement's text (which may span lines) takes the origin of the line its match started on.</summary>
-    private static MappedText ApplyReplacements(MappedText mapped, List<(string from, string to, ReplaceKind kind)> replacements)
+    /// <summary>The text-words of <paramref name="text"/> that take part in matching: every text-word but the
+    /// separator comma and semicolon, which "is considered to be a single space" (§7.2.3.4 9) c) 1. /
+    /// §7.2.4.4 8) c) 1.) — and so, like the spaces around them, is no word to compare.</summary>
+    private static List<TextWord> MatchWords(string text)
     {
-        var active = replacements
-            .Select(r => (tokens: TokenizeTextWords(r.from).Select(w => w.Value).ToList(), r.to, r.kind))
-            .Where(r => r.tokens.Count > 0)   // empty/malformed operand cannot match
-            .ToList();
+        var words = TextWordScanner.Scan(text);
+        words.RemoveAll(w => w.Kind == TextWordKind.SeparatorCommaOrSemicolon);
+        return words;
+    }
+
+    /// <summary>
+    /// Apply COPY REPLACING / REPLACE substitutions (ISO §7.2.3.4 GR 9 / §7.2.4.4 GR 8) over the §7.2.2.5 text-words
+    /// of the text: at each leftmost text-word the operands are tried in the order written and the first match wins
+    /// (d)); an unmatched word is copied (e)); after a match the word following the rightmost matched word is the new
+    /// leftmost, so inserted text is never rescanned (f)). Two text-words compare by
+    /// <see cref="TextWord.MatchesForReplacing"/> (c) 3.–4.). A match's source span is replaced verbatim by the
+    /// replacement text, so white space and line breaks between the matched words vanish with them; the unmatched
+    /// text keeps its origins (kb/Work PB82) and a replacement takes the origin of the line its match started on.
+    /// </summary>
+    private static MappedText ApplyReplacements(MappedText mapped, IReadOnlyList<Replacement> replacements)
+    {
+        var active = replacements.Where(r => r.From.Count > 0).ToList();   // an empty operand cannot match
         if (active.Count == 0) return mapped;
 
         string text = mapped.Text;
-        var words = TokenizeTextWords(text);
+        var words = MatchWords(text);
         var sb = new OriginWriter();
         int copiedUpTo = 0; // chars of `text` already emitted
         int w = 0;
         while (w < words.Count)
         {
             bool matched = false;
-            foreach (var (tokens, to, kind) in active)
+            foreach (var (from, to, kind) in active)
             {
                 if (kind == ReplaceKind.Whole)
                 {
-                    if (w + tokens.Count > words.Count) continue;
+                    if (w + from.Count > words.Count) continue;
                     bool eq = true;
-                    for (int k = 0; k < tokens.Count; k++)
-                        if (!string.Equals(words[w + k].Value, tokens[k], StringComparison.OrdinalIgnoreCase))
-                        { eq = false; break; }
+                    for (int k = 0; k < from.Count; k++)
+                        if (!words[w + k].MatchesForReplacing(from[k])) { eq = false; break; }
                     if (!eq) continue;
 
                     int matchStart = words[w].Start;
-                    int matchEnd = words[w + tokens.Count - 1].End;
+                    int matchEnd = words[w + from.Count - 1].End;
                     sb.AppendSlice(mapped, copiedUpTo, matchStart - copiedUpTo);
                     sb.Append(to.AsSpan(), mapped.OriginAt(matchStart));
                     copiedUpTo = matchEnd;
-                    w += tokens.Count;
+                    w += from.Count;
                     matched = true;
                     break;
                 }
 
-                // LEADING / TRAILING: the partial-word operand is a single text-word, matched against the
-                // start/end of one source text-word; only the matched run is replaced (ISO §7.2.3.4 GR 9 b).
-                string part = tokens[0];
-                string word = words[w].Value;
-                bool leading = kind == ReplaceKind.Leading
-                    && word.Length >= part.Length && word.StartsWith(part, StringComparison.OrdinalIgnoreCase);
-                bool trailing = kind == ReplaceKind.Trailing
-                    && word.Length >= part.Length && word.EndsWith(part, StringComparison.OrdinalIgnoreCase);
+                // LEADING / TRAILING (b)): partial-word-1 is equal "character for character" to the leftmost /
+                // rightmost characters of ONE source text-word. The comparison is case-insensitive (c) 3.) without
+                // exception: partial-word-1 is not a literal (§7.2.3.3 SR13 / §7.2.4.3 SR7), so it holds no quotation
+                // symbol and can never reach the case-significant CONTENT of a literal text-word — a literal both
+                // begins (after an optional prefix) and ends with its quotation symbol.
+                var part = from[0].Span;
+                var word = words[w].Span;
+                bool leading = kind == ReplaceKind.Leading && word.StartsWith(part, StringComparison.OrdinalIgnoreCase);
+                bool trailing = kind == ReplaceKind.Trailing && word.EndsWith(part, StringComparison.OrdinalIgnoreCase);
                 if (!leading && !trailing) continue;
 
                 sb.AppendSlice(mapped, copiedUpTo, words[w].Start - copiedUpTo);
@@ -262,11 +259,11 @@ public sealed class CopyProcessor(
                 if (leading)
                 {
                     sb.Append(to.AsSpan(), at);
-                    sb.Append(word.AsSpan(part.Length, word.Length - part.Length), at);
+                    sb.Append(word[part.Length..], at);
                 }
                 else // trailing
                 {
-                    sb.Append(word.AsSpan(0, word.Length - part.Length), at);
+                    sb.Append(word[..^part.Length], at);
                     sb.Append(to.AsSpan(), at);
                 }
                 copiedUpTo = words[w].End;
@@ -278,106 +275,6 @@ public sealed class CopyProcessor(
         }
         sb.AppendSlice(mapped, copiedUpTo, text.Length - copiedUpTo);
         return sb.Finish();
-    }
-
-    /// <summary>
-    /// Tokenize COBOL text into text-words with their source spans. White space separates words;
-    /// '(' and ')' and a separator period (a '.' not acting as a decimal point) are standalone
-    /// words; an alphanumeric literal ("…" or '…') is a single word. Used for REPLACE matching.
-    /// </summary>
-    private static List<TextWord> TokenizeTextWords(string text)
-    {
-        var words = new List<TextWord>();
-        int i = 0, n = text.Length;
-        while (i < n)
-        {
-            char c = text[i];
-            // White space and the separator comma/semicolon are equivalent and insignificant
-            // (COBOL-85 REPLACE/COPY matching) — skip them.
-            if (char.IsWhiteSpace(c) || IsSpaceEquivalentSeparator(text, i)) { i++; continue; }
-
-            // Comment lines are not text words (ISO §7.3.2): an ordinary '*>' comment is
-            // transparent to REPLACE matching, so a pseudo-text operand can span words separated
-            // by comment lines. A DEBUG line, however, is conditionally-compiled SOURCE, and
-            // COPY/REPLACE (text manipulation) runs before the debugging-mode determination — so
-            // its content DOES participate. The normalizer renders fixed-form comment lines as
-            // "*> …" and debug lines as "*> DEBUG: …"; here we skip only the "*> DEBUG:" prefix
-            // (tokenizing the content) but drop ordinary comment lines whole.
-            if (c == '*' && i + 1 < n && text[i + 1] == '>')
-            {
-                const string debugPrefix = "*> DEBUG:";
-                if (i + debugPrefix.Length <= n &&
-                    string.CompareOrdinal(text, i, debugPrefix, 0, debugPrefix.Length) == 0)
-                {
-                    i += debugPrefix.Length;
-                    continue;
-                }
-                while (i < n && text[i] != '\n') i++;
-                continue;
-            }
-
-            if (c is '(' or ')')
-            {
-                words.Add(new TextWord(c.ToString(), i, i + 1));
-                i++;
-                continue;
-            }
-
-            if (c is '"' or '\'')
-            {
-                int start = i;
-                char q = c;
-                i++;
-                while (i < n && text[i] != q) i++;
-                if (i < n) i++; // closing quote
-                words.Add(new TextWord(text[start..i], start, i));
-                continue;
-            }
-
-            // A separator period/comma/semicolon is its own text word.
-            if (IsSeparatorPunctuation(text, i))
-            {
-                words.Add(new TextWord(text[i].ToString(), i, i + 1));
-                i++;
-                continue;
-            }
-
-            int ws = i;
-            while (i < n)
-            {
-                char d = text[i];
-                if (char.IsWhiteSpace(d) || d is '(' or ')' or '"' or '\'') break;
-                if (IsSeparatorPunctuation(text, i) || IsSpaceEquivalentSeparator(text, i)) break;
-                i++;
-            }
-            words.Add(new TextWord(text[ws..i], ws, i));
-        }
-        return words;
-    }
-
-    /// <summary>
-    /// True if the character at <paramref name="i"/> is a separator period — a '.' that stands as
-    /// its own text word, i.e. not acting as a decimal point (not immediately followed by a digit).
-    /// The separator comma and semicolon are NOT text words: per COBOL-85 they are equivalent to a
-    /// space in REPLACE/COPY matching (handled by <see cref="IsSpaceEquivalentSeparator"/>).
-    /// </summary>
-    private static bool IsSeparatorPunctuation(string text, int i)
-    {
-        if (text[i] != '.') return false;
-        return i + 1 >= text.Length || !char.IsDigit(text[i + 1]);
-    }
-
-    /// <summary>
-    /// True if the character at <paramref name="i"/> is a separator comma or semicolon. COBOL-85
-    /// treats these as equivalent to a space when matching pseudo-text (so "MOVE; X , Y" and
-    /// "MOVE X Y" match), so the tokenizer skips them like white space rather than emitting a word.
-    /// A comma/semicolon immediately followed by a digit is left intact (possible decimal comma).
-    /// </summary>
-    private static bool IsSpaceEquivalentSeparator(string text, int i)
-    {
-        char c = text[i];
-        if (c is not (',' or ';')) return false;
-        return i + 1 >= text.Length || !char.IsDigit(text[i + 1]);
     }
 
     /// <summary>The recursive COPY-only expansion behind <see cref="Process"/> (the legacy compiler's path): the ONE
@@ -396,45 +293,32 @@ public sealed class CopyProcessor(
     /// after normalization and COPY … REPLACING — kb/Work PB82); null for the not-found / circular comment lines.</param>
     internal readonly record struct OneCopyResult(CopyOutcome Outcome, string Text, string? CopybookPath, MappedText? Mapped = null);
 
-    /// <summary>Parse and resolve ONE COPY statement whose keyword is at <paramref name="copyIdx"/> — read the
-    /// text-name + optional IN/OF qualifier + REPLACING (advancing <paramref name="afterCopy"/> past the
-    /// terminating period), find the copybook, and return its NormalizeCopybook+ApplyReplacements text (NOT
-    /// recursively expanded — the caller recurses). Shared by <see cref="ExpandCopyStatements"/> (legacy path) and
-    /// <see cref="ExpandCopiesOneLevel"/> (the merged CC+COPY driver), so the two never diverge.</summary>
+    /// <summary>Parse and resolve ONE COPY statement whose keyword is at <paramref name="copyIdx"/> — parse it
+    /// (<see cref="ParseCopyStatement"/>, advancing <paramref name="afterCopy"/> past its separator period), find the
+    /// copybook, and return its NormalizeCopybook+ApplyReplacements text (NOT recursively expanded — the caller
+    /// recurses). Shared by <see cref="ExpandCopyStatements"/> (legacy path) and <see cref="ExpandCopiesOneLevel"/>
+    /// (the merged CC+COPY driver), so the two never diverge.</summary>
     internal OneCopyResult ResolveOneCopy(MappedText mapped, int copyIdx, HashSet<string> alreadyIncluded, out int afterCopy)
     {
         string text = mapped.Text;
         SourceOrigin at = mapped.OriginAt(copyIdx);   // the COPY statement's SOURCE origin (kb/Work PB82)
-        afterCopy = copyIdx + "COPY".Length;
-        SkipWhitespace(text, ref afterCopy);
 
-        string libraryName = ReadTextNameOrLiteral(text, ref afterCopy);
-        SkipWhitespace(text, ref afterCopy);
+        // §7.2.3.3 SR2: "A COPY statement shall be preceded by a space except when it is the first statement in a
+        // compilation group" — a COPY word directly after a parenthesis, a colon, a literal's closing delimiter or a
+        // pseudo-text delimiter. (A COPY glued behind a period, comma or semicolon is not even a text-word of its
+        // own — see FindCopyKeyword.)
+        if (copyIdx > 0 && !char.IsWhiteSpace(text[copyIdx - 1]))
+            ReportPlacement(at, $"COPY is not preceded by a space (it follows '{text[copyIdx - 1]}') — §7.2.3.3 SR2: "
+                + "\"A COPY statement shall be preceded by a space except when it is the first statement in a "
+                + "compilation group\"");
 
-        // Optional library qualifier: COPY text-name (IN | OF) library-name (ISO §7.2.3).
-        string? libraryQualifier = null;
-        if (afterCopy < text.Length && (MatchWord(text, afterCopy, "IN") || MatchWord(text, afterCopy, "OF")))
-        {
-            afterCopy += 2;
-            SkipWhitespace(text, ref afterCopy);
-            libraryQualifier = ReadTextNameOrLiteral(text, ref afterCopy);
-            SkipWhitespace(text, ref afterCopy);
-        }
+        var statement = ParseCopyStatement(mapped, copyIdx);
+        afterCopy = statement.End;
+        if (statement.TextName is null)
+            return new OneCopyResult(CopyOutcome.NotFound, "*> COPY statement not processed — see its diagnostic", null);
+        string libraryName = statement.TextName;
 
-        var replacements = new List<(string from, string to, ReplaceKind kind)>();
-        if (afterCopy < text.Length && MatchWord(text, afterCopy, "REPLACING"))
-        {
-            afterCopy += "REPLACING".Length;
-            SkipWhitespace(text, ref afterCopy);
-            // The VCR-row-4 gate rides the operand reads (COPY only — REPLACE is not in the E.2 removal).
-            ParseReplacements(text, ref afterCopy, replacements, p => OnNonPseudoTextOperand(mapped, p));
-        }
-
-        while (afterCopy < text.Length && text[afterCopy] != '.')
-            afterCopy++;
-        if (afterCopy < text.Length) afterCopy++;
-
-        string? copybookPath = FindCopybook(libraryName, libraryQualifier);
+        string? copybookPath = FindCopybook(libraryName, statement.LibraryName);
         if (copybookPath == null)
         {
             // ISO §7.2.3.4 GR 2: library text shall be available. Hard error under named-strict dialects;
@@ -446,7 +330,8 @@ public sealed class CopyProcessor(
         }
         if (!alreadyIncluded.Add(copybookPath))
         {
-            // ISO §7.2.3.3 SR 1: a COPY shall not directly or indirectly include itself.
+            // ISO §7.2.3.4 GR12: "The library text being copied shall not cause the processing of a COPY statement
+            // that directly or indirectly copies itself."
             Report(DiagnosticDescriptors.CBL3621, at, libraryName);
             return new OneCopyResult(CopyOutcome.Circular, $"*> COPY {libraryName} — circular include skipped", null);
         }
@@ -463,16 +348,176 @@ public sealed class CopyProcessor(
         // not). Detection uses the SAME FindCopyKeyword the expander splices by, so the report and the
         // recursion can never disagree about what counts as a COPY statement. Expansion continues after the
         // report — the diagnostic is the verdict; the splice keeps the downstream parse coherent.
-        if (replacements.Count > 0 && FindCopyKeyword(normalized, 0) >= 0)
+        if (statement.ReplacingSpecified && FindCopyKeyword(normalized, 0) >= 0)
             _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.CopyReplacingNestedCopy.Code,
                 $"COPY {libraryName} REPLACING: the library text contains a COPY statement — ISO §7.2.3.4 "
                 + "GR10 forbids the combination (\"If the REPLACING phrase is specified, the library text "
                 + "shall not contain a COPY statement\"); nesting is permitted only without REPLACING "
                 + "(GR12). Flatten the copybook, or drop the REPLACING phrase.",
                 at.ToLocation(), default);
-        var copybookMapped = ApplyReplacements(normalizedMapped, replacements);
+        var copybookMapped = ApplyReplacements(normalizedMapped, statement.Replacements);
         return new OneCopyResult(CopyOutcome.Found, copybookMapped.Text, copybookPath, copybookMapped);
     }
+
+    /// <summary>A parsed COPY statement: text-name-1 or the value of literal-1 (null when the statement names no
+    /// usable library text — its diagnostic is already reported), library-name-1 or the value of literal-2, whether
+    /// the REPLACING phrase was written (§7.2.3.4 GR10 turns on that, not on how many operands parsed), its operands,
+    /// and the position just past the statement's separator period.</summary>
+    private readonly record struct CopyStatement(string? TextName, string? LibraryName, bool ReplacingSpecified,
+        List<Replacement> Replacements, int End);
+
+    /// <summary>Parse the COPY statement at <paramref name="copyIdx"/> in its §7.2.3.2 general-format order, over
+    /// §7.2.2.5 text-words: <c>COPY {text-name-1 | literal-1} [{OF | IN} {library-name-1 | literal-2}]
+    /// [SUPPRESS [PRINTING]] [REPLACING operands…] .</c> — the statement ends at its separator period (§7.2.3.4 GR6
+    /// "beginning with the reserved word COPY and ending with the separator period, inclusive"), so a period inside
+    /// pseudo-text or a literal no longer ends it. A word out of that order is COBOLNET2449; SUPPRESS has no effect on
+    /// the resultant text (GR4 governs only a listing, which this compiler does not produce). kb/Work PB1354.</summary>
+    private CopyStatement ParseCopyStatement(MappedText mapped, int copyIdx)
+    {
+        var c = new StatementCursor(mapped.Text, copyIdx + "COPY".Length, (p, message) =>
+            _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.TextManipulationStatementSyntax.Code,
+                "COPY statement: " + message + " (§7.2.3.2)", mapped.OriginAt(p).ToLocation(), default));
+
+        string? textName = ReadCopyName(mapped, c, "text-name-1 or literal-1");
+        string? libraryName = null;
+        if (c.TryPeek(out var w) && (w.IsWord("OF") || w.IsWord("IN")))
+        {
+            c.Advance(w);
+            libraryName = ReadCopyName(mapped, c, "library-name-1 or literal-2");
+        }
+        if (c.TryPeek(out w) && w.IsWord("SUPPRESS"))
+        {
+            c.Advance(w);
+            if (c.TryPeek(out w) && w.IsWord("PRINTING")) c.Advance(w);
+        }
+
+        var replacements = new List<Replacement>();
+        bool replacing = false;
+        if (!c.HasError && c.TryPeek(out w) && w.IsWord("REPLACING"))
+        {
+            replacing = true;
+            c.Advance(w);
+            // The VCR-row-4 gate rides the operand reads (COPY only — REPLACE is not in the E.2 removal).
+            ParseReplacingOperands(c, replacements,
+                nonPseudoText: p => OnNonPseudoTextOperand(mapped, p),
+                nestedCopy: p => ReportPlacement(mapped.OriginAt(p), "a COPY statement is written inside the "
+                    + "REPLACING phrase of another COPY statement — §7.2.3.3 SR1: \"a COPY statement shall not "
+                    + "appear within a COPY statement\""));
+        }
+        if (!c.HasError && c.TryPeek(out w) && w.IsWord("COPY"))
+        {
+            ReportPlacement(mapped.OriginAt(w.Start), "a COPY statement begins inside another COPY statement — "
+                + "§7.2.3.3 SR1: \"a COPY statement shall not appear within a COPY statement\"");
+            c.MarkError();
+        }
+        c.ExpectSeparatorPeriod();
+        return new CopyStatement(textName, libraryName, replacing, replacements, c.Pos);
+    }
+
+    /// <summary>The reserved words of the COPY statement's own general format — never a text-name or library-name
+    /// where they stand (COPY itself is §7.2.3.3 SR1's business).</summary>
+    private static bool IsCopyPhraseWord(in TextWord w)
+        => w.IsWord("OF") || w.IsWord("IN") || w.IsWord("SUPPRESS") || w.IsWord("PRINTING") || w.IsWord("REPLACING");
+
+    /// <summary>The figurative-constant words (§8.3.3.6.2 formats 1–6; a format-7 symbolic-character is a
+    /// user-defined word, which as text-name-1 is simply a text-name), barred as literal-1 / literal-2 by
+    /// §7.2.3.3 SR4.</summary>
+    private static readonly HashSet<string> FigurativeConstantWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ZERO", "ZEROS", "ZEROES", "SPACE", "SPACES", "HIGH-VALUE", "HIGH-VALUES", "LOW-VALUE", "LOW-VALUES",
+        "QUOTE", "QUOTES", "ALL",
+    };
+
+    /// <summary>Read text-name-1 / literal-1 (or library-name-1 / literal-2) and return the name it gives — a word as
+    /// written, or the VALUE of an alphanumeric literal (a doubled quotation symbol collapsed; a hexadecimal literal
+    /// decoded). §7.2.3.3 SR4 (no concatenation expression, no figurative constant) and SR5 ("Literal-1 and
+    /// literal-2 shall be alphanumeric literals") are checked here, each as COBOLNET2450; null when no usable name
+    /// was written.</summary>
+    private string? ReadCopyName(MappedText mapped, StatementCursor c, string operand)
+    {
+        void LiteralForm(int at, string message)
+            => _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.CopyLiteralForm.Code,
+                $"COPY {operand}: {message}", mapped.OriginAt(at).ToLocation(), default);
+
+        if (!c.TryPeek(out var w))
+        {
+            c.Error(c.Pos, $"{operand} is missing");
+            return null;
+        }
+        if (w.IsWord("COPY"))
+        {
+            ReportPlacement(mapped.OriginAt(w.Start), "a COPY statement begins inside another COPY statement — "
+                + "§7.2.3.3 SR1: \"a COPY statement shall not appear within a COPY statement\"");
+            c.MarkError();
+            return null;
+        }
+        if (w.Kind is not (TextWordKind.CharacterString or TextWordKind.Literal) || IsCopyPhraseWord(w))
+        {
+            c.Error(w.Start, $"{operand} is missing — found '{w.Value}'");
+            return null;
+        }
+        c.Advance(w);
+
+        string? name;
+        if (w.Kind == TextWordKind.Literal)
+        {
+            var literal = TextWordScanner.DecomposeLiteral(w.Value);
+            name = !literal.Terminated || !literal.IsAlphanumeric ? null
+                : literal.Prefix.Length == 0 ? literal.Content
+                : DecodeHexadecimal(literal.Content);
+            if (name is null)
+                LiteralForm(w.Start, $"{w.Value} is not an alphanumeric literal — §7.2.3.3 SR5: \"Literal-1 and "
+                    + "literal-2 shall be alphanumeric literals\"");
+        }
+        else if (FigurativeConstantWords.Contains(w.Value))
+        {
+            LiteralForm(w.Start, $"the figurative constant {w.Value.ToUpperInvariant()} names no library text — "
+                + "§7.2.3.3 SR4: \"A concatenation expression or figurative constant shall not be specified for "
+                + "literal-1, or literal-2\"");
+            if (w.IsWord("ALL") && c.TryPeek(out var allLiteral) && allLiteral.Kind == TextWordKind.Literal)
+                c.Advance(allLiteral);
+            name = null;
+        }
+        else
+            name = w.Value;
+
+        if (c.TryPeek(out var amp) && amp.IsWord("&"))
+        {
+            LiteralForm(amp.Start, "a concatenation expression names no library text — §7.2.3.3 SR4: \"A "
+                + "concatenation expression or figurative constant shall not be specified for literal-1, or literal-2\"");
+            while (c.TryPeek(out amp) && amp.IsWord("&"))
+            {
+                c.Advance(amp);
+                if (c.TryPeek(out var operandWord) && operandWord.Kind is TextWordKind.Literal or TextWordKind.CharacterString
+                    && !IsCopyPhraseWord(operandWord))
+                    c.Advance(operandWord);
+            }
+            return null;
+        }
+        return name;
+    }
+
+    /// <summary>The value of a hexadecimal alphanumeric literal's content (§8.3.3.2.2 format 2: each pair of
+    /// hexadecimal digits is one alphanumeric character); null when the content is not an even number of
+    /// hexadecimal digits.</summary>
+    private static string? DecodeHexadecimal(string hexDigits)
+    {
+        if (hexDigits.Length % 2 != 0) return null;
+        var chars = new char[hexDigits.Length / 2];
+        for (int i = 0; i < chars.Length; i++)
+        {
+            if (!byte.TryParse(hexDigits.AsSpan(2 * i, 2), System.Globalization.NumberStyles.AllowHexSpecifier,
+                    System.Globalization.CultureInfo.InvariantCulture, out byte b))
+                return null;
+            chars[i] = (char)b;
+        }
+        return new string(chars);
+    }
+
+    /// <summary>Report a §7.2.3.3 SR1 / SR2 placement violation (COBOLNET2451) at a SOURCE origin.</summary>
+    private void ReportPlacement(SourceOrigin at, string message)
+        => _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.CopyStatementPlacement.Code,
+            message, at.ToLocation(), default);
 
     /// <summary>Expand every COPY statement in <paramref name="text"/> ONE level (no recursion into the copybook):
     /// for each found copybook, its resolved text is handed to <paramref name="expandCopybook"/> (the merged
@@ -506,7 +551,10 @@ public sealed class CopyProcessor(
         int pos = 0;
         while (pos < text.Length)
         {
-            int copyIdx = FindCopyKeyword(text, pos);
+            int copyIdx = FindCopyKeyword(text, pos, glued => ReportPlacement(mapped.OriginAt(glued),
+                "COPY is glued to the character-string before it (no space follows the period, comma or semicolon), "
+                + "so it forms no COPY statement — §7.2.3.3 SR2: \"A COPY statement shall be preceded by a space "
+                + "except when it is the first statement in a compilation group\""));
             if (copyIdx < 0)
             {
                 w.AppendSlice(mapped, pos, text.Length - pos);
@@ -597,48 +645,26 @@ public sealed class CopyProcessor(
     }
 
     /// <summary>
-    /// Find the next COPY statement keyword from <paramref name="startPos"/>. Unlike a
-    /// line-start scan, COPY may appear anywhere a separator is allowed — after a level number
-    /// (77 COPY K1W03.), after a data-name (01 TST-TEST COPY K101A.), or inside a statement
-    /// (ADD COPY K1P01. TO …). The scan honours source structure: it never matches inside an
-    /// alphanumeric literal ("… COPY …") nor inside a free-form '*&gt;' comment, and requires
-    /// word boundaries so COPYSECT-1 is not mistaken for COPY.
+    /// Find the next COPY statement from <paramref name="startPos"/> (a position between statements): the next
+    /// text-word that is the character-string COPY (§7.2.2.3 "A character-string is either a text-word or the word
+    /// 'COPY'"). COPY may appear anywhere a character-string may (§7.2.3.3 SR1) — after a level number
+    /// (77 COPY K1W03.), after a data-name (01 TST-TEST COPY K101A.), inside a statement (ADD COPY K1P01. TO …) — and
+    /// because the search walks <see cref="TextWordScanner"/> words it can never match inside a literal, a comment,
+    /// or a longer word (COPYSECT-1).
+    /// <para>A COPY glued behind a period, comma or semicolon (<c>PIC X.COPY BK.</c>) is not a text-word at all —
+    /// those characters separate only when a space follows (§8.3.5 2) / 3)) — so it is not a COPY statement; it is
+    /// the §7.2.3.3 SR2 mistake, and <paramref name="onGluedCopy"/> is told where it is so the caller can name the
+    /// rule instead of leaving the downstream parser to trip over the word.</para>
     /// </summary>
-    private static int FindCopyKeyword(string text, int startPos)
+    private static int FindCopyKeyword(string text, int startPos, Action<int>? onGluedCopy = null)
     {
-        bool inString = false;
-        char quote = '"';
-        for (int i = startPos; i < text.Length; i++)
+        int pos = startPos;
+        while (TextWordScanner.TryNext(text, ref pos, out var word))
         {
-            char c = text[i];
-
-            if (inString)
-            {
-                if (c == quote)
-                {
-                    if (i + 1 < text.Length && text[i + 1] == quote) { i++; continue; } // doubled quote
-                    inString = false;
-                }
-                continue;
-            }
-
-            if (c == '"' || c == '\'') { inString = true; quote = c; continue; }
-
-            // Free-form comment: '*>' to end of line.
-            if (c == '*' && i + 1 < text.Length && text[i + 1] == '>')
-            {
-                while (i < text.Length && text[i] != '\n') i++;
-                continue;
-            }
-
-            if ((c is 'C' or 'c') && MatchWord(text, i, "COPY"))
-            {
-                bool boundBefore = i == 0 || (!char.IsLetterOrDigit(text[i - 1]) && text[i - 1] is not ('-' or '_'));
-                int after = i + 4;
-                bool boundAfter = after >= text.Length || (!char.IsLetterOrDigit(text[after]) && text[after] is not ('-' or '_'));
-                if (boundBefore && boundAfter)
-                    return i;
-            }
+            if (word.IsWord("COPY")) return word.Start;
+            if (onGluedCopy is not null && word.Kind == TextWordKind.CharacterString && word.Span.Length > 4
+                && word.Span.EndsWith("COPY", StringComparison.OrdinalIgnoreCase) && word.Span[^5] is '.' or ',' or ';')
+                onGluedCopy(word.End - 4);
         }
         return -1;
     }
@@ -654,185 +680,157 @@ public sealed class CopyProcessor(
         return true;
     }
 
-    private static void SkipWhitespace(string text, ref int pos)
+    /// <summary>A cursor over the text-words of ONE COPY or REPLACE statement — the parser of their general formats
+    /// (§7.2.3.2 / §7.2.4.2) reads through it. Separator commas and semicolons "may be used anywhere the separator
+    /// space is used" (§8.3.5 2)), so <see cref="TryPeek"/> steps over them. Only a statement's FIRST syntax error is
+    /// reported; recovery (<see cref="ExpectSeparatorPeriod"/>) skips to the statement's separator period.</summary>
+    private sealed class StatementCursor(string text, int pos, Action<int, string> reportSyntax)
     {
-        while (pos < text.Length && char.IsWhiteSpace(text[pos]))
-            pos++;
-    }
+        public string Text { get; } = text;
 
-    private static string ReadWord(string text, ref int pos)
-    {
-        int start = pos;
-        while (pos < text.Length && (char.IsLetterOrDigit(text[pos]) || text[pos] is '-' or '_'))
-            pos++;
-        return text[start..pos];
-    }
+        /// <summary>The position just past the last text-word consumed.</summary>
+        public int Pos { get; private set; } = pos;
 
-    /// <summary>
-    /// Read a COPY text-name or library-name: either a quoted alphanumeric literal (ISO §7.2.3 — the
-    /// <c>literal-1</c>/<c>literal-2</c> alternative) whose surrounding quotes are stripped (a doubled embedded
-    /// quote collapses to one), or an ordinary unquoted COBOL word. <c>ReadWord</c> alone stopped at the opening
-    /// quote and returned an empty name, so <c>COPY "MYBOOK"</c> was reported "not found".
-    /// </summary>
-    private static string ReadTextNameOrLiteral(string text, ref int pos)
-    {
-        if (pos < text.Length && (text[pos] == '"' || text[pos] == '\''))
+        /// <summary>True once the statement has drawn an error (reported here or by the caller).</summary>
+        public bool HasError { get; private set; }
+
+        /// <summary>The next text-word, not consumed, stepping over separator commas and semicolons.</summary>
+        public bool TryPeek(out TextWord word)
         {
-            char quote = text[pos];
-            pos++; // opening quote
-            var sb = new System.Text.StringBuilder();
-            while (pos < text.Length)
-            {
-                if (text[pos] == quote)
-                {
-                    if (pos + 1 < text.Length && text[pos + 1] == quote) { sb.Append(quote); pos += 2; continue; }
-                    pos++; // closing quote
-                    break;
-                }
-                sb.Append(text[pos]);
-                pos++;
-            }
-            return sb.ToString();
+            int p = Pos;
+            while (TextWordScanner.TryNext(Text, ref p, out word))
+                if (word.Kind != TextWordKind.SeparatorCommaOrSemicolon) return true;
+            return false;
         }
-        return ReadWord(text, ref pos);
+
+        /// <summary>The next text-word of any kind, consumed — how a pseudo-text body is read.</summary>
+        public bool TryTake(out TextWord word)
+        {
+            int p = Pos;
+            if (!TextWordScanner.TryNext(Text, ref p, out word)) return false;
+            Pos = p;
+            return true;
+        }
+
+        public void Advance(in TextWord word) => Pos = word.End;
+
+        /// <summary>Report a syntax error (the statement's first only).</summary>
+        public void Error(int at, string message)
+        {
+            if (HasError) return;
+            HasError = true;
+            reportSyntax(Math.Min(at, Math.Max(0, Text.Length - 1)), message);
+        }
+
+        /// <summary>Record that the caller reported an error of its own, so no syntax error follows it.</summary>
+        public void MarkError() => HasError = true;
+
+        /// <summary>Consume the terminating separator period; anything else there is an error, recovered by
+        /// skipping to the next separator period (or the end of the text).</summary>
+        public void ExpectSeparatorPeriod()
+        {
+            if (TryPeek(out var w) && w.IsSeparatorPeriod) { Advance(w); return; }
+            if (TryPeek(out w))
+                Error(w.Start, $"'{w.Value}' is out of place — the general format allows no more phrases here, "
+                    + "and the statement ends with a separator period");
+            else
+                Error(Pos, "the statement has no terminating separator period");
+            while (TryTake(out w))
+                if (w.IsSeparatorPeriod) return;
+        }
     }
 
-    private static void ParseReplacements(string text, ref int pos,
-        List<(string from, string to, ReplaceKind kind)> replacements, Action<int>? onNonPseudoText = null)
+    /// <summary>Parse the operands of a REPLACING phrase (COPY, §7.2.3.2) or a format-1 REPLACE statement
+    /// (§7.2.4.2) into <paramref name="into"/>: one or more <c>[LEADING | TRAILING] operand BY operand</c> pairs, up
+    /// to (not including) the separator period. <paramref name="nonPseudoText"/> is told of each operand that is not
+    /// <c>==pseudo-text==</c> (COPY: the Annex E.2 removal gate; REPLACE: COBOLNET1641); <paramref name="nestedCopy"/>
+    /// (COPY only) of each COPY word inside pseudo-text (§7.2.3.3 SR1).</summary>
+    private static void ParseReplacingOperands(StatementCursor c, List<Replacement> into,
+        Action<int>? nonPseudoText, Action<int>? nestedCopy)
     {
-        while (pos < text.Length && text[pos] != '.')
+        bool any = false;
+        while (c.TryPeek(out var w) && !w.IsSeparatorPeriod)
         {
-            SkipWhitespace(text, ref pos);
-            if (pos >= text.Length || text[pos] == '.') break;
-
-            // Optional LEADING / TRAILING phrase → partial-word substitution (ISO §7.2.3.4 GR 9 b).
             ReplaceKind kind = ReplaceKind.Whole;
-            if (MatchWord(text, pos, "LEADING"))
-            { pos += "LEADING".Length; SkipWhitespace(text, ref pos); kind = ReplaceKind.Leading; }
-            else if (MatchWord(text, pos, "TRAILING"))
-            { pos += "TRAILING".Length; SkipWhitespace(text, ref pos); kind = ReplaceKind.Trailing; }
+            if (w.IsWord("LEADING")) { kind = ReplaceKind.Leading; c.Advance(w); }
+            else if (w.IsWord("TRAILING")) { kind = ReplaceKind.Trailing; c.Advance(w); }
 
-            NoteNonPseudoText(text, pos, onNonPseudoText);
-            string from = ReadReplaceOperand(text, ref pos);
-            SkipWhitespace(text, ref pos);
-
-            if (MatchWord(text, pos, "BY"))
+            if (ReadOperand(c, nonPseudoText, nestedCopy) is not { } from) return;
+            bool more = c.TryPeek(out var by);
+            if (!more || !by.IsWord("BY"))
             {
-                pos += "BY".Length;
-                SkipWhitespace(text, ref pos);
+                c.Error(more ? by.Start : c.Pos, "BY and the replacement operand must follow each REPLACING operand");
+                return;
             }
-
-            NoteNonPseudoText(text, pos, onNonPseudoText);
-            string to = ReadReplaceOperand(text, ref pos);
-            replacements.Add((from, to, kind));
+            c.Advance(by);
+            if (ReadOperand(c, nonPseudoText, nestedCopy) is not { } to) return;
+            into.Add(new Replacement(MatchWords(from), to, kind));
+            any = true;
         }
+        if (!any) c.Error(c.Pos, "the REPLACING phrase names no operands");
     }
 
-    /// <summary>Report an operand about to be read that is NOT <c>==pseudo-text==</c> (the identifier /
-    /// literal / word forms) to <paramref name="onNonPseudoText"/> — the COPY REPLACING call site's VCR-row-4
-    /// gate (removed 2023); the REPLACE statement's caller passes null (REPLACE is pseudo-text-only surface
-    /// and not part of the E.2 removal).</summary>
-    private static void NoteNonPseudoText(string text, int pos, Action<int>? onNonPseudoText)
+    /// <summary>Read one REPLACING operand and return its text as written: the content of a <c>==pseudo-text==</c>
+    /// (bounded by the pseudo-text-delimiter TEXT-WORDS, so an <c>==</c> inside a literal does not end it), or — the
+    /// COBOL-85 / 2002 / 2014 COPY forms (removed by ISO 2023, Annex E.2 item 1) — a literal, or an identifier / word:
+    /// a word with optional OF/IN qualifiers and one balanced subscript group. Null (and a syntax error) when no
+    /// operand is there.</summary>
+    private static string? ReadOperand(StatementCursor c, Action<int>? nonPseudoText, Action<int>? nestedCopy)
     {
-        if (onNonPseudoText is not null
-            && !(pos < text.Length - 1 && text[pos] == '=' && text[pos + 1] == '='))
-            onNonPseudoText(pos);
-    }
-
-    private static string ReadReplaceOperand(string text, ref int pos)
-    {
-        if (pos < text.Length - 1 && text[pos] == '=' && text[pos + 1] == '=')
+        bool more = c.TryPeek(out var w);
+        if (!more || w.IsSeparatorPeriod || w.IsWord("BY"))
         {
-            pos += 2;
-            int start = pos;
-            while (pos < text.Length - 1 && !(text[pos] == '=' && text[pos + 1] == '='))
-                pos++;
-            string result = text[start..pos].Trim();
-            if (pos < text.Length - 1) pos += 2;
-            return result;
+            c.Error(more ? w.Start : c.Pos, "a REPLACING operand is missing");
+            return null;
         }
 
-        if (pos < text.Length && text[pos] is '"' or '\'')
+        if (w.Kind == TextWordKind.PseudoTextDelimiter)
         {
-            // An alphanumeric literal operand. The quotation marks are part of the literal
-            // token (REPLACE …-1 BY "TRUE " must yield a quoted literal in the source, not the
-            // bare word TRUE), so include them in the returned text.
-            char quote = text[pos];
-            int start = pos;
-            pos++;
-            while (pos < text.Length && text[pos] != quote)
-                pos++;
-            if (pos < text.Length) pos++; // consume closing quote
-            return text[start..pos];
-        }
-
-        // identifier-1/2 or word-1/2 (COBOL-85 COPY … REPLACING): a data-name with optional
-        // OF/IN qualifiers and an optional subscript — e.g. WRK IN GRP-002 (1). A plain word
-        // (including a signed number such as +2) is the degenerate single-text-word case. The
-        // verbatim span is returned: for matching it is tokenized into text words, and as a
-        // replacement it is inserted as written.
-        int idStart = pos;
-        if (string.IsNullOrEmpty(ReadTextWord(text, ref pos)))
-        {
-            if (pos < text.Length) pos++; // make progress on an unexpected character
-            return text[idStart..pos];
-        }
-
-        // OF/IN qualifier chain.
-        while (true)
-        {
-            int mark = pos;
-            SkipWhitespace(text, ref pos);
-            string kw = ReadTextWord(text, ref pos);
-            if (string.Equals(kw, "OF", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(kw, "IN", StringComparison.OrdinalIgnoreCase))
+            c.Advance(w);
+            while (c.TryTake(out var t))
             {
-                SkipWhitespace(text, ref pos);
-                ReadTextWord(text, ref pos); // qualifier data-name
-                continue;
+                if (t.Kind == TextWordKind.PseudoTextDelimiter)
+                    return c.Text[w.End..t.Start].Trim();
+                if (t.IsWord("COPY")) nestedCopy?.Invoke(t.Start);
             }
-            pos = mark; // not a qualifier — leave it for the next operand
-            break;
+            c.Error(w.Start, "the ==pseudo-text== has no closing delimiter");
+            return null;
         }
 
-        // Optional subscript: a balanced ( … ) group immediately following the name.
-        int beforeSub = pos;
-        SkipWhitespace(text, ref pos);
-        if (pos < text.Length && text[pos] == '(')
+        nonPseudoText?.Invoke(w.Start);
+        if (w.Kind == TextWordKind.Literal)
+        {
+            c.Advance(w);
+            return w.Value;
+        }
+        if (w.Kind != TextWordKind.CharacterString)
+        {
+            c.Error(w.Start, $"'{w.Value}' is not a REPLACING operand");
+            return null;
+        }
+
+        // identifier-1/2 or word-1/2: a data-name with optional OF/IN qualifiers and an optional subscript —
+        // e.g. WRK IN GRP-002 (1). A plain word (including a signed number such as +2) is the degenerate
+        // single-text-word case. The verbatim span is returned: for matching it is scanned into text-words, and as
+        // a replacement it is inserted as written.
+        int start = w.Start;
+        c.Advance(w);
+        while (c.TryPeek(out var q) && (q.IsWord("OF") || q.IsWord("IN")))
+        {
+            c.Advance(q);
+            if (c.TryPeek(out var qualifier) && qualifier.Kind == TextWordKind.CharacterString) c.Advance(qualifier);
+        }
+        if (c.TryPeek(out var open) && open.Kind == TextWordKind.Separator && open.Span[0] == '(')
         {
             int depth = 0;
-            while (pos < text.Length)
+            while (c.TryTake(out var t))
             {
-                char d = text[pos];
-                if (d == '(') depth++;
-                else if (d == ')') { depth--; pos++; if (depth == 0) break; continue; }
-                pos++;
+                if (t.Kind != TextWordKind.Separator) continue;
+                if (t.Span[0] == '(') depth++;
+                else if (t.Span[0] == ')' && --depth == 0) break;
             }
         }
-        else
-        {
-            pos = beforeSub;
-        }
-
-        return text[idStart..pos];
-    }
-
-    /// <summary>
-    /// Read one COBOL text word starting at <paramref name="pos"/>: a maximal run of characters
-    /// that are not white space, parentheses, quotes, or a separator period/comma/semicolon.
-    /// (Quotes and parentheses are handled by the callers.) Used to read REPLACING operands.
-    /// </summary>
-    private static string ReadTextWord(string text, ref int pos)
-    {
-        int start = pos;
-        while (pos < text.Length)
-        {
-            char d = text[pos];
-            if (char.IsWhiteSpace(d) || d is '(' or ')' or '"' or '\'') break;
-            if (IsSeparatorPunctuation(text, pos) || IsSpaceEquivalentSeparator(text, pos)) break;
-            pos++;
-        }
-        return text[start..pos];
+        return c.Text[start..c.Pos];
     }
 
     private string? FindCopybook(string textName, string? libraryName = null)

@@ -2127,6 +2127,36 @@ public static class DiagnosticCatalog
         + "COPY statement\"; nesting (at least 5 levels) is permitted only without REPLACING (GR12). Flatten "
         + "the copybook, or drop the REPLACING phrase.",
         "ISO §7.2.3.4 GR10 / GR12");
+    /// <summary>COBOLNET2449 — a COPY or REPLACE statement that does not follow its general format (kb/Work PB1354).
+    /// Both statements are parsed over §7.2.2.5 text-words in general-format order (COPY: text-name-1/literal-1, the
+    /// OF/IN phrase, SUPPRESS [PRINTING], REPLACING operands, the separator period); a word out of place, a missing BY,
+    /// an empty REPLACING phrase, an unterminated pseudo-text or a missing separator period is this error. Before, a
+    /// hand scan read the header positionally and skipped everything else to the next '.', so
+    /// <c>COPY t SUPPRESS REPLACING …</c> silently lost its REPLACING phrase and every malformed header compiled.</summary>
+    public static readonly DiagnosticDescriptor TextManipulationStatementSyntax = new(
+        "COBOLNET2449", "text-manipulation-statement-syntax", EditionSeverity.Error,
+        "A COPY or REPLACE statement does not follow its general format: a word is out of place, a phrase is "
+        + "incomplete (REPLACING with no operands, an operand with no BY, an unterminated ==pseudo-text==), or the "
+        + "statement has no terminating separator period.",
+        "ISO §7.2.3.2 / §7.2.4.2 / §7.2.3.4 GR6");
+
+    /// <summary>COBOLNET2450 — COPY literal-1 / literal-2 that is not a plain alphanumeric literal (kb/Work PB1354):
+    /// a concatenation expression or figurative constant (§7.2.3.3 SR4), or a national or boolean literal (SR5
+    /// "Literal-1 and literal-2 shall be alphanumeric literals").</summary>
+    public static readonly DiagnosticDescriptor CopyLiteralForm = new(
+        "COBOLNET2450", "copy-literal-form", EditionSeverity.Error,
+        "COPY literal-1 or literal-2 is a concatenation expression, a figurative constant, or a literal that is not "
+        + "alphanumeric; the library text is named by a text-name or a single alphanumeric literal.",
+        "ISO §7.2.3.3 SR4 / SR5");
+
+    /// <summary>COBOLNET2451 — a COPY statement in a place §7.2.3.3 forbids (kb/Work PB1354): within another COPY
+    /// statement (SR1 — in its header or its REPLACING operands, where it would otherwise have been spliced and
+    /// expanded), or not preceded by a space (SR2).</summary>
+    public static readonly DiagnosticDescriptor CopyStatementPlacement = new(
+        "COBOLNET2451", "copy-statement-placement", EditionSeverity.Error,
+        "A COPY statement appears within a COPY statement, or is not preceded by a space.",
+        "ISO §7.2.3.3 SR1 / SR2");
+
     public static readonly DiagnosticDescriptor UndefinedReference = new(
         "COBOLNET1639", "undefined-reference", EditionSeverity.Error,
         "A statement or clause references a name that no declaration in the source element defines, or that the "

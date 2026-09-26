@@ -471,13 +471,13 @@
   "ordinal": 1,
   "subject": "Text manipulation elements",
   "rule-digest": "e6135fcdfa31",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSeparatorPunctuation; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSpaceEquivalentSeparator",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#SeparatorFollows; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#MatchWords",
+  "test-ref": "unit:TextManipulationTextWordTests.Colon_SeparatesTextWords; unit:TextManipulationTextWordTests.PictureStrings_AreSingleTextWords; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). Rule: \"a separator, except for: a space; a pseudo-text delimiter; and the opening and closing delimiters ... In determining which character sequences form text-words, the colon, the right parenthesis, and the left parenthesis characters, in any context except within alphanumeric or national literals, are treated as separators\" (cite.py --check 7.2.2.5 -> OK §7.2.2.5 1)). The separator set is §8.3.5: comma/semicolon 'immediately followed by a space' (--check 8.3.5 -> OK 2)), period 'when followed by a space' (--check 8.3.5 -> OK 3)), parentheses, colon. Code: TokenizeTextWords makes '(' and ')' standalone words (correct; probe tw4 control: REPLACE ==WA== BY ==WC== hits WA(1:5), output [ABCDE ]B) but (a) the COLON is NOT a separator at all: 'WA(1:5)' tokenizes as '(' '1:5' ')'; and (b) period/comma/semicolon are classified by 'not followed by a DIGIT' instead of 'followed by a space', so a picture string ZZ.ZZ or Z,ZZ9 is split into several text-words (and the comma inside it is even dropped as a space-equivalent separator). Probe tw1 (all editions incl. --std 85): REPLACE ==5== BY ==2==. ... MOVE WA(1:5) TO WB, WA='ABCDEF' -> observed [ABCDE ]; spec: the text-word 5 is matched and replaced -> WA(1:2) -> expected [AB    ]. Probe tw2: REPLACE ==ZZ== BY ==99==. 01 WA PIC ZZ.ZZ. MOVE 5 -> observed [05.00]; spec: ZZ.ZZ is ONE text-word, no match -> expected [ 5.00]. The comma/semicolon-as-space treatment for MATCHING is §7.2.3.4 GR9 c) 1 and is right for a real separator comma; the defect is the classification. No register note owns this (searched kb/Work for TokenizeTextWords/pseudo-text). Finding F1. || editions (adjudicator): 1985, 2002, 2014, 2023 (text manipulation / COPY-REPLACE text-words exist in every edition; boolean and national literal delimiters from 2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): The colon and parentheses are separator text-words outside literals; period/comma/semicolon separate only when a space follows (8.3.5 2)/3)). Probe tw1: WA(1:5) under ==5== BY ==2== -> [AB    ]; tw2 ZZ.ZZ stays one word -> [ 5.00]. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSeparatorPunctuation (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSpaceEquivalentSeparator (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.2.5-2",
@@ -486,13 +486,13 @@
   "ordinal": 2,
   "subject": "Text manipulation elements",
   "rule-digest": "43a1488e42b7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#LiteralPrefixLength; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#LiteralEnd",
+  "test-ref": "unit:TextManipulationTextWordTests.Literals_WithPrefixOrDoubledQuote_AreSingleTextWords; conformance:2002/pb1354_copy_header_2002; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). Rule: \"an alphanumeric, boolean, or national literal including the opening and closing delimiters that bound the literal\" (cite.py --check 7.2.2.5 -> OK §7.2.2.5 2)). Opening delimiters per §8.3.5 5): a quotation symbol, B\" B' N\" N' X\" X', BX\" BX' NX\" NX' (--check 8.3.5 -> OK 5)). Code: the literal arm of TokenizeTextWords starts only at a bare quote/apostrophe and ends at the FIRST matching quote. (a) A prefixed literal splits: the ordinary-word loop stops at the quote, so X\"41\" is two words 'X' + '\"41\"', N\"PQ\" is 'N' + '\"PQ\"' (same for B, BX, NX). (b) A doubled quote inside the content ends the literal early: \"P\"\"Q\" becomes '\"P\"' + '\"Q\"'. Probe tw3 (--std 2002/2014/2023): REPLACE ==\"41\"== BY ==\"42\"== ==\"PQ\"== BY ==\"RS\"== ==\"Q\"== BY ==\"Z\"==. DISPLAY X\"41\" / N\"PQ\" / \"P\"\"Q\" -> observed [B] [RS] [P\"Z]; spec: none of the three literal text-words equals any pseudo-text-1 -> expected [A] [PQ] [P\"Q]. Probe tw5 --std 85: REPLACE ==\"Q\"== BY ==\"Z\"==. DISPLAY \"P\"\"Q\" -> observed [P\"Z], expected [P\"Q]. The plain \"...\" and '...' arm without doubled quotes is correct (tw5 'Q\"' unchanged). Finding F2. || editions (adjudicator): 1985, 2002, 2014, 2023 (alphanumeric literal text-words all editions; boolean, national and hexadecimal-prefixed literal delimiters per §8.3.5 5) from 2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): A literal is ONE text-word from its 8.3.5 5) opening delimiter (X\" N\" NX\" B\" BX\", either quote, any case) through its closing delimiter, doubled quotes inside. Probe tw3: [A] [PQ] [P\"Q]. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.2.5-3",
@@ -501,13 +501,13 @@
   "ordinal": 3,
   "subject": "Text manipulation elements",
   "rule-digest": "1b11e27258c1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#EndsCharacterString",
+  "test-ref": "unit:TextManipulationTextWordTests.PictureStrings_AreSingleTextWords; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). Rule has two halves (cite.py --check 7.2.2.5 \"bounded by separators\" -> OK §7.2.2.5 3); --check 7.2.2.5 \"The implementor may prohibit the use of one or more characters from outside the COBOL character repertoire\" -> OK 3)). Half 1, formation 'any other ... sequence of contiguous characters ... bounded by separators': the ordinary-word loop of TokenizeTextWords ends a word at whitespace, parens, a quote, or its own period/comma/semicolon test; since that test is 'not followed by a digit' rather than §8.3.5's 'followed by a space', and the colon is not a boundary at all, the words it forms are not the words bounded by separators (probe tw2: PIC ZZ.ZZ under REPLACE ==ZZ== BY ==99== -> observed [05.00], expected [ 5.00]; probe tw1 '1:5' formed as one word) - same mechanism as GR1, finding F1. Half 2, the implementor latitude: the code prohibits nothing (any character forms text-words), which is a permitted choice, but Annex A.1 item 23 (cite.py --check A.1 \"Characters prohibited from use in text-words in COPY\" -> OK §A.1 23): 'This item is required. This item shall be documented') has no DOC-A.1-23 row in docs/CONFORMANCE.md (grep: no text-word/item-23 determination) - finding F3. || editions (adjudicator): 1985, 2002, 2014, 2023 (the implementor-prohibition sentence and Annex A.1 item 23 per the 2023 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): Any other character sequence bounded by separators is one text-word: Z,ZZ9 and ZZ.ZZ are single words (probe comma.cob [   12]). The optional prohibition of non-repertoire characters is not exercised. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-1",
@@ -516,13 +516,13 @@
   "ordinal": 1,
   "subject": "COPY statement",
   "rule-digest": "08a458b5094b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#FindCopyKeyword; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ExpandCopiesOneLevel; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseCopyStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#FindCopyKeyword",
+  "test-ref": "unit:TextManipulationTextWordTests.CopyWithinCopy_DrawsSr1; unit:TextManipulationTextWordTests.LegalCopyPlacements_StayClean",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1354 (registrar 15a). cite.py --check 7.2.3.3 'a COPY statement shall not appear within a COPY statement' OK. Placement half CONFORMS by probe: COPY mid-statement (q05 'DISPLAY COPY BKW..' -> HELLO), COPY text inside a literal not expanded (q04 VALUE \"COPY BK2.\" displays verbatim), comment lines skipped (q06), after a level number/data-name per FindCopyKeyword doc. Prohibition half NOT enforced: q01 'COPY BK1 REPLACING ==AA-X== BY ==COPY BK2.==.' -- a COPY inside the COPY statement -- draws no diagnostic; the pseudo-text-2 is spliced and the nested COPY BK2 is expanded (only an incidental downstream parse error, and p13 draws a misleading CBL3621 'Circular COPY'). Expected: the statement rejected under SR1. Also CopyProcessor.cs:423 cites '§7.2.3.3 SR 1' for self-inclusion, which is §7.2.3.4 GR12 ('shall not cause the processing of a COPY statement that directly or indirectly copies itself', --check OK) -- a real clause answering a different question. Finding F3. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): A COPY inside the REPLACING operands or header of another COPY is COBOLNET2451 and is not spliced (probes q01, p13, p7); placement anywhere a character-string may appear still works (q04 literal, 77 COPY). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-2",
@@ -531,13 +531,13 @@
   "ordinal": 2,
   "subject": "COPY statement",
   "rule-digest": "b85c88e8fe05",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#FindCopyKeyword",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#FindCopyKeyword",
+  "test-ref": "unit:TextManipulationTextWordTests.CopyNotPrecededByASpace_DrawsSr2; unit:TextManipulationTextWordTests.LegalCopyPlacements_StayClean",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1354 (registrar 15a). cite.py --check 7.2.3.3 'A COPY statement shall be preceded by a space except when it is the first statement in a compilation group' OK. FindCopyKeyword's boundBefore accepts any non-letter/digit/-/_ character, so p14 '01 Q PIC X.COPY BK1.' (COPY preceded by a period, not a space) compiles and runs (HELLO) with no diagnostic. Expected: rejected (SR2). Under-rejects. Finding F3. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): COPY directly after ( ) : a literal or == is COBOLNET2451; a COPY glued behind . , ; forms no text-word and is reported (probe p14). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-3",
@@ -561,13 +561,13 @@
   "ordinal": 4,
   "subject": "COPY statement",
   "rule-digest": "f4cc4e51b376",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadCopyName",
+  "test-ref": "unit:TextManipulationTextWordTests.IllegalLiteralForm_DrawsSr4OrSr5",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1354 (registrar 15a). cite.py --check 7.2.3.3 'A concatenation expression or figurative constant shall not be specified for literal-1, or literal-2' OK. p05 'COPY \"BK\" & \"1\".' reads literal-1 as \"BK\" and skips '& \"1\"' to the period with no diagnostic (it then silently looks up a copybook BK -- if one existed its text would be copied). s04 'COPY SPACE.' treats the figurative constant as a text-name and compiles silently (missing copybook is also silent, a part-2 GR2 matter). Expected: both rejected. Under-rejects. Finding F1. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): Concatenation and figurative constants for literal-1/literal-2 are COBOLNET2450 (probes p05, s04). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-5",
@@ -576,13 +576,13 @@
   "ordinal": 5,
   "subject": "COPY statement",
   "rule-digest": "1d1d1ca39ad6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadCopyName; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#DecodeHexadecimal",
+  "test-ref": "unit:TextManipulationTextWordTests.IllegalLiteralForm_DrawsSr4OrSr5; unit:TextManipulationTextWordTests.AlphanumericLiteral_NamesTheLibraryText; conformance:2002/pb1354_copy_header_2002",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1354 (registrar 15a). cite.py --check 7.2.3.3 'Literal-1 and literal-2 shall be alphanumeric literals' OK. Half 1 (alphanumeric only): p06 'COPY N\"BK1\".' reads the word N as the text-name and ignores the national literal, no diagnostic; p17 'COPY 1234.' a numeric literal likewise silent. Half 2 (implementor-defined allowable value): no determination in docs/CONFORMANCE.md although A.1 item 40 names SR5 as a required, documented item (PB160 owns A.1 register debt). Alphanumeric literal-1/literal-2 values work (p03, pb82 golden). Under-rejects. Finding F1. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): National/boolean literal-1/literal-2 are COBOLNET2450 (probe p06); an alphanumeric literal (plain or X\"..\") names the text by its value (DOC-A.1-40). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-6",
@@ -592,11 +592,11 @@
   "subject": "COPY statement",
   "rule-digest": "46507fd49e62",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'at least one of which shall be neither a separator comma nor a separator semicolon' OK. ApplyReplacements filters `.Where(r => r.tokens.Count > 0)` -- an empty or comma/semicolon-only pseudo-text-1 is SILENTLY DROPPED: p08 'REPLACING ==== BY ==BB-Y==' and p07 'REPLACING ==,== BY ==BB-Y==' compile and run (HELLO) with no diagnostic. Expected: rejected. Under-rejects. Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
+  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'at least one of which shall be neither a separator comma nor a separator semicolon' OK. ApplyReplacements filters `.Where(r => r.tokens.Count > 0)` -- an empty or comma/semicolon-only pseudo-text-1 is SILENTLY DROPPED: p08 'REPLACING ==== BY ==BB-Y==' and p07 'REPLACING ==,== BY ==BB-Y==' compile and run (HELLO) with no diagnostic. Expected: rejected. Under-rejects. Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -607,11 +607,11 @@
   "subject": "COPY statement",
   "rule-digest": "b8989be82e79",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'Pseudo-text-2 shall contain zero, one, or more text-words' OK. Zero: p16 '==AA-X== BY ====' deletes the name (compiles, X printed). One: p02 -> BB-Y. More: p11/p13 multi-word pseudo-text-2 spliced verbatim. A permissive rule, all three cardinalities accepted. No spec-derived golden pins the empty form (test-needed). || REFUTED: PARTIAL — SR7 admits pseudo-text-2 of ONE text-word, and per §7.2.2.5 item 2 a text-word may be an alphanumeric literal including its delimiters, whose content may contain '=='. ReadReplaceOperand scans for the closing '==' character-by-character without literal awareness, so pseudo-text-2 ==\"A==B\"== (one legal text-word) is split at the literal's interior '==': the rest is mis-read as a non-pseudo-text operand (false COBOLNET0902) and the substituted text is a broken literal (COBOL0001). Zero-word (==  ==, ====), multi-word, comment-line-bearing, period-in-literal and doubled-quote forms all work, so the rule is honoured for most shapes but not for every legal one-text-word pseudo-text-2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
+  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'Pseudo-text-2 shall contain zero, one, or more text-words' OK. Zero: p16 '==AA-X== BY ====' deletes the name (compiles, X printed). One: p02 -> BB-Y. More: p11/p13 multi-word pseudo-text-2 spliced verbatim. A permissive rule, all three cardinalities accepted. No spec-derived golden pins the empty form (test-needed). || REFUTED: PARTIAL — SR7 admits pseudo-text-2 of ONE text-word, and per §7.2.2.5 item 2 a text-word may be an alphanumeric literal including its delimiters, whose content may contain '=='. ReadReplaceOperand scans for the closing '==' character-by-character without literal awareness, so pseudo-text-2 ==\"A==B\"== (one legal text-word) is split at the literal's interior '==': the rest is mis-read as a non-pseudo-text operand (false COBOLNET0902) and the substituted text is a broken literal (COBOL0001). Zero-word (==  ==, ====), multi-word, comment-line-bearing, period-in-literal and doubled-quote forms all work, so the rule is honoured for most shapes but not for every legal one-text-word pseudo-text-2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -622,11 +622,11 @@
   "subject": "COPY statement",
   "rule-digest": "faa8650d0f61",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1359 (registrar 15a). cite.py --check 7.2.3.3 'may be continued in accordance with the rules of reference format' OK. Fixed continuation works: r01 (2023, fixed literal continuation inside ==\"HEL / -\"LO\"==) -> WORLD; r02 word continuation at --std 2014 -> replaced (2023 rejects word continuation per E.2, correct). The FLOATING literal continuation indicator (§6.2.3.1 '\"- '- literal continuation indicator', --check OK; the only non-obsolete form in 2023) is not implemented anywhere in ReferenceFormatProcessor: s11 '01 T PIC X(5) VALUE \"AB\"- / \"CDE\".' is rejected (COBOL0001), and inside pseudo-text s10 '==\"HEL\"- / \"LO\"== BY ==\"WOR\"- / \"LD\"==' silently fails to match (HELLO printed; expected WORLD). Finding F5 (root cause is §6, not §7.2.3). || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
+  "notes": "kb/Work PB1359 (registrar 15a). cite.py --check 7.2.3.3 'may be continued in accordance with the rules of reference format' OK. Fixed continuation works: r01 (2023, fixed literal continuation inside ==\"HEL / -\"LO\"==) -> WORLD; r02 word continuation at --std 2014 -> replaced (2023 rejects word continuation per E.2, correct). The FLOATING literal continuation indicator (§6.2.3.1 '\"- '- literal continuation indicator', --check OK; the only non-obsolete form in 2023) is not implemented anywhere in ReferenceFormatProcessor: s11 '01 T PIC X(5) VALUE \"AB\"- / \"CDE\".' is rejected (COBOL0001), and inside pseudo-text s10 '==\"HEL\"- / \"LO\"== BY ==\"WOR\"- / \"LD\"==' silently fails to match (HELLO printed; expected WORLD). Finding F5 (root cause is §6, not §7.2.3). || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -637,11 +637,11 @@
   "subject": "COPY statement",
   "rule-digest": "db08aa2a5728",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'shall be from 1 through 65,535 character positions' OK. No length check exists on text-words in pseudo-text or library text: r05 a 70,000-character text-word as pseudo-text-1 compiles and runs silently. Lower bound is structural (a text-word is non-empty). Upper-bound acceptance up to 65,535 is not in doubt; exceeding it is not diagnosed. Under-rejects (low). Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
+  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'shall be from 1 through 65,535 character positions' OK. No length check exists on text-words in pseudo-text or library text: r05 a 70,000-character text-word as pseudo-text-1 compiles and runs silently. Lower bound is structural (a text-word is non-empty). Upper-bound acceptance up to 65,535 is not in doubt; exceeding it is not diagnosed. Under-rejects (low). Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -652,11 +652,11 @@
   "subject": "COPY statement",
   "rule-digest": "4db5bbe8ad8e",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ProcessWithCopyMapped",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ProcessWithCopyMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'Compiler directive lines shall not be specified within pseudo-text-1' OK. r03 (a '>>SOURCE FORMAT FIXED' line inside pseudo-text-1) and r04 (inside pseudo-text-2) both compile and run with the replacement applied (BB-Y -> HELLO), no diagnostic. Expected: rejected. Under-rejects. Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
+  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'Compiler directive lines shall not be specified within pseudo-text-1' OK. r03 (a '>>SOURCE FORMAT FIXED' line inside pseudo-text-1) and r04 (inside pseudo-text-2) both compile and run with the replacement applied (BB-Y -> HELLO), no diagnostic. Expected: rejected. Under-rejects. Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -697,11 +697,11 @@
   "subject": "COPY statement",
   "rule-digest": "5769f9c02112",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'shall not be specified as partial-word-1 or partial-word-2' OK. p12 'LEADING ==\"HE\"== BY ==\"XY\"==' compiles and runs silently (the literal token, quotes included, is used as a prefix). Expected: rejected. (The bare-literal non-pseudo-text form is separately caught at 2023 by COBOLNET0902; the pseudo-text-delimited literal is not.) Under-rejects. Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
+  "notes": "kb/Work PB1353 (registrar 15a). cite.py --check 7.2.3.3 'shall not be specified as partial-word-1 or partial-word-2' OK. p12 'LEADING ==\"HE\"== BY ==\"XY\"==' compiles and runs silently (the literal token, quotes included, is used as a prefix). Expected: rejected. (The bare-literal non-pseudo-text form is separately caught at 2023 by COBOLNET0902; the pseudo-text-delimited literal is not.) Under-rejects. Finding F2. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -712,11 +712,11 @@
   "subject": "COPY statement",
   "rule-digest": "14a0a28e0459",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#FindCopybook",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#FindCopybook; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadCopyName",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1355 (registrar 15a). GR1: 'Text-name-1 or literal-1 identifies the library text to be processed by the COPY statement.' ReadTextNameOrLiteral reads the word or the alphanumeric literal (quotes stripped, doubled quote collapsed) and FindCopybook resolves it; probe p8d (COPY \"p8book\".) incorporated the text -> DFLT. Unverified/defective edge: when the name identifies NO library text the COPY is silently replaced by the comment '*> COPY X — copybook not found' in every Cobol.Net compile, because Frontend.Preprocess (src/Cobol.Net.Frontend/Pipeline/Frontend.cs:142) constructs CopyProcessor with strict: false unconditionally, so CBL3620 never fires; probe p1 (COPY NOSUCHBOOK.) compiled and ran printing OK with no diagnostic. See finding 'library availability not enforced'. cite.py --check 7.2.3.4 'logically replacing the entire COPY statement beginning with the reserved word COPY and ending with the separator period, inclusive' -> OK §7.2.3.4 6). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
+  "notes": "kb/Work PB1355 (registrar 15a). GR1: 'Text-name-1 or literal-1 identifies the library text to be processed by the COPY statement.' ReadTextNameOrLiteral reads the word or the alphanumeric literal (quotes stripped, doubled quote collapsed) and FindCopybook resolves it; probe p8d (COPY \"p8book\".) incorporated the text -> DFLT. Unverified/defective edge: when the name identifies NO library text the COPY is silently replaced by the comment '*> COPY X — copybook not found' in every Cobol.Net compile, because Frontend.Preprocess (src/Cobol.Net.Frontend/Pipeline/Frontend.cs:142) constructs CopyProcessor with strict: false unconditionally, so CBL3620 never fires; probe p1 (COPY NOSUCHBOOK.) compiled and ran printing OK with no diagnostic. See finding 'library availability not enforced'. cite.py --check 7.2.3.4 'logically replacing the entire COPY statement beginning with the reserved word COPY and ending with the separator period, inclusive' -> OK §7.2.3.4 6). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -786,13 +786,13 @@
   "ordinal": 6,
   "subject": "COPY statement",
   "rule-digest": "b40317ac7f90",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ExpandCopiesOneLevel",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseCopyStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#StatementCursor",
+  "test-ref": "unit:TextManipulationTextWordTests.PeriodInsidePseudoText_DoesNotEndTheStatement; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1354 (registrar 15a). GR6: '...copied into the compilation group, logically replacing the entire COPY statement beginning with the reserved word COPY and ending with the separator period, inclusive.' cite.py --check 7.2.3.4 'logically replacing the entire COPY statement beginning with the reserved word COPY and ending with the separator period, inclusive' -> OK §7.2.3.4 6). ExpandCopiesOneLevel splices text up to the COPY keyword, the incorporated text framed by newlines, and resumes after the period ResolveOneCopy found (pos = afterCopy); FindCopyKeyword honours word boundaries, literals and *> comments. Mid-line COPY works (NIST forms). Defective edge: the terminating separator period is located by a raw scan `while text[afterCopy] != '.'` whenever the phrase parser did not consume the rest of the statement — after SUPPRESS [PRINTING] a REPLACING phrase is not parsed, so a '.' inside its pseudo-text ends the statement early. Probe p13 (COPY p2book SUPPRESS REPLACING ==VALUE \"AAA\".== BY ==VALUE \"ZZZ\".==.) -> error COBOL0001: unexpected '=' (legal source rejected). Same mechanism as GR8's finding. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ Existing tests cover only the conforming half and do not close this row: conformance:2023/copy_nested_five_levels. || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): The statement ends at its SEPARATOR period; a period inside pseudo-text is an operand text-word (probe p13 -> ZZZ). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-7",
@@ -816,13 +816,13 @@
   "ordinal": 8,
   "subject": "COPY statement",
   "rule-digest": "52b4837424e9",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseCopyStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
+  "test-ref": "unit:TextManipulationTextWordTests.SuppressThenReplacing_AppliesTheReplacing; conformance:2002/pb1354_copy_header_2002",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). GR8: 'If the REPLACING phrase is specified, library text is modified ... Each matched occurrence of pseudo-text-1 or partial-word-1 in the library text is replaced by the corresponding pseudo-text-2 or partial-word-2' (cite.py --check 7.2.3.4 'Each matched occurrence of pseudo-text-1 or partial-word-1 in the library text is replaced by the corresponding pseudo-text-2' -> OK §7.2.3.4 8)). The flat case works (FlatReplacing_StaysClean; probe p10 LEADING/TRAILING/whole). DEFECT: ResolveOneCopy recognizes REPLACING only IMMEDIATELY after the text-name / OF-IN qualifier; the general format (§7.2.3.2) places [SUPPRESS PRINTING] BEFORE the REPLACING phrase, and ResolveOneCopy never parses SUPPRESS — it falls to the scan-to-period, discarding the REPLACING phrase with no diagnostic. Probe p2 (copybook '01 AAA-VAR PIC X(3) VALUE \"AAA\".'; COPY p2book SUPPRESS PRINTING REPLACING ==AAA-VAR== BY ==BBB-VAR==.; DISPLAY BBB-VAR) -> COBOLNET1639 'BBB-VAR' is not defined; p2b same with bare SUPPRESS. Expected: BBB-VAR declared, displays AAA. Where the program also declares the original name, the replacement is lost silently (wrong answer). Second defect in the same GR: REPLACING runs on the library text BEFORE its conditional-compilation directives are processed (ResolveOneCopy applies ApplyReplacements, then expandCopybook runs CC) — contrary to §7.2.1 Step 2 which orders 'a) DEFINE, IF, and EVALUATE directives' before 'd) the replacing actions of COPY statements' (cite.py --check 7.2.1 'the replacing actions of COPY statements' -> OK §7.2.1) — see L2.5. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ Existing tests cover only the conforming half and do not close this row: unit:CopyReplacingNestedCopyTests.FlatReplacing_StaysClean. || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): The REPLACING phrase is applied in every legal header shape, SUPPRESS included (probes p2/p2b AAA, p01 HELLO). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-9",
@@ -831,13 +831,13 @@
   "ordinal": 9,
   "subject": "COPY statement",
   "rule-digest": "e82d3bd19add",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#MatchesForReplacing; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.CopyReplacing_ComparesLiteralsByTheSameRules; unit:TextManipulationTextWordTests.LiteralContent_IsCaseSensitive; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1351 (registrar 15a). GR9 a)/b): '...the entire REPLACING phrase operand that precedes the reserved word BY is compared to an equivalent number of contiguous library text-words' / 'Pseudo-text-1 matches the library text only if the ordered sequence of text-words that forms pseudo-text-1 is equal, character for character, to the ordered sequence of library text-words.' (cite.py --check 7.2.3.4 'Pseudo-text-1 matches the library text only if the ordered sequence of text-words that forms pseudo-text-1 is equal, character for character' -> OK, printed path '9) a)' — the mislabel is kb/Work PB718, open). §7.2.2.5 2) makes a literal ONE text-word 'including the opening and closing delimiters that bound the literal' (cite.py --check 7.2.2.5 -> OK §7.2.2.5 2)). TokenizeTextWords breaks literals into the wrong text-words: (1) the literal PREFIX (X, N, NX, B, BX, Z, U...) ends the word run at the quote and becomes its own text-word, the quoted body another; (2) a literal ends at the FIRST embedded quote, so \"p\"\"q\" is two text-words \"p\" and \"q\". Probe p12 (copybook VALUE X\"41\"; COPY p12book REPLACING ==\"41\"== BY ==\"42\"==) -> displays B; expected A (the text-word X\"41\" is not equal to \"41\"; no match). The LEADING/TRAILING half and the a)/d)/e)/f)/g) cycle verified correct by probe p10 (first operand wins, no rescan, partial-word-2 empty deletes). Siblings: the §7.2.4 REPLACE statement uses the same TokenizeTextWords/ApplyReplacements. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 85, 2002, 2014, 2023 for pseudo-text matching; the LEADING/TRAILING partial-word half per the clause's general format (edition of introduction not stated in this clause)",
-  "state": "GAP"
+  "notes": "kb/Work PB1351 landed (w61a): COPY REPLACING compares text-words by TextWord.MatchesForReplacing (probe p3: abc / NNN / OOO; p12: A). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-L2.1",
@@ -846,13 +846,13 @@
   "ordinal": 1,
   "subject": "COPY statement",
   "rule-digest": "bd681fe4bcb4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSpaceEquivalentSeparator",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#MatchWords; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#SeparatorFollows; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.SeparatorCommaAndSemicolon_AreSpaces; unit:TextManipulationTextWordTests.PictureStrings_AreSingleTextWords; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). c) 1.: 'Each occurrence of a separator comma, semicolon, or space in pseudo-text-1 or in the library text is considered to be a single space. Each sequence of one or more space separators is considered to be a single space.' TokenizeTextWords skips white space and IsSpaceEquivalentSeparator commas/semicolons (not followed by a digit, preserving a decimal-comma literal) on BOTH sides, so only text-words are compared. Probe p5d (==CO-A ; PIC , X(2)== against 'CO-A PIC X(2)') matched -> CO. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || REFUTED: PARTIAL — §8.3.5 SR2 says only a comma or semicolon IMMEDIATELY FOLLOWED BY A SPACE is a separator. IsSpaceEquivalentSeparator treats any comma not followed by a digit as a separator, so the PICTURE string Z,ZZ9 (a single text-word) splits into the text-words Z and ZZ9. Pseudo-text-1 ==ZZ9== then matches inside the PICTURE string, which is a wrong answer. The legitimate separator comma/semicolon/space collapsing (probe p5d) works. || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): Separator comma/semicolon (followed by a space) are dropped from both sides of the comparison as spaces; a comma not followed by a space stays inside its word (Z,ZZ9). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSpaceEquivalentSeparator (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-L2.2",
@@ -861,13 +861,13 @@
   "ordinal": 2,
   "subject": "COPY statement",
   "rule-digest": "fc86f7e98eda",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.ConcatenationOperands_AreSeparateTextWords; conformance:2002/pb1354_copy_header_2002",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). c) 2.: 'Each operand and operator of a concatenation expression is a separate text-word.' A word run stops at a quote, so \"AB\"&\"CD\" tokenizes as \"AB\", &, \"CD\" with or without spaces. Probe p11: ==\"CD\"== replaced the second operand of \"AB\"&\"CD\" (-> ABZZ) and ==\"EF\" & \"GH\"== matched the spaced expression (-> QQQQ). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || REFUTED: PARTIAL — TokenizeTextWords gets its concatenation split by ending a word run at any quote character. That over-splits a prefixed literal operand: X\"42\" becomes the two text-words X and \"42\", although the operand is ONE text-word. Pseudo-text-1 ==\"42\"== therefore matches inside the hex operand. Plain alphanumeric operands split correctly (the adjudicator's p11); prefixed-literal operands (X/N/NX/B/Z) do not. || editions (adjudicator): 2014, 2023 (concatenation expressions); matching rule applies wherever the construct exists",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): The & operator is always a text-word of its own and each operand, prefixed literals included, is one text-word (probe r3: X\"42\" not matched by ==\"42\"== -> [AB]). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-L2.3",
@@ -876,13 +876,13 @@
   "ordinal": 3,
   "subject": "COPY statement",
   "rule-digest": "1142413b2535",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#MatchesForReplacing",
+  "test-ref": "unit:TextManipulationTextWordTests.LiteralContent_IsCaseSensitive; unit:TextManipulationTextWordTests.HexLiteralAndWords_AreCaseInsensitive; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1351 (registrar 15a). c) 3.: 'Except when used in the non-hexadecimal formats of alphanumeric and national literals, each alphanumeric character is equivalent to its corresponding national character and each lowercase letter is equivalent to its corresponding uppercase letter' (cite.py --check 7.2.3.4 -> OK, printed path '9) a)' per PB718). ApplyReplacements compares EVERY text-word with StringComparison.OrdinalIgnoreCase, literals included, so case is folded inside non-hexadecimal alphanumeric and national literals too. Probe p3 (copybook VALUE \"abc\"; REPLACING ==\"ABC\"== BY ==\"MMM\"==) -> displays MMM; expected abc (no match). Hexadecimal literals correctly fold (probe p12b x\"41\" matched X\"41\"). Alphanumeric/national equivalence half is trivially satisfied on the UTF-16 repertoire. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1351 landed (w61a): Literal content of \"...\" and N\"...\" is case-sensitive; character-strings, prefixes and hexadecimal/boolean content are case-insensitive; alphanumeric and national are one UTF-16 repertoire. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-L2.4",
@@ -891,13 +891,13 @@
   "ordinal": 4,
   "subject": "COPY statement",
   "rule-digest": "0175e02221cb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#MatchesForReplacing; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#DecomposeLiteral; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.QuoteRepresentations_AndDoubledQuotes_Match; unit:TextManipulationTextWordTests.CopyReplacing_ComparesLiteralsByTheSameRules; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1351 (registrar 15a). c) 4.: 'a. The two representations of the quotation symbol match when specified in the opening and closing delimiters of the literal ... b. In the content of the literal, two contiguous occurrences of the character used as the quotation symbol in the opening delimiter are treated as a single occurrence of that character.' Neither normalization exists: text-words are compared including their raw delimiters, and the tokenizer ends a literal at the first embedded quote. Probe p3: ==\"xyz\"== vs library 'xyz' -> no match (displays xyz; expected NNN); =='p\"q'== vs library \"p\"\"q\" -> no match (displays p\"q; expected OOO). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1351 landed (w61a): The quotation symbol is not compared and contents compare un-doubled (probe p3: LQ NNN, LD OOO). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-L2.5",
@@ -907,11 +907,11 @@
   "subject": "COPY statement",
   "rule-digest": "db9e34c92a75",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). c) 5.: 'Each occurrence of a compiler directive line is treated as a single space.' Directive lines in the library text are tokenized as ordinary text-words because REPLACING is applied before the copybook's directives are processed. Probe p5 (copybook '01 DV-A' / '>>DEFINE ZQX 1' / 'PIC X(2) VALUE \"DV\".'; REPLACING ==DV-A PIC== BY ==DV-N PIC==) -> COBOLNET1639 DV-N not defined; control without the directive line matched (DV). Expected: match. Converse, probe p5e/p5f (copybook >>DEFINE ZQX 1 / >>IF ZQX = 1 ... Y1 / >>ELSE ... N1; REPLACING ==ZQX 1== BY ==ZQX 2==) -> N1: the replacement rewrote the directive line itself; expected Y1. §7.2.1 Step 2 orders the directives (a) before the COPY replacing actions (d). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 2002, 2014, 2023 (compiler directive lines are a 2002 introduction; at 85 the rule has no subject)",
+  "notes": "kb/Work PB1352 (registrar 15a). c) 5.: 'Each occurrence of a compiler directive line is treated as a single space.' Directive lines in the library text are tokenized as ordinary text-words because REPLACING is applied before the copybook's directives are processed. Probe p5 (copybook '01 DV-A' / '>>DEFINE ZQX 1' / 'PIC X(2) VALUE \"DV\".'; REPLACING ==DV-A PIC== BY ==DV-N PIC==) -> COBOLNET1639 DV-N not defined; control without the directive line matched (DV). Expected: match. Converse, probe p5e/p5f (copybook >>DEFINE ZQX 1 / >>IF ZQX = 1 ... Y1 / >>ELSE ... N1; REPLACING ==ZQX 1== BY ==ZQX 2==) -> N1: the replacement rewrote the directive line itself; expected Y1. §7.2.1 Step 2 orders the directives (a) before the COPY replacing actions (d). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 2002, 2014, 2023 (compiler directive lines are a 2002 introduction; at 85 the rule has no subject) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -921,13 +921,13 @@
   "ordinal": 6,
   "subject": "COPY statement",
   "rule-digest": "58715eee2133",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
+  "test-ref": "unit:TextManipulationTextWordTests.Comment_ReadingLikeTheDebugCarrier_IsASpace; unit:TextManipulationTextWordTests.CopyReplacing_Literal4WithDoubledQuote_Before2023; unit:CopyReplacingNestedCopyTests.FlatReplacing_StaysClean",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). c) 6. 'Comments, if any, are treated as a single space.' plus d) through g) (the comparison cycle). TokenizeTextWords drops *> comment text to end of line (the normalizer renders fixed-form comment lines as *>), so a comment between words is transparent: probe p5c (comment line between 'CM-A' and 'PIC') matched -> CM. d)/e)/f)/g): ApplyReplacements iterates operands in REPLACING order at each leftmost word, first match wins, continues after the rightmost matched word with no rescan of inserted text, and unmatched words are copied; partial-word-2 empty deletes the matched characters. Probe p10: AA->BB, BB->CC, CC->DD applied once each (DISPLAY BB DD -> AACC), LEADING ==PFX-== consumed the word so TRAILING was not re-applied to it (NEW-NAME-SFX), LEADING ==DEL-== BY ==== on lowercase del-me-x -> ME-X. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || REFUTED: PARTIAL — Comment skipping and the d)-e) cycle order work (p5c, p10). The comparison is not made over true library text-words, and f) placement of literal-4 fails. (1) TokenizeTextWords ends a literal at the first closing quote, so \"AB\"\"CD\" becomes two text-words and pseudo-text-1 ==\"CD\"== matches half a literal. (2) ReadReplaceOperand reads literal-4 the same way, so 'BY \"A\"\"B\"' (legal before 2023) mis-parses the REPLACING phrase and the compile fails. The f) rule for literal-4 is therefore not satisfied at 85/2002/2014. || editions (adjudicator): 85, 2002, 2014, 2023 for pseudo-text matching; the LEADING/TRAILING partial-word half per the clause's general format (edition of introduction not stated in this clause)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): A comment is a space whatever its text (the debugging-line carrier is now the noncharacter U+FDD0, ReferenceFormatProcessor.DebugLineCarrier); \"AB\"\"CD\" is one text-word; literal-4 \"A\"\"B\" is read whole (2014). d)-g) ordering unchanged (probe cancel2 KK W1 KK W2 W3 W3 KK). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-10",
@@ -936,13 +936,13 @@
   "ordinal": 10,
   "subject": "COPY statement",
   "rule-digest": "868f775c3b33",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#CopyReplacingNestedCopy",
-  "test-ref": "unit:CopyReplacingNestedCopyTests.ReplacingOverNestedCopy_DrawsGr10",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy",
+  "test-ref": "unit:CopyReplacingNestedCopyTests.ReplacingOverNestedCopy_DrawsGr10; unit:TextManipulationTextWordTests.SuppressReplacingOverNestedCopy_DrawsGr10",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1354 (registrar 15a). GR10: 'If the REPLACING phrase is specified, the library text shall not contain a COPY statement.' ResolveOneCopy reports COBOLNET1640 (Error) when replacements.Count > 0 and FindCopyKeyword finds a COPY in the normalized library text — the same scanner the expander splices by, so a COPY inside a literal or *> comment is not counted. Landed as kb/Work R34. Test ReplacingOverNestedCopy_DrawsGr10 asserts the error; FlatReplacing_StaysClean is the negative control. Edge note: when the REPLACING phrase follows SUPPRESS it is discarded (GR8 finding), so GR10 is then not checked either — same mechanism, not a separate defect. || REFUTED: PARTIAL — GR10 applies whenever the REPLACING phrase is specified. In the legal format COPY t SUPPRESS REPLACING ..., ResolveOneCopy never parses SUPPRESS. The REPLACING operands are skipped by the scan to the period, so replacements.Count==0 and COBOLNET1640 is never raised for a library that contains a COPY. The flat-REPLACING branch is verified; the SUPPRESS branch is not, so the verdict is PARTIAL. The unit test pins only the flat form. || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): GR10 now keys on the REPLACING phrase being SPECIFIED, on the SUPPRESS path too (refute probe r4 -> COBOLNET1640). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-11",
@@ -1027,11 +1027,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "46507fd49e62",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"at least one of which shall be neither a separator comma nor a separator semicolon\" -> OK 7.2.4.3 3)). Code: no check. ApplyReplacements silently discards an operand whose TokenizeTextWords yields no words (.Where(r => r.tokens.Count > 0), comment 'empty/malformed operand cannot match'). Probes: sr3.cob 'REPLACE ==,== BY ==AAA==.' and sr3b.cob 'REPLACE ==== BY ==AAA==.' both compile and run (AAA) with no diagnostic. Expected: a syntax-rule diagnostic (pseudo-text-1 with zero text-words / only separator commas). under-rejects. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"at least one of which shall be neither a separator comma nor a separator semicolon\" -> OK 7.2.4.3 3)). Code: no check. ApplyReplacements silently discards an operand whose TokenizeTextWords yields no words (.Where(r => r.tokens.Count > 0), comment 'empty/malformed operand cannot match'). Probes: sr3.cob 'REPLACE ==,== BY ==AAA==.' and sr3b.cob 'REPLACE ==== BY ==AAA==.' both compile and run (AAA) with no diagnostic. Expected: a syntax-rule diagnostic (pseudo-text-1 with zero text-words / only separator commas). under-rejects. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1042,11 +1042,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "b8989be82e79",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Pseudo-text-2 shall contain zero, one, or more text-words\" -> OK 7.2.4.3 4)). A permissive rule. Code: ReadReplaceOperand returns the trimmed span between == delimiters, \"\" for ====; ApplyReplacements appends it verbatim. Probe sr4.cob 'REPLACE ==DISPLAY \"GONE\".== BY ==== ==XX1== BY ==AAA==.' -> the DISPLAY is deleted, output AAA only, at --std 85, 2002 and 2023; multi-word pseudo-text-2 verified (sr8.cob at 85/2014 -> HELLO-WORLD). No spec-derived golden exercises an empty or multi-word pseudo-text-2 for the pseudo-text (non-partial) form (replace_partial_pseudo_text covers only partial-word-2 ====) -> test-ref empty. || REFUTED: PARTIAL — SR4 admits ANY text-words in pseudo-text-2, and a literal (with its delimiters) is one text-word (7.2.2.5 2)); ReadReplaceOperand ends pseudo-text at the first == even inside a literal, so the legal REPLACE ==XX1== BY ==DISPLAY \"A==B\"==. is rejected with COBOLNET1641. Empty, multi-word, comment-line and period-bearing pseudo-text-2 all work; test-ref stays empty. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Pseudo-text-2 shall contain zero, one, or more text-words\" -> OK 7.2.4.3 4)). A permissive rule. Code: ReadReplaceOperand returns the trimmed span between == delimiters, \"\" for ====; ApplyReplacements appends it verbatim. Probe sr4.cob 'REPLACE ==DISPLAY \"GONE\".== BY ==== ==XX1== BY ==AAA==.' -> the DISPLAY is deleted, output AAA only, at --std 85, 2002 and 2023; multi-word pseudo-text-2 verified (sr8.cob at 85/2014 -> HELLO-WORLD). No spec-derived golden exercises an empty or multi-word pseudo-text-2 for the pseudo-text (non-partial) form (replace_partial_pseudo_text covers only partial-word-2 ====) -> test-ref empty. || REFUTED: PARTIAL — SR4 admits ANY text-words in pseudo-text-2, and a literal (with its delimiters) is one text-word (7.2.2.5 2)); ReadReplaceOperand ends pseudo-text at the first == even inside a literal, so the legal REPLACE ==XX1== BY ==DISPLAY \"A==B\"==. is rejected with COBOLNET1641. Empty, multi-word, comment-line and period-bearing pseudo-text-2 all work; test-ref stays empty. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1057,11 +1057,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "68595372f2d2",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Partial-word-1 shall consist of one text-word\" -> OK 7.2.4.3 5)). Code: ParseReplacements does not count words; ApplyReplacements silently uses tokens[0] and ignores the rest. Probe sr5.cob 'REPLACE LEADING ==OLD- XYZ== BY ==NEW-==.' with DISPLAY OLD-AAA -> compiles and prints AAA (OLD- replaced as if partial-word-1 were OLD-). Expected: rejected (two text-words). Single-word positive case verified by conformance:2002/replace_partial_pseudo_text. under-rejects (and silently applies a truncated operand). || editions (adjudicator): 2023 (and the earlier edition that introduced LEADING/TRAILING partial-words -- the 2023 spec does not state it; Annex E records no change 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Partial-word-1 shall consist of one text-word\" -> OK 7.2.4.3 5)). Code: ParseReplacements does not count words; ApplyReplacements silently uses tokens[0] and ignores the rest. Probe sr5.cob 'REPLACE LEADING ==OLD- XYZ== BY ==NEW-==.' with DISPLAY OLD-AAA -> compiles and prints AAA (OLD- replaced as if partial-word-1 were OLD-). Expected: rejected (two text-words). Single-word positive case verified by conformance:2002/replace_partial_pseudo_text. under-rejects (and silently applies a truncated operand). || editions (adjudicator): 2023 (and the earlier edition that introduced LEADING/TRAILING partial-words -- the 2023 spec does not state it; Annex E records no change 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1072,11 +1072,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "7612c6b90251",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Partial-word-2 shall consist of zero or one text-word\" -> OK 7.2.4.3 6)). Zero and one text-word verified (conformance:2002/replace_partial_pseudo_text: LEADING ==DEL-== BY ==== and ==PRE-== BY ==NEW-==). Constraint half not enforced: probe sr6.cob 'REPLACE LEADING ==OLD-== BY ==NEW- X==.' is accepted by the REPLACE pass, splices 'NEW- XAAA' and fails downstream with an unrelated COBOL0309 \"unexpected 'XAAA'. A literal value is expected here\" at line 8. Expected: an SR6 diagnostic at the REPLACE statement. under-rejects. || editions (adjudicator): 2023 (and the earlier edition that introduced LEADING/TRAILING partial-words -- the 2023 spec does not state it; Annex E records no change 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Partial-word-2 shall consist of zero or one text-word\" -> OK 7.2.4.3 6)). Zero and one text-word verified (conformance:2002/replace_partial_pseudo_text: LEADING ==DEL-== BY ==== and ==PRE-== BY ==NEW-==). Constraint half not enforced: probe sr6.cob 'REPLACE LEADING ==OLD-== BY ==NEW- X==.' is accepted by the REPLACE pass, splices 'NEW- XAAA' and fails downstream with an unrelated COBOL0309 \"unexpected 'XAAA'. A literal value is expected here\" at line 8. Expected: an SR6 diagnostic at the REPLACE statement. under-rejects. || editions (adjudicator): 2023 (and the earlier edition that introduced LEADING/TRAILING partial-words -- the 2023 spec does not state it; Annex E records no change 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1087,11 +1087,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "5769f9c02112",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NoteNonPseudoText; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReplaceOperandNotPseudoText",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReplaceOperandNotPseudoText; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "conformance:negative/replace-literal-partial-word",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"shall not be specified as partial-word-1 or partial-word-2\" -> OK 7.2.4.3 7)). Code: COBOLNET1641 (kb/Work R39, landed) fires only when the operand is NOT ==-delimited (NoteNonPseudoText), i.e. the vendor spelling LEADING \"PREFIX-\" BY SPACES -- pinned by conformance:negative/replace-literal-partial-word. A literal written INSIDE the partial-word delimiters, which is exactly what 'specified as partial-word-1' means for a ==partial-word-1== operand, is not inspected: probe sr7.cob 'REPLACE LEADING ==\"AB\"== BY ==\"XY\"==.' compiles and runs silently (prints ABC). National/boolean literal forms likewise unchecked. One half verified, the other fails -> PARTIAL (the failing half is under-rejects, see finding). || editions (adjudicator): 2023 (and the earlier edition that introduced LEADING/TRAILING partial-words -- the 2023 spec does not state it; Annex E records no change 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"shall not be specified as partial-word-1 or partial-word-2\" -> OK 7.2.4.3 7)). Code: COBOLNET1641 (kb/Work R39, landed) fires only when the operand is NOT ==-delimited (NoteNonPseudoText), i.e. the vendor spelling LEADING \"PREFIX-\" BY SPACES -- pinned by conformance:negative/replace-literal-partial-word. A literal written INSIDE the partial-word delimiters, which is exactly what 'specified as partial-word-1' means for a ==partial-word-1== operand, is not inspected: probe sr7.cob 'REPLACE LEADING ==\"AB\"== BY ==\"XY\"==.' compiles and runs silently (prints ABC). National/boolean literal forms likewise unchecked. One half verified, the other fails -> PARTIAL (the failing half is under-rejects, see finding). || editions (adjudicator): 2023 (and the earlier edition that introduced LEADING/TRAILING partial-words -- the 2023 spec does not state it; Annex E records no change 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NoteNonPseudoText (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1102,11 +1102,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "a53b5f30d57f",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1359 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"may be continued in accordance with the rules of reference format\" -> OK 7.2.4.3 8)). Continuation is resolved by ReferenceFormatProcessor before the REPLACE pass, so pseudo-text inherits it. Verified: fixed-indicator word continuation inside pseudo-text-1 and literal continuation inside pseudo-text-2 at --std 85 and 2014 (probe sr8.cob -> HELLO-WORLD); at 2023 the fixed literal continuation works with the obsolete warning COBOLNET0903 (sr8f.cob -> HELLO-WORLD) and word continuation draws COBOLNET0902 (removed 2023 per Annex E.2 item 1 -- correct). NOT working: the floating literal continuation indicator \"- (6.2.3.1, cite.py --check 6.2.3.1 \"continuation of a literal when specified in an unterminated literal\" -> OK) -- probes sr8d.cob (fixed form) and sr8e.cob (free form) fail with COBOL0001 at the continuation line both inside pseudo-text AND in an ordinary VALUE clause, so the defect is the reference-format processor's, not REPLACE's; no kb/Work note owns it (searched). -> PARTIAL. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023)",
+  "notes": "kb/Work PB1359 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"may be continued in accordance with the rules of reference format\" -> OK 7.2.4.3 8)). Continuation is resolved by ReferenceFormatProcessor before the REPLACE pass, so pseudo-text inherits it. Verified: fixed-indicator word continuation inside pseudo-text-1 and literal continuation inside pseudo-text-2 at --std 85 and 2014 (probe sr8.cob -> HELLO-WORLD); at 2023 the fixed literal continuation works with the obsolete warning COBOLNET0903 (sr8f.cob -> HELLO-WORLD) and word continuation draws COBOLNET0902 (removed 2023 per Annex E.2 item 1 -- correct). NOT working: the floating literal continuation indicator \"- (6.2.3.1, cite.py --check 6.2.3.1 \"continuation of a literal when specified in an unterminated literal\" -> OK) -- probes sr8d.cob (fixed form) and sr8e.cob (free form) fail with COBOL0001 at the continuation line both inside pseudo-text AND in an ordinary VALUE clause, so the defect is the reference-format processor's, not REPLACE's; no kb/Work note owns it (searched). -> PARTIAL. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1117,11 +1117,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "e82bd5cb8473",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"shall be from 1 through 65,535 characters\" -> OK 7.2.4.3 9)). Accept half verified: a 300-character text-word in pseudo-text-1 matches and is replaced (probe sr9b.cob -> AAA). Constraint half not enforced: no length check exists; probe sr9.cob with a 70,000-character text-word in pseudo-text-1 compiles and runs silently (AAA). Expected: rejected (text-word longer than 65,535). under-rejects. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"shall be from 1 through 65,535 characters\" -> OK 7.2.4.3 9)). Accept half verified: a 300-character text-word in pseudo-text-1 matches and is replaced (probe sr9b.cob -> AAA). Constraint half not enforced: no length check exists; probe sr9.cob with a 70,000-character text-word in pseudo-text-1 compiles and runs silently (AAA). Expected: rejected (text-word longer than 65,535). under-rejects. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1132,11 +1132,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "4db5bbe8ad8e",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Compiler directive lines shall not be specified within pseudo-text-1\" -> OK 7.2.4.3 10)). Code: ReadReplaceOperand scans to the closing == with no inspection of the operand's lines. Probe sr10.cob (a '>>DEFINE ZZ AS 1' line between ==XX1== and BY) compiles and runs silently (AAA). Directive lines inside a pseudo-text operand are not diagnosed; the operand is consumed as if legal. Expected: rejected. under-rejects. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023)",
+  "notes": "kb/Work PB1353 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"Compiler directive lines shall not be specified within pseudo-text-1\" -> OK 7.2.4.3 10)). Code: ReadReplaceOperand scans to the closing == with no inspection of the operand's lines. Probe sr10.cob (a '>>DEFINE ZZ AS 1' line between ==XX1== and BY) compiles and runs silently (AAA). Directive lines inside a pseudo-text operand are not diagnosed; the operand is consumed as if legal. Expected: rejected. under-rejects. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1161,13 +1161,13 @@
   "ordinal": 2,
   "subject": "REPLACE statement",
   "rule-digest": "1f87a1982cd0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
+  "test-ref": "unit:TextManipulationTextWordTests.Colon_SeparatesTextWords; unit:TextManipulationTextWordTests.ReplaceStatement_PeriodInsidePseudoText; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). Whole-pseudo-text replacement: ApplyReplacements (ReplaceKind.Whole) substitutes pseudo-text-2 for the matched span. Probes out/probe/replace-p2/match2.cob and cancel2.cob print the spec-derived W1/W2/W3/W4 values. No golden asserts a whole-pseudo-text replacement's observable result (pb82's REPLACE pins line origins only). || REFUTED: PARTIAL — Whole-pseudo-text matching splits words wrongly in two cases. (a) TokenizeTextWords's word loop does not stop at ':', but 7.2.2.5 1) says the colon is a separator text-word. (b) The loop ends a word at a quote, so the hex literal X\"41\" becomes two words, X and \"41\" (7.2.2.5: a literal is one text-word). || editions (adjudicator): 85, 2002, 2014, 2023 (REPLACE statement; Annex E 2014->2023 lists no change to it)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): Whole pseudo-text replacement over true text-words: colon-separated and prefixed-literal words now form correctly (probes colon.cob BCD/BCD, hex.cob AB). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-3",
@@ -1176,13 +1176,13 @@
   "ordinal": 3,
   "subject": "REPLACE statement",
   "rule-digest": "b6a20c16e2c0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
-  "test-ref": "conformance:2002/replace_partial_pseudo_text",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
+  "test-ref": "conformance:2002/replace_partial_pseudo_text; unit:TextManipulationTextWordTests.LeadingPartialWord_AppliesOnEachSideOfAColon",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). Partial-word-1 replaced by partial-word-2, zero words deletes. Golden 2002/replace_partial_pseudo_text expects AB/CD/EF computed from GR3/GR8b/GR8f (replace, trailing, delete). Probe out/probe/replace-p2/lead.cob: LEADING ==old-== BY ==NEW-== on OLD-X -> NEW-X, TRAILING ==-xyz== BY ==== on ABC-XYZ -> ABC and X-ABC-XYZ -> X-ABC (case-insensitive, whole-word-length partial allowed). || REFUTED: PARTIAL — The LEADING/TRAILING replacement arm works on a single text-word (golden 2002/replace_partial_pseudo_text is spec-derived and pins replace, trailing and delete). But source words are formed without breaking at the colon, so A:B counts as one text-word and only its first or last part is ever tested. || editions (adjudicator): 2002, 2014, 2023 (partial-word operands; LEADING/TRAILING post-date 85) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements (LEADING/TRAILING arm); src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): LEADING/TRAILING compare against ONE text-word; with the colon a separator, OLD-A:OLD-B holds two words and both are replaced (probe colon.cob). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-4",
@@ -1222,11 +1222,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "99bc8cf64bb4",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1357 (registrar 15a). cite.py --check 7.2.4.4 \"The ALSO phrase, if specified, has no effect\" -> OK 6) a). a) without ALSO: placed active - holds. REPLACE OFF with none active: no effect - holds (match2.cob starts with REPLACE OFF). But REPLACE ALSO ... with nothing active and REPLACE LAST OFF with nothing active both draw COBOLNET1641 (probe out/probe/replace-p2/alsonone.cob lines 7 and 8) where the rule says they are, respectively, an ordinary activation and a no-op. Rejects legal source. || editions (adjudicator): 2002, 2014, 2023 for the ALSO/LAST phrases and the inactive queue (not in Annex E's 2014->2023 change lists, so present at 2014; the 85 base had only format 1 without ALSO and REPLACE OFF - introducing edition not quotable from the 2023 text); 85 for the active/cancel core",
+  "notes": "kb/Work PB1357 (registrar 15a). cite.py --check 7.2.4.4 \"The ALSO phrase, if specified, has no effect\" -> OK 6) a). a) without ALSO: placed active - holds. REPLACE OFF with none active: no effect - holds (match2.cob starts with REPLACE OFF). But REPLACE ALSO ... with nothing active and REPLACE LAST OFF with nothing active both draw COBOLNET1641 (probe out/probe/replace-p2/alsonone.cob lines 7 and 8) where the rule says they are, respectively, an ordinary activation and a no-op. Rejects legal source. || editions (adjudicator): 2002, 2014, 2023 for the ALSO/LAST phrases and the inactive queue (not in Annex E's 2014->2023 change lists, so present at 2014; the 85 base had only format 1 without ALSO and REPLACE OFF - introducing edition not quotable from the 2023 text); 85 for the active/cancel core retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1237,11 +1237,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "b852ae2eee8b",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1357 (registrar 15a). cite.py --check 7.2.4.4 \"A format 2 REPLACE statement with the LAST phrase cancels the active REPLACE statement\" -> OK 7) c) (PB718 notes cite.py mis-paths 7) b)). b) without ALSO cancels active + queue: holds (cancel2.cob: KK -> W1 then KK again after the second REPLACE). d) REPLACE OFF: holds. a) ALSO push+expand and c) LAST pop: not implemented, rejected with COBOLNET1641 (also.cob). Expected for also.cob: 'AA', 'AABB', 'AA'. || editions (adjudicator): 2002, 2014, 2023 for the ALSO/LAST phrases and the inactive queue (not in Annex E's 2014->2023 change lists, so present at 2014; the 85 base had only format 1 without ALSO and REPLACE OFF - introducing edition not quotable from the 2023 text); 85 for the active/cancel core",
+  "notes": "kb/Work PB1357 (registrar 15a). cite.py --check 7.2.4.4 \"A format 2 REPLACE statement with the LAST phrase cancels the active REPLACE statement\" -> OK 7) c) (PB718 notes cite.py mis-paths 7) b)). b) without ALSO cancels active + queue: holds (cancel2.cob: KK -> W1 then KK again after the second REPLACE). d) REPLACE OFF: holds. a) ALSO push+expand and c) LAST pop: not implemented, rejected with COBOLNET1641 (also.cob). Expected for also.cob: 'AA', 'AABB', 'AA'. || editions (adjudicator): 2002, 2014, 2023 for the ALSO/LAST phrases and the inactive queue (not in Annex E's 2014->2023 change lists, so present at 2014; the 85 base had only format 1 without ALSO and REPLACE OFF - introducing edition not quotable from the 2023 text); 85 for the active/cancel core retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1251,13 +1251,13 @@
   "ordinal": 8,
   "subject": "REPLACE statement",
   "rule-digest": "8d27ccf29d2c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#MatchesForReplacing; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.Colon_SeparatesTextWords; unit:TextManipulationTextWordTests.Literals_WithPrefixOrDoubledQuote_AreSingleTextWords; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). cite.py --check 7.2.2.5 \"the colon, the right parenthesis, and the left parenthesis characters\" -> OK 1); --check 7.2.2.5 \"an alphanumeric, boolean, or national literal including the opening and closing delimiters\" -> OK 2). GR8 a/b compares text-words, but TokenizeTextWords does not form §7.2.2.5 text-words: (1) a literal prefix N/X/B/NX/BX is split off, so ==\"AB\"== matches inside N\"AB\" and X\"41\" (probe out/probe/replace-p2/nat.cob prints CD for N\"AB\"; lit.cob X\"41\" -> X\"42\" prints B); (2) a doubled quote ends the literal, so \"A\"\"B\" is two words and =='\"A\"'== replaces part of it (lit.cob prints Y\"B, expected A\"B); (3) colon is not a separator, so ==2 : 3== never matches TBL(2:3) (match2.cob prints BCD, expected CD). Operand order, first-match-wins and no-rescan hold (cancel2.cob, match.cob). Finding 'replace-text-word-tokenizer'. || editions (adjudicator): 85, 2002, 2014, 2023 (REPLACE statement; Annex E 2014->2023 lists no change to it)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): The comparison runs over 7.2.2.5 text-words: probes nat.cob AB, lit.cob A\"B / A, match2.cob TBL(3:2) -> CD. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-L2.1",
@@ -1266,13 +1266,13 @@
   "ordinal": 1,
   "subject": "REPLACE statement",
   "rule-digest": "b9b1a5f9fe9f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSpaceEquivalentSeparator",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#MatchWords; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#SeparatorFollows; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.SeparatorCommaAndSemicolon_AreSpaces; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). cite.py --check 7.2.4.4 \"Each occurrence of a separator comma, semicolon, or space in pseudo-text-1\" -> OK 8) c) 1. Separator comma/semicolon and whitespace runs are skipped as one space on both sides. Probe out/probe/replace-p2/match2.cob: ==display  foo , bar== matches 'DISPLAY' / 'FOO; BAR' across a line break -> W1. || REFUTED: PARTIAL — IsSpaceEquivalentSeparator treats every comma or semicolon that is not followed by a digit as a separator. 8.3.5 rule 2 (cite.py --check 8.3.5 OK) makes them separators only when immediately followed by a space. A picture string such as Z,ZZ9 is one text-word, but the code splits it into Z and ZZ9, so a pseudo-text-1 can match inside it. || editions (adjudicator): 85, 2002, 2014, 2023 (REPLACE statement; Annex E 2014->2023 lists no change to it)",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): Separator comma/semicolon are spaces on both sides; Z,ZZ9 is one word (refute probe comma.cob [   12] [007]). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsSpaceEquivalentSeparator (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-L2.2",
@@ -1281,13 +1281,13 @@
   "ordinal": 2,
   "subject": "REPLACE statement",
   "rule-digest": "fc86f7e98eda",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.ConcatenationOperands_AreSeparateTextWords; conformance:2002/pb1354_copy_header_2002",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). cite.py --check 7.2.4.4 \"Each operand and operator of a concatenation expression is a separate text-word\" -> OK 8) c) 2. The tokenizer ends a word at a quote and starts a literal at one, so \"X\"&\"Y\" yields three words; probe out/probe/replace-p2/match2.cob ==P \"X\" & \"Y\" Q== matched P \"X\"&\"Y\" Q -> W4. (Prefixed-literal operands inherit GR8's tokenizer defect.) || REFUTED: PARTIAL — A concatenation operand that is a prefixed literal (X\"..\", N\"..\") must be ONE text-word. TokenizeTextWords splits off the prefix as a separate word, so the operands are not correct text-words. The row's quoted-literal half works, the prefixed-literal half does not: two halves, one verified, so PARTIAL. || editions (adjudicator): 2014, 2023 (concatenation expressions); rule text as in 2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): Each concatenation operand (prefixed literals included) and the & operator are separate text-words. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-L2.3",
@@ -1296,13 +1296,13 @@
   "ordinal": 3,
   "subject": "REPLACE statement",
   "rule-digest": "1142413b2535",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#MatchesForReplacing",
+  "test-ref": "unit:TextManipulationTextWordTests.LiteralContent_IsCaseSensitive; unit:TextManipulationTextWordTests.HexLiteralAndWords_AreCaseInsensitive; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1351 (registrar 15a). cite.py --check 7.2.4.4 \"each lowercase letter is equivalent to its corresponding uppercase letter\" -> OK 8) c) 3. Outside literals the case-fold holds (match2.cob lowercase ==display foo==; lead.cob ==old-==). But the rule EXCEPTS the content of non-hex alphanumeric/national literals and the comparator folds them too: probe out/probe/replace-p2/lit.cob REPLACE ==\"abc\"== BY ==\"ZZZ\"== rewrites DISPLAY \"ABC\" -> prints ZZZ, expected ABC. Alphanumeric/national equivalence is identity over the UTF-16 repertoire. Finding 'replace-literal-comparison'. || editions (adjudicator): 85, 2002, 2014, 2023 (REPLACE statement; Annex E 2014->2023 lists no change to it) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements (StringComparison.OrdinalIgnoreCase for every word)",
-  "state": "GAP"
+  "notes": "kb/Work PB1351 landed (w61a): REPLACE shares the comparison: ==\"abc\"== does not match \"ABC\" (probe lit.cob -> ABC). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-L2.4",
@@ -1311,13 +1311,13 @@
   "ordinal": 4,
   "subject": "REPLACE statement",
   "rule-digest": "7dae284241aa",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#MatchesForReplacing; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#DecomposeLiteral; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "unit:TextManipulationTextWordTests.QuoteRepresentations_AndDoubledQuotes_Match; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1351 (registrar 15a). cite.py --check 7.2.4.4 \"The two representations of the quotation symbol match\" -> OK 8) c) 4. a.; b. \"two contiguous occurrences ... treated as a single occurrence\" -> OK. a: literal words are compared as raw spellings, so ==\"QQ\"== does not match 'QQ' (probe out/probe/replace-p2/lit.cob prints QQ, expected RR). b: the tokenizer ends a literal at the first quote, so \"A\"\"B\" is not one word and its content is never normalized ('A\"B' vs \"A\"\"B\" cannot match; ==\"A\"== replaces half of \"A\"\"B\" -> Y\"B). Findings 'replace-literal-comparison' + 'replace-text-word-tokenizer'. || editions (adjudicator): 85, 2002, 2014, 2023 (REPLACE statement; Annex E 2014->2023 lists no change to it)",
-  "state": "GAP"
+  "notes": "kb/Work PB1351 landed (w61a): REPLACE shares the comparison: ==\"QQ\"== matches 'QQ' (probe lit.cob -> RR). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-L2.5",
@@ -1327,11 +1327,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "db9e34c92a75",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). cite.py --check 7.2.4.4 \"Each occurrence of a compiler directive line is treated as a single space\" -> OK 8) c) 5. Directives consumed before Step 3 (>>DEFINE, >>SOURCE, >>IF) are harmless (dir3/dir4 -> W1), but a directive line that survives into the REPLACE pass is tokenized as text-words: probe out/probe/replace-p2/dir.cob (>>TURN EC-ALL CHECKING OFF between SHOW-IT and NOW) and dir5.cob (>>PROPAGATE ON) -> COBOL0001 'cannot parse construct near NOW'; control dir2.cob without the line -> W1. Finding 'replace-directive-line-not-space'. || editions (adjudicator): 2002, 2014, 2023 (compiler directive lines) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (no directive-line arm)",
+  "notes": "kb/Work PB1352 (registrar 15a). cite.py --check 7.2.4.4 \"Each occurrence of a compiler directive line is treated as a single space\" -> OK 8) c) 5. Directives consumed before Step 3 (>>DEFINE, >>SOURCE, >>IF) are harmless (dir3/dir4 -> W1), but a directive line that survives into the REPLACE pass is tokenized as text-words: probe out/probe/replace-p2/dir.cob (>>TURN EC-ALL CHECKING OFF between SHOW-IT and NOW) and dir5.cob (>>PROPAGATE ON) -> COBOL0001 'cannot parse construct near NOW'; control dir2.cob without the line -> W1. Finding 'replace-directive-line-not-space'. || editions (adjudicator): 2002, 2014, 2023 (compiler directive lines) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (no directive-line arm) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -1341,13 +1341,13 @@
   "ordinal": 6,
   "subject": "REPLACE statement",
   "rule-digest": "9bbf1c156770",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "test-ref": "unit:TextManipulationTextWordTests.Comment_ReadingLikeTheDebugCarrier_IsASpace; unit:TextManipulationTextWordTests.FixedFormDebuggingLine_TextWordsTakePartInMatching",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 (registrar 15a). cite.py --check 7.2.4.4 \"Comments, if any, are treated as a single space\" -> OK 8) c) 6. Comment text (fixed-form comment lines normalized to '*>') is skipped: match2.cob ==MOVE-IT BAZ== matches across a comment line -> W2. The row also carries 8) d)-g): operands tried in order (cancel2.cob: ==QQ RR== before ==QQ== -> W2, W3; reversed order leaves RR), next word after the match is the new leftmost and inserted text is not rescanned (match.cob: ==ONE==->==TWO== then ==TWO==->... leaves TWO), scope ends at the next REPLACE. || REFUTED: PARTIAL — The '*>' arm of TokenizeTextWords tokenizes the body of any comment that begins '*> DEBUG:' (a normalizer marker for fixed-form debug lines). A genuine free-form comment written that way is therefore not treated as a single space. The d)-g) ordering and non-rescan behaviour held (cancel2 re-ran KK W1 KK W2 W3 W3 KK). Sibling: REPLACE is recognized only at the start of a line (SR1), so a mid-line REPLACE never opens its scope (mid.cob, COBOL0307). || editions (adjudicator): 85, 2002, 2014, 2023 (REPLACE statement; Annex E 2014->2023 lists no change to it) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords ('*>' arm); src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
-  "state": "GAP"
+  "notes": "kb/Work PB1350 landed (w61a): A programmer comment \"*> DEBUG: ...\" is now a space (refute probe dbg.cob W1 W1); only the U+FDD0 debugging-line carrier is scanned through. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-9",
@@ -1537,11 +1537,11 @@
   "subject": "Compiler directives",
   "rule-digest": "65b2b980ba84",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). §7.3.4 GR1 'A compiler directive line is not affected by the replacing action of a COPY statement or a REPLACE statement.' (cite.py --check 7.3.4 OK). The ONE text-word replacement pass (CopyProcessor.ApplyReplacements over TokenizeTextWords) skips '*>' comment lines but not '>>' directive lines, so both COPY REPLACING (applied to the copybook text in ResolveOneCopy BEFORE the CC driver renders the copybook's directives) and REPLACE (Step 3, applied BEFORE the post-COPY TURN/PUSH/POP/PROPAGATE/REF-MOD-ZERO-LENGTH/FLAG stages read their lines) rewrite directive lines. Probes: p1 'REPLACE ==CHECKING== BY ==CHEKING==.' then '>>TURN EC-ALL CHECKING OFF' -> COBOLNET0719 x2 + COBOLNET0718 (legal source rejected); p2 'COPY cb1 REPLACING ==CHECKING== BY ==CHEKING==.' over a copybook '>>TURN EC-ALL CHECKING OFF' -> the same three errors; p3 'COPY cb2 REPLACING ==AS 1== BY ==AS 3==.' over a copybook '>>DEFINE VV AS 1' / '>>IF VV = 1' ... '>>ELSE' prints 'CB2 ELSE' - SILENT WRONG ANSWER, expected 'CB2 VV=1'. Only a main-text REPLACE vs >>DEFINE/>>IF is immune (p4 'P4 VV=1'), and only because the CC driver consumed those lines before Step 3. Finding 'replacing-rewrites-directive-lines'. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
+  "notes": "kb/Work PB1352 (registrar 15a). §7.3.4 GR1 'A compiler directive line is not affected by the replacing action of a COPY statement or a REPLACE statement.' (cite.py --check 7.3.4 OK). The ONE text-word replacement pass (CopyProcessor.ApplyReplacements over TokenizeTextWords) skips '*>' comment lines but not '>>' directive lines, so both COPY REPLACING (applied to the copybook text in ResolveOneCopy BEFORE the CC driver renders the copybook's directives) and REPLACE (Step 3, applied BEFORE the post-COPY TURN/PUSH/POP/PROPAGATE/REF-MOD-ZERO-LENGTH/FLAG stages read their lines) rewrite directive lines. Probes: p1 'REPLACE ==CHECKING== BY ==CHEKING==.' then '>>TURN EC-ALL CHECKING OFF' -> COBOLNET0719 x2 + COBOLNET0718 (legal source rejected); p2 'COPY cb1 REPLACING ==CHECKING== BY ==CHEKING==.' over a copybook '>>TURN EC-ALL CHECKING OFF' -> the same three errors; p3 'COPY cb2 REPLACING ==AS 1== BY ==AS 3==.' over a copybook '>>DEFINE VV AS 1' / '>>IF VV = 1' ... '>>ELSE' prints 'CB2 ELSE' - SILENT WRONG ANSWER, expected 'CB2 VV=1'. Only a main-text REPLACE vs >>DEFINE/>>IF is immune (p4 'P4 VV=1'), and only because the CC driver consumed those lines before Step 3. Finding 'replacing-rewrites-directive-lines'. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -5287,11 +5287,11 @@
   "subject": "Lexical elements",
   "rule-digest": "bb6a79f2ae93",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#LPAREN; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#RPAREN; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PIC_STRING; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_LPAREN; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#LPAREN; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#RPAREN; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PIC_STRING; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_LPAREN; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "conformance:85/l1c17_parentheses_balanced; conformance:negative/l1c17-paren-unclosed; conformance:negative/l1c17-paren-extra-close; conformance:negative/l1c17-paren-not-delimiting",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule: 'Except when appearing in a picture character-string, the COBOL characters right parenthesis and left parenthesis are separators. Except in pseudo-text, parentheses may appear only in balanced pairs ... delimiting subscripts, a list of function or method arguments, a reference modifier, arithmetic or boolean expressions, or conditions.' (cite.py --check 8.3.5 OK §8.3.5 4)). Picture exception: PICMODE captures `X(5)`/`9(3)` as one PIC_STRING. Balance/position enforced by the parser: probes probe/lexical-elements/unbalparen.cob `COMPUTE N = (M + 1.` rejected; extraparen.cob `(M + 1))` rejected; parendisp.cob `DISPLAY (A).` rejected; subsp.cob `E (2)` / `E( 3 )` accepted. Pseudo-text exception: replparen.cob `REPLACE ==ZZ(== BY ==DISPLAY ==.` then `ZZ( \"OK\".` compiles and prints OK. All halves probed. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators)",
+  "notes": "Rule: 'Except when appearing in a picture character-string, the COBOL characters right parenthesis and left parenthesis are separators. Except in pseudo-text, parentheses may appear only in balanced pairs ... delimiting subscripts, a list of function or method arguments, a reference modifier, arithmetic or boolean expressions, or conditions.' (cite.py --check 8.3.5 OK §8.3.5 4)). Picture exception: PICMODE captures `X(5)`/`9(3)` as one PIC_STRING. Balance/position enforced by the parser: probes probe/lexical-elements/unbalparen.cob `COMPUTE N = (M + 1.` rejected; extraparen.cob `(M + 1))` rejected; parendisp.cob `DISPLAY (A).` rejected; subsp.cob `E (2)` / `E( 3 )` accepted. Pseudo-text exception: replparen.cob `REPLACE ==ZZ(== BY ==DISPLAY ==.` then `ZZ( \"OK\".` compiles and prints OK. All halves probed. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "OK"
  },
  {
@@ -5317,11 +5317,11 @@
   "subject": "Lexical elements",
   "rule-digest": "ee2494b9cc00",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1353 (registrar 15b). Rule: 'Pseudo-text delimiters are separators. An opening pseudo-text delimiter shall be immediately preceded by a space; a closing pseudo-text delimiter shall be immediately followed by one of the separators space, comma, semicolon, or period. Pseudo-text delimiters may appear only in balanced pairs delimiting pseudo-text.' (cite.py --check 8.3.5 OK §8.3.5 6)). ReadReplaceOperand recognizes '==' with no check of the preceding or following character, and when no closing '==' exists it silently takes the rest of the source text as the operand. Probes: probe/lexical-elements/repl_closenosep.cob `REPLACE ==XX==BY ==DISPLAY==.` accepted (prints OK); copyclose.cob `COPY LXC REPLACING ==XX==BY ==DISPLAY==.` accepted (prints CP); repl_opennosp.cob `REPLACE ==XX== BY==DISPLAY==.` accepted; repl_unbal.cob `REPLACE ==XX== BY ==DISPLAY.` (no closing delimiter) compiles rc=0 and the program prints NOTHING — the rest of the procedure division was swallowed into the operand. Expected: compile-time error in all four. WRONG-ANSWER for the unbalanced case. See finding 'pseudo-text delimiter'. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators)",
+  "notes": "kb/Work PB1353 (registrar 15b). Rule: 'Pseudo-text delimiters are separators. An opening pseudo-text delimiter shall be immediately preceded by a space; a closing pseudo-text delimiter shall be immediately followed by one of the separators space, comma, semicolon, or period. Pseudo-text delimiters may appear only in balanced pairs delimiting pseudo-text.' (cite.py --check 8.3.5 OK §8.3.5 6)). ReadReplaceOperand recognizes '==' with no check of the preceding or following character, and when no closing '==' exists it silently takes the rest of the source text as the operand. Probes: probe/lexical-elements/repl_closenosep.cob `REPLACE ==XX==BY ==DISPLAY==.` accepted (prints OK); copyclose.cob `COPY LXC REPLACING ==XX==BY ==DISPLAY==.` accepted (prints CP); repl_opennosp.cob `REPLACE ==XX== BY==DISPLAY==.` accepted; repl_unbal.cob `REPLACE ==XX== BY ==DISPLAY.` (no closing delimiter) compiles rc=0 and the program prints NOTHING — the rest of the procedure division was swallowed into the operand. Expected: compile-time error in all four. WRONG-ANSWER for the unbalanced case. See finding 'pseudo-text delimiter'. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -5347,11 +5347,11 @@
   "subject": "Lexical elements",
   "rule-digest": "17894f6f67b2",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#WS; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PIC_STRING; src/Cobol.Net.Frontend/Parsing/PictureSeparatorPeriodRule.cs#PictureSeparatorPeriodRule; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#WS; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PIC_STRING; src/Cobol.Net.Frontend/Parsing/PictureSeparatorPeriodRule.cs#PictureSeparatorPeriodRule; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1353 (registrar 15b). Rule (cite.py --check 8.3.5 OK §8.3.5 8) d)): the separator space may optionally precede all separators except a) reference-format rules, b) the closing delimiter of a literal (the space is part of the literal), c) the opening pseudo-text delimiter, where the preceding space is required, d) the terminating period of an entry ending with a PICTURE whose last character is ',' or '.'. Optional-space half CONFORMS: probes subsp.cob (`E (2)`, `DISPLAY T .`, `STOP RUN .`), lgsep (`N , M ;`). b) CONFORMS: litspaces.cob `DISPLAY \"|\" \" A \" \"|\"` prints '| A |' (space kept inside). d) CONFORMS: PIC_STRING's action takes a ','/';' followed by a space as the separator, so `PIC 99, .` (picsp.cob) is picture 99 plus separator comma, and `PIC 9,999,.` (piccomma.cob) keeps the trailing comma (prints 1,234,); COBOLNET2419 covers the misuse. a) is Clause 6 (not adjudicated here). c) DIVERGES: repl_opennosp.cob `REPLACE ==XX== BY==DISPLAY==.` is accepted with no space before the opening pseudo-text delimiter — same mechanism as SR-8.3.5-6 (finding 'pseudo-text delimiter'). || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators)",
+  "notes": "kb/Work PB1353 (registrar 15b). Rule (cite.py --check 8.3.5 OK §8.3.5 8) d)): the separator space may optionally precede all separators except a) reference-format rules, b) the closing delimiter of a literal (the space is part of the literal), c) the opening pseudo-text delimiter, where the preceding space is required, d) the terminating period of an entry ending with a PICTURE whose last character is ',' or '.'. Optional-space half CONFORMS: probes subsp.cob (`E (2)`, `DISPLAY T .`, `STOP RUN .`), lgsep (`N , M ;`). b) CONFORMS: litspaces.cob `DISPLAY \"|\" \" A \" \"|\"` prints '| A |' (space kept inside). d) CONFORMS: PIC_STRING's action takes a ','/';' followed by a space as the separator, so `PIC 99, .` (picsp.cob) is picture 99 plus separator comma, and `PIC 9,999,.` (piccomma.cob) keeps the trailing comma (prints 1,234,); COBOLNET2419 covers the misuse. a) is Clause 6 (not adjudicated here). c) DIVERGES: repl_opennosp.cob `REPLACE ==XX== BY==DISPLAY==.` is accepted with no space before the opening pseudo-text delimiter — same mechanism as SR-8.3.5-6 (finding 'pseudo-text delimiter'). || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -5362,11 +5362,11 @@
   "subject": "Lexical elements",
   "rule-digest": "367f2757c342",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#WS; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_WS; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#WS; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_WS; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "conformance:85/l1c17_separator_spaces",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule: 'The separator space may optionally immediately follow any separator except the opening delimiter of a literal. A space following the opening delimiter of a literal is part of the literal and not a separator.' (cite.py --check 8.3.5 OK §8.3.5 9)). STR_BODY takes every character after the opening quote into the literal. Probes: litspaces.cob `MOVE \" B\" TO A` then `DISPLAY \"[\" A \"]\"` prints '[ B   ]' (leading space kept); `A( 3 :)` / `E( 3 )` / `LOWER-CASE( \"CD\" )` (spaces after '(' ) accepted; replsp.cob `REPLACE == XX == BY == DISPLAY ==.` (space after opening pseudo-text delimiter) prints OK. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators)",
+  "notes": "Rule: 'The separator space may optionally immediately follow any separator except the opening delimiter of a literal. A space following the opening delimiter of a literal is part of the literal and not a separator.' (cite.py --check 8.3.5 OK §8.3.5 9)). STR_BODY takes every character after the opening quote into the literal. Probes: litspaces.cob `MOVE \" B\" TO A` then `DISPLAY \"[\" A \"]\"` prints '[ B   ]' (leading space kept); `A( 3 :)` / `E( 3 )` / `LOWER-CASE( \"CD\" )` (spaces after '(' ) accepted; replsp.cob `REPLACE == XX == BY == DISPLAY ==.` (space after opening pseudo-text delimiter) prints OK. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "OK"
  },
  {
@@ -57066,13 +57066,13 @@
   "ordinal": 0,
   "subject": "COPY statement",
   "rule-digest": "81b200d18277",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseCopyStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadCopyName; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
+  "test-ref": "unit:TextManipulationTextWordTests.SuppressThenReplacing_AppliesTheReplacing; unit:TextManipulationTextWordTests.MalformedHeader_DrawsSyntaxError; conformance:2002/pb1354_copy_header_2002; conformance:negative/pb1354_copy_header_syntax",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1354 (registrar 15a). General format: COPY {literal-1|text-name-1} [{OF|IN} {literal-2|library-name-1}] [SUPPRESS PRINTING] [REPLACING {==pt-1== BY ==pt-2== | {LEADING|TRAILING} ==pw-1== BY ==pw-2==}...] . -- cite.py --check 7.2.3.4 'If the SUPPRESS phrase is specified, library text incorporated as a result of COPY statement processing is not listed' OK. COPY is not in the ANTLR grammar; the whole statement is a hand scan in ResolveOneCopy: name/literal, optional IN|OF qualifier, then REPLACING is recognised ONLY as the very next word, and everything up to the next '.' is skipped. Verified OK: text-name (cc_in_copy), literal-1 (pb82 golden), OF/IN literal-2 and library-name-1 (p03/p04 -> LIBAA), SUPPRESS alone and SUPPRESS PRINTING without REPLACING (p04/s05), multiple operand pairs (q07), LEADING/TRAILING (q09 TRAILING ==-X== BY ==-Q== -> AA-Q), lowercase (q10). DEFECT (wrong-answer): p01 'COPY BK1 SUPPRESS PRINTING REPLACING ==AA-X== BY ==BB-Y==.' -- the legal SUPPRESS-before-REPLACING order the format prints -- silently DROPS the whole REPLACING phrase (BB-Y undefined; with both names declared it would silently run the unreplaced text); expected: BB-Y declared, DISPLAY BB-Y prints HELLO (same as p02 without SUPPRESS). Under-rejects: s01 'COPY BK1 GARBAGE MORE.', s02 missing BY, s03 'REPLACING.' with no operand, s06 'PRINTING' without SUPPRESS all compile silently. Finding F1. || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted",
-  "state": "GAP"
+  "notes": "kb/Work PB1354 landed (w61a): The COPY statement is parsed in general-format order over text-words; SUPPRESS [PRINTING] before REPLACING is applied (probes p01 / p2 / p2b HELLO / AAA); words outside the format are COBOLNET2449 (s01 s02 s03 s06). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.2.4.2",
@@ -57082,11 +57082,11 @@
   "subject": "REPLACE statement",
   "rule-digest": "e746a0cbcc55",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1357 (registrar 15a). Rule: Format 1 REPLACE [ALSO] {==pseudo-text-1== BY ==pseudo-text-2== | {LEADING|TRAILING} ==partial-word-1== BY ==partial-word-2==}... . ; Format 2 REPLACE [LAST] OFF . (cite.py --check 7.2.4.2 \"REPLACE [ ALSO ]\" -> OK; \"Format 2 (off)\" -> OK). Code: ApplyReplaceStatements recognizes REPLACE OFF (MatchWord OFF) and otherwise ParseReplacements reads pairs, LEADING/TRAILING honoured, empty ==== accepted. DEFECTS: (1) ALSO and LAST are never recognized -- ParseReplacements reads the word ALSO/LAST as a non-pseudo-text operand and COBOLNET1641 fires; probe out/probe/replace-statement-p1/also.cob (REPLACE ==XX1== BY ==AAA==. / REPLACE ALSO ==XX2== BY ==CCC==. / REPLACE LAST OFF.) -> two COBOLNET1641 errors at lines 12 and 14; also2.cob (REPLACE LAST OFF. alone, legal per 7.2.4.4 6) b) 'A format 2 REPLACE statement has no effect') -> COBOLNET1641. The replace state is a flat list cleared at every REPLACE, so the 7.2.4.4 GR4/GR7 LIFO queue (part 2 rules) has no representation. (2) The required word BY is optional in ParseReplacements (if MatchWord BY): probe noby.cob 'REPLACE ==XX1== ==AAA==.' compiles and runs silently (AAA). Positive half verified: pseudo-text pairs, repetition, LEADING/TRAILING (conformance:2002/replace_partial_pseudo_text), REPLACE OFF, terminating period. Mixed -> DIVERGES (rejects-legal-source for ALSO/LAST). || editions (adjudicator): 85, 2002, 2014, 2023 for the pseudo-text Format 1 and REPLACE OFF (the 2023 text; Annex E.2/E.3 record no REPLACE change 2014->2023). ALSO, LAST, LEADING/TRAILING partial-words: post-85 additions whose introducing edition the 2023 spec does not state (Annex E covers only 2014->2023) -- present in 2023.",
+  "notes": "kb/Work PB1357 (registrar 15a). Rule: Format 1 REPLACE [ALSO] {==pseudo-text-1== BY ==pseudo-text-2== | {LEADING|TRAILING} ==partial-word-1== BY ==partial-word-2==}... . ; Format 2 REPLACE [LAST] OFF . (cite.py --check 7.2.4.2 \"REPLACE [ ALSO ]\" -> OK; \"Format 2 (off)\" -> OK). Code: ApplyReplaceStatements recognizes REPLACE OFF (MatchWord OFF) and otherwise ParseReplacements reads pairs, LEADING/TRAILING honoured, empty ==== accepted. DEFECTS: (1) ALSO and LAST are never recognized -- ParseReplacements reads the word ALSO/LAST as a non-pseudo-text operand and COBOLNET1641 fires; probe out/probe/replace-statement-p1/also.cob (REPLACE ==XX1== BY ==AAA==. / REPLACE ALSO ==XX2== BY ==CCC==. / REPLACE LAST OFF.) -> two COBOLNET1641 errors at lines 12 and 14; also2.cob (REPLACE LAST OFF. alone, legal per 7.2.4.4 6) b) 'A format 2 REPLACE statement has no effect') -> COBOLNET1641. The replace state is a flat list cleared at every REPLACE, so the 7.2.4.4 GR4/GR7 LIFO queue (part 2 rules) has no representation. (2) The required word BY is optional in ParseReplacements (if MatchWord BY): probe noby.cob 'REPLACE ==XX1== ==AAA==.' compiles and runs silently (AAA). Positive half verified: pseudo-text pairs, repetition, LEADING/TRAILING (conformance:2002/replace_partial_pseudo_text), REPLACE OFF, terminating period. Mixed -> DIVERGES (rejects-legal-source for ALSO/LAST). || editions (adjudicator): 85, 2002, 2014, 2023 for the pseudo-text Format 1 and REPLACE OFF (the 2023 text; Annex E.2/E.3 record no REPLACE change 2014->2023). ALSO, LAST, LEADING/TRAILING partial-words: post-85 additions whose introducing edition the 2023 spec does not state (Annex E covers only 2014->2023) -- present in 2023. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {
@@ -62212,11 +62212,11 @@
   "subject": "Characters prohibited from use in text-words in COPY … REPLACING and REPLACE statements",
   "rule-digest": "9a6cef7afd4e",
   "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-23; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-23; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
   "test-ref": "",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Rule: A.1 item 23 'Characters prohibited from use in text-words in COPY ... REPLACING and REPLACE statements ... required ... documented (7.2.2.5 rule 3)'. cite.py --check 7.2.2.5 \"The implementor may prohibit the use of one or more characters from outside the COBOL character repertoire in, or as, text-words\" -> OK §7.2.2.5 3) (Text-words). cite.py --check 7.2.2.5 \"any other character or sequence of contiguous characters from the compile-time coded character set, bounded by separators\" -> OK §7.2.2.5 3). cite.py --check 8.3.5 \"The COBOL character space is a separator\" -> OK §8.3.5 1) (Separators). Determination: the prohibition is permissive ('may'); the empty set is the choice that rejects no source and is what the tokenizer already does for every non-White_Space character, so ISO's own default (every character of the coded character set is a text-word character) is the documented choice — no precedence step needed. Consequence the row states explicitly: with nothing prohibited, a non-repertoire White_Space character is a text-word character, because §8.3.5 names only the COBOL space. PARTIAL: é / @ / ~ hold (probe OK6); U+00A0 is treated as a separator (probe OK5 OK5). Owning defect kb/Work PB1543 (open, claims DOC-A.1-23). The missing-row finding PB1369 F3 is discharged by this row once written (drop DOC-A.1-23 from PB1369). Separator-set defects of the same tokenizer (colon, comma/semicolon predicates) are PB1350, not this item. Witness needed when PB1543 lands: a golden with REPLACE ==P<U+00A0>Q== BY ==\"OK5\"== where VALUE P Q stays unreplaced (then a compile error or a distinct value) and VALUE P<U+00A0>Q is replaced, plus the ==éV== arm. Row stays GAP until then. DOC-ROWS-2 REFUTER (determination): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md).",
+  "notes": "Rule: A.1 item 23 'Characters prohibited from use in text-words in COPY ... REPLACING and REPLACE statements ... required ... documented (7.2.2.5 rule 3)'. cite.py --check 7.2.2.5 \"The implementor may prohibit the use of one or more characters from outside the COBOL character repertoire in, or as, text-words\" -> OK §7.2.2.5 3) (Text-words). cite.py --check 7.2.2.5 \"any other character or sequence of contiguous characters from the compile-time coded character set, bounded by separators\" -> OK §7.2.2.5 3). cite.py --check 8.3.5 \"The COBOL character space is a separator\" -> OK §8.3.5 1) (Separators). Determination: the prohibition is permissive ('may'); the empty set is the choice that rejects no source and is what the tokenizer already does for every non-White_Space character, so ISO's own default (every character of the coded character set is a text-word character) is the documented choice — no precedence step needed. Consequence the row states explicitly: with nothing prohibited, a non-repertoire White_Space character is a text-word character, because §8.3.5 names only the COBOL space. PARTIAL: é / @ / ~ hold (probe OK6); U+00A0 is treated as a separator (probe OK5 OK5). Owning defect kb/Work PB1543 (open, claims DOC-A.1-23). The missing-row finding PB1369 F3 is discharged by this row once written (drop DOC-A.1-23 from PB1369). Separator-set defects of the same tokenizer (colon, comma/semicolon predicates) are PB1350, not this item. Witness needed when PB1543 lands: a golden with REPLACE ==P<U+00A0>Q== BY ==\"OK5\"== where VALUE P Q stays unreplaced (then a compile error or a distinct value) and VALUE P<U+00A0>Q is replaced, plus the ==éV== arm. Row stays GAP until then. DOC-ROWS-2 REFUTER (determination): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md). retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
   "state": "GAP"
  },
  {

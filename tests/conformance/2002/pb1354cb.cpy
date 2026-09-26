@@ -1,0 +1,1 @@
+       01 AA-X PIC X(5) VALUE "HELLO".

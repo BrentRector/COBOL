@@ -15,6 +15,15 @@ namespace CobolNet.Frontend.Preprocessor;
 /// </summary>
 public static class ReferenceFormatProcessor
 {
+    /// <summary>How a fixed-form debugging line (indicator <c>D</c>) reaches the text-manipulation stage: as a comment
+    /// to the lexer, but one whose text COPY REPLACING and REPLACE still match over (the COPY rule of COBOL-85 —
+    /// text-words in a debugging line participate in matching as if the <c>D</c> were absent;
+    /// <see cref="TextWordScanner"/> skips only this carrier). The carrier holds U+FDD0, a Unicode NONCHARACTER —
+    /// reserved for process-internal use and never in interchanged text — so no comment a programmer writes can be
+    /// mistaken for a debugging line (kb/Work PB1350: the printable <c>*&gt; DEBUG:</c> carrier made a genuine
+    /// <c>*&gt; DEBUG: …</c> comment take part in matching).</summary>
+    public static readonly string DebugLineCarrier = "*>" + (char)0xFDD0 + "DEBUG ";
+
     /// <summary>Length of the sequence number area (columns 1-6).</summary>
     private const int SequenceAreaLength = 6;
 
@@ -559,7 +568,7 @@ public static class ReferenceFormatProcessor
                     break;
 
                 case 'D' or 'd' or 'S' or 's' or 'Y' or 'y':
-                    result.AppendLine($"*> DEBUG: {sourceArea.TrimEnd()}");
+                    result.AppendLine(DebugLineCarrier + sourceArea.TrimEnd());
                     inLiteral = false;
                     pendingQuote = false;
                     break;
