@@ -18,9 +18,9 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Saturday 2026-09-26, afternoon</h3>
-    <p><strong>Landed today.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test. <span class="pill good">train 61</span> landed five groups of wrong-answer fixes in one CI-proven landing: COPY/REPLACE text-words, runtime I-O boundaries with owner decision R47 (Latin-1 files refuse characters above U+00FF), one PICTURE-clause identity for OO and CALL conformance, record sizing from the RECORD clause in bytes, and floating-point ROUNDED MODE and size-error handling.</p>
-    <p><strong>Still implementing &mdash; wave 61</strong>: literal syntax screens and user-defined-function argument binding are running; the file-control clause screens are complete and await their final gate; INVOKE's argument binder (PB1137) resumes Sunday. These ride train 62.</p>
+    <h3>In flight — Saturday 2026-09-26, evening</h3>
+    <p><strong>Landed today — three CI-proven landings.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test. <span class="pill good">train 61</span> landed COPY/REPLACE text-words, runtime I-O boundaries with owner decision R47, one PICTURE-clause identity for OO and CALL conformance, record sizing from the RECORD clause, and floating-point ROUNDED MODE and size error. <span class="pill good">train 62</span> landed the file-control clause screens (SUPPRESS WHEN, COLLATING SEQUENCE, FILE STATUS), one literal screen for length and hexadecimal grouping, and one argument-conformance mechanism now shared by CALL, user-defined functions and INVOKE.</p>
+    <p><strong>Next</strong> (after the weekly quota resets): the concatenation-operand half of the literal work (PB1406), the prototype-definition match left on PB1115, and a fresh fix wave; comprehensive battery #87 is owed.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
