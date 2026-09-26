@@ -185,6 +185,15 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} arity");
         }
 
+        // ⛔ §8.4.3.2.3 SR13 — "If function-prototype-name-1 or function-pointer-name-1 is specified, the rules for
+        // conformance specified in 14.8.2, Parameters and 14.8.3, Returning items, apply" — asked of THE ONE argument
+        // half of §14.8.2 the Format-2 CALL asks too (ParameterConformance; kb/Work PB1418 / PB1115). This binder
+        // used to re-implement CALL's argument binding privately and skip it, so a PIC X(4) identifier aliased a
+        // PIC 9(4) BY REFERENCE formal and an OBJECT REFERENCE C1 ONLY argument reached an OBJECT REFERENCE C1
+        // formal with no diagnostic. §14.8.3 needs no screen here: the result temporary IS a clone of the
+        // RETURNING item (GR1), so the returning pair conforms by construction.
+        var site = new ActivationSite($"FUNCTION {name.ToUpperInvariant()}", "§8.4.3.2.3 SR13",
+            DiagnosticCatalog.FunctionArgumentConformance);
         var callArgs = new List<BoundCallArg>(operands.Count);
         for (int i = 0; i < operands.Count; i++)
         {
@@ -204,30 +213,44 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
                 callArgs.Add(new BoundCallArg(CobolPassMode.Reference, null, null, Omitted: true) { Formal = fn.Formals[i].Item });
                 continue;
             }
-            // §8.4.3.2.3 SR10 (:6942): when the formal corresponding to argument-1 is specified with a BY
-            // VALUE phrase, argument-1 shall be of class numeric, object, or pointer. Checked HERE (the one
-            // place the formal↔argument pairing exists); the header side's SR2 already restricted the FORMAL.
-            if (fn.Formals[i].ByValue && !UdfArgIsValueClass(operand))
+            var formal = fn.Formals[i];
+            // §8.4.3.2.3 SR10: when the formal corresponding to argument-1 is specified with a BY VALUE phrase,
+            // argument-1 shall be of class numeric, object, or pointer. Checked HERE (the one place the
+            // formal↔argument pairing exists); the header side's SR2 already restricted the FORMAL. The class is
+            // the ONE answer CALL's §14.9.4.3 SR22 screen asks (ParameterConformance.ValueArgumentClass) — this
+            // screen used to test the item's CATEGORY, and a USAGE INDEX item (category numeric in the storage
+            // model, class index by §13.18.60.4 GR10) passed it (kb/Work PB1418). Fail-open on an undecidable
+            // class, exactly as the CALL screen does.
+            if (formal.ByValue && ParameterConformance.ValueArgumentClass(operand)
+                    is { } cls and not (CobolClass.Numeric or CobolClass.Object or CobolClass.Pointer))
             {
                 ctx.Edition.Error("COBOLNET1554",
-                    $"FUNCTION {name.ToUpperInvariant()} argument {i + 1}: an argument passed to a BY VALUE "
-                    + "formal parameter shall be of class numeric, object, or pointer (ISO §8.4.3.2.3 SR10)");
+                    $"FUNCTION {name.ToUpperInvariant()} argument {i + 1} is of class "
+                    + $"{cls.ToString().ToLowerInvariant()}; an argument passed to a BY VALUE formal parameter "
+                    + "shall be of class numeric, object, or pointer (ISO §8.4.3.2.3 SR10)");
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} argument {i + 1} BY VALUE class");
             }
-            if (UdfArg(operand, fn.Formals[i]) is not { } arg)
+            if (UdfArg(operand, argCtxs[i], formal) is not { } arg)
             {
-                // Name the ACTUAL unsupported shape when the segment parser already classified it (a
-                // reference-modified argument, a figurative, an unresolvable name) — never a message
-                // claiming a legal form is illegal.
+                // The operand refused to bind (the segment parser or resolver already classified it — an
+                // unresolvable name, an ALL subscript) — name that ACTUAL shape, never a message claiming a legal
+                // form is illegal. Every argument FORM §8.4.3.2.3 SR8 names has an arm in UdfArg.
                 string what = operand is BoundOperandError err
                     ? err.Feature
-                    : "this argument form (an identifier, a literal, or an arithmetic expression is "
-                      + "supported — ISO §8.4.3.2.4 SR8/GR5)";
+                    : "this argument form (ISO §8.4.3.2.3 SR8 admits an identifier, a literal, a boolean "
+                      + "expression, or an arithmetic expression)";
                 ctx.Edition.Error("COBOLNET1506",
                     $"FUNCTION {name.ToUpperInvariant()} argument {i + 1}: {what} is not yet supported for "
                     + "user-defined function activation");
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} argument {i + 1}");
             }
+            // §8.4.3.2.3 SR14: with a BY REFERENCE formal and a bit data item argument, the argument "shall be
+            // described such that it is aligned on a byte boundary", with literal-only subscripts and ref-mod
+            // leftmost position — the SAME proof CALL's §14.9.4.3 SR6 asks, so it is the same method.
+            if (!formal.ByValue && operand is BoundFieldOperand { Place: var bitPlace } && BitLayout.IsBitItem(bitPlace.Item))
+                host.Params.ScreenBitAlignment(bitPlace, DiagnosticCatalog.FunctionBitAlignment,
+                    $"FUNCTION {name.ToUpperInvariant()} argument {i + 1}", "§8.4.3.2.3 SR14");
+            host.Params.CheckArgument(formal.Item, arg, i + 1, site);
             callArgs.Add(arg);
         }
 
@@ -336,36 +359,58 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         };
     }
 
-    /// <summary>One bound argument in its §8.4.3.2.4 GR5 manner: (a) an identifier permitted as a receiving
-    /// operand, with the formal's BY REFERENCE stated or implied ⇒ BY REFERENCE over the caller's storage;
-    /// (b) a literal or arithmetic expression ⇒ BY CONTENT, a private-copy cell (the runtime
-    /// <c>CobolArgAdapt</c> profile adaptation realizes the §14.2.3 GR9 copy-in conformance to the formal —
-    /// same-scale cells alias, a scale difference gets the rescaling view); (c) a formal specified BY VALUE ⇒
-    /// BY VALUE for EVERY argument shape (GR5c :6991) — the caller snapshots the value and the callee adopts
-    /// the §14.2.3 GR10 detached copy, so a store into the formal never reaches the argument. Null =
-    /// unsupported operand form (the caller reports).</summary>
+    /// <summary>One bound argument in its ISO §8.4.3.2.4 GR5 manner, for every argument FORM §8.4.3.2.3 SR8 names:
+    /// <list type="bullet">
+    /// <item>c) a formal specified BY VALUE ⇒ BY VALUE for every shape — the caller snapshots the value and the
+    /// callee adopts the §14.2.3 GR10 detached copy (SR10 has already screened the class).</item>
+    /// <item>a) an identifier "that is permitted as a receiving operand, other than an object property or object
+    /// data item" (<see cref="IsReferenceIdentifier"/>) ⇒ BY REFERENCE over the caller's storage.</item>
+    /// <item>b) "a literal, an arithmetic expression, a boolean expression, an object property, object data item, or
+    /// any identifier that is not permitted as a receiving operand" ⇒ BY CONTENT: a private-copy cell (the runtime
+    /// <c>CobolArgAdapt</c> profile adaptation realizes the §14.2.3 GR9 copy-in conformance to the formal). A
+    /// CONSTANT RECORD item is such an identifier (§13.18.15.3 SR2), so the function's stores into its formal no
+    /// longer overwrite the structured constant (kb/Work PB1418). A boolean expression rides the same BY CONTENT
+    /// boolean value channel as CALL's boolean-expression-1 (<see cref="BoundCallArg.ContentBool"/>); a figurative
+    /// constant or ALL literal is a literal wherever 'literal' appears in a rule (§8.3.3.6.3 SR1), and its crossing
+    /// fills the formal (<c>CallEmitter.ArgText</c>, §8.3.3.6.4 GR2).</item>
+    /// </list>
+    /// Null = the operand itself refused to bind (the caller reports).</summary>
     /// <remarks>Every arm records <see cref="BoundCallArg.Formal"/>: §14.2.3 GR9's second branch names "a
     /// function" outright, so a UDF argument's crossing into a numeric formal is the ACTIVATING element's
     /// COMPUTE (kb/Work PB640), and this binder has always had the formal in hand.</remarks>
-    private static BoundCallArg? UdfArg(BoundOperand op, LinkageFormal formal) => op switch
+    private BoundCallArg? UdfArg(BoundOperand op, Core.FunctionArgumentContext a, LinkageFormal formal)
     {
-        BoundFieldOperand f => new BoundCallArg(
-            formal.ByValue ? CobolPassMode.Value : CobolPassMode.Reference, f.Place, null) { Formal = formal.Item },
-        BoundNumericLiteral or BoundStringLiteral or BoundComputedOperand
-            => new BoundCallArg(formal.ByValue ? CobolPassMode.Value : CobolPassMode.Content, null, op) { Formal = formal.Item },
-        _ => null,
-    };
+        BoundCallArg? arg = op switch
+        {
+            BoundFieldOperand f => new BoundCallArg(
+                formal.ByValue ? CobolPassMode.Value
+                : IsReferenceIdentifier(a, f.Place) ? CobolPassMode.Reference
+                : CobolPassMode.Content, f.Place, null),
+            // A class-boolean value has no BY VALUE crossing (SR10 refused it above).
+            BoundBoolOperand b => new BoundCallArg(CobolPassMode.Content, null, null) { ContentBool = b.Expr },
+            // ZERO into a BY VALUE formal is the numeric value 0 (§8.3.3.6.4 GR4) — the value channel's form.
+            BoundFigurative { Kind: 'Z' } when formal.ByValue
+                => new BoundCallArg(CobolPassMode.Value, null, new BoundNumericLiteral("0")),
+            BoundNumericLiteral or BoundStringLiteral or BoundFigurative or BoundAllLiteral or BoundComputedOperand
+                => new BoundCallArg(formal.ByValue ? CobolPassMode.Value : CobolPassMode.Content, null, op),
+            _ => null,
+        };
+        return arg is null ? null : arg with { Formal = formal.Item };
+    }
 
-    /// <summary>True when the argument is of class numeric, object, or pointer — the §8.4.3.2.3 SR10
-    /// admissible classes for an argument whose corresponding formal is BY VALUE. A numeric literal and an
-    /// arithmetic expression are class numeric by construction; an identifier tests its item's category.</summary>
-    private static bool UdfArgIsValueClass(BoundOperand op) => op switch
-    {
-        BoundNumericLiteral or BoundComputedOperand => true,
-        BoundFieldOperand f => f.Place.Item.Pic?.Category is PicCategory.Numeric or PicCategory.Pointer
-            or PicCategory.ProgramPointer or PicCategory.FunctionPointer or PicCategory.ObjectReference,
-        _ => false,
-    };
+    /// <summary>§8.4.3.2.4 GR5 a)'s test — is argument <paramref name="a"/>, bound to <paramref name="place"/>, "an
+    /// identifier that is permitted as a receiving operand, other than an object property or object data item"?
+    /// Each clause is asked where it is answered: the argument must BE an identifier (a sole data reference that
+    /// resolves to a data item — a function-identifier, keyword-omitted or not, is "not specified as a receiving
+    /// operand" by §8.4.3.2.3 SR1); an object property and an object data item are named exceptions; and the
+    /// receiving-operand prohibitions are the ONE table the receiving chokepoint reports
+    /// (<see cref="ExpressionBinder.PermitsReceiving"/>).</summary>
+    private bool IsReferenceIdentifier(Core.FunctionArgumentContext a, Place place) =>
+        CobolNet.Frontend.Expressions.SoleOperand.DataRef(a.arithmeticExpression()) is { } dref
+        && ctx.Refs.Probe(dref) is not null
+        && !ctx.Refs.IsObjectPropertyReference(dref)
+        && !ctx.Data.OoIsObjectData(place.Item)
+        && host.Expr.PermitsReceiving(dref, place);
 
     /// <summary>⛔ THE ONE DRAIN OF THE PENDING PRE-OP SUFFIX, and the only place the list is mutated on the way
     /// out. Takes everything registered past <paramref name="mark"/> and REMOVES it, so exactly one carrier ends

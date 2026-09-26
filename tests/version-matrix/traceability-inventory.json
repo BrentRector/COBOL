@@ -6066,13 +6066,13 @@
   "ordinal": 8,
   "subject": "Function-identifier",
   "rule-digest": "319b43ecc8ee",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfArg",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfArg; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#RepeatToWidth",
+  "test-ref": "conformance:2002/pb1418_function_argument_manner",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1418 (registrar 15b). SR8 (cite.py --check 8.4.3.2.3 'Argument-1 shall be an identifier, a literal, a boolean expression, or an arithmetic expression' -> OK §8.4.3.2.3 8)). The grammar admits all four shapes, and the intrinsic path binds all four (PB65, landed). The USER-FUNCTION path rejects a boolean EXPRESSION argument. Probe out/probe/function-identifier/p4b_bool_arg.cob: FUNCTION FIP4BF(WB B-AND B'1010') -> COBOLNET1506 'this argument form ... is not yet supported for user-defined function activation', because UdfArg has no BoundBoolOperand arm. A boolean LITERAL is fine (q3_boollit_arg.cob, L=0110). Expected: compiles, BY CONTENT (GR5b), and prints E=1000. An ADDRESS-identifier argument is refused as well, and that half is owned by the open note PB1060. The second sentence delegates to Clause 15, §14.8.2 and §14.8.3; for the user-function side see SR-8.4.3.2.3-13. || editions as written by the adjudicator: 1985 (Amendment 1), 2002, 2014, 2023 - applies to every function-identifier. Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1418 landed (w61h). SR8 (cite.py --check 8.4.3.2.3 'Argument-1 shall be an identifier, a literal, a boolean expression, or an arithmetic expression' -> OK §8.4.3.2.3 8)). UdfBinder.UdfArg now has an arm for every form: an identifier (BY REFERENCE or BY CONTENT per GR5), a literal including a figurative constant or ALL literal (§8.3.3.6.3 SR1 - a figurative is a literal wherever 'literal' appears in a rule), a boolean expression (BY CONTENT on CALL's ContentBool channel; was COBOLNET1506 'not yet supported'), an arithmetic expression, and a function-identifier (character-valued intrinsics on the string channel - U=ABCD, was 0000). The figurative crossing fills the formal (§8.3.3.6.4 GR2, CallEmitter.RepeatToWidth / FigurativeFillWidth - the same fix repaired CALL BY CONTENT ALL \"*\" into PIC X(4), which arrived as '*   '). Measured: B=1000, F=****, Z=0000 (conformance:2002/pb1418_function_argument_manner).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.2.3-9",
@@ -6096,13 +6096,13 @@
   "ordinal": 10,
   "subject": "Function-identifier",
   "rule-digest": "afc1b6e21ae0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfArgIsValueClass",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#ValueArgumentClass",
+  "test-ref": "conformance:negative/pb1418-function-by-value-index; unit:ActivationConformanceDriftTests.BothActivations_AskTheSharedArgumentConformance",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1418 (registrar 15b). SR10 (cite.py --check 8.4.3.2.3 'argument-1 shall be of class numeric, object, or pointer' -> OK §8.4.3.2.3 10)). UdfArgIsValueClass accepts any item whose Pic.Category is Numeric, and a USAGE INDEX item carries Category Numeric with Usage Index. §13.18.60.4 GR10 (--check OK 'The class and category of an index data item are index') makes it class INDEX, which is not in SR10's set. Probe out/probe/function-identifier/q4_sr10_index.cob: an index data item passed to a BY VALUE PIC S9(9) BINARY formal compiles and runs (I=0000). Expected: an SR10 compile-time diagnostic (COBOLNET1554). The alphanumeric half is correct: probe p8_sr10_index.cob (argument WA PIC X(4)) is refused COBOLNET1554, and conformance:negative/udf-by-value-arg-class covers that half. The sibling screen IntrinsicArgumentRules.NonIntegralItemReason already excludes Usage.Index explicitly, so the omission here is local. || editions as written by the adjudicator: 2002, 2014, 2023 (function-prototype-name form; function-pointer-name form 2014, 2023). Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1418 landed (w61h). SR10 (cite.py --check 8.4.3.2.3 'argument-1 shall be of class numeric, object, or pointer' -> OK §8.4.3.2.3 10)); §13.18.60.4 GR10 ('The class and category of an index data item are index' -> OK). The screen now asks the §8.5.2.1 Table-2 CLASS through ParameterConformance.ValueArgumentClass - the same answer CALL's §14.9.4.3 SR22 screen asks - instead of the item's storage category, so a USAGE INDEX item (and an index-name) is class index. COBOLNET1554. Measured: USAGE INDEX argument to a BY VALUE formal -> COBOLNET1554 (was I=0000). Fail-open on an undecidable class, as the CALL screen.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.2.3-11",
@@ -6141,13 +6141,13 @@
   "ordinal": 13,
   "subject": "Function-identifier",
   "rule-digest": "9909ef42a60b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#CheckArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate",
+  "test-ref": "conformance:2002/pb1418_function_argument_manner; conformance:2002/pb1115_function_objref_conforming; conformance:negative/pb1418-function-arg-picture-mismatch; conformance:negative/pb1115-function-arg-only-mismatch; unit:ActivationConformanceDriftTests.BothActivations_AskTheSharedArgumentConformance",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1418 (registrar 15b). SR13 (cite.py --check 8.4.3.2.3 'the rules for conformance specified in 14.8.2, Parameters and 14.8.3, Returning items, apply' -> OK §8.4.3.2.3 13)). §14.8.2.3.2 rule 2 (--check OK 'the definition of the formal parameter and the definition of the argument shall have the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses') names 'a function' among the activated elements. UdfActivate runs NO §14.8.2 conformance check, only the SR9 OMITTED, SR10 BY VALUE and arity checks. CallBinder's Format-2 loop runs OoConformance.DescriptionMismatch, ContentConformanceReason and the pointer rules. Probes out/probe/function-identifier/p3_sr13_conform.cob: PIC X(4) passed BY REFERENCE to a PIC 9(4) formal compiles and prints X=0013, and PIC 9(3) to PIC 9(4) prints 3=0008. q6_sr13_ret.cob: PIC X(4) to a PIC X(2) formal prints R=AB. Expected: a compile-time conformance diagnostic for each. The same shape through CALL (q5_sr14_call_bg.cob) draws COBOLNET1688 'USAGE mismatch ... §14.8.2.3.2 rule 2'. The §14.8.3 returning half holds trivially, because the temp is cloned from the RETURNING item. [code-location note: (the Format-2 twin that does check)] || editions as written by the adjudicator: 2002, 2014, 2023 (function-prototype-name form; function-pointer-name form 2014, 2023). Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1418 landed (w61h). SR13 (cite.py --check 8.4.3.2.3 'the rules for conformance specified in 14.8.2, Parameters and 14.8.3, Returning items, apply' -> OK §8.4.3.2.3 13)). UdfBinder.UdfActivate now asks ParameterConformance.CheckArgument for every argument - the SAME per-argument §14.8.2 routine the Format-2 CALL asks (§14.9.4.3 SR25): §14.8.2.3.2/§14.8.2.2 BY REFERENCE (OoConformance.DescriptionMismatch, activation mode, plus the restricted-pointer sentence) and §14.8.2.3.3 BY CONTENT/BY VALUE (ContentConformanceReason). COBOLNET2470. Measured: PIC X(4) identifier into a PIC 9(4) BY REFERENCE formal -> COBOLNET2470 (was X=0013); PIC X(4) into PIC X(2) -> 2470 (was R=AB). §14.8.3 needs no screen: the result temporary is a clone of the RETURNING item (§8.4.3.2.4 GR1). The function-pointer form shares UdfActivate.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.2.3-14",
@@ -6156,13 +6156,13 @@
   "ordinal": 14,
   "subject": "Function-identifier",
   "rule-digest": "4b98994f784c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#ScreenBitAlignment",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#ScreenBitAlignment; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate",
+  "test-ref": "conformance:negative/pb1418-function-arg-bit-unaligned; unit:ActivationConformanceDriftTests.BothActivations_AskTheSharedArgumentConformance",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1418 (registrar 15b). SR14 (cite.py --check 8.4.3.2.3 'argument-1 shall be described such that it is aligned on a byte boundary' -> OK §8.4.3.2.3 14)). The byte-boundary screen exists only for CALL (CallBinder.ScreenBitAlignment, §14.9.4.3 SR6 --check OK). The function activation never calls it. Probe out/probe/function-identifier/p9_sr14_bit_bg.cob: 01 G GROUP-USAGE BIT. 05 B1 PIC 1. 05 B2 PIC 1(3). passed as FUNCTION FIP9F(B2) to a BY REFERENCE formal compiles and runs (R=101). Expected: a compile-time diagnostic. The CALL twin q5_sr14_call_bg.cob with the same B2 draws COBOLNET1683 'starts at bit 1 of its record ... shall be aligned on a byte boundary'. The subscript and ref-mod literal-only clauses are not enforced for functions either, since the screen is absent. [code-location note: (the CALL twin)] || editions as written by the adjudicator: 2002, 2014, 2023 (function-prototype-name form; function-pointer-name form 2014, 2023). Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1418 landed (w61h). SR14 (cite.py --check 8.4.3.2.3 'argument-1 shall be described such that it is aligned on a byte boundary' -> OK §8.4.3.2.3 14)). A BY REFERENCE formal with a bit data item argument runs ParameterConformance.ScreenBitAlignment - the SAME proof CALL's §14.9.4.3 SR6/SR8 asks (moved out of CallBinder): the §8.5.1.6.3 start-bit walk plus literal-only subscripts and ref-mod leftmost position. COBOLNET2471. Measured: B2 at bit 1 of a GROUP-USAGE BIT group -> COBOLNET2471 (was R=101).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.2.4-1",
@@ -6231,13 +6231,13 @@
   "ordinal": 5,
   "subject": "Function-identifier",
   "rule-digest": "a19be35a5596",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfArg; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfArg; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#IsReferenceIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#PermitsReceiving",
+  "test-ref": "conformance:2002/pb1418_function_argument_manner; unit:ReceivingResolutionDriftTests.TheReceivingChokepoint_AsksTheConstantRecordRule",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1418 (registrar 15b). GR5 b) (cite.py --check 8.4.3.2.4 'BY CONTENT is assumed when ... argument-1 is a literal, an arithmetic expression, a boolean expression, an object property, object data item, or any identifier that is not permitted as a receiving operand' -> OK, but cite.py prints the path '§8.4.3.2.4 5) a)' for the b) item: the PB718 lettered-sub-item defect). UdfArg maps EVERY BoundFieldOperand to Reference without asking whether the identifier is permitted as a receiving operand. Probe out/probe/function-identifier/p4_gr5b_const.cob: a CONSTANT RECORD item CX VALUE 5 (§13.18.15.3 SR2, --check OK: 'nor any data item subordinate to the subject of the entry shall be specified as a receiving data item') passed to a formal the function does ADD 1 TO prints 'R=0006 C=0006'. Expected: BY CONTENT, so R=0006 C=0005. The structured constant is overwritten. The boolean-expression arm of b) is refused outright: probe p4b_bool_arg.cob FIP4BF(WB B-AND B'1010') -> COBOLNET1506 'not yet supported' (the UdfArg switch has no BoundBoolOperand arm). a) is verified by conformance:2002/udf_nested_args (A=0005, the caller sees the callee's store) and c) by conformance:2002/udf_by_value. The object-property and object-data-item arms were not probed. || editions as written by the adjudicator: 2002, 2014, 2023 (function-prototype-name form; function-pointer-name form 2014, 2023). Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1418 landed (w61h). GR5 (cite.py --check 8.4.3.2.4 'is an identifier that is permitted as a receiving operand, other than an object property or object data item' -> OK §8.4.3.2.4 5)). a) BY REFERENCE only for a sole data reference that resolves to a data item, is not an object property or object data item, and passes ExpressionBinder.PermitsReceiving - the SAME prohibition table (ReceivingFormBar/ReceivingPlaceBar) ResolveReceiving reports; b) BY CONTENT for a literal, an arithmetic or boolean expression (CALL's ContentBool channel), a function-identifier (§8.4.3.2.3 SR1), an object property/object data item, and a non-receivable identifier (a CONSTANT RECORD item, §13.18.15.3 SR2); c) BY VALUE for a BY VALUE formal. Measured: CONSTANT RECORD argument -> R=0006 C=0005 (was C=0006); WB B-AND B'1010' -> B=1000 (was COBOLNET1506). The figurative-constant argument form is SR8's residue (row SR-8.4.3.2.3-8), not a manner question.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.2.4-6",
@@ -18021,13 +18021,13 @@
   "ordinal": 3,
   "subject": "Linkage section",
   "rule-digest": "2f4a35f5a87c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage; src/Cobol.Net.Compiler/Binding/PrototypeSignatures.cs#Same; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall",
-  "test-ref": "conformance:negative/pb133-arg-conformance; conformance:negative/pb204-nested-returning-incompatible",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#CheckArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate",
+  "test-ref": "conformance:negative/pb133-arg-conformance; conformance:negative/pb204-nested-returning-incompatible; conformance:negative/pb1418-function-arg-picture-mismatch; conformance:negative/pb1115-function-arg-only-mismatch",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1254, 14d). Rule (cite.py --check 13.7.3 \"shall follow the rules specified in 14.8.2, Parameters and 14.8.3, Returning items\" -> OK §13.7.3 3)). A cross-reference rule: wherever the activated element is statically known the §14.8.2/§14.8.3 regime is checked against the linkage descriptions. Parameters half: probe sr3.cob, CALL AS NESTED USING W-A(X(2)) W-N(9(3)) against L-G (6 positions) and L-P POINTER -> COBOLNET1688 'formal (6) exceeds the argument (2) (ISO §14.8.2.2 rule 1)' (cite.py --check 14.8.2.2 OK) and 'category mismatch (formal Pointer, argument Numeric)'. Returning half: sr3r.cob -> COBOLNET1736 category mismatch on RETURNING, and COBOLNET1736 for a missing RETURNING (§14.8.3.1 'if and only if'). Both halves verified. The dynamic/literal Format-1 CALL arm is resolved at run time (§14.9.4 rows, EC-PROGRAM-ARG-MISMATCH), not this row. Probes: out13/probe/linkage-section/sr3.cob, sr3r.cob. || REFUTED: DIVERGES — The CALL ... AS NESTED arm is thoroughly enforced (USAGE, SIGN, JUSTIFIED, scale, BLANK WHEN ZERO, strong-type, group-vs-numeric, BY CONTENT COMPUTE rule, RETURNING length all rejected with COBOLNET1688/1736), but the FUNCTION-activation arm is not: 14.8.2.3.2 rule 2 names 'a function' among the activated elements whose formal and argument shall have the same PICTURE/USAGE, and 8.4.3.2.3 SR8 routes user-defined function arguments through 14.8.2. An in-unit FUNCTION-ID with REPOSITORY entry, formal P-X PIC 9(3), invoked FUNCTION RLKG(W-X) with W-X PIC 9(4) VALUE 21 (an identifier, so BY REFERENCE per 8.4.3.2.4 GR a) compiles clean and prints 00004 (P-X aliases '002' of '0021') -- a silent wrong answer where the spec requires rejection. A pointer argument to an OBJECT REFERENCE function formal is likewise accepted at compile time and fails only at run time. Both halves verified only for CALL NESTED. || Editions (adjudicator): 85, 2002, 2014, 2023 (§14.8.3 returning items 2002+)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1115 landed (w61h; folded PB1254). SR3 (cite.py --check 13.7.3 'shall follow the rules specified in 14.8.2, Parameters and 14.8.3, Returning items' -> OK §13.7.3 3)). Wherever the activated element's linkage descriptions are statically known the §14.8.2/§14.8.3 regime is checked: CALL AS NESTED / program prototype (unchanged, COBOLNET1688/1736) and now the function-identifier arm (COBOLNET2470) through the shared ParameterConformance.CheckArgument; a function's RETURNING half conforms by construction (the caller temp clones the RETURNING item, §8.4.3.2.4 GR1). Measured: FUNCTION RLKG-shape PIC 9(4) argument into a PIC 9(3) formal -> COBOLNET2470 (was 00004). The dynamic Format-1 CALL arm is resolved at run time (§14.9.4 rows), not this row.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.7.3-4",
@@ -20917,11 +20917,11 @@
   "subject": "CONSTANT RECORD clause",
   "rule-digest": "210005b82077",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveSending; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#RejectConstantStore",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveSending; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ConstantStoreProhibition; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ReceivingPlaceBar",
   "test-ref": "conformance:negative/pb881-inspect-replacing-constant-record; conformance:negative/pb881-read-into-constant-record; conformance:negative/pb881-move-corresponding-constant-record; conformance:negative/pb881-search-varying-constant-record; conformance:negative/pb416-initialize-target-constant-record; conformance:2002/pb881_constant_record_sending_roles; unit:ReceivingResolutionDriftTests.NoVerbBinder_ResolvesAnOperandWithoutStatingItsRole",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work/PB881.md - SR2 is a rule over an OPERAND ROLE ('shall be specified as a receiving data item'), so it is written once, in ExpressionBinder.ResolveReceiving (DataBinder.RejectConstantStore, COBOLNET1548), and every verb binder now states each operand's role by calling ResolveReceiving or ResolveSending - never ctx.Refs.Resolve, which screens nothing (ReceivingResolutionDriftTests fails a binder under Verbs/ that does). The sweep moved every receiving operand that had bypassed the chokepoint: INSPECT identifier-1 under REPLACING/CONVERTING (14.9.22.3 SR8 keeps Format 1's TALLYING-only identifier-1 SENDING), READ INTO (sequential and keyed) and RETURN INTO, the CORRESPONDING receiving group, SEARCH VARYING identifier-2 (14.9.37.4 GR1), INVOKE RETURNING (three arms) and BY REFERENCE arguments (typed and universal), the SET object-reference / data-pointer / program-pointer / function-pointer receivers, SET ... TO LOCALE's save target, ALLOCATE RETURNING, FREE and SET UP/DOWN pointer receivers. ACCEPT (the note's second site) had already been routed by PB429 (3fffacb61). The negatives pin four of the formerly bypassing arms at 2002/2014/2023; the positive pins the SENDING roles that stay legal (INSPECT TALLYING of a constant -> CN=0004 unchanged, MOVE CORRESPONDING from a constant group). The CONSTANT RECORD clause is COBOL-2002, so the rule has no population at 85.",
+  "notes": "kb/Work/PB881.md - SR2 is a rule over an OPERAND ROLE ('shall be specified as a receiving data item'), so it is written once, in ExpressionBinder.ResolveReceiving (DataBinder.RejectConstantStore, COBOLNET1548), and every verb binder now states each operand's role by calling ResolveReceiving or ResolveSending - never ctx.Refs.Resolve, which screens nothing (ReceivingResolutionDriftTests fails a binder under Verbs/ that does). The sweep moved every receiving operand that had bypassed the chokepoint: INSPECT identifier-1 under REPLACING/CONVERTING (14.9.22.3 SR8 keeps Format 1's TALLYING-only identifier-1 SENDING), READ INTO (sequential and keyed) and RETURN INTO, the CORRESPONDING receiving group, SEARCH VARYING identifier-2 (14.9.37.4 GR1), INVOKE RETURNING (three arms) and BY REFERENCE arguments (typed and universal), the SET object-reference / data-pointer / program-pointer / function-pointer receivers, SET ... TO LOCALE's save target, ALLOCATE RETURNING, FREE and SET UP/DOWN pointer receivers. ACCEPT (the note's second site) had already been routed by PB429 (3fffacb61). The negatives pin four of the formerly bypassing arms at 2002/2014/2023; the positive pins the SENDING roles that stay legal (INSPECT TALLYING of a constant -> CN=0004 unchanged, MOVE CORRESPONDING from a constant group). The CONSTANT RECORD clause is COBOL-2002, so the rule has no population at 85. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#RejectConstantStore (kb/Work PB1418 turned the reporting RejectConstantStore into the non-reporting ConstantStoreProhibition, asked by ExpressionBinder.ReceivingPlaceBar (the place half of the receiving-prohibition table ResolveReceiving reports and PermitsReceiving asks))",
   "state": "OK"
  },
  {
@@ -33546,13 +33546,13 @@
   "ordinal": 1,
   "subject": "Elementary items",
   "rule-digest": "40f69e865688",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#SameDescriptionAs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#CheckArgument",
+  "test-ref": "conformance:negative/pb1115-function-arg-universal-mismatch; conformance:2002/pb1115_function_objref_conforming",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1115 (open). Rule: \"If either the argument or the formal parameter is a universal object reference, the corresponding formal parameter or argument shall be a universal object reference.\" (cite.py --check 14.8.2.3.2 -> OK §14.8.2.3.2 1)). Code: BY REFERENCE arguments (INVOKE: OoBindInvocationArg byReference arm; CALL AS NESTED/prototype: CallBinder's Reference arm) go through OoConformance.DescriptionMismatch, whose ObjectReference arm requires ObjectRefDescriptor.SameDescriptionAs (Kind, Name, Factory, Only all equal) — Kind equality makes universal<->universal the only pairing. Probes (pinned cobol.exe, probe/elementary-items/r1a, r1b): typed C1 arg -> universal formal and universal arg -> typed C1 formal BY REFERENCE both refused COBOLNET0828. Both directions verified. No spec-derived test pins the universal leg (the pb389 negatives exercise SET format 5, not the parameter rule) -> test-ref empty. || REFUTED: PARTIAL — The INVOKE and CALL AS NESTED/prototype arms enforce the rule at bind, but the third activation arm, a user-defined FUNCTION reached through a REPOSITORY function-prototype, has no bind-time check at all. A typed argument into a universal formal, or the reverse, compiles cleanly. It fails only at run time because the .NET carrier type happens to differ. || editions as adjudicated: 2002, 2014, 2023 (the OO facility and its §14.8.2.3.2 object-reference paragraph enter with ISO 1989:2002; absent from 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1115 landed (w61h). Rule 1 (cite.py --check 14.8.2.3.2 'If either the argument or the formal parameter is a universal object reference' -> OK §14.8.2.3.2 1)). The third activation arm - a user-defined FUNCTION through a REPOSITORY function-prototype or a function pointer - now asks ParameterConformance.CheckArgument -> OoConformance.DescriptionMismatch at bind (§8.4.3.2.3 SR13), as the CALL AS NESTED/prototype and INVOKE arms already did. COBOLNET2470. Measured: universal formal with a class-typed argument, and the reverse -> COBOLNET2470 (were run-time EC-PROGRAM-ARG-MISMATCH).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.8.2.3.2-2",
@@ -33561,13 +33561,13 @@
   "ordinal": 2,
   "subject": "Elementary items",
   "rule-digest": "effe4d436ffa",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#SameDescriptionAs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#CheckArgument",
+  "test-ref": "conformance:negative/pb1115-function-arg-interface-mismatch",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1115 (open). Rule: \"If either the argument or the formal parameter is described with an interface-name, the corresponding formal parameter or argument shall be described with the same interface-name.\" Code: SameDescriptionAs requires Kind==Interface on both sides and case-insensitive name equality (§8.3.2.2). Probe r2a: I1 arg -> I1 formal BY REFERENCE accepted and runs (IN-M); kind mismatch refused by the same comparator (r1a/r1b show the Kind compare). conformance:negative/oo-interface-arg-mismatch does NOT cover this rule (it pins a PIC 9(6)/9(4) digit mismatch through an interface receiver), so test-ref empty. || REFUTED: PARTIAL — Same defect in the function arm. A class-typed argument into an interface-named formal of a user-defined function is not diagnosed at compile time, even though §8.4.3.2.3 SR13 applies. It fails at run time only through a carrier cast.",
-  "state": "GAP"
+  "notes": "kb/Work PB1115 landed (w61h). Rule 2 (cite.py --check 14.8.2.3.2 'described with an interface-name, the corresponding formal parameter or argument shall be described with the same interface-name' -> OK §14.8.2.3.2 2)). Function arm now asks the shared comparator at bind. Measured: interface-named formal with a class-typed argument (the class implements the interface) -> COBOLNET2470.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.8.2.3.2-3",
@@ -33576,13 +33576,13 @@
   "ordinal": 3,
   "subject": "Elementary items",
   "rule-digest": "b374cb872214",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#SameDescriptionAs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#CheckArgument",
+  "test-ref": "conformance:negative/pb1115-function-arg-only-mismatch; conformance:2002/pb1115_function_objref_conforming",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1115 (open). Rule: same object-class-name, \"and the FACTORY and ONLY phrases shall be the same\". SameDescriptionAs compares Kind, Name, Factory and Only. Probes: r3a (subclass C2 arg -> C1 formal BY REF) refused 0828; r3b (C1 ONLY -> C1) refused; r3c (FACTORY OF C1 -> C1) refused; r3d (C1 -> C1) accepted and runs; r3e (C2 -> C1 BY CONTENT) accepted — correct, BY CONTENT is §14.8.2.3.3's SET regime, not this rule. Caveat, recorded under GR-14.8.2.3.2-4: rule 3 read literally forbids an object-class-name argument at an ACTIVE-CLASS formal, which rule 4 b) expressly permits; the comparator applies rule 3 without rule 4 b)'s exception — that defect is filed against rule 4, not here. No spec-derived parameter-rule test (pb389 negatives are SET format 5) -> test-ref empty. || REFUTED: PARTIAL — This is a silent acceptance of non-conforming source. A user-defined function argument described 'OBJECT REFERENCE C1 ONLY', passed BY REFERENCE into a formal described 'OBJECT REFERENCE C1', compiles and runs with no diagnostic and no exception. Rule 3 requires the ONLY phrase to be the same on both sides, and §8.4.3.2.3 SR13 makes that a syntax rule for function activation. The INVOKE arm (r3a-r3d) is correct, but the function arm never calls the comparator, and the runtime carrier check cannot see ONLY because both sides share a carrier.",
-  "state": "GAP"
+  "notes": "kb/Work PB1115 landed (w61h). Rule 3 (cite.py --check 14.8.2.3.2 'and the FACTORY and ONLY phrases shall be the same' -> OK §14.8.2.3.2 3)). Function arm now asks the shared comparator at bind. Measured: OBJECT REFERENCE C1 ONLY argument into an OBJECT REFERENCE C1 formal -> COBOLNET2470 (was a silent run, R=NULL); ONLY on both sides still compiles and runs (O=NULL).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.8.2.3.2-4",
@@ -33682,11 +33682,11 @@
   "subject": "Elementary items",
   "rule-digest": "f2ff548e9561",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentNumericLiteralMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentBooleanMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentArithmeticMismatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#ContentConformanceReason; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#FormalCrossing",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentNumericLiteralMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentBooleanMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentArithmeticMismatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#FormalCrossing; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#ContentConformanceReason",
   "test-ref": "conformance:2002/oo_invoke_content_unsigned_formal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1113 (open). Rule (cite.py --check 14.8.2.3.3 -> OK 2) a)-d)): a) numeric formal -> COMPUTE rules; b) index data item formal -> SET rules; c) ANY LENGTH formal -> its length matches; d) otherwise MOVE rules. Verified conforming: identifier arms route to MoveTable16 (PB53/PB878 landed); fixed-point numeric identifiers into fixed formals (golden oo_invoke_content_unsigned_formal, pb53_by_content_move_rules). DEFECTS: (1) rejects-legal-source on the literal/expression/float lanes — c_lit_float (`BY CONTENT 1.5` into FLOAT-LONG) refused; c_expr_float2 (`BY CONTENT A * 2` into FLOAT-LONG) refused 'fixed-point->float CONTENT conversion ... documented refinement'; c_lit_ne (`12.5` into PIC ZZ9.99) refused although Table 16 Numeric-noninteger -> Numeric-edited = Yes; c_lit_nat (`12` into PIC N(4)) refused although Numeric-integer -> National = Yes; c_bool_nat (`B1 B-AND B2` into PIC N(4)) refused although Boolean -> National = Yes (ContentBooleanMismatch refuses it 'on purpose'); INVOKE's identifier lane refuses any fixed<->float pair (OoBinder carrier screen, read-verified) though a COMPUTE takes any numeric sender. (2) wrong-answer — c_float_disp: CALL \"S\" AS NESTED USING BY CONTENT A (A PIC 9(3)V99 VALUE 12.5) into `L USAGE FLOAT-LONG` compiles, and the callee prints IN-S [0] and COMPUTE W = L gives 00000, where MOVE A TO F in the caller gives 12.5; expected L = 12.5 (rule 2a COMPUTE). (3) under-rejects b) — c_num_idx (PIC 9(4) identifier into a USAGE INDEX formal) and c_lit_idx (literal 3) accepted; SET's §14.9.39.3 SR2 \"Identifier-2 shall reference a data item of class index\" and SR3 (no arithmetic-expression-1 into class index) refuse both (index items carry PicCategory.Numeric, so the numeric COMPUTE arm answers). c_idx_idx accepted (correct). (4) under-rejects c)/d) — ContentMismatch's default arm returns null for ANY LENGTH non-alphanumeric formals without asking the MOVE question: c_al_nat (`PIC 9V9 VALUE 1.5` into `PIC N ANY LENGTH`) accepted and prints [15]; Table 16 Numeric-noninteger -> National = No. Rule 2c only relaxes LENGTH.",
+  "notes": "OWNED BY kb/Work PB1113 (open). Rule (cite.py --check 14.8.2.3.3 -> OK 2) a)-d)): a) numeric formal -> COMPUTE rules; b) index data item formal -> SET rules; c) ANY LENGTH formal -> its length matches; d) otherwise MOVE rules. Verified conforming: identifier arms route to MoveTable16 (PB53/PB878 landed); fixed-point numeric identifiers into fixed formals (golden oo_invoke_content_unsigned_formal, pb53_by_content_move_rules). DEFECTS: (1) rejects-legal-source on the literal/expression/float lanes — c_lit_float (`BY CONTENT 1.5` into FLOAT-LONG) refused; c_expr_float2 (`BY CONTENT A * 2` into FLOAT-LONG) refused 'fixed-point->float CONTENT conversion ... documented refinement'; c_lit_ne (`12.5` into PIC ZZ9.99) refused although Table 16 Numeric-noninteger -> Numeric-edited = Yes; c_lit_nat (`12` into PIC N(4)) refused although Numeric-integer -> National = Yes; c_bool_nat (`B1 B-AND B2` into PIC N(4)) refused although Boolean -> National = Yes (ContentBooleanMismatch refuses it 'on purpose'); INVOKE's identifier lane refuses any fixed<->float pair (OoBinder carrier screen, read-verified) though a COMPUTE takes any numeric sender. (2) wrong-answer — c_float_disp: CALL \"S\" AS NESTED USING BY CONTENT A (A PIC 9(3)V99 VALUE 12.5) into `L USAGE FLOAT-LONG` compiles, and the callee prints IN-S [0] and COMPUTE W = L gives 00000, where MOVE A TO F in the caller gives 12.5; expected L = 12.5 (rule 2a COMPUTE). (3) under-rejects b) — c_num_idx (PIC 9(4) identifier into a USAGE INDEX formal) and c_lit_idx (literal 3) accepted; SET's §14.9.39.3 SR2 \"Identifier-2 shall reference a data item of class index\" and SR3 (no arithmetic-expression-1 into class index) refuse both (index items carry PicCategory.Numeric, so the numeric COMPUTE arm answers). c_idx_idx accepted (correct). (4) under-rejects c)/d) — ContentMismatch's default arm returns null for ANY LENGTH non-alphanumeric formals without asking the MOVE question: c_al_nat (`PIC 9V9 VALUE 1.5` into `PIC N ANY LENGTH`) accepted and prints [15]; Table 16 Numeric-noninteger -> National = No. Rule 2c only relaxes LENGTH. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#ContentConformanceReason (kb/Work PB1418 moved ContentConformanceReason out of CallBinder into the shared ParameterConformance (asked by the Format-2 CALL and the function-identifier))",
   "state": "GAP"
  },
  {
@@ -38272,11 +38272,11 @@
   "subject": "INITIALIZE statement",
   "rule-digest": "73ccf855939c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs#BindInitializeTarget; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#RejectConstantStore",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs#BindInitializeTarget; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ConstantStoreProhibition; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ReceivingPlaceBar",
   "test-ref": "conformance:negative/pb416-initialize-target-constant-record; conformance:85/pb416_initialize_operand_screens_85; unit:InitializeLaneDriftTests.InitializeBinder_ResolvesIdentifier1ThroughTheOneReceivingChokepoint",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work/PB416.md LANDED -- the CONSEQUENCE half now holds, and it holds as a FUNNEL rather than as a check. identifier-1 resolves through ExpressionBinder.ResolveReceiving, the ONE receiving chokepoint, so it collects every receiving-operand prohibition that lives there: LINE-COUNTER (§8.4.3.15.3 SR3), a constant-name substituting a literal (§13.10.4 GR1), PAGE-COUNTER, a resolved-but-unimplemented receiver shape (COBOLNET0899, replacing the former run-time InitializeErrorAction staging -- §4.2.2 puts a syntax-rule violation in the compile-time mechanism), the OCCURS DYNAMIC CAPACITY register (§13.18.38 SR30-32) and a CONSTANT RECORD (§13.18.15.3 SR2 / COBOLNET1548). The routing rather than a bolted-on CONSTANT RECORD test is what makes the NEXT prohibition automatic, and a drift test asserts the routing survives. The DESIGNATION half was already correct and is unchanged (identifier-1 is a Place every expanded store writes through; a function-identifier is refused by the grammar, as §8.4.3.2.3 SR1 requires). Measured before: 'INITIALIZE CR.' over a CONSTANT RECORD compiled clean and destroyed the constant's content at run time.",
+  "notes": "kb/Work/PB416.md LANDED -- the CONSEQUENCE half now holds, and it holds as a FUNNEL rather than as a check. identifier-1 resolves through ExpressionBinder.ResolveReceiving, the ONE receiving chokepoint, so it collects every receiving-operand prohibition that lives there: LINE-COUNTER (§8.4.3.15.3 SR3), a constant-name substituting a literal (§13.10.4 GR1), PAGE-COUNTER, a resolved-but-unimplemented receiver shape (COBOLNET0899, replacing the former run-time InitializeErrorAction staging -- §4.2.2 puts a syntax-rule violation in the compile-time mechanism), the OCCURS DYNAMIC CAPACITY register (§13.18.38 SR30-32) and a CONSTANT RECORD (§13.18.15.3 SR2 / COBOLNET1548). The routing rather than a bolted-on CONSTANT RECORD test is what makes the NEXT prohibition automatic, and a drift test asserts the routing survives. The DESIGNATION half was already correct and is unchanged (identifier-1 is a Place every expanded store writes through; a function-identifier is refused by the grammar, as §8.4.3.2.3 SR1 requires). Measured before: 'INITIALIZE CR.' over a CONSTANT RECORD compiled clean and destroyed the constant's content at run time. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#RejectConstantStore (kb/Work PB1418 turned the reporting RejectConstantStore into the non-reporting ConstantStoreProhibition, asked by ExpressionBinder.ReceivingPlaceBar (the place half of the receiving-prohibition table ResolveReceiving reports))",
   "state": "OK"
  },
  {

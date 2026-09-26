@@ -61,12 +61,14 @@ public sealed class PlaceStorageFormSwitchDriftTests
     /// <c>file:subject</c>. Adding a row is an adjudication, not a formality.</summary>
     private static readonly Dictionary<string, string> Exempt = new(StringComparer.Ordinal)
     {
-        ["CallBinder.cs:core"] =
+        // Moved with the method from CallBinder.cs (kb/Work PB1418: the proof is shared by CALL and the
+        // function-identifier, so it lives in ParameterConformance).
+        ["ParameterConformance.cs:core"] =
             "ScreenBitAlignment peels the decorations ITSELF in the enclosing `while (core is PlaceDecorator "
             + "dec)` loop — accumulating each reference modifier's leftmost boolean position as it goes, which "
             + "is why it cannot use the one-shot Undecorated — so `core` is a storage place by construction. Its "
-            + "default arm is also a documented ACCEPT (ISO §14.9.4.3 SR6/SR8: a shape the bit walk cannot model "
-            + "is never rejected), not a loud.",
+            + "default arm is also a documented ACCEPT (ISO §14.9.4.3 SR6/SR8, §8.4.3.2.3 SR14: a shape the bit "
+            + "walk cannot model is never rejected), not a loud.",
         ["ProgramEmitter.cs:p"] =
             "PrefixPlace re-anchors a CONTAINER-resolved FILE STATUS item, which ISO §12.4.5.8.3 SR1 makes a "
             + "two-character alphanumeric elementary item and §12.4.5.8 SR1 forbids an OCCURS on — so no "

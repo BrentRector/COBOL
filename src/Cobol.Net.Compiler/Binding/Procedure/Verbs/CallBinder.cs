@@ -183,6 +183,9 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         string calleeWhere = asNested
             ? "CALL … AS NESTED"
             : $"CALL … program-prototype '{prototype?.Name}'";
+        // §14.9.4.3 SR25 is the rule that imports §14.8.2 into a Format-2 CALL (the function-identifier's twin is
+        // §8.4.3.2.3 SR13 — UdfBinder).
+        var conformanceSite = new ActivationSite(calleeWhere, "§14.9.4.3 SR25", DiagnosticCatalog.CallArgumentConformance);
 
         // ── USING arguments — the §14.9.4.4 GR5 TRANSITIVE pass mode: BY REFERENCE is assumed before the
         //    first phrase; each explicit BY REFERENCE / BY CONTENT / BY VALUE phrase applies to every following
@@ -596,76 +599,13 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     ctx.Edition.Error(DiagnosticCatalog.CallArgumentMode,
                         $"CALL … argument {i + 1} passes BY VALUE where the corresponding formal parameter "
                         + $"'{f.Item.CobolName}' is not BY VALUE (ISO §14.9.4.3 SR21)");
-                // An ADDRESS-IDENTIFIER argument (kb/Work PB239) is a pointer VALUE with no storage behind it, so
-                // neither the description comparator nor the MOVE/COMPUTE regime below has anything to compare;
-                // its law is the class-pointer paragraph both passing regimes share (AddressConformanceReason).
-                else if (arg.DataAddress is not null || arg.ProgramAddress is not null)
-                {
-                    if (host.Ptr.AddressConformanceReason(f.Item, arg.DataAddress, arg.ProgramAddress) is { } awhy)
-                        ctx.Edition.Error(DiagnosticCatalog.CallArgumentConformance,
-                            $"{calleeWhere} argument {i + 1} (an address-identifier) does not conform to formal "
-                            + $"parameter '{f.Item.CobolName}': {awhy}");
-                }
-                // §14.8.2.3.2 / §14.8.2.2 (BY REFERENCE only — 14.8.2.3.3 puts BY CONTENT / BY VALUE in the
-                // MOVE/SET-validity regime instead): the same-description check, through THE one comparator
-                // (OoConformance.DescriptionMismatch — previously INVOKE-only; a NESTED call is the same
-                // §14.8.2.3.2 rule-2 regime as a method). Run-time it would be EC-PROGRAM-ARG-MISMATCH;
-                // at bind it is the design's diagnostic lane.
-                else if (arg.Mode is CobolPassMode.Reference && arg.Place is { } ap
-                         && CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(f.Item, ap.Item,
-                                byRefGroupPrefix: true,
-                                // §14.8.2.3.2 rules d/e — ACTIVATION mode, the INVOKE twin's (OoBinder) setting.
-                                // PAIR mode demanded the same ANY LENGTH clause on both sides, so a plain
-                                // argument meeting an ANY LENGTH formal — the clause's whole purpose, rule d:
-                                // "its length is considered to match the length of the corresponding
-                                // argument" — was refused at every AS NESTED call (kb/Work PB240).
-                                anyLengthActivationRelax: true) is { } why)
-                    ctx.Edition.Error(DiagnosticCatalog.CallArgumentConformance,
-                        $"{calleeWhere} argument {i + 1} ('{ap.Item.CobolName}') does not conform to formal "
-                        + $"parameter '{f.Item.CobolName}': {why} (ISO §14.8.2)");
-                // §14.8.2.3.3 (BY CONTENT / BY VALUE) + §14.8.2.2 rule 2 — the OTHER ARM OF THE SAME DISPATCH,
-                // and it had none at all (kb/Work PB165). §14.9.4.3 SR25 imports "the rules for conformance
-                // specified in 14.8.2, Parameters" into a Format-2 CALL, and §14.8.2.3.3's rule 2 is the very
-                // regime this loop runs in (a NESTED call or a program prototype). With no screen here,
-                // CobolArgAdapt's converting views silently ADAPTED a non-conforming pair: measured on the
-                // pre-fix tree, `CALL "S" AS NESTED USING BY CONTENT A` with `A PIC X(4) VALUE "ABCD"` and a
-                // `PIC 9(4)` formal printed `LA=0000` — a wrong answer, on source the standard says is in
-                // error, with no diagnostic. The rule itself lives with its BY REFERENCE sibling in
-                // OoConformance, so the CALL and INVOKE lanes cannot drift.
-                else if (arg.Mode is CobolPassMode.Content or CobolPassMode.Value
-                         && ContentConformanceReason(f.Item, arg) is { } cwhy)
-                    ctx.Edition.Error(DiagnosticCatalog.CallArgumentConformance,
-                        $"{calleeWhere} argument {i + 1} "
-                        + $"({(arg.Place is { } cp2 ? $"'{cp2.Item.CobolName}'" : "the value operand")}) does "
-                        + $"not conform to formal parameter '{f.Item.CobolName}' "
-                        + $"{(arg.Mode is CobolPassMode.Value ? "BY VALUE" : "BY CONTENT")}: {cwhy} "
-                        + "(ISO §14.8.2.3.3 via §14.9.4.3 SR25)");
-
-                // §14.8.2.3.2, last sentence of the class-pointer rule: "If either is a restricted pointer, both
-                // shall be restricted and of the same type." The file already consulted StrongTypeModel for
-                // §14.9.4.3 SR10 above, so the model was in hand and only this clause of the same conformance
-                // regime was missing (kb/Work PB153).
-                // ⛔ THE `asNested` SCOPING IS GONE, AND ITS PREMISE WITH IT (kb/Work PB427). The guard existed
-                // because StrongTypeModel's type equivalence was a NAME compare that "deferred cross-program
-                // EXTERNAL equivalence", so a separately-declared callee would have been screened on a test that
-                // could not see the other declaration. §8.5.3.1's equivalence is now decided from the
-                // DECLARATIONS themselves — <c>StrongTypeModel.SameRestriction</c> resolves each restriction to
-                // its own source element's type declaration and compares them structurally — so a program
-                // prototype's §12.3.8.4 GR10 a) definition, a SEPARATE outermost source element that does not
-                // inherit the caller's GLOBAL TYPEDEFs, is exactly the case the rule is FOR. §14.8.2.3.2 carries
-                // no AS-NESTED qualification of its own; the enclosing loop already has both descriptions.
-                if (arg.Mode is CobolPassMode.Reference && arg.Place is { } restrictedArg)
-                {
-                    var argR = StrongTypeModel.PointerRestriction(restrictedArg.Item);
-                    var formalR = StrongTypeModel.PointerRestriction(f.Item);
-                    if ((argR.IsRestricted || formalR.IsRestricted) && !StrongTypeModel.SameRestriction(argR, formalR))
-                        ctx.Edition.Error(DiagnosticCatalog.CallArgumentConformance,
-                            $"CALL … {(asNested ? "AS NESTED " : "")}argument {i + 1} ('{restrictedArg.Item.CobolName}') "
-                            + $"and formal parameter '{f.Item.CobolName}': one is a RESTRICTED data-pointer and the "
-                            + $"other is not restricted to the same type (argument: {argR}; formal: "
-                            + $"{formalR}) — ISO §14.8.2.3.2 requires that if either is a "
-                            + "restricted pointer, both shall be restricted and of the same type");
-                }
+                // §14.8.2.3.2 / §14.8.2.2 (BY REFERENCE) and §14.8.2.3.3 (BY CONTENT / BY VALUE), the address-
+                // identifier's class-pointer paragraph and the restricted-pointer sentence — THE ONE ARGUMENT HALF
+                // OF §14.8.2 (kb/Work PB1418), shared with the function-identifier's §8.4.3.2.3 SR13 lane so the two
+                // activations cannot drift. Run-time it would be EC-PROGRAM-ARG-MISMATCH; at bind it is the design's
+                // diagnostic lane.
+                else
+                    host.Params.CheckArgument(f.Item, arg, i + 1, conformanceSite);
             }
         }
 
@@ -736,45 +676,6 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         {
             UsedOverflowSpelling = usedOverflow,
             IsPointerTarget = isPointerTarget,
-        };
-    }
-
-    /// <summary>ISO §14.8.2.3.3's conformance verdict for ONE bound BY CONTENT / BY VALUE argument, dispatched
-    /// on the argument's SHAPE onto the rules that live with their BY REFERENCE sibling in
-    /// <see cref="CobolNet.Compiler.Oo.OoConformance"/> (kb/Work PB165). Null when conformant.
-    /// <para>The shapes are exactly the ones <c>BindCall</c> produces for a Format-2 argument, and each takes
-    /// the clause the standard names for it: an identifier the per-formal-category rule (2a COMPUTE / 2b SET /
-    /// 2c ANY LENGTH / 2d MOVE, plus the class-pointer and object-reference SET paragraph); a boolean
-    /// expression or boolean literal Table 16's BOOLEAN row (rule 2d); an arithmetic expression rule 2a's
-    /// COMPUTE; an alphanumeric literal rule 2d's MOVE; a numeric literal whichever of 2a/2d its value can
-    /// satisfy. A CONSTANT-NAME argument arrives already substituted as its literal (§13.10.4 GR1), so it
-    /// needs no arm of its own.</para>
-    /// <para>⛔ An OMITTED argument never reaches here — the loop's own <c>continue</c> takes it after SR24,
-    /// and §14.8.2's conformance rules are about a formal parameter's DESCRIPTION, which an omitted argument
-    /// has none of. That is §14.9.4.4 GR11/GR12's regime, not this one.</para></summary>
-    private string? ContentConformanceReason(DataItem formal, BoundCallArg arg)
-    {
-        if (arg.ContentBool is not null)
-            return CobolNet.Compiler.Oo.OoConformance.ContentBooleanMismatch(formal);
-        if (arg.Place is { } p)
-            return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, formal, p);
-        return arg.Value switch
-        {
-            // A figurative constant and an ALL literal are alphanumeric VALUES (§8.3.2.1 / §14.9.25's MOVE
-            // rules), so they take rule 2d's MOVE arm exactly as a written nonnumeric literal does.
-            BoundStringLiteral or BoundAllLiteral or BoundFigurative =>
-                CobolNet.Compiler.Oo.OoConformance.ContentAlphanumericLiteralMismatch(formal),
-            BoundNumericLiteral n =>
-                CobolNet.Compiler.Oo.OoConformance.ContentNumericLiteralMismatch(formal, n.Text),
-            // A BY VALUE argument binds as a computed operand even when GR8 says it is "merely a single
-            // identifier or literal" — the literal case is recovered so the two spellings of one value get
-            // ONE verdict (the CallEmitter.ArgText discipline, applied to conformance).
-            BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } ct =>
-                CobolNet.Compiler.Oo.OoConformance.ContentNumericLiteralMismatch(formal, ct),
-            BoundComputedOperand => CobolNet.Compiler.Oo.OoConformance.ContentArithmeticMismatch(formal),
-            // No bound value at all (a shape the arms above do not name) is not a conformance verdict to make:
-            // the binder has already reported whatever refused to bind.
-            _ => null,
         };
     }
 
@@ -1010,23 +911,10 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     /// </remarks>
     private void CheckByValueClass(string what, BoundComputedOperand operand)
     {
-        // ⛔ CLASSIFY THE UNDERLYING REFERENCE, NOT THE WRAPPER. IntrinsicArgumentRules.ClassOf maps any
-        // BoundComputedOperand to NUMERIC — correct in its own context, where a computed operand really is an
-        // arithmetic expression — so asking it about the wrapper made this check a silent no-op. The first
-        // version did exactly that and turned a wrongly-worded REJECT into a clean ACCEPT, which looks like a fix
-        // and is a regression: the rule stopped being enforced at all. A bare identifier binds to BoundNumRef, so
-        // its Place is the thing SR22 is about.
-        // kb/Work PB132: an index-NAME binds to BoundIndexRef, not BoundNumRef, and the old
-        // `is not BoundNumRef … return` guard ACCEPTED it — class index (§8.5.2.1 Table 2's own row) is not
-        // numeric, object, or pointer. Classified explicitly here; a genuine computed expression still
-        // classifies numeric through the generic arm.
-        CobolClass? actual = operand.Expr switch
-        {
-            BoundNumRef { Place: { } place } => IntrinsicArgumentRules.ClassOf(new BoundFieldOperand(place)),
-            BoundIndexRef => CobolClass.Index,
-            _ => IntrinsicArgumentRules.ClassOf(operand),
-        };
-        ValueClassScreen(actual, what);
+        // ⛔ CLASSIFY THE UNDERLYING REFERENCE, NOT THE WRAPPER — ParameterConformance.ValueArgumentClass unwraps a
+        // bare identifier (BoundNumRef) and an index-name (BoundIndexRef, class index — kb/Work PB132). It is the
+        // SAME class answer the function-identifier's §8.4.3.2.3 SR10 screen asks (kb/Work PB1418).
+        ValueClassScreen(ParameterConformance.ValueArgumentClass(operand), what);
     }
 
     /// <summary>ISO §14.9.4.4 GR8 — <b>the ONE reduction</b> that turns a Format-2 argument's PARSE NODE into
@@ -1201,176 +1089,10 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 $"CALL … USING argument '{name}' references a variable-length group (a DYNAMIC LENGTH item or "
                 + "dynamic-capacity table is subordinate to it) — ISO §14.9.4.3 SR12");
 
-        // SR6 (BY REFERENCE argument) / SR8 (RETURNING): a bit item must sit statically on a byte boundary.
+        // SR6 (BY REFERENCE argument) / SR8 (RETURNING): a bit item must sit statically on a byte boundary — the
+        // proof the function-identifier's §8.4.3.2.3 SR14 asks too, so it lives in ParameterConformance.
         if ((isReturning || mode is CobolPassMode.Reference) && BitLayout.IsBitItem(item))
-            ScreenBitAlignment(p, isReturning ? "§14.9.4.3 SR8" : "§14.9.4.3 SR6", role);
-    }
-
-    /// <summary>SR6/SR8's byte-boundary proof (kb/Work PB132): the referenced occurrence's start bit, computed
-    /// from the §8.5.1.6.3 cursor walk (<see cref="BitLayout.StartBitWithin"/>) plus each table subscript
-    /// times its element stride, plus a ref-mod's leftmost boolean position. The rules' second clause makes
-    /// every subscript a compile-time integer — a non-literal subscript is itself the violation. An operand
-    /// shape the walk cannot model (an unmodelled overlay, an exotic carrier) is ACCEPTED — the screen must
-    /// never reject legal source it cannot prove misaligned.</summary>
-    private void ScreenBitAlignment(Place p, string clause, string role)
-    {
-        long extra = 0;
-        Place core = p;
-        while (core is PlaceDecorator dec)
-        {
-            if (core is RefModPlace rm)
-            {
-                if (ConstIndex(rm.Start) is not { } s0)
-                {
-                    ctx.Edition.Error(DiagnosticCatalog.CallBitAlignment,
-                        $"CALL {role} '{p.Item.CobolName}': a bit item's reference-modification leftmost position "
-                        + $"shall consist of only fixed-point numeric literals (ISO {clause})");
-                    return;
-                }
-                extra += s0 - 1;
-            }
-            core = dec.Inner;
-        }
-        // ⛔ THE TIER-B REDEFINES VIEW (kb/Work PB240). A bit member of a REDEFINES class is a window over the
-        // class's ONE backing, not a member path, so the walk below never saw it and the screen ACCEPTED the
-        // operand unproven — a genuinely misaligned bit item crossed BY REFERENCE through any redefinition of
-        // its record (measured: `05 R REDEFINES X. 10 RB1 PIC 1(3) BIT. 10 RB2 PIC 1(8) BIT.` passed RB2,
-        // which starts at bit 3). The position is still statically known: §13.18.44.4 GR1 — "Storage association
-        // for the subject of the entry starts at the first bit of the data item referenced by data-name-2" —
-        // puts every redefinition at the redefined item's own first bit, so the class canonical's start within its
-        // record (the SAME §8.5.1.6.3 walk, over its own parent chain) plus the member's class-relative bit
-        // offset (BitWindow.ClassRelativeExpr — its in-class offset and each in-class subscript's stride) IS the
-        // occurrence's start. A BASED class's runtime displacement is whole bytes and cannot move the answer.
-        if (core is RedefViewPlace { Bit: { } bw, ViewItem.Class: { } viewCls })
-        {
-            if (ConstIndex(bw.ClassRelativeExpr) is not { } rel)
-            {
-                ctx.Edition.Error(DiagnosticCatalog.CallBitAlignment,
-                    $"CALL {role} '{p.Item.CobolName}': a bit item's subscripts shall consist of only "
-                    + "fixed-point numeric literals or all-literal arithmetic expressions without "
-                    + $"exponentiation (ISO {clause})");
-                return;
-            }
-            if (RecordBitOffset(viewCls.Canonical) is not { } canon) return;   // an unmodelled chain — never reject
-            ReportMisaligned(canon + rel + extra);
-            return;
-        }
-        AccessPath? path = core switch { MemberPlace mp => mp.Path, DynTablePlace dp => dp.Path, _ => null };
-        if (path is null) return;
-        var chain = new List<DataItem>();
-        for (var d = core.Item; d is not null; d = d.Parent) chain.Insert(0, d);
-        var subs = new Queue<string>();
-        foreach (var seg in path.Segments)
-        {
-            if (seg is FixedTableSegment ft) subs.Enqueue(ft.OneBasedIndex);
-            else if (seg is DynTableSegment dt) subs.Enqueue(dt.OneBasedIndex);
-        }
-        long bit = 0;
-        for (int i = 0; i < chain.Count; i++)
-        {
-            if (i > 0)
-            {
-                int within = BitLayout.StartBitWithin(chain[i - 1], chain[i]);
-                if (within < 0) return;
-                bit += within;
-            }
-            bool tabled = chain[i].Occurs is not null || chain[i].IsDynamicTable || chain[i].OccursSpec is not null;
-            if (tabled && subs.Count > 0)
-            {
-                if (ConstIndex(subs.Dequeue()) is not { } k)
-                {
-                    ctx.Edition.Error(DiagnosticCatalog.CallBitAlignment,
-                        $"CALL {role} '{p.Item.CobolName}': a bit item's subscripts shall consist of only "
-                        + "fixed-point numeric literals or all-literal arithmetic expressions without "
-                        + $"exponentiation (ISO {clause})");
-                    return;
-                }
-                bit += (k - 1) * (long)BitLayout.StrideBits(chain[i]);   // a SUBSCRIPT stride — ALIGNED strides whole bytes (§13.18.1.4 GR2)
-            }
-        }
-        ReportMisaligned(bit + extra);
-
-        void ReportMisaligned(long start)
-        {
-            if (start % BitLayout.BitsPerCharacter != 0)
-                ctx.Edition.Error(DiagnosticCatalog.CallBitAlignment,
-                    $"CALL {role} '{p.Item.CobolName}' starts at bit {start} of its record — a bit item passed by "
-                    + $"reference shall be aligned on a byte boundary (ISO {clause} / §8.5.1.6.3)");
-        }
-    }
-
-    /// <summary>The start bit of <paramref name="item"/> within its level-01 record — the §8.5.1.6.3 cursor walk
-    /// (<see cref="BitLayout.StartBitWithin"/>) summed over its parent chain, with every OCCURS level at its
-    /// FIRST occurrence; null when a link of the chain is unmodelled. Used for a REDEFINES class's canonical
-    /// (kb/Work PB240), whose ancestors carry no OCCURS: a class whose backing sits inside a table has no place
-    /// the resolver can build.</summary>
-    private static long? RecordBitOffset(DataItem item)
-    {
-        long bit = 0;
-        for (var d = item; d.Parent is { } parent; d = parent)
-        {
-            int within = BitLayout.StartBitWithin(parent, d);
-            if (within < 0) return null;
-            bit += within;
-        }
-        return bit;
-    }
-
-    /// <summary>Evaluate a rendered subscript/ref-mod index that SR6/SR8 permit — an integer literal or an
-    /// all-literal + - * / ( ) expression (no exponentiation; identifiers make it non-constant → null).</summary>
-    private static long? ConstIndex(string rendered)
-    {
-        string s = rendered.Trim();
-        if (long.TryParse(s, out long direct)) return direct;
-        foreach (char ch in s)
-            if (!(char.IsDigit(ch) || ch is '+' or '-' or '*' or '/' or '(' or ')' or ' ')) return null;
-        int i = 0;
-        long? r = AddSub(s, ref i);
-        return r is not null && SkipWs(s, ref i) == s.Length ? r : null;
-
-        static int SkipWs(string t, ref int j) { while (j < t.Length && t[j] == ' ') j++; return j; }
-        static long? AddSub(string t, ref int j)
-        {
-            long? v = MulDiv(t, ref j);
-            while (v is not null && SkipWs(t, ref j) < t.Length && t[j] is '+' or '-')
-            {
-                char op = t[j++];
-                long? w = MulDiv(t, ref j);
-                v = w is null ? null : op == '+' ? v + w : v - w;
-            }
-            return v;
-        }
-        static long? MulDiv(string t, ref int j)
-        {
-            long? v = Primary(t, ref j);
-            while (v is not null && SkipWs(t, ref j) < t.Length && t[j] is '*' or '/')
-            {
-                char op = t[j++];
-                long? w = Primary(t, ref j);
-                v = w is null or 0 && op == '/' ? null : op == '*' ? v * w : v / w;
-            }
-            return v;
-        }
-        static long? Primary(string t, ref int j)
-        {
-            if (SkipWs(t, ref j) >= t.Length) return null;
-            if (t[j] == '(')
-            {
-                j++;
-                long? v = AddSub(t, ref j);
-                if (SkipWs(t, ref j) >= t.Length || t[j] != ')') return null;
-                j++;
-                return v;
-            }
-            if (t[j] is '+' or '-')
-            {
-                char sign = t[j++];
-                long? v = Primary(t, ref j);
-                return sign == '-' ? -v : v;
-            }
-            int start = j;
-            while (j < t.Length && char.IsDigit(t[j])) j++;
-            return j > start && long.TryParse(t[start..j], out long n) ? n : null;
-        }
+            host.Params.ScreenBitAlignment(p, DiagnosticCatalog.CallBitAlignment, $"CALL {role}",
+                isReturning ? "§14.9.4.3 SR8" : "§14.9.4.3 SR6");
     }
 }

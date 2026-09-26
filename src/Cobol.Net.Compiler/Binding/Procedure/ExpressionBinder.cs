@@ -664,55 +664,20 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// receiver is legal but not yet implemented (staged loud). Without this guard the
     /// <c>.OfType&lt;Place&gt;()</c> receiver pipelines would DROP the counter silently — a silent-miscompile
     /// hazard (§1.4).</summary>
+    /// <para>⛔ ITS PROHIBITIONS ARE A TABLE, ASKED BY TWO QUESTIONS (kb/Work PB1418). "Is this identifier permitted as
+    /// a receiving operand?" is also a question the standard asks WITHOUT the operand being stored into: §8.4.3.2.4
+    /// GR5 a)/b) choose BY REFERENCE or BY CONTENT for a function argument by exactly that test ("any identifier
+    /// that is not permitted as a receiving operand" crosses BY CONTENT). The prohibitions therefore live in
+    /// <see cref="ReceivingFormBar"/> (the reference's FORM, asked before resolution) and
+    /// <see cref="ReceivingPlaceBar"/> (the resolved PLACE), which this chokepoint REPORTS and
+    /// <see cref="PermitsReceiving"/> only ASKS — so the two can never disagree about which items are
+    /// receivable.</para></summary>
     public Place? ResolveReceiving(Core.DataReferenceContext dref)
     {
-        if (dref.LINE_COUNTER() is not null)
-        {
-            ctx.Edition.Error(DiagnosticCatalog.ReportLineCounterReceiving,
-                "LINE-COUNTER shall not be referenced as a receiving operand (ISO §8.4.3.15.3 SR3)");
-            return null;
-        }
-        // ⛔ THE THIRD ARM OF THE SAME DISPATCH (kb/Work PB489). LINE-COUNTER above is rejected by rule and
-        // PAGE-COUNTER below is staged loud as not-yet-implemented; LINAGE-COUNTER — the only one of the three
-        // that is flatly ILLEGAL as a receiver — had no arm at all and fell through to the generic
-        // recognized-not-implemented catch-all, so permanently illegal source was reported as a promise. The
-        // rule that forbids it appeared nowhere in the compiler (feedback_two_arm_dispatch).
-        if (dref.LINAGE_COUNTER() is not null)
-        {
-            ctx.Edition.Error(DiagnosticCatalog.LinageCounterReceiving,
-                "LINAGE-COUNTER shall not be referenced as a receiving operand (ISO §8.4.3.14.3 SR2); "
-                + "only the input-output control system may change its value (ISO §13.18.34.4 GR7 b)");
-            return null;
-        }
-        // ⛔ THE FOURTH ARM OF THE SAME DISPATCH (kb/Work PB922). ISO §8.4.3.6.3 SR1 — "EXCEPTION-OBJECT shall
-        // not be specified as a receiving operand" — is a rule about EVERY receiving operand in the language,
-        // not about SET, which is the one statement that had an arm for it. The name RESOLVES now (the resolver
-        // knows §8.4.3.6's predefined object reference), so without this screen a receiver would fall through to
-        // a place whose PlaceRenderer.Write is an internal-error backstop; before it resolved, the reference drew
-        // "'EXCEPTION-OBJECT' is not defined — Check the spelling, or declare the item" beside "'EXCEPTION-OBJECT'
-        // is a reserved word … and cannot be used as a user-defined word": two diagnostics that contradict each
-        // other, and neither of them the rule the program broke.
-        // ⛔ THE RESOLVER'S OWN PREDICATE, NOT A SECOND SPELLING TEST: it carries the §8.9/2002 edition gate, so
-        // a '85 program that legally declares `01 EXCEPTION-OBJECT PIC X(4).` keeps its ordinary receiving path.
-        if (ctx.Refs.IsExceptionObjectRegister(dref))
-        {
-            ctx.Edition.Error(DiagnosticCatalog.ExceptionObjectReceiving,
-                "EXCEPTION-OBJECT shall not be specified as a receiving operand (ISO §8.4.3.6.3 SR1) — it is "
-                + "the predefined object reference for the CURRENT exception object (§8.4.3.6.4 GR1), set by the "
-                + "run unit when an exception is raised");
-            return null;
-        }
-        // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) — a literal can never be a
-        // receiving operand; without this the name would fall to Refs.Resolve and fail as merely "unresolved".
-        if (ctx.Data.ConstantOf(dref) is not null)
-        {
-            ctx.Edition.Error(DiagnosticCatalog.ConstantAsReceiver, $"constant-name '{DataBinder.WrittenText(dref)}' shall "
-                + "not be specified as a receiving operand — it substitutes a literal (ISO §13.10.4 GR1)");
-            return null;
-        }
+        if (ReceivingFormBar(dref) is { } formBar) return Refuse(formBar);
         // ⛔ PAGE-COUNTER IS A RECEIVING-CAPABLE PLACE, NOT A PER-VERB PERMISSION (kb/Work PB429). §8.4.3.15.3
         // SR1 — "In the procedure division, PAGE-COUNTER and LINE-COUNTER may be referenced in any context where
-        // an integer data item may appear" — names no statement, and SR3 above subtracts LINE-COUNTER and ONLY
+        // an integer data item may appear" — names no statement, and SR3 subtracts LINE-COUNTER and ONLY
         // LINE-COUNTER from the receiving side, so every integer-receiver context admits PAGE-COUNTER. Resolving
         // it HERE, at the one chokepoint, is what makes MOVE, every arithmetic resultant, INITIALIZE, INSPECT
         // TALLYING and every context added later work without an arm apiece — which is why the refusal this
@@ -736,19 +701,79 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                     + "not yet implement as a receiver (COBOLNET_DESIGN §1.4 — rejected rather than dropped)");
             return null;
         }
+        if (ReceivingPlaceBar(dref, place) is { } placeBar) return Refuse(placeBar);
+        return place;
+
+        Place? Refuse(ReceivingBar bar)
+        {
+            ctx.Edition.Error(bar.Code, bar.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Whether <paramref name="dref"/>, already resolved (as a SENDING operand) to <paramref name="place"/>,
+    /// is "an identifier that is permitted as a receiving operand" — the test ISO §8.4.3.2.4 GR5 a)/b) choose a
+    /// function argument's passing manner by. Asks the SAME prohibitions <see cref="ResolveReceiving"/> reports,
+    /// and reports nothing (the operand is legal either way; only its manner changes).</summary>
+    internal bool PermitsReceiving(Core.DataReferenceContext dref, Place place) =>
+        ReceivingFormBar(dref) is null && ReceivingPlaceBar(dref, place) is null;
+
+    /// <summary>One receiving-operand prohibition: the diagnostic code it reports under and its message.</summary>
+    private readonly record struct ReceivingBar(string Code, string Message);
+
+    /// <summary>The prohibitions decided by the reference's FORM, before it is resolved — a report counter the
+    /// input-output control system owns, the predefined EXCEPTION-OBJECT, and a constant-name (a literal).</summary>
+    private ReceivingBar? ReceivingFormBar(Core.DataReferenceContext dref)
+    {
+        if (dref.LINE_COUNTER() is not null)
+            return new(DiagnosticCatalog.ReportLineCounterReceiving.Code,
+                "LINE-COUNTER shall not be referenced as a receiving operand (ISO §8.4.3.15.3 SR3)");
+        // ⛔ THE THIRD ARM OF THE SAME DISPATCH (kb/Work PB489). LINE-COUNTER above is rejected by rule and
+        // PAGE-COUNTER is a receiving-capable place (ResolveReceiving resolves it); LINAGE-COUNTER — the only one of the three
+        // that is flatly ILLEGAL as a receiver — had no arm at all and fell through to the generic
+        // recognized-not-implemented catch-all, so permanently illegal source was reported as a promise. The
+        // rule that forbids it appeared nowhere in the compiler (feedback_two_arm_dispatch).
+        if (dref.LINAGE_COUNTER() is not null)
+            return new(DiagnosticCatalog.LinageCounterReceiving.Code,
+                "LINAGE-COUNTER shall not be referenced as a receiving operand (ISO §8.4.3.14.3 SR2); "
+                + "only the input-output control system may change its value (ISO §13.18.34.4 GR7 b)");
+        // ⛔ THE FOURTH ARM OF THE SAME DISPATCH (kb/Work PB922). ISO §8.4.3.6.3 SR1 — "EXCEPTION-OBJECT shall
+        // not be specified as a receiving operand" — is a rule about EVERY receiving operand in the language,
+        // not about SET, which is the one statement that had an arm for it. The name RESOLVES now (the resolver
+        // knows §8.4.3.6's predefined object reference), so without this screen a receiver would fall through to
+        // a place whose PlaceRenderer.Write is an internal-error backstop; before it resolved, the reference drew
+        // "'EXCEPTION-OBJECT' is not defined — Check the spelling, or declare the item" beside "'EXCEPTION-OBJECT'
+        // is a reserved word … and cannot be used as a user-defined word": two diagnostics that contradict each
+        // other, and neither of them the rule the program broke.
+        // ⛔ THE RESOLVER'S OWN PREDICATE, NOT A SECOND SPELLING TEST: it carries the §8.9/2002 edition gate, so
+        // a '85 program that legally declares `01 EXCEPTION-OBJECT PIC X(4).` keeps its ordinary receiving path.
+        if (ctx.Refs.IsExceptionObjectRegister(dref))
+            return new(DiagnosticCatalog.ExceptionObjectReceiving.Code,
+                "EXCEPTION-OBJECT shall not be specified as a receiving operand (ISO §8.4.3.6.3 SR1) — it is "
+                + "the predefined object reference for the CURRENT exception object (§8.4.3.6.4 GR1), set by the "
+                + "run unit when an exception is raised");
+        // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) — a literal can never be a
+        // receiving operand; without this the name would fall to Refs.Resolve and fail as merely "unresolved".
+        if (ctx.Data.ConstantOf(dref) is not null)
+            return new(DiagnosticCatalog.ConstantAsReceiver.Code, $"constant-name '{DataBinder.WrittenText(dref)}' shall "
+                + "not be specified as a receiving operand — it substitutes a literal (ISO §13.10.4 GR1)");
+        return null;
+    }
+
+    /// <summary>The prohibitions decided by the RESOLVED place — the OCCURS DYNAMIC CAPACITY register and a
+    /// CONSTANT RECORD's content.</summary>
+    private ReceivingBar? ReceivingPlaceBar(Core.DataReferenceContext dref, Place place)
+    {
         // The OCCURS DYNAMIC CAPACITY register (§13.18.38 SR30–32; D9) is set ONLY by a SET Format 14 statement
         // (which reroutes BEFORE this chokepoint). Any other receiving use — MOVE/arithmetic resultant/ordinary SET
         // receiver — is illegal; reject it here rather than reach CapacityRegisterPlace.Write (an internal throw).
         if (place is CapacityRegisterPlace cap)
-        {
-            ctx.Edition.Error("COBOLNET1523", $"the CAPACITY register '{cap.RegisterItem.CobolName}' shall not be a "
+            return new("COBOLNET1523", $"the CAPACITY register '{cap.RegisterItem.CobolName}' shall not be a "
                 + "receiving operand except in a SET statement Format 14 (ISO §13.18.38.3 SR30–32)");
-            return null;
-        }
         // A CONSTANT RECORD's content cannot be modified — neither the record nor any subordinate may be a
-        // receiving operand (ISO §13.18.15.3 SR2 → COBOLNET1548; DataBinder.RejectConstantStore).
-        if (ctx.Data.RejectConstantStore(place, $"receiving operand '{DataBinder.WrittenText(dref)}'")) return null;
-        return place;
+        // receiving operand (ISO §13.18.15.3 SR2 → COBOLNET1548; DataBinder.ConstantStoreProhibition).
+        return ctx.Data.ConstantStoreProhibition(place, $"receiving operand '{DataBinder.WrittenText(dref)}'")
+            is { } constant ? new(DiagnosticCatalog.ConstantAsReceiver.Code, constant) : null;
     }
 
     /// <summary>The arithmetic RESULTANT category screen (kb/Work PB128): every arithmetic statement's syntax

@@ -606,18 +606,39 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   `COBOLNET2238` otherwise — and admits fewer arguments than formals when every trailing formal is OPTIONAL
   (§14.8.2.1), the callee's adapters answering a missing slot as omitted exactly as for CALL.
 - Argument/parameter count mismatch → EC-PROGRAM-ARG-MISMATCH (when checking enabled) or diagnostic; a missing parameter behaves as omitted.
-- **Argument DESCRIPTION conformance is ONE rule set, written once, for CALL and INVOKE alike (§14.9.4.3 SR25
-  → §14.8.2; kb/Work PB133 → PB204 → PB165).** Wherever the callee's PD header is known at BIND — the AS NESTED
-  containment table, or a program prototype's §12.3.8.4 GR10 a) definition — `CallBinder`'s conformance loop runs
-  the whole of §14.8.2 against it, and every rule lives in `OoConformance`: `DescriptionMismatch` for
+- **Argument DESCRIPTION conformance is ONE rule set, written once, for CALL, the function-identifier and INVOKE
+  (§14.9.4.3 SR25 / §8.4.3.2.3 SR13 → §14.8.2; kb/Work PB133 → PB204 → PB165 → PB1418).** Wherever the activated
+  element's PD header is known at BIND — the AS NESTED containment table, a program prototype's §12.3.8.4 GR10 a)
+  definition, or a function prototype (directly, or through a function-pointer's USAGE TO phrase) — the activating
+  binder asks `ParameterConformance.CheckArgument` for every argument, and every rule it applies lives in
+  `OoConformance`: `DescriptionMismatch` for
   §14.8.2.3.2 / §14.8.2.2 (BY REFERENCE, identical description with the rule-1 group-prefix allowance and
   §8.5.1.12 variable-length compatibility), and `ContentMismatch` + the four value-shape rules for §14.8.2.3.3
   (BY CONTENT / BY VALUE: 2a COMPUTE for a numeric formal, 2b SET for an index item, 2c ANY LENGTH, 2d MOVE via
   §14.9.25.3 Table 16, plus the class-pointer / object-reference SET paragraph).
-  `CallBinder.ContentConformanceReason` dispatches on the BOUND argument's shape — identifier, boolean
-  expression, arithmetic expression, alphanumeric literal, numeric literal — and a constant-name needs no arm
-  because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688, the same code the BY
-  REFERENCE arm uses, because it is the same obligation. ⚠ The §14.8.2.3.3 rules were once PRIVATE to INVOKE, and
+  `ParameterConformance.ContentConformanceReason` dispatches on the BOUND argument's shape — identifier, boolean
+  expression, arithmetic expression, alphanumeric literal, numeric literal, and an intrinsic function-identifier
+  by its RESULT category (§15.4) — and a constant-name needs no arm
+  because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688 for a CALL and its twin
+  COBOLNET2470 for a function-identifier, the same code the BY REFERENCE arm uses, because it is the same
+  obligation. The same collaborator owns the bit-alignment proof (§14.9.4.3 SR6/SR8 and §8.4.3.2.3 SR14 —
+  COBOLNET1683 / COBOLNET2471) and the BY VALUE class answer (§14.9.4.3 SR22 / §8.4.3.2.3 SR10 —
+  `ValueArgumentClass`). ⚠ The function-identifier (`UdfBinder`) used to re-implement CALL's argument binding
+  WITHOUT this regime, so a non-conforming function argument aliased its formal silently (kb/Work PB1418 /
+  PB1115); `ActivationConformanceDriftTests` pins both lanes to the shared routine. INVOKE (`OoBinder`) still
+  dispatches the same `OoConformance` comparators from its own lane.
+- **A function argument's passing manner is §8.4.3.2.4 GR5's (kb/Work PB1418).** BY VALUE when the formal is BY
+  VALUE; BY REFERENCE for "an identifier that is permitted as a receiving operand, other than an object property
+  or object data item" — asked of `ExpressionBinder.PermitsReceiving`, which consults the SAME prohibition table
+  (`ReceivingFormBar` / `ReceivingPlaceBar`) the receiving chokepoint `ResolveReceiving` reports, so a CONSTANT
+  RECORD item (§13.18.15.3 SR2) crosses BY CONTENT and the function can no longer overwrite the structured
+  constant; BY CONTENT for every other shape — a literal, an arithmetic or boolean expression (the boolean rides
+  CALL's `ContentBool` channel), a function-identifier (§8.4.3.2.3 SR1), an object property or object data item.
+  A character-valued intrinsic function-identifier crosses on the string channel (`CallEmitter.ArgText`). A
+  figurative constant or ALL literal (a literal by §8.3.3.6.3 SR1) crossing BY CONTENT FILLS an elementary formal's character
+  image, as §14.8.2.3.3 rule 2d's MOVE does (§8.3.3.6.4 GR2 — `CallEmitter.FigurativeFillWidth` /
+  `RepeatToWidth`), for CALL and function arguments alike; it used to carry one occurrence (`"*   "`).
+  ⚠ The §14.8.2.3.3 rules were once PRIVATE to INVOKE, and
   the CALL lane therefore had no by-content screen at all while `CobolArgAdapt`'s converting views silently
   adapted whatever arrived; EXTRACTION, not a second copy, is what closed it. The DYNAMIC Format-1 lane still
   checks only the COUNT at runtime — no per-formal description facts are registered with the program table

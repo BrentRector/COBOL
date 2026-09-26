@@ -18,8 +18,8 @@
       *>   B=000000015  FP re-SET to PBTRP (same signature, GR14); FP(5) — FUNCTION omitted (SR2) — activates
       *>                the function the pointer HOLDS (GR6c), not the prototype its TO phrase names: 5 * 3.
       *>   C=IF         FP(2) = 6 in an IF condition (the per-evaluation activation path): 2 * 3 = 6.
-      *>   D=3          PERFORM VARYING I FROM 1 UNTIL FP(I) > 7 — the condition is evaluated before each pass
-      *>                (§14.9.28.4), activating PBTRP each time: 3, 6, 9 — so the loop stops with I = 3.
+      *>   D=3          PERFORM VARYING IA FROM 1 UNTIL FP(IA) > 7 — the condition is evaluated before each pass
+      *>                (§14.9.28.4), activating PBTRP each time: 3, 6, 9 — so the loop stops with IA = 3 (moved to I).
       *>   Z=000000077  FUNCTION FZ() — a zero-argument function through a pointer; SR5's parentheses written.
       *>   H: EC-FUNCTION-PTR-NULL  FP is SET TO NULL; FP(5) raises GR6c's condition (checking is ON), and the
       *>                declarative associated with it runs (GR6f), reporting it through EXCEPTION-STATUS …
@@ -68,6 +68,13 @@
        01 FZ USAGE FUNCTION-POINTER TO PBZRP.
        01 R PIC 9(9).
        01 I PIC 9.
+      *> IA is passed BY REFERENCE (8.4.3.2.4 GR5 a - a receivable
+      *> identifier) to the formal L-ARG PIC S9(4), and 8.4.3.2.3 SR13
+      *> imports 14.8.2.3.2 rule 2: the two shall have the same PICTURE and
+      *> SIGN clauses. The loop varied I PIC 9 itself until kb/Work PB1418
+      *> made the function arm enforce the rule (COBOLNET2470); I still
+      *> receives the final value, so the output is unchanged.
+       01 IA PIC S9(4).
        PROCEDURE DIVISION.
        DECLARATIVES.
        D-NULL SECTION.
@@ -90,9 +97,10 @@
            ELSE
                DISPLAY "C=ELSE"
            END-IF
-           PERFORM VARYING I FROM 1 BY 1 UNTIL FP(I) > 7
+           PERFORM VARYING IA FROM 1 BY 1 UNTIL FP(IA) > 7
                CONTINUE
            END-PERFORM
+           MOVE IA TO I
            DISPLAY "D=" I
            SET FZ TO ADDRESS OF FUNCTION PBZRP
            COMPUTE R = FUNCTION FZ()

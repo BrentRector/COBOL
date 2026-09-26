@@ -60,12 +60,29 @@ public sealed class ReceivingResolutionDriftTests
     public void TheReceivingChokepoint_AsksTheConstantRecordRule()
     {
         string code = CodeOf(ExpressionBinderPath);
-        int start = code.IndexOf("public Place? ResolveReceiving(", System.StringComparison.Ordinal);
-        Assert.True(start >= 0, "ExpressionBinder.ResolveReceiving is gone — the one receiving chokepoint.");
-        int next = code.IndexOf("\n    public ", start + 1, System.StringComparison.Ordinal);
-        string body = next < 0 ? code[start..] : code[start..next];
-        Assert.True(body.Contains("RejectConstantStore(", System.StringComparison.Ordinal),
-            "ResolveReceiving no longer asks DataBinder.RejectConstantStore — ISO §13.18.15.3 SR2 is a rule over "
+        // kb/Work PB1418: the prohibitions became a table ResolveReceiving REPORTS and PermitsReceiving (§8.4.3.2.4
+        // GR5's argument-manner test) only ASKS — so the chokepoint must still consult the place half of that table,
+        // and the place half must still ask the constant-record rule.
+        string resolve = MemberBody(code, "public Place? ResolveReceiving(");
+        Assert.True(resolve.Contains("ReceivingPlaceBar(", System.StringComparison.Ordinal)
+                && resolve.Contains("ReceivingFormBar(", System.StringComparison.Ordinal),
+            "ResolveReceiving no longer consults both halves of the receiving-prohibition table (ReceivingFormBar / "
+            + "ReceivingPlaceBar) — every verb's receiver passes through it.");
+        Assert.True(MemberBody(code, "internal bool PermitsReceiving(").Contains("ReceivingPlaceBar(", System.StringComparison.Ordinal),
+            "PermitsReceiving no longer asks the same prohibition table ResolveReceiving reports — the §8.4.3.2.4 GR5 "
+            + "argument manner and the receiving chokepoint would disagree about which identifiers are receivable.");
+        Assert.True(MemberBody(code, "private ReceivingBar? ReceivingPlaceBar(").Contains("ConstantStoreProhibition(", System.StringComparison.Ordinal),
+            "ReceivingPlaceBar no longer asks DataBinder.ConstantStoreProhibition — ISO §13.18.15.3 SR2 is a rule over "
             + "every receiving data item and this is the one place every verb's receiver passes through.");
+    }
+
+    /// <summary>The code of the member whose declaration starts with <paramref name="signature"/>, up to the next
+    /// member declared at class level.</summary>
+    private static string MemberBody(string code, string signature)
+    {
+        int start = code.IndexOf(signature, System.StringComparison.Ordinal);
+        Assert.True(start >= 0, $"ExpressionBinder no longer declares '{signature}'.");
+        int next = Regex.Match(code[(start + 1)..], @"\n    (public|internal|private) ").Index;
+        return next <= 0 ? code[start..] : code[start..(start + 1 + next)];
     }
 }

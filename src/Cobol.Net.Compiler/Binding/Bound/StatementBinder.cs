@@ -60,6 +60,10 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     private CallBinder Call => _callBinder ??= new CallBinder(Ctx, this);
     private UdfBinder? _udfBinder;
     internal UdfBinder Udf => _udfBinder ??= new UdfBinder(Ctx, this);
+    private ParameterConformance? _parameterConformance;
+    /// <summary>The ONE argument half of ISO §14.8.2 — shared by the Format-2 CALL and the function-identifier
+    /// (kb/Work PB1418).</summary>
+    internal ParameterConformance Params => _parameterConformance ??= new ParameterConformance(Ctx, this);
     private IntrinsicBinder? _intrinsicBinder;
     internal IntrinsicBinder Intrinsic => _intrinsicBinder ??= new IntrinsicBinder(Ctx, this);
     private ControlFlowBinder? _controlFlowBinder;

@@ -614,6 +614,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 return NumericArgText(a.Mode, n.Text, ctx.SignEncoding);
             case BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } ct:
                 return NumericArgText(a.Mode, ct, ctx.SignEncoding);
+            // ⛔ A CHARACTER-VALUED INTRINSIC FUNCTION-IDENTIFIER CROSSES ON THE STRING CHANNEL (kb/Work PB1418).
+            // `FUNCTION F(FUNCTION UPPER-CASE(X))` binds its argument as a computed operand over an alphanumeric
+            // BoundIntrinsicCall, and the arithmetic arm below rendered it as a NUMBER — the callee's PIC X(4)
+            // formal received "0000" for "ABCD" (measured). §15.4 puts the returned value in "a temporary
+            // elementary data item" of the function's category, so it crosses exactly as a nonnumeric literal of
+            // that category does: its character image, through the ONE string channel (OperandText.AsString).
+            case BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean } } sc:
+                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({OperandText.AsString(sc, num)}), null)";
             case BoundComputedOperand expr:
             {
                 // A GENUINE runtime expression snapshots its computed value (§14.2.3 GR9/GR10 — the CALL BY
@@ -646,14 +654,47 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // ABI accepts is read back through CobolArgAdapt's ReadNumericCell (kb/Work R12).
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<Int128>.Cell((Int128)({x.Expr})), {ValueMeta(ctx.SignEncoding, 38, x.Scale, signed: true)})";
             }
+            // ⛔ A FIGURATIVE CONSTANT / ALL LITERAL FILLS THE FORMAL (kb/Work PB1418). §14.8.2.3.3 rule 2d makes a
+            // BY CONTENT crossing into a non-numeric formal "the same as for a MOVE statement", and a figurative
+            // constant "in association with a fixed-length data item" is "repeated character by character" to the
+            // item's character positions, then truncated from the right (§8.3.3.6.4 GR2). The
+            // crossing used to carry ONE occurrence, which the callee's formal then space-padded: `CALL … AS NESTED
+            // USING BY CONTENT ALL "*"` into a PIC X(4) formal arrived as "*   ", ZERO as "0   " (measured). The
+            // formal is recorded on every Format-2 and function argument (BoundCallArg.Formal), so the fill width is
+            // its character image width; with no fixed-length formal known (a numeric formal, whose COMPUTE-rule
+            // crossing reads the one digit, or an ANY LENGTH / dynamic-length one) one occurrence is the value.
             case BoundAllLiteral all:
-                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell({CsLiteral(all.Literal)}), null)";
+                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell({CsLiteral(RepeatToWidth(all.Literal, FigurativeFillWidth(a.Formal)))}), null)";
             case BoundFigurative fig:
-                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell(new string({FigurativeConstants.Fill(fig.Kind, ctx.Data.Collating)}, 1)), null)";
+                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell(new string({FigurativeConstants.Fill(fig.Kind, ctx.Data.Collating, a.Formal?.Pic?.Category)}, {FigurativeFillWidth(a.Formal) ?? 1})), null)";
             default:
                 return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell("
                     + LoudValue("string", "CALL USING argument form") + "), null)";
         }
+    }
+
+    /// <summary>The character width a figurative-constant / ALL-literal argument fills (§14.8.2.3.3 rule 2d's MOVE
+    /// into the corresponding formal) — the formal's character positions when it is a fixed-length, non-numeric
+    /// ELEMENTARY item; null when no such width is known (no recorded formal, a numeric formal, an ANY LENGTH or
+    /// DYNAMIC LENGTH one). ⚠ A GROUP formal still receives one occurrence — a named residue: its fill width is the
+    /// group's current extent, which for a variable-length group is a run-time fact this compile-time fill cannot
+    /// read (kb/Work PB204's BoundaryImageCapable carrier), so it is not guessed here.</summary>
+    private static int? FigurativeFillWidth(DataItem? formal) =>
+        formal is { IsElementary: true, IsAnyLength: false, IsDynamicLength: false }
+        && formal.Pic is { Category: not PicCategory.Numeric }
+        && formal.ImageWidth > 0
+            ? formal.ImageWidth : null;
+
+    /// <summary>An ALL literal's value at <paramref name="width"/> characters — §8.3.3.6.4 GR9 ("all or part of the
+    /// string generated by successive concatenations of the characters comprising literal-1"), sized by GR2 (repeated
+    /// until it reaches the associated item's character positions, then truncated from the right); one occurrence
+    /// (GR3 c) when no width is known.</summary>
+    private static string RepeatToWidth(string literal, int? width)
+    {
+        if (width is not { } w || literal.Length == 0) return literal;
+        var sb = new System.Text.StringBuilder(w + literal.Length);
+        while (sb.Length < w) sb.Append(literal);
+        return sb.ToString(0, w);
     }
 
     /// <summary>The PROCEDURE DIVISION USING formal this argument place denotes AS A WHOLE, or null

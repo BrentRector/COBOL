@@ -454,6 +454,27 @@ public static class DiagnosticCatalog
         + "for the corresponding formal parameter.\" The user-defined-function twin of COBOLNET1685 (CALL) and "
         + "COBOLNET2237 (INVOKE).",
         "ISO §8.4.3.2.3 SR9");
+    /// <summary>The function-identifier twin of COBOLNET1688 (kb/Work PB1418 / PB1115): the SAME §14.8.2 argument
+    /// conformance rules, imported by a different syntax rule, asked of the same shared routine
+    /// (<c>ParameterConformance.CheckArgument</c>).</summary>
+    public static readonly DiagnosticDescriptor FunctionArgumentConformance = new(
+        "COBOLNET2470", "function-argument-conformance", EditionSeverity.Error,
+        "An argument of a function-identifier that names a function prototype or a function pointer does not "
+        + "conform to its corresponding formal parameter. ISO §8.4.3.2.3 syntax rule 13: \"If "
+        + "function-prototype-name-1 or function-pointer-name-1 is specified, the rules for conformance specified "
+        + "in 14.8.2, Parameters and 14.8.3, Returning items, apply.\" BY REFERENCE, §14.8.2.3.2 rule 2 (\"a "
+        + "function\" is one of the activated elements it lists) requires the same ALIGN, BLANK WHEN ZERO, DYNAMIC "
+        + "LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses and the object-reference rules; BY CONTENT or BY "
+        + "VALUE, §14.8.2.3.3 applies the COMPUTE / SET / MOVE rules.",
+        "ISO §8.4.3.2.3 SR13 · §14.8.2");
+    /// <summary>The function-identifier twin of COBOLNET1683 (kb/Work PB1418).</summary>
+    public static readonly DiagnosticDescriptor FunctionBitAlignment = new(
+        "COBOLNET2471", "function-bit-alignment", EditionSeverity.Error,
+        "A bit data item passed as the argument of a function-identifier whose corresponding formal parameter is "
+        + "BY REFERENCE shall be aligned on a byte boundary, and its subscripts and reference-modification "
+        + "leftmost position shall consist of only numeric literals or all-literal arithmetic expressions without "
+        + "exponentiation (ISO §8.4.3.2.3 syntax rule 14).",
+        "ISO §8.4.3.2.3 SR14");
     public static readonly DiagnosticDescriptor OmittedConditionOperand = new(
         "COBOLNET1686", "omitted-condition-operand", EditionSeverity.Error,
         "ISO §8.8.4.8 syntax rule 1: \"Data-name-1 shall be a formal parameter defined in the source element "
