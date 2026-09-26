@@ -162,7 +162,10 @@ internal sealed class ProgramEmitter
     /// and null for a formal that is not a group, which no variable-length group is compatible with
     /// (§8.5.1.12.1).</summary>
     private static string? GroupFormalLayout(DataItem formal) =>
-        !ItemCategory.IsGroupItem(formal) || VariableLengthCompatibility.Layout(formal) is not { } layout ? null
+        // A bit / national group crosses as its ELEMENTARY value (kb/Work PB1166 — CallEmitter.CallStringRead),
+        // which has no §8.5.1.12 image layout to meet.
+        !ItemCategory.IsGroupItem(formal) || formal.IsAsIfElementary
+            || VariableLengthCompatibility.Layout(formal) is not { } layout ? null
         : VariableLengthCompatibility.HasTableOrVariable(layout) ? CallEmitter.LayoutArray(layout)
         : RuntimeApi.NoTableGroupLayout;
 
@@ -544,7 +547,7 @@ internal sealed class ProgramEmitter
                 // Boundary round-trip formal (group / redefined): adopt the carrier, copy the caller's image in.
                 // A REDEFINED fixed-point BY VALUE formal (still class numeric — SR2-legal) rides the image
                 // round trip over a DETACHED cell (§14.2.3 GR10): copy-in below, and NO copy-out at return.
-                w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, Math.Max(1, f.Item.ImageWidth))};");
+                w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, Math.Max(1, CallEmitter.BoundaryImageWidth(f.Item)))};");
                 using (w.Block($"if ({RuntimeApi.ArgAdaptPresent("__args", f.Position)})"))
                 {
                     if (place is null)

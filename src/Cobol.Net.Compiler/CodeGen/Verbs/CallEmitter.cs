@@ -474,7 +474,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// for such a group). A reference-modified or redefinition view is character storage, never a group.</summary>
     internal static string? BoundaryLayout(Place p) =>
         p is not RedefViewPlace and not RefModPlace
-        && p.DenotedItem is { } item
+        // A bit / national group crosses as its ELEMENTARY value, which has no image layout (kb/Work PB1166).
+        && p.DenotedItem is { IsAsIfElementary: false } item
         && VariableLengthCompatibility.Layout(item) is { } layout
         && VariableLengthCompatibility.HasTableOrVariable(layout)
             ? LayoutArray(layout)
@@ -877,6 +878,16 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // since before this change (measured at 876d8ab0: `CALL "S" USING G(1:3)` = one CS1061; with the group
         // test widened, two).
         p is RefModPlace ? OperandText.FieldImage(p)
+        // ⛔ A BIT / NATIONAL GROUP CROSSES AS THE ELEMENTARY ITEM IT IS TREATED AS (kb/Work PB1166). §14.8.2.1 /
+        // §14.8.3.1 NOTE: "A bit group or national group is treated as an elementary item", and §14.8.2.3.2
+        // "Additionally" b)/c) and §14.8.3.3 "Additionally" 2)/3) pair it with an elementary bit / national item of
+        // the same position count — so both ends of every such crossing must speak the ELEMENTARY alphabet, the
+        // m boolean or m national positions of its §13.18.29.4 GR1b/GR2b as-if picture. Its storage image speaks
+        // another (ceil(m/8) packed characters; two bytes per national position), and while the comparator
+        // refused every group ⇄ elementary pairing that difference was invisible; admitting the pairing on the
+        // image made `CALL … RETURNING GN` deliver "ABCDE" as NUL-interleaved bytes. The FULL allocation, like
+        // every boundary read here (§14.2.3 GR8), so an occurs-depending wrapper is unwrapped.
+        : IsAsIfGroupCrossing(p) ? PlaceRenderer.SendingGroupValue(FullAllocation(p))
         : p.Item.IsGroup
             ? PlaceRenderer.GroupImage(p)   // the FULL image (GR8 is a sending-operand rule, not a boundary one) — window or struct (kb/Work PB80)
         // ⛔ AN IMAGE-CARRIED NUMERIC LEAF CROSSES AS ITS STORAGE BYTES (kb/Work PB970), for the same reason the
@@ -909,7 +920,22 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// arms read through here (kb/Work PB965 finisher — measured: `CALL … USING BY CONTENT OG` with the ODO count
     /// at 2 of 5 delivered all five occurrences).</summary>
     internal static string CallContentRead(Place p) =>
-        p is OdoGroupPlace ? PlaceRenderer.SendingGroupImage(p, "CALL BY CONTENT argument") : CallStringRead(p);
+        // SendingGroupValue is the ONE sending dispatch: an alphanumeric group's current-extent image, a bit /
+        // national group's current-extent boolean / national positions (the elementary alphabet — kb/Work PB1166).
+        p is OdoGroupPlace ? PlaceRenderer.SendingGroupValue(p, "CALL BY CONTENT argument") : CallStringRead(p);
+
+    /// <summary>A place that crosses the boundary as a bit / national group's ELEMENTARY value (kb/Work PB1166 —
+    /// see <see cref="CallStringRead"/>). A redefinition view over one is character storage, never the group.</summary>
+    private static bool IsAsIfGroupCrossing(Place p) => p is not RedefViewPlace && p.Item.IsAsIfElementary;
+
+    /// <summary>The full-allocation place of a boundary operand (§14.2.3 GR8): an occurs-depending wrapper unwrapped.</summary>
+    private static Place FullAllocation(Place p) => p is OdoGroupPlace o ? o.Inner : p;
+
+    /// <summary>The character width of a formal's TEXT crossing — the unit <see cref="CallStringRead"/> measures it
+    /// in: a bit / national group's as-if position count (kb/Work PB1166), else its record image width. ONE
+    /// answer for the CALL callee's carrier window and the INVOKE argument / copy-out windows.</summary>
+    internal static int BoundaryImageWidth(DataItem item) =>
+        item.IsAsIfElementary ? item.AsIfPic!.Length : item.ImageWidth;
 
     internal static string CallStringWrite(Place p, string value) =>
         // The boundary WRITE half of the §14.2.3 GR8/GR9 full-allocation rule above: a group (including an
@@ -933,6 +959,9 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // (§8.4.3.3.4 GR6 — an elementary alphanumeric item over the slice), and takes NEITHER the group image
         // store NOR the numeric decode/re-encode below, whose predicates both read through to the INNER item.
         p is RefModPlace ? PlaceRenderer.Write(p, value)
+        // The receiving twin of CallStringRead's bit / national group arm (kb/Work PB1166): the ONE as-if writer
+        // (PlaceRenderer.Write's as-if arm — FromBits / FromNat) distributes the elementary value to the subordinates.
+        : IsAsIfGroupCrossing(p) ? PlaceRenderer.Write(FullAllocation(p), value)
         : p.Item.IsGroup && p is not RedefViewPlace
             ? PlaceRenderer.WriteFullGroupImage(p, value, "CALL boundary copy")   // the FULL image — an ODO wrapper is unwrapped (kb/Work PB80)
         // ⛔ AN IMAGE-CARRIED NUMERIC LEAF: the boundary text IS its storage image, of EVERY byte form (kb/Work

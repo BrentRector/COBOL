@@ -335,9 +335,13 @@ singleton senders come through the gated rule; SR8/SR9/SR12 = **0867**; universa
 the narrowing tool is an OBJECT VIEW, deferred to the EC-OO/object-view wave). Object relations are live
 (Format 3 `=`/`<>` only + both-class-object = **0868**; identity renders
 `object.ReferenceEquals(l, r)` in the ConditionRenderer's object branch BEFORE the figurative branch, so
-NULL never width-materializes). Descriptor-vs-DescriptionMismatch drift protection is BEHAVIORAL (the
-EC-OO-UNIVERSAL / conforming-crossing test pair over the 9(4)/9(8) hazard), since DataItem construction
-outside the binder is not a supported seam for a direct unit matrix.
+NULL never width-materializes). Descriptor-vs-DescriptionMismatch drift protection is a UNIT MATRIX over
+pictures ANALYZED by `PictureAnalyzer` (`PictureClauseIdentityDriftTests.ConformanceDescriptor_AgreesWithTheComparator_OverEveryCarriedPair`,
+kb/Work PB1166) plus the behavioral EC-OO-UNIVERSAL / conforming-crossing pair over the 9(4)/9(8) hazard. Both
+projections read the ONE PICTURE-clause identity (`PicInfo.Clause` — expanded character-string, currency STRING,
+DECIMAL-POINT IS COMMA when a period/comma symbol is present), so a plain `X(n)` keeps the bare `S:n:J` key the
+alphanumeric-group image pairs with and every other alphanumeric picture adds its clause key; a bit / national
+group's key is `G:<usage>:<positions>` (it is an elementary item at the boundary, §14.8.2.1 NOTE).
 
 ### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that binds and emits nothing.
 

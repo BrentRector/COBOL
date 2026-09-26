@@ -1641,7 +1641,12 @@
   "l1m8-report-section-in-interface",
   "l1-bool-condition-length-8",
   "l1-type-ch-operand-omitted-two-controls",
-  "l1-type-cf-operand-omitted-final-plus-one"
+  "l1-type-cf-operand-omitted-final-plus-one",
+  "w61b-pb1166-invoke-currency-dpc",
+  "w61b-pb1166-override-picture-clause",
+  "w61b-pb1166-implements-picture-clause",
+  "w61b-pb1166-group-kind-pairing",
+  "w61b-pb1166-locale-identification-as-written"
  ],
  "pending": []
 }

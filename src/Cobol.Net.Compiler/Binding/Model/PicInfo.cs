@@ -495,6 +495,14 @@ public sealed record PicInfo(
     /// <see cref="Length"/>). Null when the picture has no currency symbol, or its string is <c>$</c>.</summary>
     public string? CurrencyString { get; init; }
 
+    /// <summary>The identity of the PICTURE clause this profile was analyzed from — the expanded character-string
+    /// with its currency STRING and, when it has a period or comma symbol, the declaring source element's
+    /// DECIMAL-POINT IS COMMA state (<see cref="PictureClauseIdentity"/>; kb/Work PB1166). Set by
+    /// <c>PictureAnalyzer.Analyze</c> only; <see langword="null"/> for an item with no PICTURE clause (a pointer,
+    /// an index, a PICTURE-less usage such as BINARY-LONG, a synthesized RENAMES/filler view) and for a
+    /// <see cref="IsRecovery"/> profile. The one input every "the same PICTURE clause" rule reads.</summary>
+    public PictureClauseIdentity? Clause { get; init; }
+
     /// <summary>For a numeric-edited (or alphanumeric-edited) item carrying one or more PICTURE EDITING phrases
     /// (ISO §13.18.40.2 Format 1, COBOL-2023): the resolved single-character render rules keyed on character-1's
     /// position in <see cref="EditMask"/> — the simple-insertion (IS) form and the single-occurrence sign-control

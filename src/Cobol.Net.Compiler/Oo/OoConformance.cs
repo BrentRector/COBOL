@@ -292,6 +292,13 @@ public static class OoConformance
     /// the sentinel deliberately matches nothing the callee ever emits as a checked formal.</summary>
     public static string ConformanceDescriptor(DataItem item)
     {
+        // A bit / national group is treated as an ELEMENTARY item at the activation boundary (§14.8.2.1 / §14.8.3.1
+        // NOTE), never as the alphanumeric group the "S:" image pairing stands for (kb/Work PB1166): its key is its
+        // group usage and its position count, so two such groups of one kind and size match and nothing
+        // alphanumeric does. The elementary boolean / national items the comparator also pairs it with are not
+        // carried through universal dispatch ("T:!" below) — the same loud strictness delta those items already have.
+        if (item.IsAsIfElementary)
+            return $"G:{item.GroupUsage}:{item.AsIfPic!.Length}";
         if (item.IsGroup)
             // A VARIABLE-LENGTH group crosses as its §8.5.1.12 component carrier, so its descriptor is that
             // layout's canonical signature (kb/Work PB204) — without it the item fell to the T:! sentinel and
@@ -307,7 +314,7 @@ public static class OoConformance
             PicCategory.ObjectReference => "O:" + (p.ObjectRef ?? ObjectRefDescriptor.Universal).SignatureKey,
             PicCategory.Numeric =>
                 $"N:{p.Usage}:{p.Digits}:{p.Scale}:{(p.Signed ? "S" : "U")}:{p.SignKind}:"
-                + (item.BlankWhenZero ? "B" : "-"),
+                + (item.BlankWhenZero ? "B" : "-") + ClauseKey(item),
             PicCategory.Alphanumeric =>
                 // An ANY LENGTH item's length is runtime-varying (ISO §13.18.2 GR1) — encoded '*' so the pair
                 // semantics track DescriptionMismatch (ANY LENGTH must MATCH between the sides; when both carry
@@ -316,9 +323,69 @@ public static class OoConformance
                 // raises EC-OO-UNIVERSAL (loud) — the one permissive corner (an ANY LENGTH argument meeting an
                 // ANY LENGTH formal matches instead of raising) is a documented strictness delta, same family
                 // as the by-ref group-prefix delta above.
-                $"S:{(item.IsAnyLength ? "*" : p.Length.ToString())}:{(item.Justified ? "J" : "N")}",
+                // A picture that is not all X — alphabetic, edited, or mixed A/9/X — carries its PICTURE-clause
+                // identity (kb/Work PB1166: PIC A(5) is not PIC X(5)); a plain X(n) item keeps the bare "S:n:J"
+                // key the alphanumeric-group image pairs with. The one consequence is a documented LOUD delta: a
+                // mixed-symbol category-alphanumeric item (PIC X9X) meeting an alphanumeric group, which the typed
+                // path admits by §14.8.2.2 rule 1, raises EC-OO-UNIVERSAL through universal dispatch.
+                $"S:{(item.IsAnyLength ? "*" : p.Length.ToString())}:{(item.Justified ? "J" : "N")}"
+                + (item.IsDynamicLength ? $":D{item.DynMaxSize}:{item.DynStructure?.Name}" : "")
+                + (IsAllX(p) ? "" : ClauseKey(item)),
             _ => "T:!",
         };
+    }
+
+    /// <summary>The PICTURE-clause identity's descriptor suffix (<see cref="PictureClauseIdentity.Key"/>), or ""
+    /// for an item with no PICTURE clause or an ANY LENGTH item (whose one-symbol picture is its length's
+    /// placeholder — the comparator skips the identity for it too).</summary>
+    private static string ClauseKey(DataItem item) =>
+        item.Pic?.Clause is { } c && !item.IsAnyLength ? ":P" + c.Key : "";
+
+    /// <summary>A plain <c>X(n)</c> picture — the only elementary shape whose descriptor is the bare image key.</summary>
+    private static bool IsAllX(PicInfo p) => p.Clause is null || p.Clause.CharacterString.All(c => c == 'X');
+
+    /// <summary>§14.8.2.2 rule 1 / §14.8.3.2: the elementary side of an alphanumeric-group pairing "shall be … an
+    /// elementary item of category alphanumeric" — the CATEGORY (§8.5.2), so neither alphabetic (<c>PIC A</c>) nor
+    /// alphanumeric-edited, both of which share <see cref="PicCategory.Alphanumeric"/> storage (kb/Work PB1166).</summary>
+    private static bool IsCategoryAlphanumeric(PicInfo? p) =>
+        p is { Category: PicCategory.Alphanumeric, IsAlphabetic: false, EditMask: null };
+
+    /// <summary>ISO §14.8.2.3.2 "Additionally" b)/c) and §14.8.3.3 "Additionally" 2)/3): a BIT GROUP "matches an
+    /// elementary bit data item described with the same number of boolean positions", a NATIONAL GROUP "matches an
+    /// elementary data item of usage national described with the same number of national character positions" —
+    /// because "A bit group or national group is treated as an elementary item" (§14.8.2.1 / §14.8.3.1 NOTE), and
+    /// so is never the alphanumeric group §14.8.2.2 / §14.8.3.2 pair with an alphanumeric item (kb/Work PB1166:
+    /// both directions were refused as "a group argument requires a group or alphanumeric formal", and a national
+    /// group crossed into an alphanumeric group of equal width). Two such groups of one kind match when their
+    /// position counts agree. <paramref name="group"/> is the side that IS a bit / national group.</summary>
+    private static string? AsIfElementaryGroupMismatch(DataItem group, DataItem other)
+    {
+        var gp = group.AsIfPic!;
+        string kind = group.GroupUsage is GroupUsage.Bit ? "bit group" : "national group";
+        string unit = group.GroupUsage is GroupUsage.Bit ? "boolean" : "national character";
+        if (other.IsAsIfElementary)
+            return other.GroupUsage != group.GroupUsage
+                ? $"a {kind} does not match a {(other.GroupUsage is GroupUsage.Bit ? "bit" : "national")} group"
+                : other.AsIfPic!.Length != gp.Length
+                    ? $"{kind} size mismatch ({gp.Length} vs {other.AsIfPic!.Length} {unit} positions)"
+                    : null;
+        if (other.IsGroup)
+            return $"a {kind} is treated as an elementary item (ISO §14.8.2.1 / §14.8.3.1 NOTE), so it does not "
+                + "match an alphanumeric group — that pairing requires an alphanumeric group item or an elementary "
+                + "item of category alphanumeric (ISO §14.8.2.2 rule 1 / §14.8.3.2)";
+        bool kindOk = group.GroupUsage is GroupUsage.Bit
+            ? other.Pic is { Category: PicCategory.Boolean, Usage: Usage.Bit }
+            : other.Pic is { Usage: Usage.National };
+        if (!kindOk)
+            return group.GroupUsage is GroupUsage.Bit
+                ? "a bit group matches only an elementary bit data item (ISO §14.8.2.3.2 \"Additionally\" b) / "
+                  + "§14.8.3.3 \"Additionally\" 2))"
+                : "a national group matches only an elementary data item of usage national (ISO §14.8.2.3.2 "
+                  + "\"Additionally\" c) / §14.8.3.3 \"Additionally\" 3))";
+        return other.Pic!.Length != gp.Length
+            ? $"{kind} size mismatch (the {kind} has {gp.Length} {unit} positions, the elementary item "
+              + $"{other.Pic.Length} — they shall be the same number)"
+            : null;
     }
 
     /// <summary>ISO §14.8.2.2 / §14.8.3.2 / §9.3.8.2.3 rule 7 — the activation boundary's strongly-typed
@@ -347,9 +414,13 @@ public static class OoConformance
 
     /// <summary>The ONE strict IDENTICAL-DESCRIPTION check — §14.8.2.3.2 (BY REFERENCE parameters ONLY; BY
     /// CONTENT follows §14.8.2.3.3 COMPUTE/MOVE/SET rules in the binder mode dispatch) and §9.3.8.2
-    /// override-signature validation. Identical = same category; numeric: same USAGE + SIGN representation +
-    /// BLANK WHEN ZERO + digits + scale + sign; alphanumeric: same length + JUSTIFIED; object reference: same
-    /// declared class; group: image crossing with equal character length (except the §14.8.2.2 rule-1 BY
+    /// override-signature validation. Identical = same category, the same ALIGNED / DYNAMIC LENGTH clauses
+    /// (<see cref="DescriptionClauses"/>), the per-category clauses (numeric: USAGE + SIGN representation + BLANK
+    /// WHEN ZERO + digits + scale + sign; alphanumeric: length + JUSTIFIED; LOCALE phrase; object reference: the
+    /// whole descriptor), and the same PICTURE clause by its ONE identity (<see cref="PictureClauseIdentity"/> —
+    /// the character-string, currency strings and DECIMAL-POINT IS COMMA; kb/Work PB1166); a bit / national group
+    /// is an elementary item (<c>AsIfElementaryGroupMismatch</c>); an alphanumeric group: image crossing with equal
+    /// character length (except the §14.8.2.2 rule-1 BY
     /// REFERENCE prefix case — <paramref name="byRefGroupPrefix"/> allows a SMALLER formal). Null when
     /// conformant. This strictness keeps BY REFERENCE marshaling TYPE-PRESERVING (the slice-2 design fact);
     /// CONTENT conversions qualify the owner class internal profiles instead.</summary>
@@ -386,10 +457,18 @@ public static class OoConformance
         // Relaxes ONLY the length compares below; category and JUSTIFIED checks stay (the §14.8.2 table row).
         bool anyLengthFormal = formal.IsAnyLength;
 
+        // A bit / national group is an ELEMENTARY item here (§14.8.2.1 / §14.8.3.1 NOTE) — its own arm, before the
+        // alphanumeric-group arms below can read it as one (kb/Work PB1166).
+        if (formal.IsAsIfElementary) return AsIfElementaryGroupMismatch(formal, arg);
+        if (arg.IsAsIfElementary) return AsIfElementaryGroupMismatch(arg, formal);
+
         if (formal.IsGroup)
         {
-            if (!(arg.IsGroup || arg.Pic?.Category is PicCategory.Alphanumeric))
-                return "a group formal requires a group or alphanumeric argument";
+            // §14.8.2.2 rule 1 / §14.8.3.2: "an alphanumeric group item or an elementary item of category
+            // alphanumeric" — the category, so a PIC A or an alphanumeric-edited argument is not one (PB1166).
+            if (!(arg.IsGroup || IsCategoryAlphanumeric(arg.Pic)))
+                return "a group formal requires a group argument or an elementary argument of category alphanumeric "
+                    + "(ISO §14.8.2.2 rule 1 / §14.8.3.2)";
             // ⛔ §14.8.2.2 / §14.8.3.2, THE VARIABLE-LENGTH SENTENCE, BEFORE the capability screens below
             // (kb/Work PB204). "If either the formal parameter or the argument is a variable length group, the
             // formal parameter and the argument shall be compatible, as described in 8.5.1.12" — an ADMISSION
@@ -466,8 +545,9 @@ public static class OoConformance
             return "the formal parameter has no resolvable description (PICTURE-less item — a later slice)";
         if (arg.IsGroup)
         {
-            if (f.Category is not PicCategory.Alphanumeric)
-                return "a group argument requires a group or alphanumeric formal";
+            if (!IsCategoryAlphanumeric(f))
+                return "a group argument requires a group formal or an elementary formal of category alphanumeric "
+                    + "(ISO §14.8.2.2 rule 1 / §14.8.3.2)";
             // §8.5.1.12.1: a variable-length group is compatible only with a compatible GROUP ("not equivalent
             // to an alphanumeric data item"), so an ELEMENTARY formal — which §14.8.2.2 rule 1 admits for a
             // fixed-length group — is a mismatch, and it is that sentence that says so, not the Tier-C island.
@@ -487,6 +567,34 @@ public static class OoConformance
             return "the argument has no resolvable description (PICTURE-less item — a later slice)";
         if (f.Category != a.Category)
             return $"category mismatch (formal {f.Category}, argument {a.Category})";
+        // ── The clauses every category shares (kb/Work PB1166). ALIGNED and DYNAMIC LENGTH are entry clauses on
+        // every identical-description list — §14.8.2.3.2 rule 2 "the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH,
+        // JUSTIFIED, PICTURE, SIGN, and USAGE clauses", §9.3.8.2.3 rule 3 "the same ALIGNED, ANY LENGTH, BLANK
+        // WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses" — asked through the ONE
+        // predicate the §8.5.3.1 profile compare reads too.
+        if (DescriptionClauses.AlignedOrDynamicLengthMismatch(formal, arg) is { } clauseWhy) return clauseWhy;
+        // The per-category arm speaks first — its USAGE / SIGN / digit messages name the clause more precisely than
+        // a character-string difference would — and the PICTURE clause's ONE identity (PictureClauseIdentity)
+        // closes every pair the arm accepted: the expanded character-string (so PIC A(5) is not PIC X(5), and an
+        // edited picture is not the plain one of equal size), the currency STRING each currency symbol stands for
+        // (rule 2 a) — "Currency symbols match if and only if the corresponding currency strings are the same"),
+        // and the DECIMAL-POINT IS COMMA state of each side's source element whenever a period or comma symbol is
+        // present (rule 2 b)). Before this every category arm compared its own subset — the EditMask text, or
+        // nothing — and a DPC class returning Z9,99 into a non-DPC Z9,99 receiver ran, the receiver reading 1234
+        // for 12.34. An ANY LENGTH formal's one-symbol picture has no length of its own (§14.8.2.3.2
+        // "Additionally" d)), so for it only the SYMBOL must agree.
+        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal) is { } armWhy) return armWhy;
+        return f.Clause is { } fc && a.Clause is { } ac
+            ? anyLengthFormal ? PictureClauseIdentity.MismatchAtAnyLength(fc, ac) : PictureClauseIdentity.Mismatch(fc, ac)
+            : null;
+    }
+
+    /// <summary>The per-category clauses of <see cref="DescriptionMismatch"/>'s elementary pair (the two sides
+    /// already share a category): object-reference descriptions, the numeric USAGE / SIGN / BLANK WHEN ZERO /
+    /// digit profile, JUSTIFIED, the LOCALE phrase, lengths and the pointer restrictions. The PICTURE clause's
+    /// identity is compared by the caller after this, for every category alike.</summary>
+    private static string? CategoryArmMismatch(DataItem formal, DataItem arg, PicInfo f, PicInfo a, bool anyLengthFormal)
+    {
         switch (f.Category)
         {
             case PicCategory.ObjectReference:
@@ -516,14 +624,8 @@ public static class OoConformance
             case PicCategory.Alphanumeric:
                 if (formal.Justified != arg.Justified)
                     return "JUSTIFIED mismatch (§14.8.2.3.2 rule 2)";
-                // "The same PICTURE clause" is not implied by equal LENGTH: an alphanumeric-EDITED picture
-                // (§13.18.40 simple insertion — the B / 0 / / positions) and a plain X picture of the same
-                // character count are different PICTURE clauses, and rule 2 names the clause, not the size.
-                if (!string.Equals(f.EditMask, a.EditMask, StringComparison.Ordinal))
-                    return $"PICTURE mismatch (formal '{f.EditMask ?? "X(" + f.Length + ")"}', argument "
-                        + $"'{a.EditMask ?? "X(" + a.Length + ")"}' — §14.8.2.3.2 rule 2 requires the same "
-                        + "PICTURE clause)";
-                // ANY LENGTH: the length is considered to match (§14.8.2.3.2 rule d / §14.8.3.3 rule 5 in
+                // The PICTURE clause — alphabetic vs alphanumeric, edited vs plain — was compared above, through
+                // its one identity. ANY LENGTH: the length is considered to match (§14.8.2.3.2 rule d / §14.8.3.3 rule 5 in
                 // activation mode; both-sides-varying in pair mode — the top-of-function match rule).
                 return !anyLengthFormal && f.Length != a.Length
                     ? $"length mismatch (formal X({f.Length}), argument X({a.Length}))"
@@ -553,30 +655,22 @@ public static class OoConformance
                 if (f.SignKind != a.SignKind)
                     return $"SIGN clause mismatch (formal {f.SignKind}, argument {a.SignKind} — "
                         + "§14.8.2.3.2 rule 2: the SIGN clauses shall be the same)";
-                // An EDITED picture's identity is its editing character-string, which equal length does not imply.
-                if (!string.Equals(f.EditMask, a.EditMask, StringComparison.Ordinal))
-                    return $"PICTURE mismatch (formal '{f.EditMask}', argument '{a.EditMask}' — "
-                        + "§14.8.2.3.2 rule 2 requires the same PICTURE clause)";
-                // A FORMAT-2 (LOCALE) picture's identity (§14.8.2.3.2 rule 2 / §8.5.3.1 rule 2 — PB64 T6): both
-                // masks are null, so the compare above passes vacuously; the rule requires the same SIZE phrase
-                // (the Length compare below carries it — Length = integer-1), the same character-string, and the
-                // same locale — "both specify the LOCALE phrase without a locale-name or both … with the same
-                // external identification" (the ONE identity, LocaleSymbol.SameLocaleAs over L1 normalization).
+                // The EDITED character-string was compared above, through the PICTURE clause's one identity. A
+                // FORMAT-2 (LOCALE) picture (§14.8.2.3.2 "Additionally" a) — PB64 T6) adds the LOCALE phrase: the
+                // same SIZE phrase (the Length compare below carries it — Length = integer-1) and "both specify the
+                // LOCALE phrase without a locale-name or both specify the LOCALE phrase with the same external
+                // identification, where the external identification is the external-locale-name or literal value
+                // associated with a locale-name" — the identification AS WRITTEN (LocaleRef.SameIdentificationAs;
+                // kb/Work PB1166: it used to compare the L1-NORMALIZED tags, so "en-US" matched "EN_us.UTF-8").
                 if ((f.LocaleEdit is not null) != (a.LocaleEdit is not null))
                     return "PICTURE mismatch (only one of the pair is a format 2 LOCALE picture — "
                         + "§14.8.2.3.2 rule 2 requires the same PICTURE clause)";
-                if (f.LocaleEdit is { } fle && a.LocaleEdit is { } ale)
-                {
-                    if (!string.Equals(fle.Picture, ale.Picture, StringComparison.Ordinal))
-                        return $"PICTURE mismatch (formal '{fle.Picture}', argument '{ale.Picture}' — "
-                            + "§14.8.2.3.2 rule 2 requires the same PICTURE clause)";
-                    bool same = fle.Locale.IsCurrent == ale.Locale.IsCurrent
-                        && (fle.Locale.IsCurrent || fle.Locale.Named!.SameLocaleAs(ale.Locale.Named!));
-                    if (!same)
-                        return $"LOCALE mismatch (formal {fle.Locale}, argument {ale.Locale} — §14.8.2.3.2 rule 2: "
-                            + "both shall specify the LOCALE phrase without a locale-name or with the same "
-                            + "external identification)";
-                }
+                if (f.LocaleEdit is { } fle && a.LocaleEdit is { } ale && !fle.Locale.SameIdentificationAs(ale.Locale))
+                    return $"LOCALE mismatch (formal {fle.Locale.Named?.ToString() ?? "LOCALE (current)"}, argument "
+                        + $"{ale.Locale.Named?.ToString() ?? "LOCALE (current)"} — both shall specify the "
+                        + "LOCALE phrase without a locale-name or with the same external identification, the "
+                        + "external-locale-name or literal value as written: ISO §14.8.2.3.2 \"Additionally\" a), "
+                        + "§14.8.3.3 \"Additionally\" 1), §9.3.8.2.3 rule 3 \"Additionally\")";
                 return !anyLengthFormal && f.Length != a.Length
                     ? $"length mismatch (formal {f.Category} ({f.Length}), argument {a.Category} ({a.Length}))"
                     : null;

@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-217 drift tests.
+218 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -154,6 +154,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [PartialExpressionSpineDriftTests](../tests/Cobol.Net.Tests.Unit/PartialExpressionSpineDriftTests.cs) | ⛔ A PARTIAL EXPRESSION IS A CONDITION WITH ITS LEFTMOST OPERAND MISSING — NOT A SECOND CONDITION LANGUAGE (kb/Work PB398). | — |
 | [PerformVaryingOperandWindowDriftTests](../tests/Cobol.Net.Tests.Unit/PerformVaryingOperandWindowDriftTests.cs) | kb/Work PB437 — the EVALUATION WINDOW of every PERFORM VARYING operand slot, pinned per slot. | — |
 | [PictureCategoryDriftTests](../tests/Cobol.Net.Tests.Unit/PictureCategoryDriftTests.cs) | ⛔ THE TWO CLOSURE PROPERTIES OF PictureAnalyzer, MEASURED OVER THE WHOLE FORMAT-1 SYMBOL ALPHABET RATHER THAN OVER A LIST OF CASES (kb/Work PB535). | — |
+| [PictureClauseIdentityDriftTests](../tests/Cobol.Net.Tests.Unit/PictureClauseIdentityDriftTests.cs) | ⛔ "THE SAME PICTURE CLAUSE" HAS ONE IDENTITY, AND EVERY ASKER READS IT (kb/Work PB1166). | — |
 | [PicturePlacementInvariantDriftTests](../tests/Cobol.Net.Tests.Unit/PicturePlacementInvariantDriftTests.cs) | ⛔ THE DATA MODEL'S CLASSIFICATION IS TOTAL: every bound DataItem is a group or an elementary item, and never both and never neither. | — |
 | [PictureTable10DriftTests](../tests/Cobol.Net.Tests.Unit/PictureTable10DriftTests.cs) | ⛔ THE GATE THAT HOLDS PictureComposition's COPY OF TABLE 10 EQUAL TO THE STANDARD. | `specs/ISO_COBOL.md` |
 | [PicturelessUsageSetDriftTests](../tests/Cobol.Net.Tests.Unit/PicturelessUsageSetDriftTests.cs) | ⛔ IsPictureless AGAINST ITS OWN SOURCE — ISO §13.16.3 SR8, re-read out of specs/ISO_COBOL.md on every run (kb/Work PB495). | `specs/ISO_COBOL.md` |

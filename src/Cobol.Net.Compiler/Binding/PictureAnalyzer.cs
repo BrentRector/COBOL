@@ -87,12 +87,29 @@ public static class PictureAnalyzer
     /// "the rules for the symbol period apply to the symbol comma, and the rules for the symbol comma apply to the
     /// symbol period" decides which of the two is the DECIMAL separator that SR12b / SR17 / SR20 and Table 10 speak
     /// of — without it `PIC 9.999.999,99` under DECIMAL-POINT IS COMMA (NIST NC107A) is rejected as legal source.
+    /// <para>Every analyzed (non-recovery) profile carries <see cref="PicInfo.Clause"/> — the PICTURE clause's
+    /// identity, attached HERE for every category arm at once because this is the one place the character-string,
+    /// the unit's CURRENCY SIGN set and its DECIMAL-POINT IS COMMA state are all in hand (kb/Work PB1166).</para>
     /// </summary>
     public static PicInfo Analyze(string picture, Usage usage, EditionContext edition, string where,
         SignSpec? sign = null, char currency = '$', bool blankWhenZero = false, bool explicitUsage = false,
         IReadOnlyList<EditingPhraseSpec>? editing = null, IReadOnlyDictionary<char, string>? currencies = null,
         LocaleEditSpec? localeFormat2 = null, bool decimalPointIsComma = false)
     {
+        var pic = AnalyzeCharacterString(picture, usage, edition, where, sign, currency, blankWhenZero, explicitUsage,
+            editing, currencies, localeFormat2, decimalPointIsComma, out var clause);
+        return pic.IsRecovery || clause is null ? pic : pic with { Clause = clause };
+    }
+
+    /// <summary>The body of <see cref="Analyze"/>; <paramref name="clause"/> is the PICTURE clause identity, set
+    /// once the character-string is expanded and its currency symbol known, and completed with the EDITING
+    /// phrase rules once those are resolved.</summary>
+    private static PicInfo AnalyzeCharacterString(string picture, Usage usage, EditionContext edition, string where,
+        SignSpec? sign, char currency, bool blankWhenZero, bool explicitUsage,
+        IReadOnlyList<EditingPhraseSpec>? editing, IReadOnlyDictionary<char, string>? currencies,
+        LocaleEditSpec? localeFormat2, bool decimalPointIsComma, out PictureClauseIdentity? clause)
+    {
+        clause = null;
         // A TRAILING ';' is the clause SEPARATOR (ISO §8.3.5 rule 2 — a semicolon immediately followed by a
         // space is a separator; ';' is never a PICTURE symbol). The REAL cure is the W3 lexer-mode trim
         // (DEVLOG 596; VCR Table 7 row 7.14): PIC_STRING trims a trailing ','/';' when LA(1) is whitespace —
@@ -153,6 +170,7 @@ public static class PictureAnalyzer
         if (cs == '\0') cs = '$';   // no currency symbol in this picture: the whitelist/editing checks see the default
         // GR14: the first occurrence contributes the whole string; the mask below is canonical ('$').
         int currencyExtra = expanded.Any(c => char.ToUpperInvariant(c) == cs) ? currencyString.Length - 1 : 0;
+        clause = PictureClauseIdentity.Of(expanded, cs, currencyString, decimalPointIsComma);
 
         // ── PICTURE format 2 (the LOCALE phrase, §13.18.40.2; kb/Work PB64 T6): its own analysis — the format-1
         // walker below reads none of its rules (Table 11 replaces Table 10; the item's size is the SIZE integer,
@@ -174,6 +192,7 @@ public static class PictureAnalyzer
         // character-string-1 (kb/Work PB491). Computed once here, beside the currency widening, and added at
         // every category arm a character-1 can reach.
         int editingExtra = EditingPositions(expanded, editRules);
+        clause = clause with { Editing = PictureClauseIdentity.EditingText(editRules) };
 
         // ── The §13.18.40.3 SR2 symbol whitelist (the W2 loud guard). The legal ISO 2023 Format-1 symbols are
         // A B E N P S V X Z 0 1 9 / , . + - * CR DB and the program's currency symbol (§13.18.40.4 GR14;

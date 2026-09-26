@@ -181,37 +181,27 @@ public static class StrongTypeModel
     /// eight-item list, one conjunct each; the PICTURE / SIGN / USAGE trio is answered by the analyzed profile
     /// (<see cref="PicInfo"/> IS the canonical PICTURE + USAGE + SIGN analysis).</summary>
     private static bool SameEssentialCharacteristics(DataItem x, DataItem y) =>
-        x.IsAligned == y.IsAligned                                            // ALIGNED        §13.18.1
+        DescriptionClauses.AlignedOrDynamicLengthMismatch(x, y) is null       // ALIGNED §13.18.1; DYNAMIC LENGTH
+                                                                              //   §13.18.19 with LIMIT + structure (PB829)
         && x.BlankWhenZero == y.BlankWhenZero                                 // BLANK WHEN ZERO §13.18.8
-        && x.IsDynamicLength == y.IsDynamicLength                             // DYNAMIC LENGTH  §13.18.19
-        && (!x.IsDynamicLength || x.DynMaxSize == y.DynMaxSize)               //   … and its LIMIT
-        && (!x.IsDynamicLength || SameDynStructure(x, y))                     //   … and its structure-name (PB829)
         && x.Justified == y.Justified                                         // JUSTIFIED      §13.18.32
         && x.Synchronized == y.Synchronized                                   // SYNCHRONIZED   §13.18.55
         && SameAnalyzedProfile(x.Pic, y.Pic);                                 // PICTURE + SIGN + USAGE
-
-    /// <summary>The DYNAMIC LENGTH clause's dynamic-length-structure-name-1 (§13.18.19.2) is part of the clause
-    /// §8.5.3.1 requires to be the same: both name no structure, or both name the same one (a name is unique in its
-    /// source element and inherited by reference, so name equality is identity).</summary>
-    private static bool SameDynStructure(DataItem x, DataItem y) =>
-        string.Equals(x.DynStructure?.Name, y.DynStructure?.Name, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The PICTURE / SIGN / USAGE conjunct, with §8.5.3.1's three exceptions.
     /// <para>The comparison is <see cref="PicInfo"/>'s OWN record equality — every analyzed axis, and every axis
     /// a later slice adds, is included by construction rather than by a hand-maintained member list. Three
     /// members are handled apart from it:</para>
     /// <list type="bullet">
-    ///   <item><b>Exception 1</b> — "Currency symbols match if and only if the corresponding currency strings
-    ///   are the same". <c>PictureAnalyzer</c> canonicalizes the mask's currency symbol to <c>$</c> and records
-    ///   the string it stands for in <see cref="PicInfo.CurrencyString"/>, so comparing the canonical
-    ///   <see cref="PicInfo.EditMask"/> together with that string IS the exception, with no special case.</item>
-    ///   <item><b>Exception 2</b> — the period / comma picture symbols match only when DECIMAL-POINT IS COMMA
-    ///   is in effect for both declarations or for neither. §13.18.40.3 rules 6–10 admit <c>.</c> and <c>,</c>
-    ///   into no category but numeric-edited (an alphanumeric- or national-edited picture-string is restricted
-    ///   to <c>A X 9 N</c> with character-1 / <c>B 0 /</c>), and the analysis of a numeric picture is itself
-    ///   DECIMAL-POINT-resolved — the clause decides which symbol is the decimal point, hence
-    ///   <see cref="PicInfo.Scale"/>, <see cref="PicInfo.Digits"/> and the mask. Two corresponding items
-    ///   analyzed under different settings therefore differ in the profile already.</item>
+    ///   <item><b>Exceptions 1 and 2</b> — "Currency symbols match if and only if the corresponding currency
+    ///   strings are the same", and the period / comma picture symbols match only when DECIMAL-POINT IS COMMA is
+    ///   in effect for both declarations or for neither. Both are carried by <see cref="PicInfo.Clause"/> — the
+    ///   ONE PICTURE-clause identity (<see cref="PictureClauseIdentity"/>, kb/Work PB1166) that the §14.8 / §9.3
+    ///   activation and signature comparator reads too — which holds the canonical character-string, the currency
+    ///   STRING, and the DECIMAL-POINT IS COMMA state whenever the picture has a period or comma symbol. This used
+    ///   to rest on the claim that two items analyzed under different settings "differ in the profile already"
+    ///   through <see cref="PicInfo.Scale"/>, which holds only when a digit position follows the separator — the
+    ///   rule is about the SYMBOLS, so it is now carried as the symbols' own fact.</item>
     ///   <item><b>Exception 3</b> — the LOCALE phrase's SIZE and external identification, carried on
     ///   <see cref="PicInfo.LocaleEdit"/>, itself a record compared by value.</item>
     /// </list>

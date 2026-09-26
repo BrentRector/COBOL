@@ -94,10 +94,13 @@ public sealed record LocaleValue(string Collate, string Ctype, string Messages, 
 /// ignored (the repertoire is UTF-16 — D-N1 — so a codeset cannot change it); an <c>@modifier</c> that is a CLDR
 /// collation type (<c>@phonebook</c>, <c>@pinyin</c>, <c>@stroke</c>, <c>@trad</c> …) becomes the BCP-47 extension
 /// <c>-u-co-&lt;type&gt;</c>, any other modifier makes the locale unavailable (EC-LOCALE-MISSING at use).
-/// <c>fr_FR</c>, <c>fr_FR.UTF-8</c> and <c>fr-FR</c> therefore identify the same locale — which matters because
+/// <c>fr_FR</c>, <c>fr_FR.UTF-8</c> and <c>fr-FR</c> therefore SELECT the same locale — which matters because
 /// <c>fr_FR</c> is a legal COBOL word (§8.3.2.1 admits the underscore) and appears in the external-locale-name
-/// branch while <c>"fr_FR.UTF-8"</c> appears in the literal branch; §8.5.3.1 rule 2's "same external
-/// identification" is a comparison of NORMALIZED keys (<see cref="SameLocale"/>), not of spellings.
+/// branch while <c>"fr_FR.UTF-8"</c> appears in the literal branch. ⚠ Selecting the same locale is not having
+/// "the same external identification": §8.5.3.1 and the §9.3.8.2.3 / §14.8.2.3.2 / §14.8.3.3 PICTURE-clause
+/// rules define that identification as "the external-locale-name or literal value" itself, so those compare the
+/// identification as WRITTEN (the compiler's <c>LocaleSymbol.SameExternalIdentificationAs</c>, kb/Work PB1166) and
+/// never this normalization.
 /// Availability is a RUN-TIME property (§8.1.5 — the ordering "is determined at runtime"): the compiler never
 /// resolves a tag; <see cref="IsAvailable"/> is the one rule, <see cref="CollationEngine.IsKnownLocale"/>.</para>
 /// </summary>
@@ -131,11 +134,6 @@ public static class LocaleIdentification
         }
         return s;
     }
-
-    /// <summary>Do two external identifications name the same locale (§8.5.3.1 rule 2 — "the same external
-    /// identification")? Compares the normalized tags case-insensitively.</summary>
-    public static bool SameLocale(string? a, string? b) =>
-        string.Equals(Normalize(a), Normalize(b), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Is the locale available in this operating environment (§14.9.39.4 GR24 — "If the locale specified by
     /// locale-name-1 is not available, the EC-LOCALE-MISSING exception condition is set to exist")? The ONE rule

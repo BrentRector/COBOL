@@ -171,7 +171,6 @@ public sealed class LocaleStateTests
     public void ExternalIdentification_IsNormalized_PerDeterminationL1(string external, string tag)
     {
         Assert.Equal(tag, LocaleIdentification.Normalize(external));
-        Assert.True(LocaleIdentification.SameLocale(external, tag));
     }
 
     [Fact]

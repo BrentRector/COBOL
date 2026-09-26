@@ -52,6 +52,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         fields.MethodRedefinesBackingDecl(root) is { } bk ? bk.Name
         : root.Class is { Tier: RedefinesTier.StringCanonical, IsCellBacked: true } ? MethodCellFormalLoad(root)
         : OoVarGroupCarried(root) ? PlaceRenderer.VarGroupImage(MethodRootPlace(root), what + " of")
+        // A bit / national group hands back its ELEMENTARY value, an alphanumeric group its image — the CALL
+        // boundary's ONE read (kb/Work PB1166), so the method ABI and the program ABI cannot speak two alphabets.
+        : root.IsAsIfElementary ? CallEmitter.CallStringRead(MethodRootPlace(root))
         : root.IsGroup ? PlaceRenderer.GroupImage(MethodRootPlace(root), what)
         : root.CsName;
 
@@ -455,8 +458,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         // a non-OPTIONAL formal its descriptor fails that check, which is the violation.
                         string exempt = f.Optional ? $"__a[{i}].Descriptor != {RuntimeApi.ObjOmittedDescriptor} && " : "";
                         w.Line(OoUnivStop(m, $"{present}{exempt}__a[{i}].Descriptor != {wantLit}",
+                            // The formal's descriptor is concatenated as its own C# literal, never spliced into the
+                            // interpolated text: it can carry a currency string or PICTURE EDITING literal
+                            // (PictureClauseIdentity.Key, kb/Work PB1166) — user text with quotes or braces.
                             $"$\"INVOKE '{cobolName}' '{m.Name}': argument {i + 1} does not conform to the formal "
-                            + $"(caller {{__a[{i}].Descriptor}}, formal {want.Replace('"', '\'')}) (ISO §14.9.23.4 GR7c/§14.8.2)\""));
+                            + $"(caller {{__a[{i}].Descriptor}}, formal \" + {wantLit} + \") (ISO §14.9.23.4 GR7c/§14.8.2)\""));
                         w.Line($"bool __o{i} = {(i < minArgs ? "" : $"__a.Length <= {i} || ")}__a[{i}].Omitted;   // §14.9.23.4 GR9");
                         w.Line($"var __p{i} = __o{i} ? default! : {OoUnivUnbox(f.Item, $"__a[{i}].Value")};");
                     }
@@ -795,6 +801,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         // image distribution, through the SAME ONE channel.
                         ? PlaceRenderer.WriteVarGroupImage(MethodRootPlace(root), formal.ParamName,
                             "OO method LINKAGE formal copy-in of")
+                        // A bit / national group receives its ELEMENTARY value through the CALL boundary's ONE
+                        // write (kb/Work PB1166 — the twin of MethodBoundaryValue's arm).
+                        : root.IsAsIfElementary ? CallEmitter.CallStringWrite(MethodRootPlace(root), formal.ParamName)
                         : PlaceRenderer.WriteFullGroupImage(MethodRootPlace(root), formal.ParamName,
                             "OO method LINKAGE formal copy-in")) + " }");
                 }
@@ -1157,7 +1166,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // The image crossing. BY REFERENCE allows a SMALLER formal (§14.8.2.2 rule 1 — a PREFIX of
                 // the argument): pass the leading formal-width characters; the write-back below splices the
                 // prefix back, preserving the argument's tail. CONTENT pads/truncates per MOVE.
-                int fw = a.Formal.IsGroup ? a.Formal.ImageWidth : Math.Max(1, a.Formal.Pic!.Length);
+                int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : Math.Max(1, a.Formal.Pic!.Length);
                 string read = a.Source is { } gsp
                     ? a.ByContent ? CallEmitter.CallContentRead(gsp) : CallEmitter.CallStringRead(gsp)
                     : CsLiteral(a.StringLiteral ?? "");
@@ -1265,7 +1274,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     "INVOKE copy-out into"));
             else if (a.Formal.IsGroup || src.Item.IsGroup)
             {
-                int fw = a.Formal.IsGroup ? a.Formal.ImageWidth : Math.Max(1, a.Formal.Pic!.Length);
+                int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : Math.Max(1, a.Formal.Pic!.Length);
                 // The §14.8.2.2 rule-1 prefix: splice the formal's characters back over the argument's
                 // LEADING positions, preserving the tail beyond the formal's width.
                 Post(CallEmitter.CallStringWrite(src,

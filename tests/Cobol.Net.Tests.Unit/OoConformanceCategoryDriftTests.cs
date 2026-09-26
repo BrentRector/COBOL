@@ -50,7 +50,7 @@ public sealed class OoConformanceCategoryDriftTests
     {
         PicCategory.Numeric => new PicInfo(category, Usage.Display, Length: 4, Digits: 4, Scale: 0, Signed: true),
         PicCategory.NumericEdited => new PicInfo(category, Usage.Display, Length: 3, Digits: 3, Scale: 0, Signed: false)
-            { EditMask = "ZZ9" },
+            { EditMask = "ZZ9", Clause = PictureClauseIdentity.Of("ZZ9", '$', "$", decimalPointIsComma: false) },
         PicCategory.National => new PicInfo(category, Usage.National, Length: 4, Digits: 0, Scale: 0, Signed: false),
         PicCategory.Boolean => new PicInfo(category, Usage.Bit, Length: 4, Digits: 0, Scale: 0, Signed: false),
         PicCategory.ObjectReference => new PicInfo(category, Usage.ObjectReference, Length: 0, Digits: 0, Scale: 0, Signed: false)
@@ -126,7 +126,7 @@ public sealed class OoConformanceCategoryDriftTests
         var starred = new DataItem
         {
             Level = 1, CobolName = "Q", CsName = "Q",
-            Pic = zz9.Pic! with { EditMask = "**9" },
+            Pic = zz9.Pic! with { EditMask = "**9", Clause = PictureClauseIdentity.Of("**9", '$', "$", decimalPointIsComma: false) },
         };
         Assert.NotNull(OoConformance.DescriptionMismatch(zz9, starred));
     }

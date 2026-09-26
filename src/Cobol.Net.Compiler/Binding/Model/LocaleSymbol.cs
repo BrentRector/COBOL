@@ -24,8 +24,19 @@ public sealed record LocaleSymbol(string Name, string External, bool FromLiteral
     /// <c>INVARIANT</c> → "") — what the generated code carries and the runtime resolves at use.</summary>
     public string Tag { get; } = LocaleIdentification.Normalize(External);
 
-    /// <summary>Do two symbols identify the same locale (§8.5.3.1 rule 2 — "the same external identification")?</summary>
-    public bool SameLocaleAs(LocaleSymbol other) => LocaleIdentification.SameLocale(External, other.External);
+    /// <summary>Do two symbols carry "the same external identification, where the external identification is the
+    /// external-locale-name or literal value associated with a locale-name in the LOCALE clause" (ISO §8.5.3.1
+    /// "Additionally", §9.3.8.2.3 rule 3 "Additionally", §14.8.2.3.2 "Additionally" a), §14.8.3.3 "Additionally" 1))? The
+    /// identification AS WRITTEN — not the locale it resolves to (kb/Work PB1166): <c>"en-US"</c> and
+    /// <c>"en_US.UTF-8"</c> select the same locale at run time (DETERMINATION L1,
+    /// <see cref="LocaleIdentification.Normalize"/>) but are two literal values, so two PICTURE clauses naming them
+    /// are not the same clause. A literal value compares character for character; an external-locale-name is a
+    /// COBOL word, and COBOL basic letters outside a literal are case-insensitive (§8.1.3.2 GR3 a)), so any pair
+    /// involving one compares without regard to case. The locale-NAME never enters: two locale-names bound to the
+    /// same identification match.</summary>
+    public bool SameExternalIdentificationAs(LocaleSymbol other) =>
+        string.Equals(External, other.External,
+            FromLiteral && other.FromLiteral ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
 
     public override string ToString() => $"LOCALE {Name} IS {(FromLiteral ? $"\"{External}\"" : External)} → {(Tag.Length == 0 ? "root" : Tag)}";
 }
@@ -76,6 +87,12 @@ public readonly record struct LocaleRef(LocaleSymbol? Named)
     /// <summary>The normalized tag of a named reference, or null for the current form.</summary>
     public string? Tag => Named?.Tag;
 
+    /// <summary>The LOCALE-phrase half of the "same PICTURE clause" rules: "both specify the LOCALE phrase without
+    /// a locale-name or both specify the LOCALE phrase with the same external identification" (ISO §8.5.3.1,
+    /// §9.3.8.2.3 rule 3, §14.8.2.3.2, §14.8.3.3 — each clause's "Additionally" sentence) — <see cref="LocaleSymbol.SameExternalIdentificationAs"/>.</summary>
+    public bool SameIdentificationAs(LocaleRef other) =>
+        IsCurrent ? other.IsCurrent : !other.IsCurrent && Named!.SameExternalIdentificationAs(other.Named!);
+
     public override string ToString() => Named is null ? "LOCALE (current)" : $"LOCALE {Named.Name} ({Named.Tag})";
 }
 
@@ -84,6 +101,18 @@ public readonly record struct LocaleRef(LocaleSymbol? Named)
 /// phrase's integer-1 (§13.18.40.4 GR17 — the item's ONLY size input), and the canonical expanded
 /// character-string-1 (uppercased, repeats unrolled, the currency symbol canonicalized to <c>$</c> — the shape
 /// <c>CobolLocaleEdit</c> parses: symbols <c>+ $ Z 9 .</c> only). Type equivalence for two such items is the SAME
-/// SIZE phrase plus the same locale identity — both current, or the same normalized external identification
-/// (§8.5.3.1 r2 / §14.8.2.3.2 r2; <see cref="LocaleSymbol.SameLocaleAs"/>).</summary>
-public sealed record LocaleEditSpec(LocaleRef Locale, int Size, string Picture);
+/// SIZE phrase, the same character-string and the same locale identity — both current, or the same external
+/// identification AS WRITTEN (§8.5.3.1 "Additionally"; <see cref="LocaleRef.SameIdentificationAs"/>). The record's
+/// equality IS that rule (it is what the §8.5.3.1 profile compare reads through <see cref="PicInfo"/>'s own
+/// equality), so it is written out: the synthesized member-wise equality would compare the locale-NAME too and
+/// refuse two locale-names bound to one identification.</summary>
+public sealed record LocaleEditSpec(LocaleRef Locale, int Size, string Picture)
+{
+    /// <inheritdoc/>
+    public bool Equals(LocaleEditSpec? other) =>
+        other is not null && Size == other.Size && string.Equals(Picture, other.Picture, StringComparison.Ordinal)
+        && Locale.SameIdentificationAs(other.Locale);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(Size, Picture, Locale.IsCurrent);
+}

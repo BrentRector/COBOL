@@ -622,6 +622,22 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   adapted whatever arrived; EXTRACTION, not a second copy, is what closed it. The DYNAMIC Format-1 lane still
   checks only the COUNT at runtime — no per-formal description facts are registered with the program table
   (kb/Work PB165, weighed against P13's prototype registry).
+- **"The same PICTURE clause" is ONE identity (kb/Work PB1166).** Every identical-description rule — §8.5.3.1,
+  §9.3.6 3), §9.3.8.2.3 rules 3/6, §14.8.2.3.2 rule 2, §14.8.3.3 — carries the same two exceptions (currency
+  symbols match iff their currency STRINGS do; period/comma symbols match iff DECIMAL-POINT IS COMMA is in effect
+  for both source elements or neither), and both are facts of the DECLARING source element, not of the
+  character-string. `PictureAnalyzer.Analyze` attaches `PicInfo.Clause` (`PictureClauseIdentity`) to every analyzed
+  profile; `DescriptionMismatch` compares it for every category (so `PIC A(5)` is not `PIC X(5)`), the §8.5.3.1
+  profile compare gets it through `PicInfo` record equality, and the non-PICTURE clauses ALIGNED / DYNAMIC LENGTH
+  are the one `DescriptionClauses` predicate both read. The LOCALE phrase compares the external identification AS
+  WRITTEN (`LocaleSymbol.SameExternalIdentificationAs` — literal values ordinal, a word case-insensitively), never
+  the L1-normalized tag that selects the locale at run time.
+- **A bit / national group is an ELEMENTARY item at the boundary** (§14.8.2.1 / §14.8.3.1 NOTE): it matches an
+  elementary bit / usage-national item of the same position count (§14.8.2.3.2 "Additionally" b)/c), §14.8.3.3
+  2)/3)) and never an alphanumeric group, and it CROSSES in the elementary alphabet — `CallEmitter.CallStringRead` /
+  `CallStringWrite`'s as-if arm (AsBits/FromBits, AsNat/FromNat over the full allocation), which the program ABI,
+  the method ABI (`OoEmitter.MethodBoundaryValue` and the formal copy-in) and every INVOKE copy route through;
+  `CallEmitter.BoundaryImageWidth` is its text width and it carries no §8.5.1.12 layout.
 - RETURNING a group item: an **image-form** group — every leaf `DataItem.ElementImageCapable`, i.e. character-stored OR any pinned numeric byte form (zoned DISPLAY, binary, packed, COMP-5, IEEE float, INDEX) — is carried; the caller temp deep-clones the description and the image crosses via AsImage/FromImage (§8.4.3.2.4 GR1; §14.2.2 SR5 places no category restriction, and none on usage either). Only the strong-typed / internal-REDEFINES / variable-length shapes and a **pointer- or object-class LEAF** stage loud (the per-shape COBOLNET1510 residues in `UdfBinder.UdfReturningResidue`). A byte-form numeric leaf was listed here as a residue until PB164's F8 widened the screen off its hand-rolled DISPLAY-only usage union onto the derived predicate (kb/Work PB199).
 - **RETURNING delivery is TOTAL (§14.9.4.4 GR4; kb/Work PB165).** With no caller target the value is discarded —
   GR4 has no receiver. With one, `CobolArgAdapt.StoreReturn` **stores or raises**, never no-ops: legs exist for
