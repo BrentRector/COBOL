@@ -493,7 +493,18 @@
   "l1c34_typedef_format_spellings",
   "l1c34_strong_type_currency_string_match",
   "w59h_non_cobol_names_not_found",
-  "w59h_listing_stage_inert"
+  "w59h_listing_stage_inert",
+  "l1_dns_a1_99_ec_imp_level2_valid",
+  "gl2m2_evaldir_directives_in_text",
+  "gl2m2_exception_object_identity",
+  "l1_item_ident_oo_before_refmod",
+  "l1_initiate_resume_next_implicit",
+  "l1p5_interface_inherits_multiple",
+  "l1_lock_mode_omitted_sets_no_lock",
+  "l1_invoke_dotnet_member_universal",
+  "l1m7_program_address_prototype_restricted",
+  "l1m7_implicit_qualifier_same_as",
+  "l1m7_implicit_qualifier_odo"
   ],
   "pending": []
 }

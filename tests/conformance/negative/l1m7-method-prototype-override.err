@@ -1,0 +1,1 @@
+COBOLNET0840: interface 'L1M7OVI', method 'PING': OVERRIDE/FINAL may not appear in a method PROTOTYPE
