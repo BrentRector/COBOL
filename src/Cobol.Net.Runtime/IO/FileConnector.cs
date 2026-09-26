@@ -782,6 +782,18 @@ public abstract class FileConnector
     /// record data passes through here.</summary>
     protected string ToMedium(string nativeImage) => CodeSet is null ? nativeImage : CodeSet.ToMedium(nativeImage);
 
+    /// <summary>⛔ THE ONE ANSWER TO "can this record be written in the file's coded character set?" for every
+    /// organization's WRITE and REWRITE (owner decision kb/Work R47; Annex A.1 item 31; kb/Work PB690): true when
+    /// the record holds a character with no byte image — <see cref="FileCharacterSet.HasCharacterWithoutByteImage"/>
+    /// — on a file whose medium form is the file coded character set itself, i.e. one with no
+    /// <see cref="CodeSet"/> conversion (a converting CODE-SET decides representability by its own
+    /// correspondence, §13.18.13). The statement is then unsuccessful before anything reaches the medium:
+    /// '91' (<see cref="FileStatusCode.CharacterWithoutByteImage"/>) for a record sequential, report, relative or
+    /// indexed file; a line sequential file reaches '71' first, through its own character set, which excludes the
+    /// same characters (<see cref="LineSequentialCharacterSet"/>).</summary>
+    protected bool RecordHasCharacterWithoutByteImage(ReadOnlySpan<char> record) =>
+        CodeSet is null && FileCharacterSet.HasCharacterWithoutByteImage(record);
+
     /// <summary>Pad (right) or truncate <paramref name="s"/> to exactly <paramref name="width"/> characters —
     /// the ALPHANUMERIC fill (§14.9.30.4 GR15: "a trailing space is defined to be the alphanumeric space
     /// character"). One char is one byte on this channel.</summary>

@@ -90,10 +90,45 @@ internal sealed class RelativeStore
     /// §14.9.51.4 GR29 a)'s "the highest relative record number existing in the physical file".</summary>
     public long Highest { get; private set; }
 
+    /// <summary>The bytes the records occupy in the persisted store (<see cref="RecordFraming.FrameBytes"/>
+    /// summed) — maintained by the three mutators, like <see cref="Highest"/>, so the WRITE-time boundary test
+    /// is O(1).</summary>
+    private long _recordBytes;
+
+    /// <summary>The bytes the frames of the persisted store would occupy after <see cref="Put"/>(<paramref
+    /// name="rrn"/>, <paramref name="record"/>): every record's frame plus a <see cref="RecordFraming.GapBytes"/>
+    /// tag for every empty slot below the highest RRN — the same image <see cref="RecordFraming.WriteStore"/>
+    /// composes, so the keyed WRITE and REWRITE can answer §14.9.51.4 GR33 b)'s '24' BEFORE the record is
+    /// released (Annex A.1 item 107; kb/Work PB1192).</summary>
+    public long FramedBytesAfterPut(long rrn, StoredFrame record)
+    {
+        bool replaces = _slots.TryGetValue(rrn, out StoredFrame replaced);
+        long records = _recordBytes + RecordFraming.FrameBytes(record) - (replaces ? RecordFraming.FrameBytes(replaced) : 0);
+        long count = _slots.Count + (replaces ? 0 : 1);
+        return records + (RecordFraming.GapBytes * (Math.Max(Highest, rrn) - count));
+    }
+
+    /// <summary>The store's frames in ordinal order — null for an empty slot — produced LAZILY from the sparse
+    /// map, so a persist never materializes one entry per relative record number (a dense array sized by
+    /// <see cref="Highest"/> overflowed at a large key and allocated millions of slots for one record —
+    /// kb/Work PB1192).</summary>
+    public IEnumerable<StoredFrame?> Ordinal()
+    {
+        long next = 1;
+        foreach (var (rrn, record) in _slots)
+        {
+            for (; next < rrn; next++) yield return null;
+            yield return record;
+            next = rrn + 1;
+        }
+    }
+
     /// <summary>Release or replace the record at <paramref name="rrn"/>.</summary>
     public void Put(long rrn, StoredFrame record)
     {
+        if (_slots.TryGetValue(rrn, out StoredFrame replaced)) _recordBytes -= RecordFraming.FrameBytes(replaced);
         _slots[rrn] = record;
+        _recordBytes += RecordFraming.FrameBytes(record);
         if (rrn > Highest) Highest = rrn;
     }
 
@@ -102,7 +137,9 @@ internal sealed class RelativeStore
     /// scan this store ever pays.</summary>
     public bool Remove(long rrn)
     {
-        if (!_slots.Remove(rrn)) return false;
+        if (!_slots.TryGetValue(rrn, out StoredFrame removed)) return false;
+        _slots.Remove(rrn);
+        _recordBytes -= RecordFraming.FrameBytes(removed);
         if (rrn == Highest) Highest = _slots.Count == 0 ? 0 : _slots.Keys.Max();
         return true;
     }
@@ -111,6 +148,7 @@ internal sealed class RelativeStore
     public void Clear()
     {
         _slots.Clear();
+        _recordBytes = 0;
         Highest = 0;
     }
 }
@@ -141,6 +179,53 @@ internal sealed class KeyedRec
 /// order holds across connectors.</summary>
 internal sealed class IndexedStore
 {
-    public readonly List<KeyedRec> Recs = [];
+    private readonly List<KeyedRec> _recs = [];
+
+    /// <summary>The records, in load order — the persisted order. READ-ONLY to the connector, exactly as
+    /// <see cref="RelativeStore.Slots"/> is: every mutation goes through <see cref="Add"/>, <see cref="Replace"/>,
+    /// <see cref="Remove"/> or <see cref="Clear"/>, which keep <see cref="RecordBytes"/> true (kb/Work PB1192).</summary>
+    public IReadOnlyList<KeyedRec> Recs => _recs;
+
     public long NextOrdinal = 1;
+
+    /// <summary>The bytes the records' frames occupy in the persisted store (<see cref="RecordFraming.FrameBytes"/>
+    /// summed) — maintained by the mutators, so §14.9.51.4 GR42 d)'s boundary test at the WRITE is O(1)
+    /// (Annex A.1 item 107).</summary>
+    public long RecordBytes { get; private set; }
+
+    /// <summary>The frame bytes of one stored record — <see cref="RecordFraming.FrameBytes"/> of its image and
+    /// extent table.</summary>
+    public static long FrameBytes(string image, RecordExtents? extents) =>
+        RecordFraming.FrameBytes(new StoredFrame(image, extents));
+
+    /// <summary>Release a record into the store (a WRITE, or the OPEN's load).</summary>
+    public void Add(KeyedRec rec)
+    {
+        _recs.Add(rec);
+        RecordBytes += FrameBytes(rec.Image, rec.Extents);
+    }
+
+    /// <summary>Replace a stored record's content in place (§14.9.35 REWRITE) — its image and extent table
+    /// together, never apart (D-FRA (v)).</summary>
+    public void Replace(KeyedRec rec, string image, RecordExtents? extents)
+    {
+        RecordBytes += FrameBytes(image, extents) - FrameBytes(rec.Image, rec.Extents);
+        rec.Image = image;
+        rec.Extents = extents;
+    }
+
+    /// <summary>Remove a record (§14.9.10 DELETE); false when it was not in the store.</summary>
+    public bool Remove(KeyedRec rec)
+    {
+        if (!_recs.Remove(rec)) return false;
+        RecordBytes -= FrameBytes(rec.Image, rec.Extents);
+        return true;
+    }
+
+    /// <summary>Empty the store (OPEN OUTPUT, the absent-OPTIONAL creation, and the OPEN's reload).</summary>
+    public void Clear()
+    {
+        _recs.Clear();
+        RecordBytes = 0;
+    }
 }

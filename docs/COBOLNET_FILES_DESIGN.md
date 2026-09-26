@@ -1806,6 +1806,51 @@ was the second copy of the qualification rule, and it could not see the file-nam
 resolution failure for an already-refused shape* — a second verdict for one fault, and the shape refusal is the
 cause.
 
+### D28. The MEDIUM'S BOUNDARIES are answered ONCE each, at the WRITE or REWRITE, before anything reaches the medium — the file coded character set, the store's capacity, the host medium, and the organization the file records (kb/Work PB1192, PB690, PB1098).
+
+**Decision.** Four questions decide whether a record may reach a physical file, and each has ONE executable
+answer that every organization's WRITE and REWRITE asks, in the connector, before the record is released:
+
+1. **Can the record be written in the file coded character set?** `FileCharacterSet` (Annex A.1 item 31, owner
+   decision kb/Work R47): ISO/IEC 8859-1, one byte per character position. `FileConnector.RecordHasCharacterWithoutByteImage`
+   refuses a record holding a character above U+00FF on a file with no converting CODE-SET — '91'
+   (§9.1.13.11; DOC-A.1-110) on every organization and on the report writer's line, '71' on a line sequential
+   file, whose character set (`LineSequentialCharacterSet`, item 115) excludes the same characters. Every record
+   write encodes through `FileCharacterSet.Medium`, a STRICT Latin-1 encoding, so a path that skipped the refusal
+   fails loudly — there is no replacement fallback and no print-specific character map anywhere.
+2. **Does the store hold it?** A relative or indexed file is held in memory while open and written whole at
+   CLOSE, so its externally-defined boundary (§9.1.13.5 item 4; Annex A.1 item 107) is the store image's
+   capacity, `RecordFraming.MaxStoreBytes`. `RecordFraming.FrameBytes` is the ONE size formula — the stores keep a
+   running total through their only mutators (`RelativeStore.FramedBytesAfterPut`, `IndexedStore.RecordBytes`)
+   and `WriteStore` sizes its composition with it — so `KeyedConnector.StoreHolds` answers §14.9.51.4 GR33 b) /
+   GR42 d)'s '24' in O(1), at the WRITE. A relative store is persisted from its sparse slots LAZILY
+   (`RelativeStore.Ordinal`), never through an array sized by the highest RRN. GR29 b)'s highest permitted RRN
+   is `RelativeConnector.HighestRelativeRecordNumber`; above it is '34'.
+3. **Does the host medium take it?** A sequential file's boundary is the host medium's capacity (§9.1.13.6
+   item 3; Annex A.1 item 108). `HostFile.IsMediumBoundary` is the one classification of the host's refusal and
+   `FileStatusCode.ForWriteFailure` maps it ('34', else '30'); `SequentialConnector.Write`, `WriteAdvancing` and
+   `Rewrite` are the only three entry points a record reaches the medium through, and each wraps its body in
+   that one catch. A keyed store meets the host only at the CLOSE, whose failure is '30'.
+4. **Does the file's recorded organization allow this connector to write?** A keyed store's header records its
+   organization (D10's no-sidecar format), and §12.4.5.10.3 GR1 makes it permanent, so a SEQUENTIAL connector's
+   OPEN I-O or EXTEND over one is the '39' conflict (`SequentialConnector.FixedAttributeConflict`; DOC-A.1-129).
+
+**Rationale.** Each of these used to be answered late, twice, or not at all: Latin-1's replacement fallback
+wrote '?' for an unrepresentable character with '00', and a private print map wrote '?' for everything above
+U+007F; a relative WRITE past the store's capacity was '00' and the CLOSE then crashed (a dense frame array
+sized by the key) or failed; a host `IOException` on a sequential WRITE escaped the statement; a sequential I-O
+connector overwrote a keyed store's header. Answering each question once, at the connector, before the release
+is what makes the refusal an I-O status the program can observe and what keeps the medium unchanged (§14.9.51.4
+GR15).
+
+**Rejected alternatives.** *An exception fallback in the writer as THE mechanism* (R47's first sketch): the
+sequential writer buffers, so the exception would surface on a LATER write — the wrong statement — after the
+refused record was already in the buffer; the fallback is kept only as the guard behind the pre-check.
+*Reserving host space at each keyed WRITE* (`SetLength` growth): it is not a reservation on a sparse Unix file
+and it leaves zero-padding a crashed run unit would read back as records. *Flushing every sequential record* to
+detect a full medium on its own WRITE: a syscall per record for every program, where the buffer-filling WRITE
+already reports the boundary.
+
 ## C# mapping
 
 > Backend neutrality (G4; SSOT §18 #23): everything semantic in this section — FILE STATUS capture, the AT END /

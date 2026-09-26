@@ -1049,7 +1049,12 @@ public sealed class CobolReport(
         int advance = (int)(target - (_physLine == 0 ? 1 : _physLine));
         if (advance < 1 && _physLine != 0) advance = 1;   // EC-REPORT-LINE-OVERLAP seam (§13.18.35.4 GR3)
         CobolFile.WriteAdvancing(_fileName, image, advance, before: false, page: null);   // no LINAGE on a report FD (§13.4.5.2 Format 3)
-        _physLine = (int)target;
+        // _physLine is where the DEVICE stands, so it moves only when the write did. A refused write — a line
+        // holding a character with no byte image in the file coded character set ('91', Annex A.1 item 159; owner
+        // decision kb/Work R47), or a medium the host reports full ('34') — "does not take place" (§14.9.51.4
+        // GR15), advance included; leaving _physLine behind makes the NEXT line's travel cover the refused line's
+        // slot, so every later line of the page still lands on its own LINE-COUNTER line (kb/Work PB690).
+        if (CobolFile.Status(_fileName) is [ '0', _ ]) _physLine = (int)target;
     }
 
     /// <summary>Reset the SUM counters whose reset point is the END of <paramref name="group"/>'s processing

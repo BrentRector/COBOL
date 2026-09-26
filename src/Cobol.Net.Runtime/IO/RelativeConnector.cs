@@ -352,10 +352,23 @@ public sealed class RelativeConnector : KeyedConnector
 
     // ── WRITE / REWRITE / DELETE (ISO §14.9.51 / §14.9.35 / §14.9.10) ───────────────────────────────────────
 
+    /// <summary>⛔ THE HIGHEST RELATIVE RECORD NUMBER PERMITTED FOR A RELATIVE FILE — ISO §14.9.51.4 GR29 b)'s
+    /// <i>"If the relative key data item contains a value that is less than 1 or greater than the highest relative
+    /// record number permitted for the file, the execution of the WRITE statement is unsuccessful, and the I O
+    /// status for the write file connector is set to '34'"</i>. The implementor's number (Annex A.1 item 107,
+    /// docs/CONFORMANCE.md <c>DOC-A.1-107</c>): 2 147 483 647. A key between the store's capacity and this
+    /// number is a well-formed relative record number that does not fit — the '24' boundary of GR33 b)
+    /// (<see cref="KeyedConnector.StoreHolds"/>), which also takes the INVALID KEY phrase; a key above it is not
+    /// a relative record number this implementation permits at all.</summary>
+    public const long HighestRelativeRecordNumber = int.MaxValue;
+
     /// <summary>WRITE (§14.9.51.4 GR29): sequential access releases consecutive RRNs (OUTPUT from 1, EXTEND from
     /// highest+1); RRN digit overflow of the key item → invalid key '24' (GR29a/GR33c). Random/dynamic writes the
-    /// slot staged in the key item: occupied → '22' (GR33a), key &lt; 1 → permanent error '34' (GR29b). Open-mode
-    /// legality per §9.1.13.7 item 8 ('48').</summary>
+    /// slot staged in the key item: occupied → '22' (GR33a), key &lt; 1 or above
+    /// <see cref="HighestRelativeRecordNumber"/> → permanent error '34' (GR29b). A record the store cannot hold →
+    /// invalid key '24' (GR33 b), <see cref="KeyedConnector.StoreHolds"/>); a record holding a character with no
+    /// byte image → '91' (<see cref="FileConnector.RecordHasCharacterWithoutByteImage"/>). Open-mode legality per
+    /// §9.1.13.7 item 8 ('48').</summary>
     /// <param name="extents">The record's EXTENT TABLE when a variable-length group record is written
     /// (determination D-FRA (v); kb/Work PB1053), stored and persisted with it.</param>
     public string Write(string image, int length = -1, RecordExtents? extents = null)
@@ -376,7 +389,12 @@ public sealed class RelativeConnector : KeyedConnector
                 return Status = FileStatusCode.BoundaryViolation;          // '24' §14.9.51 GR29a
             if (Stored(image, length) is not { } seqRec)
                 return Status = FileStatusCode.RecordSizeViolation;        // '44' §13.18.43 GR14a
-            _st.Put(slot, Framed(seqRec, image, extents));
+            if (RecordHasCharacterWithoutByteImage(seqRec))
+                return Status = FileStatusCode.CharacterWithoutByteImage;  // '91' A.1 item 31 (R47)
+            var seqFrame = Framed(seqRec, image, extents);
+            if (!StoreHolds(_st.FramedBytesAfterPut(slot, seqFrame)))
+                return Status = FileStatusCode.BoundaryViolation;          // '24' §14.9.51.4 GR33 b)
+            _st.Put(slot, seqFrame);
             _lastReleasedSlot = slot;
             _lastSlot = slot;                                              // GR29a — MOVEd back into the key item
             return Status = FileStatusCode.Success;
@@ -386,11 +404,17 @@ public sealed class RelativeConnector : KeyedConnector
         if (!IsOpen || Mode is not (FileOpenMode.IO or FileOpenMode.Output))
             return Status = FileStatusCode.WriteNotOpenForOutput;          // '48' §9.1.13.7 8b
         long key = _pendingKey;
-        if (key < 1) return Status = FileStatusCode.PermanentBoundary;     // '34' §14.9.51 GR29b
+        if (key is < 1 or > HighestRelativeRecordNumber)
+            return Status = FileStatusCode.PermanentBoundary;              // '34' §14.9.51.4 GR29 b)
         if (_slots.ContainsKey(key)) return Status = FileStatusCode.DuplicateKey;   // '22' §14.9.51 GR33a
         if (Stored(image, length) is not { } rec)
             return Status = FileStatusCode.RecordSizeViolation;            // '44' §13.18.43 GR14a
-        _st.Put(key, Framed(rec, image, extents));
+        if (RecordHasCharacterWithoutByteImage(rec))
+            return Status = FileStatusCode.CharacterWithoutByteImage;      // '91' A.1 item 31 (R47)
+        var frame = Framed(rec, image, extents);
+        if (!StoreHolds(_st.FramedBytesAfterPut(key, frame)))
+            return Status = FileStatusCode.BoundaryViolation;              // '24' §14.9.51.4 GR33 b)
+        _st.Put(key, frame);
         _lastSlot = key;
         return Status = FileStatusCode.Success;
     }
@@ -416,7 +440,10 @@ public sealed class RelativeConnector : KeyedConnector
 
     /// <summary>REWRITE (§14.9.35): open mode must be I-O ('49', §9.1.13.7 item 9). Sequential access replaces
     /// the prior READ's record (no prior successful READ → '43', GR5); random/dynamic replaces the slot named by
-    /// the key item (absent → '23', GR21). The FPI is unaffected (GR13).</summary>
+    /// the key item (absent → '23', GR21). The FPI is unaffected (GR13). A replacing record the store cannot hold
+    /// (a longer varying record, §14.9.35.4 GR18) is §9.1.13.5 item 4's "attempt … to write outside the
+    /// externally-defined boundaries" — '24', the WRITE's own boundary (<see cref="Replace"/>); one holding a
+    /// character with no byte image is '91'.</summary>
     /// <param name="extents">The replacing record's EXTENT TABLE (D-FRA (v); kb/Work PB1053) — a relative record is
     /// replaced whole (GR18), so its table is replaced with it.</param>
     public string Rewrite(string image, int length = -1, RecordExtents? extents = null)
@@ -429,14 +456,23 @@ public sealed class RelativeConnector : KeyedConnector
             if (!wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;   // '43'
             if (Stored(image, length) is not { } seqRec)
                 return Status = FileStatusCode.RecordSizeViolation;                             // '44' GR20
-            _st.Put(_lastSlot, Framed(seqRec, image, extents));
-            return Status = FileStatusCode.Success;
+            return Status = Replace(_lastSlot, seqRec, image, extents);
         }
         if (!_slots.ContainsKey(_pendingKey)) return Status = FileStatusCode.RecordNotFound;    // '23' GR21
         if (Stored(image, length) is not { } rec)
             return Status = FileStatusCode.RecordSizeViolation;                                 // '44' GR20
-        _st.Put(_pendingKey, Framed(rec, image, extents));
-        return Status = FileStatusCode.Success;
+        return Status = Replace(_pendingKey, rec, image, extents);
+    }
+
+    /// <summary>The REWRITE's one replacement, after its own target and size rules: the record-content ('91') and
+    /// boundary ('24') tests every write of a record into this store answers, then the replacement.</summary>
+    private string Replace(long slot, string stored, string image, RecordExtents? extents)
+    {
+        if (RecordHasCharacterWithoutByteImage(stored)) return FileStatusCode.CharacterWithoutByteImage;   // '91'
+        var frame = Framed(stored, image, extents);
+        if (!StoreHolds(_st.FramedBytesAfterPut(slot, frame))) return FileStatusCode.BoundaryViolation;   // '24'
+        _st.Put(slot, frame);
+        return FileStatusCode.Success;
     }
 
     /// <summary>DELETE RECORD (§14.9.10): open mode must be I-O ('49', GR1). Sequential access removes the prior
@@ -530,10 +566,8 @@ public sealed class RelativeConnector : KeyedConnector
     private void Persist()
     {
         if (Store is not { } fs) return;   // an absent OPTIONAL file holds no physical store to rewrite
-        long max = _st.Highest;
-        var frames = new StoredFrame?[max];
-        foreach (var (slot, rec) in _slots) frames[slot - 1] = rec;
-        RecordFraming.WriteStore(fs, DeclaredAttributes, frames, CodeSet);
+        // The slots LAZILY, gaps included — never a dense array sized by the highest RRN (kb/Work PB1192).
+        RecordFraming.WriteStore(fs, DeclaredAttributes, _st.Ordinal(), CodeSet);
     }
 
 }

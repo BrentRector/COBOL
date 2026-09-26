@@ -276,7 +276,11 @@
   "gl2m2_copy_resultant_spacing_85",
   "l1_initiate_multi_each_report_85",
   "l1m8_rewrite_format_85",
-  "l1m8_counters_dummy_suppressed"
+  "l1m8_counters_dummy_suppressed",
+  "pb1192_relative_write_boundary_85",
+  "pb690_file_character_set_85",
+  "pb690_report_line_byte_image_85",
+  "pb1098_organization_permanence_85"
  ],
  "pending": []
 }

@@ -119,6 +119,39 @@ internal static class RecordFraming
     /// key count. Per-key descriptors follow it.</summary>
     private const int FixedHeaderBytes = 20;
 
+    // ── The store's capacity — the externally-defined boundary of a relative or indexed file ───────────────
+
+    /// <summary>⛔ THE LARGEST STORE IMAGE THIS FORMAT CAN HOLD, in bytes — the externally-defined boundary of a
+    /// physical relative or indexed file (ISO §9.1.13.5 item 4, <i>"The implementor specifies the manner in which
+    /// these boundaries are defined"</i>; Annex A.1 item 107, docs/CONFORMANCE.md <c>DOC-A.1-107</c>;
+    /// kb/Work PB1192). It is <see cref="Array.MaxLength"/> because the whole image is composed in one array by
+    /// <see cref="WriteStore"/> and taken back in one by <see cref="ReadStore"/>: a store one byte larger could be
+    /// neither persisted nor loaded. The keyed connectors test it AT THE WRITE (§14.9.51.4 GR33 b) / GR42 d)'s
+    /// '24'), so a record the store cannot hold is refused before it is released instead of being reported '00'
+    /// and failing at the CLOSE.</summary>
+    public const long MaxStoreBytes = 0x7FFFFFC7;   // Array.MaxLength (a runtime property; its value is fixed)
+
+    /// <summary>The bytes an EMPTY relative slot occupies — its <see cref="GapTag"/> alone. Every slot below the
+    /// highest relative record number that holds no record costs this much, which is why the relative record
+    /// number is bounded by the store's capacity long before it is bounded by its own range.</summary>
+    public const int GapBytes = 4;
+
+    /// <summary>The bytes one record occupies in the store: its 4-byte length word, its extent table (if any)
+    /// and one byte per character — the file coded character set is one byte per character position
+    /// (<see cref="FileCharacterSet"/>), and a CODE-SET conversion is a per-character map, so the payload length
+    /// is the image's. The ONE size formula, shared by the WRITE-time boundary test and <see cref="WriteStore"/>'s
+    /// composition, so the two cannot disagree about what fits.</summary>
+    public static long FrameBytes(StoredFrame frame) => 4L + ExtentTableBytes(frame.Extents) + frame.Image.Length;
+
+    /// <summary>The bytes the store header for <paramref name="attributes"/> occupies — measured by encoding it
+    /// with the ONE header writer, so the size cannot drift from the layout.</summary>
+    public static long HeaderBytes(FixedFileAttributes attributes)
+    {
+        var header = new MemoryStream(FixedHeaderBytes + (64 * attributes.Keys.Count));
+        WriteHeader(header, attributes);
+        return header.Length;
+    }
+
     // ── Store-level (byte) shape — the keyed connectors' whole-store persist/load ───────────────────────────
 
     /// <summary>Write the whole store: the §9.1.6 header, then one frame per ordinal position; null = an empty
@@ -142,20 +175,28 @@ internal static class RecordFraming
     /// <param name="fs">The connector's own open handle on the physical file, positioned anywhere.</param>
     /// <param name="attributes">The writing connector's §9.1.6 fixed file attributes — the header's content.</param>
     /// <param name="frames">One entry per ordinal position; null = an empty (gap) slot. The frames are the
-    /// records in the NATIVE character set.</param>
+    /// records in the NATIVE character set. Enumerated TWICE — once to size the image, once to compose it — so
+    /// a relative store passes its slots lazily instead of materializing one entry per relative record number
+    /// (a dense array sized by the highest RRN overflowed at a large key and allocated millions of slots for
+    /// one record — kb/Work PB1192).</param>
     /// <param name="codeSet">The file's §13.18.13 CODE-SET conversion, or null for the native character set
     /// (GR7). ⛔ It converts the PAYLOAD and not the frame: the 4-byte length prefix, the gap tag and this
     /// header are the §9.1.7.2 framing this processor adds, not data of the record (see
     /// <see cref="CodeSetConversion"/>).</param>
-    public static void WriteStore(Stream fs, FixedFileAttributes attributes, IReadOnlyList<StoredFrame?> frames,
+    public static void WriteStore(Stream fs, FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames,
         CodeSetConversion? codeSet = null)
     {
-        // Pre-sized so the compose never doubles: the header is bounded by its key table and every frame is
-        // its 4-byte prefix plus one byte per character (Latin-1, and a CODE-SET conversion is a per-character
-        // map, so it does not change the length).
-        int estimate = 256 + (128 * attributes.Keys.Count);
-        foreach (StoredFrame? f in frames) estimate += 4 + ExtentTableBytes(f?.Extents) + (f?.Image.Length ?? 0);
-        var composed = new MemoryStream(estimate);
+        // Sized EXACTLY, by the one size formula the WRITE-time boundary test uses, so the compose never doubles.
+        long size = HeaderBytes(attributes);
+        foreach (StoredFrame? f in frames) size += f is { } frame ? FrameBytes(frame) : GapBytes;
+        // ⛔ The keyed WRITE and REWRITE refuse a record the store cannot hold ('24', DOC-A.1-107), so a store
+        // past the boundary here is a defect upstream of this call; it must not become a truncated file. Raised
+        // BEFORE the stream is touched, as an IOException, so the CLOSE reports §9.1.13.6 item 1's '30' and the
+        // physical file keeps its previous image.
+        if (size > MaxStoreBytes)
+            throw new IOException($"the record store ({size} bytes) exceeds the {MaxStoreBytes}-byte capacity of a "
+                + "relative or indexed file");
+        var composed = new MemoryStream((int)size);
         WriteHeader(composed, attributes);
         Span<byte> len = stackalloc byte[4];
         foreach (StoredFrame? stored in frames)
@@ -166,7 +207,10 @@ internal static class RecordFraming
                 composed.Write(len);
                 continue;
             }
-            byte[] payload = Encoding.Latin1.GetBytes(codeSet is null ? frame.Image : codeSet.ToMedium(frame.Image));
+            // The file coded character set's STRICT encoding (kb/Work PB690): the keyed WRITE/REWRITE refused any
+            // record holding a character with no byte image ('91'), so an exception here is a missed refusal —
+            // loud, raised before the stream is truncated — never a silent '?'.
+            byte[] payload = FileCharacterSet.Medium.GetBytes(codeSet is null ? frame.Image : codeSet.ToMedium(frame.Image));
             BinaryPrimitives.WriteUInt32LittleEndian(len, FrameWord(payload.Length, frame.Extents));
             composed.Write(len);
             if (frame.Extents is { } extents) composed.Write(EncodeExtentTable(extents));

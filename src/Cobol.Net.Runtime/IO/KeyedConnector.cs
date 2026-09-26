@@ -206,6 +206,26 @@ public abstract class KeyedConnector : FileConnector
         base.Reposture(share);
     }
 
+    // ── The externally-defined boundary of a relative or indexed file (ISO §9.1.13.5 item 4) ───────────────
+
+    /// <summary>The bytes of this connector's store header — measured once (the declared attributes are fixed for
+    /// the connector's life), and -1 until first asked.</summary>
+    private long _storeHeaderBytes = -1;
+
+    /// <summary>⛔ THE ONE BOUNDARY TEST OF A RELATIVE OR INDEXED FILE (kb/Work PB1192): would a store whose frames
+    /// occupy <paramref name="framedBytes"/> bytes still fit the format's capacity,
+    /// <see cref="RecordFraming.MaxStoreBytes"/>? False is §14.9.51.4 GR33 b) / GR42 d)'s <i>"outside the
+    /// externally defined boundaries"</i> — I-O status '24', the invalid key condition — decided HERE, at the
+    /// WRITE or REWRITE, before anything is released: the store lives in memory while the file is open and is
+    /// written whole at CLOSE, so a record it cannot hold used to be reported '00' and then fail at the CLOSE
+    /// (or, for a relative key in the billions, kill the run unit there). Annex A.1 item 107 is the
+    /// determination (docs/CONFORMANCE.md <c>DOC-A.1-107</c>).</summary>
+    protected bool StoreHolds(long framedBytes)
+    {
+        if (_storeHeaderBytes < 0) _storeHeaderBytes = RecordFraming.HeaderBytes(DeclaredAttributes);
+        return _storeHeaderBytes + framedBytes <= RecordFraming.MaxStoreBytes;
+    }
+
     /// <summary>Whether a CLOSE that owes a persist can still reach the physical file — false only when a
     /// <see cref="Reposture"/> rebuild lost the handle to a foreign process (see there). §9.1.13.6 item 1's
     /// '30' is the answer in that case, because the records this connector holds cannot be written: reporting a

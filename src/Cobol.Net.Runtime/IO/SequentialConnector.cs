@@ -337,8 +337,11 @@ public sealed class SequentialConnector : FileConnector
     /// decides plain-versus-repositioning from the posture; this decides the newline and the encoding, once.</summary>
     private StreamWriter OpenWriter(FileMode mode, FileShare share, FileShare? fallbackShare)
     {
+        // The file coded character set's STRICT encoding (kb/Work PB690): every write arm refuses a record holding
+        // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
+        // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
         StreamWriter Open(FileShare s) => new(HostFile.OpenConnectorWriteStream(HostPath, mode, s),
-            Encoding.Latin1) { NewLine = "\r\n" };
+            FileCharacterSet.Medium) { NewLine = "\r\n" };
         try { return Open(share); }
         catch (IOException) when (fallbackShare is { } old) { return Open(old); }
     }
@@ -778,9 +781,23 @@ public sealed class SequentialConnector : FileConnector
     /// and reading it back under a different record description is exactly the idiom those three exist for. It
     /// was MEASURED: a validated record size took six conforming programs of this repository's own corpus red,
     /// one of them into an infinite READ loop. <see cref="RecordLayoutNotice"/> is the one mechanism for the
-    /// arithmetic case, and it leaves the I-O status alone.</para></remarks>
+    /// arithmetic case, and it leaves the I-O status alone.</para>
+    /// <para>⛔ AND ONE ATTRIBUTE THE PHYSICAL FILE ITSELF STATES: ITS ORGANIZATION, WHEN IT IS A KEYED STORE
+    /// (kb/Work PB1098). The questions above ask what THIS organization's format records; a relative or indexed
+    /// store records its own organization in its header (<see cref="RecordFraming.ReadHeader"/>, the §9.1.6
+    /// attributes of kb/Work PB802), and §12.4.5.10.3 GR1 says what that attribute means — <i>"The file
+    /// organization is established at the time a physical file is created and cannot subsequently be
+    /// changed."</i> An OPEN that would let this connector WRITE into such a file — <c>I-O</c> (whose REWRITE
+    /// overwrote the header, after which the file opened only with '39' under its own description) and
+    /// <c>EXTEND</c> (whose records would follow the frames as bytes no store can parse) — is therefore the file
+    /// attribute conflict, '39'. <c>INPUT</c> changes nothing and stays unvalidated (PB802's stated consequence,
+    /// GnuCOBOL's spirit), and <c>OUTPUT</c> never reaches this question: it CREATES a new physical file, which
+    /// establishes an organization afresh (§14.9.27.4 GR18). The header read is the same bounded auxiliary open
+    /// <c>KeyedConnector.FixedAttributeConflict</c> takes, paid only by the two writing modes.</para></remarks>
     protected override bool FixedAttributeConflict() =>
-        IsVarying && !_lineSequential && !RecordFraming.StreamFramingParses(HostPath);
+        (IsVarying && !_lineSequential && !RecordFraming.StreamFramingParses(HostPath))
+        || (Mode is FileOpenMode.IO or FileOpenMode.Extend
+            && RecordFraming.ReadHeader(HostPath, out _) is StoreFormat.Described);
 
     /// <summary>§14.9.6.4 GR2 a) — <i>"A file whose input or output medium is such that the concepts of rewind
     /// and units have no meaning."</i> A sequential connector holds one <see cref="FileConnector.HostPath"/> on
@@ -1006,6 +1023,22 @@ public sealed class SequentialConnector : FileConnector
     /// carried by no other shape (a line has no frame).</param>
     public string Write(string image, int length, LinagePage? page, RecordExtents? extents = null)
     {
+        try { return WriteRecord(image, length, page, extents); }
+        catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30'
+    }
+
+    /// <summary>⛔ THE WRITE-SIDE MEDIUM BOUNDARY'S ONE CATCH SHAPE (kb/Work PB1192), written at each of the three
+    /// public entry points a record reaches the medium through — <see cref="Write"/>, <see cref="WriteAdvancing"/>
+    /// and <see cref="Rewrite"/> — and nowhere below them. A host refusal to store the bytes is the file's
+    /// externally-defined boundary when the host says the medium is exhausted (§14.9.51.4 GR20 / §9.1.13.6
+    /// item 3's '34' — <see cref="HostFile.IsMediumBoundary"/>; Annex A.1 item 108, DOC-A.1-108) and §9.1.13.6
+    /// item 1's '30' otherwise; before this, the <see cref="IOException"/> escaped the statement and killed the run
+    /// unit. The writer BUFFERS (a flush per record is paid only when a sibling connector may read the file —
+    /// <see cref="ReleaseRecord"/>), so the refusal surfaces on the WRITE whose record fills the buffer: that
+    /// WRITE is the one the boundary is reported on, and a CLOSE whose final flush is refused answers '30'
+    /// through <see cref="FileConnector.Close"/>'s own catch.</summary>
+    private string WriteRecord(string image, int length, LinagePage? page, RecordExtents? extents)
+    {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
         if (!IsOpen || _writer is null) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (Mode is not (FileOpenMode.Output or FileOpenMode.Extend)) return Status = FileStatusCode.WriteNotOpenForOutput;
@@ -1024,7 +1057,7 @@ public sealed class SequentialConnector : FileConnector
         // nothing left OPEN. Where a line IS open (an AFTER write's record, presented after its advance), the one
         // implicit advance is placed FIRST, as GR25 f) places AFTER's: see ImplicitAdvanceIsBefore (kb/Work PB964).
         if ((_printControl || page is not null) && !_lineSequential)
-            return WriteAdvancing(image, 1, before: ImplicitAdvanceIsBefore, page);
+            return WriteAdvancingRecord(image, 1, before: ImplicitAdvanceIsBefore, page);
         // §14.9.51.4 GR23: "For a line sequential file, if the record area contains one or more characters that
         // are not in the implementor-defined character set defined for a line sequential file, the execution of
         // the WRITE statement is unsuccessful and the I-O status in the write file connector is set to '71'."
@@ -1032,6 +1065,13 @@ public sealed class SequentialConnector : FileConnector
         // any stream traffic because §9.1.13.10 item 1 requires the record area (and the medium) to be left
         // unchanged. This arm did not exist before kb/Work PB329 — only REWRITE's GR17 d) twin did.
         if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;
+        // Owner decision kb/Work R47 (Annex A.1 item 31): a record holding a character with no byte image in the
+        // file coded character set is REFUSED, never written as '?' — the record sequential twin of the '71'
+        // above, which already covers a line sequential file (its character set excludes the same characters).
+        // Asked of what the WRITE TRANSFERS: a varying record's positions past its length never reach the medium.
+        if (!_lineSequential && RecordHasCharacterWithoutByteImage(
+                image.AsSpan(0, Math.Min(image.Length, IsVarying ? (length >= 0 ? length : image.Length) : RecordWidth))))
+            return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
         if (IsVarying)
         {
             int len = length >= 0 ? length : image.Length;
@@ -1106,16 +1146,33 @@ public sealed class SequentialConnector : FileConnector
     /// stream; the LOGICAL-page geometry lives in <see cref="Position"/> and <see cref="Present"/>.</summary>
     public string WriteAdvancing(string image, int lines, bool before, LinagePage? page)
     {
+        try { return WriteAdvancingRecord(image, lines, before, page); }
+        catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30' — see Write
+    }
+
+    /// <summary>The body of <see cref="WriteAdvancing"/>, inside its medium-boundary catch — and the one
+    /// <see cref="WriteRecord"/> reroutes a print or LINAGE file's plain WRITE to, so the reroute stays inside the
+    /// catch that WRITE already opened.</summary>
+    private string WriteAdvancingRecord(string image, int lines, bool before, LinagePage? page)
+    {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
         if (!IsOpen || _writer is null) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (Mode is not (FileOpenMode.Output or FileOpenMode.Extend)) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (_linagePageBroken) return LinageViolationStatus();   // §13.18.34.4 GR6 b) 2's latch — see Write()
         // §14.9.51.4 GR23 again — the SECOND WRITE ARM. GR23 is a property of the FILE, so it binds every entry
         // point a WRITE statement can reach on a line sequential connector, not just the plain-record one; it is
-        // tested on the raw record area, ahead of PrintSafe's print-stream mapping.
+        // tested on the raw record area.
         if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;
+        // Owner decision kb/Work R47 again, on the PRINT arm — the two-arm dispatch this connector has been bitten
+        // by before. This is also the report writer's line (Annex A.1 item 159: '91' in the report file's
+        // connector). ⛔ A print line is the file coded character set like any other record: one byte per column,
+        // U+0000–U+00FF the byte of the same value, so there is NO print-specific character map: one that wrote a
+        // character above U+007F as '?' would be a second, silent answer to the question this refusal answers
+        // (kb/Work PB690; DOC-A.1-159 / DOC-A.1-31).
+        if (!_lineSequential && RecordHasCharacterWithoutByteImage(image))
+            return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
         _printControl = true;
-        string text = PrintSafe(TrimRecordEnd(image));
+        string text = TrimRecordEnd(image);
         // §14.9.51.4 GR25 e)/f) — the ONE advance, placed before or after the presentation by the statement's
         // own word. On a LINAGE file both halves travel the LOGICAL page (GR25 g), GR26 a)); on any other print
         // file they are the plain stream. The pair is written once, and the page-awareness lives inside
@@ -1141,18 +1198,6 @@ public sealed class SequentialConnector : FileConnector
         return WriteSucceeded();   // §14.9.51.4 GR27 — "the WRITE statement is successful", with GR27 a)'s name
     }
 
-    /// <summary>The PRINT-stream character mapping: a character above the 7-bit range writes as <c>?</c> — the
-    /// implementor-defined runtime print encoding the NIST golden corpus encodes (the legacy print writer's
-    /// ASCII fallback: HIGH-VALUE prints as <c>?</c>, NUL passes through — NC107A's figurative-constant
-    /// information lines). Applies ONLY to print-control writes; a record (data-file) WRITE keeps its raw
-    /// characters — a record image must round-trip through READ byte-exact.</summary>
-    private static string PrintSafe(string s)
-    {
-        if (!s.Any(c => c > '\x7f')) return s;
-        var a = s.ToCharArray();
-        for (int i = 0; i < a.Length; i++) if (a[i] > '\x7f') a[i] = '?';
-        return new string(a);
-    }
 
     // ⛔ `WriteBeforeAndAfter` LIVED HERE AND IS GONE (kb/Work PB712). It was the THIRD write arm, taking a
     // BEFORE amount AND an AFTER amount and advancing — and counting LINAGE — twice, because the grammar spelled
@@ -1443,6 +1488,13 @@ public sealed class SequentialConnector : FileConnector
     /// and a frame that carried none stays without one — the record then reads back by the take step.</param>
     public string Rewrite(string image, int length = -1, RecordExtents? extents = null)
     {
+        try { return RewriteRecord(image, length, extents); }
+        catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30' — see Write
+    }
+
+    /// <summary>The body of <see cref="Rewrite"/>, inside its medium-boundary catch.</summary>
+    private string RewriteRecord(string image, int length, RecordExtents? extents)
+    {
         if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
         if (!PrevOpWasSuccessfulRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;
         int len = IsVarying ? (length >= 0 ? length : image.Length) : RecordWidth;
@@ -1453,6 +1505,8 @@ public sealed class SequentialConnector : FileConnector
         if (!_lineSequential && _lastReadBlockStart >= 0 && _reader is { BaseStream: { CanSeek: true, CanWrite: true } stream })
         {
             string record = FitRecord(image, len);
+            if (RecordHasCharacterWithoutByteImage(record))
+                return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' — the WRITE's rule (R47)
             if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record);
             RecordExtents? replacing = Framed(record, image, extents).Extents;
             string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
@@ -1512,7 +1566,7 @@ public sealed class SequentialConnector : FileConnector
         // ⛔ The REWRITE arm's §13.18.13.4 GR6 b boundary, for the same reason EmitRecord is the WRITE arm's:
         // `content` is the record's data in the NATIVE character set, and what goes on the medium is the file's
         // coded character set. Being the ONE in-place overwrite makes this the one place either arm converts.
-        byte[] bytes = Encoding.Latin1.GetBytes(ToMedium(content));
+        byte[] bytes = FileCharacterSet.Medium.GetBytes(ToMedium(content));
         stream.Write(bytes, 0, bytes.Length);
         stream.Flush();                 // §14.9.35.4 GR4 — released to the operating environment
         stream.Seek(resume, SeekOrigin.Begin);

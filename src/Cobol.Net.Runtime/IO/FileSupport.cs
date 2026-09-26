@@ -308,6 +308,35 @@ public static class HostFile
     /// <summary><c>EWOULDBLOCK</c> (= <c>EAGAIN</c>) on this Unix host — 11 on Linux, 35 on the BSD family.</summary>
     private static readonly int UnixWouldBlock = OperatingSystem.IsLinux() || OperatingSystem.IsAndroid() ? 11 : 35;
 
+    /// <summary>⛔ THE ONE HOST CLASSIFICATION OF A WRITE FAILURE AS THE MEDIUM'S BOUNDARY (kb/Work PB1192): did
+    /// the operating environment refuse to store bytes because the medium is full, a quota is exhausted, or the
+    /// file has reached the largest size the host allows? That is the manner in which COBOL.NET defines the
+    /// externally-defined boundary of a physical sequential file — ISO §9.1.13.6 3), <i>"The implementor
+    /// specifies the manner in which these boundaries are defined"</i> (Annex A.1 item 108, docs/CONFORMANCE.md
+    /// <c>DOC-A.1-108</c>).
+    /// <para>The host's own words, and nothing else, exactly as <see cref="IsSharingRefusal"/> reads them:
+    /// Windows reports <c>ERROR_HANDLE_DISK_FULL</c> (39), <c>ERROR_DISK_FULL</c> (112),
+    /// <c>ERROR_FILE_TOO_LARGE</c> (223) and <c>ERROR_DISK_QUOTA_EXCEEDED</c> (1295) as the HRESULT
+    /// <c>0x8007xxxx</c>; .NET on Unix surfaces the raw errno — <c>EFBIG</c> 27 and <c>ENOSPC</c> 28 on every
+    /// Unix, <c>EDQUOT</c> 122 on Linux and 69 on the BSD family (macOS). The errno is a per-host fact, so it is
+    /// asked HERE, once (kb/Work PB795).</para></summary>
+    public static bool IsMediumBoundary(IOException failure) => failure.HResult switch
+    {
+        unchecked((int)0x80070027) or unchecked((int)0x80070070)
+            or unchecked((int)0x800700DF) or unchecked((int)0x8007050F) => true,
+        int errno when !OperatingSystem.IsWindows() => errno is UnixFileTooLarge or UnixNoSpace || errno == UnixQuotaExceeded,
+        _ => false,
+    };
+
+    /// <summary><c>EFBIG</c> — 27 on Linux and on the BSD family.</summary>
+    private const int UnixFileTooLarge = 27;
+
+    /// <summary><c>ENOSPC</c> — 28 on Linux and on the BSD family.</summary>
+    private const int UnixNoSpace = 28;
+
+    /// <summary><c>EDQUOT</c> on this Unix host — 122 on Linux, 69 on the BSD family.</summary>
+    private static readonly int UnixQuotaExceeded = OperatingSystem.IsLinux() || OperatingSystem.IsAndroid() ? 122 : 69;
+
     // ── The third question: what may OTHER handles do while this one is open? ───────────────────────────────
 
     /// <summary>A file connector's OWN long-lived READ or READ-WRITE stream on its physical file.

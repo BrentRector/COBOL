@@ -10671,13 +10671,13 @@
   "ordinal": 4,
   "subject": "I-O status",
   "rule-digest": "2f2d4439acc4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileStatus.cs#BoundaryViolation",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/KeyedConnector.cs#StoreHolds; src/Cobol.Net.Runtime/IO/RecordFraming.cs#MaxStoreBytes; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileStatus.cs#BoundaryViolation",
+  "test-ref": "conformance:85/pb1192_relative_write_boundary_85; unit:FileBoundaryTests.RelativeWrite_BoundaryIsTheStoreCapacity_AndTheKeyRangeIs34",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1192: Rule has two halves (cite.py --check 9.1.13.5 \"An attempt is made to write outside the externally-defined boundaries of a physical relative or indexed file. The implementor specifies the manner in which these boundaries are defined\" -> OK §9.1.13.5 4)). SECOND half (sequential WRITE of a relative file whose RRN has more significant digits than the relative key item -> '24'): RelativeConnector.Write sequential arm, §14.9.51.4 GR29a/GR33c; probe iostat-rel (RELATIVE KEY PIC 9): the 10th sequential WRITE -> W10-INV=24, INVALID KEY taken, RK1 left at 9 - VERIFIED. FIRST half (write outside the externally-defined boundaries of a relative or indexed file): NO producer - IndexedConnector.Write has no '24' arm at all (§14.9.51.4 GR42 d), and the only relative boundary check is key<1 -> '34' (GR29 b, a different rule). The boundary DEFINITION is Annex A.1 item 107, required + documented (cite.py --check A.1 \"I-O status 24 (manner in which the boundaries of a file are defined). This item is required\" -> OK §A.1 107), and docs/CONFORMANCE.md carries NO DOC-A.1-107 determination (inventory row DOC-A.1-107 = GAP). Until the implementor states what the boundaries are, the absence of a producer can be neither confirmed as 'no boundary exists' nor refuted; a host write failure on a keyed store surfaces through KeyedConnector persistence at CLOSE as '30', not '24'. Hence PARTIAL: one half verified, the other depends on the undischarged A.1-107 determination (the DOC-A.1-107 row owns it; no register note covers it - see finding 'boundary determinations').",
-  "state": "GAP"
+  "notes": "kb/Work PB1192 (w61d). Both halves (cite.py --check 9.1.13.5 'An attempt is made to write outside the externally-defined boundaries of a physical relative or indexed file' -> OK 4)). Second half (sequential relative WRITE, RRN digits > key size -> '24') verified earlier. First half now has its determination (docs/CONFORMANCE.md DOC-A.1-107: the store's capacity, RecordFraming.MaxStoreBytes) and its producer at the WRITE (KeyedConnector.StoreHolds, relative and indexed): measured RRN 600 000 000 -> '24' with INVALID KEY.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.13.6-1",
@@ -10716,13 +10716,13 @@
   "ordinal": 3,
   "subject": "I-O status",
   "rule-digest": "73fc3378d559",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileSupport.cs#IsMediumBoundary; src/Cobol.Net.Runtime/IO/FileStatus.cs#ForWriteFailure; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write",
+  "test-ref": "unit:FileBoundaryTests.SequentialWrite_OnAFullMedium_Is34_AtTheWrite; unit:FileBoundaryTests.WriteFailure_MediumExhaustionIs34_AnyOtherFailureIs30",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1192: Rule (cite.py --check 9.1.13.6 \"an attempt is made to write outside the externally-defined boundaries of a physical sequential file\" -> OK §9.1.13.6 3)); statement twin §14.9.51.4 GR20 ('When an attempt is made to write beyond the externally-defined boundaries of the physical file ... set to '34''). No producer: FileStatusCode.PermanentBoundary ('34') is referenced ONLY by RelativeConnector.Write's key<1 arm (§14.9.51.4 GR29 b) - grep of src for PermanentBoundary/\"34\" finds nothing in SequentialConnector (the legacy CobolSharp.Runtime SequentialBoundaryViolation is not this compiler). The boundary definition is Annex A.1 item 108, required + documented (cite.py --check A.1 \"I-O status 34 (manner in which the boundaries of a file are defined). This item is required\" -> OK §A.1 108), and docs/CONFORMANCE.md carries no DOC-A.1-108 determination (inventory row DOC-A.1-108 = GAP). The only host event that could be such a boundary (device/volume full, file-size limit) reaches SequentialConnector.Write as an IOException that nothing catches (see GR-9.1.13.6-1), i.e. a crash, not '34'. Surveyed latitude (CLAUDE.md precedence: ISO -> GnuCOBOL): GnuCOBOL answers 34 for a write that exhausts the space available to the file. Not demonstrable by probe on this host without a size-limited volume; verdict rests on the code search (no producer) plus the missing determination.",
-  "state": "GAP"
+  "notes": "kb/Work PB1192 (w61d). Rule (cite.py --check 9.1.13.6 'an attempt is made to write outside the externally-defined boundaries of a physical sequential file' -> OK 3)). The implementor's manner (Annex A.1 item 108, DOC-A.1-108): the host medium's capacity, classified once by HostFile.IsMediumBoundary; the three sequential write entry points answer '34' through FileStatusCode.ForWriteFailure. See GR-14.9.51.4-20 for the witness.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.13.6-4",
@@ -16641,13 +16641,13 @@
   "ordinal": 1,
   "subject": "ORGANIZATION clause",
   "rule-digest": "9fbca6b4cf54",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#MapOrganization; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteHeader; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#FixedAttributeConflict; src/Cobol.Net.Runtime/IO/FixedFileAttributes.cs#Conflicts",
-  "test-ref": "conformance:85/open_fixed_attribute_conflict",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#FixedAttributeConflict; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#FixedAttributeConflict; src/Cobol.Net.Runtime/IO/RecordFraming.cs#ReadHeader; src/Cobol.Net.Compiler/Binding/DataBinder.cs#MapOrganization; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteHeader; src/Cobol.Net.Runtime/IO/FixedFileAttributes.cs#Conflicts",
+  "test-ref": "conformance:85/open_fixed_attribute_conflict; conformance:85/pb1098_organization_permanence_85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1098: Rule: 'The ORGANIZATION clause specifies the logical structure of a file. The file organization is established at the time a physical file is created and cannot subsequently be changed.' (cite.py --check 12.4.5.10.3 -> OK §12.4.5.10.3 1) General rules). Half 1 (clause specifies structure): DataBinder.MapOrganization maps LINE SEQUENTIAL / RECORD? SEQUENTIAL / RELATIVE / INDEXED and the absent clause (GR6) to FileOrganization. Half 2 (established at creation, unchangeable): RecordFraming.WriteHeader stamps the organization byte ('I'/'R') into the store header when a new RELATIVE/INDEXED physical file is created; KeyedConnector.FixedAttributeConflict compares it on every later OPEN. PROBED with the pinned cobol.exe (probe/org/mk.cob + sw.cob): an INDEXED store opened through a RELATIVE description -> '39', a RELATIVE store opened through an INDEXED description -> '39'; the golden's S13 pins a sequential file opened as RELATIVE -> '39' and S6 shows OPEN OUTPUT creating a new physical file. The reverse direction (a keyed store opened through a SEQUENTIAL description succeeds, and probe/org/ex.cob showed OPEN EXTEND appending raw bytes that the relative reader then ignores as trailing bytes while the file stays relative) is the §14.9.27.4 GR10 implementor-defined validated set, fixed by owner decision PB802 and pinned by unit FixedFileAttributeFormatTests.AKeyedStoreOpenedThroughASequentialDescription_IsNOTAConflict; the organization recorded in the file is not changed by it. The golden does not pin the relative<->indexed swap (probed only). || REFUTED: PARTIAL — First half (the clause specifies the structure; organization established at creation, OPEN OUTPUT re-creates) holds, and relative<->indexed and sequential->keyed OPENs answer '39'. But 'cannot subsequently be changed' is breachable: a RELATIVE store opened I-O through a SEQUENTIAL FD succeeds ('00'), its first READ returns the store HEADER bytes as a record, and a REWRITE overwrites the header; the file can then no longer be opened as RELATIVE ('39'), i.e. the organization recorded at creation was destroyed by a later program. The adjudicator's claim that the non-validated sequential direction 'does not change the organization recorded in the file' is falsified. PB802 only contemplated INPUT (and EXTEND appends) through a sequential FD, not I-O REWRITE over the header; §14.9.27.4 GR10 latitude governs which attributes OPEN validates, not whether a later program may rewrite the file's organization. Also the cited golden pins only sequential->RELATIVE; relative<->indexed is probe-only. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (version-invariant general rule)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1098 (w61d). Half 2 ('cannot subsequently be changed') now holds for the sequential view too: a SEQUENTIAL description's OPEN I-O or EXTEND over a physical file whose store header records RELATIVE or INDEXED is the '39' file attribute conflict (SequentialConnector.FixedAttributeConflict; DOC-A.1-129 arm (4)), so its REWRITE can no longer overwrite the header and its records can no longer follow the frames. OPEN INPUT stays unvalidated (PB802's determination) and OPEN OUTPUT creates a new file. MEASURED (golden): SQ-IO=39, SQ-EXT=39, SQ-IN=00, the relative store then reads RRN 7 intact; relative<->indexed swap '39' both ways; sequential I-O over the indexed store '39'.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.10.3-2",
@@ -16686,13 +16686,13 @@
   "ordinal": 4,
   "subject": "ORGANIZATION clause",
   "rule-digest": "66c8dd338f56",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#MapOrganization; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#ReadRandom; src/Cobol.Net.Compiler/Binding/DataBinder.cs#MapOrganization",
+  "test-ref": "conformance:85/pb1098_organization_permanence_85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1098: Rule: 'Relative organization is a permanent logical file structure in which each record is uniquely identified by an integer value greater than zero, that specifies the record's logical ordinal position in the file.' (cite.py --check 12.4.5.10.3 -> OK §12.4.5.10.3 4)). MapOrganization maps the RELATIVE phrase to FileOrganization.Relative; RelativeConnector is a sparse 1-based slot model (slot = RRN). PROBED (probe/org/mk.cob, ACCESS DYNAMIC): random WRITE with RELATIVE KEY 0 -> '34' (spec §14.9.51 GR29 b: 'If the relative key data item contains a value that is less than 1 ... the I O status ... is set to 34'), READ key 0 -> '23', WRITE key 7 then READ 7 -> '00' seven, READ 2 / READ 5 (no record) -> '23', START >= 0 then READ NEXT -> RRN 0007 (the ordinal position). Unique identification: RelativeConnector refuses a second record at an occupied RRN with '22'. Sequential-access WRITE numbering from 1 is §14.9.51 GR29 a) (the slot ordinal code at RelativeConnector.cs:376-379). No spec-derived golden located that pins RRN>0 / ordinal identity directly; test-needed. || REFUTED: PARTIAL — The identification half holds on every probe I built: RRN numbered from 1, key 0 -> '34' on WRITE / '23' on READ, sparse slots, sequential READ in ordinal order (2,5,9), EXTEND assigns highest+1 (10), DELETE leaves 9 in place, START > 1 then NEXT -> 2,9, OPEN OUTPUT sequential numbers 1,2, duplicate RRN -> '22'. But the rule also says the structure is 'permanent', and it is not: a relative store opened I-O through a SEQUENTIAL FD lets a REWRITE overwrite the store header, after which the file is refused as RELATIVE ('39'). That is the same defect as GR-12.4.5.10.3-1. One half verified, one breached, so PARTIAL. No spec-derived test pins RRN identity either (the adjudicator says so too). [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (version-invariant general rule)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1098 (w61d). Spec-derived golden now pins the relative identity: RRN 7 read back by its key (REL7BBBB), RRN 5 (no record) '23', RRN 0 is not a relative record number ('34', §14.9.51.4 GR29 b)), and the organization is permanent against a sequential and an indexed description ('39').",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.10.3-5",
@@ -16701,13 +16701,13 @@
   "ordinal": 5,
   "subject": "ORGANIZATION clause",
   "rule-digest": "402e6b44c3ea",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#MapOrganization; src/Cobol.Net.Runtime/IO/IndexedConnector.cs; src/Cobol.Net.Runtime/IO/KeyedStoreTable.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#ReadRandom; src/Cobol.Net.Compiler/Binding/DataBinder.cs#MapOrganization; src/Cobol.Net.Runtime/IO/IndexedConnector.cs; src/Cobol.Net.Runtime/IO/KeyedStoreTable.cs",
+  "test-ref": "conformance:85/pb1098_organization_permanence_85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1098: Rule: 'Indexed organization is a permanent logical file structure in which each record is identified by the value of one or more keys within that record.' (cite.py --check 12.4.5.10.3 -> OK §12.4.5.10.3 5)). MapOrganization maps INDEXED to FileOrganization.Indexed; IndexedConnector keys records by the prime RECORD KEY window and each ALTERNATE RECORD KEY window of the record image (key descriptors also recorded in the store header, FixedFileAttributes.KeyDescriptor). PROBED (probe/org/mk.cob): a duplicate prime key WRITE -> '22'; READ KEY IS prime K002 -> '00' K002AAAAsecond; READ KEY IS alternate AAAA (WITH DUPLICATES) -> '00' the first-written K003 record, READ NEXT continues in the alternate key of reference -> K002; READ of an absent prime K009 -> '23'. 'Permanent': the key table is validated against the header on OPEN (conformance:2023/open_fixed_attribute_conflict_ix covers key geometry, not identification). No spec-derived golden identified as pinning the identification rule itself; test-needed. || REFUTED: PARTIAL — The identification half holds on my probes: an alphanumeric prime key and an alternate key without DUPLICATES identify records (duplicate alternate -> '22', READ by alternate -> the right record, delete removes it from the alternate index -> '23', START LOW-VALUE then READ NEXT walks prime order, REWRITE with a changed prime key in dynamic mode -> '23'). A numeric RECORD KEY is correctly rejected under §12.4.5.12.3 SR2. But 'permanent logical file structure' is breached. An INDEXED store opened I-O through a SEQUENTIAL FD succeeds, its first record REWRITE overwrites the store header, and the file is then refused as INDEXED ('39'). The adjudicator's evidence for permanence (the header key-table check on OPEN) is exactly the header that this path destroys. PARTIAL, and no spec-derived test pins identification. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (version-invariant general rule)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1098 (w61d). Spec-derived golden now pins the indexed identity: records written K002 then K001 are identified by their prime key (READ K001 -> FST), an absent key K009 is '23', and the organization is permanent against a relative and a sequential I-O description ('39').",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.10.3-6",
@@ -49731,13 +49731,13 @@
   "ordinal": 20,
   "subject": "WRITE statement",
   "rule-digest": "d50788039873",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#WriteAdvancing; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/FileStatus.cs#ForWriteFailure; src/Cobol.Net.Runtime/IO/FileSupport.cs#IsMediumBoundary",
+  "test-ref": "unit:FileBoundaryTests.SequentialWrite_OnAFullMedium_Is34_AtTheWrite; unit:FileBoundaryTests.WriteFailure_MediumExhaustionIs34_AnyOtherFailureIs30",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1192 (registrar 14c). GR20: 'When an attempt is made to write beyond the externally-defined boundaries of the physical file, the execution of the WRITE statement is unsuccessful and the I-O status value of the write file connector is set to '34'.' (cite.py --check 14.9.51.4 -> OK rule 20); §9.1.13.6 item 3: 'The implementor specifies the manner in which these boundaries are defined.' (cite.py --check 9.1.13.6 -> OK rule 3). Searched src/Cobol.Net.Runtime: FileStatusCode.PermanentBoundary ('34') has exactly one producer, RelativeConnector.Write (GR29 b)); no sequential write arm (SequentialConnector.Write / WriteAdvancing / EmitLineSequentialRecord / ReleaseRecord) can return '34', and none catches IOException — a write that exhausts the host medium surfaces as an unhandled System.IO.IOException from the StreamWriter (or a '30' from the CLOSE flush). IoStatusClass.WriteBoundary consumes a sequential '34' (SORT GR15 / MERGE GR12 loop) that nothing produces. docs/CONFORMANCE.md carries no determination of how the boundaries are defined (DOC-A.1-151 explicitly declines to answer it). Not probed (needs a full volume); the verdict rests on the absence of any producer.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1192 (w61d). GR20 (cite.py --check 14.9.51.4 'When an attempt is made to write beyond the externally-defined boundaries of the physical file' -> OK 20)). The boundary of a sequential file is the host medium's capacity (Annex A.1 item 108, docs/CONFORMANCE.md DOC-A.1-108). HostFile.IsMediumBoundary classifies the host's refusal (Windows ERROR_HANDLE_DISK_FULL/DISK_FULL/FILE_TOO_LARGE/DISK_QUOTA_EXCEEDED; Unix EFBIG/ENOSPC/EDQUOT) and FileStatusCode.ForWriteFailure answers '34' (else '30'); SequentialConnector.Write, WriteAdvancing and Rewrite are the three entry points a record reaches the medium through and each wraps its body in that one catch, so the WRITE is unsuccessful with '34' instead of an escaping IOException. The writer buffers, so the refusal lands on the WRITE whose record fills the buffer. Witness: the classifier unit test, and an end-to-end WRITE loop on Linux /dev/full (ENOSPC by construction) that must end in '34'. IoStatusClass.WriteBoundary (SORT GR15 / MERGE GR12) now has a sequential producer.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-21",
@@ -49866,13 +49866,13 @@
   "ordinal": 29,
   "subject": "WRITE statement",
   "rule-digest": "e43570544df4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#NextSequentialSlot; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Persist; src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs#EmitWrite",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#HighestRelativeRecordNumber; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Persist; src/Cobol.Net.Runtime/IO/KeyedStoreTable.cs#Ordinal; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#NextSequentialSlot; src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs#EmitWrite",
+  "test-ref": "conformance:85/pb1192_relative_write_boundary_85; unit:FileBoundaryTests.RelativeWrite_BoundaryIsTheStoreCapacity_AndTheKeyRangeIs34",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1192 (registrar 14c). GR29 a)/b) (cite.py --check 14.9.51.4 -> OK rule 29, both items). VERIFIED by PROBE E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/write-p2/pb.cob: a) OUTPUT with RELATIVE KEY PIC 9 releases 1..9 consecutively, the 10th -> '24' with INVALID KEY run and RK left at 9; OPEN EXTEND after 9 records -> next RRN 10 overflows PIC 9 -> '24'; KeyedIoEmitter moves RelativeSlot into the key item only on success; b) DYNAMIC I-O existing key 2 -> '22' INVALID KEY; key 0 -> '34' (no invalid key). Shared-extend non-consecutive numbering is PB739's (landed). DEFECT on b)'s last sentence: 'If the relative key data item contains a value that is less than 1 or greater than the highest relative record number permitted for the file, the execution of the WRITE statement is unsuccessful, and the I O status ... is set to '34'.' RelativeConnector.Write tests only key < 1; there is no highest permitted RRN, so any key is accepted, and RelativeConnector.Persist then allocates `new string?[_st.Highest]`. PROBE E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/write-p2/pe.cob: ACCESS RANDOM, RELATIVE KEY PIC 9(18), MOVE 999999999999999999 TO RK, WRITE -> '00', CLOSE -> Unhandled System.OverflowException (run unit killed; the file is left at 20 bytes). Expected: the implementation's highest permitted RRN (bounded by what the store can represent) is exceeded -> '34', the record not written, the CLOSE clean. Keys in the tens of millions also allocate an array of that length at every CLOSE.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1192 (w61d). GR29 a)/b) (cite.py --check 14.9.51.4 'the highest relative record number permitted for the file' -> OK 29)). a) verified earlier (consecutive release, digit-overflow '24'). b)'s last sentence now holds: the highest relative record number permitted is RelativeConnector.HighestRelativeRecordNumber = 2 147 483 647 (DOC-A.1-107); a key below 1 or above it answers '34' with no INVALID KEY branch and nothing released. MEASURED on the w61d build: RRN 3 000 000 000 -> '34', the record area unaffected, the CLOSE '00'; RRN 999 999 999 999 999 999 (the original pe.cob probe) -> '34' where it used to be '00' and an OverflowException at CLOSE. The persist no longer sizes a dense array by the highest RRN (RelativeStore.Ordinal enumerates the sparse slots lazily).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-30",
@@ -49926,13 +49926,13 @@
   "ordinal": 33,
   "subject": "WRITE statement",
   "rule-digest": "566c56424417",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteStore",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#StoreHolds; src/Cobol.Net.Runtime/IO/KeyedStoreTable.cs#FramedBytesAfterPut; src/Cobol.Net.Runtime/IO/RecordFraming.cs#MaxStoreBytes; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteStore",
+  "test-ref": "conformance:85/pb1192_relative_write_boundary_85; unit:FileBoundaryTests.RelativeWrite_BoundaryIsTheStoreCapacity_AndTheKeyRangeIs34; unit:FileBoundaryTests.RelativeStore_PredictedSize_IsTheComposedSize",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1192 (registrar 14c). Three arms. a) (cite.py --check 14.9.51.4 \"When the value of the relative key data item specifies a record that already exists in the file, the I-O status associated with the write file connector is set to '22'\" -> OK 33)) CONFORMS: `_slots.ContainsKey(key)` gives DuplicateKey. Probe rel1.cob: RKD=5 a second time gives 'INVDUP 22' and runs the INVALID KEY branch; RKD=2 (a record written sequentially) gives 'INV2 22'. c) (--check 'When the number of significant digits in the relative record number is larger than the size of the relative key data item specified for the file' -> OK 33)) CONFORMS for sequential release: `slot.ToString().Length > _keyDigits` gives '24'. Probe: PIC 9 key, 10th RRN gives 'E-INV 24'; PIC 9(2) COMP key, 100th write gives 'B100 INV 24 RK=99' (key not stored). b) (--check \"When an attempt is made to write outside the externally defined boundaries of the file, the I-O status associated with the write file connector is set to '24'\" -> OK 33)) is NOT realized. The relative store defines no boundary at all. §9.1.13.5 item 4 (--check 9.1.13.5 'The implementor specifies the manner in which these boundaries are defined' -> OK 4)) requires the implementor to define one, and CONFORMANCE.md has no such determination. Probe rel2.cob: a RANDOM write of RRN 5,000,000 into an empty file gives 'OK 00', and CLOSE writes a 20,000,024-byte store: RecordFraming writes a 4-byte gap tag for every empty slot, and its MemoryStream is flushed with an (int) length. A RELATIVE KEY value in the high hundreds of millions (legal for a PIC 9(9)+ key) therefore gets '00' at WRITE and fails later, at CLOSE, with an allocation/stream-length failure. That is reasoned from the code and was not run, because of its memory cost. Arm b) should have produced '24' at the WRITE. Separately, a key below 1 gets '34' ('Z 34', no INVALID KEY branch). That follows GR29 b)'s explicit sentence (--check 14.9.51.4 'If the relative key data item contains a value that is less than 1 or greater than the highest relative record number permitted for the file' -> OK 29)), while GR33 b) plus §9.1.13.5 4) put a relative-file boundary violation under '24' and §9.1.13.6 3) confines '34' to SEQUENTIAL files. The standard conflicts with itself here, and no determination records which sentence governs. PARTIAL: a) and c) are verified and b) is not implemented. See the finding. [editions as adjudicated: 85, 2002, 2014, 2023 (the rule is in every edition's relative/indexed WRITE text; Annex E records no 2014->2023 change to it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1192 (w61d). a) and c) verified earlier. b) (cite.py --check 14.9.51.4 'When an attempt is made to write outside the externally defined boundaries of the file' -> OK 33)) now realized: the boundary of a relative file is its store's capacity, RecordFraming.MaxStoreBytes = Array.MaxLength = 2 147 483 591 bytes, counting a 4-byte tag for every empty slot below the highest RRN (Annex A.1 item 107, DOC-A.1-107). KeyedConnector.StoreHolds tests it AT THE WRITE over RelativeStore.FramedBytesAfterPut (the one size formula WriteStore also composes with): '24', the INVALID KEY branch runs, nothing is released. MEASURED: RRN 600 000 000 -> 'INVALID 24' and the file afterwards holds only the in-bounds record (golden); the exact boundary for a 4-character record is RRN 536 870 891 (fits) / 536 870 892 ('24') (unit). The key<1 / key>highest case is GR29 b)'s explicit '34' (governs over the general GR33 b); DOC-A.1-107 records the determination). A REWRITE whose longer record the store cannot hold answers the same '24'.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-34",
@@ -50061,13 +50061,13 @@
   "ordinal": 42,
   "subject": "WRITE statement",
   "rule-digest": "20bdfd2f8d70",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileRegistry.cs#WriteShared; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteStore",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#StoreHolds; src/Cobol.Net.Runtime/IO/KeyedStoreTable.cs#RecordBytes; src/Cobol.Net.Runtime/IO/FileRegistry.cs#WriteShared; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteStore",
+  "test-ref": "unit:FileBoundaryTests.IndexedStore_RecordBytes_IsTheComposedSize; unit:FileBoundaryTests.RelativeWrite_BoundaryIsTheStoreCapacity_AndTheKeyRangeIs34",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1192 (registrar 14c). Rule (cite.py --check 14.9.51.4 'Any record locks associated with the record being accessed are ignored in detection of these exceptions' -> OK 42); --check \"When the record that is to be released to the operating environment would reside outside the externally defined boundaries of the physical file, the I-O status associated with the write file connector is set to '24'\" -> OK 42)). a) '21': probe idx1.cob gives S2/S3/E1/E3 '21' (C2 under COLLATING SEQUENCE). b) '22' duplicate prime: D3 '22'. c) '22' duplicate no-DUPLICATES alternate: U2 '22' (the suppression interplay is GR41's defect). The lock sentence CONFORMS: FileRegistry.WriteShared runs no ConflictOnLockedRecord check before the WRITE, so another connector's lock never masks '21' or '22'; only a WITH LOCK ceiling preflight ('53'/'54', kb/Work PB707) can come first. d) '24' is NOT realized: IndexedConnector.Write has no boundary, and nothing in the tree produces '24' for an indexed file (grep BoundaryViolation: only RelativeConnector). §9.1.13.5 4) makes the boundary implementor-specified, and CONFORMANCE.md has no determination. The practical ceiling is RecordFraming.WriteStore's MemoryStream flushed through `(int)composed.Length`, so a store that outgrows it fails at CLOSE instead of refusing the WRITE with '24'. That is reasoned from the code, not measured. PARTIAL: a), b), c) and the lock sentence are verified and d) is not implemented. This is the same mechanism as GR33 b); see the finding. [editions as adjudicated: 85, 2002, 2014, 2023 (the rule is in every edition's relative/indexed WRITE text; Annex E records no 2014->2023 change to it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1192 (w61d). a), b), c) and the lock sentence verified earlier. d) (cite.py --check 14.9.51.4 'would reside outside the externally defined boundaries of the physical file' -> OK 42)) now realized: IndexedConnector.Write tests KeyedConnector.StoreHolds(IndexedStore.RecordBytes + the new frame) after the key checks and before the release, answering '24' (Annex A.1 item 107, DOC-A.1-107). IndexedStore's records are mutated only through Add/Replace/Remove/Clear, which keep RecordBytes equal to the frames WriteStore composes (unit test over Add, Replace, Remove, Clear). The arm cannot be driven end to end without a 2 GB store; it shares StoreHolds with the relative arm, whose '24' IS driven end to end (golden + unit).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-15.2-1",
@@ -62331,13 +62331,13 @@
   "ordinal": 31,
   "subject": "Computer's coded character set (characters in and encoding of computer's alphanumeric coded character set and computer's",
   "rule-digest": "5449fbae0c7d",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-31; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RecordAreaOutsideLineCharacterSet; src/Cobol.Net.Runtime/IO/FileStatus.cs; src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Text.cs#ByteSub; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#AsStorageImage; src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#ReadAllText",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-31; src/Cobol.Net.Runtime/IO/FileCharacterSet.cs#HasCharacterWithoutByteImage; src/Cobol.Net.Runtime/IO/FileConnector.cs#RecordHasCharacterWithoutByteImage; src/Cobol.Net.Runtime/IO/LineSequentialCharacterSet.cs#Contains; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RecordAreaOutsideLineCharacterSet; src/Cobol.Net.Runtime/IO/FileStatus.cs; src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Text.cs#ByteSub; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#AsStorageImage; src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#ReadAllText",
+  "test-ref": "conformance:85/pb690_file_character_set_85; conformance:2023/pb690_line_sequential_byte_image_2023; unit:FileBoundaryTests.FileCharacterSet_IsLatin1_AndRefusesRatherThanReplaces",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 31 required + documented. cite.py --check 8.1.2 \"The implementor shall specify the set of characters in and the encoding of each of the computer's alphanumeric character set and the computer's national character set\" -> OK §8.1.2 3). cite.py --check 8.1.2 \"the alphanumeric coded character set might consist of a subset of the UCS\" -> OK §8.1.2 (NOTE 2). cite.py --check 13.18.60.4 \"Each implementor shall specify the size and representation of characters stored for usage DISPLAY\" -> OK §13.18.60.4 7). cite.py --check 8.3.3.2.3 \"Character-1 may be any character in the coded character set that the implementor has chosen for source code representation\" -> OK §8.3.3.2.3 2). cite.py --check 8.3.3.5.3 \"national coded character set\" -> OK §8.3.3.5.3 2). cite.py --check 9.1.13.10 \"An attempt was made to rewrite or write a record to a line sequential file and the record area contains one or more characters not in the implementor-defined character set for the file\" -> OK §9.1.13.10 1). cite.py --check 9.1.13.11 \"An implementor-defined condition exists. This condition shall not duplicate any other condition specified by another I-O status value\" -> OK §9.1.13.11 1). cite.py --check 14.9.51.4 \"the execution of the WRITE statement is unsuccessful and the I-O status in the write file connector is set to '71'\" -> OK §14.9.51.4 23); cite.py --check 14.9.35.4 \"is set to '71'\" -> OK §14.9.35.4 17). Determination written to the owner decisions kb/Work R47 (files: Latin-1 one byte per position, refuse above U+00FF with an I-O status, never '?') and R48 second section (the coded character set is the UTF-16 BMP; its byte image is ISO 8859-1 one byte per position; above U+00FF: EC-DATA-CONVERSION at in-memory byte channels, I-O status refusal at files). Status choice (R47 leaves it to the implementer to derive from §9.1.13): '71' is the standard's own status for exactly this at a LINE sequential file (§9.1.13.10 / §14.9.51.4 GR23 / §14.9.35.4 GR17 d), reached by narrowing item 115's set to U+0020–U+00FF so the existing LineSequentialCharacterSet call shape refuses it; §9.1.13.10's text is confined to line sequential files, so no 7x value may be used for record sequential or report files, and §9.1.13.11's 9x slot is the only class that does not assert another condition — '91' (fatal, like item 110's '90'; EC-I-O-IMP). What HOLDS today: the one UTF-16 set in memory (ORD 8365 in a PIC X; LENGTH(\"€é\") = 2), national UTF-16BE (item 213 goldens), DISPLAY one byte per position (BYTE-LENGTH 3 for X(3)), CONVERT's ByteSub '?' + EC-DATA-CONVERSION (item 33). What DIVERGES: the file arm — pin 80de60472 (E:\\wt\\gl2-pin), out/run/d7: i31.cob (01 A PIC X(3) VALUE \"€é\"; DISPLAY ORD(A(1:1)) BYTE-LENGTH(A) CONVERT(A ANY ANUM HEX)) -> '8365 3 3FE920'; SQ7.cob (MOVE \"€é\" to a LINE SEQUENTIAL and a record SEQUENTIAL record, WRITE each with FILE STATUS) -> 'LS WRITE FS=00', 'SQ WRITE FS=00', sq7.dat = 3F E9 0D 0A, sq7r.dat = 3F E9 20 (U+20AC written as '?' with a successful status; kb/Work PB690 reproduces); L38.cob: FUNCTION LENGTH(\"€é\") FUNCTION ORD(\"€\") -> '2 8365'. Owning note: kb/Work PB690 (implementation of R47; it already claims DOC-A.1-31); PB547 owns the sibling byte channels (the record image path that substitutes without EC). Witnesses listed in the row pin the in-memory half only; the row stays GAP until PB690 lands goldens for the '71' and '91' refusals. DOC-ROWS-2 REFUTER (citation): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md).",
-  "state": "GAP"
+  "notes": "kb/Work PB690 (w61d), owner decision kb/Work R47. The file arm of the §7 determination now holds: a record holding a character above U+00FF written to a file with no converting CODE-SET is refused — '91' on record sequential, relative, indexed and report files, '71' on line sequential — nothing reaches the medium and the record area is unchanged; U+0000-U+00FF are written as the byte of the same value, print lines included (the print-only '?' map is gone). MEASURED on the w61d build: 'A€BC' -> '91' / '71' / relative '91' / indexed '91' / print '91'; 'AéBC' -> '00' and reads back byte 0xE9 (ORD 234) on every organization. Every record write encodes through FileCharacterSet.Medium, a strict ISO/IEC 8859-1 encoding with exception fallbacks.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-32",
@@ -63471,13 +63471,13 @@
   "ordinal": 107,
   "subject": "I-O status 24 (manner in which the boundaries of a file are defined)",
   "rule-digest": "179d3da7fbef",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-107; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteStore; src/Cobol.Net.Runtime/IO/FileStatus.cs#BoundaryViolation",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-107; src/Cobol.Net.Runtime/IO/RecordFraming.cs#MaxStoreBytes; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#StoreHolds; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#HighestRelativeRecordNumber; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/RecordFraming.cs#WriteStore; src/Cobol.Net.Runtime/IO/FileStatus.cs#BoundaryViolation",
+  "test-ref": "conformance:85/pb1192_relative_write_boundary_85; unit:FileBoundaryTests.RelativeWrite_BoundaryIsTheStoreCapacity_AndTheKeyRangeIs34",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "cite.py --check 9.1.13.5 \"The implementor specifies the manner in which these boundaries are defined\" -> OK §9.1.13.5 4); cite.py --check 14.9.51.4 \"When an attempt is made to write outside the externally defined boundaries of the file, the I-O status associated with the write file connector is set to '24'\" -> OK §14.9.51.4 33); cite.py --check 14.9.51.4 \"If the relative key data item contains a value that is less than 1 or greater than the highest relative record number permitted for the file\" -> OK §14.9.51.4 29). The manner of defining the boundary is latitude. This row uses storage capacity, which matches GnuCOBOL 3.x (libcob/fileio.c errno_cob_sts: ENOSPC/EDQUOT map to a boundary violation) and IBM (out of space is a boundary violation). The key<1 contradiction that kb/Work PB1192 flags for the owner is settled by ISO itself: GR29 b) is the explicit, specific sentence for the relative key value ('less than 1 or greater than the highest relative record number permitted for the file' -> '34'). GR33 b) covers the storage boundary ('24'), so the two concepts are distinct and both hold. GnuCOBOL answers '24' for key 0 (relative_write, kindex < 0), but the ISO-first precedence of CLAUDE.md rule 1 does not reach GnuCOBOL. Code at pin 80de60472: key 0 -> '34' (scratchpad/doc2/out/run/d4/p105.cob, W0 34, no INVALID KEY arm), which matches the row. There is no capacity test: per PB1192, RRN 5000000 -> '00' plus a 20 MB store, a store past Int32 fails at CLOSE, and IndexedConnector.Write has no '24' arm. So this DIVERGES, owned by kb/Work PB1192 (open, inventory_rows include DOC-A.1-107). The 2 147 483 647 limits are the current store format's own ceiling ((int)composed.Length in WriteStore). If PB1192 re-architects the store (rule 5), it restates the number in this row in the same change set.",
-  "state": "GAP"
+  "notes": "kb/Work PB1192 (w61d). A.1 item 107 required + documented; cite.py --check 9.1.13.5 'The implementor specifies the manner in which these boundaries are defined' -> OK 4). The §7 determination (corrected in this landing: the capacity is Array.MaxLength = 2 147 483 591 bytes, and the host medium is reached at the CLOSE because a keyed store is held in memory while open and written whole by the CLOSE) is implemented at KeyedConnector.StoreHolds / RecordFraming.MaxStoreBytes / RelativeConnector.HighestRelativeRecordNumber and witnessed by the golden and the exact-boundary unit test.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-108",
@@ -63486,13 +63486,13 @@
   "ordinal": 108,
   "subject": "I-O status 34 (manner in which the boundaries of a file are defined)",
   "rule-digest": "7ba896538e12",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-108; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileStatus.cs#PermanentBoundary",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-108; src/Cobol.Net.Runtime/IO/FileSupport.cs#IsMediumBoundary; src/Cobol.Net.Runtime/IO/FileStatus.cs#ForWriteFailure; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileStatus.cs#PermanentBoundary",
+  "test-ref": "unit:FileBoundaryTests.SequentialWrite_OnAFullMedium_Is34_AtTheWrite; unit:FileBoundaryTests.WriteFailure_MediumExhaustionIs34_AnyOtherFailureIs30",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "cite.py --check 9.1.13.6 \"an attempt is made to write outside the externally-defined boundaries of a physical sequential file\" -> OK §9.1.13.6 3). The manner of defining the boundary is latitude. Rule-1 precedence: GnuCOBOL 3.x maps ENOSPC/EDQUOT to COB_STATUS_34_BOUNDARY_VIOLATION (libcob/fileio.c errno_cob_sts), and IBM Enterprise COBOL treats QSAM out-of-space as the '34' boundary violation. Both agree with this row. Code at pin 80de60472: no sequential WRITE path catches IOException (SequentialConnector.Write / its StreamWriter), so a full medium escapes as System.IO.IOException and kills the run unit (kb/Work PB1512). FileStatus.PermanentBoundary '34' is produced only by the relative key<1 arm. So this DIVERGES, owned by kb/Work PB1192 (open, inventory_rows include DOC-A.1-108 and GR-9.1.13.6-3). Sibling PB1512 owns the '30' half. Not probed live, because filling a medium is not safe in a shared run dir; the evidence is a code read confirmed by PB1512's repro. Witness needed: a unit test with a stream that throws a disk-full IOException, showing '34' at the WRITE, the connector still open, and the condition held until CLOSE.",
-  "state": "GAP"
+  "notes": "kb/Work PB1192 (w61d). A.1 item 108 required + documented; cite.py --check 9.1.13.6 'an attempt is made to write outside the externally-defined boundaries of a physical sequential file' -> OK 3). The §7 determination (the host medium's capacity; '34' at the WRITE, any other host write failure '30') is implemented at HostFile.IsMediumBoundary + FileStatusCode.ForWriteFailure, wrapping SequentialConnector's three write entry points; witnessed by the classifier test and the Linux /dev/full WRITE loop.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-109",
@@ -64251,13 +64251,13 @@
   "ordinal": 159,
   "subject": "Report file (record structure)",
   "rule-digest": "9d02c3438ae8",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-159; src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitFileRegistration",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-159; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#WriteAdvancing; src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitFileRegistration",
+  "test-ref": "conformance:85/pb690_report_line_byte_image_85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 159 required + documented. cite.py --check 13.4.5.4 \"The report writer logical record structure of the file associated with file-name-1 is defined by the implementor\" -> OK §13.4.5.4 4). cite.py --check 9.1.13.10 \"An attempt was made to rewrite or write a record to a line sequential file and the record area contains one or more characters not in the implementor-defined character set for the file\" -> OK §9.1.13.10 1). cite.py --check 9.1.13.11 \"An implementor-defined condition exists. This condition shall not duplicate any other condition specified by another I-O status value\" -> OK §9.1.13.11 1). Structure (line text, CR LF / FF, no prefix, no header, one column per position) is today's behaviour and conforms; the encoding arm is written to owner decision kb/Work R47 (Latin-1, refuse above U+00FF with an I-O status) and DIVERGES. pin 80de60472, out/run/d7: RW.cob (FD RPTF REPORT IS RPT; DETAIL COLUMN 1 PIC X(4) VALUE 'ABCD', COLUMN 6 PIC N(2) SOURCE WN = N'ЖЖ'; two GENERATEs) -> rw.dat = 41 42 43 44 20 3F 3F 0D 0A x2 (the national characters corrupted to '?', no status — kb/Work PB690); PG.cob (RD PAGE LIMIT 3, five one-line GENERATEs of 'AB', FILE STATUS) -> 'AB\\r\\nAB\\r\\nAB\\fAB\\r\\nAB\\r\\n', FS=00: CR LF after each line, FF instead when the next line starts a new page, no prefix or header. Owning notes: kb/Work PB690 (implementation of R47; claims DOC-A.1-159); PB1253 owed the row. Witness needed at landing: a report golden with a national item above U+00FF asserting status '91' and the file unchanged, plus a page-advance golden pinning the FF delimiter.",
-  "state": "GAP"
+  "notes": "kb/Work PB690 (w61d). A.1 item 159 (cite.py --check 13.4.5.4 'The report writer logical record structure of the file associated with file-name-1 is defined by the implementor' -> OK 4)). One print line per record, one byte per column in ISO/IEC 8859-1: MEASURED 'AéB' is written as 41 E9 42 (ORD 234 read back), never '?'; a line holding U+20AC is refused ('91' in the report file's connector — GENERATE sets no FILE STATUS item, §9.1.13.1) and leaves a blank line, the device line not moving on a refused write so the next line lands on its own LINE-COUNTER line (ReportWriter).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-160",

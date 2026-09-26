@@ -40,7 +40,7 @@ public sealed class IndexedConnector : KeyedConnector
     /// detaches).</summary>
     private IndexedStore _st = new();
 
-    private List<KeyedRec> _recs => _st.Recs;   // load order — the persisted order (the ATTACHED store's)
+    private IReadOnlyList<KeyedRec> _recs => _st.Recs;   // load order — the persisted order (the ATTACHED store's; mutated only through it)
     private long _nextOrdinal { get => _st.NextOrdinal; set => _st.NextOrdinal = value; }
 
     /// <summary>The key-index spelling of THE PRIME RECORD KEY: <c>_alts</c> is indexed from 0, so the prime key
@@ -226,7 +226,7 @@ public sealed class IndexedConnector : KeyedConnector
             {
                 var fs = TakeFileLock(create: true);       // §14.9.27.4 GR18 — OUTPUT creates the physical file
                 Attach();
-                _recs.Clear();                             // OPEN OUTPUT empties the SHARED view (kb/Work PB143)
+                _st.Clear();                               // OPEN OUTPUT empties the SHARED view (kb/Work PB143)
                 _nextOrdinal = 1;
                 RecordFraming.WriteStore(fs, DeclaredAttributes, []);
                 break;
@@ -237,7 +237,7 @@ public sealed class IndexedConnector : KeyedConnector
                     if (!IsOptional) return FileStatusCode.FileNotFound;   // '35' — spec-pinned
                     var io = TakeFileLock(create: true);
                     Attach();
-                    _recs.Clear();
+                    _st.Clear();
                     _nextOrdinal = 1;
                     RecordFraming.WriteStore(io, DeclaredAttributes, []);   // §14.9.27 GR17
                     status = FileStatusCode.OptionalFileNotFound;
@@ -252,7 +252,7 @@ public sealed class IndexedConnector : KeyedConnector
                     if (!IsOptional) return FileStatusCode.FileNotFound;
                     var ex = TakeFileLock(create: true);
                     Attach();
-                    _recs.Clear();
+                    _st.Clear();
                     _nextOrdinal = 1;
                     RecordFraming.WriteStore(ex, DeclaredAttributes, []);
                     status = FileStatusCode.OptionalFileNotFound;
@@ -515,6 +515,8 @@ public sealed class IndexedConnector : KeyedConnector
     {
         if (Stored(image, length) is not { } stored)
             return Status = FileStatusCode.RecordSizeViolation;            // '44' §13.18.43 GR14a
+        if (RecordHasCharacterWithoutByteImage(stored))
+            return Status = FileStatusCode.CharacterWithoutByteImage;      // '91' A.1 item 31 (R47)
         extents = Framed(stored, image, extents).Extents;
         image = _layoutKeys ? stored : Fit(image);   // key slices come from the record-area image (KeyOf pads on demand)
         // §14.9.51.4 GR38 "If the access mode of the write file connector is sequential, records shall be
@@ -548,10 +550,15 @@ public sealed class IndexedConnector : KeyedConnector
             if (exists && !_alts[i].Dups) return Status = FileStatusCode.DuplicateKey;   // '22' GR40/GR42c
             if (exists) duplicateAlt = true;
         }
+        // §14.9.51.4 GR42 d) — "When the record that is to be released to the operating environment would reside
+        // outside the externally defined boundaries of the physical file, the I-O status … is set to '24'":
+        // the store's capacity (Annex A.1 item 107, KeyedConnector.StoreHolds), tested before the release.
+        if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents)))
+            return Status = FileStatusCode.BoundaryViolation;              // '24' GR42d
         // §14.9.51.4 GR40 — the WRITE RELEASES the record, so it is positioned last in the duplicate set of
         // EVERY key at once: one fresh ordinal stamped into every slot (the prime slot doubles as the record's
         // release order in the physical file — see KeyedRec.Ordinals).
-        _recs.Add(new KeyedRec { Image = stored, Extents = extents, Ordinals = ReleaseOrdinals(_nextOrdinal++) });
+        _st.Add(new KeyedRec { Image = stored, Extents = extents, Ordinals = ReleaseOrdinals(_nextOrdinal++) });
         if (sequentialRelease) _lastWrittenPrime = prime;   // GR38's running "highest … written" — sequential access only
         _lastWrittenPrimeId = prime;   // §9.1.16 lock identity of the record just released (§14.9.51 GR11)
         return Status = duplicateAlt ? FileStatusCode.DuplicateAlternateKey : FileStatusCode.Success;
@@ -571,6 +578,8 @@ public sealed class IndexedConnector : KeyedConnector
         // §14.9.35 GR18 — an indexed record's size MAY differ from the replaced record's; GR20 still bounds it.
         if (Stored(image, length) is not { } stored)
             return Status = FileStatusCode.RecordSizeViolation;                                 // '44' GR20
+        if (RecordHasCharacterWithoutByteImage(stored))
+            return Status = FileStatusCode.CharacterWithoutByteImage;                           // '91' (R47)
         extents = Framed(stored, image, extents).Extents;
         image = _layoutKeys ? stored : Fit(image);   // the WRITE's key image rule (kb/Work PB1025)
         string prime = KeyOf(image, extents, PrimeKey);
@@ -601,6 +610,11 @@ public sealed class IndexedConnector : KeyedConnector
             // so it created nothing (kb/Work PB341).
             if (exists && AltChanged(i)) duplicateAlt = true;
         }
+        // §9.1.13.5 item 4 — a replacing record the store cannot hold (a longer record, §14.9.35.4 GR18) is an
+        // attempt to write outside the file's externally-defined boundaries: '24', still inside the validation
+        // pass, so nothing below has been repositioned (Annex A.1 item 107).
+        if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents) - IndexedStore.FrameBytes(target.Image, target.Extents)))
+            return Status = FileStatusCode.BoundaryViolation;                                   // '24'
         // §14.9.35.4 GR24 a) — "When the value of a specific alternate record key is not changed, the order of
         // retrieval when that key is the key of reference remains unchanged" — so ONLY the keys this REWRITE
         // actually changed are re-stamped; b) puts the record "last within the set of duplicate records" of
@@ -612,8 +626,7 @@ public sealed class IndexedConnector : KeyedConnector
             if (repositioned == 0) repositioned = _nextOrdinal++;
             Stamp(target, i, repositioned);                                                     // GR24 b)
         }
-        target.Image = stored;
-        target.Extents = extents;
+        _st.Replace(target, stored, extents);
         return Status = duplicateAlt ? FileStatusCode.DuplicateAlternateKey : FileStatusCode.Success;
 
         // The ONE definition of "this REWRITE changed alternate key i" that GR24 a)/b), GR24's SUPPRESS WHEN
@@ -645,7 +658,7 @@ public sealed class IndexedConnector : KeyedConnector
             prime = AreaKey(keyedRecordImage, areaExtents, PrimeKey);
         KeyedRec? target = _recs.FirstOrDefault(r => KeyEq(KeyOf(r, PrimeKey), prime, PrimeKey));
         if (target is null) return Status = FileStatusCode.RecordNotFound;
-        _recs.Remove(target);
+        _st.Remove(target);
         return Status = FileStatusCode.Success;
     }
 
@@ -892,7 +905,7 @@ public sealed class IndexedConnector : KeyedConnector
 
     private void Load(IndexedStore into)
     {
-        into.Recs.Clear();
+        into.Clear();
         into.NextOrdinal = 1;
         // ⛔ NO SECOND PRESENCE QUESTION, AND NO SECOND HANDLE (kb/Work PB771) — see RelativeConnector.Load:
         // the load reads the store through the connector's OWN handle, its §9.1.15 file lock, and the handle's
@@ -904,7 +917,7 @@ public sealed class IndexedConnector : KeyedConnector
             if (stored is { } frame)
                 // The physical file order IS the release order under every key (§14.9.30.4 GR26) — PersistOrder
                 // wrote it that way, so one ordinal per record fills the whole vector (kb/Work PB341).
-                into.Recs.Add(new KeyedRec
+                into.Add(new KeyedRec
                 {
                     Image = IsVarying ? frame.Image : Fit(frame.Image),
                     Extents = IsVarying ? frame.Extents : null,   // a fitted fixed record is not the image a table describes

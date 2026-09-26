@@ -115,10 +115,24 @@ public static class FileStatusCode
     public const string DuplicateKey = "22";
     /// <summary>23 — record not found on keyed access / keyed access to an absent optional file (§9.1.13.5 item 3).</summary>
     public const string RecordNotFound = "23";
-    /// <summary>24 — invalid-key boundary violation on a relative/indexed WRITE (§9.1.13.5 item 4).</summary>
+    /// <summary>24 — invalid-key boundary violation (§9.1.13.5 item 4): a relative or indexed WRITE or REWRITE whose
+    /// record the store cannot hold — the store would exceed <see cref="RecordFraming.MaxStoreBytes"/>, the
+    /// boundary COBOL.NET defines for those organizations (Annex A.1 item 107, docs/CONFORMANCE.md DOC-A.1-107;
+    /// §14.9.51.4 GR33 b) / GR42 d)) — or a sequential-access relative WRITE whose relative record number has
+    /// more significant digits than the relative key item (§14.9.51.4 GR33 c)).</summary>
     public const string BoundaryViolation = "24";
-    /// <summary>34 — permanent-error boundary violation (a relative random WRITE with a key &lt; 1, §14.9.51 GR29b / §9.1.13.6 item 4).</summary>
+    /// <summary>34 — permanent-error boundary violation: a sequential WRITE or REWRITE the host medium cannot
+    /// store (§9.1.13.6 item 3, §14.9.51.4 GR20 — the boundary is the medium's capacity, Annex A.1 item 108,
+    /// DOC-A.1-108, classified by <see cref="HostFile.IsMediumBoundary"/>), or a random/dynamic relative WRITE
+    /// whose relative key is less than 1 or greater than <see cref="RelativeConnector.HighestRelativeRecordNumber"/>
+    /// (§14.9.51.4 GR29 b)).</summary>
     public const string PermanentBoundary = "34";
+
+    /// <summary>The I-O status of a WRITE or REWRITE whose bytes the host refused to store (kb/Work PB1192): the
+    /// medium's boundary ('34', §9.1.13.6 item 3 — <see cref="HostFile.IsMediumBoundary"/>) or, for any other
+    /// host failure, §9.1.13.6 item 1's '30' — never an escaping .NET exception.</summary>
+    public static string ForWriteFailure(IOException ex) =>
+        HostFile.IsMediumBoundary(ex) ? PermanentBoundary : PermanentError;
 
     // ── The COBOL-2002 file-sharing / record-locking status family (ISO §9.1.13.8/9; Phase 4d M2-FILE-1). The
     //    '5' first digit maps to EC-I-O-RECORD-OPERATION, '6' to EC-I-O-FILE-SHARING (§9.1.13.1) — both
@@ -140,7 +154,8 @@ public static class FileStatusCode
     public const string RunUnitLockLimit = "53";
     /// <summary>54 — the maximum number of record locks for this file connector has been exceeded (§9.1.13.8 item 4).</summary>
     public const string ConnectorLockLimit = "54";
-    /// <summary>'90' — ⛔ THE ONE IMPLEMENTOR-DEFINED I-O STATUS THIS COMPILER DEFINES (ISO §9.1.13.11 item 1:
+    /// <summary>'90' — ⛔ THE FIRST OF THE TWO IMPLEMENTOR-DEFINED I-O STATUSES THIS COMPILER DEFINES (the other is
+    /// <see cref="CharacterWithoutByteImage"/>'s '91'; ISO §9.1.13.11 item 1:
     /// <i>"I-O status = 9x. An implementor-defined condition exists. This condition shall not duplicate any other
     /// condition specified by another I-O status value. The value of x is defined by the implementor."</i>) — the
     /// LINAGE value-rule violation of §13.18.34.4 GR6 b): the page size is not greater than zero, or a specified
@@ -159,6 +174,21 @@ public static class FileStatusCode
     /// status (<see cref="FileConnector.IoConditionName"/>) and the generated hook reads the pair. A status
     /// alone cannot carry a condition the status table does not list.</para></summary>
     public const string LinageValueViolation = "90";
+
+    /// <summary>'91' — the SECOND implementor-defined I-O status (§9.1.13.11 item 1; Annex A.1 item 110,
+    /// docs/CONFORMANCE.md DOC-A.1-110): a WRITE or REWRITE whose record holds a character with no byte image in
+    /// the file's coded character set — a character above <see cref="FileCharacterSet.Highest"/> written to a
+    /// record sequential, report, relative or indexed file with no CODE-SET conversion (owner decision
+    /// kb/Work R47; Annex A.1 item 31, DOC-A.1-31; kb/Work PB690). The statement is unsuccessful, nothing reaches
+    /// the medium and the record area is unchanged — never the silent <c>?</c> Latin-1's replacement fallback
+    /// used to write. A LINE SEQUENTIAL file answers the standard's own '71' instead
+    /// (<see cref="LineRecordInvalidChar"/>): §9.1.13.10 item 1 is that organization's value for a record-area
+    /// character outside its character set, and §9.1.13.11 forbids duplicating it.
+    /// <para>Why 9x: §9.1.13.10 confines '71' to line sequential files; a '3x' permanent error would stay in
+    /// effect on the connector (Annex A.1 item 105) although the next record may well be writable; every other
+    /// class asserts a different condition. '9' is FATAL here (<c>ExceptionCatalog.IsFatalIoStatus</c>) and its
+    /// §9.1.13.1 correspondence is EC-I-O-IMP.</para></summary>
+    public const string CharacterWithoutByteImage = "91";
 
     /// <summary>61 — OPEN failed: a sharing conflict, based on the sharing mode of a previously-opened file
     /// connector or this OPEN's SHARING phrase, prevents the open (§9.1.13.9 item 1, sub-cases a–e).</summary>
