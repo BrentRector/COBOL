@@ -13,6 +13,18 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1720 — 2026-09-26 17:05 PDT — PB1592 scope decided from Annex E.2 6) + 21)
+
+PB1592 asked whether DOC-A.1-29 (compile-time arithmetic: System.Decimal, ties to even) applies at 2002/2014 and
+said the answer needed the 2002/2014 text. It does not: E.2 6) says the previous standard "required the use of an
+arithmetic mode that is no longer supported", and E.2 21) names the one arithmetic mode 2023 removed — "Standard
+Arithmetic" (both `cite.py --check` OK; STANDARD-BINARY survives as obsolete, §8.8.1.4). So at 2002/2014 compile-time
+expressions are evaluated in standard arithmetic, which this compiler already implements on the SDIDI engine it shares
+with STANDARD-DECIMAL (`OptionsModel.cs`, `ArithmeticMode.Standard`). Decision recorded in the note: option (a) —
+gate `CompileTimeExpressionEvaluator` by dialect (SDIDI at 2002/2014) and narrow DOC-A.1-29 and its row to 2023.
+Left open, under the precedence rule: whether 2023's implementor-defined mode should also be the SDIDI (one engine),
+pending a survey of GnuCOBOL's compile-time evaluator. No code changed.
+
 ## Entry 1719 — 2026-09-26 16:07 PDT — Wave-61 train 62: file-control screens, literal screen, function and INVOKE arguments
 
 Train 62 carried four fix-lane clusters in one landing, in manifest order. Three were planned: w61i, w61g and w61h. The
