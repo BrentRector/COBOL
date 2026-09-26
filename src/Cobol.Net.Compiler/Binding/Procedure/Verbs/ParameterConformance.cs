@@ -31,8 +31,12 @@ internal sealed record ActivationSite(string Callee, string ImportingRule, Diagn
 /// <c>PIC X(4)</c> argument reached a <c>PIC X(2)</c> formal, a misaligned bit item crossed BY REFERENCE, and an
 /// object reference crossed into a formal of a different object-reference description — each one a diagnostic on
 /// the CALL side and a silent run on the function side. The rule lives here so the two activations cannot drift
-/// again; <c>ActivationConformanceDriftTests</c> pins that both lanes ask it. (INVOKE's third lane is
-/// <c>OoBinder</c>'s, over the SAME comparators in <see cref="CobolNet.Compiler.Oo.OoConformance"/>.)</para>
+/// again; <c>ActivationConformanceDriftTests</c> pins that both lanes ask it. INVOKE's third lane is
+/// <c>OoBinder</c>'s, over the SAME comparators in <see cref="CobolNet.Compiler.Oo.OoConformance"/>, and it asks this
+/// type for everything its statement words like CALL's (kb/Work PB1137): the storage-section rule and the keyword-less
+/// mode test built on it (<see cref="ScreenSection"/>, <see cref="MeetsByReferenceRules"/> — §14.9.23.3 SR9/SR11 and
+/// §14.9.23.4 GR6 a), CALL's §14.9.4.3 SR3/SR7 and §14.9.4.4 GR9 a)), the bit-alignment proof (SR12, CALL's SR6/SR8)
+/// and the literal-2 verdict (<see cref="ContentConformanceReason"/>).</para>
 /// </summary>
 internal sealed class ParameterConformance(BinderContext ctx, StatementBinder host)
 {
@@ -128,9 +132,14 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                 "§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and a "
                 + "nonnumeric literal, an ALL literal or a figurative constant other than ZERO is not a numeric "
                 + "sending operand (ISO §8.8.1.1)",
-            // A figurative constant and an ALL literal are alphanumeric VALUES (§8.3.2.1 / §14.9.25's MOVE
-            // rules), so they take rule 2d's MOVE arm exactly as a written nonnumeric literal does.
-            BoundStringLiteral or BoundAllLiteral or BoundFigurative =>
+            // A written nonnumeric literal carries its CATEGORY (alphanumeric — plain or hexadecimal —, national or
+            // boolean), so rule 2d's MOVE question is asked of that sender exactly (kb/Work PB1137: a national literal
+            // at an alphanumeric formal is Table 16's "No").
+            BoundStringLiteral s =>
+                CobolNet.Compiler.Oo.OoConformance.ContentNonNumericLiteralMismatch(formal, s.Category),
+            // A figurative constant and an ALL literal are alphanumeric VALUES whose category the context chooses
+            // (§8.3.2.1 / §8.3.3.6.4), so they take rule 2d's MOVE arm under any literal category.
+            BoundAllLiteral or BoundFigurative =>
                 CobolNet.Compiler.Oo.OoConformance.ContentAlphanumericLiteralMismatch(formal),
             BoundNumericLiteral n =>
                 CobolNet.Compiler.Oo.OoConformance.ContentNumericLiteralMismatch(formal, n.Text),
@@ -191,7 +200,54 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         _ => IntrinsicArgumentRules.ClassOf(op),
     };
 
-    /// <summary>The byte-boundary proof a bit data item passed BY REFERENCE owes — §14.9.4.3 SR6/SR8 (CALL) and
+    /// <summary>⛔ THE STORAGE-SECTION MODE TEST (kb/Work PB1137), asked of a KEYWORD-LESS identifier argument before it
+    /// is resolved: does it meet "the requirements of" the rule both activating statements write in the same words
+    /// — an address-identifier or "a data item defined in the file, working-storage, local-storage, or linkage
+    /// section" that is not factory/instance object data (INVOKE §14.9.23.3 SR9 + SR10; CALL §14.9.4.3 SR3, whose
+    /// second sentence is the object-data half)? §14.9.23.4 GR6 a) (INVOKE) and §14.9.4.4 GR9 a) (Format-2 CALL)
+    /// assume BY REFERENCE — a receiving operand — when it does, and BY CONTENT — a sending one — when it does not,
+    /// so the answer decides the operand's ROLE and must come first. Non-diagnosing: a reference that identifies
+    /// nothing answers true, and the BY REFERENCE resolution that follows reports it through the resolver's own rule.
+    /// <para>The report and linage counters and EXCEPTION-OBJECT are recognized by their REFERENCE ahead of the
+    /// probe, because the ordinary resolver does not build their places; an object property by its reference,
+    /// because its temporary exists only once a statement binds it (<see cref="SectionDataItem"/> answers the
+    /// rest from the probed place).</para></summary>
+    internal bool MeetsByReferenceRules(CobolNet.Frontend.Generated.CobolParserCore.DataReferenceContext dref)
+    {
+        if (dref.PAGE_COUNTER() is not null || dref.LINE_COUNTER() is not null || dref.LINAGE_COUNTER() is not null)
+            return false;
+        if (ctx.Refs.IsExceptionObjectRegister(dref) || ctx.Refs.IsObjectPropertyReference(dref)) return false;
+        if (ctx.Refs.Probe(dref) is not { } probe) return true;
+        return probe.NonSectionKind is null && !ctx.Data.OoIsObjectData(probe.Item);
+    }
+
+    /// <summary>The storage-section rule over a RESOLVED BY REFERENCE argument or RETURNING item — CALL §14.9.4.3
+    /// SR3/SR7, INVOKE §14.9.23.3 SR9/SR11 (kb/Work PB1137): <see cref="SectionDataItem"/> says what the place is
+    /// when it is not a data item of the four sections. An OBJECT PROPERTY is admitted whatever its temporary:
+    /// §8.4.3.9.3 SR5/SR6 let it "be specified wherever a data item with that description would be valid" as a
+    /// sending or receiving item. False having reported.</summary>
+    /// <param name="p">The resolved operand.</param>
+    /// <param name="written">The reference as written — the object-property test and the message text.</param>
+    /// <param name="code">The descriptor the violation reports under.</param>
+    /// <param name="subject">How the message names the operand — <c>CALL USING argument</c>,
+    /// <c>INVOKE RETURNING item</c>.</param>
+    /// <param name="clause">The rule the message cites.</param>
+    /// <param name="addressAdmitted">The rule also admits an address-identifier (a USING argument; never the
+    /// RETURNING item).</param>
+    internal bool ScreenSection(Place p, CobolNet.Frontend.Generated.CobolParserCore.DataReferenceContext written,
+        DiagnosticDescriptor code, string subject, string clause, bool addressAdmitted)
+    {
+        if (SectionDataItem.NonSectionKind(p) is not { } kind || ctx.Refs.IsObjectPropertyReference(written))
+            return true;
+        ctx.Edition.Error(code,
+            $"{subject} '{DataBinder.WrittenText(written)}' references {kind}; ISO {clause} requires "
+            + (addressAdmitted ? "an address-identifier or " : "")
+            + "a data item defined in the file, working-storage, local-storage, or linkage section");
+        return false;
+    }
+
+    /// <summary>The byte-boundary proof a bit data item passed BY REFERENCE owes — §14.9.4.3 SR6/SR8 (CALL),
+    /// §14.9.23.3 SR12 (INVOKE — kb/Work PB1137) and
     /// §8.4.3.2.3 SR14 (function), which state the SAME two requirements: the item is "aligned on a byte
     /// boundary", and its subscripting and reference-modification leftmost position consist of only numeric
     /// literals or all-literal arithmetic expressions without exponentiation. The referenced occurrence's start

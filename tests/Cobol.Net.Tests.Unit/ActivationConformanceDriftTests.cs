@@ -56,11 +56,32 @@ public sealed class ActivationConformanceDriftTests
             + "(§14.9.4.3 SR22 / §8.4.3.2.3 SR10) — the two screens would classify arguments differently.");
     }
 
+    /// <summary>⛔ INVOKE IS THE THIRD CALLER OF THE OPERAND SCREENS (kb/Work PB1137). §14.9.23.3 states CALL's storage
+    /// section rule (SR9/SR11 for SR3/SR7) and bit-alignment rule (SR12 for SR6/SR8) in the same words, and §14.9.23.4
+    /// GR6 a) builds the keyword-less mode on SR9 exactly as §14.9.4.4 GR9 a) builds it on SR3 — yet INVOKE's argument
+    /// binder re-implemented a slice of CALL's screens and missed half of them: a report's PAGE-COUNTER crossed
+    /// BY REFERENCE and was a RETURNING item, a misaligned bit item crossed, and a keyword-less object property
+    /// crossed BY REFERENCE so the method's write reached it. INVOKE's arguments, its RETURNING item and its
+    /// literal-2 verdict now ask <c>ParameterConformance</c>, and CALL asks the same section screen and mode test.</summary>
+    [Theory]
+    [InlineData("OoBinder.cs", new[] { "Params.ScreenSection(", "Params.ScreenBitAlignment(",
+        "Params.MeetsByReferenceRules(", "Params.ContentConformanceReason(" })]
+    [InlineData("CallBinder.cs", new[] { "Params.ScreenSection(", "Params.MeetsByReferenceRules(" })]
+    public void TheActivationOperandScreens_AreAskedByCallAndInvoke(string file, string[] calls)
+    {
+        string code = Verb(file);
+        var missing = calls.Where(c => !code.Contains(c, System.StringComparison.Ordinal)).ToList();
+        Assert.True(missing.Count == 0,
+            $"{file} no longer asks {string.Join(", ", missing)} — its activation's operands would skip a rule the other "
+            + "activating statement enforces in the same words (ISO §14.9.4.3 SR3/SR6/SR7/SR8 = §14.9.23.3 "
+            + "SR9/SR11/SR12; kb/Work PB1137).");
+    }
+
     [Fact]
     public void TheArgumentRules_AreDefinedInParameterConformanceAlone()
     {
         string[] definitions = ["void CheckArgument(", "ContentConformanceReason(", "void ScreenBitAlignment(",
-            "ValueArgumentClass(BoundOperand"];
+            "ValueArgumentClass(BoundOperand", "bool ScreenSection(", "bool MeetsByReferenceRules("];
         var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
             .Where(f => Path.GetFileName(f) != "ParameterConformance.cs")
             .SelectMany(f => definitions

@@ -1663,7 +1663,11 @@
   "w61b-pb1166-override-picture-clause",
   "w61b-pb1166-implements-picture-clause",
   "w61b-pb1166-group-kind-pairing",
-  "w61b-pb1166-locale-identification-as-written"
+  "w61b-pb1166-locale-identification-as-written",
+  "pb1137-invoke-by-reference-page-counter",
+  "pb1137-invoke-returning-page-counter",
+  "pb1137-invoke-bit-unaligned",
+  "pb1137-invoke-zero-length-literal"
  ],
  "pending": []
 }

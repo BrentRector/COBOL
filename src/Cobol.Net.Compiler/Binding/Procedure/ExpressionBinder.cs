@@ -656,7 +656,17 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// <para>⛔ IT RETURNS THE RESOLVER'S CLOSED ANSWER (kb/Work PB1030), so a caller chooses its refusal node FROM
     /// it — <see cref="RefResolution.Refusal"/> and its operand/expression/condition twins — instead of guessing
     /// whether a null was reported or unbuilt, or reporting an "unresolvable" error of its own on top.</para>
-    public RefResolution ResolveSending(Core.DataReferenceContext dref) => ctx.Refs.Resolve(dref);
+    /// <para>⛔ A REPORT'S PAGE-COUNTER RESOLVES HERE AS IT DOES ON THE RECEIVING SIDE (kb/Work PB1137, the sending twin
+    /// of PB429). §8.4.3.15.3 SR1 admits it "in any context where an integer data item may appear", and the ordinary
+    /// resolver builds no place for a special register, so a position that needs the SENDING operand's Place — an
+    /// INVOKE argument passed BY CONTENT, which §14.9.23.4 GR6 a) 2. makes of a keyword-less PAGE-COUNTER — was
+    /// deferred as "a special register in a position that does not yet read it". The place is the one
+    /// <see cref="ResolveReceiving"/> builds, through the ONE counter-to-report resolution (a null there has already
+    /// reported the qualification rule, so it is a refusal, never a deferral).</para>
+    public RefResolution ResolveSending(Core.DataReferenceContext dref) =>
+        dref.PAGE_COUNTER() is null ? ctx.Refs.Resolve(dref)
+        : host.Rw.CounterPlace(dref) is { } counter ? RefResolution.Resolved(counter, DataBinder.WrittenText(dref))
+        : RefResolution.Refused(DataBinder.WrittenText(dref));
 
     /// <summary>Resolve a RECEIVING data reference to its <see cref="Place"/> — the ONE receiving-side
     /// chokepoint (MOVE targets, arithmetic resultants, SET receivers). A report counter here is rejected at

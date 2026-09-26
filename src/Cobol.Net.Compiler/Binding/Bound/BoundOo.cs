@@ -108,6 +108,16 @@ public sealed record BoundInvokeArg(
     /// literal — the pointer VALUE §8.4.3.11.4 GR1 / §8.4.3.13.4 GR1 create, a SENDING operand whatever the
     /// written phrase (SR19), so <see cref="WriteBack"/> is always false for it.</summary>
     public BoundAddressOperand? Address { get; init; }
+
+    /// <summary>The predefined NULL object reference as the argument (ISO §8.4.3.7; kb/Work PB1137): an identifier
+    /// (§8.4.3.1.3 SR7) of class object, category object reference (§8.4.3.7.3 SR2), passed BY CONTENT into an
+    /// object-reference formal — no <see cref="Source"/>, no literal, never written back.</summary>
+    public bool NullObject { get; init; }
+
+    /// <summary>The predefined object reference SELF as the argument (ISO §8.4.3.8; kb/Work PB1137): the object on
+    /// which the containing method runs, passed BY CONTENT into an object-reference formal — no
+    /// <see cref="Source"/>, never written back (§8.4.3.8.3 bars SELF as a receiving operand).</summary>
+    public bool SelfObject { get; init; }
 }
 
 /// <summary>A bound UNIVERSAL-receiver INVOKE (deep-dive D10/D-U5): there is NO formal roster at compile
@@ -142,7 +152,12 @@ public sealed record BoundUniversalArg(Place? Source, string Descriptor)
     /// <summary>A spelled OMITTED argument (ISO §14.9.23.2; kb/Work PB757) — no source; its descriptor is
     /// <c>CobolInvokeArg.OmittedDescriptor</c>, and the callee's switch admits it only against an OPTIONAL formal
     /// (§9.3.6 match rule 3 b), checked at runtime through a universal receiver (§14.9.23.4 GR7c).</summary>
-    public bool Omitted => Source is null;
+    public bool Omitted => Source is null && Address is null;
+
+    /// <summary>An ADDRESS-IDENTIFIER argument (ISO §14.9.23.3 SR9; kb/Work PB1137): no <see cref="Source"/> — the
+    /// pointer VALUE §8.4.3.11.4 GR1 / §8.4.3.13.4 GR1 create crosses in the box under its class-pointer
+    /// <see cref="Descriptor"/>, and SR19 makes it a SENDING operand, so the box is never copied back.</summary>
+    public BoundAddressOperand? Address { get; init; }
 }
 
 /// <summary>SET Format 5 — object-reference assignment (ISO §14.9.39 :31162; D-U7): copy ONE sender

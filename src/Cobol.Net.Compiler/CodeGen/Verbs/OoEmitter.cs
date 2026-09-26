@@ -548,7 +548,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // presence and is read only when present (§14.9.23.4 GR10's "except as an argument") — kb/Work PB757.
         string?[] fwd = u.Args.Select(a => a.Source is { } s && callState.WholeFormalProbe(s) is { } pr
             ? CallEmitter.OmittedTest(pr) : null).ToArray();
-        string boxes = string.Join(", ", u.Args.Select((a, i) => a.Source is not { } src
+        string boxes = string.Join(", ", u.Args.Select((a, i) => a.Address is { } ao
+            // An ADDRESS-IDENTIFIER (kb/Work PB1137) boxes its pointer VALUE — the ONE address-operand renderer the
+            // typed path uses — under its class-pointer descriptor; SR19 makes it sending, so nothing copies back.
+            ? $"new CobolInvokeArg({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(a.Descriptor, quote: true)}, (object?){U.Ptr.AddressOperandText(ao)})"
+            : a.Source is not { } src
             ? RuntimeApi.ObjOmittedArgument
             : fwd[i] is { } t
                 ? $"new CobolInvokeArg({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(a.Descriptor, quote: true)}, {t} ? null : {OoUnivCallerRead(src)}, {t})"
@@ -563,7 +567,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         w.Line($"{RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(u.Receiver))}.__CobolInvoke({selector}, __ua{id}, __ur{id});");
         for (int i = 0; i < u.Args.Count; i++)
         {
-            if (u.Args[i].Source is not { } src) continue;   // OMITTED — nothing to copy out
+            if (u.Args[i].Source is not { } src) continue;   // OMITTED or an address-identifier (SR19) — nothing to copy out
             string copyOut = OoUnivCallerWrite(src, $"__ua{id}[{i}].Value");
             w.Line((fwd[i] is { } t ? $"if (!{t}) {{ {copyOut} }}" : copyOut) + "   // BY REFERENCE copy-out (SR6)");
         }
@@ -1191,6 +1195,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // rendered by the ONE address-operand renderer — a detached pointer value (§14.9.23.3 SR19).
             else if (a.Address is { } ao)
                 w.Line($"{a.Formal.ElementType} {tmp} = {U.Ptr.AddressOperandText(ao)};");
+            // The predefined NULL object reference (§8.4.3.7; kb/Work PB1137) — BY CONTENT, the null reference itself.
+            else if (a.NullObject)
+                w.Line($"{a.Formal.ElementType} {tmp} = null;");
+            // SELF (§8.4.3.8; kb/Work PB1137) — the object the containing method runs on, the SET F5 rendering.
+            else if (a.SelfObject)
+                w.Line($"{a.Formal.ElementType} {tmp} = this;");
             else if (a.Formal.Pic is { Category: PicCategory.ObjectReference or PicCategory.Pointer
                                                  or PicCategory.ProgramPointer or PicCategory.FunctionPointer })
                 w.Line($"{a.Formal.ElementType} {tmp} = {PlaceRenderer.Read(a.Source!)};");

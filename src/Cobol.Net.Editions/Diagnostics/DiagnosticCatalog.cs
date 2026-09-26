@@ -2202,6 +2202,38 @@ public static class DiagnosticCatalog
         "A COPY statement appears within a COPY statement, or is not preceded by a space.",
         "ISO §7.2.3.3 SR1 / SR2");
 
+    // ── The INVOKE twins of the PB132 CALL operand screens (kb/Work PB1137): the rules are written in the same
+    // words for both activation statements and are checked by ONE screen (ActivationOperandScreen); each statement
+    // keeps its own code because each has its own clause, exactly as COBOLNET2237 twins COBOLNET1685. ──
+    /// <summary>COBOLNET2452 — an INVOKE BY REFERENCE argument (identifier-3) or RETURNING item (identifier-4)
+    /// that is not a data item of the four storage sections (kb/Work PB1137).</summary>
+    public static readonly DiagnosticDescriptor InvokeOperandSection = new(
+        "COBOLNET2452", "invoke-operand-section", EditionSeverity.Error,
+        "An INVOKE argument passed BY REFERENCE shall be an address-identifier or reference a data item defined in "
+        + "the file, working-storage, local-storage, or linkage section (ISO §14.9.23.3 syntax rule 9), and the "
+        + "RETURNING item shall reference such a data item (rule 11). A special register (PAGE-COUNTER, "
+        + "EXCEPTION-OBJECT) is not one; an object property is admitted by §8.4.3.9.3 SR5/SR6. A keyword-less "
+        + "argument that is not such an item is passed BY CONTENT instead (§14.9.23.4 GR6 a) 2.) — except through a "
+        + "universal object reference, where BY REFERENCE is the only mode (SR6).",
+        "ISO §14.9.23.3 SR9/SR11");
+
+    /// <summary>COBOLNET2453 — a misaligned bit data item as an INVOKE BY REFERENCE argument or RETURNING item
+    /// (kb/Work PB1137; the INVOKE twin of COBOLNET1683).</summary>
+    public static readonly DiagnosticDescriptor InvokeBitAlignment = new(
+        "COBOLNET2453", "invoke-bit-alignment", EditionSeverity.Error,
+        "A bit data item referenced by an INVOKE BY REFERENCE argument (identifier-3) or RETURNING item "
+        + "(identifier-4) shall be aligned on a byte boundary, and its subscripts and reference-modification "
+        + "leftmost position shall consist of only fixed-point numeric literals or all-literal arithmetic "
+        + "expressions without exponentiation — the referenced address must be statically byte-aligned.",
+        "ISO §14.9.23.3 SR12 / §8.5.1.6.3");
+
+    /// <summary>COBOLNET2454 — a zero-length literal-2 INVOKE argument (kb/Work PB1137).</summary>
+    public static readonly DiagnosticDescriptor InvokeArgumentZeroLengthLiteral = new(
+        "COBOLNET2454", "invoke-argument-zero-length-literal", EditionSeverity.Error,
+        "ISO §14.9.23.3 syntax rule 17: \"Literal-2 shall not be a zero-length literal.\" It binds every INVOKE "
+        + "argument literal and, through §8.4.3.4.3 SR3, every argument of an inline method invocation.",
+        "ISO §14.9.23.3 SR17");
+
     public static readonly DiagnosticDescriptor UndefinedReference = new(
         "COBOLNET1639", "undefined-reference", EditionSeverity.Error,
         "A statement or clause references a name that no declaration in the source element defines, or that the "

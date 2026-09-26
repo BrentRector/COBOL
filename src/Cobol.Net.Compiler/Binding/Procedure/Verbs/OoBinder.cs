@@ -551,6 +551,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     $"INVOKE \"{m.Name}\" RETURNING '{retRef.GetText()}': the receiving identifier is not "
                     + "resolvable to storage");
             }
+            if (!OoScreenReturning(rp, retRef, m.Name)) return BoundRejected.Reported(ctx.Edition);
             // §14.8.3.3 rule 1: the RETURNING delivery conforms "as if a SET statement were performed" —
             // for object references that is the WIDENING direction (universal receiver accepts anything; a
             // typed receiver accepts the same class or a subclass — SET SR12a2), NOT the §14.8.2.3.2
@@ -569,6 +570,26 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         }
         return new BoundInvoke(form, null, receiver, m.CsName, retPlace, args, m.Binding!.Returning, m.Owner?.CsName);
     }
+
+    /// <summary>ISO §14.9.23.3 SR11 and SR12 over a RESOLVED RETURNING item (identifier-4) — through the typed and the
+    /// universal receiver alike, which is why it is one helper (kb/Work PB1137): identifier-4 "shall reference a data
+    /// item defined in the file, working-storage, local-storage, or linkage section" (a report's PAGE-COUNTER was
+    /// accepted), and a bit data item shall be byte-aligned (a misaligned one crossed). Both screens are the ones
+    /// CALL's SR7/SR8 ask, from <see cref="ParameterConformance"/>. False having reported.</summary>
+    private bool OoScreenReturning(Place rp, Core.DataReferenceContext retRef, string? methodName)
+    {
+        string subject = methodName is null ? "INVOKE RETURNING item" : $"INVOKE \"{methodName}\" RETURNING item";
+        if (!host.Params.ScreenSection(rp, retRef, DiagnosticCatalog.InvokeOperandSection, subject,
+                "§14.9.23.3 SR11", addressAdmitted: false))
+            return false;
+        if (BitLayout.IsBitItem(rp.Item))
+            host.Params.ScreenBitAlignment(rp, DiagnosticCatalog.InvokeBitAlignment, subject, "§14.9.23.3 SR12");
+        return true;
+    }
+
+    /// <summary>A literal-2 argument as the shared §14.8.2.3.3 verdict reads one — a BY CONTENT value with no
+    /// storage (<see cref="ParameterConformance.ContentConformanceReason"/>; kb/Work PB1137).</summary>
+    private static BoundCallArg LiteralArg(BoundOperand literal) => new(CobolNet.Runtime.CobolPassMode.Content, null, literal);
 
     /// <summary>An omitted argument's slot (kb/Work PB757) — spelled OMITTED or trailing-omitted; no source, no
     /// write-back (§14.9.23.4 GR9: the omitted-argument condition is true in the invoked method).</summary>
@@ -606,6 +627,15 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         }
         if (arg.ByValueWritten)
         {
+            // SR16: "If literal-2 or its corresponding formal parameter is specified with the BY VALUE phrase,
+            // literal-2 shall be a numeric literal" — a nonnumeric literal-2 is refused by name. NULL is not
+            // literal-2 but identifier-5 (§8.4.3.1.3 SR7), and §14.9.23.3 SR15 admits its class, object.
+            if (arg.Literal?.nonNumericLiteral() is { } byValueText && byValueText.figurativeConstant()?.NULL_() is null)
+            {
+                Err($"BY VALUE {byValueText.GetText()}: literal-2 shall be a numeric literal when the BY VALUE phrase is "
+                    + "specified (ISO §14.9.23.3 SR16)");
+                return null;
+            }
             // SR5b: a BY VALUE argument requires a BY VALUE formal; every formal is BY REFERENCE today (the
             // procedure-division-header BY phrases are an unparsed grammar extension — added with them).
             Err($"BY VALUE argument for formal '{formal.CobolName}': the corresponding formal parameter is "
@@ -630,6 +660,35 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return null;
             }
             return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true) { Address = ao };
+        }
+
+        // ⛔ SELF IS AN IDENTIFIER-5 (kb/Work PB1137). §8.4.3.8 makes it an identifier format whose only role bar is
+        // that it is not a receiving operand, so `USING [BY CONTENT] SELF` passes the containing method's object BY
+        // CONTENT (it is in no DATA DIVISION section — GR6 a) 2.). An object-reference formal takes it "as if a SET
+        // statement were performed" (§14.8.2.3.3), i.e. by the SAME SELF-sender rules SET Format 5 applies
+        // (SelfSenderRefusals). It used to be a parse error.
+        if (arg.Self)
+        {
+            if (host.OoCurrentClass is not { } selfClass)
+            {
+                Err("SELF is defined only within a method definition (ISO §8.4.3.8.3 SR1)");
+                return null;
+            }
+            if (formal.Pic is not { Category: PicCategory.ObjectReference })
+            {
+                Err($"SELF is an object reference and formal '{formal.CobolName}' is not one — an object-reference "
+                    + "argument conforms by the SET rules (ISO §14.8.2.3.3)");
+                return null;
+            }
+            bool selfConforms = true;
+            foreach (string why in SelfSenderRefusals(formal.Pic.ObjectRef ?? ObjectRefDescriptor.Universal, selfClass))
+            {
+                Err($"SELF for formal '{formal.CobolName}': {why} (the SET rules, ISO §14.8.2.3.3)");
+                selfConforms = false;
+            }
+            return selfConforms
+                ? new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true) { SelfObject = true }
+                : null;
         }
 
         bool explicitReference = arg.ByReferenceWritten;
@@ -682,6 +741,23 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // an expression"; the binder can, through the SAME sole-reference reduction ConditionBinder and
         // IntrinsicBinder already use (feedback_one_rule_one_place — that helper is now shared, not re-copied).
         var dref = arg.Ref ?? ConditionBinder.SoleDataReference(arithCtx);
+        // ⛔ A CONSTANT-NAME IS LITERAL-2, NEVER AN IDENTIFIER (kb/Work PB1137). ISO §13.10.3 SR2: "constant-name-1
+        // may be used anywhere that a format specifies a literal of the class and category of constant-name-1", and
+        // §14.9.23.2's BY CONTENT branch specifies literal-2 — so a bare or BY CONTENT constant-name is literal-2,
+        // passed BY CONTENT (GR6 a) 2.: a literal never meets SR9). It used to be read as an identifier: bare, the
+        // receiving chokepoint refused it as a receiving operand; under BY CONTENT the sending resolver, which knows
+        // no constant-names, answered "not defined". Only an EXPLICIT BY REFERENCE keeps it identifier-3 — the one
+        // branch whose operand is identifier-3 or OMITTED — and the receiving chokepoint's §13.10.4 GR1 refusal is
+        // then the right verdict.
+        BoundOperand? literal2 = null;
+        string? constantName = null;
+        if (dref is not null && !explicitReference && host.Expr.ConstantOperand(dref) is { } constantLiteral)
+        {
+            literal2 = constantLiteral;
+            constantName = dref.GetText();
+            dref = null;
+            arithCtx = null;
+        }
         // ⛔ AN INLINE METHOD INVOCATION IS AN IDENTIFIER, NOT AN EXPRESSION — the SAME lesson as the
         // sole-dataReference recovery on the line above, one identifier format later (kb/Work PB428).
         // §8.4.3.4.1: "Inline method invocation references a temporary data item returned from invocation of
@@ -746,13 +822,23 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         if (dref is not null || inlinePlace is not null)
         {
             string argText = dref?.GetText() ?? DataBinder.WrittenText(arithCtx!);   // as written — `FUNCTION NUMVAL("3.7")`, never run together
-            // The role follows the passing mode (kb/Work PB881): §14.9.23.3 SR21 makes identifier-5 — an explicit
-            // BY CONTENT argument — "a sending operand", and SR20 makes identifier-3, the BY REFERENCE argument
-            // every other identifier is assumed to be (GR6 a), "a receiving operand", so it passes every receiving
-            // prohibition (§13.18.15.3 SR2 — a CONSTANT RECORD shall not be one).
+            // ⛔ THE MODE IS DECIDED BEFORE THE OPERAND IS RESOLVED, BECAUSE THE MODE DECIDES ITS ROLE (kb/Work PB881,
+            // PB1137). An explicit BY REFERENCE argument is identifier-3, "a receiving operand" (§14.9.23.3 SR20); an
+            // explicit BY CONTENT one is identifier-5, "a sending operand" (SR21). A KEYWORD-LESS identifier is either,
+            // and §14.9.23.4 GR6 a) chooses: BY REFERENCE "if the argument meets the requirements of Syntax rules 9
+            // and 10", BY CONTENT otherwise. That test is the ONE storage-section question CALL's GR9 a) asks too
+            // (ParameterConformance.MeetsByReferenceRules): a data item of the file, working-storage, local-storage
+            // or linkage section that is not factory/instance object data. It used to be answered AFTER a receiving
+            // resolution and only for object data, so an OBJECT PROPERTY — §8.4.3.9.4's conceptual temporary, in no
+            // section — crossed BY REFERENCE and the method's write reached the property through its SET accessor,
+            // and a report's PAGE-COUNTER crossed BY REFERENCE too. An inline invocation's or a function's
+            // temporary (above) fails SR9 the same way and is BY CONTENT already.
+            bool bareMeetsSr9 = dref is not null && inlinePlace is null && !explicitReference && !explicitContent
+                && host.Params.MeetsByReferenceRules(dref);
+            bool byReference = explicitReference || bareMeetsSr9;
             if ((inlinePlace ?? (dref is null ? null
-                    : explicitContent ? host.Expr.ResolveSending(dref).PlaceOrReported(ctx.Edition)
-                    : host.Expr.ResolveReceiving(dref))) is not { } place)
+                    : byReference ? host.Expr.ResolveReceiving(dref)
+                    : host.Expr.ResolveSending(dref).PlaceOrReported(ctx.Edition))) is not { } place)
             {
                 // A data reference's null is already reported, by the resolver or the receiving chokepoint (kb/Work
                 // PB1030); only an argument that is neither a reference nor an inline invocation reaches Err.
@@ -762,17 +848,25 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return null;
             }
             // §14.9.23.3 SR 10: object data (factory/instance WS) cannot cross BY REFERENCE — explicit
-            // BY REFERENCE violates the rule; a BARE object-data identifier is assumed BY CONTENT (GR6a2).
-            bool objectData = ctx.Data.OoIsObjectData(place.Item);
-            if (explicitReference && objectData)
+            // BY REFERENCE violates the rule; a BARE object-data identifier is assumed BY CONTENT (GR6a2, above).
+            if (explicitReference && ctx.Data.OoIsObjectData(place.Item))
             {
                 Err($"BY REFERENCE argument '{argText}' references OBJECT data — factory/instance "
                     + "working-storage may not cross an INVOKE by reference (ISO §14.9.23.3 SR 10); pass it "
                     + "BY CONTENT");
                 return null;
             }
-            // GR6a — REFERENCE assumed when SR9/10 hold; an inline invocation's temporary fails SR9 (above).
-            bool byReference = !explicitContent && !objectData && inlinePlace is null;
+            // SR9 over the resolved identifier-3 and SR12's byte-alignment proof — the screens CALL's SR3/SR6 run,
+            // from the ONE ParameterConformance the CALL and function activations ask (kb/Work PB1137).
+            if (byReference)
+            {
+                if (!host.Params.ScreenSection(place, dref!, DiagnosticCatalog.InvokeOperandSection,
+                        $"{verb} \"{methodName}\" USING argument", "§14.9.23.3 SR9", addressAdmitted: true))
+                    return null;
+                if (BitLayout.IsBitItem(place.Item))
+                    host.Params.ScreenBitAlignment(place, DiagnosticCatalog.InvokeBitAlignment,
+                        $"{verb} \"{methodName}\" USING argument", "§14.9.23.3 SR12");
+            }
 
             // A reference-modified operand is a unique ELEMENTARY ALPHANUMERIC item of the window length
             // (§8.4.3.3.4 GR6): conformance goes against that effective description, never the whole inner item.
@@ -892,80 +986,91 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 { ContentExpr = host.Expr.BindExpr(ax) };
         }
 
-        // A literal argument — BY CONTENT (GR6a2; a literal never meets SR9). Per §9.3.6 resolution rule 5
-        // a literal that would TRUNCATE still conforms (the SET/MOVE no-truncation requirements are ignored
-        // for literal arguments), so length/digit overflow converts per MOVE rules rather than erroring.
-        // §8.8.3.3 GR3: an alphanumeric concatenation expression is the equivalent alphanumeric literal —
-        // fold it and ride the STRINGLIT leg's conformance shape (a non-alphanumeric concat falls through
-        // to the trailing unsupported-argument diagnostic like any other non-alphanumeric literal).
-        string? alnumTxt =
-            foldedAlnum is not null ? foldedAlnum
-            : nonNumCtx?.STRINGLIT() is { } sl ? CobolLiteral.Decode(sl.GetText())
-            : nonNumCtx?.concatenationExpression() is { } ice
-              && ConcatFolder.ClassOf(ice) is PicCategory.Alphanumeric
-                ? ConcatFolder.Fold(ice, ctx.Edition, ctx.Data.Collating).Value
+        // ── literal-2 (ISO §14.9.23.2) — BY CONTENT, because a literal never meets SR9 (§14.9.23.4 GR6 a) 2.) ──
+        // ⛔ THE ONE LITERAL MAPPING, NOT A PRIVATE DECODE (kb/Work PB1137). This arm used to decode STRINGLIT, an
+        // alphanumeric concatenation, BOOLLIT and a numeric literal by hand — a fourth copy of the §8.3.3 mapping
+        // ExpressionBinder.NonNumericLiteralOperand exists to be the only copy of (kb/Work DA3) — and the copy had
+        // no hexadecimal arm, no national arm and no length screen: X"4142434445" and N"ABCDE" (legal literal-2)
+        // fell to the trailing "not yet carried" refusal while "" (SR17) was ACCEPTED. The shared mapping hands back
+        // the literal's VALUE and CATEGORY, so each lane below asks its conformance rule of the category the literal
+        // actually has. Per §9.3.6 resolution rule 5 a literal that would TRUNCATE still conforms (the SET/MOVE
+        // no-truncation requirements are ignored for literal arguments), so an overflow converts per the MOVE
+        // rules rather than erroring. A constant-name arrived above already substituted (§13.10.4 GR1).
+        literal2 ??= foldedAlnum is not null ? new BoundStringLiteral(foldedAlnum)
+            : nonNumCtx is not null ? host.Expr.NonNumericLiteralOperand(nonNumCtx)
+            : numLitRaw is not null ? new BoundNumericLiteral(numLitRaw)
             : null;
-        if (alnumTxt is not null)
+        string literalText = constantName ?? nonNumCtx?.GetText() ?? numLitRaw ?? foldedAlnum ?? "";
+        switch (literal2)
         {
-            if (OoConformance.ContentAlphanumericLiteralMismatch(formal) is null)
-                return new BoundInvokeArg(formal, null, null, alnumTxt, WriteBack: false, ByContent: true);
-            Err($"nonnumeric literal argument {nonNumCtx!.GetText()} for the non-alphanumeric formal "
-                + $"'{formal.CobolName}' (ISO §14.8.2.3.3 MOVE-rule conformance)");
-            return null;
-        }
-        // A BOOLEAN literal (or a boolean concatenation expression, §8.8.3.3 GR3) is literal-2 of the same
-        // BY CONTENT branch, and it is a boolean VALUE with no storage — so it rides the boolean channel this
-        // fix built rather than a fourth one. Without it, `INVOKE O "M" USING BY CONTENT B"1010"` fell all the
-        // way to the trailing "argument form … not yet carried" diagnostic: legal source (§14.9.23.3 SR17 bars
-        // only a ZERO-LENGTH literal-2), refused.
-        string? boolTxt =
-            nonNumCtx?.BOOLLIT() is { } bl ? CobolLiteral.Decode(bl.GetText())
-            : nonNumCtx?.concatenationExpression() is { } bce && ConcatFolder.ClassOf(bce) is PicCategory.Boolean
-                ? ConcatFolder.Fold(bce, ctx.Edition, ctx.Data.Collating).Value
-            : null;
-        if (boolTxt is not null)
-        {
-            // Table 16's BOOLEAN row again (§14.8.2.3.3 rule 2d) — the same receivers the expression arm takes,
-            // from the SAME rule, so a literal and an expression can never answer differently.
-            if (OoConformance.ContentBooleanMismatch(formal) is { } blErr)
-            {
-                Err($"boolean literal argument {nonNumCtx!.GetText()} for formal '{formal.CobolName}': {blErr}");
+            case BoundStringLiteral { Value.Length: 0 }:
+                // §14.9.23.3 SR17 — and, through §8.4.3.4.3 SR3, the inline form's arguments too (this body is both).
+                ctx.Edition.Error(DiagnosticCatalog.InvokeArgumentZeroLengthLiteral,
+                    $"{verb} \"{methodName}\": the argument {literalText} for formal '{formal.CobolName}' is a "
+                    + "zero-length literal; ISO §14.9.23.3 SR17: \"Literal-2 shall not be a zero-length literal\"");
                 return null;
-            }
-            // A LITERAL contributes no item width to §8.8.2 rule 10, so the value crosses at the formal's
-            // width — BooleanRenderer.RenderAtItemWidth leaves a literal-only expression at its own length.
-            return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
-                { ContentBool = new BoundBoolLiteral(boolTxt) };
-        }
-        if (numLitRaw is { } raw)
-        {
-            if (OoConformance.ContentNumericLiteralMismatch(formal, raw) is { } nErr)
-            {
-                Err($"numeric literal argument {raw} for formal '{formal.CobolName}' — {nErr}");
-                return null;
-            }
-            // The CARRIER split the shared rule admits: rule 2a's COMPUTE lane for a numeric formal, and rule
-            // 2d's MOVE lane, which moves an unsigned integer literal to an alphanumeric receiver as its digit
-            // characters (§14.9.25).
-            return formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
-                ? new BoundInvokeArg(formal, null, raw, null, WriteBack: false, ByContent: true)
-                : new BoundInvokeArg(formal, null, null, raw, WriteBack: false, ByContent: true);
+            case BoundStringLiteral { Category: PicCategory.Boolean } boolLit:
+                // A BOOLEAN literal (or a boolean concatenation expression, §8.8.3.3 GR3) is a boolean VALUE with no
+                // storage, so it rides the boolean channel — Table 16's BOOLEAN row (§14.8.2.3.3 rule 2d), the same
+                // receivers the boolean-expression arm takes, from the SAME rule. A LITERAL contributes no item width
+                // to §8.8.2 rule 10, so the value crosses at the formal's width (BooleanRenderer.RenderAtItemWidth).
+                if (OoConformance.ContentBooleanMismatch(formal) is { } blErr)
+                {
+                    Err($"boolean literal argument {literalText} for formal '{formal.CobolName}': {blErr}");
+                    return null;
+                }
+                return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
+                    { ContentBool = new BoundBoolLiteral(boolLit.Value) };
+            case BoundStringLiteral textLit:
+                // An ALPHANUMERIC literal — plain or hexadecimal (§8.3.3.2 makes X"…" a FORMAT of the alphanumeric
+                // literal) — or a NATIONAL one (§8.3.3.5): the §14.8.2.3.3 verdict the CALL and function activations
+                // get for the same literal (rule 2a's COMPUTE into a numeric formal, else rule 2d's MOVE asked of the
+                // literal's own category — a national literal does not move to an alphanumeric formal, Table 16).
+                if (host.Params.ContentConformanceReason(formal, LiteralArg(textLit)) is { } tErr)
+                {
+                    Err($"nonnumeric literal argument {literalText} for formal '{formal.CobolName}': {tErr}");
+                    return null;
+                }
+                return new BoundInvokeArg(formal, null, null, textLit.Value, WriteBack: false, ByContent: true);
+            case BoundNumericLiteral numLit:
+                if (host.Params.ContentConformanceReason(formal, LiteralArg(numLit)) is { } nErr)
+                {
+                    Err($"numeric literal argument {numLit.Text} for formal '{formal.CobolName}' — {nErr}");
+                    return null;
+                }
+                // The CARRIER split the shared rule admits: rule 2a's COMPUTE lane for a numeric formal, and rule
+                // 2d's MOVE lane, which moves an unsigned integer literal to an alphanumeric receiver as its digit
+                // characters (§14.9.25).
+                return formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
+                    ? new BoundInvokeArg(formal, null, numLit.Text, null, WriteBack: false, ByContent: true)
+                    : new BoundInvokeArg(formal, null, null, numLit.Text, WriteBack: false, ByContent: true);
+            case BoundFigurative { Kind: 'N' } when formal.Pic is { Category: PicCategory.ObjectReference }:
+                // ⛔ NULL IS AN IDENTIFIER, identifier-5 (kb/Work PB1137): §8.4.3.1.3 SR7 lists the predefined-object
+                // references among the identifier formats and §8.4.3.7.3 SR2 describes NULL as "class object and
+                // category object reference" — so `USING [BY CONTENT] NULL` passes the null reference BY CONTENT
+                // (it is in no DATA DIVISION section, so GR6 a) 2. assumes CONTENT). An object-reference formal takes
+                // it by the SET rules (§14.8.2.3.3), and a SET of any object reference TO NULL is always admitted.
+                // (NULL at a data-POINTER formal is §8.4.3.10's predefined address — kb/Work PB1427's arm.)
+                return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
+                    { NullObject = true };
+            case BoundOperandError { IsUnbuilt: false }:
+                return null;   // refused, and the rule it breaks reported where the operand was bound
         }
         Err($"argument form for formal '{formal.CobolName}' is not yet carried across a method activation");
         return null;
     }
 
-    /// <summary>Decode INVOKE's literal-1 (§14.9.23.3 SR2 — class alphanumeric or national): an alphanumeric
-    /// STRINGLIT, a national N"…" literal (the method NAME is its character value — §8.3.2.2 comparison), or
-    /// a hex X"…" literal (byte pairs decoded through the alphanumeric runtime encoding). Null for a literal
-    /// class SR2 excludes (boolean B"…", figurative constants) — the caller diagnoses.</summary>
     /// <summary>Bind an INVOKE through a UNIVERSAL receiver (D10/D-U5; §14.9.23.4 GR7c): no compile-time
     /// conformance — each argument and the RETURNING item carry their CONFORMANCE DESCRIPTOR for the
     /// callee's runtime check (§9.3.8.2.1 NOTE). Argument rules, all COBOLNET0866 with citations: explicit
-    /// BY CONTENT/BY VALUE are forbidden (SR6 :28435 — BY REFERENCE is assumed implicitly); a literal or
+    /// BY CONTENT/BY VALUE are forbidden (SR6 — BY REFERENCE is assumed implicitly); a literal or
     /// arithmetic-expression argument cannot cross by reference (SR6 + GR6's non-universal-only scope);
     /// OBJECT data may not cross at all (SR10 bans by-reference and SR6 removes the typed path's GR6a2
-    /// auto-CONTENT fallback); a Tier-C group (no character image) has no crossing form.</summary>
+    /// auto-CONTENT fallback); a Tier-C group (no character image) has no crossing form. An ADDRESS-IDENTIFIER
+    /// is identifier-3 by SR9 and a SENDING operand by SR19, so it crosses as its pointer value with a class-pointer
+    /// descriptor and is never copied out. Every identifier-3 and the RETURNING item take the storage-section
+    /// (SR9/SR11) and bit-alignment (SR12) screens CALL's SR3/SR6/SR7/SR8 take, from
+    /// <see cref="ParameterConformance"/> (kb/Work PB1137).</summary>
     private BoundStatement OoBindUniversalInvoke(
         InvocationSite site, Place receiver, string? methodLiteral, Place? methodSource)
     {
@@ -988,6 +1093,20 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     "INVOKE through a universal object reference: neither BY CONTENT nor BY VALUE may be "
                     + "specified — BY REFERENCE is assumed implicitly (ISO §14.9.23.3 SR6)");
             }
+            // ⛔ THE ADDRESS-IDENTIFIER ARM THE TYPED PATH GAINED IN kb/Work PB1021 AND THIS ONE NEVER DID (kb/Work
+            // PB1137 — the two-arm dispatch). §14.9.23.3 SR9: "Identifier-3 shall be an address-identifier or …", and
+            // SR6 makes every universal argument identifier-3 (BY REFERENCE "is assumed implicitly"), so
+            // `INVOKE U "M" USING ADDRESS OF X` is legal; it fell to the literal arm below and was refused with a
+            // message about a literal. SR19 makes it a SENDING operand: its pointer VALUE crosses in the box under
+            // its class-pointer descriptor (the §14.9.23.4 GR7c check at the callee decides conformance) and the
+            // box is never copied back.
+            if (a.Address is { } addrCtx)
+            {
+                if (host.Ptr.BindAddressIdentifier(addrCtx, "INVOKE … USING") is not { } ao)
+                    return BoundRejected.Reported(ctx.Edition);
+                args.Add(new BoundUniversalArg(null, OoConformance.AddressDescriptor(ao)) { Address = ao });
+                continue;
+            }
             if (a.Ref is not { } dref)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
@@ -1000,6 +1119,15 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
                     $"INVOKE: the argument '{DataBinder.WrittenText(dref)}' is not resolvable to storage");
             }
+            // SR9 and SR12 over identifier-3 — with no GR6 a) 2. fallback here (SR6), a special register or a
+            // compiler temporary is refused rather than passed BY CONTENT.
+            if (!host.Params.ScreenSection(p, dref, DiagnosticCatalog.InvokeOperandSection,
+                    "INVOKE USING argument (through a universal object reference, BY REFERENCE by SR6)",
+                    "§14.9.23.3 SR9", addressAdmitted: true))
+                return BoundRejected.Reported(ctx.Edition);
+            if (BitLayout.IsBitItem(p.Item))
+                host.Params.ScreenBitAlignment(p, DiagnosticCatalog.InvokeBitAlignment, "INVOKE USING argument",
+                    "§14.9.23.3 SR12");
             if (ctx.Data.OoIsObjectData(p.Item))
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
@@ -1027,6 +1155,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     $"INVOKE RETURNING '{retRef.GetText()}': the receiving identifier is not resolvable "
                     + "to storage");
             }
+            if (!OoScreenReturning(rp, retRef, methodName: null)) return BoundRejected.Reported(ctx.Edition);
             retDesc = OoConformance.ConformanceDescriptor(rp.Item);
             if (retDesc == "T:!")
             {
@@ -1039,6 +1168,65 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // identifier-2 value normalizes at runtime via CobolObject.NormalizeMethodName).
         return new BoundInvokeUniversal(receiver, methodLiteral?.TrimEnd().ToUpperInvariant(), methodSource,
             args, retPlace, retDesc);
+    }
+
+    /// <summary>What refuses SELF as the SENDING operand of an object-reference assignment into a receiver of
+    /// description <paramref name="rd"/> — ISO §14.9.39.3 SR8/SR10 d)/SR12 c)/SR14 b), read by the SET statement
+    /// (Format 5) and by an INVOKE argument, whose BY CONTENT object-reference crossing conforms "as if a SET
+    /// statement were performed" (§14.8.2.3.3; kb/Work PB1137). Empty when SELF conforms.</summary>
+    private IEnumerable<string> SelfSenderRefusals(ObjectRefDescriptor rd, OoClassSymbol cur)
+    {
+        switch (rd.Kind)
+        {
+            case ObjectRefKind.Universal:
+                yield break;   // SR8 — a universal receiver accepts any object
+
+            case ObjectRefKind.Interface:
+                // `Find` is class-only, so before the SR10d landing an interface-typed receiver fell
+                // through unchecked and the emitter rendered a raw `(I)(this)` cast — a runtime
+                // InvalidCastException, or a Roslyn CS error on generated user source for a sealed
+                // class, which the G4 no-CS-on-user-source rule forbids.
+                if (host.OoClasses?.FindInterface(rd.Name!) is { } tiface
+                    && !host.OoClasses.ImplementsClosure(cur, host.OoInFactory).Contains(tiface))
+                    yield return
+                        $"the {(host.OoInFactory ? "factory" : "instance")} "
+                        + $"definition of class '{cur.Name}' does not IMPLEMENT interface '{tiface.Name}' "
+                        + $"(ISO §14.9.39.3 SR10d{(host.OoInFactory ? 1 : 2)})";
+                yield break;
+
+            case ObjectRefKind.ObjectClass:
+                // c)1. — an ONLY receiver admits no SELF sender at all: SELF's run-time class is the
+                // ACTIVE class, which may be a subclass, and ONLY forbids exactly that.
+                if (rd.Only)
+                    yield return
+                        $"the receiving item is described with the ONLY phrase, so SELF is not "
+                        + "a permitted sending operand (ISO §14.9.39.3 SR12c1)";
+                // c)2. — the class containing the SET statement shall be the receiver's class or a
+                // subclass of it.
+                else if (host.OoClasses?.Find(rd.Name!) is { } tcls && !cur.ConformsTo(tcls))
+                    yield return
+                        $"class '{cur.Name}' is not '{tcls.Name}' or a "
+                        + "subclass of it (ISO §14.9.39.3 SR12c2)";
+                // c)3./c)4. — the FACTORY axis of the receiver picks WHICH definition the method shall
+                // be defined in, and SELF is the object of that definition.
+                if (rd.Factory != host.OoInFactory)
+                    yield return
+                        $"the receiving item is described {(rd.Factory ? "with" : "without")} "
+                        + "the FACTORY phrase, so the method containing the SET statement shall be "
+                        + $"defined in the {(rd.Factory ? "factory" : "instance")} definition of its "
+                        + $"containing class (ISO §14.9.39.3 SR12c{(rd.Factory ? 4 : 3)})";
+                yield break;
+
+            default:   // ObjectRefKind.ActiveClass — SR14 b)
+                if (rd.Factory != host.OoInFactory)
+                    yield return
+                        $"the receiving item is described ACTIVE-CLASS "
+                        + $"{(rd.Factory ? "with" : "without")} the FACTORY phrase, so the method "
+                        + $"containing the SET statement shall be defined in the "
+                        + $"{(rd.Factory ? "factory" : "instance")} definition of its containing class "
+                        + $"(ISO §14.9.39.3 SR14b{(rd.Factory ? 2 : 1)})";
+                yield break;
+        }
     }
 
     /// <summary>SET Format 5 core (§14.9.39; D-U7) — shared by the grammar's NULL/SELF/SUPER-sender rule
@@ -1133,61 +1321,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // object inside a factory method and an instance object inside an instance one, so the receiver's
             // FACTORY presence shall equal host.OoInFactory.
             foreach (var tp in targets)
-            {
-                var rd = tp.Item.Pic!.ObjectRef ?? ObjectRefDescriptor.Universal;
-                string where = $"SET '{tp.Item.CobolName}' TO SELF";
-                switch (rd.Kind)
-                {
-                    case ObjectRefKind.Universal:
-                        continue;   // SR8 — a universal receiver accepts any object
-
-                    case ObjectRefKind.Interface:
-                        // `Find` is class-only, so before the SR10d landing an interface-typed receiver fell
-                        // through unchecked and the emitter rendered a raw `(I)(this)` cast — a runtime
-                        // InvalidCastException, or a Roslyn CS error on generated user source for a sealed
-                        // class, which the G4 no-CS-on-user-source rule forbids.
-                        if (host.OoClasses?.FindInterface(rd.Name!) is { } tiface
-                            && !host.OoClasses.ImplementsClosure(cur, host.OoInFactory).Contains(tiface))
-                            ctx.Edition.Error("COBOLNET0867",
-                                $"{where}: the {(host.OoInFactory ? "factory" : "instance")} "
-                                + $"definition of class '{cur.Name}' does not IMPLEMENT interface '{tiface.Name}' "
-                                + $"(ISO §14.9.39.3 SR10d{(host.OoInFactory ? 1 : 2)})");
-                        continue;
-
-                    case ObjectRefKind.ObjectClass:
-                        // c)1. — an ONLY receiver admits no SELF sender at all: SELF's run-time class is the
-                        // ACTIVE class, which may be a subclass, and ONLY forbids exactly that.
-                        if (rd.Only)
-                            ctx.Edition.Error("COBOLNET0867",
-                                $"{where}: the receiving item is described with the ONLY phrase, so SELF is not "
-                                + "a permitted sending operand (ISO §14.9.39.3 SR12c1)");
-                        // c)2. — the class containing the SET statement shall be the receiver's class or a
-                        // subclass of it.
-                        else if (host.OoClasses?.Find(rd.Name!) is { } tcls && !cur.ConformsTo(tcls))
-                            ctx.Edition.Error("COBOLNET0867",
-                                $"{where}: class '{cur.Name}' is not '{tcls.Name}' or a "
-                                + "subclass of it (ISO §14.9.39.3 SR12c2)");
-                        // c)3./c)4. — the FACTORY axis of the receiver picks WHICH definition the method shall
-                        // be defined in, and SELF is the object of that definition.
-                        if (rd.Factory != host.OoInFactory)
-                            ctx.Edition.Error("COBOLNET0867",
-                                $"{where}: the receiving item is described {(rd.Factory ? "with" : "without")} "
-                                + "the FACTORY phrase, so the method containing the SET statement shall be "
-                                + $"defined in the {(rd.Factory ? "factory" : "instance")} definition of its "
-                                + $"containing class (ISO §14.9.39.3 SR12c{(rd.Factory ? 4 : 3)})");
-                        continue;
-
-                    default:   // ObjectRefKind.ActiveClass — SR14 b)
-                        if (rd.Factory != host.OoInFactory)
-                            ctx.Edition.Error("COBOLNET0867",
-                                $"{where}: the receiving item is described ACTIVE-CLASS "
-                                + $"{(rd.Factory ? "with" : "without")} the FACTORY phrase, so the method "
-                                + $"containing the SET statement shall be defined in the "
-                                + $"{(rd.Factory ? "factory" : "instance")} definition of its containing class "
-                                + $"(ISO §14.9.39.3 SR14b{(rd.Factory ? 2 : 1)})");
-                        continue;
-                }
-            }
+                foreach (string why in SelfSenderRefusals(tp.Item.Pic!.ObjectRef ?? ObjectRefDescriptor.Universal, cur))
+                    ctx.Edition.Error("COBOLNET0867", $"SET '{tp.Item.CobolName}' TO SELF: {why}");
         }
         else if (!senderNull)
         {

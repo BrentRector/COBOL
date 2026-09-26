@@ -27,6 +27,8 @@ using Core = CobolParserCore;
 /// where no passing phrase exists to say so; an INVOKE spells the mode itself.</param>
 /// <param name="Address">The operand is an ADDRESS-IDENTIFIER (§8.4.3.1.2 identifier Format 9) — §14.9.23.3 SR9
 /// names it for identifier-3 and SR19 makes it a SENDING operand (kb/Work PB1021).</param>
+/// <param name="Self">The operand is the predefined object reference SELF (§8.4.3.8; INVOKE only — kb/Work
+/// PB1137): identifier-5, never a receiving operand.</param>
 internal readonly record struct InvocationArg(
     bool ByValueWritten,
     bool ByReferenceWritten,
@@ -37,13 +39,14 @@ internal readonly record struct InvocationArg(
     Core.ArithmeticExpressionContext? Arith,
     Core.LiteralContext? Literal,
     Core.DataReferenceContext? Ref,
-    Core.AddressIdentifierContext? Address = null)
+    Core.AddressIdentifierContext? Address = null,
+    bool Self = false)
 {
     /// <summary>The INVOKE statement's <c>invokeArgument</c> reading (§14.9.23.2).</summary>
     public static InvocationArg OfInvokeArgument(Core.InvokeArgumentContext a) => new(
         a.VALUE() is not null, a.REFERENCE() is not null, a.CONTENT() is not null, Omitted: a.OMITTED() is not null,
         Expression: false, a.booleanExpression(), a.arithmeticExpression(), a.literal(), a.dataReference(),
-        a.addressIdentifier());
+        a.addressIdentifier(), a.SELF() is not null);
 
     /// <summary>The inline form's <c>argument</c> reading (§8.4.3.4.2). No passing phrase exists in that
     /// general format, so the mode is §14.9.23.4 GR6's default — exactly what a bare INVOKE argument takes.

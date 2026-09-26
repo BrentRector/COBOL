@@ -1,0 +1,41 @@
+      *> reject-at: 2002 2014 2023
+      *> kb/Work PB1137 - ISO 14.9.23.3 SR12: a bit data item passed BY
+      *> REFERENCE shall be aligned on a byte boundary. B2 starts at bit 1
+      *> of BG (8.5.1.6.3: bit items are assigned consecutively).
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB1137N3.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS PB1137N3K.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 O USAGE OBJECT REFERENCE PB1137N3K.
+       01 BG.
+          05 B1 PIC 1 USAGE BIT.
+          05 B2 PIC 1(7) USAGE BIT.
+       PROCEDURE DIVISION.
+       MAIN.
+           INVOKE PB1137N3K "NEW" RETURNING O.
+           INVOKE O "TAKEB" USING B2.
+           STOP RUN.
+       END PROGRAM PB1137N3.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. PB1137N3K INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. TAKEB.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LB PIC 1(7) USAGE BIT.
+       PROCEDURE DIVISION USING LB.
+           CONTINUE.
+       END METHOD TAKEB.
+       END OBJECT.
+       END CLASS PB1137N3K.

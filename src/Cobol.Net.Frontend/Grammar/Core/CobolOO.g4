@@ -219,11 +219,17 @@ invokeUsing
 // ADDRESS is reserved and heads no other alternative, so each arm is unambiguous and every spelling that parsed
 // before parses identically.
 invokeArgument
-    : BY? VALUE (addressIdentifier | arithmeticExpression)   // BY optional (kb/Work PB130 — only VALUE is underlined)
+    // BY optional (kb/Work PB130 — only VALUE is underlined). `literal` is the printed literal-2 of the BY VALUE brace
+    // and the carrier of the predefined NULL object reference (§8.4.3.7 — an identifier-5, which `figurativeConstant`
+    // spells): without it `USING BY VALUE NULL` was a parse error (kb/Work PB1137). The binder decides it.
+    : BY? VALUE (addressIdentifier | arithmeticExpression | literal)
     | BY? REFERENCE (addressIdentifier | dataReference | OMITTED)
-    | BY? CONTENT (addressIdentifier | {boolExprAhead()}? booleanExpression | literal | arithmeticExpression)
+    // SELF is identifier-5 (§8.4.3.8 — an identifier format whose only role bar is "shall not be a receiving
+    // operand"), so the BY CONTENT brace and the keyword-less form admit it (kb/Work PB1137); NULL rides `literal`.
+    | BY? CONTENT (addressIdentifier | SELF | {boolExprAhead()}? booleanExpression | literal | arithmeticExpression)
     | OMITTED
     | addressIdentifier   // §14.9.23.3 SR9 / SR19 — a sending operand whatever the mode
+    | SELF
     | dataReference
     | literal
     ;

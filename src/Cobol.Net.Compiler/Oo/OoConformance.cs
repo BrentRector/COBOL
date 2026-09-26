@@ -331,9 +331,34 @@ public static class OoConformance
                 $"S:{(item.IsAnyLength ? "*" : p.Length.ToString())}:{(item.Justified ? "J" : "N")}"
                 + (item.IsDynamicLength ? $":D{item.DynMaxSize}:{item.DynStructure?.Name}" : "")
                 + (IsAllX(p) ? "" : ClauseKey(item)),
+            // ⛔ CLASS POINTER CROSSES TOO (kb/Work PB1137). §14.8.2.3.2's class-pointer paragraph makes a data-pointer
+            // and a program-pointer conform to the same category, and "if either is a restricted pointer, both shall
+            // be restricted and of the same type" — so the key is the category plus the restriction, the SAME pair
+            // AddressDescriptor builds for an address-identifier argument. A program-pointer's restriction is keyed by
+            // its prototype's NAME, where the typed path compares signatures: two same-signature prototypes under
+            // different names raise EC-OO-UNIVERSAL here — a LOUD strictness delta, the by-ref group-prefix family.
+            PicCategory.Pointer => DataPointerKey(StrongTypeModel.PointerRestriction(item)),
+            PicCategory.ProgramPointer => ProgramPointerKey(p.RestrictedPrototypeName),
             _ => "T:!",
         };
     }
+
+    /// <summary>The conformance descriptor of an ADDRESS-IDENTIFIER argument crossing a universal dispatch (kb/Work
+    /// PB1137): §8.4.3.11.4 GR1 — "Data-address-identifier creates a unique data item of class pointer and category
+    /// data-pointer" —
+    /// restricted to the type of its operand when that is a strongly-typed group or a restricted data-pointer (GR2,
+    /// <see cref="StrongTypeModel.AddressOfRestriction"/>) — and §8.4.3.13.4 GR1 a program-address-identifier one of
+    /// category program-pointer, restricted by its prototype (GR3). Keyed exactly as
+    /// <see cref="ConformanceDescriptor"/> keys a pointer ITEM, so the callee's formal compares for equality.</summary>
+    public static string AddressDescriptor(BoundAddressOperand address) =>
+        address.Data is { } data ? DataPointerKey(StrongTypeModel.AddressOfRestriction(data.Item))
+        : ProgramPointerKey(address.Program!.Prototype);
+
+    private static string DataPointerKey(StrongTypeModel.TypeRestriction r) =>
+        "P:D:" + (r.IsRestricted ? r.Name!.ToUpperInvariant() : "*");
+
+    private static string ProgramPointerKey(string? prototype) =>
+        "P:P:" + (prototype is null ? "*" : prototype.ToUpperInvariant());
 
     /// <summary>The PICTURE-clause identity's descriptor suffix (<see cref="PictureClauseIdentity.Key"/>), or ""
     /// for an item with no PICTURE clause or an ANY LENGTH item (whose one-symbol picture is its length's
@@ -903,6 +928,22 @@ public static class OoConformance
             ? null
             : "a nonnumeric literal argument has no conforming MOVE into this formal parameter under any "
               + "literal category (ISO §14.8.2.3.3 rule 2d / §14.9.25.3 Table 16)";
+    }
+
+    /// <summary>ISO §14.8.2.3.3 rule 2d for a nonnumeric literal argument whose CATEGORY the bound node carries
+    /// (<c>BoundStringLiteral.Category</c> — an alphanumeric literal, plain or hexadecimal, a national literal or a
+    /// boolean literal): §14.9.25.3 Table 16 asked of THAT sender, which is what carrying the category buys over
+    /// <see cref="ContentAlphanumericLiteralMismatch"/>'s any-category reading (kb/Work PB1137 — a national literal at
+    /// an alphanumeric formal is Table 16's "No", and the any-category reading admitted it because an ALPHANUMERIC
+    /// literal would have moved). A group formal is §14.8.2.2 rule 2's MOVE, admitted by the GR4 conversion-free
+    /// copy. Null when conformant.</summary>
+    public static string? ContentNonNumericLiteralMismatch(DataItem formal, PicCategory literalCategory)
+    {
+        if (formal.IsGroup) return null;
+        return MoveTable16.Refusal(new Table16Operand(literalCategory), Table16Operand.Of(formal)) is { } why
+            ? $"a {literalCategory.ToString().ToLowerInvariant()} literal argument has no conforming MOVE into this "
+              + $"formal parameter: {why} (ISO §14.8.2.3.3 rule 2d)"
+            : null;
     }
 
     /// <summary>ISO §14.8.2.3.3 for a NUMERIC literal argument: rule 2a (COMPUTE) into a fixed-point numeric

@@ -226,7 +226,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // PlaceRenderer.Write's internal throw — an unhandled compiler exception).
                 if (host.Expr.ResolveReceiving(byRefDref) is not { } p)
                     return OperandUnresolved(byRefDref, "USING argument");
-                ScreenCallOperand(p, CobolPassMode.Reference, formatTwo, isReturning: false);
+                ScreenCallOperand(p, byRefDref, CobolPassMode.Reference, formatTwo, isReturning: false);
                 args.Add(new BoundCallArg(CobolPassMode.Reference, p, null));
             }
             else if (a.callByContent() is { } byContent)
@@ -266,7 +266,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     // Discriminated as identifier-2: the committed answer decides, never a fall-through to the
                     // expression arms (kb/Work PB1030).
                     if (host.Expr.ResolveSending(cDref) is var cr && cr.Place is not { } cp) return cr.Refusal(ctx.Edition);
-                    ScreenCallOperand(cp, CobolPassMode.Content, formatTwo, isReturning: false);
+                    ScreenCallOperand(cp, cDref, CobolPassMode.Content, formatTwo, isReturning: false);
                     args.Add(new BoundCallArg(CobolPassMode.Content, cp, null));
                 }
                 else if (cLit is { } clit)
@@ -333,7 +333,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     // identifier does. Probe-to-discriminate then Resolve-to-commit, the PB221 discipline.
                     // Resolve, never ResolveReceiving: SR17 makes it sending, so the receiving screens do
                     // not apply and their diagnostics would be false rejections.
-                    ScreenCallOperand(vp, CobolPassMode.Value, formatTwo, isReturning: false);
+                    ScreenCallOperand(vp, vdref, CobolPassMode.Value, formatTwo, isReturning: false);
                     // §14.9.4.3 SR22 over the RESOLVED item — the same screen the keyword-less BY VALUE
                     // argument runs. It no longer has to unwrap a BoundComputedOperand to recover the
                     // identifier-ness GR8 says was never lost.
@@ -415,8 +415,10 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // it is not a data item of any of those four sections, and SR20 names it explicitly as the ONE
                 // identifier permitted as a receiving operand for which "BY CONTENT may be omitted". Binding it
                 // BY REFERENCE made §8.4.3.9.4's desugar classify the occurrence ReadWrite (BoundStores) and
-                // invoke the SET accessor on an operand SR17 calls SENDING.
-                if (formatTwo && bareMode is CobolPassMode.Reference && ctx.Refs.IsObjectPropertyReference(bare))
+                // invoke the SET accessor on an operand SR17 calls SENDING. The test is the ONE SR3 question
+                // INVOKE's GR6 a) asks too (ParameterConformance — kb/Work PB1137), so a special register or
+                // factory/instance object data takes the same a)2 leg the property does.
+                if (formatTwo && bareMode is CobolPassMode.Reference && !host.Params.MeetsByReferenceRules(bare))
                 {
                     bareMode = CobolPassMode.Content;
                     byContentAssumed = true;
@@ -432,7 +434,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 }
                 else if ((bp = host.Expr.ResolveReceiving(bare)) is null)
                     return OperandUnresolved(bare, "USING argument");
-                ScreenCallOperand(bp, bareMode, formatTwo, isReturning: false);
+                ScreenCallOperand(bp, bare, bareMode, formatTwo, isReturning: false);
                 // §14.9.4.3 SR22's OTHER arm (kb/Work PB132): "identifier-4 OR ITS CORRESPONDING FORMAL
                 // PARAMETER is specified with a BY VALUE phrase" — the formal-derived Value mode (GR9 b))
                 // must meet the same class screen the explicit BY VALUE arm runs.
@@ -480,7 +482,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 else if (nDref is { } ndref)
                 {
                     if (host.Expr.ResolveSending(ndref) is var nr && nr.Place is not { } np) return nr.Refusal(ctx.Edition);   // kb/Work PB1030
-                    ScreenCallOperand(np, CobolPassMode.Content, formatTwo, isReturning: false);
+                    ScreenCallOperand(np, ndref, CobolPassMode.Content, formatTwo, isReturning: false);
                     args.Add(new BoundCallArg(CobolPassMode.Content, np, null));
                 }
                 else if (nArith is { } nax)
@@ -496,7 +498,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 {
                     if (host.Expr.ResolveReceiving(sd) is not { } sp)
                         return OperandUnresolved(sd, "USING argument");
-                    ScreenCallOperand(sp, mode, formatTwo, isReturning: false);
+                    ScreenCallOperand(sp, sd, mode, formatTwo, isReturning: false);
                     args.Add(new BoundCallArg(mode, sp, null));
                 }
                 else if (!formatTwo && !BareNeedsFormat2(bArith.GetText())) return BoundRejected.Reported(ctx.Edition);
@@ -618,7 +620,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             // kb/Work PB128: identifier-3 is a pure receiver — the chokepoint's screens apply.
             if (host.Expr.ResolveReceiving(rp.dataReference()) is not { } rpl)
                 return OperandUnresolved(rp.dataReference(), "RETURNING item");
-            ScreenCallOperand(rpl, CobolPassMode.Reference, formatTwo, isReturning: true);
+            ScreenCallOperand(rpl, rp.dataReference(), CobolPassMode.Reference, formatTwo, isReturning: true);
             returning = rpl;
         }
         // §14.9.4.3 SR25 → §14.8.3, RETURNING ITEMS — the half that had NO home at all (kb/Work PB204). SR25
@@ -1024,11 +1026,23 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     /// <summary>The CALL operand chokepoint (kb/Work PB132) — ISO §14.9.4.3 SR3/SR6/SR8/SR10/SR11/SR12/SR18
     /// over the RESOLVED mode (after GR5's transitivity or GR9's formal derivation), for every Place-carrying
     /// USING argument and the RETURNING item, so both arms of every dispatch meet the same law.</summary>
-    private void ScreenCallOperand(Place p, CobolPassMode mode, bool formatTwo, bool isReturning)
+    /// <param name="written">The operand's reference as written — the storage-section screen's object-property
+    /// test and its diagnostic text.</param>
+    private void ScreenCallOperand(Place p, Core.DataReferenceContext written, CobolPassMode mode, bool formatTwo,
+                                   bool isReturning)
     {
         var item = p.Item;
         string? name = item.CobolName;
         string role = isReturning ? "RETURNING item" : "USING argument";
+
+        // SR3 sentence 1 / SR7 — "a data item defined in the file, working-storage, local-storage, or linkage
+        // section" (kb/Work PB1137: a report's PAGE-COUNTER crossed BY REFERENCE and was a RETURNING item). SR3
+        // governs identifier-2, which is every USING operand of Format 1 and the BY REFERENCE operand of Format 2
+        // (Format 2's BY CONTENT / BY VALUE operand is identifier-4, which no section rule names); SR7 governs the
+        // RETURNING item of both formats. The ONE screen (ParameterConformance) INVOKE's SR9/SR11 ask too.
+        if (isReturning || !formatTwo || mode is CobolPassMode.Reference)
+            host.Params.ScreenSection(p, written, DiagnosticCatalog.CallOperandSection, $"CALL {role}",
+                isReturning ? "§14.9.4.3 SR7" : "§14.9.4.3 SR3", addressAdmitted: !isReturning);
 
         // ⛔ THE ANY LENGTH SCREEN IS EXACTLY AS WIDE AS THE TWO RULES THAT STATE IT (kb/Work PB240):
         //   SR11 (FORMAT 1) — "Identifier-2 and identifier-3 shall not be described with the ANY LENGTH clause":

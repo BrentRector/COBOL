@@ -248,15 +248,19 @@ public sealed class ReferenceResolver(DataBinder data)
     /// which is the pattern <c>SetBinder.BindSetLocale</c> already used.</para></summary>
     public ProbeResult? Probe(Core.DataReferenceContext dref) =>
         ResolveImpl(dref, report: false).Place is { } p
-            ? new ProbeResult(p.Item, p is RefModPlace rm ? rm.Category : p.Item.OperandPic?.Category)
+            ? new ProbeResult(p.Item, p is RefModPlace rm ? rm.Category : p.Item.OperandPic?.Category,
+                SectionDataItem.NonSectionKind(p))
             : null;
 
-    /// <summary>What a <see cref="Probe"/> may tell its caller: the resolved <see cref="DataItem"/> and the
+    /// <summary>What a <see cref="Probe"/> may tell its caller: the resolved <see cref="DataItem"/>, the
     /// operand CATEGORY of the reference (§8.4.3.3.4 GR6 for a reference-modified one — <see cref="RefModPlace"/>'s
     /// own reader — else <see cref="DataItem.OperandPic"/>, the D20 one reader, so a GROUP-USAGE group sniffs as
-    /// the boolean / national operand it is). Deliberately NOT a <see cref="Place"/>: a probe is unscreened, so a
-    /// Place it produced must never reach the bound tree (kb/Work PB221).</summary>
-    public readonly record struct ProbeResult(DataItem Item, PicCategory? OperandCategory);
+    /// the boolean / national operand it is), and — <paramref name="NonSectionKind"/> — what the reference is when
+    /// it is NOT "a data item defined in the file, working-storage, local-storage, or linkage section" (the
+    /// <see cref="SectionDataItem"/> question an activation's keyword-less argument asks BEFORE it chooses its
+    /// passing mode, kb/Work PB1137). Deliberately NOT a <see cref="Place"/>: a probe is unscreened, so a Place it
+    /// produced must never reach the bound tree (kb/Work PB221).</summary>
+    public readonly record struct ProbeResult(DataItem Item, PicCategory? OperandCategory, string? NonSectionKind);
 
     /// <summary>The drefs this resolver has already DIAGNOSED (an undefined name — <see cref="ReportUnidentified"/> —
     /// or a rejected reference shape: SR3 ref-mod-of-ref-mod, SR1 identifier-1 exclusion): one report per source

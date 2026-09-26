@@ -626,7 +626,24 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   `ValueArgumentClass`). ⚠ The function-identifier (`UdfBinder`) used to re-implement CALL's argument binding
   WITHOUT this regime, so a non-conforming function argument aliased its formal silently (kb/Work PB1418 /
   PB1115); `ActivationConformanceDriftTests` pins both lanes to the shared routine. INVOKE (`OoBinder`) still
-  dispatches the same `OoConformance` comparators from its own lane.
+  dispatches the same `OoConformance` comparators from its own lane for identifier arguments, but asks
+  `ParameterConformance.ContentConformanceReason` for its literal-2 verdict (kb/Work PB1137), so a literal gets one
+  answer from all three activations; a written nonnumeric literal is judged by its OWN category
+  (`OoConformance.ContentNonNumericLiteralMismatch` — a national literal does not move to an alphanumeric formal),
+  a figurative / ALL literal under any category.
+- **The activation OPERAND screens are shared by CALL and INVOKE (kb/Work PB1137).** §14.9.4.3 and §14.9.23.3 state
+  two operand rules in the same words, and `ParameterConformance` checks both for either statement: the
+  STORAGE-SECTION rule — a BY REFERENCE argument is "an address-identifier or … a data item defined in the file,
+  working-storage, local-storage, or linkage section" (CALL SR3, INVOKE SR9) and the RETURNING item such a data
+  item (CALL SR7, INVOKE SR11) — answered once from the resolved place by `Model/SectionDataItem` (a report's
+  PAGE-COUNTER, a sum counter, DEBUG-ITEM, EXCEPTION-OBJECT and every compiler temporary are not; an object property
+  is admitted by §8.4.3.9.3 SR5/SR6) and reported by `ScreenSection` (COBOLNET1677 / COBOLNET2452); and the
+  BIT-ALIGNMENT proof (CALL SR6/SR8, INVOKE SR12 — COBOLNET1683 / COBOLNET2453). The keyword-less MODE TEST both
+  general rules build on it — §14.9.4.4 GR9 a) (Format-2 CALL) and §14.9.23.4 GR6 a) (INVOKE): BY REFERENCE when
+  the argument meets the section rule and is not factory/instance object data, BY CONTENT otherwise — is
+  `MeetsByReferenceRules`, asked BEFORE the operand is resolved because the mode decides its role (receiving vs
+  sending). A keyword-less object property or PAGE-COUNTER therefore crosses BY CONTENT; through a UNIVERSAL
+  receiver (SR6: BY REFERENCE only) the same operand is refused.
 - **A function argument's passing manner is §8.4.3.2.4 GR5's (kb/Work PB1418).** BY VALUE when the formal is BY
   VALUE; BY REFERENCE for "an identifier that is permitted as a receiving operand, other than an object property
   or object data item" — asked of `ExpressionBinder.PermitsReceiving`, which consults the SAME prohibition table
