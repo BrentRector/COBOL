@@ -84,8 +84,9 @@ internal static class ConcatFolder
     }
 
     /// <summary>Fold the literal-1 of an <c>ALL literal-1</c> figurative — one literal or a concatenation of them
-    /// (§8.3.3.6.3 SR2) — to its equivalent single literal, DIAGNOSTIC-FREE (the version pass reports a class mix
-    /// and a zero-length literal-1): the value is the operands' decoded texts concatenated (§8.8.3.3 GR2), the class
+    /// (§8.3.3.6.3 SR2) — to its equivalent single literal, DIAGNOSTIC-FREE (the version pass's ALL arm reports a
+    /// class mix, a zero-length literal-1 and, through <see cref="ResultLengthViolation"/>, an over-long result, once
+    /// per written figurative — this fold runs at several binder sites): the value is the operands' decoded texts concatenated (§8.8.3.3 GR2), the class
     /// the first operand's. The text-plumbed DATA-division paths re-quote it through <see cref="Folded.RawText"/>
     /// (kb/Work PB71 — a VALUE ALL "A" &amp; "B" used to reach the raw-text ALL reader as the source text).</summary>
     public static Folded FoldAll(Core.AllLiteralContext al)
@@ -149,13 +150,21 @@ internal static class ConcatFolder
                     : $"figurative constant '{fig.GetText()}' (no character value)");
             }
         }
-        string value = sb.ToString();
-        // §8.8.3.2 SR2–SR4: the resulting value ≤ 8,191 character positions (alphanumeric / boolean / national).
-        if (value.Length > 8191)
-            edition.Error(DiagnosticCatalog.ConcatResultTooLong, $"the concatenated {Name(cat)} value is "
-                + $"{value.Length} character positions — the maximum is 8,191 (ISO §8.8.3.2 SR2–SR4)");
-        return new Folded(cat, value);
+        var folded = new Folded(cat, sb.ToString());
+        if (ResultLengthViolation(folded) is { } tooLong) edition.Error(DiagnosticCatalog.ConcatResultTooLong, tooLong);
+        return folded;
     }
+
+    /// <summary>§8.8.3.2 SR2–SR4 — the value a concatenation results in is at most 8,191 character positions of its
+    /// class (alphanumeric / boolean / national): the message, or null when <paramref name="folded"/> is within
+    /// bounds. ONE statement of the rule for both concatenation forms — the <c>&amp;</c> expression, reported by
+    /// <see cref="Fold"/>, and the concatenated ALL literal-1, whose fold is diagnostic-free and whose §8.8.3.2 rules
+    /// the version pass's ALL arm reports once per written figurative (kb/Work PB1393: that form had no length check
+    /// at all).</summary>
+    internal static string? ResultLengthViolation(Folded folded) =>
+        folded.Value.Length <= CobolLiteral.MaxLiteralPositions ? null
+            : $"the concatenated {Name(folded.Category)} value is {folded.Value.Length} character positions — the "
+              + $"maximum is {CobolLiteral.MaxLiteralPositionsText} (ISO §8.8.3.2 SR2–SR4)";
 
     /// <summary>THE ONE CHARACTER a KEYWORD figurative constant (ZERO · SPACE · QUOTE · HIGH-VALUE · LOW-VALUE ·
     /// NULL, with or without ALL) stands for in class <paramref name="cat"/> wherever its string is one character

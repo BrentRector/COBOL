@@ -197,6 +197,50 @@ public static class CobolLiteral
               + $"requires each hexadecimal character sequence to be {per} digits";
     }
 
+    /// <summary>The largest number of character positions a literal of ANY of the three classes may hold, and the
+    /// largest a concatenation expression may produce: ISO §8.3.3.2.3 SR1 (alphanumeric), §8.3.3.4.3 SR1
+    /// (boolean) and §8.3.3.5.3 SR1 (national) each print "shall be less than or equal to 8,191 … character
+    /// positions", and §8.8.3.2 SR2–SR4 print the same bound for the value a concatenation results in. Four rules,
+    /// one number, one symbol.</summary>
+    public const int MaxLiteralPositions = 8191;
+
+    /// <summary><see cref="MaxLiteralPositions"/> as the standard prints it ("8,191"), culture-invariant so a
+    /// diagnostic reads the same on every machine.</summary>
+    public static string MaxLiteralPositionsText { get; } =
+        MaxLiteralPositions.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// ⭐ THE §8.3.3 LITERAL LENGTH RULE, for all three classes and every format of each — a message naming the
+    /// offending clause, or <see langword="null"/> when the literal is within bounds or is not a quoted literal.
+    /// </summary>
+    /// <remarks>
+    /// The measure is the literal's VALUE in character positions of its class ("excluding the separators that
+    /// delimit the literal" — and so excluding the prefix letters, and counting a doubled embedded delimiter as the
+    /// one character it denotes): <c>X"4142"</c> is two alphanumeric positions, <c>NX"00410042"</c> two national
+    /// ones, and <c>BX"F"</c> FOUR boolean ones, because §8.3.3.4.4 GR5 maps each hexadecimal digit to four boolean
+    /// characters. That is exactly what <see cref="Decode"/> yields, so the rule asks the one codec.
+    /// <para>A malformed hexadecimal literal (<see cref="HexGroupViolation"/>) decodes to nothing and is reported
+    /// under that rule; its length is not separately judged.</para>
+    /// </remarks>
+    public static string? LengthViolation(string raw)
+    {
+        // Fast path for the overwhelmingly common short literal (this is asked of EVERY literal token): no format
+        // decodes to more positions than four per source character — BX"…" is the widest, four boolean characters
+        // per digit — so a token this short cannot exceed the cap, and no decode is allocated for it.
+        if (raw.Length <= MaxLiteralPositions / 4) return null;
+        if (ClassOf(raw) is not { } cls) return null;
+        int positions = Decode(raw).Length;
+        if (positions <= MaxLiteralPositions) return null;
+        (string name, string clause) = cls switch
+        {
+            LiteralClass.National => ("national", "§8.3.3.5.3 SR1"),
+            LiteralClass.Boolean => ("boolean", "§8.3.3.4.3 SR1"),
+            _ => ("alphanumeric", "§8.3.3.2.3 SR1"),
+        };
+        return $"is {positions} {name} character positions long — {clause} limits a {name} literal to "
+            + $"{MaxLiteralPositionsText}";
+    }
+
     /// <summary>Decode <paramref name="digits"/> as groups of <paramref name="perChar"/> hexadecimal digits, one
     /// character per group — the §8.3.3.5.4 GR4 hexadecimal-national mapping, and the shape §8.3.3.2's
     /// alphanumeric hex form uses with <paramref name="perChar"/> = 2. A trailing partial group violates

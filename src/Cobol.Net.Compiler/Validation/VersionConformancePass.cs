@@ -2308,28 +2308,20 @@ internal sealed class VersionConformancePass
             if ((nat || ctx.BOOLLIT() is not null) && InStatement(ctx))
                 _p.Check(nat ? Constructs.NationalData2002 : Constructs.BooleanData2002,
                     nat ? "national literal N\"…\"" : "boolean literal B\"…\"");
-            // §8.3.3.2.3 r6 / §8.3.3.5.3 r5 — the hexadecimal GROUPING rule (fix-queue R03). Checked HERE because
-            // this override is the one place that sees EVERY nonNumericLiteral in the unit, VALUE clauses and
-            // level-88 operands included — not only the statement-scoped ones the introduction gates above screen.
-            // ⛔ IT IS DELIBERATELY NOT A LEXER RULE. A lexer that refused an odd digit count would not reject the
-            // program: the token would simply fail to match, `X"414"` would split into an IDENTIFIER and a
-            // STRINGLIT, and the literal would be back in the SILENT-degradation hole R03 exists to close. The
-            // token must match so that something is left to diagnose.
-            // ⚠ The pass's own §8.3.2.1 word-length check (VisitCobolWord) is the precedent for a syntax rule
-            // living in this walker: it is the tree walk, not a version-only walk.
-            foreach (var t in new[] { ctx.HEXLIT(), ctx.NATLIT(), ctx.BOOLLIT() })
-                if (t is not null && CobolLiteral.HexGroupViolation(t.GetText()) is { } why)
-                    _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.HexLiteralDigitGrouping.Code,
-                        EditionSeverity.Error, DiagnosticCatalog.HexLiteralDigitGrouping.Id,
-                        $"the literal {t.GetText()} {why}", "", "ISO §8.3.3"));
+            // The literal's OWN syntax rules — the §8.3.3 length and hexadecimal-grouping rules — are LiteralScreenPass's,
+            // asked of every literal TOKEN wherever it is written (kb/Work PB1393). The grouping rule used to be asked
+            // here and in the ALL arm below, and a concatenation operand and a keyword-omitted intrinsic argument
+            // slipped past both.
             return base.VisitChildren(ctx);
         }
 
         /// <summary>The <c>ALL literal</c> figurative's literal-1 (ISO §8.3.3.6.3 SR2 — kb/Work PB71): a national or
         /// boolean literal-1 is the same COBOL-2002 introduction as the bare literal (statement-scoped, as above —
-        /// a VALUE clause's is the data/PIC gate's), and a hexadecimal literal-1 of any class takes the §8.3.3 digit
-        /// GROUPING check. The tokens are direct children of figurativeConstant, not of nonNumericLiteral, so the
-        /// override above never saw them — `ALL B"1"` at --std 85 was ungated.</summary>
+        /// a VALUE clause's is the data/PIC gate's). The tokens are direct children of figurativeConstant, not of
+        /// nonNumericLiteral, so the override above never saw them — `ALL B"1"` at --std 85 was ungated. A
+        /// CONCATENATED literal-1 is a §8.8.3 concatenation expression and takes its syntax rules here, once per
+        /// written figurative: SR1's one class and SR2–SR4's 8,191-position result (the value folds through the
+        /// binder's diagnostic-free <see cref="ConcatFolder.FoldAll"/>, so nothing else asks them — kb/Work PB1393).</summary>
         public override object? VisitFigurativeConstant(CobolParserCore.FigurativeConstantContext ctx)
         {
             var ops = ctx.allLiteral()?.allLiteralOperand() ?? [];
@@ -2340,19 +2332,11 @@ internal sealed class VersionConformancePass
                     nat ? "the figurative ALL N\"…\"" : "the figurative ALL B\"…\"");
             // A concatenated literal-1 uses the & operator — the COBOL-2002 introduction (§8.8.3), position-blind.
             if (ops.Length > 1) _p.Check(Constructs.ConcatOperator2002, "a concatenation expression (the & operator) as ALL literal-1");
-            bool malformedHex = false;
-            foreach (var o in ops)
-                if ((o.HEXLIT() ?? o.NATLIT() ?? o.BOOLLIT()) is { } t && CobolLiteral.HexGroupViolation(t.GetText()) is { } why)
-                {
-                    malformedHex = true;
-                    _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.HexLiteralDigitGrouping.Code,
-                        EditionSeverity.Error, DiagnosticCatalog.HexLiteralDigitGrouping.Id,
-                        $"the literal {t.GetText()} {why}", "", "ISO §8.3.3"));
-                }
-            // §8.3.3.6.3 SR2 — literal-1 "shall be neither a figurative constant nor a zero-length literal" (a
-            // malformed hexadecimal literal-1 decodes to nothing and is already reported above); the operands of a
-            // concatenated literal-1 are of ONE class (§8.8.3.2 SR1).
-            if (!malformedHex && ops.All(o => CobolLiteral.Decode(o.GetText()).Length == 0))
+            // §8.3.3.6.3 SR2 — literal-1 "shall be neither a figurative constant nor a zero-length literal". Asked
+            // STRUCTURALLY (CobolLiteral.IsZeroLength — contiguous delimiters), never as "decodes to nothing": a
+            // malformed hexadecimal literal-1 decodes to nothing too, and is LiteralScreenPass's COBOLNET1635, not
+            // this rule. The operands of a concatenated literal-1 are of ONE class (§8.8.3.2 SR1).
+            if (ops.All(o => CobolLiteral.IsZeroLength(o.GetText())))
                 _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.AllLiteralZeroLength.Code,
                     EditionSeverity.Error, DiagnosticCatalog.AllLiteralZeroLength.Id,
                     $"'{ctx.GetText()}': the literal-1 of an ALL figurative shall not be a zero-length literal (ISO §8.3.3.6.3 SR2)",
@@ -2362,6 +2346,10 @@ internal sealed class VersionConformancePass
                     EditionSeverity.Error, DiagnosticCatalog.ConcatClassMismatch.Id,
                     $"'{ctx.GetText()}': the operands of a concatenated ALL literal-1 shall be of the same class (ISO §8.8.3.2 SR1)",
                     "", "ISO §8.8.3.2 SR1"));
+            if (ops.Length > 1 && ConcatFolder.ResultLengthViolation(ConcatFolder.FoldAll(ctx.allLiteral())) is { } tooLong)
+                _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.ConcatResultTooLong.Code,
+                    EditionSeverity.Error, DiagnosticCatalog.ConcatResultTooLong.Id,
+                    $"the concatenated ALL literal-1: {tooLong}", "", "ISO §8.8.3.2 SR2–SR4"));
             return base.VisitChildren(ctx);
         }
 

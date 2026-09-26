@@ -217,8 +217,8 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // path); this reuses it rather than decoding again.
         if (nn.HEXLIT() is { } hx) return new BoundStringLiteral(CobolLiteral.DecodeHex(hx.GetText()));
         // National N"…" (§8.3.3.5) / boolean B"…" (§8.3.3.4) literals — LIVE (Phase 4a): the introduction
-        // gate rides every occurrence (0900 below 2002); content/size guards are the 0814 band. The lexer
-        // already restricts a BOOLLIT's content to [01]+ (CobolLexer.g4).
+        // gate rides every occurrence (0900 below 2002); the length rule (COBOLNET0814) is LiteralScreenPass's, for
+        // every class and position. The lexer already restricts a BOOLLIT's content to [01]+ (CobolLexer.g4).
         if (nn.NATLIT() is { } nat) return NationalLiteralOperand(nat.GetText());
         if (nn.BOOLLIT() is { } b) return BooleanLiteralOperand(b.GetText());
         return null;
@@ -247,35 +247,23 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         };
     }
 
-    /// <summary>Bind an <c>N"…"</c> national literal (ISO §8.3.3.5): SR1 caps the length at 8,191 national
-    /// positions. The content repertoire is the FULL national character set — one UTF-16 char per position
-    /// (D-N1, §8.1.2 NOTE 2) — including characters above U+00FF: the alphanumeric↔national correspondence
-    /// (Annex A.1 item 33 — the TOTAL UTF-16 identity, both directions, PB59) is live through
-    /// FUNCTION DISPLAY-OF / NATIONAL-OF (§15.26/§15.66), so the former staged-loud Latin-1-only guard is
-    /// lifted (P10 national wave).</summary>
-    public BoundStringLiteral NationalLiteralOperand(string raw)
-    {
+    /// <summary>Bind an <c>N"…"</c> national literal (ISO §8.3.3.5). The content repertoire is the FULL national
+    /// character set — one UTF-16 char per position (D-N1, §8.1.2 NOTE 2) — including characters above U+00FF: the
+    /// alphanumeric↔national correspondence (Annex A.1 item 33 — the TOTAL UTF-16 identity, both directions, PB59)
+    /// is live through FUNCTION DISPLAY-OF / NATIONAL-OF (§15.26/§15.66), so the former staged-loud Latin-1-only
+    /// guard is lifted (P10 national wave). The §8.3.3.5.3 SR1 length and SR5 grouping rules are the literal's
+    /// own and LiteralScreenPass asks them of every literal token (kb/Work PB1393) — never a binder funnel.</summary>
+    public BoundStringLiteral NationalLiteralOperand(string raw) =>
         // NationalData2002 (the N"…" literal introduction) gates on RECOGNITION in the VersionConformancePass
         // parse-arm (VisitNonNumericLiteral, statement-scoped); Step 14h.4b.
-        string value = CobolLiteral.Decode(raw);
-        if (value.Length > 8191)
-            ctx.Edition.Error("COBOLNET0814", $"national literal of {value.Length} positions exceeds the "
-                + "8,191-position maximum (ISO §8.3.3.5.3 SR1)");
-        return new BoundStringLiteral(value) { Category = PicCategory.National };
-    }
+        new(CobolLiteral.Decode(raw)) { Category = PicCategory.National };
 
-    /// <summary>Bind a <c>B"…"</c> boolean literal (ISO §8.3.3.4): SR1 caps the length at 8,191 boolean
-    /// positions; SR2 ('0'/'1' only) is lexer-enforced.</summary>
-    public BoundStringLiteral BooleanLiteralOperand(string raw)
-    {
+    /// <summary>Bind a <c>B"…"</c> boolean literal (ISO §8.3.3.4): SR2 ('0'/'1' only) is lexer-enforced, and the
+    /// §8.3.3.4.3 SR1 length rule is LiteralScreenPass's (kb/Work PB1393).</summary>
+    public BoundStringLiteral BooleanLiteralOperand(string raw) =>
         // BooleanData2002 (the B"…" literal introduction) gates on RECOGNITION in the VersionConformancePass
         // parse-arm (VisitNonNumericLiteral, statement-scoped); Step 14h.4b.
-        string value = CobolLiteral.Decode(raw);
-        if (value.Length > 8191)
-            ctx.Edition.Error("COBOLNET0814", $"boolean literal of {value.Length} positions exceeds the "
-                + "8,191-position maximum (ISO §8.3.3.4.3 SR1)");
-        return new BoundStringLiteral(value) { Category = PicCategory.Boolean };
-    }
+        new(CobolLiteral.Decode(raw)) { Category = PicCategory.Boolean };
 
     /// <summary>Bind a figurative constant to a bound operand. <c>ALL "literal"</c> / <c>ALL X"…"</c> (a
     /// multi-character figurative, ISO §8.3.3.6.4 Format 6) → <see cref="BoundAllLiteral"/>; <c>ALL ZEROS</c> etc.

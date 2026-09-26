@@ -887,11 +887,13 @@ fragment HEXDIGITS : [0-9a-f]* ;                                                
 // the hex sequence OPTIONAL, verified at 300 dpi 2026-08-09): one body, both delimiters, zero length legal —
 // the Group-B discipline. The apostrophe arm used to hard-code `+`, so X'' split into IDENTIFIER + a
 // zero-length Format-1 literal and NATIONAL-OF(X'') drew 1546 on the WRONG argument (PB59 / AR-15.66.3-3).
-// ⚠ NO SUB_HEXLIT TWIN, BY MEASUREMENT (PB59, probe pb59f2_subhex): the keyword-omitted intrinsic capture
-// re-lexes its argument text in DEFAULT mode — NATIONAL-OF(X'41') answers through it — and a hex literal is
-// not a legal SUBSCRIPT (§8.4.2.3 subscripts are integers), so the SUBSCRIPT mode has no HEXLIT production
-// to mirror. Reachability was probed, not deduced; a future capture path that re-lexes in SUBSCRIPT mode
-// must add the twin from this fragment.
+// ⛔ SUB_HEXLIT IS ITS SUBSCRIPT-MODE TWIN (kb/Work PB1393). The keyword-omitted intrinsic capture re-lexes its
+// argument text in DEFAULT mode, so the VALUE never needed the twin (PB59 measured that); the literal SYNTAX
+// SCREEN does. LiteralScreenPass asks the §8.3.3 length and grouping rules of every literal TOKEN of the unit's
+// one tree, and the re-parsed fragment is not part of that tree — so a captured literal is screened as its
+// SUBSCRIPT-mode token or not at all. Without the twin, `LENGTH(X"414")` lexed here as SUB_IDENTIFIER `X` +
+// SUB_STRINGLIT `"414"` and the malformed hexadecimal literal decoded to "" in silence. LiteralScreenDriftTests
+// requires every token defined over one of these literal body fragments to be in the screen's token set.
 fragment HEX_BODY  : [x] '"' HEXDIGITS '"' | [x] '\'' HEXDIGITS '\'' ;
 fragment NAT_BODY  : 'N' STR_BODY                                                    // NATLIT / SUB_NATLIT F1
                    | 'NX' '"' HEXDIGITS '"'                                          // §8.3.3.5.2 Format 2
@@ -1130,6 +1132,9 @@ SUB_STRINGLIT       : STR_BODY ;
 // misbound FUNCTION LENGTH(N"AB") before these tokens existed (Phase 4a, the proper-token rule).
 SUB_NATLIT          : NAT_BODY ;
 SUB_BOOLLIT         : BOOL_BODY ;
+// Hexadecimal-alphanumeric X"…" (§8.3.3.2 Format 2) — the twin of HEXLIT, for the literal syntax screen (see
+// HEX_BODY above). Longest match makes it beat SUB_IDENTIFIER's one-character `X`.
+SUB_HEXLIT          : HEX_BODY ;
 
 // Data-name / index-name (must follow keywords to avoid capturing OF/IN/ALL)
 SUB_IDENTIFIER      : NAME_BODY ;

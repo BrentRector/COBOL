@@ -4431,13 +4431,13 @@
   "ordinal": 1,
   "subject": "Alphanumeric literals",
   "rule-digest": "5d34f280ee4c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NonNumericLiteralOperand; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NationalLiteralOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation",
+  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; unit:LiteralScreenDriftTests.LiteralRule_HasOneReportingSite",
   "derivation": "",
-  "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1393 (registrar 15b). cite.py --check 8.3.3.2.3 \"shall be less than or equal to 8,191 alphanumeric character positions\" OK. UNENFORCED for both formats and every position: NonNumericLiteralOperand's STRINGLIT and HEXLIT arms construct BoundStringLiteral with no length check, while the NATLIT/BOOLLIT arms beside them (NationalLiteralOperand / BooleanLiteralOperand) each carry the 8,191 cap (COBOLNET0814) for their own SR1 -- the two-arm shape. A repo-wide grep for 8191 finds only the national/boolean arms, ConcatFolder (8.8.3.2 SR2-SR4) and runtime intrinsic guards. Probes: p5 MOVE/LENGTH of an 8,192-character \"A...\" literal compiles clean and prints 8192; p6 9,000 prints 9000; p13 VALUE \"A\"x8192, VALUE X\"41\"x8192 and LENGTH(X\"41\"x8192) all compile clean (8192). Expected: a compile-time diagnostic for each (a syntax rule violation). The 8,191 control (p4) is accepted, correctly. || editions as written by the adjudicator: 2014, 2023 (Annex E itemizes the 2014->2023 delta and lists no change to 8.3.3.2, so the rule stands in both; the 1985/2002 edge is NOT derivable in-repo -- no 2002 or 1985 text is held); the 1985 limit was different (160 in COBOL-85 per general knowledge) but no 1985 text is in-repo to cite",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.2.3 \"The length of an alphanumeric literal, excluding the separators that delimit the literal, shall\" -> OK SR1. The rule is asked of EVERY literal token (DEFAULT-mode and SUBSCRIPT-mode twins) by LiteralScreenPass -> COBOLNET0814: MOVE, VALUE (Format 1 and X\"...\" hex, 8,192 pairs), VALUE ALL, CONSTANT all rejected at 8,192 and accepted at 8,191 (LiteralScreenTests). Before: only the national/boolean procedure-operand arms checked any length; an over-long alphanumeric literal compiled clean everywhere.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.2.3-2",
@@ -4506,13 +4506,13 @@
   "ordinal": 6,
   "subject": "Alphanumeric literals",
   "rule-digest": "e6c0e2b977bc",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs",
-  "test-ref": "conformance:negative/r03-hex-literal-digit-grouping",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_HEXLIT",
+  "test-ref": "conformance:negative/r03-hex-literal-digit-grouping; conformance:negative/pb1393-concat-operand-hex-grouping; conformance-test:LiteralScreenTests.HexGrouping_IsScreenedAtEveryPosition; conformance:2002/pb1393_hex_literal_positions",
   "derivation": "",
-  "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1393 (registrar 15b). cite.py --check 8.3.3.2.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal digits\" OK. The implementor's number is TWO (one byte per alphanumeric character; HexGroupViolation's \"X\" => 2), stated in the COBOLNET1635 text in DIAGNOSTICS.md (Annex A.1 item 9 documentation is rule DOC-A.1-9, not this one). Probe p3: VALUE X\"414\" and MOVE X'414' each draw COBOLNET1635 (both delimiters, both DATA and PROCEDURE positions); even counts decode pairwise (p1). The negative fixture pins COBOLNET1635 on LENGTH(X\"414\"). || REFUTED: PARTIAL — The two-digit grouping rule is enforced only where the HEXLIT token is a DIRECT child of nonNumericLiteral or of an ALL figurative (VersionConformancePass.VisitNonNumericLiteral / VisitFigurativeConstant). A hexadecimal literal that is an operand of a concatenation expression (8.8.3), which is a concatOperand, is never checked. X\"4\" / X\"414\" there compiles with no diagnostic and ConcatFolder's DecodeHex silently decodes it to the empty string. This is the same silent-degradation hole COBOLNET1635 exists to close. || editions as written by the adjudicator: 2014, 2023 (Annex E itemizes the 2014->2023 delta and lists no change to 8.3.3.2, so the rule stands in both; the 1985/2002 edge is NOT derivable in-repo -- no 2002 or 1985 text is held)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.2.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal\" -> OK SR6 (implementor's number: two, DOC-A.1-9). The refuter's hole is closed: \"Z\" & X\"4\" (a concatOperand), ALL \"A\" & X\"4\" and the keyword-omitted LENGTH(X\"414\") are each rejected COBOLNET1635 once; the screen is on the literal TOKEN (LiteralScreenPass), and the keyword-omitted capture's X\"...\" now lexes as the SUBSCRIPT-mode twin SUB_HEXLIT so the screen sees it. Well-formed values unchanged (pb1393_hex_literal_positions: LENGTH(X\"4142\")=2).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.3.3.2.4-1",
@@ -4731,13 +4731,13 @@
   "ordinal": 1,
   "subject": "Boolean literals",
   "rule-digest": "b40cdd5515b3",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#BooleanLiteralOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs; src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs#BoundAllLiteral",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation",
+  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; conformance-test:NationalBooleanLiteralTests.BooleanLiteral_Over8191Positions_Rejects0814",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1393 (registrar 15b). 'The length of a boolean literal, excluding the separators that delimit the literal, shall be less than or equal to 8,191 boolean character positions' (cite.py --check 8.3.3.4.3 SR1 OK). ENFORCED ONLY in the procedure operand funnel ExpressionBinder.BooleanLiteralOperand (decoded length > 8191 -> COBOLNET0814): probe bl5 DISPLAY BX of 2048 digits (8192 positions) -> 0814 (decoded positions are the right measure per GR6); conformance-test:NationalBooleanLiteralTests.BooleanLiteral_Over8191Positions_Rejects0814 pins DISPLAY B\"<8192>\". NOT ENFORCED elsewhere: probe bl4 `01 B1 PIC 1(8192) VALUE B\"<8192 zeros>\"` compiles and runs clean; bl8 VALUE BX\"<2048 digits>\" clean; bl9 level-88 VALUE B\"<8192>\" clean; bl6 MOVE ALL B\"<8192>\" TO B1 clean (the ALL literal-1 goes through BoundAllLiteral.Of, not BooleanLiteralOperand). The CONSTANT arm DataBinder.Constants.cs:223 decodes BOOLLIT with no length check (read, not probed). Expected COBOLNET0814 on each. Sibling out of subject, same mechanism: bl10 PIC X(8192) VALUE \"<8192 A>\" and PIC N(8192) VALUE N\"<8192>\" compile clean. The existing 0814 test covers only the procedure half, so it cannot close the row. No kb/Work note owns this (searched 0814/8,191: PB59/PB125/PB383 are unrelated, landed). || editions as written by the adjudicator: 2002, 2014, 2023 (boolean literals are a COBOL-2002 introduction, gated COBOLNET0900 at --std 85 - probe bl7; the zero-length-literal introduction edge is not derivable from the in-repo 2023 text, whose Annex E lists only the 2014->2023 delta)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.4.3 \"The length of a boolean literal, excluding the separators that delimit the literal, shall\" -> OK SR1. Measured in boolean positions of the decoded value, so BX\"<2048 digits>\" is 8,192 (8.3.3.4.4 GR5 maps each digit to four boolean characters). VALUE, BX VALUE, level-88 VALUE, MOVE ALL B\"...\" and DISPLAY B\"...\" each rejected COBOLNET0814 exactly once at 8,192, accepted at 8,191.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.4.3-2",
@@ -4881,13 +4881,13 @@
   "ordinal": 1,
   "subject": "National literals",
   "rule-digest": "95492ee31c56",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NationalLiteralOperand; src/Cobol.Net.Compiler/Binding/DataBinder.cs; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#FigurativeOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation",
+  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; conformance-test:NationalBooleanLiteralTests.NationalLiteral_Over8191Positions_Rejects0814",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (registrar 15c). cite.py --check 8.3.3.5.3 \"shall be less than or equal to 8,191 national character positions\" -> OK (rule 1). The 8,191 cap is enforced ONLY in ExpressionBinder.NationalLiteralOperand (procedure operands; probe s4 MOVE N\"<8192>\" and s7 keyword-omitted LENGTH(N\"<8192>\") -> COBOLNET0814; s3 NX with 8192 groups -> 0814) and in ConcatFolder (s8 -> COBOLNET1545). It is NOT enforced for a literal in a DATA DIVISION VALUE clause: probe s1 `01 NB PIC N(8192) VALUE N\"<8192 A>\".` compiles and runs (prints X), and probe s5 `VALUE ALL N\"<8192 A>\"` likewise. Expected: COBOLNET0814 at every literal position. Sibling (not this subject): probe s6 `01 XB PIC X(8192) VALUE \"<8192 A>\"` also compiles - §8.3.3.2.3 SR1 (cite.py --check 8.3.3.2.3 \"shall be less than or equal to 8,191\" -> OK) has the same hole. The existing NationalLiteral_Over8191Positions_Rejects0814 covers only the procedure half. [editions as adjudicated: COBOL-2002, COBOL-2014, COBOL-2023 (national literals are a COBOL-2002 introduction; absent from COBOL-85, where the construct is rejected COBOLNET0900 via Constructs.NationalData2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.5.3 \"The length of a national literal, excluding the separators that delimit the literal, shall\" -> OK SR1. VALUE N\"<8192>\" (formerly compiled clean) and DISPLAY N\"<8192>\" rejected COBOLNET0814 once each; 8,191 accepted. One screen for every class and position (LiteralScreenPass).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.5.3-2",
@@ -4941,13 +4941,13 @@
   "ordinal": 5,
   "subject": "National literals",
   "rule-digest": "fae30fea2708",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitNonNumericLiteral; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation",
+  "test-ref": "conformance-test:LiteralScreenTests.HexGrouping_IsScreenedAtEveryPosition; conformance:2002/pb1393_hex_literal_positions",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (registrar 15c). cite.py --check 8.3.3.5.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal digits\" -> OK (rule 5). Implementor number = 4 (D-N1, one UTF-16 unit); HexGroupViolation reports COBOLNET1635, called only from VersionConformancePass.VisitNonNumericLiteral / VisitFigurativeConstant. Probes n2 (MOVE NX\"041\"), n3 (VALUE NX\"041\"), n7 (MOVE ALL NX\"041\"), m1 (FUNCTION LENGTH(NX\"041\")) -> COBOLNET1635 correctly. BUT the keyword-omitted intrinsic form re-parses its argument text through FunctionArgFragment, which that visitor never walks: probe n4 `MOVE LENGTH(NX\"041\") TO L` (REPOSITORY FUNCTION ALL INTRINSIC) compiles clean and prints 0000 - the malformed literal decodes to \"\" silently, precisely the pre-R03 wrong answer HexGroupViolation's own remark describes. Probe m4 UPPER-CASE(NX\"00610\") draws the wrong-rule COBOLNET1627 (§15.97.3 r1) instead. Sibling: m2 LENGTH(X\"414\") -> 0000 silently and m3 NATIONAL-OF(X\"414\") -> wrong-rule COBOLNET1546. The r03-hex-literal-digit-grouping negative covers only X\"414\" (no NX case), so no NX test exists. Documentation of the '4' is Annex A.1 item 122 (cite.py --check A.1 \"National literals (number of hexadecimal digits that map to a national character)\" -> OK), absent from CONFORMANCE.md §7. [editions as adjudicated: COBOL-2002, COBOL-2014, COBOL-2023 (national literals are a COBOL-2002 introduction; absent from COBOL-85, where the construct is rejected COBOLNET0900 via Constructs.NationalData2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.5.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal\" -> OK SR5 (four, DOC-A.1-122). The keyword-omitted LENGTH(NX\"041\") (formerly 0000, silent) and the concatenation operand N\"Z\" & NX\"041\" are rejected COBOLNET1635 once each: SUB_NATLIT is screened in the main tree. LENGTH(NX\"00410042\") keyword-omitted = 2 (golden).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.3.3.5.4-1",
@@ -9366,13 +9366,13 @@
   "ordinal": 2,
   "subject": "Concatenation expressions",
   "rule-digest": "a2f070a1f8a0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#ResultLengthViolation; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitFigurativeConstant",
+  "test-ref": "conformance-test:LiteralScreenTests.ConcatenatedAllLiteral_ResultLength_IsScreened",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1393 (registrar 15b). --check 8.8.3.2 \"the length of the value resulting from concatenation shall be less than or equal to 8,191 alphanumeric character positions\" -> OK. ConcatFolder.Fold measures the folded value and reports COBOLNET1545 when > 8191. PROBE (free form): 4096+4095 chars -> compiles, FUNCTION LENGTH = 8191 (CCL1); 4096+4096 -> COBOLNET1545 'the concatenated alphanumeric value is 8192 character positions' (CCL2); 8191-char literal & SPACE -> 1545 (CCL6: the figurative is one character, §8.3.3.6.4 GR3a). Boundary exact on both sides. No negative golden exists for COBOLNET1545 — test-needed. || REFUTED: DIVERGES — The adjudicator verified only the plain concatenation (ConcatFolder.Fold). A concatenation expression is also legal as the literal-1 of ALL literal-1 (§8.3.3.6.3 SR2 says literal-1 'may be a concatenation expression'). That path folds through ConcatFolder.FoldAll, which is documented as DIAGNOSTIC-FREE and has no 8,191 check. VersionConformancePass reports only a class mix and a zero-length literal-1 there (the only ConcatResultTooLong reference in src is ConcatFolder.cs:155). So an over-length concatenation expression of class alphanumeric compiles and runs silently. That is a syntax-rule violation accepted without a diagnostic. The Fold boundary itself is exact. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.8.3.2 \"For operands of class alphanumeric, the length of the value resulting from concatenation shall\" -> OK SR2. Both concatenation forms: the & expression (ConcatFolder.Fold, boundary exact 8,191/8,192 per the adjudicator) and the concatenated ALL literal-1 (8.3.3.6.3 SR2), whose fold is diagnostic-free and which the refuter found unchecked - now ALL \"<4096>\" & \"<4096>\" is COBOLNET1545 once, 4096+4095 legal. One statement of the rule: ConcatFolder.ResultLengthViolation.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.3.2-3",
@@ -9381,13 +9381,13 @@
   "ordinal": 3,
   "subject": "Concatenation expressions",
   "rule-digest": "56d52531c3d7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#ResultLengthViolation; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitFigurativeConstant",
+  "test-ref": "conformance-test:LiteralScreenTests.ConcatenatedAllLiteral_ResultLength_IsScreened",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1393 (registrar 15b). --check 8.8.3.2 \"the length of the value resulting from concatenation shall be less than or equal to 8,191 boolean character positions\" -> OK. Same Fold length check, class boolean. PROBE: B\"1\"x4096 & B\"0\"x4095 -> LEN=8191 (CCL5); 4096+4096 -> COBOLNET1545 'the concatenated boolean value is 8192' (CCL4). No negative golden — test-needed. || REFUTED: DIVERGES — The adjudicator verified only the plain concatenation (ConcatFolder.Fold). A concatenation expression is also legal as the literal-1 of ALL literal-1 (§8.3.3.6.3 SR2 says literal-1 'may be a concatenation expression'). That path folds through ConcatFolder.FoldAll, which is documented as DIAGNOSTIC-FREE and has no 8,191 check. VersionConformancePass reports only a class mix and a zero-length literal-1 there (the only ConcatResultTooLong reference in src is ConcatFolder.cs:155). So an over-length concatenation expression of class boolean compiles and runs silently. That is a syntax-rule violation accepted without a diagnostic. The Fold boundary itself is exact. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.8.3.2 \"For operands of class boolean, the length of the value resulting from concatenation shall\" -> OK SR3. ALL B\"<4096>\" & B\"<4096>\" rejected COBOLNET1545 once; 4096+4095 legal; the & expression form unchanged (ConcatFolder.Fold).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.3.2-4",
@@ -9396,13 +9396,13 @@
   "ordinal": 4,
   "subject": "Concatenation expressions",
   "rule-digest": "34beffd4e616",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#ResultLengthViolation; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitFigurativeConstant",
+  "test-ref": "conformance-test:LiteralScreenTests.ConcatenatedAllLiteral_ResultLength_IsScreened",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1393 (registrar 15b). --check 8.8.3.2 \"the length of the value resulting from concatenation shall be less than or equal to 8,191 national character positions\" -> OK. Same Fold check, class national (one UTF-16 unit = one national character position in this repertoire). PROBE: N\"..\"x4096 & N\"..\"x4096 -> COBOLNET1545 'the concatenated national value is 8192' (CCL3). The 8191 accept side for national was not separately probed (the check is one class-independent comparison, verified at 8191 for alphanumeric and boolean). No negative golden — test-needed. || REFUTED: DIVERGES — The adjudicator verified only the plain concatenation (ConcatFolder.Fold). A concatenation expression is also legal as the literal-1 of ALL literal-1 (§8.3.3.6.3 SR2 says literal-1 'may be a concatenation expression'). That path folds through ConcatFolder.FoldAll, which is documented as DIAGNOSTIC-FREE and has no 8,191 check. VersionConformancePass reports only a class mix and a zero-length literal-1 there (the only ConcatResultTooLong reference in src is ConcatFolder.cs:155). So an over-length concatenation expression of class national compiles and runs silently. That is a syntax-rule violation accepted without a diagnostic. The Fold boundary itself is exact. The national accept side, which the adjudicator left unprobed, is correct: RL3 at 8191 gives LEN=08191. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.8.3.2 \"For operands of class national, the length of the value resulting from concatenation shall\" -> OK SR4. ALL N\"<4096>\" & N\"<4096>\" rejected COBOLNET1545 once; 4096+4095 legal (national accept side now pinned, which the adjudicator left unprobed).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.3.3-1",
@@ -62001,13 +62001,13 @@
   "ordinal": 9,
   "subject": "Alphanumeric literals (number of hexadecimal digits that map to an alphanumeric character)",
   "rule-digest": "f48066e43558",
-  "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-9; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#DecodeHex",
-  "test-ref": "conformance:negative/r03-hex-literal-digit-grouping",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-9; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs",
+  "test-ref": "conformance:negative/r03-hex-literal-digit-grouping; conformance:negative/pb1393-concat-operand-hex-grouping; conformance:2002/pb1393_hex_literal_positions",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "The determination (two hex digits per alphanumeric character) is written and matches the code: probes /tmp/adj/doc/doc-w1-s1/probe/i9a.cob (X\"41424344\"=ABCD, X\"4a4B\"=JK, LENGTH(X\"414243\")=3) and i9b.cob (VALUE X\"414\" and MOVE X\"4\" -> COBOLNET1635) at 2002/2023; negative golden r03-hex-literal-digit-grouping pins the rejection. PARTIAL, not CONFORMS: the SR6 enforcement is incomplete on the concatenation-operand edge (i9c.cob: MOVE \"Z\" & X\"4\" -> [Z   ] silently, no COBOLNET1635) and the keyword-omitted intrinsic-argument edge — kb/Work PB1393 (open, claims DOC-A.1-9 in inventory_rows); the row names that note rather than stating the defective behaviour. cite.py --check 8.3.3.2.3 'Each hex-character-sequence-1 shall consist of the number of hexadecimal digits that the implementor has specified' OK (6). Side observation (not this item): X\"…\" also compiles at --std 85 (i9a.cob), where hexadecimal alphanumeric literals are not standard — unverified whether that is an intended extension.",
-  "state": "GAP"
+  "notes": "kb/Work PB1393 (w61g). The determination (two hexadecimal digits per alphanumeric character, 8.3.3.2.3 SR6) is written in CONFORMANCE.md 7 and now holds at every position a literal is written: the concatenation-operand and keyword-omitted-argument holes the adjudicator found are closed (LiteralScreenPass; COBOLNET1635), and the CONFORMANCE row's open-PB1393 caveat is removed.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-10",

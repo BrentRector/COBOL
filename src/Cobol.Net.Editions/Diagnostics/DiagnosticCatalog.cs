@@ -133,6 +133,18 @@ public static class DiagnosticCatalog
     //    taken this descriptor's edition half onto COBOLNET0900; this is the other half. The COBOLNET0875 and
     //    COBOLNET1518 precedents apply: a retired code stays retired.
 
+    // ── COBOLNET0814 — the literal LENGTH rule (§8.3.3.2.3 SR1 / §8.3.3.4.3 SR1 / §8.3.3.5.3 SR1) ──────
+    // kb/Work PB1393. The code predates the catalog (the Phase-4a "0814 band"), and was written as a bare string at
+    // the two procedure-operand funnels that checked it — the national and boolean ones only, so an over-long
+    // alphanumeric literal, and ANY literal in a VALUE clause, CONSTANT entry or ALL figurative, compiled clean. It
+    // is reported by exactly one site now: LiteralScreenPass, which sees every literal token in the unit.
+    public static readonly DiagnosticDescriptor LiteralTooLong = new(
+        "COBOLNET0814", "literal-too-long", EditionSeverity.Error,
+        "A literal shall be at most 8,191 character positions of its class, excluding the separators that delimit "
+        + "it: alphanumeric (§8.3.3.2.3 SR1, the X\"…\" format included), boolean (§8.3.3.4.3 SR1, a BX\"…\" "
+        + "digit counting as four boolean positions) or national (§8.3.3.5.3 SR1).",
+        "ISO §8.3.3.2.3 SR1 / §8.3.3.4.3 SR1 / §8.3.3.5.3 SR1");
+
     // ── COBOLNET1540/1541/1545 — concatenation expressions, one code per rule (§8.8.3) ───────────────
     public static readonly DiagnosticDescriptor ConcatClassMismatch = new(
         "COBOLNET1540", "concat-class-mismatch", EditionSeverity.Error,

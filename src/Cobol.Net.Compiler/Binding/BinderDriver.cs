@@ -137,6 +137,13 @@ internal sealed class BinderDriver
         // expression evaluator invokes on its own trees. kb/Work PB158.
         global::CobolNet.Validation.ExpressionFormationPass.Run(tree, edition);
 
+        // The literal-syntax pass (ISO §8.3.3.2.3 SR1/SR6, §8.3.3.4.3 SR1, §8.3.3.5.3 SR1/SR5) — a sibling on the
+        // same footing: the length and hexadecimal-grouping rules are properties of the literal TOKEN, whatever
+        // position it is written in, so they are asked once per token of the raw tree rather than once per
+        // consuming funnel (which is how VALUE / CONSTANT / ALL / concatenation-operand literals escaped them).
+        // kb/Work PB1393.
+        global::CobolNet.Validation.LiteralScreenPass.Run(tree, edition);
+
         // The declined-optional-element pass (ISO Annex A.4.1) — a THIRD sibling on the same footing: it answers
         // "does this implementation claim support for this optional module", which is orthogonal to both the
         // edition axis (VersionConformancePass) and the directive axis (FlagConformancePass). It refuses the

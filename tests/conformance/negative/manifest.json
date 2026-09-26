@@ -571,6 +571,7 @@
   "cobol-words-reserve-rejects",
   "concat_below_2002",
   "concat_class_mismatch",
+  "pb1393-concat-operand-hex-grouping",
   "config-section-in-contained-program",
   "constant-as-receiver",
   "constant-at-85",

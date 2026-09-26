@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-218 drift tests.
+219 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -130,6 +130,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [KnownWidthTotalityDriftTests](../tests/Cobol.Net.Tests.Unit/KnownWidthTotalityDriftTests.cs) | PB59: IntrinsicBinder.KnownWidth must stay TOTAL over the BoundOperand hierarchy — every concrete leaf either has a switch arm or is in the adjudicated runtime-only list below. | `src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs` |
 | [LevelNumberArmDriftTests](../tests/Cobol.Net.Tests.Unit/LevelNumberArmDriftTests.cs) | ⛔ A SECTION-KEYED SYNTAX RULE IS ONLY AS COMPLETE AS ITS LIST OF GRAMMAR ARMS, AND THAT LIST IS A CLASSIFIER. | — |
 | [LinkageCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/LinkageCarrierDriftTests.cs) | ⛔ A LINKAGE FORMAL CROSSES AS A CHARACTER IMAGE ONLY WHEN ITS OWN STORAGE *IS* A C# STRING (kb/Work PB663). | — |
+| [LiteralScreenDriftTests](../tests/Cobol.Net.Tests.Unit/LiteralScreenDriftTests.cs) | ⛔ A LITERAL'S OWN SYNTAX RULES ARE ASKED ONCE, OF EVERY LITERAL TOKEN, AT ONE SITE (kb/Work PB1393): the §8.3.3 length rule (COBOLNET0814) and hexadecimal grouping rule (COBOLNET1635) live in LiteralScreenPass, which walks every token of the unit's tree, and nowhere else; and the pass's token set is every token the lexer defines over a literal body fragment, so a new literal token — a new lexer mo… | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src` |
 | [LockedRecordStatusProducersDriftTests](../tests/Cobol.Net.Tests.Unit/LockedRecordStatusProducersDriftTests.cs) | ⛔ THE WITNESS FOR ANNEX A.1 ITEM 152'S "Condition absent." DETERMINATION (kb/Work PB1536 Q1, owner decision R43 item 3). | `src` |
 | [MethodAbiPairDriftTests](../tests/Cobol.Net.Tests.Unit/MethodAbiPairDriftTests.cs) | ⛔ THE METHOD ABI IS A PAIR PER FORMAL, AND ONLY TWO PLACES MAY SPELL IT (kb/Work PB757; COBOLNET_OO_DESIGN D6). | `src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs` |
 | [MethodConformanceRuleSetDriftTests](../tests/Cobol.Net.Tests.Unit/MethodConformanceRuleSetDriftTests.cs) | ⛔ ISO §9.3.8.2.3's per-method conformance rules are written ONCE — OoConformance.MethodConformanceMismatches (plus its rule-9 helper RaisingMismatches) — and every asker CALLS it (kb/Work PB972). | `src/Cobol.Net.Compiler/Oo/OoConformance.cs` |

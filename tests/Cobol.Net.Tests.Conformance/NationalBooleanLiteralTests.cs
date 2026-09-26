@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Conformance;
 /// (the leading N/B and the quotes leaked into the value); now each funnel either DECODES the literal with its
 /// category tag (string-legal contexts — DISPLAY, MOVE, EVALUATE selection, INSPECT args, CALL USING) or
 /// rejects COBOLNET0844 (numeric contexts — §8.8.1: a boolean/national literal is not a numeric operand).
-/// The literal guard rides COBOLNET0814: length &gt; 8,191 positions (§8.3.3.4 SR1 / §8.3.3.5 SR1). The
+/// The literal guard rides COBOLNET0814: length &gt; 8,191 positions (§8.3.3.4.3 SR1 / §8.3.3.5.3 SR1; asked of every literal token by LiteralScreenPass — kb/Work PB1393). The
 /// content repertoire is the FULL national set (one UTF-16 char per position, D-N1) — the former
 /// Latin-1-only staged guard was LIFTED by the P10 national wave when the §8.1.2 alphanumeric↔national
 /// correspondence landed (FUNCTION DISPLAY-OF / NATIONAL-OF, §15.26/§15.66).
@@ -206,7 +206,7 @@ public sealed class NationalBooleanLiteralTests
     }
 
     /// <summary>A national literal longer than 8,191 national positions is rejected COBOLNET0814
-    /// (ISO §8.3.3.5 SR1 — "1 to 8191 national character positions"). The source is built programmatically —
+    /// (ISO §8.3.3.5.3 SR1 — "shall be less than or equal to 8,191 national character positions"). The source is built programmatically —
     /// an 8,192-character literal never belongs in a checked-in file.</summary>
     [Fact]
     public void NationalLiteral_Over8191Positions_Rejects0814()
@@ -220,12 +220,12 @@ public sealed class NationalBooleanLiteralTests
                 STOP RUN.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
-        Assert.False(ok, "an 8,192-position national literal must be rejected (ISO §8.3.3.5 SR1)");
+        Assert.False(ok, "an 8,192-position national literal must be rejected (ISO §8.3.3.5.3 SR1)");
         EditionHarness.AssertHasDiagnostic(errors, "COBOLNET0814");
     }
 
     /// <summary>A boolean literal longer than 8,191 boolean positions is rejected COBOLNET0814
-    /// (ISO §8.3.3.4 SR1 — "1 to 8191 boolean character positions").</summary>
+    /// (ISO §8.3.3.4.3 SR1 — "shall be less than or equal to 8,191 boolean character positions").</summary>
     [Fact]
     public void BooleanLiteral_Over8191Positions_Rejects0814()
     {
@@ -238,7 +238,7 @@ public sealed class NationalBooleanLiteralTests
                 STOP RUN.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
-        Assert.False(ok, "an 8,192-position boolean literal must be rejected (ISO §8.3.3.4 SR1)");
+        Assert.False(ok, "an 8,192-position boolean literal must be rejected (ISO §8.3.3.4.3 SR1)");
         EditionHarness.AssertHasDiagnostic(errors, "COBOLNET0814");
     }
 

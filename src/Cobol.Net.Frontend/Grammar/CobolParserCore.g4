@@ -731,6 +731,7 @@ subToken
     | SUB_STRINGLIT
     | SUB_NATLIT       // national literal argument N"…" (ISO §15.50.3 — FUNCTION LENGTH(N"…") etc.)
     | SUB_BOOLLIT      // boolean literal argument B"…"
+    | SUB_HEXLIT       // hexadecimal-alphanumeric literal argument X"…" (kb/Work PB1393 — the literal screen's twin)
     | SIGNED_DECIMALLIT
     | SIGNED_INTEGERLIT
     | SUB_PLUS

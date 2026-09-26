@@ -1952,7 +1952,7 @@ public sealed class ReferenceResolver(DataBinder data)
             return lastNonWs.Type switch
             {
                 Core.SUB_RPAREN or Core.SUB_INTEGERLIT or Core.SIGNED_INTEGERLIT or Core.SUB_DECIMALLIT
-                    or Core.SIGNED_DECIMALLIT or Core.SUB_STRINGLIT => true,
+                    or Core.SIGNED_DECIMALLIT or Core.SUB_STRINGLIT or Core.SUB_HEXLIT => true,
                 // The predicate is ReferenceResolver.CannotBeSubscripted — §8.4.2.3.3 SR2's admission test, and
                 // the ONE copy of it (kb/Work PB877). It answers true ONLY for a name that RESOLVES to a data
                 // item NO subscript may be written on (neither carrying an OCCURS clause nor subordinate to
@@ -2010,7 +2010,7 @@ public sealed class ReferenceResolver(DataBinder data)
                     // ISO §15's general formats), and the ALL subscript word (§15.3 table(ALL) arguments).
                     if (!continues && (nextType is Core.SIGNED_INTEGERLIT or Core.SIGNED_DECIMALLIT
                             or Core.SUB_IDENTIFIER or Core.SUB_INTEGERLIT or Core.SUB_DECIMALLIT
-                            or Core.SUB_STRINGLIT or Core.SUB_ALL
+                            or Core.SUB_STRINGLIT or Core.SUB_HEXLIT or Core.SUB_ALL
                         // kb/Work PB136 — the spaced NOTE 2 form: a '(' after this WS opens a NEW subscript
                         // under the same declaration-informed rule as the unspaced arm above.
                         || (nextType == Core.SUB_LPAREN && LParenStartsNew())))
