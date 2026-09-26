@@ -297,9 +297,11 @@ public sealed class FileModel
     /// §13.18.46). THE ONE spelling of that test.</summary>
     public bool IsReportFile => ReportNames.Count > 0;
 
-    /// <summary>The fixed <c>RECORD CONTAINS n</c> character count (ISO §13.18.43 Format 1), or null when absent
-    /// or variable-length. A report file's line width prefers it over the computed field extent
-    /// (COBOLNET_REPORT_WRITER_DESIGN §4).</summary>
+    /// <summary>integer-1 of a Format 1 <c>RECORD CONTAINS integer-1</c> clause (ISO §13.18.43.2) — a count of
+    /// BYTES (§13.18.43.4 GR1: "Each integer in a RECORD clause specifies a record size in terms of bytes") — or
+    /// null when the clause is absent or variable-length. It SIZES THE FILE: <see cref="RecordWidth"/> reads it
+    /// (§13.18.43.4 GR6: "Integer-1 specifies the number of bytes contained in each record in the file"), and a
+    /// report file's line width prefers it over the computed field extent (COBOLNET_REPORT_WRITER_DESIGN §4).</summary>
     public int? RecordContains { get; set; }
 
     /// <summary>How a diagnostic NAMES the entry that describes this file: a sort-merge file description
@@ -345,17 +347,25 @@ public sealed class FileModel
     /// <c>DataBinder.ResolveFiles</c> (the <see cref="VaryingDependingItem"/> pattern).</summary>
     public LinageInfo? Linage { get; set; }
 
-    /// <summary>The variable-length minimum record size (ISO §13.18.43 GR9 — an unstated minimum defaults to the
-    /// smallest record described for the file, where an occurs-depending table contributes its MINIMUM
-    /// occurrences per GR8a); −1 for fixed-length records.</summary>
-    public int VaryMin => Varying is { } v ? v.Min ?? (Records.Count == 0 ? 1 : Records.Min(MinRecordSize))
-        : ImpliesVariableFormat ? Records.Min(MinRecordSize) : -1;
+    /// <summary>The variable-length minimum record size in BYTES — integer-2 when the clause states it, else
+    /// ISO §13.18.43.4 GR9's "the least number of bytes described for a record in that file" (each record by
+    /// <see cref="MinRecordSize"/>, GR8 a); −1 for fixed-length records.
+    /// <para>⛔ ONE formula for BOTH arms that reach it — an explicit Format 2/3 clause that omits integer-2, and
+    /// the implied Format 2 clause of <see cref="ImpliesVariableFormat"/> (§13.18.43.4 GR5 b) states the implied
+    /// integer-2 as the same smallest record). <see cref="VaryMax"/> is its twin.</para></summary>
+    public int VaryMin => !RecordSizeVaries ? -1
+        : Varying?.Min ?? (Records.Count == 0 ? 1 : Records.Min(MinRecordSize));
 
-    /// <summary>The variable-length maximum record size (ISO §13.18.43 GR10 — an unstated maximum defaults to the
-    /// largest record described for the file; an ODO table allocates its maximum, GR8b); −1 for fixed-length
-    /// records.</summary>
-    public int VaryMax => Varying is { } v ? v.Max ?? Math.Max(1, RecordWidth)
-        : ImpliesVariableFormat ? RecordMax : -1;
+    /// <summary>The variable-length maximum record size in BYTES — integer-3 when the clause states it, else
+    /// ISO §13.18.43.4 GR10's "the greatest number of bytes described for a record in that file" (each record by
+    /// <see cref="MaxRecordSize"/>, GR8 b — a dynamic-length member at its maximum), which is
+    /// <see cref="RecordMax"/>; −1 for fixed-length records.
+    /// <para>⛔ ONE formula for BOTH arms (kb/Work PB1276). The explicit arm used to read <see cref="RecordWidth"/>
+    /// — the CHARACTER AREA's width, which leaves out every out-of-line and dynamic extent — while the implied
+    /// Format 2 arm read <see cref="RecordMax"/>, so `RECORD IS VARYING IN SIZE` over a record with a
+    /// DYNAMIC LENGTH member refused (status 44) the very record the same program without the clause
+    /// wrote.</para></summary>
+    public int VaryMax => !RecordSizeVaries ? -1 : Varying?.Max ?? Math.Max(1, RecordMax);
 
     /// <summary>True when the file's record size varies — an explicit variable-length RECORD clause, or the
     /// implied Format 2 clause of <see cref="ImpliesVariableFormat"/>. THE ONE question every registration asks
@@ -399,29 +409,33 @@ public sealed class FileModel
     /// table elements described in the record is used in the summation above to determine the maximum number of
     /// bytes associated with the record description" — the twin of <see cref="MinRecordSize"/>, and the quantity
     /// §13.18.43.3 SR3 and SR4's upper arm compare against.
-    /// <para>⛔ IT IS <see cref="DataItem.ImageWidth"/>, not a second summation, and this member exists to say so
+    /// <para>⛔ IT IS <see cref="DataItem.ByteWidth"/>, not a second summation, and this member exists to say so
     /// ONCE: GR8's opening sentence is "the sum of the number of bytes in all elementary data items EXCLUDING
-    /// REDEFINITIONS AND RENAMINGS", which is exactly the sum <c>ImageWidth</c> already computes (it skips every
-    /// <c>RedefinesTargetName is not null</c> child), and an occurs-depending table's <see cref="DataItem.Occurs"/>
-    /// is its MAXIMUM occurrence count, which is GR8 b)'s own choice. A parallel recursion here would be the same
-    /// rule written down twice, and the copy is the one that would not learn about the next layout change (the
-    /// §8.5.1.6.3 bit walk is inside <c>ImageWidth</c> and would have been missed).</para></summary>
+    /// REDEFINITIONS AND RENAMINGS", which is exactly the sum <c>ByteWidth</c> already computes (it skips every
+    /// <c>RedefinesTargetName is not null</c> child, and lays a bit-bearing subtree out by the §8.5.1.6.3 walk,
+    /// which is GR4's "the entire byte in which that data item ends"), and an occurs-depending table's
+    /// <see cref="DataItem.Occurs"/> is its MAXIMUM occurrence count, which is GR8 b)'s own choice.</para>
+    /// <para>⛔ IN BYTES, NEVER CHARACTER POSITIONS (kb/Work PB1277): GR3 sizes a record by "the number of bytes
+    /// required to store the logical record, regardless of the types of characters used". This read
+    /// <see cref="DataItem.ImageWidth"/> — the CARRIER's character positions, which count a national position
+    /// once where D-N1 stores two bytes — so a national record measured half its size against the RECORD
+    /// integers: legal source was refused and oversize source accepted.</para></summary>
     internal static int MaxRecordSize(DataItem item) =>
-        IsVariableLengthRecord(item) ? (int)Math.Min(int.MaxValue, MaxDynamicExtent(item)) : item.ImageWidth;
+        IsVariableLengthRecord(item) ? (int)Math.Min(int.MaxValue, MaxDynamicExtent(item)) : item.ByteWidth;
 
     /// <summary>GR8 b)'s maximum for a record with variable-length members (kb/Work PB981): a dynamic-length
     /// item contributes its MAXIMUM size (§8.5.1.10.1 — <see cref="DataItem.DynMaxSize"/> characters, two bytes
     /// each when national, D-N1) and a dynamic-capacity table its maximum capacity, the same "maximum number of
-    /// table elements" GR8 b) names for every table. Every other member is <see cref="DataItem.ImageWidth"/>'s
+    /// table elements" GR8 b) names for every table. Every other member is <see cref="DataItem.ByteWidth"/>'s
     /// own sum, so this is that sum with the variable-length members filled in, never a second layout.</summary>
     internal static long MaxDynamicExtent(DataItem item) =>
         item.IsDynamicLength ? (long)item.DynMaxSize * (item.Pic?.Category is PicCategory.National ? 2 : 1)
         : item.IsDynamicTable ? (long)(item.OccursSpec?.Max ?? 0) * PerOccurrenceMax(item)
-        : item.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(item) ? (long)item.ImageWidth * (item.Occurs ?? 1)
+        : item.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(item) ? (long)item.ByteWidth * (item.Occurs ?? 1)
         : item.Children.Where(c => c.RedefinesTargetName is null).Sum(MaxDynamicExtent) * (item.Occurs ?? 1);
 
     private static long PerOccurrenceMax(DataItem table) =>
-        table.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(table) ? table.ImageWidth
+        table.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(table) ? table.ByteWidth
         : table.Children.Where(c => c.RedefinesTargetName is null).Sum(MaxDynamicExtent);
 
     /// <summary>⛔ THE ONE "does this record have a fixed character window?" predicate — D-FRA
@@ -465,21 +479,62 @@ public sealed class FileModel
     /// line.</summary>
     public DataItem? CharacterAnchor => Records.FirstOrDefault(r => !IsOutOfLineRecord(r));
 
-    /// <summary>The minimum byte size of one record description (ISO §13.18.43 GR8a): the sum over non-redefining
-    /// content with every occurs-depending table at its MINIMUM occurrence count (a bare <c>RECORD IS VARYING</c>
-    /// over an ODO record — RL211A — has minimum 120, not the 140 max allocation <see cref="DataItem.ImageWidth"/>
-    /// reports).</summary>
-    internal static int MinRecordSize(DataItem item) =>
-        item.IsElementary ? item.ImageWidth
-        : item.Children.Where(c => c.RedefinesTargetName is null)
-            .Sum(c => MinRecordSize(c) * (c.OccursSpec is { DependingName: not null } od ? od.Min : c.Occurs ?? 1));
+    /// <summary>The MINIMUM byte size of one record description (ISO §13.18.43.4 GR8 a): "The minimum number of
+    /// table elements described in the record is used in the summation above to determine the minimum number of
+    /// bytes associated with the record description" — the twin of <see cref="MaxRecordSize"/> (a bare
+    /// <c>RECORD IS VARYING</c> over an ODO record — RL211A — has minimum 120, not its 140-byte maximum).
+    /// <para>⛔ It is <see cref="DataItem.ByteWidth"/> with the varying tables at their minimum, NOT a second
+    /// re-summation of leaves (kb/Work PB1277): wherever no table varies beneath an item, the item's minimum IS
+    /// its <c>ByteWidth</c> — BYTES (GR3, so a national position counts two, D-N1) laid out by the one
+    /// §8.5.1.6.3 walk (GR4, so two 3-bit items share a byte). The re-summation this replaced counted each leaf
+    /// in character positions and rounded each bit leaf to a byte of its own, so a record of two
+    /// <c>PIC 1(3) USAGE BIT</c> items had minimum 2 and maximum 1 and no WRITE of it could succeed.</para></summary>
+    internal static int MinRecordSize(DataItem item) => (int)Math.Min(int.MaxValue, MinExtent(item));
 
-    /// <summary>The record area's PHYSICAL (codec) width — the max over the FD's records of the extent the
-    /// emitted <c>AsImage()</c>/<c>FromImage()</c> spans. (P5.8: <c>ImageWidth</c> under-counted a record whose
-    /// REDEFINES redefiner is wider than its target — the codec spans the class-max backing, ISO §13.18.44 /
-    /// §13.18.43.4 GR5 a) — truncating written frames and mis-registering key windows; identical to the old value for every
-    /// equal-width record, i.e. the whole prior corpus.)</summary>
-    public int RecordWidth => Records.Count == 0 ? 0 : Records.Max(Model.RecordLayout.PhysicalWidth);
+    /// <summary>GR8 a)'s summation, per occurrence of <paramref name="item"/> (a parent multiplies by the item's
+    /// own <see cref="DataItem.MinimumOccurrences"/>). Three arms:
+    /// <list type="bullet">
+    ///   <item>no table varies beneath the item — its <see cref="DataItem.ByteWidth"/>, the fixed GR8 sum;</item>
+    ///   <item>a bit-bearing subtree over an occurs-depending table — the §8.5.1.6.3 placement of that table (the
+    ///         record's unique trailing variable part, §13.18.38.3 SR22) plus its minimum run, rounded up to the
+    ///         byte it ends in (GR4) — counted in BITS for the reason <see cref="OdoModel.WrapGroup"/> gives: a
+    ///         character sum of shared-byte bit runs over-counts;</item>
+    ///   <item>otherwise the sum over the non-redefining children, each at its minimum occurrence count.</item>
+    /// </list></summary>
+    private static long MinExtent(DataItem item) =>
+        item.IsElementary || !HasVaryingTableBeneath(item) ? item.ByteWidth
+        : item.HasBitDescendant && OdoModel.TableUnder(item) is { OccursSpec: { } os } table
+                && BitLayout.StartBitOf(item, table) is >= 0 and var start
+            ? BitLayout.Characters(start
+                + (os.Min == 0 ? 0 : BitLayout.StrideBits(table) * (os.Min - 1) + BitLayout.WidthBits(table)))
+        : item.Children.Where(c => c.RedefinesTargetName is null).Sum(c => MinExtent(c) * c.MinimumOccurrences);
+
+    /// <summary>Whether a table whose occurrence count varies — an occurs-depending table or a dynamic-capacity
+    /// table — lies strictly beneath <paramref name="item"/> (a redefinition contributes nothing to GR8's sum, so
+    /// one beneath a redefining entry does not count).</summary>
+    private static bool HasVaryingTableBeneath(DataItem item) =>
+        item.Children.Any(c => c.RedefinesTargetName is null
+            && (c.OccursSpec is { DependingName: not null } or { IsDynamic: true } || HasVaryingTableBeneath(c)));
+
+    /// <summary>⛔ THE RECORD AREA'S WIDTH IN BYTES — what every connector registration, the SORT/MERGE record
+    /// length and the fixed-file attributes read (ISO §13.18.43.4 GR2: "The implicit or explicit RECORD clause
+    /// specifies the size of records in the record area"). Two sources, one answer:
+    /// <list type="bullet">
+    ///   <item>an explicit Format 1 clause — <see cref="RecordContains"/>: §13.18.43.4 GR6, "Integer-1 specifies
+    ///         the number of bytes contained in each record in the file". §13.18.43.3 SR3 lets every record
+    ///         description be SMALLER than integer-1, so the descriptions do not size such a file (kb/Work
+    ///         PB1276 — two 10-byte WRITEs under <c>RECORD CONTAINS 20</c> produced one 20-byte record);</item>
+    ///   <item>otherwise the descriptions' PHYSICAL (codec) width — the max over the records of the extent the
+    ///         emitted <c>AsImage()</c>/<c>FromImage()</c> spans, which is §13.18.43.4 GR5 a)'s implied
+    ///         "record size of the largest record description entry" (P5.8: <c>ImageWidth</c> under-counted a
+    ///         record whose REDEFINES redefiner is wider than its target — the codec spans the class-max
+    ///         backing, §13.18.44).</item>
+    /// </list>
+    /// The maximum of the two is taken so a program SR3 has already refused (a description larger than
+    /// integer-1) still sizes an area that holds its records. A variable-length file's bounds are
+    /// <see cref="VaryMin"/>/<see cref="VaryMax"/>; this stays its character area.</summary>
+    public int RecordWidth => Math.Max(RecordContains ?? 0,
+        Records.Count == 0 ? 0 : Records.Max(Model.RecordLayout.PhysicalWidth));
 
     /// <summary>The record description whose view spans the WHOLE record area — the largest one (ISO §13.18.33.4
     /// GR3: level-1 entries under an FD are "implicit redefinitions of the same area"; §13.18.43.4 GR5 a) sizes it
@@ -490,8 +545,13 @@ public sealed class FileModel
     /// <para>⛔ AN OUT-OF-LINE RECORD (<see cref="IsOutOfLineRecord"/>) IS NEVER CHOSEN WHILE A CHARACTER-WINDOW
     /// RECORD EXISTS (kb/Work PB981): it has no window over the character area, and its image width is not the
     /// area's. When EVERY record is out of line the first one is the area — the file's only storage.</para>
+    /// <para>⛔ "Largest" is measured in BYTES — <see cref="Model.RecordLayout.PhysicalWidth"/>, the unit
+    /// <see cref="RecordWidth"/> sizes the area in (§13.18.43.4 GR3; kb/Work PB1277's sibling). Measured in the
+    /// carrier's character positions (<c>ImageWidth</c>) a <c>PIC N(10)</c> record (20 bytes, D-N1) lost to a
+    /// <c>PIC X(15)</c> one, and a READ spliced the 20-byte record through the 15-byte view, so the national
+    /// record received seven and a half characters.</para>
     public DataItem? AreaRecord => Records.Count == 0 ? null
-        : Records.Where(r => !IsOutOfLineRecord(r)).MaxBy(r => r.ImageWidth) ?? Records[0];
+        : Records.Where(r => !IsOutOfLineRecord(r)).MaxBy(Model.RecordLayout.PhysicalWidth) ?? Records[0];
 
     /// <summary>True for either sequential shape (the only organizations this slice can OPEN/READ/WRITE).</summary>
     public bool IsSequential => Organization is FileOrganization.Sequential or FileOrganization.LineSequential;

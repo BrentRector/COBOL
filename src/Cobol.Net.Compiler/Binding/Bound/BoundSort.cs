@@ -39,9 +39,11 @@ public sealed record SortVaryingInfo(Place? Depending, int Min, int Max);
 /// compiler-inserted return mechanism. <paramref name="Collating"/> is the GR5-resolved sequence PAIR — the
 /// alphanumeric one for keys of class alphabetic/alphanumeric and the national one for keys of class national,
 /// each taken from the statement alphabet first, else the matching program collating sequence, else native.
-/// <paramref name="RecordWidth"/> is the SD record area's physical character-image width.</summary>
+/// The sort file's record length is <see cref="FileModel.RecordWidth"/> of <paramref name="File"/> — the ONE
+/// record-area size (ISO §13.18.43.4 GR2), which a Format 1 RECORD CONTAINS integer-1 on the SD sets (kb/Work
+/// PB1276); it is not carried here a second time.</summary>
 public sealed record BoundSort(
-    FileModel File, int RecordWidth,
+    FileModel File,
     IReadOnlyList<BoundSortMergeKey> Keys, bool DuplicatesInOrder, SortCollation Collating,
     IReadOnlyList<FileModel> Using, PcRange? InputProcedure,
     IReadOnlyList<FileModel> Giving, PcRange? OutputProcedure,
@@ -64,9 +66,10 @@ public sealed record BoundTableSortKey(bool Descending, string MemberPath, DataI
 /// <summary><c>MERGE file-name-1 …</c> (ISO §14.9.24): a k-way merge of the pre-sorted <paramref name="Using"/>
 /// streams — equal keys keep USING-file order, all of one file's records before the next file's (GR4a/GR4b) —
 /// written to every <paramref name="Giving"/> file (GR12 — each receives the FULL merged result) or pulled by
-/// RETURN in the <paramref name="OutputProcedure"/> (GR8/GR9). Collating per GR5 (identical to SORT GR5).</summary>
+/// RETURN in the <paramref name="OutputProcedure"/> (GR8/GR9). Collating per GR5 (identical to SORT GR5). The
+/// record length is <paramref name="File"/>'s <see cref="FileModel.RecordWidth"/>, as for <see cref="BoundSort"/>.</summary>
 public sealed record BoundMerge(
-    FileModel File, int RecordWidth,
+    FileModel File,
     IReadOnlyList<BoundSortMergeKey> Keys, SortCollation Collating,
     IReadOnlyList<FileModel> Using,
     IReadOnlyList<FileModel> Giving, PcRange? OutputProcedure,

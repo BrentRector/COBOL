@@ -17871,13 +17871,13 @@
   "ordinal": 1,
   "subject": "Sort-merge file description entry",
   "rule-digest": "a05a77dfd0b8",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1277_record_size_in_bytes; conformance:negative/pb1277-sd-varying-national-above-max",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1277. Rule: \"The number of characters is specified in terms of bytes.\" (--check 13.4.6.4 -> OK 1)); with §13.18.43.4 GR1 \"Each integer in a RECORD clause specifies a record size in terms of bytes\" and GR3 \"regardless of the types of characters used\" (--check OK). Code: RecordClauseRules.Screen compares the SD's RECORD integers against FileModel.MaxRecordSize/MinRecordSize, which are DataItem.ImageWidth -- the CARRIER character-position count (RecordLayout.PhysicalWidth's own comment: ByteWidth differs from ImageWidth exactly for NATIONAL, two bytes per position under D-N1). So a national record is measured at half its bytes. Probes (--std 2023): gr5.cob `SD SRT RECORD CONTAINS 5 CHARACTERS. 01 SRT-REC. 05 SK PIC N(5).` compiles and runs clean although FUNCTION BYTE-LENGTH(SRT-REC)=10 (grb.cob prints `10 10`) -- §13.18.43.3 SR3 requires rejection (10 bytes > integer-1 = 5); the alphanumeric twin grx.cob (PIC X(10)) is rejected COBOLNET2010, so the rule is live and only the unit is wrong. gr6v.cob `RECORD IS VARYING IN SIZE FROM 1 TO 5` over N(5) compiles clean (should reject, SR4 upper). gr5v.cob `VARYING IN SIZE FROM 6 TO 8` over N(4) (8 bytes, legal) is REJECTED: \"record 'SRT-REC' describes 4 bytes, which is fewer than the integer-2 = 6\" -- rejects legal source with a false byte count. FD sibling fdn.cob (`FD F1 RECORD CONTAINS 5` over N(5)) also compiles clean. Expected: every RECORD-clause size comparison in bytes (N(5)=10). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the national arm, where the count differs, exists 2002+) || Re-sited by registrar 14e: the RecordClauseRules.cs witness was removed because that table has no row for this rule (RecordClauseRuleDriftTests clamp: a code-location naming RecordClauseRules claims a Catalog row). RecordClauseRules.Screen only CONSUMES FileModel.Min/MaxRecordSize.",
-  "state": "GAP"
+  "notes": "Landed by kb/Work PB1277 (w61f). cite.py --check 13.4.6.4 'The number of characters is specified in terms of bytes' -> OK §13.4.6.4 1). An SD's RECORD clause integers are compared with the record's BYTE size: SD RECORD IS VARYING IN SIZE FROM 6 TO 8 over N(3)+N(1) (8 bytes) compiles and sorts (golden SN leg, SORTED=2; was COBOLNET2010 'describes 4 bytes'); SD FROM 1 TO 5 over PIC N(5) (10 bytes) is refused COBOLNET2010 (negative; was accepted). The SORT key screen (COBOLNET0874) and the RECORD clause screen now count in the same unit.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.5.3-1",
@@ -26121,13 +26121,13 @@
   "ordinal": 1,
   "subject": "RECORD clause",
   "rule-digest": "61cca5b6d730",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause; src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize",
+  "test-ref": "conformance:85/pb1276_record_contains_sizes_file; conformance:2002/pb1277_record_size_in_bytes; conformance:negative/pb1277-record-contains-national-larger",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1276. cite.py --check 13.18.43.4 'Each integer in a RECORD clause specifies a record size in terms of bytes' (GR1). Formats 2 and 3: the integers are honored as BYTE bounds at run time - a PIC N(10) record (20 bytes, D-N1) written with DEPENDING 20 succeeds and READ restores L=20 (probe/record-clause/p8b.cob), and 44 fires on byte counts outside [integer-2,integer-3] (p4.cob). Format 1: integer-1 sizes NOTHING in a record-bearing FD - BindRecordClause stores it in FileModel.RecordContains 'for the report-file line width' only, so the record written is the record description's size, not integer-1 bytes (finding: Format 1 integer-1 ignored; see GR-13.18.43.4-6). One half verified, one diverges => PARTIAL.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1276 + PB1277 (w61f). cite.py --check 13.18.43.4 'Each integer in a RECORD clause specifies a record size in terms of bytes' -> OK §13.18.43.4 1). Every integer is now compared with a BYTE size: Format 1 integer-1 sizes the file in bytes (PB1276), and the record sizes SR3/SR4/GR9/GR10/GR14 compare it with are DataItem.ByteWidth-based (PB1277: a PIC N(10) record is 20 bytes against RECORD CONTAINS 10 -> COBOLNET2010; FROM 16 TO 40 over X(10)+N(5) = 20 bytes compiles).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-2",
@@ -26136,13 +26136,13 @@
   "ordinal": 2,
   "subject": "RECORD clause",
   "rule-digest": "b9afb1d2fd64",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Runtime/IO/RecordFraming.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Runtime/IO/FileConnector.cs#FitRecord; docs/CONFORMANCE.md#DOC-A.1-146",
+  "test-ref": "conformance:85/pb1276_record_contains_sizes_file; unit:RecordSizeModelTests.RecordContains_SizesTheFileAboveItsDescriptions",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1276 + PB1278. cite.py --check 13.18.43.4 'The implicit or explicit RECORD clause specifies the size of records in the record area' OK (GR2). The EXPLICIT Format 1 clause does not specify the record size: `FD F1 RECORD CONTAINS 20 CHARACTERS. 01 R1 PIC X(10).` writes 10-byte records (probe/record-clause/p1.cob: p1f1.dat is 10 bytes; p2.cob: two WRITEs produce 20 bytes that a PIC X(20) FD reads back as ONE record [ABCDEFGHIJKLMNOPQRST], RECORDS=01). Expected: two 20-byte records. The storage-medium half (A.1 item 146, required+documented, cite.py --check A.1 OK): the 4-byte length prefix for variable-length files is documented under DOC-A.1-151 (RECORD DELIMITER GR5), but no DOC-A.1-146 determination exists stating the calculation (fixed = record bytes, varying = 4 + bytes, the CODE-SET/FORMAT factors GR2 names) - documentation half PARTIAL. Owned finding: Format-1 integer ignored; A.1 146/148 undocumented.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1276 (w61f). cite.py --check 13.18.43.4 'specifies the size of records in the record area' -> OK §13.18.43.4 2). The explicit clause (Format 1 integer-1) and the implicit one (GR5 a, the largest description) both size the record area through FileModel.RecordWidth; positions of the area no description covers are spaces (FileConnector.FitRecord). The implementor's calculations for the size on the storage medium are docs/CONFORMANCE.md §7 row DOC-A.1-146, whose arm (a) now matches the compiler (its remaining ⚠ is the line-sequential delimiter, kb/Work PB1540, a different arm).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-3",
@@ -26151,13 +26151,13 @@
   "ordinal": 3,
   "subject": "RECORD clause",
   "rule-digest": "fa673ff2572d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ElementaryImageWidth",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ByteWidth",
+  "test-ref": "conformance:2002/pb1277_record_size_in_bytes; conformance:negative/pb1277-record-contains-national-larger; unit:RecordSizeModelTests.UnstatedRange_IsTheRecordsByteSize",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1277. cite.py --check 13.18.43.4 'regardless of the types of characters used to represent the items within the logical record' OK (GR3). The compile-time record size (FileModel.MinRecordSize/MaxRecordSize, both on DataItem.ImageWidth) counts a NATIONAL item in CHARACTER positions (ElementaryImageWidth returns pic.Length), while its storage is 2 bytes per character (D-N1; FUNCTION BYTE-LENGTH reports 20 for 05 A PIC X(10) 05 C PIC N(5)). Measured: `FD F1 RECORD IS VARYING IN SIZE FROM 16 TO 40. 01 R1. 05 A PIC X(10). 05 C PIC N(5).` is REJECTED COBOLNET2010 'record R1 describes 15 bytes' (probe/record-clause/p8.cob) though the record is 20 bytes - legal source refused; `FD F2 RECORD IS VARYING IN SIZE FROM 1 TO 12. 01 R2 PIC N(10).` (20 bytes > 12) compiles clean (p10.cob); `FD F1 RECORD CONTAINS 10 CHARACTERS. 01 R1 PIC N(10).` compiles clean (p7.cob) though SR3 forbids 20 > 10. Runtime byte counting is correct (p8b.cob) - the defect is the binder's size arithmetic. Finding: record-size arithmetic not in bytes. || Re-sited by registrar 14e: the RecordClauseRules.cs witness was removed because that table has no row for this rule (RecordClauseRuleDriftTests clamp: a code-location naming RecordClauseRules claims a Catalog row). RecordClauseRules.Screen only CONSUMES FileModel.Min/MaxRecordSize.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1277 (w61f). cite.py --check 13.18.43.4 'regardless of the types of characters used' -> OK §13.18.43.4 3). Record sizes are DataItem.ByteWidth (a national position = 2 bytes, D-N1), never the carrier's ImageWidth: RECORD CONTAINS 10 over PIC N(10) is refused COBOLNET2010 (20 bytes), FROM 16 TO 40 over X(10)+N(5) compiles (20 bytes), a DEPENDING 12 WRITE of a PIC N(10) record answers 44 (min 20). The sibling FileModel.AreaRecord (the largest record, whose view a READ splices through) now also chooses by bytes: X(15) vs N(10) picks the 20-byte N(10) record (was X(15): a READ delivered 7.5 national characters).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-4",
@@ -26166,13 +26166,13 @@
   "ordinal": 4,
   "subject": "RECORD clause",
   "rule-digest": "54e8530f3776",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ImageWidth; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ElementaryImageWidth",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ByteWidth; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize",
+  "test-ref": "conformance:2002/pb1277_record_size_in_bytes; unit:RecordSizeModelTests.UnstatedRange_IsTheRecordsByteSize",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1277. cite.py --check 13.18.43.4 'the record size includes the entire byte in which that data item ends' OK (GR4). A record of two PIC 1(3) USAGE BIT items (6 bits) has record size 1 byte: FUNCTION BYTE-LENGTH(R2)=1 and the file's maximum (VaryMax = RecordWidth) is 1 (probe/record-clause/p11.cob); ImageWidth's group arm uses the §8.5.1.6.3 BitLayout walk and ElementaryImageWidth rounds a bit leaf up with BitLayout.Characters. The value of the filler bits is undefined, nothing to verify. ⚠ Sibling defect found on the MINIMUM path, charged to GR8/GR9 not here: MinRecordSize re-sums leaves (1+1=2) ignoring bit packing, so that record's min is 2 > max 1 and every WRITE answers 44 (p11.cob W1 FS=44, W2 FS=44). || REFUTED: PARTIAL — GR4 defines THE record size of a record whose last item ends mid-byte (bytes through the byte where it ends). The code carries two record-size computations: ImageWidth/BYTE-LENGTH/fixed-file writes get it right, but FileModel.MinRecordSize re-sums bit leaves one rounded byte each, so the same record's size is over-counted and a Format 2 file over it can never be written. One half verified, the other half diverges on exactly this rule's subject => PARTIAL (the adjudicator itself found the min-path defect and charged it only to GR8/GR9). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (bit data items - USAGE BIT - are a 2002 introduction)",
-  "state": "GAP"
+  "notes": "Landed by kb/Work PB1277 (w61f). cite.py --check 13.18.43.4 'the record size includes the entire byte in which that data item ends' -> OK §13.18.43.4 4). BOTH record-size computations now use the §8.5.1.6.3 bit walk: a record of two PIC 1(3) USAGE BIT items is 1 byte at minimum and maximum (was min 2 from a per-leaf re-summation), so RECORD IS VARYING DEPENDING 1 writes (FB1=00) and 2 answers 44; a bit ODO X(1) + PIC 1(3) BIT OCCURS 1 TO 4 is min 2 (11 bits) / max 3 (20 bits). The value of the filler bits is undefined by the rule and not asserted.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-5",
@@ -26183,10 +26183,10 @@
   "rule-digest": "1f023b9e2598",
   "verdict": "PARTIAL",
   "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ImpliesVariableFormat; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMin; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#AreaRecord; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindRelease",
-  "test-ref": "conformance:2014/pb981_fd_variable_length_records",
+  "test-ref": "conformance:2014/pb981_fd_variable_length_records; conformance:2014/pb1276_varying_unstated_max_dynamic; conformance:2002/pb1277_record_size_in_bytes",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1276. cite.py --check 13.18.43.4 'If format 1 is implied, integer-1 shall be the record size of the largest record description entry in this file description entry' OK (GR5 a). Implicit clause is implementor-defined and REQUIRED documented (A.1 item 147): docs/CONFORMANCE.md D-FRA (iv) states Format 2 when a record is variable-length, Format 1 otherwise. FD arm a) verified: `FD F1. 01 A1 PIC X(5). 01 B1 PIC X(10).` WRITE A1 writes 10 bytes (probe/record-clause/p3.cob p3a.dat). b) verified for a dynamic-length record via pb981. Not closed: (1) the SD arm - kb/Work PB322 determination F (OPEN) measured a RECORD-clause-less SD releasing at record-name-1's own size, neither Format 1's largest nor a declared Format 2 - reference, not re-reported; (2) the implied Format 2 minimum inherits the GR8 byte-count defect (MinRecordSize counts national in characters). PARTIAL.",
+  "editions": "85,2002,2014,2023",
+  "notes": "Re-verdicted by kb/Work PB1276/PB1277 (w61f); now owned by kb/Work PB322 (determination F). cite.py --check 13.18.43.4 'integer-1 shall be the record size of the largest record description entry' -> OK §13.18.43.4 5) a). Fixed by w61f: the implied Format 2 minimum/maximum are byte counts (PB1277) and equal the explicit clause's (PB1276, golden F4 leg); the implied Format 1 area record is the largest by BYTES (FileModel.AreaRecord; golden FA leg: X(15) vs N(10) picks the 20-byte record). Still open: the SD arm - a RECORD-clause-less SD releases record-name-1 at its OWN description size, neither implied Format 1's largest nor a declared Format 2 (kb/Work PB322 F; docs/CONFORMANCE.md DOC-A.1-147 ⚠). PARTIAL.",
   "state": "GAP"
  },
  {
@@ -26196,13 +26196,13 @@
   "ordinal": 6,
   "subject": "RECORD clause",
   "rule-digest": "6b9b7dfb6f2c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordContains; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause",
+  "test-ref": "conformance:85/pb1276_record_contains_sizes_file; unit:RecordSizeModelTests.RecordContains_SizesTheFileAboveItsDescriptions",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1276. cite.py --check 13.18.43.4 'Integer-1 specifies the number of bytes contained in each record in the file' OK (GR6). SR3 permits record descriptions SMALLER than integer-1, and GR6 then fixes every record at integer-1 bytes. BindRecordClause stores integer-1 only in FileModel.RecordContains, whose only reader is the report-file line width; connectors are registered with RecordWidth (the largest description). Repro probe/record-clause/p2.cob: `FD F1 RECORD CONTAINS 20 CHARACTERS. 01 R1 PIC X(10).` WRITE 'ABCDEFGHIJ', WRITE 'KLMNOPQRST'; read back through `FD F2. 01 R2 PIC X(20).` on the same file. Expected (GR6): 2 records of 20 bytes, file 40 bytes, first R2 = 'ABCDEFGHIJ' + 10 positions. Observed: file 20 bytes, ONE record [ABCDEFGHIJKLMNOPQRST], RECORDS=01. Wrong answer, silent.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1276 (w61f). cite.py --check 13.18.43.4 'Integer-1 specifies the number of bytes contained in each record in the file' -> OK §13.18.43.4 6). FileModel.RecordWidth - the ONE record-area size every connector registration, the SORT/MERGE record length and the fixed-file attributes read - is max(integer-1, the descriptions' physical width), so integer-1 sizes an FD and an SD whose descriptions are smaller (§13.18.43.3 SR3 permits them). Golden 85/pb1276_record_contains_sizes_file: two WRITEs of a 10-byte R1 under RECORD CONTAINS 20 read back through a 20-byte FD as TWO records (was one 20-byte record), and SORT through an SD RECORD CONTAINS 20 over a 10-byte description keeps each 20-byte USING record whole (was cut to 10).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-7",
@@ -26226,13 +26226,13 @@
   "ordinal": 8,
   "subject": "RECORD clause",
   "rule-digest": "f8efab00e778",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ImageWidth",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#MinimumOccurrences",
+  "test-ref": "conformance:2002/pb1277_record_size_in_bytes; unit:RecordSizeModelTests.UnstatedRange_IsTheRecordsByteSize; unit:RecordSizeModelTests.DynamicCapacityTable_CountsItsMinimumCapacityInTheMinimum",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1277. cite.py --check 13.18.43.4 'plus any implicit FILLER due to synchronization' OK (GR8). Verified correct: redefinitions excluded (ImageWidth/MinRecordSize skip RedefinesTargetName children; p7.cob R2 with 05 B REDEFINES A counted A once), a level-66 RENAMES adds nothing (p7.cob), ODO at min for a) (p5.cob: F2 min 3 = 2 + 1 occurrence, N=0 -> 44) and at max for b) (max 27). DIVERGES on the byte count itself: (1) a national leaf contributes pic.Length (characters) instead of 2 bytes per character (p8.cob, p10.cob - see GR3); (2) MinRecordSize is a SECOND summation that re-sums leaves and so ignores the §8.5.1.6.3 bit packing ImageWidth applies: 05 B1 PIC 1(3) BIT, 05 B2 PIC 1(3) BIT gives min 2 while the record is 1 byte (p11.cob). Same mechanism as GR3/GR9 finding.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1277 (w61f). cite.py --check 13.18.43.4 'sum of the number of bytes in all elementary data items excluding redefinitions and renamings' -> OK §13.18.43.4 8); 'The minimum number of table elements described in the record is used in the summation above' -> OK 8) a); 'The maximum number of table elements described in the record is used' -> OK 8) b). MaxRecordSize = ByteWidth (redefinitions skipped, ODO at maximum, bit walk); MinRecordSize = ByteWidth wherever no table varies beneath, else each varying table at DataItem.MinimumOccurrences (ODO integer-1; dynamic-capacity minimum capacity integer-4, §13.18.38.4 GR16), a bit-bearing ODO placed by the §8.5.1.6.3 walk. Unit witnesses: N(10) -> 20/20; X(10)+N(5) -> 20/20; X(2)+N(2) ODO 1 TO 3 -> 6/14; X(1)+PIC 1(3) BIT ODO 1 TO 4 -> 2/3. No SYNCHRONIZED padding exists in COBOL.NET, so the implicit-FILLER term is zero.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-9",
@@ -26241,13 +26241,13 @@
   "ordinal": 9,
   "subject": "RECORD clause",
   "rule-digest": "8f38fb7a819d",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMin; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MinRecordSize",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1277_record_size_in_bytes; unit:RecordSizeModelTests.UnstatedRange_IsTheRecordsByteSize",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1277. cite.py --check 13.18.43.4 'If integer-2 is not specified, the minimum number of bytes ... is equal to the least number of bytes described for a record in that file' OK (GR9). Correct for alphanumeric/ODO records (p5.cob: VARYING without FROM over ODO record, min 3, N=0 -> 44, N=1 -> 00; p5.cob F1 A1 5 bytes and B1 12 bytes both write). Wrong for a national record: `FD F2 RECORD IS VARYING IN SIZE DEPENDING ON L. 01 R2 PIC N(10).` (20 bytes) - L=12 WRITE answers 00 (probe/record-clause/p9.cob); expected 44 (12 < 20). Wrong for a bit record: two PIC 1(3) BIT leaves (1 byte) get min 2 > max 1, so L=1 answers 44 where the record is exactly 1 byte (p11.cob) - no WRITE of that file can ever succeed. Finding: record-size arithmetic not in bytes.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1277 (w61f). cite.py --check 13.18.43.4 'the least number of bytes described for a record in that file' -> OK §13.18.43.4 9). FileModel.VaryMin is integer-2 ?? the least MinRecordSize, in bytes, one formula for the explicit and implied clauses. Golden 2002/pb1277_record_size_in_bytes: PIC N(10) under RECORD IS VARYING DEPENDING ON L -> L=12 answers 44 (min 20, was 10: accepted); two PIC 1(3) USAGE BIT items -> min = max = 1, L=1 answers 00 (was min 2 > max 1: every WRITE 44).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-10",
@@ -26256,13 +26256,13 @@
   "ordinal": 10,
   "subject": "RECORD clause",
   "rule-digest": "d3d8d090b9f6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#MaxRecordSize",
+  "test-ref": "conformance:2014/pb1276_varying_unstated_max_dynamic; unit:RecordSizeModelTests.UnstatedMaximum_IsTheSameGr10QuantityForTheExplicitAndTheImpliedClause; unit:RecordSizeModelTests.UnstatedRange_IsTheRecordsByteSize",
   "derivation": "",
-  "editions": "2014,2023",
-  "notes": "Owned by kb/Work PB1276. cite.py --check 13.18.43.4 'If integer-3 is not specified, the maximum number of bytes to be contained in any record of the file is equal to the greatest number of bytes described for a record in that file' OK (GR10). VaryMax is `v.Max ?? Math.Max(1, RecordWidth)` on the EXPLICIT arm but `RecordMax` on the IMPLIED Format 2 arm; RecordWidth is the character-window width and excludes a dynamic-length member's extent, RecordMax (MaxRecordSize) includes it at its maximum (GR8 b). Repro probe/record-clause/p12.cob: `FD F3 RECORD IS VARYING IN SIZE. 01 R3. 05 A3 PIC X(3). 05 D3 PIC X DYNAMIC LENGTH LIMIT 20.` MOVE 14 chars to D3, WRITE R3 -> FS=44; expected 00 (17 bytes <= 23). The same program with the RECORD clause removed (implied Format 2, p12b.cob) writes the 17-byte record FS=00. A two-arm dispatch: one rule, two formulas. Plain fixed-window records (p5.cob F1: max 12) are correct. || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (the diverging shape needs a DYNAMIC LENGTH record, a 2014 facility); the default itself is at all four editions",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Landed by kb/Work PB1276 (w61f). cite.py --check 13.18.43.4 'the greatest number of bytes described for a record in that file' -> OK §13.18.43.4 10). FileModel.VaryMax is ONE formula for the explicit clause without integer-3 and the implied Format 2 clause: integer-3 ?? RecordMax (the greatest MaxRecordSize, GR8 b, a dynamic-length member at its maximum). Golden 2014/pb1276_varying_unstated_max_dynamic: X(3) + DYNAMIC LENGTH LIMIT 20 -> max 23 under RECORD IS VARYING (DEPENDING 17/23 -> 00, 24 -> 44), the same answer as with no RECORD clause (was 44 for any 17-byte record: the maximum was taken as the 3-byte character area).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-11",
@@ -64056,12 +64056,12 @@
   "ordinal": 146,
   "subject": "RECORD clause (calculations to derive size of records on storage medium)",
   "rule-digest": "4eeb6f8ea988",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-146; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Runtime/IO/RecordFraming.cs; src/Cobol.Net.Runtime/IO/SequentialConnector.cs",
-  "test-ref": "",
+  "verdict": "PARTIAL",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-146; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Runtime/IO/FileConnector.cs#FitRecord",
+  "test-ref": "conformance:85/pb1276_record_contains_sizes_file",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 146 required + documented. cite.py --check 13.18.43.4 'The implementor shall specify the calculations necessary for the user to derive the size for records on the storage medium' -> OK §13.18.43.4 2); cite.py --check 13.18.43.4 'Integer-1 specifies the number of bytes contained in each record in the file' -> OK §13.18.43.4 6); cite.py --check 13.18.43.4 'This implicit RECORD clause is defined by the implementor' -> OK §13.18.43.4 5). GR2 names CODE-SET and FORMAT as the only other factors; the row answers both (CODE-SET per §2 row 27; FORMAT clause = item 85, 'cannot arise'). Determination assembled from existing pinned determinations (items 209, 151, 148, 129, D-N1, D-FRA (v), §2 row 27) plus the spec's own GR6 (format 1 = integer-1 bytes per record) and WRITE §14.9.51.4 GR21 (line-sequential trailing spaces not transferred). Probe at pin 80de60472 (run/d5/RC.cob, --std 2023): F1 RECORD CONTAINS 20 + 01 X(10), one WRITE -> rc1.dat 10 bytes 'ABCDEFGHIJ' (DIVERGES: GR6 wants 20) — kb/Work PB1276 still open and reproducing; F2 line sequential X(10)='AB' -> 'AB' 0D 0A (4 bytes, conforms to (c)); F3 relative fixed X(6) -> 'CBNFSTR' 01 'R' 'F' + sizes + key count, then 06 00 00 00 'XY    ' (30 bytes, conforms to (d)); F4 X(3)+N(2)+9(4) COMP -> 'PQR' 00 4D 00 4E 01 02 (9 bytes: national 2 bytes BE, binary 2 bytes; conforms to the record-size basis); F5 implied format 1 over X(5)/X(10), WRITE of the X(5) record -> 10 bytes (conforms to (a) implied). Variable arm (b) already witnessed by conformance:85/l1c23_record_format3_variable (23 bytes for 5+10 with two prefixes) and conformance:2023/pb292_record_delimiter_witness. DIVERGES only on arm (a) explicit integer-1 > largest description (PB1276). ⚠ Dependency: kb/Work PB690 (blocked on the owner: the default coded character set of a file with no CODE-SET) — if the owner chooses UTF-8, 'one byte per alphanumeric character position' in this row and item 209 both change. Witness needed at landing: a golden writing a RECORD CONTAINS 20 file with a 10-byte record and asserting 20 bytes per record. Owning note: kb/Work/PB1276 (also PB1278, which owes this row). DOC-ROWS-2 REFUTER (citation): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md).",
+  "notes": "Re-verdicted by kb/Work PB1276 (w61f); now owned by kb/Work PB1540. The §7 determination (docs/CONFORMANCE.md DOC-A.1-146) is written and its arm (a) - a Format 1 record is exactly integer-1 bytes, positions no description covers are spaces - now holds (golden 85/pb1276_record_contains_sizes_file; was: the description's size). Still divergent: arm (c)'s line delimiter is CR LF on every host where the determination states the host newline (kb/Work PB1540, the row's remaining ⚠). PARTIAL.",
   "state": "GAP"
  },
  {

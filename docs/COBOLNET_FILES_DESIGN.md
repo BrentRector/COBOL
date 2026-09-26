@@ -1628,11 +1628,27 @@ travel with their formats' other rules in one table rather than being split acro
 few nanoseconds. The clause's source position is captured at bind time on `FileModel.RecordClauseAt` — the
 `RecordKeyAt` pattern — so a post-build report still points at the clause.
 
-**The quantities are the standard's own, and each is written down once.** `FileModel.MinRecordSize` is GR8 a)
-(every occurs-depending table at its MINIMUM occurrence count) and `FileModel.MaxRecordSize` is GR8 b), which
-delegates to `DataItem.ImageWidth` rather than re-summing: `ImageWidth` already skips redefining children
-(GR8's *"excluding redefinitions and renamings"*) and already takes an ODO table's maximum occurrences. A
-parallel recursion would be the same rule twice, and the copy is the one that would miss the next layout change.
+**The quantities are the standard's own, each is written down once, and every one is in BYTES.** GR3 sizes a
+record by *"the number of bytes required to store the logical record, regardless of the types of characters
+used"*, so the unit is `DataItem.ByteWidth` (a national position is two bytes, D-N1) and never the carrier's
+character positions (`ImageWidth`), which counted a national record at half its size (kb/Work PB1277).
+`FileModel.MaxRecordSize` is GR8 b) and delegates to `ByteWidth` rather than re-summing: `ByteWidth` already skips
+redefining children (GR8's *"excluding redefinitions and renamings"*), already takes an ODO table's maximum
+occurrences, and already lays a bit-bearing subtree out by the §8.5.1.6.3 walk (GR4's *"the entire byte in which
+that data item ends"*). `FileModel.MinRecordSize` is GR8 a): the same `ByteWidth` wherever no table varies beneath
+an item, and otherwise each varying table at `DataItem.MinimumOccurrences` (an ODO's integer-1, a dynamic-capacity
+table's minimum capacity integer-4 — §13.18.38.4 GR16), a bit-bearing ODO subtree placed by the bit walk. A
+parallel leaf re-summation would be the same rule twice — and it was: the one this replaced rounded each bit leaf to
+a byte of its own, so two `PIC 1(3) USAGE BIT` items had minimum 2 over maximum 1.
+
+**The file is sized by the same model (kb/Work PB1276).** `FileModel.RecordWidth` — the record AREA, §13.18.43.4
+GR2, which every connector registration, the SORT/MERGE record length and the fixed-file attributes read — is the
+explicit Format 1 integer-1 (GR6: *"Integer-1 specifies the number of bytes contained in each record in the
+file"*; SR3 lets every description be smaller) or, with none, the descriptions' physical width (GR5 a)'s implied
+integer-1). Positions of an integer-1 record that no record description covers are written as spaces (the
+national space in a national record area) — `FileConnector.FitRecord`. `FileModel.VaryMin` / `VaryMax` are GR9 /
+GR10 with ONE formula for the explicit clause that omits an integer and the implied Format 2 clause alike: the
+least / greatest `MinRecordSize` / `MaxRecordSize` over the records.
 
 **The format is a COLUMN, and `FileModel.RecordClause` is its one reader.** That property projects the existing
 `Varying` / `RecordContains` pair into a `RecordClauseFacts` — format, lower operand, upper operand, position —

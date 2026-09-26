@@ -1685,8 +1685,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         file.RecordClauseAt = Edition.Cursor;
         if (rc.VARYING() is null && rc.TO() is null)
         {
-            // The fixed Format-1 RECORD CONTAINS n (ISO §13.18.43): captured for the report-file line width
-            // (COBOLNET_REPORT_WRITER_DESIGN §4); a record-bearing FD's width still comes from its records.
+            // The fixed Format-1 RECORD CONTAINS integer-1 (ISO §13.18.43.2). It SIZES THE FILE — §13.18.43.4
+            // GR6: "Integer-1 specifies the number of bytes contained in each record in the file" — through
+            // FileModel.RecordWidth, for an FD and an SD alike (kb/Work PB1276), and a report file's line width
+            // prefers it (COBOLNET_REPORT_WRITER_DESIGN §4).
             if (rc.integerLiteral() is { Length: > 0 } fixedLits && CobolNet.Validation.IntegerOperandRules.HostValue(fixedLits[0]) is var n0)
                 file.RecordContains = n0;
             return;

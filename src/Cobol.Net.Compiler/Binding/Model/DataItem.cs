@@ -908,14 +908,15 @@ public sealed class DataItem
             : Children.Where(c => c.RedefinesTargetName is null)
                       .All(c => c.MinimumOccurrences == 0 || c.MinimumLengthIsZero));
 
-    /// <summary>The fewest occurrences this entry can have at run time — integer-1 of a Format-2
-    /// <c>OCCURS … DEPENDING ON</c> (ISO §13.18.38 SR16 permits zero), ZERO for a Format-4 DYNAMIC-capacity table
-    /// (§8.5.1.9 — the capacity varies and starts at none), and the fixed count otherwise. Read only by
-    /// <see cref="MinimumLengthIsZero"/>: <see cref="ImageWidth"/> deliberately uses the MAXIMUM, because
-    /// §8.5.1.8 fixes the allocated physical capacity at compile time.</summary>
-    private int MinimumOccurrences =>
-        OccursSpec is { IsDynamic: true } ? 0
-        : OccursSpec is { } os ? os.Min
+    /// <summary>⛔ THE ONE "fewest occurrences this entry can have at run time" — integer-1 of a Format-2
+    /// <c>OCCURS … DEPENDING ON</c> (ISO §13.18.38 SR16 permits zero), the MINIMUM CAPACITY of a Format-4
+    /// DYNAMIC-capacity table (§13.18.38.4 GR16: "Integer-4 is the minimum capacity of the table. If integer-4
+    /// is absent, a value of zero is assumed for it" — the binder stores it as <see cref="OccursSpec.Min"/>), and
+    /// the fixed count otherwise. Read by <see cref="MinimumLengthIsZero"/> and by the §13.18.43.4 GR8 a)
+    /// minimum record size (<c>FileModel.MinRecordSize</c>): <see cref="ImageWidth"/> deliberately uses the
+    /// MAXIMUM, because §8.5.1.8 fixes the allocated physical capacity at compile time.</summary>
+    internal int MinimumOccurrences =>
+        OccursSpec is { DependingName: not null } or { IsDynamic: true } ? OccursSpec.Min
         : Occurs ?? 1;
 
     /// <summary>True when this subtree contains a <c>USAGE BIT</c> leaf — the gate that sends a group's width

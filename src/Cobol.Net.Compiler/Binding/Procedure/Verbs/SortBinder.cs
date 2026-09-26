@@ -57,11 +57,10 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Reported(ctx.Edition);
         }
         if (RecordLessSd(file)) return new BoundNop();
-        if (SortRecordOf(file) is not { } record)
+        if (SortRecordOf(file) is null)
             // The MECHANISM is derived from the record itself (the R40 fleet: a fixed "VARIABLE-LENGTH"
             // string misdiagnosed a pointer-leafed record — the same wrong-cause defect twice removed).
             return new BoundUnsupported(TierCIsland.Reason(file.Records[0], "SORT SD record of"));
-        int width = Model.RecordLayout.AreaWidth(record);
 
         // Format 1 prints the KEY phrase in BRACES with an ellipsis (§14.9.40.2) — at least one is required, and
         // its data-name-1 is required too (braces, not the Format-2 brackets). The grammar's `sortKeyPhrase*` is
@@ -117,7 +116,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Reported(ctx.Edition);
         }
 
-        return new BoundSort(file, width, keys, s.sortDuplicatesPhrase() is not null, collating,
+        return new BoundSort(file, keys, s.sortDuplicatesPhrase() is not null, collating,
             usingFiles, inputProc, givingFiles, outputProc, SortVaryingOf(file));
     }
 
@@ -269,9 +268,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Reported(ctx.Edition);
         }
         if (RecordLessSd(file)) return new BoundNop();
-        if (SortRecordOf(file) is not { } record)
+        if (SortRecordOf(file) is null)
             return new BoundUnsupported($"MERGE '{file.CobolName}' without a usable SD record (Tier-C byte island, deferred)");
-        int width = Model.RecordLayout.AreaWidth(record);
 
         var keys = new List<BoundSortMergeKey>();
         foreach (var phrase in m.mergeKeyPhrase())
@@ -318,7 +316,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // procedure-range cross-pass in VersionConformancePass.GateMergeInSortMergeProc (the paragraph-pc ranges are
         // available on this BoundMerge/BoundSort). Below 2023 the runtime EC-SORT-MERGE-ACTIVE raise in
         // CobolSort.Init covers the dynamic case when checking is enabled (kb/Work PB1036).
-        return new BoundMerge(file, width, keys, collating, usingFiles, givingFiles, outputProc, SortVaryingOf(file));
+        return new BoundMerge(file, keys, collating, usingFiles, givingFiles, outputProc, SortVaryingOf(file));
     }
 
     // ── RELEASE (ISO §14.9.32) ─────────────────────────────────────────────────────────────────────────────

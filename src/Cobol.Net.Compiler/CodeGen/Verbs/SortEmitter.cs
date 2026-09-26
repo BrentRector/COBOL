@@ -45,7 +45,7 @@ internal sealed class SortEmitter(EmitContext ctx,
             EmitFilesNotOpen(sd, so.Using);
             if (so.Using.Count > 0)
                 foreach (var input in so.Using)
-                    EmitInputFile(input, sd, so.RecordWidth, so.Varying, tx);
+                    EmitInputFile(input, sd, so.File.RecordWidth, so.Varying, tx);
             else if (so.InputProcedure is { IsEmpty: false } ip)   // an EMPTY procedure releases nothing (kb/Work PB440)
             {
                 w.Line($"{RuntimeApi.SortEnterProcedure(sd, output: false)};   // §14.9.32.4 GR1 — RELEASE is legal from here to the sequence phase");
@@ -141,7 +141,7 @@ internal sealed class SortEmitter(EmitContext ctx,
             foreach (var input in mg.Using)
             {
                 w.Line($"{RuntimeApi.SortNextInput(sd)};   // a new pre-sorted USING stream (GR4 — file order breaks ties)");
-                EmitInputFile(input, sd, mg.RecordWidth, mg.Varying, tx);
+                EmitInputFile(input, sd, mg.File.RecordWidth, mg.Varying, tx);
             }
             w.Line($"{RuntimeApi.SortMerge(sd, KeysExpr(mg.Keys))};   // the GR5 sequences are the Init snapshot's; GR6's sequence test");
             if (mg.Giving.Count > 0)
