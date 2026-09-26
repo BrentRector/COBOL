@@ -95,6 +95,15 @@ internal enum PicRole
 /// </summary>
 internal static class PictureComposition
 {
+    /// <summary>
+    /// Test seam (kb/Work PB1600): when set, every Table-10 walk (<see cref="Precedence"/>) reports how many role
+    /// tests it made — one per live symbol per candidate assignment, plus the culprit scan on a refusal. The scale
+    /// gate asserts that COUNT grows linearly with the symbol count; it replaced a stopwatch ratio that a loaded
+    /// runner turned red with no code change. <see cref="AsyncLocal{T}"/>, so only the observing test's own
+    /// analysis reports here while the Unit assembly runs in parallel.
+    /// </summary>
+    internal static readonly AsyncLocal<Action<long>?> WalkObserver = new();
+
     // ── ISO §13.18.40.6, Table 10 — Format 1 picture symbol order of precedence ──────────────────────────────
     // One entry per SECOND symbol (the table's ROW, in printed order = the PicRole order); within an entry, one
     // cell per FIRST symbol (the table's COLUMN, same order). 'x' == "the symbol at the top of the column MAY
@@ -565,6 +574,7 @@ internal static class PictureComposition
         var role = new PicRole[n];
         int combos = 1 << ambiguous.Count;
         (int First, int Second) worst = (-1, -1);
+        long tests = 0;   // the work the PB1600 scale gate counts (WalkObserver)
         for (int pick = 0; pick < combos; pick++)
         {
             for (int i = 0; i < n; i++) role[i] = roleA[i];
@@ -575,6 +585,7 @@ internal static class PictureComposition
             for (int j = 0; j < n; j++)
             {
                 if (!live[j]) continue;
+                tests++;
                 int refused = seen & ~MayPrecede[(int)role[j]];
                 if (refused != 0)
                 {
@@ -582,15 +593,19 @@ internal static class PictureComposition
                     // reader would name (the earliest one the row forbids).
                     var culprit = (PicRole)System.Numerics.BitOperations.TrailingZeroCount(refused);
                     for (int i = 0; i < j; i++)
+                    {
+                        tests++;
                         if (live[i] && role[i] == culprit) { bad = (i, j); break; }
+                    }
                     break;
                 }
                 seen |= 1 << (int)role[j];
             }
-            if (bad.First < 0) return true;
+            if (bad.First < 0) { WalkObserver.Value?.Invoke(tests); return true; }
             if (bad.Second > worst.Second || (bad.Second == worst.Second && bad.First > worst.First)) worst = bad;
         }
 
+        WalkObserver.Value?.Invoke(tests);
         return fail(DiagnosticCatalog.PicturePrecedence,
             $"the symbol '{syms[worst.Second].Text}' at symbol position {worst.Second + 1} may not follow the symbol "
             + $"'{syms[worst.First].Text}' at symbol position {worst.First + 1}. Character-string-1 shall consist of "

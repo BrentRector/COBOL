@@ -11,9 +11,10 @@ namespace CobolNet.Tests.Unit;
 /// code — hosted CI runners are shared and loaded, and `DeepNestingTests` went red TWICE on a 1-second compile that
 /// took 26 s there. Assert the property instead: a work count (<c>PhysicalModel.ListBuilds</c>), an observed
 /// suspension (<c>CobolTiming.SuspensionObserver</c>), a growth ratio, or completion. Reporting an elapsed time with
-/// <c>output.WriteLine</c> is fine; comparing it is not. A GROWTH RATIO of two readings taken in the same run
-/// (<c>PictureCompositionTests.ALargeRepeatExpandedPicture_CostsLinearTime</c>) measures the code, not the host, and is
-/// the one permitted timing shape.
+/// <c>output.WriteLine</c> is fine; comparing it is not. ⛔ A GROWTH RATIO of two stopwatch readings is NOT a safe
+/// shape either (kb/Work PB1600): the two readings are taken at different moments, load lands on one and not the
+/// other, and <c>PictureCompositionTests</c>' 3 000-vs-30 000-symbol ratio read 36x against a bound of 30 on untouched
+/// code — it now counts the Table-10 walk's role tests (<c>PictureComposition.WalkObserver</c>) instead.
 /// </summary>
 public sealed class NoWallClockAssertionDriftTests
 {

@@ -212,30 +212,35 @@ public sealed class PictureCompositionTests
     /// symbol. This pins the difference: the quadratic form takes minutes on these inputs and the linear one
     /// milliseconds, so the bound is generous and still cannot be met by an accidental regression.
     /// </summary>
-    /// <para>⛔ It measures the GROWTH RATE, never an absolute time (kb/Work PB1590's rule — a fixed ceiling on a loaded
-    /// CI runner fails with no code change): the same five shapes at 3 000 and at 30 000 symbols, the best of three
-    /// runs each, and the ratio of the two. Linear work scales ~10x; the quadratic pair walk scales ~100x; the bound
-    /// sits between them, and load that slows both sizes alike cannot move a ratio.</para>
+    /// <para>⛔ It counts WORK, never time (kb/Work PB1600, after PB1590): the walk reports its role tests through
+    /// <c>PictureComposition.WalkObserver</c>, for the same five shapes at 3 000 and at 30 000 symbols. The linear
+    /// walk makes one test per symbol, so tenfold more symbols is at most ~10x the tests; the quadratic pair walk
+    /// is ~100x. The count is deterministic, so no runner load can move it — the stopwatch ratio this replaced read
+    /// 36x under load on untouched code (train 61).</para>
     [Fact]
-    public void ALargeRepeatExpandedPicture_CostsLinearTime()
+    public void ALargeRepeatExpandedPicture_CostsLinearWork()
     {
-        double small = BestOfThreeTicks(3_000), large = BestOfThreeTicks(30_000);
-        double growth = large / Math.Max(small, 1);
-        Assert.True(growth < 30,
-            $"tenfold more symbols cost {growth:F0}x the work in the §13.18.40.6 Table 10 walk (linear is ~10x, "
-            + "quadratic ~100x) — it is quadratic in the symbol count again");
+        long small = TableWalkTests(3_000), large = TableWalkTests(30_000);
+        // The seam is connected and every symbol of every shape was walked: without this an unobserved walk (0)
+        // would make any ratio pass.
+        Assert.True(small >= 5 * 2_900 && large >= 5 * 29_000,
+            $"the Table 10 walk reported {small} / {large} role tests — the WalkObserver seam is disconnected or the "
+            + "shapes no longer reach the walk");
+        Assert.True(large <= 11 * small,
+            $"tenfold more symbols cost {(double)large / small:F1}x the role tests in the §13.18.40.6 Table 10 walk "
+            + "(linear is ~10x, quadratic ~100x) — it is quadratic in the symbol count again");
     }
 
-    private long BestOfThreeTicks(int n)
+    private long TableWalkTests(int n)
     {
         string[] pictures = [$"X({n})", $"9({n})", $"Z({n})", $"$({n})", $"9({n * 2 / 3})V9({n * 3 / 10})"];
-        long best = long.MaxValue;
-        for (int run = 0; run < 3; run++)
+        long tests = 0;
+        PictureComposition.WalkObserver.Value = count => tests += count;
+        try
         {
-            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (string picture in pictures) Diagnose(picture);
-            best = Math.Min(best, System.Diagnostics.Stopwatch.GetTimestamp() - start);
         }
-        return best;
+        finally { PictureComposition.WalkObserver.Value = null; }
+        return tests;
     }
 }
