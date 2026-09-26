@@ -32,12 +32,16 @@ The facts exist; what is missing is a USER-facing presentation, versioned with t
 
 ## §3 Source layout and publication
 
+**What a reader sees:** ordinary web pages at `https://wiseowlsoftware.com/cobol/docs/` — browse, search and link
+like any documentation site, nothing to download or install. A version picker switches between releases;
+`/cobol/docs/latest/` is the default. Everything below is BUILD plumbing that readers never see.
+
 - **Source:** `docs/manual/` in THIS repo, Starlight-compatible Markdown/MDX (frontmatter `title`, `description`,
   `sidebar`). Hand-written chapters live there; GENERATED chapters are written by generators into
   `docs/manual/reference/` at build time and are never hand-edited (a header comment says so).
-- **Bundle:** the release pipeline produces `docs-bundle-<version>.zip` (hand-written + generated pages, plus an
+- **Bundle (a build input, never a user download):** the release pipeline produces `docs-bundle-<version>.zip` (hand-written + generated pages, plus an
   `index.json` with version and commit) as a release artifact. `main` publishes a rolling `next` bundle.
-- **Site:** the wiseowlsoftware.com repo mounts Starlight at `/cobol/docs/` and its build fetches bundles into
+- **Site:** the wiseowlsoftware.com repo mounts Starlight at `/cobol/docs/` and its BUILD (CI, at deploy time) fetches the bundles into
   `src/content/docs/cobol/<version>/`; `/cobol/docs/latest/` aliases the newest release. The site repo owns theme,
   navigation and the bifurcated home page; this repo owns the content. Neither copies the other's files by hand.
 - **Why a bundle, not a submodule or a copy:** the site builds any number of versions without checking out old

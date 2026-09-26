@@ -18,14 +18,14 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — 2026-09-22 late evening</h3>
-    <p><strong>Landing.</strong> <span class="pill warn">train 52</span> is landing wave 52 (one operand-class screen for GO TO DEPENDING / SEARCH VARYING / SET, ADDRESS OF as an argument, OO class data, NUMVAL-C locale grouping) together with the Conformance runner's compiled-program cache (PB985), which cuts a lander's re-gate from ~23 min to ~1.5 min. Trains 53 and 54 (wave 54: directive state, the MOVE chain for ACCEPT and INVOKE, the report LINE clause, operand surfaces, refusals that must carry a diagnostic) are merged and gating behind it.</p>
-    <p><strong>Implementing.</strong> Finishers for the reserved-word gate's legacy parse path (PB655 + PB764), POINTER storage images at the CALL boundary (PB970), group operands the image composer cannot build (PB244), method DECLARATIVES (PB1010), keys after dynamic-length members (PB1025 + PB1026), SORT/MERGE termination (PB993) and the reference resolver's silent nulls (PB1030). <strong>Update, 2026-09-23 morning:</strong> trains 52 through 57 have all landed, and <strong>battery #86</strong> at main <span class="mono">c54434a8d</span> is green on every compiler leg with seventeen per-case differential flips &mdash; <em>every one licensed by the standard</em>: context-sensitive words usable as names, empty argument lists and ASSIGN lists now accepted; misplaced USE, GO TO into declaratives and bare-literal conditions now refused; and INSPECT &hellip; TRAILING and ENTRY, which compiled only as staged run-time aborts, now refused at compile time because ISO/IEC 1989 does not print them &mdash; each read from the case, re-derived from the standard and re-baselined.</p>
+    <h3>In flight — Saturday 2026-09-26</h3>
+    <p><strong>Landed today.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test (37 goldens, 25 negatives, 5 witness classes). Of the lane's 120 input rows, 6 are held behind open defects and 54 were judged not closable by a test &mdash; an owner-facing question of its own.</p>
+    <p><strong>Implementing &mdash; wave 61</strong>, eight groups of wrong-answer defects, one per subsystem. Finished and awaiting the train lander: COPY/REPLACE text-words (PB1350, PB1354, PB1351 &mdash; 25 rows on its branch) and runtime I-O boundaries with owner decision R47 (PB1192, PB690, PB1098 &mdash; 13 rows). Still running: OO conformance and INVOKE arguments, file-control clause screens, floating-point ROUNDED and size error, record sizing, literal screens, and user-defined-function argument binding.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
-      <h3>Owner decisions</h3>
-      <p>Open questions live in <span class="mono">kb/Work/</span> as notes of kind <span class="mono">decision</span> and are asked one at a time as each becomes relevant. Standing precedence for implementation latitude: the ISO text where it controls, then GnuCOBOL, then IBM or Micro Focus.</p>
+      <h3>Owner decisions today</h3>
+      <p>R50: user documentation is docs-as-code published with Astro Starlight on wiseowlsoftware.com, distributed on NuGet under <span class="mono">WiseOwl.</span>. Contributions are accepted under a CLA; the GitHub community standards are in place.</p>
     </div>
     <div class="card">
       <h3>History</h3>

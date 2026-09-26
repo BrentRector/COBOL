@@ -13,6 +13,14 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1717 — 2026-09-26 13:50 PDT — Ledger refresh after golden lane 2; docs-bundle wording
+
+Conformance Ledger regenerated and published (artifact v77) after golden lane 2: trend point 86e17b70 appended
+(GAP 1182, closed 3165, DNS 456), and the hand-written in-flight section rewritten for today (it still described
+2026-09-22). `DESIGN-USER-DOCUMENTATION.md` §3 corrected on the owner's reading: the docs bundle is a BUILD input the
+wiseowlsoftware.com pipeline fetches at deploy time — readers browse ordinary pages at `/cobol/docs/` and never
+download anything; the section now says so first.
+
 ## Entry 1716 — 2026-09-26 12:46 PDT — Community standards, user-documentation design (R50), WSL toolchain script
 
 **GitHub community standards** — the repo's checklist lacked a code of conduct, contributing guide, security policy,
