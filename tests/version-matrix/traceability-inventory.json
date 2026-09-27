@@ -38692,11 +38692,11 @@
   "subject": "INSPECT statement",
   "rule-digest": "97162f64a6a7",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectReplacingSize; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectStaticWidth",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectReplacingSize; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Put",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1127 (open). 'When both literal-1 and literal-3 are specified, they shall be the same size except when literal-3 is a figurative constant, in which case it is expanded or contracted to be the size of literal-1.' --check OK (14.9.22.3 6). Unequal literals rejected COBOLNET0846 for ALL/FIRST/LEADING, alphanumeric/national/boolean/concatenation literals and a figurative literal-1 vs 'ZZ' (P30,P33,P34,P35,P37,P38,P32); figurative literal-3 expanded: ALL 'AB' BY SPACES -> '  CDE' (P31), BY QUOTE -> '\"\"CDE' (P39), bare symbolic character takes the same path. Hex-literal operands are refused before this check (SR3 finding), not an SR6 defect. The expansion half is pinned by conformance-test:InspectDifferentialTests.Replace_FigurativeReplacement_ExpandsToPatternSize_SpecPinned, but the rejection half has no negative golden, so test-ref left empty. probes under scratchpad/adj-d1/out/probe/inspect-p1 (pinned cobol.exe, --std 2023 unless noted) || REFUTED: PARTIAL — The literal-literal size check and figurative expansion are right for spelled literals (R04 'A' vs 'Z''Q' rejected, R05 'ABC' BY 'Z''Q' gives Z'QDE, R06 Format 3 rejected, R08 second bare pair rejected, R11 FIRST 'BCD' BY ZEROS gives A000E, R12 national BY SPACE gives A  DE). But a constant-name literal-1/literal-3 is never reached: legal equal-size source is rejected. A constant-name is a literal for this rule: §13.10.3 SR2 (--check OK) 'constant-name-1 may be used anywhere that a format specifies a literal', §13.10.4 GR1 (--check OK) 'as if literal-1 ... were written'. InspectBinder.InspectCharOperandOf's dataReference arm sends a constant-name to ResolveSending, which does not resolve it, so every INSPECT literal-position constant-name is refused with COBOLNET1639 'not defined' (MOVE KZ TO X works, S01MOVE). kb/Work R01 (landed) claimed INSPECT substitutes constants; the operand arm does not. || editions as adjudicated: 85/2002/2014/2023",
+  "notes": "OWNED BY kb/Work PB1127 (open). 'When both literal-1 and literal-3 are specified, they shall be the same size except when literal-3 is a figurative constant, in which case it is expanded or contracted to be the size of literal-1.' --check OK (14.9.22.3 6). Unequal literals rejected COBOLNET0846 for ALL/FIRST/LEADING, alphanumeric/national/boolean/concatenation literals and a figurative literal-1 vs 'ZZ' (P30,P33,P34,P35,P37,P38,P32); figurative literal-3 expanded: ALL 'AB' BY SPACES -> '  CDE' (P31), BY QUOTE -> '\"\"CDE' (P39), bare symbolic character takes the same path. Hex-literal operands are refused before this check (SR3 finding), not an SR6 defect. The expansion half is pinned by conformance-test:InspectDifferentialTests.Replace_FigurativeReplacement_ExpandsToPatternSize_SpecPinned, but the rejection half has no negative golden, so test-ref left empty. probes under scratchpad/adj-d1/out/probe/inspect-p1 (pinned cobol.exe, --std 2023 unless noted) || REFUTED: PARTIAL — The literal-literal size check and figurative expansion are right for spelled literals (R04 'A' vs 'Z''Q' rejected, R05 'ABC' BY 'Z''Q' gives Z'QDE, R06 Format 3 rejected, R08 second bare pair rejected, R11 FIRST 'BCD' BY ZEROS gives A000E, R12 national BY SPACE gives A  DE). But a constant-name literal-1/literal-3 is never reached: legal equal-size source is rejected. A constant-name is a literal for this rule: §13.10.3 SR2 (--check OK) 'constant-name-1 may be used anywhere that a format specifies a literal', §13.10.4 GR1 (--check OK) 'as if literal-1 ... were written'. InspectBinder.InspectCharOperandOf's dataReference arm sends a constant-name to ResolveSending, which does not resolve it, so every INSPECT literal-position constant-name is refused with COBOLNET1639 'not defined' (MOVE KZ TO X works, S01MOVE). kb/Work R01 (landed) claimed INSPECT substitutes constants; the operand arm does not. || editions as adjudicated: 85/2002/2014/2023 retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectStaticWidth (kb/Work PB1126 deleted the bind-time figurative expansion; a figurative literal-3 is now sized to its pattern at RUN time by CobolInspect.Put)",
   "state": "GAP"
  },
  {
@@ -38766,13 +38766,13 @@
   "ordinal": 2,
   "subject": "INSPECT statement",
   "rule-digest": "ab6d9b1f5e1c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Tally; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit",
+  "test-ref": "conformance:2002/pb1128_inspect_identifier1_class_store",
   "derivation": "",
   "editions": "2023",
-  "notes": "OWNED BY kb/Work PB1128 (open). Rule: zero-length identifier-1 -> a) identifier-1 and identifier-2 unchanged, b) successful, c) control to end of statement (cite.py --check 14.9.22.4 'the contents of the data items referenced by identifier-1 and identifier-2 are unchanged' -> OK 2) a)). No explicit short-circuit exists, but the runtime loops run zero times over an empty image, every count is 0 and the emitter ADDs 0 into identifier-2, and the replaced/converted image is the empty string stored back over a zero extent - observationally identical. Probe p3.cob with CNT=0 (G zero-length): N PIC 99 VALUE 7 TALLYING N FOR ALL 'A' CHARACTERS -> N=07 unchanged; REPLACING ALL 'A' BY 'B' and CONVERTING 'A' TO 'C' then CNT=5 -> G='AAAAA' unchanged; no EC, execution continues (b). Second route probed too: p7.cob under >>REF-MOD-ZERO-LENGTH, INSPECT S1(1:L) with L=0 TALLYING N FOR ALL 'A' CHARACTERS / REPLACING ALL 'A' BY 'B' -> N=07, S1='AAAA', EXCEPTION-STATUS blank. || REFUTED: PARTIAL — GR2 a) requires identifier-2 to be UNCHANGED when identifier-1 is zero-length, and c) requires control to go straight to the end of the statement. The implementation has no zero-length short-circuit. It still runs the counter store counter := counter + 0 (ArithmeticEmitter.StoreArith through CobolNum.Store/FormatImage), and that store rewrites identifier-2 whenever its content is not already in canonical form. The adjudicator probed only a canonical counter (PIC 99 VALUE 7), where adding 0 happens to leave the value alone. Identifier-1 unchanged (half a) and no EC set (half b) were confirmed. Identifier-2 unchanged fails for a non-canonical counter, so the rule is PARTIAL, and in fact a defect for that shape. || editions as adjudicated: 2023 text (applies wherever a zero-length identifier-1 can exist; Annex E lists no INSPECT change for it)",
-  "state": "GAP"
+  "notes": "kb/Work PB1128 (landed w66k). GR2 a)-c): a zero-length identifier-1 leaves identifier-1 AND identifier-2 unchanged and control goes immediately to the end of the statement. InspectEmitter.Emit reads identifier-1's image once and wraps every pass and the write-back in `if (image.Length != 0)`, so the tallying pass no longer runs counter := counter + 0 (an arithmetic store that re-encoded a non-canonical counter image: '7 ' in a PIC 99 came back '07'). Witness N9: ZG's table at count 0, CG holding '7 ' reads '7 ' after INSPECT ZG TALLYING C2 FOR CHARACTERS.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-3",
@@ -38797,11 +38797,11 @@
   "subject": "INSPECT statement",
   "rule-digest": "47bcb931d4c0",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitStore; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#OperandTextOf; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#AsString",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitStore; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#OperandTextOf; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#AsString; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem",
+  "test-ref": "conformance:2002/pb1128_inspect_identifier1_class_store; conformance:negative/pb1128-inspect-national-numeric-edited-mix",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1128 (open). cite.py --check 14.9.22.4 \"the original value of the sign is retained upon completion of the INSPECT statement\" -> OK GR4 d). identifier-1 and every identifier operand are read via OperandText.AsString(deSign:true); EmitStore re-applies the original sign. Probes (misc.cob): a) alphanumeric/national images; b) ED PIC ZZ9.99 value 1.5 TALLYING ALL \" \" -> 2; E PIC 9(4) 1201 REPLACING ALL \"0\" BY \"5\" -> 1251; c) NN PIC 9(4) USAGE NATIONAL 1201 TALLYING ALL \"1\" -> 2; d) NS PIC S9(4) SIGN LEADING SEPARATE -1201: ALL \"1\" ALL \"-\" -> 2 (sign position excluded), REPLACING 1->9 -> -9209; NT PIC S9(4) overpunch -1201 REPLACING 1->8 -> 820Q (= -8208, sign retained). The InspectDifferentialTests GR4d methods are AssertSameAsLegacy and do not close the row. || REFUTED: DIVERGES — Two arms of GR4 are wrong. (1) GR4c + Table 2 (8.5.2.1): a numeric-edited item with USAGE NATIONAL is class national and is inspected as category national. The binder classes it as alphanumeric instead. The legal INSPECT NE TALLYING C FOR ALL N\" \" is REJECTED with COBOLNET2306 (SR4 class mixing), and the SR4-violating alphanumeric literal \" \" is accepted. (2) GR4d, second sentence: the original sign is not kept when the replaced digit image becomes zero. EmitStore re-signs with (Read(p)<0 ? -mag : mag), and -0 collapses to +0 in both the native arm and the string-stored arm. A negative item loses its sign. The other arms work: GR4a, GR4b, the de-signed read of identifier-1 and identifier-3, and a nonzero result's sign. || editions as adjudicated: 1985, 2002, 2014, 2023 (boolean/national arms 2002+)",
+  "notes": "OWNED BY kb/Work PB1128 (half). GR4 c) FIXED w66k: a numeric-edited item of usage national is class NATIONAL (8.5.2.1 Table 2) - IntrinsicArgumentRules.ClassOfItem answers CobolClass.NumericEditedNational and AllOrNothingClass compares Table-2 classes, so INSPECT NE TALLYING C FOR ALL N\" \" binds (witness N5 = 02) and the alphanumeric \" \" is COBOLNET2306 (negative pb1128-inspect-national-numeric-edited-mix). GR4 d)'s second sentence STILL DIVERGES: when the replaced digits make a signed identifier-1 zero, the original NEGATIVE sign is lost (S9(3) -5 REPLACING ALL \"5\" BY \"0\" displays 00{ where 00} is required). A native-stored signed DISPLAY item is a C# long, which has no negative zero, so the fix is a data-model decision (a sign carried apart from the magnitude), not an emitter edit.",
   "state": "GAP"
  },
  {
@@ -39021,13 +39021,13 @@
   "ordinal": 14,
   "subject": "INSPECT statement",
   "rule-digest": "aa6360bb532a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectStaticWidth",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#CheckReplacingSizes; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#RangeInspectSizeError; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands",
+  "test-ref": "conformance:2002/pb1126_inspect_size_ec; conformance:2002/pb1128_inspect_identifier1_class_store",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1126 (open). Rule (three sentences): sizes shall be equal; 'If these sizes are not equal, the EC-RANGE-INSPECT-SIZE exception condition is set to exist' ; a figurative literal-3 takes 'the size of literal-1 or the size of the data item referenced by identifier-3' (cite.py --check 14.9.22.4 -> OK 14) for both quotes). DEFECT 1 (EC never set): CobolInspect.Replace skips a size-mismatched operand ('GR14 deterministic skip') and nothing anywhere in src raises EC-RANGE-INSPECT-SIZE (grep: only ExceptionCatalog.cs:190 names it, as Fatal). Probe p2.cob under >>TURN EC-ALL CHECKING ON: S1='XABX', P PIC X(4) VALUE 'AB', INSPECT S1 REPLACING ALL P BY \"Q\" -> runs on, S1='XABX', FUNCTION EXCEPTION-STATUS blank; spec: EC-RANGE-INSPECT-SIZE exists (fatal, so with checking on and no declarative the run unit terminates). DEFECT 2 (figurative sizing): the binder expands a figurative literal-3 only when InspectStaticWidth(pattern) is known; for a function-identifier identifier-3 it returns null, so the 1-character figurative survives and the runtime size check then silently skips the operand. Probe p1.cob T16: P='AB  ', INSPECT S1 REPLACING ALL FUNCTION TRIM(P) BY SPACES over 'XABX' -> '[XABX]'; spec: SPACES takes identifier-3's size (2) -> '[X  X]'. The literal case works (Replace_FigurativeReplacement_ExpandsToPatternSize_SpecPinned). No register note owns either half. || editions as adjudicated: 1985, 2002, 2014, 2023 (the EC-RANGE-INSPECT-SIZE half 2002+, when exception conditions were introduced)",
-  "state": "GAP"
+  "notes": "kb/Work PB1126 (landed w66k). All three sentences: (1)+(2) a non-figurative pattern/replacement pair of unequal size sets EC-RANGE-INSPECT-SIZE, checked for the whole statement before the first cycle (CobolInspect.CheckReplacingSizes -> ExceptionState.RangeInspectSizeError; the per-statement fatal gate EcBinder arms for a BoundInspect); with checking off the undefined result is the deterministic never-matches. Witness E1. (3) a figurative literal-3 takes the size of literal-1 / identifier-3 at RUN time (BoundInspectReplace.ReplacementIsFigurative; CobolInspect.Put fills it) - the bind-time expansion answered only a static width, so ALL FUNCTION UPPER-CASE(P) BY SPACES left a one-character replacement that was skipped. Witnesses N7 'X  X' and E4. 85 has no EC mechanism; its leg is the figurative sizing.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-15",
@@ -39036,13 +39036,13 @@
   "ordinal": 15,
   "subject": "INSPECT statement",
   "rule-digest": "2362456ed2b4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectCharactersReplacement",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#CheckReplacingSizes; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#RangeInspectSizeError",
+  "test-ref": "conformance:2002/pb1126_inspect_size_ec",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1126 (open). Rule: with CHARACTERS, identifier-5 'shall be one character in length. If it is not, the EC-RANGE-INSPECT-SIZE exception condition is set to exist' (cite.py --check 14.9.22.4 -> OK 15)). SR7's literal half is enforced at compile time (COBOLNET0846); the identifier-5 half falls to CobolInspect.Replace, which takes the replacement's first character and raises nothing. Probe p2.cob under >>TURN EC-ALL CHECKING ON: R2 PIC X(2) VALUE '**', INSPECT S1 REPLACING CHARACTERS BY R2 -> '[****]', EXCEPTION-STATUS blank, run continues; spec: EC-RANGE-INSPECT-SIZE set (fatal). The results being undefined licenses the '****' image but not the missing exception. Same mechanism as GR14. || editions as adjudicated: 1985, 2002, 2014, 2023 (the EC half 2002+)",
-  "state": "GAP"
+  "notes": "kb/Work PB1126 (landed w66k). A CHARACTERS replacement (identifier-5) that is not one character sets EC-RANGE-INSPECT-SIZE before the first cycle; SR7's literal half stays COBOLNET0846 at compile time. Checking off: the undefined result contributes the first character. Witness E2 (R2 PIC X(2)). 85 has no EC mechanism.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-16",
@@ -39111,13 +39111,13 @@
   "ordinal": 20,
   "subject": "INSPECT statement",
   "rule-digest": "08c20abda691",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert; src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs#WriteGroupValue; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectCharOperandOf",
+  "test-ref": "conformance:2002/pb1128_inspect_identifier1_class_store",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1128 (open). Rule: format 4 executes as a format 2 with one ALL phrase per character of literal-4, literal-3 the ordinally corresponding character of literal-5 (cite.py --check 14.9.22.4 -> OK 20)). Every such operand is one character over the same single region, so the shared cycle degenerates to CobolInspect.Convert's per-character map inside Region(before, after); figurative literal-5 is expanded to literal-4's size at bind time. Probes: p1.cob T15 'ABCABC' CONVERTING \"ABC\" TO \"XYZ\" AFTER \"C\" -> 'ABCXYZ'; Annex D.25 EXAMPLE 6 (AFTER QUOTE BEFORE \"#\") -> 'AC\"XEYXFYZX#AB\"D' exactly as printed (p4.cob); BACKWARD p5.cob 'ABCABC' AFTER \"C\" -> 'XYZXYC'. The size-mismatch (GR22) and duplicate-character (GR23) behaviour belong to sibling part rules. No spec-derived test pins the equivalence directly (conformance:2023/inspect_backward C= covers only the BACKWARD boundary). || REFUTED: PARTIAL — GR20 makes a format 4 behave as a format 2 with one ALL c BY d pair per character. The per-character map in CobolInspect.Convert is right for alphanumeric and national ELEMENTARY items and for alphanumeric groups. W1 PIC N(5) and W2 alphanumeric group GA both give 'ZZYZZ'. The BEFORE delimiter case W4 gives 'XYCABC'. The duplicate-from case W5 gives 'XYCXYC'. A plain figurative TO QUOTE, W3, expands correctly. Two shapes fail. (1) A NATIONAL GROUP identifier-1 (GROUP-USAGE NATIONAL, which SR1 allows) is CORRUPTED. On a fixed 5-occurrence national group, CONVERTING N\"A\" TO N\"Z\" gives '婚婚娠††' where 'ZZZZZ' is expected. On a national ODO group the live positions become mojibake. The emitter stores the converted UTF-16 character string through the group byte-image path (GF.FromImage(__ins) / SpliceInto(GN.AsImage(), ...)). REPLACING corrupts the same way (X3), so the defect is in the shared store; the format 2 equivalence holds, but its result is wrong. (2) A figurative constant beginning with ALL is legal as literal-5: SR3 bars ALL only for literals 1-4, and GR22 sizes a figurative literal-5 to literal-4. The binder still rejects 'CONVERTING \"ABC\" TO ALL \"Q\"' with COBOLNET1757, so that legal format 4 source never executes. The claim that a figurative literal-5 is expanded at bind time holds only for the non-ALL figuratives. || editions as adjudicated: 1985, 2002, 2014, 2023 (BACKWARD half 2023 only - Annex E.3.3 item 34)",
-  "state": "GAP"
+  "notes": "kb/Work PB1128 (landed w66k). The two failing shapes are fixed at their roots: (1) a NATIONAL GROUP identifier-1 is stored back through PlaceRenderer.WriteGroupValue, the receiving twin of SendingGroupValue, in national positions (13.18.29.4 GR2 b) - it was stored through the group BYTE-image writer, so CONVERTING N\"A\" TO N\"Z\" over five N\"A\" gave mojibake; witness N1 ZZZZZ, N2 QBQCQ, N3 the occurs-depending splice over the SENDING extent (GR1) 5ZZZAA; (2) SR3 bars ALL only from literal-1..4, so CONVERTING \"ABC\" TO ALL \"Q\" binds (was COBOLNET1757) and the runtime repeats the ALL literal to literal-4's size (GR22, 8.3.3.6.4 GR2) - witness N6 QQQDEF QRQDEF.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-21",
@@ -39141,13 +39141,13 @@
   "ordinal": 22,
   "subject": "INSPECT statement",
   "rule-digest": "f91bb7eaf91c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectStaticWidth; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs#EC-RANGE-INSPECT-SIZE",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#RangeInspectSizeError; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands",
+  "test-ref": "conformance:2002/pb1126_inspect_size_ec; conformance:2002/pb1128_inspect_identifier1_class_store",
   "derivation": "",
   "editions": "85",
-  "notes": "OWNED BY kb/Work PB1126 (open). cite.py --check 14.9.22.4 \"If these sizes are not equal, the EC-RANGE-INSPECT-SIZE exception condition is set to exist and the results of the execution of the INSPECT statement are undefined. When a figurative constant is used as literal-5\" -> OK GR22. Three sentences, two defective. (1) EC half: EC-RANGE-INSPECT-SIZE is only catalogued (ExceptionCatalog L3, Fatal); nothing raises it. CobolInspect.Convert clamps to min(from,to) 'deterministic in place of undefined + EC-RANGE-INSPECT-SIZE'. INSPECT is nucleus, so the §14.6.13.1.1 optional-element exemption does not apply. Probe g22.cob: >>TURN EC-RANGE-INSPECT-SIZE CHECKING ON; F PIC X(3) 'abc', T2 PIC X(2); INSPECT X CONVERTING F TO T2 -> runs on, X=XYcdef, EXCEPTION-STATUS blank. Spec: the fatal EC is set to exist -> with no declarative the run unit terminates abnormally (§14.6.12). (2) figurative half: the binder expands a figurative literal-5 only when InspectStaticWidth(from) is non-null; a function-identifier (or inline method invocation) identifier-6 has null width, so the figurative stays ONE character and Convert maps only the first from-character. Probe: F='abc', W='abcdef', INSPECT W CONVERTING FUNCTION TRIM(F) TO ZEROS -> W2=0bcdef; spec (literal-5 size = identifier-6 size = 3): 000def. Static widths work (W=000def via F(1:N)). Literal/literal size mismatch is a compile-time SR9 check (COBOLNET0846) — correct. Same mechanism hits GR14/GR15 (sibling part): Replace skips a size-mismatched operand and a function-identifier pattern with a figurative replacement is silently skipped. || editions as adjudicated: 1985 (equal-size requirement; no EC model), 2002, 2014, 2023 (EC-RANGE-INSPECT-SIZE)",
-  "state": "GAP"
+  "notes": "kb/Work PB1126 (landed w66k). Unequal non-figurative CONVERTING sets set EC-RANGE-INSPECT-SIZE before any character converts (witness E3); a figurative literal-5 takes identifier-6's / literal-4's size at RUN time (BoundInspectConvert.ToIsFigurative; an ALL literal repeats per 8.3.3.6.4 GR2) - CONVERTING FUNCTION LOWER-CASE(F) TO ZEROS gives 000def (witness N8), and was 0bcdef.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-23",

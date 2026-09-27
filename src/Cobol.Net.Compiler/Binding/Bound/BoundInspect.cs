@@ -23,16 +23,22 @@ public enum InspectReplaceKind { All = 0, First = 1, Leading = 2, Characters = 3
 public sealed record BoundInspectTally(
     Place Counter, InspectTallyKind Kind, BoundOperand? Pattern, BoundOperand? Before, BoundOperand? After);
 
-/// <summary>One flattened REPLACING operand: kind, pattern (null for CHARACTERS), equal-length replacement
-/// (§14.9.22.4 GR14 — a figurative replacement was already expanded to the pattern size at bind time, SR6), and
-/// per-operand BEFORE/AFTER delimiters (GR9). Source order = the GR8a shared-cycle order.</summary>
+/// <summary>One flattened REPLACING operand: kind, pattern (null for CHARACTERS), replacement, and per-operand
+/// BEFORE/AFTER delimiters (GR9). Source order = the GR8a shared-cycle order. <paramref name="ReplacementIsFigurative"/>
+/// marks a figurative literal-3, whose size "is equal to the size of literal-1 or the size of the data item
+/// referenced by identifier-3" (§14.9.22.4 GR14) — a size the RUNTIME fills it to, because identifier-3's size is
+/// a run-time fact (a function-identifier, a dynamic-length item; kb/Work PB1126).</summary>
 public sealed record BoundInspectReplace(
-    InspectReplaceKind Kind, BoundOperand? Pattern, BoundOperand Replacement, BoundOperand? Before, BoundOperand? After);
+    InspectReplaceKind Kind, BoundOperand? Pattern, BoundOperand Replacement, BoundOperand? Before, BoundOperand? After,
+    bool ReplacementIsFigurative = false);
 
 /// <summary>The CONVERTING phrase (ISO §14.9.22.2 Format 4): the positional from→to character maps (GR20) and the
-/// single BEFORE/AFTER region. A figurative <paramref name="To"/> was expanded to <paramref name="From"/>'s size
-/// at bind time (SR9/GR22).</summary>
-public sealed record BoundInspectConvert(BoundOperand From, BoundOperand To, BoundOperand? Before, BoundOperand? After);
+/// single BEFORE/AFTER region. <paramref name="ToIsFigurative"/> marks a figurative literal-5 — which, unlike
+/// literal-1 through literal-4, MAY begin with the word ALL (SR3) — whose size "is equal to the size of literal-4
+/// or the size of the data item referenced by identifier-6" (GR22): the runtime repeats its value to that size
+/// (kb/Work PB1126 / PB1128).</summary>
+public sealed record BoundInspectConvert(BoundOperand From, BoundOperand To, BoundOperand? Before, BoundOperand? After,
+    bool ToIsFigurative = false);
 
 /// <summary>INSPECT (ISO §14.9.22). Formats 1–3 carry the flattened tallying/replacing operand lists; format 4
 /// carries <see cref="Converting"/>. A format 3 executes as two successive statements — tallying then replacing —

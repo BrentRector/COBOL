@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime.Exceptions;
+
 namespace CobolNet.Runtime;
 
 /// <summary>
@@ -168,15 +170,24 @@ public static class CobolInspect
     /// can never create or destroy a later match. A CHARACTERS operand (null pattern) replaces each matched
     /// character with its replacement's first character (GR17a); FIRST replaces only its leftmost match and each
     /// successive FIRST phrase independently replaces one occurrence regardless of its pattern value (GR17d);
-    /// LEADING uses the same contiguity-from-first-eligibility rule as tallying (GR17c). A pattern/replacement
-    /// size mismatch (the identifier-fed GR14/GR15 case) skips the operand — deterministic in place of the
-    /// undefined-results + EC-RANGE-INSPECT-SIZE the 2002+ EC model will raise.
+    /// LEADING uses the same contiguity-from-first-eligibility rule as tallying (GR17c).
+    /// <para>A FIGURATIVE replacement (<paramref name="figurative"/>[k]) has the size of its pattern (GR14 — "the
+    /// size of the figurative constant is equal to the size of literal-1 or the size of the data item referenced by
+    /// identifier-3"), so it is filled to the pattern's RUN-TIME size here: the binder cannot know that size for a
+    /// function-identifier or a dynamic-length identifier-3 (kb/Work PB1126).</para>
+    /// <para>A pattern/replacement size mismatch (GR14 — only an identifier can produce one; two literals are SR6's
+    /// compile-time error) and a CHARACTERS replacement that is not one character (GR15) set EC-RANGE-INSPECT-SIZE,
+    /// checked for the whole statement BEFORE the first cycle. With checking enabled the fatal condition ends the
+    /// statement there; with it off, "the results of the execution of the INSPECT statement are undefined" and the
+    /// deterministic outcome is: the mis-sized operand never matches, and a CHARACTERS replacement contributes its
+    /// first character.</para>
     /// </summary>
     public static string Replace(
         string? text, int[] kinds, string?[] patterns, string?[] replacements,
-        string?[] befores, string?[] afters, bool backward = false)
+        string?[] befores, string?[] afters, bool backward = false, bool[]? figurative = null)
     {
         string t = text ?? "";
+        CheckReplacingSizes(kinds, patterns, replacements, figurative);
         if (backward)
         {
             t = ReverseText(t);
@@ -211,7 +222,7 @@ public static class CobolInspect
                 {
                     if (!inRegion) continue;
                     string rep = replacements[k] ?? " ";
-                    chars[pos] = rep.Length > 0 ? rep[0] : ' ';   // GR17a (GR15 fallback: first character)
+                    chars[pos] = rep.Length > 0 ? rep[0] : ' ';   // GR17a (GR15 unchecked: first character)
                     pos += 1;
                     matched = true;
                     break;
@@ -219,7 +230,8 @@ public static class CobolInspect
 
                 string pat = patterns[k] ?? "";
                 string repl = replacements[k] ?? "";
-                if (pat.Length == 0 || pat.Length != repl.Length) continue;   // GR14 deterministic skip
+                bool fill = figurative is not null && figurative[k];
+                if (pat.Length == 0 || !fill && pat.Length != repl.Length) continue;   // GR14 unchecked: never matches
                 bool fits = inRegion && pos + pat.Length <= regionEnd[k];
                 bool isMatch = fits && t.AsSpan(pos, pat.Length).SequenceEqual(pat.AsSpan());
 
@@ -228,7 +240,7 @@ public static class CobolInspect
                     if (!live[k]) continue;
                     if (isMatch)
                     {
-                        repl.CopyTo(0, chars, pos, repl.Length);
+                        Put(chars, pos, pat.Length, repl, fill);
                         live[k] = false;          // only the leftmost occurrence, per FIRST phrase (GR17d)
                         pos += pat.Length;
                         matched = true;
@@ -247,7 +259,7 @@ public static class CobolInspect
                     }
                     if (pos == expectedPos[k] && isMatch)
                     {
-                        repl.CopyTo(0, chars, pos, repl.Length);
+                        Put(chars, pos, pat.Length, repl, fill);
                         pos += pat.Length;
                         expectedPos[k] = pos;
                         matched = true;
@@ -260,7 +272,7 @@ public static class CobolInspect
                 // ReplaceAll (GR17b — each match replaced).
                 if (isMatch)
                 {
-                    repl.CopyTo(0, chars, pos, repl.Length);
+                    Put(chars, pos, pat.Length, repl, fill);
                     pos += pat.Length;
                     matched = true;
                     break;
@@ -273,17 +285,63 @@ public static class CobolInspect
         return new string(chars);
     }
 
+    /// <summary>Write one replacement over <paramref name="size"/> matched positions: the replacement itself, or,
+    /// for a figurative (<paramref name="fill"/>), its value repeated to the matched size (GR14's "equal to the size
+    /// of literal-1"). No allocation: the fill is written in place.</summary>
+    private static void Put(char[] chars, int pos, int size, string repl, bool fill)
+    {
+        if (!fill) { repl.CopyTo(0, chars, pos, size); return; }
+        // A figurative is never zero-length: §8.3.3.6.3 SR2's zero-length ALL literal-1 is a compile-time error
+        // (COBOLNET1648) and every other figurative is one character — so there is no empty case to invent a value for.
+        for (int i = 0; i < size; i++) chars[pos + i] = repl[i % repl.Length];
+    }
+
+    /// <summary>§14.9.22.4 GR14 / GR15, asked of the whole statement before the first comparison cycle: every
+    /// non-figurative pattern/replacement pair of unequal size, and every CHARACTERS replacement that is not one
+    /// character, sets EC-RANGE-INSPECT-SIZE (Table 13 fatal). GR14 compares the two SIZES and names no exemption,
+    /// so a zero-length identifier-3 beside a non-empty replacement is a mismatch too.</summary>
+    private static void CheckReplacingSizes(int[] kinds, string?[] patterns, string?[] replacements, bool[]? figurative)
+    {
+        for (int k = 0; k < kinds.Length; k++)
+        {
+            if (figurative is not null && figurative[k]) continue;
+            int repl = replacements[k]?.Length ?? 0;
+            if (kinds[k] == ReplaceCharacters)
+            {
+                if (repl != 1)
+                    ExceptionState.RangeInspectSizeError(
+                        $"INSPECT REPLACING CHARACTERS BY a {repl}-character replacement; ISO §14.9.22.4 GR15 requires one character");
+                continue;
+            }
+            int pat = patterns[k]?.Length ?? 0;
+            if (pat != repl)
+                ExceptionState.RangeInspectSizeError(
+                    $"INSPECT REPLACING operand {k + 1}: a {pat}-character pattern replaced by a {repl}-character "
+                    + "replacement; ISO §14.9.22.4 GR14 requires equal sizes");
+        }
+    }
+
     /// <summary>
     /// CONVERTING (§14.9.22.4 GR20): equivalent to a REPLACING with one <c>ALL c BY d</c> per character of
     /// <paramref name="fromSet"/> (positional correspondence with <paramref name="toSet"/>) — since every operand
     /// is one character, this degenerates to a per-character map over the ONE region. A character duplicated in
     /// <paramref name="fromSet"/> maps by its FIRST occurrence (GR23 — <c>IndexOf</c>). The from/to maps are
     /// positional and direction-independent, so BACKWARD reverses only the text and delimiters.
+    /// <para>GR22: a FIGURATIVE literal-5 (<paramref name="toFigurative"/>) has the size of the from-set, so the
+    /// to-set is its value repeated to that RUN-TIME size (an identifier-6 function-identifier's size is known only
+    /// here, kb/Work PB1126; an ALL literal repeats per §8.3.3.6.4 GR2). A non-figurative to-set of another size
+    /// sets EC-RANGE-INSPECT-SIZE (Table 13 fatal) before any character is converted; with checking off the results
+    /// are undefined and the deterministic outcome maps only the common prefix.</para>
     /// </summary>
     public static string Convert(
-        string? text, string fromSet, string toSet, string? before, string? after, bool backward = false)
+        string? text, string fromSet, string toSet, string? before, string? after, bool backward = false,
+        bool toFigurative = false)
     {
         string t = text ?? "";
+        if (!toFigurative && fromSet.Length != toSet.Length)
+            ExceptionState.RangeInspectSizeError(
+                $"INSPECT CONVERTING a {fromSet.Length}-character set to a {toSet.Length}-character set; ISO "
+                + "§14.9.22.4 GR22 requires equal sizes");
         if (backward)
         {
             t = ReverseText(t);
@@ -291,15 +349,13 @@ public static class CobolInspect
             if (after is { Length: > 1 }) after = ReverseText(after);
         }
         var (start, end) = Region(t, before, after);
-        // GR22: from/to are equal-size (a figurative toSet was expanded at bind time); a runtime identifier-fed
-        // mismatch clamps to the common prefix — deterministic in place of undefined + EC-RANGE-INSPECT-SIZE.
-        int mapLen = Math.Min(fromSet.Length, toSet.Length);
+        int mapLen = toFigurative ? fromSet.Length : Math.Min(fromSet.Length, toSet.Length);
         var chars = t.ToCharArray();
         for (int i = start; i < end; i++)
         {
             int mapIdx = fromSet.IndexOf(chars[i]);   // first occurrence wins (GR23)
             if (mapIdx >= 0 && mapIdx < mapLen)
-                chars[i] = toSet[mapIdx];
+                chars[i] = toFigurative ? toSet[mapIdx % toSet.Length] : toSet[mapIdx];   // a figurative is never empty (Put)
         }
         if (backward) Array.Reverse(chars);
         return new string(chars);

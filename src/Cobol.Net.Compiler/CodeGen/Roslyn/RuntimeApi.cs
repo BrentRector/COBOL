@@ -717,14 +717,20 @@ internal static class RuntimeApi
         $"{nameof(CobolInspect)}.{nameof(CobolInspect.Tally)}({image}, new int[] {{ {kinds} }}, " +
         $"new string?[] {{ {pats} }}, new string?[] {{ {befs} }}, new string?[] {{ {afts} }}, {backward})";
 
-    /// <summary>The replacing pass — <c>CobolInspect.Replace</c>.</summary>
-    public static string InspectReplace(string image, string kinds, string pats, string reps, string befs, string afts, string backward) =>
+    /// <summary>The replacing pass — <c>CobolInspect.Replace</c>. <paramref name="figs"/> is the comma-separated
+    /// per-operand figurative-replacement flags, or null when no replacement is figurative (the runtime's default).</summary>
+    public static string InspectReplace(string image, string kinds, string pats, string reps, string befs, string afts, string backward,
+        string? figs = null) =>
         $"{nameof(CobolInspect)}.{nameof(CobolInspect.Replace)}({image}, new int[] {{ {kinds} }}, new string?[] {{ {pats} }}, " +
-        $"new string?[] {{ {reps} }}, new string?[] {{ {befs} }}, new string?[] {{ {afts} }}, {backward})";
+        $"new string?[] {{ {reps} }}, new string?[] {{ {befs} }}, new string?[] {{ {afts} }}, {backward}"
+        + (figs is null ? ")" : $", new bool[] {{ {figs} }})");
 
-    /// <summary>CONVERTING — <c>CobolInspect.Convert</c>.</summary>
-    public static string InspectConvert(string image, string from, string to, string before, string after, string backward) =>
-        $"{nameof(CobolInspect)}.{nameof(CobolInspect.Convert)}({image}, {from}, {to}, {before}, {after}, {backward})";
+    /// <summary>CONVERTING — <c>CobolInspect.Convert</c>. <paramref name="toFigurative"/> marks a figurative
+    /// literal-5, which the runtime repeats to the from-set's size.</summary>
+    public static string InspectConvert(string image, string from, string to, string before, string after, string backward,
+        bool toFigurative = false) =>
+        $"{nameof(CobolInspect)}.{nameof(CobolInspect.Convert)}({image}, {from}, {to}, {before}, {after}, {backward}"
+        + (toFigurative ? ", toFigurative: true)" : ")");
 
     /// <summary>Compile-time anchor for the tally-kind discriminators the emitter selects.</summary>
     public static string InspectTallyKindText(Binding.Bound.InspectTallyKind k) => k switch

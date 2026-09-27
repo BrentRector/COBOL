@@ -215,9 +215,9 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 var (before, after) = InspectDelimiters(item.inspectDelimiters());
                 if (item.CHARACTERS() is not null)
                 {
-                    var (rep, _) = InspectCharOperand(item.inspectChar(0));
+                    var (rep, repFigurative) = InspectCharOperand(item.inspectChar(0));
                     ctx.Validation.CheckInspectCharactersReplacement(rep);   // SR7 — pure check
-                    replacing.Add(new BoundInspectReplace(InspectReplaceKind.Characters, null, rep, before, after));
+                    replacing.Add(new BoundInspectReplace(InspectReplaceKind.Characters, null, rep, before, after, repFigurative));
                     continue;
                 }
                 if (item.TRAILING() is not null)
@@ -231,13 +231,13 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
 
                 var (pat, _) = InspectCharOperand(item.inspectChar(0));
                 var (rep2, figurative) = InspectCharOperand(item.inspectChar(1));
-                if (figurative && rep2 is BoundStringLiteral f && InspectStaticWidth(pat) is { } wp && wp != f.Value.Length)
-                    // SR6 / GR14: a figurative literal-3 is expanded (or contracted) to the size of literal-1 /
-                    // identifier-3 — e.g. ALL "AB" BY SPACES replaces with "  ". (The legacy skipped the operand.)
-                    rep2 = new BoundStringLiteral(new string(f.Value[0], wp));
-                else
-                    ctx.Validation.CheckInspectReplacingSize(pat, rep2, figurative);   // SR6 — pure check
-                replacing.Add(new BoundInspectReplace(kind, pat, rep2, before, after));
+                // SR6 / GR14: a figurative literal-3 "is expanded or contracted to be the size of literal-1", and
+                // GR14 says the same of identifier-3 — whose size is a RUN-TIME fact for a function-identifier or a
+                // dynamic-length item. So the runtime sizes it, for every pattern shape alike (kb/Work PB1126: a
+                // bind-time expansion that answered only a static width left `ALL FUNCTION TRIM(P) BY SPACES` a
+                // one-character replacement the size check then skipped). Only two LITERALS are checked here.
+                ctx.Validation.CheckInspectReplacingSize(pat, rep2, figurative);   // SR6 — pure check
+                replacing.Add(new BoundInspectReplace(kind, pat, rep2, before, after, figurative));
             }
         }
 
@@ -261,11 +261,11 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                         + "(the CONVERTING-alphabet form is a GnuCOBOL extension). Write the character "
                         + "strings, or a data item holding them");
             var (from, _) = InspectCharOperand(conv.inspectChar(0));
-            var (to, figurative) = InspectCharOperand(conv.inspectChar(1));
-            if (figurative && to is BoundStringLiteral f && InspectStaticWidth(from) is { } wf && wf != f.Value.Length)
-                to = new BoundStringLiteral(new string(f.Value[0], wf));   // SR9/GR22 — figurative literal-5 takes literal-4's size
-            else
-                ctx.Validation.CheckInspectConvertingSize(from, to, figurative);   // SR9 — pure check
+            // Literal-5 is the ONE INSPECT literal SR3 does not bar from beginning with the word ALL (kb/Work PB1128).
+            var (to, figurative) = InspectCharOperand(conv.inspectChar(1), literal5: true);
+            // SR9 / GR22: a figurative literal-5 takes literal-4's / identifier-6's size — at RUN time, the same
+            // reason as SR6 above (kb/Work PB1126).
+            ctx.Validation.CheckInspectConvertingSize(from, to, figurative);   // SR9 — pure check
             BoundOperand? before = null, after = null;
             foreach (var ba in conv.inspectBeforeAfterPhrase())
             {
@@ -273,7 +273,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 if (ba.BEFORE() is not null) before = op;
                 else after = op;
             }
-            converting = new BoundInspectConvert(from, to, before, after);
+            converting = new BoundInspectConvert(from, to, before, after, figurative);
         }
 
         return new BoundInspect(targetOperand, tallying, replacing, converting, backward);
@@ -302,14 +302,17 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     /// an identifier reads its FULL raw image at run time (GR5/GR6 — no trimming; GR4d de-signs a signed numeric
     /// operand at the read). <c>Figurative</c> reports the figurative origin so SR6/SR9 can expand a replacement
     /// to the pattern size.</summary>
-    private (BoundOperand Op, bool Figurative) InspectCharOperand(Core.InspectCharContext c)
+    private (BoundOperand Op, bool Figurative) InspectCharOperand(Core.InspectCharContext c, bool literal5 = false)
     {
-        var bound = InspectCharOperandOf(c);
+        var bound = InspectCharOperandOf(c, literal5);
         // SR4's operand record (kb/Work PB980). A FIGURATIVE operand (and a bare symbolic character, which IS one)
         // takes identifier-1's class by SR3 — "When identifier-1 is of class national, the class of the figurative
         // constant is national; when identifier-1 is of class boolean, the figurative constant is of class
-        // boolean" — so it is never recorded and can never be the mismatch.
-        if (!bound.Figurative) _sr4Operands?.Add(Sr4Entry(bound.Op));
+        // boolean" — so it is never recorded and can never be the mismatch. The ALL-literal figurative literal-5
+        // is the exception: SR3's class sentence is written over "literal-1, literal-2, or literal-4", and an
+        // `ALL N"…"` carries the class of the LITERAL written in it, so SR4 asks it like any literal.
+        if (!bound.Figurative || bound.Op is BoundAllLiteral)
+            _sr4Operands?.Add(Sr4Entry(bound.Op));
         return bound;
     }
 
@@ -325,16 +328,31 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     private static (CobolClass? Class, bool Triggers) Sr4Entry(BoundOperand op) =>
         (IntrinsicArgumentRules.ClassOf(op), op is not BoundFieldOperand { Place.Item.IsGroup: true });
 
-    private (BoundOperand Op, bool Figurative) InspectCharOperandOf(Core.InspectCharContext c)
+    private (BoundOperand Op, bool Figurative) InspectCharOperandOf(Core.InspectCharContext c, bool literal5)
     {
         var fig = c.figurativeConstant() ?? c.literal()?.nonNumericLiteral()?.figurativeConstant();
         if (fig is not null)
         {
-            if (fig.allLiteral() is not null || fig.ALL() is not null && fig.cobolWord() is not null)   // EVERY form beginning with the word ALL — literal-1 (PB71) and ALL symbolic-character-1 (PB110)
-                return (BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
-                    $"INSPECT operand '{c.GetText()}' is a figurative constant that begins with the word ALL, which "
-                    + "an INSPECT literal shall not be (ISO §14.9.22.3 SR3)",
-                    "INSPECT operand ALL \"literal\" / ALL symbolic-character (ISO §14.9.22.3 SR3)"), false);
+            // ⛔ SR3: "Literal-1, literal-2, literal-3, and literal-4 shall not be a figurative constant that begins
+            // with the word ALL" — EVERY form beginning with the word (ALL literal-1 PB71, ALL symbolic-character-1
+            // PB110, and ALL ZERO/SPACE/HIGH-VALUE/LOW-VALUE/QUOTE, which this screen used to let through as the bare
+            // word), and ONLY those four: literal-5 is not named, so `CONVERTING "ABC" TO ALL "Q"` is legal and was
+            // refused (kb/Work PB1128).
+            if (fig.ALL() is not null)
+            {
+                if (!literal5)
+                    return (BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
+                        $"INSPECT operand '{ConcatFolder.Spelling(fig)}' is a figurative constant that begins with the "
+                        + "word ALL, which literal-1, literal-2, literal-3 and literal-4 shall not be (ISO §14.9.22.3 SR3)",
+                        "INSPECT operand ALL figurative (ISO §14.9.22.3 SR3)"), false);
+                // Literal-5's ALL literal-1 / ALL symbolic-character-1, through THE ONE figurative binder (it folds a
+                // concatenated or constant-name literal-1 and reports §8.3.3.6.3 SR2/SR4): a BoundAllLiteral whose
+                // value the runtime repeats to identifier-6's / literal-4's size (GR22), exactly as §8.3.3.6.4 GR2
+                // repeats any ALL literal to its associated size. ALL ZERO / SPACE / … binds as the bare word's
+                // BoundFigurative and takes the one-character arm below — the same figurative, filled to size.
+                var allFig = host.Expr.FigurativeOperand(fig);
+                if (allFig is BoundAllLiteral or BoundOperandError) return (allFig, allFig is BoundAllLiteral);
+            }
             return (new BoundStringLiteral(InspectFigurativeChar(fig).ToString()), true);
         }
         // ⛔ A FUNCTION-IDENTIFIER OPERAND (ISO §8.4.3.1.2 Format 1; fix-queue PB45). §14.9.22.2 writes these as
@@ -386,18 +404,4 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         : fig.lowValueWord() is not null || fig.NULL_() is not null ? '\u0000'
         : fig.quoteWord() is not null ? '"'
         : ' ';
-
-    /// <summary>The compile-time-known character width of an INSPECT operand's run-time image, or null. A literal
-    /// is its own length; an identifier's raw image width is static — alphanumeric/edited items their PIC length,
-    /// a numeric item its digit count (the GR4d de-signed image excludes any separate sign position), a group its
-    /// image width. Sizes both SR6/SR9 figurative expansion and the literal/literal equal-size checks rest on.</summary>
-    private static int? InspectStaticWidth(BoundOperand op) => op switch
-    {
-        BoundStringLiteral s => s.Value.Length,
-        BoundFieldOperand f when f.Place.Item.IsGroup =>
-            f.Place.Item.AsIfPic?.Length ?? f.Place.Item.ImageWidth,   // a bit group: its boolean positions (D20/PB79)
-        BoundFieldOperand { Place.Item.Pic: { Category: PicCategory.Numeric } pic } => pic.Digits,
-        BoundFieldOperand { Place.Item.Pic: { } pic } => pic.Length,
-        _ => null,
-    };
 }

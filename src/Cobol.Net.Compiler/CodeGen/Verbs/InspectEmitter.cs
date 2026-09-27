@@ -33,6 +33,20 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         // function-identifier (PB10). AsString already dispatches on the operand kind, so admitting the function
         // case cost nothing here; it is the STORE below that the shape constrains.
         w.Line($"string {img} = {OperandText.AsString(ins.Target, num, deSign: true)};");
+        // ⛔ GR2 — a ZERO-LENGTH identifier-1 (a dynamic-length item at length 0, an occurs-depending group at count
+        // 0, a function returning a zero-length value — §8.5.4) leaves identifier-1 AND identifier-2 unchanged and
+        // "control is immediately transferred to the end of the INSPECT statement" (kb/Work PB1128). Without the
+        // test the tallying pass still ran `counter := counter + 0`, which is not a no-op: the arithmetic store
+        // re-encodes identifier-2, so a counter holding a non-canonical image ("7 " in a PIC 99) came back "07".
+        // The one image read above is the whole of item identification this statement then owes (GR6).
+        using (w.Block($"if ({img}.Length != 0)"))
+            EmitBody(ins, id, img);
+    }
+
+    /// <summary>The TALLYING / REPLACING / CONVERTING passes and the write-back, over the non-empty image.</summary>
+    private void EmitBody(BoundInspect ins, int id, string img)
+    {
+        var w = ctx.Writer;
         string back = ins.Backward ? "true" : "false";
 
         if (ins.Tallying.Count > 0)
@@ -60,13 +74,18 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
             string reps = string.Join(", ", r.Select(x => OperandTextOf(x.Replacement)));
             string befs = string.Join(", ", r.Select(x => OperandTextOf(x.Before)));
             string afts = string.Join(", ", r.Select(x => OperandTextOf(x.After)));
-            w.Line($"{img} = {RuntimeApi.InspectReplace(img, kinds, pats, reps, befs, afts, back)};");
+            // GR14: a figurative literal-3 takes the size of ITS pattern, which the runtime knows and the binder may
+            // not (kb/Work PB1126) — so the flags travel, and the runtime fills.
+            string? figs = r.Any(x => x.ReplacementIsFigurative)
+                ? string.Join(", ", r.Select(x => x.ReplacementIsFigurative ? "true" : "false"))
+                : null;
+            w.Line($"{img} = {RuntimeApi.InspectReplace(img, kinds, pats, reps, befs, afts, back, figs)};");
             mutated = true;
         }
 
         if (ins.Converting is { } cv)
         {
-            w.Line($"{img} = {RuntimeApi.InspectConvert(img, OperandTextOf(cv.From), OperandTextOf(cv.To), OperandTextOf(cv.Before), OperandTextOf(cv.After), back)};");
+            w.Line($"{img} = {RuntimeApi.InspectConvert(img, OperandTextOf(cv.From), OperandTextOf(cv.To), OperandTextOf(cv.Before), OperandTextOf(cv.After), back, cv.ToIsFigurative)};");
             mutated = true;
         }
 
@@ -88,8 +107,8 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         }
     }
 
-    /// <summary>Store the replaced/converted image back into identifier-1 by its storage shape: a character-image
-    /// group distributes via <c>FromImage</c> (a Tier-B view group splices its window); a string-stored elementary
+    /// <summary>Store the replaced/converted image back into identifier-1 by its storage shape: a group through the
+    /// ONE group value writer in the alphabet it was read in (a Tier-B view group splices its window); a string-stored elementary
     /// item (alphanumeric / numeric-edited / zoned image) takes the image directly; a native-stored numeric DISPLAY
     /// item re-encodes the digit image — re-applying the RETAINED original sign for a signed item (§14.9.22.4
     /// GR4d). A replacement that left a non-digit in a numeric item decodes by digit positions only — deterministic
@@ -97,18 +116,18 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     private void EmitStore(Place p, string img)
     {
         var w = ctx.Writer;
-        // ISO §13.18.38 GR7 + §14.6.4 step 6: an occurs-depending group is INSPECTed over its current-count extent;
-        // the replaced image (already current-count, read via the GR8 sending slice) splices back over exactly that
-        // extent, leaving positions past the count unmodified.
         // A reference-modified identifier-1 is the elementary alphanumeric unique item of §8.4.3.3.4 GR6 — the
         // replaced image splices into it (kb/Work PB70: over a GROUP inner it used to fall into the group arm).
         if (p is RefModPlace) { w.Line(PlaceRenderer.Write(p, img)); return; }
-        // ISO §13.18.38 GR7 + §14.6.4 step 6: an occurs-depending group is INSPECTed over its current-count extent;
-        // the replaced image (already current-count, read via the GR8 sending slice) splices back over exactly that
-        // extent, leaving positions past the count unmodified.
-        if (p is OdoGroupPlace odo) { w.Line(PlaceRenderer.ReceiveInto(odo, img)); return; }
-        // A group identifier-1 (§14.9.22.3 SR1 — "an alphanumeric or national group item"): the ONE group-image store.
-        if (p.Item.IsGroup) { w.Line(PlaceRenderer.WriteGroupImage(p, img, "INSPECT REPLACING/CONVERTING into group")); return; }
+        // A group identifier-1 (§14.9.22.3 SR1 — "an alphanumeric or national group item"): the ONE group VALUE
+        // writer, in the alphabet the read used (a national group's national positions, never its byte image —
+        // kb/Work PB1128), over the SENDING extent — §14.9.22.4 GR1 sizes identifier-1 "as a sending data item", so
+        // an occurs-depending group splices back over exactly its current-count part, positions past it unmodified.
+        if (p.Item.IsGroup)
+        {
+            w.Line(PlaceRenderer.WriteGroupValue(p, img, "INSPECT REPLACING/CONVERTING into group", AccessDir.Sending));
+            return;
+        }
         // ⛔ THE REPLACED IMAGE OF A NUMERIC ITEM IS NOT AN ALPHANUMERIC SENDING OPERAND. Every decode below
         // takes CobolNum.DigitMagnitude, never the §14.9.25.4 GR6 d) 3 capped FromAlphanumeric: this image
         // is the ITEM'S OWN and its PICTURE already fixes the size, so GR6 d) 3 asks nothing here. kb/Work PB426

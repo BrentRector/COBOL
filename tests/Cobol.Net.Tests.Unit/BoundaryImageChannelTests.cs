@@ -174,13 +174,15 @@ public sealed class BoundaryImageChannelTests
         string src = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "CodeGen", "Roslyn", "PlaceRenderer.cs"));
         Assert.Contains("BitImagePlace b => SendingBits(b.Inner)", src);
         Assert.Contains("BitImagePlace b => WriteBits(b.Inner, rhs)", src);
-        // SendingBits delegates to the direction-parameterized BitsAs (kb/Work PB202 — the GR8 direction law), so
-        // the arm-carrying bodies are BitsAs and WriteBits.
+        // SendingBits delegates to the direction-parameterized BitsAs (kb/Work PB202 — the GR8 direction law), and
+        // WriteBits to its direction-parameterized twin BitsWrite (kb/Work PB1128 — WriteGroupValue stores INSPECT's
+        // identifier-1 over the SENDING extent), so the arm-carrying bodies are BitsAs and BitsWrite.
         Assert.Contains("string SendingBits(Place group) => BitsAs(group, AccessDir.Sending);", src);
-        foreach (string one in new[] { "BitsAs", "WriteBits" })
+        Assert.Contains("string WriteBits(Place group, string bits) => BitsWrite(group, bits, AccessDir.Receiving);", src);
+        foreach (string one in new[] { "BitsAs", "BitsWrite" })
         {
             int at = src.IndexOf($"string {one}(", StringComparison.Ordinal);
-            Assert.True(at > 0, $"PlaceRenderer.{one} not found — the ONE bit {(one.StartsWith("Write") ? "writer" : "reader")} was renamed or removed.");
+            Assert.True(at > 0, $"PlaceRenderer.{one} not found — the ONE bit {(one.EndsWith("Write") ? "writer" : "reader")} was renamed or removed.");
             // Each must name the ODO wrapper (GR8's current extent) and the generated member it owns. The body
             // ends at the blank line before the next member (a `;` scan would stop inside an interpolated
             // string — the emitted `FromBits(…);` carries one).

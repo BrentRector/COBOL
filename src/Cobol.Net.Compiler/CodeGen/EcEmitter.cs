@@ -396,6 +396,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         ("EC-RANGE-PTR", "RangePtrChecking"),                   // §14.9.39.4 GR20 — the NEW ADDRESS outside the implementor data-pointer range (DOC-A.1-216; kb/Work PB465)
         ("EC-BOUND-SUBSCRIPT", "BoundSubscriptChecking"),       // §8.4.2.3.4 GR2 — subscript outside 1..highest
         ("EC-BOUND-ODO", "BoundOdoChecking"),                   // §13.18.38.4 GR7 — DEPENDING value outside int-1..int-2
+        ("EC-RANGE-INSPECT-SIZE", "RangeInspectSizeChecking"),  // §14.9.22.4 GR14/GR15/GR22 — an INSPECT operand pair of unequal size (kb/Work PB1126)
         ("EC-RANGE-INDEX", "RangeIndexChecking"),               // §13.18.38.4 GR2 / §14.9.39.4 GR2 a) 1. b + GR4 a) — an index driven outside the implementor range (kb/Work PB459)
         // The *-ARG-OMITTED trio — one rule per activated-element kind, raised at the formal's guarded reference
         // by OmittedFormal (kb/Work PB971); the binder queries exactly the current element's name.

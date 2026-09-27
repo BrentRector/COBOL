@@ -820,6 +820,12 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             // which this sees through the BoundSequence recursion.
             if (node is BoundMove && ctx.EcState.Turn.Enabled("EC-DATA-OVERFLOW", null, line))
                 enabled.Add(("EC-DATA-OVERFLOW", null));
+            // EC-RANGE-INSPECT-SIZE (fatal, §14.9.22.4 GR14/GR15/GR22 — kb/Work PB1126) is INSPECT's own: the three
+            // rules that set it are written over INSPECT's operands and nothing else, and its only raise sites are
+            // CobolInspect.Replace / Convert, so the node kind IS the rule's scope (unlike the ambient families above,
+            // whose raise sites render inline into any verb).
+            if (node is BoundInspect && ctx.EcState.Turn.Enabled("EC-RANGE-INSPECT-SIZE", null, line))
+                enabled.Add(("EC-RANGE-INSPECT-SIZE", null));
             // EC-DATA-INCOMPATIBLE (fatal, §14.6.13.2) rides an AMBIENT per-statement gate, exactly like its own
             // sibling EC-DATA-NOT-FINITE above — the two are rules 3 and 2/4 of ONE clause about one subject, the
             // content of a sending operand that is not valid, and they get one shape.

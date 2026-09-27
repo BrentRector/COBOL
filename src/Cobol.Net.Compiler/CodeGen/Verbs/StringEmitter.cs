@@ -213,7 +213,9 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         // updated image splices into it (kb/Work PB70: over a GROUP inner it used to fall into the group arm).
         if (p is RefModPlace) { w.Line(PlaceRenderer.Write(p, imageExpr)); return; }
         // A group identifier-3 (§14.9.43.4 GR3a — the alphanumeric MOVE rules): the ONE group-image store.
-        if (p.Item.IsGroup) { w.Line(PlaceRenderer.WriteGroupImage(p, imageExpr, "STRING INTO group")); return; }
+        // The ONE group VALUE writer, in the alphabet ReadImage read (SendingGroupValue): a national group — class
+        // national, so legal here by SR1 — takes its national positions, never its byte image (kb/Work PB1128).
+        if (p.Item.IsGroup) { w.Line(PlaceRenderer.WriteGroupValue(p, imageExpr, "STRING INTO group")); return; }
         if (p is not RedefViewPlace && !p.Item.StoreAsImage
             && p.Item.Pic is { IsCharacterFormNumeric: true })   // THE ONE character-form predicate (kb/Work PB646)
         {

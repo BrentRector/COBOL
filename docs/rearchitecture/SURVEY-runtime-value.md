@@ -176,9 +176,9 @@ for consolidation but **omits these three numeric parsers** (see gap check §8).
 4. **[LOW] `CobolFloat.ToScaled` saturation constant `1.7014118e38` (`:39`)** is a hand-written approximation of
    `Int128.MaxValue`. Correct in spirit (guards the undefined out-of-range `(Int128)double` cast) but a magic literal;
    a named constant derived from `Int128.MaxValue` would be safer against future edits.
-5. **[INFO] `CobolInspect`/`CobolStringOps` identifier-fed size mismatches** deterministically **skip/clamp** in place
-   of the 2002+ `EC-RANGE-INSPECT-SIZE`/undefined behavior (`CobolInspect.cs:172-173,222,295`;
-   `CobolStringOps` GR14/15). Documented as named residue, not a bug — but a real edition-correctness gap to schedule.
+5. **[INFO — CLOSED by kb/Work PB1126] `CobolInspect` identifier-fed size mismatches** now set
+   `EC-RANGE-INSPECT-SIZE` (§14.9.22.4 GR14/15/22) through `ExceptionState.RangeInspectSizeError`; the skip/clamp
+   survives only as the deterministic outcome of the undefined result when checking is off.
 
 ---
 

@@ -32,16 +32,20 @@ internal static class AllOrNothingClass
     /// <summary>True when some TRIGGERING operand is of class <paramref name="governing"/> and some operand of
     /// <paramref name="all"/> is of a decidable OTHER class. <paramref name="triggers"/> defaults to
     /// <paramref name="all"/>; INSPECT passes its elementary items and literals only ("references an ELEMENTARY
-    /// data item or literal of class …" — while every operand, a group included, must then conform).</summary>
+    /// data item or literal of class …" — while every operand, a group included, must then conform).
+    /// <para>Each operand is compared by its Table-2 CLASS COLUMN (<see cref="IntrinsicArgumentRules.TableTwoClass"/>),
+    /// never by the lattice's refined member: a national numeric-edited item IS class national (kb/Work PB1128 —
+    /// compared raw, its refined member was "another class" and INSPECT refused the legal N" " beside it). UNSTRING's
+    /// SR3 is CATEGORY-worded, but its SR2/SR4 admit no numeric-edited operand, so the projection cannot move it.</para></summary>
     public static bool Violated(CobolClass governing, IReadOnlyCollection<CobolClass?> all,
                                 IReadOnlyCollection<CobolClass?>? triggers = null)
     {
         bool triggered = false;
         foreach (var c in triggers ?? all)
-            if (c == governing) { triggered = true; break; }
+            if (c is { } t && IntrinsicArgumentRules.TableTwoClass(t) == governing) { triggered = true; break; }
         if (!triggered) return false;
         foreach (var c in all)
-            if (c is { } cls && cls != governing) return true;
+            if (c is { } cls && IntrinsicArgumentRules.TableTwoClass(cls) != governing) return true;
         return false;
     }
 

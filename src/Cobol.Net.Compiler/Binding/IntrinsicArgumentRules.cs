@@ -55,6 +55,14 @@ internal enum CobolClass
     /// </para>
     /// </remarks>
     NumericEditedDeEditing,
+
+    /// <summary>NUMERIC-EDITED with usage NATIONAL — ISO §8.5.2.1 Table 2 class NATIONAL ("National | National,
+    /// National-edited, Numeric-edited (if usage is national)"), the national twin of
+    /// <see cref="NumericEditedDeEditing"/>. Its absence was kb/Work PB1128: the class was read off the CATEGORY
+    /// alone, which cannot see the usage Table 2 splits the row on, so a national numeric-edited item answered
+    /// "alphanumeric" and INSPECT's §14.9.22.3 SR4 refused the legal N" " operand beside it while admitting the
+    /// illegal " ". Every CLASS-worded rule reads it as national through <see cref="IntrinsicArgumentRules.TableTwoClass"/>.</summary>
+    NumericEditedNational,
     Boolean,
     National,
     Numeric,
@@ -468,6 +476,10 @@ internal static class IntrinsicArgumentRules
         // into PicCategory.Alphanumeric, so the category cannot answer — IsAlphabetic can, exactly as the
         // Usage.Index arm above un-folds the index item's storage category.
         if (item.Pic is { IsAlphabetic: true }) return CobolClass.Alphabetic;
+        // Table 2 splits the numeric-edited row on USAGE — class alphanumeric "if usage is display", national "if
+        // usage is national" — so the category table below cannot answer it alone (kb/Work PB1128).
+        if (item.Pic is { AnalyzedCategory: PicCategory.NumericEdited, Usage: Usage.National })
+            return CobolClass.NumericEditedNational;
         // ⛔ THE ANALYZED category, never the storage one (kb/Work PB960): a recovery profile — the placeholder
         // for an entry whose PICTURE was already rejected — has NO class, so it reads "not statically decidable"
         // and every screen over this table fails OPEN instead of re-diagnosing the item as alphanumeric.
@@ -545,6 +557,7 @@ internal static class IntrinsicArgumentRules
     public static CobolClass TableTwoClass(CobolClass c) => c switch
     {
         CobolClass.NumericEditedDeEditing => CobolClass.Alphanumeric,
+        CobolClass.NumericEditedNational => CobolClass.National,
         _ => c,
     };
 
@@ -1079,7 +1092,7 @@ internal static class IntrinsicArgumentRules
     /// <summary>The CATEGORY-worded string rows ('t') — the ONE set stated as categories rather than derived
     /// from the class column, because that is how its clauses are worded (kb/Work PB305).</summary>
     private static readonly CobolClass[] CategoryStringRules =
-        [CobolClass.Alphanumeric, CobolClass.NumericEditedDeEditing, CobolClass.National];
+        [CobolClass.Alphanumeric, CobolClass.NumericEditedDeEditing, CobolClass.National, CobolClass.NumericEditedNational];
 
     /// <summary>The classes a verified class code admits, or <see langword="null"/> for "no general screen" —
     /// the function's rule is a NEGATIVE list and its own arm owns it.</summary>
@@ -1569,6 +1582,7 @@ internal static class IntrinsicArgumentRules
         CobolClass.NumericEditedDeEditing => "alphanumeric (numeric-edited)",
         CobolClass.Boolean => "boolean",
         CobolClass.National => "national",
+        CobolClass.NumericEditedNational => "national (numeric-edited)",
         CobolClass.Numeric => "numeric",
         CobolClass.Object => "object",
         CobolClass.Pointer => "pointer",

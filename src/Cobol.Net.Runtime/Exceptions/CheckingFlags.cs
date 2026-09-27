@@ -114,6 +114,10 @@ public struct CheckingFlags
     /// Format 2's GR4 a) name the same limit). kb/Work PB459.</summary>
     public bool RangeIndex;
 
+    /// <summary>EC-RANGE-INSPECT-SIZE — an INSPECT REPLACING / CONVERTING operand pair of unequal size, or a
+    /// CHARACTERS replacement that is not one character (§14.9.22.4 GR14 / GR15 / GR22; kb/Work PB1126).</summary>
+    public bool RangeInspectSize;
+
     /// <summary>EC-OO-UNIVERSAL — the ACTIVATOR's half of §14.9.23.4 GR7c's "enabled in BOTH" gate. Set around
     /// an INVOKE by the emitted statement guard and read by the callee's <c>__CobolInvoke</c>, which is entered
     /// synchronously on the same run unit; the METHOD's half is a compile-time literal baked per method.</summary>

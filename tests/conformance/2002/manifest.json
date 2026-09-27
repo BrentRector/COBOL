@@ -4,6 +4,8 @@
   "pb1142_arithmetic_identifier_operands",
   "pb1493_floating_comment_fixed",
   "pb1493_floating_comment_free",
+  "pb1128_inspect_identifier1_class_store",
+  "pb1126_inspect_size_ec",
   "pb1634_zero_argument_numeric_formal",
   "pb1627_all_literal_concat_operands",
   "pb1632_pointer_arg_cell_backed",

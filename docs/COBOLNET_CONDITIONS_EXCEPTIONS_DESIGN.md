@@ -151,7 +151,10 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   can actually raise here: EC-SIZE-* (arithmetic), EC-I-O-* per referenced file, EC-OVERFLOW-STRING/-UNSTRING,
   EC-PROGRAM-* (CALL/CANCEL), EC-ARGUMENT-FUNCTION (intrinsic-bearing statements), EC-BOUND-REF-MOD/-OVERFLOW +
   EC-DATA-NOT-FINITE and EC-DATA-INCOMPATIBLE (any statement — ambient gates, below) and EC-DATA-OVERFLOW (a
-  MOVE), EC-STORAGE-NOT-AVAIL (SET SIZE), EC-RANGE-INDEX (any statement — ambient, below). A name this
+  MOVE), EC-STORAGE-NOT-AVAIL (SET SIZE), EC-RANGE-INDEX (any statement — ambient, below),
+  EC-RANGE-INSPECT-SIZE (an INSPECT — §14.9.22.4 GR14/GR15/GR22 are written over INSPECT's operands alone and
+  `CobolInspect.Replace` / `Convert` are the only raise sites, so the node kind IS the rule's scope; kb/Work
+  PB1126). A name this
   implementation still cannot raise binds no wrapper — §14.6.13.1.1 sets an indicator only
   "when the associated exception occurs".
 - **EC-RANGE-INDEX is AMBIENT, deliberately, and that is the lesson from PB230 applied ahead of time**

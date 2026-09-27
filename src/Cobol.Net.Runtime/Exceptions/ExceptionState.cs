@@ -726,6 +726,26 @@ public sealed class ExceptionEngine
     /// the index is undefined UNLESS the value of the index is specified by the rules of that statement".</summary>
     public void RangeIndexError(string detail) => FatalIfEnabled(RangeIndexChecking, "EC-RANGE-INDEX", detail);
 
+    // ── EC-RANGE-INSPECT-SIZE ambient statement gate (kb/Work PB1126) ─────────────────────────────────────────
+    //
+    // ⛔ CATALOGUED, NEVER RAISED, until PB1126: the runtime skipped a mis-sized REPLACING operand and clamped
+    // CONVERTING to the common prefix under a comment promising that "the 2002+ EC model will raise".
+
+    /// <summary>True while the currently-executing INSPECT has EC-RANGE-INSPECT-SIZE checking enabled (fatal).
+    /// <c>CobolInspect.Replace</c> / <c>Convert</c> consult it.</summary>
+    public bool RangeInspectSizeChecking
+    {
+        get => _checking.RangeInspectSize;
+        set => _checking.RangeInspectSize = value;
+    }
+
+    /// <summary>Raise EC-RANGE-INSPECT-SIZE when an INSPECT operand pair is not of equal size (ISO §14.9.22.4 GR14,
+    /// GR15, GR22: "the EC-RANGE-INSPECT-SIZE exception condition is set to exist and the results of the execution
+    /// of the INSPECT statement are undefined"; Table 13 Fatal) when checking is enabled; otherwise return, and the
+    /// caller's deterministic outcome for the undefined result stands.</summary>
+    public void RangeInspectSizeError(string detail) =>
+        FatalIfEnabled(RangeInspectSizeChecking, "EC-RANGE-INSPECT-SIZE", detail);
+
     /// <summary>True while EC-PROGRAM-ARG-OMITTED checking is enabled (fatal).</summary>
     public bool ProgramArgOmittedChecking
     {
@@ -1562,6 +1582,16 @@ public static class ExceptionState
 
     /// <inheritdoc cref="ExceptionEngine.RangeIndexError"/>
     public static void RangeIndexError(string detail) => E.RangeIndexError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.RangeInspectSizeChecking"/>
+    public static bool RangeInspectSizeChecking
+    {
+        get => E.RangeInspectSizeChecking;
+        set => E.RangeInspectSizeChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.RangeInspectSizeError"/>
+    public static void RangeInspectSizeError(string detail) => E.RangeInspectSizeError(detail);
 
     /// <inheritdoc cref="ExceptionEngine.OoUniversalChecking"/>
     public static bool OoUniversalChecking

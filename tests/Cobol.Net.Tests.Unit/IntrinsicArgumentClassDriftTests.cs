@@ -482,6 +482,8 @@ public sealed class IntrinsicArgumentClassDriftTests
             // refined member the lattice reports for it. THIS is the witness kb/Work PB305 turns on.
             (CobolClass.NumericEditedDeEditing, new PicInfo(PicCategory.NumericEdited, Usage.Display, 3, 3, 0, false)),
             (CobolClass.National, new PicInfo(PicCategory.National, Usage.National, 4, 0, 0, false)),
+            // PIC ZZ9 USAGE NATIONAL — Table 2 splits the numeric-edited row on usage: class NATIONAL (kb/Work PB1128).
+            (CobolClass.NumericEditedNational, new PicInfo(PicCategory.NumericEdited, Usage.National, 3, 3, 0, false)),
             (CobolClass.Numeric, new PicInfo(PicCategory.Numeric, Usage.Display, 4, 4, 0, false)),
             (CobolClass.Boolean, new PicInfo(PicCategory.Boolean, Usage.Bit, 8, 0, 0, false)),
             (CobolClass.Object, new PicInfo(PicCategory.ObjectReference, Usage.ObjectReference, 8, 0, 0, false)),

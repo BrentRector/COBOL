@@ -562,10 +562,36 @@ internal static class PlaceRenderer
     /// positions to the subordinates. GR8a (data-name-1 OUTSIDE an occurs-depending table beneath the group)
     /// modifies only the current extent: the stored prefix is spliced over the live bit string, positions past the
     /// count untouched. GR8b (data-name-1 inside) keeps the maximum length, which is the plain arm.</summary>
-    public static string WriteBits(Place group, string bits) =>
-        group is OdoGroupPlace o && UsesCurrentExtent(o, AccessDir.Receiving)
+    public static string WriteBits(Place group, string bits) => BitsWrite(group, bits, AccessDir.Receiving);
+
+    /// <summary>The bit writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
+    private static string BitsWrite(Place group, string bits, AccessDir dir) =>
+        group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
             ? $"{Read(o.Inner)}.FromBits({RuntimeApi.StrSpliceInto($"{Read(o.Inner)}.AsBits()", "1", LengthExpr(o), bits, "'0'", allowZeroLength: true)});"
             : $"{Read(group)}.FromBits({bits});";
+
+    /// <summary>⛔ <b>THE ONE WRITER OF A GROUP OPERAND'S VALUE</b> — the receiving twin of
+    /// <see cref="SendingGroupValue"/>, over the same three kinds of group (ISO §13.18.29.4): a BIT group takes its
+    /// boolean-position string (<see cref="WriteBits"/>, GR1b), a NATIONAL group its national-position string
+    /// (<see cref="WriteNat"/>, GR2b), an ALPHANUMERIC group its character image (<see cref="WriteGroupImage"/>, GR3).
+    /// A verb that READS a group operand's value through <see cref="SendingGroupValue"/>, rewrites it and stores it
+    /// back (INSPECT REPLACING/CONVERTING, STRING's receiver) must store through THIS, in the SAME alphabet it read:
+    /// kb/Work PB1128 — both verbs stored a national group's national-position string through the BYTE-image writer,
+    /// so `INSPECT NG CONVERTING N"A" TO N"Z"` over five N"A" positions wrote ten UTF-16 characters into ten bytes
+    /// and the group read back as mojibake. <paramref name="dir"/> is the §13.18.38.4 GR8 extent law of the store:
+    /// <see cref="AccessDir.Receiving"/> keeps GR8b's maximum length for a depending-INSIDE table;
+    /// <see cref="AccessDir.Sending"/> splices over the CURRENT extent whatever the depending position — the store
+    /// of a statement whose rules size the operand "as a sending data item" (INSPECT §14.9.22.4 GR1), so the value
+    /// it writes back is exactly as long as the value it read.
+    /// <para>A Tier-B REDEFINES view (<see cref="RedefViewPlace"/>) is written as its character WINDOW, whatever its
+    /// group kind, because that is what the operand readers read it as (<c>OperandText</c>'s view arm precedes the
+    /// group dispatch, and this generated struct-less window has no <c>FromNat</c> / <c>FromBits</c>): the pair
+    /// must agree, so the view is served first, exactly as <see cref="WriteGroupImage"/> serves it.</para></summary>
+    public static string WriteGroupValue(Place group, string value, string context, AccessDir dir = AccessDir.Receiving) =>
+        group is RedefViewPlace || !group.Item.IsAsIfElementary
+            ? (group is OdoGroupPlace o && UsesCurrentExtent(o, dir) ? ReceiveInto(o, value) : WriteGroupImage(group, value, context))
+        : group.Item.GroupUsage is GroupUsage.Bit ? BitsWrite(group, value, dir)
+        : NatWrite(group, value, dir);
 
     /// <summary>⛔ THE ONE READER OF A NATIONAL GROUP'S OPERAND VALUE (ISO §13.18.29.4 GR2b — "a national group is
     /// treated as though it were an elementary data item of usage national … described with PICTURE N(m), where m
@@ -591,8 +617,11 @@ internal static class PlaceRenderer
     /// to the group's byte image and distributes it. GR8a (data-name-1 OUTSIDE an occurs-depending table beneath
     /// the group) modifies only the current extent; GR8b keeps the maximum length, the plain arm — exactly
     /// <see cref="WriteBits"/>'s split.</summary>
-    public static string WriteNat(Place group, string value) =>
-        group is OdoGroupPlace o && UsesCurrentExtent(o, AccessDir.Receiving)
+    public static string WriteNat(Place group, string value) => NatWrite(group, value, AccessDir.Receiving);
+
+    /// <summary>The national writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
+    private static string NatWrite(Place group, string value, AccessDir dir) =>
+        group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
             ? $"{Read(o.Inner)}.FromNat({RuntimeApi.StrSpliceInto($"{Read(o.Inner)}.AsNat()", "1", NatLengthExpr(o), value, null, allowZeroLength: true)});"
             : $"{Read(group)}.FromNat({value});";
 
