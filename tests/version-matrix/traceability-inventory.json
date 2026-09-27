@@ -7941,13 +7941,13 @@
   "ordinal": 1,
   "subject": "Dynamic-capacity tables",
   "rule-digest": "d4b46e27d854",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefReceiving; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#DynTableSegment",
-  "test-ref": "conformance:2014/dyn_implicit_grow",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs#GroupTarget; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefReceiving",
+  "test-ref": "conformance:2014/dyn_implicit_grow; conformance:2014/pb1411_dyn_vargroup_element_receiver; unit:GroupStoreTargetDriftTests.EveryPlaceRendererGroupStore_ReceivesThroughGroupTarget; conformance:2014/dyn_nested_group_move",
   "derivation": "",
   "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1411 (registrar 15b). Rule: 8.5.1.9.1 1) 'its occurrences are created dynamically' (cite.py --check 8.5.1.9.1 \"its occurrences are created dynamically\" -> OK 8.5.1.9.1 1)). CobolDynTable<T> is an out-of-line growable store; GrowTo creates and seeds occurrences [old..new) on demand, RefReceiving grows on a receiving subscript past the current capacity (8.5.1.9.3, --check OK 'a new element is automatically created and the capacity of the table is increased to the value given by the subscript'), SetCapacity grows/shrinks explicitly. Probe p3: MOVE 8 TO LZ(100000) in LOCAL-STORAGE -> LC=0000100000, LZ(100000)=8; 7-level nested dynamic tables grow on demand (p4 A7=4). Covering golden dyn_implicit_grow (expected values derived from 8.5.1.9.2/.9.3 in its header). || REFUTED: PARTIAL — Occurrences are NOT created dynamically when the receiving operand is an element of a dynamic-capacity table that is a VARIABLE-LENGTH GROUP (an element containing a nested dynamic table). The variable-length-group MOVE emitter renders the receiving element through RefSending instead of RefReceiving (the two-arm dispatch shape), so a MOVE to such an element past the current capacity does not create it, does not raise the capacity, and writes into the benign scratch slot -- the data is silently discarded (wrong answer, no diagnostic). All elementary/fixed-group receiving shapes I probed DO grow correctly (MOVE, ADD, SUBTRACT, MULTIPLY, DIVIDE, COMPUTE, STRING INTO, UNSTRING INTO, ref-mod receiver, INITIALIZE, INSPECT REPLACING, ACCEPT, SET 88 TO TRUE, CALL BY REFERENCE, nested dyn in dyn, dyn in fixed OCCURS, LOCAL-STORAGE, arithmetic subscripts), so the rule is half-verified => PARTIAL. The cited golden dyn_implicit_grow pins only an elementary MOVE and also asserts undefined content (E3 without INITIALIZED per 8.5.1.9.5) and a checking-off sending-past-capacity read, so it does not pin this branch. [code-location note: (RefSending/RefReceiving direction split)] || editions as written by the adjudicator: 2014, 2023 (dynamic-capacity tables are a COBOL-2014 facility, ISO optional module A.4.4; absent from 1985/2002 - the compiler gates them COBOLNET0900 below 2014, probe p4 --std 2002; the 2023 Annex E records no change to 8.5.1.9)",
-  "state": "GAP"
+  "notes": "kb/Work PB1411 (landed w67o). The refuter's PARTIAL shape: a variable-length group ELEMENT of a dynamic-capacity table as a receiver rendered through RefSending (WriteVarGroupImage's Read(group)), so MOVE past the capacity wrote into scratch. Every group-level store in PlaceRenderer (FromImage, FromVarImage, FromContiguousImage, FromBits, FromNat) now calls its receiver through ONE helper, GroupTarget, which takes RefReceiving for a DynTablePlace; the drift test fails any store whose receiver is not GroupTarget. Witness: MOVE SRC TO EL (3) -> ELC=3, EA3=ZZ, EB(3,1..2)=B01,B02.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.9.1-2",
@@ -7986,13 +7986,13 @@
   "ordinal": 1,
   "subject": "Dynamic-capacity tables",
   "rule-digest": "d97ad919c81e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefReceiving; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#NonfatalIfEnabled; src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupImageCodec.cs#FromVarImage; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RaiseImplicitOverflow; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#NonfatalIfEnabled",
+  "test-ref": "conformance:2014/pb1269_dyn_overflow_resume_next; conformance:2014/pb1144_dyn_move_recreate; conformance:2014/ec_bound_overflow",
   "derivation": "",
   "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1269, PB1144 (registrar 15b). Rule (--check OK 8.5.1.9.6 1)): EC-BOUND-OVERFLOW 'shall exist when a dynamic-capacity table has an expected capacity and an operation causes this expected capacity to be exceeded. If the change in capacity was implicit and the expected capacity had already been exceeded before the operation, no exception shall exist.' + 'If checking ... results in the execution of a declarative procedure ... that executes a RESUME statement with the NEXT STATEMENT phrase, the operation shall be allowed to continue, thus exceeding the receiving table's specified expected capacity' (--check OK). VERIFIED CONFORMING: subscript-driven implicit growth raises on the FIRST crossing only (RefReceiving `occ > exp && _count <= exp`), growth proceeds with checking off or a declarative completing normally; golden conformance:2014/ec_bound_overflow pins that half. DEFECT A (wrong-answer), probe p1: >>TURN EC-BOUND-OVERFLOW CHECKING ON, FROM 2 TO 4, declarative USE AFTER EC-BOUND-OVERFLOW doing RESUME AT NEXT STATEMENT, MOVE 22 TO WS-E(6) -> observed DECL=EC-BOUND-OVERFLOW, CAP=0000000002, E6=000; spec: the operation continues and the table exceeds its expected capacity -> CAP=0000000006 (E6=022). Cause: RefReceiving raises BEFORE GrowTo and NonfatalIfEnabled throws RaiseResumeSignal for RESUME NEXT STATEMENT, unwinding past the growth. DEFECT B (silent), probe p2: sender group with a TO-less dynamic table grown to 6, MOVE S TO R where R's table is FROM 1 TO 4 -> R recreated at capacity 6 (RC=0000000006) but FUNCTION EXCEPTION-STATUS blank; spec: the MOVE (14.6.9.2 'recreates or overwrites the receiving table', --check OK) exceeds the expected capacity 4 from 1 -> EC-BOUND-OVERFLOW. Cause: GroupImageCodec FromVarImage -> CobolDynTable.FromCurrentImage -> SetCapacity, the explicit-SET primitive, which raises EC-BOUND-SET (14.9.39.4 GR30, --check OK) - a condition whose checking gate binds only on SET nodes (EcBinder SetCapacityNames) - so under the MOVE's ambient EC-BOUND-OVERFLOW gate nothing is recorded; and even with EC-BOUND-SET on it would name the SET-statement condition and ignore GR1's implicit 'already exceeded' exemption. OPEN READING (not asserted as a defect): probe p6 SET K UP BY 5 over TO 4 with EC-BOUND-OVERFLOW on -> no EC-BOUND-OVERFLOW (EC-BOUND-SET only, by design, EcBinder.cs ~line 359 comment). GR1's 'If the change in capacity was implicit' qualifier implies explicit changes are within GR1 too; whether an explicit SET raises EC-BOUND-OVERFLOW in addition to GR30's EC-BOUND-SET needs adjudication. ec_bound_overflow covers only the conforming half, so test-ref is empty (test-needed). [code-location note: (DynTable arm); code-location note: (ambient EC-BOUND-OVERFLOW gate)] || editions as written by the adjudicator: 2014, 2023 (dynamic-capacity tables are a COBOL-2014 facility, ISO optional module A.4.4; absent from 1985/2002 - the compiler gates them COBOLNET0900 below 2014, probe p4 --std 2002; the 2023 Annex E records no change to 8.5.1.9)",
-  "state": "GAP"
+  "notes": "kb/Work PB1269 + PB1144 (landed w67o). 8.5.1.9.6 1): EC-BOUND-OVERFLOW exists when an operation causes the expected capacity to be exceeded; an implicit change to a table already past it raises nothing; RESUME AT NEXT STATEMENT lets the operation continue. Every IMPLICIT change now raises through ONE site, CobolDynTable.RaiseImplicitOverflow (first-crossing guard), BEFORE the change: the receiving-subscript growth (RefReceiving) and the 14.6.9.2 recreation (FromCurrentImage, which used to route through SetCapacity and raise the SET's EC-BOUND-SET instead). ExceptionEngine.BoundOverflowError passes nextStatementContinues, so a RESUME AT NEXT STATEMENT returns to the raise site and the growth and the store complete (was: RaiseResumeSignal unwound before GrowTo, capacity stayed 2). Witnesses: pb1269 (DECL once, CAP 6, E6=022, then CAP 7 with no second call); pb1144 C1-C3 (MOVE S TO R to capacity 6 raises EC-BOUND-OVERFLOW, the second MOVE nothing).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.9.6-2",
@@ -8001,13 +8001,13 @@
   "ordinal": 2,
   "subject": "Dynamic-capacity tables",
   "rule-digest": "04c8acd47f6f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#MaxOccurrences; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#BoundTableLimitError",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#Enlarged; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage",
+  "test-ref": "unit:CobolDynTableTests.SetCapacity_BeyondRuntimeResources_LeavesTheCapacityUnchanged; conformance:2023/pb463_dyn_implementor_maximum",
   "derivation": "",
   "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1410 (registrar 15b). Rule (--check OK 8.5.1.9.6 2)): 'The fatal EC-BOUND-TABLE-LIMIT exception condition shall exist when an operation attempts to increase the capacity of a dynamic-capacity table to a value higher than the maximum capacity of the table based on the resources available at runtime.' 8.5.1.9.1 defines the maximum capacity as the limit 'imposed by the implementor and by current resource availability' (--check OK). VERIFIED CONFORMING: the fixed implementor arm - probe p5a, >>TURN EC-BOUND-TABLE-LIMIT CHECKING ON, MOVE 1 TO E(2000000000) -> 'abnormal run-unit termination: EC-BOUND-TABLE-LIMIT (fatal) ... exceeds the implementor maximum (1073741823)'; the SET path shares GrowTo. DEFECT (crashes), probe p5c: element group of 40 x PIC 9(18), SET K TO 1000000000 (below MaxOccurrences) with EC-BOUND-TABLE-LIMIT checking on -> the process dies with the .NET message 'Out of memory.' and no COBOL exception; spec: the request exceeds the maximum capacity 'based on the resources available at runtime', so the fatal EC-BOUND-TABLE-LIMIT shall exist (abnormal termination naming EC-BOUND-TABLE-LIMIT, or a USE declarative for it runs). Cause: GrowTo's only maximum test is the constant MaxOccurrences; Array.Resize / the seeding loop's OutOfMemoryException is never caught, unlike the sibling CobolDynString (dynamic-length items) and CobolPtr which catch OutOfMemoryException and raise the COBOL condition. No test covers EC-BOUND-TABLE-LIMIT at all (grep of tests/ finds only pb460's comment). || editions as written by the adjudicator: 2014, 2023 (dynamic-capacity tables are a COBOL-2014 facility, ISO optional module A.4.4; absent from 1985/2002 - the compiler gates them COBOLNET0900 below 2014, probe p4 --std 2002; the 2023 Annex E records no change to 8.5.1.9)",
-  "state": "GAP"
+  "notes": "kb/Work PB1410 (landed w67o). 8.5.1.9.6 2): the fatal EC-BOUND-TABLE-LIMIT exists when an operation attempts to increase the capacity past the maximum capacity 'based on the resources available at runtime'. GrowTo and the FromCurrentImage recreation catch the allocation failure (Enlarged falls back from the doubled size to the exact request first) and raise BoundTableLimitError with the table unchanged. Probe (DOTNET_GCHeapHardLimit=2GB, SET K TO 1000000000 over a 40 x PIC 9(18) element): checking on -> abnormal termination on EC-BOUND-TABLE-LIMIT; checking off -> K stays 0 and the run continues (was: process killed by 'Out of memory.').",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.11.3-1",
@@ -24456,13 +24456,13 @@
   "ordinal": 17,
   "subject": "OCCURS clause",
   "rule-digest": "43835dbe6362",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#FieldInit; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefReceiving; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity",
-  "test-ref": "conformance:2014/dyn_capacity_bounds",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RaiseImplicitOverflow",
+  "test-ref": "conformance:2014/dyn_capacity_bounds; conformance:2014/pb1269_dyn_overflow_resume_next; conformance:2014/ec_bound_overflow",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "Owned by kb/Work PB1269. Rule (cite.py OK §13.18.38.4 17)): 'Integer-5 is the expected capacity of the table.' Its consequences are defined elsewhere: §8.5.1.9.1 (a TO value 'may be exceeded with a nonfatal exception'), §8.5.1.9.6 1) EC-BOUND-OVERFLOW for an implicit crossing, §14.9.39.4 30) (cite.py OK) EC-BOUND-SET for an explicit SET past it. Code: FieldInit passes s.ExpectedMax as CobolDynTable's _expected. Verified: not a hard cap (conformance:2014/dyn_capacity_bounds, SET to 9 over TO 4 -> 9 with checking off; gr14b.cob implicit growth past TO 3 continues to 4 and 5); EC-BOUND-OVERFLOW raised on the first implicit crossing only. Not conforming: (1) RESUME AT NEXT STATEMENT after EC-BOUND-OVERFLOW suppresses the growth §8.5.1.9.6 says continues (FINDING F3, repro under GR-13.18.38.4-14); (2) the explicit-SET arm has no EC-BOUND-SET raise site at all (grep: only the catalog entry in ExceptionCatalog.cs and a 'staged follow-on' comment in CobolDynTable.GrowTo) — already owned by open kb/Work PB460, not re-reported. Two consequences verified, two divergent -> PARTIAL. || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (Format 4 only)",
-  "state": "GAP"
+  "notes": "kb/Work PB1269 (landed w67o). GR17: integer-5 is the expected capacity - which 8.5.1.9.1 says 'may be exceeded with a nonfatal exception'. Exceeding it now works on every path including a declarative that RESUMEs NEXT STATEMENT (8.5.1.9.6 1)); before, that path abandoned the growth and the capacity stayed at FROM.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.38.4-18",
@@ -24471,13 +24471,13 @@
   "ordinal": 18,
   "subject": "OCCURS clause",
   "rule-digest": "0f2800010ad1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#FieldInit; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#FieldInit; src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#NoValueSeed; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo",
+  "test-ref": "conformance:2014/pb1267_dyn_initialized_seed; unit:CobolDynTableTests.CreatedOccurrences_TakeTheInitializedSeed_OpeningOccurrencesTheInitialState; conformance:2014/dyn_initialized",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "Owned by kb/Work PB1267. Rule (cite.py OK §13.18.38.4 18): 'If INITIALIZED is specified, any unreferenced locations of each new element added to the table are implicitly initialized, as defined in 8.5.1.9.5'; §8.5.1.9.5 (cite.py OK): 'first initialized as though they had been the subject of a statement of the form INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT'; §14.9.20.4 GR6c's table (cite.py OK §14.9.20.4 6)) sends ZEROES to a Numeric-edited receiver. Code: FieldInit seeds every new occurrence with ElementInit — the data-division INITIAL-STATE initializer (VALUE else the InitialStateBackground §14.6.2.3.2 background) — and the Initialized flag is only 'carried' (comment: 'INITIALIZED is carried for the (always-on) new-occurrence seed'); CobolDynTable.GrowTo calls _seedAt for every new occurrence. The two recipes differ where the background is not GR6c's figurative: a VALUE-less NUMERIC-EDITED leaf. PROBE out13/probe/occurs-p2/gr18b.cob (--std 2023): 05 R OCCURS DYNAMIC CAPACITY IN RCAP INITIALIZED with 10 RE1 PIC ZZ9 / RE2 PIC $Z9.99 / RE3 PIC 999- / RDT PIC 99/99 (no VALUE); MOVE 'A' TO RX(2) creates occurrences 1 and 2. Observed RE1/RE2/RE3/RDT of both new occurrences = all spaces '[   ][      ][    ][     ]'. Spec-derived expected (the INITIALIZE … TO DEFAULT result, which the same program's own INITIALIZE R(1) WITH FILLER ALL TO VALUE THEN TO DEFAULT prints): '[  0][$ 0.00][000 ][00/00]'. Also seen via SET RCAP UP BY 1 (explicit growth, gr18.cob: RE(4) spaces). Other categories match (X spaces, 9 zero, COMP-3 zero, national spaces, SIGN SEPARATE '+00', BWZ blank, FILLER VALUE 'FF' and VALUE literals seeded). Harm: wrong-answer (a numeric-edited field of a newly created element DISPLAYs blank instead of edited zero, and a numeric test on it differs). FINDING F1. || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (Format 4 only)",
-  "state": "GAP"
+  "notes": "kb/Work PB1267 (landed w67o). GR18 -> 8.5.1.9.5: a new element is initialized as though by INITIALIZE ... WITH FILLER ALL TO VALUE THEN TO DEFAULT. The emitter composes a second seed under SeedRecipe.Initialize (threaded through ValueInitializer, GroupValueSlicer, PhysicalModel's memo key and GroupImageCodec's image lane): a VALUE-less numeric-edited leaf takes the edited ZERO (14.9.20.4 GR6 c), a group-level VALUE is not a sender (GR5 c) 1. b), no OPTIONS background; VALUE-bearing leaves compose as in the initial state (GR6 a) 3.). CobolDynTable seeds occurrences a statement creates (RefReceiving, SET) from it and the opening occurrences from the initial state. Witness: C2/C3 [  0][$ 0.00][000 ][00/00][  ][42], O1 keeps the group VALUE GV.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.39.3-1",
@@ -62781,13 +62781,13 @@
   "ordinal": 61,
   "subject": "Dynamic-capacity table (physical allocation)",
   "rule-digest": "ab8d29fb838a",
-  "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-61; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-61; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity",
+  "test-ref": "unit:CobolDynTableTests.CreatedOccurrences_TakeTheInitializedSeed_OpeningOccurrencesTheInitialState; conformance:2014/pb1267_dyn_initialized_seed; conformance:2014/pb1144_dyn_move_recreate",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "VOLUNTARY row (item 61 need not be documented). §8.5.1.9.1 (cite.py --check 8.5.1.9.1 'The size, location, and time of physical allocation of a dynamic-capacity table are implementor-defined' -> OK §8.5.1.9.1 3)). Code read: CobolDynTable ctor allocates new T[Math.Max(open,4)] with open = max(FROM, VALUE capacity) and seeds via GrowTo; GrowTo doubles from >=4 capped at MaxOccurrences and seeds every new slot (i=_count..target) with _seedAt; SetCapacity shrink only lowers _count. Probe /tmp/adj/doc/doc-w1-s2/probe/i61.cob at 2014/2023: FROM 2 -> C0=2; MOVE to E(10) -> C=10, E5=ABC (intermediate initialized); SET C TO 3, MOVE 'QQQ' TO E(3), SET C TO 12 -> E10=ABC (re-created occurrence re-initialized), E3=QQQ. PARTIAL: the allocation-failure edge is the open defect PB1410 (OutOfMemoryException instead of EC-BOUND-TABLE-LIMIT) - the row names it as open rather than documenting it; no golden pins the allocation strategy. Owning notes: PB1410, PB1534. Refuter correction: growth is triggered only by a RECEIVING reference (CobolDynTable.RefReceiving) or SET (SetCapacity); RefSending past the capacity returns a scratch slot and never allocates - row said 'a reference'. Re-probe refute-probe/r61.cob at 2023 matches (C0=2, C1=10 E5=ABC, C2=3, C3=12 E10=ABC E3=QQQ); 2002 -> COBOLNET0900. cite.py OK §8.5.1.9.1 3); §8.5.1.9.4 NOTE read.",
-  "state": "GAP"
+  "notes": "kb/Work PB1410 + PB1267 + PB1144 (landed w67o). docs/CONFORMANCE.md section 7 DOC-A.1-61 now states the whole allocation story the code implements: one managed array per table, doubling with an exact-size fallback, opening occurrences from the initial state and statement-created ones from the INITIALIZED recipe when written, lowering clears the deleted occurrences, a variable-length group transfer allocates a new array, and an unsatisfiable allocation is EC-BOUND-TABLE-LIMIT with the table unchanged (the open-note caveat is gone).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-62",

@@ -28,7 +28,10 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
     /// from the record root (see <see cref="ValueInitializer.FieldInit"/>). It selects WHICH occurrence's
     /// group-level VALUE this composition deposits (§13.18.63.4 GR12–GR15 through <see cref="DataItem.ValueAt"/>)
     /// and travels on to the members, whose own table VALUEs are keyed by the same tuple.</param>
-    public string ComposedInit(DataItem group, Subscripts subs = default)
+    /// <param name="recipe">Under <see cref="SeedRecipe.Initialize"/> a group-level VALUE is not applied: §14.9.20.4
+    /// GR5 c) 1. b qualifies only "a data-item format VALUE clause … specified in the data description entry of the
+    /// elementary data item", so the members compose one by one (kb/Work PB1267).</param>
+    public string ComposedInit(DataItem group, Subscripts subs = default, SeedRecipe recipe = SeedRecipe.InitialState)
     {
         // A GROUP-level VALUE initializes the whole AREA (ISO §13.18.63.4 GR5) — the ONE area rule lives in
         // AreaOf, which also says which UNIT the area is measured in; here it distributes over the subordinate
@@ -37,9 +40,9 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
         // else keeps the member-wise default (a SHARED-STORAGE subtree is not a loss — its Tier-B / EXTERNAL /
         // BASED backing is seeded by GroupImageCodec.ImageInitOf, which applies the SAME AreaOf rule to the
         // same group).
-        if (AreaOf(group, ctx, subs) is { } area && DistributableSubtree(group))
+        if (recipe is SeedRecipe.InitialState && AreaOf(group, ctx, subs) is { } area && DistributableSubtree(group))
             return area.Bits ? SliceBitInit(group, area.Text) : SliceInit(group, area.Text);
-        var parts = phys.PhysicalChildrenOf(group, subs).Select(f => $"{f.Name} = {f.Init}");
+        var parts = phys.PhysicalChildrenOf(group, subs, recipe).Select(f => $"{f.Name} = {f.Init}");
         return $"new {group.StructName} {{ {string.Join(", ", parts)} }}";
     }
 

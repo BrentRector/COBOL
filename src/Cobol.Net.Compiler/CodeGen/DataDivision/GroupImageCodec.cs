@@ -28,7 +28,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// <param name="subs">The OCCURRENCE CONTEXT — the subscripts of every OCCURS level entered on the way down
     /// from the record root, most inclusive first (the twin of <see cref="ValueInitializer.FieldInit"/>'s, so the
     /// two lanes key a Format 2 (table) VALUE the same way).</param>
-    public string ImageInitOf(DataItem item, bool useValues = true, Subscripts subs = default)
+    public string ImageInitOf(DataItem item, bool useValues = true, Subscripts subs = default,
+        SeedRecipe recipe = SeedRecipe.InitialState)
     {
         // ⛔ A FORMAT 2 (table) VALUE GIVES EACH OCCURRENCE ITS OWN IMAGE — §13.18.63.4 GR12 ("A format 2 VALUE
         // clause initializes a table element to the value of literal-1"), GR13 (cyclic reuse under TO), GR14
@@ -45,14 +46,14 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // outside every FROM..TO range takes the same VALUE-less image it always took.
         if (useValues && item.ContainsTableValue && item.Occurs is { } occ and > 0)
             return "(" + string.Join(" + ", Enumerable.Range(1, occ)
-                .Select(o => ImageInitOfOne(item, useValues, subs.With(o)))) + ")";
-        string one = ImageInitOfOne(item, useValues, item.Occurs is > 0 ? subs.With(1) : subs);
+                .Select(o => ImageInitOfOne(item, useValues, subs.With(o), recipe))) + ")";
+        string one = ImageInitOfOne(item, useValues, item.Occurs is > 0 ? subs.With(1) : subs, recipe);
         return item.Occurs is { } n and > 1 ? RuntimeApi.StrRepeat(one, $"{n}") : one;
     }
     /// <param name="subs">The subscript tuple of THIS occurrence — the twin of
     /// <see cref="ValueInitializer.InitializerFor"/>'s parameter of the same name, so the image lane and the
     /// native-field lane compose one occurrence from the same literal text (kb/Work PB208/PB505).</param>
-    private string ImageInitOfOne(DataItem item, bool useValues, Subscripts subs = default)
+    private string ImageInitOfOne(DataItem item, bool useValues, Subscripts subs, SeedRecipe recipe)
     {
         // ⛔ A POINTER-CLASS LEAF CONTRIBUTES RESERVED BYTES AND NO IMAGE (kb/Work PB231 — the pointer third).
         // Its value is a managed reference held in the area's MANAGED SLOT (Place.SlotWindow / StorageCell.SlotAt),
@@ -71,7 +72,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // VALUE, if any, is the slot's seed (CellDynSeeds). A one-character fill here displaced every following
         // member of an ADDRESS-OF-taken variable-length group by one position.
         if (DynSlotWindow.CarriedBySlot(item)) return "\"\"";
-        string image = CarrierInitOfOne(item, useValues, subs);
+        string image = CarrierInitOfOne(item, useValues, subs, recipe);
         // ⛔ A NATIONAL LEAF'S SEED IS ITS BYTES, NOT ITS CARRIER (kb/Work PB231). Everything this method seeds
         // is a BYTE-ADDRESSED shared area — a Tier-B REDEFINES backing, an EXTERNAL run-unit cell, a
         // BASED/ADDRESS-OF cell, an OO backing — and a national character position occupies TWO of those bytes
@@ -116,16 +117,16 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// <c>IsCanonical = false</c>, so the physical walk answers EMPTY for the children of a Tier-B canonical —
     /// the exact group this seed exists for. What the two composers must share is the RUN LAW, and they now do
     /// (<see cref="BitLayout.RunsOf"/>).</para></summary>
-    private string InitImageOfMember(DataItem c, BitRunMap runs, bool useValues, Subscripts subs) =>
+    private string InitImageOfMember(DataItem c, BitRunMap runs, bool useValues, Subscripts subs, SeedRecipe recipe) =>
         runs.RunLedBy(c) is { } run
             ? RuntimeApi.BitsPack(string.Join(" + ", run.Select(m => InitialBitCarrierOf(m, useValues, subs))),
                                   $"{run.Sum(BitLayout.RunBits)}")
         : runs.IsInRun(c) ? "\"\""
-        : ImageInitOf(c, useValues, subs);
+        : ImageInitOf(c, useValues, subs, recipe);
 
     /// <summary>The item's initial image in its VALUE CARRIER's own units — see <see cref="ImageInitOfOne"/>,
     /// which applies the storage coding on top (kb/Work PB231).</summary>
-    private string CarrierInitOfOne(DataItem item, bool useValues, Subscripts subs = default)
+    private string CarrierInitOfOne(DataItem item, bool useValues, Subscripts subs, SeedRecipe recipe)
     {
         if (item.IsGroup)
         {
@@ -151,7 +152,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             // rule, a refusal. Neither is here now: GroupValueSlicer.AreaOf answers with the area AND its unit,
             // so this lane cannot disagree with the record-struct lane about what a bit group's area is
             // (kb/Work PB207).
-            if (useValues && GroupValueSlicer.AreaOf(item, ctx, subs) is { } area)
+            if (useValues && recipe is SeedRecipe.InitialState && GroupValueSlicer.AreaOf(item, ctx, subs) is { } area)
                 // A bit group's area is m BOOLEAN POSITIONS (§13.18.29.4 GR1b); its IMAGE is those positions
                 // PACKED — ceil(m/8) characters through CobolBits.Pack, the ONE bit-order law (D19/PB43), never
                 // a second packer written here. The count is asked of ExtentBits, not taken from the area's own
@@ -195,7 +196,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             // construction rather than by both remembering to filter first.
             var runs = BitLayout.RunsOf(item.Children);
             var parts = item.Children.Where(c => (c.IsGroup || c.IsElementary) && c.RedefinesTargetName is null)
-                .Select(c => InitImageOfMember(c, runs, useValues, subs));
+                .Select(c => InitImageOfMember(c, runs, useValues, subs, recipe));
             return item.Children.Count > 0 ? "(" + string.Join(" + ", parts) + ")" : "\"\"";
         }
         var pic = item.Pic!;
@@ -256,7 +257,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // OPTIONS model. It now asks the SAME choke point the native-field arm asks (InitialStateBackground),
         // one call apart, and a drift test asserts the two agree for every category × usage. The baselines below
         // are unchanged and remain what a no-clause program gets.
-        if (vals.Background.Seed(item, pic) is { } bg) return bg;
+        if (vals.NoValueSeed(item, pic, recipe) is { } bg) return bg;
         return pic.Category is PicCategory.Numeric && !pic.IsFloat
             ? RuntimeApi.NumFormatImage("0L", item.ProfileName)
             // Boolean initial state — zeros (§13.18.63). A USAGE BIT item's zeros are PACKED, so the seed is

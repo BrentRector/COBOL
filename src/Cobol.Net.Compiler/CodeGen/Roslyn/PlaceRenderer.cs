@@ -187,8 +187,11 @@ internal static class PlaceRenderer
         // A bit / national GROUP receiving as an ELEMENTARY item (§13.18.29.4 GR1b/GR2b; D20/PB79): the value is
         // its as-if picture's string — the bit string for a bit group (the ONE bit writer's FromBits distributes
         // the boolean positions to the subordinates), the national character image for a national group (the ONE
-        // group-image store).
-        MemberPlace { Item.IsAsIfElementary: true } m => m.Item.GroupUsage is GroupUsage.Bit
+        // group-image store). ⛔ BOTH structural shapes (kb/Work PB1411's sweep): an element of a dynamic-capacity
+        // table that is a bit / national group is a DynTablePlace, and it used to fall to the plain dynamic-table
+        // assignment below — `RefReceiving(i) = "<bits>"`, CS0029 on legal source. The writers reach it through
+        // GroupTarget's RefReceiving, so the element is created (§8.5.1.9.3) and then distributed.
+        Place { Item.IsAsIfElementary: true } m when m is MemberPlace or DynTablePlace => m.Item.GroupUsage is GroupUsage.Bit
             ? WriteBits(m, rhs)
             // ⛔ THE NATIONAL WRITER, not the byte-image one (kb/Work PB327): a national group's as-if PICTURE
             // N(m) value is m NATIONAL POSITIONS, and its image is the 2m BYTES they occupy.
@@ -378,9 +381,23 @@ internal static class PlaceRenderer
         _ when !group.ImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),   // the OPERAND's capability (kb/Work PB189)
         OdoGroupPlace odo when UsesCurrentExtent(odo, AccessDir.Receiving) => ReceiveInto(odo, image),   // GR8a
         OdoGroupPlace odo => WriteGroupImage(odo.Inner, image, context),   // GR8b — the maximum length, whatever the inner's storage shape
-        DynTablePlace dyn => $"{RenderPath(dyn.Path, AccessDir.Receiving)}.FromImage({image});",
-        _ => $"{Read(group)}.FromImage({image});",
+        _ => $"{GroupTarget(group)}.FromImage({image});",
     };
+
+    /// <summary>⛔ THE ONE RECEIVER OF A GROUP-LEVEL STORE (kb/Work PB1411) — the struct a generated
+    /// <c>FromImage</c> / <c>FromVarImage</c> / <c>FromContiguousImage</c> / <c>FromBits</c> / <c>FromNat</c> is
+    /// called on. A group that is (or lies beneath) an element of a dynamic-capacity table is reached through the
+    /// RECEIVING accessor: §8.5.1.9.3 — "When a data item in a dynamic-capacity table is referenced as a receiving
+    /// item and the value of the subscript exceeds the current capacity of the table, a new element is
+    /// automatically created and the capacity of the table is increased to the value given by the subscript" — so
+    /// <c>RefReceiving</c> grows-and-seeds, where <see cref="Read"/>'s <c>RefSending</c> hands back benign scratch
+    /// and the store is silently discarded. Every group writer used to spell its target as <c>Read(group)</c> and
+    /// only <see cref="WriteGroupImage"/> carried a dynamic-table arm (the two-arm dispatch shape): a
+    /// variable-length group element (<see cref="WriteVarGroupImage"/>) and a bit / national group element
+    /// (<see cref="WriteBits"/> / <see cref="WriteNat"/>) never grew the table. <c>GroupStoreTargetDriftTests</c>
+    /// holds every group writer to this one target.</summary>
+    private static string GroupTarget(Place group) =>
+        group is DynTablePlace dyn ? RenderPath(dyn.Path, AccessDir.Receiving) : Read(group);
 
     /// <summary>The character IMAGE of a group place, whatever its storage shape (kb/Work PB80): a record-struct
     /// group's generated <c>AsImage()</c>; a Tier-B / BASED class-tier window's <c>Read</c> (already the string
@@ -440,7 +457,7 @@ internal static class PlaceRenderer
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreCarrier(RenderPath(g.Cell, AccessDir.Sending),
             $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynMax, value)};",   // kb/Work PB1026
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
-        _ => $"{Read(group)}.FromVarImage({value});",
+        _ => $"{GroupTarget(group)}.FromVarImage({value});",
     };
 
     /// <summary>⛔ A VARIABLE-LENGTH GROUP'S CONTIGUOUS IMAGE at its current extent — ISO §8.5.1.11.2: "a
@@ -518,7 +535,7 @@ internal static class PlaceRenderer
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Sending),
             $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, record, extents)};",
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
-        _ => $"{Read(group)}.FromContiguousImage({record}, {extents});",
+        _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents});",
     };
 
     /// <summary>⛔ THE ONE READER OF A GROUP OPERAND'S IMAGE IN A <b>SENDING</b> CONTEXT — <see cref="GroupImage"/>,
@@ -601,8 +618,8 @@ internal static class PlaceRenderer
     /// <summary>The bit writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
     private static string BitsWrite(Place group, string bits, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{Read(o.Inner)}.FromBits({RuntimeApi.StrSpliceInto($"{Read(o.Inner)}.AsBits()", "1", LengthExpr(o), bits, "'0'", allowZeroLength: true)});"
-            : $"{Read(group)}.FromBits({bits});";
+            ? $"{GroupTarget(o.Inner)}.FromBits({RuntimeApi.StrSpliceInto($"{GroupTarget(o.Inner)}.AsBits()", "1", LengthExpr(o), bits, "'0'", allowZeroLength: true)});"
+            : $"{GroupTarget(group)}.FromBits({bits});";
 
     /// <summary>⛔ <b>THE ONE WRITER OF A GROUP OPERAND'S VALUE</b> — the receiving twin of
     /// <see cref="SendingGroupValue"/>, over the same three kinds of group (ISO §13.18.29.4): a BIT group takes its
@@ -656,8 +673,8 @@ internal static class PlaceRenderer
     /// <summary>The national writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
     private static string NatWrite(Place group, string value, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{Read(o.Inner)}.FromNat({RuntimeApi.StrSpliceInto($"{Read(o.Inner)}.AsNat()", "1", NatLengthExpr(o), value, null, allowZeroLength: true)});"
-            : $"{Read(group)}.FromNat({value});";
+            ? $"{GroupTarget(o.Inner)}.FromNat({RuntimeApi.StrSpliceInto($"{GroupTarget(o.Inner)}.AsNat()", "1", NatLengthExpr(o), value, null, allowZeroLength: true)});"
+            : $"{GroupTarget(group)}.FromNat({value});";
 
     /// <summary>An occurs-depending NATIONAL group's current extent in NATIONAL POSITIONS: the byte extent the
     /// AsImage channel slices at, divided by the pinned bytes-per-national-position (kb/Work PB327).</summary>

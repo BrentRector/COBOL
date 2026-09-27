@@ -8,8 +8,9 @@ namespace CobolNet.Runtime;
 /// A DYNAMIC-capacity table (ISO/IEC 1989:2023 §13.18.38 Format 4 / §8.5.1.9; data-model design D9). Out-of-line
 /// growable storage for a COBOL <c>OCCURS DYNAMIC</c> table: a backing array plus a current-capacity counter (=
 /// the table's <b>current capacity</b> — the number of occurrences allocated now, §8.5.1.9.1). The CAPACITY register
-/// is a view over <see cref="Capacity"/>. New/intermediate occurrences are seeded with the one-occurrence element
-/// initializer (INITIALIZED, §8.5.1.9.5). Element access returns <c>ref T</c> so a subscripted write goes through the
+/// is a view over <see cref="Capacity"/>. The occurrences the table opens with are seeded with the element's
+/// initial state; new/intermediate occurrences a statement creates are seeded with the INITIALIZED phrase's
+/// INITIALIZE recipe when it is written (§8.5.1.9.5; kb/Work PB1267). Element access returns <c>ref T</c> so a subscripted write goes through the
 /// single ref every <c>Place.Write</c> relies on; <c>T</c> is the element value type (a record struct) or string.
 /// </summary>
 public sealed class CobolDynTable<T>
@@ -19,6 +20,7 @@ public sealed class CobolDynTable<T>
     private int _searching;             // >0 while a SEARCH of THIS table is in progress (EC-FLOW-SEARCH guard)
     private T _scratch = default!;      // the benign out-of-range slot (COBOL-85 / checking-off policy)
     private readonly Func<int, T> _seedAt;   // occurrence-indexed seed (1-based); a Format 2 (table) VALUE varies by occurrence
+    private readonly Func<int, T> _createdAt;   // the seed of an occurrence a STATEMENT creates (§8.5.1.9.5 INITIALIZED)
     private readonly int _min;
     private readonly int? _expected;    // TO integer-5 — the expected capacity (nonfatal to exceed)
 
@@ -26,28 +28,34 @@ public sealed class CobolDynTable<T>
     /// raises EC-BOUND-TABLE-LIMIT (fatal) with the current capacity left unchanged.</summary>
     public const int MaxOccurrences = 0x3FFF_FFFF;   // ~Array.MaxLength headroom
 
-    /// <param name="seed">Produces one freshly-initialized occurrence (the element's VALUE-THEN-DEFAULT image).</param>
+    /// <param name="seed">Produces one occurrence as the initial state has it (§14.6.2.3.2 — the element's VALUE
+    /// clauses over the background): the occurrences the table OPENS with.</param>
     /// <param name="min">FROM integer-4 — the minimum / initial current capacity (§13.18.38 GR16); the table opens
     /// at this capacity, seeded.</param>
     /// <param name="expected">TO integer-5 — the expected capacity (§13.18.38 GR17), or null if unbounded.</param>
-    /// <param name="initialized">The INITIALIZED phrase (§8.5.1.9.5). New occurrences are ALWAYS seeded here (a
-    /// crash-safe well-formed default; the INITIALIZED-absent "undefined" case permits any content).</param>
-    public CobolDynTable(Func<T> seed, int min, int? expected, bool initialized)
-        : this((Func<int, T>)(_ => seed()), min, expected, initialized, min) { }
+    /// <param name="initializedSeed">The INITIALIZED phrase's seed (§8.5.1.9.5 — the element "as though … the
+    /// subject of a statement of the form INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT") for every
+    /// occurrence a STATEMENT creates later, or null when it is the same as <paramref name="seed"/> — which it
+    /// always may be when INITIALIZED is absent, since those contents are then undefined (kb/Work PB1267).</param>
+    public CobolDynTable(Func<T> seed, int min, int? expected, Func<T>? initializedSeed)
+        : this((Func<int, T>)(_ => seed()), min, expected,
+               initializedSeed is null ? null : (Func<int, T>)(_ => initializedSeed()), min) { }
 
     /// <summary>The Format 2 (table) VALUE overload (ISO §13.18.63.2/GR12–GR16): a PER-OCCURRENCE seed (1-based)
     /// and an explicit initial current capacity (<paramref name="initialCapacity"/> — the GR16 value, ≥ the FROM
-    /// minimum). Occurrences 1..initialCapacity take their keyed VALUE literal; growth beyond re-seeds through the
-    /// same <paramref name="seedAt"/> (occurrences outside the VALUE range yield the element default).</summary>
-    public CobolDynTable(Func<int, T> seedAt, int min, int? expected, bool initialized, int initialCapacity)
+    /// minimum). Occurrences 1..initialCapacity take their keyed VALUE literal; growth beyond re-seeds through
+    /// <paramref name="initializedSeedAt"/> when INITIALIZED is written, else through the same
+    /// <paramref name="seedAt"/> (occurrences outside the VALUE range yield the element default).</summary>
+    public CobolDynTable(Func<int, T> seedAt, int min, int? expected, Func<int, T>? initializedSeedAt, int initialCapacity)
     {
         _seedAt = seedAt;
+        _createdAt = initializedSeedAt ?? seedAt;
         _min = min < 0 ? 0 : min;
         _expected = expected;
         int open = Math.Max(_min, initialCapacity < 0 ? 0 : initialCapacity);
         _store = new T[Math.Max(open, 4)];
         _count = 0;
-        GrowTo(open);   // initial current capacity = FROM (§8.5.1.9.1) raised to the VALUE's §13.18.63.4 GR16 capacity
+        GrowTo(open, _seedAt);   // initial current capacity = FROM (§8.5.1.9.1) raised to the VALUE's §13.18.63.4 GR16 capacity
     }
 
     /// <summary>The current capacity — the number of occurrences allocated now (§8.5.1.9.1). The source-level
@@ -65,22 +73,20 @@ public sealed class CobolDynTable<T>
     }
 
     /// <summary>A RECEIVING element reference (§8.5.1.9.3): an occurrence &gt; the current capacity GROWS the table to
-    /// it, seeding any skipped intermediate occurrences. An occurrence &lt; 1 is benign scratch. When the growth
-    /// FIRST crosses the expected capacity (TO integer-5) it sets the nonfatal EC-BOUND-OVERFLOW (§8.5.1.9.6 GR1)
-    /// under CHECKING ON — GR1's "already exceeded before an implicit change ⇒ no exception" is the
-    /// <c>!wasExceeded</c> guard (only the first crossing raises); the growth proceeds regardless.</summary>
+    /// it, seeding any skipped intermediate occurrences. An occurrence &lt; 1 is benign scratch. An implicit growth
+    /// past the expected capacity (TO integer-5) raises the nonfatal EC-BOUND-OVERFLOW through
+    /// <see cref="RaiseImplicitOverflow"/> — the ONE §8.5.1.9.6 1) raise every implicit capacity change shares — and
+    /// the growth proceeds regardless, a declarative's RESUME AT NEXT STATEMENT included (kb/Work PB1269).</summary>
     public ref T RefReceiving(long occ)
     {
         if (occ < 1) { _scratch = _seedAt((int)occ); return ref _scratch; }
         if (occ > _count)
         {
-            if (_expected is { } exp && occ > exp && _count <= exp)   // first implicit crossing of the expected capacity
-                ExceptionState.BoundOverflowError(
-                    $"OCCURS DYNAMIC implicit growth to {occ} exceeds the expected capacity {exp} (ISO §8.5.1.9.6 GR1)");
+            RaiseImplicitOverflow(occ, "implicit growth");
             // `occ`, not `(int)occ` — the SAME narrowing the explicit path carried (kb/Work PB459). A receiving
             // reference to occurrence 5 000 000 000 wrapped to 705 032 704 and silently grew the table to it
             // instead of raising GR30's EC-BOUND-TABLE-LIMIT; the `long` widens to GrowTo's Int128 parameter.
-            GrowTo(occ);
+            GrowTo(occ, _createdAt);
             // ⛔ GrowTo may now DECLINE (GR30 leaves the capacity unchanged when checking is off), so the
             // occurrence it was asked for can still not exist. Falling through to `_store[occ-1]` here would be
             // an IndexOutOfRangeException — a raw .NET failure on user source, from the one path where a benign
@@ -90,38 +96,87 @@ public sealed class CobolDynTable<T>
         return ref _store[(int)(occ - 1)];
     }
 
+    /// <summary>⛔ THE ONE §8.5.1.9.6 1) RAISE FOR AN IMPLICIT CAPACITY CHANGE — "The nonfatal EC-BOUND-OVERFLOW
+    /// exception condition shall exist when a dynamic-capacity table has an expected capacity and an operation
+    /// causes this expected capacity to be exceeded. If the change in capacity was implicit and the expected
+    /// capacity had already been exceeded before the operation, no exception shall exist." Every capacity change
+    /// that is not a SET Format 14 (§8.5.1.9.4 makes the SET the only EXPLICIT one) is implicit: a receiving
+    /// subscript past the current capacity (§8.5.1.9.3, <see cref="RefReceiving"/>) and the recreation of a
+    /// receiving table by a variable-length group transfer (§14.6.9.2, <see cref="FromCurrentImage"/>). Both come
+    /// here, so neither can raise the explicit SET's EC-BOUND-SET instead (kb/Work PB1144) or forget the
+    /// already-exceeded exemption.
+    /// <para>Called BEFORE the change, like its explicit twin in <see cref="SetCapacity"/>: a declarative that
+    /// completes normally, or one that executes RESUME AT NEXT STATEMENT, returns here and the change is made —
+    /// §8.5.1.9.6 1) names that continuation for exactly this condition ("the operation shall be allowed to
+    /// continue, thus exceeding the receiving table's specified expected capacity"), which is why
+    /// <see cref="ExceptionEngine.BoundOverflowError"/> does not unwind on the NEXT STATEMENT resume (kb/Work
+    /// PB1269). A RESUME AT procedure-name still transfers control out of the statement.</para></summary>
+    private void RaiseImplicitOverflow(Int128 newCapacity, string operation)
+    {
+        if (_expected is { } exp && newCapacity > exp && _count <= exp)
+            ExceptionState.BoundOverflowError(
+                $"OCCURS DYNAMIC {operation} to {newCapacity} exceeds the expected capacity {exp} (ISO §8.5.1.9.6 1))");
+    }
+
     /// <summary>Raise the current capacity to <paramref name="newCount"/>, seeding new occurrences [old..new)
-    /// (§8.5.1.9.5). A request past <see cref="MaxOccurrences"/> raises EC-BOUND-TABLE-LIMIT (fatal, capacity
-    /// unchanged). This is the pure grow primitive: EC-BOUND-OVERFLOW on implicit growth past the expected capacity
-    /// (§8.5.1.9.6 GR1) is raised by <see cref="RefReceiving"/> BEFORE calling here (only implicit growth qualifies);
-    /// EC-BOUND-SET on an explicit SET past the expected capacity (§14.9.39.4 GR30's second arm) is raised by
+    /// (§8.5.1.9.5). A request the table cannot reach — past <see cref="MaxOccurrences"/>, or past what the
+    /// runtime's resources can hold — raises EC-BOUND-TABLE-LIMIT (fatal) with the capacity unchanged
+    /// (<see cref="TableLimit"/>). This is the pure grow primitive: EC-BOUND-OVERFLOW on an implicit change
+    /// (§8.5.1.9.6 1)) is raised by <see cref="RaiseImplicitOverflow"/> BEFORE calling here; EC-BOUND-SET on an
+    /// explicit SET past the expected capacity (§14.9.39.4 GR30's second arm) is raised by
     /// <see cref="SetCapacity"/> BEFORE the capacity changes, as this one is (kb/Work PB460).</summary>
     /// <remarks>⛔ <paramref name="newCount"/> is <see cref="Int128"/>, and THAT IS THE POINT (kb/Work PB459):
     /// the implementor-maximum test is written ONCE, here, and it has to see the request BEFORE any narrowing.
     /// The explicit-SET path used to hand this an <c>(int)</c> cast of a <c>long</c>, so a capacity request of
     /// 5 000 000 000 WRAPPED to 705 032 704 — a small VALID capacity, silently allocated — instead of raising.</remarks>
-    private void GrowTo(Int128 newCount)
+    private void GrowTo(Int128 newCount, Func<int, T> seedAt)
     {
         if (newCount <= _count) return;
-        if (newCount > MaxOccurrences)
-        {
-            // §14.9.39.4 GR30 states the outcome outright — "the EC-BOUND-TABLE-LIMIT exception condition is set
-            // to exist AND THE CAPACITY OF THE TABLE IS UNCHANGED" — so with checking off this returns and the
-            // table keeps its capacity, rather than the unconditional throw that used to abort the run unit.
-            ExceptionState.BoundTableLimitError(
-                $"OCCURS DYNAMIC growth to {newCount} exceeds the implementor maximum ({MaxOccurrences}) "
-                + "— ISO §14.9.39.4 GR30");
-            return;   // GR30: capacity unchanged
-        }
+        if (newCount > MaxOccurrences) { TableLimit(newCount, $"the implementor maximum ({MaxOccurrences})"); return; }
         int target = (int)newCount;   // ≤ MaxOccurrences by the test above
-        if (target > _store.Length)
+        var before = _store;
+        try
         {
-            int cap = _store.Length < 4 ? 4 : _store.Length;
-            while (cap < target) cap = cap >= MaxOccurrences / 2 ? MaxOccurrences : cap * 2;
-            Array.Resize(ref _store, cap);
+            if (target > _store.Length) _store = Enlarged(_store, target);
+            for (int i = _count; i < target; i++) _store[i] = seedAt(i + 1);
         }
-        for (int i = _count; i < target; i++) _store[i] = _seedAt(i + 1);
+        catch (OutOfMemoryException)
+        {
+            // ⛔ THE MAXIMUM CAPACITY IS ALSO "CURRENT RESOURCE AVAILABILITY" (kb/Work PB1410). §8.5.1.9.1 3):
+            // "The actual limit for the current capacity imposed by the implementor and by current resource
+            // availability is referred to as the maximum capacity", and §8.5.1.9.6 2) makes the attempt to pass
+            // it "based on the resources available at runtime" the fatal EC-BOUND-TABLE-LIMIT — never a .NET
+            // OutOfMemoryException killing the process. The larger array, if one was allocated, is dropped and
+            // the table keeps its old storage and capacity (the slots seeded above the count are invisible).
+            _store = before;
+            TableLimit(newCount, "the resources available at runtime");
+            return;
+        }
         _count = target;
+    }
+
+    /// <summary>§8.5.1.9.6 2) / §14.9.39.4 GR30 — the fatal EC-BOUND-TABLE-LIMIT with the capacity UNCHANGED. GR30
+    /// states the outcome outright ("the EC-BOUND-TABLE-LIMIT exception condition is set to exist and the capacity
+    /// of the table is unchanged"), so with checking off this returns and the table keeps its capacity, rather
+    /// than the unconditional throw that used to abort the run unit; with checking on it throws the fatal
+    /// condition for the statement's EC dispatch.</summary>
+    private static void TableLimit(Int128 requested, string limit) =>
+        ExceptionState.BoundTableLimitError(
+            $"OCCURS DYNAMIC growth to {requested} exceeds {limit} — ISO §8.5.1.9.6 2)");
+
+    /// <summary>A store at least <paramref name="target"/> long holding <paramref name="store"/>'s occurrences —
+    /// doubled for amortized growth, and when the doubled size cannot be allocated, exactly
+    /// <paramref name="target"/>: a request the runtime CAN hold is never refused for the headroom this
+    /// implementation would have liked (§8.5.1.9.6 2) is about the capacity requested, not the array's slack).
+    /// Throws <see cref="OutOfMemoryException"/> only when even the exact size cannot be had.</summary>
+    private static T[] Enlarged(T[] store, int target)
+    {
+        int cap = store.Length < 4 ? 4 : store.Length;
+        while (cap < target) cap = cap >= MaxOccurrences / 2 ? MaxOccurrences : cap * 2;
+        var grown = store;
+        try { Array.Resize(ref grown, cap); }
+        catch (OutOfMemoryException) when (cap > target) { grown = store; Array.Resize(ref grown, target); }
+        return grown;
     }
 
     /// <summary>SET Format 14 <c>… TO n</c> (§14.9.39 GR29): set the current capacity to n (raise OR lower), clamped
@@ -162,11 +217,18 @@ public sealed class CobolDynTable<T>
         if (n <= MaxOccurrences && _expected is { } exp && n > exp)
             ExceptionState.BoundSetError(
                 $"SET of an OCCURS DYNAMIC capacity to {n} exceeds the expected capacity {exp} (ISO §14.9.39.4 GR30)");
-        if (n > _count) { GrowTo(n); return; }               // grow: n > _count ≥ _min, so no clamp can apply
+        if (n > _count) { GrowTo(n, _createdAt); return; }               // grow: n > _count ≥ _min, so no clamp can apply
         // GR30's minimum clamp — "If the new capacity of the table is less than the minimum capacity defined in
         // the corresponding OCCURS clause, the new capacity of the table shall be the minimum capacity" — over a
         // shrink, where n < _count ≤ MaxOccurrences makes the narrowing exact.
-        if (n < _count) _count = n < _min ? _min : (int)n;   // free the highest occurrences (§8.5.1.9.4)
+        if (n < _count)
+        {
+            // §8.5.1.9.4: "the appropriate number of higher occurrences is deleted and any resources they were
+            // using are freed" — the slots are cleared so the deleted occurrences hold no references; the array
+            // itself is kept, as that clause's NOTE permits.
+            int kept = n < _min ? _min : (int)n;
+            if (kept < _count) { Array.Clear(_store, kept, _count - kept); _count = kept; }
+        }
     }
 
     /// <summary>SET Format 14 <c>… UP BY n</c> (§14.9.39.4 GR30 b): raise the current capacity by n.</summary>
@@ -192,16 +254,46 @@ public sealed class CobolDynTable<T>
 
     /// <summary>The write half of <see cref="CurrentImage"/> — distribute a carried current-extent image back
     /// into the table (kb/Work PB204). The capacity BECOMES the number of whole
-    /// <paramref name="elementWidth"/>-wide occurrences the content holds, which is sound only because
+    /// <paramref name="elementWidth"/>-wide occurrences the content holds (raised to the FROM minimum by
+    /// space-filled elements), which is sound only because
     /// §8.5.1.12.3 admits corresponding tables at an activation boundary only "when the byte length of their
     /// elements is equal" — the bind-time compatibility check is what makes this division meaningful.
     /// <paramref name="store"/> distributes one occurrence's image into a freshly seeded element, so a group
     /// element keeps whatever storage its initializer allocated.</summary>
+    /// <remarks>⛔ THIS IS §14.6.9.2's RECREATION, NOT A SET (kb/Work PB1144). "The operation recreates or overwrites
+    /// the receiving table with a copy of the sending table, after freeing, if applicable, all the resources
+    /// previously occupied by the receiving table", and then "If the receiving table is a dynamic-capacity table
+    /// specifying a minimum capacity that is higher than its current capacity, further elements are created and
+    /// filled with spaces until the current capacity of the table is equal to its minimum capacity" (§14.6.9.4's
+    /// fill: each element space-filled). This used to route through <see cref="SetCapacity"/>, the explicit SET
+    /// Format 14 primitive, and that was wrong three ways: its minimum clamp KEPT the receiver's stale occurrences
+    /// between the sender's count and the minimum instead of creating space-filled ones; it raised the SET's
+    /// EC-BOUND-SET, whose checking only a SET statement enables, so the implicit change's EC-BOUND-OVERFLOW
+    /// (§8.5.1.9.6 1)) was never reported; and it applied the SET's no-exemption rule where §8.5.1.9.6 1) exempts
+    /// an implicit change to a table already past its expected capacity. The new table is built whole and swapped
+    /// in, so a table that cannot be recreated (EC-BOUND-TABLE-LIMIT, <see cref="TableLimit"/>) is left exactly as
+    /// it was.</remarks>
     public void FromCurrentImage(string content, int elementWidth, Func<T, string, T> store)
     {
         var parts = CobolVarGroup.Occurrences(content, elementWidth);
-        SetCapacity(parts.Length);
-        for (int i = 0; i < parts.Length && i < _count; i++) _store[i] = store(_seedAt(i + 1), parts[i]);
+        int target = Math.Max(parts.Length, _min);   // §14.6.9.2: the minimum-capacity fill
+        RaiseImplicitOverflow(target, "recreation by a variable-length group transfer");
+        if (target > MaxOccurrences) { TableLimit(target, $"the implementor maximum ({MaxOccurrences})"); return; }
+        string? spaces = null;
+        T[] fresh;
+        try
+        {
+            fresh = new T[Math.Max(target, 4)];
+            for (int i = 0; i < target; i++)
+                fresh[i] = store(_seedAt(i + 1), i < parts.Length ? parts[i] : spaces ??= new string(' ', Math.Max(0, elementWidth)));
+        }
+        catch (OutOfMemoryException)
+        {
+            TableLimit(target, "the resources available at runtime");   // §8.5.1.9.6 2): the table is unchanged
+            return;
+        }
+        _store = fresh;
+        _count = target;
     }
 
     /// <summary>ISO §14.6.9.4, Space filling a dynamic table (kb/Work PB393): "If a dynamic table is subordinate

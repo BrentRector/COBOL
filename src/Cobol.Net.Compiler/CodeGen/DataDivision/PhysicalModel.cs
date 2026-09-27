@@ -17,7 +17,7 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// <summary>Memoized physical-field list per group item — the cache that turns the otherwise-exponential
     /// nested-group emission (width and init recursively recomputing each other) into linear time. The root forest
     /// is cached separately in <see cref="_rootPhysCache"/>.</summary>
-    private readonly Dictionary<(DataItem Owner, Subscripts Subs), IReadOnlyList<Physical>> _physCache = [];
+    private readonly Dictionary<(DataItem Owner, Subscripts Subs, SeedRecipe Recipe), IReadOnlyList<Physical>> _physCache = [];
     private IReadOnlyList<Physical>? _rootPhysCache;
 
     /// <summary>The composed-initializer back-edges (set once by <see cref="DataEmitter"/> — the physical
@@ -65,17 +65,22 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// (<see cref="DataItem.ContainsTableValue"/>), where two occurrences of the same group genuinely compose
     /// different initializers. Everywhere else the cache answers, which is what keeps the ~49-level CCVS nesting
     /// linear (width and init otherwise recompute each other exponentially).</para></summary>
-    public IReadOnlyList<Physical> PhysicalChildrenOf(DataItem owner, Subscripts subs = default)
+    /// <param name="recipe">The seed recipe the members' <see cref="Physical.Init"/> compose by — the OTHER input
+    /// Init varies on (kb/Work PB1267), so it is part of the memo key; everything else in a Physical is still the
+    /// declaration's alone.</param>
+    public IReadOnlyList<Physical> PhysicalChildrenOf(DataItem owner, Subscripts subs = default,
+        SeedRecipe recipe = SeedRecipe.InitialState)
     {
         // ⛔ THE MEMO SURVIVES THE OCCURRENCE CONTEXT, and it has to: width and Init recompute each other, so
         // dropping the cache on a table-VALUE spine restores exactly the exponential nested-group emission the
         // cache exists to kill. The key carries the context ONLY where the subtree's initializers actually vary
         // with it — one entry per group everywhere else, one per (group, occurrence tuple) on the spine, which
-        // is proportional to the source the emitter writes for that table anyway.
-        var key = (owner, owner.ContainsTableValue ? subs : default);
+        // is proportional to the source the emitter writes for that table anyway. The recipe adds at most one
+        // entry per group inside an INITIALIZED dynamic-capacity table's element.
+        var key = (owner, owner.ContainsTableValue ? subs : default, recipe);
         if (_physCache.TryGetValue(key, out var cached)) return cached;
         ListBuilds++;
-        var list = BuildPhysicals(owner.Children, subs).ToList();
+        var list = BuildPhysicals(owner.Children, subs, recipe).ToList();
         _physCache[key] = list;
         return list;
     }
@@ -83,7 +88,7 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// <summary>The memoized physical fields of the top-level (01/77) forest.</summary>
     public IReadOnlyList<Physical> RootPhysicals()
     {
-        if (_rootPhysCache is null) { ListBuilds++; _rootPhysCache = BuildPhysicals(ctx.Data.Roots, default).ToList(); }
+        if (_rootPhysCache is null) { ListBuilds++; _rootPhysCache = BuildPhysicals(ctx.Data.Roots, default, SeedRecipe.InitialState).ToList(); }
         return _rootPhysCache;
     }
 
@@ -102,7 +107,7 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// <summary>The physical fields a run of sibling items emits: skip REDEFINES views; substitute a Tier-B class's ONE
     /// string backing (emitted once, at the canonical) for the whole class; a Tier-A view forwards to its canonical's
     /// field. The class's numeric <c>NumProfile</c>s are still emitted elsewhere (EmitProfiles — D9).</summary>
-    private IEnumerable<Physical> BuildPhysicals(IEnumerable<DataItem> items, Subscripts subs)
+    private IEnumerable<Physical> BuildPhysicals(IEnumerable<DataItem> items, Subscripts subs, SeedRecipe recipe)
     {
         // D19/PB43 — the §8.5.1.6.3 bit RUNS in this sibling list, keyed by the leaf that starts each one. A run is
         // a maximal stretch of consecutive USAGE BIT leaves at the SAME level: exactly the items the standard puts
@@ -121,7 +126,7 @@ internal sealed class PhysicalModel(EmitContext ctx)
                 // is a window over it. A non-canonical Tier-B member yields no field.
                 if (c.IsCanonical)
                     yield return new Physical(cls.BackingCsName, "string", cls.Width, false,
-                        RuntimeApi.StrStore(Codec.ImageInitOf(c, subs: subs), $"{cls.Width}"), $"REDEFINES backing for {c.CobolName}");
+                        RuntimeApi.StrStore(Codec.ImageInitOf(c, subs: subs, recipe: recipe), $"{cls.Width}"), $"REDEFINES backing for {c.CobolName}");
                 continue;
             }
             if (c.Class is { Tier: RedefinesTier.Alias } && !c.IsCanonical)
@@ -169,12 +174,12 @@ internal sealed class PhysicalModel(EmitContext ctx)
                 // A bit GROUP member keeps its record-struct type (IsGroupStruct) — its own AsImage/FromImage still exist
                 // for the standalone (record) case — but inside the run its slice is the run's (D20/PB79).
                 yield return new Physical(c.CsName, c.FieldType, run is null ? 0 : BitLayout.Characters(runBits),
-                    c.IsGroup, Values.FieldInit(c, subs), comment, occurs, null, run);
+                    c.IsGroup, Values.FieldInit(c, subs, recipe), comment, occurs, null, run);
                 continue;
             }
             // A class pointer/object leaf (kb/Work PB244): its slice of the one-way transfer image is its reserved
             // placeholder positions (D-SLOT) - GroupImageCodec.SlotPlaceholder, the same recipe the storage seed uses.
-            yield return new Physical(c.CsName, c.FieldType, width, c.IsGroup, Values.FieldInit(c, subs), comment, occurs, numLeaf, null, natLeaf,
+            yield return new Physical(c.CsName, c.FieldType, width, c.IsGroup, Values.FieldInit(c, subs, recipe), comment, occurs, numLeaf, null, natLeaf,
                 SlotWindow.CarriedBySlot(c));
         }
     }

@@ -7,6 +7,29 @@ using CobolNet.CodeGen.Emit;
 
 namespace CobolNet.CodeGen;
 
+/// <summary>WHICH RULE a data-division seed is composed by (kb/Work PB1267). The same composition — one element,
+/// its members in order, the VALUE recipe at each leaf — serves two occasions the standard words differently:
+/// <list type="bullet">
+/// <item><see cref="InitialState"/> — §14.6.2.3.2's initial state: the OPTIONS-paragraph background first
+/// (action 1), then every VALUE clause, a group-level VALUE included (§13.18.63.4 GR5).</item>
+/// <item><see cref="Initialize"/> — the new element of a dynamic-capacity table whose OCCURS carries INITIALIZED:
+/// §8.5.1.9.5, "as though they had been the subject of a statement of the form INITIALIZE … WITH FILLER ALL TO
+/// VALUE THEN TO DEFAULT". §14.9.20.4 GR5 c) 1. b qualifies a leaf by "a data-item format VALUE clause … in the
+/// data description entry of the ELEMENTARY data item" (so a group-level VALUE is not an INITIALIZE sender), GR6
+/// a) 3. makes that leaf's sender "a literal that, when moved to the receiving-operand with a MOVE statement,
+/// produces the same result as the initial value of the data item as produced by the application of the VALUE
+/// clause" (so a VALUE-bearing leaf composes exactly as it does in the initial state), and GR6 c)'s table gives
+/// every other leaf its category's figurative constant — ZEROES for a numeric-edited item, which the initial
+/// state leaves to the background (spaces).</item>
+/// </list></summary>
+internal enum SeedRecipe
+{
+    /// <summary>§14.6.2.3.2 — the background, then every VALUE clause.</summary>
+    InitialState,
+    /// <summary>§8.5.1.9.5 — INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT.</summary>
+    Initialize,
+}
+
 /// <summary>The VALUE-or-default initializer rendering of the DATA DIVISION (P7 Step 9l): an OCCURS table's
 /// array literal, a group's composed initializer (via <see cref="GroupValueSlicer"/>), an elementary item's
 /// VALUE / figurative / COBOL default. Wired by <see cref="DataEmitter"/>.</summary>
@@ -29,56 +52,73 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// the caller knowing which entry in the chain wrote the clause (kb/Work PB505). Threading it is what lets a
     /// table VALUE live on an entry SUBORDINATE to the OCCURS (SR18) and span several dimensions (GR12's
     /// odometer); before it, both were refused.</para></summary>
-    public string FieldInit(DataItem item, Subscripts outer = default)
+    /// <param name="recipe">The rule this seed is composed by (<see cref="SeedRecipe"/>) — the initial state
+    /// everywhere except inside the INITIALIZED seed of a dynamic-capacity table's new elements.</param>
+    public string FieldInit(DataItem item, Subscripts outer = default, SeedRecipe recipe = SeedRecipe.InitialState)
     {
         // A DYNAMIC-capacity table (§13.18.38 Format 4, D9): an out-of-line CobolDynTable seeded per occurrence with
         // the SAME one-occurrence initializer the fixed path repeats (heed DEVLOG 643 — seed EVERY occurrence). Opens
         // at FROM (min), raised to the §13.18.63.4 GR16 initial capacity when a table VALUE applies; TO is the
-        // expected capacity; INITIALIZED is carried for the (always-on) new-occurrence seed.
+        // expected capacity.
+        // ⛔ TWO SEEDS WHEN INITIALIZED IS WRITTEN (kb/Work PB1267). The occurrences the table OPENS with belong to
+        // the initial state (this call's own recipe); an element a STATEMENT creates later belongs to §8.5.1.9.5 —
+        // "any elementary items not referenced as receiving operands in a statement that creates new elements in
+        // that table are first initialized as though they had been the subject of a statement of the form
+        // INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT" — so it takes the SeedRecipe.Initialize
+        // composition. The two differ on a VALUE-less numeric-edited leaf (edited ZERO vs the background), under an
+        // OPTIONS INITIALIZE fill, and under a group-level VALUE; where they compose the same text the second seed
+        // is omitted (null), so the common table carries one lambda. Without INITIALIZED "the content of any
+        // unreferenced locations in the new table element and the content of the other new occurrences are
+        // undefined", and the initial-state seed is a conforming choice for it (docs/CONFORMANCE.md DOC-A.1-61).
         if (item.IsDynamicTable)
         {
             var s = item.OccursSpec!;
             int min = s.InitialCap ?? 0;
             string expected = s.ExpectedMax is int e ? e.ToString() : "null";
-            string init = s.Initialized ? "true" : "false";
             if (!item.ContainsTableValue)
-                return $"new CobolDynTable<{item.ElementType}>(() => {ElementInit(item, outer.With(1))}, {min}, "
-                     + $"{expected}, {init})";
+            {
+                string opening = ElementInit(item, outer.With(1), recipe);
+                string created = s.Initialized ? ElementInit(item, outer.With(1), SeedRecipe.Initialize) : opening;
+                return $"new CobolDynTable<{item.ElementType}>(() => {opening}, {min}, {expected}, "
+                     + (created == opening ? "null" : $"() => {created}") + ")";
+            }
             // §13.18.63.4 GR16 fixed the initial capacity in the binder ("If more than one VALUE clause applies,
             // the maximum value thus calculated becomes the initial capacity"); occurrences within it take their
             // keyed element, and growth beyond re-seeds through the same function to the VALUE-less default.
             int cap = Math.Max(min, item.TableValueInitialCapacity ?? min);
-            return $"new CobolDynTable<{item.ElementType}>({SeedSwitch(item, outer, cap)}, {min}, "
-                 + $"{expected}, {init}, {cap})";
+            string openingAt = SeedSwitch(item, outer, cap, recipe);
+            string createdAt = s.Initialized ? SeedSwitch(item, outer, cap, SeedRecipe.Initialize) : openingAt;
+            return $"new CobolDynTable<{item.ElementType}>({openingAt}, {min}, {expected}, "
+                 + $"{(createdAt == openingAt ? "null" : createdAt)}, {cap})";
         }
         if (item.Occurs is { } n)
         {
             // Without a table VALUE in the subtree every occurrence is identical — compose ONE and repeat it (the
             // shape both lanes always had, and the reason a 49-level CCVS record still emits in linear time).
             if (!item.ContainsTableValue)
-                return $"new {item.ElementType}[] {{ {string.Join(", ", Enumerable.Repeat(ElementInit(item, outer.With(1)), n))} }}";
+                return $"new {item.ElementType}[] {{ {string.Join(", ", Enumerable.Repeat(ElementInit(item, outer.With(1), recipe), n))} }}";
             return $"new {item.ElementType}[] {{ "
-                 + string.Join(", ", Enumerable.Range(1, n).Select(o => ElementInit(item, outer.With(o)))) + " }";
+                 + string.Join(", ", Enumerable.Range(1, n).Select(o => ElementInit(item, outer.With(o), recipe))) + " }";
         }
-        return ElementInit(item, outer);
+        return ElementInit(item, outer, recipe);
     }
 
     /// <summary>ONE table element / one non-table field at <paramref name="subs"/>: a group composes its members
     /// (or takes its own §13.18.63.4 GR5 area VALUE), an elementary item takes the literal its VALUE clause gives
     /// this occurrence.</summary>
-    private string ElementInit(DataItem item, Subscripts subs) =>
-        item.IsGroup ? Slicer.ComposedInit(item, subs) : InitializerFor(item, subs);
+    private string ElementInit(DataItem item, Subscripts subs, SeedRecipe recipe) =>
+        item.IsGroup ? Slicer.ComposedInit(item, subs, recipe) : InitializerFor(item, subs, recipe);
 
     /// <summary>The per-occurrence seed function of a DYNAMIC-capacity table carrying (or containing) a Format 2
     /// VALUE: <c>(int __i) =&gt; __i switch { … }</c> over occurrences 1..<paramref name="cap"/>, defaulting to the
     /// VALUE-less element for anything the table grows to later. Occurrences whose element text is IDENTICAL share
     /// one arm — the common case is one literal over a whole range, and an arm per occurrence would put a
     /// thousand identical branches into the generated source.</summary>
-    private string SeedSwitch(DataItem item, Subscripts outer, int cap)
+    private string SeedSwitch(DataItem item, Subscripts outer, int cap, SeedRecipe recipe)
     {
         // Subscript 0 identifies no table element (§13.18.63.3 SR20 admits none below 1), so it is the tuple that
         // deliberately matches no FROM..TO range: the element as it stands with no table VALUE keyed to it.
-        string dflt = ElementInit(item, outer.With(0));
+        string dflt = ElementInit(item, outer.With(0), recipe);
         var arms = new List<string>();
         var pending = new List<int>();
         string? pendingText = null;
@@ -91,7 +131,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
         }
         for (int o = 1; o <= cap; o++)
         {
-            string text = ElementInit(item, outer.With(o));
+            string text = ElementInit(item, outer.With(o), recipe);
             if (pendingText is not null && !string.Equals(text, pendingText, StringComparison.Ordinal)) Flush();
             pendingText = text;
             pending.Add(o);
@@ -102,11 +142,31 @@ internal sealed class ValueInitializer(EmitContext ctx)
             : $"(int __i) => __i switch {{ {string.Join(" ", arms)} _ => {dflt} }}";
     }
     /// <summary>The C# initializer expression for an elementary item, from its VALUE clause or the COBOL default.</summary>
-    public string InitializerFor(DataItem item, Subscripts subs = default)
+    public string InitializerFor(DataItem item, Subscripts subs = default, SeedRecipe recipe = SeedRecipe.InitialState)
         // ⛔ THE ONE READER for "what initializes this item at this occurrence" — DataItem.ValueAt: the Format-1
         // VALUE (the same for every occurrence, §13.18.63.4 GR9) or the Format-2 literal keyed to this subscript
         // tuple (GR12–GR15). The image lane asks the same property, so the two cannot disagree.
-        => InitializerFrom(item, item.ValueAt(subs));
+        => InitializerFrom(item, item.ValueAt(subs), recipe);
+
+    /// <summary>⛔ THE ONE NO-VALUE SEED, both lanes, both recipes (kb/Work PB1267 over PB152's choke point): what
+    /// a VALUE-less elementary item starts as, or null for the caller's own category baseline (spaces / zero /
+    /// boolean zeros / null — which IS §14.9.20.4 GR6 c)'s figurative constant for every category but one).
+    /// <see cref="SeedRecipe.InitialState"/> asks the §14.6.2.3.2 background; <see cref="SeedRecipe.Initialize"/>
+    /// never does (an INITIALIZE sends GR6 c)'s constant, not the OPTIONS fill) and answers the one category whose
+    /// constant the baseline does not already spell: a numeric-edited item receives "Figurative constant ZEROES"
+    /// by MOVE, i.e. the EDITED image of zero (BLANK WHEN ZERO included) — the compile-time compose
+    /// <see cref="EditedImageOfNumericValue"/> the VALUE clause uses, or the run-time locale compose for a
+    /// format-2 (LOCALE) item.</summary>
+    public string? NoValueSeed(DataItem item, PicInfo pic, SeedRecipe recipe)
+    {
+        if (recipe is SeedRecipe.InitialState) return Background.Seed(item, pic);
+        if (pic.Category is not PicCategory.NumericEdited) return null;
+        if (pic.LocaleEdit is not null) return RuntimeApi.LocaleEditCompose(pic, Int128.Zero, 0, item.BlankWhenZero);
+        // A figurative ZERO moved to a numeric-edited item is the numeric value zero (§14.9.25.4), at every
+        // edition — hence the literal "0" at the 2023 level, where the VALUE rule treats the two identically.
+        return EditedImageOfNumericValue(2023, ctx.Data.DecimalPointIsComma, item, pic, "0") is { } z
+            ? EmitText.CsLiteral(z) : null;
+    }
 
     /// <summary>⛔ THE ONE §13.18.63 VALUE RECIPE, with the operand handed in rather than read off the item —
     /// the arm the REPORT SECTION needs (kb/Work PB506). A format-4 VALUE operand lives on the report field
@@ -124,7 +184,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// `PIC XXBXX VALUE "AB CD"` printed `AB  C`, `PIC X(5) JUSTIFIED VALUE "AB"` printed `   AB`, and
     /// `PIC ZZZ9 BLANK WHEN ZERO VALUE "0000"` printed spaces — each while the IDENTICAL working-storage entry,
     /// through this method, was right.</para></summary>
-    public string InitializerFrom(DataItem item, string? effRaw)
+    public string InitializerFrom(DataItem item, string? effRaw, SeedRecipe recipe = SeedRecipe.InitialState)
     {
         // ⛔ THE ONE CATEGORY/WIDTH READER (DataItem.OperandPic, D20), never raw `Pic` — which is NULL for every
         // GROUP. An elementary item reads identically (OperandPic IS Pic there), and the two group shapes the
@@ -193,7 +253,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
         // precedes action 2 (the VALUE seed) and this is the only place that ordering has to appear, because a
         // field initializer is one expression and every VALUE-bearing path above has already returned.
         // ONE choke point, shared with the Tier-B image arm — see InitialStateBackground.
-        if (effRaw is not { } raw) return Background.Seed(item, pic) ?? pic.DefaultInitializer;
+        if (effRaw is not { } raw) return NoValueSeed(item, pic, recipe) ?? pic.DefaultInitializer;
 
         // A FORMAT-2 (LOCALE) item's numeric VALUE has NO compile-time image — §13.18.40.5 r11 + §14.6.6 r6 make
         // the locale the one current AT THE TIME of editing — so the initializer is a RUNTIME CobolLocaleEdit

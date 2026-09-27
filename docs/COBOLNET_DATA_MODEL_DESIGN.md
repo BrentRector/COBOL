@@ -1194,8 +1194,15 @@ and seeded correctly while `OCCURS DYNAMIC FROM 3 TO 9.` was refused, while the 
 refused both. Golden `tests/conformance/2014/pb500_format1_value_dynamic_table` pins all six shapes, including the
 mixed entry where a Format 1 and a Format 2 VALUE sit over one dynamic table and only the latter moves the capacity.
 
-`CobolDynTable` wires **EC-BOUND-OVERFLOW** since P13 (the receiving-subscript implicit grow past the expected
-capacity raises through the ambient `BoundOverflowChecking` gate, first crossing only) and **EC-BOUND-SET** (kb/Work
+`CobolDynTable` wires **EC-BOUND-OVERFLOW** since P13 through ONE raise, `RaiseImplicitOverflow`, for every
+IMPLICIT capacity change (§8.5.1.9.6 1) — the receiving-subscript grow and, since kb/Work PB1144, the §14.6.9.2
+recreation `FromCurrentImage` performs for a variable-length group MOVE / boundary transfer, which is its own
+primitive and never `SetCapacity`: it builds a new array of the sender's occurrences raised to the FROM minimum with
+space-filled elements) through the ambient `BoundOverflowChecking` gate, first crossing only, and a declarative's
+RESUME AT NEXT STATEMENT lets the change proceed (§8.5.1.9.6 1); kb/Work PB1269). Growth that the runtime cannot
+allocate is EC-BOUND-TABLE-LIMIT with the table unchanged (kb/Work PB1410). New occurrences a statement creates
+take the INITIALIZED phrase's §8.5.1.9.5 seed (`SeedRecipe.Initialize`, a second constructor seed; kb/Work
+PB1267). **EC-BOUND-SET** (kb/Work
 PB460): `SetCapacity` raises it on EVERY SET Format 14 whose new capacity exceeds the expected maximum capacity
 (§14.9.39.4 GR30's second arm — no first-crossing exemption), BEFORE the change, through `BoundSetChecking`, which
 the EC binder enables precisely on `BoundSetCapacity`. `docs/CONFORMANCE.md` A.4.4 records the two determinations.

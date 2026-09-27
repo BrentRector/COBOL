@@ -393,7 +393,14 @@ public sealed class ExceptionEngine
     /// by the activation boundary (<c>ProgramTable</c>) to the runtime element now executing, so a condition
     /// raised inside a CALLed program selects THAT program's declaratives (§14.9.49.4 GR4 a) and never the
     /// activator's.</para></summary>
-    private void NonfatalIfEnabled(bool enabled, string ec)
+    /// <param name="nextStatementContinues">True for a condition whose own rule names RESUME AT NEXT STATEMENT as
+    /// a CONTINUATION of the interrupted operation rather than a transfer out of it — today only EC-BOUND-OVERFLOW,
+    /// whose §8.5.1.9.6 1) says a declarative "that executes a RESUME statement with the NEXT STATEMENT phrase"
+    /// leaves "the operation … allowed to continue, thus exceeding the receiving table's specified expected
+    /// capacity" (kb/Work PB1269). The raise site then returns as it does for a declarative that completed
+    /// normally; the statement finishes and control reaches the next statement, which is where the resume was
+    /// going. RESUME AT procedure-name (≥ 0) still unwinds.</param>
+    private void NonfatalIfEnabled(bool enabled, string ec, bool nextStatementContinues = false)
     {
         if (!enabled) return;
         Set(ec, fatal: false);
@@ -401,6 +408,7 @@ public sealed class ExceptionEngine
         // -1 (#3, the declarative completed normally) and -3 (#4, none qualified) both leave the statement to
         // finish under its own rules; only an explicit RESUME transfers control out of it.
         if (r is DeclarativeCompleted or NoDeclarative) return;
+        if (nextStatementContinues && r == ResumeSignal.NextStatement) return;
         throw new RaiseResumeSignal(r);   // §14.9.33.4 GR2 (-2 ≡ ResumeSignal.NextStatement) / GR3 (≥ 0)
     }
 
@@ -533,11 +541,15 @@ public sealed class ExceptionEngine
         set => _checking.BoundOverflow = value;
     }
 
-    /// <summary>Record EC-BOUND-OVERFLOW when a dynamic-capacity table's implicit growth (a receiving subscript)
-    /// first exceeds its expected capacity (§8.5.1.9.6 GR1 — the FIRST crossing only; an already-exceeded
-    /// implicit grow raises nothing). Nonfatal (Table 13), so it never throws; it sets the last exception status
-    /// only while checking is enabled (§14.6.13.1.1). The growth proceeds regardless.</summary>
-    public void BoundOverflowError(string detail) => NonfatalIfEnabled(BoundOverflowChecking, "EC-BOUND-OVERFLOW");
+    /// <summary>Record EC-BOUND-OVERFLOW when an implicit capacity change of a dynamic-capacity table (a receiving
+    /// subscript, §8.5.1.9.3; a variable-length group transfer's recreation, §14.6.9.2) first exceeds its expected
+    /// capacity (§8.5.1.9.6 1) — an already-exceeded implicit change raises nothing; <c>CobolDynTable</c> asks
+    /// that). Nonfatal (Table 13); it sets the last exception status only while checking is enabled
+    /// (§14.6.13.1.1). The change proceeds regardless — after a declarative that completes normally AND after one
+    /// that executes RESUME AT NEXT STATEMENT, which §8.5.1.9.6 1) names as this condition's continuation
+    /// (kb/Work PB1269).</summary>
+    public void BoundOverflowError(string detail) =>
+        NonfatalIfEnabled(BoundOverflowChecking, "EC-BOUND-OVERFLOW", nextStatementContinues: true);
 
     // ── EC-BOUND-SET ambient statement gate (OCCURS DYNAMIC explicit SET past the expected capacity) ─────────────
 

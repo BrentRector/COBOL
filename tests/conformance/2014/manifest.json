@@ -151,7 +151,11 @@
   "w59_float_decimal_clause_witness",
   "w59_rounded_final_transfer_only",
   "w59_numeric_category_usages",
-  "w59h_vlg_override_signature"
+  "w59h_vlg_override_signature",
+  "pb1144_dyn_move_recreate",
+  "pb1267_dyn_initialized_seed",
+  "pb1269_dyn_overflow_resume_next",
+  "pb1411_dyn_vargroup_element_receiver"
  ],
  "pending": []
 }

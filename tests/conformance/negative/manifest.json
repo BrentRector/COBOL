@@ -130,6 +130,7 @@
   "pb521-property-with-based",
   "pb521-property-with-typedef",
   "pb189-dynamic-table-element-operand-2002",
+  "pb1267-occurs-dynamic-initialized-2002",
   "pb764-reserved-word-as-system-name",
   "pb655-alter-dataname-85",
   "pb225-float-class-not-standard-float",
