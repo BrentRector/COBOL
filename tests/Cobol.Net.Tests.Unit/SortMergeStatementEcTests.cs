@@ -193,7 +193,7 @@ public sealed class SortMergeStatementEcTests
     /// <summary>⛔ DRIFT: every Table 13 EC-SORT-MERGE-* name the implementation raises itself has a FLAGGED fatal
     /// gate row, so <c>&gt;&gt;TURN … CHECKING ON</c> arms a raise site — the family sat unwired behind a green
     /// suite until PB1036 (the general registry is kb/Work PB1037). -IMP is the implementor's own name, which
-    /// COBOL.NET never raises (docs/CONFORMANCE.md §7, DOC-A.1-100). A new EC-SORT-MERGE-* row in the catalog
+    /// WiseOwl COBOL never raises (docs/CONFORMANCE.md §7, DOC-A.1-100). A new EC-SORT-MERGE-* row in the catalog
     /// fails here until it is wired, and <c>ExceptionRaiseHelperDriftTests</c> then pins its helper to the flag.</summary>
     [Fact]
     public void EverySortMergeCondition_HasAFlaggedFatalGate()

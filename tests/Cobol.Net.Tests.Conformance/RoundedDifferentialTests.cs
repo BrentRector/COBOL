@@ -16,15 +16,15 @@ public sealed class RoundedDifferentialTests
 {
     private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(dialectLevel: 2014);   // OPTIONS / ROUNDED MODE IS are ISO-2014+ features
 
-    /// <summary>Compile+run with COBOL.NET and assert its stdout equals the hand-computed spec value.</summary>
+    /// <summary>Compile+run with WiseOwl COBOL and assert its stdout equals the hand-computed spec value.</summary>
     private static void AssertOutput(string source, string expected)
     {
         var (ok, outp, detail) = CobolNet.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, outp);
     }
 
-    /// <summary>Assert COBOL.NET produces byte-identical stdout to the legacy oracle.</summary>
+    /// <summary>Assert WiseOwl COBOL produces byte-identical stdout to the legacy oracle.</summary>
     private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source, 2014);
 
     private static string Program(string ws, string proc) => $"""

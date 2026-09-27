@@ -1,4 +1,4 @@
-# COBOL.NET — THE PLAN (the ONE rearchitecture + 100%-ISO roadmap · live resume state · phase execution detail)
+# WiseOwl COBOL — THE PLAN (the ONE rearchitecture + 100%-ISO roadmap · live resume state · phase execution detail)
 
 > **⛔ THIS IS THE ONLY PLANNING DOCUMENT (owner directive 2026-07-19).** It replaced and absorbed
 > `resume-prompt.md`, the 17 per-phase step-by-step docs (`PHASE-00..16-*.md`), `PHASE-13-audit.md` (+ its scout
@@ -340,7 +340,7 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
   `syn_definition:2129` — PB93's REDEFINES / RENAMES operand checks; `syn_value:271` — PB94's SR2), 2 ×
   AGREE_ACCEPT → WE_REJECT_THEY_ACCEPT (`syn_value:299` `PIC XXX VALUE 123`, `syn_value:425` `PIC BXX VALUE
   123` — §13.18.63.3 SR4 makes a numeric VALUE literal on an alphanumeric item illegal; GnuCOBOL's default dialect
-  accepts it, COBOL.NET accepts it under `--permissive` with COBOLNET1657 — the DEFAULT_DIALECT tier's expected
+  accepts it, WiseOwl COBOL accepts it under `--permissive` with COBOLNET1657 — the DEFAULT_DIALECT tier's expected
   ISO-stricter divergence). Green.
   **✅ PB96 CLOSED (DEVLOG 1320, 2026-08-18)** — a level-66 RENAMES THRU alias is the record's STORAGE WINDOW, tiled
   greedily by the record's leaves (REDEFINES views included — they read the storage they overlay; NC252A's span
@@ -676,7 +676,7 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
   including R13, decided by the owner 2026-08-08 (**follow GnuCOBOL** on the beyond-PICTURE COMP-5
   DISPLAY; §7 item 56; and the broader preference — implementor latitude + split vendors → follow
   GnuCOBOL — is in session memory as `follow-gnucobol-on-split-latitude`, LATITUDE ONLY — and the vendor axis is
-  now CLOSED by owner decision the same evening: COBOL.NET stays STRICT-ISO permanently, GnuCOBOL's
+  now CLOSED by owner decision the same evening: WiseOwl COBOL stays STRICT-ISO permanently, GnuCOBOL's
   non-ISO extensions are never implemented; R36/R37/R38/R39 carry the record). The battery reference below is current at the R33+R38 closing tree; CI green
   through `b66a292c`. After PB29+PB39, what remains is the A-series analyses (§11) and the P14
   campaigns proper.
@@ -1822,7 +1822,7 @@ result. Run the long legs ONE AT A TIME.
   collection each: **721 s → 600 s**, average concurrency **2.7× → 17.4×**, and the Unit leg **171 s →
   138 s**. ⚠ **That is a 17% cut, not the 10× A13 predicted, and the reason is worth carrying:** the
   profiler's concurrency figure counts COLLECTIONS, not cores, and the "idle" cores were never idle —
-  a COBOL.NET compile is internally parallel and a NIST row spawns a `dotnet` child. The box is now
+  a WiseOwl COBOL compile is internally parallel and a NIST row spawns a `dotnet` child. The box is now
   saturated (≈24 threads on 24 physical cores), so the class-split lever is EXHAUSTED and the next
   lever is reducing the WORK (a persistent compile/run host), never more partitions.
   See `DESIGN-test-build-ci.md` §3.11.
@@ -2149,7 +2149,7 @@ result. Run the long legs ONE AT A TIME.
   which `docs/CONFORMANCE.md` §4 records as PB260's debt rather than as the conforming posture; enabling it would
   pin the debt. `kb/Work/PB260` carries the substring to record when the named diagnostic lands.
 - **⛔ READ EVERY BATTERY RECORD UP TO AND INCLUDING #60 WITH THIS CAVEAT (kb/Work/PB750): their `guard NIST:`
-  and `guard verdict:` lines measured the LEGACY compiler, not COBOL.NET.** Both guards hard-coded
+  and `guard verdict:` lines measured the LEGACY compiler, not WiseOwl COBOL.** Both guards hard-coded
   `src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll`, whose project graph contains no `Cobol.Net.Compiler`,
   so `NIST: 353 MATCH, 0 REGRESSION(S)` was a true statement about the ORACLE and never evidence about the
   shipping compiler — battery #58's own `NC215A` wrong answer (PB741) is the demonstration: green in the guard
@@ -3157,7 +3157,7 @@ already-derivable coverage; none change the pipeline.
   burn-down reports). `python scripts/spec/backfill_closes_rows.py`
   re-derives the back-link from the inventory's own commit history — idempotent, and it never overwrites an
   answer a human wrote.
-- Owner status page: `python scripts/spec/gen_ledger.py` renders the **COBOL.NET Conformance Ledger** artifact
+- Owner status page: `python scripts/spec/gen_ledger.py` renders the **WiseOwl COBOL Conformance Ledger** artifact
   from the repo — inventory, `kb/Work` (through `work.py`'s own predicate), `audit_annex_a1.py --json`, `CONFORMANCE.md`
   §2/§4/§5 and §0's CURRENT battery bullet — so a refresh is one run plus one publish to the artifact's existing URL,
   never a hand rewrite; `--check` reports staleness and the GAP series lives in `docs/rearchitecture/evidence/ledger-trend.json`.
@@ -3656,7 +3656,7 @@ legacy comparison. Wire the suite into CI as a trend (not a hard gate). CAMPAIGN
 
 **Goal.** Run the GnuCOBOL project's testsuite (the largest maintained external COBOL test corpus: the
 `tests/testsuite.src/*.at` groups — syntax `syn_*.at` + runtime `run_*.at`, ~1000+ groups — plus its NIST
-runner configuration) through COBOL.NET, and fold every divergence into the traceability inventory / the
+runner configuration) through WiseOwl COBOL, and fold every divergence into the traceability inventory / the
 conformance dispositions. External corpora find what every in-house instrument is blind to; this is cheapest
 while the legacy oracle still exists.
 
@@ -3890,7 +3890,7 @@ The AS-IS dossier and the sibling DESIGN docs identify the load-bearing weakness
    `tests/CobolSharp.Tests.{Unit,Integration}` (they also gate the SHARED `Cobol.Net.Frontend`, so they retire
    with the byte engine, not before) and `scripts/{compliance.sh,nist-batch.sh}`. ⛔ **The guard scripts are NOT
    on that list any more** (PB750): `guard.sh`, `guard-fast.sh`, `guard-run-group.sh`, `guard-verdict.sh`,
-   `guard-nist-audit.sh`, `guard-verify.sh`, `guard-compiler.sh` and `guard-compile.sh` are the COBOL.NET
+   `guard-nist-audit.sh`, `guard-verify.sh`, `guard-compiler.sh` and `guard-compile.sh` are the WiseOwl COBOL
    CLI-level NIST leg plus its verdict-evidence rules, chain-isolation model and population/expectation audit.
    `run-suite.sh` survives as a triage helper (it selects its compiler through `guard-compiler.sh`).
 4. **The runtime carries a deferred rename.** `src/Cobol.Net.Runtime/Cobol.Net.Runtime.csproj` has
@@ -4329,7 +4329,7 @@ from `constructs.json` + harness results so the conformance doc is regenerable a
 implementation (mirrors the `gen-reserved-words.ps1` discipline). A hand-written narrative wraps the generated tables.
 
 #### 7.3 `docs/CONFORMANCE.md` section map (author to this outline)
-1. **Title / scope / edition.** "ISO/IEC 1989:2023 conformance statement for COBOL.NET (cobol). Default `--std 2023`;
+1. **Title / scope / edition.** "ISO/IEC 1989:2023 conformance statement for WiseOwl COBOL (cobol). Default `--std 2023`;
    supported editions 85/2002/2014/2023." Note conformance is claimed per the edition selected by `--std`.
 2. **§4.2.2 Warning mechanism.** How to invoke conformance/extension/archaic/obsolete/nonstandard warnings (`--std`,
    `--permissive`/strict, the diagnostic codes band). Reference the diagnostic registry / `docs/DIAGNOSTICS.md`.

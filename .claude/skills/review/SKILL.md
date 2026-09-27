@@ -3,7 +3,7 @@ name: review
 description: Use when asked for a code review, architecture review, performance review, or duplication/efficiency analysis - the four review dimensions the owner requires, run as parallel agents with project-specific criteria and adversarial verification.
 ---
 
-> **Generic base:** [`review`](https://github.com/BrentRector/claude-skills/blob/main/skills/review/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the COBOL.NET application of it and wins on conflict.
+> **Generic base:** [`review`](https://github.com/BrentRector/claude-skills/blob/main/skills/review/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
 
 # Review
 

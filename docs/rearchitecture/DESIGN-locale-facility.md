@@ -4,7 +4,7 @@
 > `docs/COBOLNET_DESIGN.md` §0.5 and `docs/DOC_INDEX.md`. kb/Work/PB64.md owns the item.
 >
 > **The four owner decisions (2026-08-18), verbatim of record — they supersede council decision 3 (2026-07-03):**
-> - **Q1 — IMPLEMENT the A.4.9 locale module.** COBOL.NET claims support for Annex A.4.9 items 1–13 as each
+> - **Q1 — IMPLEMENT the A.4.9 locale module.** WiseOwl COBOL claims support for Annex A.4.9 items 1–13 as each
 >   increment of §12 lands — and EVERY increment HAS: T6 (2026-08-28) completed the claim, CONFORMANCE.md §5's
 >   A.4.9 row reads Claimed, and the COBOLNET1518 by-name refusal is DELETED (the code is never reallocated).
 > - **Q2 — the two defaults come from ENVIRONMENT VARIABLES** (DETERMINATION L2 as drafted): `COBOL_USER_LOCALE`
@@ -14,11 +14,11 @@
 >   drafted; the key locale is captured at OPEN and the cross-locale key-order caveat is documented).
 > - **Q4 — `STANDARD-COMPARE` / the `ORDER TABLE` clause are implemented over Unicode CLDR + UCA data** (.NET's
 >   ICU `CompareInfo` root collation, plus tables derived from it — never a hand-vendored ISO 14651 file). The
->   conformance statement COBOL.NET makes, VERBATIM and nowhere reworded:
+>   conformance statement WiseOwl COBOL makes, VERBATIM and nowhere reworded:
 >   **"Implements collation behavior consistent with ISO/IEC 14651 through derived tables and CLDR/UCA data."**
 >   (CONFORMANCE.md §2 A.3 item 25 and §7 carry that sentence.)
 >
-> **⚙ 2026-08-18, the owner's COLLATION guidance (kb/Work PB101):** the collation realization is COBOL.NET's OWN
+> **⚙ 2026-08-18, the owner's COLLATION guidance (kb/Work PB101):** the collation realization is WiseOwl COBOL's OWN
 > DERIVED CLDR/UCA engine (`src/Cobol.Net.Runtime/Collation/`, README there) — a table generated from the pinned
 > CLDR release-48-2 root collation + UCD 17.0.0 data, embedded in the runtime, with its own NFD — and NOT .NET's
 > ICU `CompareInfo`, which this design first drafted as the realization. Measured reason: the host's bundled ICU
@@ -244,7 +244,7 @@ The **five seams**, each singular:
 specified, locale-name-1 references a locale identified by external-locale-name-1 or the value of literal-4.
 The implementor specifies the allowable external-locale-names and the allowable content of literal-4*"
 (`--check` OK). §1 (Scope) confirms this document "*does not specify … The mechanism by which locales are
-defined and made available on a processor*" (`--check` OK). COBOL.NET's specification:
+defined and made available on a processor*" (`--check` OK). WiseOwl COBOL's specification:
 
 1. The external identification is a **culture name** accepted by `CultureInfo.GetCultureInfo(name)` — a BCP-47
    tag (`fr-FR`, `de-CH`, `ja-JP`), or the invariant culture spelled `INVARIANT`.
@@ -343,7 +343,7 @@ with less state.
 **⚖ DETERMINATION L2 — the two defaults.** §8.2.1 requires: "*The implementor shall specify the manner in which
 the user default locale is defined and shall provide at least one user default locale…*" and the same sentence
 for the system default (both `--check` OK), and "*The capability of setting the system default locale from
-COBOL is not provided*" (`--check` OK). COBOL.NET:
+COBOL is not provided*" (`--check` OK). WiseOwl COBOL:
 
 | Concept | Source, in precedence order | Rationale |
 |---|---|---|
@@ -353,7 +353,7 @@ COBOL is not provided*" (`--check` OK). COBOL.NET:
 §8.2.1 also fixes the non-COBOL interaction: a default switched by a non-COBOL module "*is not utilized by
 COBOL unless a SET statement is executed to make it the current runtime locale*", and it is implementor-defined
 "*whether, and for which locale categories, a switch of current locale by a non-COBOL runtime module is
-utilized by COBOL*" (both `--check` OK). **⚖ DETERMINATION L3:** COBOL.NET *never* observes a foreign switch —
+utilized by COBOL*" (both `--check` OK). **⚖ DETERMINATION L3:** WiseOwl COBOL *never* observes a foreign switch —
 `LocaleState` is authoritative and is read from `CultureInfo` **once**, at run-unit activation. A subsequent
 `Thread.CurrentThread.CurrentCulture = …` by a hosting .NET application has no effect on COBOL semantics. This
 is the only choice compatible with `RunUnit`'s `AsyncLocal` ambient model and with reproducible goldens.
@@ -376,7 +376,7 @@ General rules (all `--check` OK): GR22 — `LOCALE USER-DEFAULT TO x` sets the *
 a category list sets the current locale for those categories from locale-name-1, identifier-10 (a saved
 locale), USER-DEFAULT, or SYSTEM-DEFAULT; GR24 — an unavailable locale-name-1 sets `EC-LOCALE-MISSING`; GR25 —
 run-unit duration. `LC_ALL` names every category, including "*any other categories included in the locale*"
-(§8.2.1 table, `--check` OK on the `LC_COLLATE | Collating sequence` row) — for COBOL.NET the set is exactly
+(§8.2.1 table, `--check` OK on the `LC_COLLATE | Collating sequence` row) — for WiseOwl COBOL the set is exactly
 the six named categories, since a `CultureInfo` exposes no others.
 
 **SET format 12 (save-locale).** §14.9.39.4 GR26 (`--check` OK): "*If LC_ALL is specified, the current locale
@@ -584,7 +584,7 @@ run-time call. A tailoring cannot outrank U+FFFF (a tailored primary is bounded 
 
 ⚠ Two honest limits, both documented:
 - The rules say "*the character, or multiple-character combination*". A multiple-character combination cannot
-  be the value of a one-character figurative constant in this compiler's typed model; COBOL.NET returns a
+  be the value of a one-character figurative constant in this compiler's typed model; WiseOwl COBOL returns a
   single character. Recorded as an implementor determination with the §4.2.7 duty.
 - Ties (characters at equal primary/secondary/tertiary weight) are broken by **code unit**, ascending, so the
   result is stable — §15.15.4 r2 imposes exactly that stability duty on the sibling CHAR function: "*for a
@@ -622,7 +622,7 @@ and only for a program that references ORD/CHAR (or HIGH-/LOW-VALUE at run time)
   primary/alternate keys **processor-dependent**: "*The capability of specifying a collating sequence for
   primary and alternate keys of an indexed file where the alphabet specified in the COLLATING SEQUENCE clause
   is defined in the SPECIAL-NAMES paragraph with the LOCALE phrase or with literals is dependent on the
-  capabilities of the processor*". ⚖ **DETERMINATION L8:** COBOL.NET *does* provide it — the index is an
+  capabilities of the processor*". ⚖ **DETERMINATION L8:** WiseOwl COBOL *does* provide it — the index is an
   in-process ordered structure keyed by `CobolCollation`, so a locale key ordering costs nothing extra — and
   documents the one consequence: **an indexed file written under one locale and read under another is not
   guaranteed to be in key order**, which is why the resolved locale key is captured at OPEN and a mid-file
@@ -699,7 +699,7 @@ one-to-one. .NET's `TextInfo.ToUpper`/`ToLower` are **simple** maps: `ß` is unc
 That is not a shortfall: §8.2.1 requires locale categories to be "*as specified in ISO/IEC 9945:2009, Clause
 7*" with implementations free to differ "*provided that logically-equivalent functionality is supported*"
 (`--check` OK), and ISO 9945's LC_CTYPE `toupper`/`tolower` are themselves strictly per-character maps. So
-under COBOL.NET's LC_CTYPE the correspondence is always one-to-one and §15.57.4 r5's second sentence is
+under WiseOwl COBOL's LC_CTYPE the correspondence is always one-to-one and §15.57.4 r5's second sentence is
 vacuously satisfied — documented under §4.2.7, and pinned by a Turkish-I golden that proves the *tailoring*
 is live (`LOWER-CASE("I" LOCALE tr)` → `ı`, U+0131, witnessed by `FUNCTION ORD`, never by the console echo).
 
@@ -836,7 +836,7 @@ Three consequences the design must carry:
    the two answers apart — which is how the wrong one survived from T4's landing to 2026-09-04.
 
 **⚖ DETERMINATION L10 — `d_fmt` and `t_fmt`.** ISO 9945's `d_fmt` is the culture's short date and `t_fmt` its
-`%H:%M:%S` time. COBOL.NET maps `d_fmt` → `CultureInfo.DateTimeFormat.ShortDatePattern` and `t_fmt` →
+`%H:%M:%S` time. WiseOwl COBOL maps `d_fmt` → `CultureInfo.DateTimeFormat.ShortDatePattern` and `t_fmt` →
 `LongTimePattern` (the pattern that carries seconds; `ShortTimePattern` omits them, and §15.53.4 r2 requires
 "*hours, minutes, and seconds*"). Documented under §4.2.7. `LOCALE-TIME-FROM-SECONDS` additionally honours
 D.31.4.5's NOTE that it "*recognizes and processes argument values representing precision to the nanosecond*"
@@ -884,7 +884,7 @@ design is small and complete:
 - argument-4 is the ordering **level**; absent ⇒ "*the highest level defined in the ordering table*"
   (§15.85.4 r1).
 - **⚖ OWNER DECISION (Q4, 2026-08-18) — Unicode CLDR + UCA as the base implementation, realized (PB101, the
-  owner's collation guidance) by COBOL.NET's OWN derived engine.** The default ordering table `ISO 14651_2020_TABLE1`
+  owner's collation guidance) by WiseOwl COBOL's OWN derived engine.** The default ordering table `ISO 14651_2020_TABLE1`
   is `CollationEngine.Standard`: the derived root table (generated from the CLDR release-48-2 root collation, UCA
   17.0.0 — ISO/IEC 14651's Common Template Table is kept synchronized with the same Unicode data) under the
   ISO/IEC 14651 DEFAULT treatment — four levels, variable characters (space, punctuation, symbols) ignored through
@@ -900,7 +900,7 @@ design is small and complete:
   binder warning at compile time that the literal will never resolve. Trailing spaces truncate per r4 (the same
   `TrimForLocale` as §4.4.3); the national conversion of r3 is the identity on the D-N1 substrate; the result is
   `"<"`, `"="`, `">"` (r6/r7). Every derived table stays a Unicode-licensed derivation — never a hand-vendored ISO
-  file. The conformance statement COBOL.NET makes, VERBATIM:
+  file. The conformance statement WiseOwl COBOL makes, VERBATIM:
   **"Implements collation behavior consistent with ISO/IEC 14651 through derived tables and CLDR/UCA data."**
 
 ### 4.10 Exceptions
@@ -915,7 +915,7 @@ individually). This design supplies the **raise sites**, which is what turns the
 | `EC-LOCALE-INVALID-PTR` | `SET LOCALE cats TO p` where p is not a live saved-locale handle | §14.9.39.4 GR21 |
 | `EC-LOCALE-INCOMPATIBLE` | locale comparison over an operand the collation does not order (DETERMINATION L6) | §8.8.4.2.11 |
 | `EC-LOCALE-SIZE` | format-2 editing truncates a significant character | §13.18.40.5 GR14b |
-| `EC-LOCALE-IMP` | reserved; no COBOL.NET use — documented as such | §14.6.13.1.6 |
+| `EC-LOCALE-IMP` | reserved; no WiseOwl COBOL use — documented as such | §14.6.13.1.6 |
 
 Each is a one-line `ExceptionState.Set(name, fatal: true)` at the site, using the existing engine. Every one
 gets a golden that **observes** it (a `>>TURN … CHECKING ON` + declarative program, the shape probe
@@ -1029,11 +1029,11 @@ lands in `docs/CONFORMANCE.md`.
 | LC_COLLATE | §8.8.4.2.11, LOCALE-COMPARE, PCS, SORT/MERGE, ORD/CHAR | `CultureInfo.CompareInfo` | See the three globalization-mode limits below |
 | LC_CTYPE | class tests, UPPER-/LOWER-CASE | `CultureInfo.TextInfo` | **Simple (1:1) mapping only** — DETERMINATION L9 — ✅ T5 (`LocaleFacts.TextInfo`; the class tests are POSIX `alpha`/`upper`/`lower` over Unicode letters, space excluded) |
 | LC_MONETARY `currency_symbol` | PICTURE fmt-2, NUMVAL-C | `NumberFormatInfo.CurrencySymbol` | — |
-| … `int_curr_symbol` | NUMVAL-C matching | `RegionInfo.ISOCurrencySymbol` | .NET has no separator character for the international form; COBOL.NET uses the 3-letter code plus one space, and §15.68.3 r5b.3 only ever matches "*the first three characters*" |
+| … `int_curr_symbol` | NUMVAL-C matching | `RegionInfo.ISOCurrencySymbol` | .NET has no separator character for the international form; WiseOwl COBOL uses the 3-letter code plus one space, and §15.68.3 r5b.3 only ever matches "*the first three characters*" |
 | … `mon_decimal_point` / `mon_thousands_sep` | separators | `CurrencyDecimalSeparator` / `CurrencyGroupSeparator` | — |
 | … `mon_grouping` | group sizes | `CurrencyGroupSizes` | — |
 | … `frac_digits` | fraction digits | `CurrencyDecimalDigits` | — |
-| … `int_frac_digits` | international form | **no .NET carrier** | COBOL.NET uses `CurrencyDecimalDigits` for both; a documented limit |
+| … `int_frac_digits` | international form | **no .NET carrier** | WiseOwl COBOL uses `CurrencyDecimalDigits` for both; a documented limit |
 | … `positive_sign` / `negative_sign` | sign strings | `PositiveSign` / `NegativeSign` | — |
 | … `p_cs_precedes`, `n_cs_precedes`, `p_sign_posn`, `n_sign_posn` | placement | derived from `CurrencyPositivePattern` (4 values) and `CurrencyNegativePattern` (16 values) | A **generated** pattern→triple table, never hand-maintained (see below) |
 | LC_TIME `d_fmt` / `t_fmt` | LOCALE-DATE / -TIME | `ShortDatePattern` / `LongTimePattern` | DETERMINATION L10 — ✅ T4 (`LocaleFacts.DateFormat` / `TimeFormat`; `CobolLocale.FormatTime` renders `t_fmt` over its tokens, since hour 24 / seconds 99 / a fraction exceed a `DateTime`) |
@@ -1050,7 +1050,7 @@ THROWING when no convention reproduces a layout. `sep_by_space` is load-bearing 
 patterns need it nonzero; `$ -n` and `n- $` exist only at sep 2); the POSITIVE pattern carries NO sign slot,
 so `p_sign_posn` = 1 is an explicit determination (never mirrored — the invariant's `n_sign_posn` is 0).
 The **drift test** (`MonetaryFactsTests`) asserts, for every specific culture on the host (≥400 asserted
-examined), that COBOL.NET's format-2 edit produces the same *placement shape* as `value.ToString("C",
+examined), that WiseOwl COBOL's format-2 edit produces the same *placement shape* as `value.ToString("C",
 culture)`, and that the derived range equals the runtime's accepted maximum — the assertion that would have
 caught pattern 16 and will catch a 17. ⚠ The test builds its picture FROM the culture's `frac_digits` so the
 two digit strings are comparable — a TEST-CONSTRUCTION choice, not a rule: §13.18.40.5 r12 hands the locale
@@ -1059,7 +1059,7 @@ only the separators and group sizes, and NO editing rule reads `frac_digits`.
 **Three globalization-mode limits, all detected rather than assumed:**
 
 1. **Invariant globalization mode** (`InvariantGlobalization=true`, or the equivalent runtime switch) collapses
-   every culture to the invariant one. LC_COLLATE is unaffected — it is COBOL.NET's own engine (PB101), never
+   every culture to the invariant one. LC_COLLATE is unaffected — it is WiseOwl COBOL's own engine (PB101), never
    `CompareInfo` — but LC_CTYPE / LC_MONETARY / LC_TIME are .NET culture data: `LocaleFacts` probes for the mode
    once (`LocaleFacts.InvariantMode`) and, if set, every non-root locale's culture data is INCOMPLETE
    (`HasCultureData` false) ⇒ **`EC-LOCALE-INVALID`** at an operation that needs it (§8.2.1 "invalid or
@@ -1276,7 +1276,7 @@ feature that breaks them.
 
 **Owner-reserved (this design cannot answer them):**
 
-- **Q1 — Does COBOL.NET claim A.4.9 support?** ✅ **ANSWERED 2026-08-18: YES — implement.** Council decision 3
+- **Q1 — Does WiseOwl COBOL claim A.4.9 support?** ✅ **ANSWERED 2026-08-18: YES — implement.** Council decision 3
   (2026-07-03, documented non-support) is superseded. T0 landed first (PB78 / PB92 / PB100).
 - **Q2 — the default-locale mechanism.** ✅ **ANSWERED 2026-08-18: environment variables** — `COBOL_USER_LOCALE`
   / `COBOL_SYSTEM_LOCALE` with the .NET culture fallbacks (DETERMINATION L2 as drafted; no compiler option, no

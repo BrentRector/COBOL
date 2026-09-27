@@ -110,7 +110,7 @@ public sealed class SectionDifferentialTests
             HELPER.
                 DISPLAY "TWO-HELPER".
             """));
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal("TWO-HELPER", output);
     }
 

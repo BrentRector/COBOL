@@ -24,7 +24,7 @@ namespace CobolNet.Binding.Model;
 /// </summary>
 internal static class BitLayout
 {
-    /// <summary>Bits per character position. §8.1.2 makes this implementor-specified; COBOL.NET pins <b>8</b>,
+    /// <summary>Bits per character position. §8.1.2 makes this implementor-specified; WiseOwl COBOL pins <b>8</b>,
     /// consistent with <see cref="DataItem.ByteWidth"/>'s "DISPLAY = 1 byte per character position" and recorded
     /// in <c>docs/CONFORMANCE.md</c> §4.2.16.</summary>
     public const int BitsPerCharacter = 8;

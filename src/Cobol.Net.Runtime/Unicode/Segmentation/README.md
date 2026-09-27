@@ -3,7 +3,7 @@
 The third text subsystem beside collation (`Runtime/Collation/`) and normalization (`Runtime/Unicode/`): where those
 answer *how do two texts order* and *are two spellings the same text*, this answers **how many characters does a
 reader see, and where may a text be cut without breaking one**. It implements UAX #29 *extended grapheme clusters*
-from COBOL.NET's own derived property table, so every host segments identically whatever Unicode version its
+from WiseOwl COBOL's own derived property table, so every host segments identically whatever Unicode version its
 runtime carries (kb/Work PB104).
 
 | File | What |

@@ -773,7 +773,7 @@ public static class PictureAnalyzer
     private static void ReportTooLarge(EditionContext edition, string where, string picture, long positions)
         => edition.Error(DiagnosticCatalog.PictureItemTooLarge, $"{where}: PICTURE {picture} describes "
             + $"{(positions > MaxCharacterPositions ? "more than " : "")}{Math.Min(positions, (long)MaxCharacterPositions)} "
-            + $"character positions — COBOL.NET's maximum for one elementary item is {MaxCharacterPositions} "
+            + $"character positions — WiseOwl COBOL's maximum for one elementary item is {MaxCharacterPositions} "
             + "(⚠ implementor-defined: ISO §13.18.40.3 SR4 bounds only the WRITTEN character-string and SR14 "
             + "only a numeric item's digit positions, and Annex A.1 carries no maximum-item-size item)");
 
@@ -1091,19 +1091,19 @@ public static class PictureAnalyzer
             // representation). The member flows through so the 2014 introduction gate still fires below 2014.
             case "FLOAT-BINARY-128":
                 edition.Error("COBOLNET1564", $"{where}: USAGE FLOAT-BINARY-128 (ISO/IEC 60559:2020 binary128, "
-                    + "ISO §13.18.60.4 GR16) is a processor-dependent language element not supported by COBOL.NET "
+                    + "ISO §13.18.60.4 GR16) is a processor-dependent language element not supported by WiseOwl COBOL "
                     + "(Annex A.3 item 17): .NET provides no IEEE 754 binary128 type, and GR16 pins the format so a "
                     + "double-backed approximation would be non-conforming");
                 return Usage.FloatBinary128;
             case "FLOAT-DECIMAL-16":
                 edition.Error("COBOLNET1564", $"{where}: USAGE FLOAT-DECIMAL-16 (ISO/IEC 60559:2020 decimal64, "
-                    + "ISO §13.18.60.4 GR17) is a processor-dependent language element not supported by COBOL.NET "
+                    + "ISO §13.18.60.4 GR17) is a processor-dependent language element not supported by WiseOwl COBOL "
                     + "(Annex A.3 item 19): .NET provides no IEEE 754 decimal64 type (System.Decimal is a different "
                     + "format)");
                 return Usage.FloatDecimal16;
             case "FLOAT-DECIMAL-34":
                 edition.Error("COBOLNET1564", $"{where}: USAGE FLOAT-DECIMAL-34 (ISO/IEC 60559:2020 decimal128, "
-                    + "ISO §13.18.60.4 GR18) is a processor-dependent language element not supported by COBOL.NET "
+                    + "ISO §13.18.60.4 GR18) is a processor-dependent language element not supported by WiseOwl COBOL "
                     + "(Annex A.3 item 19): .NET provides no IEEE 754 decimal128 type");
                 return Usage.FloatDecimal34;
             case { } other:

@@ -3,7 +3,7 @@
 namespace CobolNet.Runtime.IO;
 
 /// <summary>
-/// ISO §14.9.6.4 GR2 — the partition every physical file falls into, and the ONE place COBOL.NET's medium
+/// ISO §14.9.6.4 GR2 — the partition every physical file falls into, and the ONE place WiseOwl COBOL's medium
 /// determination is written down.
 ///
 /// <para>GR2: <i>"For the purpose of showing the effect of various types of CLOSE statements as applied to
@@ -14,7 +14,7 @@ namespace CobolNet.Runtime.IO;
 /// used to live in four unrelated doc comments and `docs/CONFORMANCE.md` §2 contradicted them (kb/Work
 /// PB235).</para>
 ///
-/// <para>⛔ COBOL.NET'S DETERMINATION IS NOT FREE — IT IS FORCED BY THE STATUS THE COMPILER ALREADY REPORTS.
+/// <para>⛔ WiseOwl COBOL'S DETERMINATION IS NOT FREE — IT IS FORCED BY THE STATUS THE COMPILER ALREADY REPORTS.
 /// §9.1.13.2 item 6 defines '07' as <i>"An OPEN or CLOSE statement is successfully executed but a CLOSE
 /// statement with the NO REWIND, REEL/UNIT, or FOR REMOVAL phrase or an OPEN statement with the NO REWIND
 /// phrase references a physical file on a non-reel/unit medium"</i> — '07' EXISTS ONLY on a non-reel/unit
@@ -77,7 +77,7 @@ public enum CloseSymbol
     /// <summary>b) No rewind of current reel — <i>"The current unit is left in its current position."</i></summary>
     NoRewindCurrentReel = 1 << 1,
     /// <summary>c) Close file — <i>"Closing operations specified by the implementor are executed."</i>
-    /// (Annex A.1 item 24: those operations are a REQUIRED documented implementor item; COBOL.NET's are
+    /// (Annex A.1 item 24: those operations are a REQUIRED documented implementor item; WiseOwl COBOL's are
     /// stated in `docs/CONFORMANCE.md` §7's A.1 item 24 row.)</summary>
     CloseFile = 1 << 2,
     /// <summary>d) Unit removal — <i>"The current unit is rewound, when applicable, and the unit is logically
@@ -152,7 +152,7 @@ public static class Table14
 
     /// <summary>The symbols that can only be performed on a REEL/UNIT-STRUCTURED medium — a, b, d and f, every
     /// one of which manipulates a unit, a volume pointer or a reel position. §14.9.6.4 GR2 puts no supported
-    /// COBOL.NET medium in category (b) or (c) (see <see cref="PhysicalFileCategory"/>), so no cell this
+    /// WiseOwl COBOL medium in category (b) or (c) (see <see cref="PhysicalFileCategory"/>), so no cell this
     /// dispatch can reach contains one; <see cref="FileRegistry"/> treats their appearance as a compiler defect
     /// rather than silently performing a subset of the cell.</summary>
     public const CloseSymbol UnitStructuredOnly =

@@ -1,7 +1,7 @@
-# GnuCOBOL extensions — constructs COBOL.NET does not support
+# GnuCOBOL extensions — constructs WiseOwl COBOL does not support
 
 > **STATUS: LIVE, PROVISIONAL, and NOT exhaustive.** This is the running register of non-ISO constructs found
-> while running the GnuCOBOL testsuite through COBOL.NET (plan §11 A4 / PHASE-14 Step 13, the external
+> while running the GnuCOBOL testsuite through WiseOwl COBOL (plan §11 A4 / PHASE-14 Step 13, the external
 > differential corpus). It exists so that support for them is a **deliberate future decision** rather than an
 > accident of what we happened to notice. **Nothing here is scheduled** — the current mission is ISO/IEC
 > 1989:2023 conformance across four editions (owner decision D13), and every row below is *outside* that

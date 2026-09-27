@@ -58,7 +58,7 @@ public sealed class NumericEditedDifferentialTests
                 MOVE N1 TO E1.
                 DISPLAY ">" E1 "<".
             """));
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(">$ 72.10CR<\n>$ 72.10  <", output);
     }
 

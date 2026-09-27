@@ -7,7 +7,7 @@
     <!-- Compiler dependencies -->
     <PackageVersion Include="Antlr4.Runtime.Standard" Version="4.13.1" />
     <PackageVersion Include="Mono.Cecil" Version="0.11.6" />
-    <!-- COBOL.NET (greenfield) backend: Roslyn for runtime C# code generation + compilation -->
+    <!-- WiseOwl COBOL (greenfield) backend: Roslyn for runtime C# code generation + compilation -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <!-- CLI argument parsing: Microsoft's first-party parser (the one the dotnet CLI uses) — correct
          inline-value and space-separated handling, arity, and auto-generated help (Cobol.Net.Cli). -->

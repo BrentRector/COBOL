@@ -1,6 +1,6 @@
-# COBOL.NET — OO COBOL -> .NET classes (deep-dive design)
+# WiseOwl COBOL — OO COBOL -> .NET classes (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §10; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
@@ -188,7 +188,7 @@ second hand-written copy of rules 1–6 and 8 until kb/Work PB972, with rule 9 i
 
 **A GROUP formal or RETURNING item crosses as its CHARACTER IMAGE, through THE ONE CHANNEL.** §14.2.3 GR8 makes
 a BY REFERENCE formal "occupy the same storage area as the argument" and §14.9.23.4 GR8 delivers the RETURNING
-item; COBOL.NET realizes both through the generated `AsImage()`/`FromImage()` round trip. ⛔ `OoEmitter` does
+item; WiseOwl COBOL realizes both through the generated `AsImage()`/`FromImage()` round trip. ⛔ `OoEmitter` does
 **not** spell that round trip itself — it routes every group crossing through `PlaceRenderer.GroupImage` /
 `PlaceRenderer.WriteFullGroupImage` (the law stated in `GroupImage`'s doc-comment: "THE ONE reader — a consumer
 that spells `.AsImage()` itself is wrong for the window shape"), building the boundary root's `Place` with

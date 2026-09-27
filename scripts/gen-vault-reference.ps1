@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-# gen-vault-reference.ps1 — generate Obsidian reference notes for the COBOL.NET type surface.
+# gen-vault-reference.ps1 — generate Obsidian reference notes for the WiseOwl COBOL type surface.
 #
 # Parses the hand-written C# under the greenfield source trees and emits one markdown note per type into
 # kb/Reference/<Section>/ (a GITIGNORED build output — regenerated, never hand-edited), carrying each type's

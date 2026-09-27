@@ -1,4 +1,4 @@
-# COBOL.NET GnuCOBOL external-differential PER-CASE VERDICT BASELINE.
+# WiseOwl COBOL GnuCOBOL external-differential PER-CASE VERDICT BASELINE.
 #
 # ⛔ WHY THIS FILE EXISTS. The differential's four TOTALS matching the previous run is NOT evidence of zero
 # flips — offsetting flips look identical, and for a long time no per-case report was kept, so "0 per-case

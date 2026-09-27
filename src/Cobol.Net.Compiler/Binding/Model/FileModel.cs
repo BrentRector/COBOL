@@ -10,7 +10,7 @@ public enum FileOrganization { Sequential, LineSequential, Relative, Indexed }
 public enum FileAccessMode { Sequential, Random, Dynamic }
 
 /// <summary>The SHARING mode (ISO §12.4.5.15 / §14.9.27): how OTHER file connectors may access this file while
-/// it is open. <c>None</c> = the implementor default (COBOL.NET: ALL OTHER). NoOther = exclusive.</summary>
+/// it is open. <c>None</c> = the implementor default (WiseOwl COBOL: ALL OTHER). NoOther = exclusive.</summary>
 public enum SharingMode { None, AllOther, NoOther, ReadOnly }
 
 /// <summary>The LOCK MODE granularity (ISO §12.4.5.9): MANUAL (locks acquired only by an explicit WITH LOCK) vs
@@ -422,7 +422,7 @@ public sealed class FileModel
 
     /// <summary>⛔ DETERMINATION D-FRA (docs/CONFORMANCE.md §3, kb/Work PB981) — ISO §13.18.43.4 GR5: "If the
     /// RECORD clause is not specified, an implicit format 1 or format 2 RECORD clause is assumed to be
-    /// specified. This implicit RECORD clause is defined by the implementor". COBOL.NET implies FORMAT 2 exactly
+    /// specified. This implicit RECORD clause is defined by the implementor". WiseOwl COBOL implies FORMAT 2 exactly
     /// when a record description is VARIABLE-LENGTH (a dynamic-length elementary record, or a variable-length
     /// group — §8.5.1.12.1): such a record has no one size, and §13.18.43.4 GR13 c) already sizes a record containing a
     /// variable-occurrence item by its extent at the time of the output statement, which is what WRITE sends.

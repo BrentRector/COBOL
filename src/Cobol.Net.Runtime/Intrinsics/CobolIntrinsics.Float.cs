@@ -315,10 +315,10 @@ public static partial class CobolIntrinsics
     // ── THE RANGE OF THE RETURNED VALUE (kb/Work PB1566) ────────────────────────────────────────────────────────
     // ⛔ A RESULT PAST BINARY64 IS THE SIZE ERROR CONDITION, NEVER ±Infinity OR A FLUSHED ZERO. Under native
     // arithmetic "the characteristics and representation of the returned value are defined by the implementor"
-    // (§15.4.1), and COBOL.NET's determination is that this family's returned value IS a binary64 (CONFORMANCE.md
+    // (§15.4.1), and WiseOwl COBOL's determination is that this family's returned value IS a binary64 (CONFORMANCE.md
     // DOC-A.1-92) — so binary64's range is the range of the native intermediate the value is formed in. §14.7.5
     // case 5 makes a value outside that range the size error condition when "the implementor defines that the
-    // range of values allowed for the intermediate data item is to be checked", which COBOL.NET defines
+    // range of values allowed for the intermediate data item is to be checked", which WiseOwl COBOL defines
     // (DOC-A.1-179), and the no-phrase rule 3 names the condition: "farther from zero or nearer to zero than is
     // allowed for the intermediate data item" — EC-SIZE-OVERFLOW or EC-SIZE-UNDERFLOW. That is the FACTORIAL
     // precedent on the other native carrier (CobolIntrinsics.Factorial: 34! past the Int128 intermediate), and

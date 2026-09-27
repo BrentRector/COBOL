@@ -1,13 +1,13 @@
-# COBOL.NET — Pipeline & Emitter Architecture (deep-dive design)
+# WiseOwl COBOL — Pipeline & Emitter Architecture (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §2; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
 
 ## Summary
 
-The COBOL.NET compiler is a 6-phase pipeline: Frontend (reused ANTLR preprocess/lex/parse of the SUPERSET grammar — one grammar recognising the union of all editions → parse tree) → Bind (edition-AGNOSTIC (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1): resolve symbols + build a typed/categorized BOUND TREE that PRESERVES COBOL structure — zero edition checks) → VersionConformancePass (the ONE edition-gating funnel over the bound tree; the driver HALTS before emit when any diagnostics exist — canonical mechanism doc: `docs/rearchitecture/DESIGN-version-conformance-pipeline.md`) → Desugar (bound→bound passes: MOVE CORR, PERFORM VARYING AFTER, condition-names) → Emit (reachable only on a clean tree; codegen behind `ICodeGenBackend` over the ONE backend-neutral bound tree, selectable `--backend roslyn|cil`, default **roslyn**: the RoslynBackend renders idiomatic C# via a decomposed emitter, NO lowered IR) → Roslyn compile → assembly + .g.cs (+ PDB). A CilBackend (Mono.Cecil) is future-additive behind the same interface with its OWN private structure→branch lowering. Daily discipline: ALL semantics live in the binder/bound tree; emitters only RENDER — bound nodes never carry pre-rendered C#-specific fragments where a structured form is feasible (SSOT §18 decision 23).
+The WiseOwl COBOL compiler is a 6-phase pipeline: Frontend (reused ANTLR preprocess/lex/parse of the SUPERSET grammar — one grammar recognising the union of all editions → parse tree) → Bind (edition-AGNOSTIC (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1): resolve symbols + build a typed/categorized BOUND TREE that PRESERVES COBOL structure — zero edition checks) → VersionConformancePass (the ONE edition-gating funnel over the bound tree; the driver HALTS before emit when any diagnostics exist — canonical mechanism doc: `docs/rearchitecture/DESIGN-version-conformance-pipeline.md`) → Desugar (bound→bound passes: MOVE CORR, PERFORM VARYING AFTER, condition-names) → Emit (reachable only on a clean tree; codegen behind `ICodeGenBackend` over the ONE backend-neutral bound tree, selectable `--backend roslyn|cil`, default **roslyn**: the RoslynBackend renders idiomatic C# via a decomposed emitter, NO lowered IR) → Roslyn compile → assembly + .g.cs (+ PDB). A CilBackend (Mono.Cecil) is future-additive behind the same interface with its OWN private structure→branch lowering. Daily discipline: ALL semantics live in the binder/bound tree; emitters only RENDER — bound nodes never carry pre-rendered C#-specific fragments where a structured form is feasible (SSOT §18 decision 23).
 
 TWO MAKE-OR-BREAK DECISIONS (both validated against owner-locked constraints):
 

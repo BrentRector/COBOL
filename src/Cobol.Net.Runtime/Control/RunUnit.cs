@@ -74,7 +74,7 @@ public sealed class RunUnit
     public LocaleState Locale { get; } = new();
 
     /// <summary>The X3.23-1985 OBJECT-TIME (run-time) debug switch (the '85 debug module — deleted 2002, absent 2023;
-    /// COBOL.NET models the facility only at <c>--std 85</c>, VCR Table 7 row 7.17). It is implementor-defined; for a
+    /// WiseOwl COBOL models the facility only at <c>--std 85</c>, VCR Table 7 row 7.17). It is implementor-defined; for a
     /// CCVS run it is ON. Default ON so a program compiled WITH DEBUGGING MODE runs its debugging declaratives (the
     /// COMPILE-time switch — SOURCE-COMPUTER … WITH DEBUGGING MODE — is what gates whether the debug scaffolding is
     /// emitted at all; this is the second switch that gates whether emitted triggers actually fire). The emitted

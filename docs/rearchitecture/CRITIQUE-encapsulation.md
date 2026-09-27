@@ -1,6 +1,6 @@
 # CRITIQUE — Encapsulation / Coupling / God-Classes
 
-> Dimension: **encapsulation, coupling, and god-classes** across the COBOL.NET compiler
+> Dimension: **encapsulation, coupling, and god-classes** across the WiseOwl COBOL compiler
 > (`src/Cobol.Net.{Frontend,Compiler,Runtime,Cli}`, ~40k LOC). Method: read the real code — the three god
 > classes and a sampling of their partials, the data model (`DataItem`, `Place`), the bound-store analysis,
 > the emitter orchestrator, and the frontend edition surface. Every finding cites `file:line`.

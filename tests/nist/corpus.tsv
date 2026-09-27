@@ -1,4 +1,4 @@
-# COBOL.NET NIST corpus manifest (rearchitecture P0 step 7). Tab-separated; a leading # is a comment.
+# WiseOwl COBOL NIST corpus manifest (rearchitecture P0 step 7). Tab-separated; a leading # is a comment.
 # The ONE source of truth for the green NIST set + producer/consumer chains — folds NistDifferentialTests
 # [InlineData] + tests/nist/chains.tsv + scripts/guard.sh LEGACY_DIVERGENT. Generated mechanically; a green
 # program is a manifest row, not a code edit. Columns:

@@ -181,7 +181,7 @@ public sealed class SharedExtendOpenDriftTests
     /// ordinal 1, which the assertions below reject explicitly rather than by omission.</para>
     /// <para>⛔ ONLY THE TWO LOCK-MODE-BEARING SPELLINGS APPEAR, and the omission is a fact about the standard
     /// rather than a convenience: §12.4.5.9 GR1 makes a connector with no LOCK MODE clause take the implementor
-    /// default, which for COBOL.NET is no record locking, so a <see cref="Spelling.OpenPhrase"/> connector sets
+    /// default, which for WiseOwl COBOL is no record locking, so a <see cref="Spelling.OpenPhrase"/> connector sets
     /// no lock and its write ordinal has no observable at all. Asserting over it would assert the absence of a
     /// lock that the standard never asked for. Its OPEN and its append are still covered, by
     /// <see cref="SharedExtend_OpensAndAppends_ForEverySequentialFraming"/>.</para></summary>

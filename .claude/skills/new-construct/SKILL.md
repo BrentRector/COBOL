@@ -3,7 +3,7 @@ name: new-construct
 description: Use when adding or edition-gating a COBOL construct, grammar rule, or reserved word - covers grammar fragment placement, the version predicate, the constructs.json row, the mandatory edition-gate test sweep, and goldens.
 ---
 
-> **Generic base:** [`engineering-standards`](https://github.com/BrentRector/claude-skills/blob/main/skills/engineering-standards/SKILL.md) + [`variant-analysis`](https://github.com/BrentRector/claude-skills/blob/main/skills/variant-analysis/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the COBOL.NET application of it and wins on conflict.
+> **Generic base:** [`engineering-standards`](https://github.com/BrentRector/claude-skills/blob/main/skills/engineering-standards/SKILL.md) + [`variant-analysis`](https://github.com/BrentRector/claude-skills/blob/main/skills/variant-analysis/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
 
 # New construct
 

@@ -1,13 +1,13 @@
-# COBOL.NET — Data Model (records, tables, references) (deep-dive design)
+# WiseOwl COBOL — Data Model (records, tables, references) (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §3; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
 
 ## Summary
 
-DECISION-COMPLETE DESIGN: COBOL DATA DIVISION → typed-native C#, for COBOL.NET.
+DECISION-COMPLETE DESIGN: COBOL DATA DIVISION → typed-native C#, for WiseOwl COBOL.
 
 == 0. THE CENTRAL IDEA: every reference is a Place ==
 The whole subsystem is organized around ONE abstraction — a `Place` — that names a typed C# location and serves MOVE, arithmetic, file I/O, and CALL-by-reference identically. This replaces the legacy `(byte[],offset,length)` IrLocation. A Place has two emission methods used by every consumer (the RoslynBackend's rendering of the Place's backend-neutral structured resolution — see the §11 backend note / SSOT §18 #23):
@@ -559,7 +559,7 @@ clause SELECTS one**, and both selections are mandatory:
 
 | declaration | governing rule | required representation |
 |---|---|---|
-| `PIC 1(n)` with no USAGE | **§13.18.60.3 SR13(b)** implies USAGE DISPLAY → **§13.18.60.4 GR7** "an alphanumeric coded character set shall be used" | one character per boolean position — **what COBOL.NET already does; unchanged** |
+| `PIC 1(n)` with no USAGE | **§13.18.60.3 SR13(b)** implies USAGE DISPLAY → **§13.18.60.4 GR7** "an alphanumeric coded character set shall be used" | one character per boolean position — **what WiseOwl COBOL already does; unchanged** |
 | `PIC 1(n) USAGE BIT` | **§13.18.60.4 GR5** "the USAGE BIT clause specifies that **bits shall be used** … alignment … is specified in 8.5.1.6.3" | **bits**, aligned per §8.5.1.6.3 |
 
 Two storage forms for one category is **not** the two-mechanisms anti-pattern — it is precisely what the USAGE
@@ -901,7 +901,7 @@ size error condition); §14.9.25.4 GR5 + §14.6.13.2 rule 4 (de-editing; incompa
 floating-point literal, or ZERO / the zero forms); §15.43.4 r1 / §15.58.4 r1 + §8.8.4.4.4 GR3 l
 (HIGHEST/LOWEST-ALGEBRAIC's well-formedness on the entry, keyed on the arithmetic mode's intermediate); Annex A.3
 item 1 c/d (the 31-digit / 3-digit latitude is available only to a processor supporting none of the standard
-float usages / arithmetics — COBOL.NET supports FLOAT-BINARY-* and STANDARD-DECIMAL, so the FULL range is
+float usages / arithmetics — WiseOwl COBOL supports FLOAT-BINARY-* and STANDARD-DECIMAL, so the FULL range is
 mandatory).*
 
 **Decisions (the draft's D-EF1..D-EF9, adopted):** (1) storage is the existing numeric-edited `string` image —
@@ -1330,7 +1330,7 @@ resolved items); `INDEXED BY` in a TYPEDEF used ≥2× — RESOLVED (kb/Work PB9
 typedefs are program/global-scope-first (the `OoRootOwner` parallel forest → staged loud follow-up). §13.18.57.4
 GR2 d) (a group-typed subject "is aligned as though it were a level 1 item") is carried by
 `DataItem.AlignedAsLevelOne` into the one bit-placement predicate `BitLayout.SharesByteWith` — bit alignment is the
-only level-1 placement COBOL.NET has, since it inserts no word-boundary slack at any level (§8.5.1.6.4; kb/Work
+only level-1 placement WiseOwl COBOL has, since it inserts no word-boundary slack at any level (§8.5.1.6.4; kb/Work
 PB1569).
 
 ### D18. A FUNCTION-IDENTIFIER in a subscript or reference-modification position materializes into a COMPILER TEMP hoisted as a statement pre-op — never a new arm on `RenderSegment`, and never an early `BoundExpr` carrier migration.
@@ -1392,7 +1392,7 @@ subject is the COMPOSED entry, with `DataItem.ValueIsCopied` carrying the proven
 answering once per WRITTEN clause.)
 
 **⛔ AND THE INTEGRALITY RULE IS ONE READ SHARED WITH ORDINARY SCALED SUBSCRIPTS (fix-queue PB41).** Asking what a
-scale-0 temp would do to a NUMERIC function result is what exposed the pre-existing sibling: a COBOL.NET numeric
+scale-0 temp would do to a NUMERIC function result is what exposed the pre-existing sibling: a WiseOwl COBOL numeric
 item stores UNSCALED — `PIC 9V9 VALUE 2.0` is the field `20L` at scale 1 — and `ResolveSubscriptName` never
 consulted `Pic.Scale`, so `W-E(W-S)` with `W-S = 2.0` indexed **occurrence 20**, fell outside `1..5`, and read the
 benign scratch slot. Compiled clean, ran to completion, wrong answer. Both clauses are about the VALUE, so both
@@ -1698,7 +1698,7 @@ character-string-1") is what fixes that reading, and it is what keeps `PIC X(300
 unsigned nonzero integer": a sign, a zero, an empty or non-numeric factor and an unclosed parenthesis each draw
 **COBOLNET2147**, by the literal route and by the constant-name route alike, since
 `DataBinder.Constants.ExpandPicConstants` rewrites `(constant-name)` to `(integer)` in the source string and
-hands it to the same expander. The expansion is BOUNDED as it accumulates: past COBOL.NET's
+hands it to the same expander. The expansion is BOUNDED as it accumulates: past WiseOwl COBOL's
 **⚠ implementor-defined maximum of 134 217 728 (2²⁷) character positions in one elementary item** — the standard
 sets none, SR4 bounding only the written string, SR14 only a numeric item's digit positions, and Annex A.1
 carrying no maximum-item-size item — the entry draws **COBOLNET2148**. Before this, `PIC X(-3)` left the binder

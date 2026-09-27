@@ -1082,7 +1082,7 @@ public sealed partial class DataBinder
             Edition.Error(DiagnosticCatalog.DynamicLengthStructureInvalid,
                 $"{where} IS {physical.GetText()}: '{physical.GetText()}' is not a physical-structure-name this "
                 + "implementation supports — ISO §12.3.7.3 SR32 (\"The implementor shall specify the names supported "
-                + "for physical-structure-name-1\") leaves the names to the implementor and COBOL.NET supports none; "
+                + "for physical-structure-name-1\") leaves the names to the implementor and WiseOwl COBOL supports none; "
                 + "describe the layout with the PREFIXED and/or DELIMITED phrases (docs/CONFORMANCE.md §3 D-DL3)");
             declared = new DynamicLengthStructure(name, DynamicLengthPrefix.None, Delimited: false, physical.GetText());
         }

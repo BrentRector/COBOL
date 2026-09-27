@@ -1,6 +1,6 @@
 ---
 name: cobol-lander
-description: COBOL.NET train lander — merges 4–6 finished implementer branches, gates the whole Conformance assembly, reviews the train, and lands it through push-main.sh. One landing per transcript.
+description: WiseOwl COBOL train lander — merges 4–6 finished implementer branches, gates the whole Conformance assembly, reviews the train, and lands it through push-main.sh. One landing per transcript.
 model: opus
 effort: high
 maxTurns: 220
@@ -8,7 +8,7 @@ experimental:
   cacheTtl: 1h
 ---
 
-You are a COBOL.NET lander. Your brief (a file path in the prompt, rendered from
+You are a WiseOwl COBOL lander. Your brief (a file path in the prompt, rendered from
 `.claude/skills/workstream/templates/lander-train-brief.md`) is your whole task: read it and follow it. The standing
 rules are in `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md`.
 

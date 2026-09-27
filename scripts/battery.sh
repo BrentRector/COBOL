@@ -21,7 +21,7 @@
 #   PHASE 2  guard-fast                       — REBUILDS the `cobol` CLI + the legacy test projects, whose
 #                                               closures include Cobol.Net.Frontend and the whole greenfield
 #                                               compiler. Must not overlap phase 1.
-#                                               ⛔ SINCE kb/Work/PB750 THIS LEG MEASURES COBOL.NET. It used to
+#                                               ⛔ SINCE kb/Work/PB750 THIS LEG MEASURES WiseOwl COBOL. It used to
 #                                               drive the LEGACY `cobolsharp.dll`, so `guard NIST: 353 MATCH`
 #                                               was a statement about the oracle and battery #58's NC215A wrong
 #                                               answer was invisible to it. The summary line now NAMES the
@@ -135,7 +135,7 @@ if [ "${SKIP_GUARD:-0}" != "1" ]; then
     # ⛔ THE COMPILER IS PART OF THE VERDICT (PB750): the pattern requires the `(cobol)` / `(legacy)` tag, so a
     # guard that somehow printed the old unlabelled line reports NO VERDICT LINE here rather than a green.
     note "$(printf '%-16s %s' 'guard NIST:' "$(grep -E '^=== NIST \(' "$OUT/guard.log" | tail -1)")"
-    grep -qE '^=== NIST \(cobol\): ' "$OUT/guard.log" || { note "guard NIST:      ⛔ the guard did not drive COBOL.NET — see $OUT/guard.log"; RC=1; }
+    grep -qE '^=== NIST \(cobol\): ' "$OUT/guard.log" || { note "guard NIST:      ⛔ the guard did not drive WiseOwl COBOL — see $OUT/guard.log"; RC=1; }
     note "$(printf '%-16s %s' 'guard audit:' "$(grep -E '^=== NIST AUDIT: (CLEAN|[0-9])' "$OUT/guard.log" | tail -1)")"
     note "$(printf '%-16s %s' 'guard verdict:' "$(grep -E '^=== (ALL GREEN|FAILURES)' "$OUT/guard.log" | tail -1)")"
     grep -q '^=== ALL GREEN ===' "$OUT/guard.log" || RC=1

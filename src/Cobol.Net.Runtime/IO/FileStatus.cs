@@ -117,7 +117,7 @@ public static class FileStatusCode
     public const string RecordNotFound = "23";
     /// <summary>24 — invalid-key boundary violation (§9.1.13.5 item 4): a relative or indexed WRITE or REWRITE whose
     /// record the store cannot hold — the store would exceed <see cref="RecordFraming.MaxStoreBytes"/>, the
-    /// boundary COBOL.NET defines for those organizations (Annex A.1 item 107, docs/CONFORMANCE.md DOC-A.1-107;
+    /// boundary WiseOwl COBOL defines for those organizations (Annex A.1 item 107, docs/CONFORMANCE.md DOC-A.1-107;
     /// §14.9.51.4 GR33 b) / GR42 d)) — or a sequential-access relative WRITE whose relative record number has
     /// more significant digits than the relative key item (§14.9.51.4 GR33 c)).</summary>
     public const string BoundaryViolation = "24";
@@ -141,7 +141,7 @@ public static class FileStatusCode
     /// its lock (§9.1.13.8 item 1).</summary>
     public const string RecordLocked = "51";
     /// <summary>52 — the implementor-detected deadlock (§9.1.13.8 item 2; the detection conditions are the
-    /// Annex A.1 item 109 determination recorded in docs/CONFORMANCE.md §7). COBOL.NET detects one exactly when
+    /// Annex A.1 item 109 determination recorded in docs/CONFORMANCE.md §7). WiseOwl COBOL detects one exactly when
     /// a RETRY FOREVER waits on a record locked by another file connector: that holder is inside the executing
     /// run unit and cannot release while this statement runs, so §14.7.9.3 GR3's "until the operation has been
     /// completed" would never terminate.

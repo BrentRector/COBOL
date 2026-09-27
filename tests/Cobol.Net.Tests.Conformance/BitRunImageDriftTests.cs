@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 ///
 /// <para>ISO §8.5.1.6.3 puts "an elementary bit data item immediately following an elementary bit data item or
 /// bit group item of the same level" at the next BIT position, so consecutive same-level bit members SHARE a
-/// byte. A group's layout is therefore a run walk, and COBOL.NET composes that group's character image TWICE:
+/// byte. A group's layout is therefore a run walk, and WiseOwl COBOL composes that group's character image TWICE:
 /// the record-struct lane emits <c>AsImage()</c> over <c>PhysicalModel</c>'s physical fields, and the
 /// compile-time SEED (<c>GroupImageCodec.ImageInitOf</c>) composes the string a Tier-B REDEFINES backing, an
 /// EXTERNAL cell, a BASED cell or an OO backing starts from. Only the first knew about runs, so declaring a

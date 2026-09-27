@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// The LC_MONETARY model (kb/Work PB64 T6; DESIGN-locale-facility §8, test plan T-C 3): the runtime-DERIVED
 /// pattern→convention tables, the mon_grouping conversion, the L12 normalization, and the drift oracle that
-/// asserts, for EVERY specific culture the host exposes, that COBOL.NET's format-2 edit produces the same
+/// asserts, for EVERY specific culture the host exposes, that WiseOwl COBOL's format-2 edit produces the same
 /// PLACEMENT SHAPE as <c>value.ToString("C", culture)</c> — the "make the next case automatic" guarantee: a
 /// future ICU release that adds a currency pattern fails here instead of silently mis-editing.
 /// </summary>

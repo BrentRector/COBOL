@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Cobol.Net.Tests.Conformance — the conformance/differential harness for the greenfield COBOL.NET compiler.
+    Cobol.Net.Tests.Conformance — the conformance/differential harness for the greenfield WiseOwl COBOL compiler.
     Added as a scaffold at G0 (docs/COBOLNET_DESIGN.md §17 §1.5 step 4). At G5 this grows the differential NIST
-    harness (§2): run the legacy oracle + COBOL.NET on each of the 364 NIST programs and assert identical stdout;
+    harness (§2): run the legacy oracle + WiseOwl COBOL on each of the 364 NIST programs and assert identical stdout;
     at G7 it runs the post-85 conformance corpus (tests/conformance/<ver>/). For now it holds a thin smoke so the
     project is real and in the build.
   -->

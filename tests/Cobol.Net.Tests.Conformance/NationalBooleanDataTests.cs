@@ -178,7 +178,7 @@ public sealed class NationalBooleanDataTests
     /// reads as a decision).
     /// <para>The derivation: §13.18.44.4 GR1 associates the storage of the two entries over "an area sufficient
     /// to contain the number of bits required by the data item referenced by the subject of the entry", and
-    /// §13.18.60.4 GR8 leaves a national character's size to the implementor — COBOL.NET pins TWO bytes,
+    /// §13.18.60.4 GR8 leaves a national character's size to the implementor — WiseOwl COBOL pins TWO bytes,
     /// UTF-16BE (D-N1). So <c>01 A PIC N(4).</c> is an EIGHT-byte area and <c>01 B REDEFINES A PIC X(8).</c>
     /// overlays it exactly. N"AB" is U+0041 U+0042, whose bytes are 00 41 00 42 — the high-order byte FIRST, so
     /// B's second character is "A" and its fourth is "B". Reading them positionally is the assertion: a

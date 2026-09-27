@@ -540,7 +540,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // "no whole-group character image" on `CALL "SUB" USING G`. That claim was false, and refusing the
             // CALL rejected conforming source — §14.2.3 GR8 (`cite.py`-verified): "If the argument is passed by
             // reference, the activated runtime element operates as if the formal parameter occupies the same
-            // storage area as the argument", which COBOL.NET realizes through the very image round-trip that
+            // storage area as the argument", which WiseOwl COBOL realizes through the very image round-trip that
             // exists. Only a variable-length group or a group with a pointer/object-class leaf is still
             // genuinely imageless and stays loud (every NUMERIC leaf kind joined the image across kb/Work
             // PB164 waves 1–2 + the R40 INDEX pin) — the wording matches the predicate actually tested.

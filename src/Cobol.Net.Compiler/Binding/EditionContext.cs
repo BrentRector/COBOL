@@ -157,10 +157,10 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
 
     /// <summary>The ONE wording of the internal-error net, shared by <see cref="NoteRefusal"/> and the funnel.</summary>
     internal static string UnreportedRefusalMessage(string feature) =>
-        $"{feature} was refused without a diagnostic naming the rule it breaks; this is a COBOL.NET internal error — "
+        $"{feature} was refused without a diagnostic naming the rule it breaks; this is a WiseOwl COBOL internal error — "
         + "please report it with the source that produced it";
 
-    /// <summary>Record an operand shape COBOL.NET has not BUILT (not a source error) — announced once per
+    /// <summary>Record an operand shape WiseOwl COBOL has not BUILT (not a source error) — announced once per
     /// statement by the funnel as COBOLNET1756, exactly as a statement-level <c>BoundUnsupported</c> is.</summary>
     internal void NoteUnbuilt(string feature) => _unbuilt.Add(feature);
 

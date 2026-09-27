@@ -230,7 +230,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// arithmetic", whichever is CLOSER to zero for FARTHEST-FROM-ZERO and FARTHER from zero for NEAREST-TO-ZERO.
     /// The mode's extremes are <see cref="ArithmeticModes.IntermediateExtremes"/>; the comparison is exact
     /// scaled-BigInteger, because these magnitudes reach 10^±6176 and no CLR numeric type spans that.
-    /// <para>⚠ LATENT BY MEASUREMENT, NOT BY ASSUMPTION: for every data description COBOL.NET can declare today
+    /// <para>⚠ LATENT BY MEASUREMENT, NOT BY ASSUMPTION: for every data description WiseOwl COBOL can declare today
     /// the receiver's bound wins or ties (the widest carrier is binary64, whose extremes ARE the native
     /// intermediate's, and the standard modes' SDIDI is wider still), so this method currently always returns
     /// its argument. It is written as the real comparison anyway — the clamp starts biting the moment a wider

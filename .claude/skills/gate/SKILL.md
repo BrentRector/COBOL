@@ -3,7 +3,7 @@ name: gate
 description: Use before every commit and before every merge to choose and run the correct test gate - wave-local filtered (~2 min) per commit versus the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
 ---
 
-> **Generic base:** [`test-gate`](https://github.com/BrentRector/claude-skills/blob/main/skills/test-gate/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the COBOL.NET application of it and wins on conflict.
+> **Generic base:** [`test-gate`](https://github.com/BrentRector/claude-skills/blob/main/skills/test-gate/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
 
 # Gate
 

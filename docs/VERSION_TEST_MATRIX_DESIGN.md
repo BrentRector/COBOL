@@ -1,4 +1,4 @@
-# Version Test Matrix — Design (testing COBOL.NET as N per-edition compilers)
+# Version Test Matrix — Design (testing WiseOwl COBOL as N per-edition compilers)
 
 > **STATUS BANNER — DESIGN + live implementation record. The (construct × edition) test matrix is in place: the
 > harness scaffold (`VersionMatrixTests` over (construct × edition) + the INV-1 continuity `[Theory]`), the default

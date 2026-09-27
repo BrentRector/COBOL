@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// A compiler the differential harness can drive uniformly: compile a COBOL source string to a runnable assembly
 /// and run it, returning its stdout. Two implementations — <see cref="LegacyCompiler"/> (the byte-engine oracle,
 /// 364-NIST-green) and <see cref="CobolNetCompiler"/> (the greenfield typed-native compiler) — let a test assert
-/// that COBOL.NET produces <b>byte-identical stdout to the legacy</b> for a program (COBOLNET_DESIGN §2 / §18 #7).
+/// that WiseOwl COBOL produces <b>byte-identical stdout to the legacy</b> for a program (COBOLNET_DESIGN §2 / §18 #7).
 /// This is the verification backbone the G2 checkpoint demands ("binds and DISPLAYs its data byte-identically to
 /// the legacy"); hand-typed expected strings would re-derive the very semantics under test (padding, scale,
 /// edited/overpunch images).
@@ -42,7 +42,7 @@ internal static class CutRunner
     /// non-conformance — it trims trailing spaces off alphanumeric operands (so <c>DISPLAY WS-X</c> of a
     /// <c>PIC X(10)</c> holding <c>"HI"</c> emits <c>"HI"</c>, not <c>"HI        "</c>), contradicting ISO
     /// §14.9.11.4 GR1/GR6 ("the content of each operand … the size … is the sum of the sizes of the operands").
-    /// COBOL.NET emits the spec-correct full field; a single-/trailing-operand DISPLAY then matches the legacy once
+    /// WiseOwl COBOL emits the spec-correct full field; a single-/trailing-operand DISPLAY then matches the legacy once
     /// per-line trailing spaces are stripped. (A case that exposes <i>internal</i> trailing spaces — e.g.
     /// <c>DISPLAY WS-X "]"</c> — is pinned to the spec value instead, since the legacy is non-conforming there.)
     /// </summary>
@@ -107,7 +107,7 @@ internal static class CutRunner
 }
 
 /// <summary>
-/// The greenfield COBOL.NET compiler under test: drives <see cref="CompilerDriver"/> (COBOL → typed-native C# →
+/// The greenfield WiseOwl COBOL compiler under test: drives <see cref="CompilerDriver"/> (COBOL → typed-native C# →
 /// Roslyn) into an isolated temp dir, then runs the produced assembly.
 /// </summary>
 /// <param name="dialectLevel">The targeted ISO edition (default 85 — the differential harness compiles at the

@@ -22,7 +22,7 @@ public sealed class Ansi85AcceptanceTests
     private static void AssertRuns(string source, string expected)
     {
         var (ok, stdout, detail) = CobolNet85.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(CutRunner.Normalize(expected), stdout);
     }
 

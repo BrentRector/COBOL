@@ -1,13 +1,13 @@
-# COBOL.NET — File I/O (deep-dive design)
+# WiseOwl COBOL — File I/O (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §8; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
 
 ## Summary
 
-Deep, decision-complete design for the COBOL.NET FILES subsystem (typed records, clean byte boundary). Core architecture: the FD or SD record IS a .NET record struct (the record area is a typed field, not a byte buffer) — including for a file description entry written with NO record description entries, which §13.4.5.3 SR3 permits and which gets §14.9.30.4 GR6's implied entry synthesized at bind time (D18); the only bytes are at the on-disk edge, produced by a compiler-GENERATED per-layout codec (Serialize and Deserialize) running only at READ and WRITE. CODE-SET is one Encoding parameter threaded into that codec. The proven 364-NIST legacy handlers are ported VERBATIM for control logic (open-mode tables, ISO-cited status codes, the file-position-indicator plus key-of-reference plus duplicate-ordering state machines) but re-substrated from a byte array to a generic FileConnector plus an IRecordCodec. Covers all organizations (SEQUENTIAL, LINE SEQUENTIAL, RELATIVE, INDEXED), all access modes, OPEN CLOSE READ WRITE REWRITE DELETE START (CLOSE dispatching on the §14.9.6.4 GR2 physical-file category through Table 14 — D11), FILE STATUS as a two-char string item, variable-length records, prime and composite ALTERNATE keys, SAME RECORD AREA, SORT and MERGE, and LINAGE. Ordering and lookup keys are a typed-derived CobolKey comparable (numeric by decoded value, alphanumeric by image plus collating, composite component-wise), decoupled from the stored payload; one comparison policy shared by indexed files and SORT.
+Deep, decision-complete design for the WiseOwl COBOL FILES subsystem (typed records, clean byte boundary). Core architecture: the FD or SD record IS a .NET record struct (the record area is a typed field, not a byte buffer) — including for a file description entry written with NO record description entries, which §13.4.5.3 SR3 permits and which gets §14.9.30.4 GR6's implied entry synthesized at bind time (D18); the only bytes are at the on-disk edge, produced by a compiler-GENERATED per-layout codec (Serialize and Deserialize) running only at READ and WRITE. CODE-SET is one Encoding parameter threaded into that codec. The proven 364-NIST legacy handlers are ported VERBATIM for control logic (open-mode tables, ISO-cited status codes, the file-position-indicator plus key-of-reference plus duplicate-ordering state machines) but re-substrated from a byte array to a generic FileConnector plus an IRecordCodec. Covers all organizations (SEQUENTIAL, LINE SEQUENTIAL, RELATIVE, INDEXED), all access modes, OPEN CLOSE READ WRITE REWRITE DELETE START (CLOSE dispatching on the §14.9.6.4 GR2 physical-file category through Table 14 — D11), FILE STATUS as a two-char string item, variable-length records, prime and composite ALTERNATE keys, SAME RECORD AREA, SORT and MERGE, and LINAGE. Ordering and lookup keys are a typed-derived CobolKey comparable (numeric by decoded value, alphanumeric by image plus collating, composite component-wise), decoupled from the stored payload; one comparison policy shared by indexed files and SORT.
 
 ## Decisions
 
@@ -186,7 +186,7 @@ therefore **a function of the conflict's own class**, never a literal chosen at 
 values — `61` for OPEN and `62` for DELETE FILE — and **no deadlock value**, so a file-sharing conflict has no
 conforming landing but its own; §14.9.10.4 GR15b is imperative there ("*The* value … is placed") where its
 record-conflict twin GR6b says only "*A* value". §9.1.13.8 item 2's `52` is a **record**-conflict value whose
-detection conditions the implementor defines. COBOL.NET detects a deadlock in exactly one circumstance: a
+detection conditions the implementor defines. WiseOwl COBOL detects a deadlock in exactly one circumstance: a
 `RETRY FOREVER` waiting on a record locked by another file connector (§9.1.13.8 item 1). That holder is inside the
 executing run unit and cannot release while this statement runs, so GR3's "until the input-output operation has
 been completed" would never terminate — which is what makes it a deadlock rather than a timeout. Harmonizing the
@@ -198,7 +198,7 @@ two classes breaks conformance in one direction (a `52` for a file conflict) or 
 not fire. That is why this is a wrong-answer defect and not two cosmetic digits (kb/Work PB142).
 
 **The GR2 determination (Annex A.1 item 166).** §14.7.9.3 GR2 requires the implementor to specify the timeout
-temporary's picture `9(n)V9(m)` and the **maximum meaningful value** of arithmetic-expression-2. COBOL.NET defines
+temporary's picture `9(n)V9(m)` and the **maximum meaningful value** of arithmetic-expression-2. WiseOwl COBOL defines
 **n = 1, m = 0, maximum meaningful value = 0**. The ground is structural, not a convenience: every file and record
 lock here is held by a file connector *of the executing run unit*, and a connector cannot release one while another
 statement of the same run unit is executing, so no positive timeout period can change the outcome — a sleep would
@@ -334,7 +334,7 @@ LEGAL. The harness was proved able to surface `COBOLNET1720` as a failure before
 
 **⛔ OWNER DECISION, 2026-09-07 (question 24), verbatim: "Let's match GNUCobol's implementation in spirit. No
 sidecar of any type."** It REPLACES the `.cbattr` catalog sidecar this decision used to carry (kb/Work PB193,
-re-decided by kb/Work PB802); NTFS alternate data streams were considered and rejected with it. COBOL.NET
+re-decided by kb/Work PB802); NTFS alternate data streams were considered and rejected with it. WiseOwl COBOL
 writes and reads **nothing beside a data file**.
 
 **The rule.** §9.1.6: a physical file's organization, key geometry, code set, logical record sizes, record type,
@@ -355,7 +355,7 @@ answers, each stated in the code where that organization's format lives:
 
 - **Record sequential with FIXED-length records — nothing, and line sequential — nothing.** §9.1.7.2: "In record
   sequential files the length of each record is determined by any information the implementor may add to the
-  record on the physical storage medium (such as record length headers)" — COBOL.NET adds none to a
+  record on the physical storage medium (such as record length headers)" — WiseOwl COBOL adds none to a
   fixed-length one, which is plain bytes — and "In line sequential files the length of each record is determined
   by the number of characters between the preceding line delimiter and the following line delimiter or the end
   of file if no line delimiter is present", where the delimiters encode no attribute either. The standard then
@@ -367,7 +367,7 @@ answers, each stated in the code where that organization's format lives:
   validated record size broke six conforming programs, one of them into an infinite READ loop.
   `RecordLayoutNotice` stays the stderr notice for the arithmetic case, and leaves the I-O status alone.
 - **Record sequential with RECORD VARYING — the record-length header must PARSE, and that is the whole of it.**
-  §9.1.7.2's "such as record length headers" is precisely what COBOL.NET adds here: `RecordFraming`'s 4-byte
+  §9.1.7.2's "such as record length headers" is precisely what WiseOwl COBOL adds here: `RecordFraming`'s 4-byte
   little-endian length prefix per record, whose method §12.4.5.11.4 GR5 grants ("If the RECORD DELIMITER clause
   is not specified, the method used for determining the length of a variable-length record is specified by the
   implementor") and whose GR1 it obeys ("Any method used shall not be reflected in the record area or the record
@@ -436,7 +436,7 @@ not an omission: §13.18.13.4 GR7 makes it the native character set when no CODE
 the named alphabet's when one is, and since kb/Work PB793 those two really can differ (the `EBCDIC` code-name is a
 genuine alternate device code set). It is not validated for two reasons GR10's latitude exists to accommodate —
 the whole purpose of a CODE-SET clause is to read a physical file some OTHER system wrote, which carries no
-COBOL.NET header at all, so the check would fire only where it is not wanted; and reading a converted file
+WiseOwl COBOL header at all, so the check would fire only where it is not wanted; and reading a converted file
 through a description with NO CODE-SET clause is GR7's own default and the raw-medium idiom a dump or transcode
 utility is written in, so a '39' there would reject legal source. The **minimum and maximum physical record
 size** is outside the set because the managed I-O model does no blocking and BLOCK CONTAINS is accepted inert
@@ -782,7 +782,7 @@ element that runs the statement — a) *"in the source unit that specifies the O
 per-element nor per-activation. An EXTERNAL file connector is ONE object per run unit shared by every describing
 element (§13.18.22.4 GR4 a), whose entries §12.4.5.3 GR1 b) requires only to be CONSISTENT — unlike GR1 i), which
 makes FILE STATUS *the same* external item — so two programs may legally hold separate storage for data-name-1
-(COBOL.NET's GR1 b) consistency rule compares the ASSIGN operand text — device class dropped, a literal by its value,
+(WiseOwl COBOL's GR1 b) consistency rule compares the ASSIGN operand text — device class dropped, a literal by its value,
 case ignored, no host-path mapping — and the USING data-name-1 by spelling: `docs/CONFORMANCE.md` §7, `DOC-A.1-72`). A
 RECURSIVE non-INITIAL unit's internal connector is unit-scoped last-used state across activations (§8.6.4,
 §14.6.2.3.3) while its LOCAL-STORAGE is per-activation. An installed closure therefore answers with whichever
@@ -1163,7 +1163,7 @@ without a keyed verb, draws the SAME diagnostics, exactly once.
 { data-name-2 } … }` (rendered from printed pages 359 and 350; `RECORD`, `ALTERNATE` and `SOURCE` carry underline
 rules, `KEY` and both occurrences of `IS` do not) — and §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2 give the second one
 its meaning: *"Record-key-name-1 defines a record key consisting of the concatenation of all occurrences of
-data-name-2 in the order specified."* A COBOL.NET record key is **one contiguous byte window** at every layer
+data-name-2 in the order specified."* A WiseOwl COBOL record key is **one contiguous byte window** at every layer
 that carries it — `FileModel`, `RecordLayout.KeyIndexOfKeyItem`, `RuntimeApi.FileRegisterIndexed`,
 `IndexedConnector`'s `(Off, Len)` slice, and `FixedFileAttributes.KeyDescriptor` in D10's store header — so the
 concatenated form is **not provided**, which Annex A.3 item 40 expressly permits (*"The capability of specifying
@@ -2203,7 +2203,7 @@ failure branches were fired once before it was trusted.
   name exactly THREE organizations, so LINE SEQUENTIAL is a *phrase* selecting the line-delimited type of the
   sequential organization (§9.1.7.2) — the `{ LINE | RECORD }` inner choice of the §12.4.5.10.2 general format.
   Two consequences the corpus had to absorb: every golden below 2023 that named the organization moved to
-  `tests/conformance/2023/`, and **a report file COBOL.NET writes cannot be read back at all below 2023** —
+  `tests/conformance/2023/`, and **a report file WiseOwl COBOL writes cannot be read back at all below 2023** —
   the report writer frames a report file as CRLF-delimited text whatever its ORGANIZATION, and only a
   line-sequential READ recovers those lines, so the 85/2002 report goldens that observed their report by
   re-reading it are 2023 programs. **`RECORD SEQUENTIAL` — the other half of the 2023 inner choice — gates from

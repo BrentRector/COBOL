@@ -1,4 +1,4 @@
-# COBOL.NET — Engineering Doctrine
+# WiseOwl COBOL — Engineering Doctrine
 
 > **This file is DOCTRINE — the standing "how we build" that does not change session to session.**
 > It deliberately does not restate what other files own:

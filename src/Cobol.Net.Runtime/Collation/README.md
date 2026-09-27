@@ -1,4 +1,4 @@
-# The COBOL.NET collation subsystem — `Cobol.Net.Runtime/Collation/`
+# The WiseOwl COBOL collation subsystem — `Cobol.Net.Runtime/Collation/`
 
 > **Conformance statement (owner decision Q4, 2026-08-18, verbatim and never reworded):**
 > *"Implements collation behavior consistent with ISO/IEC 14651 through derived tables and CLDR/UCA data."*

@@ -19,7 +19,7 @@ namespace CobolNet.Frontend.Preprocessor;
 public sealed record TurnEvent(int Line, IReadOnlyList<(string Ec, string? File)> Names, bool On, bool WithLocation);
 
 /// <summary>
-/// The COBOL.NET <c>&gt;&gt;TURN</c> directive stage (ISO §7.3.25; greenfield-only — the legacy pipeline keeps
+/// The WiseOwl COBOL <c>&gt;&gt;TURN</c> directive stage (ISO §7.3.25; greenfield-only — the legacy pipeline keeps
 /// consuming TURN in <see cref="ConditionalCompilationProcessor"/>): parses each surviving <c>&gt;&gt;TURN</c>
 /// line of the FINAL preprocessed text into a <see cref="TurnEvent"/>, enforces the directive's syntax rules
 /// (SR3 — no duplicate (exception-name, file-name) pair per directive; SR4 — a file-name only with an

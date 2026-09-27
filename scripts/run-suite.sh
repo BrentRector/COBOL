@@ -13,7 +13,7 @@ cd "$ROOT" || exit 1
 
 # WHICH COMPILER — the same selection the guards make (scripts/guard-compiler.sh): `cobol` by default, the
 # legacy oracle only under COBOLSHARP_LEGACY_DIFFERENTIAL=1. This survey used to hard-code the legacy CLI, so a
-# suite triaged with it reported the ORACLE's compile/run health, not COBOL.NET's (kb/Work/PB750).
+# suite triaged with it reported the ORACLE's compile/run health, not WiseOwl COBOL's (kb/Work/PB750).
 . "$(dirname "$0")/guard-compiler.sh"
 guard_select_compiler
 guard_announce_compiler

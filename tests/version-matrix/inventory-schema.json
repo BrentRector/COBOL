@@ -638,7 +638,7 @@
       "decision": "docs/CONFORMANCE.md §5 Annex A.4 row 'A.4.10 | Object orientation optional items | Partial' — item 1 (CLASS-ID INHERITS repetition of object-class-name-2) and item 3 (parametric polymorphism) are NOT claimed; item 2 (INTERFACE-ID INHERITS repetition of interface-name-2) IS supported and enforced. That row was corrected on 2026-09-02 (kb/Work PB285) because it had said 'Not claimed' of all three while the compiler ships item 2. Licence for the declined two: §4.2.7 + A.4.1; item 1 is refused COBOLNET0849 at pass-1 (src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build). ⚠ §4 carries no A.4.10 item, so the §5 row is the whole of the §4.2.7 user documentation.",
       "$selector": [
         "A rule is SOLELY conditioned on A.4.10 item 1 when its content turns on a PLURALITY of CLASS-side INHERITS",
-        "bases — the repetition of object-class-name-2 — so that under the single-inheritance surface COBOL.NET",
+        "bases — the repetition of object-class-name-2 — so that under the single-inheritance surface WiseOwl COBOL",
         "supports it has nothing left to say. A.4.1's second sentence extends the licence from the named format part",
         "to the rules hanging off it.",
         "",
@@ -664,7 +664,7 @@
         "definition shall have unique method resolution signatures within that object class definition') and",
         "§11.7.3 SR3/SR4 (OVERRIDE must match 'the same method resolution signature'). §9.3.5.3 scopes the",
         "optionality to the FEATURE and grants latitude over the RESOLUTION ALGORITHM, never over whether the",
-        "signature exists. COBOL.NET implements a DEGENERATE signature — the method NAME alone, enforced by",
+        "signature exists. WiseOwl COBOL implements a DEGENERATE signature — the method NAME alone, enforced by",
         "COBOLNET0822 — so those seven rows want per-row adjudication (arguably DIVERGES against §11.7.3 SR3),",
         "never this stamp.",
         "",
@@ -1082,7 +1082,7 @@
     },
     "a1-condition-absent": {
       "verdict": "DOCUMENTED-NON-SUPPORT",
-      "decision": "kb/Work R43 item 3 — OWNER DECISION 2026-09-24, answering kb/Work PB1536 Q1. An Annex A.1 item the standard marks CONDITIONALLY REQUIRED, whose docs/CONFORMANCE.md §7 determination records that its condition does not exist in COBOL.NET ('Condition absent.'), closes as DOCUMENTED-NON-SUPPORT — CONTINGENT: re-adjudicate if the capability is ever added. Licence: A.1's own preamble, 'Conditionally required: If the associated feature or language element is implemented then this element is also required.' (cite.py --check A.1 → OK). As for a not-provided optional item, the §7 row STAYS and is the row's evidence: it states which condition is absent and why, names the code that makes it absent, and its `Pinned by` witness observes the absence.",
+      "decision": "kb/Work R43 item 3 — OWNER DECISION 2026-09-24, answering kb/Work PB1536 Q1. An Annex A.1 item the standard marks CONDITIONALLY REQUIRED, whose docs/CONFORMANCE.md §7 determination records that its condition does not exist in WiseOwl COBOL ('Condition absent.'), closes as DOCUMENTED-NON-SUPPORT — CONTINGENT: re-adjudicate if the capability is ever added. Licence: A.1's own preamble, 'Conditionally required: If the associated feature or language element is implemented then this element is also required.' (cite.py --check A.1 → OK). As for a not-provided optional item, the §7 row STAYS and is the row's evidence: it states which condition is absent and why, names the code that makes it absent, and its `Pinned by` witness observes the absence.",
       "$selector": [
         "The twin of `a1-optional-not-provided`, over the other requirement class A.1's preamble conditions: an AND-gate",
         "over two authorities, each a fact somebody else wrote down —",

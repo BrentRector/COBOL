@@ -61,7 +61,7 @@ const COMMON = `
 ⛔ PUBLIC SKILLS (MANDATORY-PRACTICES P10): read E:\\claude-skills\\skills\\spec-compliance-audit\\SKILL.md and E:\\claude-skills\\skills\\spec-oracle\\SKILL.md first; the project's spec-lookup skill and this prompt win on conflict.
 ${STOP ? `⛔ GRACEFUL STOP (MANDATORY-PRACTICES P3): before EACH rule check for the file ${STOP}; if it exists, make sure every decided rule is
 in your checkpoint file and return at once with what is decided (summary starting "STOPPED"). Never start a probe once it exists.
-` : ''}You work in the COBOL.NET project. SOURCE OF TRUTH FOR CODE: the PINNED worktree ${PIN} (read-only snapshot, so verdicts
+` : ''}You work in the WiseOwl COBOL project. SOURCE OF TRUTH FOR CODE: the PINNED worktree ${PIN} (read-only snapshot, so verdicts
 are attributable; it carries its OWN built compiler at ${PIN}/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe — use THAT
 for probes, never the main tree's). SPEC: E:\\COBOL\\specs\\ISO_COBOL.md (ISO/IEC 1989:2023). Read E:\\COBOL\\CLAUDE.md
 first — its eight rules bind you. You may run python scripts under ${PIN}/scripts (cite.py) and the pinned cobol.exe

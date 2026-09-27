@@ -16,12 +16,12 @@ public sealed class ExpressionDifferentialTests
 
     private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
 
-    /// <summary>Pin COBOL.NET output to the spec-correct value where the legacy is non-conforming (its DISPLAY
+    /// <summary>Pin WiseOwl COBOL output to the spec-correct value where the legacy is non-conforming (its DISPLAY
     /// trims an alphanumeric operand's trailing spaces, contra ISO §14.9.11.4 GR6).</summary>
     private static void AssertSpec(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(CutRunner.Normalize(expected), cout);
     }
 

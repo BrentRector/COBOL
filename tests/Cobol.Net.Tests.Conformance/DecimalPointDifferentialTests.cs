@@ -23,7 +23,7 @@ public sealed class DecimalPointDifferentialTests
     private static void AssertSpecPinned(string source, string expected, int dialect = 85)
     {
         var (cok, cout, cdetail) = new CobolNetCompiler(dialect).CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(expected, cout);
     }
 

@@ -165,7 +165,7 @@ internal sealed class StatementValidation(DataBinder data)
     /// <para>⛔ THE STAGE WAS THE DEFECT. Eight sites each turned "this name resolves to nothing" into a
     /// <c>BoundUnsupported</c>, which the emitter renders as <c>NotImplemented.Run(...)</c>: a misspelled
     /// <c>PERFORM</c> COMPILED, shipped an assembly, and aborted the run unit with an unhandled .NET exception
-    /// telling the user that COBOL.NET had not implemented a feature — the diagnosis sent to the wrong party,
+    /// telling the user that WiseOwl COBOL had not implemented a feature — the diagnosis sent to the wrong party,
     /// at the wrong time, and on an unexecuted path never sent at all. ISO §4.2.2 ¶2 puts violations of "the
     /// general formats and the explicit syntax rules" in the compile-time mechanism.</para>
     /// <para>The diagnostic is the EXISTING <see cref="DiagnosticCatalog.UndefinedReference"/> (COBOLNET1639)
@@ -651,7 +651,7 @@ internal sealed class StatementValidation(DataBinder data)
     /// index associated with identifier-1") fixes the expected answer: for a qualified reference, identifier-1 is
     /// the QUALIFIED table. <see cref="ReferenceResolver.ResolveTableOperand"/> is that one resolution.</para>
     /// <para>Staging: every verdict here is a COMPILE-TIME diagnostic (ISO §4.2.2 ¶2), never the
-    /// <c>BoundUnsupported</c> run-time loud these used to be — which told the user COBOL.NET had not implemented
+    /// <c>BoundUnsupported</c> run-time loud these used to be — which told the user WiseOwl COBOL had not implemented
     /// a feature, on a program that still compiled and shipped, and said nothing at all on an unexecuted path
     /// (kb/Work PB390's invariant; PB444 owns the SR4 arm). SR1, SR2's second sentence and SR3 report and let the
     /// bind CONTINUE, so one compile reports every violation it can see; only SR2's first sentence returns null,

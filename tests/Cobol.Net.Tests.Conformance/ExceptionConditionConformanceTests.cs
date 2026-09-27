@@ -21,7 +21,7 @@ public sealed class ExceptionConditionConformanceTests
     private static void AssertSpec(string source, string expected)
     {
         var (ok, stdout, detail) = CobolNet.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}\nstdout:\n{stdout}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}\nstdout:\n{stdout}");
         Assert.Equal(expected, stdout);
     }
 

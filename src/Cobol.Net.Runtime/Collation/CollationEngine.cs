@@ -24,7 +24,7 @@ public sealed record ResolvedLocaleCollation(string Tag, CollationTable Table, C
 }
 
 /// <summary>
-/// The static entry point of COBOL.NET's collation subsystem — the configurations a COBOL program reaches, each a
+/// The static entry point of WiseOwl COBOL's collation subsystem — the configurations a COBOL program reaches, each a
 /// cached, thread-safe <see cref="Collator"/> over the derived <see cref="CollationTable"/>:
 /// <list type="bullet">
 /// <item><see cref="Compare(string?,string?)"/> / <see cref="Root"/> — the CLDR root order (tertiary, non-ignorable),

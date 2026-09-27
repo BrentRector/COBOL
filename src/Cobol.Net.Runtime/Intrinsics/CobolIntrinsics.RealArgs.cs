@@ -131,7 +131,7 @@ public static partial class CobolIntrinsics
 
     /// <summary>The ONE input to a §15.90/§15.91 argument that is the value of NO integer: a NaN. §15.3 sets
     /// EC-ARGUMENT-FUNCTION (the shared raise site, fatal under checking); with checking disabled §15.3's
-    /// closing sentence makes the result implementor-defined, and COBOL.NET defines it as the r1a verdict
+    /// closing sentence makes the result implementor-defined, and WiseOwl COBOL defines it as the r1a verdict
     /// <b>1</b> — "the date is not valid" — never the 0 that would report a non-date as a VALID date.
     /// <para>±∞ is deliberately NOT routed here: infinity saturates into the body and r1a answers it, so there
     /// is nothing to raise on.</para></summary>

@@ -71,7 +71,7 @@ const results = await pipeline(
       '',
       'Your question is NOT whether the transcription is wrong - that is already established and verified. Your',
       'question is whether the COMPILER INHERITED the defect: was the ANTLR grammar written from the WRONG diagram,',
-      'so that COBOL.NET now rejects legal COBOL (or accepts illegal COBOL)?',
+      'so that WiseOwl COBOL now rejects legal COBOL (or accepts illegal COBOL)?',
       '',
       'This is not hypothetical. Worked example, already proven:',
       '  - The GOBACK general format (p661) lost its choice-indicator bars in transcription, so the markdown read',

@@ -54,7 +54,7 @@ public static class RecordLayoutNotice
             if (!Reported.Add(hostPath)) return;
         long whole = byteLength / recordLength;
         Console.Error.WriteLine(
-            $"COBOL.NET notice: file '{hostPath}' is {byteLength} bytes, which is not a whole multiple "
+            $"WiseOwl COBOL notice: file '{hostPath}' is {byteLength} bytes, which is not a whole multiple "
             + $"of the {recordLength}-byte record described for it ({whole} whole records + {byteLength % recordLength} "
             + "trailing bytes). The record description and the file's layout disagree; reads after the first record "
             + "will be misaligned. If this file was written by an earlier build, note that a BINARY or PACKED field "

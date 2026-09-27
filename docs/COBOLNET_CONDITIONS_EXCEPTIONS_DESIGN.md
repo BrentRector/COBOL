@@ -1,6 +1,6 @@
-# COBOL.NET — Conditions & Exception Model (deep-dive design)
+# WiseOwl COBOL — Conditions & Exception Model (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §11; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.

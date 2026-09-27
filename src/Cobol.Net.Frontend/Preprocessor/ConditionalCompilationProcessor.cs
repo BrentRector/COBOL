@@ -46,7 +46,7 @@ public static class ConditionalCompilationProcessor
 {
     /// <param name="text">The free-form-normalized source text.</param>
     /// <param name="leaveDirectives">The ISO §7.3 directive keywords whose emitting-branch lines are LEFT IN the
-    /// text for a downstream dedicated stage (the COBOL.NET pipeline: TURN, PROPAGATE, REF-MOD-ZERO-LENGTH,
+    /// text for a downstream dedicated stage (the WiseOwl COBOL pipeline: TURN, PROPAGATE, REF-MOD-ZERO-LENGTH,
     /// FLAG-02/FLAG-14, COBOL-WORDS, LEAP-SECOND — <c>Frontend.LeftDirectives</c>); an omitted-branch line still
     /// drops with its branch. Null/empty (the legacy caller) consumes every recognized directive here. ONE set,
     /// not one bool per directive (kb/Work PB65 — the sixth flag was the shape's own reproach).</param>

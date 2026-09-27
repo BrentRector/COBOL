@@ -3,7 +3,7 @@
 
 ⚠ THIS IS THE SINGLE-CLUSTER FORM. When two or more clusters are ready, use `lander-train-brief.md` instead — ⓜ a landing is ~90 % fixed cost, so one cluster costs 10.4 M against 5.1 M per cluster at five (`.claude/skills/workstream/SKILL.md` §3). Spend a lander on one cluster only when nothing else is ready or the fix is blocking. Either way: ONE LANDING PER LANDER TRANSCRIPT.
 
-You are the LANDER for fix-lane cluster {CLUSTER} of the COBOL.NET compiler. You are in a FRESH isolated git worktree of E:\COBOL cut from current `main`. Read CLAUDE.md first (rules 6, 7, 8 bind you). The implementer's report is in `{REPORT_PATH}`; its uncommitted work is in worktree `{IMPL_WORKTREE}` (branch `{IMPL_BRANCH}`), cut from an OLDER main. Main has moved since (read `git log --oneline {IMPL_BASE}..HEAD`).
+You are the LANDER for fix-lane cluster {CLUSTER} of the WiseOwl COBOL compiler. You are in a FRESH isolated git worktree of E:\COBOL cut from current `main`. Read CLAUDE.md first (rules 6, 7, 8 bind you). The implementer's report is in `{REPORT_PATH}`; its uncommitted work is in worktree `{IMPL_WORKTREE}` (branch `{IMPL_BRANCH}`), cut from an OLDER main. Main has moved since (read `git log --oneline {IMPL_BASE}..HEAD`).
 
 WHY YOU GATE HERE AND COMMIT THERE. Read-only adjudication fleets probe the MAIN tree's built `cobol.exe` right now, so a build on main would swap the binary under them (and the fleet guard denies it). You therefore rebase the cluster onto HEAD and run its gate IN THIS WORKTREE, then land the identical content on main with git operations only — no `dotnet` on main.
 

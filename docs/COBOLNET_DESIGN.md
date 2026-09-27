@@ -1,13 +1,13 @@
-# COBOL.NET — Consolidated Design (SSOT)
+# WiseOwl COBOL — Consolidated Design (SSOT)
 
-> **Status: LIVE / authoritative.** This is the single, internally-consistent source of truth that the COBOL.NET
+> **Status: LIVE / authoritative.** This is the single, internally-consistent source of truth that the WiseOwl COBOL
 > implementation follows. It synthesizes the 11 subsystem designs (pipeline, data-model, numeric, control-flow,
 > redefines/renames, string-ops, files, interprogram, OO, conditions/exceptions, intrinsics/registers) into one
 > coherent design, reconciling every cross-subsystem conflict. Where two subsystem designs disagreed, the loser is
 > named explicitly (see §14, Cross-Cutting Consistency). It refines `docs/COBOLNET_ARCHITECTURE.md` (the thin
 > overview) and supersedes any contradicting statement in it (notably the §3 `decimal` rows — see §3.1 below).
 >
-> **Project:** COBOL.NET — a greenfield compiler translating COBOL → idiomatic, typed-native **C# source**, compiled
+> **Project:** WiseOwl COBOL — a greenfield compiler translating COBOL → idiomatic, typed-native **C# source**, compiled
 > by **Roslyn**. New compiler in `src/Cobol.Net.Compiler` + `src/Cobol.Net.Cli` (exe `cobol`) + `src/Cobol.Net.Runtime`;
 > the reused front-end (ANTLR lexer/parser/preprocessor) is extracted into `src/Cobol.Net.Frontend` (§17/G0 — DONE;
 > front-end namespaces are `CobolNet.Frontend.*`; the legacy tree keeps its own `CobolSharp.Compiler.*`
@@ -149,7 +149,7 @@ neither silent nor compiled (`StatementEmitter` throws if one arrives). ⛔ **TH
 Every node that stands for something the binder could not give a meaning to is obtainable only through a factory
 that records itself on `EditionContext`: `BoundRejected`, and the operand-level `BoundExprError` /
 `BoundOperandError` / `BoundBoolError`, each as `Refused` (the source is wrong; the site reported the rule —
-`Report(edition, rule, message, feature)` does both), `Unbuilt` (a legal shape COBOL.NET has not built) or `Carry`
+`Report(edition, rule, message, feature)` does both), `Unbuilt` (a legal shape WiseOwl COBOL has not built) or `Carry`
 (the same failure moved to another value channel); `BoundConditionError` has its one site in
 `ConditionBinder.Refused`. The ONE funnel every statement passes, `StatementBinder.BindStatement`, reads the ledger:
 a statement that bound a refusal and drew no error fails the compile with the internal COBOLNET2362 (a refused
@@ -1006,7 +1006,7 @@ Instance methods are `virtual` by default (COBOL forbids implicit hiding, §11.7
 `override`; FINAL→`sealed override`; ABSTRACT→`abstract`. BY REFERENCE → typed `ref` (§9.3.6 match-rule 3c requires
 same class/category — so `ref` is conformant); RETURNING → C# return value. **Parametric polymorphism is DECLINED, not
 merely deferred** — an OPTIONAL element (ISO **§9.3.5.3**, rule 7 "Parametric polymorphism is an optional feature in
-this Working Draft International Standard"; Annex **A.4.10 item 3**) whose support COBOL.NET does not claim: a duplicate
+this Working Draft International Standard"; Annex **A.4.10 item 3**) whose support WiseOwl COBOL does not claim: a duplicate
 method name is refused BY NAME with `COBOLNET0822`, naming the facility and its A.4.10 item. (`PIC 9(4)`/`PIC 9(8)`
 both map to `long`, so a signature-keyed resolution would collide in the emitted type anyway.) ⚠ The `§12063` this
 paragraph and the two `COBOLNET0822` emit sites used to cite is **not a clause** — ISO/IEC 1989:2023 ends at §16 and
@@ -1421,7 +1421,7 @@ UNSTRING. **Named loser:** the data-model design's `CobolString.RefMod/SpliceInt
 
 ### 14.10 Diagnostic numbering (settled for new diagnostics)
 
-New COBOL.NET diagnostics use ONE band: **`COBOLNET07xx`** (conditions), and per-subsystem sub-bands within a single
+New WiseOwl COBOL diagnostics use ONE band: **`COBOLNET07xx`** (conditions), and per-subsystem sub-bands within a single
 `COBOLNET`-prefixed scheme (REDEFINES uses `COBOLNET_REDEF_*` *names* mapped into the numeric band). **Named loser:**
 mixing the legacy `COBOLxxxx`/`CBLxxxx` codes into new diagnostics. Whether to additionally *reuse* legacy codes for
 continuity with existing diagnostic-asserting tests is an owner question (§15) — but the default for new work is the
@@ -1450,7 +1450,7 @@ until G8 — keeping the legacy build in the test graph for the duration is an o
 2. **Standard-vs-native arithmetic.** v1 ships **NATIVE** arithmetic only (`Int128` fixed-point, §6.2 — fully
    conformant as the default, what the 364-NIST corpus uses). `ARITHMETIC IS STANDARD-DECIMAL` (decimal128, 34
    digits) is incompatible with the locked substrate AND with .NET `decimal`. DECISION NEEDED: (a) permanently scope
-   COBOL.NET to native arithmetic (**recommended**), or (b) later add a quarantined decimal-float intermediate type
+   WiseOwl COBOL to native arithmetic (**recommended**), or (b) later add a quarantined decimal-float intermediate type
    usable ONLY under `ARITHMETIC IS STANDARD-DECIMAL`. STANDARD-BINARY is spec-obsolete → stays unimplemented. Also
    confirm `DIV_GUARD_DIGITS = 14` against the NIST division-rounding tests in G5.
 
@@ -1619,7 +1619,7 @@ ISO-conforming output under the `LEGACY_DIVERGENT` protocol (`scripts/guard.sh` 
 **Checkpoint:** the conformance corpus + the post-85 dialect-gated NIST programs green.
 
 ### G8 — Cut over
-Retire the byte engine, drop the legacy from the test graph (resolve **Q13**), rename `CobolSharp`→`COBOL.NET`
+Retire the byte engine, drop the legacy from the test graph (resolve **Q13**), rename `CobolSharp`→`WiseOwl COBOL`
 (exe `cobol.exe`), final architecture/doc pass.
 > ✔ **Ratified refinement (2026-07-03, `docs/COMPLETION_ROADMAP_COUNCIL.md` Phase 9):** G8 executes as THREE
 > serial cuts — Cut 1 test-graph (Q13 resolved: the ~47 differential files convert to pinned goldens; the CI
@@ -1627,7 +1627,7 @@ Retire the byte engine, drop the legacy from the test graph (resolve **Q13**), r
 > tag), Cut 3 the atomic rename + committed regen + final doc pass + the ISO §4.2 conformance document. A
 > greenfield-guard vs legacy-guard **equivalence proof (roadmap Phase 8) is a hard precondition of Cut 1** —
 > the legacy must still run when the verdict-diff executes.
-**Checkpoint:** full guard green on COBOL.NET alone; the architecture doc + this SSOT reconciled.
+**Checkpoint:** full guard green on WiseOwl COBOL alone; the architecture doc + this SSOT reconciled.
 
 ---
 
@@ -1665,7 +1665,7 @@ These were verified against the live tree (2026-06-08), not assumed:
 | T1 | **`Cobol.Net.Tests.Unit`** | xUnit | `CobolNet.Tests.Unit` | — | Unit tests for the new compiler + runtime. |
 | T2 | **`Cobol.Net.Tests.Conformance`** | xUnit | `CobolNet.Tests.Conformance` | — | NIST + post-85 conformance corpus, run against the new compiler. |
 
-**Decision — name form.** Assembly/package/folder names use the dotted product brand **`Cobol.Net.*`** (reads as the product "COBOL.NET"); **root namespaces stay the single token `CobolNet`** (e.g. `CobolNet.Frontend`, `CobolNet.CodeGen`). Rationale: dotted `Cobol.Net.*` is the marketing/NuGet identity; `CobolNet` as the namespace root avoids a clash with the `.Net`/`System.Net` reading and keeps `using CobolNet.CodeGen;` clean. One rule, applied consistently. (Owner may prefer `Cobol.Net` namespaces too — trivially flippable since it is just the `<RootNamespace>` value; not load-bearing.)
+**Decision — name form.** Assembly/package/folder names use the dotted product brand **`Cobol.Net.*`** (reads as the product "WiseOwl COBOL"); **root namespaces stay the single token `CobolNet`** (e.g. `CobolNet.Frontend`, `CobolNet.CodeGen`). Rationale: dotted `Cobol.Net.*` is the marketing/NuGet identity; `CobolNet` as the namespace root avoids a clash with the `.Net`/`System.Net` reading and keeps `using CobolNet.CodeGen;` clean. One rule, applied consistently. (Owner may prefer `Cobol.Net` namespaces too — trivially flippable since it is just the `<RootNamespace>` value; not load-bearing.)
 
 **Decision — CLI split (P2/P3).** Today `Program.cs` lives *inside* the exe project, so tests cannot reference the compiler without referencing an exe. Split it: `Cobol.Net.Compiler` (library, everything except the CLI shell) + `Cobol.Net.Cli` (exe, `<AssemblyName>cobol</AssemblyName>`, ~120-line driver). This mirrors the proven legacy `CobolSharp.Compiler`/`CobolSharp.CLI` split and lets the test projects reference a library.
 
@@ -1876,7 +1876,7 @@ internal sealed class ArithmeticEmitter(EmissionContext ctx)   // GOOD: collabor
 **OWNER-CONFIRMED 2026-06-08.** All four consequential forks were reviewed with the owner and the **recommended**
 option chosen for each: **#1** mixed-USAGE REDEFINES → confined byte[] pun (in-memory program data stays 100% typed);
 **#9** control flow → PC-dispatcher for v1, idiomatic "pretty pass" later; **#2** arithmetic → native only
-(ARITHMETIC IS STANDARD-DECIMAL out of scope); **conformance** → the differential harness (legacy vs COBOL.NET
+(ARITHMETIC IS STANDARD-DECIMAL out of scope); **conformance** → the differential harness (legacy vs WiseOwl COBOL
 identical stdout). The remaining items below stand as the mechanical defaults (owner reviewed the full list).
 
 1. **Byte-at-boundaries (REDEFINES Tier C + file records).** DECISION: in-memory **program data is 100% typed** (no

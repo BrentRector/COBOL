@@ -66,7 +66,7 @@ public sealed class ClassConditionDifferentialTests
         string source = Program(ws, proc);
         string want = CutRunner.Normalize(expected);
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(want, cout);                       // primary: ISO §8.8.4.4.4 GR3 n)2
         var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
         Assert.True(lok, $"legacy oracle failed: {ldetail}");

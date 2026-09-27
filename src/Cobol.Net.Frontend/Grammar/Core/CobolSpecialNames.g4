@@ -61,7 +61,7 @@ specialNameEntry
 
 // LOCALE locale-name-1 IS { external-locale-name-1 | literal-4 } (§12.3.7).
 // ⛔ PARSED SO IT CAN BE DIAGNOSED, NOT SO IT CAN BE USED. This is an §A.4.9 item 10 optional-locale element —
-// "SPECIAL-NAMES paragraph: LOCALE clause and LOCALE phrases in the ALPHABET clause (12.3.7)" — and COBOL.NET's
+// "SPECIAL-NAMES paragraph: LOCALE clause and LOCALE phrases in the ALPHABET clause (12.3.7)" — and WiseOwl COBOL's
 // documented non-support of the locale module is conformant per §4.2.7 / §A.4.1 ONLY if it is DIAGNOSED. The
 // binder emits COBOLNET1518, the same cited message the LOCALE phrase of LOWER-CASE / NUMVAL-C already gets; a
 // raw parse error is not documented non-support, it is an unexplained rejection. Superset-parse / bind-narrow,

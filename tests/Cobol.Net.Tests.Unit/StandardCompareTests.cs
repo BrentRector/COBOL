@@ -150,7 +150,7 @@ public sealed class StandardCompareTests
         Assert.Equal("<", CobolIntrinsics.StandardCompare("a", "A", name, 3));
     }
 
-    /// <summary>§12.3.7.4 GR17 — "The implementor specifies the allowable content of literal-9" — and COBOL.NET's
+    /// <summary>§12.3.7.4 GR17 — "The implementor specifies the allowable content of literal-9" — and WiseOwl COBOL's
     /// determination is that a CLDR locale tag naming a tailored collation is allowable. Spanish orders ñ as a
     /// letter of its own between n and o, so a name the root table orders BELOW "nz" is ordered ABOVE it under
     /// es-ES: the same two operands, two tables, two answers.</summary>
@@ -194,7 +194,7 @@ public sealed class StandardCompareTests
     /// ⛔ WITH CHECKING OFF, NOTHING IS RAISED AND NOTHING IS RECORDED. §14.6.13.1.1: "If no exception is
     /// detected during the execution of a statement or if checking for an exception that occurs is not enabled,
     /// no exception condition is raised" — so the last exception status stays clear. §14.6.13.1.3 #8 then leaves
-    /// the outcome to the implementor, and COBOL.NET's determination (CONFORMANCE.md §4 item 5) is to continue
+    /// the outcome to the implementor, and WiseOwl COBOL's determination (CONFORMANCE.md §4 item 5) is to continue
     /// and return "=", a value §15.85.4 r6 defines and r7 sizes.
     /// </summary>
     [Fact]

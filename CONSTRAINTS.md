@@ -1,4 +1,4 @@
-# COBOL.NET — Anti-Pattern Catalog
+# WiseOwl COBOL — Anti-Pattern Catalog
 
 **This document is the SSOT for the labelled anti-pattern catalog.** The labels (`[GodObject]`,
 `[LayerViolation]`, …) are cited from `kb/Context/Doctrine & Anti-Patterns.md` and

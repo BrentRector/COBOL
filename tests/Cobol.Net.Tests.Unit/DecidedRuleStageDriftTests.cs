@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// ⛔ THE PB390 INVARIANT, the half PB236 left standing: a syntax rule the binder has ALREADY DECIDED is
 /// reported as an ERROR naming the rule — never compiled into the program as a run-time refusal, and never
-/// announced as a gap in COBOL.NET. PB236 separated the carrier's three jobs at the ADD/CORRESPONDING and
+/// announced as a gap in WiseOwl COBOL. PB236 separated the carrier's three jobs at the ADD/CORRESPONDING and
 /// file-name sites; the procedure-name family (PERFORM, GO TO, GO TO … DEPENDING, ALTER, RESUME AT,
 /// SORT/MERGE INPUT and OUTPUT PROCEDURE), the SET Format-3 and Format-4 operand rules, and §14.9.25.3 SR12's
 /// "shall not be reference-modified" half were still shipping their verdicts as <c>BoundUnsupported</c>.

@@ -57,7 +57,7 @@ public abstract class FileConnector
     /// and its physical-file-table registration on the old path.</para>
     /// <para>Returns null when the association stands, or the I-O status of a failed one. The allowable CONTENT of
     /// data-name-1 and the consistency rules are the implementor's (§12.4.5.3 GR4; Annex A.1 items 10 and 73) —
-    /// COBOL.NET's determination is in docs/CONFORMANCE.md §7 (DOC-A.1-73): the content with leading and trailing
+    /// WiseOwl COBOL's determination is in docs/CONFORMANCE.md §7 (DOC-A.1-73): the content with leading and trailing
     /// SPACES removed is the assign target and is then mapped to a host path exactly as literal-1 would be; content
     /// that is empty after that removal, or that carries a control character, names no physical file, so the
     /// association cannot be made and §9.1.13.6 item 2's '31' is the status the standard reserves for exactly this
@@ -713,7 +713,7 @@ public abstract class FileConnector
     protected abstract string DeclaredOrganization { get; }
 
     /// <summary>Which of §14.9.6.4 GR2's four categories this connector's PHYSICAL FILE falls in — the index
-    /// Table 14 (§14.9.6.4 GR3) is read by, and the ONE place COBOL.NET's medium determination is stated in
+    /// Table 14 (§14.9.6.4 GR3) is read by, and the ONE place WiseOwl COBOL's medium determination is stated in
     /// code. GR2 requires every supported physical file to be in exactly one category; making it an abstract
     /// property makes that total by construction, where it used to be a sentence in a doc comment on one CLOSE
     /// method (kb/Work PB235). See <see cref="PhysicalFileCategory"/> for why the answers are (a) and (d).</summary>

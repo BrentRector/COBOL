@@ -6,7 +6,7 @@ namespace CobolNet.Tests.Conformance;
 
 /// <summary>
 /// The W2 data-skeleton × edition matrix (roadmap Phase 2; VERSION_TEST_MATRIX introduction invariants). A
-/// 2002-introduced data construct that COBOL.NET recognizes must NEVER compile silently: below 2002 the
+/// 2002-introduced data construct that WiseOwl COBOL recognizes must NEVER compile silently: below 2002 the
 /// ConstructRegistry introduction gate rejects (COBOLNET0900 naming COBOL-2002); at 2002/2014/2023 it either
 /// WORKS or says so loudly. Before this sweep each of these silently misbound to USAGE DISPLAY / "pure numeric,
 /// zero digits".

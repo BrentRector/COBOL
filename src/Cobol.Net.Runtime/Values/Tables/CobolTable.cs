@@ -84,7 +84,7 @@ public static class CobolTable
     /// <summary>A SCALED subscript expression's occurrence number (ISO §8.4.2.3.4 GR1b; fix-queue PB41): "the
     /// subscript is the result of the evaluation of arithmetic-expression-1. If the evaluation of
     /// arithmetic-expression-1 does not result in an integer, the EC-BOUND-SUBSCRIPT exception condition is set to
-    /// exist." A COBOL.NET numeric item stores UNSCALED, so <c>PIC 9V9 VALUE 2.0</c> is the field <c>20L</c> at
+    /// exist." A WiseOwl COBOL numeric item stores UNSCALED, so <c>PIC 9V9 VALUE 2.0</c> is the field <c>20L</c> at
     /// scale 1 — the VALUE is 2 and the STORAGE is 20. The scale-less overloads above are the scale-0 fast path and
     /// stay byte-identical; these carry the scale the item's PICTURE declares.
     /// <para>The three arities exist for the same reason the scale-less pair does: a subscript item's storage form
@@ -156,7 +156,7 @@ public static class CobolTable
     /// count, an OCCURS DEPENDING table's current count, or a dynamic-capacity table's current capacity ("from 1 to
     /// the current capacity of the table"), which for a table nested inside another depends on the outer occurrence.
     /// <para>"The evaluation of an ALL subscript shall result in at least one argument, otherwise the result of the
-    /// reference to the function-identifier is undefined." COBOL.NET defines the undefined case as
+    /// reference to the function-identifier is undefined." WiseOwl COBOL defines the undefined case as
     /// EC-ARGUMENT-FUNCTION (set when checking is on) and terminates the reference with that name either way — a
     /// zero-argument list is never handed to a body whose result over nothing is itself undefined.</para>
     /// <para><paramref name="lead"/>, when given, renders the FIRST element enumerated in place of

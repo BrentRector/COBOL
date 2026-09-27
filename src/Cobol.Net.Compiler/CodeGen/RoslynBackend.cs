@@ -118,7 +118,7 @@ internal sealed class RoslynBackend : ICodeGenBackend
             .Where(static p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
             .Select(static p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
-        // The COBOL.NET runtime the generated program calls (CobolNum / CobolString).
+        // The WiseOwl COBOL runtime the generated program calls (CobolNum / CobolString).
         if (File.Exists(AssemblyPackager.RuntimePath))   // not a compilation input: the runtime is part of the compiler's own deployment
             refs.Add(MetadataReference.CreateFromFile(AssemblyPackager.RuntimePath));
         return [.. refs];

@@ -124,7 +124,7 @@ public sealed record BoundKeyedDeleteFile(
 
     /// <summary>The OVERRIDE phrase (§14.9.10.4 GR18 second sentence — "If the OVERRIDE phrase is specified, the
     /// file attributes are not checked"). The phrase parsed before this carrier existed and the binder dropped
-    /// it, so GR18's distinction had no representation below the parse tree; with COBOL.NET's validated
+    /// it, so GR18's distinction had no representation below the parse tree; with WiseOwl COBOL's validated
     /// fixed-file-attribute set EMPTY (kb/Work PB192, Annex A.1 item 50) the observable behaviour was right by
     /// coincidence and would have gone silently wrong the moment anything was validated (kb/Work PB196).</summary>
     public bool Override { get; init; }

@@ -39,7 +39,7 @@ const res = []
 for (let i = 0; i < FILES.length; i += N) {
   const chunk = FILES.slice(i, i + N)
   const rs = await parallel(chunk.map(slug => () => agent(`
-You validate golden DRAFTS for the COBOL.NET compiler (repo E:\\COBOL; read CLAUDE.md first). The drafts and
+You validate golden DRAFTS for the WiseOwl COBOL compiler (repo E:\\COBOL; read CLAUDE.md first). The drafts and
 the writer/refuter report for file "${slug}" are under ${SCRATCH}/out/${slug}/ (destination paths mirror the repo:
 tests/conformance/<edition>/<name>.cob|.out, tests/conformance/negative/<name>.cob|.err; REPORT.json if a fixer
 rewrote the report, else read the writer report in ${SCRATCH}/reports/${slug}.json).

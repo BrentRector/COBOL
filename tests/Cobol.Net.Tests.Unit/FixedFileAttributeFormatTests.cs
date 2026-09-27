@@ -182,7 +182,7 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // §9.1.7.2 puts a sequential file's record lengths in the DATA and in the READING program, not in the
         // file: "In record sequential files the length of each record is determined by any information the
         // implementor may add to the record on the physical storage medium (such as record length headers)" —
-        // COBOL.NET adds none to a fixed-length one — and "In line sequential files the length of each record
+        // WiseOwl COBOL adds none to a fixed-length one — and "In line sequential files the length of each record
         // is determined by the number of characters between the preceding line delimiter and the following
         // line delimiter or the end of file if no line delimiter is present". The standard answers the
         // resulting disagreement with a SUCCESSFUL completion, §9.1.13.2 item 3's '04' and item 5's '06', so
@@ -445,7 +445,7 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
     [Fact]
     public void TheKeyCheckVariableIsRegisteredInTheRuntimeConfig()
     {
-        // RuntimeConfig is the ONE answer to "which environment variables does a COBOL.NET program honor".
+        // RuntimeConfig is the ONE answer to "which environment variables does a WiseOwl COBOL program honor".
         var entry = RuntimeConfig.Find(FileRegistry.KeyCheckVariable);
         Assert.NotNull(entry);
         Assert.Equal("files", entry!.Subsystem);

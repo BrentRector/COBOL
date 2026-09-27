@@ -84,7 +84,7 @@ public sealed class ClauseOperandQualificationSpecTests
         => AssertRejects(TableOperandProgram("T-LINES"), "COBOLNET2025");
 
     /// <summary>§8.4.3.14.3 SR2 — "The LINAGE-COUNTER identifier shall not be referenced as a receiving operand."
-    /// The outcome was already a rejection; the SENTENCE was "a reference shape COBOL.NET does not yet implement
+    /// The outcome was already a rejection; the SENTENCE was "a reference shape WiseOwl COBOL does not yet implement
     /// as a receiver", which describes permanently illegal source as a pending feature (kb/Work PB489).</summary>
     [Fact]
     public void LinageCounter_AsAReceivingOperand_IsRejectedByItsOwnRule()

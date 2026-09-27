@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Cobol.Net.Runtime — the clean, typed-native runtime that COBOL.NET-generated C# programs call. It has
+    Cobol.Net.Runtime — the clean, typed-native runtime that WiseOwl COBOL-generated C# programs call. It has
     NO byte-array storage substrate: numeric values are native long/Int128 (unscaled fixed-point) / float / double,
     character values are string. The oracle-verified CobolNum/NumProfile/CobolRounding/CobolString logic is ported
     here clean (TFM/lang come from Directory.Build.props — not re-declared).

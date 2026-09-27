@@ -9,13 +9,13 @@ namespace CobolNet.Tests.Conformance;
 /// §16 G2). Two kinds of assertion, both grounded in the ISO/IEC 1989:2023 specification:
 /// <list type="bullet">
 ///   <item><see cref="AssertSameAsLegacy"/> — the legacy byte-engine oracle (364-NIST-green) is a sound reference
-///         here, so COBOL.NET stdout must equal legacy stdout <b>on the NIST acceptance basis</b> (per-line
+///         here, so WiseOwl COBOL stdout must equal legacy stdout <b>on the NIST acceptance basis</b> (per-line
 ///         trailing-space stripped — the guard's <c>normalize()</c>). Used wherever that normalization makes the
 ///         two agree (single/trailing operand, numeric).</item>
 ///   <item><see cref="AssertSpec"/> — pinned to the <b>spec-correct</b> value with an ISO citation, used where the
 ///         legacy is non-conforming. The legacy trims trailing spaces off an alphanumeric DISPLAY operand, which
 ///         ISO §14.9.11.4 GR1/GR6 forbid ("the content of each operand … the size … is the sum of the sizes of
-///         the operands"); COBOL.NET emits the full field, so a test that exposes <i>internal</i> trailing spaces
+///         the operands"); WiseOwl COBOL emits the full field, so a test that exposes <i>internal</i> trailing spaces
 ///         (a trailing <c>"]"</c>) is pinned to the spec, not the quirk.</item>
 /// </list>
 /// Scope is narrow per the G-staging: elementary-item DISPLAY only (no whole-group DISPLAY — <c>AsImage</c> is G6),
@@ -31,13 +31,13 @@ public sealed class DataDisplayDifferentialTests
     private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>
-    /// Compile + run <paramref name="source"/> on COBOL.NET and assert its stdout equals the <b>spec-correct</b>
+    /// Compile + run <paramref name="source"/> on WiseOwl COBOL and assert its stdout equals the <b>spec-correct</b>
     /// <paramref name="expected"/> (NIST-basis normalized). Used where the legacy oracle is non-conforming.
     /// </summary>
     private static void AssertSpec(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed to compile/run the fragment: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed to compile/run the fragment: {cdetail}");
         Assert.Equal(CutRunner.Normalize(expected), cout);
     }
 

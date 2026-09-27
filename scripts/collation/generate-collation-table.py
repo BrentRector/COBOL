@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-generate-collation-table.py — build COBOL.NET's DERIVED root collation table from Unicode CLDR / UCA data.
+generate-collation-table.py — build WiseOwl COBOL's DERIVED root collation table from Unicode CLDR / UCA data.
 
     python scripts/collation/generate-collation-table.py [--data data/unicode] [--out src/Cobol.Net.Runtime/Collation/Data]
 
@@ -27,7 +27,7 @@ Output: <out>/root-collation.bin (the table, deflate-compressed; format document
 ⚖ LEGAL: this program never reads, copies or embeds ISO/IEC 14651 text or its Common Template Table. Every weight
 comes from the Unicode data files above; the output is a DERIVED table (primaries are re-scaled by
 PRIMARY_SHIFT so tailorings have room to insert between adjacent root primaries; the order is preserved exactly).
-The COBOL.NET conformance statement (owner decision Q4, 2026-08-18, verbatim): "Implements collation behavior
+The WiseOwl COBOL conformance statement (owner decision Q4, 2026-08-18, verbatim): "Implements collation behavior
 consistent with ISO/IEC 14651 through derived tables and CLDR/UCA data."
 
 Element flags (format 2): bit 0 = variable (the CLDR `*` marking — spaces and punctuation, the CLDR default
@@ -50,7 +50,7 @@ from collections import OrderedDict
 
 FORMAT_VERSION = 2          # 2 (2026-08-19): + reordering groups; element flags bit 1 = uppercase (case bit)
 PRIMARY_SHIFT = 4          # stored primaries are the raw 16-bit CLDR values; the runtime shifts them left by this
-MAGIC = b"CNCT"            # "COBOL.NET Collation Table"
+MAGIC = b"CNCT"            # "WiseOwl COBOL Collation Table"
 
 CE_RE = re.compile(r"\[([.*])([0-9A-Fa-f]{4})\.([0-9A-Fa-f]{4})\.([0-9A-Fa-f]{4})\]")
 LINE_RE = re.compile(r"^([0-9A-Fa-f]{4,6}(?:\s+[0-9A-Fa-f]{4,6})*)\s*;\s*((?:\[[.*][0-9A-Fa-f.]+\])+)\s*(?:#.*)?$")

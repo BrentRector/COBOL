@@ -90,7 +90,7 @@ public sealed class CloseTable14Tests
             }
     }
 
-    /// <summary>⛔ COBOL.NET'S MEDIUM DETERMINATION, proved through the behaviour Table 14 assigns rather than
+    /// <summary>⛔ WiseOwl COBOL'S MEDIUM DETERMINATION, proved through the behaviour Table 14 assigns rather than
     /// through a getter. §14.9.6.4 GR2 requires every supported physical file to be in exactly one category;
     /// the sequential connector is (a) Non-unit and the two keyed connectors are (d), and NOTHING is (b) or
     /// (c) — which is what makes Table 14's two unit columns vacuous rather than unimplemented (documented at

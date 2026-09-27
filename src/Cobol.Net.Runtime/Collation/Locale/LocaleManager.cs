@@ -11,7 +11,7 @@ namespace CobolNet.Runtime.Collation.Locale;
 /// load its collation — the CLDR collation of the tag (<see cref="CldrLocaleLoader"/> →
 /// <see cref="CldrTailoringBuilder"/>), then the site's numeric <c>.tailor</c> rules on top — and make the engine
 /// collate by it, for the run unit that is current.
-/// <para><b>Where the state lives.</b> There is exactly ONE current-locale state in COBOL.NET: the run unit's
+/// <para><b>Where the state lives.</b> There is exactly ONE current-locale state in WiseOwl COBOL: the run unit's
 /// <see cref="LocaleState"/> (<c>RunUnit.Current.Locale</c>, ISO/IEC 1989:2023 §8.2.1 / §14.6.6 — DESIGN-locale-facility
 /// §4.3). <see cref="SetLocale"/> writes it (every category, the <c>SET LOCALE LC_ALL</c> shape) and
 /// <see cref="CurrentLocale"/> reads its LC_COLLATE category; the LOCALE-based collating sequence

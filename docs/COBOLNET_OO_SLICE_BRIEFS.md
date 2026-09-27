@@ -1,4 +1,4 @@
-# COBOL.NET — OO slice implementation briefs
+# WiseOwl COBOL — OO slice implementation briefs
 
 > **Status: LEDGER / implementation briefs** for the OO slices — all now implemented and folded into the
 > AUTHORITATIVE design `docs/COBOLNET_OO_DESIGN.md`; each brief's decisions LIVE IN the deep-dive, and

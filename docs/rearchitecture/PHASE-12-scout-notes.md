@@ -304,7 +304,7 @@ spec §14.9.20) — a separate gap, note it.
   abbreviated relations are already edition-invariant; boolean conditions landed 2002-gated in P10/P11. The only
   plausible 2014 §8.8.4 delta is §8.8.4.2.17 (variable-length-group comparison), which belongs to the DYNAMIC LENGTH
   work. Naming anything more requires the 1989:2014 text.
-- **[VERIFIED] "Increased limits" drop is sound** (§4.2.15). COBOL.NET imposes no artificial translator limits;
+- **[VERIFIED] "Increased limits" drop is sound** (§4.2.15). WiseOwl COBOL imposes no artificial translator limits;
   nothing concrete is skipped. One-line DEVLOG note per the plan.
 
 ---

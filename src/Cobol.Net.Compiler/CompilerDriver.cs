@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis;
 namespace CobolNet;
 
 /// <summary>
-/// Drives the COBOL.NET compile pipeline end-to-end: COBOL source → typed-native C# → a runnable .NET assembly.
+/// Drives the WiseOwl COBOL compile pipeline end-to-end: COBOL source → typed-native C# → a runnable .NET assembly.
 /// This is the library entry point the CLI (<c>Cobol.Net.Cli</c>) and the tests call; it owns no console I/O and
 /// no process control, returning a structured <see cref="Result"/> the caller maps to exit codes / assertions.
 /// </summary>

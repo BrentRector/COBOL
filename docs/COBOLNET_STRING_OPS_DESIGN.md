@@ -1,13 +1,13 @@
-# COBOL.NET — String Operations (deep-dive design)
+# WiseOwl COBOL — String Operations (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §7; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
 
 ## Summary
 
-Design for COBOL.NET string manipulation on .NET `string`: INSPECT (TALLYING/REPLACING/CONVERTING with ALL/LEADING/FIRST/CHARACTERS, BEFORE/AFTER INITIAL, BACKWARD), STRING (DELIMITED BY / WITH POINTER / ON OVERFLOW), UNSTRING (DELIMITED BY [ALL] / DELIMITER IN / COUNT IN / WITH POINTER / TALLYING / ON OVERFLOW), reference modification as a typed substring view (read + write), alphanumeric MOVE (space-fill/truncate/JUSTIFIED) and comparison, and national (PIC N / UTF-16).
+Design for WiseOwl COBOL string manipulation on .NET `string`: INSPECT (TALLYING/REPLACING/CONVERTING with ALL/LEADING/FIRST/CHARACTERS, BEFORE/AFTER INITIAL, BACKWARD), STRING (DELIMITED BY / WITH POINTER / ON OVERFLOW), UNSTRING (DELIMITED BY [ALL] / DELIMITER IN / COUNT IN / WITH POINTER / TALLYING / ON OVERFLOW), reference modification as a typed substring view (read + write), alphanumeric MOVE (space-fill/truncate/JUSTIFIED) and comparison, and national (PIC N / UTF-16).
 
 CENTRAL REPRESENTATION DECISION: alphanumeric/national elementary items are `string` at rest; every mutating op takes the value in and returns the new value, and the emitter assigns once: e.g. `FIELD = CobolStrings.InspectReplacing(FIELD, ops...);`, `RESULT = CobolStrings.StringInto(RESULT, ref ptr, sendings...);`. This is the natural port of the legacy `InspectRuntime`/`StorageArea` string code, which already does ALL its real work on `string`/`char[]` internally and only touches `byte[]` at the read/write edges — the port is "delete the byte edges, take value in / return value out." A new static runtime class `CobolNet.Runtime.CobolStrings` (sibling to `CobolString`/`CobolNum`) holds the ported algorithms; the existing `CobolString.Store`/`Compare` stay for whole-field MOVE/compare.
 

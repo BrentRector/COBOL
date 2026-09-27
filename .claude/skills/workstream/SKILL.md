@@ -3,7 +3,7 @@ name: workstream
 description: Use BEFORE dispatching any fleet, lander, implementer or adjudication workflow - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
 ---
 
-> **Generic base:** [`agent-fleet`](https://github.com/BrentRector/claude-skills/blob/main/skills/agent-fleet/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the COBOL.NET application of it and wins on conflict.
+> **Generic base:** [`agent-fleet`](https://github.com/BrentRector/claude-skills/blob/main/skills/agent-fleet/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
 
 # Workstream — token-frugal, restart-safe orchestration
 

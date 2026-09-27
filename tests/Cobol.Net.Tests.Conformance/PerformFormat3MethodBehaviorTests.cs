@@ -62,7 +62,7 @@ public sealed class PerformFormat3MethodBehaviorTests
     private static void AssertSpec(string proc, string expected)
     {
         var (ok, stdout, detail) = CobolNet.CompileAndRun(MProg(proc));
-        Assert.True(ok, $"COBOL.NET failed: {detail}\nstdout:\n{stdout}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}\nstdout:\n{stdout}");
         Assert.Equal(expected, stdout);
     }
 
@@ -320,7 +320,7 @@ public sealed class PerformFormat3MethodBehaviorTests
             END CLASS F3XCLS.
             """;
         var (ok, stdout, detail) = CobolNet.CompileAndRun(src);
-        Assert.True(ok, $"COBOL.NET failed: {detail}\nstdout:\n{stdout}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}\nstdout:\n{stdout}");
         Assert.Equal("INNER-CONTINUED\nOUTER-AFTER\nOUTER-DONE", stdout);
     }
 }

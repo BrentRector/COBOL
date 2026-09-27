@@ -3,7 +3,7 @@ name: land-a-fix
 description: Use when landing a conformance fix-queue item or any spec-derived fix - the complete loop from spec citation through golden, manifest registration, gate, DEVLOG, commit and push. Invoke it when starting a CA/V queue item or any "fix this bug" task.
 ---
 
-> **Generic base:** [`engineering-standards`](https://github.com/BrentRector/claude-skills/blob/main/skills/engineering-standards/SKILL.md) + [`dotnet-engineering`](https://github.com/BrentRector/claude-skills/blob/main/skills/dotnet-engineering/SKILL.md) + [`variant-analysis`](https://github.com/BrentRector/claude-skills/blob/main/skills/variant-analysis/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the COBOL.NET application of it and wins on conflict.
+> **Generic base:** [`engineering-standards`](https://github.com/BrentRector/claude-skills/blob/main/skills/engineering-standards/SKILL.md) + [`dotnet-engineering`](https://github.com/BrentRector/claude-skills/blob/main/skills/dotnet-engineering/SKILL.md) + [`variant-analysis`](https://github.com/BrentRector/claude-skills/blob/main/skills/variant-analysis/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
 
 # Land a fix
 

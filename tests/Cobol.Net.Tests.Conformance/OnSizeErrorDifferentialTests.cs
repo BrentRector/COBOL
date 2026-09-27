@@ -22,7 +22,7 @@ public sealed class OnSizeErrorDifferentialTests
     private static void AssertOutput(string source, string expected, bool needs2014 = false)
     {
         var (ok, outp, detail) = (needs2014 ? CobolNet2014 : CobolNet).CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, outp);
     }
 

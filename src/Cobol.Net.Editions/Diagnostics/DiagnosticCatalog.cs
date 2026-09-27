@@ -1297,7 +1297,7 @@ public static class DiagnosticCatalog
         + "floating-point usages, if neither the HIGH-ORDER-LEFT phrase nor the HIGH-ORDER-RIGHT phrase is "
         + "specified, 11.9.8, FLOAT-BINARY clause, specifies which of these phrases is implied.\" and d) its "
         + "standard-decimal twin. The implementor-defined float usages (COMP-1/COMP-2/FLOAT-SHORT/-LONG/"
-        + "-EXTENDED) are outside both — GR13/GR21 leave their representation to the implementor, and COBOL.NET "
+        + "-EXTENDED) are outside both — GR13/GR21 leave their representation to the implementor, and WiseOwl COBOL "
         + "pins them big-endian (Annex A.1 item 48).",
         "ISO §13.18.60.2 / §13.18.60.4 GR19c-d");
     public static readonly DiagnosticDescriptor UsageEncodingPhraseScope = new(
@@ -2000,7 +2000,7 @@ public static class DiagnosticCatalog
         "COBOLNET1662", "order-table-unresolved", EditionSeverity.Warning,
         "The SPECIAL-NAMES ORDER TABLE clause's literal-9 does not name a cultural ordering table this "
         + "implementation provides. ISO §12.3.7.4 GR17 leaves the allowable content of literal-9 to the "
-        + "implementor; COBOL.NET accepts the default table 'ISO 14651_2020_TABLE1' (case-insensitive, the space "
+        + "implementor; WiseOwl COBOL accepts the default table 'ISO 14651_2020_TABLE1' (case-insensitive, the space "
         + "and the underscore interchangeable) and, as an implementor extension, a CLDR locale tag naming a "
         + "tailored collation. Every FUNCTION STANDARD-COMPARE reference to this ordering-name sets "
         + "EC-ORDER-NOT-SUPPORTED at run time (§15.85.4 r2). The clause itself stays legal.",
@@ -2115,7 +2115,7 @@ public static class DiagnosticCatalog
     // .OfType<Place>() — `MOVE "Z" TO OK1 TB(2:1) OK2` moved into OK1 and OK2 and silently skipped TB.
     public static readonly DiagnosticDescriptor ReceivingReferenceNotImplemented = new(
         NotImplemented, "receiving-reference-shape-not-implemented", EditionSeverity.Error,
-        "A receiving operand names a declared item in a reference shape COBOL.NET does not yet implement as a receiver "
+        "A receiving operand names a declared item in a reference shape WiseOwl COBOL does not yet implement as a receiver "
         + "(COBOLNET_DESIGN §1.4: an unsupported shape fails loud, never silently). The statement is rejected rather "
         + "than run with the receiver dropped.", "COBOLNET_DESIGN §1.4",
         RecognizedNotImplemented);
@@ -2123,7 +2123,7 @@ public static class DiagnosticCatalog
     // can carry a deferral (a pointer / object-reference operand, a helper answering "place or reported").
     public static readonly DiagnosticDescriptor ReferenceShapeNotImplemented = new(
         NotImplemented, "reference-shape-not-implemented", EditionSeverity.Error,
-        "An operand names a declared item in a reference shape COBOL.NET does not yet implement in this position "
+        "An operand names a declared item in a reference shape WiseOwl COBOL does not yet implement in this position "
         + "(COBOLNET_DESIGN §1.4: an unsupported shape fails loud, never silently). The statement is rejected.",
         "COBOLNET_DESIGN §1.4",
         RecognizedNotImplemented);
@@ -2399,7 +2399,7 @@ public static class DiagnosticCatalog
     //    · STANDARD-1 is PROCESSOR-DEPENDENT — Annex A.3 item 26, "The STANDARD-1 phrase of the RECORD
     //      DELIMITER clause is dependent upon a reel type of device", and §12.4.5.11.4 GR2 spells the
     //      dependency as a requirement on the run: "If STANDARD-1 is specified, the external medium shall be a
-    //      tape drive." COBOL.NET provides no reel device (docs/CONFORMANCE.md §2 rows 28-30, 33-34), so
+    //      tape drive." WiseOwl COBOL provides no reel device (docs/CONFORMANCE.md §2 rows 28-30, 33-34), so
     //      §12.4.5.11.4 GR3's ISO/IEC 1001:2012 7.1.2 framing cannot be reached.
     //    · feature-name-1 is IMPLEMENTOR-DEFINED and OPTIONAL — Annex A.1 item 150, "This item is optional",
     //      whose licence is A.1's preamble ("Optional: The element may be provided at the implementor's
@@ -2426,7 +2426,7 @@ public static class DiagnosticCatalog
         "the RECORD DELIMITER clause (ISO §12.4.5.11) selects the method of determining a variable-length "
         + "record's length on the external medium, and neither alternative of its required choice is supported. "
         + "STANDARD-1 is a processor-dependent element (§4.2.6; Annex A.3 item 26) whose §12.4.5.11.4 GR2 "
-        + "medium is a tape drive, and COBOL.NET provides no reel device; no feature-name is available either "
+        + "medium is a tape drive, and WiseOwl COBOL provides no reel device; no feature-name is available either "
         + "(§12.4.5.11.3 SR2 leaves the names to the implementor and Annex A.1 item 150 makes providing them "
         + "optional — this implementation provides none). The clause is ACCEPTED and has no effect: every "
         + "variable-length record is framed by the §12.4.5.11.4 GR5 implementor method (the 4-byte length "
@@ -2528,7 +2528,7 @@ public static class DiagnosticCatalog
         "A data-division clause of the VALIDATE facility (the §13.16.2 validation-clauses group — CLASS, "
         + "DEFAULT, DESTINATION, INVALID, PRESENT WHEN format 2, VARYING's validation leg, "
         + "VALIDATE-STATUS/VAL-STATUS — or the §13.18.63 format-5 content-validation entry) is written. The "
-        + "VALIDATE facility is an OPTIONAL element (Annex A.4.14) whose support COBOL.NET does not claim "
+        + "VALIDATE facility is an OPTIONAL element (Annex A.4.14) whose support WiseOwl COBOL does not claim "
         + "(docs/CONFORMANCE.md §4 item 3, §5), and at COBOL-2023 it is additionally OBSOLETE (§4.2.13; Annex "
         + "F.2 item 5); Annex A.4.1 admits the syntax only when support IS claimed, so the clause is refused by "
         + "name. Every clause of the group exists from COBOL-2002. CLASS is the one whose leading word is "
@@ -2543,7 +2543,7 @@ public static class DiagnosticCatalog
         "COBOLNET1709", "apply-commit-clause-unsupported", EditionSeverity.Error,
         "The I-O-CONTROL paragraph's APPLY COMMIT clause (ISO §12.4.6.3) is written. The commit and rollback "
         + "facility is an OPTIONAL element (Annex A.4.3 item 2) and processor-dependent (Annex A.3 items 6-7) "
-        + "whose support COBOL.NET does not claim (docs/CONFORMANCE.md §4 item 2, §5) — there is no transaction "
+        + "whose support WiseOwl COBOL does not claim (docs/CONFORMANCE.md §4 item 2, §5) — there is no transaction "
         + "manager — so Annex A.4.1 makes refusing the clause by name the conforming posture. With no clause "
         + "accepted, no APPLY COMMIT clause is ever active, which is exactly the state §14.9.7.4 GR1 / "
         + "§14.9.36.4 GR1 make COMMIT and ROLLBACK behave as CONTINUE in. Introduced by COBOL-2023 (Annex E.3.2 "
@@ -2553,7 +2553,7 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor DeclinedModuleExceptionName = new(
         "COBOLNET1710", "declined-module-exception-name", EditionSeverity.Error,
         "A written exception-name (>>TURN, RAISE, EXIT/GOBACK RAISING, a USE declarative, or an "
-        + "exception-checking PERFORM's WHEN phrase) belongs to an OPTIONAL module whose support COBOL.NET does "
+        + "exception-checking PERFORM's WHEN phrase) belongs to an OPTIONAL module whose support WiseOwl COBOL does "
         + "not claim, so no statement in this implementation can ever set that condition to exist. Annex A.4.1 "
         + "makes the module's exception conditions optional WITH it (\"Any associated syntax rules, general "
         + "rules, other rules, exception conditions, and I-O status values are also optional, even if not "
@@ -2598,7 +2598,7 @@ public static class DiagnosticCatalog
         "COBOLNET1560", "screen-facility-unsupported", EditionSeverity.Error,
         "A SCREEN SECTION construct (the section header §13.9, a screen description entry §13.17, one of its "
         + "clauses §13.18.x, or the SPECIAL-NAMES CURSOR / CRT STATUS clause §12.3.7) is part of the OPTIONAL "
-        + "screen handling module (§4.2.7; Annex A.4.2), for which COBOL.NET claims no support — A.4.1 admits "
+        + "screen handling module (§4.2.7; Annex A.4.2), for which WiseOwl COBOL claims no support — A.4.1 admits "
         + "an optional element's syntax only when support is claimed, so it is refused by name rather than "
         + "silently accepted and dropped. The facility exists from COBOL-2002. See docs/CONFORMANCE.md §5.",
         "ISO §4.2.7 / Annex A.4.1 / Annex A.4.2 / §13.9 / §13.17 / §12.3.7", Annex: DeclinedAnnex.A4);
@@ -2612,7 +2612,7 @@ public static class DiagnosticCatalog
         "A screen-handling STATEMENT or exception-name — ACCEPT format 3 (§14.9.1), DISPLAY format 2 (§14.9.11), "
         + "SET format 6 ATTRIBUTE (§14.9.39), or an EC-SCREEN exception-name in a RAISING phrase, a USE "
         + "statement, a PERFORM WHEN phrase, a RAISE statement or a >>TURN directive — is part of the OPTIONAL "
-        + "screen handling module (§4.2.7; Annex A.4.2 items 1, 9, 10, 24), for which COBOL.NET claims no "
+        + "screen handling module (§4.2.7; Annex A.4.2 items 1, 9, 10, 24), for which WiseOwl COBOL claims no "
         + "support. A.4.1 admits an optional element's syntax only when support is claimed; a screen ACCEPT or "
         + "DISPLAY silently re-read as its device format would transfer the wrong data, and a catalogued "
         + "EC-SCREEN name with no raise site reads as implemented to every consumer that can see it. "
@@ -2663,7 +2663,7 @@ public static class DiagnosticCatalog
     /// §8.5.3.1 / §8.5.3.3 (type declarations and strong typing — including SR1's prohibition on an
     /// ELEMENTARY type definition carrying the STRONG phrase).</summary>
     // ── THE THREE JOBS OF THE OLD `BoundUnsupported` CARRIER (kb/Work PB236) ──────────────────────────────
-    //    One bound node used to answer three different questions — "COBOL.NET has not built this" (a DEFERRAL),
+    //    One bound node used to answer three different questions — "WiseOwl COBOL has not built this" (a DEFERRAL),
     //    "your OPERAND is ill-formed" and "this statement is ILLEGAL HERE" — and StatementEmitter rendered all
     //    three as the same run-time `NotImplemented.Run(...)`. The two user-error jobs therefore reached the
     //    programmer as a claim that THE COMPILER is incomplete when in fact THE SOURCE is wrong, at run time,
@@ -2724,7 +2724,7 @@ public static class DiagnosticCatalog
         "COBOLNET1756", "statement-not-implemented", EditionSeverity.Warning,
         "A statement this compiler has not implemented was accepted and staged to a loud run-time refusal "
         + "(COBOLNET_DESIGN §1.4): the compilation succeeds and every other statement runs, but reaching this "
-        + "one aborts the run unit with NotImplementedCobolFeatureException. This is a gap in COBOL.NET, not an "
+        + "one aborts the run unit with NotImplementedCobolFeatureException. This is a gap in WiseOwl COBOL, not an "
         + "error in the source — the warning exists so the gap is visible before the program is run. It is "
         + "never raised for a statement whose bind already drew an error: a refused statement makes no claim "
         + "about the compiler.",
@@ -2733,7 +2733,7 @@ public static class DiagnosticCatalog
     /// The grammar accepts some shapes the standard does not print — vendor extensions (INSPECT … TRAILING,
     /// SEARCH … NOT AT END, the ENTRY statement) and the defensive residue of a union-parsed rule — and each used
     /// to reach the binder's DEFERRAL carrier, so a program the standard gives no meaning to compiled with a
-    /// COBOLNET1756 warning claiming COBOL.NET was incomplete, and aborted the run unit when the statement ran.
+    /// COBOLNET1756 warning claiming WiseOwl COBOL was incomplete, and aborted the run unit when the statement ran.
     /// ISO §4.2.2 ¶1 fixes what may be accepted — "An implementation shall accept the syntax and provide the
     /// functionality for all standard language elements" — and ¶2 requires the compile-time indication of
     /// "violations of the general formats and the explicit syntax rules of standard COBOL". This
@@ -3760,7 +3760,7 @@ public static class DiagnosticCatalog
     /// screened LINE-COUNTER with a rule-citing rejection and PAGE-COUNTER with a correctly-labelled
     /// not-yet-implemented, while LINAGE-COUNTER — the only one of the three that is flatly ILLEGAL as a
     /// receiver — had no arm and inherited the catch-all, so permanently illegal source was reported as "a
-    /// reference shape COBOL.NET does not yet implement as a receiver" (COBOLNET0899). A user reads that as a
+    /// reference shape WiseOwl COBOL does not yet implement as a receiver" (COBOLNET0899). A user reads that as a
     /// promise and a future implementer reads it as a gap to close (feedback_two_arm_dispatch).</para></summary>
     public static readonly DiagnosticDescriptor LinageCounterReceiving = new(
         "COBOLNET2026", "linage-counter-receiving", EditionSeverity.Error,
@@ -3842,7 +3842,7 @@ public static class DiagnosticCatalog
     //    the one reference-resolution site (kb/Work PB877). Both were decidable there and neither was decided:
     //    the resolver returned a bare null and what the programmer saw depended on WHICH SIDE of the statement
     //    the reference was on — the receiving chokepoint's catch-all promised `PLAIN(1)` was "a reference shape
-    //    COBOL.NET does not yet implement as a receiver" (COBOLNET0899, a promise about permanently illegal
+    //    WiseOwl COBOL does not yet implement as a receiver" (COBOLNET0899, a promise about permanently illegal
     //    source, the PB489 shape again), while the identical SENDING reference compiled clean and aborted at run
     //    time. §4.2.2 requires a compile-time mechanism for a syntax-rule violation. ──
 
@@ -4177,14 +4177,14 @@ public static class DiagnosticCatalog
         "ISO §13.18.40.3 SR6");
 
     /// <summary>COBOLNET2148 — the repeat-expanded character-string describes more character positions than
-    /// COBOL.NET's implementor-defined maximum for one elementary item.</summary>
+    /// WiseOwl COBOL's implementor-defined maximum for one elementary item.</summary>
     public static readonly DiagnosticDescriptor PictureItemTooLarge = new(
         "COBOLNET2148", "picture-item-too-large", EditionSeverity.Error,
         "⚠ IMPLEMENTOR-DEFINED LIMIT. The standard bounds a picture character-string two ways and neither "
         + "bounds its EXPANSION: §13.18.40.3 SR4 bounds the 63 characters it is WRITTEN in, and SR14 bounds a "
         + "numeric or fixed-point numeric-edited item to 1 through 31 DIGIT positions — an alphanumeric, "
         + "alphabetic, national or boolean character-string has no such cap, and Annex A.1 carries no "
-        + "implementor-defined item for the maximum size of a data item. COBOL.NET therefore fixes the maximum "
+        + "implementor-defined item for the maximum size of a data item. WiseOwl COBOL therefore fixes the maximum "
         + "number of character positions in one elementary item at 134 217 728 (2^27), the largest power of two "
         + "whose UTF-16 image (2 bytes per character position, alphanumeric and national alike) stays inside "
         + ".NET's single-object ceiling. Past it the compiler used to die with an OutOfMemoryException out of "
@@ -4798,7 +4798,7 @@ public static class DiagnosticCatalog
         "COBOLNET2241", "unavailable-implementor-name", EditionSeverity.Error,
         "A SPECIAL-NAMES entry of the switch-name / feature-name / device-name form names a system-name this "
         + "implementation does not make available. ISO §12.3.7.3 SR8: \"The implementor shall specify the names "
-        + "that are available for switch-name-1, feature-name-1, and device-name-1.\" COBOL.NET's names are the "
+        + "that are available for switch-name-1, feature-name-1, and device-name-1.\" WiseOwl COBOL's names are the "
         + "device-names CONSOLE, SYSIN, SYSOUT and SYSERR, the feature-names C01 and CSP, and the switch-names "
         + "SWITCH-0 through SWITCH-36 and UPSI-0 through UPSI-7 (Annex A.1 items 189, 190, 191). A system-name "
         + "belongs to exactly one of the three types (§8.3.2.3.1), so ON STATUS / OFF STATUS — printed only in "
@@ -4827,7 +4827,7 @@ public static class DiagnosticCatalog
         "The ADVANCING phrase of a WRITE statement names a mnemonic-name that is associated with a switch-name or "
         + "a device-name. ISO §14.9.51.3 SR16: \"When mnemonic-name-1 is specified, the name is associated with a "
         + "feature-name specified by the implementor.\" §12.3.7.3 SR5 and SR7 confine a switch's mnemonic to SET and "
-        + "a device's to ACCEPT and DISPLAY. COBOL.NET's feature-names are C01 (top of the next page) and CSP "
+        + "a device's to ACCEPT and DISPLAY. WiseOwl COBOL's feature-names are C01 (top of the next page) and CSP "
         + "(suppress spacing).",
         "ISO §14.9.51.3 SR16");
 
@@ -4876,19 +4876,19 @@ public static class DiagnosticCatalog
         "The TO phrase of an ASSIGN clause lists operands in a combination this implementation does not allow. "
         + "ISO §12.4.5.1 writes `ASSIGN [TO] {device-name-1 | literal-1} …`, and ISO §12.4.5.2 SR5: \"The meaning "
         + "and rules for the allowable specification of device-name-1 and the value of literal-1 are defined by "
-        + "the implementor.\" COBOL.NET allows ONE operand, which names the physical file, or a device class (DISK "
+        + "the implementor.\" WiseOwl COBOL allows ONE operand, which names the physical file, or a device class (DISK "
         + "or PRINTER) followed by ONE operand naming the file (docs/CONFORMANCE.md §7 DOC-A.1-71).",
         "ISO §12.4.5.2 SR5 / Annex A.1 item 71");
 
     /// <summary>COBOLNET2257 — a SPECIAL-NAMES DYNAMIC LENGTH STRUCTURE clause this implementation refuses: it names
-    /// a physical-structure-name, of which COBOL.NET supports none (ISO §12.3.7.3 SR32, determination D-DL3), or it
+    /// a physical-structure-name, of which WiseOwl COBOL supports none (ISO §12.3.7.3 SR32, determination D-DL3), or it
     /// re-declares a dynamic-length-structure-name the same paragraph already declares (§8.4.2.1). kb/Work PB829 —
     /// the clause had no grammar and was COBOL0001 "unexpected 'DYNAMIC'".</summary>
     public static readonly DiagnosticDescriptor DynamicLengthStructureInvalid = new(
         "COBOLNET2257", "dynamic-length-structure-invalid", EditionSeverity.Error,
         "A DYNAMIC LENGTH STRUCTURE clause in the SPECIAL-NAMES paragraph (ISO §12.3.7.2) cannot be accepted. "
         + "Either it names a physical-structure-name — ISO §12.3.7.3 SR32: \"The implementor shall specify the "
-        + "names supported for physical-structure-name-1\", and COBOL.NET supports none (docs/CONFORMANCE.md §3 "
+        + "names supported for physical-structure-name-1\", and WiseOwl COBOL supports none (docs/CONFORMANCE.md §3 "
         + "D-DL3), so the layout must be described with the PREFIXED and/or DELIMITED phrases — or it declares a "
         + "dynamic-length-structure-name that the same paragraph already declares, so no reference could uniquely "
         + "identify one layout (ISO §8.4.2.1).",
@@ -4964,10 +4964,10 @@ public static class DiagnosticCatalog
     /// a condition refused with no failing diagnostic recorded would compile clean and throw at run time.</summary>
     public static readonly DiagnosticDescriptor UnreportedConditionRefusal = new(
         "COBOLNET2319", "unreported-condition-refusal", EditionSeverity.Error,
-        "COBOL.NET internal error: the binder refused a condition form without reporting the rule it breaks. The "
+        "WiseOwl COBOL internal error: the binder refused a condition form without reporting the rule it breaks. The "
         + "compile is failed rather than let the unbound condition reach the generated program, where it would "
         + "abort the run unit when evaluated. Please report the source that produced it.",
-        "COBOL.NET internal (no ISO rule)");
+        "WiseOwl COBOL internal (no ISO rule)");
 
     /// <summary>GO TO … DEPENDING ON identifier-1 is not a numeric elementary integer data item (kb/Work PB210) —
     /// screened by the ONE operand-class screen (<c>OperandClassScreen</c>, the <c>OperandPositions</c> row).</summary>
@@ -5053,10 +5053,10 @@ public static class DiagnosticCatalog
     /// its own COBOLNET2319.)</summary>
     public static readonly DiagnosticDescriptor UnreportedRefusal = new(
         "COBOLNET2362", "unreported-refusal", EditionSeverity.Error,
-        "COBOL.NET internal error: the binder refused a statement or an operand without reporting the rule it "
+        "WiseOwl COBOL internal error: the binder refused a statement or an operand without reporting the rule it "
         + "breaks. The compile is failed rather than let the refused node reach the generated program, where it "
         + "would abort the run unit when executed. Please report the source that produced it.",
-        "COBOL.NET internal (no ISO rule)");
+        "WiseOwl COBOL internal (no ISO rule)");
 
     // kb/Work PB1030 — the reference resolver's segment materializer is the adjudicator of what may stand in a
     // subscript or reference-modifier position; a segment that is not an arithmetic expression used to come back
@@ -5070,13 +5070,13 @@ public static class DiagnosticCatalog
         + "§8.4.3.3.3 SR4: \"Leftmost-position and length shall be arithmetic expressions.\"",
         "ISO §8.4.2.3.2 · §8.4.2.3.3 SR6 · §8.4.3.3.3 SR4");
     // kb/Work PB1030 — a reference to a name whose own declaration was refused: before, the resolver answered null
-    // without a word and the statement was announced as a COBOL.NET gap ("not implemented").
+    // without a word and the statement was announced as a WiseOwl COBOL gap ("not implemented").
     public static readonly DiagnosticDescriptor ReferenceToRefusedDeclaration = new(
         "COBOLNET2364", "reference-to-refused-declaration", EditionSeverity.Error,
         "A statement references a name whose declaration the compiler refused — a REDEFINES entry its syntax rules "
         + "reject (Tier D), a RENAMES entry whose operands did not resolve, or a SCREEN SECTION entry (the section is "
         + "declined, COBOLNET1560). The declaration's own error names the rule; this one names the statement the "
-        + "refusal reaches, so the reference is neither reported as undefined nor announced as a COBOL.NET gap.",
+        + "refusal reaches, so the reference is neither reported as undefined nor announced as a WiseOwl COBOL gap.",
         "ISO §8.4.2.1 (the reference identifies no bindable resource)");
 
     /// <summary>§14.9.49.3 SR3 — a statement in a declarative procedure references a nondeclarative procedure, and
@@ -5138,7 +5138,7 @@ public static class DiagnosticCatalog
         + "clause may be specified only in a class definition, a function definition, a function-prototype "
         + "definition, an interface definition, a program prototype definition, or a program definition that is not "
         + "contained within another program.' §11.9.7.4 GR3: 'When entry-convention-name-1 is specified, the "
-        + "meaning of the entry convention is implementor-defined.' COBOL.NET provides only the COBOL convention.",
+        + "meaning of the entry convention is implementor-defined.' WiseOwl COBOL provides only the COBOL convention.",
         "ISO §11.9.7.3 SR1; §11.9.7.4 GR3");
 
     /// <summary>ISO §5.5 1) — an <c>integer-n</c> operand of a general format is written as zero where no associated

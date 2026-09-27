@@ -147,7 +147,7 @@ public static class CobolBits
     /// ("National characters shall be represented in the storage of the computer as characters of a uniform size
     /// equal to or a multiple of the size of characters in the computer's alphanumeric character set. Each
     /// implementor shall specify the size and representation of characters stored for usage NATIONAL") and
-    /// COBOL.NET pins <b>2</b> — determination D-N1/D-N3, and the answer <c>FUNCTION BYTE-LENGTH</c>, CONVERT's
+    /// WiseOwl COBOL pins <b>2</b> — determination D-N1/D-N3, and the answer <c>FUNCTION BYTE-LENGTH</c>, CONVERT's
     /// raw-storage channel and CONFORMANCE.md items 33/188 already give.</summary>
     public const int BytesPerNational = 2;
 

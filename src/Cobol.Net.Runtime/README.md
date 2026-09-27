@@ -1,4 +1,4 @@
-# The COBOL.NET runtime's text processing — collation · normalization · segmentation · locale · CLDR · cache
+# The WiseOwl COBOL runtime's text processing — collation · normalization · segmentation · locale · CLDR · cache
 
 `Cobol.Net.Runtime` is the library every compiled COBOL program links against; this file is the map of its
 **text-processing subsystems** — six folders that share one Unicode version, one design rule ("our own derived data,

@@ -456,7 +456,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>The §8.8.1.1 class screen for a resolved data reference used as an expression operand (DA6).
     /// <para>
-    /// COBOL.NET accepted every alphanumeric shape here and decoded its digit characters — and did so
+    /// WiseOwl COBOL accepted every alphanumeric shape here and decoded its digit characters — and did so
     /// INCONSISTENTLY: a group of <c>PIC X</c> leaves computed, while a group of <c>PIC 9</c> leaves compiled and
     /// then THREW at run time, so the operand whose digits were unambiguous failed and the merely-textual one
     /// succeeded. Owner decision 2026-07-29: reject under strict conformance, keep the leniency DIALECT-GATED
@@ -707,7 +707,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             // ⛔ THE RESOLVER'S ANSWER, NOT A GUESS (kb/Work PB1030): only a DEFERRED shape is reported here.
             if (answer.Outcome == RefOutcome.Deferred)
                 ctx.Edition.Error(DiagnosticCatalog.ReceivingReferenceNotImplemented,
-                    $"receiving operand '{DataBinder.WrittenText(dref)}' names a declared item in a reference shape COBOL.NET does "
+                    $"receiving operand '{DataBinder.WrittenText(dref)}' names a declared item in a reference shape WiseOwl COBOL does "
                     + "not yet implement as a receiver (COBOLNET_DESIGN §1.4 — rejected rather than dropped)");
             return null;
         }

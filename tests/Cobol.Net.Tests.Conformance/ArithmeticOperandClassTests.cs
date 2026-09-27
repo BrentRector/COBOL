@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Conformance;
 /// A group item (class alphanumeric, §8.5), an elementary alphanumeric or national item, and a reference-modified
 /// slice (§8.4.3.3.4) are therefore NOT permissible arithmetic operands.
 /// <para>
-/// COBOL.NET accepted all of them and decoded their digit characters — and did so INCONSISTENTLY: a group of
+/// WiseOwl COBOL accepted all of them and decoded their digit characters — and did so INCONSISTENTLY: a group of
 /// <c>PIC X</c> leaves computed, while a group of <c>PIC 9</c> leaves compiled and then THREW at run time. The
 /// operand whose digits were unambiguous failed and the merely-textual one succeeded. Owner decision 2026-07-29:
 /// reject under strict conformance, keep the leniency DIALECT-GATED behind <c>--permissive</c>.

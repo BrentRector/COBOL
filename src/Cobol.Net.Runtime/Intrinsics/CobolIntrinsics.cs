@@ -99,7 +99,7 @@ public static partial class CobolIntrinsics
     ///         SIZE ERROR where it used to store a saturated value silently. Nothing here had to change.</item>
     ///   <item><b>With no receiver</b> — the render never reaches this function. §15.4.1 leaves "the
     ///         characteristics and representation of the returned value" to the implementor under native
-    ///         arithmetic, and COBOL.NET's determination is that the float family's value IS a binary64; the
+    ///         arithmetic, and WiseOwl COBOL's determination is that the float family's value IS a binary64; the
     ///         quantization exists only to land it in a fixed-point receiver, whose scale defines it. A relation
     ///         then compares natively (§8.8.4.2.4) and the text channel renders through
     ///         <c>CobolFloat.Display</c>, which is what docs/CONFORMANCE.md already required.</item>

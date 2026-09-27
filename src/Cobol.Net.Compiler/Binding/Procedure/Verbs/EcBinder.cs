@@ -138,7 +138,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         // SR3 — procedure-name-1 shall be in the NONdeclarative portion.
         var pn = r.procedureName()!;
         // An unresolvable procedure-name is the ONE operand resolution's verdict, reported at COMPILE time
-        // (kb/Work PB390) — never a BoundUnsupported claiming COBOL.NET has not implemented RESUME.
+        // (kb/Work PB390) — never a BoundUnsupported claiming WiseOwl COBOL has not implemented RESUME.
         if (ctx.Table.ResolveProcedureOperand(pn, "RESUME AT", kind: ProcedureReferenceKind.Resume) is not { } target)
             return BoundRejected.Reported(ctx.Edition);
         // ⛔ THE RESOLUTION CARRIES THE SECTION, SO THE RULE ASKS THE RULE'S OWN QUESTION (kb/Work PB433).

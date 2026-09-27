@@ -29,16 +29,16 @@ compile the SAME source with both and assert byte-identical normalized stdout (`
 `normalize()`: drop CR, per-line trailing-trim). **The legacy engine is deleted at G8** (design SSOT + the csproj
 comment on the legacy `ProjectReference`). At that moment every dynamic differential test loses its oracle.
 
-`NistDifferentialTests` is DIFFERENT and safe: it compares COBOL.NET output to committed goldens
+`NistDifferentialTests` is DIFFERENT and safe: it compares WiseOwl COBOL output to committed goldens
 (`tests/nist/valid/*.txt`), not to a live legacy run. But the green NIST set is a hand-maintained ~318-row
 `[InlineData]` list — a THIRD copy of "which programs are green" (the others: `scripts/guard.sh` `NIST_TESTS`, and
 implicitly `tests/nist/chains.tsv`).
 
-### 1.3 Guard scripts (bash, Linux-only NIST loop, over the COBOL.NET CLI)
+### 1.3 Guard scripts (bash, Linux-only NIST loop, over the WiseOwl COBOL CLI)
 ⛔ **The NIST leg drives `cobol` (`src/Cobol.Net.Cli`), not the legacy CLI** — since kb/Work/PB750, which found
 that both guards had hard-coded `src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll`. That binary's project
 graph is `CobolSharp.CLI → CobolSharp.Compiler → Cobol.Net.Frontend`; `Cobol.Net.Compiler` — the Roslyn code
-generator that IS COBOL.NET — is not in it, so the leg was structurally blind to every greenfield codegen defect
+generator that IS WiseOwl COBOL — is not in it, so the leg was structurally blind to every greenfield codegen defect
 and each battery's headline `guard NIST: 353 MATCH` was a true statement about the ORACLE. Battery #58 is the
 demonstration: `NC215A` printed a wrong answer (PB741) that `NistDifferentialTests_P0` caught and the guard's
 353-MATCH/audit-CLEAN NIST line could not see.
@@ -87,7 +87,7 @@ that structurally (guard population ⊇ every asserted program, ⊆ the manifest
 neither guard hard-coding a CLI path); `guard-nist-audit.sh` asserts it dynamically, per program, per compiler.
 
 ### 1.4 CI (`.github/workflows/build-and-test.yml`) — a gated matrix behind ONE required check
-Ten jobs. `changes` decides whether the matrix runs at all; then, concurrently, `guard` (COBOL.NET parallel NIST +
+Ten jobs. `changes` decides whether the matrix runs at all; then, concurrently, `guard` (WiseOwl COBOL parallel NIST +
 legacy unit/integration, ubuntu) · `greenfield-conformance` (ubuntu, 6 shards) · `greenfield-unit` (ubuntu) ·
 `windows-conformance` (windows, the same 6 shards, Release) · `conformance-population` (the shard-sum guard) ·
 `inv1-strong-2023` · `windows-build-test` (Release warnings-as-errors) · `legacy-oracle` (schedule/dispatch only);
@@ -223,7 +223,7 @@ IX999Z  IX     pending        -                                        none     
 - `NistDifferentialTests` reads `corpus.tsv` via `[MemberData]`, NOT a hand-maintained `[InlineData]` list.
 - The bash guard reads the same file for its `NIST_TESTS` and `LEGACY_DIVERGENT`, and since kb/Work/PB750 its
   EXPECTED verdict is derived per compiler: a `divergent` row expects `LEGACY DIVERGENT` under the legacy
-  oracle and `MATCH` under `cobol` (the golden IS the ISO-conforming output COBOL.NET must reproduce).
+  oracle and `MATCH` under `cobol` (the golden IS the ISO-conforming output WiseOwl COBOL must reproduce).
   ⛔ **`LEGACY_DIVERGENT` is DERIVED, through one reader** — `scripts/guard-population.sh`'s
   `guard_legacy_divergent()`, sourced by `guard.sh` AND `guard-fast.sh` — and an unreadable or divergent-free
   manifest is a LOUD non-zero return, never an empty exemption set. Until kb/Work PB898 this sentence described
@@ -371,7 +371,7 @@ other. Scripts collapse to:
   already fast/portable) but add a `.ps1` sibling.
 - ⛔ **REVISED by kb/Work/PB750:** `guard-fast.sh`, `guard-run-group.sh`, `guard-verify.sh`, `guard-compiler.sh`,
   `guard-compile.sh`, `guard-verdict.sh` and `guard-nist-audit.sh` no longer "exist to parallelize the legacy
-  NIST loop" — they ARE the CLI-level COBOL.NET NIST leg, and they carry the verdict-evidence rules, the chain
+  NIST loop" — they ARE the CLI-level WiseOwl COBOL NIST leg, and they carry the verdict-evidence rules, the chain
   isolation model and the population/expectation audit. They SURVIVE G8; what is deleted there is
   `guard-compiler.sh`'s legacy arm (`COBOLSHARP_LEGACY_DIFFERENTIAL=1`) and `LEGACY_DIVERGENT`. DELETE at G8:
   `compliance.sh`, `nist-batch.sh` (ad-hoc dashboards duplicating the guard). `run-suite.sh` survives as a
@@ -386,7 +386,7 @@ strategy: { matrix: { os: [ubuntu-latest, windows-latest] } }
 jobs:
   build-test:      # per-OS: build -warnaserror; dotnet test Unit + Conformance + Characterization --no-build
   version-sweep:   # ubuntu: cobol check-batch INV-1 (permissive continuity), fail on BREAKS
-  nist-cli:        # ubuntu: guard-fast.sh — the CLI-level COBOL.NET NIST leg (PB750). Survives G8.
+  nist-cli:        # ubuntu: guard-fast.sh — the CLI-level WiseOwl COBOL NIST leg (PB750). Survives G8.
   legacy-oracle:   # TEMPORARY (pre-G8 only): COBOLSHARP_LEGACY_DIFFERENTIAL=1 guard-fast.sh — proves the bake
                    # still matches the legacy oracle; the SWITCH (not the leg) is deleted at G8
 ```
@@ -595,7 +595,7 @@ UP, so a partition that silently stopped binding goes RED instead of green-and-e
 ⛔ **THE TAIL IS GONE; THE WALL BARELY MOVED — AND THE SECOND HALF OF THAT SENTENCE IS THE FINDING.** A13
 predicted ~783 s → ~80 s. The split did precisely what it was designed to do, yet bought 17%, because
 `sum-of-test-time ÷ wall` measures COLLECTION concurrency, **not core utilisation**, and the "idle" cores were
-never idle: one COBOL.NET compile is internally parallel (Roslyn `Emit`) and a NIST row spawns a `dotnet` child
+never idle: one WiseOwl COBOL compile is internally parallel (Roslyn `Emit`) and a NIST row spawns a `dotnet` child
 that is too. The proof is in the after-profile itself — the SAME work reports **5.4× more test time** because the
 new collections found contention, not silicon; at 17.4× + 6.5× ≈ 24 threads on 24 physical cores the box is
 saturated. **The class-split lever is therefore EXHAUSTED**, and the remaining lever is to reduce the WORK — the
@@ -764,7 +764,7 @@ errors stays on the Release/CI build; the drift tests (`ConstructRegistry`, `Res
    gate (3) is advisory/reviewed, never a hard CI red on its own IF gates (1)+(2) are green — but a gate-(3) diff
    with NO corresponding source change in the PR IS a red (unexpected drift). Keep the characterization corpus small
    and representative (one program per feature family), not the whole NIST set.
-2. **Bake faithfulness.** If the bake captures a legacy output that COBOL.NET already diverges from (an
+2. **Bake faithfulness.** If the bake captures a legacy output that WiseOwl COBOL already diverges from (an
    intended ISO fix), the golden would wrongly pin the legacy value. MITIGATION: bake only cases where the
    differential test is currently GREEN (cobolnet already == legacy); a currently-red/skip differential case is
    hand-authored to the ISO value and marked `divergent`.

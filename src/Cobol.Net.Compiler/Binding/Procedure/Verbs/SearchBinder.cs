@@ -26,7 +26,7 @@ internal sealed class SearchBinder(BinderContext ctx, StatementBinder host)
     /// answer on legal, unambiguous COBOL — and none of §14.9.37.3 SR1–SR3 could even be asked, because nothing
     /// downstream ever saw a subscript or a modifier at all. The resolution is now the ordinary §8.4.2.2 one
     /// (<c>ReferenceResolver.ResolveTableOperand</c>) and the rules are the one check catalog's.</para>
-    /// <para>The nested-dynamic guard stays HERE and stays a <c>BoundUnsupported</c>: it is a genuine COBOL.NET
+    /// <para>The nested-dynamic guard stays HERE and stays a <c>BoundUnsupported</c>: it is a genuine WiseOwl COBOL
     /// increment, not a rule the source violates (a subscripted capacity path over the enclosing indices), which
     /// is exactly the job PB236 left the carrier.</para></summary>
     /// <param name="dref">identifier-1 as written.</param>

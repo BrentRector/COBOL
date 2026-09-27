@@ -5,7 +5,7 @@
 # ⛔ WHICH COMPILER THIS MEASURES (kb/Work/PB750). The NIST leg drives `cobol` (src/Cobol.Net.Cli) — the compiler
 # this project ships — and refuses to start unless the resolved binary really references Cobol.Net.Compiler.
 # Until 2026-09-06 it hard-coded the LEGACY `cobolsharp.dll`, whose project graph contains no code generator, so
-# its headline MATCH count was a true statement about the ORACLE and no statement at all about COBOL.NET.
+# its headline MATCH count was a true statement about the ORACLE and no statement at all about WiseOwl COBOL.
 # `GUARD_COMPILER=legacy` runs the identical leg through the legacy oracle instead — a differential observation,
 # never the gate (`COBOLSHARP_LEGACY_DIFFERENTIAL=1` does too, and ALSO flips the Integration suite's opt-in
 # differential corpus; see scripts/guard-compiler.sh). Every summary line names the compiler it drove.
@@ -184,7 +184,7 @@ export COBOL_SWITCH_1=ON
 #     awk -F'\t' '$3=="divergent"{print $1"\t"$6}' tests/nist/corpus.tsv
 #
 # ⭐ THE SET APPLIES TO THE LEGACY ONLY (kb/Work/PB750). Every divergence is one the LEGACY exhibits, so under
-# the default compiler (`cobol`) these goldens are exactly what COBOL.NET must reproduce —
+# the default compiler (`cobol`) these goldens are exactly what WiseOwl COBOL must reproduce —
 # NistDifferentialTests already locks them byte-exact — and exempting them would blind the guard on the very
 # programs a codegen regression is most likely to break. The variable is therefore emptied unless the run is
 # the opt-in legacy differential. Both guards derive it from the ONE manifest, through the ONE reader in

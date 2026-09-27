@@ -5,7 +5,7 @@ using System.Text;
 namespace CobolNet.Runtime.IO;
 
 /// <summary>
-/// THE process-wide rule for what COBOL.NET puts on stdout and stderr: <b>UTF-8, always, everywhere</b> — one
+/// THE process-wide rule for what WiseOwl COBOL puts on stdout and stderr: <b>UTF-8, always, everywhere</b> — one
 /// rule, one place, called by every entry point this product has.
 /// </summary>
 /// <remarks>

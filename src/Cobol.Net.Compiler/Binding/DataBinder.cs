@@ -1881,7 +1881,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // conformance:85/pb235_same_record_area_close). GR7's other branch — a successful CLOSE with no open
             // member left makes the area UNAVAILABLE — carries no obligation a conforming program can observe:
             // the standard defines nothing about referencing an unavailable record area (and Annex A.2 item 5
-            // makes the unsuccessful case outright undefined), so COBOL.NET's determination is that the storage
+            // makes the unsuccessful case outright undefined), so WiseOwl COBOL's determination is that the storage
             // KEEPS ITS LAST CONTENT, documented at docs/CONFORMANCE.md §7, A.1 item 24 (kb/Work PB235).
             DataItem? anchor = null;
             var sharing = new List<FileModel>();
@@ -6471,7 +6471,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // data-name-2 and continues over an area sufficient to contain the number of bits required by the
             // data item referenced by the subject of the entry") against §8.5.1.9.1's dynamic-capacity model,
             // whose "physical and logical capacities may vary during execution": there is no fixed area to
-            // associate. A COBOL.NET storage-model rejection, honestly labelled, not a borrowed rule number.
+            // associate. A WiseOwl COBOL storage-model rejection, honestly labelled, not a borrowed rule number.
             // (The message names the OFFENDING MEMBER, not the class canonical — it used to say "the
             // dynamic-capacity table in '<canonical>'" even when the canonical was the ordinary fixed item and
             // the dynamic table was the REDEFINING entry.)

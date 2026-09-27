@@ -52,7 +52,7 @@ public enum SetAmountRule
 ///
 /// <para><b>The implementor index range.</b> §13.18.38.4 GR2 leaves "the rules for the range of values allowed in
 /// the index defined by index-name-1" to the implementor, requiring only that the range cover occurrence numbers
-/// (1 − integer-2) through (2 × integer-2). COBOL.NET's index cell IS a C# <c>long</c> holding a 1-based
+/// (1 − integer-2) through (2 × integer-2). WiseOwl COBOL's index cell IS a C# <c>long</c> holding a 1-based
 /// occurrence number (data-model D3), so the range is the full signed 64-bit interval
 /// [−9 223 372 036 854 775 808, +9 223 372 036 854 775 807] — documented as DOC-A.1-128 in
 /// <c>docs/CONFORMANCE.md</c> §7, which A.1 item 128 requires. A value OUTSIDE it is the EC-RANGE-INDEX case;

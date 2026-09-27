@@ -1,13 +1,13 @@
-# COBOL.NET — Numeric Model (native scaled-integer) (deep-dive design)
+# WiseOwl COBOL — Numeric Model (native scaled-integer) (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §6; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
 
 ## Summary
 
-Decision-complete design for COBOL.NET's native scaled-integer numeric model. SUBSTRATE (owner-locked, documented + hardened): every fixed-point datum is a native integer holding its UNSCALED value (all digits; decimal point = compile-time scale metadata). Storage CLR type by capacity: PIC ≤18 digits → `long`; 19–38 digits → `Int128` (value type); COMP-1/COMP-2 → `float`/`double`; COMP-5 / BINARY-CHAR family → `long`/`Int128` by digit tier, bounded to the native two's-complement byte width by binary-wrap. NO `decimal`, NO `BigInteger`.
+Decision-complete design for WiseOwl COBOL's native scaled-integer numeric model. SUBSTRATE (owner-locked, documented + hardened): every fixed-point datum is a native integer holding its UNSCALED value (all digits; decimal point = compile-time scale metadata). Storage CLR type by capacity: PIC ≤18 digits → `long`; 19–38 digits → `Int128` (value type); COMP-1/COMP-2 → `float`/`double`; COMP-5 / BINARY-CHAR family → `long`/`Int128` by digit tier, bounded to the native two's-complement byte width by binary-wrap. NO `decimal`, NO `BigInteger`.
 
 THE CENTRAL HARDENING: the runtime's value engine (`src/Cobol.Net.Runtime/Numeric/CobolNum.cs`) is Int128-monomorphic, NOT long — a long-only engine would silently overflow real COMPUTE (e.g. `COMPUTE c = a * b` on two PIC 9(18) = 36 digits). The single intermediate carrier is an Int128 value + its compile-time scale (conceptually `CobolInt(Int128 Unscaled, int Scale)`). Storage stays the narrow native type; every operand widens long→Int128 at op entry, scales-align, computes in Int128, and a single `TryStore` rescales/rounds/truncates/bounds-checks back into the receiver's storage type. The 'Int128 escape boundary' is reached only when a single product of two ≥19-digit operands exceeds Int128 (~38 digits) → EC-SIZE-OVERFLOW.
 
@@ -439,7 +439,7 @@ free by landing AT the receiver's scale, and only the working-scale path lost it
 
 Rule (b) is the half no working-scale choice can reach, because with no receiver there is no scale to quantize TO
 and the `ws = 9` stand-in was arbitrary. §15.4.1 leaves "the characteristics and representation of the returned
-value" to the implementor under native arithmetic, and **COBOL.NET's determination is that the §15.4.1 float
+value" to the implementor under native arithmetic, and **WiseOwl COBOL's determination is that the §15.4.1 float
 family's returned value IS a binary64** — the quantization is part of the TRANSFER into a fixed-point receiver
 (§14.6.8), not part of the value. Every consumer of a receiver-less numeric already had a `Real` arm and is more
 correct on it: a relation compares natively (§8.8.4.2.4, the arm a COMP-2 operand already took), the text channel
@@ -765,7 +765,7 @@ Two-phase per the spec: (a) evaluate the expression into the intermediate CobolI
 **Decision (⚖ OWNER, 2026-08-03; fix-queue PB18 + PB28 + PB32).** Two parts, and only the first is a choice.
 
 **(a) The technique — a choice, taken.** §8.8.1.3 makes native arithmetic implementor-defined, so any of exact,
-approximate, or exact-then-raise conforms. COBOL.NET's documented native technique is **exact `Int128` repeated
+approximate, or exact-then-raise conforms. WiseOwl COBOL's documented native technique is **exact `Int128` repeated
 multiplication whenever the result fits the carrier, falling back to the double approximation when it does not** —
 never a size error merely for outgrowing the carrier. `CobolIntrinsics.PowNativeIntDec` is the one implementation
 (since PB69 — see the ⛔ paragraph below; the Int128 twin's saturating fallback is gone).

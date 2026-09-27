@@ -660,9 +660,9 @@ public static partial class CobolIntrinsics
     /// digit — zero-filled or TRUNCATED ON THE LEFT to exactly <paramref name="length"/> boolean positions.
     /// Left truncation is NORMAL, not an error: the result is <c>value mod 2^length</c> (Annex D.10's
     /// 544→low-6-bits worked example). §15.13.3: argument-2 shall be a positive nonzero integer (r2);
-    /// argument-1 shall be positive (r1) — COBOL.NET accepts 0 (all-zero bits; the r1-vs-r2
+    /// argument-1 shall be positive (r1) — WiseOwl COBOL accepts 0 (all-zero bits; the r1-vs-r2
     /// "positive"/"positive nonzero" drafting contrast reads as arg-2-only excluding zero) and rejects a
-    /// negative via EC-ARGUMENT-FUNCTION (§15.3). The documented COBOL.NET maximum returned-value length
+    /// negative via EC-ARGUMENT-FUNCTION (§15.3). The documented WiseOwl COBOL maximum returned-value length
     /// (§15.4) is the §8.3.3.4.3 SR1 boolean-literal maximum, 8 191 positions. The '0'/'1' string is the
     /// D-B1 boolean substrate.</summary>
     /// <remarks>⛔ THE VALUE CARRIER IS Int128, AND THE BIT WALK COVERS IT (fix-queue PB65 / RV-15.13.4-1 D1).

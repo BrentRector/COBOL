@@ -70,7 +70,7 @@ const FIX_OUT = {
 }
 
 const COMMON = `
-You work in the COBOL.NET repository at E:\\COBOL (read CLAUDE.md first — its eight rules bind you).
+You work in the WiseOwl COBOL repository at E:\\COBOL (read CLAUDE.md first — its eight rules bind you).
 THE TREE IS FROZEN: a comprehensive battery is running. You may READ anything in the repo and run python scripts
 (scripts/spec/cite.py). You MUST NOT run dotnet, cobol.exe, git, or write ANY file inside E:\\COBOL. Every
 file you produce goes under ${SCRATCH}/out/<slug>/ using the repo-relative destination path as a subpath

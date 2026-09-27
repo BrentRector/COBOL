@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Unit;
 /// kb/Work PB1592 — the compile-time arithmetic MODE is the edition's (ISO §7.3.6.3 GR2 + Annex E.2 items 6 and 21):
 /// at 2002 and 2014 the previous standards PRESCRIBED standard arithmetic ("The previous COBOL Standard required the
 /// use of an arithmetic mode that is no longer supported", E.2 6); the one mode 2023 removed is Standard Arithmetic,
-/// E.2 21), which COBOL.NET runs on the SDIDI decimal engine (34 digits, decimal128 range, §8.8.1.5.2) with the
+/// E.2 21), which WiseOwl COBOL runs on the SDIDI decimal engine (34 digits, decimal128 range, §8.8.1.5.2) with the
 /// standard-decimal default intermediate rounding NEAREST-AWAY-FROM-ZERO (§11.9.11.2 GR3 a); from 2023 the mode is
 /// the documented System.Decimal one (docs/CONFORMANCE.md DOC-A.1-29). Every expected value below is derived from
 /// those rules by hand, then §7.3.6.3 GR3 (truncate the final result to its integer part), never read off the

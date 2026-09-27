@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Cobol.Net.Tests.Unit — unit/end-to-end tests for the greenfield COBOL.NET compiler + runtime. Added at G0
+    Cobol.Net.Tests.Unit — unit/end-to-end tests for the greenfield WiseOwl COBOL compiler + runtime. Added at G0
     (docs/COBOLNET_DESIGN.md §17 §1.5 step 4) so the G2 bound-tree work has a validation harness. References the
     compiler LIBRARY (Cobol.Net.Compiler) — possible only because G0 step 3 split the CLI out of the compiler.
   -->

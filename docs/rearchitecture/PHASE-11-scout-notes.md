@@ -1255,8 +1255,8 @@ Apply ONLY after the Step-1 commit lands and no battery is running.
 /// or TRUNCATED ON THE LEFT to exactly argument-2 boolean positions (left truncation is NORMAL, not an
 /// error: the result is argument-1 mod 2^argument-2 — Annex D.10's 544→low-6-bits worked example).
 /// §15.13.3: argument-2 shall be a positive nonzero integer (r2); argument-1 shall be positive (r1) —
-/// COBOL.NET accepts 0 (all-zero bits; the r1-vs-r2 "positive"/"positive nonzero" drafting contrast, scout-
-/// resolved) and rejects negatives via EC-ARGUMENT-FUNCTION (§15.3). The documented COBOL.NET maximum
+/// WiseOwl COBOL accepts 0 (all-zero bits; the r1-vs-r2 "positive"/"positive nonzero" drafting contrast, scout-
+/// resolved) and rejects negatives via EC-ARGUMENT-FUNCTION (§15.3). The documented WiseOwl COBOL maximum
 /// returned-value length (§15.4) is the §8.3.3.4.3 SR1 boolean maximum, 8 191 positions.</summary>
 public static string BooleanOfInteger(long value, long length)
 {
@@ -1279,7 +1279,7 @@ public static string BooleanOfInteger(long value, long length)
 }
 
 /// <summary>FUNCTION INTEGER-OF-BOOLEAN (ISO §15.45.4 r1): the unsigned binary value of argument-1's bit
-/// configuration, MSB first, over a temporary boolean item sized to argument-1 (r1a/r1b). COBOL.NET's
+/// configuration, MSB first, over a temporary boolean item sized to argument-1 (r1a/r1b). WiseOwl COBOL's
 /// integer channel is a signed 64-bit long, so a configuration above 63 significant bits takes
 /// EC-ARGUMENT-FUNCTION via the §15.4 maximum-returned-value hook (documented). A zero-length argument
 /// (a zero-length BX literal, §8.3.3.4.3) is value 0 — the natural reading of an empty configuration.</summary>
@@ -1293,7 +1293,7 @@ public static long IntegerOfBoolean(string boolean)
                 "FUNCTION INTEGER-OF-BOOLEAN argument-1 is not of class boolean (§15.45.3 r1)");
         if (v > (long.MaxValue >> 1) - (c - '0'))   // the next shift would exceed 63 significant bits
             return Exceptions.ExceptionState.ArgumentError(
-                "FUNCTION INTEGER-OF-BOOLEAN value exceeds the 63-bit COBOL.NET integer maximum (§15.4)");
+                "FUNCTION INTEGER-OF-BOOLEAN value exceeds the 63-bit WiseOwl COBOL integer maximum (§15.4)");
         v = (v << 1) | (uint)(c - '0');
     }
     return v;

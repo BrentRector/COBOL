@@ -5,7 +5,7 @@ using System.Text;
 namespace CobolNet.CodeGen;
 
 /// <summary>
-/// A minimal indentation-aware writer for emitting readable C# source text. COBOL.NET emits C# as text and
+/// A minimal indentation-aware writer for emitting readable C# source text. WiseOwl COBOL emits C# as text and
 /// hands it to Roslyn to parse + compile, so the generated <c>.cs</c> is directly inspectable — a deliberate
 /// design choice (the output is meant to read like hand-written .NET).
 /// </summary>

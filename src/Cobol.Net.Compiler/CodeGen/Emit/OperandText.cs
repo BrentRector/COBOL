@@ -324,7 +324,7 @@ internal static class OperandText
     /// decode is the exact inverse of the encode the group codec / REDEFINES backing used, so a WINDOWED leaf
     /// and its NATIVE twin print identical text. §13.18.44.4 GR1 associates the two descriptions with ONE
     /// storage area, so "same value, two descriptions, two different printed images" is never a defensible
-    /// answer, whatever latitude §14.9.11.4 GR1 leaves the implementor over the FORM of that text (COBOL.NET's
+    /// answer, whatever latitude §14.9.11.4 GR1 leaves the implementor over the FORM of that text (WiseOwl COBOL's
     /// determination: docs/CONFORMANCE.md Annex A.1 items 56/92). The three lanes below are the three carriers
     /// a byte-form numeric leaf can have, and they mirror <c>NumericRenderer.FieldNumCore</c>'s windowed arms
     /// one for one — the float lane FIRST (its <c>IsFloat</c> exclusion is what printed raw IEEE bytes), then

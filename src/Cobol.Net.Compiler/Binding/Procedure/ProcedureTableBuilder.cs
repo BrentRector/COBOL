@@ -181,7 +181,7 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     /// resolves to nothing is a compile-time DIAGNOSTIC by construction and not a per-site habit.
     /// <para>⛔ THIS EXISTS BECAUSE THE SILENT TWIN WAS USED EIGHT TIMES. Each site turned the null into a
     /// <c>BoundUnsupported</c> — which the emitter renders as <c>NotImplemented.Run(...)</c> — so a misspelled
-    /// PERFORM COMPILED, produced an assembly, and aborted the run unit claiming COBOL.NET had not implemented a
+    /// PERFORM COMPILED, produced an assembly, and aborted the run unit claiming WiseOwl COBOL had not implemented a
     /// feature; on a path the flow skipped it said nothing at all. ISO §4.2.2 ¶2 requires the compile-time
     /// mechanism. The message itself lives in the ONE syntax-rule catalog
     /// (<see cref="Validation.StatementValidation.RejectProcedureName"/>), never here.</para>

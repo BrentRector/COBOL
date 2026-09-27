@@ -921,7 +921,7 @@ statement
     | terminateStatement
     | suppressStatement   // §14.9.45 — SUPPRESS PRINTING; SR1/GR1 (USE-BEFORE-REPORTING context) enforced at bind
     | invokeStatement   // introduction-gated in the VersionConformancePass parse arm (VisitInvokeStatement → Check(Invoke2002))
-    // ── Wave H: RECOGNIZE-AND-NAME the facilities COBOL.NET does not implement. TWO LICENCES, one posture
+    // ── Wave H: RECOGNIZE-AND-NAME the facilities WiseOwl COBOL does not implement. TWO LICENCES, one posture
     //    (kb/Work PB709): RECEIVE / SEND (Annex A.3 item 4) and COMMIT / ROLLBACK (A.3 items 6-7) are
     //    PROCESSOR-DEPENDENT, and ISO §4.2.6 ¶3 makes the compile-time WARNING MECHANISM mandatory for them, so
     //    a GENERIC parse error there is a live non-conformance; VALIDATE is Annex A.4.14 and is not in A.3 at

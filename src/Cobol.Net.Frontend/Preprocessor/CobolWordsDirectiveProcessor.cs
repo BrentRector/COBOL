@@ -8,7 +8,7 @@ using CobolNet.Frontend.Diagnostics;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
-/// The COBOL.NET <c>&gt;&gt;COBOL-WORDS</c> directive stage (ISO §7.3.10; Annex D.12; Annex E.3.3 item 12;
+/// The WiseOwl COBOL <c>&gt;&gt;COBOL-WORDS</c> directive stage (ISO §7.3.10; Annex D.12; Annex E.3.3 item 12;
 /// greenfield-only — the legacy pipeline keeps consuming the word via
 /// <see cref="ConditionalCompilationProcessor"/>'s <c>KnownIgnoredDirectives</c>): parses each surviving
 /// <c>&gt;&gt;COBOL-WORDS { EQUATE l1 WITH l2 | UNDEFINE l3 | SUBSTITUTE l4 BY l5 | RESERVE l6 }</c> line of the

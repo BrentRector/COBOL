@@ -133,7 +133,7 @@ public sealed class ArithmeticModeScreenDriftTests : CobolNetTestBase
     {
         // §4.2.6: "An implementation shall provide a warning mechanism at compile time to indicate use of
         // syntactically-detectable processor-dependent language elements not supported by that implementation."
-        // COBOL.NET's is the hard COBOLNET0806 (see docs/CONFORMANCE.md §1 on why an error, not a warning).
+        // WiseOwl COBOL's is the hard COBOLNET0806 (see docs/CONFORMANCE.md §1 on why an error, not a warning).
         var errors = CompileAt2014(production, Fixtures[production]);
         int count = errors.Count(e => e.Contains("COBOLNET0806", StringComparison.Ordinal));
         Assert.True(count >= 1,
