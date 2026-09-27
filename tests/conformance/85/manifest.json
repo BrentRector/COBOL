@@ -1,6 +1,7 @@
 {
  "enabled": [
   "pb1491_continued_literal_logical_line",
+  "pb1380_renames_ref_mod",
   "pb1350_text_words_85",
   "pb1276_record_contains_sizes_file",
   "pb1080_file_status_item_forms",

@@ -399,16 +399,24 @@ public sealed class ReferenceResolver(DataBinder data)
         : RefResolution.Refused(written);
 
     /// <summary>The non-place answer when <see cref="PlaceForItem"/> built no place: its deferred shape, or —
-    /// when it names none — a REJECTED REDEFINES view, whose data description entry was refused at its
-    /// declaration (Tier D, <see cref="RedefinesTier.Rejected"/>). A reference to it is reported here, once per
-    /// reference (COBOLNET2364), because the statement holding it must say why it cannot bind.</summary>
-    private RefResolution ItemFailure(Core.DataReferenceContext dref, DataItem item, DeferredShape? deferred)
+    /// when it names none — the entry whose declaration was refused (a REJECTED REDEFINES view, Tier D
+    /// <see cref="RedefinesTier.Rejected"/>; a level-66 RENAMES entry whose operands did not resolve). A reference
+    /// to it is reported here, once per reference (COBOLNET2364), because the statement holding it must say why
+    /// it cannot bind.</summary>
+    private RefResolution ItemFailure(Core.DataReferenceContext dref, PlaceGap gap)
     {
         string written = DataBinder.WrittenText(dref);
-        if (deferred is { } shape) return RefResolution.Deferred(shape, written);
-        ReportRefusedDeclaration(dref, item.CobolName ?? item.CsName, item.Class?.RejectReason);
+        if (gap.Deferred is { } shape) return RefResolution.Deferred(shape, written);
+        ReportRefusedDeclaration(dref, gap.Refused.CobolName ?? gap.Refused.CsName, gap.Refused.Class?.RejectReason);
         return RefResolution.Refused(written);
     }
+
+    /// <summary>Why <see cref="PlaceForItem(DataItem, IReadOnlyList{string}, out PlaceGap)"/> built no place:
+    /// the <see cref="DeferredShape"/> it has not built, or — when <paramref name="Deferred"/> is null — the
+    /// item whose DECLARATION was refused. That item is carried rather than assumed because it need not be the
+    /// item asked about: a level-66 RENAMES alias builds no place when data-name-2 (its no-THROUGH target) or one
+    /// of its spanned leaves was refused, and the report must name that entry (kb/Work PB1380).</summary>
+    private readonly record struct PlaceGap(DeferredShape? Deferred, DataItem Refused);
 
     /// <summary>COBOLNET2364 — a reference to a name whose declaration the compiler REFUSED (a Tier-D REDEFINES
     /// view; a SCREEN SECTION name, the section being declined as COBOLNET1560). The compile has already failed at
@@ -517,93 +525,27 @@ public sealed class ReferenceResolver(DataBinder data)
 
         if (ReadSubscripts(dref, item, subCtx, out var indexExprs) is { } subscriptFailure) return subscriptFailure;
 
-        // A level-66 RENAMES alias (ISO §13.18.45): one elementary-alphanumeric view COMPOSED over the spanned
-        // leaves — reads concatenate their images, writes distribute slices back. This slice covers STRING-VALUED
-        // leaves (X / edited / StoreAsImage); a typed-numeric leaf in the span fails loud (the image codecs for a
-        // composed numeric leaf are a later slice). No subscripts: a RENAMES operand cannot have/live under OCCURS.
-        if (item.Renames is { } ren)
-        {
-            // A level-66 entry is never a table element, so a written subscript was refused by §8.4.2.3.3 SR2
-            // above (ScreenSubscriptArity) — this arm is unreachable, and the refusal ledger holds it to that.
-            if (indexExprs.Count > 0) return Refused();
-            // The no-THRU form is an ALIAS: §13.18.45.4 GR1 — "all of the data attributes of data-name-2 become
-            // the data attributes of data-name-1 and the storage area occupied by data-name-2 becomes the storage
-            // area occupied by data-name-1". Attributes AND storage forward to the renamed item's place (numeric
-            // stays numeric: NC252A's ADD 3500 TO RENAME-12 over a PIC 9(4); a group forwards as the group), and
-            // only the THRU form composes an alphanumeric span (GR2).
-            // ⛔ BUT THE IDENTITY DOES NOT FORWARD (kb/Work PB602). GR1 shares the attributes and the storage, not
-            // the NAME: data-name-1 is a data item of its OWN, and a bare forward made a reference to the 66
-            // indistinguishable from a reference to the renamed item — so `START RLF KEY IS = RK-ALIAS` passed
-            // §14.9.41.3 SR5's "shall be the data item specified in the RELATIVE KEY clause" that its THROUGH
-            // sibling (a RenamesPlace, which keeps its own Item) was correctly refused by. `DenotesAs` records the
-            // alias on the renamed item's own place, so nothing about the ACCESS changes and only the identity
-            // question answers differently.
-            // A RENAMES entry whose operands did not resolve was refused at its declaration (COBOLNET1655,
-            // §13.18.45.3), and the data binder leaves it with no From and an empty Span.
-            if (ren.Thru is null ? ren.From is null : ren.Span.Count == 0)
-                return ItemFailure(dref, item, null);
-            if (ren.Thru is null)
-                return PlaceForItem(ren.From!, [], out var fwdDeferred) is { } fwdPlace
-                    ? Resolved(fwdPlace with { DenotesAs = item }) : ItemFailure(dref, ren.From!, fwdDeferred);
-            var leafPlaces = new List<Place>(ren.Span.Count);
-            var widths = new List<int>(ren.Span.Count);
-            foreach (var part in ren.Span)
-            {
-                var leaf = part.Leaf;
-                if (part.Occurrence is { } occIdx)
-                {
-                    // ONE occurrence (or the one-and-only cell) of the leaf, possibly a partial slice of it (kb/Work
-                    // PB96): the cell's place, then its ref-mod view when the part does not cover the whole cell.
-                    if (PlaceForItem(leaf, leaf.Occurs is null ? [] : [occIdx.ToString()], out var cellDeferred) is not { } cellRaw)
-                        return ItemFailure(dref, leaf, cellDeferred);
-                    Place cell = cellRaw;
-                    bool cellString = data.IsImageBackedEarly(leaf) || cell is RedefViewPlace
-                        || leaf.Pic?.Category is PicCategory.Alphanumeric or PicCategory.NumericEdited
-                            or PicCategory.National or PicCategory.Boolean;
-                    if (!cellString)
-                    {
-                        if (leaf.Pic is not { IsCharacterFormNumeric: true })   // THE ONE character-form predicate (kb/Work PB646)
-                            return Deferred(DeferredShape.RenamesNonCharacterLeaf);
-                        cell = new NumericImagePlace(cell);
-                    }
-                    if (part.IsPartial) cell = new RefModPlace(cell, part.Start.ToString(), part.Length.ToString());
-                    leafPlaces.Add(cell);
-                    widths.Add(part.Length);
-                    continue;
-                }
-                // An OCCURS leaf inside the span contributes EVERY occurrence in order (§13.18.45 — the alias
-                // covers the whole fixed-size area; NC252A's RENAME-7 over TABLE-ITEM-2 OCCURS 5).
-                int occ = leaf.Occurs ?? 1;
-                for (int k = 1; k <= occ; k++)
-                {
-                    if (PlaceForItem(leaf, leaf.Occurs is null ? [] : [k.ToString()], out var leafDeferred) is not { } lpRaw)
-                        return ItemFailure(dref, leaf, leafDeferred);
-                    Place lp = lpRaw;
-                    bool stringValued = data.IsImageBackedEarly(leaf) || lp is RedefViewPlace
-                        || leaf.Pic?.Category is PicCategory.Alphanumeric or PicCategory.NumericEdited
-                            or PicCategory.National or PicCategory.Boolean;
-                    // A typed NUMERIC-DISPLAY leaf participates through its character image (the alias is an
-                    // alphanumeric view of the span, §13.18.45 — NC252A's PIC 999 leaves under RENAMES-TEST-1).
-                    if (!stringValued)
-                    {
-                        if (leaf.Pic is not { IsCharacterFormNumeric: true })   // THE ONE character-form predicate (kb/Work PB646)
-                            return Deferred(DeferredShape.RenamesNonCharacterLeaf);
-                        lp = new NumericImagePlace(lp);
-                    }
-                    widths.Add(leaf.ImageWidth);   // a whole part: every occurrence, at the leaf's width (kb/Work PB96)
-                    leafPlaces.Add(lp);
-                }
-            }
-            return Resolved(new RenamesPlace(leafPlaces, item, widths));
-        }
-
-        if (PlaceForItem(item, indexExprs, out var deferred) is not { } inner) return ItemFailure(dref, item, deferred);
+        // ⛔ EVERY NAMED ITEM TAKES THE SAME TAIL — a level-66 RENAMES alias included (kb/Work PB1380). The alias's
+        // place is built by PlaceForItem, the ONE item→place builder, and then meets the reference-modification
+        // tail below like any other identifier. It used to be composed in an arm of its own HERE that returned
+        // before that tail, so `RN(2:3)` bound the WHOLE alias — ISO §8.4.3.3.4 GR5's "unique data item that is a
+        // subset of the data item referenced by identifier-1" was never created, `MOVE RN(2:3) TO X` moved every
+        // character of the span, and `RN(2:N)` with N = 0 overwrote the span instead of raising EC-BOUND-REF-MOD
+        // (§7.3.23.3 GR1, directive omitted). Both forms were dropped: the THROUGH form's RenamesPlace AND the
+        // no-THROUGH form's forward to data-name-2's place.
+        if (PlaceForItem(item, indexExprs, out var gap) is not { } inner) return ItemFailure(dref, gap);
 
         if (refCtx is null && cleanRef is null) return Resolved(inner);
+        // identifier-1's DESCRIPTION is the item its place stands for, not the name as written: for a no-THROUGH
+        // RENAMES alias that is data-name-2, whose attributes §13.18.45.4 GR1 makes data-name-1's own; for a
+        // THROUGH alias it is the alias itself (an alphanumeric group item, GR2); for every other item the two
+        // are the same item. The syntactic path, the data-division path (ResolveItemRefMod) and the resolved-place
+        // path (RefModOf) all read it this way, so SR1 and the view are asked of one description.
+        DataItem described = inner.Item;
         // ⛔ ISO §8.4.3.3.3 SR1 — WHAT identifier-1 MAY BE, in ONE place (kb/Work PB70). An excluded shape is a
         // bind-time rejection (COBOLNET1647), never the run-time NotImplemented a sending ref-mod used to reach nor
         // the silent drop a receiving one fell into.
-        if (RefModExclusion(item) is { } why)
+        if (RefModExclusion(described) is { } why)
         {
             if (!_probing && _diagnosed.Add(dref))   // R30 purity: a probe never diagnoses (kb/Work PB157)
                 data.Edition.Error(DiagnosticCatalog.RefModIdentifierNotPermitted,
@@ -612,7 +554,7 @@ public sealed class ReferenceResolver(DataBinder data)
         }
         if ((cleanRef is not null ? ReadRefMod(cleanRef) : ReadRefMod(refCtx!)) is not { } spec)
             return SegmentFailure(DataBinder.WrittenText(dref));   // a bound the materializer refused or deferred (§8.4.3.3.3 SR4)
-        return RefModView(item, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
+        return RefModView(described, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
     }
 
     /// <summary>Reference-modify an ALREADY-RESOLVED place — §8.4.3.1.4 GR1 g)'s tail ("a reference modifier
@@ -707,10 +649,12 @@ public sealed class ReferenceResolver(DataBinder data)
     /// view is the SAME <see cref="RefModView"/> the procedure division builds, reached without a parse context.
     /// <para><paramref name="length"/> null is §8.4.3.3.2's bracketed, omitted length — the slice runs to the
     /// rightmost position (§8.4.3.3.4 GR5c last sentence). Null return: the item has no place, or §8.4.3.3.3 SR1
-    /// does not admit it (the CALLER rejects that at bind with COBOLNET1647 — this is the backstop).</para></summary>
+    /// does not admit it (the CALLER rejects that at bind with COBOLNET1647 — this is the backstop).</para>
+    /// <para>SR1 and the view read the PLACE's item, as <see cref="Resolve"/> does — a no-THROUGH level-66 alias is
+    /// described by data-name-2 (§13.18.45.4 GR1), never by its own entry (kb/Work PB1380).</para></summary>
     public Place? ResolveItemRefMod(DataItem item, int start, int? length, bool allowZeroLength = false) =>
-        RefModExclusion(item) is null && PlaceForItem(item, []) is { } inner
-            ? RefModView(item, inner, new RefModSpec(start.ToString(), length?.ToString(), allowZeroLength))
+        PlaceForItem(item, []) is { } inner && RefModExclusion(inner.Item) is null
+            ? RefModView(inner.Item, inner, new RefModSpec(start.ToString(), length?.ToString(), allowZeroLength))
             : null;
 
     /// <summary>ISO §8.4.3.3.3 SR1, read as an EXCLUSION test: the reason <paramref name="item"/> may NOT be
@@ -907,6 +851,8 @@ public sealed class ReferenceResolver(DataBinder data)
     ///         class's ONE string backing (the canonical too, so exactly one stored member);</item>
     ///   <item>a Tier-A (alias) view → the canonical's ONE stored field, reinterpreted through the view's own
     ///         Pic/scale/profile (the place carries the VIEW's <see cref="DataItem"/>);</item>
+    ///   <item>a level-66 RENAMES entry → data-name-2's own place (no THROUGH) or a <see cref="RenamesPlace"/>
+    ///         composed over the spanned leaves (THROUGH) — <see cref="PlaceForRenames"/>;</item>
     ///   <item>any other item → a plain <see cref="MemberPlace"/>.</item>
     /// </list>
     /// Returns <see langword="null"/> for a form not handled in this slice — a subscripted Tier-B view, a whole-OCCURS
@@ -917,24 +863,29 @@ public sealed class ReferenceResolver(DataBinder data)
     /// </summary>
     private Place? PlaceForItem(DataItem item, IReadOnlyList<string> indexExprs) => PlaceForItem(item, indexExprs, out _);
 
-    /// <param name="deferred">On a null return, the <see cref="DeferredShape"/> this builder has not built — or null
-    /// when the item is a REJECTED (Tier D) REDEFINES view, refused at its own declaration (kb/Work PB1030).</param>
-    private Place? PlaceForItem(DataItem item, IReadOnlyList<string> indexExprs, out DeferredShape? deferred)
+    /// <param name="gap">On a null return, the <see cref="DeferredShape"/> this builder has not built — or none,
+    /// with the entry whose declaration was refused: a REJECTED (Tier D) REDEFINES view (kb/Work PB1030), or a
+    /// level-66 RENAMES entry or the refused entry behind it (kb/Work PB1380).</param>
+    private Place? PlaceForItem(DataItem item, IReadOnlyList<string> indexExprs, out PlaceGap gap)
     {
-        deferred = null;
+        gap = new(null, item);
+        // A level-66 RENAMES entry (ISO §13.18.45) is a data item of its own that owns no storage — its place is
+        // composed from the places of the items it renames (kb/Work PB1380: it is built HERE, in the one builder,
+        // so every caller — a reference-modified alias above all — receives it the same way).
+        if (item.Renames is { } ren) return PlaceForRenames(item, ren, indexExprs, out gap);
         // A WHOLE (unsubscripted) OCCURS DYNAMIC table reference has no element access — it would otherwise fold to a
         // MemberPlace wrapping the bare CobolDynTable<T> object, which is uncompilable in any value context. Fail
         // LOUD here (data-model D9); FUNCTION LENGTH and other whole-table operations route to a dedicated
         // DynWholeTablePlace in a later increment. A SUBSCRIPTED dynamic element (indexExprs non-empty) is inc 3's
         // access path and is NOT caught by this guard.
-        if (item.IsDynamicTable && indexExprs.Count == 0) { deferred = DeferredShape.DynamicWholeTable; return null; }
+        if (item.IsDynamicTable && indexExprs.Count == 0) { gap = new(DeferredShape.DynamicWholeTable, item); return null; }
         if (item.Class is { Tier: RedefinesTier.StringCanonical } sc)
         {
             // The backing is emitted in the canonical's containing struct (FieldEmitter.PhysicalFields), so a NESTED
             // class's backing must be reached through that struct's access path — a bare `_redef_X` resolves only for a
             // top-level (static-field) class. Fail loud if the parent path is unavailable (e.g. it is itself within an
             // OCCURS), rather than emit an unqualified reference that does not exist in scope.
-            if (BuildBackingPath(sc) is not { } backing) { deferred = DeferredShape.NestedClassBacking; return null; }
+            if (BuildBackingPath(sc) is not { } backing) { gap = new(DeferredShape.NestedClassBacking, item); return null; }
             // A SUBSCRIPTED view: each OCCURS level on the item's path WITHIN the class displaces the window by
             // (occurrence − 1) × that level's per-occurrence width — the redefined table lays its occurrences
             // end-to-end in the ONE backing (ISO §13.18.44). ClassOffset is the occurrence-1 position; subscripts
@@ -943,7 +894,7 @@ public sealed class ReferenceResolver(DataBinder data)
             for (DataItem? n = item; n is not null && ReferenceEquals(n.Class, sc); n = n.Parent)
                 if (n.Occurs is not null) occursLevels.Add(n);
             occursLevels.Reverse();
-            if (occursLevels.Count != indexExprs.Count) { deferred = DeferredShape.UnbuiltAccessPath; return null; }   // an item-path caller's count
+            if (occursLevels.Count != indexExprs.Count) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }   // an item-path caller's count
             string offset = item.ClassOffset.ToString();
             // The BIT twin of the same displacement, for a USAGE BIT member (kb/Work PB203): a bit item's
             // occurrences lie at successive BIT positions (§8.5.1.6.3's "next bit position in storage"; the same
@@ -980,7 +931,7 @@ public sealed class ReferenceResolver(DataBinder data)
         // A Tier-A view forwards to the canonical (a numeric view reinterprets the shared unscaled value via its own
         // scale, for free). A not-yet-wired (Tier-C) / Rejected view is loud.
         if (item.Class is { } cls && !item.IsCanonical && cls.Tier != RedefinesTier.Alias)
-            return null;   // Tier D (Rejected) — refused at the declaration; `deferred` stays null
+            return null;   // Tier D (Rejected) — refused at the declaration; the gap names the item itself
         DataItem accessItem = item.Class is { Tier: RedefinesTier.Alias } ac && !item.IsCanonical
             ? ac.Canonical : item;
         // A subscripted element whose access path crosses an OCCURS DYNAMIC level (data-model D9): the sending and
@@ -990,15 +941,90 @@ public sealed class ReferenceResolver(DataBinder data)
         for (DataItem? n = accessItem; n is not null; n = n.Parent)
             if (n.IsDynamicTable)
             {
-                if (BuildAccessPath(accessItem, indexExprs) is not { } dynPath) { deferred = DeferredShape.UnbuiltAccessPath; return null; }
+                if (BuildAccessPath(accessItem, indexExprs) is not { } dynPath) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
                 return new DynTablePlace(dynPath, item);
             }
         // An unsubscripted reference to an OCCURS table (whole-table op) is a later slice → AccessPath null → loud.
-        if (BuildAccessPath(accessItem, indexExprs) is not { } path) { deferred = DeferredShape.UnbuiltAccessPath; return null; }
+        if (BuildAccessPath(accessItem, indexExprs) is not { } path) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
         // (Resolving a group no longer mutates WholeGroupReferenced — the "which groups are whole-image operands"
         // analysis is the post-bind UsageCollectionPass, which walks the BOUND tree and collects ONLY true
         // whole-group operands, not every RESOLVED group. PHASE-05 Step 5, §14.9.25.4 MOVE GR4.)
         return WrapIfOdoGroup(new MemberPlace(path, item), item);
+    }
+
+    /// <summary>The place of a level-66 RENAMES entry (ISO §13.18.45) — the <see cref="PlaceForItem"/> arm for an
+    /// item that owns no storage of its own. The no-THROUGH form forwards to data-name-2's place (GR1); the
+    /// THROUGH form composes a <see cref="RenamesPlace"/> over the spanned storage parts (GR2). This slice covers
+    /// STRING-VALUED leaves (X / edited / StoreAsImage) and character-form numeric leaves through their image; any
+    /// other typed-numeric leaf in the span is the <see cref="DeferredShape.RenamesNonCharacterLeaf"/> stage.</summary>
+    private Place? PlaceForRenames(DataItem alias, RenamesInfo ren, IReadOnlyList<string> indexExprs, out PlaceGap gap)
+    {
+        gap = new(null, alias);
+        // A level-66 entry is never a table element, so a written subscript was refused by §8.4.2.3.3 SR2 before
+        // the syntactic path got here (ScreenSubscriptArity); an item-path caller's count is the same mismatch
+        // every other item reports.
+        if (indexExprs.Count > 0) { gap = new(DeferredShape.UnbuiltAccessPath, alias); return null; }
+        // A RENAMES entry whose operands did not resolve was refused at its declaration (COBOLNET1655,
+        // §13.18.45.3), and the data binder leaves it with no From and an empty Span.
+        if (ren.Thru is null ? ren.From is null : ren.Span.Count == 0) return null;
+        // The no-THRU form is an ALIAS: §13.18.45.4 GR1 — "all of the data attributes of data-name-2 become the
+        // data attributes of data-name-1 and the storage area occupied by data-name-2 becomes the storage area
+        // occupied by data-name-1". Attributes AND storage forward to the renamed item's place (numeric stays
+        // numeric: NC252A's ADD 3500 TO RENAME-12 over a PIC 9(4); a group forwards as the group), and only the
+        // THRU form composes an alphanumeric span (GR2).
+        // ⛔ BUT THE IDENTITY DOES NOT FORWARD (kb/Work PB602). GR1 shares the attributes and the storage, not the
+        // NAME: data-name-1 is a data item of its OWN, and a bare forward made a reference to the 66
+        // indistinguishable from a reference to the renamed item — so `START RLF KEY IS = RK-ALIAS` passed
+        // §14.9.41.3 SR5's "shall be the data item specified in the RELATIVE KEY clause" that its THROUGH sibling
+        // (a RenamesPlace, which keeps its own Item) was correctly refused by. `DenotesAs` records the alias on the
+        // renamed item's own place, so nothing about the ACCESS changes and only the identity question answers
+        // differently.
+        if (ren.Thru is null)
+            return PlaceForItem(ren.From!, [], out gap) is { } fwdPlace ? fwdPlace with { DenotesAs = alias } : null;
+        var leafPlaces = new List<Place>(ren.Span.Count);
+        var widths = new List<int>(ren.Span.Count);
+        foreach (var part in ren.Span)
+        {
+            var leaf = part.Leaf;
+            if (part.Occurrence is { } occIdx)
+            {
+                // ONE occurrence (or the one-and-only cell) of the leaf, possibly a partial slice of it (kb/Work
+                // PB96): the cell's place, then its ref-mod view when the part does not cover the whole cell.
+                if (SpanLeafPlace(leaf, leaf.Occurs is null ? [] : [occIdx.ToString()], out gap) is not { } cell)
+                    return null;
+                if (part.IsPartial) cell = new RefModPlace(cell, part.Start.ToString(), part.Length.ToString());
+                leafPlaces.Add(cell);
+                widths.Add(part.Length);
+                continue;
+            }
+            // An OCCURS leaf inside the span contributes EVERY occurrence in order (§13.18.45 — the alias covers
+            // the whole fixed-size area; NC252A's RENAME-7 over TABLE-ITEM-2 OCCURS 5).
+            int occ = leaf.Occurs ?? 1;
+            for (int k = 1; k <= occ; k++)
+            {
+                if (SpanLeafPlace(leaf, leaf.Occurs is null ? [] : [k.ToString()], out gap) is not { } lp) return null;
+                widths.Add(leaf.ImageWidth);   // a whole part: every occurrence, at the leaf's width (kb/Work PB96)
+                leafPlaces.Add(lp);
+            }
+        }
+        return new RenamesPlace(leafPlaces, alias, widths);
+    }
+
+    /// <summary>One spanned leaf cell of a RENAMES THROUGH alias, as the CHARACTER string the composed alias
+    /// concatenates: a string-valued leaf as it is, a typed NUMERIC-DISPLAY leaf through its character image (the
+    /// alias is an alphanumeric view of the span, §13.18.45.4 GR2 — NC252A's PIC 999 leaves under
+    /// RENAMES-TEST-1). Null with the gap when the cell has no place, or has no character form to take part
+    /// through.</summary>
+    private Place? SpanLeafPlace(DataItem leaf, IReadOnlyList<string> indexExprs, out PlaceGap gap)
+    {
+        if (PlaceForItem(leaf, indexExprs, out gap) is not { } place) return null;
+        bool stringValued = data.IsImageBackedEarly(leaf) || place is RedefViewPlace
+            || leaf.Pic?.Category is PicCategory.Alphanumeric or PicCategory.NumericEdited
+                or PicCategory.National or PicCategory.Boolean;
+        if (stringValued) return place;
+        if (leaf.Pic is { IsCharacterFormNumeric: true }) return new NumericImagePlace(place);   // THE ONE character-form predicate (kb/Work PB646)
+        gap = new(DeferredShape.RenamesNonCharacterLeaf, leaf);
+        return null;
     }
 
     /// <summary>A group whose subtree contains an occurs-depending table is an ODO operand (ISO §13.18.38 GR8): wrap
@@ -1043,8 +1069,8 @@ public sealed class ReferenceResolver(DataBinder data)
             // SR2 names the CONDITIONAL VARIABLE for a condition-name reference (§8.4.2.3 Format 2), which is
             // exactly the item this entry is handed — so the ONE subscript reading applies unchanged (kb/Work PB877).
             var answer = ReadSubscripts(dref, item, SubscriptGroupOf(dref), out var indexExprs)
-                ?? (PlaceForItem(item, indexExprs, out var deferred) is { } place
-                    ? RefResolution.Resolved(place, "") : ItemFailure(dref, item, deferred));
+                ?? (PlaceForItem(item, indexExprs, out var gap) is { } place
+                    ? RefResolution.Resolved(place, "") : ItemFailure(dref, gap));
             if (answer.Outcome == RefOutcome.Deferred) data.Edition.NoteUnbuilt(answer.Feature);
             return answer;
         }
@@ -1382,10 +1408,11 @@ public sealed class ReferenceResolver(DataBinder data)
     }
 
     /// <summary>Build the <see cref="Place"/> for a by-name reference with ALREADY-RENDERED C# index expressions
-    /// (one per OCCURS level, outermost first). A level-66 RENAMES alias stays null (loud) — its composition
-    /// lives only on the parse-context path.</summary>
+    /// (one per OCCURS level, outermost first). A level-66 RENAMES entry is built by the same
+    /// <see cref="PlaceForItem"/> as every other item (kb/Work PB1380); it is never a table element, so a written
+    /// subscript on one builds no place.</summary>
     internal Place? ResolveByName(string name, IReadOnlyList<string> qualifiers, IReadOnlyList<string> indexExprs) =>
-        FindItem(name, qualifiers) is { Renames: null } item ? PlaceForItem(item, indexExprs) : null;
+        FindItem(name, qualifiers) is { } item ? PlaceForItem(item, indexExprs) : null;
 
     /// <summary>Render one subscript token segment to a C# index expression (the private
     /// <see cref="RenderSegment"/>), or null when the segment uses an unhandled form (caller fails loud).</summary>

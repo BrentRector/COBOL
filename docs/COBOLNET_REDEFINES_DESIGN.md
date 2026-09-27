@@ -133,6 +133,12 @@ RENAMES THRU (GR2 — NC252A: 66 RENAME1 RENAMES NAME1 THRU NAME3): composed acc
   WITHOUT-THROUGH alias is the opposite by GR1 ("all of the data attributes of data-name-2 become the data attributes of
   data-name-1"), which is why `ReferenceResolver` forwards it to the renamed item's own place and builds no `RenamesPlace`
   at all — the Tier-A/Tier-B split above is exactly this rule split, and the two must stay in step.
+  Both forms are built by `ReferenceResolver.PlaceForItem` (its `PlaceForRenames` arm) — the ONE item→place builder — so a
+  level-66 reference takes the same tail as any other identifier: a reference-modified alias `RN(2:3)` is the §8.4.3.3.4 GR5
+  slice (a `RefModPlace` over the `RenamesPlace`, or over data-name-2's forwarded place), screened by §8.4.3.3.3 SR1 against the
+  PLACE's item (the THROUGH alias itself, an alphanumeric group; data-name-2 for the no-THROUGH form), and a zero-length slice
+  raises EC-BOUND-REF-MOD unless REF-MOD-ZERO-LENGTH is on (§7.3.23.3 GR1). The by-item entries (`ResolveItem`,
+  `ResolveItemRefMod`, `ResolveByName`) reach it the same way (kb/Work PB1380; `RenamesPlaceBuilderDriftTests`).
 
 TIER C (scoped byte[] — mixed-USAGE pun): 01 PUN. / 05 AS-TEXT PIC X(4). / 05 AS-NUM REDEFINES AS-TEXT PIC 9(8) COMP-5. →
   private static byte[] _redef_AS_TEXT = new byte[4];   // ONE stored backing, class width 4 (persistent, NOT materialize-on-demand).
