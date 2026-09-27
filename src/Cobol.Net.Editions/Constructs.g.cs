@@ -41,6 +41,7 @@ public static class Constructs
     public const string ListingDirective2002 = "listing-directive-2002";
     public const string PageDirective2002 = "page-directive-2002";
     public const string PropagateDirective2002 = "propagate-directive-2002";
+    public const string FloatingCommentIndicator2002 = "floating-comment-indicator-2002";
     public const string SourceFormatDirective2002 = "source-format-directive-2002";
     public const string TurnDirective2002 = "turn-directive-2002";
     public const string DisplayDirective2023 = "display-directive-2023";

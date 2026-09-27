@@ -2208,6 +2208,24 @@ public static class DiagnosticCatalog
         + "statement has no terminating separator period.",
         "ISO §7.2.3.2 / §7.2.4.2 / §7.2.3.4 GR6");
 
+    /// <summary>COBOLNET2495 — a floating comment indicator <c>*&gt;</c> written directly after a character (kb/Work
+    /// PB1493). It is recognized in ONE place, the §6.5 logical conversion, which still takes the rest of the line as
+    /// the comment; before, both the fixed-form strip and the lexer took <c>X*&gt; …</c> as a comment silently.</summary>
+    public static readonly DiagnosticDescriptor FloatingCommentNotSeparated = new(
+        "COBOLNET2495", "floating-comment-not-separated", EditionSeverity.Error,
+        "A floating comment indicator *> is written directly after another character. ISO §6.2.3.2 SR2: \"The "
+        + "floating comment indicator of an inline comment shall be preceded by a separator space\". Write a space "
+        + "before the *>.", "ISO §6.2.3.2 SR2");
+
+    /// <summary>COBOLNET2496 — a multiple-character floating indicator split across a fixed-form continued line and
+    /// its continuation line (kb/Work PB1493): the continued line ends with the indicator's first character and the
+    /// continuation line's program text begins with the rest, so the join spells it without its being written.</summary>
+    public static readonly DiagnosticDescriptor FloatingIndicatorSplit = new(
+        "COBOLNET2496", "floating-indicator-split", EditionSeverity.Error,
+        "A continuation line completes a floating indicator (*> or >>) begun at the end of the line it continues. "
+        + "ISO §6.2.3.2 SR3: \"All the characters forming a multiple-character floating indicator shall be specified "
+        + "on the same line.\" Write the whole indicator on one line.", "ISO §6.2.3.2 SR3");
+
     /// <summary>COBOLNET2450 — COPY literal-1 / literal-2 that is not a plain alphanumeric literal (kb/Work PB1354):
     /// a concatenation expression or figurative constant (§7.2.3.3 SR4), or a national or boolean literal (SR5
     /// "Literal-1 and literal-2 shall be alphanumeric literals").</summary>

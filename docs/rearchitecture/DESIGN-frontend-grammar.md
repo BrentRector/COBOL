@@ -731,7 +731,7 @@ StripNistArchiveMarkers → NormalizeToFreeForm(edition,permissive) → Conditio
 
 Target changes:
 1. **Namespace** all five files `CobolSharp.Compiler.Preprocessor` → `CobolNet.Frontend.Preprocessor` (D8).
-2. **Delete the per-stage edition-metadata/severity copies** (D4): `ReferenceFormatProcessor.EditionGates`
+2. **Delete the per-stage edition-metadata/severity copies** (D4): `ReferenceFormatProcessor.ReferenceFormatDiagnostics`
    and `CopyProcessor` currently re-implement the strict/permissive `Removed()` policy. They take an injected
    `IEditionSeverityPolicy` (from `Cobol.Net.Editions`) instead, so "removed = error strict / warning
    permissive" has ONE definition. The preprocessor keeps only its *reference-format/COPY-specific* gate rows
@@ -740,6 +740,40 @@ Target changes:
    it is a real safety invariant for TURN anchoring; convert the `throw` into a recorded internal diagnostic
    (consistent with the top-level exception boundary), not a raw exception.
 4. The preprocessor remains hand-written (not the dead `CobolPreprocessor.g4`); that grammar is deleted (§3.4).
+
+#### 3.6.0 Reference format — the ISO §6.5 logical conversion is ONE pass (kb/Work PB1491, PB1493)
+
+`ReferenceFormatProcessor` (`ReferenceFormatProcessor.LogicalConversion.cs`) IS the §6.5 logical conversion, for both
+reference formats, and the only place source comments are recognized. Its model:
+
+- **Lines, not a character buffer.** The resultant compilation group is a list of lines with a parallel origin list
+  (kb/Work PB82) — one resultant line per physical line, except a fixed-form continuation line, which occupies none.
+- **The join target is the LATEST LOGICAL line** (§6.5 6) a)/b) "appended immediately to the right of the last
+  character in the latest logical line of the resultant compilation group"), tracked by index. A comment line or a
+  blank line is "logically discarded" (§6.5 2)): it keeps its slot as an EMPTY line but is never the join target and
+  never touches the literal state a continued line left open (§6.3.5 "Comment lines and blank lines may be
+  interspersed among lines containing the parts of a literal"). Writing the join against "the last line written" is
+  what made an interspersed comment line receive the continuation and a blank line crash the origin tracking.
+- **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
+  (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
+- **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
+  3) removes an inline comment on a continuation line too, and a quotation symbol ends a literal only when it is the
+  one that opened it. It replaced two scanners that disagreed (a comment strip that assumed "not in a literal" and a
+  state scan that treated either quotation symbol as closing).
+- **Comments never leave this pass.** A comment line becomes an empty line and an inline comment is cut, in fixed
+  AND free form, so no later stage (the lexer's picture mode, the COPY/REPLACE text-word scanner, the NIST
+  substitutions) has a comment rule to get wrong. The lexer keeps `COMMENT_START` (and `PIC_COMMENT` /
+  `SUB_COMMENT` in its other modes) only for the INTERNAL `*>` carriers written after this pass: the debugging-line
+  carrier and the COPY stage's not-found notes.
+- **The §6.2.3.2 syntax rules and the edition gate live here**, in `ReferenceFormatDiagnostics`: SR2 (a `*>` not
+  preceded by a separator space — COBOLNET2495; the text after it is still the comment), SR3 (a continuation line
+  completing a `*>` or `>>` begun at the end of the line it continues — COBOLNET2496), and the 2002 introduction
+  gate `floating-comment-indicator-2002` (COBOLNET0900, once per compilation), asked in FIXED form only — free form
+  is itself a 2002 introduction reached below 2002 only through the auto-detection extension, and its only comment is
+  the floating one.
+- **The next case is automatic.** The floating literal continuation indicator (§6.5 4) and 8); kb/Work PB1359) and
+  the continuation-line validation (§6.2.3.2 SR6; kb/Work PB1492) are further steps of the same per-line pass over
+  the same literal state — not a second scanner.
 
 #### 3.6.1 Directive state — `>>PUSH` / `>>POP` (kb/Work PB941)
 

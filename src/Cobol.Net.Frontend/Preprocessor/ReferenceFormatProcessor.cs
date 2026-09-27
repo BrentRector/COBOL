@@ -13,7 +13,7 @@ namespace CobolNet.Frontend.Preprocessor;
 /// Fixed-form: columns 1-6 sequence, 7 indicator, 8-72 source, 73+ comment.
 /// Free-form: no column restrictions.
 /// </summary>
-public static class ReferenceFormatProcessor
+public static partial class ReferenceFormatProcessor
 {
     /// <summary>How a fixed-form debugging line (indicator <c>D</c>) reaches the text-manipulation stage: as a comment
     /// to the lexer, but one whose text COPY REPLACING and REPLACE still match over (the COPY rule of COBOL-85 —
@@ -113,7 +113,7 @@ public static class ReferenceFormatProcessor
     public static MappedText NormalizeToFreeFormMapped(
         string sourceText, int dialectLevel, bool permissive, DiagnosticBag? diagnostics, string sourcePath)
     {
-        var gates = diagnostics is null ? null : new EditionGates(dialectLevel, permissive, diagnostics, sourcePath);
+        var gates = diagnostics is null ? null : new ReferenceFormatDiagnostics(dialectLevel, permissive, diagnostics, sourcePath);
         var lines = sourceText.Split('\n');
 
         // Locate the >>SOURCE FORMAT switches: line index → the declared format (fixed?). Each switch partitions
@@ -147,7 +147,7 @@ public static class ReferenceFormatProcessor
         // classifies the NIST fixed corpus and free-form real-world source without a directive — DEVLOG 931).
         if (switches.Count == 0)
         {
-            if (!IsFixedForm(sourceText)) return MappedText.Identity(sourceText, sourcePath);
+            if (!IsFixedForm(sourceText)) return ConvertFreeFormMapped(sourceText, gates, sourcePath);
             var (fl, fo) = ConvertFixedToFreeMapped(sourceText, gates, 0);
             return Mapped(fl, fo, sourcePath);
         }
@@ -178,7 +178,11 @@ public static class ReferenceFormatProcessor
                     outOrigins.AddRange(so);
                 }
                 else
-                    for (int k = segStart; k < segEnd; k++) { outLines.Add(lines[k].TrimEnd('\r')); outOrigins.Add(k + 1); }   // free: as-is
+                    for (int k = segStart; k < segEnd; k++)   // free: line for line, its comment removed (§6.5 2) / 3))
+                    {
+                        outLines.Add(ConvertFreeLine(lines[k].TrimEnd('\r'), k + 1, gates));
+                        outOrigins.Add(k + 1);
+                    }
             }
             if (s < segments.Count)
             {
@@ -244,32 +248,6 @@ public static class ReferenceFormatProcessor
         return new MappedText(string.Join('\n', outLines), origins);
     }
 
-    /// <summary>The MAPPED fixed→free conversion (kb/Work PB82): the output lines (a fixed-form continuation JOINS
-    /// physical lines) and, per output line, the 1-based physical source line where that output line STARTED — the
-    /// first source line that wrote content into it (a joined continuation keeps its head line's number).</summary>
-    private static (List<string> Lines, List<int> Origins) ConvertFixedToFreeMapped(string sourceText, EditionGates? gates, int lineOffset)
-    {
-        var origins = new List<int>();
-        string converted = ConvertFixedToFree(sourceText, gates, lineOffset, origins);
-        var outLines = SplitLines(converted).ToList();
-        // origins has one entry per '\n' — SplitLines drops the artifact final empty piece, so the counts agree;
-        // any residue is a defect in the tracking, never silently padded.
-        if (origins.Count != outLines.Count)
-            throw new InvalidOperationException(
-                $"ConvertFixedToFree origin tracking: {origins.Count} origin(s) for {outLines.Count} output line(s) (kb/Work PB82)");
-        return (outLines, origins);
-    }
-
-    /// <summary>Split a <see cref="ConvertFixedToFree"/> result into clean per-line strings for the per-segment
-    /// assembly. Every emitted line ends with <c>AppendLine</c>, so the result ends with exactly ONE trailing
-    /// newline (the artifact) — drop only that final empty element. A bare <c>TrimEnd('\n')</c> would instead delete
-    /// a BLANK source line that terminates the segment, losing it and misaligning the following segment.</summary>
-    private static IEnumerable<string> SplitLines(string s)
-    {
-        var parts = s.Replace("\r\n", "\n").Split('\n');
-        return parts.Length > 0 && parts[^1].Length == 0 ? parts[..^1] : parts;
-    }
-
     /// <summary>Our documented margin R (Annex A item 158 / CONFORMANCE.md §7): the program-text area is columns
     /// 8–72, so column position <see cref="SourceAreaStart"/>+<see cref="SourceAreaWidth"/> = 72.</summary>
     private const int MarginR = SourceAreaStart + SourceAreaWidth;
@@ -295,16 +273,46 @@ public static class ReferenceFormatProcessor
     }
 
     /// <summary>
-    /// The per-compilation edition gates of the fixed-form continuation mechanism (registry rows
-    /// <c>col7-continuation-obsolete-2023</c> / <c>fixed-form-word-continuation-removed-2023</c>; the emit
-    /// sites live HERE because only the column-aware pass can see the indicator — the metadata stays
-    /// registry-canonical, and the strict/permissive decision is the ONE <see cref="EditionSeverityPolicy"/>
-    /// (P2.9 — removed = error strict / warning permissive, obsolete = warning always; never a local
-    /// <c>if(permissive)</c>). One diagnostic per file per gate.
+    /// The per-compilation diagnostics of reference format — the ones only the §6.5 logical conversion can raise,
+    /// because only it sees the indicator area and the line boundaries: the edition gates of the fixed-form
+    /// continuation mechanism (registry rows <c>col7-continuation-obsolete-2023</c> /
+    /// <c>fixed-form-word-continuation-removed-2023</c>), of the floating comment indicator
+    /// (<c>floating-comment-indicator-2002</c>) and of the <c>&gt;&gt;SOURCE</c> directive, and the §6.2.3.2 syntax
+    /// rules of the floating comment indicator. The edition metadata stays registry-canonical, and the
+    /// strict/permissive decision is the ONE <see cref="EditionSeverityPolicy"/> (P2.9 — removed = error strict /
+    /// warning permissive, obsolete = warning always; never a local <c>if(permissive)</c>). One diagnostic per file
+    /// per edition gate.
     /// </summary>
-    private sealed class EditionGates(int dialectLevel, bool permissive, DiagnosticBag diagnostics, string sourcePath)
+    private sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive, DiagnosticBag diagnostics, string sourcePath)
     {
-        private bool _col7Flagged, _wordFlagged;
+        private bool _col7Flagged, _wordFlagged, _floatingCommentFlagged;
+
+        /// <summary>A floating comment indicator in program text (§6.2.3.1) — a COBOL-2002 introduction, so COBOL-85
+        /// source has none (row <c>floating-comment-indicator-2002</c>). Gated once per compilation, at its first use.</summary>
+        public void OnFloatingComment(int line, int column)
+        {
+            if (_floatingCommentFlagged) return;
+            _floatingCommentFlagged = true;
+            var row = ConstructRegistry.Find(Constructs.FloatingCommentIndicator2002)!;
+            ConstructRegistry.Check(EditionInfo.Of(dialectLevel, permissive),
+                new BagSink(diagnostics, new SourceOrigin(sourcePath, line).ToLocation(column)), row.Id, row.Display);
+        }
+
+        /// <summary>§6.2.3.2 SR2: "The floating comment indicator of an inline comment shall be preceded by a
+        /// separator space" — COBOLNET2495. The text from the indicator on is still taken as the comment.</summary>
+        public void OnUnseparatedFloatingComment(int line, int column)
+            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FloatingCommentNotSeparated.Code,
+                "the floating comment indicator *> shall be preceded by a separator space (ISO §6.2.3.2 SR2); write a "
+                + "space before it", new SourceOrigin(sourcePath, line).ToLocation(column), default);
+
+        /// <summary>§6.2.3.2 SR3: "All the characters forming a multiple-character floating indicator shall be
+        /// specified on the same line" — COBOLNET2496, for a continuation line that completes one begun at the end of
+        /// the latest logical line.</summary>
+        public void OnSplitFloatingIndicator(int line, string indicator)
+            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FloatingIndicatorSplit.Code,
+                $"the floating indicator {indicator} is split across a continued line and its continuation line; all the "
+                + "characters of a multiple-character floating indicator shall be on the same line (ISO §6.2.3.2 SR3)",
+                new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn), default);
 
         /// <summary>Any col-7 '-' continuation — OBSOLETE at 2023 (Annex F.2 item 4; VCR row 94).</summary>
         public void OnContinuation(int line)
@@ -451,392 +459,5 @@ public static class ReferenceFormatProcessor
         bool fixedShape = hasNumericSequence || (hasFixedIndicatorGlyph && !hasContentPastSourceArea);
         return totalLines > 0 && fixedShape &&
                fixedIndicators * 100 / totalLines > FixedFormThresholdPercent;
-    }
-
-    /// <summary>
-    /// Convert fixed-form source to free-form by stripping columns 1-6 and 73+,
-    /// handling indicator column (7), and joining continuation lines.
-    /// Tracks literal/quote state across lines to correctly handle doubled-quotes
-    /// ("") that straddle continuation boundaries (ISO §6.2.2).
-    /// </summary>
-    public static string ConvertFixedToFree(string sourceText) => ConvertFixedToFree(sourceText, gates: null);
-
-    /// <summary>The MAPPED fixed→free conversion of a whole text originating in <paramref name="file"/> (kb/Work PB82).</summary>
-    public static MappedText ConvertFixedToFreeMapped(string sourceText, string file)
-    {
-        var (l, o) = ConvertFixedToFreeMapped(sourceText, gates: null, 0);
-        return Mapped(l, o, file);
-    }
-
-    /// <param name="lineOffset">The file-relative index (0-based) of this text's first line — nonzero when
-    /// converting one SOURCE-FORMAT SEGMENT of a larger file, so the <see cref="EditionGates"/> continuation
-    /// diagnostics report the file line, not the segment-relative one.</param>
-    /// <param name="origins">When given (kb/Work PB82), receives the 1-based physical source line of each output line,
-    /// one entry per newline written — the line that FIRST wrote content into that output line, so a continuation
-    /// joined into its predecessor leaves the predecessor's origin standing.</param>
-    private static string ConvertFixedToFree(string sourceText, EditionGates? gates, int lineOffset = 0, List<int>? origins = null)
-    {
-        var lines = sourceText.Split('\n');
-        var result = new StringBuilder();
-        int lineNo = lineOffset;
-        // Origin tracking (kb/Work PB82): each newline appended to the builder completes one output line, whose
-        // origin is the source line being processed — unless the line was REOPENED by a continuation join, which
-        // strips the previous output line's newline (see the '-' arm) and hands its origin back, so the joined line
-        // keeps its HEAD line's number. Newlines are counted incrementally from `scanned`; the join is the one
-        // place the builder shrinks, and it is handled there, never inferred from the length.
-        int nlSeen = 0, scanned = 0;
-        int? reopenedOrigin = null;
-        void SyncOrigins(int srcLine)
-        {
-            if (origins is null) return;
-            for (int i = scanned; i < result.Length; i++)
-                if (result[i] == '\n') { nlSeen++; origins.Add(reopenedOrigin ?? srcLine); reopenedOrigin = null; }
-            scanned = result.Length;
-        }
-
-        // Literal state carried across lines for continuation decisions
-        bool inLiteral = false;
-        bool pendingQuote = false; // true when last char was first half of potential "" pair
-
-        // True while inside an obsolete IDENTIFICATION comment-entry paragraph (AUTHOR/INSTALLATION/etc.):
-        // its free-text body is commented out until the next Area-A header. See CommentEntryParagraphs.
-        bool inCommentEntry = false;
-
-        foreach (var rawLine in lines)
-        {
-            if (lineNo > lineOffset) SyncOrigins(lineNo);   // the previous source line's newly completed output lines
-            lineNo++;
-            var line = rawLine.TrimEnd('\r');
-
-            if (line.Length < SourceAreaStart)
-            {
-                result.AppendLine();
-                inLiteral = false;
-                pendingQuote = false;
-                continue;
-            }
-
-            char indicator = line[IndicatorColumn];
-            string sourceArea = line[SourceAreaStart..];
-            if (sourceArea.Length > SourceAreaWidth)
-                sourceArea = sourceArea[..SourceAreaWidth];
-
-            // Obsolete comment-entry handling: applies only to ordinary code lines (the '-' continuation
-            // and the '*'/'/'/'D'/excluded-indicator lines fall through to the switch, which already
-            // comments or joins them — a comment-entry body is plain space-indicator text).
-            bool excludedIndicator =
-                indicator is '*' or '/' or 'D' or 'd' or 'S' or 's' or 'Y' or 'y'
-                          or 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u' or '-';
-            if (!excludedIndicator)
-            {
-                string? firstAreaAWord = FirstAreaAWord(sourceArea);
-                if (firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
-                {
-                    // Start (or continue, for back-to-back comment paragraphs) a comment-entry.
-                    inCommentEntry = true;
-                    result.AppendLine($"*> {sourceArea.TrimEnd()}");
-                    inLiteral = false;
-                    pendingQuote = false;
-                    continue;
-                }
-                if (inCommentEntry)
-                {
-                    if (firstAreaAWord is not null)
-                    {
-                        // An Area-A header that is NOT a comment paragraph = the next real paragraph or
-                        // division (ENVIRONMENT/DATA/PROCEDURE/section/program). End the comment-entry and
-                        // let this line be processed normally below.
-                        inCommentEntry = false;
-                    }
-                    else
-                    {
-                        // Area-B free text of the comment-entry: keep as commentary.
-                        result.AppendLine($"*> {sourceArea.TrimEnd()}");
-                        inLiteral = false;
-                        pendingQuote = false;
-                        continue;
-                    }
-                }
-            }
-
-            switch (indicator)
-            {
-                case '*' or '/':
-                    result.AppendLine($"*> {sourceArea.TrimEnd()}");
-                    inLiteral = false;
-                    pendingQuote = false;
-                    break;
-
-                case 'D' or 'd' or 'S' or 's' or 'Y' or 'y':
-                    result.AppendLine(DebugLineCarrier + sourceArea.TrimEnd());
-                    inLiteral = false;
-                    pendingQuote = false;
-                    break;
-
-                // CCVS optional/alternate source lines: the file-I/O suites tag auxiliary or
-                // alternate-configuration lines in the indicator column — 'P' (an optional scratch
-                // file such as the INDEXED RAW-DATA member, assigned to an X-card the program's
-                // header does not declare) and 'J' (an alternate ASSIGN target beside the primary
-                // space-indicator one). The primary configuration is the space-indicator lines, so
-                // these alternates are excluded for a standard run (treated as comment lines).
-                //
-                // 'H' (CLOSE … REEL) and 'E' (CLOSE … UNIT) tag the multi-reel/multi-volume tape
-                // feature (with REELUNIT counters) — an optional feature CobolSharp does not support;
-                // the CCVS pairs each such block with a replacement line ('I' for REEL, 'F' for UNIT,
-                // e.g. MOVE "CLOSE REEL DELETED" TO RE-MARK) that becomes the controlling IF's body
-                // once the 'H'/'E' lines (which carry the period) are deleted. Excluding 'H'/'E' and
-                // keeping the replacement (a normal line) yields the intended no-multi-volume program
-                // — and stops CLOSE … REEL/UNIT from prematurely closing the file mid write-loop.
-                // (Only 'H'/'E' are excluded; 'F' is also used as ordinary code in the IC suite.)
-                //
-                // 'T'/'U' are a matched ALTERNATE PAIR that completes an intentionally-incomplete record
-                // layout (IX207A/IX208A): the base (space-indicator) FD record omits the key/alternate-key
-                // filler bytes, and exactly ONE of the T or U variant lines supplies them — base+T and
-                // base+U each total the declared RECORD length, but keeping BOTH overflows it and shifts the
-                // key offsets away from the fixed-width FILE-RECORD-INFO work area the records are written
-                // through. The test's own working-storage key images use the 'T' form, so 'T' is the active
-                // configuration (kept as ordinary code) and 'U' is the excluded alternate.
-                case 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u':
-                    result.AppendLine($"*> {sourceArea.TrimEnd()}");
-                    inLiteral = false;
-                    pendingQuote = false;
-                    break;
-
-                case '-':
-                    gates?.OnContinuation(lineNo);
-                    // The WORD-continuation shape (removed 2023, VCR row 2): a NON-literal continuation whose
-                    // splice joins two COBOL word characters (§6.3.5 — the continuation's first nonblank
-                    // immediately follows the preceding line's last nonblank). Literal continuation and
-                    // non-word splices (e.g. after a period or parenthesis) are NOT word continuation.
-                    if (gates is not null && !inLiteral
-                        && LastNonSpace(result) is { } prevCh && IsCobolWordChar(prevCh)
-                        && sourceArea.TrimStart() is { Length: > 0 } contText && IsCobolWordChar(contText[0]))
-                        gates.OnWordContinuation(lineNo);
-                    // The join REOPENS the previous output line: strip its newline HERE (HandleContinuation then
-                    // finds none), give its origin back so the completed joined line keeps the head line's number.
-                    if (origins is not null)
-                    {
-                        while (result.Length > 0 && result[result.Length - 1] is '\n' or '\r')
-                        {
-                            if (result[result.Length - 1] == '\n' && nlSeen > 0)
-                            {
-                                nlSeen--;
-                                reopenedOrigin = origins[^1];
-                                origins.RemoveAt(origins.Count - 1);
-                            }
-                            result.Length--;
-                        }
-                        scanned = result.Length;
-                    }
-                    HandleContinuation(result, sourceArea,
-                        ref inLiteral, ref pendingQuote);
-                    break;
-
-                default:
-                    // Normal line: strip any inline *> comment (COBOL-2002) that lies outside a literal, then
-                    // emit. Preserve trailing spaces when inside an unclosed literal.
-                    inLiteral = false;
-                    pendingQuote = false;
-                    string code = StripInlineComment(sourceArea);
-                    ScanLiteralState(code, ref inLiteral, ref pendingQuote);
-                    result.AppendLine(inLiteral ? code : code.TrimEnd());
-                    break;
-            }
-        }
-        SyncOrigins(lineNo);   // the last source line's output lines
-
-        return result.ToString();
-    }
-
-    /// <summary>
-    /// If the source area begins with a word in Area A (its first non-space character falls within
-    /// columns 8-11, i.e. the first <see cref="AreaAWidth"/> characters), return that word (the run of
-    /// non-space, non-period characters), else null. Used to detect division/section/paragraph headers,
-    /// which begin in Area A, versus Area-B continuation/free text, which is indented to column 12+.
-    /// </summary>
-    private static string? FirstAreaAWord(string sourceArea)
-    {
-        int start = 0;
-        while (start < sourceArea.Length && sourceArea[start] == ' ') start++;
-        if (start >= sourceArea.Length || start >= AreaAWidth)
-            return null; // blank line, or text begins in Area B (not a header)
-        int end = start;
-        while (end < sourceArea.Length && sourceArea[end] is not (' ' or '.')) end++;
-        return sourceArea[start..end];
-    }
-
-    /// <summary>
-    /// Truncate a fixed-format source area at a floating <c>*&gt;</c> inline comment (COBOL-2002, ISO §6.2.3)
-    /// that lies outside any string literal. Everything from the <c>*&gt;</c> to end of line is commentary. The
-    /// lexer would skip it regardless, but stripping it here keeps the cross-line literal-state scan from being
-    /// confused by quotes/apostrophes inside the comment text (which would otherwise mis-join a following
-    /// continuation line). A <c>*&gt;</c> embedded in a literal (e.g. <c>"A*&gt;B"</c>) is preserved.
-    /// </summary>
-    private static string StripInlineComment(string sourceArea)
-    {
-        bool inLiteral = false;
-        char quote = '\0';
-        for (int i = 0; i + 1 < sourceArea.Length; i++)
-        {
-            char c = sourceArea[i];
-            if (inLiteral)
-            {
-                if (c == quote)
-                {
-                    // A doubled quote ("") is an embedded quote that stays in the literal; a lone quote closes it.
-                    if (i + 1 < sourceArea.Length && sourceArea[i + 1] == quote) i++;
-                    else inLiteral = false;
-                }
-            }
-            else if (c is '"' or '\'')
-            {
-                inLiteral = true;
-                quote = c;
-            }
-            else if (c == '*' && sourceArea[i + 1] == '>')
-            {
-                return sourceArea[..i];
-            }
-        }
-        return sourceArea;
-    }
-
-    /// <summary>
-    /// Scan a source area to determine the literal/quote state at end of line.
-    /// Does NOT modify the content — only updates inLiteral and pendingQuote.
-    /// </summary>
-    private static void ScanLiteralState(string sourceArea,
-        ref bool inLiteral, ref bool pendingQuote)
-    {
-        for (int i = 0; i < sourceArea.Length; i++)
-        {
-            char c = sourceArea[i];
-
-            if (c is not ('"' or '\''))
-            {
-                if (pendingQuote)
-                {
-                    // Previous quote was NOT doubled — it closed the literal
-                    inLiteral = false;
-                    pendingQuote = false;
-                }
-                continue;
-            }
-
-            // c is a quote character
-            if (!inLiteral)
-            {
-                inLiteral = true;
-                pendingQuote = false;
-            }
-            else if (pendingQuote)
-            {
-                // Second half of a doubled-quote pair
-                pendingQuote = false;
-            }
-            else
-            {
-                // First quote inside a literal — could be closing or first half of ""
-                pendingQuote = true;
-            }
-        }
-    }
-
-    /// <summary>A COBOL word-forming character (§8.3.1 — letters, digits, hyphen; the underscore joined at
-    /// 2002 and rides the same splice rule).</summary>
-    private static bool IsCobolWordChar(char c) => char.IsLetterOrDigit(c) || c is '-' or '_';
-
-    /// <summary>The last non-space, non-newline character accumulated so far (the splice's LEFT side), or
-    /// null when the previous content is empty.</summary>
-    private static char? LastNonSpace(StringBuilder sb)
-    {
-        for (int i = sb.Length - 1; i >= 0; i--)
-            if (sb[i] is not (' ' or '\n' or '\r')) return sb[i];
-        return null;
-    }
-
-    /// <summary>
-    /// Handle a continuation line (column 7 = '-'). Joins to the previous line.
-    /// When continuing a literal, decides whether the continuation's opening quote is:
-    /// - a resume marker (strip it) — normal case
-    /// - the second half of a "" pair (keep it) — when previous line ended mid-pair
-    /// </summary>
-    private static void HandleContinuation(StringBuilder result, string sourceArea,
-        ref bool inLiteral, ref bool pendingQuote)
-    {
-        // Remove the last newline from result to join with previous line
-        while (result.Length > 0 && result[result.Length - 1] is '\n' or '\r')
-            result.Length--;
-
-        if (!inLiteral)
-        {
-            // Not in a literal — strip trailing spaces from previous line and
-            // append trimmed continuation content (§6.3.5: first non-space of
-            // continuation immediately follows last non-space of preceding line)
-            while (result.Length > 0 && result[result.Length - 1] == ' ')
-                result.Length--;
-            string trimmed = sourceArea.TrimStart();
-            result.AppendLine(trimmed);
-            ScanLiteralState(trimmed, ref inLiteral, ref pendingQuote);
-            return;
-        }
-
-        // We're inside an unclosed literal from the previous line.
-        // Find the first non-blank character.
-        int firstNonBlank = 0;
-        while (firstNonBlank < sourceArea.Length && sourceArea[firstNonBlank] == ' ')
-            firstNonBlank++;
-
-        if (firstNonBlank >= sourceArea.Length)
-        {
-            result.AppendLine();
-            return;
-        }
-
-        char firstChar = sourceArea[firstNonBlank];
-
-        if (firstChar is not ('"' or '\''))
-        {
-            // Not a quote — non-literal continuation
-            result.Append(sourceArea[firstNonBlank..]);
-            result.AppendLine();
-            ScanLiteralState(sourceArea[firstNonBlank..], ref inLiteral, ref pendingQuote);
-            return;
-        }
-
-        if (pendingQuote)
-        {
-            // Previous line ended with the first half of a "" pair.
-            // This quote is the SECOND HALF — data, not a resume marker.
-            // Keep this quote (append it).
-            pendingQuote = false;
-
-            // Check if the NEXT character is also a quote — if so, it's
-            // the resume marker for the continuing literal and must be stripped.
-            int contentStart = firstNonBlank + 1;
-            if (contentStart < sourceArea.Length && sourceArea[contentStart] is '"' or '\'')
-            {
-                // Append the paired quote, then skip the resume marker
-                result.Append(sourceArea[firstNonBlank]);
-                result.Append(sourceArea[(contentStart + 1)..]);
-                result.AppendLine();
-                ScanLiteralState(sourceArea[(contentStart + 1)..], ref inLiteral, ref pendingQuote);
-            }
-            else
-            {
-                // No resume marker follows — just append everything
-                result.Append(sourceArea[firstNonBlank..]);
-                result.AppendLine();
-                ScanLiteralState(sourceArea[(firstNonBlank + 1)..], ref inLiteral, ref pendingQuote);
-            }
-        }
-        else
-        {
-            // Normal literal continuation: strip the resume marker quote.
-            result.Append(sourceArea[(firstNonBlank + 1)..]);
-            result.AppendLine();
-            // Re-scan the appended content (after the stripped quote)
-            ScanLiteralState(sourceArea[(firstNonBlank + 1)..], ref inLiteral, ref pendingQuote);
-        }
     }
 }

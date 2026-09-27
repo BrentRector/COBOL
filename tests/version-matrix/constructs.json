@@ -480,6 +480,18 @@
    "source": "       >>PROPAGATE ON\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. PB725PR.\n       PROCEDURE DIVISION.\n       MAIN.\n           DISPLAY \"X\".\n           STOP RUN.\n"
   },
   {
+   "id": "floating-comment-indicator-2002",
+   "description": "The floating comment indicator *> (ISO §6.2.3.1) - a comment line when it is the first character-string in the program-text area, an inline comment after one or more character-strings - in either reference format. COBOL-85 had only the fixed comment indicators * and / of the indicator area, so *> in the program text of a COBOL-85 source is not a comment indicator. Recognized in ONE place, the §6.5 logical conversion in ReferenceFormatProcessor (kb/Work PB1493), which gates it once per compilation, in FIXED form - the only reference format a COBOL-85 source can be written in (free form is itself a 2002 introduction, reached below 2002 only through the documented auto-detection extension, and the floating indicator is its only comment); the witness is therefore fixed-form. The edition edge below 2023 is DERIVED, not quoted (VCR row 7.21's discipline - the repo holds no 2002 or 2014 text, ratified decision #1): the M2 post-85 feature catalog in docs/ISO2023_CONFORMANCE_PLAN.md places '*>' inline comments in COBOL-2002, and Annex E, which itemizes the 2014->2023 delta, does not list the floating indicators, so they predate 2023.",
+   "display": "the floating comment indicator *>",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §6.2.3.1 (floating indicators, both reference formats); a COBOL-2002 introduction (M2 catalog derivation, VCR row 7.21 discipline)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "floating indicators (§6.2.3) - 2002 introduction",
+   "source": "000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. PB1493FC.\n000300 PROCEDURE DIVISION.\n000400 MAIN.\n000500     DISPLAY \"X\". *> an inline comment\n000600     STOP RUN.\n"
+  },
+  {
    "id": "source-format-directive-2002",
    "description": "The >>SOURCE [FORMAT] [IS] { FIXED | FREE } compiler directive (ISO §7.3.24) - it switches the reference format of the source or library text that follows. Implemented by ReferenceFormatProcessor, which runs BEFORE the conditional-compilation driver (it must, to normalize the text), so the introduction gate for this ONE directive emits there rather than at the shared directive-recognition point. The §7.3 compiler-directive facility is a COBOL-2002 introduction: COBOL-85 has no compiler directives at all, so a '>>' line cannot occur in a conforming COBOL-85 source. The edition edge below 2023 is DERIVED, not quoted (VCR Table 7's discipline, rows 7.19/7.20 - the repo holds no 2002 or 2014 text, ratified decision #1): the derivation is (a) the M2 post-85 feature catalog in docs/ISO2023_CONFORMANCE_PLAN.md, which places '*>' inline comments, >>SOURCE FORMAT, conditional compilation and 'recognize-and-ignore of the other standard >> directives' in COBOL-2002, (b) the sibling row leap-second-directive-2002, already landed on the same derivation (kb/Work PB65), and (c) Annex E, which itemizes the 2014->2023 delta and does NOT list this directive among the additions, so it predates 2023. Overturnable in one line if the 2002/2014 text is ever acquired.",
    "display": ">>SOURCE FORMAT directive",
@@ -2312,7 +2324,7 @@
    "obsoleteIn": 2023,
    "expectDiagnostic": "COBOLNET0903",
    "vcr": "VCR row 94 (F.2 item 4); W3 preprocessor threading (DEVLOG 598)",
-   "source": "000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. VMLC1.\n000300 DATA DIVISION.\n000400 WORKING-STORAGE SECTION.\n000500 01 W-TXT PIC X(20) VALUE \"AAAAAAAAAA\n000600-    \"BBBBBBBBBB\".\n000700 PROCEDURE DIVISION.\n000800 MAIN.\n000900     DISPLAY W-TXT.\n001000     STOP RUN.\n"
+   "source": "000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. VMLC1.\n000300 DATA DIVISION.\n000400 WORKING-STORAGE SECTION.\n000500 01 W-TXT PIC X(60) VALUE \"AAAAAAAAAA\n000600-    \"BBBBBBBBBB\".\n000700 PROCEDURE DIVISION.\n000800 MAIN.\n000900     DISPLAY W-TXT.\n001000     STOP RUN.\n"
   },
   {
    "id": "padding-character-removed-2014",

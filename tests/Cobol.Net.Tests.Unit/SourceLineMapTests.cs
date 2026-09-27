@@ -75,7 +75,10 @@ public sealed class SourceLineMapTests : IDisposable
         Assert.Equal(7, m.Lines[bIndex].Line);           // the line AFTER the join is still physical line 7
         int aIndex = Array.FindIndex(lines, l => l.Contains("01 A PIC"));
         Assert.Equal(5, m.Lines[aIndex].Line);           // the joined line keeps its head line
-        Assert.Contains("\"abcdef\"", lines[aIndex]);    // and IS joined
+        // and IS joined — the short continued line read as space-filled to margin R, so positions 33–72 are part of
+        // the literal (§6.3.5 "any spaces at the end of the fixed-form continued line are part of the literal";
+        // DOC-A.1-157; kb/Work PB1491)
+        Assert.Contains("\"abc" + new string(' ', 40) + "def\"", lines[aIndex]);
     }
 
     [Fact]

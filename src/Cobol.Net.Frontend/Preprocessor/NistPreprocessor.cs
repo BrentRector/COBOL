@@ -118,8 +118,11 @@ public static class NistPreprocessor
         // "absent optional" file appear present (IX216A/217A/218A: OPEN INPUT/EXTEND of an absent optional
         // indexed file must give 05 / READ → AT END 10, not 00 from a producer's shared TF###).
         // Region pattern: a SELECT entry runs from the SELECT keyword to its terminating period. Two
-        // hazards drive the exact shape of this regex, both rooted in NormalizeToFreeForm rewriting
-        // fixed-form indicator-column lines into free-form "*> …" comment lines that survive in this text:
+        // hazards drove the exact shape of this regex, both rooted in NormalizeToFreeForm once rewriting
+        // fixed-form indicator-column lines into free-form "*> …" comment lines that survived into this text.
+        // Since kb/Work PB1491/PB1493 the §6.5 logical conversion leaves a comment line EMPTY, so both now guard
+        // only the one "*>" line that still survives — the debugging-line carrier (indicator 'D'), which can sit
+        // inside a SELECT entry just as a comment line did:
         //   (1) It must NOT stop at the first literal '.', because CCVS routinely interposes "*> …" comment
         //       lines (e.g. SM203A/SM204A's "…DURING EXTRACTION." note) BETWEEN `SELECT TEST-FILE ASSIGN TO`
         //       and the `XXXXD002.` operand. A naive `[\s\S]*?\.` stops at the comment's period, leaving the

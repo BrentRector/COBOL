@@ -1047,6 +1047,11 @@ mode PICMODE;
 
 PIC_IS      : 'IS' -> skip ;              // optional IS keyword
 PIC_WS      : [ \t\r\n]+ -> skip ;        // skip whitespace
+// A comment line between PIC and its character-string (kb/Work PB1493). Source comments are removed by the
+// reference-format stage (ISO §6.5 2) / 3)) before the lexer runs, but the fixed-form DEBUGGING-line carrier
+// (ReferenceFormatProcessor.DebugLineCarrier) still reaches it as a *> line — and *> never begins a picture
+// character-string (> is no PICTURE symbol). Longest match: it always reaches at least as far as PIC_STRING would.
+PIC_COMMENT : '*>' ~[\r\n]* -> skip ;
 PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
     {
         // Handle PIC "999999999999.." — greedy match consumed sentence-ending period.
@@ -1095,6 +1100,8 @@ PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
 mode SUBSCRIPT;
 
 SUB_WS              : [ \t\r\n]+ ;
+// The same comment carrier inside a subscript or reference-modifier (see PIC_COMMENT): *> is no operator there.
+SUB_COMMENT         : '*>' ~[\r\n]* -> skip ;
 
 // Keywords must precede SUB_IDENTIFIER (same length → first rule wins)
 SUB_OF              : 'OF' ;
