@@ -2923,8 +2923,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>Post-build TYPE-expansion pass: every <c>TYPE IS type-name</c> reference (a real item in the forest)
     /// gets the referenced type declaration's subtree cloned in. Runs at the top of <see cref="BindResolve"/> — AFTER
-    /// all <see cref="BindEntries"/> (so forward references resolve; every TYPEDEF is in <see cref="TypeDecls"/>) and
-    /// BEFORE the resolution passes (so the clone is a normal part of the forest they walk).</summary>
+    /// all <see cref="BindEntries"/> (so forward references resolve; every TYPEDEF is in <see cref="TypeDecls"/>),
+    /// AFTER <see cref="SynthesizeImpliedPictures"/> (so a template's §13.16.3 SR9 VALUE-implied PICTURE is part of
+    /// the description it hands over — §13.18.57.4 GR3; kb/Work PB1300) and BEFORE the resolution passes (so the
+    /// clone is a normal part of the forest they walk).</summary>
     internal void ExpandTypes()
     {
         foreach (var item in AllItems().Where(i => i.TypeRefName is not null).ToList())
@@ -3072,7 +3074,27 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (template.IsGroup)
             foreach (var child in template.Children)
                 item.Children.Add(CloneItem(child, item, expanding));
+        bool wroteBased = item.IsBased;
         CopyEntryDescription(template, item, DescriptionCopyScope.TypeSubject);
+        if (!wroteBased && item.IsBased) ScreenComposedBased(item, $"TYPE '{typeName}'");
+        // §13.18.57.4 GR3 — "If a VALUE clause is specified in the data description of the subject of the entry,
+        // the content of the literal associated with that VALUE clause is used for the initial value associated
+        // with the subject of the entry", and the subject IS the composed item, so its OWN literal answers to the
+        // §13.18.63.3 literal screen against the COMPOSED description — the template's PICTURE, written or
+        // SR9-implied (kb/Work PB1300). BindEntry could not ask it: the entry had no PICTURE until this copy, so
+        // `01 W TYPE U VALUE "QRSTUV".` over a two-character U, and `01 M TYPE N VALUE 12345.` over a PIC 9(3)
+        // N, compiled clean and stored a truncated value. A COPIED value (ValueIsCopied) is the template's, which
+        // its own entry already answered for; a GROUP subject's own VALUE is the group-value screen's
+        // (CheckGroupValueDeclarations), which reads the composed forest already.
+        if (!item.ValueIsCopied && item.Pic is { } composedPic && !composedPic.IsRecovery)
+        {
+            string valueWhere = $"data item '{subject}'";
+            if (item.RawValue is { } ownValue)
+                item.RawValue = ScreenValueLiteral(composedPic, ownValue, valueWhere,
+                    ValueSubject.ForElementary(composedPic, item.IsDynamicLength, item.IsAnyLength,
+                        item.PicIsValueImplied));
+            ScreenTableValueLiterals(item, valueWhere);
+        }
         foreach (var c88 in template.Own88s) CloneConditionOnto(item, c88);   // the type's ROOT-level 88s (GR1; D17 inc 3)
         expanding.Remove(typeName);
     }
@@ -3092,6 +3114,45 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             if (p.GroupUsage is not GroupUsage.None || p.OwnSign is not null || p.OwnUsage is not null)
                 return p;
         return null;
+    }
+
+    /// <summary>ISO §13.16.3 SR16's LEVEL sentence — "The level number of such data description entries shall be
+    /// 1 or 77" — as ONE predicate for both ways an entry comes to carry a BASED clause: written
+    /// (<c>BindEntry</c>'s BASED block) and composed by a TYPE / SAME AS copy (<see cref="ScreenComposedBased"/>).
+    /// ⚠ SR16's SECTION sentence ("only in data description entries in the linkage section, in the
+    /// working-storage section, and in the local-storage section") is NOT asked yet by either arm — kb/Work PB516
+    /// owns it, and its fix belongs HERE so both arms acquire it at once.</summary>
+    private static bool BasedLevelAdmitted(int level) => level is 1 or 77;
+
+    /// <summary>The placement screen for a BASED clause a TYPE or SAME AS clause COMPOSED into
+    /// <paramref name="subject"/> (kb/Work PB1300). §13.18.57.4 GR1 and §13.18.49.4 GR1 make the clause's effect
+    /// "as though the data description identified by type-name-1 [data-name-1] had been coded in place", and
+    /// neither excludes BASED, so the composed entry is held to the rules a written BASED clause is: §13.16.3 SR16
+    /// (level 1 or 77), SR5 ("The EXTERNAL clause shall not be specified in the same data description entry as
+    /// the REDEFINES or BASED clause") and SR13 (BASED "shall not be specified in the same data description entry
+    /// with the CONSTANT RECORD clause"). §13.16.3 SR3's REDEFINES arm cannot arise — SR12 and SR14 already refuse
+    /// REDEFINES beside SAME AS and TYPE. The formal-parameter ban (§14.2.2 SR1) and the class-object rule
+    /// (§13.18.5.3 SR1) read <see cref="DataItem.IsBased"/> in later passes and so judge the composed entry
+    /// without help. A violation reports once and clears the flag, so the entry binds as ordinary storage under
+    /// an already-failed compile — the written arm's discipline.</summary>
+    private void ScreenComposedBased(DataItem subject, string via)
+    {
+        string? rule =
+            !BasedLevelAdmitted(subject.Level)
+                ? $"the BASED clause may be specified only in a level-01 or level-77 entry, and this entry is at "
+                  + $"level {subject.Level:00} (ISO §13.16.3 SR16)"
+            : subject.HasExternalClause
+                ? "the EXTERNAL clause shall not be specified in the same data description entry as the BASED "
+                  + "clause (ISO §13.16.3 SR5)"
+            : subject.IsConstantRecord
+                ? "the BASED clause shall not be specified in the same data description entry with the CONSTANT "
+                  + "RECORD clause (ISO §13.16.3 SR13)"
+            : null;
+        if (rule is null) return;
+        Edition.Error(DiagnosticCatalog.ComposedBasedPlacement, $"'{subject.CobolName ?? "FILLER"}': {via} brings "
+            + "a BASED clause into this entry — the effect is as though the referenced description had been coded "
+            + $"in place (ISO §13.18.57.4 GR1 / §13.18.49.4 GR1) — but {rule}");
+        subject.IsBased = false;
     }
 
     /// <summary>⛔ THE ONE DATA-DESCRIPTION COPY — every clause one entry's description hands to another, for
@@ -3134,6 +3195,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         {
             to.Pic = from.Pic;
             to.PicIsUsageSynthesized = from.PicIsUsageSynthesized;   // the profile's provenance travels with it (PB495)
+            to.PicIsValueImplied = from.PicIsValueImplied;           // … written or SR9-implied (§13.18.57.4 GR3; PB1300)
         }
         // ⛔ The WRITTEN character-string travels on its OWN condition, not on Pic's. §13.16.3 SR8's recovery
         // clears the analyzed profile while keeping the spelling the later screens have to name, so an entry can
@@ -3191,6 +3253,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // FIXED one-character item. §13.18.2.3 SR2/SR3/SR4 and the DYNAMIC LENGTH shape rules are re-screened at
         // the copy's own site by the placement sweeps, which CLEAR the flag where the new site fails them.
         if (entryCopy) to.IsAnyLength |= from.IsAnyLength;   // EntryOnly: §13.18.2.3 SR2's linkage parameter shape
+        // BASED (§13.18.5) is in neither GR-1 exclusion list, so the subject of `01 X TYPE T` over
+        // `01 T TYPEDEF BASED …` IS a based item (§13.18.58.4 GR3; kb/Work PB1300). §13.18.57.4 GR4 — "that BASED
+        // clause applies and any BASED clause specified in the description of type-name-1 is ignored for this
+        // entry" — decides only WHOSE clause it is when the subject writes one too, and both clauses mean the
+        // same thing, so the |= is the whole of GR4. The composed entry's placement is screened at the
+        // copy's site (ScreenComposedBased), where the subject's level and section are known.
+        if (entryCopy) to.IsBased |= from.IsBased;           // EntryOnly: a temporary is never a template
         if (!to.IsDynamicLength && from.IsDynamicLength)
         {
             to.IsDynamicLength = true;
@@ -3427,14 +3496,24 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // ── GR1/GR2: the copy. ──────────────────────────────────────────────────────────────────────────────
         // The entry description (PICTURE/USAGE/SIGN/VALUE/JUSTIFIED/BLANK WHEN ZERO/SYNCHRONIZED + the carried
         // TYPE identity; scope Entry — §13.18.49.4 GR1 does NOT exclude alignment, unlike §13.18.57.4 GR1).
+        bool wroteBased = item.IsBased;   // §13.16.3 SR12 admits no BASED beside SAME AS; an error-recovery guard
         CopyEntryDescription(target, item, DescriptionCopyScope.Entry);
+        if (!wroteBased && item.IsBased) ScreenComposedBased(item, $"SAME AS '{targetName}'");
         // GR3/GR5: a USAGE / SIGN clause of a group containing data-name-1 takes effect as though specified
         // for the SUBJECT (nearest enclosing clause, the §13.18.60 GR1 discipline; only an ELEMENTARY target
         // can have ancestors — SR7). The subject's chain cannot see data-name-1's ancestors, so the transform
         // the InheritUsage/InheritSign passes would have applied is applied here, on the copied Pic.
+        // ⛔ EACH RULE NAMES THE GROUP KINDS IT TRANSFERS FROM, and the two sets differ (kb/Work PB1300): GR3 —
+        // "If an alphanumeric group item or strongly-typed group item to which data-name-1 is subordinate
+        // contains a USAGE clause"; GR5 — "an alphanumeric group item, national group item, or strongly-typed
+        // group item … contains a SIGN clause". A group of any other kind carries no clause across, so the walk
+        // passes over it to the next enclosing group. Unfiltered, `S SAME AS E` with E under `05 H USAGE
+        // NATIONAL` inside `01 G GROUP-USAGE NATIONAL` took H's USAGE NATIONAL and was 6 bytes where GR1 makes
+        // it E's own PIC 9(3) DISPLAY description, 3 bytes. Asked through the ONE group-kind classifier.
         if (item.OwnUsage is null)
             for (var p = target.Parent; p is not null; p = p.Parent)
-                if (p.OwnUsage is { } au)
+                if (p.OwnUsage is { } au
+                    && (ItemCategory.GroupKindsOf(p) & (GroupKinds.Alphanumeric | GroupKinds.StronglyTyped)) != 0)
                 {
                     item.OwnUsage = au;
                     // ⛔ THE SAME transform §13.18.60.4 GR1 applies to a subordinate leaf — one method, so this
@@ -3450,7 +3529,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 }
         if (item.OwnSign is null)
             for (var p = target.Parent; p is not null; p = p.Parent)
-                if (p.OwnSign is { } asg)
+                if (p.OwnSign is { } asg
+                    && (ItemCategory.GroupKindsOf(p)
+                        & (GroupKinds.Alphanumeric | GroupKinds.National | GroupKinds.StronglyTyped)) != 0)
                 {
                     item.OwnSign = asg;
                     // ⛔ THE SAME transform §13.18.52 applies to a subordinate leaf — one method, exactly as the
@@ -4787,7 +4868,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // indicates a class and no size).
         if (rawValue is { } rv && pic is not null)
             rawValue = ScreenValueLiteral(pic, rv, entryWhere,
-                ValueSubject.ForElementary(pic, isDynamicLength, isAnyLength));
+                ValueSubject.ForElementary(pic, isDynamicLength, isAnyLength, implicitPicture: false));
         // An EXTERNAL type declaration (ISO §13.18.22 SR1 — EXTERNAL is legal on a level-1 type declaration;
         // the level-1 shape is §13.18.58.3 SR3, already enforced by RegisterTypeDecl's 1529). The declaration
         // itself has no storage (§13.18.58.4 GR2); the effect lands on its REFERENCES — §13.18.22 GR2 (a data
@@ -4948,7 +5029,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // ordinary storage under an already-failed compile (never a half-based state).
         if (isBased)
         {
-            if (level is not (1 or 77))
+            if (!BasedLevelAdmitted(level))
             {
                 Edition.Error(DiagnosticCatalog.UsageClauseCompatibility, $"{entryWhere}: the BASED clause may be specified only in a "
                     + "level-01 or level-77 entry (ISO §13.16.3 SR16 / §13.18.5)");
@@ -5707,7 +5788,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // The subject §13.18.63.3 SR4/SR5/SR10 measure each occurrence-literal against is the ELEMENT, an
         // ELEMENTARY item (kb/Work PB206) — described once, exactly as the format-1 call site describes it, so
         // the two formats cannot disagree about a size any more than they can about a category.
-        var elementSubject = ValueSubject.ForElementary(subject, item.IsDynamicLength, item.IsAnyLength);
+        var elementSubject = ValueSubject.ForElementary(subject, item.IsDynamicLength, item.IsAnyLength,
+            item.PicIsValueImplied);
         var screened = new List<TableValueSpec>(specs.Count);
         bool rewritten = false;
         foreach (var s in specs)

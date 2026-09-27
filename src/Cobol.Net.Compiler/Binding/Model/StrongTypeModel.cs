@@ -188,7 +188,8 @@ public static class StrongTypeModel
         && x.Synchronized == y.Synchronized                                   // SYNCHRONIZED   §13.18.55
         && SameAnalyzedProfile(x.Pic, y.Pic);                                 // PICTURE + SIGN + USAGE
 
-    /// <summary>The PICTURE / SIGN / USAGE conjunct, with §8.5.3.1's three exceptions.
+    /// <summary>The PICTURE / SIGN / USAGE conjunct, with §8.5.3.1's two exceptions and its "Additionally"
+    /// paragraph.
     /// <para>The comparison is <see cref="PicInfo"/>'s OWN record equality — every analyzed axis, and every axis
     /// a later slice adds, is included by construction rather than by a hand-maintained member list. Three
     /// members are handled apart from it:</para>
@@ -202,8 +203,11 @@ public static class StrongTypeModel
     ///   to rest on the claim that two items analyzed under different settings "differ in the profile already"
     ///   through <see cref="PicInfo.Scale"/>, which holds only when a digit position follows the separator — the
     ///   rule is about the SYMBOLS, so it is now carried as the symbols' own fact.</item>
-    ///   <item><b>Exception 3</b> — the LOCALE phrase's SIZE and external identification, carried on
-    ///   <see cref="PicInfo.LocaleEdit"/>, itself a record compared by value.</item>
+    ///   <item><b>The "Additionally" paragraph</b> — "locale specifications in the PICTURE clauses match if and
+    ///   only if" both specify the same SIZE phrase and the same external identification — never the
+    ///   locale-NAME, so two locale-names bound to one identification match (kb/Work PB1475). Carried on
+    ///   <see cref="PicInfo.LocaleEdit"/>, whose <see cref="LocaleEditSpec"/> equality IS that rule
+    ///   (<see cref="LocaleRef.SameIdentificationAs"/>), the predicate the OoConformance arms read too.</item>
     /// </list>
     /// <para>⛔ <see cref="PicInfo.EditingRules"/> is an <c>IReadOnlyList</c>, for which the record's synthesized
     /// equality uses the DEFAULT comparer — reference equality — so two separately-analyzed items with identical

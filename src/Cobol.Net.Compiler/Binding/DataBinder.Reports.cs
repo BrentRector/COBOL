@@ -1960,7 +1960,8 @@ public sealed partial class DataBinder
                 for (int vr = 0; vr < valueRaws.Count; vr++)
                     valueRaws[vr] = ScreenValueLiteral(pic, valueRaws[vr],
                         $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'",
-                        ValueSubject.ForElementary(pic, isDynamicLength: false, isAnyLength: false));
+                        ValueSubject.ForElementary(pic, isDynamicLength: false, isAnyLength: false,
+                            implicitPicture: picText is null));
                 // §13.18.53.3 SR3 — "If arithmetic-expression-1 or the ROUNDED phrase is specified, the entry
                 // shall define either a numeric data item or a numeric-edited data item." The receiving operand
                 // of GR2's implicit COMPUTE is this printable item (kb/Work PB852).

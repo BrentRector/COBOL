@@ -1505,8 +1505,9 @@ cannot freeze the below-2023 routing defect it is waiting on.
 mechanism design `docs/rearchitecture/DESIGN-data-model.md` §2.7a). SR9 says the PICTURE clause "may be omitted
 for an elementary item when an alphanumeric, boolean, or national literal that is not a zero-length literal is
 specified in the data-item format of the VALUE clause", and implies `X(length)` / `1(length)` / `N(length)`. The
-`SynthesizeImpliedPictures` pass (`DataBinder.ImpliedPicture.cs`, registered between `ExpandTypes` and
-`UsageInheritancePass`) builds that character-string — the arm from `CobolLiteral.ClassOf`, the length from
+`SynthesizeImpliedPictures` pass (`DataBinder.ImpliedPicture.cs`, registered FIRST — before `ExpandTypes`, so a
+TYPEDEF template's implied PICTURE is part of the description a TYPE subject receives, §13.18.57.4 GR3, kb/Work
+PB1300 — and before `UsageInheritancePass`) builds that character-string — the arm from `CobolLiteral.ClassOf`, the length from
 `CobolLiteral.Decode(…).Length`, a figurative constant's from §8.3.3.6.4 GR3 b/c with GR1/GR4 choosing its
 category from the context — and hands it to the SAME `PictureAnalyzer.Analyze` call a WRITTEN clause takes, so
 the item is thereafter indistinguishable from one whose source wrote the clause (§13.18.60.3 SR13 a) and SR20 are

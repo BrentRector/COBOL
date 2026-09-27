@@ -51,12 +51,22 @@ internal readonly record struct ImpliedPicture(LiteralClass Class, int Length)
 /// explicit or <b>implicit</b> picture character-string contains the symbol 'N', a USAGE NATIONAL clause is
 /// implied"), so an implied <c>N(length)</c> acquires usage national by the standard's own words.</para>
 ///
-/// <para><b>The forest is <c>CompositionForest</c></b>, not <c>ConformanceForest</c>: SR9's subject is the entry AS
-/// COMPOSED. A TYPEDEF template's own entry (<c>01 T TYPEDEF. 05 A VALUE "AB".</c>) is a data description entry the
-/// SR8 guard reports over, so it needs the implied picture too; the <c>TYPE</c> clone of it needs one because the
-/// clone is what the emitter lays out. The EDITION GATE fires once per SOURCE entry (the <c>TypeAnchor</c> test —
-/// the same once-per-written-entry discipline every per-entry data-attribute gate follows), and the pass is
-/// idempotent (a non-null <c>Pic</c> is skipped) so a forest that yields an item twice cannot double-report.</para>
+/// <para><b>It runs BEFORE <c>ExpandTypes</c>, over the WRITTEN entries (<c>ConformanceForest</c>), and that is the
+/// other half of the design (kb/Work PB1300).</b> SR9 is a rule about the entry the programmer wrote, and the TYPE
+/// clause then carries its result: §13.18.57.4 GR3 — <i>"When the description of type-name-1 includes an implicit
+/// PICTURE clause derived from a VALUE clause, that implicit PICTURE clause becomes part of the description of the
+/// subject of the entry."</i> So a TYPEDEF template (<c>01 U TYPEDEF VALUE "ABCD".</c>, or a member
+/// <c>05 A VALUE "AB".</c>) must OWN its implied PICTURE before its description is copied — and then the one
+/// description copy (<c>CopyEntryDescription</c>) hands it to every TYPE subject and every reproduced subordinate
+/// exactly as it hands over a written PICTURE; SAME AS (§13.18.49.4 GR1) the same way. This pass used to run AFTER
+/// the copy, over the composed forest: the template had no PICTURE yet, the subject's copy took none, and a subject
+/// that wrote its OWN VALUE then had its picture implied from THAT literal — <c>01 W TYPE U VALUE "Q".</c> bound as
+/// PIC X(1) where GR3 makes it the template's X(4), and <c>VALUE "QRSTUV"</c> over a two-character template
+/// silently widened the item instead of drawing the §13.18.63.3 size refusal. An entry whose description is still a
+/// pending TYPE / SAME AS reference is not picture-less in SR9's sense (<c>IsPictureLessLeaf</c>): its PICTURE is
+/// the referenced description's, so it is left to the copy. Because no clone exists yet, every item visited IS a
+/// written entry and the EDITION GATE fires once per source entry by construction; the pass stays idempotent (a
+/// non-null <c>Pic</c> is skipped).</para>
 ///
 /// <para><b>THE STANDARD STATES THIS RULE THREE TIMES, once per entry kind, and the sweep is complete</b>
 /// (<c>grep -n "PICTURE clause may be omitted" specs/ISO_COBOL.md</c> returns exactly three hits). §13.16.3 SR9
@@ -86,13 +96,16 @@ public sealed partial class DataBinder
     /// alphanumeric, boolean or national literal the PICTURE the rule implies.</summary>
     internal void SynthesizeImpliedPictures()
     {
-        foreach (var item in CompositionForest())
+        // The WRITTEN entries — the pass runs before ExpandTypes, so there are no clones to exclude yet; the forest
+        // is named for what the rule is about (see the class remarks).
+        foreach (var item in ConformanceForest())
         {
             // ⛔ THE SAME PREDICATE THE SR8 GUARD USES, and deliberately so: SR9's subject is precisely the
             // population SR8 would otherwise reject, so the two rules must never disagree about which entries
-            // they are looking at. It is also what makes this pass IDEMPOTENT — an entry that already has a
-            // PICTURE (written, usage-synthesized, or implied on an earlier visit) fails it, and
-            // CompositionForest can yield one item twice (see the class remarks).
+            // they are looking at. It also excludes an entry whose description is a still-pending TYPE / SAME AS
+            // reference (its PICTURE is the referenced description's — §13.18.57.4 GR3, §13.18.49.4 GR1), and it
+            // is what makes this pass IDEMPOTENT: an entry that already has a PICTURE (written or
+            // usage-synthesized) fails it.
             if (!IsPictureLessLeaf(item)) continue;
             // ⛔ FORMAT 1 ONLY. SR9's grant is worded "specified in the DATA-ITEM FORMAT of the VALUE clause",
             // which is §13.18.63.2 Format 1 (`VALUE IS literal-1`) — DataItem.RawValue. The Format-2 (table)
@@ -103,13 +116,13 @@ public sealed partial class DataBinder
 
             using var _ = Edition.At(item);
             string where = $"data item '{item.CobolName ?? "FILLER"}'";
-            // The edition gate, through the ONE canonical funnel (ConstructRegistry.Check), once per SOURCE entry:
-            // COBOL-85 required a PICTURE for every elementary item bar an index data item and the subject of a
-            // RENAMES clause, and had no VALUE-implied PICTURE at all. Its boolean and national arms are gated a
-            // second time and independently by `boolean-data-2002` / `national-data-2002`, which is why this row
-            // carries the alphanumeric arm's introduction.
-            if (StrongTypeModel.TypeAnchor(item) is null)
-                ConstructRegistry.Check(Edition.Edition, Edition.Sink, Constructs.ValueImpliedPicture2002, where);
+            // The edition gate, through the ONE canonical funnel (ConstructRegistry.Check), once per SOURCE entry
+            // (every entry visited here is one — no clone exists yet): COBOL-85 required a PICTURE for every
+            // elementary item bar an index data item and the subject of a RENAMES clause, and had no
+            // VALUE-implied PICTURE at all. Its boolean and national arms are gated a second time and
+            // independently by `boolean-data-2002` / `national-data-2002`, which is why this row carries the
+            // alphanumeric arm's introduction.
+            ConstructRegistry.Check(Edition.Edition, Edition.Sink, Constructs.ValueImpliedPicture2002, where);
 
             // ⛔ THE SAME CALL BindEntry MAKES FOR A WRITTEN PICTURE, argument for argument — the entry's OWN
             // usage and its own SIGN clause, `explicitUsage` = "this entry wrote a USAGE clause". A usage the
@@ -117,6 +130,7 @@ public sealed partial class DataBinder
             // as it is for a written PICTURE; passing the inherited usage here as well would screen it twice and
             // report the §13.18.60.3 SR3/SR5/SR12/SR20 violation twice.
             item.PictureText = implied.Text;
+            item.PicIsValueImplied = true;   // an IMPLICIT clause: no SR4/SR5/SR10 size bound (see the property)
             item.Pic = PictureAnalyzer.Analyze(implied.Text, item.OwnUsage ?? Usage.Display, Edition, where,
                 item.OwnSign, currencies: CurrencySigns, blankWhenZero: item.BlankWhenZero,
                 explicitUsage: item.OwnUsage is not null, decimalPointIsComma: DecimalPointIsComma);

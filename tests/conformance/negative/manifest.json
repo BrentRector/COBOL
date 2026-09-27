@@ -1684,7 +1684,9 @@
   "pb1630-call-content-null-alnum-formal",
   "pb1142-divide-into-inline-receiver",
   "pb1142-multiply-alphanumeric-function",
-  "pb1230-constant-dup-same-value"
+  "pb1230-constant-dup-same-value",
+  "w66g-pb1300-composed-based-level",
+  "w66g-pb1475-strong-type-dpc-differs"
  ],
  "pending": []
 }

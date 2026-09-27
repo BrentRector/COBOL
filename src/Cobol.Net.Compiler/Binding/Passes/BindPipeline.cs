@@ -33,16 +33,21 @@ internal static class BindPipeline
     public static IReadOnlyList<IBindPass> Build(Core.ProgramUnitContext program) => new IBindPass[]
     {
         // ── The per-unit resolution passes, in the EXACT pre-P5 BindResolve order (DataBinder.cs). ──
+        // The §13.16.3 SR9 VALUE-implied PICTURE (kb/Work PB504/PB831/PB1300; DataBinder.ImpliedPicture.cs).
+        // FIRST, and the placement is the design. SR9 implies the clause for the entry the programmer WROTE, and
+        // §13.18.57.4 GR3 then says "when the description of type-name-1 includes an implicit PICTURE clause
+        // derived from a VALUE clause, that implicit PICTURE clause becomes part of the description of the
+        // subject of the entry" — so the template must OWN its implied PICTURE before ExpandTypes copies its
+        // description, exactly as it owns a written one. Run after the copy (the former order), the template had
+        // no PICTURE to hand over and the subject's OWN VALUE literal implied one instead: `01 U TYPEDEF VALUE
+        // "ABCD". 01 W TYPE U VALUE "Q".` bound W as PIC X(1) where GR3 makes it PIC X(4) (kb/Work PB1300). An
+        // entry whose description is still a pending TYPE / SAME AS reference is not picture-less in SR9's
+        // sense (IsPictureLessLeaf) — its PICTURE is the referenced description's — so it waits for the copy.
+        // BEFORE UsageInheritancePass as well, so that from this point on the entry is INDISTINGUISHABLE from
+        // one whose source wrote `PICTURE X(n)` — §13.18.60.4 GR1 inheritance, the §13.18.60.3 SR3/SR5/SR12/SR20
+        // screens, SIGN inheritance and every later pass apply to it through their existing single sites.
+        new BindPass("SynthesizeImpliedPictures", PassPhase.None, PassPhase.None, d => d.SynthesizeImpliedPictures()),
         new BindPass("ExpandTypes", PassPhase.None, PassPhase.TypesExpanded, d => d.ExpandTypes()),
-        // The §13.16.3 SR9 VALUE-implied PICTURE (kb/Work PB504/PB831; DataBinder.ImpliedPicture.cs). Placed
-        // HERE, and the placement is the design: AFTER ExpandTypes so a TYPE / SAME AS clone that inherits the
-        // template's VALUE gets the implied clause too, and BEFORE UsageInheritancePass so that from this point
-        // on the entry is INDISTINGUISHABLE from one whose source wrote `PICTURE X(n)` — §13.18.60.4 GR1
-        // inheritance, the §13.18.60.3 SR3/SR5/SR12/SR20 screens, SIGN inheritance and every later pass apply to
-        // it through their existing single sites, with no carve-out and no second copy of any rule. Running it
-        // one pass LATER would mean UsageInheritancePass had already rejected `01 A USAGE NATIONAL VALUE N"AB".`
-        // for having no PICTURE, which SR9 says it may omit.
-        new BindPass("SynthesizeImpliedPictures", PassPhase.TypesExpanded, PassPhase.TypesExpanded, d => d.SynthesizeImpliedPictures()),
         new BindPass("UsageInheritancePass", PassPhase.TypesExpanded, PassPhase.UsageResolved, d => d.UsageInheritancePass()),
         // The §13.18.60.3 USAGE declaration-PLACEMENT screen — SR14/SR15/SR4 (kb/Work PB183). Placed HERE, and
         // not one pass earlier or later, for two reasons. It needs UsageInheritancePass to have settled

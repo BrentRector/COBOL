@@ -63,9 +63,16 @@ internal readonly record struct ValueSubject(ValueSubjectKind Kind, int? SizePos
     /// never the picture's one position. ANY LENGTH (§13.18.2) is the same shape.
     /// <c>01 UN PIC N DYNAMIC LENGTH VALUE N"SEED".</c> was rejected as exceeding "the item's 1 national
     /// positions" while its alphanumeric twin was accepted and ran — the [[two_arm_dispatch]] shape, one arm
-    /// sized and one not (kb/Work PB206).</para></summary>
-    public static ValueSubject ForElementary(PicInfo pic, bool isDynamicLength, bool isAnyLength) =>
-        new(ValueSubjectKind.Elementary, isDynamicLength || isAnyLength ? null : pic.Length);
+    /// sized and one not (kb/Work PB206).</para>
+    /// <para>⛔ <paramref name="implicitPicture"/> is the same sentence's other word: the bound is the size an
+    /// EXPLICIT PICTURE clause indicates, and a §13.16.3 SR9 / §13.15.3 SR14 VALUE-implied PICTURE is not one.
+    /// That matters only when the implied clause reaches an entry whose OWN literal differs from the one that
+    /// implied it — a TYPE subject over a VALUE-implied template (§13.18.57.4 GR3: "that implicit PICTURE clause
+    /// becomes part of the description of the subject of the entry"; kb/Work PB1300) — and there no syntax rule
+    /// sizes the literal (⚠ DETERMINATION, the word "explicit" read as written). Every caller states the
+    /// provenance; none defaults it.</para></summary>
+    public static ValueSubject ForElementary(PicInfo pic, bool isDynamicLength, bool isAnyLength, bool implicitPicture) =>
+        new(ValueSubjectKind.Elementary, isDynamicLength || isAnyLength || implicitPicture ? null : pic.Length);
 
     /// <summary>A GROUP item's group-level VALUE (§13.18.63.3 SR13 sentence 1). Its size is "the size of the group
     /// item" (SR4/SR5/SR10 sentence 3) — the group's own positions: §8.5.2.1 gives a group a class and a category,

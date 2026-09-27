@@ -1,0 +1,10 @@
+X=[HELLO]
+Y=[WORLD]
+S=[WORLD]
+W=[Q   ] LEN 4
+V=[ABCD] LEN 4
+R=[XY7] LEN 3
+W2=[QR] LEN 2
+SA 2
+E 6 ES 3
+NS 4

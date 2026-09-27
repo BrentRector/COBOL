@@ -488,11 +488,15 @@ interface IBindPass { string Name { get; } PassPhase Requires { get; } PassPhase
 
 Ordered, with the **data-model dependency chain made explicit**:
 
+0. **`SynthesizeImpliedPictures`** — ISO §13.16.3 SR9's VALUE-implied PICTURE (§2.7a). FIRST, and the placement
+    is load-bearing in both directions: **before** the clone, over the WRITTEN entries, so a TYPEDEF template owns
+    its implied PICTURE when its description is copied — §13.18.57.4 GR3: "that implicit PICTURE clause becomes
+    part of the description of the subject of the entry" (kb/Work PB1300: run after the clone, the subject's OWN
+    VALUE implied its picture instead, `01 W TYPE U VALUE "Q"` over `U VALUE "ABCD"` binding as X(1)); and
+    **before** usage inheritance so the entry is already PICTURE-bearing when GR1 and the §13.18.60.3 screens
+    reach it. An entry still pending a TYPE / SAME AS reference is not picture-less in SR9's sense and waits for
+    the copy.
 1. `ExpandTypesPass` (TYPEDEF/TYPE clone; produces TypeName/StrongType; sets StrongRoot cache)
-1a. **`SynthesizeImpliedPictures`** — ISO §13.16.3 SR9's VALUE-implied PICTURE (§2.7a). Between 1 and 2, and the
-    placement is load-bearing in both directions: **after** the clone so a `TYPE` reference that inherits the
-    template's VALUE gets the implied clause too, and **before** usage inheritance so the entry is already
-    PICTURE-bearing when GR1 and the §13.18.60.3 screens reach it.
 2. `UsageInheritancePass` (merge of `InheritUsageClauses` + `ResolveIndexItems`, renamed — §2.7)
 3. `SignInheritancePass`
 4. `RedefinesClassifier` (produces Class/Tier/ClassOffset/IsCanonical/Width; Tier-C verdict)
@@ -544,8 +548,11 @@ ALIGNED (§13.18.1), ANY LENGTH (§13.18.2) and DYNAMIC LENGTH (§13.18.19) were
    `[DescriptionCopy(DescriptionCopyKind.…, "<the §/GR, or the pass that owns the fact>")]` —
    `Clause` (travels) · `Alignment` (travels except onto a TYPE subject) · `EntryOnly` (travels with every entry
    copy but not onto a compiler temporary — VALUE, which a temp stored by its pre-op before any read cannot
-   observe and whose Format-2 FROM subscripts would address an OCCURS a temp's root never reproduces, and ANY
-   LENGTH, §13.18.2.3 SR2's linkage-section parameter shape) · `MemberOnly` (a reproduced subordinate
+   observe and whose Format-2 FROM subscripts would address an OCCURS a temp's root never reproduces, ANY
+   LENGTH, §13.18.2.3 SR2's linkage-section parameter shape, and BASED — in neither GR-1 exclusion list, so a
+   TYPE / SAME AS subject of a based description is based, §13.18.57.4 GR4 only deciding whose clause applies;
+   a composed BASED is placement-screened at the copy site by `ScreenComposedBased`, COBOLNET2510, kb/Work
+   PB1300) · `MemberOnly` (a reproduced subordinate
    only — the name, OCCURS, REDEFINES, a nested TYPE/SAME AS reference, the declaration cursor) · `CopyWritten`
    (the copy derives it: `ValueIsCopied`, `ExternalFromType`) · `None` (excluded by a named rule, or owned by a
    post-build pass). Adding a field to `DataItem` is therefore a CHOICE made where the field is declared.

@@ -125,13 +125,29 @@ public static class ItemCategory
         if (!item.IsGroup) return GroupKinds.None;
         // §13.18.29.4 GR1/GR2 — the GROUP-USAGE clause names the kind outright, and SR1 above guarantees such a
         // group is neither strongly typed nor variable-length, so these two arms are terminal.
-        if (item.GroupUsage is GroupUsage.Bit) return GroupKinds.Bit;
-        if (item.GroupUsage is GroupUsage.National) return GroupKinds.National;
+        var groupUsage = GroupUsageInEffect(item);
+        if (groupUsage is GroupUsage.Bit) return GroupKinds.Bit;
+        if (groupUsage is GroupUsage.National) return GroupKinds.National;
         GroupKinds kinds = GroupKinds.None;
         if (StrongTypeModel.IsStronglyTyped(item)) kinds |= GroupKinds.StronglyTyped;
         if (VariableLengthCompatibility.IsVariableLength(item)) kinds |= GroupKinds.VariableLength;
         // §13.18.29.4 GR3 — no GROUP-USAGE clause, not strongly typed, not variable-length ⇒ alphanumeric.
         return kinds is GroupKinds.None ? GroupKinds.Alphanumeric : kinds;
+    }
+
+    /// <summary>The GROUP-USAGE a group is "explicitly or implicitly described as" (ISO §13.18.29.3 SR2/SR3: "All
+    /// subordinate group items shall be explicitly or implicitly described as GROUP-USAGE BIT [NATIONAL]") — its
+    /// own clause, else the nearest enclosing group's. The usage-inheritance walk WRITES the implied clause down
+    /// onto every subordinate group, so after it has run this is the item's own <see cref="DataItem.GroupUsage"/>;
+    /// asked PULL-style here so the answer is the same BEFORE that walk too — the SAME AS expansion
+    /// (§13.18.49.4 GR3/GR5, kb/Work PB1300) classifies data-name-1's ancestors in the first bind pass, when a
+    /// group nested in a <c>GROUP-USAGE NATIONAL</c> group has not been marked yet and would otherwise read as
+    /// an alphanumeric group.</summary>
+    private static GroupUsage GroupUsageInEffect(DataItem item)
+    {
+        for (DataItem? g = item; g is not null; g = g.Parent)
+            if (g.GroupUsage is not GroupUsage.None) return g.GroupUsage;
+        return GroupUsage.None;
     }
 
     /// <summary>The group kinds <paramref name="kinds"/> names, spelled the way the standard spells them, joined

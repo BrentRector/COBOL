@@ -5382,6 +5382,22 @@ public static class DiagnosticCatalog
         + "to a BASED clause. The site names the rule it caught.",
         "ISO §12.4.5.8.3");
 
+    /// <summary>COBOLNET2510 — a TYPE or SAME AS clause COMPOSES a BASED clause into an entry that may not carry one
+    /// (kb/Work PB1300). §13.18.57.4 GR1 / §13.18.49.4 GR1 make the clause's effect "as though the data description
+    /// identified by type-name-1 [data-name-1] had been coded in place", and neither GR-1 excludes BASED (§13.18.58.4
+    /// GR3: "All other data description clauses … are assumed by data defined using the type-name"), so the
+    /// composed entry answers to the BASED placement rules exactly as a written one does. The written arms keep
+    /// their own codes; this one names the composition so the user sees WHERE the BASED clause came from.
+    /// <c>DataBinder.ScreenComposedBased</c> is the one site.</summary>
+    public static readonly DiagnosticDescriptor ComposedBasedPlacement = new(
+        "COBOLNET2510", "composed-based-placement", EditionSeverity.Error,
+        "A TYPE or SAME AS clause brings a BASED clause (from the description of type-name-1 or data-name-1) into "
+        + "a data description entry where the BASED clause may not be specified: ISO §13.16.3 SR16 — only in the "
+        + "linkage, working-storage and local-storage sections, at level-number 1 or 77; SR5 — not in the same entry "
+        + "as the EXTERNAL clause; SR13 — not in the same entry as the CONSTANT RECORD clause. The site names the "
+        + "rule it caught.",
+        "ISO §13.18.57.4 GR1 · §13.18.49.4 GR1 · §13.16.3 SR5/SR13/SR16");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

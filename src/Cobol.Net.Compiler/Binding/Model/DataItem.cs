@@ -167,6 +167,18 @@ public sealed class DataItem
         "the provenance of the copied PICTURE (ISO §13.16.3 SR8) — travels with Pic")]
     public bool PicIsUsageSynthesized { get; set; }
 
+    /// <summary>True when <see cref="Pic"/> is the PICTURE clause ISO §13.16.3 SR9 IMPLIES from the entry's VALUE
+    /// literal (<c>DataBinder.SynthesizeImpliedPictures</c>) rather than one the source wrote. The provenance
+    /// matters to exactly one family of rules: the §13.18.63.3 SR4/SR5/SR10 size sentences bound a VALUE literal
+    /// by "the size indicated by an EXPLICIT PICTURE clause", so an implicit picture sets no such bound. It
+    /// travels with the PICTURE through a TYPE copy — §13.18.57.4 GR3: "that implicit PICTURE clause becomes part
+    /// of the description of the subject of the entry", still implicit — so a TYPE subject's own VALUE over a
+    /// VALUE-implied template is screened for its CLASS but not for a size no explicit clause indicated
+    /// (kb/Work PB1300).</summary>
+    [DescriptionCopy(DescriptionCopyKind.Clause,
+        "the provenance of the copied PICTURE (ISO §13.16.3 SR9; §13.18.57.4 GR3 — the implicit PICTURE becomes part of the subject's description) — travels with Pic")]
+    public bool PicIsValueImplied { get; set; }
+
     /// <summary>The PICTURE character-string as WRITTEN (repetition factors already expanded from any integer
     /// constant-name, §13.10.3 SR2), or <see langword="null"/> for an entry with no PICTURE clause. Kept because
     /// a rule about the picture can be violated LATER than entry bind: §13.18.60.4 GR1 gives an elementary item
@@ -563,9 +575,12 @@ public sealed class DataItem
 
     /// <summary>True for a BASED 01/77 entry (ISO §13.18.5 — a storage TEMPLATE with an implicit data-address
     /// pointer, initially NULL; no storage of its own until SET ADDRESS OF / ALLOCATE gives it one). The
-    /// post-build pass routes every reference through the pointer (Phase-4b increment 2).</summary>
-    [DescriptionCopy(DescriptionCopyKind.None,
-        "ISO §13.18.57.4 GR4 — the SUBJECT's own BASED clause applies and type-name-1's 'is ignored for this entry'; §13.16.3 SR16 confines BASED to level 1/77, so no subordinate carries it")]
+    /// post-build pass routes every reference through the pointer (Phase-4b increment 2). Written by
+    /// <c>BindEntry</c> for a written clause and by the one description copy for a TYPE / SAME AS subject whose
+    /// type-name-1 / data-name-1 is based; a composed BASED is placement-screened by
+    /// <c>DataBinder.ScreenComposedBased</c> (§13.16.3 SR5/SR13/SR16).</summary>
+    [DescriptionCopy(DescriptionCopyKind.EntryOnly,
+        "BASED (§13.18.5) is in NEITHER GR-1 exclusion list (§13.18.57.4 GR1, §13.18.49.4 GR1; §13.18.58.4 GR3 'All other data description clauses … are assumed by data defined using the type-name'), so a TYPE / SAME AS subject becomes based; §13.18.57.4 GR4 only settles WHICH clause applies when the subject writes its own, and both mean 'based' (kb/Work PB1300). Not onto a compiler temporary: it is storage the pre-op creates and stores, never a template awaiting an address")]
     public bool IsBased { get; set; }
 
     /// <summary>ALIGNED (ISO §13.18.1; kb/Work PB487) — §13.18.1.4 GR1: "An ALIGNED clause causes the subject of

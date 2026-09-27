@@ -49,7 +49,8 @@ public enum DescriptionCopyKind
 
     /// <summary>A data description clause carried by every ENTRY copy (TYPE subject, SAME AS subject, reproduced
     /// subordinate — it is in neither GR-1 exclusion list) but NOT onto a COMPILER TEMPORARY
-    /// (<see cref="DescriptionCopyScope.CompilerTemp"/>): the VALUE clause in both its spellings, and ANY LENGTH.
+    /// (<see cref="DescriptionCopyScope.CompilerTemp"/>): the VALUE clause in both its spellings, ANY LENGTH, and
+    /// BASED (§13.18.5 — a temporary is storage the pre-op creates, never a template awaiting an address).
     /// A temporary is the ISO §8.4.3.2.4 GR1 / §8.4.3.4.4 GR1 / §14.9.25.4 GR1 item whose content is always
     /// STORED by the pre-op that creates it before anything reads it, so an initial value is unobservable — and a
     /// Format-2 VALUE's FROM subscripts would address an OCCURS a temp's root never reproduces; ANY LENGTH is a

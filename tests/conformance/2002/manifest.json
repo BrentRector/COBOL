@@ -525,7 +525,9 @@
   "pb1137_invoke_argument_forms",
   "pb1617_figurative_group_formal_fill",
   "pb1630_null_argument_crossing",
-  "pb1230_constant_literal_as_written"
+  "pb1230_constant_literal_as_written",
+  "w66g_pb1300_type_same_as_composition",
+  "w66g_pb1475_strong_type_locale_identification"
   ],
   "pending": []
 }
