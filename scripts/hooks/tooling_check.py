@@ -23,7 +23,7 @@ import sys
 REPO = pathlib.Path(__file__).resolve().parents[2]
 HOME = pathlib.Path.home()
 CLOUD = os.environ.get("CLAUDE_CODE_REMOTE") == "true"
-ROLES = ["cobol-implementer", "cobol-lander", "cobol-refuter", "cobol-adjudicator", "cobol-clerk"]
+ROLES = ["cobol-implementer", "cobol-lander", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator"]
 SKILL_DOCTOR_STAMP = HOME / ".claude" / "cobolsharp-skill-doctor.stamp"
 SKILL_DOCTOR_DAYS = 7
 

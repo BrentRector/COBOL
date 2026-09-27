@@ -36,8 +36,28 @@ def check(path, pats):
     return [p for p in pats if not re.search(p if p != POINTER else re.escape(POINTER), text)]
 
 
+# P1: a mechanical role takes its model from its own frontmatter (Sonnet). A per-call `model` on its agent() call
+# OVERRIDES that, which is how "model: 'opus' on every agent" silently put clerks on Opus (owner 2026-09-27).
+MECHANICAL = re.compile(r"agentType:\s*'cobol-(?:clerk|locator)'")
+CALL_MODEL = re.compile(r"\bmodel:\s*'")
+
+
+def mechanical_model_overrides():
+    """Every workflow template line (or agent() option object) that names a mechanical role AND passes a model."""
+    found = []
+    for js in [*T.glob('*.js'), *(HERE.parents[1] / 'workflows').glob('*.js')]:
+        for i, line in enumerate(js.read_text(encoding='utf-8').splitlines(), 1):
+            if MECHANICAL.search(line) and CALL_MODEL.search(line):
+                found.append(f'{js.name}:{i}')
+    return found
+
+
 def main():
     bad = 0
+    over = mechanical_model_overrides()
+    if over:
+        bad += 1
+        print(f'FAIL     mechanical role given a per-call model (P1 — it overrides its Sonnet frontmatter): {over}')
     if len(sys.argv) > 1:
         targets = [(pathlib.Path(a), SPEC) for a in sys.argv[1:]]
     else:

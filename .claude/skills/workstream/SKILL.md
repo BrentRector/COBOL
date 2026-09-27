@@ -21,11 +21,17 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 > "Run all this work so that we don't repeat effort when hitting a limit and resuming."
 
 The orchestrator (the session model) dispatches, reconciles, gates and commits; every other job — probe, implement,
-validate, adversarial review, land — is a subagent on the latest Opus: `~/.claude/settings.json` sets
-`CLAUDE_CODE_SUBAGENT_MODEL` to the ALIAS `opus` (Opus 5.5 since 2026-09-22 — never pin a dated id), and every
-workflow passes `model: 'opus'`. ⭐ **Fleets run through the Workflow tool on a STANDING owner opt-in (2026-09-25)**, and
+validate, adversarial review, land — is a subagent, and ⭐ **THE MODEL FOLLOWS THE ROLE** (MANDATORY-PRACTICES P1,
+owner 2026-09-27): JUDGMENT roles (implementer, lander, adjudicator, refuter, registrar, reviewer) run the latest
+Opus by the ALIAS `opus` (Opus 5.5 since 2026-09-22 — never pin a dated id; `~/.claude/settings.json` sets
+`CLAUDE_CODE_SUBAGENT_MODEL=opus` as the default), and the workflow passes `model: 'opus'` for them. MECHANICAL
+roles run Sonnet from their own frontmatter: `cobol-clerk` for chores that write (filing notes from a structured
+report, leak scans, doc prose, link and format sweeps) and `cobol-locator` for read-only lookups (code-site
+location, orient.py / fix_clusters.py / where.py summaries, transcript and log measurements). ⛔ Never pass
+`model` on a mechanical role's `agent()` call: it overrides the frontmatter. A mechanical agent that hits a
+judgment call returns `NEEDS-OPUS: <why>`, and that item is re-dispatched to a judgment role. ⭐ **Fleets run through the Workflow tool on a STANDING owner opt-in (2026-09-25)**, and
 every `agent()` names its role's `agentType` from `.claude/agents/` (`cobol-implementer` · `cobol-lander` ·
-`cobol-refuter` · `cobol-adjudicator` · `cobol-clerk`), which fixes that role's effort, turn cap, 1-hour prompt cache
+`cobol-refuter` · `cobol-adjudicator` · `cobol-clerk` · `cobol-locator`), which fixes that role's effort, turn cap, 1-hour prompt cache
 and — for the read-only roles — a hook that refuses writes inside any git tree (MANDATORY-PRACTICES O4, P12).
 
 ## 1. Checkpoint to disk, never to a transcript
