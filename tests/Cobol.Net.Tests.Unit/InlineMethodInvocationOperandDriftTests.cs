@@ -93,10 +93,14 @@ public sealed class InlineMethodInvocationOperandDriftTests
             + "proved nothing (feedback_verdict_evidence_invariant).");
     }
 
-    /// <summary>The receiving side must admit NEITHER — §8.4.3.4.3 SR1 is how this compiler enforces the
-    /// inline form's non-receiving property: STRUCTURALLY, by the construct's absence from the receiving
-    /// rules, exactly as §8.4.3.2.3 SR1 holds for a function-identifier. A guard that only checked the
-    /// sending side would be satisfied by a careless edit that added it everywhere.</summary>
+    /// <summary>The purely receiving rules must admit NEITHER — for them §8.4.3.4.3 SR1 holds STRUCTURALLY, by
+    /// the construct's absence, exactly as §8.4.3.2.3 SR1 holds for a function-identifier. A guard that only
+    /// checked the sending side would be satisfied by a careless edit that added it everywhere.
+    /// <para>⚠ This does NOT cover the four MIXED-ROLE arithmetic rules (<c>addToPhrase</c>,
+    /// <c>subtractFromOperand</c>, <c>multiplyByOperand</c>, <c>divideIntoOperand</c>), which admit both forms
+    /// because Format 2 needs them as senders; there SR1 is the binder's Format-1 check, pinned by
+    /// <c>ArithmeticOperandRoleDriftTests</c> (kb/Work PB1142 — crediting this fact with them is how an inline
+    /// invocation receiver went silently dropped).</para></summary>
     [Fact]
     public void ReceivingOperandRules_DoNotAdmitAnInlineMethodInvocation()
     {

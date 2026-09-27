@@ -54,8 +54,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
         }
         if (add.addToPhrase() is { } to)
         {
-            if (!Format1Receivers("ADD", "§14.9.2.2", to.receivingArithmeticOperand().Length,
-                    to.literal() is not null || to.functionCall() is not null))
+            if (!Format1Receivers("ADD", "§14.9.2.2", [to]))
                 return BoundRejected.Reported(ctx.Edition);
             var recv = host.Expr.Receivers(to.receivingArithmeticOperand(), editedOk: false, "§14.9.2.3 SR2");
             ctx.Validation.CheckComposite("ADD", addends, recv);
@@ -84,8 +83,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
         }
         if (sub.subtractFromPhrase()?.subtractFromOperand() is { } targets)
         {
-            if (!Format1Receivers("SUBTRACT", "§14.9.44.2", targets.receivingArithmeticOperand().Length,
-                    targets.receivingOperand()?.literal() is not null || targets.functionCall() is not null))
+            if (!Format1Receivers("SUBTRACT", "§14.9.44.2", [targets]))
                 return BoundRejected.Reported(ctx.Edition);
             var recv = host.Expr.Receivers(targets.receivingArithmeticOperand(), editedOk: false, "§14.9.44.3 SR2");
             ctx.Validation.CheckComposite("SUBTRACT", minuends, recv);
@@ -117,14 +115,8 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             return new BoundMultiplyGiving(a, b, recv, sizeErr);
         }
         // In-place: each BY operand is itself the receiver (target ← target × a).
-        foreach (var op in byOps)
-            if (op.receivingOperand()?.literal() is not null || op.functionCall() is not null)
-            {
-                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.ArithmeticFormatOperand,
-                    "MULTIPLY … BY without GIVING: Format 1 prints `BY {identifier-2 [rounded]}…` — "
-                    + "receivers only; a literal or function-identifier operand belongs to Format 2's GIVING "
-                    + "form (ISO §14.9.26.2)");
-            }
+        if (!Format1Receivers("MULTIPLY", "§14.9.26.2", byOps))
+            return BoundRejected.Reported(ctx.Edition);
         var byRecv = host.Expr.Receivers(byOps);
         ctx.Validation.CheckComposite("MULTIPLY", [a], byRecv);
         return new BoundMultiplyBy(a, byRecv, sizeErr);
@@ -181,9 +173,8 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
                 ctx.Validation.CheckComposite("DIVIDE", [dividendX, a], recv);
                 return new BoundDivideGiving(dividendX, a, recv, sizeErr);
             }
-            if (!Format1Receivers("DIVIDE", "§14.9.12.2", into.divideIntoOperand().receivingArithmeticOperand().Length,
-                    into.divideIntoOperand().literal() is not null || into.divideIntoOperand().functionCall() is not null))
-                return BoundRejected.Reported(ctx.Edition);   // the old fall-through crashed the compiler (targets.Max on empty)
+            if (!Format1Receivers("DIVIDE", "§14.9.12.2", [into.divideIntoOperand()]))
+                return BoundRejected.Reported(ctx.Edition);   // a receiver-less BoundDivideInto crashed the emitter (targets.Max on empty)
             var intoRecv = host.Expr.Receivers(into.divideIntoOperand().receivingArithmeticOperand(), editedOk: false, "§14.9.12.3 SR1");
             ctx.Validation.CheckComposite("DIVIDE", [a], intoRecv);
             return new BoundDivideInto(a, intoRecv, sizeErr);   // target ← target ÷ a
@@ -223,18 +214,25 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>The Format-1 half of the same discipline: without GIVING, the TO/FROM/BY/INTO operands are
-    /// RECEIVERS — a literal or function-identifier there is illegal (§8.4.3.2.3 SR1 for the function side),
-    /// and the old binder either crashed (DIVIDE's targets.Max on empty) or mis-bound. False = rejected.</summary>
-    private bool Format1Receivers(string verb, string cite, int receiverCount, bool nonReceiverOperand)
+    /// RECEIVERS — Format 1 prints <c>{identifier-2 [rounded-phrase]}</c> only — so a literal, a
+    /// function-identifier (§8.4.3.2.3 SR1) or an inline method invocation (§8.4.3.4.3 SR1) there is illegal.
+    /// ALL FOUR VERBS ask the ONE <see cref="ArithmeticOperandRole"/> classification (kb/Work PB1142): the
+    /// hand-enumerated per-verb lists this replaced missed the inline-invocation arm, which dropped the operand
+    /// silently (ADD / SUBTRACT / MULTIPLY) or crashed the emitter on an empty receiver list (DIVIDE). Reports
+    /// every offending operand, so a MULTIPLY with two bad BY operands names both. False = rejected.</summary>
+    private bool Format1Receivers(string verb, string cite, IEnumerable<Antlr4.Runtime.ParserRuleContext> mixedOperands)
     {
-        if (nonReceiverOperand && receiverCount == 0)
-        {
-            ctx.Edition.Error(DiagnosticCatalog.ArithmeticFormatOperand,
-                $"{verb} without GIVING: Format 1 prints receiving identifiers only — a literal or "
-                + $"function-identifier operand belongs to the GIVING form (ISO {cite})");
-            return false;
-        }
-        return true;
+        bool ok = true;
+        foreach (var mixed in mixedOperands)
+            if (ArithmeticOperandRole.FirstNonReceiver(mixed) is { } bad)
+            {
+                ctx.Edition.Error(DiagnosticCatalog.ArithmeticFormatOperand,
+                    $"{verb} without GIVING: Format 1 prints receiving identifiers only (ISO {cite}), and "
+                    + $"'{bad.GetText()}' is {ArithmeticOperandRole.Describe(bad)} — a sending operand belongs to "
+                    + "the GIVING form");
+                ok = false;
+            }
+        return ok;
     }
 
     public BoundStatement BindCompute(Core.ComputeStatementContext compute)

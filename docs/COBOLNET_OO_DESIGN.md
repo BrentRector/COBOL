@@ -618,8 +618,15 @@ same non-receiving property §8.4.3.2.3 SR1 gives a function-identifier: no stor
 the site yields is a `BoundNumRef` over the temp — the SAME carrier a user-defined function result takes, so every
 general-operand chokepoint (`IntrinsicBinder.OperandOf` → `BoundFieldOperand`) serves it with no new code. SR2 (no NULL,
 no universal receiver) is COBOLNET2138, GR1 b)'s missing RETURNING is COBOLNET2139 and SR4 (ANY LENGTH / ACTIVE-CLASS
-RETURNING) is COBOLNET2140; SR1 holds STRUCTURALLY — the operand alternative was added to exactly the rules that admit
-`functionCall` and to no receiving rule, pinned by `InlineMethodInvocationOperandDriftTests`.
+RETURNING) is COBOLNET2140. SR1 holds STRUCTURALLY for every purely receiving rule — the operand alternative was added
+to exactly the rules that admit `functionCall` and to no receiving rule, pinned by
+`InlineMethodInvocationOperandDriftTests` — but four of those rules are MIXED-ROLE (the arithmetic TO / FROM / BY /
+INTO operand: a receiver in Format 1, a sender in Format 2), and there SR1 is the bind-time Format-1 screen every
+arithmetic verb asks through the ONE `ArithmeticOperandRole` classification (COBOLNET1689; kb/Work PB1142, pinned by
+`ArithmeticOperandRoleDriftTests`). As an arithmetic SENDING operand the invocation takes the same §8.8.1.1 class screen
+a function-identifier does (`ExpressionBinder.BindIdentifierOperand`, COBOLNET0844): the temporary carries the method's
+RETURNING class (§8.4.3.4.4 GR1), so an alphanumeric result is not an arithmetic operand; a SOLE invocation stays a
+legal relation / EVALUATE comparand (`ConditionBinder.SoleInlineInvocation`).
 
 INVOKE binds via `OoBindInvoke` (`Binding/Procedure/Verbs/OoBinder.cs`): identifier-1-shadows-class-name resolution, literal
 selector, `BoundInvoke(Form, …)` for NEW (RETURNING required + §14.8 receiver conformance — 0826) and the

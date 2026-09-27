@@ -1164,6 +1164,12 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 // parentheses" (§8.8.1.1) and the single-child descent gives that for free.
                 : SoleFunctionCall(expr) is { } sfc
                     ? IntrinsicBinder.OperandOf(host.Intrinsic.BindIntrinsic(sfc))
+                // Its §8.4.3.1.2 Format-4 twin (kb/Work PB1142): a SOLE inline method invocation "references a
+                // temporary data item with the same class, category, and content as the temp-identifier" (ISO
+                // §8.4.3.4.4 GR1), so an alphanumeric-returning one is a legal relation operand exactly as a sole
+                // alphanumeric function is. The expression spine's §8.8.1.1 screen now reads an invocation's class
+                // too, so the sole form must be short-circuited here for the same reason PB172 gave the function.
+                : SoleInlineInvocation(expr) is { } sii ? host.Oo.OoInlineInvocationOperand(sii)
                 // A sole numeric LITERAL stays a literal operand — against an alphanumeric/group operand it
                 // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1), which a
                 // computed wrapper would lose.

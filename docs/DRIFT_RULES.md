@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-220 drift tests.
+221 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -32,6 +32,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ArgumentSubstituteDriftTests](../tests/Cobol.Net.Tests.Unit/ArgumentSubstituteDriftTests.cs) | ⛔ NO INTRINSIC GUARD SPELLS ITS OWN SUBSTITUTED TEXT RESULT (kb/Work PB383, PB470). | `src/Cobol.Net.Runtime/Intrinsics` |
 | [ArithmeticModeScreenDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticModeScreenDriftTests.cs) | The §4.2.6 non-support screen for ARITHMETIC IS STANDARD-BINARY fires for EVERY kind of source unit that can carry an OPTIONS paragraph — and the set of such units is read out of the GRAMMAR, not out of a list somebody remembered to update. | `src/Cobol.Net.Frontend/Grammar` |
 | [ArithmeticOneInitialEvaluationDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticOneInitialEvaluationDriftTests.cs) | ⛔ AN ARITHMETIC STATEMENT EVALUATES ITS RIGHT-HAND SIDE ONCE, AND THE §14.7.4.3 r7 GATE TESTS THAT ONE INTERMEDIATE (kb/Work PB654). | — |
+| [ArithmeticOperandRoleDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticOperandRoleDriftTests.cs) | ⛔ EVERY ARITHMETIC VERB ASKS ONE RECEIVER CLASSIFICATION, AND IT COVERS EVERY OPERAND ARM THE GRAMMAR WRITES (kb/Work PB1142, CLAUDE.md rule 5). | — |
 | [ArithmeticSendingOperandDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticSendingOperandDriftTests.cs) | ⛔ THE SENDING ARITHMETIC OPERAND IS ONE RULE WRITTEN FOUR TIMES, AND ALL FOUR WERE WRONG (fix-queue PB45). | — |
 | [BooleanExpressionGateSiteDriftTests](../tests/Cobol.Net.Tests.Unit/BooleanExpressionGateSiteDriftTests.cs) | ⛔ AN INTRODUCTION GATE IS ONLY AS COMPLETE AS ITS LIST OF GRAMMAR SITES, AND THAT LIST WAS HAND-MAINTAINED. | — |
 | [BoundDeferralDriftTests](../tests/Cobol.Net.Tests.Unit/BoundDeferralDriftTests.cs) | ⛔ kb/Work PB909 — BoundUnsupported's TWO JOBS, split into two TYPES. | `src/Cobol.Net.Compiler`, `tests/conformance/negative` |

@@ -404,7 +404,9 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// file's runtime counter (ISO §8.4.3.14 GR1 — an unsigned integer); otherwise the resolved item's value.
     /// The ONE dataReference→<see cref="BoundExpr"/> mapping, used by every expression path.</summary>
     private BoundExpr RefExpr(Core.DataReferenceContext dref, OperandContext context) =>
-        host.Intrinsic.KeywordOmittedFunction(dref) is { } kof ? kof   // §8.4.3.2 SR2 — a repository intrinsic/function name + (args) without FUNCTION
+        // §8.4.3.2.3 SR2 — a repository intrinsic/function name + (args) without FUNCTION: a function-identifier
+        // like any other, so it takes the SAME §8.8.1.1 class screen (kb/Work PB1142).
+        host.Intrinsic.KeywordOmittedFunction(dref) is { } kof ? ScreenIdentifierOperand(kof, dref, context)
         : dref.LINAGE_COUNTER() is not null
             ? LinageFileOf(dref) is { } lcf ? new BoundLinageCounterRef(lcf)
                 : BoundExprError.Refused(ctx.Edition, $"LINAGE-COUNTER reference '{DataBinder.WrittenText(dref)}' (ISO §8.4.3.14)")
@@ -1082,62 +1084,87 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         if (pe.numericLiteral() is { } num) return new BoundNumLiteral(CheckLiteral(num.GetText()));
         if (pe.ZERO_ARITH() is not null) return new BoundNumLiteral("0");
         if (pe.dataReference() is { } dref) return RefExpr(dref, context);
-        // The §8.4.3.1.2 Format 4 identifier (§8.4.3.4 inline method invocation; kb/Work PB428) — the
-        // Format-1 twin below. It binds to a BoundNumRef over the §8.4.3.4.4 GR1 c) temporary, so the
-        // §8.8.1.1 class screen the data-item path applies (OperandRef) reaches it through the temp's own
-        // cloned category rather than through a second screen here.
-        if (pe.inlineMethodInvocation() is { } imi) return host.Oo.OoBindInlineInvocation(imi);
         if (pe.arithmeticExpression() is { } paren) return BindExprCore(paren, context);
-        // FUNCTION call (ISO §15; the 1989 Intrinsic Function Module) — StatementBinder.Intrinsics.cs.
-        if (pe.functionCall() is { } fc)
-        {
-            var call = host.Intrinsic.BindIntrinsic(fc);
-            // §8.8.1.1's class screen for a FUNCTION-IDENTIFIER operand (kb/Work PB68 — the fourth site of the
-            // class-boolean rule): a function-identifier references a temporary data item (§8.4.3.2.4 GR1) whose
-            // class is the function's type (§15.2), so an alphanumeric, national or BOOLEAN function is not "an
-            // identifier referencing a numeric data item" — the same DA6 rule OperandRef applies to a data item,
-            // with the same dialect gate (strict rejects; --permissive decodes the digit characters). Before this,
-            // `COMPUTE N = FUNCTION BOOLEAN-OF-INTEGER(5, 8) + 1` compiled clean and died at run time with an
-            // unhandled NotImplemented — a crash on legal-shaped source, the wrong stage.
-            // ⛔ BOTH ARITHMETIC CONTEXTS, and the reason it is finally safe (kb/Work PB172). PB155 widened this
-            // to the window context and had to REVERT it: the window serves BOTH genuinely-arithmetic positions
-            // (SET amounts, VARYING FROM/BY, subscripts) AND relation/EVALUATE COMPARAND positions, where a SOLE
-            // alphanumeric function is a legal §8.8.4.2.1 operand (`IF FUNCTION LOWER-CASE(X) = Y` — six NIST
-            // IF-suite programs). A sole DATA reference short-circuited through FieldOperand before OperandRef;
-            // a sole FUNCTION call had NO such short-circuit, so this screen could not tell a comparand from an
-            // arithmetic term and rejected legal source.
-            // THE BOUNDARY IS SOLE-vs-COMPOUND, NOT STATEMENT-vs-STATEMENT — `IF FUNCTION LOWER-CASE(X) + 1 = Y`
-            // is illegal in the very statement where the sole form is legal, so no per-statement context member
-            // could ever express it. `ConditionBinder.SoleFunctionCall` / `EvaluateBinder.BindValueOperand` now
-            // supply the missing short-circuit beside the two that already existed, which is what lets the screen
-            // key on the RULE (Rules().NumericClassScreen) instead of on one enum member — and the eight
-            // genuinely-arithmetic window sites gain it with no per-site edit at all.
-            // ⛔ THE VERDICT READS THE CLASS, NOT ResultCategory (IntrinsicArgumentRules.cs's PB124 wave-5b note):
-            // the storage model folds §15.2 item 6's INDEX functions into category numeric, so a ResultCategory
-            // test let `FUNCTION SQRT(FUNCTION MAX(IX1 IX2))` pass a class-numeric screen. Widening a screen that
-            // carries a known hole would have spread the hole to eight more sites.
-            if (context.Rules().NumericClassScreen && call is BoundIntrinsicCall sc
-                && IntrinsicBinder.OperandOf(sc) is { } scOp
-                && !IntrinsicArgumentRules.IsArithmeticOperandClass(scOp))
-            {
-                string cls = IntrinsicArgumentRules.ClassOf(scOp)?.ToString().ToLowerInvariant()
-                    ?? sc.ResultCategory.ToString().ToLowerInvariant();
-                string what = $"FUNCTION {sc.Sig.Name} ({(cls[0] is 'a' or 'e' or 'i' or 'o' or 'u' ? "an" : "a")} "
-                    + $"{cls} function, ISO §15.2)";
-                if (ctx.Edition.Permissive)
-                    ctx.Edition.Warning("COBOLNET0844", $"{what} is not a numeric operand (ISO §8.8.1.1); accepted "
-                        + "under --permissive, decoding its digit characters as an unsigned integer");
-                else
-                {
-                    ctx.Edition.Error("COBOLNET0844", $"{what} is not a numeric operand: ISO §8.8.1.1 admits only an "
-                        + "identifier referencing a NUMERIC data item, a numeric literal, or the figurative constant "
-                        + "ZERO in an arithmetic expression. --permissive accepts it as a digit-decoding extension");
-                    return BoundExprError.Refused(ctx.Edition, $"{what} in an arithmetic expression (ISO §8.8.1.1)");
-                }
-            }
-            return call;
-        }
+        // The two §8.4.3.1.2 identifier formats that are NOT a data-name reference — Format 1 (a FUNCTION call,
+        // ISO §15; StatementBinder.Intrinsics.cs) and Format 4 (an inline method invocation, §8.4.3.4; kb/Work
+        // PB428) — take ONE entry, shared with the operand-wrapper walk, so both reach §8.8.1.1's class screen.
+        if (((Antlr4.Runtime.ParserRuleContext?)pe.functionCall() ?? pe.inlineMethodInvocation()) is { } id)
+            return BindIdentifierOperand(id, context);
         return BoundExprError.Refused(ctx.Edition, "primary-expression operand");
+    }
+
+    /// <summary>⛔ THE ONE ENTRY FOR AN OPERAND WRITTEN AS A FUNCTION-IDENTIFIER (ISO §8.4.3.1.2 Format 1) OR AN
+    /// INLINE METHOD INVOCATION (Format 4), from BOTH the expression spine (<see cref="BindPrimary"/>) and the
+    /// operand-wrapper walk (<see cref="BindOperandExprCore"/>) — kb/Work PB1142.
+    /// <para>
+    /// Both formats reference a TEMPORARY data item whose class is the result's — a function's by §15.2 ("The type
+    /// of a function is determined by the class and category of the unique data item that results from the
+    /// evaluation of that function"), an invocation's by §8.4.3.4.4 GR1 ("An inline method invocation references
+    /// a temporary data item with the same class, category, and content as the temp-identifier") — so §8.8.1.1
+    /// ("An arithmetic expression may be an identifier referencing a numeric data item") asks of both the question
+    /// <see cref="OperandRef"/> asks of a data item, through the ONE classifier
+    /// (<see cref="IntrinsicArgumentRules.IsArithmeticOperandClass"/> over <see cref="IntrinsicBinder.OperandOf"/>),
+    /// with the same dialect gate (strict rejects; --permissive decodes the digit characters).
+    /// </para>
+    /// <para>
+    /// ⛔ WHY ONE ENTRY. The screen used to live INLINE in <see cref="BindPrimary"/>'s function arm, so it covered
+    /// one arm of two dispatches: the walk's function arm — every arithmetic verb's written operand, e.g.
+    /// <c>MULTIPLY FUNCTION UPPER-CASE("12") BY B</c> — bound the call UNSCREENED and digit-decoded an alphanumeric
+    /// function where COMPUTE drew COBOLNET0844; and neither dispatch's inline-invocation arm was screened at all
+    /// (<c>COMPUTE N = O :: "GETNAME"</c> digit-decoded under STRICT, while the comment on that arm claimed the
+    /// data-item screen reached it through the temporary — it did not: the invocation binds to a
+    /// <see cref="BoundNumRef"/> and never passes <see cref="OperandRef"/>).
+    /// </para>
+    /// <para>
+    /// ⛔ BOTH ARITHMETIC CONTEXTS, and why that is safe (kb/Work PB172). The window context serves genuinely
+    /// arithmetic positions (SET amounts, VARYING FROM/BY, subscripts) AND relation / EVALUATE comparands, where a
+    /// SOLE alphanumeric identifier is a legal §8.8.4.2.1 operand (`IF FUNCTION LOWER-CASE(X) = Y`). The boundary
+    /// is SOLE-vs-COMPOUND, not statement-vs-statement, so the comparand binders short-circuit the sole forms
+    /// before the spine — <c>ConditionBinder.SoleFunctionCall</c> / <c>SoleInlineInvocation</c> in
+    /// <c>ComparisonOperandOf</c> and <c>EvaluateBinder.BindValueOperand</c> — and this screen keys on the RULE
+    /// (<c>Rules().NumericClassScreen</c>). ⛔ THE VERDICT READS THE CLASS, NOT ResultCategory (PB124 wave 5b):
+    /// the storage model folds §15.2 item 6's INDEX functions into category numeric.
+    /// </para></summary>
+    private BoundExpr BindIdentifierOperand(Antlr4.Runtime.ParserRuleContext id, OperandContext context)
+    {
+        var bound = id switch
+        {
+            Core.FunctionCallContext fc => host.Intrinsic.BindIntrinsic(fc),
+            Core.InlineMethodInvocationContext imi => host.Oo.OoBindInlineInvocation(imi),
+            _ => throw new InvalidOperationException(
+                $"BindIdentifierOperand serves ISO §8.4.3.1.2 Formats 1 and 4 only, not {id.GetType().Name}"),
+        };
+        return ScreenIdentifierOperand(bound, id, context);
+    }
+
+    /// <summary>§8.8.1.1's class screen over an ALREADY-BOUND non-data-name identifier — the half of
+    /// <see cref="BindIdentifierOperand"/> the keyword-omitted function form (§8.4.3.2.3 SR2: a repository
+    /// function-name written without the word FUNCTION, which the grammar parses as a data reference) shares
+    /// from <see cref="RefExpr"/>. Before, that third spelling of a function-identifier bypassed the screen in
+    /// EVERY arithmetic position, COMPUTE included (kb/Work PB1142's sibling sweep: `COMPUTE C =
+    /// UPPER-CASE("12") + 1` gave 13 under STRICT).</summary>
+    private BoundExpr ScreenIdentifierOperand(BoundExpr bound, Antlr4.Runtime.ParserRuleContext id, OperandContext context)
+    {
+        if (!context.Rules().NumericClassScreen) return bound;
+        var operand = IntrinsicBinder.OperandOf(bound);
+        if (IntrinsicArgumentRules.IsArithmeticOperandClass(operand)) return bound;
+        string cls = IntrinsicArgumentRules.ClassOf(operand)?.ToString().ToLowerInvariant() ?? "non-numeric";
+        string article = cls[0] is 'a' or 'e' or 'i' or 'o' or 'u' ? "an" : "a";
+        string what = bound is BoundIntrinsicCall sc
+            ? $"FUNCTION {sc.Sig.Name} ({article} {cls} function, ISO §15.2)"
+            : id is Core.InlineMethodInvocationContext
+                ? $"the inline method invocation '{id.GetText()}' ({article} {cls} result, ISO §8.4.3.4.4 GR1)"
+                : $"the function-identifier '{id.GetText()}' ({article} {cls} result, ISO §15.2)";
+        if (ctx.Edition.Permissive)
+        {
+            ctx.Edition.Warning("COBOLNET0844", $"{what} is not a numeric operand (ISO §8.8.1.1); accepted "
+                + "under --permissive, decoding its digit characters as an unsigned integer");
+            return bound;
+        }
+        ctx.Edition.Error("COBOLNET0844", $"{what} is not a numeric operand: ISO §8.8.1.1 admits only an "
+            + "identifier referencing a NUMERIC data item, a numeric literal, or the figurative constant "
+            + "ZERO in an arithmetic expression. --permissive accepts it as a digit-decoding extension");
+        return BoundExprError.Refused(ctx.Edition, $"{what} in an arithmetic expression (ISO §8.8.1.1)");
     }
 
     /// <summary>Descend an operand-wrapper node to its inner arithmetic expression, or its leaf literal / data
@@ -1189,12 +1216,13 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 // the arm below and bound `FUNCTION SQRT(W-Z)` as plain `W-Z`: `ADD FUNCTION SQRT(W-Z) TO W-R`
                 // with W-Z = 4 added FOUR instead of TWO. Silent, and it survives "does it compile" entirely —
                 // it was caught only by checking the VALUE against the spec-derived answer.
-                if (c is Core.FunctionCallContext fc) return host.Intrinsic.BindIntrinsic(fc);
-                // The Format-4 twin of the arm above, and caught here for the SAME reason: an
-                // inlineMethodInvocation CONTAINS a dataReference (its receiver, and every identifier
-                // argument), so without this arm the breadth-first walk would descend into it and bind
-                // `O :: "GET" (W)` as plain `O` — the silent wrong answer PB45 measured for FUNCTION.
-                if (c is Core.InlineMethodInvocationContext imi) return host.Oo.OoBindInlineInvocation(imi);
+                // The Format-4 twin — an inlineMethodInvocation — is caught here for the SAME reason: it CONTAINS
+                // a dataReference (its receiver, and every identifier argument), so the walk would bind
+                // `O :: "GET" (W)` as plain `O`. Both take the ONE entry BindPrimary uses, so §8.8.1.1's class
+                // screen reaches every arithmetic verb's written operand (kb/Work PB1142: this arm used to bind
+                // the call UNSCREENED, digit-decoding an alphanumeric function COMPUTE rejected).
+                if (c is Core.FunctionCallContext or Core.InlineMethodInvocationContext)
+                    return BindIdentifierOperand((Antlr4.Runtime.ParserRuleContext)c, context);
                 // ⛔ THE BARE nonNumericLiteral ARM (kb/Work PB171), BEFORE the LiteralContext arm and for a
                 // reason the tree hides: `valueOperand : arithmeticExpression | nonNumericLiteral` names
                 // `nonNumericLiteral` DIRECTLY, bypassing the `literal : numericLiteral | nonNumericLiteral`

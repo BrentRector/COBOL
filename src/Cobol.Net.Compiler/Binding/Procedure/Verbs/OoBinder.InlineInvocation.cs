@@ -158,10 +158,13 @@ internal sealed class InvocationSite
 /// are no post-ops. Registration order gives §8.4.3.1.4 GR1's left-to-right component order for free: a
 /// nested invocation registers while its consumer's arguments bind.</para>
 ///
-/// <para><b>SR1 holds STRUCTURALLY, not by a check.</b> Format 4 was added to exactly the operand rules that
-/// already admit <c>functionCall</c> (§8.4.3.1.2 Format 1), whose exclusion §8.4.3.2.3 SR1 words identically;
-/// no receiving rule admits either. <c>InlineMethodInvocationOperandDriftTests</c> is what keeps that true of
-/// the .g4 as it grows, so this binder never has to re-derive it.</para>
+/// <para><b>Where SR1 is enforced.</b> Format 4 was added to exactly the operand rules that already admit
+/// <c>functionCall</c> (§8.4.3.1.2 Format 1), whose exclusion §8.4.3.2.3 SR1 words identically, and no purely
+/// RECEIVING rule admits either — <c>InlineMethodInvocationOperandDriftTests</c> keeps that true of the .g4. But
+/// four of those rules are MIXED-ROLE: the arithmetic TO / FROM / BY / INTO operand is a receiver in Format 1 and
+/// a sender in Format 2 (kb/Work PB134), so there the rule is a BIND-time check — the ONE
+/// <c>ArithmeticOperandRole</c> classification every arithmetic verb's Format-1 screen asks (kb/Work PB1142;
+/// pinned by <c>ArithmeticOperandRoleDriftTests</c>). This binder still never has to re-derive it.</para>
 /// </summary>
 internal sealed partial class OoBinder
 {

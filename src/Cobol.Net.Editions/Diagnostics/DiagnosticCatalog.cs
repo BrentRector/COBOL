@@ -527,10 +527,11 @@ public static class DiagnosticCatalog
         "COBOLNET1689", "arithmetic-format-operand", EditionSeverity.Error,
         "An arithmetic statement's operand does not fit the format its phrases select. The GIVING forms of "
         + "ADD / SUBTRACT / MULTIPLY / DIVIDE print ONE sending `{identifier | literal}` TO/FROM/BY/INTO "
-        + "operand with no ROUNDED; the non-GIVING forms print receiving identifiers only, so a literal or "
-        + "function-identifier operand there is illegal; and every BY form of DIVIDE prints GIVING. The old "
-        + "binders silently dropped the extra operands and the ROUNDED, or crashed.",
-        "ISO §14.9.2.2 / §14.9.44.2 / §14.9.26.2 / §14.9.12.2");
+        + "operand with no ROUNDED; the non-GIVING forms print receiving identifiers only, so a literal, a "
+        + "function-identifier (§8.4.3.2.3 SR1) or an inline method invocation (§8.4.3.4.3 SR1) there is "
+        + "illegal; and every BY form of DIVIDE prints GIVING. The old binders silently dropped the extra "
+        + "operands, the ROUNDED or an inline-invocation receiver, or crashed.",
+        "ISO §14.9.2.2 / §14.9.44.2 / §14.9.26.2 / §14.9.12.2 / §8.4.3.2.3 SR1 / §8.4.3.4.3 SR1");
     public static readonly DiagnosticDescriptor CommitRollbackContext = new(
         "COBOLNET1690", "commit-rollback-context", EditionSeverity.Error,
         "A COMMIT or ROLLBACK statement in a context its syntax rules ban: \"This statement shall not be "

@@ -6456,13 +6456,13 @@
   "ordinal": 1,
   "subject": "Inline method invocation",
   "rule-digest": "16994cd24e32",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#primaryExpression; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/MoveBinder.cs",
-  "test-ref": "unit:InlineMethodInvocationOperandDriftTests.ReceivingOperandRules_DoNotAdmitAnInlineMethodInvocation",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#primaryExpression; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/MoveBinder.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticOperandRole.cs#IsReceiver; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs#Format1Receivers",
+  "test-ref": "unit:InlineMethodInvocationOperandDriftTests.ReceivingOperandRules_DoNotAdmitAnInlineMethodInvocation; conformance:negative/pb1142-divide-into-inline-receiver; conformance-test:ArithmeticIdentifierOperandTests.Format1_NonReceiverOperand_IsRejected_NotDroppedOrCrashed; unit:ArithmeticOperandRoleDriftTests.MixedRules_AreExactlyTheGrammarRulesOfferingBothRoles",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1142 (registrar 15b). cite.py --check 8.4.3.4.3 'Inline method invocation shall not be specified as a receiving operand' OK. Enforced structurally: inlineMethodInvocation is admitted only where functionCall (sending) is; no receiving rule admits it, kept true by the drift test. Probe p9_receiving `MOVE \"X\" TO A1 :: \"GETNAME\"` rejected (COBOL0307 unexpected '::') - rejected, though by a generic parse diagnostic rather than a named SR1 message. || REFUTED: PARTIAL — The rule is NOT structural: the grammar admits inlineMethodInvocation in several positions that are RECEIVING in some formats (addToPhrase TO, subtractFromOperand, multiplyByOperand, divideIntoOperand, inspectStatement identifier-1), so enforcement depends on per-format binder screens -- and the Format-1 arithmetic screen (COBOLNET1689) catches functionCall but NOT inline invocation (two-arm dispatch). ADD 1 TO S :: \"GETN\" compiles and runs silently; DIVIDE 2 INTO S :: \"GETN\" crashes the compiler (InvalidOperationException in ArithmeticEmitter.EmitDivide). MOVE-TO and INSPECT REPLACING/CONVERTING are rejected (INSPECT via COBOLNET1632, whose message miscites 8.4.3.2.3 SR1/function-identifier). The drift test checks only 6 named receiving rules and never inspects the format-dependent sites, so it cannot pin this. || editions as written by the adjudicator: 2002, 2014, 2023 (OO facility; §8.4.3.4 absent from 85)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1142 landed (w65c). cite.py --check 8.4.3.4.3 'Inline method invocation shall not be specified as a receiving operand.' OK. Holds STRUCTURALLY for every purely receiving rule (InlineMethodInvocationOperandDriftTests), and by the bind-time Format-1 screen for the four MIXED-ROLE arithmetic rules (addToPhrase, subtractFromOperand, multiplyByOperand, divideIntoOperand): ADD/SUBTRACT/MULTIPLY/DIVIDE ... TO/FROM/BY/INTO OB::\"M\" without GIVING are each COBOLNET1689 naming SR1 - before, ADD/SUBTRACT/MULTIPLY compiled clean with the receiver dropped and DIVIDE crashed the compiler (InvalidOperationException in ArithmeticEmitter.EmitDivide). MOVE ... TO and INSPECT receivers are refused by the grammar / COBOLNET1632 as before. The rule's subject is a 2002 construct (8.4.3.4, introduced by COBOL 2002), so the editions are 2002+.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.4.3-2",
@@ -40521,13 +40521,13 @@
   "ordinal": 1,
   "subject": "MULTIPLY statement",
   "rule-digest": "437fa1876f91",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#BindExprCore; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#Receivers; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ScreenResultant",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#BindIdentifierOperand; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#OperandRef; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ScreenResultant; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#Receivers",
+  "test-ref": "conformance:negative/pb1142-multiply-alphanumeric-function; conformance-test:ArithmeticIdentifierOperandTests.AlphanumericIdentifier_AsArithmeticOperand_IsRejected; conformance:2002/pb1142_arithmetic_identifier_operands",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1142 (open). SR1 'Identifier-1 and identifier-2 shall reference a data item of category numeric.' (cite --check 14.9.26.3 OK). Probes: identifier-1 PIC X -> COBOLNET0844 (N1); national -> 0844 (N17); F2 identifier-2 PIC X -> 0844 (N9); F1 identifier-2 PIC X -> COBOLNET1675 citing SR1 (N2); numeric-edited F1 receiver -> 1675 (N3, correctly barred since SR1 says numeric only); group -> 1675 (N10). The inline-method-invocation F1 operand is never screened, but it is illegal on 8.4.3.4.3 SR1 grounds and is carried by the FMT finding. No spec-derived negative golden for these MULTIPLY positions -> test-needed. || REFUTED: DIVERGES — An alphanumeric-category function-identifier as identifier-1 (Format 1 or 2) or as the Format 2 identifier-2 is accepted without a diagnostic and gets digit-decoded. SR1 requires category numeric. The same operand in COMPUTE is rejected with COBOLNET0844, so the MULTIPLY operand's function-call arm skips the 8.8.1.1 screen (a two-arm dispatch). The adjudicator probed only data-name operands. [code-location note: (8.8.1.1 numeric-operand screen, COBOLNET0844)] || editions as adjudicated: 1985, 2002, 2014, 2023 (MULTIPLY formats 1 and 2 with the SIZE ERROR / NOT SIZE ERROR pair; the rounded-phrase MODE option carries 14.7.4's own edition)",
-  "state": "GAP"
+  "notes": "kb/Work PB1142 landed (w65c). SR1 'Identifier-1 and identifier-2 shall reference a data item of category numeric.' (cite --check 14.9.26.3 OK). Data-name operands were already screened (0844 sending / 1675 receiving). The function-identifier and inline-method-invocation formats now take the SAME 8.8.1.1 class screen through ExpressionBinder.BindIdentifierOperand, the one entry the expression spine (BindPrimary) and the operand-wrapper walk (BindOperandExprCore) share: MULTIPLY FUNCTION UPPER-CASE(\"12\") BY B (identifier-1), MULTIPLY A BY FUNCTION UPPER-CASE(\"12\") GIVING C (F2 identifier-2) and the alphanumeric inline-invocation forms are COBOLNET0844 under strict, digit-decoded with the 0844 warning under --permissive (DA6 gate). Before, the walk bound the function unscreened (B = 3.3 x 12 = 39.6 under STRICT) and no position screened an invocation. As a F1 identifier-2 a function / invocation is a receiver violation (FMT-14.9.26.2, COBOLNET1689).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.26.3-2",
@@ -60081,13 +60081,13 @@
   "ordinal": 0,
   "subject": "MULTIPLY statement",
   "rule-digest": "a8a272b3231e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#multiplyStatement; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#multiplyByOperand; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#arithmeticOnSizeError; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs#BindMultiply; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#Receivers",
-  "test-ref": "conformance:85/phrase_order_arithmetic",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#multiplyStatement; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#multiplyByOperand; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#arithmeticOnSizeError; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs#BindMultiply; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#Receivers; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticOperandRole.cs#FirstNonReceiver; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs#Format1Receivers",
+  "test-ref": "conformance:85/phrase_order_arithmetic; conformance:2002/pb1142_arithmetic_identifier_operands; conformance:negative/pb1142-divide-into-inline-receiver; conformance-test:ArithmeticIdentifierOperandTests.Format1_NonReceiverOperand_IsRejected_NotDroppedOrCrashed; unit:ArithmeticOperandRoleDriftTests.TheClassifier_PartitionsEveryOperandArm",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1142 (open). Both formats parse and bind: F1 `BY {identifier-2 [rounded]}...` (multi-receiver, per-receiver ROUNDED), F2 one sending `BY {identifier-2|literal-2}` + `GIVING {identifier-3 [rounded]}...`; the SIZE ERROR pair in either order and ON omitted (5.2.6.4 choice indicators, cite --check 5.2.6.4 'any single alternative shall be specified only once' OK); a duplicated ON SIZE ERROR is rejected (COBOL0307). BindMultiply narrows the widened grammar per format: F1 with a literal/function BY -> COBOLNET1689 (probe N7/N12); F2 with 2 BY operands or BY ... ROUNDED -> COBOLNET1689 (N8/N11). Probes p1.cob: F1 `MULTIPLY A(2.5) BY C(7) D(10) ROUNDED` -> C=17 D=25; F2 multi-GIVING incl. numeric-edited OK. DEFECT: multiplyByOperand also admits `inlineMethodInvocation` (PB428), and the F1 guard at ArithmeticBinder BindMultiply checks only `receivingOperand()?.literal()` and `functionCall()`; Receivers(MultiplyByOperandContext) then silently drops the operand (it reads only receivingOperand().dataReference()). `MULTIPLY A BY B OB::\"GETX\".` compiles CLEAN and runs (B=8.2, the invocation vanishes); `MULTIPLY A BY OB::\"GETX\".` compiles clean with ZERO receivers (a no-op). Spec: F1 identifier-2 is the receiving item (GR1 'stored as the new value of the data item referenced by identifier-2') and 8.4.3.4.3 SR1 'Inline method invocation shall not be specified as a receiving operand.' (cite --check 8.4.3.4.3 OK) -> must be rejected. See finding 'F1 non-receiver guard omits inlineMethodInvocation'. test-ref covers only the SIZE-ERROR-phrase shape of the format; the inline-invocation negative is test-needed. cite --check 14.9.26.2 'where rounded-phrase is described in 14.7.4, ROUNDED phrase' OK. || editions as adjudicated: 1985, 2002, 2014, 2023 (MULTIPLY formats 1 and 2 with the SIZE ERROR / NOT SIZE ERROR pair; the rounded-phrase MODE option carries 14.7.4's own edition)",
-  "state": "GAP"
+  "notes": "kb/Work PB1142 landed (w65c). Both formats parse and bind; the union grammar (multiplyByOperand: receivingOperand roundedPhrase? | functionCall | inlineMethodInvocation) is narrowed per format by the ONE ArithmeticOperandRole classification all four arithmetic verbs ask: Format 1 `BY {identifier-2 [rounded-phrase]}` accepts only a data reference placed through a receiving rule (positive definition), so a literal, a function-identifier (8.4.3.2.3 SR1) and an inline method invocation (8.4.3.4.3 SR1) are each COBOLNET1689 - before, the invocation receiver was silently DROPPED (MULTIPLY A BY B OB::\"GETX\" printed B=8.2 with the second operand ignored). Format 2 `BY {identifier-2 | literal-2}` + GIVING binds every identifier format (2002 golden rows 1-4). ArithmeticOperandRoleDriftTests pins the mixed-rule set and the receiving-rule set against the .g4.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-14.9.27.2",

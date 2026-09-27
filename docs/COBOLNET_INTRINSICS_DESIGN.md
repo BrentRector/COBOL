@@ -398,9 +398,16 @@ was rejected as a class mix while the illegal alphanumeric mirror was accepted),
 `BoundBoolCall`, rendered through the string channel), the LENGTH fold and `IsStringOperand` (a boolean function's
 '0'/'1' image is a string operand), the condition renderer's `StringCategoryOf`/`BoolRead` (two boolean function
 results compared each other take §8.8.4.2.8's right-zero-extension), and §8.8.1.1's arithmetic screen, which now
-fires at BIND for a string-class function operand (`ExpressionBinder.BindPrimary` — it compiled clean and threw at
-run time; `--permissive` decodes the digits exactly as for a data item, the DA6 gate). Pinned by
-`pb68_boolean_function_operand_contexts` and the `pb68-*` negatives.
+fires at BIND for a string-class function operand (`ExpressionBinder.BindIdentifierOperand` — it compiled clean and
+threw at run time; `--permissive` decodes the digits exactly as for a data item, the DA6 gate). That entry is the ONE
+path for both non-data-name identifier formats of §8.4.3.1.2 — the function-identifier (Format 1) and
+its Format-4 twin, the inline method invocation — from BOTH the expression spine (`BindPrimary`) and the operand-wrapper walk (`BindOperandExprCore`), so every arithmetic
+verb's written operand — not only COMPUTE's — is screened (kb/Work PB1142); its screening half
+(`ScreenIdentifierOperand`) also serves the keyword-omitted spelling (§8.4.3.2.3 SR2), which parses as a data
+reference and reaches it from `RefExpr`. A SOLE function or invocation stays a
+legal relation / EVALUATE comparand through the comparand binders' short-circuits. Pinned by
+`pb68_boolean_function_operand_contexts`, the `pb68-*` negatives, `pb1142-multiply-alphanumeric-function` and
+`ArithmeticIdentifierOperandTests`.
 
 ### The ALL subscript in an argument (§15.3): ONE enumerating operand, three ranges, admissible only where the format repeats an argument (PB62).
 

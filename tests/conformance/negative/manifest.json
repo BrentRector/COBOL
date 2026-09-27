@@ -1681,7 +1681,9 @@
   "pb1617-call-content-figurative-varlength-group",
   "pb1617-invoke-figurative-strong-group",
   "pb1617-call-content-figurative-pointer-formal",
-  "pb1630-call-content-null-alnum-formal"
+  "pb1630-call-content-null-alnum-formal",
+  "pb1142-divide-into-inline-receiver",
+  "pb1142-multiply-alphanumeric-function"
  ],
  "pending": []
 }
