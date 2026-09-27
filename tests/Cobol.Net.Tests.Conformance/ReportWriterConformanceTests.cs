@@ -21,9 +21,9 @@ public sealed class ReportWriterConformanceTests
     /// back through a second SELECT with <c>ORGANIZATION LINE SEQUENTIAL</c> — and that organization is a
     /// COBOL-2023 introduction (ISO §12.4.5.10.3 GR2; the Foreword lists "Line Sequential file organization"
     /// among the main changes over ISO/IEC 1989:2014), so below 2023 the read-back is COBOLNET0900. It cannot be
-    /// swapped for a record-sequential read either: COBOL.NET frames a report file as line-delimited text
+    /// swapped for a record-sequential read either: WiseOwl COBOL frames a report file as line-delimited text
     /// whatever the file's ORGANIZATION, while the record-sequential connector reads fixed-size records — so a
-    /// COBOL.NET report file is not readable at all below 2023. The report-writer BEHAVIOR under test is
+    /// WiseOwl COBOL report file is not readable at all below 2023. The report-writer BEHAVIOR under test is
     /// edition-invariant, so 2023 costs nothing; what is lost is only the (unobtainable) claim that these
     /// assertions were observed at 85.</summary>
     private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
@@ -32,7 +32,7 @@ public sealed class ReportWriterConformanceTests
     private static void AssertSpec(string source, string expected)
     {
         var (ok, stdout, detail) = CobolNet.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, stdout);
     }
 

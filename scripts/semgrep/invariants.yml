@@ -1,4 +1,4 @@
-# COBOL.NET architectural invariants, mechanized.
+# WiseOwl COBOL architectural invariants, mechanized.
 #
 # These rules encode doctrine that was previously prose in PROMPT.md and COBOLNET_DESIGN.md §1.2 — rules only a
 # reviewer would catch, and only if they remembered. Anything checkable by a pattern should not be an instruction.

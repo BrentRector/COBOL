@@ -364,7 +364,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// the shared rule <see cref="NumericRenderer.AlignRoundedUp"/> owns (ALLOCATE §14.9.3.4 GR1 is its only
     /// sibling).</item>
     /// <item>SECONDS — §14.7.9.3 GR2 instead stores the timeout period through an implicit COMPUTE WITHOUT the
-    /// ROUNDED phrase into a 9(n)V9(m) temporary, i.e. TRUNCATION at the implementor's m. COBOL.NET's
+    /// ROUNDED phrase into a 9(n)V9(m) temporary, i.e. TRUNCATION at the implementor's m. WiseOwl COBOL's
     /// determination is n = 1, m = 0 with a maximum meaningful value of 0 (A.1 item 166, docs/CONFORMANCE.md
     /// §7), so the amount is clamped to a zero-length period at the runtime and is inert — but it is still
     /// PASSED, because it is the GR4a screen input, and it is still rendered by the truncating
@@ -608,7 +608,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// <summary>READ file [INTO x] [AT END …][NOT AT END …] (ISO §14.9.30): on success the record image is
     /// distributed into the FD record area (and, with INTO, MOVEd to the target); the AT END / NOT AT END imperative
     /// branches on the at-end condition. After an UNSUCCESSFUL read the record area's content is spec-UNDEFINED
-    /// (§14.9.30 GR18 "unless otherwise specified…"); COBOL.NET's documented refinement is that the area is
+    /// (§14.9.30 GR18 "unless otherwise specified…"); WiseOwl COBOL's documented refinement is that the area is
     /// UNCHANGED — the store sits in the success branch only — extending the spec's own rule for every other
     /// unsuccessful I-O verb (REWRITE GR14 / WRITE GR15 / DELETE GR8 / START GR2 all say "unaffected"). The
     /// legacy's LOW-VALUE fill there was a byte-engine artifact (ST146A's golden is re-baselined over it,

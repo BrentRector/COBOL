@@ -39,10 +39,10 @@ public sealed record ConfigEntry(string Name, string Subsystem, string Purpose, 
 }
 
 /// <summary>
-/// The REGISTRY of every environment variable the COBOL.NET runtime reads (kb/Work PB108) — a diagnostic
+/// The REGISTRY of every environment variable the WiseOwl COBOL runtime reads (kb/Work PB108) — a diagnostic
 /// enumeration, NOT a configuration system: it introduces no knob, loads nothing, overrides nothing, and mutates no
 /// runtime state. Each subsystem keeps reading its own variable through its own constant, exactly as before; this
-/// class lists those constants in ONE place so that "which environment variables does a COBOL.NET program honor"
+/// class lists those constants in ONE place so that "which environment variables does a WiseOwl COBOL program honor"
 /// has one answer (<see cref="All"/>, <see cref="Describe"/>), and so that a NEW variable cannot appear in the
 /// runtime unregistered: <c>RuntimeConfigTests</c> scans the runtime sources for every
 /// <c>Environment.GetEnvironmentVariable(</c> call and every <c>COBOL…_</c> name literal and asserts each is
@@ -127,7 +127,7 @@ public static class RuntimeConfig
     public static string Describe()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("COBOL.NET runtime — environment variables read (RuntimeConfig; a diagnostic registry, not a configuration system):");
+        sb.AppendLine("WiseOwl COBOL runtime — environment variables read (RuntimeConfig; a diagnostic registry, not a configuration system):");
         string? subsystem = null;
         foreach (var e in All)
         {

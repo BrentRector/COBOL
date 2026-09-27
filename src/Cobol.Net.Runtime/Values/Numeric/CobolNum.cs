@@ -6,7 +6,7 @@ using CobolNet.Runtime.Exceptions;
 namespace CobolNet.Runtime;
 
 /// <summary>
-/// The value-level numeric engine for COBOL.NET, operating entirely on hardware-native <see cref="long"/>.
+/// The value-level numeric engine for WiseOwl COBOL, operating entirely on hardware-native <see cref="long"/>.
 /// </summary>
 /// <remarks>
 /// <para>A COBOL fixed-point datum is represented as a native integer holding its <b>unscaled</b> value (every
@@ -522,7 +522,7 @@ public static partial class CobolNum
 
     // ── The ORDINAL-POSITION integrality rule (ISO §8.4.2.3.4 GR1b · §8.4.3.3.4 rule 5)c); fix-queue PB41) ──────
     // A subscript and a reference-modifier leftmost-position/length are the VALUE of an arithmetic expression, and
-    // BOTH clauses make a non-integer value an exception condition rather than a truncation. A COBOL.NET numeric
+    // BOTH clauses make a non-integer value an exception condition rather than a truncation. A WiseOwl COBOL numeric
     // item stores UNSCALED (PIC 9V9 VALUE 2.0 is the field 20L, scale 1), so the value question and the storage
     // question are different questions — reading the storage as an occurrence number is how PB41 indexed
     // occurrence 20 for the subscript 2.0. These two helpers are the ONE place that difference is resolved; the
@@ -756,7 +756,7 @@ public static partial class CobolNum
     /// ⛔ THE TEXT IMAGE OF AN INTRINSIC FUNCTION'S RETURNED VALUE (DA2). A function's value lives in a
     /// "temporary elementary data item" (ISO §15.4) whose characteristics, under native arithmetic, are
     /// explicitly <b>defined by the implementor</b> (§15.4.1); §14.9.11.4 GR1 likewise makes any conversion
-    /// between a DISPLAY operand and the device implementor-defined. COBOL.NET's determination — documented as
+    /// between a DISPLAY operand and the device implementor-defined. WiseOwl COBOL's determination — documented as
     /// an Annex A.1 item — is the <b>literal form of the value</b>: the significant digits with no leading-zero
     /// padding, a leading <c>-</c> when negative, and a decimal point followed by exactly
     /// <paramref name="scale"/> fraction digits when the value is scaled.
@@ -823,7 +823,7 @@ public static partial class CobolNum
 
     /// <summary>The deterministic digit decode of a character image whose SIZE is already fixed by its own data
     /// description — no size rule is applied here (ISO §14.6.13.2: incompatible content in a numeric context is
-    /// undefined, and COBOL.NET's determination is deterministic — a non-digit position contributes no digit, an
+    /// undefined, and WiseOwl COBOL's determination is deterministic — a non-digit position contributes no digit, an
     /// all-non-digit or empty image is 0). The unsigned MAGNITUDE only: no operational sign is decoded.
     /// <para>⛔ An ALPHANUMERIC or NATIONAL SENDING OPERAND takes <see cref="FromAlphanumeric"/> instead, which
     /// applies §14.9.25.4 GR6 d) 3's 31-character size rule before this scan.</para></summary>

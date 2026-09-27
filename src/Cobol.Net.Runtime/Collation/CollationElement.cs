@@ -3,7 +3,7 @@
 namespace CobolNet.Runtime.Collation;
 
 /// <summary>
-/// One collation element of COBOL.NET's derived multi-level collation table: the (primary, secondary, tertiary)
+/// One collation element of WiseOwl COBOL's derived multi-level collation table: the (primary, secondary, tertiary)
 /// weight triple of the Unicode Collation Algorithm (UTS #10) — the same three-level shape ISO/IEC 14651's Common
 /// Template Table uses — plus the element's VARIABLE marking, which decides its treatment under
 /// <see cref="AlternateHandling.Shifted"/> (space, punctuation and symbols are variable; letters and digits are not).

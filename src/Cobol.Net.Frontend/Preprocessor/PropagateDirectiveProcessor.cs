@@ -7,7 +7,7 @@ using CobolNet.Frontend.Diagnostics;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
-/// The COBOL.NET <c>&gt;&gt;PROPAGATE</c> directive stage (ISO/IEC 1989:2023 §7.3.21): the directive controls
+/// The WiseOwl COBOL <c>&gt;&gt;PROPAGATE</c> directive stage (ISO/IEC 1989:2023 §7.3.21): the directive controls
 /// AUTOMATIC propagation of an unhandled exception condition to the activating runtime element (GR1/GR2 — as though
 /// a <c>GOBACK RAISING LAST</c> were executed), scoped over the functions/methods/programs that follow in the
 /// compilation group; the default is <c>PROPAGATE OFF</c> (GR4). <b>§7.3.21.3 SR1 (the directive shall not be

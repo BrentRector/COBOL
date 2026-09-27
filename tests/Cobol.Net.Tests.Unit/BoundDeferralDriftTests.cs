@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ kb/Work PB909 — <c>BoundUnsupported</c>'s TWO JOBS, split into two TYPES. The deferral carrier meant both
-/// "COBOL.NET has not built this" and "no general format prints this", so an ungrammatical statement and a
+/// "WiseOwl COBOL has not built this" and "no general format prints this", so an ungrammatical statement and a
 /// missing feature looked the same: INSPECT … REPLACING TRAILING and SEARCH … NOT AT END compiled with a
 /// COBOLNET1756 warning and aborted the run unit, where ISO §4.2.2 ¶2 owes a compile-time indication of
 /// "violations of the general formats and the explicit syntax rules of standard COBOL".
@@ -25,7 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class BoundDeferralDriftTests
 {
-    /// <summary>The vocabulary of a violated rule. A deferral names what COBOL.NET has not built; if its message
+    /// <summary>The vocabulary of a violated rule. A deferral names what WiseOwl COBOL has not built; if its message
     /// needs a syntax-rule number, "shall", or "extension", the SOURCE is what is wrong and the node is wrong.
     /// General-rule (GR) citations stay legal — a deferral may name the semantics it has not built.</summary>
     private static readonly Regex RuleVocabulary = new(
@@ -227,7 +227,7 @@ SKIPPER.
     }
 
     /// <summary>kb/Work PB938 — a test that PINS a capability limit is a decision about the standard. Now that the
-    /// deferral has one code of its own (COBOLNET1756 means "COBOL.NET has not built this" and nothing else), a
+    /// deferral has one code of its own (COBOLNET1756 means "WiseOwl COBOL has not built this" and nothing else), a
     /// NEGATIVE golden expecting it would be asserting that the standard refuses what only this compiler does —
     /// the `pb17-function-subscript-varying-by` shape, which held conforming source as a rejection for months
     /// and was found only by a fix walking past it. The population is zero; this keeps it zero.</summary>

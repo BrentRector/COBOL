@@ -350,7 +350,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
 
             // SECONDS-PAST-MIDNIGHT (§15.80) — type NUMERIC in standard numeric time form: the runtime
             // returns the local time-of-day TICK count = the unscaled value at SCALE 7 (the documented
-            // 100 ns COBOL.NET precision, §15.80.3 r3).
+            // 100 ns WiseOwl COBOL precision, §15.80.3 r3).
             case "SecondsPastMidnight":
                 return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, ""), 7);
 
@@ -709,7 +709,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // working-scale choice can reach — the standard-mode arm above now owns the other modes, which is the
         // scope this citation always had).
         // §15.4.1: "When native arithmetic is in effect, the characteristics and representation of the returned
-        // value are defined by the implementor" — COBOL.NET's determination is that the §15.4.1 float family's
+        // value are defined by the implementor" — WiseOwl COBOL's determination is that the §15.4.1 float family's
         // returned value IS a binary64, and the quantization exists ONLY to land it in a fixed-point receiver,
         // whose scale is what defines the quantization. With no receiver there is no scale to quantize TO, and the
         // arbitrary ws = 9 stand-in was not merely a different rendering — it was WRONG, because FromDouble

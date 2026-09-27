@@ -17,7 +17,7 @@ public sealed class OptionsDifferentialTests
     private static void AssertOutput(string source, string expected)
     {
         var (ok, outp, detail) = CobolNet.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, outp);
     }
 

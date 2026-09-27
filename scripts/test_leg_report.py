@@ -96,7 +96,7 @@ FRAME = "at CobolNet.Tests.Unit.ConflictMarkerDriftTests.Sweep"
 
 #: The real transcript of a failing Unit leg (golden lane #2 batch 3, DEVLOG 1700), message replaced by PLANT.
 FAILED_TRANSCRIPT = f"""\
-Test run for E:\\CobolSharp\\tests\\Cobol.Net.Tests.Unit\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Unit.dll (.NETCoreApp,Version=v10.0)
+Test run for E:\\COBOL\\tests\\Cobol.Net.Tests.Unit\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Unit.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 [xUnit.net 00:00:40.84]     CobolNet.Tests.Unit.ConflictMarkerDriftTests.TheSweepActuallyReadsTheTrackedTree [FAIL]
   Failed CobolNet.Tests.Unit.ConflictMarkerDriftTests.TheSweepActuallyReadsTheTrackedTree [21 s]
@@ -105,23 +105,23 @@ A total of 1 test files matched the specified pattern.
   Stack Trace:
      at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
    at System.IO.File.OpenRead(String path)
-   {FRAME}(String root, IEnumerable`1 relativePaths) in E:\\CobolSharp\\tests\\Cobol.Net.Tests.Unit\\ConflictMarkerDriftTests.cs:line 232
-   at CobolNet.Tests.Unit.ConflictMarkerDriftTests.TheSweepActuallyReadsTheTrackedTree() in E:\\CobolSharp\\tests\\Cobol.Net.Tests.Unit\\ConflictMarkerDriftTests.cs:line 124
+   {FRAME}(String root, IEnumerable`1 relativePaths) in E:\\COBOL\\tests\\Cobol.Net.Tests.Unit\\ConflictMarkerDriftTests.cs:line 232
+   at CobolNet.Tests.Unit.ConflictMarkerDriftTests.TheSweepActuallyReadsTheTrackedTree() in E:\\COBOL\\tests\\Cobol.Net.Tests.Unit\\ConflictMarkerDriftTests.cs:line 124
 
 Failed!  - Failed:     1, Passed: 29189, Skipped:     0, Total: 29190, Duration: 2 m 47 s - Cobol.Net.Tests.Unit.dll (net10.0)
 """.splitlines()
 
 PASSED_TRANSCRIPT = """\
-Test run for E:\\CobolSharp\\tests\\Cobol.Net.Tests.Unit\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Unit.dll (.NETCoreApp,Version=v10.0)
+Test run for E:\\COBOL\\tests\\Cobol.Net.Tests.Unit\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Unit.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 Passed!  - Failed:     0, Passed: 29190, Skipped:     0, Total: 29190, Duration: 2 m 41 s - Cobol.Net.Tests.Unit.dll (net10.0)
 """.splitlines()
 
 #: A filter that matched nothing: vstest prints no verdict line and EXITS 0.
 EMPTY_TRANSCRIPT = """\
-Test run for E:\\CobolSharp\\tests\\Cobol.Net.Tests.Conformance\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Conformance.dll (.NETCoreApp,Version=v10.0)
+Test run for E:\\COBOL\\tests\\Cobol.Net.Tests.Conformance\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Conformance.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-No test matches the given testcase filter `FullyQualifiedName~NoSuchTest` in E:\\CobolSharp\\tests\\Cobol.Net.Tests.Conformance\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Conformance.dll
+No test matches the given testcase filter `FullyQualifiedName~NoSuchTest` in E:\\COBOL\\tests\\Cobol.Net.Tests.Conformance\\bin\\Debug\\net10.0\\Cobol.Net.Tests.Conformance.dll
 """.splitlines()
 
 

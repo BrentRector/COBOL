@@ -21,7 +21,7 @@ public sealed class InspectDifferentialTests
     private static void AssertSpecPinned(string source, string expected, int dialectLevel = 85)
     {
         var (ok, stdout, detail) = new CobolNetCompiler(dialectLevel).CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, stdout);
     }
 

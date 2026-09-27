@@ -1,6 +1,6 @@
-# COBOL.NET — Report Writer (deep-dive design)
+# WiseOwl COBOL — Report Writer (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL → idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL → idiomatic
 > typed-native C# via Roslyn; no byte substrate). This doc CLOSES the SSOT's "designed only to the seam"
 > scope flag for Report Writer (`docs/COBOLNET_DESIGN.md` §14 verb table / §15.5): the subsystem is now
 > implemented. The locked invariants and cross-cutting consistency live in the SSOT; spec authority is
@@ -494,7 +494,7 @@ deep-dive table points here.
   the §13.18.41.4 GR3g absent-SUM neither-prints-nor-resets pin.
 - **⛔ EVERY corpus golden and unit fact below that observes report CONTENT lives at `--std 2023`, and the reason
   is not the Report Writer** (an 85 subsystem): the only way to read a report file back is a second SELECT with
-  `ORGANIZATION LINE SEQUENTIAL`, a COBOL-2023 introduction (§12.4.5.10.3 GR2; kb/Work PB688), and a COBOL.NET
+  `ORGANIZATION LINE SEQUENTIAL`, a COBOL-2023 introduction (§12.4.5.10.3 GR2; kb/Work PB688), and a WiseOwl COBOL
   report file is CRLF-delimited text whatever its own ORGANIZATION, so a record-sequential read-back of it is
   misaligned. `ReportWriterConformanceTests` compiles whole at 2023 for that reason, and the nine 2002 goldens
   moved to `tests/conformance/2023/`. The ONE golden that stays at 85 —

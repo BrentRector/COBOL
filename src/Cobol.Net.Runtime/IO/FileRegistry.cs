@@ -365,7 +365,7 @@ public sealed class FileRegistry
         if ((cell & Table14.UnitStructuredOnly) != 0)
             throw new InvalidOperationException(
                 $"CLOSE {format} on a {c.Category} file needs Table 14 symbols {cell & Table14.UnitStructuredOnly}, "
-                + "which require a reel/unit-structured medium — COBOL.NET supports none (docs/CONFORMANCE.md "
+                + "which require a reel/unit-structured medium — WiseOwl COBOL supports none (docs/CONFORMANCE.md "
                 + "§7, A.1 item 24); a new medium must implement them here (kb/Work PB235)");
         bool absent = c.OptionalNotPresent;   // read BEFORE the close (the FPI state survives it — PB140)
         // e) Close unit, non-unit-media branch: "Execution of this statement is considered successful. The file
@@ -385,7 +385,7 @@ public sealed class FileRegistry
         }
         // §14.9.6.4 GR1 — the not-open guard, ahead of any closing action.
         if (!c.IsOpen) { c.SetStatus(FileStatusCode.FileNotOpen); return; }
-        // c) Close file: "Closing operations specified by the implementor are executed." COBOL.NET's are
+        // c) Close file: "Closing operations specified by the implementor are executed." WiseOwl COBOL's are
         // documented at docs/CONFORMANCE.md §7, A.1 item 24 (which makes them a required documented
         // item) — flush/persist/dispose in CloseCore, plus the §14.9.6.4 GR9 lock release here.
         SharedClose(name);   // no-op for a non-sharing-active connector
@@ -424,7 +424,7 @@ public sealed class FileRegistry
     }
 
     /// <summary>CLOSE … REEL/UNIT — Table 14's <c>CLOSE UNIT</c> row (§14.9.6.3 SR2 makes REEL and UNIT
-    /// equivalent). On the Non-unit medium COBOL.NET supports that cell is symbol e alone: the file REMAINS
+    /// equivalent). On the Non-unit medium WiseOwl COBOL supports that cell is symbol e alone: the file REMAINS
     /// OPEN with status '07' and nothing else happens. <see cref="CloseByFormat"/> executes the cell.</summary>
     public void CloseReelUnit(string name) => CloseByFormat(name, CloseFormat.Unit);
 
@@ -800,7 +800,7 @@ public sealed class FileRegistry
     // external releaser exists), so an unsatisfiable conflict lands on the conflict's OWN §9.1.13 status —
     // never a sleep, and never a manufactured one. See D8 in docs/COBOLNET_FILES_DESIGN.md and ExhaustionStatus.
 
-    /// <summary>⛔ THE ONE PLACE COBOL.NET'S IMPLEMENTOR-DEFAULT SHARING MODE IS NAMED (ISO §9.1.15:
+    /// <summary>⛔ THE ONE PLACE WiseOwl COBOL'S IMPLEMENTOR-DEFAULT SHARING MODE IS NAMED (ISO §9.1.15:
     /// <i>"If no specification is made in either location, the implementor defines the sharing mode in which the
     /// file is opened; the implementor-defined sharing mode may be one of the modes specified in this Working
     /// Draft International Standard or may be a mode completely specified by the implementor."</i>).
@@ -1592,7 +1592,7 @@ public sealed class FileRegistry
     /// the statement's own answer and is returned untouched, un-retried.</para>
     /// <para>GR4a: no RETRY phrase, or an arithmetic-expression evaluating negative or zero, makes NO further
     /// attempt. GR1: n TIMES makes n further attempts after the initial failure. GR2: FOR n SECONDS clamps the
-    /// timeout period to the implementor's maximum meaningful value, which COBOL.NET defines as ZERO (A.1 item
+    /// timeout period to the implementor's maximum meaningful value, which WiseOwl COBOL defines as ZERO (A.1 item
     /// 166, docs/CONFORMANCE.md §7), so its period is zero-length and it likewise makes none. GR3: FOREVER waits
     /// until the operation completes. Never sleeps — the ground for the GR2 determination is that a lock here is
     /// held only by a file connector of the EXECUTING run unit, which cannot release it while this statement
@@ -1635,7 +1635,7 @@ public sealed class FileRegistry
     /// for OPEN and '62' for DELETE FILE — and NO deadlock value, so a file-sharing conflict has no landing but
     /// its own; §14.9.10.4 GR15b is imperative there ("The value … is placed") where its record-conflict twin
     /// GR6b says only "A value". §9.1.13.8 item 2's '52' is a RECORD-conflict value whose detection conditions
-    /// the implementor defines (A.1 item 109, recorded in docs/CONFORMANCE.md §7): COBOL.NET detects a deadlock
+    /// the implementor defines (A.1 item 109, recorded in docs/CONFORMANCE.md §7): WiseOwl COBOL detects a deadlock
     /// exactly when a FOREVER retry waits on a record locked by another file connector (§9.1.13.8 item 1), since
     /// that holder is inside the executing run unit and can never release while this statement runs, so GR3's
     /// "until the operation has been completed" would never terminate.</para>

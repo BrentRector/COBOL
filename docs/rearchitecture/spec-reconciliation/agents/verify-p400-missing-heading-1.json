@@ -6,7 +6,7 @@
     "pdf_says": "13.17.3   Syntax rules — printed at the same heading depth as 13.17.1 General, 13.17.2 General formats and 13.17.4 General rules (all three-component subclause numbers under 13.17).",
     "markdown_says": "specs/ISO_COBOL.md line 17201: \"## 13.17.3 Syntax rules\" — an H2, while its siblings are H3: line 17051 \"### 13.17.1 General\", line 17056 \"### 13.17.2 General formats\", line 17254 \"### 13.17.4 General rules\", under line 17048 \"## 13.17 Screen description entry\".",
     "why_it_matters": "13.17.3 is promoted a level, so it renders as a peer of clause 13.17 itself rather than as one of its subclauses. Any generated table of contents, anchor map, or section-extraction tool that walks heading depth will place the Syntax rules of the screen description entry outside 13.17, breaking §-citation lookups for exactly the rules a compiler needs (e.g. 13.17.3 SR 1 on entry-name-clause ordering).",
-    "verify_command": "cd E:/CobolSharp && python scripts/spec/page_workunit.py 400 --out E:/Temp/specrecon/v400 --dpi 300"
+    "verify_command": "cd E:/COBOL && python scripts/spec/page_workunit.py 400 --out E:/Temp/specrecon/v400 --dpi 300"
   },
   "verdict": {
     "real": true,

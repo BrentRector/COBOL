@@ -13,7 +13,7 @@
 #     CLI="src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll"
 # and drove the whole 376-program NIST compile-and-run leg — plus its audit and its forensics — through it.
 # That binary is the LEGACY byte engine: its dependency closure is CobolSharp.Compiler -> Cobol.Net.Frontend,
-# and `Cobol.Net.Compiler` (the Roslyn code generator that IS COBOL.NET) is not in it. So every battery's
+# and `Cobol.Net.Compiler` (the Roslyn code generator that IS WiseOwl COBOL) is not in it. So every battery's
 # headline `guard NIST: 353 MATCH, 0 REGRESSION(S)` was a true statement about the ORACLE and said nothing
 # whatever about the compiler this project ships. Battery #58 proved it the hard way: `NC215A` printed a
 # wrong answer (PB741) that the Conformance assembly's NistDifferentialTests partitions caught and the guard's
@@ -25,7 +25,7 @@
 # legacy compiler is still runnable through the SAME leg, but only through the project's existing opt-in
 # differential switch:
 #
-#   bash scripts/guard-fast.sh                          -> COBOL.NET  (the gate)
+#   bash scripts/guard-fast.sh                          -> WiseOwl COBOL  (the gate)
 #   COBOLSHARP_LEGACY_DIFFERENTIAL=1 bash scripts/guard-fast.sh   -> the legacy oracle (a differential run)
 #
 # and every verdict line NAMES the compiler it drove, so a pasted `NIST (cobol): ...` line can never again be
@@ -122,7 +122,7 @@ guard_assert_compiler_identity() {
         cobol)
             if [ "$rc" -ne 0 ]; then
                 echo "⛔ GUARD REFUSES TO RUN: $cli does NOT reference Cobol.Net.Compiler." >&2
-                echo "   The guard was asked to measure COBOL.NET ($want) but resolved a binary whose project" >&2
+                echo "   The guard was asked to measure WiseOwl COBOL ($want) but resolved a binary whose project" >&2
                 echo "   graph contains no code generator — i.e. the LEGACY byte engine, or a stale bin dir." >&2
                 echo "   This is exactly kb/Work/PB750: every 'NIST: NNN MATCH' line such a run printed measured" >&2
                 echo "   the oracle, not the compiler. Fix the path or rebuild; do not silence this check." >&2
@@ -132,7 +132,7 @@ guard_assert_compiler_identity() {
             if [ "$rc" -eq 0 ]; then
                 echo "⛔ GUARD REFUSES TO RUN: $cli DOES reference Cobol.Net.Compiler." >&2
                 echo "   COBOLSHARP_LEGACY_DIFFERENTIAL=1 asks for the legacy ORACLE, whose whole value is that it" >&2
-                echo "   shares no code generator with COBOL.NET. A differential against yourself proves nothing." >&2
+                echo "   shares no code generator with WiseOwl COBOL. A differential against yourself proves nothing." >&2
                 return 1
             fi ;;
         *)  echo "⛔ GUARD: guard_assert_compiler_identity — unknown compiler name '$want'" >&2; return 1 ;;
@@ -144,7 +144,7 @@ guard_assert_compiler_identity() {
 guard_announce_compiler() {
     echo "=== COMPILER UNDER TEST: $GUARD_COMPILER ($GUARD_CLI_DLL) ==="
     if [ "$GUARD_COMPILER" = "legacy" ]; then
-        echo "  ⚠ LEGACY ARM — this run measures the LEGACY ORACLE, not COBOL.NET."
+        echo "  ⚠ LEGACY ARM — this run measures the LEGACY ORACLE, not WiseOwl COBOL."
         echo "    Its verdicts are a differential observation only; they are NOT the project's NIST gate (PB750)."
         if [ "${COBOLSHARP_LEGACY_DIFFERENTIAL:-0}" = "1" ]; then
             echo "    ⚠ COBOLSHARP_LEGACY_DIFFERENTIAL=1 ALSO switches CobolSharp.Tests.Integration's"
@@ -184,7 +184,7 @@ guard_compiler_self_test() {
 
     echo "=== guard-compiler --self-test (the compiler-identity watchdog) ==="
 
-    # (S) THE SELECTION ITSELF — the default must be COBOL.NET, and each way of asking for the legacy arm must
+    # (S) THE SELECTION ITSELF — the default must be WiseOwl COBOL, and each way of asking for the legacy arm must
     #     be honoured. A watchdog that checks the binary is no use if the SELECTION silently defaults wrong.
     sel() { ( unset GUARD_COMPILER COBOLSHARP_LEGACY_DIFFERENTIAL; "$@"; guard_select_compiler >/dev/null 2>&1 \
               && echo "$GUARD_COMPILER $GUARD_CLI_DLL $GUARD_DIVERGENT" || echo "REFUSED" ); }
@@ -204,7 +204,7 @@ guard_compiler_self_test() {
     if [ -f "$LEGACY" ]; then
         out=$(guard_assert_compiler_identity "$LEGACY" legacy 2>&1); want "the real cobolsharp.dll is accepted as legacy" 0 $? "$out"
 
-        # (1) ⭐ THE PB750 CASE ITSELF — the guard, believing it is measuring COBOL.NET, is handed the binary the
+        # (1) ⭐ THE PB750 CASE ITSELF — the guard, believing it is measuring WiseOwl COBOL, is handed the binary the
         #     guard actually used from 2026-07 to 2026-09-06. It must REFUSE.
         out=$(guard_assert_compiler_identity "$LEGACY" cobol 2>&1)
         want "the LEGACY dll is REFUSED when cobol is claimed" 1 $? "$out" "does NOT reference Cobol.Net.Compiler"

@@ -47,7 +47,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: CobolSharp commit
+      label: WiseOwl COBOL commit
       description: Output of `git rev-parse --short HEAD` in your clone.
     validations:
       required: true

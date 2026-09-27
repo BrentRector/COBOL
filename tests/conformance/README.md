@@ -1,6 +1,6 @@
-# COBOL.NET conformance corpus
+# WiseOwl COBOL conformance corpus
 
-NIST CCVS covers **COBOL-85 only**. This corpus is the spec-derived equivalent for every edition COBOL.NET
+NIST CCVS covers **COBOL-85 only**. This corpus is the spec-derived equivalent for every edition WiseOwl COBOL
 compiles: small, focused programs that each exercise a specific ISO rule, compiled at the matching `--std` in
 STRICT mode and byte-compared against expected output. It is executed by `CorpusRunnerTests` in
 `tests/Cobol.Net.Tests.Conformance`, so it provides **both conformance evidence and regression protection**, and

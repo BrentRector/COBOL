@@ -132,7 +132,7 @@ public static class CobolFloat
     /// <para>SCOPE. GR6 d)4.a binds a receiver "described with a standard floating-point usage" — FLOAT-BINARY-32
     /// and FLOAT-BINARY-64 here (§13.18.60.4 GR14/GR15). For COMP-1/COMP-2/FLOAT-SHORT/FLOAT-LONG/FLOAT-EXTENDED
     /// §14.6.8.3 rule 1 instead says "the implementor specifies any exception conditions that might be set to
-    /// exist during data conversion" (cite.py-verified), and COBOL.NET's determination is the SAME condition —
+    /// exist during data conversion" (cite.py-verified), and WiseOwl COBOL's determination is the SAME condition —
     /// one rule for every float receiver, published in CONFORMANCE.md. The single-precision arm has raised it for
     /// COMP-1 since D21, so this makes the family consistent rather than adding a second regime.</para></summary>
     public static double StoreChecked(CobolDec src, bool single)
@@ -155,7 +155,7 @@ public static class CobolFloat
     /// (cite.py-verified) — THE VALUE, which for a binary64 is the exact ±man·2^exp it holds and always a
     /// terminating decimal, never a re-rounded surrogate for it. Rule 2 leaves a FLOAT-SHORT/-LONG/-EXTENDED
     /// sender's conversion to the implementor ("the implementor defines the manner in which the value is
-    /// converted to a fixed-point value", cite.py-verified) and COBOL.NET's determination is that SAME exact
+    /// converted to a fixed-point value", cite.py-verified) and WiseOwl COBOL's determination is that SAME exact
     /// conversion — one rule for every float sender rather than two regimes.
     /// <para>⛔ WHY NOT <c>v * 10^scale</c> IN BINARY64, which is what this replaced. That product is ITSELF a
     /// rounded double once |v|·10^scale passes 2^53, so the landing answered with a value the sender never held —
@@ -280,7 +280,7 @@ public static class CobolFloat
     /// arithmetic statement under ON SIZE ERROR / EC-SIZE checking (§14.7.5 case 3), and every intermediate consumer
     /// with no capacity check downstream (an alignment, an argument), where a huge sentinel is the loud answer. A
     /// TRUNCATING landing — a MOVE (§14.6.8.2 r4: "truncation on either end"), the no-phrase arithmetic store
-    /// (§14.6.13.1.3 item 8 — "the implementor defines … how any receiving operands are affected", and COBOL.NET's
+    /// (§14.6.13.1.3 item 8 — "the implementor defines … how any receiving operands are affected", and WiseOwl COBOL's
     /// documented disposition is the low-order digits), INVOKE BY CONTENT — takes <see cref="ToScaledUnchecked"/>
     /// instead: it has no check to see the sentinel, and truncating a sentinel stores garbage
     /// (<c>MOVE FUNCTION NUMVAL-F("5E+30") TO PIC V9(9)</c> stored 884105727, the low digits of
@@ -345,7 +345,7 @@ public static class CobolFloat
     // floating-point — evaluates in binary64 (CONFORMANCE.md DOC-A.1-123), so binary64's range IS the intermediate
     // data item's range, and §14.7.5 case 5 makes an operation leaving it the size error condition "if native
     // arithmetic is in effect and the implementor defines that the range of values allowed for the intermediate
-    // data item is to be checked" — which COBOL.NET defines (DOC-A.1-179). The no-phrase rule 3 names the
+    // data item is to be checked" — which WiseOwl COBOL defines (DOC-A.1-179). The no-phrase rule 3 names the
     // condition: "farther from zero or nearer to zero than is allowed for the intermediate data item" —
     // EC-SIZE-OVERFLOW or EC-SIZE-UNDERFLOW (cite.py-verified). "Nearer to zero than allowed" is a nonzero exact
     // result that ROUNDS to zero: a subnormal is a binary64 value (ISO/IEC 60559 gradual underflow), not an

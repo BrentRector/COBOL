@@ -117,7 +117,7 @@ kb/Grammar/
 # Generated conformance view over the traceability inventory (scripts/spec/gen_conformance_notes.py).
 # The inventory JSON is the SSOT and IS tracked; these 3,200+ notes are its Dataview-queryable projection.
 kb/Conformance/
-# Generated status page for the owner's "COBOL.NET Conformance Ledger" artifact (scripts/spec/gen_ledger.py).
+# Generated status page for the owner's "WiseOwl COBOL Conformance Ledger" artifact (scripts/spec/gen_ledger.py).
 # A build output for the same reason kb/Conformance/ is: every input it reads IS tracked, so the page can be
 # re-derived at will — and committing it would make `--check` red after every landing that moves a row, which
 # is a gate people learn to ignore. `ledger-trend.json` and `ledger-in-flight.md` ARE tracked: the trend series

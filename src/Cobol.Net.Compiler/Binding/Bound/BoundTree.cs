@@ -7,7 +7,7 @@ using CobolNet.Binding.Model;
 namespace CobolNet.Binding.Bound;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-//  The COBOL.NET bound semantic tree (COBOLNET_DESIGN §2). The binder resolves every reference to a Place, every
+//  The WiseOwl COBOL bound semantic tree (COBOLNET_DESIGN §2). The binder resolves every reference to a Place, every
 //  literal to typed text, and every condition/expression to a bound node ONCE — so the backend (and future
 //  desugar passes + the G4 PC dispatcher) walk this tree WITHOUT re-touching the ANTLR parse tree. No bound node
 //  holds a raw parse context. Control-flow *emission* (sequential paragraph calls now, the dispatcher at G4) is the
@@ -249,14 +249,14 @@ public sealed record BoundOdoExtent(Place Depending, int MinOccurs, int MaxOccur
 /// ⛔ THE WRONG USE IS UNREPRESENTABLE (kb/Work PB1029): the constructor is private, and the node is obtainable
 /// only as a <see cref="Refused"/> (the SOURCE is wrong and the site reported the rule — the one statement funnel
 /// fails the compile with COBOLNET2362 if the statement drew no error) or as an <see cref="Unbuilt"/> shape
-/// (COBOL.NET's gap, announced by that funnel as COBOLNET1756). Either way it can never compile SILENTLY into a
+/// (WiseOwl COBOL's gap, announced by that funnel as COBOLNET1756). Either way it can never compile SILENTLY into a
 /// run-time abort, which is what a STRING sending ALL literal (§14.9.43.3 SR2) did before.</summary>
 public sealed record BoundExprError : BoundExpr
 {
     /// <summary>What could not be bound — the text of the run-time guard.</summary>
     public string Feature { get; }
 
-    /// <summary>True for a shape COBOL.NET has not built; false for a refusal of the source.</summary>
+    /// <summary>True for a shape WiseOwl COBOL has not built; false for a refusal of the source.</summary>
     public bool IsUnbuilt { get; }
 
     private BoundExprError(string feature, bool unbuilt) { Feature = feature; IsUnbuilt = unbuilt; }
@@ -277,7 +277,7 @@ public sealed record BoundExprError : BoundExpr
         return Refused(edition, feature);
     }
 
-    /// <summary>A legal shape COBOL.NET has not built — announced by the statement funnel (COBOLNET1756).</summary>
+    /// <summary>A legal shape WiseOwl COBOL has not built — announced by the statement funnel (COBOLNET1756).</summary>
     public static BoundExprError Unbuilt(EditionContext edition, string feature)
     {
         edition.NoteUnbuilt(feature);
@@ -549,14 +549,14 @@ public sealed record BoundAllLiteral(string Literal) : BoundOperand
 /// ⛔ THE WRONG USE IS UNREPRESENTABLE (kb/Work PB1029): the constructor is private, and the node is obtainable
 /// only as a <see cref="Refused"/> (the SOURCE is wrong and the site reported the rule — the one statement funnel
 /// fails the compile with COBOLNET2362 if the statement drew no error) or as an <see cref="Unbuilt"/> shape
-/// (COBOL.NET's gap, announced by that funnel as COBOLNET1756). Either way it can never compile SILENTLY into a
+/// (WiseOwl COBOL's gap, announced by that funnel as COBOLNET1756). Either way it can never compile SILENTLY into a
 /// run-time abort, which is what a STRING sending ALL literal (§14.9.43.3 SR2) did before.</summary>
 public sealed record BoundOperandError : BoundOperand
 {
     /// <summary>What could not be bound — the text of the run-time guard.</summary>
     public string Feature { get; }
 
-    /// <summary>True for a shape COBOL.NET has not built; false for a refusal of the source.</summary>
+    /// <summary>True for a shape WiseOwl COBOL has not built; false for a refusal of the source.</summary>
     public bool IsUnbuilt { get; }
 
     private BoundOperandError(string feature, bool unbuilt) { Feature = feature; IsUnbuilt = unbuilt; }
@@ -577,7 +577,7 @@ public sealed record BoundOperandError : BoundOperand
         return Refused(edition, feature);
     }
 
-    /// <summary>A legal shape COBOL.NET has not built — announced by the statement funnel (COBOLNET1756).</summary>
+    /// <summary>A legal shape WiseOwl COBOL has not built — announced by the statement funnel (COBOLNET1756).</summary>
     public static BoundOperandError Unbuilt(EditionContext edition, string feature)
     {
         edition.NoteUnbuilt(feature);
@@ -642,14 +642,14 @@ public sealed record BoundBoolShift(BoundBoolExpr Operand, BoolShiftKind Kind, B
 /// ⛔ THE WRONG USE IS UNREPRESENTABLE (kb/Work PB1029): the constructor is private, and the node is obtainable
 /// only as a <see cref="Refused"/> (the SOURCE is wrong and the site reported the rule — the one statement funnel
 /// fails the compile with COBOLNET2362 if the statement drew no error) or as an <see cref="Unbuilt"/> shape
-/// (COBOL.NET's gap, announced by that funnel as COBOLNET1756). Either way it can never compile SILENTLY into a
+/// (WiseOwl COBOL's gap, announced by that funnel as COBOLNET1756). Either way it can never compile SILENTLY into a
 /// run-time abort, which is what a STRING sending ALL literal (§14.9.43.3 SR2) did before.</summary>
 public sealed record BoundBoolError : BoundBoolExpr
 {
     /// <summary>What could not be bound — the text of the run-time guard.</summary>
     public string Feature { get; }
 
-    /// <summary>True for a shape COBOL.NET has not built; false for a refusal of the source.</summary>
+    /// <summary>True for a shape WiseOwl COBOL has not built; false for a refusal of the source.</summary>
     public bool IsUnbuilt { get; }
 
     private BoundBoolError(string feature, bool unbuilt) { Feature = feature; IsUnbuilt = unbuilt; }
@@ -670,7 +670,7 @@ public sealed record BoundBoolError : BoundBoolExpr
         return Refused(edition, feature);
     }
 
-    /// <summary>A legal shape COBOL.NET has not built — announced by the statement funnel (COBOLNET1756).</summary>
+    /// <summary>A legal shape WiseOwl COBOL has not built — announced by the statement funnel (COBOLNET1756).</summary>
     public static BoundBoolError Unbuilt(EditionContext edition, string feature)
     {
         edition.NoteUnbuilt(feature);
@@ -790,7 +790,7 @@ public sealed record BoundUdfEvaluated(IReadOnlyList<BoundStatement> Activations
 [BoundNode]
 public abstract record BoundStatement;
 
-/// <summary>⛔ A DEFERRAL, AND NOTHING ELSE: a statement whose construct COBOL.NET HAS NOT BUILT. The backend
+/// <summary>⛔ A DEFERRAL, AND NOTHING ELSE: a statement whose construct WiseOwl COBOL HAS NOT BUILT. The backend
 /// emits a loud runtime guard (§1.4) and <see cref="StatementBinder.BindStatement"/> reports COBOLNET1756 at
 /// compile time, so the gap is visible before the program is run.
 /// <para>⛔ IT IS NOT THE CARRIER FOR AN ILL-FORMED OPERAND OR AN ILLEGAL PLACEMENT (kb/Work PB236). It used to
@@ -831,7 +831,7 @@ public sealed record BoundRejected : BoundStatement
     /// operand screen, a placement rule (kb/Work PB1029: ~100 sites wrote <c>return new BoundNop();</c> after such a
     /// call, where nothing checked that the callee had in fact reported). The refusal is put on the ledger, and the
     /// one statement funnel fails the compile with COBOLNET2362 if the statement drew no error.
-    /// <para>⛔ NOT for a null from the reference resolver: that null is either reported or a shape COBOL.NET has not
+    /// <para>⛔ NOT for a null from the reference resolver: that null is either reported or a shape WiseOwl COBOL has not
     /// built, and only the funnel can tell which — bind a <see cref="BoundUnsupported"/> there.</para></summary>
     public static BoundRejected Reported(EditionContext edition)
     {

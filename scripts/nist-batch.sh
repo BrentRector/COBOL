@@ -10,7 +10,7 @@
 
 set -u
 
-ROOT="E:/CobolSharp"
+ROOT="E:/COBOL"
 CSV_SUMMARY="nist_summary.csv"
 FAIL_LOG="nist_failures.log"
 
@@ -78,7 +78,7 @@ run_one_test() {
   fi
 
   echo "$test: compiling..."
-  # COBOL.NET (`cobol`), not the legacy oracle — kb/Work/PB750. ⚠ THIS SCRIPT IS NOT A GATE and duplicates
+  # WiseOwl COBOL (`cobol`), not the legacy oracle — kb/Work/PB750. ⚠ THIS SCRIPT IS NOT A GATE and duplicates
   # what scripts/guard-fast.sh does properly (isolation, chains, the verdict-evidence rules, the audit); it is
   # kept only as an ad-hoc CSV survey. Use guard-fast.sh for anything whose answer will be quoted.
   dotnet run --project src/Cobol.Net.Cli -- --nist "$test" "tests/nist/programs/$test.cob" -o "tests/nist/output/$test.dll" 2>/dev/null

@@ -7,7 +7,7 @@ Never fails the session: any error is reported as context, not raised.
 In a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it first does the per-CLONE setup: the private
 `specs-private` submodule (a fresh clone has no submodules; it holds the licensed PDF that `render-spec-page.py` and
 the figure audits read — `cite.py` and `specs/ISO_COBOL.md` live in the main repo and need no submodule — and it
-clones only when BrentRector/CobolSharp-private is attached to the session) and the git-ignored GnuCOBOL corpus. The VM toolchain, and the user-level
+clones only when BrentRector/COBOL-private is attached to the session) and the git-ignored GnuCOBOL corpus. The VM toolchain, and the user-level
 shim that makes this hook fire when the session starts in /home/user rather than the repo, come from
 scripts/cloud/setup-env.sh. Locally the hook stays read-only.
 """
@@ -33,7 +33,7 @@ def init_cloud_submodules() -> str:
         status = "ok" if r.returncode == 0 else (
             f"FAILED (exit {r.returncode}): {(r.stderr or r.stdout).strip()}\n"
             "FIX: the cloud GitHub proxy only serves repositories attached to the session — attach "
-            "BrentRector/CobolSharp-private to this session (or the routine's sources), then re-run "
+            "BrentRector/COBOL-private to this session (or the routine's sources), then re-run "
             "`git submodule update --init --recursive --depth 1`.")
     except Exception as exc:  # noqa: BLE001 - a hook must never break the session
         status = f"FAILED: {exc}"

@@ -19,7 +19,7 @@ public sealed class PerformFormat3BehaviorTests
     private static void AssertSpec(string proc, string expected)
     {
         var (ok, stdout, detail) = CobolNet.CompileAndRun(Prog(proc));
-        Assert.True(ok, $"COBOL.NET failed: {detail}\nstdout:\n{stdout}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}\nstdout:\n{stdout}");
         Assert.Equal(expected, stdout);
     }
 
@@ -233,7 +233,7 @@ public sealed class PerformFormat3BehaviorTests
     private static void AssertFile(string name, string proc, string expected)
     {
         var (ok, stdout, detail) = CobolNet.CompileAndRun(ProgFile(name, proc));
-        Assert.True(ok, $"COBOL.NET failed: {detail}\nstdout:\n{stdout}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}\nstdout:\n{stdout}");
         Assert.Equal(expected, stdout);
     }
 

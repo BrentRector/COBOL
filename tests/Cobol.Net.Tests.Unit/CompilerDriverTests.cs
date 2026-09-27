@@ -6,7 +6,7 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// Smoke tests for the greenfield COBOL.NET pipeline via <see cref="CompilerDriver"/>. These anchor the current
+/// Smoke tests for the greenfield WiseOwl COBOL pipeline via <see cref="CompilerDriver"/>. These anchor the current
 /// G2/G3 capability (typed WS fields, MOVE, DISPLAY, arithmetic) and give the G2 bound-tree rebuild a regression
 /// net. (The full 364-program differential harness against the legacy oracle lands at G5; see COBOLNET_DESIGN §2.)
 /// </summary>

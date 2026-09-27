@@ -52,9 +52,24 @@ for m in re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?stash\b(\s+\w+)?", commands):
 if re.search(r"--autostash\b", commands):
     block("`--autostash` uses the shared stash stack (see `git stash`). Commit WIP first, then rebase.")
 
-# 2. a push that targets main directly — THIS repo only (another repo reached by `cd`/`-C` has its own rules)
+# 2. a push that targets main directly — THIS repo only (another repo reached by `cd`/`-C` has its own rules).
+# "This repo" is recognized by its FOLDER NAME, derived from where this hook lives — never a hard-coded literal: the
+# literal "cobolsharp" silently failed OPEN when the repo became E:\COBOL (2026-09-26). The old name is kept so a
+# path written before the rename is still recognized; a RELATIVE `cd` never leaves the repo.
+_ROOT = __import__("pathlib").Path(__file__).resolve().parents[2].name.lower()
+_THIS_REPO = {_ROOT, "cobol", "cobolsharp"}
+
+
+def _is_this_repo(target: str) -> bool:
+    t = target.lower().replace("\\", "/")
+    if not (t.startswith(("/", "~")) or re.match(r"[a-z]:", t)):
+        return True
+    segs = [s for s in t.split("/") if s]
+    return any(s in _THIS_REPO or any(s.startswith(n + "-") for n in _THIS_REPO) for s in segs)
+
+
 cds = re.findall(r"(?:\bcd|\bSet-Location|\bgit\s+-C)\s+[\"']?([^\s;&|\"']+)", commands)
-other_repo = any("cobolsharp" not in c.lower().replace("\\", "/") for c in cds)
+other_repo = any(not _is_this_repo(c) for c in cds)
 for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;&|\n]*)", commands)):
     args = m.group(1)
     if re.search(r"(?:^|\s|:)(?:refs/heads/)?main(?:\s|$)", args):

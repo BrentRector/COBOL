@@ -7,7 +7,7 @@ using CobolNet.Tests.Shared;                             // ProcessObserver — 
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// Base for COBOL.NET end-to-end tests: compile a COBOL source string with <see cref="CompilerDriver"/> (the
+/// Base for WiseOwl COBOL end-to-end tests: compile a COBOL source string with <see cref="CompilerDriver"/> (the
 /// greenfield COBOL→C#→Roslyn pipeline) into a per-test temp directory, run the produced assembly, and return its
 /// captured stdout. Each test gets an isolated temp dir (disposed afterwards).
 /// </summary>

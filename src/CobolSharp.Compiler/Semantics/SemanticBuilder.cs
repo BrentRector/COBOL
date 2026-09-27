@@ -805,7 +805,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
         foreach (var clause in ctx.fileControlClauses())
         {
             // The shared grammar's TO phrase is a list (ISO §12.4.5.1; kb/Work PB829): the oracle takes the operand that
-            // names the file - the last - which is COBOL.NET's DOC-A.1-71 reading of every list it allows.
+            // names the file - the last - which is WiseOwl COBOL's DOC-A.1-71 reading of every list it allows.
             if (clause.assignClause()?.assignTarget() is { Length: > 0 } assignCtxs)
             {
                 string assignText = assignCtxs[^1].GetText();

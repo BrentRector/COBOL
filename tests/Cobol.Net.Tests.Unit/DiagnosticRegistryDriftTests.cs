@@ -128,7 +128,7 @@ public sealed class DiagnosticRegistryDriftTests
     internal static string RenderMarkdown()
     {
         var sb = new StringBuilder();
-        sb.Append("# COBOL.NET diagnostics\n\n");
+        sb.Append("# WiseOwl COBOL diagnostics\n\n");
         sb.Append("> **Generated** from `src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs` — do not edit by hand.\n");
         sb.Append("> Regenerate: `pwsh scripts/gen-diagnostics-doc.ps1` (or run `DiagnosticRegistryDriftTests` with\n");
         sb.Append("> `COBOLNET_WRITE_DIAGNOSTICS_DOC=1`). `DiagnosticRegistryDriftTests` fails CI if this file drifts.\n\n");

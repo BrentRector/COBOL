@@ -200,7 +200,7 @@ public static class UsageFamilies
     /// <summary>The union — every usage the §13.18.60.2 general format prints an endianness-phrase on (and the
     /// only usages §13.18.60.4 GR19c/d give an implied phrase). The implementor-defined float usages
     /// (COMP-1/COMP-2/FLOAT-SHORT/-LONG/-EXTENDED) are deliberately OUTSIDE it: GR13/GR21 leave their
-    /// representation to the implementor, and COBOL.NET pins them big-endian (Annex A.1 item 48).</summary>
+    /// representation to the implementor, and WiseOwl COBOL pins them big-endian (Annex A.1 item 48).</summary>
     public static bool IsStandardFloat(Usage u) => IsStandardBinaryFloat(u) || IsStandardDecimalFloat(u);
 
     /// <summary>⛔ THE PICTURE-LESS USAGES — ISO §13.16.3 SR8's named set, written down ONCE. "The PICTURE
@@ -334,7 +334,7 @@ public static class UsageFamilies
 
 /// <summary>
 /// The analyzed PICTURE + USAGE of an elementary item: its category, the numeric profile (digit count, decimal
-/// scale, sign) and the .NET type COBOL.NET represents it with. This is pure spec analysis — no byte storage.
+/// scale, sign) and the .NET type WiseOwl COBOL represents it with. This is pure spec analysis — no byte storage.
 /// </summary>
 /// <remarks>
 /// <para><b>Numeric profile.</b> <see cref="Digits"/> is the count of <c>9</c> positions, <see cref="Scale"/> the
@@ -658,7 +658,7 @@ public sealed record PicInfo(
     /// a native two's-complement integer of the fixed byte width (1/2/4/8) under the COMP-5 BinaryCapacity
     /// truncation discipline (numeric design D6). SIGNED is the default (GR12); UNSIGNED clears the operational
     /// sign and widens the positive range (same storage width, GR21). The spec gives no implied PICTURE, so the
-    /// DISPLAY digit count is COBOL.NET's documented implementor choice: the decimal width of the range's
+    /// DISPLAY digit count is WiseOwl COBOL's documented implementor choice: the decimal width of the range's
     /// maximum magnitude — CHAR 3 / SHORT 5 / LONG 10 / DOUBLE 19 (signed) · 20 (unsigned).</summary>
     public static PicInfo BinaryItem(Usage usage, bool signed)
     {

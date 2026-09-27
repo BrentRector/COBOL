@@ -3,7 +3,7 @@ name: workstream
 description: Use BEFORE dispatching any fleet, lander, implementer or adjudication workflow - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
 ---
 
-> **Generic base:** [`agent-fleet`](https://github.com/BrentRector/claude-skills/blob/main/skills/agent-fleet/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the COBOL.NET application of it and wins on conflict.
+> **Generic base:** [`agent-fleet`](https://github.com/BrentRector/claude-skills/blob/main/skills/agent-fleet/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
 
 # Workstream — token-frugal, restart-safe orchestration
 
@@ -165,7 +165,7 @@ the work, not to wait. Stage the earliest-stage, largest jobs behind the near-do
   checkpoint reached main inside a landing, and the next lander's rebase then had to choose between two agents'
   checkpoints for one path.)
 - ⛔ **`git stash` IS FORBIDDEN IN THIS REPO — WIP GOES INTO A COMMIT.** The stash stack lives in the COMMON git
-  directory (`git rev-parse --git-common-dir` → `E:\CobolSharp\.git`), so it is SHARED by every linked worktree:
+  directory (`git rev-parse --git-common-dir` → `E:\COBOL\.git`), so it is SHARED by every linked worktree:
   `git stash list` run from an isolated implementer worktree shows the other agents' entries and `stash pop` takes
   `stash@{0}` whoever pushed it. PB713's implementer ran `… && git stash pop -q` after a `git stash push` that had
   created nothing (its file was untracked), so the pop consumed the REGISTRAR's stash; it was restored with

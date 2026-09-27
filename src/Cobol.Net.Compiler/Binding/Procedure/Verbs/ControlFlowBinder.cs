@@ -437,7 +437,7 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
         // "Procedure-name-1 [-2] shall be the name of either a paragraph or a section in the same source element
         // as that in which the PERFORM statement is specified" (ISO §14.9.28.3 SR12, SR13) — decided here since
         // the first binder, but delivered as a BoundUnsupported, i.e. compiled into the program as a run-time
-        // abort blaming COBOL.NET for a gap. Each arm names its OWN rule number; fixing one and not the other is
+        // abort blaming WiseOwl COBOL for a gap. Each arm names its OWN rule number; fixing one and not the other is
         // the two-arm defect this project keeps finding.
         if (ctx.Table.ResolveProcedureOperand(names[0], "PERFORM", PerformNameRule("Procedure-name-1", "SR12"),
                 ProcedureReferenceKind.Perform) is not { } first)

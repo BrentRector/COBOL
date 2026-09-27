@@ -35,19 +35,19 @@ public sealed class MoveEditionDifferentialTests
             STOP RUN.
         """;
 
-    /// <summary>Assert COBOL.NET (at --std 85) matches the spec-derived value AND the legacy oracle agrees.</summary>
+    /// <summary>Assert WiseOwl COBOL (at --std 85) matches the spec-derived value AND the legacy oracle agrees.</summary>
     private static void AssertSpecAndLegacy(string source, string expected)
     {
         string want = CutRunner.Normalize(expected);
         var (cok, cout, cdetail) = CobolNet85.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(want, cout);
         var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
         Assert.True(lok, $"legacy oracle failed: {ldetail}");
         Assert.Equal(want, lout);
     }
 
-    /// <summary>Assert COBOL.NET (at --std 85) matches the pinned value with NO legacy cross-check — used where
+    /// <summary>Assert WiseOwl COBOL (at --std 85) matches the pinned value with NO legacy cross-check — used where
     /// the legacy oracle is unusable for the case: it REJECTS QUOTE/HIGH-VALUE/LOW-VALUE→numeric at compile time
     /// (its CBL0906, stricter than ISO 2014 — Annex E.2 item 1 says these were permitted through 2014), and its
     /// space-filled numeric DISPLAY renders EMPTY (zero characters — an internal byte-cell artifact inconsistent
@@ -57,7 +57,7 @@ public sealed class MoveEditionDifferentialTests
     private static void AssertPinned(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet85.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(CutRunner.Normalize(expected), cout);
     }
 

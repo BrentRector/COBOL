@@ -22,7 +22,7 @@ public enum IeeeSpecial
 /// not an incidental encoding — which is why they live in one testable function rather than inline in the
 /// emitter, and why <c>IeeeSpecialsTests</c> asserts what each one decodes to.
 /// <para>The receiver of a Format-15 float word is confined by §14.9.39.3 SR32 to a STANDARD floating-point
-/// usage; of those, the two COBOL.NET provides map EXACTLY onto the CLR's IEEE types — FLOAT-BINARY-32 →
+/// usage; of those, the two WiseOwl COBOL provides map EXACTLY onto the CLR's IEEE types — FLOAT-BINARY-32 →
 /// <c>float</c> = binary32, FLOAT-BINARY-64 → <c>double</c> = binary64 — so the interchange format GR33–GR35
 /// name IS the carrier and nothing is approximated here. FLOAT-BINARY-128 and the two FLOAT-DECIMAL usages are
 /// Annex A.3 items 17/19 documented non-support, refused at declaration (COBOLNET1564), so no receiver of those

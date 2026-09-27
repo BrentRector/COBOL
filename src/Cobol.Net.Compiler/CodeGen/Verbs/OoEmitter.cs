@@ -1144,6 +1144,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         ? RuntimeApi.StrStoreBoolean(bv, $"{bw}", a.Formal.Justified)
                     : ReceivingStore.Characters(a.Formal, bv, $"{bw}")) + ";");   // the ONE elementary character store (kb/Work PB871)
             }
+            // A figurative-constant / ALL-literal literal-2 (kb/Work PB1617): §14.2.3 GR9's MOVE into the method
+            // formal's allocated record, filled to that record's character positions (§8.3.3.6.4 GR2) by the ONE
+            // argument fill the CALL and function lanes use. A group formal is the case that makes it load-bearing:
+            // the image arm below would space-pad one occurrence.
+            else if (a.ContentFill is { } fill)
+                w.Line($"string {tmp} = {CallEmitter.FigurativeArgumentImage(fill, a.Formal, Ctx.Data)};");
             else if (OoVarGroupCarried(a.Formal))
             {
                 // §14.8.2.2's variable-length sentence at the INVOKE boundary (kb/Work PB204): the carrier is
@@ -1195,9 +1201,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // rendered by the ONE address-operand renderer — a detached pointer value (§14.9.23.3 SR19).
             else if (a.Address is { } ao)
                 w.Line($"{a.Formal.ElementType} {tmp} = {U.Ptr.AddressOperandText(ao)};");
-            // The predefined NULL object reference (§8.4.3.7; kb/Work PB1137) — BY CONTENT, the null reference itself.
-            else if (a.NullObject)
-                w.Line($"{a.Formal.ElementType} {tmp} = null;");
+            // The predefined NULL (§8.4.3.7 / §8.4.3.10; kb/Work PB1137 + PB1630) — BY CONTENT, the FORMAL's own null:
+            // its PicInfo.DefaultInitializer, the value INITIALIZE's implicit SET TO NULL stores (ManagedPointer.Null /
+            // ProgramPointer.Null / FunctionPointer.Null / null). A bare `null` was right only for an object reference.
+            else if (a.PredefinedNull)
+                w.Line($"{a.Formal.ElementType} {tmp} = {a.Formal.Pic!.DefaultInitializer};");
             // SELF (§8.4.3.8; kb/Work PB1137) — the object the containing method runs on, the SET F5 rendering.
             else if (a.SelfObject)
                 w.Line($"{a.Formal.ElementType} {tmp} = this;");

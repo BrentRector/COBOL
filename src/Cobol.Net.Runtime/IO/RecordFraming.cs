@@ -45,7 +45,7 @@ internal readonly record struct StoredFrame(string Image, RecordExtents? Extents
 /// this is §9.1.7.2: "In record sequential files the length of each record is determined by any information the
 /// implementor may add to the record on the physical storage medium (such as record length headers)" — this
 /// prefix IS that header. §12.4.5.11.4 GR5 makes the same grant for the variable-length case where no RECORD
-/// DELIMITER clause governs, which for COBOL.NET is EVERY case (the clause is declined whole — COBOLNET1778,
+/// DELIMITER clause governs, which for WiseOwl COBOL is EVERY case (the clause is declined whole — COBOLNET1778,
 /// docs/CONFORMANCE.md §2 row 26), and the determination is filed as Annex A.1 item 151 in
 /// docs/CONFORMANCE.md §7. §12.4.5.11.4 GR1 is what this framing must not violate — "Any method used shall not
 /// be reflected in the record area or the record size used within the function, method, or program" — so the

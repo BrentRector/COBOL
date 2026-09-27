@@ -44,7 +44,7 @@ public sealed class AbbreviatedConditionDifferentialTests
     {
         string source = Program(proc);
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(expected, cout);                 // primary: conformance to the ISO spec
         var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
         Assert.True(lok, $"legacy oracle failed: {ldetail}");

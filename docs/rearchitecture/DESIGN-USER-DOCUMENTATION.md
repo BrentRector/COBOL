@@ -50,7 +50,7 @@ like any documentation site, nothing to download or install. A version picker sw
 ## §4 Content map
 
 **Hand-written** (`docs/manual/`):
-- *Install* — `dotnet tool install -g WiseOwl.Cobol`; prerequisites (.NET 10 runtime); verifying the install.
+- *Install* — `dotnet tool install -g WiseOwl.COBOL`; prerequisites (.NET 10 runtime); verifying the install.
 - *Getting started* — hello world; compile, run, the produced assembly.
 - *User guide* — the `cobol` command; `--std 85|2002|2014|2023` and `--permissive`; reference format (fixed / free /
   `>>SOURCE`); COPY libraries and search; files and I-O (organizations, the Latin-1 no-CODE-SET rule of R47, status
@@ -81,9 +81,9 @@ without its page is RED. Every citation a generated page prints passes `cite.py 
 
 | Package | Content | Notes |
 |---|---|---|
-| `WiseOwl.Cobol` | the compiler as a .NET global tool, command `cobol` | `PackAsTool`, `ToolCommandName=cobol` |
-| `WiseOwl.Cobol.Runtime` | the runtime library compiled programs reference | versioned in lockstep with the compiler |
-| `WiseOwl.Cobol.MSBuild` | optional: compile `.cob` items inside a .csproj | mirrors `WiseOwl.Demeanor.MSBuild`; decide in PB1613 |
+| `WiseOwl.COBOL` | the compiler as a .NET global tool, command `cobol` | `PackAsTool`, `ToolCommandName=cobol` |
+| `WiseOwl.COBOL.Runtime` | the runtime library compiled programs reference | versioned in lockstep with the compiler |
+| `WiseOwl.COBOL.MSBuild` | optional: compile `.cob` items inside a .csproj | mirrors `WiseOwl.Demeanor.MSBuild`; decide in PB1613 |
 
 License metadata: `PackageLicenseExpression` `BUSL-1.1` (the SPDX id of the Business Source License 1.1) or
 `PackageLicenseFile` pointing at `LICENSE` — settled in PB1613 against how Demeanor's packages declare theirs. Package

@@ -115,7 +115,7 @@ ad-hoc line mechanisms plus a dead one.
 ### S8 — Stale namespaces on 16 of 17 frontend files · **LOW** · every file except `Frontend.cs`
 All Preprocessor/Parsing/Common/Diagnostics files still declare `namespace CobolSharp.Compiler.*`
 (grep confirmed 16 files) though physically in `Cobol.Net.Frontend`. `Frontend.cs:16` further claims
-it "is the ONE place COBOL.NET reuses the legacy `CobolSharp.Compiler` assembly" — **stale**: the
+it "is the ONE place WiseOwl COBOL reuses the legacy `CobolSharp.Compiler` assembly" — **stale**: the
 code was already physically extracted; only the namespace strings remain legacy.
 
 ---

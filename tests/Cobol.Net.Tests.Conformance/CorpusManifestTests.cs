@@ -139,7 +139,7 @@ public sealed class CorpusManifestTests
                 $"scripts/{script} hard-codes the LEGACY CLI's bin path again — that is exactly kb/Work/PB750");
         }
 
-        // And the default is COBOL.NET: the legacy path exists ONLY behind the opt-in differential switch.
+        // And the default is WiseOwl COBOL: the legacy path exists ONLY behind the opt-in differential switch.
         string resolver = File.ReadAllText(TestRepo.Scripts("guard-compiler.sh"));
         Assert.Contains("COBOLSHARP_LEGACY_DIFFERENTIAL", resolver, StringComparison.Ordinal);
         Assert.Contains("src/Cobol.Net.Cli", resolver, StringComparison.Ordinal);

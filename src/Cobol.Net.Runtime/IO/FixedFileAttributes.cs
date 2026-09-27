@@ -8,7 +8,7 @@ namespace CobolNet.Runtime.IO;
 /// A physical file's §9.1.6 FIXED FILE ATTRIBUTES as a value, and the §14.9.27.4 GR10 comparison over them.
 /// <para>
 /// ⛔ THERE IS NO CATALOG AND NO SIDECAR — owner decision 2026-09-07 (kb/Work PB802), verbatim: <i>"Let's match
-/// GNUCobol's implementation in spirit. No sidecar of any type."</i> COBOL.NET writes and reads NOTHING beside a
+/// GNUCobol's implementation in spirit. No sidecar of any type."</i> WiseOwl COBOL writes and reads NOTHING beside a
 /// data file (NTFS alternate data streams were considered and rejected with the `.cbattr` sidecar they would
 /// have replaced). A physical file's fixed file attributes are whatever ITS OWN BYTES record, so this type is a
 /// VALUE and a COMPARISON — never a store. The bytes that carry it for a RELATIVE or INDEXED file are

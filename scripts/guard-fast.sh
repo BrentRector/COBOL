@@ -259,7 +259,7 @@ fi
 NIST_FAILS=$(grep -cE "REGRESSION!" "$RESULTS" || true); NIST_FAILS=${NIST_FAILS:-0}
 NIST_MATCH=$(grep -cE ": MATCH" "$RESULTS" || true); NIST_MATCH=${NIST_MATCH:-0}
 # ⛔ THE LINE NAMES THE COMPILER (kb/Work/PB750). "NIST: 353 MATCH" was quoted in plan §9 battery records as
-# evidence about COBOL.NET for months while it measured the legacy oracle; a verdict that does not say what it
+# evidence about WiseOwl COBOL for months while it measured the legacy oracle; a verdict that does not say what it
 # measured is a verdict a reader will attribute to whatever they were thinking about.
 echo "=== NIST (${GUARD_COMPILER}): ${NIST_MATCH} MATCH, ${NIST_FAILS} REGRESSION(S) ==="
 

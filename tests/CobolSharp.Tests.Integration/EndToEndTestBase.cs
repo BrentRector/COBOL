@@ -27,7 +27,7 @@ public class EndToEndTestBase : IDisposable
     /// <c>Console.WriteLine</c> = the platform newline (<c>\r\n</c> on Windows, <c>\n</c> on Linux/CI). Without
     /// this, every multi-line-output assertion would pass on Windows and fail on Linux. Normalizing on the
     /// comparison side (here) keeps the legacy engine — the differential oracle being retired at G8 — untouched;
-    /// the COBOL.NET deliverable instead sets <c>Console.Out.NewLine</c> in its generated program for
+    /// the WiseOwl COBOL deliverable instead sets <c>Console.Out.NewLine</c> in its generated program for
     /// deterministic output.
     /// </summary>
     private static string NormalizeOutput(string s) => s.ReplaceLineEndings("\r\n").TrimEnd();

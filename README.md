@@ -1,131 +1,104 @@
-# CobolSharp
+# WiseOwl COBOL
 
-COBOL.NET — a COBOL compiler targeting .NET, built from the ISO/IEC 1989:2023 specification
-with correct support for all prior editions (1985, 2002, 2014). It translates standard COBOL
-source to idiomatic, typed-native C#, which Roslyn compiles into a .NET assembly.
+A COBOL compiler for .NET, built from the ISO/IEC 1989:2023 standard, with correct support for every earlier edition
+(1985, 2002, 2014). It compiles standard COBOL to idiomatic, typed-native C# — a COBOL record is a .NET record
+struct, an elementary item is a native field — which Roslyn builds into an ordinary .NET assembly.
 
-## Quick Start
+The standard is the specification: every rule of ISO/IEC 1989:2023 is a row in a traceability inventory, and each
+row closes only when a spec-derived test proves the compiler conforms. Behavior the standard leaves to the
+implementor is documented, with its rationale, in [docs/CONFORMANCE.md](docs/CONFORMANCE.md).
+
+## Quick start
 
 ```bash
-# Build from source
-git clone https://github.com/BrentRector/CobolSharp.git
-cd CobolSharp
-dotnet build
+git clone https://github.com/BrentRector/COBOL.git
+cd COBOL
+dotnet build CobolSharp.sln
 
-# Compile a COBOL program (the source is a positional argument; the produced exe is `cobol`)
+# compile a COBOL program (the source is a positional argument)
 dotnet run --project src/Cobol.Net.Cli -- hello.cob -o hello.dll
-
-# Run the compiled program
 dotnet hello.dll
 ```
 
-## Current Status
+Select an edition with `--std 85|2002|2014|2023` (default 2023). A construct the selected edition does not have is
+rejected; `--permissive` turns such rejections into warnings for migration work.
 
-- **3166 conformance tests**, **281 unit tests**, **33 characterization tests** passing
-- Differential legacy-oracle guard: **353 NIST programs MATCH** byte-for-byte
-- COBOL-85 corpus complete; full ISO-2023 plus per-edition (1985/2002/2014) conformance is the standing mission
-- Clean-architecture rearchitecture in progress (a selectable Roslyn / direct-CIL backend over one bound tree)
+A NuGet distribution (`WiseOwl.COBOL`, a .NET global tool providing the `cobol` command) and a documentation site are
+planned; see [docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md](docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md).
 
-## Implemented Features
+## Status
 
-### Data Division
-- **PICTURE clause**: all symbols (9, X, A, S, V, P, Z, *, +, -, CR, DB, B, 0, /)
-- **USAGE**: DISPLAY, BINARY/COMP/COMP-4, PACKED-DECIMAL/COMP-3, COMP-5 (native binary extension), INDEX
-- **Data hierarchy**: groups, elementary items, OCCURS (up to 7 levels), REDEFINES, RENAMES (level 66), level 77/88
-- **OCCURS**: ASCENDING/DESCENDING KEY, INDEXED BY, OCCURS DEPENDING ON
-- **VALUE clause**: literals, figurative constants (ZERO, SPACE, HIGH-VALUE, LOW-VALUE, QUOTE, ALL literal)
-- **VALUE THRU** in level-88 condition names with range checking
-- **BLANK WHEN ZERO**, JUSTIFIED RIGHT, SIGN IS LEADING/TRAILING SEPARATE
+As of 2026-09-26 (measured, not estimated):
 
-### Procedure Division
-- **Arithmetic**: ADD, SUBTRACT, MULTIPLY, DIVIDE (with REMAINDER), COMPUTE with full operator precedence, ON SIZE ERROR
-- **Control flow**: IF/ELSE/END-IF, EVALUATE/WHEN/OTHER, PERFORM (inline, out-of-line, THRU, TIMES, UNTIL, VARYING), GO TO, ALTER
-- **Data movement**: MOVE (with category compatibility matrix), MOVE CORRESPONDING, INITIALIZE
-- **String operations**: STRING, UNSTRING (with DELIMITED BY, POINTER, TALLYING, OVERFLOW), INSPECT (TALLYING, REPLACING, CONVERTING)
-- **Conditions**: relational, sign (POSITIVE/NEGATIVE/ZERO), class (NUMERIC/ALPHABETIC/ALPHABETIC-LOWER/UPPER), condition-name (level 88), switch-status, abbreviated combined (COBOL-85 &#167;6.3.4.2)
-- **File I/O**: OPEN, CLOSE, READ (sequential + keyed), WRITE (BEFORE/AFTER ADVANCING), REWRITE, DELETE, START
-- **File organizations**: sequential, indexed (with ALTERNATE KEY + secondary indices), relative
-- **Inter-program**: CALL (static + dynamic), USING (BY REFERENCE, BY CONTENT, BY VALUE), RETURNING, ENTRY statement, CANCEL, ON EXCEPTION / NOT ON EXCEPTION, INITIAL program support
-- **Other**: DISPLAY, ACCEPT, EXIT PROGRAM, EXIT PARAGRAPH, EXIT SECTION, GOBACK, STOP RUN, NEXT SENTENCE, CONTINUE
+- **Traceability:** 4,347 normative rules; every one adjudicated against the standard; 3,286 closed (75.6 %) and
+  1,061 open. Clause 15 (intrinsic functions) is fully closed.
+- **Tests on every change:** 9,046 conformance tests, 29,491 unit tests, 33 characterization tests — plus the NIST
+  CCVS suite, a per-edition version matrix, and a GnuCOBOL differential run per batch. CI runs on Windows and Linux.
+- **Declined facilities** (documented non-support, each with a compile-time warning, as §4.2.6 permits): the
+  Message Control System, commit and rollback, the VALIDATE facility, and screen handling. Optional modules and
+  processor-dependent elements are dispositioned in [docs/CONFORMANCE.md](docs/CONFORMANCE.md).
 
-### Environment Division
-- **SPECIAL-NAMES**: implementor switches (ON/OFF STATUS), ALPHABET (STANDARD-1, STANDARD-2, NATIVE, literal THRU/ALSO), CLASS definitions, DECIMAL-POINT IS COMMA, CURRENCY SIGN
-- **FILE-CONTROL**: SELECT, ASSIGN, ORGANIZATION, ACCESS MODE, FILE STATUS, RECORD KEY, ALTERNATE KEY
-- **LABEL RECORDS**: parsed and accepted (obsolete clause)
+## What it covers
 
-### Intrinsic Functions
-- ~70 functions: math (SQRT, LOG, MOD, FACTORIAL, etc.), string (LENGTH, REVERSE, UPPER-CASE, LOWER-CASE, TRIM, etc.), date/time (CURRENT-DATE, INTEGER-OF-DATE, etc.), financial (ANNUITY, PRESENT-VALUE), aggregates (MAX, MIN, SUM, MEAN, etc.)
-
-### Compiler Infrastructure
-- **Parser**: ANTLR4 lexer + parser with a modular grammar split across 9 imported per-subsystem fragments (data, expressions, control flow, I/O, OO, report writer, screen, special-names, words) over a dedicated lexer
-- **SUBSCRIPT lexer mode**: dedicated ANTLR4 mode preserving sign adjacency for spec-true subscript parsing (&#167;5.3)
-- **Preprocessor**: reference-format normalization, COPY with REPLACING, REPLACE, NIST test fixups
-- **Binder**: scope-aware symbol table, type system, storage-form and record-layout computation, category compatibility
-- **Bound tree**: typed expression/statement tree with abbreviated condition expansion, walked by a source-generated exhaustive visitor (no lowered IR)
-- **C# emission**: the bound tree is rendered to idiomatic, typed-native C# source and compiled by Roslyn (the primary backend); a direct-CIL backend is a future phase
-- **Edition conformance**: a two-arm version-conformance pass gates each construct against the targeted ISO edition
-- **Diagnostics**: descriptor-based diagnostics with file/line/column positions
-- **Validation**: flow-sensitive file-state analysis, FILE STATUS checking, and wired semantic validators
-- **Runtime**: typed-native runtime library — native scaled-integer numerics, strings, tables, and sequential/indexed/relative file handlers (no byte-array State)
-
-### Version Targeting
-- **Editions**: full support for COBOL-85, COBOL-2002, COBOL-2014, and COBOL-2023, selected with `--std 85|2002|2014|2023`
-- **Default**: COBOL-2023 (or COBOL-85 under `--nist`)
-- **Edition gating**: a construct the targeted edition removed (e.g. ALTER) is rejected; `--permissive` downgrades such rejections to warnings for migration
+- **All four editions** — COBOL-85, 2002, 2014 and 2023 — each with its own syntax and semantics, and gating
+  diagnostics where an edition lacks a construct.
+- **The language** (current standing per rule in [docs/CONFORMANCE.md](docs/CONFORMANCE.md) — conformance is
+  measured, not claimed): the Identification, Environment, Data and Procedure divisions, including the compiler
+  directing facility and conditional compilation, COPY/REPLACE, national and boolean data, dynamic-capacity tables,
+  typed and strongly-typed items, exception handling (declaratives and `EC-` exception conditions), sequential,
+  relative and indexed files, SORT and MERGE, the report writer, inter-program communication (CALL, nested and
+  recursive programs, function and program prototypes), user-defined functions, object orientation (classes,
+  interfaces, methods, properties, factories), locales and culturally sensitive collation, and every intrinsic
+  function of Clause 15.
+- **Arithmetic:** native, and standard-decimal (decimal128 intermediates) as selected by the OPTIONS paragraph.
 
 ## Architecture
 
 ```
-COBOL Source
-  -> Preprocessor (reference-format, COPY/REPLACE, NIST fixups)
-  -> Lexer (ANTLR4, with SUBSCRIPT mode for data-name parentheses)
-  -> Parser (ANTLR4, 9 imported grammar fragments)
-  -> Binder (symbol table, type resolution, storage-form + record layout)
-  -> Bound Tree (expression/statement binding, abbreviated condition expansion)
-  -> C# Emission (idiomatic, typed-native C# source)
-  -> Roslyn (-> .NET assembly)
-  -> Runtime (typed-native numerics, strings, tables, file handlers)
+COBOL source
+  → Preprocessor      reference format, COPY / REPLACE, compiler directives
+  → Lexer / Parser    ANTLR4, one grammar per subsystem
+  → Binder            names, types, storage, every syntax and general rule
+  → Bound tree        the backend-neutral program
+  → C# emission       idiomatic, typed-native C#
+  → Roslyn            a .NET assembly, linked to the typed-native runtime
 ```
 
-### Solution Structure
-
 ```
-CobolSharp.sln
-  src/
-    Cobol.Net.Cli/                    Command-line driver (produces the `cobol` executable)
-    Cobol.Net.Frontend/               Preprocessor + ANTLR4 grammar, lexer, and parser
-    Cobol.Net.Compiler/               Binder, bound tree, C# emitter, Roslyn backend
-    Cobol.Net.Compiler.SourceGen/     Roslyn source generator (exhaustive bound-tree visitor)
-    Cobol.Net.Editions/               Per-edition construct registry + version-conformance gating
-    Cobol.Net.Runtime/                Typed-native runtime library linked into compiled programs
-    CobolSharp.CLI/, .Compiler/, .Runtime/  Legacy byte-engine compiler, retained only as a differential oracle (until the G8 cut-over)
-  tests/
-    Cobol.Net.Tests.Unit/             281 unit tests
-    Cobol.Net.Tests.Conformance/      3166 conformance tests
-    Cobol.Net.Tests.Characterization/ 33 byte-exact snapshot tests
-    nist/                             NIST CCVS test programs + expected output
-  scripts/
-    guard.sh                          Full regression gate
-    guard-fast.sh                     Parallel fast regression gate
+src/
+  Cobol.Net.Cli/                 the `cobol` command
+  Cobol.Net.Frontend/            preprocessor, grammar, parser, compile-time expressions
+  Cobol.Net.Compiler/            binder, bound tree, C# emitter, Roslyn backend
+  Cobol.Net.Compiler.SourceGen/  source generator for the bound-tree visitor
+  Cobol.Net.Editions/            per-edition construct registry and gating
+  Cobol.Net.Runtime/             the runtime library compiled programs use
+  CobolSharp.*                   the legacy engine, kept only as a differential oracle until it is retired
+tests/
+  Cobol.Net.Tests.Conformance/   spec-derived programs with expected output, per edition, plus negatives
+  Cobol.Net.Tests.Unit/          unit and drift tests
+  Cobol.Net.Tests.Characterization/
+  nist/                          the NIST CCVS programs and expected output
 ```
 
-## Building
+## Building and testing
 
-Requires .NET 10.0 SDK and Java (for ANTLR4 parser generation).
+Requires the .NET 10 SDK, PowerShell 7+, Python 3.14+ and Java 21+ (ANTLR parser generation).
 
 ```bash
-dotnet build                    # Build all projects
-dotnet test                     # Run unit + conformance + characterization tests
-bash scripts/guard.sh           # Full regression gate including NIST
+dotnet build CobolSharp.sln
+pwsh scripts/build-local.ps1 -Filter "~Inspect"   # build + the conformance tests for an area + Unit + Characterization
 ```
 
-After `dotnet clean`, the build automatically regenerates ANTLR4 parser files from the grammar.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the standard-citation rule and the Contributor License
+Agreement.
 
-## Known Gaps
+## Community
 
-- **Direct-CIL backend**: the Roslyn C#-source backend is the sole implemented backend; a selectable direct-CIL (Mono.Cecil) backend is a planned future phase
-- **Rearchitecture in progress**: a clean-architecture refactor is underway — a fully structural `Place` lvalue model and a complete FUNCTION-argument grammar are the current work items
+- [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md)
+- Report wrong output, compiler crashes and conformance findings with the issue forms.
 
 ## License
 
-Business Source License 1.1 -- Copyright (c) 2026 Brent Rector. See [LICENSE](LICENSE) for details.
+Business Source License 1.1 — Copyright (c) 2026 Brent Rector. Non-commercial use is permitted; each version
+converts to the Apache License 2.0 four years after release; commercial licenses are available. See
+[LICENSE](LICENSE).

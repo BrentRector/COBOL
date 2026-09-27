@@ -220,7 +220,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     }
 
     // ⛔ `OoScopeHint` IS GONE (kb/Work PB390). It appended "names resolve METHOD-LOCALLY (§11.7)" to the four
-    //    unknown-procedure BoundUnsupported guards — a hint on a RUN-TIME abort that told the user COBOL.NET had
+    //    unknown-procedure BoundUnsupported guards — a hint on a RUN-TIME abort that told the user WiseOwl COBOL had
     //    not implemented a feature. The hint survives where it belongs: on the compile-time diagnostic, composed
     //    once by StatementValidation.RejectProcedureName from the ONE resolution's own method-scope fact, so no
     //    site can carry the hint without the report or the report without the hint.
@@ -414,7 +414,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // error, and always taken off the ledger here so an enclosing statement does not answer for it again.
         string? unbuiltOperand = data.Edition.TakeUnbuiltSince(unbuiltMark);
         // ⛔ THE DEFERRAL ANNOUNCES ITSELF (kb/Work PB236). `BoundUnsupported` was the carrier for three
-        // incompatible jobs — a feature COBOL.NET has not built, an ill-formed OPERAND, and an illegal
+        // incompatible jobs — a feature WiseOwl COBOL has not built, an ill-formed OPERAND, and an illegal
         // PLACEMENT — and the emitter rendered all three as the same run-time `NotImplemented.Run(...)`. The two
         // user-error jobs have moved to bind-time diagnostics at their own sites; what is left here is job ONE,
         // and it is reported so it can never again be invisible: before this, a program carrying an
@@ -432,7 +432,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // case a site cannot classify — the null is either REPORTED (an undefined name, a subscript on a
         // non-table item) or a shape the resolver has not built — and the error count since this statement began
         // is what tells the two apart. A statement whose bind already drew an error is a refused statement: the
-        // compile fails anyway, and announcing a gap in COBOL.NET on top of it (`INSPECT A(1) …` on a non-table
+        // compile fails anyway, and announcing a gap in WiseOwl COBOL on top of it (`INSPECT A(1) …` on a non-table
         // item used to draw COBOLNET2096 AND "not implemented") sends the user after the wrong party.
         if (!drewError && (core is BoundUnsupported { Feature: var f } ? f : unbuiltOperand) is { } gap)
             data.Edition.Warning(DiagnosticCatalog.StatementNotImplemented,
@@ -544,7 +544,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // section, is consumed by ProcedureTableBuilder.DeclCollectSection and never reaches this binder, so a USE
         // statement bound HERE is misplaced by construction: in a nondeclarative paragraph, in a declarative
         // paragraph, or after the section's first sentence. It used to fall to the bottom arm and be announced as
-        // a feature COBOL.NET had not implemented.
+        // a feature WiseOwl COBOL had not implemented.
         _ when s.useStatement() is not null => BoundRejected.Report(data.Edition, DiagnosticCatalog.UseStatementPlacement,
             "USE: a USE statement shall immediately follow a section header in the declaratives portion of the "
             + "procedure division and shall appear in a sentence by itself (ISO §14.9.49.3 SR1); this one is "

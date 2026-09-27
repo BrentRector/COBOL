@@ -7,7 +7,7 @@ using CobolNet.Runtime.Collation;
 namespace CobolNet.Benchmarks.Collation;
 
 /// <summary>
-/// The performance profile of the COBOL.NET collation engine (<c>src/Cobol.Net.Runtime/Collation/</c>, kb/Work
+/// The performance profile of the WiseOwl COBOL collation engine (<c>src/Cobol.Net.Runtime/Collation/</c>, kb/Work
 /// PB101).
 /// </summary>
 /// <remarks>

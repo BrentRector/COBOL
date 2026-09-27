@@ -1,6 +1,6 @@
 # The CLDR locale loader — `Runtime/Collation/CLDR/`
 
-COBOL.NET's collation is CLDR from top to bottom: the **root order** is the derived table generated from CLDR's
+WiseOwl COBOL's collation is CLDR from top to bottom: the **root order** is the derived table generated from CLDR's
 `allkeys_CLDR.txt` (`Collation/README.md`), and — since kb/Work PB105 — every **locale order** is derived from the
 locale's CLDR collation *rules* by the loader and builder in this folder. The hand-derived `.tailor` files of
 `Collation/Tailoring/` are now a site-override format on top; the derivation that produced them (Spanish ñ from
@@ -153,5 +153,5 @@ STANDARD-COMPARE over a locale ordering table therefore collates by the locale's
 
 CLDR data under the Unicode License v3 (`data/unicode/LICENSE-UNICODE.txt`); UTS #35 Part 5 is the specification
 the parser and builder follow, in their own words. Nothing here reads, copies or embeds ISO/IEC 14651 text or its
-tables; COBOL.NET's conformance statement is unchanged: *"Implements collation behavior consistent with ISO/IEC 14651
+tables; WiseOwl COBOL's conformance statement is unchanged: *"Implements collation behavior consistent with ISO/IEC 14651
 through derived tables and CLDR/UCA data."*

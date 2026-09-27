@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# User-space WSL toolchain refresh for COBOL.NET (parity target: scripts/cloud/setup-env.sh / CI setup-dotnet 10.0.x).
+# User-space WSL toolchain refresh for WiseOwl COBOL (parity target: scripts/cloud/setup-env.sh / CI setup-dotnet 10.0.x).
 set -u
 log() { echo "[wsl-tooling] $*"; }
 

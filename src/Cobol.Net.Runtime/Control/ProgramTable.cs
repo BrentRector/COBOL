@@ -589,7 +589,7 @@ public sealed class ProgramTable
             if (path.Length == 0) return false;
             var asm = System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
             var register = asm.GetType("__CobolModule")?.GetMethod("Register", Type.EmptyTypes);
-            if (register is null) return false;   // not a COBOL.NET module — no registrar surface
+            if (register is null) return false;   // not a WiseOwl COBOL module — no registrar surface
             register.Invoke(null, null);
             return true;
         }

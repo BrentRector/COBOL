@@ -1592,6 +1592,11 @@ internal static class RuntimeApi
     /// <see cref="RoundingText"/>, so a member rename breaks HERE, never the generated text.</summary>
     public static string PassModeText(CobolPassMode mode) => $"{nameof(CobolPassMode)}.{mode}";
 
+    /// <summary>The carrier of the predefined NULL written as a CALL / function-activation argument (kb/Work PB1630;
+    /// <see cref="PredefinedNullArgument"/> states the rule).</summary>
+    public static string PredefinedNullArgumentCarrier =>
+        $"{nameof(PredefinedNullArgument)}.{nameof(PredefinedNullArgument.Instance)}";
+
     // ── Run-unit lifecycle (CobolFile) ──
 
     /// <summary>Run-unit file-subsystem init (the entry wrapper's Main) — <c>CobolFile.Init</c>. (The matching

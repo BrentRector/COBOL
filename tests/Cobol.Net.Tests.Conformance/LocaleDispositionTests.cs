@@ -85,7 +85,7 @@ public sealed class LocaleDispositionTests
     /// ⛔ STANDARD-COMPARE IS THE ONE A.4.9-LISTED FUNCTION THAT IS **SUPPORTED** (kb/Work PB101 T7, owner
     /// decision Q4). It is A.4.9 item 11 but ordering-table-dependent, not locale-dependent, and its route is
     /// §A.3 item 25 — "The implementor need not accept the syntax … when support for ISO/IEC 14651:2020 is not
-    /// provided" — which COBOL.NET now DOES provide, over the derived CLDR/UCA collation engine. This test used
+    /// provided" — which WiseOwl COBOL now DOES provide, over the derived CLDR/UCA collation engine. This test used
     /// to assert the COBOLNET1518 rejection and its §A.3 citation; it asserts the claim instead, in both the
     /// default-table form and the ORDER TABLE form, because a suite that only ever pinned the refusal would go
     /// green on a compiler that silently stopped binding the function at all.

@@ -18,7 +18,7 @@ namespace CobolNet.Frontend.Preprocessor;
 public sealed record RefModZeroLengthEvent(int Line, bool On);
 
 /// <summary>
-/// The COBOL.NET <c>&gt;&gt;REF-MOD-ZERO-LENGTH</c> directive stage (ISO §7.3.23; greenfield-only — the legacy
+/// The WiseOwl COBOL <c>&gt;&gt;REF-MOD-ZERO-LENGTH</c> directive stage (ISO §7.3.23; greenfield-only — the legacy
 /// pipeline keeps consuming the directive via <see cref="ConditionalCompilationProcessor"/>'s
 /// <c>KnownIgnoredDirectives</c>): parses each surviving <c>&gt;&gt;REF-MOD-ZERO-LENGTH {ON | OFF}</c> line of the
 /// FINAL preprocessed text into a <see cref="RefModZeroLengthEvent"/>, edition-gates the directive (the

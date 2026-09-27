@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the owner's **COBOL.NET Conformance Ledger** artifact from the repo — every figure COMPUTED.
+"""Render the owner's **WiseOwl COBOL Conformance Ledger** artifact from the repo — every figure COMPUTED.
 
 ⛔ WHY THIS EXISTS. The ledger is the owner's live status page, and it was maintained by HAND: a session read the
 inventory, the work register, the A.1 audit and plan §0, then retyped ~60 numbers into a 460-line HTML file. Two
@@ -78,7 +78,7 @@ TREND = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-trend.json"
 IN_FLIGHT = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-in-flight.md"
 DEFAULT_OUT = REPO / "docs" / "rearchitecture" / "evidence" / "conformance-ledger.html"
 
-TITLE = "COBOL.NET Conformance Ledger"
+TITLE = "WiseOwl COBOL Conformance Ledger"
 
 #: Verdicts that RESOLVE a row — the row still needs a spec-derived witness to close, but no further
 #: adjudication. Mirrors `inventory-schema.json`'s `resolves` flag; kept as a literal here because this script

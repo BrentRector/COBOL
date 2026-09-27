@@ -7,7 +7,7 @@
 # UCD Version: 17.0.0
 # For a description of the format and usage, see
 # http://www.unicode.org/reports/tr35/tr35-collation.html#Root_Data_Files
-# COBOL.NET: a deterministic 1-in-25 sample (every 25th data line, from the first) of the 206298-line
+# WiseOwl COBOL: a deterministic 1-in-25 sample (every 25th data line, from the first) of the 206298-line
 # CLDR release-48-2 file — 8252 lines. Any subsequence of a sorted list is sorted, so the sample is a
 # valid (weaker) conformance check; the full file is run when COBOLNET_UCA_CONFORMANCE_DIR names its directory.
 # Unicode License — data/unicode/LICENSE-UNICODE.txt.

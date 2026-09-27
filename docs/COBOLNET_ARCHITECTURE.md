@@ -1,4 +1,4 @@
-# COBOL.NET — Architecture (greenfield COBOL → C# compiler)
+# WiseOwl COBOL — Architecture (greenfield COBOL → C# compiler)
 
 > ⛔ **SUPERSEDED FOR DEPTH by `docs/COBOLNET_DESIGN.md`** (the decision-complete SSOT — pipeline/bound-tree, data
 > model, numeric, control-flow PC-dispatcher, REDEFINES, strings, files, interprogram, OO, conditions/exceptions,

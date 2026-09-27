@@ -167,7 +167,7 @@ Generated code emits into namespace `CobolSharp.Compiler.Generated` while living
 `Invoke-Antlr4CSharp.ps1:29`. Every consumer aliases `using Core = CobolParserCore`. The preprocessor files
 physically live in `src/Cobol.Net.Frontend/Preprocessor/` but still declare
 `namespace CobolSharp.Compiler.Preprocessor` (verified on all five files). `Frontend.cs:16` claims it "is the
-ONE place COBOL.NET reuses the legacy `CobolSharp.Compiler` assembly" — **this is stale**: the preprocessor
+ONE place WiseOwl COBOL reuses the legacy `CobolSharp.Compiler` assembly" — **this is stale**: the preprocessor
 and parse machinery were already physically extracted into `Cobol.Net.Frontend`; only `DiagnosticBag` /
 `TurnEvent` type *namespaces* remain legacy-named, and they too live in this assembly now
 (`Diagnostics/DiagnosticBag.cs`, `Preprocessor/TurnDirectiveProcessor.cs`).
@@ -1353,7 +1353,7 @@ is willing to (a) modify the frozen oracle (against its "differential net until 
 grammar so greenfield and legacy diverge (against singular-pattern). This re-sequences D10 to sit AFTER — or to
 land ON — the G8 cut, not inside PHASE 04's byte-neutral window.
 
-### 9.4 ⛔ THE OPEN DECISION (owner) — does COBOL.NET preserve ISO §8.3.5 space-separated lists?
+### 9.4 ⛔ THE OPEN DECISION (owner) — does WiseOwl COBOL preserve ISO §8.3.5 space-separated lists?
 This is the gating question; §9.5's staging depends on the answer.
 - **Option A — spec-faithful (recommended): keep space-separated subscript/argument lists.** Then a **scoped
   WS-significance mechanism is unavoidable** (an island-grammar region, or a `WS`-non-skipping lexer predicate

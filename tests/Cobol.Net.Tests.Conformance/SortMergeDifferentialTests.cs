@@ -24,7 +24,7 @@ public sealed class SortMergeDifferentialTests
     private static void AssertSpecPinned(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(expected, cout);
     }
 
@@ -478,7 +478,7 @@ public sealed class SortMergeDifferentialTests
     }
 
     /// <summary>GR18/GR24 at --std 2002: the table sorts IN PLACE on the typed element array; GR19a ascending by
-    /// the numeric key IK. SPEC-PINNED (the per-edition compile is COBOL.NET's own; the expected image follows
+    /// the numeric key IK. SPEC-PINNED (the per-edition compile is WiseOwl COBOL's own; the expected image follows
     /// directly from GR19/GR24): elements reorder to 01BB 02DD 03CC 04EE 05AA.</summary>
     [Fact]
     public void TableSort_2002_SortsElementsInPlace()

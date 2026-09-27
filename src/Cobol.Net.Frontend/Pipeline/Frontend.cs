@@ -13,14 +13,14 @@ using CobolNet.Frontend.Preprocessor;
 namespace CobolNet.Frontend;
 
 /// <summary>
-/// The COBOL.NET front-end: source text → preprocessed free-form text → ANTLR parse tree.
+/// The WiseOwl COBOL front-end: source text → preprocessed free-form text → ANTLR parse tree.
 /// </summary>
 /// <remarks>
-/// This is the COBOL.NET front-end (assembly <c>Cobol.Net.Frontend</c>): the source preprocessor
+/// This is the WiseOwl COBOL front-end (assembly <c>Cobol.Net.Frontend</c>): the source preprocessor
 /// (reference-format normalization, conditional compilation, COPY expansion, NIST placeholder substitution) and
 /// the ANTLR lexer/parser. The parse tree it returns (<see cref="CobolParserCore.CompilationUnitContext"/>) is a
 /// pure syntactic artifact — no semantic analysis, storage layout, or emission is involved. It is shared,
-/// unchanged, by both the greenfield COBOL.NET pipeline and (until the G8 cut-over) the legacy differential
+/// unchanged, by both the greenfield WiseOwl COBOL pipeline and (until the G8 cut-over) the legacy differential
 /// oracle, which references this same assembly.
 /// <para>
 /// The pipeline mirrors the legacy <c>Compilation.Preprocess</c> + <c>Compilation.LexAndParse</c> exactly so
@@ -35,7 +35,7 @@ public sealed class Frontend
 
     /// <summary>
     /// When non-null, enables NIST CCVS preprocessing for the named test (e.g. <c>"NC101A"</c>): the
-    /// <c>XXXXX###</c>/<c>XXXXP###</c>/<c>XXXXD###</c> placeholders are substituted with COBOL.NET-appropriate
+    /// <c>XXXXX###</c>/<c>XXXXP###</c>/<c>XXXXD###</c> placeholders are substituted with WiseOwl COBOL-appropriate
     /// values so the CCVS conformance programs compile.
     /// </summary>
     public string? NistTestName { get; init; }

@@ -85,7 +85,7 @@ public sealed class PerformVaryingDifferentialTests
             BUMP.
                 ADD 1 TO WS-N.
             """));
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal("008", output);
     }
 

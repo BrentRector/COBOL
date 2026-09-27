@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// Sequential file I/O (ISO/IEC 1989:2023 §14.9; COBOLNET_DESIGN §8): OPEN/CLOSE/WRITE/READ/REWRITE over a typed-native
 /// connector. Each test round-trips through the file (WRITE then READ back, or query FILE STATUS) and DISPLAYs the
-/// result, so the existing stdout differential harness pins COBOL.NET to the legacy oracle (364-NIST-green) — the
+/// result, so the existing stdout differential harness pins WiseOwl COBOL to the legacy oracle (364-NIST-green) — the
 /// file content itself is verified indirectly, through the program's own read-back. The printer WRITE … ADVANCING path
 /// is exercised end-to-end by the NC101A NIST program; here the focus is the data-file verbs and the status machine.
 /// </summary>
@@ -241,7 +241,7 @@ public sealed class FileIoDifferentialTests
                 CLOSE P-IN.
                 STOP RUN.
             """);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         // Two lines and no third: the last WRITE is BEFORE ADVANCING 1 LINE, whose own advance terminates the line,
         // and nothing in §14.9.51.4 adds a terminator at CLOSE. This expectation used to carry a third, empty record
         // ("\nL=") - the spurious CLOSE-time line terminator kb/Work PB864 removed (its sibling
@@ -250,7 +250,7 @@ public sealed class FileIoDifferentialTests
     }
 
     /// <summary>The feature-name <c>C01</c> (docs/CONFORMANCE.md §7, Annex A.1 items 190 and 222 — kb/Work PB862):
-    /// "skip to channel 1", the top of the next page — COBOL.NET's §14.9.51.4 GR25 d rule for it is EXACTLY the
+    /// "skip to channel 1", the top of the next page — WiseOwl COBOL's §14.9.51.4 GR25 d rule for it is EXACTLY the
     /// <c>ADVANCING PAGE</c> advance in the same position. So the same records written once through a C01 mnemonic
     /// and once through PAGE must read back identically, BEFORE and AFTER alike. Spec-derived from the determination,
     /// not measured: the assertion is the equality, never a captured byte stream.</summary>
@@ -313,7 +313,7 @@ public sealed class FileIoDifferentialTests
                 CLOSE P-IN.
                 STOP RUN.
             """);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         var lines = cout.Split('\n');
         var viaC01 = lines.Where(l => l.StartsWith("M=", StringComparison.Ordinal)).Select(l => l[2..]).ToList();
         var viaPage = lines.Where(l => l.StartsWith("P=", StringComparison.Ordinal)).Select(l => l[2..]).ToList();
@@ -324,7 +324,7 @@ public sealed class FileIoDifferentialTests
     /// <summary>READ on a file connector that is NOT open: I-O status '47' (§9.1.13.7 item 7 / §14.9.30 GR2),
     /// the statement is unsuccessful, and AT END does NOT fire ('47' is not the at-end family, §9.1.13.4).
     /// SPEC-PINNED: the record area's content after an unsuccessful READ is spec-UNDEFINED (§14.9.30 GR18
-    /// "unless otherwise specified…"); COBOL.NET's documented refinement is that the area is UNCHANGED —
+    /// "unless otherwise specified…"); WiseOwl COBOL's documented refinement is that the area is UNCHANGED —
     /// extending the spec's own rule for every other unsuccessful I-O verb (REWRITE GR14 / WRITE GR15 /
     /// DELETE GR8 / START GR2: "unaffected"). The legacy LOW-VALUE-filled it (a byte-engine artifact — the
     /// ST146A golden was re-baselined over it, DEVLOG 570), so this is not legacy-differential.</summary>
@@ -355,7 +355,7 @@ public sealed class FileIoDifferentialTests
                 DISPLAY "REC=" F-REC.
                 STOP RUN.
             """);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal("FS=47\nREC=KEEPSAKE", cout);
     }
 }

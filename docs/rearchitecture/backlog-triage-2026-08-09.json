@@ -131,7 +131,7 @@
    "expected": "Re-derived independently from the rule text I read at specs/ISO_COBOL.md:30366 -- 15.16.3 r2: 'The value of argument-1 shall be greater than zero and less than or equal to the number of positions in the national program collating sequence.' The identity national sequence has 65536 positions, so EVERY value outside 1..65536 is an incorrect argument value and 15.3 requires EC-ARGUMENT-FUNCTION to be set to exist -- fatal with checking ON. Critically, that is true of the TRUE value, not of any narrowed image of it: a magnitude >= 2^63 that an unchecked (long)(Int128) cast would alias INTO the window (including one that aliases onto the LEGAL maximum 65536), and a NEGATIVE magnitude that aliases onto a positive in-window ordinal, must all be rejected.",
    "actual": "Every wrap-shaped magnitude is now rejected with its TRUE value printed in the message, on four separate argument channels: rfa1 CHAR-NATIONAL(PIC 9(20) 18446744073709617152 = 2^64+65536) -> 'abnormal run-unit termination: EC-ARGUMENT-FUNCTION (fatal): the intrinsic integer argument 18446744073709617152 is outside the range the function can represent (ISO 15.3)', exit 1; rfa2 (PIC S9(20) -18446744073709551550 = -(2^64)+66) -> same fatal EC naming -18446744073709551550, exit 1; rfa3 (arithmetic expression BIGN + 0) -> same fatal EC naming 18446744073709551682, exit 1; rfa5 (non-identity ALSO-shrunk national PCS, 2^64+65535) -> same fatal EC, exit 1. Controls: rfa4 CHAR-NATIONAL(66) -> CTRL-66=[A] and ORD(CHAR-NATIONAL(65536)) -> CTRL-MAX=065536, exit 0 (no over-rejection). rfa6 with checking OFF -> CHECKOFF=[ ] (the 15.3 one-space default) then CONTINUES -- NOT the aliased ordinal-66 character 'A', which proves the lossy narrowing itself is gone rather than merely fenced by a guard placed in front of it.",
    "derivation": "15.16.3 r2 read in full at specs/ISO_COBOL.md:30366 (quoted above) plus 15.3's closing paragraph ('If the evaluation of an argument results in an incorrect value for that argument ... the EC-ARGUMENT-FUNCTION exception condition is set to exist'). The recorded defect was NOT 'the bound is wrong' -- the note itself verified the bound -- it was that IntrinsicRenderer.AsInt's '(long)(Int128)' narrowing is unchecked in C# and wraps modulo 2^64, so the guard never saw the true value. The refuting question is therefore not 'is 2^64+66 rejected' but 'is the guard now applied to the TRUE value on every channel and at every sign', which is what the five probes below test.",
-   "probe": "refute-char-convert-a/rfa1.cob (PROGRAM-ID RF1632A): '>>TURN EC-ARGUMENT-FUNCTION CHECKING ON' / 01 BIGN PIC 9(20) VALUE 18446744073709617152. / DISPLAY \"START\" MOVE FUNCTION CHAR-NATIONAL (BIGN) TO N-CHAR ... | rfa2.cob (RF1632B): 01 NEGB PIC S9(20) VALUE -18446744073709551550. / CHAR-NATIONAL (NEGB) | rfa3.cob (RF1632C): CHAR-NATIONAL (BIGN + 0) with BIGN = 18446744073709551682 | rfa4.cob (RF1632D) control: CHAR-NATIONAL(66) and ORD(CHAR-NATIONAL(65536)) | rfa5.cob (RF1632E): OBJECT-COMPUTER. XX PROGRAM COLLATING SEQUENCE FOR NATIONAL NAT-A. SPECIAL-NAMES. ALPHABET NAT-A FOR NATIONAL IS N\"B\" ALSO N\"A\", N\"C\". / CHAR-NATIONAL(18446744073709617151) | rfa6.cob (RF1632F): same 2^64+66 value with NO checking directive. Command for each: E:\\CobolSharp\\src\\Cobol.Net.Cli\\bin\\Debug\\net10.0\\cobol.exe <f>.cob --std 2023 -o <f>.dll --run",
+   "probe": "refute-char-convert-a/rfa1.cob (PROGRAM-ID RF1632A): '>>TURN EC-ARGUMENT-FUNCTION CHECKING ON' / 01 BIGN PIC 9(20) VALUE 18446744073709617152. / DISPLAY \"START\" MOVE FUNCTION CHAR-NATIONAL (BIGN) TO N-CHAR ... | rfa2.cob (RF1632B): 01 NEGB PIC S9(20) VALUE -18446744073709551550. / CHAR-NATIONAL (NEGB) | rfa3.cob (RF1632C): CHAR-NATIONAL (BIGN + 0) with BIGN = 18446744073709551682 | rfa4.cob (RF1632D) control: CHAR-NATIONAL(66) and ORD(CHAR-NATIONAL(65536)) | rfa5.cob (RF1632E): OBJECT-COMPUTER. XX PROGRAM COLLATING SEQUENCE FOR NATIONAL NAT-A. SPECIAL-NAMES. ALPHABET NAT-A FOR NATIONAL IS N\"B\" ALSO N\"A\", N\"C\". / CHAR-NATIONAL(18446744073709617151) | rfa6.cob (RF1632F): same 2^64+66 value with NO checking directive. Command for each: E:\\COBOL\\src\\Cobol.Net.Cli\\bin\\Debug\\net10.0\\cobol.exe <f>.cob --std 2023 -o <f>.dll --run",
    "variations": [
     "ALIAS-ONTO-A-LEGAL-VALUE magnitude (the discriminating axis the prober's 2^64+66 could not be): 2^64+65536 = 18446744073709617152 narrows to exactly 65536, the LEGAL maximum, so a surviving post-narrowing guard would have ACCEPTED it silently -- rfa1 rejects it naming the full 20-digit value",
     "SIGN axis, untouched by the prober: PIC S9(20) VALUE -18446744073709551550 = -(2^64)+66 narrows to +66, an in-window ordinal -- rfa2 rejects it naming the negative value",
@@ -1185,7 +1185,7 @@
    "expected": "If A.4.9 were claimed: argument-1 of class alphabetic/alphanumeric/national is accepted. Under the owner-ratified non-support: a named COBOLNET1518 by name, BEFORE argument-1's class is inspected.",
    "actual": "COBOLNET1518 on every reference form and at every edition. Re-run this pass at --std 2023, 2002, 2014 and 85: identical single diagnostic, exit=70. No class screen is ever reached.",
    "derivation": "Spec text read this pass at specs/ISO_COBOL.md 15.51.3 r1: 'Argument-1 shall be of class alphabetic, alphanumeric, or national.' An argument rule is only evaluable once the reference binds. Read at IntrinsicBinder.cs:460 the Unsupported arm returns LocaleUnsupported BEFORE BindIntrinsicArgs (:510), the COBOLNET1504 arity check (:511) and CheckArgumentClasses (:525) - so the rule is unreachable, not merely unimplemented.",
-   "probe": "rf01.cob: 01 WS-R PIC X. / MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob: 01 WS-R PIC X. / MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002 (NEW - prober never varied it): single 1518, exit=70",
     "--std 2014 (NEW): single 1518, exit=70",
@@ -1206,7 +1206,7 @@
    "expected": "If claimed: argument-2's class screened per the rule. Under non-support: COBOLNET1518 before argument-2 is bound; not demotable by --permissive.",
    "actual": "COBOLNET1518 on every form; --permissive re-run this pass on rf01 -> still error, exit=70.",
    "derivation": "15.51.3 r2 (read this pass): 'Argument-2 shall be of class alphabetic, alphanumeric, or national.' Same unreachability as r1 - the whole reference is refused at bind, so no per-position screen runs. The non-demotability follows from the reject being ctx.Edition.Error (unconditional) rather than Removed() (the only Permissive-aware channel).",
-   "probe": "rf01.cob + rf04.cob (FUNCTION LOCALE-COMPARE(FUNCTION TRIM(WS-A) WS-B)). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run [--permissive]",
+   "probe": "rf01.cob + rf04.cob (FUNCTION LOCALE-COMPARE(FUNCTION TRIM(WS-A) WS-B)). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run [--permissive]",
    "variations": [
     "--permissive re-run directly on the LOCALE-COMPARE site (prober only inferred it from a LOCALE-TIME sibling)",
     "nested-intrinsic argument-2 (rf04) - a shape the prober did not write",
@@ -1223,7 +1223,7 @@
    "expected": "If claimed: arguments of DIFFERENT classes are accepted (the rule is a permission, observable only as the absence of a rejection). Under non-support: refused before any cross-argument comparison.",
    "actual": "COBOLNET1518 at bind. LOCALE-COMPARE remains absent from IntrinsicArgumentRules - re-grepped this pass: IntrinsicArgumentRules.cs contains ZERO occurrences of 'locale' (case-insensitive count = 0).",
    "derivation": "15.51.3 r3 (read this pass): 'Arguments may be of different classes.' A permission cannot be observed while the reference is refused by name; and correctly, no Verified row exists that could contradict it.",
-   "probe": "rf04.cob (mixed nested/plain operands) + `grep -cin locale src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs` -> 0. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf04.cob (mixed nested/plain operands) + `grep -cin locale src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs` -> 0. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "mixed operand shapes via nesting (rf04)",
     "--std 2002/2014/85 (NEW)",
@@ -1240,7 +1240,7 @@
    "expected": "If claimed: locale-name-1 declarable in SPECIAL-NAMES and its association checked. Under non-support: the function rejects by name AND the SPECIAL-NAMES LOCALE clause draws a named non-support diagnostic.",
    "actual": "Function-with-locale-operand -> COBOLNET1518. Clause at --std 2023/2014/2002: BOTH branches -> the named SN COBOLNET1518 (A.4.9 item 10). ** BUT at --std 85 the LITERAL branch is still a raw, misdirecting parse error (COBOL0001 + COBOL0308 'A data-name is expected here, not a literal'), and the word branch compiles clean. ** A locale-name still cannot be declared at any edition, so the rule remains unimplemented.",
    "derivation": "15.51.3 r4 (read this pass): 'Locale-name-1 shall be associated with a locale in the SPECIAL-NAMES paragraph.' No association can exist at any edition: at 2002+ the clause is diagnosed non-support; at 85 the word branch is swallowed as an implementor-switch entry and the literal branch fails to parse.",
-   "probe": "rf15.cob (SPECIAL-NAMES. LOCALE LOC1 IS FR-FR. + MOVE FUNCTION LOCALE-DATE(WS-D LOC1)) -> SN1518 + R1518; rf08.cob (word branch) / rf09.cob (literal branch) at --std 2023, 2014, 2002, 85. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf15.cob (SPECIAL-NAMES. LOCALE LOC1 IS FR-FR. + MOVE FUNCTION LOCALE-DATE(WS-D LOC1)) -> SN1518 + R1518; rf08.cob (word branch) / rf09.cob (literal branch) at --std 2023, 2014, 2002, 85. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "clause branch x EDITION cross-product (NEW - the prober held edition fixed per branch)",
     "clause + function reference in ONE program (rf15) - both diagnostics coexist, neither masks the other",
@@ -1258,7 +1258,7 @@
    "expected": "If claimed: argument-1 of class alphanumeric or national AND 8 character positions. Under non-support: COBOLNET1518 before any class or length screen.",
    "actual": "A SPEC-CONFORMING argument (PIC X(8) VALUE \"20260808\") still rejects by name -> COBOLNET1518, exit=70, proving the reject is the disposition and not a class screen. No length predicate exists in the catalog schema (ArgKinds encodes class only).",
    "derivation": "15.52.3 r1: 'Argument-1 shall be of class alphanumeric or national and shall be 8 character positions in length.' A two-part obligation; neither part has an expression, and both are unreachable behind the bind-time reject.",
-   "probe": "rf02.cob / rf03.cob / rf15.cob with 01 WS-D PIC X(8) VALUE \"20260808\". E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf03.cob / rf15.cob with 01 WS-D PIC X(8) VALUE \"20260808\". E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "keyword-omitted form under REPOSITORY FUNCTION ALL INTRINSIC (rf02, NEW for LOCALE-DATE - the prober only ran keyword-omission for LOCALE-COMPARE)",
     "result reference modification FUNCTION LOCALE-DATE(WS-D)(1:2) (rf03, NEW) -> single 1518, no stacking",
@@ -1277,7 +1277,7 @@
    "expected": "If claimed: argument-1's CONTENT validated as CURRENT-DATE positions 1-8 YYYYMMDD and valid as a returned value of that function. Under non-support: COBOLNET1518 before any value screen.",
    "actual": "COBOLNET1518 per reference on every probe, exit=70. No value rule and no EC-ARGUMENT-FUNCTION raise site for LOCALE-DATE exists.",
    "derivation": "15.52.3 r2: 'The content of argument-1 shall be a date in the same format as the year, month, and day returned in character positions 1 through 8 by the CURRENT-DATE function and shall be valid according to the definition of a returned value from that function.' Two-part; both parts absent and unreachable.",
-   "probe": "rf02.cob / rf03.cob / rf18.cob (VALUE \"20260808\", a VALID date - so a value screen, had one existed, would have passed and the only diagnostic left is the disposition). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf03.cob / rf18.cob (VALUE \"20260808\", a VALID date - so a value screen, had one existed, would have passed and the only diagnostic left is the disposition). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "valid date content (rf02/rf03) vs the prober's axes",
     "keyword-omitted (rf02/rf18, NEW)",
@@ -1295,7 +1295,7 @@
    "expected": "If claimed: locale-name-1 associated in SPECIAL-NAMES. Under non-support: the function rejects by name and the clause draws the uniform named diagnostic decision 3 requires.",
    "actual": "Function with locale-name operand -> COBOLNET1518. Clause at 2023/2014/2002: both branches -> SN1518. ** ALPHABET AL1 IS LOCALE at --std 2023 -> COBOLNET0901 (loud), but at --std 85 -> COMPILES CLEAN, runs, prints 'RF10-ALPHA Y', exit=0 - still silent, still a silently wrong alphabet. ** The FOR NATIONAL branch (rf12) draws COBOLNET0898 + a false COBOLNET0901 at 2023, neither citing A.4.9.",
    "derivation": "15.52.3 r3: 'Locale-name-1 shall be associated with a locale in the SPECIAL-NAMES paragraph.' Nothing can be associated at any edition, so the rule stays unimplemented - the ratified disposition.",
-   "probe": "rf15.cob (clause + LOCALE-DATE(WS-D LOC1)); rf08/rf09 (clause branches) x 2023/2014/2002/85; rf10 (ALPHABET AL1 IS LOCALE) x 2023/85; rf11 (ALPHABET AL1 IS LOCALE LOC2); rf12 (FOR NATIONAL). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf15.cob (clause + LOCALE-DATE(WS-D LOC1)); rf08/rf09 (clause branches) x 2023/2014/2002/85; rf10 (ALPHABET AL1 IS LOCALE) x 2023/85; rf11 (ALPHABET AL1 IS LOCALE LOC2); rf12 (FOR NATIONAL). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "ALPHABET branch x EDITION (NEW - the prober ran it only at 2023)",
     "ALPHABET ... IS LOCALE locale-name-2 form (rf11, NEW) -> SN1518 + COBOLNET0901",
@@ -1314,7 +1314,7 @@
    "expected": "If claimed: argument-1 of class alphanumeric or national AND 6 character positions. Under non-support: COBOLNET1518 before the screen.",
    "actual": "A spec-conforming PIC X(6) VALUE \"120000\" argument still rejects by name -> COBOLNET1518, exit=70. At --std 85/2002/2014: single 1518, no COBOLNET1502.",
    "derivation": "15.53.3 r1: 'Argument-1 shall be of class alphanumeric or national and shall be 6 character positions in length.' Unreachable behind the bind-time reject; the length half has no schema expression at all.",
-   "probe": "rf02.cob (01 WS-T PIC X(6) VALUE \"120000\", keyword-omitted MOVE LOCALE-TIME(WS-T)) + rf14.cob (PERFORM UNTIL FUNCTION LOCALE-TIME(WS-T) = \"X\"). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob (01 WS-T PIC X(6) VALUE \"120000\", keyword-omitted MOVE LOCALE-TIME(WS-T)) + rf14.cob (PERFORM UNTIL FUNCTION LOCALE-TIME(WS-T) = \"X\"). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "keyword-omitted form for LOCALE-TIME (rf02, NEW - prober did keyword-omission only for LOCALE-COMPARE)",
     "PERFORM UNTIL condition context (rf14, NEW)",
@@ -1332,7 +1332,7 @@
    "expected": "If claimed: argument-1's content validated as CURRENT-DATE positions 9-14 hhmmss. Under non-support: COBOLNET1518 first.",
    "actual": "COBOLNET1518 on every reference; no LOCALE-TIME body under src/Cobol.Net.Runtime and the catalog RuntimeMethod is empty. The only body in the tree is legacy IntrinsicFunctions.cs:617.",
    "derivation": "15.53.3 r2: 'The content of argument-1 shall be in the same format as the hours, minutes, and seconds returned in character positions 9 through 14 of the CURRENT-DATE function and shall be valid according to the definition of a returned value from that function.' No check exists or is reachable.",
-   "probe": "rf02.cob (valid \"120000\") + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob (valid \"120000\") + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "valid content so a value screen would have passed",
     "PERFORM UNTIL context (NEW)",
@@ -1350,7 +1350,7 @@
    "expected": "If claimed: the two WIDENED ranges are accepted - hours 00 through 24, seconds 00 through 99. Under non-support: COBOLNET1518 before any range validation.",
    "actual": "COBOLNET1518, exit=70. The clause-specific range pair has no representation anywhere in src/Cobol.Net.*: no validator, no EC-ARGUMENT-FUNCTION arm, no constant.",
    "derivation": "15.53.3 r3, mechanically checked this pass - `cite.py --check 15.53.3 \"The hours past midnight shall be 00 through 24\"` -> OK 15.53.3 3) a). The rule widens BOTH directions over CURRENT-DATE, so a future implementation cannot reuse a CURRENT-DATE validator; it needs this clause's own pair.",
-   "probe": "rf02.cob / rf14.cob (LOCALE-TIME references reached from MOVE and from a PERFORM UNTIL condition). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf14.cob (LOCALE-TIME references reached from MOVE and from a PERFORM UNTIL condition). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "MOVE vs PERFORM UNTIL condition (NEW)",
     "keyword-omitted (NEW)",
@@ -1367,7 +1367,7 @@
    "expected": "If claimed: locale-name-1 associated in SPECIAL-NAMES. Under non-support: the function rejects by name and the clause draws the uniform named 1518 decision 3 requires.",
    "actual": "Two-argument function form -> COBOLNET1518. Clause at 2023/2014/2002: both branches -> SN1518. ** At --std 85 the LITERAL branch still emits COBOL0001 'no viable alternative at input LOCALE' plus the VERBATIM misdirecting COBOL0308 'unexpected \"fr_FR\". A data-name is expected here, not a literal.' (exit=65), while the word branch compiles clean and runs (exit=0). **",
    "derivation": "15.53.3 r4: 'Locale-name-1 shall be associated with a locale in the SPECIAL-NAMES paragraph.' Nothing to associate at any edition; the rule stays unimplemented.",
-   "probe": "rf15.cob (SPECIAL-NAMES LOCALE + two-argument function reference in one program); rf08.cob / rf09.cob at --std 2023, 2014, 2002 and 85. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf15.cob (SPECIAL-NAMES LOCALE + two-argument function reference in one program); rf08.cob / rf09.cob at --std 2023, 2014, 2002 and 85. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "clause branch x EDITION cross-product (NEW)",
     "clause and function reference COEXISTING in one compilation (rf15, NEW) -> SN1518 + R1518, independent",
@@ -1385,7 +1385,7 @@
    "expected": "If claimed: argument-1 a numeric value in standard numeric time form. Under non-support: COBOLNET1518 before the 15.5.5 value screen that EXISTS as shared machinery can be reached.",
    "actual": "COBOLNET1518, exit=70, at --std 2023, 2014, 2002 and 85 (rf17 run at all four this pass). The shared screen (CobolDate.cs#SecondsOutOfStandardForm) remains wired only to FORMATTED-TIME/-DATETIME/COMBINED-DATETIME - 'unreachable', not 'absent'.",
    "derivation": "15.54.3 r1, mechanically checked this pass: `cite.py --check 15.54.3 \"Argument-1 shall be a numeric value in standard numeric time form\"` -> OK 15.54.3 1). The reject-by-name precedes argument binding, so the existing shared value machinery never applies to this function.",
-   "probe": "rf17.cob: 01 WS-S PIC 9(5) VALUE 43200. / MOVE FUNCTION LOCALE-TIME-FROM-SECONDS(WS-S) TO WS-R. Also rf02.cob keyword-omitted form. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf17.cob: 01 WS-S PIC 9(5) VALUE 43200. / MOVE FUNCTION LOCALE-TIME-FROM-SECONDS(WS-S) TO WS-R. Also rf02.cob keyword-omitted form. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002 with IntroducedIn 2014 (NEW and pointed: the D8 window is VIOLATED here, yet no COBOLNET1502 is emitted - single 1518 - which is the suppression's sharpest test and the prober never ran it)",
     "keyword-omitted form (rf02, NEW)",
@@ -1403,7 +1403,7 @@
    "expected": "If claimed: locale-name-1 associated in SPECIAL-NAMES. Under non-support: the function rejects by name and the clause draws the named SN 1518.",
    "actual": "Function reference -> COBOLNET1518. Clause at 2023/2014/2002 -> SN1518 on both branches. ** At --std 85 the literal branch is still a raw COBOL0001 + misdirecting COBOL0308 parse error (exit=65). **",
    "derivation": "15.54.3 r2: 'Locale-name-1 shall be associated with a locale in the SPECIAL-NAMES paragraph.' A locale-name still cannot be declared at any edition.",
-   "probe": "rf02.cob / rf17.cob (function) + rf08.cob / rf09.cob at four editions (clause). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf17.cob (function) + rf08.cob / rf09.cob at four editions (clause). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "clause branch x EDITION cross-product (NEW)",
     "keyword-omitted function form (rf02, NEW)",
@@ -2873,7 +2873,7 @@
    "expected": "The general format 'FUNCTION LOCALE-COMPARE ( argument-1 argument-2 [ locale-name-1 ] )' is deliberately never ACCEPTED - every reference form draws the named COBOLNET1518, which is the A.4.1 posture for an unclaimed optional element. Acceptance would be the defect.",
    "actual": "Rejected in EVERY form measured this pass: FUNCTION-keyword (rf01), keyword-omitted under REPOSITORY FUNCTION ALL INTRINSIC (rf02), nested as an argument and taking a nested argument (rf04), mis-arity (rf05, 1 arg -> 1518 not COBOLNET1504), >>COBOL-WORDS EQUATE synonym (rf06 -> 1518 naming LOCALE-DATE), STRING DELIMITED BY and INSPECT TALLYING FOR ALL (rf07), EVALUATE subject and PERFORM UNTIL condition (rf14), result reference modification (rf03). ** STILL LIVE and WIDER than recorded: 'REPOSITORY. FUNCTION LOCALE-COMPARE INTRINSIC.' with no reference compiles clean and runs (rf13, exit=0) - and so do LOCALE-DATE, LOCALE-TIME and LOCALE-TIME-FROM-SECONDS in the same paragraph, at --std 2023, 2014, 2002 AND 85. **",
    "derivation": "15.51.2 general format + A.4.1: 'An implementation shall accept the syntax and provide the functionality for an optional element only when support for that language element is claimed by the implementor.' The reference-site reject is the conforming disposition; the REPOSITORY declaration site accepts syntax for an unclaimed element and is therefore the A.4.1 posture failing.",
-   "probe": "rf13.cob: REPOSITORY. FUNCTION LOCALE-COMPARE INTRINSIC / FUNCTION LOCALE-DATE INTRINSIC / FUNCTION LOCALE-TIME INTRINSIC / FUNCTION LOCALE-TIME-FROM-SECONDS INTRINSIC. with NO reference -> 'RF13-DECLARED-ONLY Y', exit=0 at all four editions. Plus rf01-rf07, rf14, rf18. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf13.cob: REPOSITORY. FUNCTION LOCALE-COMPARE INTRINSIC / FUNCTION LOCALE-DATE INTRINSIC / FUNCTION LOCALE-TIME INTRINSIC / FUNCTION LOCALE-TIME-FROM-SECONDS INTRINSIC. with NO reference -> 'RF13-DECLARED-ONLY Y', exit=0 at all four editions. Plus rf01-rf07, rf14, rf18. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "ALL FOUR locale functions declared, not just LOCALE-COMPARE (NEW)",
     "the silent-acceptance measured at 2023/2014/2002/85 (NEW - the prober measured one function at one edition)",
@@ -2893,7 +2893,7 @@
    "expected": "The general format 'FUNCTION LOCALE-DATE ( argument-1 [ locale-name-1 ] )' is never accepted; a named COBOLNET1518 in every form, not demotable by --permissive.",
    "actual": "One-argument (rf02/rf18), two-argument with locale-name (rf15), keyword-omitted (rf02/rf18), result ref-mod (rf03), nested (rf04), mis-arity 3 args (rf05), STRING/INSPECT operands (rf07), >>COBOL-WORDS synonym (rf06) - all COBOLNET1518, exit=70, at 2023/2014/2002/85. --permissive does not demote it.",
    "derivation": "15.52.2 general format + A.4.1 (quoted at FMT-15.51.2) + 4.2.7's documentation duty, which docs/CONFORMANCE.md discharges with its A.4.9 'Not claimed' row. The loud named reject is the conforming state, so NOT-IMPLEMENTED records an existing owner decision rather than a defect.",
-   "probe": "rf02.cob / rf03.cob / rf04.cob / rf05.cob / rf06.cob / rf07.cob / rf15.cob / rf18.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf03.cob / rf04.cob / rf05.cob / rf06.cob / rf07.cob / rf15.cob / rf18.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "keyword-omitted via BOTH routes - REPOSITORY FUNCTION ALL INTRINSIC (rf02) and a NAMED intrinsic specifier (rf18) (NEW: the prober only used ALL)",
     "result reference modification (rf03, NEW)",
@@ -2912,7 +2912,7 @@
    "expected": "The general format 'FUNCTION LOCALE-TIME ( argument-1 [ locale-name-1 ] )' is never accepted; a named COBOLNET1518 on every form and axis.",
    "actual": "One-argument, keyword-omitted (rf02), PERFORM UNTIL condition (rf14) - all COBOLNET1518, exit=70, at 2023/2014/2002/85. --permissive does not demote. At --std 85 a single 1518 with NO COBOLNET1502.",
    "derivation": "15.53.2 general format + A.4.1 / 4.2.7 as above; every reference form funnels through BindIntrinsicCore's Unsupported arm at IntrinsicBinder.cs:460.",
-   "probe": "rf02.cob / rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "keyword-omitted for LOCALE-TIME specifically (rf02, NEW)",
     "PERFORM UNTIL condition context (rf14, NEW)",
@@ -2929,7 +2929,7 @@
    "expected": "The general format 'FUNCTION LOCALE-TIME-FROM-SECONDS ( argument-1 [ locale-name-1 ] )' is never accepted; a named COBOLNET1518 including on the optional locale-name branch.",
    "actual": "One-argument (rf17) and keyword-omitted (rf02) -> COBOLNET1518, exit=70, at --std 2023, 2014, 2002 and 85 - including at 2002, which is OUTSIDE the row's own IntroducedIn 2014 window, where a single 1518 and no COBOLNET1502 is emitted.",
    "derivation": "15.54.2 general format + A.4.1 (checked OK) and 4.2.7: reject-at-reference is the conforming posture for an unclaimed A.4.9 module, and ratified decision 3 makes this NOT-IMPLEMENTED rather than a defect.",
-   "probe": "rf17.cob / rf02.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf17.cob / rf02.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002 against an IntroducedIn 2014 row (NEW - the decisive suppression test)",
     "keyword-omitted form (rf02, NEW)",
@@ -4091,7 +4091,7 @@
    "expected": "docs/CONFORMANCE.md section 7 (the Annex A.1 register) shall carry a row for item 87, FORMATTED-CURRENT-DATE (accuracy of returned time).",
    "actual": "Re-ran 'python scripts/spec/audit_annex_a1.py' myself. Its section-7 row list is 2, 59, 158, 205, 206, 207, 208, 211, 135, 209, 215, 144, 112, 171, 56, 22, 180, 188, 123, 179, 202, 92 x2 - item 87 is absent. A Select-String over docs/CONFORMANCE.md for 'accuracy of returned time' returns exactly one hit, line 318, which reads '... filed under **item 87**, which is *FORMATTED-CURRENT-DATE (accuracy of returned time)* - a different, still undocumented obligation'. The register itself therefore names the gap as open.",
    "derivation": "15.38.4 r2 read at line 31331: 'The implementor shall define the accuracy of the portion of the returned value that corresponds to the time format portion of the argument.' The rule's entire content is a DEFINE obligation discharged in user documentation, so a behaviour that merely happens does not satisfy it. rfo8.cob makes the missing definition concrete: an 18-'s' fraction subfield renders F18=[20260809T093320546632700000000000], i.e. 7 significant digits followed by eleven information-free zeros - precisely the accuracy figure item 87 is supposed to state and does not.",
-   "probe": "cd E:/CobolSharp && python scripts/spec/audit_annex_a1.py (output above); Select-String over docs/CONFORMANCE.md for 'accuracy of returned time|item 87'; plus rfo8.cob as the behavioural witness of the undefined accuracy. Not required by the task (only FIXED and CANNOT-PROBE rows must be re-probed) but re-run because it is cheap and mechanical.",
+   "probe": "cd E:/COBOL && python scripts/spec/audit_annex_a1.py (output above); Select-String over docs/CONFORMANCE.md for 'accuracy of returned time|item 87'; plus rfo8.cob as the behavioural witness of the undefined accuracy. Not required by the task (only FIXED and CANNOT-PROBE rows must be re-probed) but re-run because it is cheap and mechanical.",
    "variations": [],
    "mechanism": "",
    "attribution": "",
@@ -4550,7 +4550,7 @@
    "expected": "If claimed: mixed-class promotion to national per 15.51.4 r1. Under non-support: the rule has no execution surface - the program containing the reference never compiles.",
    "actual": "COBOLNET1518 at bind on every probe (rf01/rf04/rf14, editions 2023/2002/2014/85), exit=70; no conversion path exists - no LOCALE-COMPARE body under src/Cobol.Net.Runtime (re-grepped this pass: the only bodies in the tree are src/CobolSharp.Runtime/Intrinsics/IntrinsicFunctions.cs:597 LocaleCompare and its three locale siblings, all LEGACY).",
    "derivation": "15.51.4 r1 VERBATIM from specs/ISO_COBOL.md (read this pass, not inherited): 'If the arguments are of different classes, and one is national, the other argument is converted to class national for purposes of comparison.' This is a RUN-TIME rule; it can only be observed by executing a compiled program, and no program containing the reference ever compiles.",
-   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002/2014 (NEW)",
     "EVALUATE and PERFORM UNTIL contexts (rf14, NEW)",
@@ -4568,7 +4568,7 @@
    "expected": "If claimed: trailing-space truncation per 15.51.4 r2. Under non-support: the rule has no execution surface - the program containing the reference never compiles.",
    "actual": "COBOLNET1518 at bind on every probe (rf01/rf04/rf14, editions 2023/2002/2014/85), exit=70; no truncation exists on the typed-native path; the catalog row's RuntimeMethod is the empty string.",
    "derivation": "15.51.4 r2 VERBATIM from specs/ISO_COBOL.md (read this pass, not inherited): 'For purposes of comparison, trailing spaces are truncated from the operands except that an operand consisting of all spaces is truncated to a single space.' This is a RUN-TIME rule; it can only be observed by executing a compiled program, and no program containing the reference ever compiles.",
-   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002/2014 (NEW)",
     "EVALUATE and PERFORM UNTIL contexts (rf14, NEW)",
@@ -4586,7 +4586,7 @@
    "expected": "If claimed: locale selection + EC-LOCALE-MISSING per 15.51.4 r3. Under non-support: the rule has no execution surface - the program containing the reference never compiles.",
    "actual": "COBOLNET1518 at bind on every probe (rf01/rf04/rf14, editions 2023/2002/2014/85), exit=70; no current-locale model and no raise site - re-grepped src/ this pass for 'EC-LOCALE|EcLocale': exactly seven lines, all in ExceptionCatalog.cs (the category name at :50 and six L3 registrations at :124-129, EC-LOCALE-MISSING at :128). Zero raise/set sites.",
    "derivation": "15.51.4 r3 VERBATIM from specs/ISO_COBOL.md (read this pass, not inherited): 'If locale-name-1 is specified, the locale used for comparison is the one associated with locale-name-1; otherwise, the current locale is used. If the locale associated with locale-name-1 is not available, the EC-LOCALE-MISSING exception condition is set to exist.' This is a RUN-TIME rule; it can only be observed by executing a compiled program, and no program containing the reference ever compiles.",
-   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002/2014 (NEW)",
     "EVALUATE and PERFORM UNTIL contexts (rf14, NEW)",
@@ -4604,7 +4604,7 @@
    "expected": "If claimed: cultural ordering per 15.51.4 r4. Under non-support: the rule has no execution surface - the program containing the reference never compiles.",
    "actual": "COBOLNET1518 at bind on every probe (rf01/rf04/rf14, editions 2023/2002/2014/85), exit=70; no cultural-ordering comparison in src/Cobol.Net.*.",
    "derivation": "15.51.4 r4 VERBATIM from specs/ISO_COBOL.md (read this pass, not inherited): 'Argument-1 and argument-2 are compared using the cultural ordering defined by the locale being used.' This is a RUN-TIME rule; it can only be observed by executing a compiled program, and no program containing the reference ever compiles.",
-   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002/2014 (NEW)",
     "EVALUATE and PERFORM UNTIL contexts (rf14, NEW)",
@@ -4622,7 +4622,7 @@
    "expected": "If claimed: the '='/'<'/'>' result per 15.51.4 r5. Under non-support: the rule has no execution surface - the program containing the reference never compiles.",
    "actual": "COBOLNET1518 at bind on every probe (rf01/rf04/rf14, editions 2023/2002/2014/85), exit=70; no producer of that one-character result in src/Cobol.Net.*.",
    "derivation": "15.51.4 r5 VERBATIM from specs/ISO_COBOL.md (read this pass, not inherited): 'The returned value is: '=' if the arguments compare equal, '<' if argument-1 is less than argument-2, '>' if argument-1 is greater than argument-2.' This is a RUN-TIME rule; it can only be observed by executing a compiled program, and no program containing the reference ever compiles.",
-   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002/2014 (NEW)",
     "EVALUATE and PERFORM UNTIL contexts (rf14, NEW)",
@@ -4640,7 +4640,7 @@
    "expected": "If claimed: result length 1 per 15.51.4 r6. Under non-support: the rule has no execution surface - the program containing the reference never compiles.",
    "actual": "COBOLNET1518 at bind on every probe (rf01/rf04/rf14, editions 2023/2002/2014/85), exit=70; no intrinsic result LENGTH is modelled for this function; the row is read only en route to the reject.",
    "derivation": "15.51.4 r6 VERBATIM from specs/ISO_COBOL.md (read this pass, not inherited): 'The length of the returned value is 1.' This is a RUN-TIME rule; it can only be observed by executing a compiled program, and no program containing the reference ever compiles.",
-   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf01.cob (MOVE FUNCTION LOCALE-COMPARE(\"A\" \"B\") TO WS-R PIC X - a receiver sized exactly 1, which would detect a wrong result length if it ever ran) + rf04.cob + rf14.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "--std 2002/2014 (NEW)",
     "EVALUATE and PERFORM UNTIL contexts (rf14, NEW)",
@@ -4658,7 +4658,7 @@
    "expected": "If claimed: locale-name-1 else the current locale selects the formatting locale; an unavailable locale sets EC-LOCALE-MISSING. Under non-support: unreachable, and the non-raise is conforming per 14.6.13.1.1.",
    "actual": "COBOLNET1518 at bind. EC-LOCALE-MISSING remains declaration-only: ExceptionCatalog.cs:128 L3(\"EC-LOCALE-MISSING\", EcFatality.Fatal), zero raise sites (re-grepped this pass).",
    "derivation": "15.52.4 r1: 'If locale-name-1 is specified, the locale used for formatting the date is the one associated with locale-name-1; otherwise, the current locale is used. If the locale associated with locale-name-1 is not available, the EC-LOCALE-MISSING exception condition is set to exist.' Neither half has a seam.",
-   "probe": "rf15.cob (with locale-name) / rf02.cob (without) + `grep -n 'EC-LOCALE|EcLocale' src/`. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf15.cob (with locale-name) / rf02.cob (without) + `grep -n 'EC-LOCALE|EcLocale' src/`. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "with vs without the locale-name operand",
     "--std 2002/2014 (NEW)",
@@ -4675,7 +4675,7 @@
    "expected": "If claimed: the returned value formats the date per locale field d_fmt. Under non-support: no result is produced.",
    "actual": "COBOLNET1518, exit=70; catalog RuntimeMethod still empty, zero 'locale' hits under src/Cobol.Net.Compiler/CodeGen/ (re-grepped this pass), and no LocaleDate body under src/Cobol.Net.Runtime - the only one in the tree is the legacy src/CobolSharp.Runtime/.../IntrinsicFunctions.cs:608.",
    "derivation": "15.52.4 r2: 'The returned value is a character-string containing the date specified by argument-1 in the appropriate date format as indicated in the locale by locale field d_fmt.' No d_fmt machinery exists on the typed-native path.",
-   "probe": "rf02.cob / rf03.cob / rf18.cob + greps of CodeGen and Cobol.Net.Runtime. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf03.cob / rf18.cob + greps of CodeGen and Cobol.Net.Runtime. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "MOVE / DISPLAY / ref-mod receiver contexts",
     "keyword-omitted (NEW)",
@@ -4692,7 +4692,7 @@
    "expected": "If claimed: the returned-value length depends on the locale's format, i.e. it is run-time-variable. Under non-support: no result and hence no length.",
    "actual": "COBOLNET1518 on every LOCALE-DATE probe including the ref-mod form (rf03), which is the shape that would force a static length decision if the function ever bound. The fixed result-category schema still carries no run-time length notion.",
    "derivation": "15.52.4 r3: 'The length of the returned value depends on the format indicated in the locale.' A run-time-variable alphanumeric result has no representation in the catalog's fixed result-category schema, so implementing this rule is a schema change, not a row edit.",
-   "probe": "rf03.cob (MOVE FUNCTION LOCALE-DATE(WS-D)(1:2) TO WS-R - reference modification of the result) and rf02.cob (PIC X(40) receiver). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf03.cob (MOVE FUNCTION LOCALE-DATE(WS-D)(1:2) TO WS-R - reference modification of the result) and rf02.cob (PIC X(40) receiver). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "result REFERENCE MODIFICATION (rf03, NEW - the sharpest probe of a length model, and one the prober never wrote)",
     "PIC X(40) vs PIC X receivers",
@@ -4709,7 +4709,7 @@
    "expected": "If claimed: locale-name-1 else the current locale; EC-LOCALE-MISSING on an unavailable locale. Under non-support: unreachable, and the non-raise is conforming per 14.6.13.1.1.",
    "actual": "COBOLNET1518. EC-LOCALE-MISSING still declaration-only (ExceptionCatalog.cs:128), zero raise sites - re-grepped this pass across all of src/.",
    "derivation": "15.53.4 r1: 'If locale-name-1 is specified, the locale used for formatting the time is the one associated with locale-name-1; otherwise, the current locale is used. If the locale associated with locale-name-1 is not available, the EC-LOCALE-MISSING exception condition is set to exist.' No current-locale model (14.6.6 r1 unmodelled), no association, no raise.",
-   "probe": "rf15.cob (with locale-name) + rf02.cob (without) + `grep -n 'EC-LOCALE|EcLocale' src/` -> 7 lines, all ExceptionCatalog.cs. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf15.cob (with locale-name) + rf02.cob (without) + `grep -n 'EC-LOCALE|EcLocale' src/` -> 7 lines, all ExceptionCatalog.cs. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "with vs without the locale-name operand",
     "--std 2002/2014 (NEW)",
@@ -4726,7 +4726,7 @@
    "expected": "If claimed: the returned value formats hhmmss per locale field t_fmt, with the locale category selected per 14.6.6 r8. Under non-support: no result is produced.",
    "actual": "COBOLNET1518; empty RuntimeMethod, zero LOCALE arms in src/Cobol.Net.Compiler/CodeGen/, no t_fmt or LC_TIME model anywhere in src/Cobol.Net.*.",
    "derivation": "15.53.4 r2: 'The returned value is a character-string containing hours, minutes, and seconds of the time specified by argument-1 in the culturally-appropriate format indicated in the locale by locale field t_fmt.' Nothing produces it.",
-   "probe": "rf02.cob / rf14.cob + CodeGen grep. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob / rf14.cob + CodeGen grep. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "MOVE vs PERFORM UNTIL contexts",
     "keyword-omitted (NEW)",
@@ -4743,7 +4743,7 @@
    "expected": "If claimed: a run-time, locale-dependent result length. Under non-support: no result, no length; the dynamic-length architectural constraint stands.",
    "actual": "COBOLNET1518 on all LOCALE-TIME probes. IntrinsicRenderer's empty-RuntimeMethod guard remains the never-reached second backstop behind the bind-time reject.",
    "derivation": "15.53.4 r3: 'The length of the returned value depends on the format indicated in the locale.' Unreachable, and unrepresentable in the static result model.",
-   "probe": "rf02.cob (PIC X(40) receiver) + rf03.cob's sibling ref-mod shape for the same schema question. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf02.cob (PIC X(40) receiver) + rf03.cob's sibling ref-mod shape for the same schema question. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "receiver sizing across probes",
     "result ref-mod as the length-forcing shape (NEW)",
@@ -4760,7 +4760,7 @@
    "expected": "If claimed: locale-name-1 else the current locale; EC-LOCALE-MISSING (correctly catalogued Fatal) set on an unavailable locale. Under non-support: unreachable.",
    "actual": "COBOLNET1518. EC-LOCALE-MISSING: registration only at ExceptionCatalog.cs:128, beside the five other EC-LOCALE names at :124-129; zero raise or set sites in all of src/ (re-grepped this pass).",
    "derivation": "15.54.4 r1: 'If locale-name-1 is specified, the locale used for formatting the time is the one associated with locale-name-1; otherwise, the current locale is used. If the locale associated with locale-name-1 is not available, the EC-LOCALE-MISSING exception condition is set to exist.' No seam for either half.",
-   "probe": "rf17.cob / rf02.cob + the EC-LOCALE grep (7 lines total, all ExceptionCatalog.cs). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf17.cob / rf02.cob + the EC-LOCALE grep (7 lines total, all ExceptionCatalog.cs). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "with vs without the locale-name operand",
     "--std 2002/2014/85 (NEW)",
@@ -4777,7 +4777,7 @@
    "expected": "If claimed: the returned value formats the time per locale field t_fmt, honoring sub-second precision (D.31.4.5 NOTE). Under non-support: no result is produced.",
    "actual": "COBOLNET1518, exit=70; empty RuntimeMethod, no t_fmt machinery anywhere in src/Cobol.Net.*. The only body is legacy IntrinsicFunctions.cs:630 LocaleTimeFromSeconds.",
    "derivation": "15.54.4 r2: 'The returned value is a character-string containing hours, minutes, and seconds of the time specified by argument-1 in the culturally-appropriate format indicated in the locale by locale field t_fmt.' Nothing on the typed-native path produces it.",
-   "probe": "rf17.cob + rf02.cob (keyword-omitted). E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf17.cob + rf02.cob (keyword-omitted). E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "integer argument (rf17/rf02)",
     "keyword-omitted form (NEW)",
@@ -4794,7 +4794,7 @@
    "expected": "If claimed: a run-time, locale-dependent result length. Under non-support: no result and hence no length - the intended state under the ratified disposition.",
    "actual": "COBOLNET1518 on every LOCALE-TIME-FROM-SECONDS probe. The Alphanumeric result typing (correct per 15.54.1) is only ever read en route to the reject.",
    "derivation": "15.54.4 r3: 'The length of the returned value depends on the format indicated in the locale.' Unreachable; a run-time-variable length is still unrepresentable in the result model.",
-   "probe": "rf17.cob (PIC X(40) receiver) + rf02.cob. E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
+   "probe": "rf17.cob (PIC X(40) receiver) + rf02.cob. E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <p>.cob --std <ed> -o <p>.dll --run",
    "variations": [
     "receiver sizing",
     "keyword-omitted (NEW)",

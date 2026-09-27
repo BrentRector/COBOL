@@ -41,7 +41,7 @@ public sealed class CobolSizeError(string detail, string ecName) : CobolFatalExc
     /// <c>CobolFloat.Div</c> for binary64, <c>CobolDec.Div</c> for the standard-decimal intermediate), and it throws
     /// it whether or not checking is enabled: the condition exists either way, and only its disposition differs.
     /// With checking off and no SIZE ERROR phrase §14.6.13.1.3 item 8 leaves that disposition to the implementor,
-    /// and COBOL.NET's (CONFORMANCE.md DOC-A.1-70) is that a quotient which cannot be formed has no value to store,
+    /// and WiseOwl COBOL's (CONFORMANCE.md DOC-A.1-70) is that a quotient which cannot be formed has no value to store,
     /// so the run unit terminates abnormally naming the condition (kb/Work PB1605). Until then the scaled lane
     /// answered 0 and the binary64 lane ±Infinity (or NaN), and the run went on with that value.</summary>
     public static CobolSizeError ZeroDivide() =>

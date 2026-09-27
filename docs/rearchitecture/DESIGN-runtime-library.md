@@ -4,7 +4,7 @@ Status: EXECUTED (PHASE-08) — §2's target design IS the as-built runtime; §4
 (plus the `ExternalSwitches`→`SwitchStore` conversion the §5 hidden-static gate surfaced); step 6 (the G8
 RootNamespace flip + real sub-namespaces) is the ONE remaining item, deferred to G8 Cut 3 behind the compiler's
 `RuntimeApi` façade. §1 records the pre-P8 problems as the rationale; §6's former open questions are resolved
-inline. Scope: the organization + API of the greenfield runtime `src/Cobol.Net.Runtime` that COBOL.NET-generated
+inline. Scope: the organization + API of the greenfield runtime `src/Cobol.Net.Runtime` that WiseOwl COBOL-generated
 C# programs call. Upholds the HARD INVARIANTS (typed-native only; spec-first; battery green throughout; singular
 pattern; four-editions-in-one; JSON/XML out of scope).
 
@@ -344,7 +344,7 @@ that has three consequences a user of this compiler on Linux or macOS is entitle
   gets the protection of rule 3's *"allows concurrent access"* instead, and another RUN UNIT may open the file
   in the extend or I-O mode where Windows refuses it. ⛔ **The BINARY half is a fact about `flock`; the
   "and therefore unavoidable" half is not.** Advisory is sufficient here — §9.1.15 3) binds *other run units*,
-  and every COBOL.NET run unit reaches the file through this runtime, so every one of them takes whatever lock
+  and every WiseOwl COBOL run unit reaches the file through this runtime, so every one of them takes whatever lock
   the runtime takes — and `fcntl` region locks are advisory in the same way while being PER-ACCESS, which is
   exactly the property `flock` lacks: a read lock for rule 2 admits another reader and refuses a writer. kb/Work
   PB833 owns closing it, `GR-9.1.15-2` stays PARTIAL until it does, and this paragraph records the CURRENT

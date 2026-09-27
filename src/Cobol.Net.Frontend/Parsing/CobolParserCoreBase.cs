@@ -311,7 +311,7 @@ public abstract class CobolParserCoreBase : Parser
     /// <summary>
     /// True when the current token spells a reserved-as-facility keyword AT THE TARGETED EDITION — i.e. it can
     /// only be the (unsupported) facility verb here, never a user-defined word. Gates the recognize-and-name
-    /// statement arms for the facilities COBOL.NET does not implement: MCS SEND/RECEIVE (ISO §14.9.31/§14.9.38,
+    /// statement arms for the facilities WiseOwl COBOL does not implement: MCS SEND/RECEIVE (ISO §14.9.31/§14.9.38,
     /// Annex A.3 item 4), COMMIT/ROLLBACK (A.3 items 6–7), VALIDATE (§14.9.50).
     /// <para>
     /// WHY A PREDICATE AT ALL, given these are now hard lexer tokens: their §8.9 reservation is NON-MONOTONIC —

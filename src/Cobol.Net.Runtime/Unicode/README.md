@@ -1,4 +1,4 @@
-# The COBOL.NET Unicode normalization subsystem — `Cobol.Net.Runtime/Unicode/`
+# The WiseOwl COBOL Unicode normalization subsystem — `Cobol.Net.Runtime/Unicode/`
 
 The public, stable place to ask "put this text into a canonical form" — `UnicodeNormalizer.Normalize`,
 `IsNormalized`, `CompareNormalized`, `IsNfcAvailable`, in the namespace `CobolNet.Runtime.Unicode`.
@@ -126,7 +126,7 @@ by design, on a host where `IsNfcAvailable` is false.
 ## 7. The sibling: grapheme cluster segmentation
 
 `Segmentation/` (README there; kb/Work PB104) is the third text subsystem — UAX #29 extended grapheme clusters from
-COBOL.NET's own derived property table. Normalization never moves a cluster boundary (NFC and NFD of a text have the
+WiseOwl COBOL's own derived property table. Normalization never moves a cluster boundary (NFC and NFD of a text have the
 same clusters, canonically equivalent one for one — `GraphemeBreakerTests.Segmentation_IsStableUnderNormalization`),
 so a text may be counted or cut by cluster before or after normalizing with the same result; and a cluster-safe cut
 keeps a collation prefix where a code-unit cut can lose an accent. `../README.md` puts the three pipelines side by side.

@@ -4,12 +4,12 @@ namespace CobolNet.Runtime;
 
 /// <summary>
 /// Raised at run time when a generated program reaches a COBOL construct the compiler bound but could not yet
-/// translate. This is the runtime half of COBOL.NET's loud-failure invariant (COBOLNET_DESIGN §1.4): an
+/// translate. This is the runtime half of WiseOwl COBOL's loud-failure invariant (COBOLNET_DESIGN §1.4): an
 /// unsupported construct emits a guarded call that throws here, never a silent <c>// TODO</c> no-op that would let
 /// a program run <i>silently wrong</i>.
 /// </summary>
 public sealed class NotImplementedCobolFeatureException(string feature)
-    : Exception("COBOL.NET: a COBOL feature that is not yet implemented was reached at run time: " + feature)
+    : Exception("WiseOwl COBOL: a COBOL feature that is not yet implemented was reached at run time: " + feature)
 {
     /// <summary>The COBOL construct that was not implemented (for diagnostics).</summary>
     public string Feature { get; } = feature;

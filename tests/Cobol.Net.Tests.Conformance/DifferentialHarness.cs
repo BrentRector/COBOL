@@ -6,7 +6,7 @@ using Xunit;
 namespace CobolNet.Tests.Conformance;
 
 /// <summary>
-/// Scaffold for the COBOL.NET conformance / differential harness (docs/COBOLNET_DESIGN.md §2, §18.7).
+/// Scaffold for the WiseOwl COBOL conformance / differential harness (docs/COBOLNET_DESIGN.md §2, §18.7).
 /// </summary>
 /// <remarks>
 /// The G5 build-out: an <c>ICompilerUnderTest { Compile+Run(src, dialect, nist?) }</c> abstraction with a

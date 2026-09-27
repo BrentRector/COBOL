@@ -24,7 +24,7 @@ public sealed class StringUnstringDifferentialTests
     private static void AssertSpecPinned(string source, string expected)
     {
         var (ok, output, detail) = CobolNet.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, output);
     }
 

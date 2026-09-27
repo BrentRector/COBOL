@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Unit;
 /// configuration", and §4.2.16 (Annex A.1 items 205/215) obliges us to DOCUMENT our choice — so these vectors
 /// ARE that documentation, executable.
 /// <para>
-/// COBOL.NET's choices, each following the IBM / Micro Focus / GnuCOBOL survey so a data file interchanges:
+/// WiseOwl COBOL's choices, each following the IBM / Micro Focus / GnuCOBOL survey so a data file interchanges:
 /// BINARY is two's complement BIG-ENDIAN in exactly <c>StorageLength</c> bytes; PACKED is BCD two digits per
 /// byte with a trailing sign nibble <c>0xC</c>/<c>0xD</c>, or <c>0xF</c> when the item has no operational sign;
 /// PACKED WITH NO SIGN (COBOL-2023) has no sign nibble at all.

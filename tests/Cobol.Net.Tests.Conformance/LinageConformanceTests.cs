@@ -33,7 +33,7 @@ public sealed class LinageConformanceTests
     private static void AssertSpec(string source, string expected)
     {
         var (ok, stdout, detail) = CobolNet.CompileAndRun(source);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.Equal(expected, stdout);
     }
 
@@ -82,7 +82,7 @@ public sealed class LinageConformanceTests
     {
         var (ok, _, detail, bytes) =
             (edition == 85 ? CobolNetBytes : CobolNetBytes2023).CompileRunAndReadFile(source, fileName);
-        Assert.True(ok, $"COBOL.NET failed: {detail}");
+        Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.NotNull(bytes);
         Assert.Equal(expected, System.Text.Encoding.Latin1.GetString(bytes!));
     }

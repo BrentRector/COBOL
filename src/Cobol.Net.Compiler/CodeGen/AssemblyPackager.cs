@@ -10,7 +10,7 @@ namespace CobolNet.CodeGen;
 /// </summary>
 internal static class AssemblyPackager
 {
-    /// <summary>The COBOL.NET runtime assembly the generated program calls (deployed alongside the compiler).
+    /// <summary>The WiseOwl COBOL runtime assembly the generated program calls (deployed alongside the compiler).
     /// Consumed by BOTH halves of the backend: <see cref="RoslynBackend"/> references it at compile time and
     /// <see cref="Package"/> deploys it at packaging time.</summary>
     internal static string RuntimePath =>

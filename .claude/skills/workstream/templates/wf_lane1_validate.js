@@ -39,13 +39,13 @@ const res = []
 for (let i = 0; i < FILES.length; i += N) {
   const chunk = FILES.slice(i, i + N)
   const rs = await parallel(chunk.map(slug => () => agent(`
-You validate golden DRAFTS for the COBOL.NET compiler (repo E:\\CobolSharp; read CLAUDE.md first). The drafts and
+You validate golden DRAFTS for the WiseOwl COBOL compiler (repo E:\\COBOL; read CLAUDE.md first). The drafts and
 the writer/refuter report for file "${slug}" are under ${SCRATCH}/out/${slug}/ (destination paths mirror the repo:
 tests/conformance/<edition>/<name>.cob|.out, tests/conformance/negative/<name>.cob|.err; REPORT.json if a fixer
 rewrote the report, else read the writer report in ${SCRATCH}/reports/${slug}.json).
-RULES. Do NOT write anything inside E:\\CobolSharp; do NOT run dotnet build/test; do NOT edit any draft .out/.err —
+RULES. Do NOT write anything inside E:\\COBOL; do NOT run dotnet build/test; do NOT edit any draft .out/.err —
 the expected values are SPEC-DERIVED and refuter-upheld; if the compiler disagrees, the compiler is the suspect.
-Compiler: E:\\CobolSharp\\.claude\\worktrees\\lane3-pin-5fe593a0\\src\\Cobol.Net.Cli\\bin\\Debug\\net10.0\\cobol.exe (a PINNED build of battery-green tree 5fe593a0 — landings cannot move it under you; never use the main tree's exe).
+Compiler: E:\\COBOL\\.claude\\worktrees\\lane3-pin-5fe593a0\\src\\Cobol.Net.Cli\\bin\\Debug\\net10.0\\cobol.exe (a PINNED build of battery-green tree 5fe593a0 — landings cannot move it under you; never use the main tree's exe).
 FOR EACH POSITIVE DRAFT: copy the .cob to a fresh scratch dir under ${SCRATCH}/run/${slug}/<name>/ and run
   cobol.exe <name>.cob --std <edition-from-its-directory> --run
 capturing stdout+stderr. Compare stdout to the draft .out: trailing whitespace per line and the final newline are

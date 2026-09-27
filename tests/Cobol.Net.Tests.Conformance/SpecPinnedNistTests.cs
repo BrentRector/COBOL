@@ -130,7 +130,7 @@ public sealed class SpecPinnedNistTests
     /// determined in <c>docs/CONFORMANCE.md</c> §3. kb/Work PB436.</para>
     /// <para>⚠ THE ASSERTION IS THE COMPUTED VALUE, NOT THE FAIL LINE. <c>NistDifferentialTests</c> masks the
     /// <c>COMPUTED=</c> operand on both sides of its byte comparison, so the golden alone cannot pin the number
-    /// COBOL.NET actually produced — a lowering that ran the body nine times would still match it. This pin
+    /// WiseOwl COBOL actually produced — a lowering that ran the body nine times would still match it. This pin
     /// reads the digits.</para></summary>
     [Fact]
     public void NC201A_VaryingAfterFromOuterInductionVariable_RunsEightBodies()

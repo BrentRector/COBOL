@@ -2062,7 +2062,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// <summary>§15.50.4 r1/r2/r3 for a FIXED item (kb/Work PB61): an elementary boolean item's BOOLEAN positions
     /// (r1), an elementary usage-national item's NATIONAL positions (r2), and for everything else — an
     /// alphanumeric group, a DISPLAY leaf, a COMP/PACKED leaf, an INDEX/POINTER/PROGRAM-POINTER/COMP-1/COMP-2
-    /// carrier — the length "in alphanumeric character positions" (r3), which is the byte width under COBOL.NET's
+    /// carrier — the length "in alphanumeric character positions" (r3), which is the byte width under WiseOwl COBOL's
     /// 1-byte-per-alphanumeric-position model (D-N1: national = 2 bytes = 2 positions inside an alphanumeric group).
     /// A bit group / national group (GROUP-USAGE, §13.18.29) is not modelled — kb/Work PB79 — so a group is
     /// always r3's alphanumeric group here.</summary>
@@ -2107,7 +2107,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// family, so no grammar change is needed: a bare word already parses as an argument context.</para>
     /// <para>⚖ <b>WHAT IT RETURNS IS AN IMPLEMENTOR DETERMINATION, AND §15.50.4 r8 IS THE ONE THAT MAKES IT
     /// SMALL.</b> r8's closing sentence: <i>"If argument-1 is physically located where it is defined, LENGTH
-    /// returns the same value that would be returned had the PHYSICAL argument not been specified."</i> COBOL.NET
+    /// returns the same value that would be returned had the PHYSICAL argument not been specified."</i> WiseOwl COBOL
     /// determines that a variable-length group IS physically located where it is defined — the program has no
     /// addressable out-of-line pointer to observe, and the group presents as a contiguous character image at its
     /// defined position — so PHYSICAL returns the r7 value. The alternative reading (r8's middle sentence: "the

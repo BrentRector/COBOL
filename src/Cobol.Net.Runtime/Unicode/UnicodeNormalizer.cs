@@ -6,7 +6,7 @@ using CobolNet.Runtime.Collation;
 namespace CobolNet.Runtime.Unicode;
 
 /// <summary>
-/// The PUBLIC, stable Unicode normalization surface of COBOL.NET — putting text into one of the two canonical
+/// The PUBLIC, stable Unicode normalization surface of WiseOwl COBOL — putting text into one of the two canonical
 /// forms (<see cref="UnicodeNormalizationForm.NFD"/>, <see cref="UnicodeNormalizationForm.NFC"/>) so that two
 /// spellings of the same characters can be recognized as the same text. See <c>Unicode/README.md</c> for the why.
 /// <para><b>NFD is computed by the collation engine's own table-driven decomposition</b>

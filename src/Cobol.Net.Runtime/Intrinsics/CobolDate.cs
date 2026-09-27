@@ -227,7 +227,7 @@ public static class CobolDate
     /// <summary>SECONDS-PAST-MIDNIGHT (ISO §15.80.3): the current LOCAL time of day in seconds past midnight,
     /// in standard numeric time form — type NUMERIC, fractional seconds intended (r1/r2; the Annex D.31.5.4
     /// example carries 12 fraction digits). Returns the day's tick count = the UNSCALED value at SCALE 7 (the
-    /// renderer's documented contract): the COBOL.NET documented precision (§15.80.3 r3, implementor item 171)
+    /// renderer's documented contract): the WiseOwl COBOL documented precision (§15.80.3 r3, implementor item 171)
     /// is 100 ns — 7 fraction digits, the .NET <see cref="DateTime"/> resolution. Range [0, 86 400) —
     /// The REPORTED side of §7.3.17 is the implementor's and answered "never" (A.1 item 112 — the .NET clock has no
     /// leap seconds), so a returned value ≥ 86 400 is unreachable under ON and OFF alike (§15.80.3 r4 answered

@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ THE PB236 INVARIANT: a statement the grammar ACCEPTED and the binder REFUSED never leaves the compiler
-/// silent. <c>BoundUnsupported</c> used to be the carrier for THREE incompatible jobs — a construct COBOL.NET
+/// silent. <c>BoundUnsupported</c> used to be the carrier for THREE incompatible jobs — a construct WiseOwl COBOL
 /// has not built, an ill-formed OPERAND, and an illegal PLACEMENT — and <c>StatementEmitter</c> rendered all
 /// three as the same <c>NotImplemented.Run(...)</c>. Two consequences, both measured: the two user-error jobs
 /// told the programmer THE COMPILER was incomplete when in fact THE SOURCE was wrong, and on a path the flow
@@ -20,7 +20,7 @@ namespace CobolNet.Tests.Unit;
 /// is exactly what the per-site habit failed at (two of START's five refusals carried a diagnostic and three
 /// did not).</para>
 /// <para>⛔ WHY THIS IS A GATE AND NOT A GREEN TICK. Three of the four facts here are the ones that would go
-/// wrong: the announce must NOT fail the compile (a deferral is COBOL.NET's gap, not the source's error, so a
+/// wrong: the announce must NOT fail the compile (a deferral is WiseOwl COBOL's gap, not the source's error, so a
 /// program whose unimplemented statement is never reached still has a defined meaning and still runs); it must
 /// NOT fire on programs it has no business touching; and a violated SYNTAX RULE must draw an ERROR naming the
 /// rule, never this warning. A test that asserted only "some diagnostic appeared" would pass in every one of
@@ -32,7 +32,7 @@ public sealed class StatementDeferralAnnounceDriftTests
     /// Format 2) that the typed-array sort path has not built. It sits behind a GO TO so the RUN never reaches
     /// it — before PB236 that made the staged loud unobservable at EVERY stage.
     /// <para>⚠ This row used ENTRY until kb/Work PB909, and that was a PIN OF THE WRONG KIND (kb/Work PB938): ISO/IEC
-    /// 1989 defines no ENTRY statement, so the test was asserting that a vendor extension is a gap in COBOL.NET
+    /// 1989 defines no ENTRY statement, so the test was asserting that a vendor extension is a gap in WiseOwl COBOL
     /// rather than source the standard does not contain. ENTRY is now refused (COBOLNET2269).</para></summary>
     private const string DeferralProgram = """
 IDENTIFICATION DIVISION.
@@ -71,7 +71,7 @@ MAIN.
     public void Deferral_IsAnnounced_AsAWarning_AndTheProgramStillCompiles()
     {
         var (ok, errors, warnings) = Compile(DeferralProgram);
-        // The compile SUCCEEDS: a gap in COBOL.NET may not reject a program the standard gives a meaning to.
+        // The compile SUCCEEDS: a gap in WiseOwl COBOL may not reject a program the standard gives a meaning to.
         Assert.True(ok, string.Join("\n", errors));
         Assert.Contains(warnings, w => w.Contains("COBOLNET1756", StringComparison.Ordinal));
     }

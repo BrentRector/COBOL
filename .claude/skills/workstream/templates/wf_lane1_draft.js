@@ -70,9 +70,9 @@ const FIX_OUT = {
 }
 
 const COMMON = `
-You work in the COBOL.NET repository at E:\\CobolSharp (read CLAUDE.md first — its eight rules bind you).
+You work in the WiseOwl COBOL repository at E:\\COBOL (read CLAUDE.md first — its eight rules bind you).
 THE TREE IS FROZEN: a comprehensive battery is running. You may READ anything in the repo and run python scripts
-(scripts/spec/cite.py). You MUST NOT run dotnet, cobol.exe, git, or write ANY file inside E:\\CobolSharp. Every
+(scripts/spec/cite.py). You MUST NOT run dotnet, cobol.exe, git, or write ANY file inside E:\\COBOL. Every
 file you produce goes under ${SCRATCH}/out/<slug>/ using the repo-relative destination path as a subpath
 (e.g. ${SCRATCH}/out/<slug>/tests/conformance/2023/<name>.cob). A director copies validated drafts into the tree.
 THE SPEC IS THE ONLY ORACLE: specs/ISO_COBOL.md (ISO/IEC 1989:2023). Derive every expected output value from the

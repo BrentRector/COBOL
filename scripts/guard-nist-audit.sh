@@ -42,7 +42,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 #   status == divergent, compiler=legacy -> LEGACY DIVERGENT   (the golden is the ISO baseline; the LEGACY is
 #                                        non-conforming there, so its diff is expected and never a regression)
 #   status == divergent, compiler=cobol  -> MATCH         (those goldens ARE the ISO-conforming output, which is
-#                                        precisely what COBOL.NET must reproduce — NistDifferentialTests locks
+#                                        precisely what WiseOwl COBOL must reproduce — NistDifferentialTests locks
 #                                        all eleven byte-exact. Carrying the legacy exemption over to `cobol`
 #                                        would exempt the eleven programs likeliest to catch a codegen defect.)
 #   otherwise                        -> MATCH
@@ -175,7 +175,7 @@ self_test() {
 
     # The two CONTROLS — one per compiler. AA2A is the `divergent` row, and it is the ONE row whose expected
     # verdict depends on which compiler ran (kb/Work/PB750): the legacy is non-conforming there and diverges by
-    # design, COBOL.NET must reproduce the ISO golden exactly.
+    # design, WiseOwl COBOL must reproduce the ISO golden exactly.
     control() {
         printf '  AA1A: MATCH\n  AA2A: MATCH\n  AA3A: NO BASELINE (0 FAIL*)\n'
     }
@@ -234,7 +234,7 @@ self_test() {
     # (3) ⭐ THE PB750 ARM, BOTH DIRECTIONS. The `divergent` expectation is the one thing the compiler identity
     #     changes, so each compiler must REJECT the other's verdict shape. Without these two cases the audit
     #     would happily accept a `cobol` run that skipped the eleven ISO-conforming goldens (exactly the green
-    #     that hid a codegen regression for months), or a legacy run scored against COBOL.NET's expectations.
+    #     that hid a codegen regression for months), or a legacy run scored against WiseOwl COBOL's expectations.
     control | sed 's/AA2A: MATCH/AA2A: LEGACY DIVERGENT (golden = ISO baseline)/' > "$d/results"
     check "cobol exempting a divergent program is caught" 1 "UNEXPECTED: AA2A expected MATCH"
     control_legacy > "$d/results"

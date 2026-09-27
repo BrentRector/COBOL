@@ -13,9 +13,9 @@
 # GitHub (the repo AND the private specs-private submodule) goes through the separate GitHub proxy regardless — but
 # that proxy only authorizes repositories ATTACHED TO THE SESSION, so the specs-private submodule (the licensed PDF,
 # needed only by render-spec-page.py and the figure audits — specs/ISO_COBOL.md and cite.py are in the main repo)
-# clones only when BrentRector/CobolSharp-private is attached too; otherwise "could not read Username … terminal
+# clones only when BrentRector/COBOL-private is attached too; otherwise "could not read Username … terminal
 # prompts disabled". `claude --cloud` attaches ONE repository; the claude.ai/code page attaches both ("+" beside the
-# repo chip, or the link https://claude.ai/code?repositories=BrentRector/CobolSharp,BrentRector/CobolSharp-private).
+# repo chip, or the link https://claude.ai/code?repositories=BrentRector/COBOL,BrentRector/COBOL-private).
 #
 # What the VM lacks that this repo needs (everything else — git, python3, java 21 for ANTLR — is pre-installed):
 #   * .NET 10 SDK — global.json pins 10.0.100 (rollForward latestMinor); CI uses setup-dotnet 10.0.x
@@ -25,7 +25,7 @@
 # Per-CLONE work (the specs-private submodule, the git-ignored GnuCOBOL corpus under tests/external/) is NOT done
 # here: this script's result is SNAPSHOTTED and reused while the repo is cloned fresh per session, so the
 # SessionStart hook (scripts/hooks/session_start.py) does it on every cloud session. What this script owns is making
-# that hook RUN: with two repositories attached (CobolSharp + CobolSharp-private — see above) Claude
+# that hook RUN: with two repositories attached (COBOL + COBOL-private — see above) Claude
 # Code starts in their PARENT, /home/user, so the repo's .claude/settings.json never loads and no hook fires (cloud
 # smoke #2, 2026-09-24: "Found 0 total hooks in registry"). The user-level SessionStart hook installed below closes
 # that gap, and the corpus tarball is pre-cached here so the hook's per-clone fetch is a local copy.
@@ -125,8 +125,8 @@ fi
 #    ~/.claude/settings.json, never overwriting keys the platform may have put there. ──────────────────────────────
 cat > /usr/local/bin/cobolsharp-session-start <<'EOF'
 #!/usr/bin/env bash
-# User-level SessionStart shim installed by CobolSharp scripts/cloud/setup-env.sh — see that file's header.
-for repo in "${CLAUDE_PROJECT_DIR:-/home/user}/CobolSharp" /home/user/CobolSharp; do
+# User-level SessionStart shim installed by WiseOwl COBOL scripts/cloud/setup-env.sh — see that file's header.
+for repo in "${CLAUDE_PROJECT_DIR:-/home/user}/COBOL" /home/user/COBOL "${CLAUDE_PROJECT_DIR:-/home/user}/CobolSharp" /home/user/CobolSharp; do
   [ -f "$repo/scripts/hooks/session_start.py" ] || continue
   [ "$(realpath "${CLAUDE_PROJECT_DIR:-.}")" = "$(realpath "$repo")" ] && exit 0   # the project hook runs instead
   exec python "$repo/scripts/hooks/session_start.py"

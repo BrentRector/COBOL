@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// alphanumeric and <b>numeric USAGE-DISPLAY</b> leaves (e.g. the CCVS <c>TEST-RESULTS</c> record with its
 /// <c>DOTVALUE PIC 99</c>). Per ISO/IEC 1989:2023 §14.9 MOVE general rule 4, a whole-group move is a pure character
 /// copy with no conversion, "filled without consideration for the individual elementary or group items", so a numeric-DISPLAY
-/// subordinate can legitimately hold non-numeric characters (spaces). COBOL.NET stores such a leaf as its character
+/// subordinate can legitimately hold non-numeric characters (spaces). WiseOwl COBOL stores such a leaf as its character
 /// image (a <c>string</c>) — NOT a lossy native <c>long</c> — so the group image is byte-faithful (no byte[] — the
 /// owner-locked no-byte-substrate model; COBOLNET_DESIGN §14.4 / §4 Tier-B). Numeric use of the leaf decodes via
 /// <c>CobolNum.ParseDisplay</c> / formats via <c>FormatDisplay</c>. Pinned to the legacy oracle, spec-pinned where
@@ -24,7 +24,7 @@ public sealed class GroupNumericLeafDifferentialTests
     private static void AssertSpec(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(CutRunner.Normalize(expected), cout);
     }
 

@@ -971,6 +971,13 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         if (lit.numericLiteral() is not null
             || lit.nonNumericLiteral()?.figurativeConstant()?.zeroWord() is not null)
             return;
+        // NULL is not literal-2 at all (kb/Work PB1630): §8.4.3.1.2 makes it an IDENTIFIER (Format 8,
+        // predefined-address; Format 6, predefined-object) of class pointer (§8.4.3.10.1) or object (§8.4.3.7.3
+        // SR2), which the grammar carries on the figurative arm. As identifier-4 it answers to §14.9.4.3 SR22 —
+        // "identifier-4 shall be of class numeric, object, or pointer" — which both of its classes satisfy; its
+        // conformance to the formal is §14.8.2.3.3's (ParameterConformance.ContentConformanceReason).
+        if (lit.nonNumericLiteral()?.figurativeConstant()?.NULL_() is not null)
+            return;
         ctx.Edition.Error(DiagnosticCatalog.CallByValueLiteralKind,
             $"CALL … USING {lit.GetText()} with {subject}: literal-2 shall be a NUMERIC literal "
             + "(ISO §14.9.4.3 SR23)");

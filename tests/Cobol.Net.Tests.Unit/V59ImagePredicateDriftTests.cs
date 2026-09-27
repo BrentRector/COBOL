@@ -22,7 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// loud-stages a construct whose codec <c>RecordStructEmitter</c> actually generated, which is how
 /// <c>CALL "SUB" USING G</c> came to throw "no whole-group character image" for a group whose
 /// <c>FUNCTION BYTE-LENGTH</c> answered 5. That is rejecting conforming source (§14.2.3 GR8 — a BY REFERENCE
-/// formal "occupies the same storage area as the argument", which COBOL.NET realizes through that very image
+/// formal "occupies the same storage area as the argument", which WiseOwl COBOL realizes through that very image
 /// round-trip).
 /// </para>
 /// <para>

@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// PICTURE <c>P</c> scaling positions (ISO/IEC 1989:2023 §13.18.40): an assumed-zero digit position that holds no
 /// storage but shifts the implied decimal point. TRAILING P (<c>99P</c>) scales the stored digits up → a NEGATIVE
-/// fraction scale; LEADING P (<c>P(4)9</c>) puts the point left of every digit. COBOL.NET carries this as a single
+/// fraction scale; LEADING P (<c>P(4)9</c>) puts the point left of every digit. WiseOwl COBOL carries this as a single
 /// signed scale through the whole numeric pipeline. These reproduce the exact P-pictures the NC101A MULTIPLY tests use
 /// (the gap that surfaced once NC101A ran end-to-end); each evaluates the computation and DISPLAYs a literal verdict,
 /// pinned to the legacy oracle (which scales P correctly — it is 364-NIST-green, NC101A included).

@@ -5,7 +5,7 @@
 > exception ledger (§1.1 — the UDF Check, the catalog-driven per-name windows, the two behavioral reads, the
 > owner-disposition SYNC-on-group site). Exec Step E folded the last ~19 inline binder gates into the pass;
 > all 9 PHASE-03 exit criteria hold.
-> How COBOL.NET enforces edition (85 / 2002 / 2014 / 2023) conformance. The gating pass runs **post-bind** as a
+> How WiseOwl COBOL enforces edition (85 / 2002 / 2014 / 2023) conformance. The gating pass runs **post-bind** as a
 > two-arm walk — one arm over the bound tree (semantic gates), one over the raw parse tree (syntactic gates + the
 > §8.9 reserved-word funnel); version *identity* is recovered by the pass itself (bound-node type/attribute or
 > parse-tree re-recognition — no `.Syntax` back-reference, no grammar annotation), while version *numbers* stay

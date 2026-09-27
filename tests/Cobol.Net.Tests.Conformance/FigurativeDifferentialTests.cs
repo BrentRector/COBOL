@@ -19,7 +19,7 @@ public sealed class FigurativeDifferentialTests
     private static void AssertSpec(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(CutRunner.Normalize(expected), cout);
     }
 

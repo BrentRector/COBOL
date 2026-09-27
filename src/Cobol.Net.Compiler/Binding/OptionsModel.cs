@@ -95,7 +95,7 @@ public static class ArithmeticModes
 
     /// <summary>⛔ THE ONE SPELLING OF "this mode's arithmetic runs on the SDIDI decimal engine" (kb/Work PB194).
     /// <see cref="ArithmeticMode.Standard"/> — the 2002 mode, obsolete 2014, removed 2023 — is NOT a third engine:
-    /// its standard intermediate data item for every operand COBOL.NET can carry IS the standard DECIMAL one, so it
+    /// its standard intermediate data item for every operand WiseOwl COBOL can carry IS the standard DECIMAL one, so it
     /// routes to the same <c>CobolDec</c> path as STANDARD-DECIMAL (<c>NumericRenderer.StandardDecimal</c>,
     /// <c>DataBinder.BindDeclarations</c>, and <see cref="NumvalDigitCap"/>'s 34 above all say so).
     /// <para>The set used to be written down in four places and TWO of the copies named STANDARD-DECIMAL alone.
@@ -165,7 +165,7 @@ public static class ArithmeticModes
     /// intermediate cannot hold. These are the representable extremes themselves.</para>
     /// <para>⚠ EVERY ROW IS CURRENTLY UNREACHABLE AS A CLAMP and is written anyway, exactly as
     /// <see cref="NumvalDigitCap"/>'s standard-binary row is. GR32 b/GR36 b take whichever bound is closer to /
-    /// farther from zero, and for every data description COBOL.NET can declare today the ITEM's bound wins or
+    /// farther from zero, and for every data description WiseOwl COBOL can declare today the ITEM's bound wins or
     /// ties: the widest declarable carrier is binary64, whose extremes ARE the native row below, and the
     /// standard modes' SDIDI is wider still. The clamp bites the moment a wider carrier lands — a true IEEE
     /// binary128 <c>FLOAT-BINARY-128</c> reaches 1.19E+4932, past the native intermediate — and then it bites

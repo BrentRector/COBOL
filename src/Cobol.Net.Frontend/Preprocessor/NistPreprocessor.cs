@@ -209,7 +209,7 @@ public static class NistPreprocessor
 
         // XXXXX086/087/088: the implementor's own DATA DESCRIPTION of a file/label identifier item. The card is
         // written `01 IX-FD1-ID1` / `XXXXX086.` — the whole clause list is the X-card, and the implementor
-        // supplies it. COBOL.NET provides NO implementor-defined data description clause (§13.16.2 Format 1 is a
+        // supplies it. WiseOwl COBOL provides NO implementor-defined data description clause (§13.16.2 Format 1 is a
         // closed list, kb/Work PB487), so the description it supplies is a plain alphanumeric item; §13.16.3 SR8
         // requires an elementary entry to carry a PICTURE, which is exactly what these cards exist to provide.
         // ⛔ Behaviour-preserving for the whole corpus, verified per site: IX206A declares its three
@@ -222,7 +222,7 @@ public static class NistPreprocessor
         source = System.Text.RegularExpressions.Regex.Replace(
             source, @"(?<![A-Za-z0-9])XXXXX08[678](?![A-Za-z0-9])", "PICTURE X(10)");
 
-        // XXXXX069 / XXXXX053: the two X-cards that name a construct COBOL.NET DOES NOT PROVIDE, so the card is
+        // XXXXX069 / XXXXX053: the two X-cards that name a construct WiseOwl COBOL DOES NOT PROVIDE, so the card is
         // DELETED — which is the CCVS-documented action for an optional card the implementor does not supply,
         // and the same treatment kb/Work PB487 gave XXXXX086-088 above.
         //   • XXXXX069 — the corpus states its own contract on the next line: "REPLACE WITH ADDITIONAL INFO
@@ -231,7 +231,7 @@ public static class NistPreprocessor
         //     DESCRIPTION CLAUSE, and ISO §13.4.5.2 is a CLOSED list (kb/Work PB829) with no slot for one.
         //   • XXXXX053 — the whole I-O-CONTROL entry of IX302M:30 / RL302M:30 / SQ302M:29, written `XXXXX053.`
         //     with "Message expected for above statement: OBSOLETE" beneath it: the implementor's own RERUN
-        //     clause, the obsolete §12.4.6.2 entry removed at COBOL-2002. COBOL.NET supplies none, and an empty
+        //     clause, the obsolete §12.4.6.2 entry removed at COBOL-2002. WiseOwl COBOL supplies none, and an empty
         //     I-O-CONTROL paragraph is legal (the format brackets both of its clauses), so the card and its
         //     separator period go together — leaving the period behind would strand a clause-less DOT.
         // ⛔ Until kb/Work PB829 both cards were left unsubstituted and the vendor catch-all ATE the raw token,

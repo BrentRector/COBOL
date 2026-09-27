@@ -307,13 +307,13 @@ public sealed class OoClassTable
                 IsFinal = id.FINAL() is not null,
             };
             if (bases.Count > 1)
-                // ISO §11.3.2 permits several INHERITS bases; COBOL.NET v1 restricts to SINGLE inheritance and
+                // ISO §11.3.2 permits several INHERITS bases; WiseOwl COBOL v1 restricts to SINGLE inheritance and
                 // rejects the rest LOUDLY (SSOT §18 #18; A.4.10 — multiple inheritance / parametric polymorphism
                 // rejected). Silently compiling against only the first base was the R9 silent-miscompile.
                 using (edition.At(id.className(2)))
                     edition.Error("COBOLNET0849",
                         $"class '{name}': INHERITS FROM {bases.Count} base classes ({string.Join(", ", bases)}) — "
-                        + "COBOL.NET v1 supports single inheritance only; multiple inheritance is rejected "
+                        + "WiseOwl COBOL v1 supports single inheritance only; multiple inheritance is rejected "
                         + "(ISO §11.3.2; SSOT §18 #18 / A.4.10)");
             usedCsNames.Add(csName + NamingConvention.FactorySuffix);   // belt-and-braces (a `__` name cannot collide with COBOL-derived names)
             if (table._ifaceByName.ContainsKey(name))
@@ -384,7 +384,7 @@ public sealed class OoClassTable
                         $"class '{name}': duplicate method name '{methodName}' — method names shall be unique "
                         + "within a class in this implementation (OO deep-dive D9). Overloading by method "
                         + "resolution signature is PARAMETRIC POLYMORPHISM (ISO §9.3.5.3), an OPTIONAL element "
-                        + "(Annex A.4.10 item 3; §9.3.5.3 rule 7) whose support COBOL.NET does not claim");
+                        + "(Annex A.4.10 item 3; §9.3.5.3 rule 7) whose support WiseOwl COBOL does not claim");
                 if (sel is null && m.methodName().Length > 1
                     && !string.Equals(m.methodName(1).GetText(), methodName, StringComparison.OrdinalIgnoreCase))
                     using (edition.At(m.methodName(1)))
@@ -432,7 +432,7 @@ public sealed class OoClassTable
                         $"class '{name}': duplicate factory method name '{methodName}' — method names shall "
                         + "be unique within the factory definition in this implementation (OO deep-dive D9). "
                         + "Overloading by method resolution signature is PARAMETRIC POLYMORPHISM (ISO "
-                        + "§9.3.5.3), an OPTIONAL element (Annex A.4.10 item 3) whose support COBOL.NET does "
+                        + "§9.3.5.3), an OPTIONAL element (Annex A.4.10 item 3) whose support WiseOwl COBOL does "
                         + "not claim — the factory arm carried NO citation at all before this");
                 if (fsel is null && m.methodName().Length > 1
                     && !string.Equals(m.methodName(1).GetText(), methodName, StringComparison.OrdinalIgnoreCase))

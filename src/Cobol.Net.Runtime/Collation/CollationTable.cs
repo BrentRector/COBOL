@@ -6,11 +6,11 @@ using System.IO.Compression;
 namespace CobolNet.Runtime.Collation;
 
 /// <summary>
-/// COBOL.NET's DERIVED collation table: every Unicode code point (or contraction — a sequence of code points that
+/// WiseOwl COBOL's DERIVED collation table: every Unicode code point (or contraction — a sequence of code points that
 /// collates as a unit) → its sequence of <see cref="CollationElement"/>s. The <see cref="Root"/> table is generated
 /// from the Unicode CLDR root collation and UCA data by <c>scripts/collation/generate-collation-table.py</c>
 /// (sources, versions and hashes in <c>Data/root-collation.manifest.json</c>; the pinned inputs live under
-/// <c>data/unicode/</c>) and is embedded in this assembly, so every COBOL.NET program on every host orders text
+/// <c>data/unicode/</c>) and is embedded in this assembly, so every WiseOwl COBOL program on every host orders text
 /// identically — the order does not depend on the ICU build the operating system happens to ship.
 /// <para>A table answers three questions the collation engine asks while walking a string: the elements of a code
 /// point (<see cref="GetElements"/>; explicit mappings, plus the two computed families — Hangul syllables through
@@ -28,7 +28,7 @@ namespace CobolNet.Runtime.Collation;
 /// <see cref="PrimaryMap"/> / <see cref="SecondaryMap"/> / <see cref="TertiaryMap"/> record the root → this-table
 /// mapping so a root-scale weight (a <c>.tailor</c> file's) can still be layered on top correctly.</para>
 /// <para>⚖ No ISO/IEC 14651 text or table is embedded here or read by the generator; the data is Unicode's
-/// (data/unicode/LICENSE-UNICODE.txt). COBOL.NET's conformance statement, verbatim: "Implements collation behavior
+/// (data/unicode/LICENSE-UNICODE.txt). WiseOwl COBOL's conformance statement, verbatim: "Implements collation behavior
 /// consistent with ISO/IEC 14651 through derived tables and CLDR/UCA data."</para>
 /// </summary>
 public sealed class CollationTable

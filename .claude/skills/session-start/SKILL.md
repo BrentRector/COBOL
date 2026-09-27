@@ -1,6 +1,6 @@
 ---
 name: session-start
-description: Use at the start of every COBOL.NET session, and whenever asked "where are we", "what is next", or "what is the current state" - reads the one live-state SSOT, runs the mechanical probe, and confirms the gate baseline before any code change.
+description: Use at the start of every WiseOwl COBOL session, and whenever asked "where are we", "what is next", or "what is the current state" - reads the one live-state SSOT, runs the mechanical probe, and confirms the gate baseline before any code change.
 ---
 
 # Session start

@@ -22,7 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// <see cref="DateTimeOffset"/>, whose offset range is ±14:00. For such a host the rule's table offers NO in-range
 /// value, so every available behavior departs from something: emitting 14 leaves the stated range, clamping to 13
 /// MISREPORTS the offset, and writing '0'/'00'/'00' asserts position 17's "the system … does not have the facility
-/// to provide the local time differential factor" (cite.py --check 15.21.3 → OK), which is false. COBOL.NET
+/// to provide the local time differential factor" (cite.py --check 15.21.3 → OK), which is false. WiseOwl COBOL
 /// reports the true offset and documents the departure — <c>docs/CONFORMANCE.md</c> §7, and inventory rows
 /// RV-15.21.3-1 / RV-15.99.3-1 at DOCUMENTED-NON-SUPPORT (§4.2.6/§4.2.7 documentation obligation).</para>
 ///

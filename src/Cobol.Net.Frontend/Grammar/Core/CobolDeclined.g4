@@ -5,7 +5,7 @@
 // THE DECLINED-OPTIONAL-ELEMENT SURFACE (Annex A.4) — recognized so it can be NAMED, never implemented.
 //
 // Annex A.4.1: "An implementation shall accept the syntax and provide the functionality for an optional
-// element only when support for that language element is claimed by the implementor." COBOL.NET claims no
+// element only when support for that language element is claimed by the implementor." WiseOwl COBOL claims no
 // support for the VALIDATE facility (A.4.14) or for commit and rollback (A.4.3) — docs/CONFORMANCE.md §5 —
 // so their syntax is REFUSED. The obligation this file discharges is that the refusal NAME THE FACILITY.
 // MEASURED before this file existed, at EVERY edition: `05 A PIC X(4) DEFAULT IS "AB".` →

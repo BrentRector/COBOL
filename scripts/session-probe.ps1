@@ -105,7 +105,7 @@ if (Test-Path 'tests/version-matrix/traceability-inventory.json') {
 # in plan §0.
 # Network-tolerant: any failure to reach GitHub is silent, so the probe still works offline.
 try {
-    $wf = & gh api repos/BrentRector/CobolSharp/actions/workflows --jq '.workflows[] | select(.state != "active") | "\(.name) [\(.state)]"' 2>$null
+    $wf = & gh api repos/BrentRector/COBOL/actions/workflows --jq '.workflows[] | select(.state != "active") | "\(.name) [\(.state)]"' 2>$null
     if ($LASTEXITCODE -eq 0 -and $wf) {
         Write-Host "ci     : ⛔ DISABLED — $wf  (re-enable: gh workflow enable 'Build and Test')"
         Write-Host "         every gate is LOCAL until then: bash scripts/battery.sh"

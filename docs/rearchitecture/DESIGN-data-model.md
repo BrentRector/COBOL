@@ -158,9 +158,9 @@ is a SPECIAL-NAMES declaration (§12.3.7.2 dynamic-length-structure-clause; kb/W
 (§12.3.7.4 GR18 — SHORT PREFIXED 65535, SIGNED SHORT PREFIXED 32767, the 32-bit fields past the implementor
 maximum), §13.18.19.3 SR4's bound on the LIMIT phrase, and — as part of the DYNAMIC LENGTH clause — §8.5.3.1's
 same-type test. The layout itself (length field, GR19's binary-zero delimiter) is RECORDED on the model, not
-materialized: §8.5.1.10.3 leaves the item's location to the implementor, and no COBOL.NET operation gives the item a
+materialized: §8.5.1.10.3 leaves the item's location to the implementor, and no WiseOwl COBOL operation gives the item a
 byte image a program can address (a variable-length group has no fixed record window — the record-area image of
-one is the loud `TierCIsland` stage). A physical-structure-name is an implementor set COBOL.NET leaves EMPTY
+one is the loud `TierCIsland` stage). A physical-structure-name is an implementor set WiseOwl COBOL leaves EMPTY
 (§12.3.7.3 SR32; determination D-DL3 in `docs/CONFORMANCE.md` §3), refused as COBOLNET2257.
 
 **Key rule (unifies invariant #1 + #2):** `CharImage` is the ONE case that subsumes *every* string-stored leaf,

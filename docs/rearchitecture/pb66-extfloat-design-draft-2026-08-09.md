@@ -305,7 +305,7 @@ Annex A.3 item 1 makes "the ability to specify a significand longer than 31 digi
 associated with a floating-point numeric-edited data item" ✔ OK (A.3 1 c) and "…an exponent longer than 3
 digits…" ✔ OK (A.3 1 d) processor-dependent — **but only "When no support for any of the features standard binary
 floating-point usages, standard decimal floating-point usages, standard-binary arithmetic, and standard-decimal
-arithmetic is provided."** COBOL.NET provides `FLOAT-BINARY-32`/`FLOAT-BINARY-64` (LIVE, `PicInfo` Usage docs) and
+arithmetic is provided."** WiseOwl COBOL provides `FLOAT-BINARY-32`/`FLOAT-BINARY-64` (LIVE, `PicInfo` Usage docs) and
 implements `ARITHMETIC IS STANDARD-DECIMAL` (numeric design D3, `CobolDec`). **The antecedent is false, so the
 latitude is not available and the full SR15/GR13 b range is mandatory.** This single conclusion is what forces
 D-EF3: a 36-digit significand cannot round-trip through binary64.
@@ -392,7 +392,7 @@ documented implementor conversion the standard-decimal path already uses.
 ### D-EF8. The §14.9.25.4 GR6 4a "undefined" content is PINNED to the saturated extreme image.
 
 When normalization needs an exponent larger than the mask's exponent capacity, the standard sets
-EC-DATA-OVERFLOW and leaves the content undefined. COBOL.NET's pinned choice: **the maximum-magnitude image —
+EC-DATA-OVERFLOW and leaves the content undefined. WiseOwl COBOL's pinned choice: **the maximum-magnitude image —
 all-nines significand at the maximum exponent — carrying the value's sign** (the sign only where the mask has a
 sign symbol). Deterministic, monotone in the input, and it can never manufacture a small plausible number from a
 huge one. Documented in `docs/CONFORMANCE.md` beside the other undefined-behaviour determinations.
@@ -759,7 +759,7 @@ rules say the entry shall be such that the test *would* return true; that makes 
 well-formedness condition on the data description entry**, evaluated at the function reference. This is exactly
 the distinction the `validate_the_premise_not_only_the_rule` feedback exists for, and it is why the *class
 condition* `IN-ARITHMETIC-RANGE` is NOT a prerequisite of this wave: PB66's inventory note observes that
-`IN-ARITHMETIC-RANGE` exists in COBOL.NET only as a `ReservedWords.Table` row, and the note is right — but the
+`IN-ARITHMETIC-RANGE` exists in WiseOwl COBOL only as a `ReservedWords.Table` row, and the note is right — but the
 rule can be honoured in full without it. (Implementing the class condition itself remains its own item; it is
 2014+ and belongs with the FLOAT-INFINITY / FARTHEST-FROM-ZERO / NEAREST-TO-ZERO package.)
 
@@ -783,12 +783,12 @@ The smallest nonzero magnitude, needed for the "closer to zero" half:
 
 ### 10.3 The IN-ARITHMETIC-RANGE bound, per arithmetic mode
 
-"the form of an intermediate data item appropriate to the mode of arithmetic in effect" — COBOL.NET's modes
+"the form of an intermediate data item appropriate to the mode of arithmetic in effect" — WiseOwl COBOL's modes
 (numeric design D3):
 
 | Mode | Intermediate form | `farthest` | `closest (nonzero)` |
 |---|---|---|---|
-| **NATIVE** (default) | §8.8.1.3 makes native arithmetic "an implementor-defined method" ✔ OK; COBOL.NET's documented native technique is the exact `Int128` fixed-point engine (D1) for fixed-point operands and **IEEE binary64** for any float-valued expression (D7/D16/D18). A floating-point numeric-edited item's value is float-valued, so its intermediate form is binary64. | `1.7976931348623157E+308` | `4.9406564584124654E-324` |
+| **NATIVE** (default) | §8.8.1.3 makes native arithmetic "an implementor-defined method" ✔ OK; WiseOwl COBOL's documented native technique is the exact `Int128` fixed-point engine (D1) for fixed-point operands and **IEEE binary64** for any float-valued expression (D7/D16/D18). A floating-point numeric-edited item's value is float-valued, so its intermediate form is binary64. | `1.7976931348623157E+308` | `4.9406564584124654E-324` |
 | **STANDARD-DECIMAL** (implemented, `CobolDec`) | §8.8.1.5.2 SDIDI — "with a maximum precision of 34 decimal digits; the smallest positive nonzero value is 1.0E-6176" ✔ OK; the magnitude ceiling is decimal128's ≈ `9.99…E+6144` | ≈ `1E+6145` | `1.0E-6176` |
 | **STANDARD-BINARY** | documented-unsupported (D3; the mode is obsolete per §8.8.1.4.1's NOTE) — the existing `ArithmeticMode.StandardBinary` rejection covers it | — | — |
 
@@ -1028,7 +1028,7 @@ its own note — recording it here so it is not lost, per CLAUDE.md rule 8's "a 
 before it becomes a DEVLOG paragraph".
 
 **Q6 — SCOPE. `USAGE NATIONAL` + a floating-point edited picture.** §13.18.40.4 GR1 makes every symbol a national
-character position, and §8.5.2.1 Table 2 makes the item class *national*. COBOL.NET already stages the whole
+character position, and §8.5.2.1 Table 2 makes the item class *national*. WiseOwl COBOL already stages the whole
 national-form numeric/numeric-edited family loud (`PictureAnalyzer.cs:210`, Phase-4a residue). This design
 inherits that stage rather than fixing it, which is **not** a new deferral — it is the existing, already-tracked
 one — but the wave must confirm the float form takes that stage and does not slip through it.

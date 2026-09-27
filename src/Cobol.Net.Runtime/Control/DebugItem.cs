@@ -6,7 +6,7 @@ namespace CobolNet.Runtime;
 /// The cause that triggered a debugging declarative for a <c>USE FOR DEBUGGING ON procedure-name / ALL PROCEDURES</c>
 /// subject (X3.23-1985 debug module — the DEBUG-CONTENTS taxonomy, corroborated by the CCVS DB101A witness). The
 /// facility was deleted by ISO/IEC 1989:2002 and is absent from ISO/IEC 1989:2023, so its authoritative behavior is
-/// the 1985 standard; COBOL.NET models it only at <c>--std 85</c> (VCR Table 7 row 7.17). Each enumerand renders one
+/// the 1985 standard; WiseOwl COBOL models it only at <c>--std 85</c> (VCR Table 7 row 7.17). Each enumerand renders one
 /// DEBUG-CONTENTS string (<see cref="DebugItem.Populate"/>); the transfer-of-control kind that reaches the subject
 /// procedure selects it (the PC dispatcher knows the transfer kind).
 /// </summary>
@@ -40,7 +40,7 @@ public enum DebugCause
 /// <c>IF SUB-1-1 = "0004"</c>) is SIGN-AGNOSTIC, not a disproof of the signed form: per ISO MOVE GR6a
 /// (§14.9.25.4, specs/ISO_COBOL.md:28921) a signed numeric's SEPARATE sign character is NOT moved to an
 /// alphanumeric receiver, so S9(4) SIGN LEADING SEPARATE holding +4 → X(5) yields <c>"0004 "</c> — identical to
-/// the unsigned image the witness tests. COBOL.NET pins the authoritative signed 5-char width; DEBUG-SUB is
+/// the unsigned image the witness tests. WiseOwl COBOL pins the authoritative signed 5-char width; DEBUG-SUB is
 /// SPACES when the triggering reference is not subscripted.</para>
 /// <code>
 /// 01  DEBUG-ITEM.
@@ -54,7 +54,7 @@ public enum DebugCause
 ///     02  FILLER         PIC X   VALUE SPACE.
 ///     02  DEBUG-SUB-3    PIC S9(4) SIGN LEADING SEPARATE.
 ///     02  FILLER         PIC X   VALUE SPACE.
-///     02  DEBUG-CONTENTS PIC X(30).  *> implementor-defined width (COBOL.NET pins 30, enough for every
+///     02  DEBUG-CONTENTS PIC X(30).  *> implementor-defined width (WiseOwl COBOL pins 30, enough for every
 ///                                    *> procedure-trigger DEBUG-CONTENTS token; the data/file record-image
 ///                                    *> legs are staged — see COBOLNET1571).
 /// </code>
@@ -67,7 +67,7 @@ public sealed class DebugItem
     public const int NameWidth = 30;
     /// <summary>DEBUG-SUB-1/2/3 width — S9(4) SIGN LEADING SEPARATE (a sign character + four digits = five).</summary>
     public const int SubWidth = 5;
-    /// <summary>DEBUG-CONTENTS width — COBOL.NET's pinned implementor width (§ implementor-defined).</summary>
+    /// <summary>DEBUG-CONTENTS width — WiseOwl COBOL's pinned implementor width (§ implementor-defined).</summary>
     public const int ContentsWidth = 30;
 
     /// <summary>The whole DEBUG-ITEM group image width — the members plus the single-space FILLER between each
@@ -77,7 +77,7 @@ public sealed class DebugItem
 
     /// <summary>DEBUG-LINE — the source line of the CAUSING statement (the statement whose execution
     /// triggered the debugging declarative — the Wave F review fix, pinned by DB101A; implementor-defined
-    /// format: COBOL.NET right-justifies the decimal image in X(6)).</summary>
+    /// format: WiseOwl COBOL right-justifies the decimal image in X(6)).</summary>
     public string DebugLine { get; private set; } = new string(' ', LineWidth);
 
     /// <summary>DEBUG-NAME — the leftmost 30 characters of the triggering procedure-name.</summary>

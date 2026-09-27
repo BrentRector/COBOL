@@ -21,7 +21,7 @@ public enum LocaleCategory
 /// <summary>A SET of locale categories — the operand shape of SET LOCALE format 11 (ISO §14.9.39.2: the LC_ brace
 /// carries choice indicators, so "one or more of the alternatives … each at most once … in any order" per §5.2.6.4;
 /// DESIGN-locale-facility §4.3 — a scalar category would reject legal source). LC_ALL is every category
-/// (§8.2.1's table: COBOL.NET's locale exposes exactly these six).</summary>
+/// (§8.2.1's table: WiseOwl COBOL's locale exposes exactly these six).</summary>
 [Flags]
 public enum LocaleCategorySet
 {

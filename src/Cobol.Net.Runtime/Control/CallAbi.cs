@@ -58,6 +58,29 @@ public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrie
 }
 
 /// <summary>
+/// ⛔ THE PREDEFINED NULL WRITTEN AS AN ARGUMENT (kb/Work PB1630) — the carrier of <c>USING [BY CONTENT | BY VALUE]
+/// NULL</c> on a CALL or a user-defined function activation. NULL is an IDENTIFIER, not a literal (§8.4.3.1.2
+/// Format 8, predefined-address; Format 6's NULL object reference), and §8.4.3.10.3 SR1 a) admits it "as an argument
+/// in a program-prototype format CALL statement, a function-prototype format function activation, or a method
+/// invocation". Its category is decided by "the associated data item's class" — the FORMAL's — which the activating
+/// element does not know when §12.3.8.4 GR10 c) takes the details from an external repository. So the carrier holds
+/// no storage of any type: the formal's slot adapter (<see cref="CobolArgAdapt.Slot{T}"/> /
+/// <see cref="CobolArgAdapt.SlotValue{T}"/>) supplies a fresh cell holding the null of its own carrier, and every
+/// other adapter's type switch refuses it as EC-PROGRAM-ARG-MISMATCH (§14.8.2.3.3: only a formal of class pointer or
+/// object reference takes its argument by a SET, and §14.9.25.3 SR1 bars class pointer and object from a MOVE).
+/// <para>It is a PRESENT argument (<see cref="ManagedPointer.IsNull"/> false): <see cref="ManagedPointer.Null"/> as a
+/// carrier is the OMITTED argument (§14.9.4.4 GR11), which is a different fact — a NULL argument makes the
+/// omitted-argument condition false and the formal's value the null address.</para>
+/// </summary>
+public sealed class PredefinedNullArgument : ManagedPointer
+{
+    /// <summary>The one instance; the carrier is stateless and never written through.</summary>
+    public static readonly PredefinedNullArgument Instance = new();
+
+    private PredefinedNullArgument() { }
+}
+
+/// <summary>
 /// The uniform program ABI every compiled program class implements (design D2 — the typed analog of the
 /// rejected byte <c>Entry(ManagedPointer[])</c>). <see cref="Call"/> activates the program as a CALLed program
 /// (positional formal mapping, §14.2.3 GR2); <see cref="Activate"/> runs it as the run-unit main program;
@@ -731,11 +754,20 @@ public static class CobolArgAdapt
     /// <c>PicInfo.ClrType</c>, so a conforming pairing IS a same-<c>T</c> carrier (§14.2.3 GR8's "same storage
     /// area", realized with zero indirection). A carrier of any other shape means the two sides disagreed about
     /// the crossing — it degrades to the loud omitted carrier rather than reinterpreting storage, the same way
-    /// <see cref="VarGroup"/> does.</para></summary>
+    /// <see cref="VarGroup"/> does.</para>
+    /// <para>⛔ The ONE other carrier a slot admits is <see cref="PredefinedNullArgument"/> — the predefined NULL
+    /// written as the argument (kb/Work PB1630). It carries no storage of any type, because its category is the
+    /// FORMAL's (§8.4.3.10.3 SR1 names "the associated data item's class"), so the formal's adapter supplies the
+    /// value: a fresh cell holding the null of the formal's own carrier (<see cref="PredefinedNull{T}"/>).</para></summary>
     public static ManagedPointer<T> Slot<T>(CobolArg[] args, int i)
     {
         if (!Present(args, i)) return Omitted<T>();
-        return args[i].Carrier is ManagedPointer<T> mp ? mp : Unreadable<T>(args, i, "a pointer or object-reference formal");
+        return args[i].Carrier switch
+        {
+            ManagedPointer<T> mp => mp,
+            PredefinedNullArgument => ManagedPointer<T>.Cell(PredefinedNull<T>()),
+            _ => Unreadable<T>(args, i, "a pointer or object-reference formal"),
+        };
     }
 
     /// <summary>The BY VALUE / BY CONTENT twin of <see cref="Slot{T}"/> (ISO §14.2.3 GR10 — a record "allocated
@@ -743,12 +775,30 @@ public static class CobolArgAdapt
     /// formal is of class object or pointer): a DETACHED cell holding the argument's reference value, so the
     /// callee's stores never reach the caller's storage. That SET of one pointer (or object reference) from
     /// another of the same category IS the reference copy this cell performs — there is no conversion for it
-    /// to apply, which is why the numeric lane's landing machinery has no counterpart here.</summary>
+    /// to apply, which is why the numeric lane's landing machinery has no counterpart here. A NULL argument
+    /// (§14.9.4.3 SR22 admits identifier-4 of class pointer or object BY VALUE, and NULL is one — §8.4.3.1.2
+    /// Format 8) takes the same arm <see cref="Slot{T}"/> does.</summary>
     public static ManagedPointer<T> SlotValue<T>(CobolArg[] args, int i)
     {
         if (!Present(args, i)) return Omitted<T>();
-        return args[i].Carrier is ManagedPointer<T> mp ? ManagedPointer<T>.Cell(mp.Value) : Unreadable<T>(args, i, "a BY VALUE pointer or object-reference formal");
+        return args[i].Carrier switch
+        {
+            ManagedPointer<T> mp => ManagedPointer<T>.Cell(mp.Value),
+            PredefinedNullArgument => ManagedPointer<T>.Cell(PredefinedNull<T>()),
+            _ => Unreadable<T>(args, i, "a BY VALUE pointer or object-reference formal"),
+        };
     }
+
+    /// <summary>⛔ THE NULL VALUE OF A MANAGED-SLOT CARRIER — the ONE runtime statement of it (kb/Work PB1630). §8.4.3.10.4
+    /// GR1–GR3: associated with a data-pointer, program-pointer or function-pointer, the predefined address NULL
+    /// "references a data item of category data-pointer that contains the null address" (and its program / function
+    /// twins); §8.4.3.7.4 GR1: the NULL object reference "contains the null object reference value". A data pointer's
+    /// is the <see cref="ManagedPointer.Null"/> carrier, never a CLR null a later dereference would trip on;
+    /// <see cref="ProgramPointer"/> and <see cref="FunctionPointer"/> are readonly structs whose <c>default</c> IS their
+    /// null address; an object reference's CLR null IS its null reference. The compiler's twin is each managed
+    /// item's <c>PicInfo.DefaultInitializer</c>, which the INVOKE lane and INITIALIZE's implicit SET TO NULL render.</summary>
+    internal static T PredefinedNull<T>() =>
+        typeof(T) == typeof(ManagedPointer) ? (T)(object)ManagedPointer.Null : default!;
 
     /// <summary>Deliver a RETURNING value to the caller's RETURNING item (ISO §14.6.5 — "the result is placed in
     /// the data item referenced by that RETURNING phrase of that activating statement"). Null-tolerant: a CALL
@@ -1021,15 +1071,11 @@ public static class CobolArgAdapt
             // turn a documented GR12 leniency into an NRE (kb/Work PB204 added the var-group carrier).
             if (typeof(T) == typeof(string)) return (T)(object)"";
             if (typeof(T) == typeof(CobolVarGroup)) return (T)(object)CobolVarGroup.Empty;
-            // The DATA-POINTER carrier's benign empty value is the predefined NULL data pointer, not a CLR
-            // null (ISO §8.4.3.10.4 GR1 — "the predefined address NULL references a data item of category
-            // data-pointer that contains the null address"; kb/Work PB663). `default` would hand back null
-            // and make the documented GR12 leniency an NRE the first time the callee referenced the formal —
-            // the same trap the string and var-group arms exist for. ProgramPointer / FunctionPointer need no
-            // arm: each is a readonly struct whose `default` IS its own null address (GR3 / GR2), and an
-            // object reference's CLR null IS its initial state (§13.18.63).
-            if (typeof(T) == typeof(ManagedPointer)) return (T)(object)ManagedPointer.Null;
-            return default!;
+            // Every other carrier's benign empty value is its NULL (a managed slot — kb/Work PB663: `default` for a
+            // data pointer would hand back a CLR null and make the documented GR12 leniency an NRE the first time
+            // the callee referenced the formal, the trap the string and var-group arms exist for) or its
+            // `default` (a native numeric cell), which PredefinedNull answers for both.
+            return PredefinedNull<T>();
         },
         // GR12 leaves a store into the omitted formal undefined: it is ignored (there is no caller storage).
         _ => { });

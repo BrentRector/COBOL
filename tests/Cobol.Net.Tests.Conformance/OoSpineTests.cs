@@ -102,7 +102,7 @@ public sealed class OoSpineTests
     /// <para>⛔ THE STAGE MOVED, AND THE INTENT DID NOT (kb/Work PB390). This test used to require the RUN to
     /// die — it asserted the <c>NotImplementedCobolFeatureException</c> text "unknown procedure 'PARA-C'" — so
     /// a GREEN test was pinning the broken stage: the program COMPILED, shipped an assembly, and blamed a gap
-    /// in COBOL.NET for what is an error in the source (ISO §4.2.2 ¶2 requires the compile-time mechanism).
+    /// in WiseOwl COBOL for what is an error in the source (ISO §4.2.2 ¶2 requires the compile-time mechanism).
     /// The refusal is now the compile-time COBOLNET1639, and the method-local explanation rides it.</para></summary>
     [Fact]
     public void Trap10_CrossMethodPerform_IsRefusedAtCompileTime()
@@ -1411,7 +1411,7 @@ public sealed class OoSpineTests
     /// <para>⛔ THE STAGE MOVED, AND THE INTENT DID NOT (kb/Work PB443, the PB390 shape again). The shadow half
     /// used to require the RUN to die: `SEARCH TAB2` over a method-local non-table returned a
     /// <c>BoundUnsupported</c>, so the program COMPILED, shipped an assembly and aborted the run unit claiming
-    /// COBOL.NET had not implemented a feature — a GREEN test pinning the broken stage, on a rule ISO §4.2.2 ¶2
+    /// WiseOwl COBOL had not implemented a feature — a GREEN test pinning the broken stage, on a rule ISO §4.2.2 ¶2
     /// puts in the compile-time mechanism. It is now COBOLNET2075 quoting §14.9.37.3 SR2, and the SHADOWING
     /// claim is asserted more sharply than before: the error names TAB2 as "not a table", which only the
     /// METHOD-LOCAL `PIC X(4)` is — the object's same-named item IS a table with an INDEXED phrase, so a lookup
@@ -1997,7 +1997,7 @@ public sealed class OoSpineTests
         Assert.Contains("AFTER 7234", stdout);
     }
 
-    /// <summary>§11.3.2 permits several INHERITS bases; COBOL.NET v1 restricts to SINGLE inheritance and
+    /// <summary>§11.3.2 permits several INHERITS bases; WiseOwl COBOL v1 restricts to SINGLE inheritance and
     /// rejects 2+ LOUDLY (SSOT §18 #18 / A.4.10 — the R9 fix: the repetition PARSES per the superset-parse
     /// doctrine, then pass-1 raises 0849; previously the 2nd base was a bare syntax error).</summary>
     [Fact]

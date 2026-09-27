@@ -265,7 +265,7 @@ public static partial class CobolNum
     /// place.
     /// <para><b>Keyed on the BYTE FORM, because that is what "a valid representation for the usage" means</b>
     /// (§13.18.60.4 GR7/GR11/GR12 leave each representation to the implementor and <see cref="NumericByteForm"/>
-    /// is COBOL.NET's documentation of ours):</para>
+    /// is WiseOwl COBOL's documentation of ours):</para>
     /// <list type="bullet">
     /// <item>ZONED — GR3 n)1.a exactly: "the presence or absence of an operational sign … is in agreement with
     /// the data description … and … the content, except for the operational sign, consists entirely of the

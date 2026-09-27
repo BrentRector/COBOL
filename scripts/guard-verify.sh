@@ -52,7 +52,7 @@ witnesses() {
 
     local FR="$d/root" BIN="$d/bin"
     # The runtime the group runner copies beside a program before running it. Since PB750 the guard's default
-    # compiler is COBOL.NET, so the default runtime is Cobol.Net.Runtime; the witnesses stub that path.
+    # compiler is WiseOwl COBOL, so the default runtime is Cobol.Net.Runtime; the witnesses stub that path.
     mkdir -p "$FR/tests/nist/output" "$FR/tests/nist/valid" "$FR/tests/nist/data" \
              "$FR/src/Cobol.Net.Runtime/bin/Debug/net10.0" "$BIN"
     printf 'stub\n' > "$FR/src/Cobol.Net.Runtime/bin/Debug/net10.0/Cobol.Net.Runtime.dll"

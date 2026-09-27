@@ -26,20 +26,20 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     {
         string want = CutRunner.Normalize(expected);
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(want, cout);                       // primary: conformance to ISO §14.9.25.4 GR6a
         var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
         Assert.True(lok, $"legacy oracle failed: {ldetail}");
         Assert.Equal(want, lout);                       // cross-check: the oracle agrees with the spec value
     }
 
-    /// <summary>Assert COBOL.NET matches the SPEC-derived value, with NO legacy cross-check — used where the legacy
+    /// <summary>Assert WiseOwl COBOL matches the SPEC-derived value, with NO legacy cross-check — used where the legacy
     /// differential oracle is non-conformant to ISO 2023 for the case (the spec is the authority; cf. the DISPLAY
     /// trailing-trim precedent).</summary>
     private static void AssertSpecOnly(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"COBOL.NET failed: {cdetail}");
+        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
         Assert.Equal(CutRunner.Normalize(expected), cout);
     }
 

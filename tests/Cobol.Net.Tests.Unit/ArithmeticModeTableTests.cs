@@ -76,7 +76,7 @@ public sealed class ArithmeticModeTableTests
 
     [Theory]
     // ARITHMETIC IS STANDARD (2002; obsolete 2014, removed 2023) is NOT a third engine — its standard
-    // intermediate data item for every operand COBOL.NET can carry IS the standard-decimal one, so every
+    // intermediate data item for every operand WiseOwl COBOL can carry IS the standard-decimal one, so every
     // mode-conditioned decision must answer for it exactly as it answers for STANDARD-DECIMAL. Two sites in
     // IntrinsicBinder had dropped it from the set and screened it against binary64 instead (measured: a
     // PIC 9(3)E+999 argument REJECTED under STANDARD, accepted under STANDARD-DECIMAL).

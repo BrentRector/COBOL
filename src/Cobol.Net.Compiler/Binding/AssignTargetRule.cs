@@ -10,7 +10,7 @@ using Core = CobolParserCore;
 
 /// <summary>
 /// ⛔ THE ONE READER OF THE ASSIGN CLAUSE'S TO-PHRASE LIST — ISO/IEC 1989:2023 §12.4.5.1 (every format writes
-/// <c>ASSIGN [TO] {device-name-1 | literal-1} …</c>, the ellipsis on the inner brace pair) under COBOL.NET's
+/// <c>ASSIGN [TO] {device-name-1 | literal-1} …</c>, the ellipsis on the inner brace pair) under WiseOwl COBOL's
 /// §12.4.5.2 SR5 determination, <c>docs/CONFORMANCE.md</c> §7 row <c>DOC-A.1-71</c> (kb/Work PB829).
 /// <para><b>What the standard leaves open.</b> SR5: "The meaning and rules for the allowable specification of
 /// device-name-1 and the value of literal-1 are defined by the implementor." The general format admits a LIST,

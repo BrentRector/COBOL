@@ -7,7 +7,7 @@ using CobolNet.Frontend.Diagnostics;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
-/// The COBOL.NET <c>&gt;&gt;FLAG-02</c> / <c>&gt;&gt;FLAG-14</c> migration-flagging directive stage (ISO §7.3.14 /
+/// The WiseOwl COBOL <c>&gt;&gt;FLAG-02</c> / <c>&gt;&gt;FLAG-14</c> migration-flagging directive stage (ISO §7.3.14 /
 /// §7.3.15; greenfield-only — the legacy pipeline keeps consuming the words via
 /// <see cref="ConditionalCompilationProcessor"/>'s <c>KnownIgnoredDirectives</c>): parses each surviving
 /// <c>&gt;&gt;FLAG-nn { ALL | option… } { ON | OFF }</c> line of the FINAL preprocessed text into a

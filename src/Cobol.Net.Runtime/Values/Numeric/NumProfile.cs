@@ -118,7 +118,7 @@ public enum NumericSign
 
 /// <summary>
 /// The compact, runtime-facing numeric profile of a COBOL data item: just enough to scale, round and bound-check
-/// a value, and to lay it out at a byte boundary. The COBOL.NET compiler builds it directly from a <c>PicInfo</c>
+/// a value, and to lay it out at a byte boundary. The WiseOwl COBOL compiler builds it directly from a <c>PicInfo</c>
 /// (digits, scale, sign, usage→capacity discipline, usage→byte form) and threads it into every numeric store
 /// so arithmetic obeys the receiver's PICTURE+USAGE (truncation / ROUNDED / SIZE ERROR) and into the record-image
 /// codec so the item occupies its true bytes (COBOLNET_DESIGN §14.4).

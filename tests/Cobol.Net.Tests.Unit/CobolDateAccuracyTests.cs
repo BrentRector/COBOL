@@ -52,7 +52,7 @@ public sealed class CobolDateAccuracyTests
         // … at width 9 the two digits past the tick are ZEROS, not noise …
         Assert.Equal("2026-06-10T05:14:27.812479100+02:30",
             UnderClock(at, () => CobolDate.FormattedCurrentDate("YYYY-MM-DDThh:mm:ss.sssssssss+hh:mm")));
-        // … and at COBOL.NET's documented §15.3.3.2 maximum of 18 the field is still the tick followed
+        // … and at WiseOwl COBOL's documented §15.3.3.2 maximum of 18 the field is still the tick followed
         // by zeros — the exact shape the conformance golden observes without being able to name the
         // instant that produced it.
         Assert.Equal("2026-06-10T05:14:27.812479100000000000+02:30",

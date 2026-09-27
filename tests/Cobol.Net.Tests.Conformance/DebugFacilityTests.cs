@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// The X3.23-1985 USE FOR DEBUGGING / DEBUG-ITEM special-register facility at <c>--std 85</c> (VCR Table 7 row
 /// 7.17). The '85 debug module was deleted by ISO/IEC 1989:2002 and is absent from ISO/IEC 1989:2023, so its
-/// authoritative behavior is the 1985 standard; COBOL.NET models it (accepted-and-ACTIVE) only at <c>--std 85</c>
+/// authoritative behavior is the 1985 standard; WiseOwl COBOL models it (accepted-and-ACTIVE) only at <c>--std 85</c>
 /// and rejects it ≥2002 (COBOLNET0902). Implemented: the ON procedure-name / ALL PROCEDURES trigger leg with the
 /// DEBUG-CONTENTS transfer-cause taxonomy (START PROGRAM / SPACES / PERFORM LOOP / FALL THROUGH — DB101A witness)
 /// and DEBUG-NAME. STAGED loud (COBOLNET1571): the data-name / file-name / cd-name subject kinds and the

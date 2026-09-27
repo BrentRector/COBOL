@@ -281,7 +281,7 @@ public sealed class ReferenceResolver(DataBinder data)
         // kb/Work R32 — a name DECLARED in the SCREEN SECTION is not undefined. Since kb/Work PB260 the section
         // itself is REFUSED (COBOLNET1560), so "is not defined" would send the user hunting a declaration that is
         // right there — the reference is to a REFUSED declaration (COBOLNET2364). Before kb/Work PB1030 this arm
-        // reported NOTHING, and the statement bound a run-time NotImplemented announced as a COBOL.NET gap.
+        // reported NOTHING, and the statement bound a run-time NotImplemented announced as a WiseOwl COBOL gap.
         if (data.ScreenNames.Contains(name))
         {
             ReportRefusedDeclaration(dref, name, "a SCREEN SECTION entry — COBOLNET1560");
@@ -293,7 +293,7 @@ public sealed class ReferenceResolver(DataBinder data)
         // statement shall contain a reference that uniquely identifies that resource", and an alphabet-name
         // (SPECIAL-NAMES) identifies no data item — so the reference identifies no resource of the kind the
         // position needs. R38 adjudicated the vendor alphabet-operand forms (GnuCOBOL's INSPECT CONVERTING
-        // alphabet) as extensions no edition admits, and the owner's 2026-08-08 decision keeps COBOL.NET
+        // alphabet) as extensions no edition admits, and the owner's 2026-08-08 decision keeps WiseOwl COBOL
         // strict-ISO permanently; this arm used to report nothing and let the statement abort at run time.
         if (data.Alphabets.ContainsKey(name) || data.NationalAlphabets.ContainsKey(name))
         {
@@ -413,7 +413,7 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <summary>COBOLNET2364 — a reference to a name whose declaration the compiler REFUSED (a Tier-D REDEFINES
     /// view; a SCREEN SECTION name, the section being declined as COBOLNET1560). The compile has already failed at
     /// the declaration; this names the consequence at the statement, instead of "not defined" (the name IS
-    /// declared) or "not implemented" (it is not a gap in COBOL.NET).</summary>
+    /// declared) or "not implemented" (it is not a gap in WiseOwl COBOL).</summary>
     private void ReportRefusedDeclaration(Core.DataReferenceContext dref, string name, string? why)
     {
         if (_probing || !_diagnosed.Add(dref)) return;   // R30 purity; one report per written reference
@@ -1124,7 +1124,7 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <para>⛔ BOTH WERE DECIDABLE HERE AND NEITHER WAS DECIDED. The resolver returned a bare null on an arity
     /// mismatch and what the programmer saw depended on WHICH SIDE OF THE STATEMENT the reference stood on:
     /// <c>MOVE 1 TO PLAIN (1)</c> drew the receiving chokepoint's catch-all, COBOLNET0899 "a reference shape
-    /// COBOL.NET does not yet implement as a receiver" — a promise, about source no edition of the standard will
+    /// WiseOwl COBOL does not yet implement as a receiver" — a promise, about source no edition of the standard will
     /// ever admit (the PB489 shape) — while <c>DISPLAY PLAIN (1)</c> COMPILED CLEAN and aborted at run time on
     /// <c>NotImplementedCobolFeatureException</c>, where §4.2.2 requires a compile-time mechanism.</para>
     /// <para><b>SR5</b> — "Each table element reference shall be subscripted except when such reference appears"
@@ -2484,7 +2484,7 @@ public sealed class ReferenceResolver(DataBinder data)
 
     /// <summary>⛔ THE ONE ORDINAL-POSITION READ (fix-queue PB41): an already-resolved numeric item → the C#
     /// <c>long</c> expression for the POSITION it denotes, in either position kind.
-    /// <para>A COBOL.NET numeric item stores UNSCALED — <c>PIC 9V9 VALUE 2.0</c> is the field <c>20L</c> at scale
+    /// <para>A WiseOwl COBOL numeric item stores UNSCALED — <c>PIC 9V9 VALUE 2.0</c> is the field <c>20L</c> at scale
     /// 1 — so the item's VALUE and its STORAGE are different numbers whenever the PICTURE has a <c>V</c>. Both
     /// position clauses are about the VALUE: §8.4.2.3.4 GR1b makes the subscript "the result of the evaluation of
     /// arithmetic-expression-1", and §8.4.3.3.4 rule 5)c) says the same for a leftmost-position/length. Reading the

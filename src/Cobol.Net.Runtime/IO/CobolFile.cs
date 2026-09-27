@@ -3,7 +3,7 @@
 namespace CobolNet.Runtime.IO;
 
 /// <summary>
-/// The static file-I/O facade the COBOL.NET backend emits calls to: a PURE DELEGATOR onto the ONE
+/// The static file-I/O facade the WiseOwl COBOL backend emits calls to: a PURE DELEGATOR onto the ONE
 /// <see cref="FileRegistry"/> (DESIGN-runtime-library §2.2 — polymorphic connector dispatch; the former
 /// sequential-first/<c>Keyed*</c>-fallthrough second dispatch mechanism is deleted). The compiler registers every
 /// SELECTed file at program start, then emits a verb call per file statement; the connector owns the ISO §9.1.13

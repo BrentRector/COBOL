@@ -1,5 +1,5 @@
 DISPATCH SPEC — wave {wave} ({letter}), {group}: {notes}
-Brief: E:\CobolSharp\.claude\skills\workstream\templates\fix-lane-implementer-brief.md — read it WHOLE first; {{PB}} = {lead}.
+Brief: E:\COBOL\.claude\skills\workstream\templates\fix-lane-implementer-brief.md — read it WHOLE first; {{PB}} = {lead}.
 Base: your worktree is cut from current main ({base}). CLAUDE.md rule 1 carries the ISO → GnuCOBOL → IBM/Micro Focus
 precedence for implementation options; obey it.
 

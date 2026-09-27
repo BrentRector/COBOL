@@ -587,7 +587,7 @@ public sealed class DataItem
     /// <para>The only placement the standard gives a level-1 item that a subordinate does not have is bit alignment:
     /// §8.5.1.6.3 — "a level 1 bit group are at the first bit of a byte", where a same-level successor of a bit item
     /// would otherwise go "at the next bit position in storage". Every other item already starts on a byte, and
-    /// COBOL.NET inserts no word-boundary slack for any level (§8.5.1.6.4 leaves that to the runtime module), so
+    /// WiseOwl COBOL inserts no word-boundary slack for any level (§8.5.1.6.4 leaves that to the runtime module), so
     /// the flag is read at exactly ONE site — <see cref="BitLayout.SharesByteWith"/>, the placement predicate the
     /// extent walk, the offset walk, the REDEFINES class walk and the image RUNS all derive from. It aligns the
     /// SUBJECT's first bit, not each occurrence: ALIGNED's own rule for a multiple-occurrence item (§13.18.1.4
@@ -976,7 +976,7 @@ public sealed class DataItem
             if (IsDynamicLength) return 0;
             if (Pic is not { } pic) return 0;
             // D19/PB43 — a USAGE BIT leaf OCCUPIES ceil(n/8) character positions, not n. §13.18.60.4 GR5 makes
-            // its representation bits; §8.1.2 leaves bits-per-character to the implementor and COBOL.NET pins 8.
+            // its representation bits; §8.1.2 leaves bits-per-character to the implementor and WiseOwl COBOL pins 8.
             // ⚠ This is its OCCUPANCY, deliberately NOT what FUNCTION LENGTH returns for it: §15.50.4 r1 gives an
             // elementary bit item its length in BOOLEAN positions (n). The two coincided while USAGE BIT was
             // stored char-per-bit, which is precisely how the defect stayed invisible — they are read from
@@ -1027,16 +1027,16 @@ public sealed class DataItem
     /// distinction). A group sums each non-redefining child's byte contribution × its own fixed-OCCURS count
     /// (mirroring <see cref="ImageWidth"/>; a REDEFINING child overlays its target and adds no storage,
     /// §13.18.44). Per-usage byte widths are IMPLEMENTOR-DEFINED (§13.18.60 GR4/6/7/8/11/12; §8.1.2 even makes
-    /// bits-per-byte implementor-specified) — these are COBOL.NET's PINNED, DOCUMENTED widths
+    /// bits-per-byte implementor-specified) — these are WiseOwl COBOL's PINNED, DOCUMENTED widths
     /// (COBOLNET_INTRINSICS_DESIGN §BYTE-LENGTH): DISPLAY = 1 byte per character position; a boolean item of
     /// usage DISPLAY (implied by §13.18.60.3 SR13(b) when no USAGE clause is written) = 1 byte per boolean
     /// position, per §13.18.60.4 GR7's "alphanumeric coded character set"; a boolean item of **USAGE BIT** =
     /// <c>ceil(n / 8)</c>, because §13.18.60.4 GR5 says bits SHALL be used and §8.1.2 leaves bits-per-character to
-    /// the implementor (COBOL.NET pins 8) — design D19, fix-queue PB43; NATIONAL = 2 bytes per position (UTF-16,
+    /// the implementor (WiseOwl COBOL pins 8) — design D19, fix-queue PB43; NATIONAL = 2 bytes per position (UTF-16,
     /// D-N1/D-N3); BINARY/COMP-5/PACKED/BINARY-CHAR..DOUBLE =
     /// their <see cref="Model.PicInfo.StorageWidth"/>; COMP-1/FLOAT-SHORT = 4, COMP-2/FLOAT-LONG/-EXTENDED = 8
     /// (the .NET Single/Double carriers); INDEX / POINTER / PROGRAM-POINTER / FUNCTION-POINTER / OBJECT REFERENCE
-    /// = 8 (the 64-bit managed carrier). COBOL.NET has no SYNCHRONIZED physical padding, so a group carries no
+    /// = 8 (the 64-bit managed carrier). WiseOwl COBOL has no SYNCHRONIZED physical padding, so a group carries no
     /// implicit-filler bytes (§15.14.4 r3 is satisfied vacuously).</summary>
     public int ByteWidth =>
         IsElementary ? ElementaryByteWidth

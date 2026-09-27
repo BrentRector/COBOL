@@ -7,7 +7,7 @@ behavior.
 
 ## Layout
 - `positive/*.cob` — programs expected to COMPILE. Exercised by both gates:
-  - **gate 2** (`DiagnosticSnapshotTests`) — the COBOL.NET diagnostic surface (a CheckOnly compile), snapshotted to
+  - **gate 2** (`DiagnosticSnapshotTests`) — the WiseOwl COBOL diagnostic surface (a CheckOnly compile), snapshotted to
     `../Cobol.Net.Tests.Characterization/Snapshots/<name>.<edition>.diag.txt`.
   - **gate 3** (`EmittedCSharpSnapshotTests`) — the generated C#, snapshotted to `<name>.<edition>.g.cs.txt`.
 - `negative/*.cob` — programs expected to FAIL with a diagnostic. Exercised by **gate 2 only** (they emit no C#).

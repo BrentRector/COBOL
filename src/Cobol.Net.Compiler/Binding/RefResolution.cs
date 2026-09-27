@@ -16,7 +16,7 @@ public enum RefOutcome
     /// a subscript (§8.4.2.3.2), a reference to a declaration that was itself refused, …. A caller binds a refusal
     /// node; the statement funnel's refusal ledger fails the compile (COBOLNET2362) if the claim was false.</summary>
     Reported,
-    /// <summary>A LEGAL reference in a shape COBOL.NET has not built. The resolver has already put it on the
+    /// <summary>A LEGAL reference in a shape WiseOwl COBOL has not built. The resolver has already put it on the
     /// unbuilt-operand ledger, so the statement funnel announces it (COBOLNET1756) even if the caller dropped it;
     /// <see cref="RefResolution.Shape"/> names which shape, and <see cref="DeferredShapes"/> names who owns
     /// building it.</summary>
@@ -24,7 +24,7 @@ public enum RefOutcome
 }
 
 /// <summary>⛔ THE CENSUS OF REFERENCE SHAPES THE RESOLVER DEFERS (kb/Work PB1030). Every
-/// <see cref="RefOutcome.Deferred"/> answer names one member, so the list of legal reference shapes COBOL.NET has
+/// <see cref="RefOutcome.Deferred"/> answer names one member, so the list of legal reference shapes WiseOwl COBOL has
 /// not built is THIS enum and nowhere else; <see cref="DeferredShapes.Describe"/> gives each its text and its
 /// owner. A new deferral is a new member — <c>RefResolutionDriftTests</c> fails a member with no description.</summary>
 public enum DeferredShape
@@ -135,7 +135,7 @@ public sealed class RefResolution
     {
         if (Outcome == RefOutcome.Deferred)
             edition.Error(Editions.Diagnostics.DiagnosticCatalog.ReferenceShapeNotImplemented,
-                $"{Feature}: COBOL.NET does not yet implement this reference shape in this position (COBOLNET_DESIGN §1.4)");
+                $"{Feature}: WiseOwl COBOL does not yet implement this reference shape in this position (COBOLNET_DESIGN §1.4)");
         return Place;
     }
 

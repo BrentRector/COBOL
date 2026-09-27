@@ -131,7 +131,7 @@ public enum FileRetryKind
     /// further attempt (GR4a).</summary>
     Times,
     /// <summary>RETRY FOR n SECONDS — a timeout period clamped by GR2 to the implementor's MAXIMUM MEANINGFUL
-    /// VALUE, which COBOL.NET defines as ZERO (Annex A.1 item 166, recorded in docs/CONFORMANCE.md §7): a lock
+    /// VALUE, which WiseOwl COBOL defines as ZERO (Annex A.1 item 166, recorded in docs/CONFORMANCE.md §7): a lock
     /// here is held only by a file connector of the executing run unit, which cannot release it while this
     /// statement runs, so no positive timeout could change the outcome. The period is therefore zero-length,
     /// no further attempt is made, and the conflict's OWN §9.1.13 status stands — never a sleep.</summary>
@@ -310,7 +310,7 @@ public static class HostFile
 
     /// <summary>⛔ THE ONE HOST CLASSIFICATION OF A WRITE FAILURE AS THE MEDIUM'S BOUNDARY (kb/Work PB1192): did
     /// the operating environment refuse to store bytes because the medium is full, a quota is exhausted, or the
-    /// file has reached the largest size the host allows? That is the manner in which COBOL.NET defines the
+    /// file has reached the largest size the host allows? That is the manner in which WiseOwl COBOL defines the
     /// externally-defined boundary of a physical sequential file — ISO §9.1.13.6 3), <i>"The implementor
     /// specifies the manner in which these boundaries are defined"</i> (Annex A.1 item 108, docs/CONFORMANCE.md
     /// <c>DOC-A.1-108</c>).

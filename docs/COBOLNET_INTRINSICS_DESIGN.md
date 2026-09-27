@@ -1,6 +1,6 @@
-# COBOL.NET — Intrinsics, Special Registers & Misc (deep-dive design)
+# WiseOwl COBOL — Intrinsics, Special Registers & Misc (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §12; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
@@ -28,7 +28,7 @@
 
 ## Summary
 
-DESIGN FOR THE COBOL.NET (greenfield COBOL→idiomatic-C#/Roslyn) target. The subsystem has TWO graded spines plus several smaller surfaces; everything is designed to fit the backend-neutral bound-tree pipeline (SSOT §1.1: ANTLR parse tree → binder → ONE bound tree → `ICodeGenBackend`, `--backend roslyn|cil`; Roslyn C#-source is the primary backend, Cecil/CIL is future-additive with its own private lowering — NO shared lowered IR). The binder resolves every FUNCTION call to a structured `BoundIntrinsicCall` (the resolved `IntrinsicSig` + typed bound arguments — never a pre-rendered C# fragment); backends only RENDER it, routing through the singular `CobolNum.Store(value,scale,profile)` and `CobolString.Store(value,width)` paths and the native substrate (fixed-point = `long` holding the UNSCALED value; float = `double`; alphanumeric = UTF-16 `string`; bool = `bool`; no byte[], no software `decimal`/`BigInteger` by default).
+DESIGN FOR THE WiseOwl COBOL (greenfield COBOL→idiomatic-C#/Roslyn) target. The subsystem has TWO graded spines plus several smaller surfaces; everything is designed to fit the backend-neutral bound-tree pipeline (SSOT §1.1: ANTLR parse tree → binder → ONE bound tree → `ICodeGenBackend`, `--backend roslyn|cil`; Roslyn C#-source is the primary backend, Cecil/CIL is future-additive with its own private lowering — NO shared lowered IR). The binder resolves every FUNCTION call to a structured `BoundIntrinsicCall` (the resolved `IntrinsicSig` + typed bound arguments — never a pre-rendered C# fragment); backends only RENDER it, routing through the singular `CobolNum.Store(value,scale,profile)` and `CobolString.Store(value,width)` paths and the native substrate (fixed-point = `long` holding the UNSCALED value; float = `double`; alphanumeric = UTF-16 `string`; bool = `bool`; no byte[], no software `decimal`/`BigInteger` by default).
 
 SPINE 1 — INTRINSIC CATALOG (the graded deliverable). Reject porting the legacy `decimal`-typed signatures. Instead build ONE declarative table `IntrinsicCatalog`: name → {ISO §15.2 function-type, result category, arity model (fixed N / optional trailing / variadic), per-arg category, binding = compile-time-fold | runtime-method}. §15.2 gives exactly six types — alphanumeric / boolean / national / numeric / INTEGER / index — and THAT classification IS the return-type column, mapped to the native substrate: integer-function→`long` (`Int128` past 18 digits, e.g. FACTORIAL); floating-point math (SQRT, SIN/COS/TAN/ASIN/ACOS/ATAN, LOG/LOG10/EXP/EXP10, PI, STANDARD-DEVIATION, VARIANCE, ANNUITY, PRESENT-VALUE, RANDOM)→`double`; exact numeric (SUM, MEAN, MEDIAN, MIDRANGE, RANGE, MAX/MIN-numeric, MOD, REM, INTEGER, INTEGER-PART, FRACTION-PART, ABS, SIGN, NUMVAL, NUMVAL-C, NUMVAL-F)→`NumX` (unscaled `long`+scale) so it flows straight into `CobolNum.Store` with the receiver's ROUNDED; alphanumeric/national (UPPER-CASE, LOWER-CASE, REVERSE, TRIM, CONCAT [§15.18, 2023 — CONCATENATE is NOT an ISO function at any edition and is intentionally absent, PHASE-11 Step 7], SUBSTITUTE, CHAR, CHAR-NATIONAL, NATIONAL-OF, DISPLAY-OF, the date-string functions)→`string`; boolean→`bool` (BOOLEAN-OF-INTEGER on the D-B1 '0'/'1' substrate, PHASE-11 Step 2). Runtime home = `CobolNet.Runtime.CobolIntrinsics` (numeric/string/financial/conversion families) + `CobolNet.Runtime.CobolDate` (date/time). Mine the legacy `IntrinsicFunctions.cs` for BEHAVIOR only (NaN/out-of-domain→EC-ARGUMENT-FUNCTION default result; ORD-MAX/ORD-MIN tie = first; date algorithms; NUMVAL parsing), not for types. The catalog is consulted in the BINDER at the function-call operand cell (`IntrinsicBinder`, the `BindPrimary` hook) and at the DISPLAY/MOVE-source/condition-operand binding paths — it is the single source of result-category truth, replacing the legacy ad-hoc `AlphanumericFunctions` HashSet + special-cases. MAX/MIN are category-polymorphic (resolve by arg category at the call site); `table(ALL)` expansion and variadic `params` port from legacy; FUNCTION LENGTH folds at compile time from PIC metadata.
 
@@ -366,7 +366,7 @@ on their current capacity" defines only the fixed-element case), and a bit-beari
 §8.5.1.6.3 layout, not a sum) — both a loud stage with the shape in the message. An ODO group inside a BASED entry
 or a REDEFINES-class record is never wrapped as an `OdoGroupPlace` by the resolver, so its r4 extent (and its GR8
 sending slice) is not applied — kb/Work PB80. PHYSICAL (§15.50.4 r8 / §15.14.4 r7) is accepted on both functions
-and transparent under COBOL.NET's determination that a group is physically located where it is defined
+and transparent under WiseOwl COBOL's determination that a group is physically located where it is defined
 (CONFORMANCE.md). Pinned by `pb61_length_byte_length_rule_branches` (one probe per rule branch, values derived in
 its header), `pb24_length_*`, `v59_length_agrees`, and the `pb61-*` negatives.
 
@@ -434,7 +434,7 @@ it to the ellipsis in every §15.x.2 general format, both ways; CONVERT/FIND-STR
 words and repeat nothing) — on any other function the ALL is COBOLNET1645 at any cardinality (`MOD(E(ALL) B)`
 bound over a one-occurrence table before), and the arity gate counts the arguments as WRITTEN, an ALL as its
 elements when its ranges are fixed and as the one argument §15.3 guarantees otherwise. "The evaluation of an ALL
-subscript shall result in at least one argument, otherwise the result … is undefined" — COBOL.NET defines the
+subscript shall result in at least one argument, otherwise the result … is undefined" — WiseOwl COBOL defines the
 undefined case as EC-ARGUMENT-FUNCTION (set when checking is on) and terminates the reference with that name
 either way (`CobolTable.AllArgs`), never handing an empty list to a body. ⛔ **AND EVERY VARIADIC NUMERIC BODY
 ASSERTS THAT INVARIANT AT ITS OWN ENTRY, through the one `CobolIntrinsics.RequireArguments` (kb/Work PB257),

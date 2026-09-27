@@ -1,6 +1,6 @@
 # SURVEY — Runtime Value Library (`Cobol.Net.Runtime` : Numeric / Strings / Text / Tables)
 
-Status: SURVEY (rearchitecture recon). Scope: the elementary/aggregate **value** kernels a COBOL.NET-generated C#
+Status: SURVEY (rearchitecture recon). Scope: the elementary/aggregate **value** kernels a WiseOwl COBOL-generated C#
 program calls — `Values`-to-be folders `Numeric/` (`CobolNum`, `NumProfile`, `CobolDec`, `CobolFloat`, `CobolEdit`,
 `CobolRounding`, `CobolSizeError`), `Strings/` (`CobolInspect`, `CobolStringOps`), `Text/` (`CobolString`,
 `CobolBool`, `CobolClass`), `Tables/` (`CobolTable`, `CobolDynTable`). Cross-read against the compile-time renderers

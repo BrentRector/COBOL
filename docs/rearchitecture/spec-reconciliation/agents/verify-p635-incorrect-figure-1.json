@@ -6,7 +6,7 @@
     "pdf_says": "DELETE Format 1 (record), 14.9.10.2. The INVALID KEY block is printed as ONE tall square bracket spanning both alternatives with a full-height vertical choice-indicator bar immediately inside each bracket:  [ |  INVALID KEY imperative-statement-1 / NOT INVALID KEY imperative-statement-2  | ] .",
     "markdown_says": "```\nDELETE file-name-1  RECORD\n  [ retry-phrase ]\n  \u2310 INVALID KEY imperative-statement-1     \u00ac\n  | NOT INVALID KEY imperative-statement-2 |\n  [ END-DELETE ]\n```",
     "why_it_matters": "The two inner choice-indicator bars (5.2.6.4) are gone: the markdown has exactly one glyph per side per row, so the four printed vertical strokes per row collapse to one. Without the bars the bracket reads as 'at most one of the enclosed alternatives', which would forbid writing INVALID KEY and NOT INVALID KEY on the same DELETE statement. The standard permits both (14.9.10.4 GR 11 explicitly discusses 'the presence or absence of the optional INVALID KEY and NOT INVALID KEY phrases'), so the loss is toward falsely-restrictive syntax.",
-    "reproduce": "cd E:/CobolSharp && python scripts/spec/page_workunit.py 635 --out E:/Temp/specrecon/v635 --dpi 300"
+    "reproduce": "cd E:/COBOL && python scripts/spec/page_workunit.py 635 --out E:/Temp/specrecon/v635 --dpi 300"
   },
   "verdict": {
     "real": true,

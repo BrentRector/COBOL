@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-generate-grapheme-table.py — build COBOL.NET's DERIVED grapheme-cluster property table from Unicode Character
+generate-grapheme-table.py — build WiseOwl COBOL's DERIVED grapheme-cluster property table from Unicode Character
 Database data (the data the UAX #29 extended-grapheme-cluster rules read).
 
     python scripts/unicode/generate-grapheme-table.py [--data data/unicode] [--out src/Cobol.Net.Runtime/Unicode/Segmentation/Data]
@@ -34,7 +34,7 @@ import zlib
 from collections import OrderedDict
 
 FORMAT_VERSION = 1
-MAGIC = b"CNGB"            # "COBOL.NET Grapheme Break"
+MAGIC = b"CNGB"            # "WiseOwl COBOL Grapheme Break"
 
 GCB = OrderedDict([("Other", 0), ("CR", 1), ("LF", 2), ("Control", 3), ("Extend", 4), ("ZWJ", 5), ("Regional_Indicator", 6),
                    ("Prepend", 7), ("SpacingMark", 8), ("L", 9), ("V", 10), ("T", 11), ("LV", 12), ("LVT", 13)])

@@ -3,7 +3,7 @@
   <!--
     Cobol.Net.Frontend — the reusable COBOL front-end (preprocessor + ANTLR lexer/parser + parse tree +
     diagnostics), extracted from the legacy CobolSharp.Compiler at G0 (docs/COBOLNET_DESIGN.md §17).
-    This is the single front-end for BOTH the greenfield COBOL.NET compiler and (until cut-over at G8) the
+    This is the single front-end for BOTH the greenfield WiseOwl COBOL compiler and (until cut-over at G8) the
     legacy byte-engine oracle. Its namespaces are CobolNet.Frontend.* as of rearchitecture PHASE 01
     (docs/rearchitecture/PHASE-01-mechanical-rename-deadcode.md) — the rename was pulled FORWARD from the former
     G8 big-bang, so G8 is now a pure DELETION of the legacy tree. The legacy tree keeps its own

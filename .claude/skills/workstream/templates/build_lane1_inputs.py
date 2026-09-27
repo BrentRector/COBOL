@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
-REPO = pathlib.Path(r"E:\CobolSharp")
+REPO = pathlib.Path(r"E:\COBOL")
 OUT = pathlib.Path(__file__).resolve().parent / "in"
 OUT.mkdir(parents=True, exist_ok=True)
 MAX = 14

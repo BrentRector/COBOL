@@ -97,7 +97,7 @@ public sealed class DynamicLengthTests
         if (!legal) EditionHarness.AssertHasDiagnostic(diag, "COBOLNET2258");
     }
 
-    /// <summary>§12.3.7.3 SR32 — the implementor specifies the physical-structure-names, and COBOL.NET specifies
+    /// <summary>§12.3.7.3 SR32 — the implementor specifies the physical-structure-names, and WiseOwl COBOL specifies
     /// none (docs/CONFORMANCE.md §3 D-DL3): the alternative is refused by name, COBOLNET2257. A second declaration of
     /// one name in the paragraph is COBOLNET2257 too (§8.4.2.1), and a repeated PREFIXED phrase is the
     /// choice-indicator rule (§5.2.6.4, COBOLNET2104).</summary>

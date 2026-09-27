@@ -1,4 +1,4 @@
-# COBOL.NET — Edition Validation (reserved words + edition diagnostics)
+# WiseOwl COBOL — Edition Validation (reserved words + edition diagnostics)
 
 > **Status: LIVE. The ONE `VersionConformancePass`
 > (`src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs`) is the SOLE edition gate — a TWO-ARM pass

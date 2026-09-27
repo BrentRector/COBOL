@@ -83,7 +83,7 @@ const results = await pipeline(
       'very defects you are looking for. Render and LOOK at the page.',
       '',
       'STEP 1 - render the printed page(s) for these clauses, and list their rules:',
-      '  cd E:/CobolSharp && python scripts/spec/clause_page.py ' + batch.join(' ') +
+      '  cd E:/COBOL && python scripts/spec/clause_page.py ' + batch.join(' ') +
         ' --render E:/Temp/gc' + i + ' --dpi 300',
       '  That resolves each clause to its PDF page AND renders it. It EXITS NON-ZERO if a clause does not',
       '  resolve — if that happens, STOP and report it; do not proceed without a page.',
@@ -95,7 +95,7 @@ const results = await pipeline(
         'if any(r[\'section\']==c or r[\'section\'].startswith(c+\'.\') for c in w)]"',
       '  and Read the rendered PNG. Read the general format AND the syntax rules for the section.',
       '',
-      'STEP 2 - read the grammar. Search E:/CobolSharp/src/Cobol.Net.Frontend/Grammar/ (CobolParserCore.g4 and',
+      'STEP 2 - read the grammar. Search E:/COBOL/src/Cobol.Net.Frontend/Grammar/ (CobolParserCore.g4 and',
       'Core/*.g4) for the rule implementing this construct. Quote it and its file:line.',
       '',
       'STEP 3 - compare, element by element. For the general format check:',
@@ -112,7 +112,7 @@ const results = await pipeline(
       '',
       'STEP 4 - PROVE IT against the real compiler. Write minimal COBOL to E:/Temp/ (UNIQUE PROGRAM-ID per file -',
       '.NET serves a stale same-named assembly otherwise) and run:',
-      '  cd E:/CobolSharp && src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <file.cob> -o <out.dll> --std 2023',
+      '  cd E:/COBOL && src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <file.cob> -o <out.dll> --std 2023',
       'ALWAYS include a CONTROL program that must succeed, so a rejection is attributable to the construct rather',
       'than to unrelated invalid source. Put the exact source in `repro` and the exact output in `observed`.',
       '',
@@ -137,7 +137,7 @@ const results = await pipeline(
       'the MARKDOWN is wrong, that is still worth reporting - say so in fix_sketch.',
       '',
       'PERSIST BEFORE YOU RETURN - MANDATORY. Write your complete results to',
-      '  E:/CobolSharp/docs/rearchitecture/spec-reconciliation/grammar-' + batch.join('_').replace(/\./g, '-') + '.json',
+      '  E:/COBOL/docs/rearchitecture/spec-reconciliation/grammar-' + batch.join('_').replace(/\./g, '-') + '.json',
       'as {"sections": ' + JSON.stringify(batch) + ', "findings": [...]}. Write it even if everything MATCHES - a',
       'file proving a section was checked clean is evidence; its absence is indistinguishable from work never done.',
     ].join('\n'),
@@ -171,7 +171,7 @@ const results = await pipeline(
           'confirm it, restate the exact ISO syntax the fix must implement.',
           '',
           'PERSIST BEFORE YOU RETURN: write your result to',
-          '  E:/CobolSharp/docs/rearchitecture/spec-reconciliation/grammar-confirm-' + String(f.section).replace(/\./g, '-') + '.json',
+          '  E:/COBOL/docs/rearchitecture/spec-reconciliation/grammar-confirm-' + String(f.section).replace(/\./g, '-') + '.json',
         ].join('\n'),
         { label: 'confirm:' + f.section, phase: 'Confirm', schema: RESULT }
       ).then(v => ({ ...f, confirmation: v }))

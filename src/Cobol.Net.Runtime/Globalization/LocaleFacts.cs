@@ -13,7 +13,7 @@ namespace CobolNet.Runtime.Globalization;
 /// The resolved SNAPSHOT of one locale's COBOL-relevant categories (ISO/IEC 1989:2023 §8.2.1 — LC_COLLATE,
 /// LC_CTYPE, LC_MONETARY, LC_TIME; DESIGN-locale-facility seam S5 / §8 "The .NET mapping and its documented
 /// limits"): the ONE place a <see cref="CultureInfo"/> is read for a locale, cached per tag. LC_COLLATE is NOT read
-/// from .NET — it is COBOL.NET's own derived CLDR/UCA engine (<see cref="CollationEngine"/>; <see cref="Collate"/>
+/// from .NET — it is WiseOwl COBOL's own derived CLDR/UCA engine (<see cref="CollationEngine"/>; <see cref="Collate"/>
 /// is the tag the engine resolves); the other three categories are .NET culture data: LC_CTYPE the
 /// <see cref="TextInfo"/> (DETERMINATION L9 — simple 1:1 case mapping), LC_MONETARY the <see cref="NumberFormatInfo"/>
 /// currency fields + <see cref="RegionInfo"/>, LC_TIME the <see cref="DateTimeFormatInfo"/> with DETERMINATION L10:

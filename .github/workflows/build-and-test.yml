@@ -259,14 +259,14 @@ jobs:
   # runner's cores (JOBS defaults to nproc) with a per-suite isolation model PROVEN equivalent to the serial
   # guard by scripts/guard-verify.sh (which diffs the per-test verdicts). Linux only — the NIST loop is bash. A
   # non-zero exit (any REGRESSION, DIFF, FAIL*, or build warning) fails the job.
-  # ⛔ IT MEASURES COBOL.NET SINCE kb/Work/PB750. The NIST leg used to drive the LEGACY `cobolsharp.dll`, whose
+  # ⛔ IT MEASURES WiseOwl COBOL SINCE kb/Work/PB750. The NIST leg used to drive the LEGACY `cobolsharp.dll`, whose
   # project graph has no code generator, so this job's green said nothing about the shipping compiler; it now
   # drives `cobol` (src/Cobol.Net.Cli), refuses to start if the resolved binary does not reference
   # Cobol.Net.Compiler, and names the compiler in its `=== NIST (cobol): … ===` line. The legacy oracle is
   # reachable through the same leg with COBOLSHARP_LEGACY_DIFFERENTIAL=1 — a differential, never the gate.
   # The legacy unit + integration legs remain: they gate CobolSharp.Compiler and the SHARED Cobol.Net.Frontend. ──
   guard:
-    name: Guard (COBOL.NET NIST + legacy unit + integration, parallel)
+    name: Guard (WiseOwl COBOL NIST + legacy unit + integration, parallel)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true'
     runs-on: ubuntu-latest
@@ -291,7 +291,7 @@ jobs:
       - name: Run parallel guard (scripts/guard-fast.sh)
         run: bash scripts/guard-fast.sh
 
-  # ── The greenfield COBOL.NET compiler (src/Cobol.Net.*) suites — the ACTIVE work (differential vs the legacy
+  # ── The greenfield WiseOwl COBOL compiler (src/Cobol.Net.*) suites — the ACTIVE work (differential vs the legacy
   # oracle + the NIST byte-baselines + the version matrix + unit). The guard job's NIST leg drives the same
   # compiler (PB750) over the CLI, from bash, on Linux only; these jobs cover the in-process compile path, both
   # OSes, and everything outside NIST, so they stay a separate gate (DEVLOG 515). Each job builds its own test project(s) then runs --no-build. The
@@ -668,7 +668,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # ── The opt-in legacy-oracle bake-verify cross-check (rearch P0). The normal battery now compares COBOL.NET to the
+  # ── The opt-in legacy-oracle bake-verify cross-check (rearch P0). The normal battery now compares WiseOwl COBOL to the
   # COMMITTED goldens under tests/differential/ (COBOLNET_DIFF_MODE=golden, the default) and never runs the legacy
   # engine — so the greenfield jobs above stay green after the G8 deletion of CobolSharp.Compiler. This job re-proves
   # the goldens still equal a LIVE legacy run (COBOLNET_DIFF_MODE=verify asserts cobolnet == legacy AND cobolnet ==

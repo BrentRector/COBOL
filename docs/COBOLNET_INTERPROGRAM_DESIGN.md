@@ -1,13 +1,13 @@
-# COBOL.NET — Interprogram (CALL / cross-program data) (deep-dive design)
+# WiseOwl COBOL — Interprogram (CALL / cross-program data) (deep-dive design)
 
-> **Status: LIVE / authoritative subsystem design** for the COBOL.NET rewrite (COBOL -> idiomatic
+> **Status: LIVE / authoritative subsystem design** for the WiseOwl COBOL rewrite (COBOL -> idiomatic
 > typed-native C# via Roslyn; no byte substrate). The condensed cross-referenced view is
 > `docs/COBOLNET_DESIGN.md` §9; THIS is the full design (decisions + rationale + C# mapping + hard
 > problems + edge cases). The locked invariants and cross-cutting consistency live in the SSOT.
 
 ## Summary
 
-Decision-complete design for cross-program data + calls in COBOL.NET (COBOL→typed-native C#→Roslyn). The load-bearing problem is BY REFERENCE on typed-native fields with NO byte window. Resolution: ONE managed-reference carrier (the typed-native re-implementation of `ManagedPointer`, internally `ManagedRef<T>`) that serves BY REFERENCE args, LINKAGE items, USAGE POINTER, ADDRESS OF, BASED, ALLOCATE, and SET ADDRESS OF — honoring the owner's singular-pattern rule. Crucially the carrier does NOT box WORKING-STORAGE: an ordinary `01 WS-X PIC 9(4)` stays a native `long`; a carrier is built ONLY at a call site as `ManagedRef<long>.OverField(()=>WS_X, v=>WS_X=v)` (an accessor over the caller's native field) so DISPLAY/MOVE/arithmetic keep zero indirection. The calling convention has two layers: a uniform opaque ABI (`ICobolProgram.Call(CobolArgs)`, the typed analog of the rejected `Entry(ManagedPointer[])`) for dynamic/cross-assembly CALL, and a typed fast path (direct `R=_SUB.Run(...)`) for same-assembly, statically-resolvable, PIC-conforming calls. Each program becomes its own (instantiable, not static) C# class; nested programs are nested classes; recursion/functions/methods get a per-activation instance, plain programs a cached singleton for last-used persistence. RETURNING maps to the C# method return value (idiomatic). The only sanctioned transient-byte boundary is category-mismatch BY REFERENCE (PIC X(4) arg viewed as PIC 9(4)); same-category — the common case — is always fully typed. Pointers are always-typed (never byte-gated).
+Decision-complete design for cross-program data + calls in WiseOwl COBOL (COBOL→typed-native C#→Roslyn). The load-bearing problem is BY REFERENCE on typed-native fields with NO byte window. Resolution: ONE managed-reference carrier (the typed-native re-implementation of `ManagedPointer`, internally `ManagedRef<T>`) that serves BY REFERENCE args, LINKAGE items, USAGE POINTER, ADDRESS OF, BASED, ALLOCATE, and SET ADDRESS OF — honoring the owner's singular-pattern rule. Crucially the carrier does NOT box WORKING-STORAGE: an ordinary `01 WS-X PIC 9(4)` stays a native `long`; a carrier is built ONLY at a call site as `ManagedRef<long>.OverField(()=>WS_X, v=>WS_X=v)` (an accessor over the caller's native field) so DISPLAY/MOVE/arithmetic keep zero indirection. The calling convention has two layers: a uniform opaque ABI (`ICobolProgram.Call(CobolArgs)`, the typed analog of the rejected `Entry(ManagedPointer[])`) for dynamic/cross-assembly CALL, and a typed fast path (direct `R=_SUB.Run(...)`) for same-assembly, statically-resolvable, PIC-conforming calls. Each program becomes its own (instantiable, not static) C# class; nested programs are nested classes; recursion/functions/methods get a per-activation instance, plain programs a cached singleton for last-used persistence. RETURNING maps to the C# method return value (idiomatic). The only sanctioned transient-byte boundary is category-mismatch BY REFERENCE (PIC X(4) arg viewed as PIC 9(4)); same-category — the common case — is always fully typed. Pointers are always-typed (never byte-gated).
 
 ## Decisions
 
@@ -273,6 +273,23 @@ aliases a same-`T` carrier and fails the activation with EC-PROGRAM-ARG-MISMATCH
 PB615 — see "A supplied argument the formal cannot read" below), and `SlotValue<T>` is
 §14.2.3 GR10's detached record — which GR10 fills with *“a SET statement”* for this class, i.e. the reference
 copy itself.
+
+**⛔ THE PREDEFINED NULL AS AN ARGUMENT IS AN IDENTIFIER OF THE FORMAL'S CLASS, NOT A FILL (kb/Work PB1630).**
+§8.4.3.1.2 lists NULL as identifier Format 8 (predefined-address) and Format 6 (predefined-object), and §8.4.3.10.3
+SR1 a) admits it *“as an argument in a program-prototype format CALL statement, a function-prototype format
+function activation, or a method invocation”*, its category decided by *“the associated data item's class”* — the
+formal's. So it crosses in its written mode (BY CONTENT, or BY VALUE: §14.9.4.3 SR22 admits identifier-4 of class
+pointer or object, and SR23's numeric-literal rule is not about it) as ONE storage-free carrier,
+`PredefinedNullArgument.Instance`, and the formal's `Slot<T>` / `SlotValue<T>` supplies a fresh cell holding the null
+of its own carrier (`CobolArgAdapt.PredefinedNull<T>`: `ManagedPointer.Null`, a default `ProgramPointer` /
+`FunctionPointer`, a null reference — §8.4.3.10.4 GR1–GR3, §8.4.3.7.4 GR1). The carrier is the same whether or not
+the activating element knows the formal, which it does not under §12.3.8.4 GR10 c); every non-slot adapter refuses it
+as EC-PROGRAM-ARG-MISMATCH. At bind, `ParameterConformance.ContentConformanceReason` gives NULL the §14.8.2.3.3 verdict
+of an identifier of class pointer — the SET paragraph for a pointer / object-reference formal, and a refusal for every
+other formal, whose MOVE or COMPUTE admits no pointer or object operand (§14.9.25.3 SR1). The INVOKE lane is typed, so
+it renders the formal's own `PicInfo.DefaultInitializer` (`BoundInvokeArg.PredefinedNull`). Before PB1630 the CALL and
+function lanes crossed NULL as a one-character LOW-VALUE fill, which a pointer formal refused at run time and a PIC X
+formal accepted.
 
 **⛔ A POINTER BY CONTENT INTO A NON-POINTER FORMAL IS ITS STORAGE IMAGE (kb/Work PB970 arm 2).** §14.8.2.3.2 is
 the BY REFERENCE rule; BY CONTENT, §14.8.2.3.3 rule 1 asks only that *“the formal parameter shall be of the same
@@ -651,10 +668,30 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   RECORD item (§13.18.15.3 SR2) crosses BY CONTENT and the function can no longer overwrite the structured
   constant; BY CONTENT for every other shape — a literal, an arithmetic or boolean expression (the boolean rides
   CALL's `ContentBool` channel), a function-identifier (§8.4.3.2.3 SR1), an object property or object data item.
-  A character-valued intrinsic function-identifier crosses on the string channel (`CallEmitter.ArgText`). A
-  figurative constant or ALL literal (a literal by §8.3.3.6.3 SR1) crossing BY CONTENT FILLS an elementary formal's character
-  image, as §14.8.2.3.3 rule 2d's MOVE does (§8.3.3.6.4 GR2 — `CallEmitter.FigurativeFillWidth` /
-  `RepeatToWidth`), for CALL and function arguments alike; it used to carry one occurrence (`"*   "`).
+  A character-valued intrinsic function-identifier crosses on the string channel (`CallEmitter.ArgText`).
+- **A figurative constant or ALL literal argument FILLS the formal's allocated record (kb/Work PB1418 + PB1617).**
+  It is a literal (§8.3.3.6.3 SR1), so it crosses BY CONTENT, and §14.2.3 GR9's second branch — a NESTED or
+  prototyped program, a method, a function — allocates "a data item with the same description and the same number
+  of bytes as the formal parameter, where the maximum length is used if the formal parameter is described as a
+  variable-occurrence data item" and MOVEs the argument into it; §8.3.3.6.4 GR2 repeats the figurative to that
+  record's character positions. ONE helper, `CallEmitter.FigurativeArgumentImage`, renders the value for all three
+  lanes (CALL and function through `ArgText`; INVOKE through `BoundInvokeArg.ContentFill`), at
+  `FigurativeFillWidth` = the formal's text-crossing window (`BoundaryImageWidth`): an elementary non-numeric
+  item's positions, an alphanumeric group's record image (an OCCURS DEPENDING group at its MAXIMUM, per GR9 — no
+  run-time extent is involved), a bit / national group's as-if positions (§14.8.2.1 NOTE), in the formal's own
+  category for HIGH-/LOW-VALUE. Where GR9 gives no fixed record — no formal known (the FIRST branch: "of the same
+  length as the argument"), a numeric formal (the COMPUTE reads the value), ANY LENGTH, DYNAMIC LENGTH — the
+  figurative keeps its §8.3.3.6.4 GR3 length (one character / one literal-1). A VARIABLE-LENGTH group formal
+  (§8.5.1.12) is not a fill case at all: §8.5.1.12.1 bars a move into it from anything but a compatible group, so
+  `ParameterConformance` refuses it at bind. It used to carry one occurrence into a group formal (`"*   "`), and
+  INVOKE refused every figurative but NULL as "not yet carried".
+- **A GROUP formal asks the WHOLE MOVE question (kb/Work PB1617).** §14.8.2.2 rule 2 makes a BY CONTENT argument's
+  conformance that of "a MOVE statement with the argument as the sending operand and the corresponding formal
+  parameter as the receiving operand", so a literal, ALL literal, figurative or numeric literal argument into a
+  group formal takes `MoveTable16.Validity` — §14.9.25.3 SR2 (a strongly-typed group accepts only its own type)
+  and SR9 (a variable-length group only a compatible group) included — never a blanket "conformant". Its
+  class-pointer / object-reference twin: such a formal takes §14.8.2.3.3's SET paragraph, so a literal or any
+  figurative but NULL is refused at bind (it used to pass Table 16 and die at the callee's managed slot).
   ⚠ The §14.8.2.3.3 rules were once PRIVATE to INVOKE, and
   the CALL lane therefore had no by-content screen at all while `CobolArgAdapt`'s converting views silently
   adapted whatever arrived; EXTRACTION, not a second copy, is what closed it. The DYNAMIC Format-1 lane still

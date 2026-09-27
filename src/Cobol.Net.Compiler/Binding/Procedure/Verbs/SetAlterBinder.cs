@@ -135,7 +135,7 @@ internal sealed class SetAlterBinder(BinderContext ctx)
                     + "[PROCEED TO] procedure-name-2 (X3.23-1985 ALTER statement)");
             // ⛔ BOTH ALTER OPERANDS ARE procedure-names AND GO THROUGH THE ONE RESOLUTION (kb/Work PB390):
             // an unresolvable name is reported at COMPILE time, not staged to a run-time abort blaming a gap in
-            // COBOL.NET. proc-1 additionally has to be a PARAGRAPH (a section resolves to a multi-pc range and
+            // WiseOwl COBOL. proc-1 additionally has to be a PARAGRAPH (a section resolves to a multi-pc range and
             // the ALTER shape rule is about a single GO TO sentence), so a RESOLVED section takes the shape arm
             // below rather than the name arm — telling the user "that is a section" beats "unknown procedure".
             if (ctx.Table.ResolveProcedureOperand(names[0], "ALTER") is not { } target) { bad = true; continue; }

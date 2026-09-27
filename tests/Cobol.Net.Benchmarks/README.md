@@ -1,6 +1,6 @@
 # `tests/Cobol.Net.Benchmarks/` — the BenchmarkDotNet harness
 
-The measured performance profile of COBOL.NET's performance-sensitive runtime subsystems: the **collation
+The measured performance profile of WiseOwl COBOL's performance-sensitive runtime subsystems: the **collation
 engine** (`src/Cobol.Net.Runtime/Collation/`, kb/Work **PB101** — `Collation/CollationBenchmarks.cs`), the **key
 cache** (**PB106** — `Collation/CacheBenchmarks.cs`), the **CLDR loader and builder** (**PB105** —
 `Collation/CldrBenchmarks.cs`), and the **Unicode normalization and grapheme segmentation** subsystems

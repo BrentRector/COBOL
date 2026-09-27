@@ -1,4 +1,4 @@
-# COBOL.NET — ISO/IEC 1989:2023 Conformance Plan (LEDGER — the M2/M3/M4 post-85 feature catalog)
+# WiseOwl COBOL — ISO/IEC 1989:2023 Conformance Plan (LEDGER — the M2/M3/M4 post-85 feature catalog)
 
 > **⚠ FROZEN HISTORICAL LEDGER (2026-07-19):** rows here are NOT live tracking — the P13 review found several
 > stale (e.g. 'no named track' rows that ARE now tracked). Live state = the plan §0 + its §8 residue ledger +
@@ -64,7 +64,7 @@
 ## 0.5 [RETIRED 2026-06-10 — pre-PIVOT history only] The byte-engine data-model migration (DEVLOG 393–456)
 
 > ⛔ **OBSOLETE — do NOT execute anything in this section.** It describes the legacy byte-engine → typed-fields
-> migration. The greenfield COBOL.NET (`src/Cobol.Net.*`) is born typed-native (no byte substrate, no migration);
+> migration. The greenfield WiseOwl COBOL (`src/Cobol.Net.*`) is born typed-native (no byte substrate, no migration);
 > the Roslyn C# backend is PRIMARY with a Cecil/CIL backend future-additive behind `ICodeGenBackend`
 > (`docs/COBOLNET_DESIGN.md`). Its supporting docs (`DATA_MODEL_ARCHITECTURE.md`, `DATA_MODEL_REVIEW.md`,
 > `RECORD_STRUCT_STORAGE_DESIGN.md`, `OO_IMPLEMENTATION_DESIGN.md`) were DELETED (DEVLOG 523–524).
@@ -89,7 +89,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
   scaffolding (classify *everything* byte-backed = today's behavior) → Stage 1 numeric pipeline + differential
   oracle → Stage 2 classifier (fallback on) → Stage 3 flip typed one rule at a time (**character data first — the
   cheapest, highest-payoff flip**) → Stage 4 pointers + OO → Stage 5 Roslyn C# backend w/ Cecil oracle → Stage 6
-  finalize runtime + post-conformance rename (`CobolSharp` → `COBOL.NET`, exe `cobol.exe`).
+  finalize runtime + post-conformance rename (`CobolSharp` → `WiseOwl COBOL`, exe `cobol.exe`).
   - **PROGRESS — Stage 0/1 slice 1 LANDED (DEVLOG 394):** ☑ the numeric substrate is in (`src/CobolSharp.Runtime/
     Numeric/`): `CobolRounding` (8 ISO modes), **`CobolDecimal`** (the exact `BigInteger` base-10 carrier — the
     owner-gated substrate), `NumProfile` (runtime numeric descriptor + `FromDescriptor` bridge), **`CobolNum`**
@@ -252,7 +252,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
 ## 1. Current status — DONE (do not re-list as gaps)
 
 - **M1 (COBOL-85): COMPLETE — on BOTH compilers.** Legacy: NIST CCVS85 = 364 baselines green. **GREENFIELD
-  (COBOL.NET): Phase 1 closed the COBOL-85 corpus drive (DEVLOG 571–575, 2026-06-11)** — every golden-bearing
+  (WiseOwl COBOL): Phase 1 closed the COBOL-85 corpus drive (DEVLOG 571–575, 2026-06-11)** — every golden-bearing
   NIST program locked byte-exact in `NistDifferentialTests` (318: NC/ST/RL/IX/IC/SQ/IF/SM/RW/OBSQ); Report
   Writer, collating, the full §15 intrinsic catalog (with edition windows), COPY/REPLACE, LINAGE, and file I/O
   (incl. variable-length records, EXTERNAL/GLOBAL FDs, the Tier-C record codec) all typed-native. ⚠ The ☑
@@ -778,7 +778,7 @@ A commercial compiler needs more than spec checkboxes. Track these in parallel:
 ### 6.2 Project + executable rename — ☑ SUPERSEDED (realized by the PIVOT)
 > The greenfield is born `src/Cobol.Net.*` with exe `cobol` (`docs/COBOLNET_PROJECT_ORG_DESIGN.md`); the legacy
 > `CobolSharp.*` projects are deleted at G8, so no rename remains. The touch-points below are historical.
-- Rename the project **`CobolSharp` → `COBOL.NET`** (rationale: it is COBOL for the .NET runtime — there is no
+- Rename the project **`CobolSharp` → `WiseOwl COBOL`** (rationale: it is COBOL for the .NET runtime — there is no
   "sharp" in it).
 - **Produced executable MUST be named `cobol.exe`** (lowercase).
 - Touch-points to plan for: `.csproj` `AssemblyName` + output exe name; the `.sln`; root namespaces

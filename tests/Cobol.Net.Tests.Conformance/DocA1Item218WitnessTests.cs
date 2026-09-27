@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// when I-O status value indicates a fatal exception condition)" — and the one arm no corpus golden can witness,
 /// because the golden harness requires exit 0 and this arm ends in abnormal run-unit termination.
 ///
-/// <para><b>The determination</b> (docs/CONFORMANCE.md §7, DOC-A.1-218): COBOL.NET continues the run unit
+/// <para><b>The determination</b> (docs/CONFORMANCE.md §7, DOC-A.1-218): WiseOwl COBOL continues the run unit
 /// (§9.1.13.1 "The implementor may either continue or terminate the execution of the run unit") and does NOT
 /// "specify otherwise" under §14.6.13.1.3 rule 3 — "If the exception condition is a fatal EC-I-O exception
 /// condition, then the rules for 9.1.13, I-O status apply, then if the implementor has not specified otherwise,

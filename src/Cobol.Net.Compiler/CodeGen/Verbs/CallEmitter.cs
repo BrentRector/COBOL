@@ -540,7 +540,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // "no whole-group character image" on `CALL "SUB" USING G`. That claim was false, and refusing the
             // CALL rejected conforming source — §14.2.3 GR8 (`cite.py`-verified): "If the argument is passed by
             // reference, the activated runtime element operates as if the formal parameter occupies the same
-            // storage area as the argument", which COBOL.NET realizes through the very image round-trip that
+            // storage area as the argument", which WiseOwl COBOL realizes through the very image round-trip that
             // exists. Only a variable-length group or a group with a pointer/object-class leaf is still
             // genuinely imageless and stays loud (every NUMERIC leaf kind joined the image across kb/Work
             // PB164 waves 1–2 + the R40 INDEX pin) — the wording matches the predicate actually tested.
@@ -654,48 +654,79 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // ABI accepts is read back through CobolArgAdapt's ReadNumericCell (kb/Work R12).
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<Int128>.Cell((Int128)({x.Expr})), {ValueMeta(ctx.SignEncoding, 38, x.Scale, signed: true)})";
             }
-            // ⛔ A FIGURATIVE CONSTANT / ALL LITERAL FILLS THE FORMAL (kb/Work PB1418). §14.8.2.3.3 rule 2d makes a
-            // BY CONTENT crossing into a non-numeric formal "the same as for a MOVE statement", and a figurative
-            // constant "in association with a fixed-length data item" is "repeated character by character" to the
-            // item's character positions, then truncated from the right (§8.3.3.6.4 GR2). The
-            // crossing used to carry ONE occurrence, which the callee's formal then space-padded: `CALL … AS NESTED
-            // USING BY CONTENT ALL "*"` into a PIC X(4) formal arrived as "*   ", ZERO as "0   " (measured). The
-            // formal is recorded on every Format-2 and function argument (BoundCallArg.Formal), so the fill width is
-            // its character image width; with no fixed-length formal known (a numeric formal, whose COMPUTE-rule
-            // crossing reads the one digit, or an ANY LENGTH / dynamic-length one) one occurrence is the value.
-            case BoundAllLiteral all:
-                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell({CsLiteral(RepeatToWidth(all.Literal, FigurativeFillWidth(a.Formal)))}), null)";
-            case BoundFigurative fig:
-                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell(new string({FigurativeConstants.Fill(fig.Kind, ctx.Data.Collating, a.Formal?.Pic?.Category)}, {FigurativeFillWidth(a.Formal) ?? 1})), null)";
+            // ⛔ NULL IS AN IDENTIFIER, NOT A FILL (kb/Work PB1630). §8.4.3.1.2 Format 8 (predefined-address) and
+            // §8.4.3.10.3 SR1 a) admit it "as an argument in a program-prototype format CALL statement, a
+            // function-prototype format function activation", and §14.8.2.3.3 hands it to a pointer / object-reference
+            // formal by a SET. This arm used to fall into the figurative fill below and cross as a one-character
+            // string, which every slot adapter refused at run time (EC-PROGRAM-ARG-MISMATCH on legal source). It
+            // crosses in its OWN mode — BY CONTENT or BY VALUE (§14.9.4.3 SR22 admits class pointer and object) — as
+            // the storage-free NULL carrier whose value the formal's own slot adapter supplies, so the crossing is
+            // the same whether or not this activating element knows the formal (§12.3.8.4 GR10 c)).
+            case BoundFigurative { Kind: 'N' }:
+                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, {RuntimeApi.PredefinedNullArgumentCarrier}, null)";
+            // ⛔ A FIGURATIVE CONSTANT / ALL LITERAL FILLS THE FORMAL'S ALLOCATED RECORD (kb/Work PB1418 + PB1617) —
+            // through the ONE fill the INVOKE lane shares (FigurativeArgumentImage).
+            case BoundAllLiteral or BoundFigurative:
+                return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell({FigurativeArgumentImage(a.Value, a.Formal, ctx.Data)}), null)";
             default:
                 return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell("
                     + LoudValue("string", "CALL USING argument form") + "), null)";
         }
     }
 
-    /// <summary>The character width a figurative-constant / ALL-literal argument fills (§14.8.2.3.3 rule 2d's MOVE
-    /// into the corresponding formal) — the formal's character positions when it is a fixed-length, non-numeric
-    /// ELEMENTARY item; null when no such width is known (no recorded formal, a numeric formal, an ANY LENGTH or
-    /// DYNAMIC LENGTH one). ⚠ A GROUP formal still receives one occurrence — a named residue: its fill width is the
-    /// group's current extent, which for a variable-length group is a run-time fact this compile-time fill cannot
-    /// read (kb/Work PB204's BoundaryImageCapable carrier), so it is not guessed here.</summary>
-    private static int? FigurativeFillWidth(DataItem? formal) =>
-        formal is { IsElementary: true, IsAnyLength: false, IsDynamicLength: false }
-        && formal.Pic is { Category: not PicCategory.Numeric }
-        && formal.ImageWidth > 0
-            ? formal.ImageWidth : null;
-
-    /// <summary>An ALL literal's value at <paramref name="width"/> characters — §8.3.3.6.4 GR9 ("all or part of the
-    /// string generated by successive concatenations of the characters comprising literal-1"), sized by GR2 (repeated
-    /// until it reaches the associated item's character positions, then truncated from the right); one occurrence
-    /// (GR3 c) when no width is known.</summary>
-    private static string RepeatToWidth(string literal, int? width)
+    /// <summary>⛔ THE ONE VALUE OF A FIGURATIVE-CONSTANT / ALL-LITERAL ARGUMENT (kb/Work PB1418 + PB1617) — the C#
+    /// string expression every activation that knows its formal crosses: the Format-2 CALL and the user-defined
+    /// function (<see cref="ArgText"/>) and the INVOKE (<c>OoEmitter</c>'s content-fill arm).
+    /// <para>The rule is §14.2.3 GR9's second branch: for "a program and the NESTED phrase", a prototyped program, "a
+    /// method" or "a function", the allocated record is "a data item with the same description and the same number
+    /// of bytes as the formal parameter, where the maximum length is used if the formal parameter is described as a
+    /// variable-occurrence data item", and the argument is moved into it by "a MOVE statement" unless the formal is
+    /// numeric (then "a COMPUTE statement"). A figurative constant moved to "a fixed-length data item" is "repeated
+    /// character by character" to that item's character positions and truncated from the right (§8.3.3.6.4 GR2) —
+    /// so the value that crosses is the fill at the RECORD's width (<see cref="FigurativeFillWidth"/>), in the
+    /// formal's own category for HIGH-/LOW-VALUE (a national formal reads the national sequence, §8.3.3.6.4 GR1).
+    /// Where no fixed width exists — no formal known (GR9's FIRST branch, whose record is "of the same length as the
+    /// argument"), a numeric formal (the COMPUTE reads the value), an ANY LENGTH formal (whose record takes "the
+    /// same … length as the argument") or a dynamic-length one (not a fixed-length item) — the figurative's length
+    /// is the one §8.3.3.6.4 GR3 b)/c) gives it: one character, or one occurrence of literal-1.</para>
+    /// <para>Before PB1617 the width was stated for an ELEMENTARY formal only, so a GROUP formal received one
+    /// occurrence that the callee space-padded (measured: <c>CALL … AS NESTED USING BY CONTENT ALL "*"</c> into
+    /// <c>01 G. 05 A PIC X(2). 05 B PIC X(2).</c> displayed <c>*   </c>), and the INVOKE lane had no arm at all.</para></summary>
+    internal static string FigurativeArgumentImage(BoundOperand fill, DataItem? formal, DataBinder data)
     {
-        if (width is not { } w || literal.Length == 0) return literal;
-        var sb = new System.Text.StringBuilder(w + literal.Length);
-        while (sb.Length < w) sb.Append(literal);
-        return sb.ToString(0, w);
+        int? width = FigurativeFillWidth(formal);
+        return fill switch
+        {
+            // §8.3.3.6.4 GR2's repetition is the ONE runtime rule EmitText.RepeatToWidth folds (kb/Work PB297).
+            BoundAllLiteral all => CsLiteral(width is { } w ? RepeatToWidth(all.Literal, w) : all.Literal),
+            // NULL fills nothing: it is the predefined-address identifier, and each lane crosses it as its own null
+            // (kb/Work PB1630 — ArgCarrierText's NULL arm, OoEmitter's PredefinedNull arm).
+            BoundFigurative { Kind: 'N' } => throw new ArgumentException(
+                "NULL is the predefined-address identifier (ISO §8.4.3.1.2 Format 8), not a figurative fill", nameof(fill)),
+            BoundFigurative fig =>
+                $"new string({FigurativeConstants.Fill(fig.Kind, data.Collating, formal?.OperandPic?.Category, data.NationalCollating)}, {width ?? 1})",
+            _ => throw new ArgumentException(
+                $"{fill.GetType().Name} is not a figurative constant or ALL literal", nameof(fill)),
+        };
     }
+
+    /// <summary>The character positions of §14.2.3 GR9's allocated record for a figurative-constant / ALL-literal
+    /// argument — the width <see cref="FigurativeArgumentImage"/> fills to — or null when the record has no fixed
+    /// character width to fill (see there). It is the formal's TEXT-crossing window
+    /// (<see cref="BoundaryImageWidth"/>, the width the callee's carrier and the INVOKE argument window use), so the
+    /// fill and the window cannot disagree: an alphanumeric group's record image width, a bit / national group's
+    /// as-if position count (§14.8.2.1 NOTE: "A bit group or national group is treated as an elementary item"), a
+    /// non-numeric elementary item's character positions.
+    /// <para>An OCCURS DEPENDING group needs no run-time extent: GR9 allocates the record at the MAXIMUM length, which
+    /// is the record image width. A VARIABLE-LENGTH group (§8.5.1.12) has no fixed record at all — and needs none,
+    /// because §8.5.1.12.1 bars any move into it from an operand that is not a compatible group, which
+    /// <c>ParameterConformance</c> reports at bind — so it answers null.</para></summary>
+    private static int? FigurativeFillWidth(DataItem? formal) =>
+        formal is null || formal.IsAnyLength || formal.IsDynamicLength ? null
+        : formal.IsElementary
+            ? formal.Pic is { Category: not PicCategory.Numeric } && formal.ImageWidth > 0 ? formal.ImageWidth : null
+        : VariableLengthCompatibility.IsVariableLength(formal) ? null
+        : BoundaryImageWidth(formal);
 
     /// <summary>The PROCEDURE DIVISION USING formal this argument place denotes AS A WHOLE, or null
     /// (ISO §8.8.4.8.4 GR1c / §14.9.4.4 GR12 — kb/Work PB165).

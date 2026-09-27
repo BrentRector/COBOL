@@ -46,7 +46,7 @@ public sealed record DynamicLengthStructure(
     string Name, DynamicLengthPrefix Prefix, bool Delimited, string? PhysicalStructureName)
 {
     /// <summary>§8.5.1.10.1's second candidate — the largest integer the PREFIXED phrase's length field can hold,
-    /// or null when there is no PREFIXED phrase. COBOL.NET's length fields are exactly the binary fields GR18
+    /// or null when there is no PREFIXED phrase. WiseOwl COBOL's length fields are exactly the binary fields GR18
     /// names (32-bit, or 16-bit with SHORT), so these are GR18's own table values.</summary>
     public long? PrefixedMaximum => Prefix switch
     {

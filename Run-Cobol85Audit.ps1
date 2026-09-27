@@ -1,6 +1,6 @@
 param(
-    [string]$RepoRoot = "e:\CobolSharp",
-    [string]$OutDir   = "e:\CobolSharp\audit\cobol85"
+    [string]$RepoRoot = "e:\COBOL",
+    [string]$OutDir   = "e:\COBOL\audit\cobol85"
 )
 
 Set-StrictMode -Version Latest

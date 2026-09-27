@@ -43,7 +43,7 @@ fileControlClauseGroup
 // ASSIGN [TO] {device-name-1 | literal-1} … [USING data-name-1] | ASSIGN USING data-name-1 (ISO §12.4.5.1, every
 // format). ⛔ THE ELLIPSIS IS ON THE INNER BRACE PAIR (rendered, kb/Work PB829 — folios 312-314), so the TO phrase
 // is a LIST and `assignTarget+` is the general format. What the list MEANS, and which lists are allowed, is the
-// implementor's (§12.4.5.2 SR5): COBOL.NET's determination (docs/CONFORMANCE.md §7 row DOC-A.1-71) is applied BY
+// implementor's (§12.4.5.2 SR5): WiseOwl COBOL's determination (docs/CONFORMANCE.md §7 row DOC-A.1-71) is applied BY
 // NAME at bind, in `AssignTargetRule` — never by a one-operand grammar that answered a legal list with COBOL0308.
 assignClause
     : ASSIGN TO? assignTarget+ (USING dataReference)?
@@ -151,7 +151,7 @@ fileReserveClause
 // strict, a warning with the pre-removal no-op reading under --permissive). Deleting the rule was MEASURED and
 // rejected: NIST SQ216A writes `PADDING CHARACTER IS "9"` and SQ217A the operand form `PADDING PADDING-CHARACTER`
 // (both compiled at --std 85), so the 85/2002 reading has to stay. Nothing is captured on the FileModel and that
-// is deliberate — COBOL.NET has no blocking model, so a stored padding character would be a field nothing reads
+// is deliberate — WiseOwl COBOL has no blocking model, so a stored padding character would be a field nothing reads
 // (feedback_a_dead_lookup_is_also_unverified); the clause is inert in the program's own terms, which is what
 // makes the --permissive migration reading honest.
 // ⛔ TWO ARMS, ONE TOKEN (kb/Work PB300 — the second arm is why a decline may not cost the user the WORD):

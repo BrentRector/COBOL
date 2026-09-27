@@ -125,7 +125,7 @@ internal static class OptionsBinder
         return null;
     }
 
-    /// <summary>The ARITHMETIC clause's mode — AND the one place COBOL.NET declines STANDARD-BINARY.
+    /// <summary>The ARITHMETIC clause's mode — AND the one place WiseOwl COBOL declines STANDARD-BINARY.
     ///
     /// <para>⛔ THE SCREEN LIVES HERE BECAUSE THIS IS THE SINGLE CONSTRUCTION POINT. It used to live in
     /// <c>DataBinder</c>, which binds programs, functions and the class/factory/object skeletons but NOT a
