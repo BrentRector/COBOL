@@ -41,6 +41,7 @@ set -u
 # it is never the cache that is being measured. `COBOLNET_COMPILE_CACHE=on bash scripts/battery.sh` overrides.
 export COBOLNET_COMPILE_CACHE="${COBOLNET_COMPILE_CACHE:-off}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
+. scripts/python-resolve.sh   # "$PY": the ONE interpreter every python leg below runs (kb/Work PB1637)
 OUT="${1:-${TMPDIR:-/tmp}/battery-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$OUT"
 T0=$(date +%s); el() { echo "[+$(( $(date +%s) - T0 ))s] $*"; }
@@ -61,11 +62,11 @@ note() { echo "$1" | tee -a "$SUMMARY"; }
 # tracked files, two of them in `src/`, that no note owned (kb/Work PB379). Same rule 1, same second of runtime,
 # same log, same red: an audit nobody runs is a checker that has never contradicted anything.
 el "=== PHASE -1: citation audits (static, no build) ==="
-python3 scripts/spec/audit_code_citations.py --check > "$OUT/citations.log" 2>&1
+"$PY" scripts/spec/audit_code_citations.py --check > "$OUT/citations.log" 2>&1
 CIT=$?
 note "$(printf '%-16s %s' 'citations:' "$(grep -E '^(⛔|[0-9]+ files)' "$OUT/citations.log" | tail -1)")"
 [ "$CIT" -eq 0 ] || { note "citations:       ⛔ findings — see $OUT/citations.log"; RC=1; }
-python3 scripts/spec/audit_doc_citations.py --check >> "$OUT/citations.log" 2>&1
+"$PY" scripts/spec/audit_doc_citations.py --check >> "$OUT/citations.log" 2>&1
 DOCCIT=$?
 note "$(printf '%-16s %s' 'doc citations:' "$(grep -E '^⛔ [0-9]+ MISFILED' "$OUT/citations.log" | tail -1)")"
 [ "$DOCCIT" -eq 0 ] || { note "doc citations:   ⛔ misfiled — see $OUT/citations.log"; RC=1; }
@@ -75,7 +76,7 @@ note "$(printf '%-16s %s' 'doc citations:' "$(grep -E '^⛔ [0-9]+ MISFILED' "$O
 # is an agent's recorded output, never edited to stay current (both audits above skip the directory by name), so
 # a claim the tree has since refuted cannot be repaired and must carry a `superseded_by` marker instead. One of
 # those files told PB712's implementer that a refuted grammar "must NOT be re-implemented". No submodule needed.
-python3 scripts/spec/audit_evidence_supersession.py --check >> "$OUT/citations.log" 2>&1
+"$PY" scripts/spec/audit_evidence_supersession.py --check >> "$OUT/citations.log" 2>&1
 EVSUP=$?
 note "$(printf '%-16s %s' 'evidence:' "$(grep -E '^⛔ [0-9]+ UNMARKED' "$OUT/citations.log" | tail -1)")"
 [ "$EVSUP" -eq 0 ] || { note "evidence:        ⛔ unmarked refuted claims — see $OUT/citations.log"; RC=1; }
@@ -84,7 +85,7 @@ note "$(printf '%-16s %s' 'evidence:' "$(grep -E '^⛔ [0-9]+ UNMARKED' "$OUT/ci
 # surviving reference RESOLVES — deliberately not how many there are — so a verdict batch that SUBTRACTED valid
 # evidence left the battery green. This compares the inventory against the merge-base with main and is RED on
 # any witness lost without a `retired-witness:` mark or a verdict change that re-sites it.
-python3 scripts/spec/audit_witness_loss.py --check >> "$OUT/citations.log" 2>&1
+"$PY" scripts/spec/audit_witness_loss.py --check >> "$OUT/citations.log" 2>&1
 WLOSS=$?
 note "$(printf '%-16s %s' 'witnesses:' "$(grep -E '^=== WITNESS LOSS' "$OUT/citations.log" | tail -1)")"
 [ "$WLOSS" -eq 0 ] || { note "witnesses:       ⛔ inventory evidence lost — see $OUT/citations.log"; RC=1; }
@@ -143,7 +144,7 @@ fi
 
 if [ "${SKIP_DIFF:-0}" != "1" ]; then
     el "=== PHASE 3: GnuCOBOL external differential ==="
-    python3 scripts/gnucobol_differential.py --exe src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe \
+    "$PY" scripts/gnucobol_differential.py --exe src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe \
         --report "$OUT/gnucobol-report.json" > "$OUT/gnucobol.log" 2>&1
     note "$(printf '%-16s %s' 'gnucobol:' "$(grep -E '^cases run:' "$OUT/gnucobol.log" | tail -1)")"
     grep -E '^  (AGREE|WE_)' "$OUT/gnucobol.log" | sed 's/^/                 /' | tee -a "$SUMMARY"

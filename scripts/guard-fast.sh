@@ -36,6 +36,7 @@ export ROOT
 
 # WHICH COMPILER, asserted against the binary's own dependency graph (scripts/guard-compiler.sh).
 . "$(dirname "$0")/guard-compiler.sh"
+. "$(dirname "$0")/python-resolve.sh"   # "$PY" for the leg reporters (kb/Work PB1637)
 guard_select_compiler
 guard_announce_compiler
 CLI="$GUARD_CLI_DLL"
@@ -277,8 +278,8 @@ wait "$INT"; INT_RC=$?
 # six lines matching `error|[FAIL]|Failed …` — a failing test's name without its message or stack — and in CI the
 # full log in $TMPDIR dies with the runner, so a legacy unit or integration red was unattributable there. A reporter
 # that cannot run (no python3) exits non-zero and turns the leg RED rather than silent.
-echo "=== Unit ==="; python3 scripts/test_leg_report.py --name unit --log "$TMP/gf_unit.log" --rc "$UNIT_RC" || UNIT_RC=1
-echo "=== Integration ==="; python3 scripts/test_leg_report.py --name integration --log "$TMP/gf_int.log" --rc "$INT_RC" || INT_RC=1
+echo "=== Unit ==="; "$PY" scripts/test_leg_report.py --name unit --log "$TMP/gf_unit.log" --rc "$UNIT_RC" || UNIT_RC=1
+echo "=== Integration ==="; "$PY" scripts/test_leg_report.py --name integration --log "$TMP/gf_int.log" --rc "$INT_RC" || INT_RC=1
 
 # (5) Baseline-cleanliness check — ONE implementation, shared with guard.sh (scripts/guard-baselines.sh).
 # It used to be a hand-kept copy of guard.sh's loop ("parity with guard.sh"), and the copies drifted the moment
