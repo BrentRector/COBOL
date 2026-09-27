@@ -274,6 +274,23 @@ PB615 — see "A supplied argument the formal cannot read" below), and `SlotValu
 §14.2.3 GR10's detached record — which GR10 fills with *“a SET statement”* for this class, i.e. the reference
 copy itself.
 
+**⛔ THE PREDEFINED NULL AS AN ARGUMENT IS AN IDENTIFIER OF THE FORMAL'S CLASS, NOT A FILL (kb/Work PB1630).**
+§8.4.3.1.2 lists NULL as identifier Format 8 (predefined-address) and Format 6 (predefined-object), and §8.4.3.10.3
+SR1 a) admits it *“as an argument in a program-prototype format CALL statement, a function-prototype format
+function activation, or a method invocation”*, its category decided by *“the associated data item's class”* — the
+formal's. So it crosses in its written mode (BY CONTENT, or BY VALUE: §14.9.4.3 SR22 admits identifier-4 of class
+pointer or object, and SR23's numeric-literal rule is not about it) as ONE storage-free carrier,
+`PredefinedNullArgument.Instance`, and the formal's `Slot<T>` / `SlotValue<T>` supplies a fresh cell holding the null
+of its own carrier (`CobolArgAdapt.PredefinedNull<T>`: `ManagedPointer.Null`, a default `ProgramPointer` /
+`FunctionPointer`, a null reference — §8.4.3.10.4 GR1–GR3, §8.4.3.7.4 GR1). The carrier is the same whether or not
+the activating element knows the formal, which it does not under §12.3.8.4 GR10 c); every non-slot adapter refuses it
+as EC-PROGRAM-ARG-MISMATCH. At bind, `ParameterConformance.ContentConformanceReason` gives NULL the §14.8.2.3.3 verdict
+of an identifier of class pointer — the SET paragraph for a pointer / object-reference formal, and a refusal for every
+other formal, whose MOVE or COMPUTE admits no pointer or object operand (§14.9.25.3 SR1). The INVOKE lane is typed, so
+it renders the formal's own `PicInfo.DefaultInitializer` (`BoundInvokeArg.PredefinedNull`). Before PB1630 the CALL and
+function lanes crossed NULL as a one-character LOW-VALUE fill, which a pointer formal refused at run time and a PIC X
+formal accepted.
+
 **⛔ A POINTER BY CONTENT INTO A NON-POINTER FORMAL IS ITS STORAGE IMAGE (kb/Work PB970 arm 2).** §14.8.2.3.2 is
 the BY REFERENCE rule; BY CONTENT, §14.8.2.3.3 rule 1 asks only that *“the formal parameter shall be of the same
 length as the corresponding argument”* when the program is called with no program-specifier and no NESTED phrase,

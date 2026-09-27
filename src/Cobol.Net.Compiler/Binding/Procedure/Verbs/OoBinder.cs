@@ -1050,15 +1050,21 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
                     ? new BoundInvokeArg(formal, null, numLit.Text, null, WriteBack: false, ByContent: true)
                     : new BoundInvokeArg(formal, null, null, numLit.Text, WriteBack: false, ByContent: true);
-            case BoundFigurative { Kind: 'N' } when formal.Pic is { Category: PicCategory.ObjectReference }:
-                // ⛔ NULL IS AN IDENTIFIER, identifier-5 (kb/Work PB1137): §8.4.3.1.3 SR7 lists the predefined-object
-                // references among the identifier formats and §8.4.3.7.3 SR2 describes NULL as "class object and
-                // category object reference" — so `USING [BY CONTENT] NULL` passes the null reference BY CONTENT
-                // (it is in no DATA DIVISION section, so GR6 a) 2. assumes CONTENT). An object-reference formal takes
-                // it by the SET rules (§14.8.2.3.3), and a SET of any object reference TO NULL is always admitted.
-                // (NULL at a data-POINTER formal is §8.4.3.10's predefined address — kb/Work PB1427's arm.)
+            case BoundFigurative { Kind: 'N' }:
+                // ⛔ NULL IS AN IDENTIFIER, identifier-5 (kb/Work PB1137 + PB1630): §8.4.3.1.3 SR7 lists the
+                // predefined-object references among the identifier formats, §8.4.3.7.3 SR2 describes the NULL object
+                // reference as "class object and category object reference", and §8.4.3.10.3 SR1 a) admits the NULL
+                // address of class pointer "as an argument in … a method invocation" — so `USING [BY CONTENT] NULL`
+                // passes the formal's null BY CONTENT (it is in no DATA DIVISION section, so GR6 a) 2. assumes
+                // CONTENT). Its conformance is the ONE §14.8.2.3.3 verdict the CALL and function lanes ask: a formal of
+                // class pointer or object reference takes it by the SET rules, and every other formal refuses it.
+                if (host.Params.ContentConformanceReason(formal, LiteralArg(literal2)) is { } nullErr)
+                {
+                    Err($"argument NULL for formal '{formal.CobolName}': {nullErr}");
+                    return null;
+                }
                 return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
-                    { NullObject = true };
+                    { PredefinedNull = true };
             case BoundFigurative { Kind: not 'N' } or BoundAllLiteral:
                 // ⛔ A FIGURATIVE CONSTANT IS literal-2 TOO (kb/Work PB1617): §8.3.3.6.3 SR1 — "A figurative constant
                 // may be used whenever 'literal' appears in a format" — and this switch refused every one but NULL as

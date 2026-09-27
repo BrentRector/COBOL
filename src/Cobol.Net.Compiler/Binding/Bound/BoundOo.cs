@@ -118,10 +118,12 @@ public sealed record BoundInvokeArg(
     /// written phrase (SR19), so <see cref="WriteBack"/> is always false for it.</summary>
     public BoundAddressOperand? Address { get; init; }
 
-    /// <summary>The predefined NULL object reference as the argument (ISO §8.4.3.7; kb/Work PB1137): an identifier
-    /// (§8.4.3.1.3 SR7) of class object, category object reference (§8.4.3.7.3 SR2), passed BY CONTENT into an
-    /// object-reference formal — no <see cref="Source"/>, no literal, never written back.</summary>
-    public bool NullObject { get; init; }
+    /// <summary>The predefined NULL as the argument (kb/Work PB1137 + PB1630): an identifier (§8.4.3.1.2 Format 6,
+    /// the NULL object reference of class object, §8.4.3.7.3 SR2; Format 8, the NULL address of class pointer,
+    /// §8.4.3.10.1) passed BY CONTENT into a formal of class object reference or pointer — whichever the formal's
+    /// class makes it (§8.4.3.10.3 SR1 names "the associated data item's class"), so the value that crosses is the
+    /// formal's own null. No <see cref="Source"/>, no literal, never written back.</summary>
+    public bool PredefinedNull { get; init; }
 
     /// <summary>The predefined object reference SELF as the argument (ISO §8.4.3.8; kb/Work PB1137): the object on
     /// which the containing method runs, passed BY CONTENT into an object-reference formal — no

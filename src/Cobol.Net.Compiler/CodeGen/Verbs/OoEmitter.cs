@@ -1201,9 +1201,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // rendered by the ONE address-operand renderer — a detached pointer value (§14.9.23.3 SR19).
             else if (a.Address is { } ao)
                 w.Line($"{a.Formal.ElementType} {tmp} = {U.Ptr.AddressOperandText(ao)};");
-            // The predefined NULL object reference (§8.4.3.7; kb/Work PB1137) — BY CONTENT, the null reference itself.
-            else if (a.NullObject)
-                w.Line($"{a.Formal.ElementType} {tmp} = null;");
+            // The predefined NULL (§8.4.3.7 / §8.4.3.10; kb/Work PB1137 + PB1630) — BY CONTENT, the FORMAL's own null:
+            // its PicInfo.DefaultInitializer, the value INITIALIZE's implicit SET TO NULL stores (ManagedPointer.Null /
+            // ProgramPointer.Null / FunctionPointer.Null / null). A bare `null` was right only for an object reference.
+            else if (a.PredefinedNull)
+                w.Line($"{a.Formal.ElementType} {tmp} = {a.Formal.Pic!.DefaultInitializer};");
             // SELF (§8.4.3.8; kb/Work PB1137) — the object the containing method runs on, the SET F5 rendering.
             else if (a.SelfObject)
                 w.Line($"{a.Formal.ElementType} {tmp} = this;");

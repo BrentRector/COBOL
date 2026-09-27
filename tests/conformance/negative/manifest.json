@@ -1674,7 +1674,8 @@
   "pb1137-invoke-zero-length-literal",
   "pb1617-call-content-figurative-varlength-group",
   "pb1617-invoke-figurative-strong-group",
-  "pb1617-call-content-figurative-pointer-formal"
+  "pb1617-call-content-figurative-pointer-formal",
+  "pb1630-call-content-null-alnum-formal"
  ],
  "pending": []
 }

@@ -654,6 +654,16 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // ABI accepts is read back through CobolArgAdapt's ReadNumericCell (kb/Work R12).
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<Int128>.Cell((Int128)({x.Expr})), {ValueMeta(ctx.SignEncoding, 38, x.Scale, signed: true)})";
             }
+            // ⛔ NULL IS AN IDENTIFIER, NOT A FILL (kb/Work PB1630). §8.4.3.1.2 Format 8 (predefined-address) and
+            // §8.4.3.10.3 SR1 a) admit it "as an argument in a program-prototype format CALL statement, a
+            // function-prototype format function activation", and §14.8.2.3.3 hands it to a pointer / object-reference
+            // formal by a SET. This arm used to fall into the figurative fill below and cross as a one-character
+            // string, which every slot adapter refused at run time (EC-PROGRAM-ARG-MISMATCH on legal source). It
+            // crosses in its OWN mode — BY CONTENT or BY VALUE (§14.9.4.3 SR22 admits class pointer and object) — as
+            // the storage-free NULL carrier whose value the formal's own slot adapter supplies, so the crossing is
+            // the same whether or not this activating element knows the formal (§12.3.8.4 GR10 c)).
+            case BoundFigurative { Kind: 'N' }:
+                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, {RuntimeApi.PredefinedNullArgumentCarrier}, null)";
             // ⛔ A FIGURATIVE CONSTANT / ALL LITERAL FILLS THE FORMAL'S ALLOCATED RECORD (kb/Work PB1418 + PB1617) —
             // through the ONE fill the INVOKE lane shares (FigurativeArgumentImage).
             case BoundAllLiteral or BoundFigurative:
@@ -689,6 +699,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         {
             // §8.3.3.6.4 GR2's repetition is the ONE runtime rule EmitText.RepeatToWidth folds (kb/Work PB297).
             BoundAllLiteral all => CsLiteral(width is { } w ? RepeatToWidth(all.Literal, w) : all.Literal),
+            // NULL fills nothing: it is the predefined-address identifier, and each lane crosses it as its own null
+            // (kb/Work PB1630 — ArgCarrierText's NULL arm, OoEmitter's PredefinedNull arm).
+            BoundFigurative { Kind: 'N' } => throw new ArgumentException(
+                "NULL is the predefined-address identifier (ISO §8.4.3.1.2 Format 8), not a figurative fill", nameof(fill)),
             BoundFigurative fig =>
                 $"new string({FigurativeConstants.Fill(fig.Kind, data.Collating, formal?.OperandPic?.Category, data.NationalCollating)}, {width ?? 1})",
             _ => throw new ArgumentException(

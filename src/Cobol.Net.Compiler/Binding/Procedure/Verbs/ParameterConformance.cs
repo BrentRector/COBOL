@@ -123,6 +123,20 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, formal, p);
         return arg.Value switch
         {
+            // ⛔ NULL IS AN IDENTIFIER OF CLASS POINTER OR OBJECT, NOT A FIGURATIVE LITERAL (kb/Work PB1630). §8.4.3.1.2
+            // lists it as Format 8 (predefined-address) and Format 6 (predefined-object); §8.4.3.10.1: "NULL is a
+            // predefined address of class pointer", §8.4.3.7.3 SR2: "class object and category object reference". So it
+            // is asked the question for an identifier of that class: §14.8.2.3.3's SET paragraph for a formal of class
+            // pointer or object reference — and a SET of any such receiver TO NULL is valid (§14.9.39) —
+            // and, for every other formal, the COMPUTE / SET-index / MOVE rule its class takes, none of which admits a
+            // pointer or object operand (§14.9.25.3 SR1 for the MOVE, which §14.8.2.2 rule 2 also asks of a group
+            // formal). The alphanumeric-figurative arm below used to answer it, so NULL crossed into a PIC X formal as
+            // a one-character fill and into a pointer formal as a string the slot adapter refused at run time.
+            BoundFigurative { Kind: 'N' } => SlotWindow.CarriedBySlot(formal) ? null
+                : "NULL is the predefined address of class pointer (ISO §8.4.3.10.1) or the predefined object reference "
+                + "of class object (§8.4.3.7.3 SR2); §14.8.2.3.3 transfers it only into a formal parameter of class "
+                + "pointer or object reference, by the SET rules, and a formal of any other class takes its argument by a "
+                + "MOVE or COMPUTE, whose operands shall not be of class object or pointer (§14.9.25.3 SR1)",
             // ⛔ A GROUP FORMAL ASKS THE WHOLE MOVE QUESTION (kb/Work PB1617). §14.8.2.1 sends every pair that is not
             // elementary-to-elementary to §14.8.2.2, whose rule 2 makes a BY CONTENT argument's conformance "the same as
             // for a MOVE statement with the argument as the sending operand and the corresponding formal parameter as
