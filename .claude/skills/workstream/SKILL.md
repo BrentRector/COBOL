@@ -85,6 +85,14 @@ a whole fresh implementer at 40.3 M**. Two only when the notes share one code si
 which case the register's own clustering rule says they were one mechanism to begin with.
 
 **⭐ Group related fixes — owner decision 2026-09-13 ("adopt it").** The FILL UNIT is a GROUP: the harm-ranked note plus every open note that shares its named source files or its rule family (the registrar's root-cause cluster, or a grep of the notes' code sites) — three or four notes, one implementer, one branch, one gate, one report with a section per note; the mechanism rule above still governs the WORK inside the group (each note fixed at its root, checkpoint per mechanism, SPLIT at a note boundary at the turn cap). Evidence: trains 37/38 re-merged PB416/PB391 (MOVE validity), PB419/PB420/PB425 (INITIALIZE and MOVE emitters) and PB443/PB877 (the subscript resolver) pairwise, two composition defects appeared that neither implementer could see, and half the reports folded a sibling note. A group touching a shared seam runs `~CorpusRunner` + `~Nist` at the implementer's gate (the PB425 drop).
+⭐ **THE GROUPS ARE COMPUTED, NOT EYEBALLED — owner 2026-09-27 ("group fixes so all fixes in one source file, or one
+small set of related code, all get fixed in one pass").** `python scripts/spec/fix_clusters.py [--json out.json]`
+resolves every open defect's named code sites to real `src/Cobol.Net.*` files, gives each note a PRIMARY file, and
+clusters notes by it (cap 5, split by harm, singletons absorbed into a cluster whose file they also name), ranked by
+summed harm. **Fill each slot with the top-ranked cluster of a subsystem not already in flight**, never a hand-picked
+lead + keyword siblings. Measured on its first run: 411 open actionable defects → 125 clusters (42 of five notes), so
+a six-slot wave carries ~25–30 defects instead of ~10. Wave 65, grouped by hand, split `ConditionRenderer.cs`'s five
+defects across two implementers (A and E) and left three of `ReferenceFormatProcessor.cs`'s five behind.
 
 **⭐ Lander throughput — owner decision 2026-09-22 ("do all that we can").** The lander is the serial bottleneck: train
 47's lander took 84 min, and its whole-Conformance leg measured 9.6 min on a quiet host, 18.5 min at battery #84 and
