@@ -274,6 +274,18 @@ PB615 — see "A supplied argument the formal cannot read" below), and `SlotValu
 §14.2.3 GR10's detached record — which GR10 fills with *“a SET statement”* for this class, i.e. the reference
 copy itself.
 
+**⛔ THE CLASSIFICATION ASKS THE PLACE'S CODING, NOT ITS SHAPE (kb/Work PB1632).** A cell-backed area (BASED,
+EXTERNAL, or one whose ADDRESS OF is taken) renders every member as a `RedefViewPlace`, and a managed member's
+view carries the `SlotWindow` coding. That view IS the item's storage, not a redefinition of it.
+`CallEmitter.CallPlaceIsManaged` therefore admits `RedefViewPlace { Coding: SlotWindow }` beside the plain
+place, as `CallPlaceIsVarGroup` admits its own `VarGroupWindow` coding. Any other redefinition or
+reference-modification over a pointer stays excluded, because §13.18.44.3 SR12/SR14 and §8.4.3.3.3 SR1 bar both
+on conforming source. `PlaceRenderer.Read`/`Write` already render a slot window
+(`CobolPtr.SlotRead`/`SlotWrite`), so the Managed arm's snapshot and accessor carriers need no second rendering.
+Excluding every view sent `SET WP TO ADDRESS OF WP` followed by `CALL … BY CONTENT WP` to the character arm,
+where the compiler threw. Golden: `tests/conformance/2002/pb1632_pointer_arg_cell_backed` (a self-addressed
+pointer, a BASED pointer and a cell-backed program-pointer, BY CONTENT and BY REFERENCE).
+
 **⛔ THE PREDEFINED NULL AS AN ARGUMENT IS AN IDENTIFIER OF THE FORMAL'S CLASS, NOT A FILL (kb/Work PB1630).**
 §8.4.3.1.2 lists NULL as identifier Format 8 (predefined-address) and Format 6 (predefined-object), and §8.4.3.10.3
 SR1 a) admits it *“as an argument in a program-prototype format CALL statement, a function-prototype format

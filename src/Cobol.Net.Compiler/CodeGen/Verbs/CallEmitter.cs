@@ -888,15 +888,23 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// for "does this item's value ride the area's managed slots rather than its bytes?" (kb/Work PB231), so
     /// the boundary and the storage cannot disagree about the population: class pointer (data / program /
     /// function) and class object-reference.
-    /// <para>A <see cref="RedefViewPlace"/> or a <see cref="RefModPlace"/> is excluded by construction and the
-    /// exclusion is stated rather than relied on: §13.18.44.3 SR12 ("The REDEFINES clause shall not be
-    /// specified for a data item of class object, message-tag, or pointer …") and SR14 (the same list for
-    /// data-name-2) bar both ends of a redefinition, and §8.4.3.3.3 SR1's list admits reference modification
-    /// only for character-class and display/national numeric operands — so neither place shape can stand over
-    /// such an item on conforming source, and a nonconforming one keeps the character arm's existing loud
-    /// rather than acquiring a slot it has no storage for.</para></summary>
+    /// <para>⛔ The test is asked of the place's CODING, never of its shape (kb/Work PB1632). A cell-backed area —
+    /// BASED, EXTERNAL, or one whose ADDRESS OF is taken — renders EVERY member as a <see cref="RedefViewPlace"/>,
+    /// and a managed member's view carries the <see cref="SlotWindow"/> coding: that view IS the item's storage,
+    /// not a redefinition of it. Excluding every RedefViewPlace sent <c>SET WP TO ADDRESS OF WP</c> +
+    /// <c>CALL … BY CONTENT WP</c> to the character arm, where the COMPILER threw for want of a pointer's image,
+    /// although §14.8.2.3.3 2) makes a pointer argument conform "as if a SET statement were performed". The
+    /// same rule <see cref="CallPlaceIsVarGroup"/> applies to its own cell coding.</para>
+    /// <para>Any OTHER <see cref="RedefViewPlace"/> or a <see cref="RefModPlace"/> stays excluded, and the exclusion
+    /// is stated rather than relied on: §13.18.44.3 SR12 ("The REDEFINES clause shall not be specified for a data
+    /// item of class object, message-tag, or pointer …") and SR14 (the same list for data-name-2) bar both ends
+    /// of a redefinition, and §8.4.3.3.3 SR1's list admits reference modification only for character-class and
+    /// display/national numeric operands — so neither shape can stand over such an item on conforming source,
+    /// and a nonconforming one keeps the character arm's existing loud rather than acquiring a slot it has no
+    /// storage for.</para></summary>
     internal static bool CallPlaceIsManaged(Place p) =>
-        p is not RedefViewPlace and not RefModPlace && SlotWindow.CarriedBySlot(p.Item);
+        (p is not RedefViewPlace and not RefModPlace || p is RedefViewPlace { Coding: SlotWindow })
+        && SlotWindow.CarriedBySlot(p.Item);
 
     /// <summary>⛔ THE ONE classification of a place's crossing form, in priority order, for BOTH sides of the
     /// boundary (kb/Work PB663). Managed first — a pointer item is neither a group nor a character shape, so
