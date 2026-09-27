@@ -13,7 +13,26 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
-## Entry 1729 — 2026-09-27 05:05 PDT — PB1628: CURRENCY SIGN binds after SYMBOLIC CHARACTERS; PB1635 filed (cite.py misnumbers `N.` rules)
+## Entry 1730 — 2026-09-27 04:37 PDT — PB1626 decided by survey; PB1636 registers the 54 unclosable rows; three DEVLOG stamps corrected
+
+**PB1626 (owner question → decided under the standing protocol).** GnuCOBOL 3.2 classifies a `>>DEFINE … PARAMETER`
+value SYNTACTICALLY (`cobc/ppparse.y`, `ppp_check_needs_quote`, read from the local GPL tarball; nothing copied): an
+optional sign, digits and at most one `.` make a numeric literal of any length; a quoted value is the literal as
+written; an empty value leaves the name undefined. Ours goes through `decimal.TryParse(NumberStyles.Number)`, which
+makes 29-plus-digit values alphanumeric and accepts `1,000` and surrounding spaces. §7.3.11.4 GR4 leaves the form
+to the implementor, so rule 1's precedence (GnuCOBOL next) decides: classify syntactically, carry the value in
+`CtNumeric`. Two points must be cited before implementing (the over-long diagnostic's site, and whether an empty
+value defines a name), and DOC-A.1-49 is rewritten in the same change. The note is now an implementation item, and
+no owner question remains.
+**PB1636 (new).** Golden lane 2's 54 test-unclosable rows were "recorded nowhere" (DEVLOG 1715), a rule-8 gap. The
+note registers them through the inventory's own selector (CONFORMS and GAP, plus the one DNS row, less the 6 held),
+points at the writers' reasons, and sets the PB386 route: draft 54 `DRV-` determinations with each claim re-derived,
+then put the signatures to the owner as one question.
+**Correction.** I estimated the headings of entries 1727–1729 (04:12, 04:45, 05:05) instead of reading the clock,
+and two of them were ahead of real time. They now carry their commits' real times (04:07, 04:22, 04:32). Every
+stamp comes from `date`.
+
+## Entry 1729 — 2026-09-27 04:32 PDT — PB1628: CURRENCY SIGN binds after SYMBOLIC CHARACTERS; PB1635 filed (cite.py misnumbers `N.` rules)
 
 **PB1628.** `CURRENCY SIGN IS "US" & SYM-D PICTURE SYMBOL "$"` drew COBOLNET2473 ("not a literal") when the
 SYMBOLIC CHARACTERS clause declaring SYM-D came later in the paragraph. The spec admits it: §12.3.7.3 SR18 bars only a
@@ -28,7 +47,7 @@ The next step is to render the printed page to decide whether this is a transcri
 **Gate.** Characterization 33/33; Conformance (SpecialNames, Currency, Symbolic, Picture, Edited, CorpusRunner,
 Negative, Drift, Alphabet, Nist, Locale) 4253/4253; Unit 29491/29491.
 
-## Entry 1728 — 2026-09-27 04:45 PDT — PB1631 + PB1634: one BY VALUE literal screen; a ZERO argument into a numeric formal is zero
+## Entry 1728 — 2026-09-27 04:22 PDT — PB1631 + PB1634: one BY VALUE literal screen; a ZERO argument into a numeric formal is zero
 
 **PB1631.** INVOKE §14.9.23.3 SR16 and CALL §14.9.4.3 SR23 are the same sentence, but each had its own copy. INVOKE's
 admitted only NULL, so BY VALUE ZERO got the SR16 message; CALL's asked `zeroWord()`, which `ALL ZERO` also carries,
@@ -47,7 +66,7 @@ still reads as zero, which still needs to be derived against the spec.
 **Gate.** Characterization 33/33; Conformance (Call, Invoke, Oo, CorpusRunner, Negative, Drift, Figurative,
 Currency, Function, Nist, Parameter) 4899/4899; Unit 29491/29491.
 
-## Entry 1727 — 2026-09-27 04:12 PDT — PB1602: the store header records SUPPRESS WHEN exactly (format version 2)
+## Entry 1727 — 2026-09-27 04:07 PDT — PB1602: the store header records SUPPRESS WHEN exactly (format version 2)
 
 **What.** An indexed file declaring `ALTERNATE RECORD KEY … SUPPRESS WHEN "€€"` could not be reopened by the program
 that wrote it. OPEN INPUT and OPEN I-O both returned '39'. `RecordFraming.WriteHeader` stored the suppress value
