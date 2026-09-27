@@ -2677,19 +2677,24 @@
   },
   {
    "id": "arithmetic-intermediate-precision-2023",
-   "status": "pending",
-   "description": "Compile-time arithmetic expression mode + intermediate-result handling became implementor-defined at COBOL-2023 (the Standard Arithmetic required pre-2023 was removed) - a candidate BEHAVIOR VARIANT (INV-3): the same COMPUTE with an intermediate division/rounding could in principle yield different output across editions. PENDING (INV-3 discovery candidate): UNCONFIRMED - COBOL.NET uses ONE scaled-integer numeric pipeline, so its arithmetic is believed edition-INVARIANT (cf. the DEVLOG-517 de-sign/DISPLAY findings, all version-invariant); confirm by running the case at 85/2002/2014/2023 and diffing stdout before activating a per-edition variant (see variant.confirm).",
+   "status": "active",
+   "description": "Compile-time arithmetic expression MODE (ISO §7.3.6.3 GR2) - a CONFIRMED BEHAVIOR VARIANT (INV-3; kb/Work PB1592). Annex E.2 item 6 makes the mode implementor-defined only at COBOL-2023 and records the prior rule ('The previous COBOL Standard required the use of an arithmetic mode that is no longer supported'); the one mode 2023 removed is Standard Arithmetic (E.2 item 21). So at 2002/2014 a compile-time arithmetic expression (CONSTANT AS, >>DEFINE, >>IF/>>EVALUATE) evaluates in standard arithmetic - the SDIDI decimal engine, 34 digits, NEAREST-AWAY-FROM-ZERO - and at 2023 in the documented System.Decimal mode (docs/CONFORMANCE.md DOC-A.1-29). The edge is the runtime behaviour register's DialectBehavior.CompileTimeArithmeticImplementorDefined, read by CompileTimeArithmetic.For; this row carries the per-edition OUTPUT witness. The source's constant 0.0000000000000000000000000015 / 2 * 10000000000000000000000000000 is 7.5E-28 exactly in the SDIDI (x1E28 = 7.5, GR3 -> 7) and a tie rounded to the even 8E-28 in System.Decimal (-> 8). The construct itself (a compile-time arithmetic expression) is a COBOL-2002 introduction with the constant entry and the >> directives, so COBOL-85 refuses the source with the constant entry's introduction gate (COBOLNET0900).",
    "display": "compile-time arithmetic / intermediate-result mode",
-   "diagnosticCode": "n/a (behavior variant - not a syntax gate)",
-   "citation": "ISO Annex E.2 item 6 / §8.8 (compile-time arithmetic implementor-defined at 2023); VCR row 12",
-   "introducedIn": 85,
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §7.3.6.3 GR2; Annex E.2 items 6 and 21 (compile-time arithmetic implementor-defined from 2023; standard arithmetic before); VCR row 12",
+   "introducedIn": 2002,
    "removedIn": null,
-   "vcr": "VCR row 12 / Annex E.2 item 6 (2014->2023: arithmetic mode implementor-defined) - INV-3 discovery candidate",
-   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. AV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 R PIC 9V9(4).\nPROCEDURE DIVISION.\nMAIN.\n    COMPUTE R = 2 / 3 * 3.\n    DISPLAY R.\n    STOP RUN.\n",
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "VCR row 12 / Annex E.2 item 6 (2014->2023: arithmetic mode implementor-defined) - behavior:compile-time-arithmetic-mode",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. CTAV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 K-T2 CONSTANT AS\n      0.0000000000000000000000000015 / 2\n      * 10000000000000000000000000000.\n01 W-N PIC 999.\nPROCEDURE DIVISION.\nMAIN.\n    MOVE K-T2 TO W-N.\n    DISPLAY \"T2=\" W-N.\n    STOP RUN.\n",
    "variant": {
-    "confirmed": false,
-    "confirm": "Run source at 85/2002/2014/2023 and diff stdout. If identical -> version-INVARIANT: record the determination (DEVLOG) and drop the variant. If it differs -> gate the behavior by DialectLevel and populate outputs per edition. §8.8 / Annex E.2 item 6.",
-    "outputs": {}
+    "confirmed": true,
+    "confirm": "CONFIRMED 2026-09-26 (kb/Work PB1592): standard arithmetic (SDIDI) at 2002/2014 gives T2=007, the documented System.Decimal mode at 2023 gives T2=008 - derived from ISO §8.8.1.5.2 + §11.9.11.2 GR3 a) and DOC-A.1-29, then §7.3.6.3 GR3.",
+    "outputs": {
+     "2002": "T2=007",
+     "2014": "T2=007",
+     "2023": "T2=008"
+    }
    }
   },
   {

@@ -28,6 +28,12 @@
          EditionInfo + EditionSeverityPolicy instead of re-encoding edition metadata (the parse-layer residue
          is ReservedWordEditionHints). Editions is BELOW Frontend — it references nothing here. -->
     <ProjectReference Include="..\Cobol.Net.Editions\Cobol.Net.Editions.csproj" />
+    <!-- The typed-native runtime leaf (DESIGN-edition-framework: Runtime → Frontend → Compiler → Cli; the runtime
+         references nothing in the solution). The compile-time expression evaluator carries its values in the ONE
+         SDIDI decimal engine (CobolDec) and selects its arithmetic mode through the ONE per-edition behaviour
+         register (DialectBehaviors): ISO Annex E.2 6) + 21) prescribe standard arithmetic for compile-time
+         arithmetic expressions at 2002/2014, and that engine lives here (kb/Work PB1592). -->
+    <ProjectReference Include="..\Cobol.Net.Runtime\Cobol.Net.Runtime.csproj" />
     <PackageReference Include="Antlr4.Runtime.Standard" />
   </ItemGroup>
 

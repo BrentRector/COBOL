@@ -62302,11 +62302,11 @@
   "subject": "Compile-Time Arithmetic (Mode of arithmetic used and rules for intermediate data handling)",
   "rule-digest": "d7c571ffd4cf",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-29; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalArith; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateArithmeticOperand",
-  "test-ref": "conformance:2023/gl2m2_ct_arith_mode; conformance:negative/gl2m2-ct-arith-intermediate-overflow",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-29; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalArith; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateArithmeticOperand; src/Cobol.Net.Frontend/Expressions/CompileTimeArithmetic.cs#For",
+  "test-ref": "conformance:2023/gl2m2_ct_arith_mode; conformance:negative/gl2m2-ct-arith-intermediate-overflow; unit:CompileTimeArithmeticModeTests.ModeDependentValues_FollowTheEditionsMode; unit:CompileTimeArithmeticModeTests.Selection_IsStandardArithmeticBelow2023",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Documented Decimal mode: 2/3*3=2, 100/7*7=100, 1/3*3=0, ties to even 2.5E-28->2, 7.5E-28->8, GR3 truncation; overflow COBOLNET1547. Witnessed at 2023 only: Annex E.2 6) says the compile-time arithmetic mode was prescribed before 2023, so whether the determination applies at 2002/2014 is the open analysis kb/Work PB1592; the row keeps its editions until that analysis decides them.",
+  "editions": "2023",
+  "notes": "Documented System.Decimal mode, COBOL-2023 only (kb/Work PB1592): 2/3*3=2, 100/7*7=100, 1/3*3=0, ties to even 2.5E-28->2, 7.5E-28->8, GR3 truncation; overflow COBOLNET1547/1619. Annex E.2 6) makes the mode implementor-defined only at 2023 and records that 'The previous COBOL Standard required the use of an arithmetic mode that is no longer supported' (cite.py --check E.2 -> OK §E.2 6)); the only mode 2023 removed is Standard Arithmetic (-> OK §E.2 21)), so at 2002/2014 the mode is PRESCRIBED, not this determination: CompileTimeArithmetic.For selects standard arithmetic (the SDIDI engine, 34 digits, NEAREST-AWAY-FROM-ZERO) below 2023 through DialectBehavior.CompileTimeArithmeticImplementorDefined (VCR row 12), witnessed by conformance:2002/pb1592_ct_arith_standard and the confirmed INV-3 variant arithmetic-intermediate-precision-2023. GnuCOBOL 3.2 survey (sources read, not copied): cobc folds literal-only binary operations with 64-bit integers and has no >>IF arithmetic evaluator - narrower than System.Decimal, so the 2023 choice stands.",
   "state": "OK"
  },
  {

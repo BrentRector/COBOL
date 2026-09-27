@@ -5,6 +5,7 @@ using CobolNet.Editions;
 using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
+using CobolNet.Runtime;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -19,7 +20,7 @@ using Core = CobolParserCore;
 /// </summary>
 public sealed class CompileTimeExpressionEvaluatorTests
 {
-    private sealed class CollectingDiag : ICtDiagnostics
+    internal sealed class CollectingDiag : ICtDiagnostics
     {
         public readonly List<(CtDiagCode Code, string Message)> Reports = [];
         public void Report(CtDiagCode code, string message) => Reports.Add((code, message));
@@ -28,10 +29,10 @@ public sealed class CompileTimeExpressionEvaluatorTests
     private static readonly CtOperandVocabulary Vocab =
         new("previously defined numeric compilation variables", "ISO §7.3.6.2 SR1b");
 
-    /// <summary>Evaluate <paramref name="text"/> as an arithmetic operand; <paramref name="names"/> supplies any
-    /// numeric constant-name values.</summary>
-    private static (CompileTimeExpressionEvaluator.CtNumber? Result, CollectingDiag Diag) Eval(
-        string text, Dictionary<string, decimal>? names = null)
+    /// <summary>Evaluate <paramref name="text"/> as an arithmetic operand at <paramref name="edition"/>;
+    /// <paramref name="names"/> supplies any numeric constant-name values (as their literal texts).</summary>
+    internal static (CompileTimeExpressionEvaluator.CtNumber? Result, CollectingDiag Diag) Eval(
+        string text, Dictionary<string, string>? names = null, int edition = 2023)
     {
         var flag = new ErrorFlag();
         var lexer = new CobolLexer(new AntlrInputStream(text));
@@ -39,7 +40,7 @@ public sealed class CompileTimeExpressionEvaluatorTests
         lexer.AddErrorListener(flag);
         var tokens = new CommonTokenStream(lexer);
         ZeroTokenRewriter.Rewrite(tokens);
-        var parser = new Core(tokens) { Edition = EditionInfo.Of(2023) };
+        var parser = new Core(tokens) { Edition = EditionInfo.Of(edition) };
         parser.RemoveErrorListeners();
         parser.AddErrorListener(flag);
         Core.ArithmeticExpressionContext ctx = parser.arithmeticExpression();
@@ -48,11 +49,18 @@ public sealed class CompileTimeExpressionEvaluatorTests
 
         var diag = new CollectingDiag();
         var ev = new CompileTimeExpressionEvaluator(
-            resolveName: w => names is not null && names.TryGetValue(w, out var v)
-                ? CtValue.Numeric(v, v.ToString(System.Globalization.CultureInfo.InvariantCulture)) : null,
+            edition: EditionInfo.Of(edition),
+            resolveName: w => names is not null && names.TryGetValue(w, out var t) && CtNumeric.TryParseLiteral(t, out var v)
+                ? CtValue.Numeric(v, t) : null,
             diag: diag, vocab: Vocab, decimalPointIsComma: false);
         return (ev.EvaluateArithmeticOperand(ctx, "test"), diag);
     }
+
+    /// <summary>Assert a carrier value equals <paramref name="expected"/> BY VALUE (the carrier's spelling of a
+    /// value — 2 vs 20E-1 — is not part of the contract).</summary>
+    internal static void AssertValue(decimal expected, CobolDec actual) =>
+        Assert.True(CobolDec.Compare(CtNumeric.FromDecimal(expected), actual) == 0,
+            $"expected {expected}, got {CtNumeric.ToScientificText(actual)}");
 
     [Theory]
     // Expression forms: §8.8.1 precedence, then §7.3.6.3 GR3 integer truncation of the final result.
@@ -82,7 +90,7 @@ public sealed class CompileTimeExpressionEvaluatorTests
         Assert.NotNull(r);
         Assert.True(r!.Value.WasSingleLiteral);
         Assert.Equal("1.5E3", r.Value.Text);
-        Assert.Equal(1500m, r.Value.Value);
+        AssertValue(1500m, r.Value.Value);
     }
 
     /// <summary>§8.8.1.2 Table 3, row "Unary + or −" × column "Unary + or −" = '—' (kb/Work PB158). This is the
@@ -111,7 +119,7 @@ public sealed class CompileTimeExpressionEvaluatorTests
         var (r, diag) = Eval("- -2");
         Assert.Empty(diag.Reports);
         Assert.NotNull(r);
-        Assert.Equal(2m, r!.Value.Value);
+        AssertValue(2m, r!.Value.Value);
     }
 
     /// <summary>The other permissible neighbours of a unary sign, so the screen is pinned against firing on
@@ -129,18 +137,23 @@ public sealed class CompileTimeExpressionEvaluatorTests
         Assert.Equal(expected, r!.Value.Text);
     }
 
-    [Fact] // §7.3.6.2 SR2 — a sole literal beyond the decimal evaluation range is rejected LOUDLY, never a silent null.
-    public void Rejects_OverRangeSoleLiteral()
+    /// <summary>§8.3.3.3.2 — a sole fixed-point literal past the edition's digit capacity (31) is rejected LOUDLY,
+    /// never a silent null. It is a LITERAL (§7.3.11.4 GR5), so the limit that refuses it is the literal's own, not
+    /// the §7.3.6.2 SR2 intermediate-result range an arithmetic mode imposes (kb/Work PB1592).</summary>
+    [Fact]
+    public void Rejects_OverCapacitySoleLiteral()
     {
-        var (r, diag) = Eval("123456789012345678901234567890123456");   // 36 digits — beyond .NET decimal
+        var (r, diag) = Eval("123456789012345678901234567890123456");   // 36 digit positions
         Assert.Null(r);
-        Assert.Contains(diag.Reports, x => x.Code == CtDiagCode.ArithmeticRule && x.Message.Contains("SR2"));
+        Assert.Contains(diag.Reports, x => x.Code == CtDiagCode.ArithmeticRule
+                                           && x.Message.Contains("§8.3.3.3.2", StringComparison.Ordinal)
+                                           && x.Message.Contains("36 digit positions", StringComparison.Ordinal));
     }
 
     [Fact] // A previously-defined numeric constant-name substitutes its value (§7.3.6.2 SR1b / §13.10.3 SR2).
     public void Substitutes_NumericName()
     {
-        var (r, diag) = Eval("K * 2 + 1", new() { ["K"] = 5m });
+        var (r, diag) = Eval("K * 2 + 1", new() { ["K"] = "5" });
         Assert.Empty(diag.Reports);
         Assert.Equal("11", r!.Value.Text);
     }

@@ -68,7 +68,8 @@ The conditional-compilation stage (§7.2 text-manipulation) has two different jo
         │  → compileTimeOperandFragment / constantConditionalExpressionFragment tree
         ▼
    CompileTimeExpressionEvaluator (walks CobolParserCore.*Context; boolean via BooleanExpressionResolver)
-        │  injected: name resolver · code-preserving diag sink · operand-source clause · decimalPointIsComma
+        │  injected: edition (→ arithmetic mode + literal capacity) · name resolver · code-preserving diag sink ·
+        │            operand-source clause · decimalPointIsComma
         ▼
    CtValue (numeric / alphanumeric / national / boolean) — or a loud diagnostic, never a wrong value
 ```
@@ -86,6 +87,13 @@ utilities, now reachable by both layers:
   build-verified.**
 
 `PicCategory` stays in Compiler — the evaluator uses its own `CtCategory`; the binder adapts at the call boundary.
+
+**Frontend → Runtime (kb/Work PB1592).** The documented layering is `Runtime → Frontend → Compiler → Cli`
+(DESIGN-edition-framework; the runtime references nothing in the solution), and the Frontend now takes that edge:
+the evaluator carries every numeric value in the runtime's `CobolDec` (the SDIDI) and selects its arithmetic mode
+through the runtime's `DialectBehaviors` register. The standard's own per-edition rule demands it — standard
+arithmetic at 2002/2014 (§5.1) is the SDIDI engine, and a second copy of that engine in the Frontend would be two
+implementations of one rule.
 
 ## 4. The ANTLR grammar (one source of truth for syntax)
 
@@ -149,6 +157,7 @@ cceRelationOrBoolean
 
 ```csharp
 public sealed class CompileTimeExpressionEvaluator(
+    EditionInfo edition,                     // selects the §7.3.6.3 GR2 mode (§5.1) + the §8.3.3.3.2 literal capacity
     Func<string, CtValue?> resolveName,     // a name → its bound value, or null if undefined
     ICtDiagnostics diag,                     // CODE-preserving sink (§5.2) — not a bare Action<string>
     CtOperandVocabulary vocab,               // per-consumer operand-source clause / noun (§5.2)
@@ -160,23 +169,41 @@ public sealed class CompileTimeExpressionEvaluator(
     // EvaluateArithmeticOperand, so it is GR3-truncated and rule-5 integer-validated.
     public BitString? EvaluateBoolean(CobolParserCore.BooleanExpressionContext e, string where);
 }
-public readonly record struct CtNumber(bool WasSingleLiteral, decimal Value);   // GR3-truncated unless WasSingleLiteral
+public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Text);   // GR3-truncated unless WasSingleLiteral
 ```
 
-* **GR5 + GR3 live INSIDE `EvaluateArithmeticOperand`.** The raw-`decimal` recursion (`EvalArith`, the lift of
+* **GR5 + GR3 live INSIDE `EvaluateArithmeticOperand`.** The raw-value recursion (`EvalArith`, the lift of
   `EvalConstExpr`) stays private — intermediates correctly un-truncated (§7.3.6.3 GR1). At the boundary: a single
   numeric literal (private `SoleNumericLiteral` probe) is kept exact (GR5 / §13.10.3 SR1 — `AS 0.25` → `0.25`);
   otherwise the final result is truncated to its integer part (GR3 / INTEGER-PART §15.49). No consumer re-does
   this — the probe/truncate rule lives in one place, not copied at each operand site — and the boolean shift
   count is correct because it calls this boundary.
+* **The literal capacity is enforced here too.** GR3 makes the final result "an integer numeric literal", so a
+  result with more digits than a fixed-point literal may have (`EditionInfo.MaxDigits`, 31 — §8.3.3.3.2) is
+  refused; so is a sole literal or a literal operand past that capacity. A sole literal is otherwise NOT bounded
+  by any arithmetic mode (GR5 — it is not an expression).
 
-### 5.1 Arithmetic semantics (§7.3.6) — lifted from the binder
+### 5.1 Arithmetic semantics (§7.3.6) — one evaluator, the edition's mode
 
-The private recursion is the existing `EvalConstExpr`, unchanged in logic: `+ - * /` and unary sign over the
-grammar precedence tiers (§8.8.1/§7.3.6.3 GR1); SR1a exponentiation reject; SR1b operand-is-fixed-point-literal-
-or-numeric-name (floating-point/E-form rejected); SR1c div-by-zero reject; SR2 intermediates ride .NET
-`System.Decimal` (96-bit, 28–29 significant digits — **not** IEEE-754 decimal128; the lifted overflow message +
-the V41 `CONFORMANCE.md §3` note are corrected accordingly); overflow reported, never wrapped.
+The private recursion is the existing `EvalConstExpr` walk: `+ - * /` and unary sign over the grammar precedence
+tiers (§8.8.1/§7.3.6.3 GR1); SR1a exponentiation reject; SR1b operand-is-fixed-point-literal-or-numeric-name
+(floating-point/E-form rejected); SR1c div-by-zero reject; overflow reported, never wrapped.
+
+**The MODE is selected per edition (§7.3.6.3 GR2 + Annex E.2 6)/21), kb/Work PB1592).** `CompileTimeArithmetic.For
+(edition)` is the ONE selection — every operand ENTERS the mode and every operation RUNS in it, so the three
+consumers cannot disagree:
+
+| Edition | Mode | Why |
+|---|---|---|
+| 2002, 2014 | `CompileTimeArithmetic.Standard` — the SDIDI (`CobolDec`, 34 digits, decimal128 range), NEAREST-AWAY-FROM-ZERO (§11.9.11.2 GR3 a) | E.2 6): "The previous COBOL Standard required the use of an arithmetic mode that is no longer supported"; the only mode 2023 removed is Standard Arithmetic (E.2 21). This compiler's standard arithmetic IS the SDIDI engine (`ArithmeticModes.IsDecimalEngine(Standard)`). |
+| 2023 | `CompileTimeArithmetic.SystemDecimal` — .NET `System.Decimal` (96-bit, 28–29 digits, ties to even; **not** decimal128) | E.2 6) makes the mode implementor-defined; the documented choice is CONFORMANCE.md DOC-A.1-29 (kept after a GnuCOBOL survey). |
+
+The edition edge is written once, in the runtime's behaviour register (`DialectBehavior.CompileTimeArithmeticImplementorDefined`,
+VCR row 12). COBOL-85 has no compile-time arithmetic expression; an expression reached there only after its
+introduction gate refused it takes the pre-2023 mode. **Values** travel in the mode-independent carrier
+`CtNumeric`/`CobolDec` (exact for every valid literal and for every value either mode yields), so `CtValue`,
+`CtNumber` and the consumers never see which mode produced a value; the System.Decimal mode enters a carrier value
+through the same `decimal` parse a literal always used.
 
 ### 5.2 Diagnostics — code-preserving, per-consumer citations
 
@@ -223,8 +250,8 @@ legal mixed shift-with-binary form and told the user to parenthesize — a confo
 source. `ConditionBinder`'s tier-walk (`BindBoolExpr/Xor/And/Shift`) is refactored onto `Resolve<T>`; the mixed
 form is now accepted and evaluated per rule 7b. Existing COBOLNET1569 tests flip from reject to accept-and-verify.
 
-`BitString`'s fold mirrors the runtime `CobolBool` kernel EXACTLY (the proven §8.8.2 implementation; the Frontend
-cannot reference the Runtime assembly, so the algorithm — not the code — is shared). Operator/operand semantics
+`BitString`'s fold mirrors the runtime `CobolBool` kernel EXACTLY (the proven §8.8.2 implementation; the algorithm
+— not the code — is shared: it was written before the Frontend → Runtime reference of §3 existed). Operator/operand semantics
 (§8.8.2):
 
 * **`B-NOT`** — complement, length preserved.
@@ -274,11 +301,12 @@ Format 2 evaluates each WHEN's cce (§7.3.8). Single-numeric-literal reclassific
 
 ```csharp
 enum CtCategory { Numeric, Alphanumeric, National, Boolean }
-sealed record CtValue(CtCategory Category, decimal Number, string Text, BitString? Bits);
+sealed record CtValue(CtCategory Category, CobolDec Number, string Text, BitString? Bits);   // Number: the CtNumeric carrier
 ```
 
 Member-wise record equality is **replaced by a hand-written `Equals`** dispatching on `Category` (Numeric →
-`Number` only, so `AS 1` / `AS 01` / `AS 1.0` are the same value and SR2 does not fire on spelling;
+`Number` by VALUE — `CobolDec.Compare`, with `CtNumeric.ValueHash` for the hash, never the carrier's member-wise
+`(Sig, Exp)` — so `AS 1` / `AS 01` / `AS 1.0` are the same value and SR2 does not fire on spelling;
 Alnum/National → `Text`; Boolean → `Bits` value-equality). `AS PARAMETER` (GR4, landed) and the SR2/COBOLNET1618
 redefinition check (landed) use this model.
 

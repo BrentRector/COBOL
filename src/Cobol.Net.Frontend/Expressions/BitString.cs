@@ -12,8 +12,8 @@ namespace CobolNet.Frontend.Expressions;
 /// which right-extends the shorter operand.
 ///
 /// The fold operators mirror the runtime <see cref="T:CobolNet.Runtime.CobolBool"/> kernel EXACTLY (the proven
-/// §8.8.2 implementation; the Frontend cannot reference the Runtime assembly, so the ALGORITHM — not the code —
-/// is shared): a binary op combines positionwise left-to-right, right-zero-extending the shorter operand, result
+/// §8.8.2 implementation; the ALGORITHM — not the code — is shared, written before the Frontend referenced the
+/// Runtime assembly): a binary op combines positionwise left-to-right, right-zero-extending the shorter operand, result
 /// length = the larger operand (rules 9/10); zero-length combines to zero-length (rule 9 NOTE 2); <see cref="Not"/>
 /// preserves length; a shift preserves the first operand's length (rule 8).
 ///

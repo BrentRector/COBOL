@@ -9,9 +9,10 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// INV-3 — the behavior-variant matrix (rearch P3 step 7; VERSION_TEST_MATRIX_DESIGN §2.10), the weakest leg of
 /// "four compilers in one": does the SAME source produce different OUTPUT across <c>--std</c> editions? Stood up as
-/// a LOUD DISCOVERY TOOL — no edition-variant behavior is CONFIRMED yet (the investigated de-sign/DISPLAY diffs were
-/// all version-INVARIANT, DEVLOG 517; COBOL.NET's one scaled-integer numeric pipeline makes most arithmetic
-/// edition-invariant). Uses the SAME <c>[Theory][MemberData]</c> mechanism + the SAME <c>constructs.json</c>
+/// a LOUD DISCOVERY TOOL (the investigated de-sign/DISPLAY diffs were all version-INVARIANT, DEVLOG 517; COBOL.NET's
+/// one scaled-integer numeric pipeline makes most RUN-TIME arithmetic edition-invariant). Its first CONFIRMED variant
+/// is compile-time arithmetic (<c>arithmetic-intermediate-precision-2023</c>, kb/Work PB1592): standard arithmetic
+/// at 2002/2014, the documented System.Decimal mode at 2023. Uses the SAME <c>[Theory][MemberData]</c> mechanism + the SAME <c>constructs.json</c>
 /// catalogue as <see cref="VersionMatrixTests"/> (a `variant` block per candidate row) — NOT a new mechanism.
 /// A candidate is `confirmed:false` (pending) until an investigation confirms its edition-dependence and populates
 /// per-edition <c>outputs</c>; then it becomes an asserted per-edition golden. Pending candidates still RUN at every
@@ -81,9 +82,9 @@ public sealed class VersionBehaviorMatrixTests
         }
     }
 
-    /// <summary>The matrix is a DISCOVERY tool: it is well-formed even with zero CONFIRMED variants (the current
-    /// state — DEVLOG 517). This makes the "no confirmed edition-variant behavior yet" fact LOUD rather than an
-    /// empty/absent test surface.</summary>
+    /// <summary>The matrix is a DISCOVERY tool: it is well-formed with pending candidates and confirmed variants
+    /// alike, and every CONFIRMED variant carries its per-edition goldens — an empty/absent surface would hide
+    /// whether any edition-variant behavior exists.</summary>
     [Fact]
     public void BehaviorVariantCatalogue_IsWellFormed()
     {

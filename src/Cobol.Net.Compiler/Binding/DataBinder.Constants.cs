@@ -40,7 +40,8 @@ using Core = CobolParserCore;
 /// (GR4 — evaluated per §7.3.6 compile-time arithmetic: no exponentiation SR1a, fixed-point numeric literal
 /// operands SR1b — a constant-name operand substitutes its literal per §13.10.3 SR2/GR1, with SR4/SR5 ruling
 /// out circularity — no division by zero SR1c, the final result truncated to its integer part §7.3.6.3 GR3;
-/// intermediate results ride .NET <see cref="decimal"/>, the documented §7.3.6.2 SR2 implementor choice);
+/// intermediate results ride the edition's compile-time arithmetic mode, <see cref="CompileTimeArithmetic.For"/> —
+/// standard arithmetic at 2002/2014, the documented .NET <see cref="decimal"/> mode from 2023, kb/Work PB1592);
 /// <b>AS LENGTH OF data-name-2</b> (GR6 — the value of the §15.50 LENGTH function: <c>DataItem.ImageWidth</c>,
 /// THE character-position width authority the FUNCTION LENGTH fold reads, which is maximum-allocation based
 /// so the GR6 occurs-depending exception holds); <b>AS BYTE-LENGTH OF</b> (GR5) is STAGED LOUD — the §15.14
@@ -252,6 +253,7 @@ public sealed partial class DataBinder
         // its literal, §13.10.3 SR2/GR1), routes the evaluator's diagnostics to its own codes, and names the
         // operand source per §13.10.3.
         var evaluator = new CompileTimeExpressionEvaluator(
+            edition: Edition.Edition,
             resolveName: ResolveConstantName,
             diag: new ConstantEvaluatorDiagnostics(this),
             vocab: new CtOperandVocabulary(
@@ -265,12 +267,13 @@ public sealed partial class DataBinder
     /// <summary>The value of a BARE constant-name (§7.3.6.2 SR1b / §13.10.3 SR2 substitution), or null when the
     /// name is not a currently-defined constant — the shared compile-time evaluator's name-resolution callback.
     /// The CONSTANT-entry arithmetic path uses only the NUMERIC case (§7.3.6.2 SR1b), so a non-numeric constant
-    /// resolves to null and is rejected there. (A constant's <see cref="ConstantDef.Text"/> is already normalized
-    /// dot-decimal.)</summary>
+    /// resolves to null and is rejected there, and so does a floating-point constant (§7.3.6.2 SR1b — its
+    /// substituted literal is not fixed-point). (A constant's <see cref="ConstantDef.Text"/> is already normalized
+    /// dot-decimal; its value enters the expression in the edition's arithmetic mode at the evaluator.)</summary>
     private CtValue? ResolveConstantName(string word) =>
         _constants.TryGetValue(word, out var d) && d.Category == PicCategory.Numeric
-        && decimal.TryParse(d.Text, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign,
-            CultureInfo.InvariantCulture, out decimal v) ? CtValue.Numeric(v, d.Text) : null;
+        && !NumericLiteral.IsFloatingPointForm(d.Text)
+        && CtNumeric.TryParseLiteral(d.Text, out var v) ? CtValue.Numeric(v, d.Text) : null;
 
     /// <summary>Routes the shared compile-time evaluator's diagnostics to the CONSTANT-entry binder's own codes: an
     /// arithmetic rule → the <c>ConstantEntryRule</c> descriptor; a §12.3.7 GR14a separator violation →

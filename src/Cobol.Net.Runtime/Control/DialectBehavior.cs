@@ -44,6 +44,17 @@ public enum DialectBehavior
     /// requirement — so the RULE is the prior standard's normative content.) INDEXED ONLY: the relative and
     /// sequential sub-rule blocks print rule b) unamended.</summary>
     IndexedReadPreviousAfterOpenAtEnd = 0,
+
+    /// <summary>ISO/IEC 1989:2023 §7.3.6.3 GR2 — "The implementor shall define and document which mode of
+    /// arithmetic is to be used when evaluating compile-time arithmetic." 2023 CHANGED IT: Annex E.2 item 6 says
+    /// the mode "is now explicitly implementor defined", and its justification records the PRIOR rule — "The
+    /// previous COBOL Standard required the use of an arithmetic mode that is no longer supported" — so it passes
+    /// the admission test above. The one arithmetic mode 2023 removed is Standard Arithmetic (E.2 item 21), so at
+    /// 2002 and 2014 a compile-time arithmetic expression (CONSTANT AS, <c>&gt;&gt;DEFINE</c>,
+    /// <c>&gt;&gt;IF</c>/<c>&gt;&gt;EVALUATE</c>) is evaluated in standard arithmetic, and from 2023 in the
+    /// implementor's documented mode (docs/CONFORMANCE.md DOC-A.1-29). The consumer is
+    /// <c>CobolNet.Frontend.Expressions.CompileTimeArithmetic.For</c> — kb/Work PB1592.</summary>
+    CompileTimeArithmeticImplementorDefined = 1,
 }
 
 /// <summary>
@@ -72,6 +83,10 @@ public static class DialectBehaviors
             29, "14.9.30.4 GR21 d) 3", "E.2 item 22",
             "READ ... PREVIOUS immediately after an OPEN on an INDEXED file raises the at end condition; "
             + "before 2023 the rule made the first existing record available"),
+        new(DialectBehavior.CompileTimeArithmeticImplementorDefined, "compile-time-arithmetic-mode", 2023,
+            12, "7.3.6.3 GR2", "E.2 item 6",
+            "compile-time arithmetic expressions are evaluated in the implementor-defined mode; before 2023 the "
+            + "standard prescribed standard arithmetic (the mode E.2 item 21 removed)"),
     ];
 
     static DialectBehaviors()

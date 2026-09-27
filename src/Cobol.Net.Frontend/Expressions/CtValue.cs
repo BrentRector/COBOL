@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Expressions;
 
@@ -34,27 +35,30 @@ public enum CtCategory
 public sealed record CtValue
 {
     public CtCategory Category { get; }
-    /// <summary>The numeric value (meaningful only for <see cref="CtCategory.Numeric"/>).</summary>
-    public decimal Number { get; }
+    /// <summary>The numeric value in the <see cref="CtNumeric"/> carrier (meaningful only for
+    /// <see cref="CtCategory.Numeric"/>).</summary>
+    public CobolDec Number { get; }
     /// <summary>The character value (meaningful for <see cref="CtCategory.Alphanumeric"/>/<see cref="CtCategory.National"/>;
     /// for Numeric it is the canonical value text — the §7.3.11.4 GR5 single-literal form).</summary>
     public string Text { get; }
     /// <summary>The bit value (meaningful only for <see cref="CtCategory.Boolean"/>).</summary>
     public BitString? Bits { get; }
 
-    private CtValue(CtCategory category, decimal number, string text, BitString? bits)
+    private CtValue(CtCategory category, CobolDec number, string text, BitString? bits)
     {
         Category = category; Number = number; Text = text; Bits = bits;
     }
 
-    public static CtValue Numeric(decimal number, string text) => new(CtCategory.Numeric, number, text, null);
-    public static CtValue Alphanumeric(string text) => new(CtCategory.Alphanumeric, 0m, text, null);
-    public static CtValue National(string text) => new(CtCategory.National, 0m, text, null);
-    public static CtValue Boolean(BitString bits) => new(CtCategory.Boolean, 0m, "", bits);
+    public static CtValue Numeric(CobolDec number, string text) => new(CtCategory.Numeric, number, text, null);
+    public static CtValue Alphanumeric(string text) => new(CtCategory.Alphanumeric, default, text, null);
+    public static CtValue National(string text) => new(CtCategory.National, default, text, null);
+    public static CtValue Boolean(BitString bits) => new(CtCategory.Boolean, default, "", bits);
 
+    // Numeric equality is VALUE equality (CobolDec.Compare), never the record struct's member-wise (Sig, Exp)
+    // equality: 1 and 1.0 are one value with two carrier spellings.
     public bool Equals(CtValue? other) => other is not null && Category == other.Category && Category switch
     {
-        CtCategory.Numeric => Number == other.Number,
+        CtCategory.Numeric => CobolDec.Compare(Number, other.Number) == 0,
         CtCategory.Boolean => Bits is not null && other.Bits is not null && Bits.Equals(other.Bits),
         _ => string.Equals(Text, other.Text, StringComparison.Ordinal),   // Alphanumeric / National — binary, length-sensitive
     };
@@ -65,14 +69,14 @@ public sealed record CtValue
     /// which is the §7.3.11.3 SR2 redefinition equality (boolean length-sensitive).</summary>
     public bool RelationalEquals(CtValue other) => Category == other.Category && Category switch
     {
-        CtCategory.Numeric => Number == other.Number,
+        CtCategory.Numeric => CobolDec.Compare(Number, other.Number) == 0,
         CtCategory.Boolean => Bits is not null && other.Bits is not null && BitString.EqualExtended(Bits, other.Bits),
         _ => string.Equals(Text, other.Text, StringComparison.Ordinal),
     };
 
     public override int GetHashCode() => Category switch
     {
-        CtCategory.Numeric => HashCode.Combine(Category, Number),
+        CtCategory.Numeric => HashCode.Combine(Category, CtNumeric.ValueHash(Number)),
         CtCategory.Boolean => HashCode.Combine(Category, Bits?.Bits),
         _ => HashCode.Combine(Category, Text),
     };

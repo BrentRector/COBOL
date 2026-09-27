@@ -7,6 +7,7 @@ using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -172,6 +173,7 @@ public static class ConditionalCompilationProcessor
             // `_defines` (a directive may reference a variable an earlier directive — or a copybook — set); the
             // frontend routes every formation diagnostic to COBOLNET1619; a directive operand is dot-decimal (§5.3).
             _evaluator = new CompileTimeExpressionEvaluator(
+                edition: _edition,
                 resolveName: w => _defines.TryGetValue(w, out var v) ? v : null,
                 diag: _diag,
                 vocab: new CtOperandVocabulary("previously defined numeric compilation variables", "ISO §7.3.6.2 SR1b"),
@@ -488,7 +490,7 @@ public static class ConditionalCompilationProcessor
                 string? env = inputs.GetEnvironmentVariable(name);
                 if (env is null) { defines.Remove(name); return; }
                 var pv = decimal.TryParse(env, NumberStyles.Number, CultureInfo.InvariantCulture, out var num)
-                    ? CtValue.Numeric(num, env) : CtValue.Alphanumeric(env);
+                    ? CtValue.Numeric(CtNumeric.FromDecimal(num), env) : CtValue.Alphanumeric(env);
                 AssignDefine(name, pv, over, defines, diag);
                 return;
             }
@@ -571,7 +573,7 @@ public static class ConditionalCompilationProcessor
             diag.Report(CtDiagCode.DirectiveRule, ">>WHEN: a THROUGH range requires numeric operands (ISO §7.3.13.3 SR12)");
             return false;
         }
-        return subject.Number >= lo.Number && subject.Number <= hi.Number;
+        return CobolDec.Compare(subject.Number, lo.Number) >= 0 && CobolDec.Compare(subject.Number, hi.Number) <= 0;
     }
 
     /// <summary>Split a WHEN object at a top-level <c>THROUGH</c>/<c>THRU</c> word (the §7.3.13 range separator),

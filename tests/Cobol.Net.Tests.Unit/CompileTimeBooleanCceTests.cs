@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
 using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Parsing;
 using Xunit;
@@ -25,7 +26,8 @@ public sealed class CompileTimeBooleanCceTests
         new("previously defined numeric compilation variables", "ISO §7.3.6.2 SR1b");
 
     private static CompileTimeExpressionEvaluator NewEval(CollectingDiag diag, Dictionary<string, CtValue>? names) =>
-        new(resolveName: w => names is not null && names.TryGetValue(w, out var v) ? v : null,
+        new(edition: EditionInfo.Latest,
+            resolveName: w => names is not null && names.TryGetValue(w, out var v) ? v : null,
             diag: diag, vocab: Vocab, decimalPointIsComma: false);
 
     private static (CtValue? Value, CollectingDiag Diag) EvalOperand(string text, Dictionary<string, CtValue>? names = null)
@@ -214,7 +216,7 @@ public sealed class CompileTimeBooleanCceTests
     [Fact] // §7.3.8.4.4 defined-condition.
     public void Cce_DefinedCondition()
     {
-        var names = new Dictionary<string, CtValue> { ["A"] = CtValue.Numeric(1m, "1") };
+        var names = new Dictionary<string, CtValue> { ["A"] = CtValue.Numeric(CtNumeric.FromDecimal(1m), "1") };
         Assert.True(EvalCce("A IS DEFINED", names).Result);
         Assert.False(EvalCce("A IS NOT DEFINED", names).Result);
         Assert.False(EvalCce("B IS DEFINED", names).Result);
@@ -226,7 +228,7 @@ public sealed class CompileTimeBooleanCceTests
     {
         var names = new Dictionary<string, CtValue>
         {
-            ["LVL"] = CtValue.Numeric(14m, "14"),
+            ["LVL"] = CtValue.Numeric(CtNumeric.FromDecimal(14m), "14"),
             ["SYS"] = CtValue.Alphanumeric("type A"),
         };
         Assert.True(EvalCce("LVL > 10 AND LVL < 20", names).Result);

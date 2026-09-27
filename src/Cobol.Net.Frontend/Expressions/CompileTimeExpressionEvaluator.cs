@@ -1,9 +1,10 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using System.Globalization;
 using Antlr4.Runtime.Tree;
 using CobolNet.Common;
+using CobolNet.Editions;
 using CobolNet.Frontend.Generated;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Expressions;
 
@@ -20,9 +21,14 @@ using Core = CobolParserCore;
 ///
 /// The §7.3.11.4 GR5 reclassification (a single numeric literal stays a literal, keeping its fractional value) and
 /// the §7.3.6.3 GR3 truncation (an arithmetic EXPRESSION's final result is truncated to its integer part) are
-/// applied HERE, at the public <see cref="EvaluateArithmeticOperand"/> boundary — the raw-decimal recursion stays
+/// applied HERE, at the public <see cref="EvaluateArithmeticOperand"/> boundary — the raw-value recursion stays
 /// private so intermediate results are correctly un-truncated (§7.3.6.3 GR1), and no consumer re-implements the
 /// probe/truncate rule.
+///
+/// The MODE of arithmetic (§7.3.6.3 GR2) is the edition's: the constructor selects it through
+/// <see cref="CompileTimeArithmetic.For"/> — standard arithmetic at 2002/2014, where Annex E.2 6) says the previous
+/// standard prescribed it, and the documented System.Decimal mode from 2023 (kb/Work PB1592). Values travel in the
+/// mode-independent <see cref="CtNumeric"/> carrier, so a consumer never sees which mode produced one.
 /// </summary>
 public sealed class CompileTimeExpressionEvaluator
 {
@@ -30,7 +36,12 @@ public sealed class CompileTimeExpressionEvaluator
     private readonly ICtDiagnostics _diag;
     private readonly CtOperandVocabulary _vocab;
     private readonly bool _decimalPointIsComma;
+    private readonly CompileTimeArithmetic _arithmetic;
+    private readonly int _literalDigits;
 
+    /// <param name="edition">The targeted edition — it selects the §7.3.6.3 GR2 arithmetic mode
+    /// (<see cref="CompileTimeArithmetic.For"/>) and the §8.3.3.3.2 fixed-point literal capacity
+    /// (<see cref="EditionInfo.MaxDigits"/>) every literal operand and every §7.3.6.3 GR3 result is held to.</param>
     /// <param name="resolveName">A bare (unqualified, unsubscripted) name → its bound <see cref="CtValue"/> if it is
     /// a currently-defined constant/compilation-variable, else <see langword="null"/>. An arithmetic operand uses
     /// only the NUMERIC case (§7.3.6.2 SR1b — a non-numeric or undefined name is rejected); a boolean operand uses
@@ -40,9 +51,11 @@ public sealed class CompileTimeExpressionEvaluator
     /// <param name="decimalPointIsComma">The active §12.3.7 GR14a mode (binder: the real SPECIAL-NAMES setting;
     /// frontend: false — a directive operand is processed before SPECIAL-NAMES is bound, so it is dot-decimal).</param>
     public CompileTimeExpressionEvaluator(
-        Func<string, CtValue?> resolveName, ICtDiagnostics diag, CtOperandVocabulary vocab,
+        EditionInfo edition, Func<string, CtValue?> resolveName, ICtDiagnostics diag, CtOperandVocabulary vocab,
         bool decimalPointIsComma)
     {
+        _arithmetic = CompileTimeArithmetic.For(edition);
+        _literalDigits = edition.MaxDigits;
         _resolveName = resolveName;
         _diag = diag;
         _vocab = vocab;
@@ -51,9 +64,10 @@ public sealed class CompileTimeExpressionEvaluator
 
     /// <summary>The final value of one compile-time arithmetic operand (§7.3.6). <paramref name="WasSingleLiteral"/>
     /// is true when the operand was a single numeric literal (§7.3.11.4 GR5 / §13.10.3 SR1 — treated as a literal,
-    /// NOT truncated). <paramref name="Text"/> is the canonical value text (a single literal's normalized text,
-    /// sign included; an expression's GR3-truncated integer) — the substitution form consumers store.</summary>
-    public readonly record struct CtNumber(bool WasSingleLiteral, decimal Value, string Text);
+    /// NOT truncated). <paramref name="Value"/> is the value in the <see cref="CtNumeric"/> carrier.
+    /// <paramref name="Text"/> is the canonical value text (a single literal's normalized text, sign included; an
+    /// expression's GR3-truncated integer) — the substitution form consumers store.</summary>
+    public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Text);
 
     /// <summary>Evaluate one compile-time arithmetic operand (ISO §7.3.6), applying §7.3.11.4 GR5 (single-literal
     /// reclassification) and §7.3.6.3 GR3 (integer truncation of an expression's final result) at this boundary.
@@ -71,37 +85,60 @@ public sealed class CompileTimeExpressionEvaluator
         // §7.3.11.4 GR5 / §13.10.3 SR1 — a single (possibly signed) numeric literal is a LITERAL, not an
         // expression, so it keeps its value (AS 0.25 stays 0.25) and is NOT truncated. As a literal it may be of
         // ANY numeric class, so a floating-point (E-form) literal is valid here — unlike a §7.3.6.2 SR1b
-        // arithmetic-EXPRESSION operand, which must be fixed-point (see ParseLiteral). Parse permissively
-        // (AllowExponent); a literal whose magnitude exceeds the decimal evaluation range is rejected LOUDLY
-        // (never a silent null — the boundary's "null means already reported" contract).
+        // arithmetic-EXPRESSION operand, which must be fixed-point (see ParseLiteral). No arithmetic mode applies to
+        // it (kb/Work PB1592): the carrier holds every valid literal exactly, so the only limits are the literal's
+        // own — its fixed-point digit capacity (§8.3.3.3.2) and the decimal128 exponent range this compiler gives a
+        // floating-point literal in every arithmetic mode (§8.3.3.3.3 r3) — each rejected LOUDLY (never a silent
+        // null — the boundary's "null means already reported" contract).
         if (SoleNumericLiteral(expr) is { } lit)
         {
             string text = CobolNet.Common.NumericLiteral.Normalize(lit, _decimalPointIsComma, out var issue);
             ReportSeparator(issue, lit);
-            if (decimal.TryParse(text,
-                    NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign | NumberStyles.AllowExponent,
-                    CultureInfo.InvariantCulture, out decimal v))
-                return new CtNumber(true, v, text);
-            _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the numeric literal '{lit}' exceeds the .NET "
-                + "decimal evaluation range (96-bit, 28–29 significant digits — the documented §7.3.6.2 SR2 "
-                + "implementor limit)");
+            bool floating = CobolNet.Common.NumericLiteral.IsFloatingPointForm(text);
+            if (!floating && !WithinLiteralCapacity(text, lit, where)) return null;
+            if (CtNumeric.TryParseLiteral(text, out var v)) return new CtNumber(true, v, text);
+            _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the numeric literal '{lit}' lies outside the "
+                + "decimal128 range this compiler gives a numeric literal, about 1E-6176 to 9.99E+6144 (ISO "
+                + "§8.3.3.3.3 r3; §8.8.1.5.2 r2; CONFORMANCE.md §7)");
             return null;
         }
-        // An arithmetic EXPRESSION: evaluate the raw value (intermediates un-truncated, §7.3.6.3 GR1), then
-        // truncate the FINAL result to its integer part (§7.3.6.3 GR3 / INTEGER-PART §15.49).
+        // An arithmetic EXPRESSION: evaluate the raw value in the edition's mode (intermediates un-truncated,
+        // §7.3.6.3 GR1), then truncate the FINAL result to its integer part (§7.3.6.3 GR3 / INTEGER-PART §15.49).
+        // GR3 also makes that value "an integer numeric literal", so it is held to the literal's digit capacity
+        // (§8.3.3.3.2) — reachable only under standard arithmetic, whose 34-digit intermediates can carry a
+        // product of two 31-digit operands that no literal of this edition can spell.
         if (EvalArith(expr, where) is not { } result) return null;
-        decimal truncated = decimal.Truncate(result);
-        return new CtNumber(false, truncated, truncated.ToString(CultureInfo.InvariantCulture));
+        CobolDec truncated = CtNumeric.IntegerPart(result);
+        int digits = CtNumeric.IntegerDigits(truncated);
+        if (digits > _literalDigits)
+        {
+            _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the final result of the compile-time arithmetic "
+                + $"expression has {digits} digits, but it is an integer numeric literal (ISO §7.3.6.3 GR3) and a "
+                + $"fixed-point numeric literal has at most {_literalDigits} digits (ISO §8.3.3.3.2)");
+            return null;
+        }
+        return new CtNumber(false, truncated, CtNumeric.ToIntegerText(truncated));
     }
 
-    // ── The §7.3.6 raw-decimal recursion (lifted from the CONSTANT binder's battery-tested EvalConstExpr) ────────
+    /// <summary>The §8.3.3.3.2 fixed-point literal capacity (<see cref="EditionInfo.MaxDigits"/>), counted the way
+    /// every other literal screen counts it — digit positions — reported through the evaluator's sink.</summary>
+    private bool WithinLiteralCapacity(string canonicalText, string written, string where)
+    {
+        int digits = canonicalText.Count(char.IsAsciiDigit);
+        if (digits <= _literalDigits) return true;
+        _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the numeric literal '{written}' has {digits} digit "
+            + $"positions; a fixed-point numeric literal has at most {_literalDigits} (ISO §8.3.3.3.2)");
+        return false;
+    }
+
+    // ── The §7.3.6 raw-value recursion (lifted from the CONSTANT binder's battery-tested EvalConstExpr) ──────────
 
     /// <summary>Evaluate a compile-time arithmetic expression to its raw (un-truncated) value (ISO §7.3.6):
     /// operands are fixed-point numeric literals (§7.3.6.2 SR1b) or previously-defined numeric names substituting
-    /// them; exponentiation is rejected (SR1a); division by zero is rejected (SR1c); intermediates ride .NET
-    /// <see cref="decimal"/> (96-bit, 28–29 significant digits — the documented §7.3.6.2 SR2 implementor choice).
-    /// <see langword="null"/> (already reported) on any violation.</summary>
-    private decimal? EvalArith(IParseTree node, string where)
+    /// them; exponentiation is rejected (SR1a); division by zero is rejected (SR1c); every operand enters, and every
+    /// operation runs in, the edition's <see cref="CompileTimeArithmetic"/> mode (§7.3.6.3 GR2), whose range bounds
+    /// the intermediate results. <see langword="null"/> (already reported) on any violation.</summary>
+    private CobolDec? EvalArith(IParseTree node, string where)
     {
         switch (node)
         {
@@ -109,38 +146,26 @@ public sealed class CompileTimeExpressionEvaluator
                 return EvalArith(a.GetChild(0), where);
             case Core.AdditiveExpressionContext or Core.MultiplicativeExpressionContext:
             {
-                decimal? acc = null;
+                CobolDec? acc = null;
                 char op = '+';
                 for (int i = 0; i < node.ChildCount; i++)
                 {
                     var c = node.GetChild(i);
                     if (c is Core.AddOpContext or Core.MulOpContext) { op = c.GetText()[0]; continue; }
                     if (EvalArith(c, where) is not { } v) return null;
-                    if (acc is null) { acc = v; continue; }
-                    try
+                    if (acc is not { } left) { acc = v; continue; }
+                    if (op == '/' && v.Sig == 0)
                     {
-                        switch (op)
-                        {
-                            case '+': acc += v; break;
-                            case '-': acc -= v; break;
-                            case '*': acc *= v; break;
-                            case '/':
-                                if (v == 0m)
-                                {
-                                    _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the compile-time arithmetic "
-                                        + "expression divides by zero — the expression shall be specified in such a "
-                                        + "way that a division by zero cannot occur (ISO §7.3.6.2 SR1c)");
-                                    return null;
-                                }
-                                acc /= v;
-                                break;
-                        }
+                        _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the compile-time arithmetic "
+                            + "expression divides by zero — the expression shall be specified in such a "
+                            + "way that a division by zero cannot occur (ISO §7.3.6.2 SR1c)");
+                        return null;
                     }
-                    catch (OverflowException)
+                    acc = _arithmetic.Apply(op, left, v);
+                    if (acc is null)
                     {
                         _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: an intermediate result of the compile-time "
-                            + "arithmetic expression exceeds the .NET decimal evaluation range (96-bit, 28–29 "
-                            + "significant digits — the documented §7.3.6.2 SR2 implementor limit)");
+                            + $"arithmetic expression exceeds {_arithmetic.RangeDescription}");
                         return null;
                     }
                 }
@@ -161,20 +186,23 @@ public sealed class CompileTimeExpressionEvaluator
             {
                 if (u.primaryExpression() is { } pr) return EvalArith(pr, where);
                 var inner = EvalArith(u.unaryExpression(), where);
-                return inner is null ? null : u.addOp().GetText() == "-" ? -inner : inner;
+                return inner is not { } value ? null
+                    : u.addOp().GetText() == "-" ? new CobolDec(-value.Sig, value.Exp)   // negation is exact
+                    : value;
             }
             case Core.PrimaryExpressionContext pe:
             {
                 if (pe.numericLiteral() is { } num) return ParseLiteral(num.GetText(), where);
-                if (pe.ZERO_ARITH() is not null) return 0m;
+                if (pe.ZERO_ARITH() is not null) return new CobolDec(0, 0);
                 if (pe.arithmeticExpression() is { } paren) return EvalArith(paren, where);
                 if (pe.dataReference() is { } dref)
                 {
                     // A name operand substitutes its literal (§7.3.6.2 SR1b) — only a BARE (unqualified,
-                    // unsubscripted) NUMERIC constant/compilation-variable is a valid operand.
+                    // unsubscripted) NUMERIC constant/compilation-variable is a valid operand, and its value
+                    // enters the expression through the edition's mode like any literal operand.
                     if (dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w
                         && _resolveName(w.GetText()) is { Category: CtCategory.Numeric } cv)
-                        return cv.Number;
+                        return EnterOperand(cv.Number, w.GetText(), where);
                     _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: '{dref.GetText()}' — all operands of the "
                         + $"compile-time arithmetic expression shall be fixed-point numeric literals or {_vocab.OperandSource} "
                         + $"({_vocab.GoverningCitation})");
@@ -192,16 +220,31 @@ public sealed class CompileTimeExpressionEvaluator
     }
 
     /// <summary>Parse one fixed-point numeric literal operand (§7.3.6.2 SR1b): dot-decimal after the §12.3.7 GR14a
-    /// normalization; a floating-point (E-form) literal is NOT fixed-point and rejects.</summary>
-    private decimal? ParseLiteral(string text, string where)
+    /// normalization; a floating-point (E-form) literal is NOT fixed-point and rejects; a literal past the
+    /// §8.3.3.3.2 digit capacity rejects; the value then enters the edition's mode (<see cref="EnterOperand"/>),
+    /// whose range is the §7.3.6.2 SR2 limit — a separate rule from SR1b, reported as such.</summary>
+    private CobolDec? ParseLiteral(string text, string where)
     {
         string norm = CobolNet.Common.NumericLiteral.Normalize(text, _decimalPointIsComma, out var issue);
         ReportSeparator(issue, text);
-        if (decimal.TryParse(norm, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign,
-                CultureInfo.InvariantCulture, out decimal v))
-            return v;
-        _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: '{text}' — all operands of a compile-time arithmetic "
-            + "expression shall be fixed-point numeric literals (ISO §7.3.6.2 SR1b)");
+        bool fixedPoint = !CobolNet.Common.NumericLiteral.IsFloatingPointForm(norm);
+        if (fixedPoint && !WithinLiteralCapacity(norm, text, where)) return null;
+        if (!fixedPoint || !CtNumeric.TryParseLiteral(norm, out var v))
+        {
+            _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: '{text}' — all operands of a compile-time arithmetic "
+                + "expression shall be fixed-point numeric literals (ISO §7.3.6.2 SR1b)");
+            return null;
+        }
+        return EnterOperand(v, text, where);
+    }
+
+    /// <summary>An operand value entering the expression in the edition's mode (§7.3.6.3 GR2), or
+    /// <see langword="null"/> (reported) when it lies outside the mode's range (§7.3.6.2 SR2).</summary>
+    private CobolDec? EnterOperand(CobolDec value, string written, string where)
+    {
+        if (_arithmetic.Enter(value) is { } entered) return entered;
+        _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the operand '{written}' of the compile-time arithmetic "
+            + $"expression exceeds {_arithmetic.RangeDescription}");
         return null;
     }
 
@@ -352,17 +395,20 @@ public sealed class CompileTimeExpressionEvaluator
         bool circular = suf.B_SHIFT_LC() is not null || suf.B_SHIFT_RC() is not null;
         bool left = suf.B_SHIFT_L() is not null || suf.B_SHIFT_LC() is not null;
         if (EvaluateDirectiveArithmetic(suf.arithmeticExpression(), where) is not { } count) return null;
-        if (count.Value != decimal.Truncate(count.Value))
+        if (!CtNumeric.IsInteger(count.Value))
         { ReportDirective(where, "the second operand of a boolean shift shall be an integer operand (ISO §8.8.2 rule 5)"); return null; }
-        if (count.Value < 0)
+        if (count.Value.Sig < 0)
         { ReportDirective(where, "a boolean shift count shall not be negative (ISO §8.8.2 rule 8)"); return null; }
         // Reduce the count to a small equivalent BEFORE the (long) cast so an astronomically large literal count
         // cannot overflow the cast: a LOGICAL shift by ≥ the length is all boolean zeros (cap at the length), and a
-        // CIRCULAR shift is periodic in the length (mod). A zero-length operand shifts to itself.
+        // CIRCULAR shift is periodic in the length (mod). A zero-length operand shifts to itself. The count is an
+        // integer of at most the edition's literal capacity (31 digits — the boundary above enforced it), so it
+        // fits an Int128.
         int n = operand.Length;
+        Int128 c = CtNumeric.ToInt128(count.Value);
         long k = n == 0 ? 0
-               : circular ? (long)(count.Value % n)
-               : count.Value > n ? n : (long)count.Value;
+               : circular ? (long)(c % n)
+               : c > n ? n : (long)c;
         return operand.Shift(k, circular, left);
     }
 
@@ -458,7 +504,7 @@ public sealed class CompileTimeExpressionEvaluator
         if (negate) op = NegateOp(op);
         if (left.Category == CtCategory.Numeric)
         {
-            int cmp = decimal.Compare(left.Number, right.Number);
+            int cmp = CobolDec.Compare(left.Number, right.Number);
             return op switch { "==" => cmp == 0, "!=" => cmp != 0, "<" => cmp < 0, ">" => cmp > 0, "<=" => cmp <= 0, ">=" => cmp >= 0, _ => false };
         }
         if (op is not ("==" or "!="))
