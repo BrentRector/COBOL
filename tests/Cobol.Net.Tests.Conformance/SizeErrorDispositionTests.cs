@@ -126,6 +126,73 @@ public sealed class SizeErrorDispositionTests
         Assert.DoesNotContain("   at ", stderr);   // no CLR stack trace
     }
 
+    /// <summary>kb/Work PB1605 — the ZERO DIVISOR over every value lane and every divide shape. §14.7.5 case 2 is the
+    /// size error condition wherever a divisor is zero, and no-phrase rule 2 sets EC-SIZE-ZERO-DIVIDE; with checking
+    /// not enabled §14.6.13.1.3 item 8 hands the disposition to the implementor, and CONFORMANCE.md DOC-A.1-70's is
+    /// that a quotient which cannot be formed has no value to store: the run unit terminates abnormally naming the
+    /// condition, exit 1. <c>ARITHMETIC</c> is the lane switch — native (the scaled Int128 carrier, and binary64
+    /// wherever a FLOAT-LONG operand or receiver is present) or STANDARD-DECIMAL (the SDIDI intermediate, which
+    /// alone terminated before PB1605). The scaled rows stored 000 and ran on; the binary64 rows stored +Infinity
+    /// (FR), and the float-to-fixed row stored 000.</summary>
+    [Theory]
+    [InlineData("NATIVE", "COMPUTE A = B / Z.")]
+    [InlineData("NATIVE", "COMPUTE A = 1 + B / Z.")]                  // a nested (non-final) quotient
+    [InlineData("NATIVE", "DIVIDE Z INTO A.")]
+    [InlineData("NATIVE", "DIVIDE B BY Z GIVING A REMAINDER R.")]
+    [InlineData("NATIVE", "IF B / Z > 1 DISPLAY \"GT\" END-IF.")]     // receiverless: a condition
+    [InlineData("NATIVE", "COMPUTE FR = FL / FZ.")]
+    [InlineData("NATIVE", "DIVIDE FZ INTO FR.")]
+    [InlineData("NATIVE", "COMPUTE A = FL / FZ.")]
+    [InlineData("NATIVE", "IF FL / FZ > 1 DISPLAY \"GT\" END-IF.")]
+    [InlineData("STANDARD-DECIMAL", "COMPUTE A = B / Z.")]
+    public void ZeroDivisor_CheckingOff_TerminatesNamingEcSizeZeroDivide(string arithmetic, string body)
+    {
+        var (exit, stdout, stderr) = Run(ProgZeroDivisor(arithmetic, body));
+        Assert.Equal(1, exit);
+        Assert.Contains("BEFORE", stdout);
+        Assert.DoesNotContain("AFTER", stdout);
+        Assert.Contains("abnormal run-unit termination: EC-SIZE-ZERO-DIVIDE (fatal)", stderr);
+        Assert.DoesNotContain("   at ", stderr);   // no CLR stack trace
+    }
+
+    /// <summary>The same zero divisors under the SIZE ERROR phrase: §14.7.5 phrase rule 1 leaves every resultant
+    /// unchanged and rule 3 runs the phrase, then execution continues — the unchecked kernels' raise must not
+    /// change the checked path. A (VALUE 7) and FR (VALUE 9) are displayed as their initial values.</summary>
+    [Theory]
+    [InlineData("NATIVE", "COMPUTE A = B / Z ON SIZE ERROR DISPLAY \"SE\" END-COMPUTE.")]
+    [InlineData("NATIVE", "COMPUTE FR = FL / FZ ON SIZE ERROR DISPLAY \"SE\" END-COMPUTE.")]
+    [InlineData("STANDARD-DECIMAL", "COMPUTE A = B / Z ON SIZE ERROR DISPLAY \"SE\" END-COMPUTE.")]
+    public void ZeroDivisor_UnderThePhrase_LeavesTheResultantsAndContinues(string arithmetic, string body)
+    {
+        var (exit, stdout, _) = Run(ProgZeroDivisor(arithmetic, body +" DISPLAY \"A=\" A \" FR=\" FR."));
+        Assert.Equal(0, exit);
+        Assert.Contains("SE", stdout);
+        Assert.Contains("A=007 FR=9", stdout);
+        Assert.Contains("AFTER", stdout);
+    }
+
+    private static string ProgZeroDivisor(string arithmetic, string body) => $$"""
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. PB1605ZD.
+               OPTIONS.
+                   ARITHMETIC IS {{arithmetic}}.
+               DATA DIVISION.
+               WORKING-STORAGE SECTION.
+               01 B  PIC 9 VALUE 5.
+               01 Z  PIC 9 VALUE 0.
+               01 A  PIC 9(3) VALUE 7.
+               01 R  PIC 9(3) VALUE 9.
+               01 FL USAGE FLOAT-LONG VALUE 5.
+               01 FZ USAGE FLOAT-LONG VALUE 0.
+               01 FR USAGE FLOAT-LONG VALUE 9.
+               PROCEDURE DIVISION.
+               MAIN-P.
+                   DISPLAY "BEFORE".
+                   {{body}}
+                   DISPLAY "AFTER".
+                   STOP RUN.
+        """;
+
     /// <summary>§14.6.13.1.3 #7 — checking enabled and nothing resumes: the guarded statement sets the status,
     /// finds no USE / WHEN, and the run unit terminates abnormally naming the condition.</summary>
     [Fact]

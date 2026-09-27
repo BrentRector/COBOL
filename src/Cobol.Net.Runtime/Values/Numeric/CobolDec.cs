@@ -513,10 +513,11 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
 
     /// <summary>Divide: the dividend pre-scales so the exact quotient carries ≥34 significant digits, the
     /// shift-subtract 256÷128 division yields quotient+remainder, and one rounding lands the SDIDI result.
-    /// A zero divisor raises the size error (§14.7.5 case 2 — EC-SIZE-ZERO-DIVIDE territory).</summary>
+    /// A zero divisor raises <see cref="CobolSizeError.ZeroDivide"/> (§14.7.5 case 2), checked or not — the SDIDI
+    /// arm of the three value lanes' one zero-divisor rule.</summary>
     public static CobolDec Div(CobolDec a, CobolDec b, CobolRounding mode)
     {
-        if (b.Sig == 0) throw new CobolSizeError("divide by zero (standard-decimal)", "EC-SIZE-ZERO-DIVIDE");
+        if (b.Sig == 0) throw CobolSizeError.ZeroDivide();
         if (a.Sig == 0) return new CobolDec(0, 0);
         bool negative = (a.Sig < 0) ^ (b.Sig < 0);
         UInt128 den = UAbs(b.Sig);

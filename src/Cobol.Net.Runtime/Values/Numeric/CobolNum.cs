@@ -630,20 +630,21 @@ public static partial class CobolNum
     }
 
     /// <summary>
-    /// Divide (see <see cref="Divide"/>) but raise <see cref="CobolSizeError"/> on a zero divisor (ISO §14.7.5 case
-    /// 2) instead of returning 0. Emitted only inside a statement that carries an ON SIZE ERROR phrase, so a
-    /// division in a statement WITHOUT the phrase keeps <see cref="Divide"/>'s behavior unchanged.
+    /// The CHECKED quotient — <see cref="Divide"/> (whose zero divisor already raises §14.7.5 case 2 in every
+    /// context), plus the one size error only a checked context owes: ROUNDED MODE IS PROHIBITED on an inexact
+    /// quotient (§14.7.4.3 r7, EC-SIZE-TRUNCATION). Emitted where an ON SIZE ERROR phrase or EC-SIZE checking is in
+    /// effect; unchecked, PROHIBITED keeps CONFORMANCE.md DOC-A.1-70's truncated landing (kb/Work PB1196).
     /// </summary>
     public static Int128 DivideOrThrow(Int128 a, int aScale, Int128 b, int bScale, int resultScale, CobolRounding mode)
     {
-        if (b == 0) throw new CobolSizeError("divide by zero", "EC-SIZE-ZERO-DIVIDE");
+        Int128 quotient = Divide(a, aScale, b, bScale, resultScale, mode);
         // ROUNDED MODE IS PROHIBITED: an inexact quotient AT resultScale is a size error (§14.7.4.3 r7). When the
         // division rounds directly at the receiver scale (the outermost-division case), the inexactness is consumed
         // inside Divide, so it must be detected here from the exact remainder rather than by the receiver's TryStore.
         if (mode == CobolRounding.Prohibited && DivisionLosesPrecision(a, aScale, b, bScale, resultScale))
             throw new CobolSizeError("ROUNDED MODE IS PROHIBITED on an inexact quotient (ISO §14.7.4.3 r7 — "
                 + "EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
-        return Divide(a, aScale, b, bScale, resultScale, mode);
+        return quotient;
     }
 
     /// <summary>True when <c>a/10^aScale ÷ b/10^bScale</c> cannot be represented exactly at <paramref name="resultScale"/>
@@ -960,12 +961,16 @@ public static partial class CobolNum
     /// own scales (<c>a/10^aScale ÷ b/10^bScale</c> rendered at <paramref name="resultScale"/>). The radix alignment
     /// (<c>a × 10^exp</c>) runs in <see cref="Int128"/> — an 18-significant-digit dividend scaled by the receiver's
     /// fraction digits exceeds the long range MID-computation even though the QUOTIENT fits (ISO §8.8.1: arithmetic
-    /// operates on the algebraic values; intermediate width is the implementor's problem, not the program's). A zero
-    /// divisor returns 0 (the caller raises ON SIZE ERROR — later slice).
+    /// operates on the algebraic values; intermediate width is the implementor's problem, not the program's).
+    /// <para>A zero divisor raises <see cref="CobolSizeError.ZeroDivide"/> — §14.7.5 case 2 — checked or NOT: the
+    /// condition exists either way, and checking decides only its disposition (the SIZE ERROR phrase, an EC-SIZE
+    /// declarative or PERFORM WHEN, else abnormal termination — CONFORMANCE.md DOC-A.1-70's determination for the
+    /// unchecked §14.6.13.1.3 item 8 case). This unchecked kernel returned 0 until kb/Work PB1605, so
+    /// <c>COMPUTE A = B / Z</c> stored 000 and the run went on.</para>
     /// </summary>
     public static Int128 Divide(Int128 a, int aScale, Int128 b, int bScale, int resultScale, CobolRounding mode)
     {
-        if (b == 0) return 0;
+        if (b == 0) throw CobolSizeError.ZeroDivide();
         int exp = bScale + resultScale - aScale;     // quotient_unscaled = round(a × 10^exp / b)
         Int128 num = a, den = b;
         if (exp >= 0) num *= Pow10Wide(exp); else den *= Pow10Wide(-exp);

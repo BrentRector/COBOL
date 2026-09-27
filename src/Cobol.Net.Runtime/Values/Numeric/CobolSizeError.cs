@@ -33,4 +33,17 @@ namespace CobolNet.Runtime;
 /// (<c>CobolNum.DivideOrThrow</c>) latched the wrong level-3 name, so a USE AFTER EC-SIZE-TRUNCATION declarative
 /// never saw it (kb/Work PB1147). Every raise site now says which Table 13 condition it is.</para>
 /// </summary>
-public sealed class CobolSizeError(string detail, string ecName) : CobolFatalException(ecName, detail);
+public sealed class CobolSizeError(string detail, string ecName) : CobolFatalException(ecName, detail)
+{
+    /// <summary>The zero divisor — §14.7.5 case 2, "if the divisor in a divide operation or in a DIVIDE statement is
+    /// zero", EC-SIZE-ZERO-DIVIDE by no-phrase rule 2 (a Fatal condition in Table 13). The ONE raise every value
+    /// lane's quotient kernel throws (<c>CobolNum.Divide</c> for the scaled <see cref="Int128"/> carrier,
+    /// <c>CobolFloat.Div</c> for binary64, <c>CobolDec.Div</c> for the standard-decimal intermediate), and it throws
+    /// it whether or not checking is enabled: the condition exists either way, and only its disposition differs.
+    /// With checking off and no SIZE ERROR phrase §14.6.13.1.3 item 8 leaves that disposition to the implementor,
+    /// and COBOL.NET's (CONFORMANCE.md DOC-A.1-70) is that a quotient which cannot be formed has no value to store,
+    /// so the run unit terminates abnormally naming the condition (kb/Work PB1605). Until then the scaled lane
+    /// answered 0 and the binary64 lane ±Infinity (or NaN), and the run went on with that value.</summary>
+    public static CobolSizeError ZeroDivide() =>
+        new("a zero divisor in a divide operation (ISO §14.7.5 case 2)", "EC-SIZE-ZERO-DIVIDE");
+}

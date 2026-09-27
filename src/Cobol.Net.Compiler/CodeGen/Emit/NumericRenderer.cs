@@ -600,20 +600,26 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// two-arm shape). Where checking is enabled (<see cref="Checked"/>) each operation is the checked runtime twin
     /// of the scaled carrier's: a zero divisor is EC-SIZE-ZERO-DIVIDE (§14.7.5 case 2, as <c>DivideOrThrow</c>), and
     /// a result outside binary64 is EC-SIZE-OVERFLOW / -UNDERFLOW (case 5, as <c>MulChecked</c>/<c>AddChecked</c>).
-    /// Unchecked it is the bare IEEE operator, exactly as the scaled lane's unchecked operators wrap.</summary>
+    /// Unchecked, the sum, difference and product are the bare IEEE operators, exactly as the scaled lane's unchecked
+    /// operators wrap; the QUOTIENT is <c>CobolFloat.Div</c>, because a zero divisor is case 2 whether or not checking
+    /// is enabled — the same rule <c>CobolNum.Divide</c> and <c>CobolDec.Div</c> keep (kb/Work PB1605; the bare
+    /// <c>/</c> stored +Infinity and ran on, where CONFORMANCE.md DOC-A.1-70 terminates).</summary>
     private NumX CombineReal(NumX a, string op, NumX b)
     {
         string x = Real(a), y = Real(b);
-        if (!Checked) return new NumX($"({x} {op} {y})", 0, Real: true);
-        string fn = op switch
+        string? fn = (op, Checked) switch
         {
-            "+" => nameof(CobolFloat.AddChecked),
-            "-" => nameof(CobolFloat.SubChecked),
-            "*" => nameof(CobolFloat.MulChecked),
-            "/" => nameof(CobolFloat.DivChecked),
+            ("/", false) => nameof(CobolFloat.Div),
+            ("+" or "-" or "*", false) => null,
+            ("+", true) => nameof(CobolFloat.AddChecked),
+            ("-", true) => nameof(CobolFloat.SubChecked),
+            ("*", true) => nameof(CobolFloat.MulChecked),
+            ("/", true) => nameof(CobolFloat.DivChecked),
             _ => throw new InvalidOperationException($"no binary64 operator '{op}'"),
         };
-        return new NumX($"{nameof(CobolFloat)}.{fn}({x}, {y})", 0, Real: true);
+        return fn is null
+            ? new NumX($"({x} {op} {y})", 0, Real: true)
+            : new NumX($"{nameof(CobolFloat)}.{fn}({x}, {y})", 0, Real: true);
     }
 
     // Plain STANDARD arithmetic (2002; obsolete 2014, removed 2023 — Annex E.2 item 21) uses the standard
@@ -688,8 +694,8 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             ds = baseScale + Math.Max(0, guard);
             mode = CobolRounding.Truncation;
         }
-        // Under an ON SIZE ERROR phrase, a zero divisor must raise the size error (ISO §14.7.5 case 2): the checked
-        // DivideOrThrow signals it (caught by the statement's try); otherwise Divide returns 0 unchanged.
+        // Both kernels raise a zero divisor (ISO §14.7.5 case 2 — checked or not, kb/Work PB1605); the checked
+        // DivideOrThrow adds the PROHIBITED-inexact quotient, which only a checked context owes (§14.7.4.3 r7).
         string fn = Checked ? "DivideOrThrow" : "Divide";
         return new NumX($"CobolNum.{fn}({a.Expr}, {a.Scale}, {b.Expr}, {b.Scale}, {ds}, CobolRounding.{mode})", ds);
     }

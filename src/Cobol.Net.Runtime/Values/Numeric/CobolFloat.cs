@@ -402,8 +402,16 @@ public static class CobolFloat
     /// PB1147).</summary>
     public static double DivChecked(double a, double b)
     {
-        if (b == 0) throw new CobolSizeError("divide by zero", "EC-SIZE-ZERO-DIVIDE");
-        double r = a / b;
+        double r = Div(a, b);
         return double.IsFinite(a) && double.IsFinite(b) ? InBinary64Range(r, nonzero: a != 0, "division") : r;
     }
+
+    /// <summary>The native binary64 quotient where size-error checking is NOT enabled — the IEEE operator, except that
+    /// a zero divisor (either sign) is still §14.7.5 case 2 and raises <see cref="CobolSizeError.ZeroDivide"/>: the
+    /// condition exists whether or not checking is enabled, and CONFORMANCE.md DOC-A.1-70's disposition for it with
+    /// checking off is abnormal termination, exactly as the scaled lane's <c>CobolNum.Divide</c> and the SDIDI lane's
+    /// <c>CobolDec.Div</c> (kb/Work PB1605). The bare <c>/</c> this replaced stored +Infinity, or NaN for 0/0, and
+    /// the run went on. Overflow and underflow of a nonzero divisor's quotient stay the IEEE results, as the
+    /// unchecked sum, difference and product do.</summary>
+    public static double Div(double a, double b) => b == 0 ? throw CobolSizeError.ZeroDivide() : a / b;
 }
