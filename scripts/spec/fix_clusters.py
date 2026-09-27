@@ -44,7 +44,7 @@ def frontmatter(text):
 def source_index():
     """{type-or-stem: [relative path]} over the greenfield sources; partial files key on their full stem too."""
     idx = collections.defaultdict(list)
-    for p in (ROOT / "src").rglob("*.cs"):
+    for p in [*(ROOT / "src").rglob("*.cs"), *(ROOT / "src").rglob("*.g4")]:   # grammar files are code sites too
         rel = p.relative_to(ROOT).as_posix()
         if not rel.startswith("src/Cobol.Net.") or "/obj/" in rel or "/bin/" in rel or "/Generated/" in rel:
             continue
@@ -61,8 +61,16 @@ def source_index():
 def sites(text, idx):
     """Counter of resolved source files a note names."""
     c = collections.Counter()
-    for m in re.finditer(r"src/Cobol\.Net\.[\w./-]+?\.cs", text):
+    for m in re.finditer(r"src/Cobol\.Net\.[\w./-]+?\.(?:cs|g4)", text):
         c[m.group(0)] += 3                                   # an explicit path is the strongest signal
+    # A bare file name — `ReferenceResolver.cs#ResolveImplCore`, `CobolLexer.g4#NAME_BODY`, `DataBinder.Constants.cs`
+    # — the form notes' "**Code site.**" prose uses. Missing it left 15 notes that NAME their site unclusterable
+    # (measured 2026-09-27 by the site-locator pass).
+    for m in re.finditer(r"(?<![\w/.])([A-Z]\w+(?:\.[A-Z]\w+)*)\.(cs|g4)\b", text):
+        stem = m.group(1)
+        hit = [r for r in idx.get(stem, []) if r.endswith(f"/{stem}.{m.group(2)}")]
+        if hit:
+            c[hit[0]] += 3
     for m in re.finditer(r"\b([A-Z][A-Za-z0-9]+)\.([A-Z][A-Za-z0-9]+)\b", text):
         partial = f"{m.group(1)}.{m.group(2)}"
         if partial in idx and len(idx[partial]) == 1 and idx[partial][0].endswith(f"/{partial}.cs"):
