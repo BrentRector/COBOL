@@ -126,7 +126,7 @@ internal static class ConcatFolder
             {
                 LiteralClass.National => PicCategory.National,
                 LiteralClass.Boolean => PicCategory.Boolean,
-                _ => PicCategory.Alphanumeric,   // X"…" is the hexadecimal FORMAT of the alphanumeric literal (§8.3.3.2)
+                _ => PicCategory.Alphanumeric,   // X"…" is the alphanumeric literal's Format 2 (hexadecimal-alphanumeric, §8.3.3.2.2)
             }, CobolLiteral.Decode(token));
         }
         if (fig.ALL() is null || fig.cobolWord()?.GetText() is not { } word || env.Constant(word) is not { } k) return null;

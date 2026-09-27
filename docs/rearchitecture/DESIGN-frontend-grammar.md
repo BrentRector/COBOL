@@ -619,22 +619,30 @@ captured token run faithfully.
 **3.3c Mode inventory** stays: DEFAULT, PICMODE, SUBSCRIPT, COMMENT_MODE (`CobolLexer.g4:497,651,726,782`).
 No change to mode semantics; only the shared-fragment factoring in 3.3b.
 
-**3.3d The ALL figurative's literal-1 (kb/Work PB71, 2026-08-18).** `figurativeConstant`'s Format-6 arm is
-`ALL allLiteral`, where `allLiteral : allLiteralOperand (AMPERSAND allLiteralOperand)*` and
-`allLiteralOperand : STRINGLIT | HEXLIT | NATLIT | BOOLLIT` — ONE arm for the four literal kinds §8.3.3.6.3 SR2
-admits (alphanumeric plain or hexadecimal, national N/NX, boolean B/BX), and literal-1 "may be a concatenation
-expression". Two load-bearing decisions: (1) `nonNumericLiteral` lists `figurativeConstant` BEFORE
+**3.3d The ALL figurative's literal-1 (kb/Work PB71, 2026-08-18; PB1627, 2026-09-26).** `figurativeConstant`'s
+Format-6 arm is `ALL allLiteral`, where `allLiteral : concatenationExpression | STRINGLIT | HEXLIT | NATLIT |
+BOOLLIT` — ONE arm for the four literal kinds §8.3.3.6.3 SR2 admits (alphanumeric plain or hexadecimal, national
+N/NX, boolean B/BX), and literal-1 "may be a concatenation expression", which is THE `concatenationExpression`
+rule below, operands and all. Two load-bearing decisions: (1) `nonNumericLiteral` lists `figurativeConstant` BEFORE
 `concatenationExpression`, because `ALL "A" & "B"` is genuinely ambiguous between "ALL over the concatenated
 literal-1 AB" (legal, SR2) and "a concatenation whose first operand is the figurative ALL "A"" (illegal, §8.8.3.2
 SR1) — ANTLR resolves a true ambiguity toward the lower alternative, so the legal reading wins, while `"X" & ALL
-"A"` still parses as a concatenation and is rejected COBOLNET1541 by `ConcatFolder`. (2) Every consumer asks
-`fig.allLiteral()` — the binder (`BoundAllLiteral.Of`, the category from `CobolLiteral.ClassOf`), `ConcatFolder`,
-the boolean channel, INSPECT's SR3 screen, the legacy oracle — so a fifth literal kind is one grammar line and one
-classifier arm; the former shape (`ALL STRINGLIT | ALL HEXLIT | ALL BOOLLIT`, tested token-by-token at five sites)
-is what let `ALL B"1"` parse and die at run time. The version pass's `VisitFigurativeConstant` owns the
-statement-scoped 2002 gate for a national/boolean literal-1, the §8.3.3 hexadecimal grouping check, the SR2
-zero-length check (COBOLNET1648) and the §8.8.3.2 SR1 same-class check (COBOLNET1540) — the tree walk, as for the
-bare literals.
+"A"` still parses as a concatenation and is rejected COBOLNET1541 by `ConcatFolder`. (2) Every binder consumer
+reads literal-1 through ONE reader, `ConcatFolder.FoldAllLiteral` — the procedure-division figurative binder
+(`BoundAllLiteral.Of(Folded)`), the boolean channel and its routing predicate, the VALUE reader
+(`RawValueOperandText`) and the SPECIAL-NAMES ALPHABET/CLASS literal phrase — so literal-1 is folded, classed and
+screened identically everywhere. It resolves all three written shapes: a quoted literal; a concatenation expression,
+through the same pairwise `Walk` as every other concatenation (so `ALL "A" & SPACE`, `ALL "A" & K` and `ALL "A" &
+STAR` are legal — §8.8.3.2 SR1 admits figurative operands, §13.10.3 SR2 a constant-name); and a constant-name
+written alone, which parses as the `ALL cobolWord` arm (the parse cannot tell it from a symbolic-character) and
+is resolved as Format 6 before the Format 7 readers see it. With a reporting context it asks SR2 — COBOLNET1648 for
+a zero-length literal-1 (structurally: contiguous delimiters, never "decodes to nothing"), COBOLNET2491 for a
+constant-name standing for a numeric literal — and every §8.8.3.2 rule of a concatenated literal-1; the
+per-position diagnostic dedup keeps a figurative read at two sites to one report. The version pass's
+`VisitFigurativeConstant` keeps only the statement-scoped 2002 gate for a national/boolean literal-1 (the `&` gate is
+`VisitConcatenationExpression`'s, on recognition); the §8.3.3 literal-token rules are LiteralScreenPass's. The rules
+moved to the binder because they need the program's constant-names, which the parse walk has not got (the version
+pass used to ask them over a quoted-only operand list — kb/Work PB1393's arm, PB1627).
 
 **The `&` operand and its class (kb/Work PB1406, 2026-09-26).** `concatOperand : STRINGLIT | NATLIT | BOOLLIT |
 HEXLIT | figurativeConstant | cobolWord`. The `cobolWord` arm is how §8.8.3.1's literal-1 / literal-2 admit the two
@@ -650,8 +658,8 @@ never a chain classed by its first non-figurative operand. Every fold site names
 (`Program`, `SpecialNames(nationalPhrase, sr11)` or `Unscoped`): the environment carries the HIGH-/LOW-VALUE
 characters of the position (the program collating sequences outside SPECIAL-NAMES, §12.3.7.4 GR10's native
 extremes of the clause's NATIONAL phrase inside it) and the constant-name / symbolic-character tables, and its
-constructor is private so no site can omit the national table again. The ALL literal-1 arm above
-(`allLiteralOperand`) does NOT yet share this operand model — it admits quoted literals only.
+constructor is private so no site can omit the national table again. The ALL literal-1 arm above shares this
+operand model: its concatenation IS this rule (kb/Work PB1627).
 
 **3.3e The computer paragraphs (kb/Work PB78, 2026-08-18).** `objectComputerParagraph : OBJECT_COMPUTER DOT
 (({!objectComputerClauseAhead()}? computerName)? objectComputerClause* DOT)?` — ISO §12.3.6.2's `[computer-name-1]`
