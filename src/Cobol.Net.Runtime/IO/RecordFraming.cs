@@ -112,8 +112,11 @@ internal static class RecordFraming
     /// <summary>The store format's version, written as the byte immediately after <see cref="Magic"/> and
     /// CHECKED on every decode. A version this build does not know is <see cref="StoreFormat.Foreign"/>
     /// rather than "attributes not recorded": a layout this build cannot read cannot have its frames
-    /// located either, so the only safe answer is to refuse the store instead of reading past it.</summary>
-    private const byte FormatVersion = 1;
+    /// located either, so the only safe answer is to refuse the store instead of reading past it.
+    /// <para>Version 2 (kb/Work PB1602) writes a key's SUPPRESS WHEN value as exact UTF-16 code units with an
+    /// Int32 count. Version 1 wrote it through Latin-1 and so could not record every legal declaration. A
+    /// version-1 store is Foreign to this build: no reader for it is kept.</para></summary>
+    private const byte FormatVersion = 2;
 
     /// <summary>The fixed part of the header — magic, organization, record type, the two record sizes and the
     /// key count. Per-key descriptors follow it.</summary>
@@ -323,14 +326,46 @@ internal static class RecordFraming
             fs.WriteByte(k.Duplicates ? (byte)1 : (byte)0);
             // §12.4.5.6.4 GR6 admits ANY figurative-constant or literal SUPPRESS WHEN value, so it is written
             // with an explicit length rather than a delimiter: a value carrying a NUL or a line ending is legal.
-            byte[] suppress = k.Suppress is null ? [] : Encoding.Latin1.GetBytes(k.Suppress);
-            BinaryPrimitives.WriteUInt16LittleEndian(word[..2], (ushort)(k.Suppress is null ? 0 : suppress.Length + 1));
-            fs.Write(word[..2]);
-            if (k.Suppress is not null) fs.Write(suppress, 0, suppress.Length);
+            // ⛔ It is written as its exact UTF-16 CODE UNITS (kb/Work PB1602). The header records what the
+            // program DECLARED, and §12.4.5.3's OPEN comparison asks it back, so the encoding must be lossless over
+            // the whole repertoire (UTF-16 — the alphanumeric AND national literal both). Latin-1 turned "€€" into
+            // "??", and the program could never reopen the file it had just written ('39'). An Encoding would also
+            // be lossy: it replaces a lone surrogate (a legal NX"D800" national literal) with U+FFFD.
+            WriteCodeUnits(fs, k.Suppress);
             byte[] collation = Encoding.ASCII.GetBytes(k.Collation);
             fs.WriteByte((byte)collation.Length);
             fs.Write(collation, 0, collation.Length);
         }
+    }
+
+    /// <summary>Write an optional string as a little-endian Int32 code-unit count biased by one (0 = absent), then
+    /// its UTF-16 code units, each little-endian — the exact <see cref="string"/>, lone surrogates included
+    /// (kb/Work PB1602). <see cref="ReadCodeUnits"/> is its inverse.</summary>
+    private static void WriteCodeUnits(Stream fs, string? s)
+    {
+        var buf = new byte[4 + 2 * (s?.Length ?? 0)];
+        BinaryPrimitives.WriteInt32LittleEndian(buf, s is null ? 0 : s.Length + 1);
+        for (int i = 0; i < (s?.Length ?? 0); i++)
+            BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(4 + 2 * i), s![i]);
+        fs.Write(buf, 0, buf.Length);
+    }
+
+    /// <summary>The inverse of <see cref="WriteCodeUnits"/>; false when the stream ends inside the value or the
+    /// count is not one a header can hold.</summary>
+    private static bool ReadCodeUnits(Stream fs, out string? s)
+    {
+        s = null;
+        var word = new byte[4];
+        if (!FillExactly(fs, word, 4)) return false;
+        int biased = BinaryPrimitives.ReadInt32LittleEndian(word);
+        if (biased == 0) return true;
+        if (biased < 0 || biased - 1 > Array.MaxLength / 2) return false;
+        var buf = new byte[2 * (biased - 1)];
+        if (!FillExactly(fs, buf, buf.Length)) return false;
+        var chars = new char[biased - 1];
+        for (int i = 0; i < chars.Length; i++) chars[i] = (char)BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(2 * i));
+        s = new string(chars);
+        return true;
     }
 
     /// <summary>Decode the store header from the CURRENT position, leaving the stream on the first frame; null
@@ -365,15 +400,7 @@ internal static class RecordFraming
             int len = BinaryPrimitives.ReadInt32LittleEndian(word);
             int dup = fs.ReadByte();
             if (dup < 0) return null;
-            if (!FillExactly(fs, word, 2)) return null;
-            int suppressLen = BinaryPrimitives.ReadUInt16LittleEndian(word);
-            string? suppress = null;
-            if (suppressLen > 0)
-            {
-                var buf = new byte[suppressLen - 1];   // the length is stored biased by one so 0 means "absent"
-                if (!FillExactly(fs, buf, buf.Length)) return null;
-                suppress = Encoding.Latin1.GetString(buf);
-            }
+            if (!ReadCodeUnits(fs, out string? suppress)) return null;
             int collLen = fs.ReadByte();
             if (collLen < 0) return null;
             var coll = new byte[collLen];

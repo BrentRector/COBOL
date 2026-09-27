@@ -409,6 +409,13 @@ fixed-length record sequential file is still plain bytes and a line sequential f
 the interchange property those shapes exist for, and a varying record-sequential file still carries only the
 per-record prefix it always carried.
 
+**The header is VERSION 2 (kb/Work PB1602).** Each key's SUPPRESS WHEN value is stored as its exact UTF-16 code
+units behind an Int32 count biased by one (0 = no phrase). The header records what the program DECLARED, and the
+OPEN comparison asks it back, so the encoding must be lossless over the whole repertoire, lone surrogates in a
+national literal included. Version 1 wrote the value through Latin-1: `SUPPRESS WHEN "€€"` was recorded as `??`,
+and the program could not reopen a file it had just written ('39'). A version-1 store is Foreign to this build and
+refused with '39' like any other store it cannot read. No version-1 reader is kept (zero back-compat baggage).
+
 **⚠ WHAT THE DECISION GIVES UP, stated plainly.** kb/Work PB193's original reproduction — a RELATIVE file
 reopened INPUT through a SEQUENTIAL or LINE SEQUENTIAL FD — no longer answers '39'. The sequential
 organization's format encodes nothing, so nothing in it contradicts a sequential description, and the OPEN
