@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb1543_nbsp_is_a_text_word_character",
   "pb1491_continued_literal_logical_line",
   "pb1380_renames_ref_mod",
   "pb1350_text_words_85",

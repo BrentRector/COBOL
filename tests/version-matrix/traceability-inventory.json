@@ -426,13 +426,13 @@
   "ordinal": 7,
   "subject": "Reference format",
   "rule-digest": "8c114d29adce",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NormalizeCopybookMapped",
+  "test-ref": "conformance:2002/pb1067_library_text_source_format",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1067: 'If the line is a free-form line and is not a continuation line, that line is copied to the resultant compilation group.' (--check OK §6.5 7)). The free segment arm copies each line as-is (TrimEnd('\\r') only; line 172), and a whole-file free source returns MappedText.Identity. Probes rf1/rf9/rf16 (free) compile their non-continuation lines unchanged. The continuation half of free-form lines is GR-6.5-8 (NOT-IMPLEMENTED). No isolating spec-derived golden. || REFUTED: DIVERGES — §6.5 applies to source text AND library text, in the order lines are obtained. The main-source free arm of NormalizeToFreeFormMapped does copy free lines as-is (probes p10/p11/p13 correct), but library text is not routed uniformly: CopyProcessor.NormalizeCopybookMapped sends any member whose lines are >=50% sequence-numbered straight to ConvertFixedToFreeMapped, which has NO >>SOURCE handling. A free-form line following a legal '>>SOURCE FORMAT FREE' in such a member is therefore read as fixed form (cols 1-6 as sequence area, col 7 as indicator - here 'P', which the converter treats as a CCVS comment line) and is silently DROPPED instead of copied; the directive line itself is also not discarded by this stage. Same defect falsifies GR-6.5-1's 'mode is determined' for library text. || Editions (adjudicator, verbatim): 2002/2014/2023 (free-form reference format; the SOURCE FORMAT directive that selects it is a 2002 introduction)",
-  "state": "GAP"
+  "notes": "kb/Work PB1067 (w67m): the refuted half — a free-form line after >>SOURCE FORMAT FREE in a sequence-numbered copybook was read as fixed and dropped — is closed: library text is iterated by the same walker, so the free-form line is copied to the resultant compilation group (golden leg [CPY-FREE]).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.5-8",
@@ -458,7 +458,7 @@
   "rule-digest": "8223293338a8",
   "verdict": "PARTIAL",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ConvertFixedToFree; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1067_library_text_source_format",
   "derivation": "",
   "editions": "85,2002,2014,2023",
   "notes": "kb/Work PB1496 (also PB1067): 'The next input line is obtained and processing iterates at step 1. … The implementor shall define the effect on the source listing, if any, of logical conversion.' (--check OK §6.5 9)). Both converters iterate line by line in source order over the whole compilation group and hand the converted text on (CopyProcessor / conditional compilation run after — §6.5 'before the application of replacing and conditional compilation actions'). The listing half is A.1 item 117: docs/CONFORMANCE.md's directive paragraph states 'no source listing is produced' (>>LISTING/>>PAGE inert), so logical conversion has no listing effect — documented, though not as a DOC-A.1-117 row. The per-step defects are recorded on GR-6.5-2/4/5/6/8. || REFUTED: PARTIAL — Two halves. (1) Iteration: the main-source normalizer does walk every line in order; but for library text the step-1 iteration is not uniform (a sequence-numbered copybook bypasses the directive-aware walk entirely - see GR-6.5-7 / GR-6.5-1), so 'processing iterates at step 1' does not hold for every line obtained. (2) The implementor-defined listing effect is A.1 item 117, 'required' AND 'shall be documented'; the only text is a passing clause in CONFORMANCE.md's directive paragraph ('>>LISTING / >>PAGE ... no source listing is produced, so listing on/off and page ejects are inert'), which answers the directives, not item 117. There is no DOC-A.1-117 determination, and the project's own register audit (scripts/spec/audit_annex_a1.py, gated by AnnexA1RegisterDriftTests) counts item 117 among the 121 REMAINING documentation obligations - the same standard the adjudicator applied to GR-6.1-1 c) (missing DOC-A.1-157 counted as a defect). One half unverified/undocumented => PARTIAL, not CONFORMS. || Editions (adjudicator, verbatim): 85/2002/2014/2023",
@@ -818,10 +818,10 @@
   "rule-digest": "52b4837424e9",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseCopyStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
-  "test-ref": "unit:TextManipulationTextWordTests.SuppressThenReplacing_AppliesTheReplacing; conformance:2002/pb1354_copy_header_2002",
+  "test-ref": "unit:TextManipulationTextWordTests.SuppressThenReplacing_AppliesTheReplacing; conformance:2002/pb1354_copy_header_2002; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1354 landed (w61a): The REPLACING phrase is applied in every legal header shape, SUPPRESS included (probes p2/p2b AAA, p01 HELLO). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "notes": "kb/Work PB1352 (w67m) re-verdict: library text is modified by the REPLACING phrase text-word by text-word; a compiler directive line inside it is not library text-words (7.2.3.4 9) c) 5.), so it is neither matched nor modified.",
   "state": "OK"
  },
  {
@@ -906,13 +906,13 @@
   "ordinal": 5,
   "subject": "COPY statement",
   "rule-digest": "db9e34c92a75",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "test-ref": "unit:TextManipulationDirectiveLineTests.Matching_RunsAcrossADirectiveLine_AndKeepsIt; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). c) 5.: 'Each occurrence of a compiler directive line is treated as a single space.' Directive lines in the library text are tokenized as ordinary text-words because REPLACING is applied before the copybook's directives are processed. Probe p5 (copybook '01 DV-A' / '>>DEFINE ZQX 1' / 'PIC X(2) VALUE \"DV\".'; REPLACING ==DV-A PIC== BY ==DV-N PIC==) -> COBOLNET1639 DV-N not defined; control without the directive line matched (DV). Expected: match. Converse, probe p5e/p5f (copybook >>DEFINE ZQX 1 / >>IF ZQX = 1 ... Y1 / >>ELSE ... N1; REPLACING ==ZQX 1== BY ==ZQX 2==) -> N1: the replacement rewrote the directive line itself; expected Y1. §7.2.1 Step 2 orders the directives (a) before the COPY replacing actions (d). probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 2002, 2014, 2023 (compiler directive lines are a 2002 introduction; at 85 the rule has no subject) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): 'Each occurrence of a compiler directive line is treated as a single space' (cite.py OK 7.2.3.4 9) c) 5.) — TextWordScanner.MatchWords drops DirectiveLine elements (TextWord.IsSpaceForMatching), so COPY ... REPLACING ==DV-A PIC== matches across a >>DEFINE line in the copybook (golden leg [DV]).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-L2.6",
@@ -1326,13 +1326,13 @@
   "ordinal": 5,
   "subject": "REPLACE statement",
   "rule-digest": "db9e34c92a75",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "test-ref": "unit:TextManipulationDirectiveLineTests.Matching_RunsAcrossADirectiveLine_AndKeepsIt; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). cite.py --check 7.2.4.4 \"Each occurrence of a compiler directive line is treated as a single space\" -> OK 8) c) 5. Directives consumed before Step 3 (>>DEFINE, >>SOURCE, >>IF) are harmless (dir3/dir4 -> W1), but a directive line that survives into the REPLACE pass is tokenized as text-words: probe out/probe/replace-p2/dir.cob (>>TURN EC-ALL CHECKING OFF between SHOW-IT and NOW) and dir5.cob (>>PROPAGATE ON) -> COBOL0001 'cannot parse construct near NOW'; control dir2.cob without the line -> W1. Finding 'replace-directive-line-not-space'. || editions (adjudicator): 2002, 2014, 2023 (compiler directive lines) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (no directive-line arm) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): REPLACE ==SHOW-IT NOW== matches across a >>TURN line (one space, cite.py OK 7.2.4.4 8) c) 5.) and the >>TURN line is written back on its own line after the replacement (golden leg [W1]).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-L2.6",
@@ -1536,13 +1536,13 @@
   "ordinal": 1,
   "subject": "Compiler directives",
   "rule-digest": "65b2b980ba84",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "test-ref": "unit:TextManipulationDirectiveLineTests.CopyReplacing_DoesNotRewriteTheCopybooksDefine; unit:TextManipulationDirectiveLineTests.Replace_DoesNotRewriteALaterStagesDirective; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). §7.3.4 GR1 'A compiler directive line is not affected by the replacing action of a COPY statement or a REPLACE statement.' (cite.py --check 7.3.4 OK). The ONE text-word replacement pass (CopyProcessor.ApplyReplacements over TokenizeTextWords) skips '*>' comment lines but not '>>' directive lines, so both COPY REPLACING (applied to the copybook text in ResolveOneCopy BEFORE the CC driver renders the copybook's directives) and REPLACE (Step 3, applied BEFORE the post-COPY TURN/PUSH/POP/PROPAGATE/REF-MOD-ZERO-LENGTH/FLAG stages read their lines) rewrite directive lines. Probes: p1 'REPLACE ==CHECKING== BY ==CHEKING==.' then '>>TURN EC-ALL CHECKING OFF' -> COBOLNET0719 x2 + COBOLNET0718 (legal source rejected); p2 'COPY cb1 REPLACING ==CHECKING== BY ==CHEKING==.' over a copybook '>>TURN EC-ALL CHECKING OFF' -> the same three errors; p3 'COPY cb2 REPLACING ==AS 1== BY ==AS 3==.' over a copybook '>>DEFINE VV AS 1' / '>>IF VV = 1' ... '>>ELSE' prints 'CB2 ELSE' - SILENT WRONG ANSWER, expected 'CB2 VV=1'. Only a main-text REPLACE vs >>DEFINE/>>IF is immune (p4 'P4 VV=1'), and only because the CC driver consumed those lines before Step 3. Finding 'replacing-rewrites-directive-lines'. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): the one text-word scanner reads a whole compiler directive line (CompilerDirectiveLine.TryParse, preceded only by spaces per 7.3.3 SR2) as ONE TextWordKind.DirectiveLine element; ApplyReplacements never compares or rewrites it and writes back, on its own line, any directive line lying inside a matched span. COPY REPLACING (applied before the copybook's own DEFINE/IF lines are rendered) and REPLACE (before the TURN/PROPAGATE/PAGE stages) therefore leave every directive line unchanged. cite.py --check 7.3.4 OK 1).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.4-2",
@@ -1551,13 +1551,13 @@
   "ordinal": 2,
   "subject": "Compiler directives",
   "rule-digest": "0f2af913ec93",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Pipeline/Frontend.cs#Preprocess; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ProcessWithCopyMapped; src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ProcessWithCopyMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "test-ref": "unit:TextManipulationDirectiveLineTests.Replace_DoesNotRewriteALaterStagesDirective; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). §7.3.4 GR2 'Compiler directives are processed either in the text manipulation stage or the compilation stage of processing, as specified in 7.2, Text manipulation. ... During the compilation stage, compiler directives are processed in the order encountered in the structured compilation group.' (cite.py --check 7.3.4 OK); §7.2.1 Steps 1-4 fix the text-stage order (cite.py --check 7.2.1 'the replacing actions of COPY statements' OK). The Frontend pipeline is: normalize (Step 1 incl. >>SOURCE) -> merged CC+COPY driver (Step 1/2 interleaved: DEFINE/IF/EVALUATE with COPY) -> REPLACE (Step 3) -> COBOL-WORDS (Step 4) -> the compilation-stage directive stages on the final text in source order, with PUSH/POP recorded as DirectiveStackOps replayed by every stage. Verified: O1B a REPLACE-produced word is then mapped by >>COBOL-WORDS EQUATE (Step 4 after Step 3); O2 a copybook >>DEFINE is in force only after the COPY; PP1-PP9 PUSH/POP of DEFINE nested and across a copybook restore in order; G5A/G5B TURN applies in text order. Residue: a >>SOURCE FORMAT inside a copybook is not honoured in Step 1 (kb/Work PB1067, open - the copybook's following line is silently dropped), and COPY REPLACING is applied to library text before its directive lines are processed (the GR-7.3.4-1 finding). PARTIAL. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): the text-manipulation order of 7.2.1 is honoured in its result (7.2.1 lets the implementor optimize 'as long as the final result is the same'): REPLACE still runs before the TURN/PROPAGATE/FLAG stages read their lines, but it can no longer change a directive line (7.3.4 1)), so each directive reaches its stage exactly as written, in encounter order.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.4-3",
@@ -1596,13 +1596,13 @@
   "ordinal": 5,
   "subject": "Compiler directives",
   "rule-digest": "c8fd46e31bb1",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs; src/Cobol.Net.Compiler/Binding/TurnState.cs; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs; src/Cobol.Net.Compiler/Binding/TurnState.cs; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NormalizeCopybookMapped",
+  "test-ref": "conformance:2002/pb1067_library_text_source_format",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1067 (registrar 15a). §7.3.4 GR5 'A compiler directive applies to all of the source text and library text that follows and is independent of execution flow.' (cite.py --check 7.3.4 OK). Directive state is folded over SOURCE POSITION, not execution: G5A a paragraph written BEFORE '>>TURN EC-ALL CHECKING ON' and PERFORMed from after it divides by zero unchecked and continues, while the same statement written after the TURN terminates abnormally (EC-SIZE-ZERO-DIVIDE); G5B a TURN inside a copybook governs the main text after the COPY; O2/PP4 a copybook >>DEFINE governs the text after the COPY. conformance-test:ThroughRangeExceptionTests.TurnIsHonouredPerStatement_NotOncePerUnit pins the TURN half. Residue: a '>>SOURCE FORMAT FREE' inside a copybook judged fixed-form does NOT apply to the library text that follows it (kb/Work PB1067, open, owns it: the next line is silently dropped). PARTIAL for that one directive. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1067 (w67m): the PARTIAL half was the SOURCE FORMAT directive in library text, which a sequence-numbered copybook skipped; library text now runs through the directive-aware walker, so a SOURCE FORMAT directive applies to all the library text that follows it (and its text-manipulation siblings already applied to source and library text alike).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.6.2-1",
@@ -3096,13 +3096,13 @@
   "ordinal": 1,
   "subject": "IF directive",
   "rule-digest": "d6c1d360bfe9",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ExpandCopiesOneLevel; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ProcessWithCopyMapped",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements",
+  "test-ref": "unit:TextManipulationDirectiveLineTests.CopyReplacing_DoesNotRewriteAnIfCondition; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). GR1 (cite.py --check 7.3.16.4 OK): 'Text-1 and text-2 are not part of the IF compiler directive line. Any text words in text-1 or text-2 that do not form a compiler directive line are subject to the matching and replacing rules of the COPY statement and the REPLACE statement.' Its complement is §7.3.4 GR1 (cite.py --check 7.3.4 OK): 'A compiler directive line is not affected by the replacing action of a COPY statement or a REPLACE statement.' Positive half verified: REPLACE applies to text-1 words (p09 prints REPL) and COPY REPLACING applies to text-1 words in a copybook (p11 prints CPYR). Negative half FAILS: ResolveOneCopy applies COPY REPLACING to the WHOLE copybook text, directive lines included, before ExpandCopiesOneLevel hands it to the CC driver (expandCopybook). Probe p15: >>DEFINE V AS 1 / >>DEFINE W AS 2 / COPY IFCB3 REPLACING ==V== BY ==W== where IFCB3 is '>>IF V = 1 / DISPLAY \"V-TRUE\" / >>ELSE / DISPLAY \"V-FALSE\" / >>END-IF' -> prints V-FALSE; spec-derived expected V-TRUE (the >>IF line is not replaced, V = 1 is TRUE, GR2). p21: the same for a NESTED >>IF V = 1 inside text-1 of >>IF U = 1 -> NEST-FALSE, expected NEST-TRUE. p14: REPLACING ==V== BY ==Q== -> spurious COBOLNET1619 'Q is not a previously-defined compilation variable'. The REPLACE-statement half is safe because CopyProcessor.ApplyReplaceStatements runs after CC consumed the IF/ELSE/END-IF lines. Harm: wrong-answer (silent wrong branch selection). New finding. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, incl. conditional compilation, is absent from COBOL-85; the pinned compiler gates >>IF at --std 85 with COBOLNET0900, probe p01)",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): only text words that do not form a compiler directive line are matched and replaced; the >>IF / >>ELSE / >>END-IF lines are DirectiveLine elements, so COPY IFCB REPLACING ==V== BY ==W== leaves >>IF V = 1 intact (golden leg [V-TRUE]) while text-1/text-2 remain subject to replacing.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.16.4-2",
@@ -3351,13 +3351,13 @@
   "ordinal": 2,
   "subject": "PAGE directive",
   "rule-digest": "b6bc43815375",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Editions/DirectiveOperandSyntax.cs#DirectiveOperandForm; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Editions/ConstructRegistry.g.cs#page-directive-2002",
-  "test-ref": "conformance:2023/pb794_directive_operands",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "conformance:2023/pb794_directive_operands; unit:TextManipulationDirectiveLineTests.CopyInPageCommentText_IsNotACopyStatement",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). Rule: 'Comment-text-1 is not checked syntactically.' (cite.py --check 7.3.19.3 -> OK §7.3.19.3 2)). The page-directive-2002 row declares DirectiveOperand Form=Text (DirectiveOperandSyntax.Text's doc cites §7.3.19.3 SR2), so CheckOperand checks presence only, and OperandRequired=false because comment-text-1 is bracketed in §7.3.19.2 (kb/Work PB794, landed). Probes out/probe/page-directive/p1.cob and p2.cob: an unbalanced quote, the == pseudo-text delimiter, COPY FOO., *>, END PROGRAM X. and periods inside comment-text draw no diagnostic and have no side effect; bare >>PAGE is accepted too. CompilerDirectiveCatalogDriftTests (line 240) keeps PAGE out of the closed-word checks. Golden pb794_directive_operands writes free text after >>PAGE at 2023. || REFUTED: PARTIAL — Comment-text-1 IS checked in one shape: in library text copied with REPLACING, the text is scanned for a COPY keyword and a match is rejected with COBOLNET1640 (§7.2.3.4 GR10 check does not exclude directive lines). The CheckOperand Form=Text path (presence only) is correct for main source, so only half verified. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 directive facility is post-85; Annex E lists no 2014->2023 change to §7.3.19; COBOL-85 has no >> lines — derived edge, VCR Table 7 row 7.21)",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): comment-text-1 is checked in no shape — CheckOperand checks presence only, and the text-manipulation scanners no longer scan a >>PAGE line for a COPY keyword (DirectiveLine element), so COPY FOO. in comment-text of REPLACING library text draws no COBOLNET1640.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.19.4-1",
@@ -3366,13 +3366,13 @@
   "ordinal": 1,
   "subject": "PAGE directive",
   "rule-digest": "5d62b6f908cf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Editions/ConstructRegistry.g.cs#page-directive-2002",
-  "test-ref": "conformance:2023/pb794_directive_operands",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "conformance:2023/pb794_directive_operands; unit:TextManipulationDirectiveLineTests.CopyInPageCommentText_IsNotACopyStatement; conformance:2002/pb1352_directive_lines_not_replaced",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1352 (registrar 15a). Rule: 'Comment-text-1 shall serve only as documentation.' (cite.py --check 7.3.19.4 -> OK §7.3.19.4 1)). Render consumes every >> line (emit=\"\") and the page-directive-2002 row declares DirectiveOperandForm.Text with OperandRequired=false, so comment-text-1 never reaches the parser or binder. Probe out/probe/page-directive/p1.cob: comment-text holding COBOL-looking text (COPY FOO., == PIC X(3), END-IF >>IF, an unbalanced quote) compiles and runs at 2002 and 2023 with output ONE / TWO1 — no COPY expansion, no conditional-compilation effect, no literal scanning. Golden pb794_directive_operands writes free text after >>PAGE; its .out is derived from the rule (the text has no effect). || REFUTED: PARTIAL — Comment-text-1 is NOT only documentation when the >>PAGE line lies in library text copied with REPLACING: CopyProcessor's §7.2.3.4 GR10 check runs FindCopyKeyword over the normalized copybook text without skipping directive lines, so the word COPY inside >>PAGE comment-text draws COBOLNET1640 and rejects legal source. Main-source comment-text is inert (adjudicator's probes hold), so one half verified, one half broken. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 directive facility is post-85; Annex E lists no 2014->2023 change to §7.3.19; COBOL-85 has no >> lines — derived edge, VCR Table 7 row 7.21)",
-  "state": "GAP"
+  "notes": "kb/Work PB1352 (w67m): the refuted half is closed — the 7.2.3.4 GR10 scan (FindCopyKeyword over TextWordScanner) no longer sees a COPY inside >>PAGE comment-text in library text copied with REPLACING, because the >>PAGE line is one DirectiveLine element (golden leg [PG]). Main-source comment-text was already inert.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.19.4-2",
@@ -3711,13 +3711,13 @@
   "ordinal": 1,
   "subject": "SOURCE FORMAT directive",
   "rule-digest": "9f2be44ddc14",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NormalizeCopybookMapped; src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NormalizeCopybookMapped",
+  "test-ref": "conformance:2002/pb1067_library_text_source_format; unit:LibraryTextReferenceFormatTests.StatedFormat_IsHandedOnFromTheLineAfterTheDirective",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1361 (registrar 15a). Rule: 'the source text or library text following the directive and continuing through a subsequent SOURCE FORMAT directive shall be treated as fixed form if FIXED is specified, or as free form if FREE is specified' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 1)). MAIN SOURCE half conforms: NormalizeToFreeFormMapped partitions the file into segments at each >>SOURCE line (probes p6a/p6b/p7 run correctly; unit:SourceFormatTests.MidFile_FixedThenFree / MidFile_FreeThenFixed cover it). Two defects: (a) LIBRARY TEXT half - a copybook CopyProcessor.NormalizeCopybookMapped judges fixed (>=50% digit sequence areas) goes through ConvertFixedToFreeMapped whole and the >>SOURCE inside it is never honoured: probe p8 (PB1067 repro) prints only CPY-FIXED, expected CPY-FIXED then CPY-FREE - owned by open kb/Work PB1067. (b) NEW: a directive line is recognized only if its fixed-form sequence area is digits/spaces (CompilerDirectiveLine.TryParse line 55: `allowSequenceArea && char.IsAsciiDigit(s[i])`), but §6.3.2 'may consist of any character in the computer's coded character set' (--check OK). Probe p12 (7 digit-sequenced fixed lines, then `SEQ008 >>SOURCE FORMAT FREE`, then free `DISPLAY \"FREE-PART\".` / `STOP RUN.`) prints only FIXED-PART, exit 0, no diagnostic; expected FIXED-PART then FREE-PART. Silent wrong answer. Verdict DIVERGES. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility; X3.23-1985 has no directives and only fixed reference format)",
-  "state": "GAP"
+  "notes": "kb/Work PB1067 (w67m): library text now goes through the ONE 6.5 walker (NormalizeToFreeFormMapped) instead of a sequence-number heuristic that sent a numbered member straight to the fixed converter with no >>SOURCE handling; a >>SOURCE FORMAT FREE inside a fixed copybook switches the lines that follow (golden legs [CPY-FIXED]/[CPY-FREE]; before, the free line was silently dropped).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.24.3-2",
@@ -3741,13 +3741,13 @@
   "ordinal": 3,
   "subject": "SOURCE FORMAT directive",
   "rule-digest": "680d03276c0a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NormalizeCopybookMapped",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatMap.cs#LibraryTextDefaultAt; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#Preprocess",
+  "test-ref": "conformance:2002/pb1067_library_text_source_format; unit:LibraryTextReferenceFormatTests.InheritedFormat_IsHandedOn; unit:LibraryTextReferenceFormatTests.DetectedFormat_FixedIsHandedOn_FreeIsNot",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1067 (registrar 15a). Rule: 'The default reference format of library text is the reference format that was in effect for the COPY statement that resulted in processing of this library text.' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 3)). Code: NormalizeCopybookMapped decides the copybook's format from the copybook ALONE (>=50% digit sequence areas -> fixed, else NormalizeToFreeFormMapped's own auto-detection); the format in effect at the COPY statement is never passed in (the method takes only text and path). Probe p4: main `>>SOURCE FORMAT IS FREE`, COPY CPYP4 whose free-form text is `       01 CB-N PIC 9(6) VALUE` / `123456 .` -> judged fixed, 123456 stripped as a sequence area, COBOL0001 near '.'; expected (free, inherited) CB-N=123456. Probe p5: fixed main (digit sequence), COPY CPYP5 = one fixed line with blank sequence area and tag CPYTAG01 in cols 73-80 -> judged free, 'unexpected CPYTAG01'; expected CB-X=ABCD. Rejects legal source both directions. Same code site and fix as open kb/Work PB1067 ('starting in the format of the COPY statement (§7.3.24.3 3))') but PB1067 claims only GR-7.3.24.3-1 - its inventory_rows should add this row. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility; X3.23-1985 has no directives and only fixed reference format)",
-  "state": "GAP"
+  "notes": "kb/Work PB1067 (w67m): the normalizer records a ReferenceFormatMap per text (the compilation group's registered by Frontend, each library text's by CopyProcessor); ResolveOneCopy looks the COPY statement's origin line up in the map of the text it is written in and starts the library text in that format (golden leg [LIB-FREE]: a copybook copied from free-form text is free). Determination (docs/CONFORMANCE.md): the compilation group's format, when no SOURCE directive states it, is DETECTED (documented extension over GR2, DEVLOG 931); a text detected fixed hands fixed on, a text detected free (no column structure — seven-space indentation is legal in both) hands nothing on and the library text is detected on its own.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.24.3-4",
@@ -3771,13 +3771,13 @@
   "ordinal": 5,
   "subject": "SOURCE FORMAT directive",
   "rule-digest": "b5e889e88577",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#NormalizeCopybookMapped; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1067_library_text_source_format",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1067 (registrar 15a). Rule: a SOURCE FORMAT directive in library text is 'in effect until another SOURCE FORMAT directive is encountered or the end of the library text is reached' and afterwards 'the reference format shall revert to the reference format that was in effect for the COPY statement' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 5)). REVERT half conforms by construction: each copybook is normalized as its own text, so a switch inside it cannot leak into the including source - probe p7 (fixed main, copybook `>>SOURCE FORMAT FREE` then a free DISPLAY past col 72) prints CPY-FREE... then MAIN-AFTER, the main's following digit-sequenced fixed line read correctly. IN-EFFECT half fails for a copybook NormalizeCopybookMapped judges fixed: the directive is ignored and the line after it is silently dropped - probe p8 prints only CPY-FIXED, expected CPY-FIXED then CPY-FREE. That is open kb/Work PB1067's mechanism; PB1067 claims only GR-7.3.24.3-1 and should add this row. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility; X3.23-1985 has no directives and only fixed reference format)",
-  "state": "GAP"
+  "notes": "kb/Work PB1067 (w67m): a SOURCE FORMAT directive in library text is in effect to the next directive or the end of that library text (legs [CPY-FREE], [LIB-FIXED]); the COPY statement's text is logically converted independently, so after the library text the format in effect for the COPY statement is back in force (legs [MAIN-FIXED], [MAIN-FREE]).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.25.3-1",
@@ -62211,13 +62211,13 @@
   "ordinal": 23,
   "subject": "Characters prohibited from use in text-words in COPY … REPLACING and REPLACE statements",
   "rule-digest": "9a6cef7afd4e",
-  "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-23; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplacements; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-23; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner",
+  "test-ref": "conformance:85/pb1543_nbsp_is_a_text_word_character; unit:TextManipulationTextWordTests.UnicodeSpaceLookalike_IsATextWordCharacter",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Rule: A.1 item 23 'Characters prohibited from use in text-words in COPY ... REPLACING and REPLACE statements ... required ... documented (7.2.2.5 rule 3)'. cite.py --check 7.2.2.5 \"The implementor may prohibit the use of one or more characters from outside the COBOL character repertoire in, or as, text-words\" -> OK §7.2.2.5 3) (Text-words). cite.py --check 7.2.2.5 \"any other character or sequence of contiguous characters from the compile-time coded character set, bounded by separators\" -> OK §7.2.2.5 3). cite.py --check 8.3.5 \"The COBOL character space is a separator\" -> OK §8.3.5 1) (Separators). Determination: the prohibition is permissive ('may'); the empty set is the choice that rejects no source and is what the tokenizer already does for every non-White_Space character, so ISO's own default (every character of the coded character set is a text-word character) is the documented choice — no precedence step needed. Consequence the row states explicitly: with nothing prohibited, a non-repertoire White_Space character is a text-word character, because §8.3.5 names only the COBOL space. PARTIAL: é / @ / ~ hold (probe OK6); U+00A0 is treated as a separator (probe OK5 OK5). Owning defect kb/Work PB1543 (open, claims DOC-A.1-23). The missing-row finding PB1369 F3 is discharged by this row once written (drop DOC-A.1-23 from PB1369). Separator-set defects of the same tokenizer (colon, comma/semicolon predicates) are PB1350, not this item. Witness needed when PB1543 lands: a golden with REPLACE ==P<U+00A0>Q== BY ==\"OK5\"== where VALUE P Q stays unreplaced (then a compile error or a distinct value) and VALUE P<U+00A0>Q is replaced, plus the ==éV== arm. Row stays GAP until then. DOC-ROWS-2 REFUTER (determination): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md). retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
-  "state": "GAP"
+  "notes": "kb/Work PB1543 (w67m): the determination (no character is prohibited in a text-word; only the COBOL space, tab and line end separate) is now what the compiler does — TextWordScanner.IsSeparatorSpace (the lexer's WS set) replaced char.IsWhiteSpace at every text-word boundary (TryNext, SeparatorFollows, EndsCharacterString) and at the 7.2.3.3 SR2 'preceded by a space' test; U+00A0 / U+2003 / U+3000 are text-word characters (cite.py OK 8.3.5 1), 7.2.2.5 3)).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-24",

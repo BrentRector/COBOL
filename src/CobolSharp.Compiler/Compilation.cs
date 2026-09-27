@@ -337,7 +337,8 @@ public sealed class Compilation
         string sourceDir = Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? ".";
 
         rawText = ReferenceFormatProcessor.StripNistArchiveMarkers(rawText);
-        string normalizedText = ReferenceFormatProcessor.NormalizeToFreeForm(rawText);
+        string normalizedText = ReferenceFormatProcessor.NormalizeToFreeFormMapped(rawText, dialectLevel: 85,
+            permissive: false, diagnostics: null, sourcePath, initialFixed: null, out var referenceFormats).Text;
 
         // Conditional compilation (>>DEFINE / >>IF / >>ELSE / >>END-IF) runs on the free-form text BEFORE COPY
         // expansion, so an >>IF may include or omit COPY statements in its branches (ISO §7.3.16 GR1). It is an
@@ -352,6 +353,10 @@ public sealed class Compilation
         // first does not disturb them.
         var copyProcessor = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
             strict: Options.Config.IsStrict);
+        // Library text starts in the format in effect for its COPY statement (§7.3.24.3 3), kb/Work PB1067). This
+        // legacy path numbers COPY statements by NORMALIZED line, which is the physical line wherever the format map
+        // is uniform — every source without a >>SOURCE switch, the whole NIST corpus this oracle serves.
+        copyProcessor.RegisterReferenceFormat(sourcePath, referenceFormats);
         string expandedText = copyProcessor.Process(normalizedText, sourceDir);
 
         if (NistTestName != null)

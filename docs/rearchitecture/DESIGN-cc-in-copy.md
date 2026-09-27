@@ -96,11 +96,17 @@ options b/c update the shared `FlagScanState`. REPLACE (Step 3) runs after the w
 (`CopyProcessor.ApplyReplaceStatements` over the merged text); the five collection stages + COBOL-WORDS run
 unchanged on the final text.
 
-### §3.4 Copybook `>>SOURCE FORMAT` scoping (§7.3.24.3 GR5)
+### §3.4 Copybook reference format (§7.3.24.3 GR3 / GR5 — kb/Work PB1067)
 
-`NormalizeCopybook` already normalizes each copybook in ISOLATION (its own `>>SOURCE FORMAT` segments are
-resolved within the copybook and do not leak out), so GR5's "scoped-and-reverting" is satisfied by construction.
-No cross-copybook SOURCE FORMAT state is threaded.
+`NormalizeCopybookMapped` runs library text through the ONE §6.5 walker the main source uses
+(`ReferenceFormatProcessor.NormalizeToFreeFormMapped`), starting in the format in effect for the COPY statement (GR3).
+Every normalization reports a `ReferenceFormatMap` (the format of each physical line); `Frontend.Preprocess` registers
+the compilation group's map with `CopyProcessor.RegisterReferenceFormat`, each library text's map is registered as it
+is normalized, and `ResolveOneCopy` asks the map of the text holding the COPY at the COPY's origin line
+(`ReferenceFormatMap.LibraryTextDefaultAt`: a stated or inherited format, or a DETECTED fixed one, is handed on; a
+text detected free hands nothing on and the library text is detected on its own — CONFORMANCE.md DOC-A.1-158). The
+copybook's own `>>SOURCE FORMAT` segments are resolved within it and the COPY's text was converted on its own, so
+GR5's revert holds by construction.
 
 ### §3.5 The origin line map (kb/Work PB82 — landed 2026-08-18)
 

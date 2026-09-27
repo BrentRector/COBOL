@@ -28,6 +28,15 @@ internal enum TextWordKind
     /// <summary>§8.3.5 6): the pseudo-text delimiter <c>==</c>. Not a text-word (§7.2.2.5 1) excepts it); it bounds
     /// the pseudo-text operands of COPY REPLACING and REPLACE.</summary>
     PseudoTextDelimiter,
+
+    /// <summary>A whole compiler directive line (§7.3.3: the <c>&gt;&gt;</c> indicator preceded only by spaces, as
+    /// <see cref="CobolNet.Editions.CompilerDirectiveLine.TryParse(string, out CobolNet.Editions.CompilerDirectiveLine, bool)"/>
+    /// recognizes it), from its indicator to the end of its line. Not a text-word: "Each occurrence of a compiler
+    /// directive line is treated as a single space" for matching (§7.2.3.4 9) c) 5. / §7.2.4.4 8) c) 5.), and "A
+    /// compiler directive line is not affected by the replacing action of a COPY statement or a REPLACE statement"
+    /// (§7.3.4 1)) — so nothing inside it is ever a text-word to compare, a replacement target, or a COPY
+    /// statement.</summary>
+    DirectiveLine,
 }
 
 /// <summary>One text-word (ISO §7.2.2.5): its kind and its span <c>[Start, End)</c> in <see cref="Source"/>, the text
@@ -48,6 +57,11 @@ internal readonly record struct TextWord(string Source, TextWordKind Kind, int S
 
     /// <summary>The separator period that ends a COPY or REPLACE statement (§8.3.5 3)).</summary>
     public bool IsSeparatorPeriod => Kind == TextWordKind.Separator && Source[Start] == '.';
+
+    /// <summary>Whether matching treats this element as a single space rather than a text-word to compare: a
+    /// separator comma or semicolon (§7.2.3.4 9) c) 1. / §7.2.4.4 8) c) 1.) or a compiler directive line
+    /// (c) 5.). A statement's syntax steps over the same elements where a separator space may stand.</summary>
+    public bool IsSpaceForMatching => Kind is TextWordKind.SeparatorCommaOrSemicolon or TextWordKind.DirectiveLine;
 
     /// <summary>The two text-words match for COPY REPLACING (ISO §7.2.3.4 9) c)) and REPLACE (§7.2.4.4 8) c) — the
     /// same rules, one implementation):
@@ -109,6 +123,10 @@ internal readonly record struct LiteralParts(string Prefix, char Quote, string C
 /// <item>§7.2.3.4 9) c) 2.: "Each operand and operator of a concatenation expression is a separate text-word" —
 /// <c>&amp;</c> (which no COBOL word contains) is always a text-word of its own.</item>
 /// <item>§8.3.5 6): <c>==</c> is a pseudo-text delimiter wherever it begins outside a literal.</item>
+/// <item>A compiler directive line left in the text (the stages after text manipulation read <c>&gt;&gt;TURN</c>,
+/// <c>&gt;&gt;PROPAGATE</c>, <c>&gt;&gt;PAGE</c> …; library text is replaced before its own <c>&gt;&gt;DEFINE</c> /
+/// <c>&gt;&gt;IF</c> lines are processed) is ONE <see cref="TextWordKind.DirectiveLine"/> element, never scanned
+/// for text-words (§7.3.4 1); §7.2.3.4 9) c) 5.).</item>
 /// </list>
 /// A fixed-form debugging line reaches this stage as <see cref="ReferenceFormatProcessor.DebugLineCarrier"/> + its
 /// text: the carrier is skipped and the text scanned, so its text-words take part in matching as if the <c>D</c>
@@ -117,6 +135,16 @@ internal readonly record struct LiteralParts(string Prefix, char Quote, string C
 /// </summary>
 internal static class TextWordScanner
 {
+    /// <summary>The characters that separate as the COBOL character space does (§8.3.5 1) "The COBOL character space is
+    /// a separator") — the space, the horizontal tab (white space throughout source text, CONFORMANCE.md DOC-A.1-23 /
+    /// item 157) and the line end — exactly the lexer's <c>WS</c> set (<c>CobolLexer.g4</c>: <c>[ \t\r\n]</c>), so a
+    /// text-word ends where the lexer's word ends. Never Unicode White_Space: U+00A0, U+2000–U+200A, U+3000 and the
+    /// rest only LOOK like a space and are ordinary text-word characters (§7.2.2.5 3); kb/Work PB1543).</summary>
+    public static readonly char[] SeparatorSpaces = [' ', '\t', '\r', '\n'];
+
+    /// <summary>Whether <paramref name="c"/> is one of the <see cref="SeparatorSpaces"/>.</summary>
+    public static bool IsSeparatorSpace(char c) => c is ' ' or '\t' or '\r' or '\n';
+
     /// <summary>Every text-word of <paramref name="text"/>, in order.</summary>
     public static List<TextWord> Scan(string text)
     {
@@ -128,11 +156,12 @@ internal static class TextWordScanner
 
     /// <summary>The text-words of <paramref name="text"/> that take part in matching: every text-word but the
     /// separator comma and semicolon, which "is considered to be a single space" (§7.2.3.4 9) c) 1. /
-    /// §7.2.4.4 8) c) 1.) — and so, like the spaces around them, is no word to compare.</summary>
+    /// §7.2.4.4 8) c) 1.), and every compiler directive line, which "is treated as a single space" (c) 5.) — so,
+    /// like the spaces around them, neither is a word to compare (<see cref="TextWord.IsSpaceForMatching"/>).</summary>
     public static List<TextWord> MatchWords(string text)
     {
         var words = Scan(text);
-        words.RemoveAll(w => w.Kind == TextWordKind.SeparatorCommaOrSemicolon);
+        words.RemoveAll(w => w.IsSpaceForMatching);
         return words;
     }
 
@@ -145,7 +174,7 @@ internal static class TextWordScanner
         while (pos < n)
         {
             char c = text[pos];
-            if (char.IsWhiteSpace(c)) { pos++; continue; }
+            if (IsSeparatorSpace(c)) { pos++; continue; }
 
             if (c == '*' && pos + 1 < n && text[pos + 1] == '>')
             {
@@ -161,7 +190,12 @@ internal static class TextWordScanner
 
             int start = pos;
             TextWordKind kind;
-            if (c is '(' or ')' or ':' || (c == '.' && SeparatorFollows(text, pos)))
+            if (c == '>' && DirectiveLineEnd(text, pos) is var directiveEnd and >= 0)
+            {
+                kind = TextWordKind.DirectiveLine;
+                pos = directiveEnd;
+            }
+            else if (c is '(' or ')' or ':' || (c == '.' && SeparatorFollows(text, pos)))
             {
                 kind = TextWordKind.Separator;
                 pos++;
@@ -222,10 +256,28 @@ internal static class TextWordScanner
     /// so does a closing pseudo-text delimiter: §8.3.5 8) lets the separator space OPTIONALLY precede that separator,
     /// so <c>==STOP RUN.==</c> and <c>==STOP RUN. ==</c> must form the same text-words (⚠ determination, PB1350).</summary>
     private static bool SeparatorFollows(string text, int pos)
-        => pos + 1 >= text.Length || char.IsWhiteSpace(text[pos + 1]) || IsPseudoTextDelimiter(text, pos + 1);
+        => pos + 1 >= text.Length || IsSeparatorSpace(text[pos + 1]) || IsPseudoTextDelimiter(text, pos + 1);
 
     private static bool IsPseudoTextDelimiter(string text, int pos)
         => text[pos] == '=' && pos + 1 < text.Length && text[pos + 1] == '=';
+
+    /// <summary>The end of the compiler directive line whose <c>&gt;&gt;</c> indicator is at <paramref name="pos"/>
+    /// (the position of its line's line feed, or of the carriage return before it), or -1 when no directive line
+    /// starts there. The text reaching this stage is logically free form (§7.2.1 Step 1), and "A compiler directive
+    /// shall be preceded only by zero, one, or more space characters" (§7.3.3 SR2) — the ONE recognizer,
+    /// <see cref="CobolNet.Editions.CompilerDirectiveLine"/>, decides the rest.</summary>
+    private static int DirectiveLineEnd(string text, int pos)
+    {
+        if (pos + 1 >= text.Length || text[pos + 1] != '>') return -1;
+        int lineStart = pos;
+        while (lineStart > 0 && text[lineStart - 1] is ' ' or '\t') lineStart--;
+        if (lineStart > 0 && text[lineStart - 1] != '\n') return -1;
+
+        int lineEnd = text.IndexOf('\n', pos);
+        if (lineEnd < 0) lineEnd = text.Length;
+        if (lineEnd > pos && text[lineEnd - 1] == '\r') lineEnd--;
+        return CobolNet.Editions.CompilerDirectiveLine.TryParse(text[pos..lineEnd], out _) ? lineEnd : -1;
+    }
 
     /// <summary>Where a character-string ends: at a space, at a separator (§7.2.2.5 1) / §8.3.5), at a literal's
     /// opening delimiter, at the concatenation operator, and at a comment indicator (the lexer's reading of
@@ -233,7 +285,7 @@ internal static class TextWordScanner
     private static bool EndsCharacterString(string text, int pos)
     {
         char d = text[pos];
-        return char.IsWhiteSpace(d)
+        return IsSeparatorSpace(d)
             || d is '(' or ')' or ':' or '"' or '\'' or '&'
             || (d is '.' or ',' or ';' && SeparatorFollows(text, pos))
             || IsPseudoTextDelimiter(text, pos)

@@ -111,7 +111,7 @@ public sealed class Frontend
     /// </summary>
     public CobolParserCore.CompilationUnitContext? Parse(string sourcePath, DiagnosticBag diagnostics)
     {
-        var normalized = Normalize(sourcePath, diagnostics);
+        var (normalized, referenceFormats) = Normalize(sourcePath, diagnostics);
 
         // ISO §14.9.28.4 GR14 (kb/Work PB1004, PB1066): "An implicit PUSH ALL … is assumed at the end of
         // imperative-statement-1. Immediately preceding the END PERFORM phrase, there is an implicit POP ALL". Only
@@ -128,7 +128,7 @@ public sealed class Frontend
             // Every stage from the driver on reports into THIS pass's bag; only the converged pass's diagnostics
             // are the compilation's (a DEFINE's SR2 redefinition or a FLAG warning depends on the state in effect).
             var passDiagnostics = new DiagnosticBag();
-            var (processed, directives, encounters) = Preprocess(normalized, sourcePath, passDiagnostics, implicitOps);
+            var (processed, directives, encounters) = Preprocess(normalized, referenceFormats, sourcePath, passDiagnostics, implicitOps);
             LineMap = new SourceLineMap(processed.Lines);
             var tree = LexAndParse(processed.Text, sourcePath, directives.CobolWordsMap, passDiagnostics);
             bool mayMatter = directives.HasLineScopedEvents() || encounters.Directives.Any(e => e.ChangesState);
@@ -155,7 +155,9 @@ public sealed class Frontend
     /// compilation (<c>&gt;&gt;DEFINE/IF/…</c>) → COPY expansion → NIST placeholder substitution. Each stage is a
     /// no-op on source that does not use it, so an ordinary program passes through essentially unchanged.
     /// </summary>
-    private MappedText Normalize(string sourcePath, DiagnosticBag diagnostics)
+    /// <returns>The logical free-form text and the reference format each physical line was read in — which the COPY
+    /// statements of the text need (§7.3.24.3 3), kb/Work PB1067).</returns>
+    private (MappedText Text, ReferenceFormatMap Formats) Normalize(string sourcePath, DiagnosticBag diagnostics)
     {
         string raw = Inputs.ReadAllText(sourcePath);
 
@@ -165,7 +167,9 @@ public sealed class Frontend
         // The edition-aware overload carries the fixed-form continuation gates (VCR rows 2/94, W3): only the
         // column-aware pass can see the col-7 indicator, so the per-edition obligations emit HERE. Mapped (kb/Work
         // PB82): a fixed-form continuation JOINS physical lines, and the map records which line each output came from.
-        return ReferenceFormatProcessor.NormalizeToFreeFormMapped(raw, DialectLevel, Permissive, diagnostics, sourcePath);
+        var text = ReferenceFormatProcessor.NormalizeToFreeFormMapped(raw, DialectLevel, Permissive, diagnostics, sourcePath,
+            initialFixed: null, out var formats);
+        return (text, formats);
     }
 
     /// <summary>The text manipulation and directive stages after normalization — repeatable, because the
@@ -173,7 +177,8 @@ public sealed class Frontend
     /// (<see cref="Parse"/>). Returns the resultant text, the directive results (WITHOUT the implicit ops, which the
     /// caller replays once the program has converged), and the driver's directive encounters.</summary>
     private (MappedText Text, DirectiveResults Directives, ConditionalCompilationResult Encounters) Preprocess(
-        MappedText normalized, string sourcePath, DiagnosticBag diagnostics, IReadOnlyList<KeyedDirectiveOp> implicitOps)
+        MappedText normalized, ReferenceFormatMap referenceFormats, string sourcePath, DiagnosticBag diagnostics,
+        IReadOnlyList<KeyedDirectiveOp> implicitOps)
     {
         string sourceDir = Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? ".";
 
@@ -184,6 +189,7 @@ public sealed class Frontend
         // COPY runs BEFORE NIST substitution so placeholders inside copied library text are substituted.
         var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath, strict: false,
             dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs);
+        copy.RegisterReferenceFormat(sourcePath, referenceFormats);
         var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, sourceDir, copy, LeftDirectives,
             diagnostics, sourcePath, DialectLevel, Permissive, Inputs, implicitOps);
         var mapped = manipulated.Text;

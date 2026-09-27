@@ -67,6 +67,17 @@ public sealed class CopyProcessor(
     /// <summary>Add a directory to search for copybooks.</summary>
     public void AddSearchPath(string path) => _searchPaths.Add(path);
 
+    /// <summary>The reference format each text was read in, by file (kb/Work PB1067): the compilation group's, which
+    /// the caller registers after normalizing it, and each library text's, registered as it is normalized — so a
+    /// COPY statement's format is known wherever it is written.</summary>
+    private readonly Dictionary<string, ReferenceFormatMap> _referenceFormats = new(StringComparer.Ordinal);
+
+    /// <summary>Record the reference format <paramref name="file"/> was read in — the normalizer's
+    /// <see cref="ReferenceFormatMap"/> for the compilation group — so library text copied from it starts in the format
+    /// in effect for its COPY statement (§7.3.24.3 3)). A text with no registered map (a caller that normalized
+    /// without one) has its library text's initial format detected, as the compilation group's is.</summary>
+    public void RegisterReferenceFormat(string file, ReferenceFormatMap formats) => _referenceFormats[file] = formats;
+
     /// <summary>Ensure the source's own directory is searched FIRST (the <see cref="Process"/> setup, ISO §7.2.3)
     /// — used by the merged CC+COPY driver, which calls <see cref="ExpandCopiesOneLevel"/> directly.</summary>
     internal void RegisterSourceDir(string sourceDir)
@@ -206,7 +217,17 @@ public sealed class CopyProcessor(
         if (active.Count == 0) return mapped;
 
         string text = mapped.Text;
-        var words = TextWordScanner.MatchWords(text);
+        // The words compared, and — apart — the compiler directive lines: each is "a single space" for matching
+        // (c) 5.), so a match runs across it, but "A compiler directive line is not affected by the replacing action"
+        // (§7.3.4 1)), so one lying inside a matched span is written back, on its own line, after the replacement.
+        var words = new List<TextWord>();
+        var directives = new List<TextWord>();
+        foreach (var t in TextWordScanner.Scan(text))
+        {
+            if (t.Kind == TextWordKind.DirectiveLine) directives.Add(t);
+            else if (!t.IsSpaceForMatching) words.Add(t);
+        }
+        int nextDirective = 0;
         var sb = new OriginWriter();
         int copiedUpTo = 0; // chars of `text` already emitted
         int w = 0;
@@ -227,6 +248,16 @@ public sealed class CopyProcessor(
                     int matchEnd = words[w + from.Count - 1].End;
                     sb.AppendSlice(mapped, copiedUpTo, matchStart - copiedUpTo);
                     sb.Append(to.AsSpan(), mapped.OriginAt(matchStart));
+                    while (nextDirective < directives.Count && directives[nextDirective].Start < matchStart) nextDirective++;
+                    bool keptDirective = false;
+                    for (; nextDirective < directives.Count && directives[nextDirective].Start < matchEnd; nextDirective++)
+                    {
+                        var directive = directives[nextDirective];
+                        sb.NewLine(mapped.OriginAt(directive.Start));
+                        sb.AppendSlice(mapped, directive.Start, directive.End - directive.Start);
+                        keptDirective = true;
+                    }
+                    if (keptDirective) sb.NewLine(mapped.OriginAt(matchEnd));
                     copiedUpTo = matchEnd;
                     w += from.Count;
                     matched = true;
@@ -297,7 +328,7 @@ public sealed class CopyProcessor(
         // compilation group" — a COPY word directly after a parenthesis, a colon, a literal's closing delimiter or a
         // pseudo-text delimiter. (A COPY glued behind a period, comma or semicolon is not even a text-word of its
         // own — see FindCopyKeyword.)
-        if (copyIdx > 0 && !char.IsWhiteSpace(text[copyIdx - 1]))
+        if (copyIdx > 0 && !TextWordScanner.IsSeparatorSpace(text[copyIdx - 1]))
             ReportPlacement(at, $"COPY is not preceded by a space (it follows '{text[copyIdx - 1]}') — §7.2.3.3 SR2: "
                 + "\"A COPY statement shall be preceded by a space except when it is the first statement in a "
                 + "compilation group\"");
@@ -326,9 +357,11 @@ public sealed class CopyProcessor(
             return new OneCopyResult(CopyOutcome.Circular, $"*> COPY {libraryName} — circular include skipped", null);
         }
 
-        // Library text is itself in reference (fixed) format — normalize to free form so inserted lines align in
-        // the program's source area; then COPY … REPLACING (same text-word matching as REPLACE, ISO §7.2.4).
-        var normalizedMapped = NormalizeCopybookMapped(_inputs.ReadAllText(copybookPath), copybookPath);
+        // Library text goes through the same §6.5 logical conversion as the source text, starting in the format in
+        // effect for this COPY statement (§7.3.24.3 3)) — its own >>SOURCE FORMAT directives switch it from there, and
+        // the COPY's text is unaffected after it (5), the revert). Then COPY … REPLACING (§7.2.3.4 9)).
+        bool? copyFixed = _referenceFormats.TryGetValue(at.File, out var copyFormats) ? copyFormats.LibraryTextDefaultAt(at.Line) : null;
+        var normalizedMapped = NormalizeCopybookMapped(_inputs.ReadAllText(copybookPath), copybookPath, copyFixed);
         string normalized = normalizedMapped.Text;
         // §7.2.3.4 GR10 (kb/Work R34): "If the REPLACING phrase is specified, the library text shall not
         // contain a COPY statement" — GR12 permits nesting only WITHOUT replacing. Before this check the
@@ -599,39 +632,18 @@ public sealed class CopyProcessor(
         return -1;
     }
 
-    /// <summary>
-    /// Normalize copy-library text to free form. Library members are reference (fixed) format,
-    /// but CCVS members use non-standard indicator letters (C, G) in column 7 that the general
-    /// <see cref="ReferenceFormatProcessor.IsFixedForm"/> heuristic rejects. Detect fixed form
-    /// from the sequence-number area (columns 1-6 numeric) instead, then convert; fall back to
-    /// the general normalizer for anything that does not look like a sequence-numbered member.
-    /// </summary>
-    private static string NormalizeCopybook(string text) => NormalizeCopybookMapped(text, "<copybook>").Text;
-
-    /// <summary>The MAPPED copybook normalization (kb/Work PB82) — the ONE implementation: the free-form library text
-    /// with, per line, the copybook's path and physical line (a fixed-form member's continuation joins are tracked
-    /// exactly as the main source's are).</summary>
-    private static MappedText NormalizeCopybookMapped(string text, string copybookPath)
+    /// <summary>Normalize library text to logical free form (kb/Work PB82 / PB1067) through the ONE §6.5 walker the
+    /// source text uses — <see cref="ReferenceFormatProcessor.NormalizeToFreeFormMapped(string, int, bool, DiagnosticBag?, string, bool?, out ReferenceFormatMap)"/>
+    /// — starting in <paramref name="copyFixed"/>, the format in effect for the COPY statement (§7.3.24.3 3); null
+    /// when that is unknown, and then detected as the compilation group's is). The text's own &gt;&gt;SOURCE FORMAT
+    /// directives switch it (1), 5)); the resulting map is registered so a COPY inside this library text starts its
+    /// library text in the format in effect THERE. Per line: the copybook's path and physical line.</summary>
+    private MappedText NormalizeCopybookMapped(string text, string copybookPath, bool? copyFixed)
     {
-        var lines = text.Split('\n');
-        int seqLines = 0, total = 0;
-        foreach (var raw in lines)
-        {
-            var line = raw.TrimEnd('\r');
-            if (string.IsNullOrWhiteSpace(line) || line.Length < 7) continue;
-            total++;
-            bool seqDigits = true, anyDigit = false;
-            for (int i = 0; i < 6 && i < line.Length; i++)
-            {
-                if (char.IsDigit(line[i])) anyDigit = true;
-                else if (line[i] != ' ') { seqDigits = false; break; }
-            }
-            if (seqDigits && anyDigit) seqLines++;
-        }
-        bool fixedForm = total > 0 && seqLines * 100 / total >= 50;
-        return fixedForm
-            ? ReferenceFormatProcessor.ConvertFixedToFreeMapped(text, copybookPath)
-            : ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, dialectLevel: 85, permissive: false, diagnostics: null, copybookPath);
+        var mapped = ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, dialectLevel, permissive,
+            diagnostics: null, copybookPath, copyFixed, out var formats);
+        _referenceFormats[copybookPath] = formats;
+        return mapped;
     }
 
     /// <summary>
@@ -684,12 +696,13 @@ public sealed class CopyProcessor(
         /// <summary>True once the statement has drawn an error (reported here or by the caller).</summary>
         public bool HasError { get; private set; }
 
-        /// <summary>The next text-word, not consumed, stepping over separator commas and semicolons.</summary>
+        /// <summary>The next text-word, not consumed, stepping over separator commas and semicolons and compiler
+        /// directive lines (<see cref="TextWord.IsSpaceForMatching"/> — each stands where a separator space may).</summary>
         public bool TryPeek(out TextWord word)
         {
             int p = Pos;
             while (TextWordScanner.TryNext(Text, ref p, out word))
-                if (word.Kind != TextWordKind.SeparatorCommaOrSemicolon) return true;
+                if (!word.IsSpaceForMatching) return true;
             return false;
         }
 
@@ -754,18 +767,29 @@ public sealed class CopyProcessor(
             }
             c.Advance(by);
             if (ReadOperand(c, nonPseudoText, nestedCopy) is not { } to) return;
-            into.Add(new Replacement(TextWordScanner.MatchWords(from), to, kind));
+            into.Add(new Replacement(from.MatchWords, to.Text, kind));
             any = true;
         }
         if (!any) c.Error(c.Pos, "the REPLACING phrase names no operands");
     }
 
-    /// <summary>Read one REPLACING operand and return its text as written: the content of a <c>==pseudo-text==</c>
+    /// <summary>One REPLACING operand as read from its statement: its text as written (the content of
+    /// <c>==pseudo-text==</c> without its delimiters, or the operand's own span) and its elements AS SCANNED IN THE
+    /// STATEMENT — never re-scanned out of context, where the operand's first characters would sit at a line start (a
+    /// <c>==&gt;&gt;PAGE==</c> written mid-line is a text-word, not a compiler directive line).</summary>
+    private readonly record struct Operand(string Text, List<TextWord> Elements)
+    {
+        /// <summary>The text-words compared (§7.2.3.4 9) c) / §7.2.4.4 8) c): no separator comma or semicolon and no
+        /// compiler directive line — each is a single space).</summary>
+        public List<TextWord> MatchWords => Elements.FindAll(e => !e.IsSpaceForMatching);
+    }
+
+    /// <summary>Read one REPLACING operand (see <see cref="Operand"/>): the content of a <c>==pseudo-text==</c>
     /// (bounded by the pseudo-text-delimiter TEXT-WORDS, so an <c>==</c> inside a literal does not end it), or — the
     /// COBOL-85 / 2002 / 2014 COPY forms (removed by ISO 2023, Annex E.2 item 1) — a literal, or an identifier / word:
     /// a word with optional OF/IN qualifiers and one balanced subscript group. Null (and a syntax error) when no
     /// operand is there.</summary>
-    private static string? ReadOperand(StatementCursor c, Action<int>? nonPseudoText, Action<int>? nestedCopy)
+    private static Operand? ReadOperand(StatementCursor c, Action<int>? nonPseudoText, Action<int>? nestedCopy)
     {
         bool more = c.TryPeek(out var w);
         if (!more || w.IsSeparatorPeriod || w.IsWord("BY"))
@@ -777,11 +801,13 @@ public sealed class CopyProcessor(
         if (w.Kind == TextWordKind.PseudoTextDelimiter)
         {
             c.Advance(w);
+            var elements = new List<TextWord>();
             while (c.TryTake(out var t))
             {
                 if (t.Kind == TextWordKind.PseudoTextDelimiter)
-                    return c.Text[w.End..t.Start].Trim();
+                    return new Operand(c.Text[w.End..t.Start].Trim(TextWordScanner.SeparatorSpaces), elements);
                 if (t.IsWord("COPY")) nestedCopy?.Invoke(t.Start);
+                elements.Add(t);
             }
             c.Error(w.Start, "the ==pseudo-text== has no closing delimiter");
             return null;
@@ -791,7 +817,7 @@ public sealed class CopyProcessor(
         if (w.Kind == TextWordKind.Literal)
         {
             c.Advance(w);
-            return w.Value;
+            return new Operand(w.Value, [w]);
         }
         if (w.Kind != TextWordKind.CharacterString)
         {
@@ -801,26 +827,33 @@ public sealed class CopyProcessor(
 
         // identifier-1/2 or word-1/2: a data-name with optional OF/IN qualifiers and an optional subscript —
         // e.g. WRK IN GRP-002 (1). A plain word (including a signed number such as +2) is the degenerate
-        // single-text-word case. The verbatim span is returned: for matching it is scanned into text-words, and as
-        // a replacement it is inserted as written.
+        // single-text-word case. The verbatim span is returned with the text-words it holds: those are compared, and
+        // as a replacement it is inserted as written.
         int start = w.Start;
+        var words = new List<TextWord> { w };
         c.Advance(w);
         while (c.TryPeek(out var q) && (q.IsWord("OF") || q.IsWord("IN")))
         {
             c.Advance(q);
-            if (c.TryPeek(out var qualifier) && qualifier.Kind == TextWordKind.CharacterString) c.Advance(qualifier);
+            words.Add(q);
+            if (c.TryPeek(out var qualifier) && qualifier.Kind == TextWordKind.CharacterString)
+            {
+                c.Advance(qualifier);
+                words.Add(qualifier);
+            }
         }
         if (c.TryPeek(out var open) && open.Kind == TextWordKind.Separator && open.Span[0] == '(')
         {
             int depth = 0;
             while (c.TryTake(out var t))
             {
+                words.Add(t);
                 if (t.Kind != TextWordKind.Separator) continue;
                 if (t.Span[0] == '(') depth++;
                 else if (t.Span[0] == ')' && --depth == 0) break;
             }
         }
-        return c.Text[start..c.Pos];
+        return new Operand(c.Text[start..c.Pos], words);
     }
 
     private string? FindCopybook(string textName, string? libraryName = null)

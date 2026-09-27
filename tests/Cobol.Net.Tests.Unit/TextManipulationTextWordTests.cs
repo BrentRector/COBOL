@@ -105,6 +105,18 @@ public sealed class TextManipulationTextWordTests : IDisposable
         Assert.Contains("MOVE C TO D.", text);
     }
 
+    [Theory] // §8.3.5 1) (kb/Work PB1543): only the COBOL space (with tab and line end) separates — a character that
+             // merely looks like one is a text-word character, so P<it>Q is ONE word and never the two words P Q.
+    [InlineData((char)0x00A0)]
+    [InlineData((char)0x2003)]
+    [InlineData((char)0x3000)]
+    public void UnicodeSpaceLookalike_IsATextWordCharacter(char lookalike)
+    {
+        var (text, bag) = Run($" REPLACE ==P{lookalike}Q== BY ==R==.\n DISPLAY P Q P{lookalike}Q.\n");
+        Clean(bag);
+        Assert.Contains("DISPLAY P Q R.", text);
+    }
+
     [Fact] // §7.2.4.4 8) b): LEADING compares against ONE text-word — each side of a colon is its own.
     public void LeadingPartialWord_AppliesOnEachSideOfAColon()
     {

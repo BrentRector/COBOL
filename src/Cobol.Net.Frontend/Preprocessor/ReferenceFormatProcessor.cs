@@ -112,6 +112,16 @@ public static partial class ReferenceFormatProcessor
     /// user cannot find. The string overload is this one's <c>.Text</c>.</summary>
     public static MappedText NormalizeToFreeFormMapped(
         string sourceText, int dialectLevel, bool permissive, DiagnosticBag? diagnostics, string sourcePath)
+        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath, initialFixed: null, out _);
+
+    /// <summary>The ONE §6.5 logical-conversion walker, for source text AND library text (§6.5 applies to both "in
+    /// the order that lines of source text and library text are obtained"), also reporting the reference format it
+    /// read each physical line in (<paramref name="formats"/>).</summary>
+    /// <param name="initialFixed">The format the text starts in: for library text, the format in effect for its COPY
+    /// statement (§7.3.24.3 3) — kb/Work PB1067); null for a compilation group, whose initial format is detected
+    /// (the documented extension over §7.3.24.3 2)'s fixed-form default, DEVLOG 931).</param>
+    public static MappedText NormalizeToFreeFormMapped(string sourceText, int dialectLevel, bool permissive,
+        DiagnosticBag? diagnostics, string sourcePath, bool? initialFixed, out ReferenceFormatMap formats)
     {
         var gates = diagnostics is null ? null : new ReferenceFormatDiagnostics(dialectLevel, permissive, diagnostics, sourcePath);
         var lines = sourceText.Split('\n');
@@ -147,21 +157,26 @@ public static partial class ReferenceFormatProcessor
         // classifies the NIST fixed corpus and free-form real-world source without a directive — DEVLOG 931).
         if (switches.Count == 0)
         {
-            if (!IsFixedForm(sourceText)) return ConvertFreeFormMapped(sourceText, gates, sourcePath);
+            bool wholeFixed = initialFixed ?? IsFixedForm(sourceText);
+            formats = ReferenceFormatMap.Create(wholeFixed, detected: initialFixed is null, []);
+            if (!wholeFixed) return ConvertFreeFormMapped(sourceText, gates, sourcePath);
             var (fl, fo) = ConvertFixedToFreeMapped(sourceText, gates, 0);
             return Mapped(fl, fo, sourcePath);
         }
 
-        // Per-segment. The INITIAL segment (before the first directive) is auto-detected; each subsequent segment
-        // is in the format its preceding directive declared (GR4 bootstrap: a leading directive makes the initial
-        // segment empty, so its format governs from the next line). Emit one output line per source line, the
-        // directive lines blanked — a fixed segment's continuation joins reduce its line count exactly as the
-        // whole-file path already does.
-        bool initialFixed = IsFixedForm(string.Join('\n', lines[..switches[0].Index]));
-        var segments = WithPoppedFormats(switches, stackOps, initialFixed);
+        // Per-segment. The INITIAL segment (before the first directive) is in the given initial format, or
+        // auto-detected; each subsequent segment is in the format its preceding directive declared (GR4 bootstrap: a
+        // leading directive makes the initial segment empty, so its format governs from the next line). Emit one
+        // output line per source line, the directive lines blanked — a fixed segment's continuation joins reduce its
+        // line count exactly as the whole-file path already does.
+        bool firstFixed = initialFixed ?? IsFixedForm(string.Join('\n', lines[..switches[0].Index]));
+        var segments = WithPoppedFormats(switches, stackOps, firstFixed);
+        // A segment boundary at 0-based line i changes the format from the NEXT line: 1-based line i + 2.
+        formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null,
+            segments.Select(s => (s.Index + 2, s.Fixed)));
         var outLines = new List<string>();
         var outOrigins = new List<int>();   // the 1-based source line of each output line (kb/Work PB82)
-        bool segFixed = initialFixed;
+        bool segFixed = firstFixed;
         int segStart = 0;
         for (int s = 0; s <= segments.Count; s++)
         {
