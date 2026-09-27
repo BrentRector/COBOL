@@ -25,7 +25,7 @@ BRIEFS = {
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'NEVER run the whole Conformance', r'\\STOP',
-                                     r'tail -n \+1 -f', r'where\.py', r'semgrep/verify\.py', r'cite\.py --check',
+                                     r'tail -n \+1 -f', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'RUN BY NAME', r'drift_rules\.py'],
 }
 SPEC = BRIEFS['dispatch-spec-implementer.md'] + [r'reports\\w\d+[a-z]-PB\d+-report\.md']

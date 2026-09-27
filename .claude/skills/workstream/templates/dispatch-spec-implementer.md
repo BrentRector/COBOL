@@ -9,8 +9,12 @@ Scratch:  {S}\{slug}\
 Report your ACTUAL branch (`git branch --show-current`).
 {pred}
 THE GROUP IS ONE ROOT: {root}. Read every note first — {files} — they carry the forensic detail, the citations, the
-probes and the CODE SITES. ⛔ START FROM THE NOTE'S CODE SITES (and `python scripts/spec/where.py <clause>` when it
-exists) — do not re-survey the codebase: orientation (grep/read) was 46 % of every implementer's tokens in waves 45–57.
+probes and the CODE SITES. ⛔ ORIENT IN ONE CALL, BEFORE READING ANY SOURCE FILE: `python scripts/spec/orient.py
+<every source file your notes name>` prints each file's outline with line numbers, the clauses it cites, the tests
+that exercise it, what EARLIER implementers learned about it (the landed notes' code sites and mechanisms) and its
+recent commits. Then read only the line ranges it points you to, and use `python scripts/spec/where.py <clause>`
+for a rule no note locates. Do not re-survey the codebase: orientation (grep/read) was 46 % of every implementer's
+tokens in waves 45–57, re-deriving what earlier waves had already learned.
 Do not re-derive what the notes measured, but DO re-run every probe on your own build.
 ⛔ DRIFT RULES (MANDATORY-PRACTICES P11): before editing any file run `python scripts/spec/drift_rules.py <files>` and
 honor every SPECIFIC rule it prints — the drift tests will enforce them at your gate anyway.
