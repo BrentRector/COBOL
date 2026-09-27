@@ -65,9 +65,14 @@ public sealed class CompileTimeExpressionEvaluator
     /// <summary>The final value of one compile-time arithmetic operand (§7.3.6). <paramref name="WasSingleLiteral"/>
     /// is true when the operand was a single numeric literal (§7.3.11.4 GR5 / §13.10.3 SR1 — treated as a literal,
     /// NOT truncated). <paramref name="Value"/> is the value in the <see cref="CtNumeric"/> carrier.
-    /// <paramref name="Text"/> is the canonical value text (a single literal's normalized text, sign included; an
-    /// expression's GR3-truncated integer) — the substitution form consumers store.</summary>
-    public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Text);
+    /// <paramref name="Literal"/> is the literal the operand STANDS FOR, as source text — the substitution form a
+    /// consumer stores: a single literal EXACTLY AS WRITTEN (its sign and its decimal separator included — §13.10.4
+    /// GR1, "as if literal-1 … were written where constant-name-1 is written", kb/Work PB1230), or an expression's
+    /// §7.3.6.3 GR3 integer literal. It is never a normalized form: a consumer that needs the value reads
+    /// <paramref name="Value"/>, and one that re-binds the literal takes it through its own literal chokepoint in the
+    /// active DECIMAL-POINT mode, exactly as it would the written literal. <paramref name="IsInteger"/> is true for
+    /// an integer literal (fixed-point, no decimal separator) and for every expression result (GR3).</summary>
+    public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Literal, bool IsInteger);
 
     /// <summary>Evaluate one compile-time arithmetic operand (ISO §7.3.6), applying §7.3.11.4 GR5 (single-literal
     /// reclassification) and §7.3.6.3 GR3 (integer truncation of an expression's final result) at this boundary.
@@ -96,7 +101,8 @@ public sealed class CompileTimeExpressionEvaluator
             ReportSeparator(issue, lit);
             bool floating = CobolNet.Common.NumericLiteral.IsFloatingPointForm(text);
             if (!floating && !WithinLiteralCapacity(text, lit, where)) return null;
-            if (CtNumeric.TryParseLiteral(text, out var v)) return new CtNumber(true, v, text);
+            if (CtNumeric.TryParseLiteral(text, out var v))
+                return new CtNumber(true, v, lit, IsInteger: !floating && !text.Contains('.'));
             _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the numeric literal '{lit}' lies outside the "
                 + "decimal128 range this compiler gives a numeric literal, about 1E-6176 to 9.99E+6144 (ISO "
                 + "§8.3.3.3.3 r3; §8.8.1.5.2 r2; CONFORMANCE.md §7)");
@@ -117,7 +123,7 @@ public sealed class CompileTimeExpressionEvaluator
                 + $"fixed-point numeric literal has at most {_literalDigits} digits (ISO §8.3.3.3.2)");
             return null;
         }
-        return new CtNumber(false, truncated, CtNumeric.ToIntegerText(truncated));
+        return new CtNumber(false, truncated, CtNumeric.ToIntegerText(truncated), IsInteger: true);
     }
 
     /// <summary>The §8.3.3.3.2 fixed-point literal capacity (<see cref="EditionInfo.MaxDigits"/>), counted the way
@@ -266,20 +272,20 @@ public sealed class CompileTimeExpressionEvaluator
         }
     }
 
-    /// <summary>The single (possibly signed) numeric literal an arithmetic expression consists of, or null — the
-    /// §13.10.3 SR1 / §7.3.11.4 GR5 re-classification probe ("if the operand consists of a single numeric literal,
-    /// that operand is treated as a literal, not as an arithmetic-expression"), canonicalized by dropping a
-    /// redundant leading '+' so the substitution text of <c>+5</c> and <c>5</c> is one string.
+    /// <summary>The single (possibly signed) numeric literal an arithmetic expression consists of, AS WRITTEN, or
+    /// null — the §13.10.3 SR1 / §7.3.11.4 GR5 re-classification probe ("if the operand consists of a single numeric
+    /// literal, that operand is treated as a literal, not as an arithmetic-expression").
+    /// <para>⛔ THE LITERAL IS RETURNED AS WRITTEN — its '+' is NOT dropped (kb/Work PB1230). Canonicalizing
+    /// <c>+5</c> to <c>5</c> here made <c>CONSTANT AS +5</c> substitute <c>5</c>, so the constant DISPLAYed '5' where
+    /// the literal +5 displays '+5' — not §13.10.4 GR1's "as if literal-1 … were written". Equal values are
+    /// <see cref="CtNumber.Value"/>'s question, never the text's.</para>
     /// <para>⛔ THE DESCENT IS <see cref="SoleOperand.NumericLiteral"/>, NOT A LOCAL COPY (kb/Work PB400). This
     /// used to walk its own spine and TOGGLE the sign through a stacked unary chain, which reclassified
     /// <c>- -5</c> — an operand that does not CONSIST OF a single literal — as the literal 5. The shared descent
     /// applies §8.3.3.3.2 rule 2's contiguity test instead, so exactly one ADJACENT sign is part of the literal
     /// and everything else is an arithmetic-expression operand (and is therefore §7.3.6.3 GR3-truncated, which
     /// the toggling version silently skipped).</para></summary>
-    private static string? SoleNumericLiteral(Core.ArithmeticExpressionContext expr) =>
-        SoleOperand.NumericLiteral(expr) is { } text
-            ? (text.StartsWith('+') ? text[1..] : text)
-            : null;
+    private static string? SoleNumericLiteral(Core.ArithmeticExpressionContext expr) => SoleOperand.NumericLiteral(expr);
 
     // ══ Directive-context operand dispatch (§7.3.3 SR10 master constraint) ═══════════════════════════════════════
 
@@ -304,7 +310,7 @@ public sealed class CompileTimeExpressionEvaluator
                 ReportDirective(where, $"'{w.GetText()}' is not a previously-defined compilation variable (ISO §7.3.11 / §13.10.3)");
                 return null;
             }
-            return EvaluateDirectiveArithmetic(ae, where) is { } n ? CtValue.Numeric(n.Value, n.Text) : null;
+            return EvaluateDirectiveArithmetic(ae, where) is { } n ? CtValue.Numeric(n.Value, n.Literal) : null;
         }
         if (op.nonNumericLiteral() is { } nn)
             return NonNumericOperand(nn, where);

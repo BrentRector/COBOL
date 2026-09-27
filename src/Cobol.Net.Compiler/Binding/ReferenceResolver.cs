@@ -2370,10 +2370,11 @@ public sealed class ReferenceResolver(DataBinder data)
             return ix.Cell;   // keep rendering: a null here would re-route to D18 and screen the operand twice
         }
         // An INTEGER constant-name in a subscript position substitutes its integer literal (ISO §13.10.3 SR2 /
-        // §13.10.4 GR1/GR3 — a subscript is a literal position, §8.4.2.3.2) — the literal text IS the C# read.
+        // §13.10.4 GR1/GR3 — a subscript is a literal position, §8.4.2.3.2) — its canonical integer text IS the C#
+        // read (IntegerText, not the literal as written: `+5` is a COBOL integer literal, not a C# operand spelling).
         if (qualifiers.Count == 0
-            && data.FindConstant(name) is { Category: PicCategory.Numeric, IsInteger: true } k)
-            return k.Text;
+            && data.FindConstant(name) is { Category: PicCategory.Numeric, IntegerText: { } integer })
+            return integer;
         DataItem? item = qualifiers.Count == 0 ? ResolveUnqualified(name) : ResolveQualified(name, qualifiers);
         if (item is null) return null;
         if (!IntrinsicArgumentRules.IsArithmeticOperandClass(item)) (pending ??= []).Add(new PendingScreen(item, name));

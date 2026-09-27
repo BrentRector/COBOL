@@ -56,12 +56,23 @@ using Core = CobolParserCore;
 public sealed partial class DataBinder
 {
     /// <summary>One folded compile-time constant (ISO §13.10). <paramref name="Text"/> is the substitution
-    /// value: for class numeric the normalized literal text (dot-decimal, sign included); for the string
-    /// classes the DECODED character value. <paramref name="RawText"/> is the equivalent literal as RAW source
-    /// text (re-quoted per class) — the currency of the text-plumbed paths (the DATA-division VALUE capture),
-    /// mirroring <c>ConcatFolder.Folded.RawText</c>.</summary>
+    /// value: for class numeric the LITERAL AS WRITTEN — literal-1 with its own sign and decimal separator
+    /// (§13.10.4 GR1, "as if literal-1 … were written where constant-name-1 is written"), or the GR3 integer
+    /// literal of an expression / LENGTH OF form; for the string classes the DECODED character value.
+    /// <para>⛔ A NUMERIC <paramref name="Text"/> IS SOURCE TEXT, NEVER A NORMALIZED VALUE (kb/Work PB1230). A
+    /// consumer that re-binds it takes it through its literal chokepoint in the active DECIMAL-POINT mode, exactly
+    /// as the written literal would go — which is why <c>AS 1,5</c> under DECIMAL-POINT IS COMMA substitutes
+    /// cleanly and <c>AS +5</c> displays '+5'. It used to hold the evaluator's normalized text ('1.5', '5'), and
+    /// every reference re-checked that as a literal: '1.5' was refused under the comma mode.</para>
+    /// <paramref name="IntegerText"/> is the constant's value as a canonical integer (no '+', no separator) when the
+    /// constant IS an integer (§13.10.3 SR2 — an integer literal-1, or GR3–GR6), else null: the form the integer
+    /// positions read (an OCCURS bound, a PICTURE repetition, a subscript). <paramref name="RawText"/> is the
+    /// equivalent literal as RAW source text (re-quoted per class) — the currency of the text-plumbed paths (the
+    /// DATA-division VALUE capture), mirroring <c>ConcatFolder.Folded.RawText</c>. <paramref name="Specification"/>
+    /// is the AS operand as written, which §13.10.3 SR9 compares when the name is duplicated.</summary>
     public sealed record ConstantDef(
-        string Name, PicCategory Category, string Text, bool IsInteger, bool IsGlobal, string RawText);
+        string Name, PicCategory Category, string Text, string? IntegerText, bool IsGlobal, string RawText,
+        string Specification);
 
     /// <summary>The per-unit compile-time constant table (§13.10.4 GR1 substitution source). It also holds the
     /// GLOBAL constants of every containing program (<see cref="InheritGlobalConstants"/>, kb/Work PB1009), named
@@ -176,10 +187,11 @@ public sealed partial class DataBinder
         }
 
         var cv = body.constantValue();
+        string spec = WrittenSpecification(cv);
         ConstantDef? def =
-            cv.LENGTH() is not null ? BindConstantLength(name, isGlobal, cv.dataReference(), where)
-            : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, nn, where)
-            : BindConstantArithmetic(name, isGlobal, cv.arithmeticExpression(), where);
+            cv.LENGTH() is not null ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where)
+            : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
+            : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
         if (def is null) return;
 
         // A container's GLOBAL constant of the same name is SHADOWED by this local entry (§8.4.6 scope of names;
@@ -187,16 +199,34 @@ public sealed partial class DataBinder
         // element — the contained program's own declaration is the one its references mean, as for any global
         // data-name it redeclares — not as a cross-element obligation to repeat the container's specification.
         if (_inheritedConstants.Remove(name)) _constants.Remove(name);
-        // §13.10.3 SR9: a duplicate constant-name shall carry the SAME specification as the prior entry.
+        // §13.10.3 SR9: "If constant-name-1 duplicates another constant-name, the specification of
+        // arithmetic-expression-1, literal-1, data-name-1, data-name-2, or compilation-variable-name-1 shall be the
+        // same as specified in the other constant-name" — the SPECIFICATIONS, as written, not the values they fold to
+        // (kb/Work PB1230: `AS 5` then `AS 2 + 3`, and `AS LENGTH OF W` then `AS 7`, compared equal by value and
+        // compiled). ⚠ DETERMINATION: "the same" is text-word equality under the ONE matcher the standard itself
+        // defines for comparing written text (§7.2.3.4 9) c), COPY REPLACING — separators collapse to a space, COBOL
+        // words compare without regard to case), so `AS 5` / `AS 05` / `AS +5` are three specifications.
         if (_constants.TryGetValue(name, out var prior))
         {
-            if (prior.Category != def.Category || prior.Text != def.Text)
+            if (!CobolNet.Frontend.Preprocessor.TextWordSequence.Matches(prior.Specification, def.Specification))
                 Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: duplicates constant-name "
-                    + $"'{prior.Name}' with a different specification — a duplicated constant-name shall carry "
-                    + "the same specification (ISO §13.10.3 SR9)");
+                    + $"'{prior.Name}' with a different specification ('{def.Specification}', where the other entry "
+                    + $"specifies '{prior.Specification}') — a duplicated constant-name shall carry the same "
+                    + "specification (ISO §13.10.3 SR9)");
             return;
         }
         _constants[name] = def;
+    }
+
+    /// <summary>The AS operand's specification as written (§13.10.3 SR9's subject): its tokens' texts, one space
+    /// apart. Built from the parse tree's TOKENS, not the source span, so a comment written inside a multi-line
+    /// operand (<c>AS 2 *&gt; two</c> / <c>+ 3</c>) is not part of it — joined into one line, the comment would
+    /// have swallowed the rest of the operand and made unequal specifications compare equal.</summary>
+    private static string WrittenSpecification(Core.ConstantValueContext cv)
+    {
+        var tokens = new List<Antlr4.Runtime.IToken>();
+        ReferenceResolver.CollectLeafTokens(cv, tokens);
+        return string.Join(' ', tokens.Select(t => t.Text));
     }
 
     /// <summary>AS literal-1 for the STRING classes (§13.10.4 GR1/GR2 — the constant is the literal; class and
@@ -204,12 +234,12 @@ public sealed partial class DataBinder
     /// (GR3 of §8.8.3.3 — the ConcatFolder chokepoint), so <c>AS "A" &amp; "B"</c> is the literal "AB". A
     /// figurative constant is rejected (§13.10.3 SR6).</summary>
     private ConstantDef? BindConstantStringLiteral(
-        string name, bool isGlobal, Core.NonNumericLiteralContext nn, string where)
+        string name, bool isGlobal, string spec, Core.NonNumericLiteralContext nn, string where)
     {
         if (nn.concatenationExpression() is { } ce)
         {
             var folded = ConcatFolder.Fold(ce, Edition, LiteralEnv);
-            return new ConstantDef(name, folded.Category, folded.Value, false, isGlobal, folded.RawText);
+            return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec);
         }
         if (nn.figurativeConstant() is not null)
         {
@@ -222,8 +252,8 @@ public sealed partial class DataBinder
             : nn.HEXLIT() is { } x ? (PicCategory.Alphanumeric, CobolLiteral.DecodeHex(x.GetText()))
             : nn.NATLIT() is { } nat ? (PicCategory.National, CobolLiteral.Decode(nat.GetText()))
             : (PicCategory.Boolean, CobolLiteral.Decode(nn.BOOLLIT()!.GetText()));
-        return new ConstantDef(name, cat, value, false, isGlobal,
-            new ConcatFolder.Folded(cat, value).RawText);
+        return new ConstantDef(name, cat, value, null, isGlobal,
+            new ConcatFolder.Folded(cat, value).RawText, spec);
     }
 
     /// <summary>The arithmetic-expression AS form. §13.10.3 SR1 first: an operand that is a SINGLE numeric
@@ -233,7 +263,7 @@ public sealed partial class DataBinder
     /// <c>BYTE-LENGTH OF x</c> form parses through this leg as a qualified dataReference (no dedicated token)
     /// and is recognized and STAGED LOUD here (GR5; the §15.14 intrinsic is itself Deferred).</summary>
     private ConstantDef? BindConstantArithmetic(
-        string name, bool isGlobal, Core.ArithmeticExpressionContext expr, string where)
+        string name, bool isGlobal, string spec, Core.ArithmeticExpressionContext expr, string where)
     {
         // The BYTE-LENGTH OF form (§13.10.4 GR5) — a §13.10 CONSTANT-specific shape (a qualified dataReference),
         // NOT a §7.3.6 arithmetic operand; recognized and STAGED LOUD before the shared evaluator sees it. A sole
@@ -260,20 +290,26 @@ public sealed partial class DataBinder
                 "previously defined numeric constant-names substituting them", "ISO §13.10.3 SR7 / §7.3.6.2 SR1b"),
             decimalPointIsComma: DecimalPointIsComma);
         if (evaluator.EvaluateArithmeticOperand(expr, where) is not { } n) return null;
-        bool isInt = !n.Text.Contains('.') && !n.Text.Contains('E') && !n.Text.Contains('e');
-        return new ConstantDef(name, PicCategory.Numeric, n.Text, isInt, isGlobal, n.Text);
+        // The constant carries the literal AS WRITTEN (§13.10.4 GR1 — kb/Work PB1230), never a normalized form; its
+        // value, where an integer position needs one, is the evaluator's — derived once, from the ONE literal parser.
+        return new ConstantDef(name, PicCategory.Numeric, n.Literal,
+            n.IsInteger ? CtNumeric.ToIntegerText(n.Value) : null, isGlobal, n.Literal, spec);
     }
 
     /// <summary>The value of a BARE constant-name (§7.3.6.2 SR1b / §13.10.3 SR2 substitution), or null when the
     /// name is not a currently-defined constant — the shared compile-time evaluator's name-resolution callback.
     /// The CONSTANT-entry arithmetic path uses only the NUMERIC case (§7.3.6.2 SR1b), so a non-numeric constant
     /// resolves to null and is rejected there, and so does a floating-point constant (§7.3.6.2 SR1b — its
-    /// substituted literal is not fixed-point). (A constant's <see cref="ConstantDef.Text"/> is already normalized
-    /// dot-decimal; its value enters the expression in the edition's arithmetic mode at the evaluator.)</summary>
+    /// substituted literal is not fixed-point). A constant's <see cref="ConstantDef.Text"/> is its literal AS WRITTEN
+    /// (kb/Work PB1230), so its value is read the way the written literal's is: through the ONE numeric-literal
+    /// normalizer in this program's DECIMAL-POINT mode (§12.3.7.4 GR14a — already screened when the constant was
+    /// bound, so no issue can arise here) and the ONE literal parser; it enters the expression in the edition's
+    /// arithmetic mode at the evaluator.</summary>
     private CtValue? ResolveConstantName(string word) =>
         _constants.TryGetValue(word, out var d) && d.Category == PicCategory.Numeric
-        && !NumericLiteral.IsFloatingPointForm(d.Text)
-        && CtNumeric.TryParseLiteral(d.Text, out var v) ? CtValue.Numeric(v, d.Text) : null;
+        && NumericLiteral.Normalize(d.Text, DecimalPointIsComma, out _) is var canonical
+        && !NumericLiteral.IsFloatingPointForm(canonical)
+        && CtNumeric.TryParseLiteral(canonical, out var v) ? CtValue.Numeric(v, d.Text) : null;
 
     /// <summary>Routes the shared compile-time evaluator's diagnostics to the CONSTANT-entry binder's own codes: an
     /// arithmetic rule → the <c>ConstantEntryRule</c> descriptor; a §12.3.7 GR14a separator violation →
@@ -298,7 +334,7 @@ public sealed partial class DataBinder
     /// dynamic-length operand. data-name-2 must already be bound
     /// (definition-before-reference — SR4 rules out the reverse dependence).</summary>
     private ConstantDef? BindConstantLength(
-        string name, bool isGlobal, Core.DataReferenceContext dref, string where)
+        string name, bool isGlobal, string spec, Core.DataReferenceContext dref, string where)
     {
         string? baseName = dref.cobolWord()?.GetText();
         if (baseName is null) return null;
@@ -373,7 +409,7 @@ public sealed partial class DataBinder
             return null;
         }
         string text = width.ToString(CultureInfo.InvariantCulture);
-        return new ConstantDef(name, PicCategory.Numeric, text, true, isGlobal, text);
+        return new ConstantDef(name, PicCategory.Numeric, text, text, isGlobal, text, spec);
 
         static bool HasDynamicTable(DataItem item) =>
             item.IsDynamicTable || item.Children.Any(HasDynamicTable);
@@ -392,7 +428,8 @@ public sealed partial class DataBinder
         string word = bound.cobolWord().GetText();
         if (_constants.TryGetValue(word, out var k))
         {
-            if (k is { Category: PicCategory.Numeric, IsInteger: true } && int.TryParse(k.Text, out int kv))
+            if (k is { Category: PicCategory.Numeric, IntegerText: { } it }
+                && int.TryParse(it, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int kv))
                 return kv;
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the OCCURS bound '{word}' shall be "
                 + "an INTEGER constant-name (ISO §13.10.3 SR2 — only an integer constant may specify an OCCURS "
@@ -420,7 +457,7 @@ public sealed partial class DataBinder
                 string word = m.Groups[1].Value;
                 if (_constants.TryGetValue(word, out var k))
                 {
-                    if (k is { Category: PicCategory.Numeric, IsInteger: true }) return "(" + k.Text + ")";
+                    if (k is { Category: PicCategory.Numeric, IntegerText: { } it }) return "(" + it + ")";
                     Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: '{word}' in the PICTURE "
                         + "repetition position shall be an INTEGER constant-name (ISO §13.10.3 SR2)");
                     return "(1)";   // recovery shape — the compile has already failed

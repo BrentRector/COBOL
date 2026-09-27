@@ -72,12 +72,16 @@ public sealed class CompileTimeExpressionEvaluatorTests
     [InlineData("0.25", "0.25", true)]
     [InlineData("-5", "-5", true)]
     [InlineData("42", "42", true)]
+    // kb/Work PB1230 — the literal is carried AS WRITTEN, its '+' included (§13.10.4 GR1 "as if literal-1 … were
+    // written"): `+5` and `5` are one value but two literals, and a constant substitutes the one it was given.
+    [InlineData("+5", "+5", true)]
+    [InlineData("+0.25", "+0.25", true)]
     public void Evaluates_ArithmeticAndReclassification(string src, string expectedText, bool wasSingleLiteral)
     {
         var (r, diag) = Eval(src);
         Assert.Empty(diag.Reports);
         Assert.NotNull(r);
-        Assert.Equal(expectedText, r!.Value.Text);
+        Assert.Equal(expectedText, r!.Value.Literal);
         Assert.Equal(wasSingleLiteral, r.Value.WasSingleLiteral);
     }
 
@@ -89,7 +93,7 @@ public sealed class CompileTimeExpressionEvaluatorTests
         Assert.Empty(diag.Reports);
         Assert.NotNull(r);
         Assert.True(r!.Value.WasSingleLiteral);
-        Assert.Equal("1.5E3", r.Value.Text);
+        Assert.Equal("1.5E3", r.Value.Literal);
         AssertValue(1500m, r.Value.Value);
     }
 
@@ -134,7 +138,7 @@ public sealed class CompileTimeExpressionEvaluatorTests
         var (r, diag) = Eval(src);
         Assert.Empty(diag.Reports);
         Assert.NotNull(r);
-        Assert.Equal(expected, r!.Value.Text);
+        Assert.Equal(expected, r!.Value.Literal);
     }
 
     /// <summary>§8.3.3.3.2 — a sole fixed-point literal past the edition's digit capacity (31) is rejected LOUDLY,
@@ -150,12 +154,31 @@ public sealed class CompileTimeExpressionEvaluatorTests
                                            && x.Message.Contains("36 digit positions", StringComparison.Ordinal));
     }
 
+    /// <summary>kb/Work PB1230 — <see cref="CompileTimeExpressionEvaluator.CtNumber.IsInteger"/> is the §13.10.3 SR2
+    /// "constant-name-1 is an integer" answer the integer positions (OCCURS bound, PICTURE repetition, subscript) read:
+    /// an integer literal whatever its sign, never a literal with a decimal point or an exponent, and every §7.3.6.3
+    /// GR3 expression result. The value, not the written text, is what an integer position consumes.</summary>
+    [Theory]
+    [InlineData("+5", true, 5)]
+    [InlineData("-5", true, -5)]
+    [InlineData("7 / 2", true, 3)]
+    [InlineData("5.0", false, 5)]
+    [InlineData("1.5E2", false, 150)]
+    public void IsInteger_FollowsTheLiteralsForm_NotItsValue(string src, bool isInteger, int value)
+    {
+        var (r, diag) = Eval(src);
+        Assert.Empty(diag.Reports);
+        Assert.NotNull(r);
+        Assert.Equal(isInteger, r!.Value.IsInteger);
+        AssertValue(value, r.Value.Value);
+    }
+
     [Fact] // A previously-defined numeric constant-name substitutes its value (§7.3.6.2 SR1b / §13.10.3 SR2).
     public void Substitutes_NumericName()
     {
         var (r, diag) = Eval("K * 2 + 1", new() { ["K"] = "5" });
         Assert.Empty(diag.Reports);
-        Assert.Equal("11", r!.Value.Text);
+        Assert.Equal("11", r!.Value.Literal);
     }
 
     [Fact] // §7.3.6.2 SR1c — division by zero is rejected.

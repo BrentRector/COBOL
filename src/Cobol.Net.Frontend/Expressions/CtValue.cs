@@ -39,7 +39,8 @@ public sealed record CtValue
     /// <see cref="CtCategory.Numeric"/>).</summary>
     public CobolDec Number { get; }
     /// <summary>The character value (meaningful for <see cref="CtCategory.Alphanumeric"/>/<see cref="CtCategory.National"/>;
-    /// for Numeric it is the canonical value text — the §7.3.11.4 GR5 single-literal form).</summary>
+    /// for Numeric it is the literal the value stands for, as source text — a single literal as written, §7.3.11.4
+    /// GR5, or an expression's integer result — and every numeric comparison reads <see cref="Number"/>, never this).</summary>
     public string Text { get; }
     /// <summary>The bit value (meaningful only for <see cref="CtCategory.Boolean"/>).</summary>
     public BitString? Bits { get; }

@@ -62,7 +62,7 @@ public sealed class CompileTimeArithmeticModeTests
             return;
         }
         Assert.Empty(diag.Reports);
-        Assert.Equal(expected, r!.Value.Text);
+        Assert.Equal(expected, r!.Value.Literal);
         Assert.False(r.Value.WasSingleLiteral);
     }
 
@@ -80,7 +80,7 @@ public sealed class CompileTimeArithmeticModeTests
         {
             var (r, diag) = Eval(expr, edition);
             Assert.Empty(diag.Reports);
-            Assert.Equal(expected, r!.Value.Text);
+            Assert.Equal(expected, r!.Value.Literal);
         }
     }
 
@@ -95,7 +95,7 @@ public sealed class CompileTimeArithmeticModeTests
         const string expr = "1000000000000000000000000000001 * 10005 - 1000000000000000000000000000000 * 10005";
         var (r, diag) = Eval(expr, 2002);
         Assert.Empty(diag.Reports);
-        Assert.Equal("10010", r!.Value.Text);
+        Assert.Equal("10010", r!.Value.Literal);
     }
 
     /// <summary>§7.3.6.3 GR3 makes the final result "an integer numeric literal", and a fixed-point numeric literal
@@ -126,7 +126,7 @@ public sealed class CompileTimeArithmeticModeTests
     {
         var (r, diag) = Eval("9999999999999999999999999999999 + 0", 2002);
         Assert.Empty(diag.Reports);
-        Assert.Equal("9999999999999999999999999999999", r!.Value.Text);
+        Assert.Equal("9999999999999999999999999999999", r!.Value.Literal);
 
         var (r32, diag32) = Eval("9999999999999999999999999999999 + 1", 2002);   // 10^31: 32 digits
         Assert.Null(r32);
@@ -144,7 +144,7 @@ public sealed class CompileTimeArithmeticModeTests
         var (r, diag) = Eval("123456789012345678901234567890", edition);
         Assert.Empty(diag.Reports);
         Assert.True(r!.Value.WasSingleLiteral);
-        Assert.Equal("123456789012345678901234567890", r.Value.Text);
+        Assert.Equal("123456789012345678901234567890", r.Value.Literal);
     }
 
     /// <summary>An operand the mode cannot hold is the §7.3.6.2 SR2 limit, reported as SR2 — not as an SR1 b)
@@ -159,7 +159,7 @@ public sealed class CompileTimeArithmeticModeTests
 
         var (r02, diag02) = Eval("123456789012345678901234567890 + 1", 2002);
         Assert.Empty(diag02.Reports);
-        Assert.Equal("123456789012345678901234567891", r02!.Value.Text);
+        Assert.Equal("123456789012345678901234567891", r02!.Value.Literal);
     }
 
     /// <summary>An operand literal past the §8.3.3.3.2 digit capacity is refused by that rule, in every mode.</summary>

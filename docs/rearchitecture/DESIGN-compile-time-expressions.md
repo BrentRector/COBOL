@@ -169,12 +169,19 @@ public sealed class CompileTimeExpressionEvaluator(
     // EvaluateArithmeticOperand, so it is GR3-truncated and rule-5 integer-validated.
     public BitString? EvaluateBoolean(CobolParserCore.BooleanExpressionContext e, string where);
 }
-public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Text);   // GR3-truncated unless WasSingleLiteral
+public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Literal, bool IsInteger);   // GR3-truncated unless WasSingleLiteral
 ```
 
 * **GR5 + GR3 live INSIDE `EvaluateArithmeticOperand`.** The raw-value recursion (`EvalArith`, the lift of
   `EvalConstExpr`) stays private — intermediates correctly un-truncated (§7.3.6.3 GR1). At the boundary: a single
-  numeric literal (private `SoleNumericLiteral` probe) is kept exact (GR5 / §13.10.3 SR1 — `AS 0.25` → `0.25`);
+  numeric literal (private `SoleNumericLiteral` probe) is kept exact (GR5 / §13.10.3 SR1 — `AS 0.25` → `0.25`)
+  and is returned AS WRITTEN in `Literal` — its sign and decimal separator included, never a normalized form
+  (kb/Work PB1230: §13.10.4 GR1 makes a constant-name "as if literal-1 … were written", so `AS +5` substitutes
+  `+5` and `AS 1,5` under DECIMAL-POINT IS COMMA substitutes `1,5`, which the consumer's own literal chokepoint
+  then reads in the active mode; the value a consumer computes with is `Value`, and `IsInteger` answers §13.10.3
+  SR2's "constant-name-1 is an integer" for the integer positions). A duplicated constant-name's §13.10.3 SR9
+  check compares the AS operands AS WRITTEN, through the ONE text-word equality (`TextWordSequence.Matches`,
+  §7.2.3.4 9) c)) — never the folded values;
   otherwise the final result is truncated to its integer part (GR3 / INTEGER-PART §15.49). No consumer re-does
   this — the probe/truncate rule lives in one place, not copied at each operand site — and the boolean shift
   count is correct because it calls this boundary.

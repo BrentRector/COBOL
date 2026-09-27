@@ -5400,8 +5400,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             : op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symAll && SymbolicRaw(symAll.GetText()) is { } rawAll
             ? rawAll
             : SymbolicValueRawText(op) is { } rawBare ? rawBare
-            : ConstantValueRawText(op) is { } konst ? konst
-            : NormalizeIfNumericLiteral(op.GetText());
+            // A constant-name substitutes its literal AS WRITTEN and that literal then takes the path the written
+            // literal takes (§13.10.4 GR1 "as if literal-1 … were written"; kb/Work PB1230): `VALUE K` where
+            // `K CONSTANT AS 1,5` under DECIMAL-POINT IS COMMA normalizes exactly as `VALUE 1,5` does.
+            : NormalizeIfNumericLiteral(ConstantValueRawText(op) ?? op.GetText());
     }
 
     /// <summary>THE literal-position predicate for a VALUE operand (kb/Work PB732), PURE — no folding, no

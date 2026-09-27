@@ -18216,13 +18216,13 @@
   "ordinal": 1,
   "subject": "Constant entry",
   "rule-digest": "5dc8f01810ff",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Expressions/SoleOperand.cs#NumericLiteral; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateArithmeticOperand",
-  "test-ref": "conformance:2002/constant_entry",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Expressions/SoleOperand.cs#NumericLiteral; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateArithmeticOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
+  "test-ref": "conformance:2002/constant_entry; conformance:2002/pb1230_constant_literal_as_written; unit:CompileTimeExpressionEvaluatorTests.Evaluates_ArithmeticAndReclassification; unit:CompileTimeExpressionEvaluatorTests.IsInteger_FollowsTheLiteralsForm_NotItsValue",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1230, 14d). SR1 (cite OK). AS 0.25 -> 0.25 (golden FRAC=0.25, FCOMP=200); AS -2.5 (sign adjacent, one literal per §8.3.3.3.2) -> -2.5; AS - 2.5 (separated sign = unary operator, an expression) -> -2; AS (0.5) -> 0; AS 1.5E2 (floating literal, single) accepted as literal = 150 while 1.5E2 + 1 is rejected by §7.3.6.2 SR1b. || REFUTED: PARTIAL — The classification half is right: a single numeric literal is not truncated (0.25, -2.5 and 1.5E2 are kept; '- 2.5' and '(0.5)' are expressions). But what the constant carries forward is not literal-1 as written. EvaluateArithmeticOperand returns the NORMALIZED text: the '+' is stripped and a comma decimal separator becomes '.'. BindConstantArithmetic stores that text as the substitution. Under DECIMAL-POINT IS COMMA the stored '1.5' is re-checked as a literal at the reference point and rejected, so a LEGAL program fails to compile. With AS +5 the constant displays '5' while the literal +5 written directly displays '+5', so the constant is not treated 'as if literal-1 were written' (§13.10.4 GR1). The defect is in the SR1 single-literal path the adjudicator cites, and it surfaces through GR1. File it as a defect. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "(kb/Work PB1230 landed, w65f). SR1 (cite.py --check 13.10.3 'If the operand of the constant entry consists of a single numeric literal, that operand is treated as a literal' -> OK 13.10.3 1)). A single (possibly adjacent-signed) numeric literal is classified by SoleOperand.NumericLiteral and kept as a LITERAL, not truncated (AS 0.25, AS -2.5, AS 1.5E2 kept; '- 2.5' and '(0.5)' are expressions). The refuter's residue is closed: the constant now carries literal-1 AS WRITTEN (CtNumber.Literal; the evaluator no longer strips '+', and the comma decimal separator is no longer rewritten to '.'), so under DECIMAL-POINT IS COMMA 'AS 1,5' substitutes cleanly at DISPLAY/MOVE/COMPUTE/relation/VALUE positions and 'AS +5' displays '+5' as the literal +5 does (13.10.4 GR1). Its value is derived from the written text through the ONE normalizer + literal parser (NumericLiteral.Normalize / CtNumeric.TryParseLiteral); the integer positions read ConstantDef.IntegerText. Golden pb1230_constant_literal_as_written runs at 2002/2014/2023.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-2",
@@ -18336,13 +18336,13 @@
   "ordinal": 9,
   "subject": "Constant entry",
   "rule-digest": "2098bd8bc014",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantEntry; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordSequence",
+  "test-ref": "conformance:negative/constant-dup-mismatch; conformance:negative/pb1230-constant-dup-same-value; conformance:2002/pb1230_constant_literal_as_written; unit:TextWordSequenceTests.SameSpecification; unit:TextWordSequenceTests.DifferentSpecification",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1230, 14d). SR9 (cite OK: 'the specification of arithmetic-expression-1, literal-1, data-name-1, data-name-2, or compilation-variable-name-1 shall be the same'). Code compares the folded (Category, Text) VALUE, not the specification. Accepted though specifications differ: `AS 5` then `AS 2 + 3`; `AS 1 + 4` then `AS 2 + 3`; `AS LENGTH OF W` (W PIC X(7)) then `AS 7`. Rejected correctly: 5 vs 05 (texts differ), 42 vs 43 (negative/constant-dup-mismatch); identical LENGTH OF W twice accepted. F-SR9-VALUE-NOT-SPEC. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "(kb/Work PB1230 landed, w65f). SR9 (cite.py --check 13.10.3 'the specification of arithmetic-expression-1, literal-1, data-name-1, data-name-2, or compilation-variable-name-1 shall be the same as specified in the other constant-name' -> OK 13.10.3 9)). BindConstantEntry now compares the AS operands AS WRITTEN (ConstantDef.Specification) through the ONE text-word equality (TextWordSequence.Matches over TextWord.MatchesForReplacing, 7.2.3.4 9) c)), not the folded (Category, Text) values: AS 5 then AS 2 + 3, and AS LENGTH OF W then AS 7, are now COBOLNET1547 (negative pb1230-constant-dup-same-value); a duplicate differing only in separator spacing / word case is accepted (golden K2 / k2). DETERMINATION: 'the same' specification = text-word equality (5 / 05 / +5 are three specifications). The compilation-variable-name-1 leg is unreachable while CONSTANT ... FROM is staged loud (COBOLNET0899, kb/Work PB1228): no FROM entry is accepted, so no SR9 violation through it compiles.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-10",

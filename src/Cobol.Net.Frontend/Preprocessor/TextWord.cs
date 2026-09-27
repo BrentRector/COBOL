@@ -126,6 +126,16 @@ internal static class TextWordScanner
         return words;
     }
 
+    /// <summary>The text-words of <paramref name="text"/> that take part in matching: every text-word but the
+    /// separator comma and semicolon, which "is considered to be a single space" (§7.2.3.4 9) c) 1. /
+    /// §7.2.4.4 8) c) 1.) — and so, like the spaces around them, is no word to compare.</summary>
+    public static List<TextWord> MatchWords(string text)
+    {
+        var words = Scan(text);
+        words.RemoveAll(w => w.Kind == TextWordKind.SeparatorCommaOrSemicolon);
+        return words;
+    }
+
     /// <summary>The next text-word at or after <paramref name="pos"/> (which must not lie inside a literal or a
     /// comment), skipping spaces and comments; <paramref name="pos"/> advances past it. False at the end of the
     /// text.</summary>
@@ -261,5 +271,30 @@ internal static class TextWordScanner
             i++;
         }
         return i;
+    }
+}
+
+/// <summary>
+/// The public face of text-word EQUALITY for the later stages: whether two source texts are the same ordered sequence
+/// of §7.2.2.5 text-words under the ONE text-word comparison, <see cref="TextWord.MatchesForReplacing"/> (ISO
+/// §7.2.3.4 9) c) — separators collapse to a space, COBOL words compare case-insensitively, the non-hexadecimal
+/// alphanumeric and national literals case-sensitively, and the two quotation symbols match).
+/// <para>Its asker is §13.10.3 SR9 (kb/Work PB1230): a duplicated constant-name's "specification of
+/// arithmetic-expression-1, literal-1, data-name-1, data-name-2, or compilation-variable-name-1 shall be the same as
+/// specified in the other constant-name" — a comparison of what was WRITTEN, which is the question this matcher
+/// already answers for COPY REPLACING and REPLACE, so SR9 asks it here rather than keeping a second notion of "the
+/// same text".</para>
+/// </summary>
+public static class TextWordSequence
+{
+    /// <summary>True when <paramref name="a"/> and <paramref name="b"/> are the same text-words in the same order.</summary>
+    public static bool Matches(string a, string b)
+    {
+        var x = TextWordScanner.MatchWords(a);
+        var y = TextWordScanner.MatchWords(b);
+        if (x.Count != y.Count) return false;
+        for (int i = 0; i < x.Count; i++)
+            if (!x[i].MatchesForReplacing(y[i])) return false;
+        return true;
     }
 }

@@ -191,16 +191,6 @@ public sealed class CopyProcessor(
     /// partial-word-1 as the text-words it is compared by, and the replacement text exactly as written.</summary>
     private readonly record struct Replacement(IReadOnlyList<TextWord> From, string To, ReplaceKind Kind);
 
-    /// <summary>The text-words of <paramref name="text"/> that take part in matching: every text-word but the
-    /// separator comma and semicolon, which "is considered to be a single space" (§7.2.3.4 9) c) 1. /
-    /// §7.2.4.4 8) c) 1.) — and so, like the spaces around them, is no word to compare.</summary>
-    private static List<TextWord> MatchWords(string text)
-    {
-        var words = TextWordScanner.Scan(text);
-        words.RemoveAll(w => w.Kind == TextWordKind.SeparatorCommaOrSemicolon);
-        return words;
-    }
-
     /// <summary>
     /// Apply COPY REPLACING / REPLACE substitutions (ISO §7.2.3.4 GR 9 / §7.2.4.4 GR 8) over the §7.2.2.5 text-words
     /// of the text: at each leftmost text-word the operands are tried in the order written and the first match wins
@@ -216,7 +206,7 @@ public sealed class CopyProcessor(
         if (active.Count == 0) return mapped;
 
         string text = mapped.Text;
-        var words = MatchWords(text);
+        var words = TextWordScanner.MatchWords(text);
         var sb = new OriginWriter();
         int copiedUpTo = 0; // chars of `text` already emitted
         int w = 0;
@@ -764,7 +754,7 @@ public sealed class CopyProcessor(
             }
             c.Advance(by);
             if (ReadOperand(c, nonPseudoText, nestedCopy) is not { } to) return;
-            into.Add(new Replacement(MatchWords(from), to, kind));
+            into.Add(new Replacement(TextWordScanner.MatchWords(from), to, kind));
             any = true;
         }
         if (!any) c.Error(c.Pos, "the REPLACING phrase names no operands");
