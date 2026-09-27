@@ -912,7 +912,9 @@ public static class OoConformance
 
     /// <summary>ISO §14.8.2.3.3 rule 2d for a NONNUMERIC literal argument — "the conformance rules are the same
     /// as for a MOVE statement", i.e. §14.9.25.3 Table 16 with the literal as the sending operand. Null when
-    /// conformant. A group formal is §14.8.2.2 rule 2's MOVE, admitted by the GR4 conversion-free copy.
+    /// conformant. An ELEMENTARY formal only: a group formal is §14.8.2.2 rule 2's WHOLE MOVE question (SR2's strong
+    /// type and SR9's variable-length group included), which <c>ParameterConformance.ContentConformanceReason</c> asks
+    /// of <see cref="MoveTable16.Validity(BoundOperand, Table16Operand, DataItem?)"/> before it reaches here (kb/Work PB1617).
     /// <para>The verdict is Table 16's, asked once per sender category the literal could be
     /// (<see cref="NonNumericLiteralSenders"/>) — conformant when ANY of them is admitted. That is deliberately
     /// weaker than the rule the standard states for a KNOWN category, and it is the honest strength for a bound
@@ -922,7 +924,6 @@ public static class OoConformance
     /// </summary>
     public static string? ContentAlphanumericLiteralMismatch(DataItem formal)
     {
-        if (formal.IsGroup) return null;
         var receiver = Table16Operand.Of(formal);
         return NonNumericLiteralSenders.Any(s => MoveTable16.Refusal(s, receiver) is null)
             ? null
@@ -935,11 +936,10 @@ public static class OoConformance
     /// boolean literal): §14.9.25.3 Table 16 asked of THAT sender, which is what carrying the category buys over
     /// <see cref="ContentAlphanumericLiteralMismatch"/>'s any-category reading (kb/Work PB1137 — a national literal at
     /// an alphanumeric formal is Table 16's "No", and the any-category reading admitted it because an ALPHANUMERIC
-    /// literal would have moved). A group formal is §14.8.2.2 rule 2's MOVE, admitted by the GR4 conversion-free
-    /// copy. Null when conformant.</summary>
+    /// literal would have moved). An ELEMENTARY formal only — a group formal takes the whole MOVE question first
+    /// (<see cref="ContentAlphanumericLiteralMismatch"/>'s remark; kb/Work PB1617). Null when conformant.</summary>
     public static string? ContentNonNumericLiteralMismatch(DataItem formal, PicCategory literalCategory)
     {
-        if (formal.IsGroup) return null;
         return MoveTable16.Refusal(new Table16Operand(literalCategory), Table16Operand.Of(formal)) is { } why
             ? $"a {literalCategory.ToString().ToLowerInvariant()} literal argument has no conforming MOVE into this "
               + $"formal parameter: {why} (ISO §14.8.2.3.3 rule 2d)"

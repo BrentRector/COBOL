@@ -651,10 +651,30 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   RECORD item (§13.18.15.3 SR2) crosses BY CONTENT and the function can no longer overwrite the structured
   constant; BY CONTENT for every other shape — a literal, an arithmetic or boolean expression (the boolean rides
   CALL's `ContentBool` channel), a function-identifier (§8.4.3.2.3 SR1), an object property or object data item.
-  A character-valued intrinsic function-identifier crosses on the string channel (`CallEmitter.ArgText`). A
-  figurative constant or ALL literal (a literal by §8.3.3.6.3 SR1) crossing BY CONTENT FILLS an elementary formal's character
-  image, as §14.8.2.3.3 rule 2d's MOVE does (§8.3.3.6.4 GR2 — `CallEmitter.FigurativeFillWidth` /
-  `RepeatToWidth`), for CALL and function arguments alike; it used to carry one occurrence (`"*   "`).
+  A character-valued intrinsic function-identifier crosses on the string channel (`CallEmitter.ArgText`).
+- **A figurative constant or ALL literal argument FILLS the formal's allocated record (kb/Work PB1418 + PB1617).**
+  It is a literal (§8.3.3.6.3 SR1), so it crosses BY CONTENT, and §14.2.3 GR9's second branch — a NESTED or
+  prototyped program, a method, a function — allocates "a data item with the same description and the same number
+  of bytes as the formal parameter, where the maximum length is used if the formal parameter is described as a
+  variable-occurrence data item" and MOVEs the argument into it; §8.3.3.6.4 GR2 repeats the figurative to that
+  record's character positions. ONE helper, `CallEmitter.FigurativeArgumentImage`, renders the value for all three
+  lanes (CALL and function through `ArgText`; INVOKE through `BoundInvokeArg.ContentFill`), at
+  `FigurativeFillWidth` = the formal's text-crossing window (`BoundaryImageWidth`): an elementary non-numeric
+  item's positions, an alphanumeric group's record image (an OCCURS DEPENDING group at its MAXIMUM, per GR9 — no
+  run-time extent is involved), a bit / national group's as-if positions (§14.8.2.1 NOTE), in the formal's own
+  category for HIGH-/LOW-VALUE. Where GR9 gives no fixed record — no formal known (the FIRST branch: "of the same
+  length as the argument"), a numeric formal (the COMPUTE reads the value), ANY LENGTH, DYNAMIC LENGTH — the
+  figurative keeps its §8.3.3.6.4 GR3 length (one character / one literal-1). A VARIABLE-LENGTH group formal
+  (§8.5.1.12) is not a fill case at all: §8.5.1.12.1 bars a move into it from anything but a compatible group, so
+  `ParameterConformance` refuses it at bind. It used to carry one occurrence into a group formal (`"*   "`), and
+  INVOKE refused every figurative but NULL as "not yet carried".
+- **A GROUP formal asks the WHOLE MOVE question (kb/Work PB1617).** §14.8.2.2 rule 2 makes a BY CONTENT argument's
+  conformance that of "a MOVE statement with the argument as the sending operand and the corresponding formal
+  parameter as the receiving operand", so a literal, ALL literal, figurative or numeric literal argument into a
+  group formal takes `MoveTable16.Validity` — §14.9.25.3 SR2 (a strongly-typed group accepts only its own type)
+  and SR9 (a variable-length group only a compatible group) included — never a blanket "conformant". Its
+  class-pointer / object-reference twin: such a formal takes §14.8.2.3.3's SET paragraph, so a literal or any
+  figurative but NULL is refused at bind (it used to pass Table 16 and die at the callee's managed slot).
   ⚠ The §14.8.2.3.3 rules were once PRIVATE to INVOKE, and
   the CALL lane therefore had no by-content screen at all while `CobolArgAdapt`'s converting views silently
   adapted whatever arrived; EXTRACTION, not a second copy, is what closed it. The DYNAMIC Format-1 lane still

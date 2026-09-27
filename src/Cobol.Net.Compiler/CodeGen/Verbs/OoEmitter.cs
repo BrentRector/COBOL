@@ -1144,6 +1144,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         ? RuntimeApi.StrStoreBoolean(bv, $"{bw}", a.Formal.Justified)
                     : ReceivingStore.Characters(a.Formal, bv, $"{bw}")) + ";");   // the ONE elementary character store (kb/Work PB871)
             }
+            // A figurative-constant / ALL-literal literal-2 (kb/Work PB1617): §14.2.3 GR9's MOVE into the method
+            // formal's allocated record, filled to that record's character positions (§8.3.3.6.4 GR2) by the ONE
+            // argument fill the CALL and function lanes use. A group formal is the case that makes it load-bearing:
+            // the image arm below would space-pad one occurrence.
+            else if (a.ContentFill is { } fill)
+                w.Line($"string {tmp} = {CallEmitter.FigurativeArgumentImage(fill, a.Formal, Ctx.Data)};");
             else if (OoVarGroupCarried(a.Formal))
             {
                 // §14.8.2.2's variable-length sentence at the INVOKE boundary (kb/Work PB204): the carrier is

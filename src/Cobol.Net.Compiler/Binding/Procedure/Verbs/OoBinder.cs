@@ -1000,6 +1000,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             : nonNumCtx is not null ? host.Expr.NonNumericLiteralOperand(nonNumCtx)
             : numLitRaw is not null ? new BoundNumericLiteral(numLitRaw)
             : null;
+        // Into a numeric formal §14.8.2.3.3 rule 2a's COMPUTE reads the figurative constant ZERO as the numeric value
+        // zero — §8.3.3.6.3 SR1 a) makes ZERO the one figurative a numeric literal's position admits, and §8.8.1.1 names
+        // it among a COMPUTE's operands — so it takes the numeric-literal lane (its verdict and its carrier split), and
+        // only a character-carried formal takes the fill below (kb/Work PB1617).
+        if (literal2 is BoundFigurative { Kind: 'Z' } && formal is { IsGroup: false, Pic.Category: PicCategory.Numeric })
+            literal2 = new BoundNumericLiteral("0");
         string literalText = constantName ?? nonNumCtx?.GetText() ?? numLitRaw ?? foldedAlnum ?? "";
         switch (literal2)
         {
@@ -1053,6 +1059,20 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // (NULL at a data-POINTER formal is §8.4.3.10's predefined address — kb/Work PB1427's arm.)
                 return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
                     { NullObject = true };
+            case BoundFigurative { Kind: not 'N' } or BoundAllLiteral:
+                // ⛔ A FIGURATIVE CONSTANT IS literal-2 TOO (kb/Work PB1617): §8.3.3.6.3 SR1 — "A figurative constant
+                // may be used whenever 'literal' appears in a format" — and this switch refused every one but NULL as
+                // "not yet carried". It takes the shared §14.8.2.3.3 verdict (rule 2a refuses any but ZERO into a
+                // numeric formal — ZERO arrived above as the numeric literal 0; rule 2d / §14.8.2.2 rule 2 ask the
+                // MOVE) and crosses on its own fill channel, which §14.2.3 GR9 sizes at the method's formal
+                // (CallEmitter.FigurativeArgumentImage).
+                if (host.Params.ContentConformanceReason(formal, LiteralArg(literal2)) is { } fErr)
+                {
+                    Err($"figurative-constant argument {literalText} for formal '{formal.CobolName}': {fErr}");
+                    return null;
+                }
+                return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
+                    { ContentFill = literal2 };
             case BoundOperandError { IsUnbuilt: false }:
                 return null;   // refused, and the rule it breaks reported where the operand was bound
         }

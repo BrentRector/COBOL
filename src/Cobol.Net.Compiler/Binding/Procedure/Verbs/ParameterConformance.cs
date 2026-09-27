@@ -99,7 +99,9 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                 + $"({(arg.Place is { } cp ? $"'{cp.Item.CobolName}'" : "the value operand")}) does not conform to "
                 + $"formal parameter '{formal.CobolName}' "
                 + $"{(arg.Mode is CobolPassMode.Value ? "BY VALUE" : "BY CONTENT")}: {cwhy} "
-                + $"(ISO §14.8.2.3.3 via {site.ImportingRule})");
+                // §14.8.2 as a whole, as the BY REFERENCE arm says it: the reason names its own subclause —
+                // §14.8.2.3.3 for an elementary formal, §14.8.2.2 rule 2 for a group one (kb/Work PB1617).
+                + $"(ISO §14.8.2 via {site.ImportingRule})");
     }
 
     /// <summary>ISO §14.8.2.3.3's conformance verdict for ONE bound BY CONTENT / BY VALUE argument, dispatched
@@ -121,6 +123,33 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, formal, p);
         return arg.Value switch
         {
+            // ⛔ A GROUP FORMAL ASKS THE WHOLE MOVE QUESTION (kb/Work PB1617). §14.8.2.1 sends every pair that is not
+            // elementary-to-elementary to §14.8.2.2, whose rule 2 makes a BY CONTENT argument's conformance "the same as
+            // for a MOVE statement with the argument as the sending operand and the corresponding formal parameter as
+            // the receiving operand" — and a MOVE into a group is more than Table 16: SR2 refuses anything but a
+            // same-type group into a strongly-typed one, and SR9 / §8.5.1.12.1 refuse any operand but a compatible
+            // group into a VARIABLE-LENGTH one ("may not undergo … a move operation … unless the other operand is a
+            // compatible group"). The literal arms below answered every group formal with "conformant", so a
+            // figurative constant reached a variable-length group formal and died at run time as
+            // EC-PROGRAM-ARG-MISMATCH (or crossed silently), and an integer literal — which MOVEs to an
+            // alphanumeric group — was refused. The literal is the sender exactly as the written MOVE binds it, so
+            // MoveTable16.Validity (kb/Work PB878: "the WHOLE question, never Table 16 alone") answers it.
+            // ⛔ A FORMAL OF CLASS POINTER OR OBJECT REFERENCE TAKES THE SET PARAGRAPH (kb/Work PB1617). §14.8.2.3.3: "If
+            // the formal parameter is of class pointer or an object reference described without the ACTIVE-CLASS
+            // phrase, the conformance rules shall be the same as if a SET statement were performed … with the argument
+            // as the sending operand", and no SET format sends a nonnumeric, numeric or ALL literal, or a figurative
+            // constant other than NULL, to such a receiver. The literal arms below asked Table 16 instead and admitted
+            // SPACE, which then reached the callee's managed slot as a string (run-time EC-PROGRAM-ARG-MISMATCH on the
+            // CALL lane, a backend CS1503 on the INVOKE lane once INVOKE carried figuratives). NULL is the one
+            // figurative such a SET admits, and it is left to the lanes that carry it.
+            BoundStringLiteral or BoundAllLiteral or BoundFigurative { Kind: not 'N' } or BoundNumericLiteral
+                when SlotWindow.CarriedBySlot(formal) =>
+                "§14.8.2.3.3 transfers a value into a formal parameter of class pointer or object reference by the SET "
+                + "rules, and a literal or a figurative constant other than NULL is not a sending operand of any SET format",
+            BoundStringLiteral or BoundAllLiteral or BoundFigurative or BoundNumericLiteral when formal.IsGroup =>
+                MoveTable16.Validity(arg.Value, Table16Operand.Of(formal), formal) is { } move
+                    ? $"§14.8.2.2 rule 2 transfers the argument into the group formal parameter by the MOVE rules: {move.Reason}"
+                    : null,
             // ⛔ RULE 2a FIRST: "If the formal parameter is numeric, the conformance rules are the same as for a
             // COMPUTE statement", and a COMPUTE's sending operands are numeric — §8.8.1.1 admits "a numeric literal,
             // the figurative constant ZERO" and no other literal. So a nonnumeric literal, an ALL literal or any

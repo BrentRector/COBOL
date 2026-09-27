@@ -1671,7 +1671,10 @@
   "pb1137-invoke-by-reference-page-counter",
   "pb1137-invoke-returning-page-counter",
   "pb1137-invoke-bit-unaligned",
-  "pb1137-invoke-zero-length-literal"
+  "pb1137-invoke-zero-length-literal",
+  "pb1617-call-content-figurative-varlength-group",
+  "pb1617-invoke-figurative-strong-group",
+  "pb1617-call-content-figurative-pointer-formal"
  ],
  "pending": []
 }
