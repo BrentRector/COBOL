@@ -357,7 +357,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // asked as ItemCategory.IsGroupItem — the CATEGORY question — never the structural IsGroup, which it
         // fails for want of subordinate entries (kb/Work PB907; the bind-side twin is
         // StatementValidation.CheckVariableLengthMove, and the two must ask the same predicate). It is never
-        // VARIABLE-LENGTH (§13.18.45.3 SR8), so it takes the FIXED-group arm of VarCarrierRead / VarCarrierWrite:
+        // VARIABLE-LENGTH (§13.18.45.3 SR8), so it takes the FIXED-group arm of PlaceRenderer.VarGroupCarrier / VarCarrierWrite:
         // its layout is its span (VariableLengthCompatibility.Layout), and its image is the composed RenamesPlace string (PlaceRenderer).
         Place? send = source switch
         {
@@ -370,31 +370,17 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             || !ItemCategory.IsGroupItem(send.Item) || !ItemCategory.IsGroupItem(target.Item)) return false;
         if (!VariableLengthCompatibility.IsVariableLength(send.Item)
             && !VariableLengthCompatibility.IsVariableLength(target.Item)) return false;
-        ctx.Writer.Line(VarCarrierRead(send, target.Item) is not { } carrier
+        ctx.Writer.Line(PlaceRenderer.VarGroupCarrier(send, target.Item, "the sending variable-length group",
+                "the sending group of a variable-length group MOVE") is not { } carrier
             ? LoudStmt(VarShapeReason(send.Item, "the sending operand of a variable-length group MOVE"))
             : VarCarrierWrite(target, send.Item, carrier) ?? LoudStmt(
                 VarShapeReason(target.Item, "the receiving operand of a variable-length group MOVE")));
         return true;
     }
 
-    /// <summary>The §8.5.1.12 component carrier of a §14.9.25.4 GR9 SENDING operand — the variable-length group's own
-    /// composer, or a fixed group's record image decomposed at the spans of ITS tables that correspond to
-    /// <paramref name="other"/>'s dynamic-capacity tables (<c>VariableLengthCompatibility.CorrespondingSpans</c>
-    /// — the PAIR's correspondence, §8.5.1.12.2; kb/Work PB965). Null when this implementation cannot compose
-    /// the group's current extent (the caller emits the named loud).</summary>
-    private static string? VarCarrierRead(Place g, DataItem other) =>
-        VariableLengthCompatibility.IsVariableLength(g.Item)
-            ? g.Item.CurrentExtentImageCapable
-                ? PlaceRenderer.VarGroupImage(g, "the sending variable-length group")
-                : null
-            : VariableLengthCompatibility.CorrespondingSpans(g.Item, other) is { } spans && g.ImageCapable
-                ? RuntimeApi.VarGroupFromFixedImage(
-                    PlaceRenderer.SendingGroupImage(g, "the sending group of a variable-length group MOVE"),
-                    SpanArray(spans))
-                : null;
-
-    /// <summary>The RECEIVING half of <see cref="VarCarrierRead"/> — the statement that distributes the carrier
-    /// back into the receiving group's members. Null when the shape cannot be distributed.</summary>
+    /// <summary>The RECEIVING half of <see cref="PlaceRenderer.VarGroupCarrier"/> (the ONE sending-side reader, shared
+    /// with the §8.8.4.2.17 comparison — kb/Work PB1467) — the statement that distributes the carrier back into the
+    /// receiving group's members. Null when the shape cannot be distributed.</summary>
     private static string? VarCarrierWrite(Place g, DataItem other, string carrier) =>
         VariableLengthCompatibility.IsVariableLength(g.Item)
             ? g.Item.CurrentExtentImageCapable
@@ -402,12 +388,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 : null
             : VariableLengthCompatibility.CorrespondingSpans(g.Item, other) is { } spans && g.ImageCapable
                 ? PlaceRenderer.WriteGroupImage(g,
-                    RuntimeApi.VarGroupToFixedImage(carrier, g.Item.ImageWidth, SpanArray(spans)),
+                    RuntimeApi.VarGroupToFixedImage(carrier, g.Item.ImageWidth, PlaceRenderer.SpanArray(spans)),
                     "the receiving group of a variable-length group MOVE")
                 : null;
-
-    /// <summary>The flat <c>(offset, width)</c> C# array literal <c>CobolVarGroup.FromFixedImage</c> takes.</summary>
-    private static string SpanArray(int[] spans) => $"new int[] {{ {string.Join(", ", spans)} }}";
 
     /// <summary>Why a GR9 operand's §8.5.1.12 components cannot be composed by THIS implementation — a named
     /// shape, never the generic Tier-C string, because the generic one blames "a dynamic-length /

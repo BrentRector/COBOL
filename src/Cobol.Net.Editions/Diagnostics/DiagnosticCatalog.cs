@@ -1867,6 +1867,42 @@ public static class DiagnosticCatalog
     // PB1627). A quoted literal-1 is one of the three by construction of the grammar; the one spelling that can be of
     // another class is a constant-name (§13.10.3 SR2 lets it stand for a literal of its OWN class), so `ALL K` with K
     // a numeric constant is refused by this rule rather than read as a symbolic-character.
+    // §8.5.1.12.1 over a RELATION (kb/Work PB1467): a variable-length group "may not undergo a comparison … unless the
+    // other operand is a compatible group". The MOVE twin is §14.9.25.3 SR9's COBOLNET1931; both ask the one
+    // VariableLengthCompatibility.PairRefusal. Before this an incompatible pair compiled clean and aborted the run
+    // unit on a whole-group image such a group does not have.
+    public static readonly DiagnosticDescriptor VariableLengthGroupComparison = new(
+        "COBOLNET2492", "variable-length-group-comparison", EditionSeverity.Error,
+        "A relation compares a variable-length group (a group with a dynamic-length elementary item or a "
+        + "dynamic-capacity table subordinate to it) with an operand that is not a compatible group. ISO §8.5.1.12.1: "
+        + "\"a variable-length group is not equivalent to an alphanumeric data item and may not undergo a comparison "
+        + "or a move operation, in either direction, explicitly or otherwise, unless the other operand is a compatible "
+        + "group.\" Compare it with a group whose dynamic-length items and dynamic-capacity tables correspond "
+        + "(§8.5.1.12.2) and match (§8.5.1.12.3), or compare its elementary items.", "ISO §8.5.1.12.1");
+    // §8.8.4.2.1's CLOSED "Comparisons are defined for the following:" list over the general relation (kb/Work
+    // PB1468), asked of the ONE table RelationComparability at the ONE relation checkpoint. Before it, a COMP /
+    // packed / float / non-integer / arithmetic-expression operand against an alphanumeric one compiled clean and ran
+    // as an undocumented character comparison, and an index-name against an alphanumeric operand compiled clean and
+    // aborted the run unit ("computed expression in a string context").
+    public static readonly DiagnosticDescriptor RelationNumericNotInteger = new(
+        "COBOLNET2532", "relation-numeric-not-integer", EditionSeverity.Error,
+        "A relation compares a numeric operand with an operand of class alphanumeric, alphabetic or national, and the "
+        + "numeric operand is not an integer literal or an integer numeric data item of usage display or national. "
+        + "ISO §8.8.4.2.1 defines that pair only as item 6, \"Two operands where one is a numeric integer and the other "
+        + "is class alphanumeric or national\", and §8.8.4.2.5: \"The numeric integer operand shall be an integer "
+        + "literal or an integer numeric data item of usage display or national.\" A non-integer, COMPUTATIONAL, "
+        + "packed-decimal or floating-point operand, an arithmetic expression, or a NUMERIC intrinsic function has no "
+        + "defined comparison with a character operand. MOVE the value to a data item of the character operand's class "
+        + "first, or compare it with a numeric operand. --permissive accepts it with a warning as the character "
+        + "comparison of the value's text.", "ISO §8.8.4.2.5");
+    public static readonly DiagnosticDescriptor RelationIndexPair = new(
+        "COBOLNET2533", "relation-index-pair", EditionSeverity.Error,
+        "A relation compares an index-name or an index data item with an operand ISO §8.8.4.2.13 does not pair it "
+        + "with. \"Relation tests may be made only between 1) two index-names … 2) an index-name and a numeric data "
+        + "item or numeric literal … 3) an index data item and an index-name or another index data item.\" An "
+        + "index-name compared with an alphanumeric operand or an arithmetic expression, and an index data item "
+        + "compared with a numeric literal, a numeric data item or a figurative constant, are none of these. SET a "
+        + "numeric data item from the index first and compare that.", "ISO §8.8.4.2.13");
     public static readonly DiagnosticDescriptor AllLiteralClass = new(
         "COBOLNET2491", "all-literal-class", EditionSeverity.Error,
         "The literal-1 of the figurative constant ALL literal-1 is a constant-name that stands for a numeric literal. "
@@ -2603,15 +2639,19 @@ public static class DiagnosticCatalog
         + "match a condition that cannot occur. The message names the module.",
         "ISO §4.2.7 / Annex A.4.1 / §14.6.13.1.1", DeclinedOptionalElement, PermissiveInert: true,
         Annex: DeclinedAnnex.A4);
-    public static readonly DiagnosticDescriptor StrongGroupOrderingSignedLeaf = new(
-        NotImplemented, "strong-group-ordering-signed-leaf", EditionSeverity.Error,
-        "An ORDERING relation (<, >, <=, >=) between strongly-typed groups containing a SIGNED numeric "
-        + "elementary item is legal (§8.8.4.2.3 SR4 restricts only boolean/message-tag/object/pointer contents) "
-        + "but not yet implemented: §8.8.4.2.12 orders strongly-typed groups ELEMENT BY ELEMENT — a signed "
-        + "numeric pair compares ALGEBRAICALLY (§8.8.4.2.4), which the whole-group character-image comparison "
-        + "cannot honor (the overpunch/separate sign breaks lexical=algebraic). Equality and every "
-        + "unsigned/alphanumeric-leaf ordering ARE carried by the image comparison (provably element-equivalent "
-        + "for a fixed same-type profile).", "ISO §8.8.4.2.12 / §8.8.4.2.4", RecognizedNotImplemented);
+    // ⛔ `StrongGroupOrderingSignedLeaf` ("strong-group-ordering-signed-leaf") LIVED HERE AND IS GONE (kb/Work
+    // PB1469). It staged an ordering over strongly-typed groups with a SIGNED numeric leaf because the relation was
+    // a whole-group image comparison; ISO §8.8.4.2.12 is now implemented element by element
+    // (`StrongGroupComparison`), so every leaf kind orders by its own rule and there is nothing left to stage.
+    // What remains unbuilt is a MEMBER SHAPE the element walk cannot reach, not a leaf kind:
+    public static readonly DiagnosticDescriptor StrongGroupComparisonMember = new(
+        NotImplemented, "strong-group-comparison-member", EditionSeverity.Error,
+        "A relation between strongly-typed group items reaches a member this implementation cannot yet compare "
+        + "element by element (ISO §8.8.4.2.12 — \"each elementary item of the first operand is compared with the "
+        + "corresponding elementary item of the second operand\"): a dynamic-capacity table (whose occurrences are "
+        + "a run-time count per operand), an OCCURS DEPENDING ON object that is itself inside a table, or a member "
+        + "in a REDEFINES storage tier the element walk has no access path to.", "ISO §8.8.4.2.12",
+        RecognizedNotImplemented);
 
     // ── Annex A.4.2 — ACCEPT and DISPLAY SCREEN HANDLING, the largest DECLINED optional module (kb/Work PB260).
     //

@@ -152,6 +152,11 @@ public sealed class DisplayUsageUnionDriftTests
             // rejected BY THE STANDARD.
             ["Binding/Procedure/Verbs/StringUnstringBinder.cs"] = (0, 1),
 
+            // PAIR — SPEC-REQUIRED, verbatim (kb/Work PB1468). §8.8.4.2.5: "The numeric integer operand shall be an
+            // integer literal or an integer numeric data item of usage display or national." A COMP/packed/float
+            // item against an alphanumeric operand is not §8.8.4.2.1 item 6's pair — refused COBOLNET2532.
+            ["Binding/RelationComparability.cs"] = (0, 1),
+
             // KEEPER — D-U6a's UNIVERSAL box bridge: OoUnivImageBridged asks whether the canonical box is the ZONED
             // display image over a NATIVE local, which is genuinely the DISPLAY-only question. Its twin for every
             // other byte form (native box over an IMAGE local) is OoUnivNativeBoxOverImage, which reads

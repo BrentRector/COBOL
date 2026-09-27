@@ -29,6 +29,10 @@ namespace CobolNet.Runtime;
 /// <param name="MaxUnits">Component k's maximum size in units (§8.5.1.10.1 / the table's maximum capacity).</param>
 public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] Unit, long[] MaxUnits)
 {
+    /// <summary>Each variable-length component's offset in the FIXED run, in the carrier's flattened order — where
+    /// <see cref="CobolVarGroup.Compare"/> interleaves the components with the fixed material (ISO §8.8.4.2.17).</summary>
+    public IReadOnlyList<int> ComponentOffsets => FixedAt;
+
     /// <summary>The EXTENT TABLE of a record of this type (D-FRA (v); kb/Work PB1053): each variable-length
     /// component's fixed-run offset and the length, in characters, of its content in <paramref name="current"/> —
     /// the carrier the record's own <c>AsVarImage()</c> composes, whose components are exactly the ones this layout

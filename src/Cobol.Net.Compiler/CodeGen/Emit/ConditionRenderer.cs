@@ -232,6 +232,13 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
             string core = $"CobolBool.Equal({BoolRead(r.Left)}, {BoolRead(r.Right)})";
             return r.Op == "==" ? core : $"!({core})";
         }
+        // ⛔ A VARIABLE-LENGTH GROUP HAS NO IMAGE TO COMPARE (kb/Work PB1467). The pair's comparison is asked of the
+        // ONE classifier the binder's screen asked (RelationPair — which also lowered every strongly-typed pair to
+        // its elementary relations before this node was built), and §8.8.4.2.17's compatible pair compares
+        // component by component. The screen refused every other operand opposite such a group (§8.5.1.12.1), so
+        // both operands here are groups.
+        if (RelationPair.Classify(r.Left, r.Right) is RelationPairShape.VariableLengthGroup)
+            return RenderVariableLengthGroupRelational(r);
         // A figurative operand (a single-character constant OR an ALL "literal") is materialized against the OTHER
         // operand's width (ISO §8.3.3.6.4 GR2), so it routes through the width-aware figurative path.
         if (r.Left is BoundFigurative or BoundAllLiteral || r.Right is BoundFigurative or BoundAllLiteral)
@@ -260,6 +267,31 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         if (BlankWhenZeroSenderTest(r, out string bwzBlanked))
             return $"({bwzBlanked} ? {RenderNumericRelational(r)} : {RenderRelationalCore(r, cmp, leftCat, rightCat)})";
         return RenderRelationalCore(r, cmp, leftCat, rightCat);
+    }
+
+    /// <summary>ISO §8.8.4.2.17 — "A comparison of two compatible groups, one or both of which is a variable-length
+    /// group, proceeds from left to right as described under 8.8.4.2.7, Comparison of alphanumeric operands",
+    /// with corresponding tables compared by §14.6.9.3 and dynamic-length items at their current length. Both
+    /// operands decompose into the ONE §8.5.1.12 carrier (<see cref="PlaceRenderer.VarGroupCarrier"/> — the MOVE's
+    /// GR9 reader), and <c>CobolVarGroup.Compare</c> walks them against the variable-length side's component
+    /// offsets, under the alphanumeric program collating sequence §8.8.4.2.7 names.</summary>
+    private string RenderVariableLengthGroupRelational(BoundRelational r)
+    {
+        if (r.Left is not BoundFieldOperand { Place: var lp } || r.Right is not BoundFieldOperand { Place: var rp })
+            return EmitText.LoudValue("bool", "a variable-length group compared with an operand that is not a group");
+        Place variable = VariableLengthCompatibility.IsVariableLength(lp.Item) ? lp : rp;
+        string? left = PlaceRenderer.VarGroupCarrier(lp, rp.Item, "a compared variable-length group",
+                          "a fixed-length group compared with a variable-length group"),
+                right = PlaceRenderer.VarGroupCarrier(rp, lp.Item, "a compared variable-length group",
+                          "a fixed-length group compared with a variable-length group");
+        if (left is null || right is null)
+            return EmitText.LoudValue("bool", TierCIsland.Reason((left is null ? lp : rp).Item,
+                "the §8.8.4.2.17 comparison of"));
+        // The sequence is the PAIR's, from the ONE pair reader (kb/Work PB649/PB741) — for two groups, the
+        // alphanumeric program collating sequence §8.8.4.2.7 names.
+        var (leftCat, rightCat) = RelationCategories(r.Left, r.Right);
+        string collate = ctx.CollateArgFor(leftCat, rightCat);
+        return $"{RuntimeApi.VarGroupCompare(left, right, PlaceRenderer.VarGroupComponentOffsets(variable), collate)} {r.Op} 0";
     }
 
     /// <summary>GR3's content test for whichever operand is the subject of a BLANK WHEN ZERO entry and has a

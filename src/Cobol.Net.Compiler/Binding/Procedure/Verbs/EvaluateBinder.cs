@@ -564,9 +564,17 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             // ⛔ AN IN PHRASE ROUTES HERE WHETHER OR NOT CHECKING IS ON: a relation pair derives its sequence from
             // its operands' categories, which is the very rule the phrase overrides, so the named sequence has
             // nowhere to ride on that lowering. The unchecked render of this node is that same inclusive pair.
-            if (alphabet is not null || ecApplies)
+            // ⛔ …BUT ONLY FOR A PAIR THAT COMPARES AS ONE ITEM EACH (kb/Work PB1469 / PB1467 sibling arm). The node
+            // compares character IMAGES, which is §8.8.4.2.7 for a Flat pair and wrong for the other two shapes: a
+            // strongly-typed range orders element by element (§8.8.4.2.12 — `EVALUATE A WHEN LO THRU HI` over float
+            // leaves answered OUT for -10 <= -5 <= 3 the moment EC-RANGE-INVALID checking routed it here), and a
+            // variable-length group has no image at all (§8.8.4.2.17). Those take the inclusive relation pair, which
+            // is §14.9.13.4 GR4 a) 5.'s own lowering and passes through the ONE relation checkpoint.
+            bool flatRange = RelationPair.Classify(left, lo) is RelationPairShape.Flat
+                && RelationPair.Classify(left, hi) is RelationPairShape.Flat;
+            if (flatRange && (alphabet is not null || ecApplies))
                 return host.Udf.UdfAttachPerEvaluation(
-                    new BoundRangeMembership(left, lo, hi, CheckInvalid: ecApplies, Alphabet: alphabet),
+                    host.Cond.CheckedRangeMembership(left, lo, hi, checkInvalid: ecApplies, alphabet),
                     objMark);
             return host.Udf.UdfAttachPerEvaluation(new BoundLogical("&&",
                 [host.Cond.CheckedRelational(left, ">=", lo), host.Cond.CheckedRelational(left, "<=", hi)]),
@@ -771,9 +779,13 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // the intermediate GR3's evaluation never happens. And at one use in a LATER arm the render sits in an
         // `else if` an earlier arm can skip, which is not "the beginning of the execution of the EVALUATE
         // statement". Materializing gives it the one PRE-op store §14.9.13.4 GR3 requires, at the head.
-        return slot.NeedsIntermediate && host.SendingValue.Materialize(value, "evaluate") is { } frozen
-            ? new BoundFieldOperand(frozen)
-            : value;
+        if (!slot.NeedsIntermediate || host.SendingValue.Materialize(value, "evaluate") is not { } frozen) return value;
+        // The intermediate is the implementor's device; every §8.8.4.2 operand rule is about the operand WRITTEN,
+        // so the relation checkpoint is told which one this stands for (kb/Work PB1468 — an index-name subject's
+        // intermediate is a numeric item, and `EVALUATE I1 WHEN I2 WHEN IDA` was refused as numeric-vs-index).
+        var intermediate = new BoundFieldOperand(frozen);
+        host.Cond.RecordIntermediate(intermediate, value);
+        return intermediate;
     }
 
     /// <summary>How the statement's WHEN phrases USE selection subject <c>index</c> — the two facts that

@@ -307,6 +307,48 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     private static string Slice(string s, int at, int length) =>
         at >= s.Length || length <= 0 ? "" : s.Substring(at, Math.Min(length, s.Length - at));
 
+    /// <summary>⛔ ISO §8.8.4.2.17 — THE COMPARISON OF TWO COMPATIBLE GROUPS, ONE OR BOTH OF WHICH IS A
+    /// VARIABLE-LENGTH GROUP (kb/Work PB1467): it "proceeds from left to right as described under 8.8.4.2.7,
+    /// Comparison of alphanumeric operands except that — when corresponding tables are encountered, they are
+    /// compared as described in 14.6.9.3, Comparing two tables — when corresponding dynamic-length elementary items
+    /// are encountered, the length is determined as described in 8.5.1.10.4 … After comparison of corresponding
+    /// tables or dynamic-length elementary items, comparison continues with the next data item in each of the
+    /// compatible groups."
+    /// <para>The two carriers already lay their operands out in that order: <see cref="Fixed"/> is each group's
+    /// material with every variable-length component collapsed (the §8.5.1.12.3 accounting under which compatible
+    /// groups have the same relative positions), and component k sits at <paramref name="fixedAt"/>[k] of it. So
+    /// the walk compares each stretch of fixed material, then each pair of components, in order, and stops at the
+    /// first inequality. Every step is one §8.8.4.2.7 comparison — the shorter side extended with spaces — which is
+    /// exactly both "except" clauses: a dynamic-length item compares at its current length (§8.5.1.10.4 — "treated
+    /// as a fixed-length data item whose length is the dynamic-length elementary item's current length"), and two
+    /// tables of equal element width (§8.5.1.12.3's matching) compared element by element "until … the last element
+    /// of the table with the smallest current capacity has been compared", after which "each successive remaining
+    /// element of the larger table [is compared] with spaces" (§14.6.9.3), is the same as their concatenated
+    /// occurrences compared with space padding. A component a side does not carry (a dynamic-capacity table beyond
+    /// a shorter fixed group's end, §8.5.1.12.2) is the empty string — compared with spaces, the space-filled table
+    /// that sentence substitutes.</para>
+    /// <para><paramref name="collation"/> is the alphanumeric program collating sequence when it is not native
+    /// (§8.8.4.2.7), null otherwise.</para></summary>
+    /// <returns>&lt;0, 0 or &gt;0 as <paramref name="a"/> is less than, equal to or greater than <paramref name="b"/>.</returns>
+    public static int Compare(CobolVarGroup a, CobolVarGroup b, IReadOnlyList<int> fixedAt, CobolCollation? collation = null)
+    {
+        int pos = 0;
+        for (int k = 0; k < fixedAt.Count; k++)
+        {
+            int at = fixedAt[k];
+            int c = CompareRun(Slice(a.Fixed, pos, at - pos), Slice(b.Fixed, pos, at - pos), collation);
+            if (c != 0) return c;
+            c = CompareRun(a.Dyn(k), b.Dyn(k), collation);
+            if (c != 0) return c;
+            pos = at;
+        }
+        int rest = Math.Max(a.Fixed.Length, b.Fixed.Length) - pos;
+        return CompareRun(Slice(a.Fixed, pos, rest), Slice(b.Fixed, pos, rest), collation);
+    }
+
+    private static int CompareRun(string a, string b, CobolCollation? collation) =>
+        collation is null ? CobolString.Compare(a, b) : CobolString.Compare(a, b, collation);
+
     /// <summary>Split a dynamic-capacity table's carried content into its occurrences at
     /// <paramref name="elementWidth"/> character positions each — the read half of the concatenation the
     /// composer emits. A trailing partial occurrence is padded, so a sender whose capacity ended mid-element

@@ -247,6 +247,27 @@ internal static class VariableLengthCompatibility
             ? CobolNet.Runtime.CobolVarGroup.CorrespondingSpans(f, v)
             : null;
 
+    /// <summary>⛔ ISO §8.5.1.12.1's PROHIBITION OVER AN OPERAND PAIR, for every operation it names — "a
+    /// variable-length group is not equivalent to an alphanumeric data item and may not undergo a comparison or a
+    /// move operation, in either direction, explicitly or otherwise, unless the other operand is a compatible
+    /// group". Null when neither operand is a variable-length group or the pair is compatible; else the reason.
+    /// A null operand means "not a plain data item" — a literal, a figurative constant, a function result, or a
+    /// reference-modified operand (§8.4.3.3.4 GR6 makes it an ELEMENTARY alphanumeric item) — which is a violation,
+    /// not a fall-through, because the rule is stated in terms of the OTHER operand. The MOVE (§14.9.25.3 SR9, via
+    /// <c>MoveTable16</c>) and the relation condition (<c>StatementValidation.CheckRelationalOperands</c>, kb/Work
+    /// PB1467) both ask it, so the two operations cannot read the one sentence differently.</summary>
+    /// <param name="aRole">/<paramref name="bRole"/> name each operand in the reason ("sending", "receiving",
+    /// "first", …); <paramref name="operation"/> completes "a variable-length group …" for this operation.</param>
+    public static string? PairRefusal(DataItem? a, DataItem? b, string aRole, string bRole, string operation)
+    {
+        bool engaged = (a is not null && IsVariableLength(a)) || (b is not null && IsVariableLength(b));
+        return !engaged ? null
+            : a is null || b is null
+                ? $"the {(b is null ? bRole : aRole)} operand is not a group item: a variable-length group "
+                  + $"{operation} (ISO §8.5.1.12.1)"
+                : Mismatch(a, b);
+    }
+
     /// <summary>Null when <paramref name="one"/> and <paramref name="other"/> are COMPATIBLE per §8.5.1.12,
     /// else the reason, worded for a diagnostic. Two FIXED-length groups are compatible outright (§8.5.1.12.1:
     /// "Two fixed-length groups are always compatible, unless they are strongly typed and have different type

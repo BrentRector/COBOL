@@ -358,16 +358,9 @@ public static class MoveTable16
     /// <para>No edition gate is needed and none is written: a variable-length group can only be DECLARED from
     /// COBOL-2014 (the DYNAMIC LENGTH clause §13.18.19 and OCCURS Format 4 §13.18.38), so the rule is
     /// unreachable below 2014 by construction rather than by a predicate that could drift.</para></summary>
-    private static string? VariableLengthRefusal(DataItem? sender, DataItem? receiver)
-    {
-        bool engaged = (receiver is not null && VariableLengthCompatibility.IsVariableLength(receiver))
-                    || (sender is not null && VariableLengthCompatibility.IsVariableLength(sender));
-        return !engaged ? null
-            : sender is null || receiver is null
-                ? $"the {(receiver is null ? "receiving" : "sending")} operand is not a group item: a "
-                  + "variable-length group may move only to or from a compatible GROUP (ISO §8.5.1.12.1)"
-                : VariableLengthCompatibility.Mismatch(sender, receiver);
-    }
+    private static string? VariableLengthRefusal(DataItem? sender, DataItem? receiver) =>
+        VariableLengthCompatibility.PairRefusal(sender, receiver, "sending", "receiving",
+            "may move only to or from a compatible GROUP");
 
     /// <summary>
     /// ⭐ <b>THE WHOLE OF ISO §14.9.25.3's VALIDITY QUESTION FOR A DATA-ITEM SENDER AND A DATA-ITEM RECEIVER</b>,

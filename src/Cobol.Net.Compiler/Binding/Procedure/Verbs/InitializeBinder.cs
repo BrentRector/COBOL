@@ -203,7 +203,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             var tblPath = ReferenceResolver.BuildTablePath(dtbl)!;
             // identifier-1 carries no subscript on this arm (the guard above), so the ONE dimension the expansion
             // enters is the whole occurrence key a Format-2 VALUE on the element is looked up by.
-            ExpandInitialize(new InitializeDynCursor(tblPath.Add(new DynTableSegment(v)), dtbl),
+            ExpandInitialize(new DynElementCursor(tblPath.Add(new DynTableSegment(v)), dtbl),
                 spec, body, dtbl, [new OccurrenceDim(v, null)], identifier1: true);
             if (body.Count > 0 && DynCapacity(dtbl, tblPath) is { } cap) actions.Add(new InitializeLoop(v, cap, body));
             else if (body.Count > 0) actions.Add(new InitializeErrorAction(
@@ -269,23 +269,14 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
                 actions.Add(Store(place, regSrc));
             return;
         }
-        // ⛔ THE SWITCH IS OVER THE STORAGE FORM, SO IT ASKS THE UNDECORATED PLACE (kb/Work PB393). identifier-1
-        // is a RECEIVING operand (§14.9.20.3 SR7), and none of the decorations change where its members live:
-        // an OdoGroupPlace answers §13.18.38.4 GR8 about the group's EXTENT — which GR8b already fixes at the
-        // maximum for a receiving operand, and which the child walk below applies per-table for GR8a — and a
-        // bit/national group's image view is a §14.9.20.4 GR1 non-question ("identifier-1 is processed as a
-        // group item"). Switching on the decorated place sent every one of them to the default arm, which
-        // emitted a loud that aborted the run unit on plain COBOL-85 source.
-        InitializeCursor? cursor = place.Undecorated switch
-        {
-            MemberPlace mp => new InitializeMemberCursor(mp.Path, mp.MemberItem),
-            // The cell path rides along so a pointer-class receiver inside the class reaches the area's managed
-            // slots (kb/Work PB231) — ALLOCATE … INITIALIZED lowers to exactly this expansion (§14.9.3.4 GR7).
-            RedefViewPlace rv => new InitializeViewCursor(rv.Backing, rv.OffsetExpr, rv.ViewItem.ClassOffset, rv.ViewItem, "",
-                Cell: ReferenceResolver.BuildCellPath(rv.ViewItem.Class)),
-            DynTablePlace dp => new InitializeDynCursor(dp.Path, dp.Item),
-            _ => null,
-        };
+        // ⛔ THE CURSOR IS BUILT OVER THE UNDECORATED PLACE (kb/Work PB393; PlaceCursor.Over). identifier-1 is a
+        // RECEIVING operand (§14.9.20.3 SR7), and none of the decorations change where its members live: an
+        // OdoGroupPlace answers §13.18.38.4 GR8 about the group's EXTENT — which GR8b already fixes at the maximum
+        // for a receiving operand, and which the child walk below applies per-table for GR8a — and a bit/national
+        // group's image view is a §14.9.20.4 GR1 non-question ("identifier-1 is processed as a group item"). The
+        // cell path rides along so a pointer-class receiver inside a class reaches the area's managed slots
+        // (kb/Work PB231) — ALLOCATE … INITIALIZED lowers to exactly this expansion (§14.9.3.4 GR7).
+        PlaceCursor? cursor = PlaceCursor.Over(place);
         if (cursor is null)
         {
             actions.Add(new InitializeErrorAction($"INITIALIZE target '{DataBinder.WrittenText(dref)}' (unsupported place kind)"));
@@ -372,7 +363,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     /// whose entry has REDEFINES, and with it its whole subtree (level-66 entries are not storage children,
     /// §13.18.45); GR5a1 — items that are not valid MOVE receivers (an index data item, §14.9.25.3 SR). A child
     /// with an OCCURS clause expands one loop per dimension (GR5b2 — every occurrence).</summary>
-    private void ExpandInitialize(InitializeCursor cur, in InitializeSpec spec, List<InitializeAction> actions,
+    private void ExpandInitialize(PlaceCursor cur, in InitializeSpec spec, List<InitializeAction> actions,
         DataItem? identifier1Item, IReadOnlyList<OccurrenceDim> key, bool identifier1 = false)
     {
         DataItem item = cur.Item;
@@ -417,7 +408,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
                 var dbody = new List<InitializeAction>();
                 if (childCur.StoragePath is { } dtp)
                 {
-                    ExpandInitialize(new InitializeDynCursor(dtp.Add(new DynTableSegment(dv)), child),
+                    ExpandInitialize(new DynElementCursor(dtp.Add(new DynTableSegment(dv)), child),
                         spec, dbody, identifier1Item, [.. key, new OccurrenceDim(dv, null)]);
                     if (dbody.Count > 0 && TableCount(child, identifier1Item, dtp) is { } dcount)
                         actions.Add(new InitializeLoop(dv, dcount, dbody));
@@ -553,7 +544,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     private InitializeStore Store(Place target, BoundOperand source) =>
         new(host.Move.BindMoveOf(source, [target], ImplicitMovePhrase.Initialize));
 
-    private InitializeAction? ElementaryAction(InitializeCursor cur, DataItem item, InitializeCategory cat,
+    private InitializeAction? ElementaryAction(PlaceCursor cur, DataItem item, InitializeCategory cat,
         in InitializeSpec spec, string? effectiveValue)
     {
         var q = Qualify(cat, effectiveValue, spec);
@@ -623,7 +614,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     /// nothing can answer — a storage form that carries no access path — and it is staged LOUD rather than
     /// resolved to an arbitrary literal, because §14.9.20.4 GR6a3 names ONE literal per occurrence and a lane
     /// that cannot identify the occurrence has no honest answer.</para></summary>
-    private void ExpandTableValue(InitializeCursor cur, DataItem item, InitializeCategory cat,
+    private void ExpandTableValue(PlaceCursor cur, DataItem item, InitializeCategory cat,
         in InitializeSpec spec, List<InitializeAction> actions, IReadOnlyList<OccurrenceDim> key, TableValuePlan plan)
     {
         // The plan is keyed by the subject's FULL OCCURS chain in §13.18.63.3 SR20's order, so the key the walk
@@ -882,111 +873,5 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             return new BoundStringLiteral(CobolLiteral.Decode(t)) { Category = PicCategory.Boolean };
         if (CobolLiteral.IsStringLiteral(t)) return new BoundStringLiteral(CobolLiteral.Decode(t));
         return new BoundNumericLiteral(t);
-    }
-
-    // ── Receiver cursors: extend the RESOLVED identifier-1 place member-by-member ────────────────────────────
-
-    /// <summary>A bind-time lvalue cursor over the receiving subtree: it extends the already-resolved identifier-1
-    /// <see cref="Place"/> (so a qualified / subscripted identifier-1 expands from its built access path — no
-    /// re-resolution), materializing each elementary receiver as a typed place. <see cref="Child"/> returns null
-    /// for a storage form not yet wired (the caller fails loud).</summary>
-    private abstract record InitializeCursor(DataItem Item)
-    {
-        public abstract InitializeCursor? Child(DataItem child);
-        public abstract InitializeCursor Indexed(string indexVar);
-        public abstract Place ToPlace();
-
-        /// <summary>The cursor's STRUCTURAL access path, or null for a storage form that has none — the Tier-B
-        /// window cursor, whose receivers are character windows over one string backing. It is what a
-        /// dynamic-capacity child needs (kb/Work PB393): its CAPACITY register and its per-occurrence element
-        /// path are both built from the table's own path, and taking it from the cursor rather than from
-        /// <c>ReferenceResolver.BuildTablePath</c> is what keeps a SUBSCRIPTED or qualified identifier-1's
-        /// indices on the path.</summary>
-        public virtual AccessPath? StoragePath => null;
-    }
-
-    /// <summary>A plain member-access cursor, mirroring <c>ReferenceResolver.AccessPath</c>: <c>CsName</c> segments
-    /// chained with <c>.</c>, each OCCURS level routed through the ref-returning <c>CobolTable.At</c> (benign
-    /// subscripting, ISO §8.4.2.3.4 GR2). Entering a Tier-B (string-canonical) REDEFINES class — whose ONE stored
-    /// string backing lives in the containing struct (COBOLNET_DESIGN §4.2) — switches to a
-    /// <see cref="InitializeViewCursor"/>; an unwired Tier-C / Rejected class yields null (loud).</summary>
-    private sealed record InitializeMemberCursor(AccessPath Path, DataItem Item) : InitializeCursor(Item)
-    {
-        public override InitializeCursor? Child(DataItem child)
-        {
-            if (child.Class is { } cls)
-            {
-                if (cls.Tier == RedefinesTier.StringCanonical && child.IsCanonical)
-                    return new InitializeViewCursor(Path.Add(new MemberSegment(cls.BackingCsName)),
-                        child.ClassOffset.ToString(), child.ClassOffset, child, "",
-                        Cell: ReferenceResolver.BuildCellPath(cls));
-                if (cls.Tier != RedefinesTier.Alias || !child.IsCanonical) return null;
-            }
-            return new InitializeMemberCursor(Path.Add(new MemberSegment(child.CsName)), child);
-        }
-
-        public override InitializeCursor Indexed(string indexVar) =>
-            this with { Path = Path.Add(new FixedTableSegment(indexVar)) };
-
-        public override Place ToPlace() => new MemberPlace(Path, Item);
-
-        public override AccessPath? StoragePath => Path;
-    }
-
-    /// <summary>A cursor at one occurrence of an OCCURS DYNAMIC table (data-model D9): entered at the element level
-    /// with the two direction-specific accessor paths already applied (<c>{tbl}.RefSending(v)</c> /
-    /// <c>{tbl}.RefReceiving(v)</c> for the loop variable <c>v</c>). Children append their <c>.CsName</c> to both;
-    /// a nested FIXED OCCURS below the element wraps both in <c>CobolTable.At</c>. Yields a <see cref="DynTablePlace"/>
-    /// so an INITIALIZE store writes through <c>RefReceiving</c> (within the 1‥Capacity bound, so no growth). A
-    /// REDEFINES view under the element is not wired here (null → loud; inc-5 territory).</summary>
-    private sealed record InitializeDynCursor(AccessPath Path, DataItem Item) : InitializeCursor(Item)
-    {
-        public override InitializeCursor? Child(DataItem child) =>
-            child.Class is null
-                ? new InitializeDynCursor(Path.Add(new MemberSegment(child.CsName)), child)
-                : null;
-
-        public override InitializeCursor Indexed(string indexVar) =>
-            this with { Path = Path.Add(new FixedTableSegment(indexVar)) };
-
-        public override Place ToPlace() => new DynTablePlace(Path, Item);
-
-        public override AccessPath? StoragePath => Path;
-    }
-
-    /// <summary>A cursor inside a Tier-B REDEFINES class: every receiver is a (offset, width) character window over
-    /// the class's ONE string backing. The window offset = the entry place's offset expression + (this item's
-    /// in-class offset − the entry item's) + Σ (indexVar − 1) × per-occurrence width for each OCCURS level crossed
-    /// (ISO §13.18.44 — a redefined table lays its occurrences end-to-end in the one backing; the same arithmetic
-    /// as <c>ReferenceResolver.PlaceForItem</c>).</summary>
-    /// <param name="Cell">The class's backing <c>StorageCell</c> path, for the three cell-backed surfaces — what a
-    /// pointer-class receiver's managed slot addresses (kb/Work PB231; <see cref="SlotWindow"/>). Null for a plain
-    /// REDEFINES class, which cannot hold such a member.</param>
-    private sealed record InitializeViewCursor(
-        AccessPath Backing, string BaseExpr, int BaseOffset, DataItem Item, string OccursTerms,
-        string OccursBitTerms = "", AccessPath? Cell = null) : InitializeCursor(Item)
-    {
-        public override InitializeCursor? Child(DataItem child) =>
-            ReferenceEquals(child.Class, Item.Class) ? this with { Item = child } : null;
-
-        // The byte stride and its BIT twin, accumulated together so a USAGE BIT receiver's occurrences are
-        // displaced by §8.5.1.6.3's "next bit position" rather than by its byte ceiling (kb/Work PB203).
-        public override InitializeCursor Indexed(string indexVar) => this with
-        {
-            OccursTerms = $"{OccursTerms} + ({indexVar} - 1) * {Item.ImageWidth}",
-            OccursBitTerms = $"{OccursBitTerms} + ({indexVar} - 1) * {BitLayout.StrideBits(Item)}",   // §13.18.1.4 GR2
-        };
-
-        public override Place ToPlace()
-        {
-            int delta = Item.ClassOffset - BaseOffset;
-            // ⛔ THROUGH THE ONE WINDOW BUILDER (kb/Work PB203). `BaseExpr - BaseOffset` is the entry place's
-            // RUNTIME displacement with its static in-class offset removed — exactly what the builder needs,
-            // because a bit member's own position is already carried in BITS by DataItem.ClassBitOffset and
-            // re-deriving it from a byte expression would round a sub-byte member down to its containing byte.
-            return RedefViewPlace.For(Backing, Item,
-                $"{BaseExpr}{(delta != 0 ? $" + {delta}" : "")}{OccursTerms}",
-                BaseExpr == BaseOffset.ToString() ? null : $"{BaseExpr} - {BaseOffset}", OccursBitTerms, Cell);
-        }
     }
 }

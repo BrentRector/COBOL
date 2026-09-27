@@ -76,7 +76,9 @@
                " CTL=" FUNCTION BYTE-LENGTH(C-SHORT)
                " " FUNCTION BYTE-LENGTH(C-GROUP)
            DISPLAY "V=" A-SHORT " " A-LONG " " C-SHORT
-           IF A-INDEX = 3
+      *> Compared with the INDEX-NAME it was set from: ISO 8.8.4.2.13 row 3 pairs an index data item only
+      *> with "an index-name or another index data item" - `A-INDEX = 3` is outside that list (kb/Work PB1468).
+           IF A-INDEX = T-X
                DISPLAY "IDX=OK"
            ELSE
                DISPLAY "IDX=BAD"

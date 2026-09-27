@@ -904,6 +904,26 @@ of an unsupported facility.
   Only PERFORM and RESUME claim an exemption. Pinned by `unit:DeclarativesStructuralRulesTests`,
   `conformance:85/pb362_declaratives_reference_boundary` and `conformance:negative/pb362-goto-into-declarative`.
 
+- **D-RELCLASS — a relation outside §8.8.4.2.1's "Comparisons are defined for the following:" list is refused
+  (kb/Work PB1468).** The list is closed, and two of its limits are class/usage/form facts of the source, so §4.2.2
+  ("This warning mechanism shall indicate violations of such rules") reaches them; the severity is ours. **§8.8.4.2.5**
+  ("The numeric integer operand shall be an integer literal or an integer numeric data item of usage display or
+  national"): a non-integer, COMPUTATIONAL, packed-decimal or floating-point item, a non-integer literal, an arithmetic
+  expression or a NUMERIC intrinsic function against an operand of class alphanumeric, alphabetic or national is an
+  **ERROR, COBOLNET2532**, and `--permissive` keeps it as a warning evaluated as the character comparison of the
+  value's text — the DA6 disposition every §8.8.1.1 / §15.3 class screen follows. An **INTEGER** intrinsic function
+  (§15.2 item 5) is admitted as the integer operand: §8.8.4.2.5 routes the comparison "according to the rules of the
+  MOVE statement", and the A.1 item 92 determination (§7) already makes such a function the Table-16 Integer row that moves to an
+  alphanumeric receiver in its literal text form, so the relation and the MOVE agree. **§8.8.4.2.13** ("Relation tests
+  may be made only between" two index-names; an index-name and a numeric data item or numeric literal; an index data
+  item and an index-name or another index data item) is an **unconditional ERROR, COBOLNET2533** — the pairs outside
+  it have no comparison to keep under `--permissive` (an index-name against an alphanumeric operand aborted the run
+  unit). The figurative ZERO opposite an index-name is row 2's numeric literal (§8.3.3.6.4 GR4, "the numeric value
+  '0'"); an arithmetic expression or a function opposite an index-name is not "a numeric data item or numeric
+  literal" and is refused. Implemented in `RelationComparability` at the one relation checkpoint; pinned by
+  `conformance:RelationComparabilityTests`, `conformance:85/pb1468_relation_defined_pairs`,
+  `conformance:negative/pb1468-relation-numeric-not-integer` and `conformance:negative/pb1468-relation-index-pair`.
+
 ## 4. Documented non-support facilities (§4.2.6 / §4.2.7 / §4.2.13)
 
 The following whole facilities are **not implemented**, and every element of each is **recognized and refused or

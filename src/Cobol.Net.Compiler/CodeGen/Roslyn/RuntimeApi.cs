@@ -1511,6 +1511,16 @@ internal static class RuntimeApi
     public static string VarGroupFromFixedImage(string image, string spans) =>
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.FromFixedImage)}({image}, {spans})";
 
+    /// <summary>The ISO §8.8.4.2.17 comparison of two compatible groups' carriers — <c>CobolVarGroup.Compare</c>,
+    /// &lt;0 / 0 / &gt;0; <paramref name="collateArg"/> is the <c>, __COLLATE</c> suffix or empty (kb/Work PB1467).</summary>
+    public static string VarGroupCompare(string left, string right, string componentOffsets, string collateArg) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Compare)}({left}, {right}, {componentOffsets}{collateArg})";
+
+    /// <summary>A variable-length record type's component offsets in its fixed run —
+    /// <c>{group}.__Contiguous.ComponentOffsets</c>.</summary>
+    public static string VarGroupComponentOffsets(string groupRead) =>
+        $"{groupRead}.{ContiguousLayoutProperty}.{nameof(CobolContiguousLayout.ComponentOffsets)}";
+
     /// <summary>The inverse of <see cref="VarGroupFromFixedImage"/> — rebuild the fixed group's record image.</summary>
     public static string VarGroupToFixedImage(string carrier, int totalWidth, string spans) =>
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.ToFixedImage)}({carrier}, {totalWidth}, {spans})";

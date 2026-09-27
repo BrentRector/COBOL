@@ -1414,8 +1414,7 @@ internal sealed class StatementValidation(DataBinder data)
     /// diagnostics): class-boolean comparability (§8.8.4.2.2 Format 2 — boolean operands compare only with a
     /// boolean or the figurative ZERO, equality only — COBOLNET0844), and the strongly-typed-group rules
     /// (§8.8.4.2.3 SR1: same type both sides — COBOLNET1533; SR4: a strong group with a boolean/object/pointer
-    /// leaf is equality-only — COBOLNET1535 <c>strong-compare-ordering</c>; plus the §8.8.4.2.12 signed-leaf
-    /// ordering stage — COBOLNET0899 <c>strong-group-ordering-signed-leaf</c>, P10 Step 16), and the
+    /// leaf is equality-only — COBOLNET1535 <c>strong-compare-ordering</c>), and the
     /// §8.8.4.2.2 FORMAT 3 band (<see cref="CheckFormat3Relation"/>) — "a relation condition involving operands
     /// of class message-tag, object, or pointer is a message-tag-object-or-pointer-reference relation
     /// condition" (§8.8.4.2.1), whose general format admits ONLY <c>IS [NOT] EQUAL TO</c> / <c>=</c> /
@@ -1425,8 +1424,8 @@ internal sealed class StatementValidation(DataBinder data)
     /// PB399 — one caller of this checkpoint, not the checkpoint — so it screened `IF P &gt;= Q` and said
     /// nothing about the SAME pair under EVALUATE, SEARCH WHEN, PERFORM UNTIL or an abbreviated relation.
     /// Measured: `EVALUATE WS-P WHEN WS-Q THRU WS-R` compiled clean and ordered raw addresses, and
-    /// `EVALUATE WS-P WHEN WS-X` reached the BACKEND and failed as a raw C# CS1503. §14.9.13.4 GR2 makes an
-    /// EVALUATE pair a comparison "as if the corresponding relation condition were written", so every §8.8.4.2
+    /// `EVALUATE WS-P WHEN WS-X` reached the BACKEND and failed as a raw C# CS1503. §14.9.13.3 SR7 a) makes an
+    /// EVALUATE pair's objects "valid operands for comparison … in accordance with 8.8.4.2", so every §8.8.4.2
     /// rule is owed to it; the two-arm shape is fixed by moving the rule to the arm both sides share, never by
     /// copying it. It was also written TWICE there, once per class, which is why the two copies disagreed about
     /// the same category (only the object copy screened its operands' identity at all).</para></summary>
@@ -1450,12 +1449,17 @@ internal sealed class StatementValidation(DataBinder data)
         bool lb = IsBoolOperand(left), rb = IsBoolOperand(right);
         if (lb || rb)
         {
-            // A null category is the classifier's "not statically decidable" (a recovery profile for a rejected
-            // declaration, an operand whose binding already failed — kb/Work PB960), and it fails OPEN here as it
-            // does in every screen over the same classifier: the rule rejects what it NAMES, never what the
-            // compiler could not classify.
-            static bool BoolCompatible(BoundOperand o) => o is BoundFigurative { Kind: 'Z' }
-                || IntrinsicResultType.OperandCategory(o) is PicCategory.Boolean or null;
+            // Asked of the §8.5.2.1 Table-2 lattice's CANDIDATE set (kb/Work PB1427): an operand is boolean-compatible
+            // when class boolean is among the classes it may present — ZERO is "one or more of the boolean character
+            // '0'" (§8.3.3.6.4 GR4), SPACE / QUOTE / HIGH-VALUE / LOW-VALUE are character values only (GR5–GR8), an
+            // index data item is class index. The set is EMPTY only for "not statically decidable" (a recovery
+            // profile, an operand whose binding already failed — kb/Work PB960), which fails OPEN: the rule rejects
+            // what it NAMES, never what the compiler could not classify. (The category reader that stood here
+            // answered null for EVERY figurative and every PICTURE-less item, so `IF B1 = SPACE` and a boolean
+            // against an index data item passed as "undecidable".)
+            static bool BoolCompatible(BoundOperand o) =>
+                IntrinsicArgumentRules.CandidateClasses(o) is var set
+                && (set.Length == 0 || Array.IndexOf(set, CobolClass.Boolean) >= 0);
             if (!(BoolCompatible(left) && BoolCompatible(right)))
                 data.Edition.Error("COBOLNET0844", "a boolean operand may be compared only with another "
                     + "boolean operand or the figurative constant ZERO (ISO §8.8.4.2.2; §8.8.4.2.1 F1 "
@@ -1474,29 +1478,72 @@ internal sealed class StatementValidation(DataBinder data)
             if (sl is null || sr is null || !StrongTypeModel.SameType(sl, sr))
                 data.Edition.Error(DiagnosticCatalog.StrongCompareMismatch, "a strongly-typed group may be compared only with a group of the "
                     + "same type (ISO §8.8.4.2.3 SR1 / §8.5.3.3)");
-            // §8.8.4.2.3 SR4: a strong group whose elementary items include class boolean, message-tag,
-            // object, or pointer may be compared only for EQUALITY or INEQUALITY — an ordering relation on
-            // such a group is a syntax error (the complete spec rule, not a stage; P10 Step 16 reclassified
-            // the former "not implemented" framing — message-tag has no greenfield class yet, so the test
-            // covers the three modeled categories).
+            // §8.8.4.2.3 SR4: "Strongly-typed group items that contain elementary items of class boolean,
+            // message-tag, object, or pointer, may be compared only for equality or inequality" — an ordering
+            // relation on such a group is a syntax error. Every other same-type ordering is LEGAL and is compared
+            // element by element (§8.8.4.2.12 — ConditionBinder.CheckedRelational lowers it; kb/Work PB1469
+            // retired the signed-leaf stage that stood here while the relation was a whole-group image).
             else if (op is not ("==" or "!=") && (ContainsNonOrderableLeaf(sl) || ContainsNonOrderableLeaf(sr)))
                 data.Edition.Error(DiagnosticCatalog.StrongCompareOrdering, "a strongly-typed group containing a boolean, object-reference, "
                     + "or pointer element may be compared only for equality or inequality "
                     + "(ISO §8.8.4.2.3 SR4 — no ordering relation is defined for such a group)");
-            // §8.8.4.2.12 (P10 Step 16, staged loud): strongly-typed groups order ELEMENT BY ELEMENT, a signed
-            // numeric pair comparing ALGEBRAICALLY (§8.8.4.2.4) — the whole-group character-image comparison
-            // the emitter performs cannot honor that for a SIGNED leaf (overpunch/separate-sign images do not
-            // order algebraically). EQUALITY stays image-based for every same-type shape (a fixed profile's
-            // value→image map is injective, so image-equal ⟺ element-equal), and an ordering over
-            // unsigned-numeric/alphanumeric/national leaves is image-order == element-order (equal-width
-            // digit/character columns, §8.8.4.2.7) — both fully implemented.
-            else if (op is not ("==" or "!=") && sl is { } && (ContainsSignedNumericLeaf(sl) || ContainsSignedNumericLeaf(sr!)))
-                data.Edition.Error(DiagnosticCatalog.StrongGroupOrderingSignedLeaf, "an ordering relation between "
-                    + "strongly-typed groups containing a SIGNED numeric elementary item requires the "
-                    + "element-by-element algebraic comparison of ISO §8.8.4.2.12/§8.8.4.2.4 — recognized but "
-                    + "not yet implemented (the image comparison carries equality and unsigned orderings only)");
+        }
+        // ISO §8.5.1.12.1 (kb/Work PB1467): a variable-length group "may not undergo a comparison … unless the other
+        // operand is a compatible group" — asked of the ONE pair classifier the relation's construction also asks,
+        // and of the ONE §8.5.1.12.1 reader the MOVE asks (VariableLengthCompatibility.PairRefusal). A strongly-typed
+        // pair is not asked: §8.8.4.2.12 compares it element by element (SR1 above already required one type).
+        else if (RelationPair.Classify(left, right) is RelationPairShape.VariableLengthGroup)
+        {
+            if (VariableLengthCompatibility.PairRefusal(OperandItem(left), OperandItem(right), "first", "second",
+                    "may be compared only with a compatible GROUP") is { } why)
+                data.Edition.Error(DiagnosticCatalog.VariableLengthGroupComparison, why);
+        }
+        // Every other pair is a GENERAL relation (or a boolean / Format 3 one, which the table answers "not mine"):
+        // §8.8.4.2.1's closed "Comparisons are defined for the following:" list, asked of the ONE table.
+        else CheckGeneralRelationComparability(left, right);
+    }
+
+    /// <summary>⛔ §8.8.4.2.1's "Comparisons are defined for the following:" over the general relation, asked of the
+    /// ONE table (<see cref="RelationComparability"/>, kb/Work PB1468) at the ONE relation checkpoint — so IF,
+    /// EVALUATE subject/object pairs and ranges, PERFORM UNTIL, SEARCH WHEN and abbreviated relations inherit it.
+    /// <list type="bullet">
+    /// <item>§8.8.4.2.13's index pairs are an unconditional error: "Relation tests may be made only between" its
+    /// three pairs, and a pair outside them has no comparison to fall back on — an index-name against an
+    /// alphanumeric operand used to abort the run unit ("computed expression in a string context").</item>
+    /// <item>§8.8.4.2.5's numeric operand of item 6 is an error with the leniency dialect-gated — the DA6
+    /// disposition (<c>IntrinsicArgumentRules</c>' remarks): §4.2.2's "This warning mechanism shall indicate
+    /// violations of such rules" obliges the flag, and the character comparison of the value's text that
+    /// --permissive keeps is what the compiler has always evaluated for the pair.</item>
+    /// </list></summary>
+    private void CheckGeneralRelationComparability(BoundOperand left, BoundOperand right)
+    {
+        switch (RelationComparability.Breach(left, right))
+        {
+            case RelationComparabilityBreach.IndexPair:
+                data.Edition.Error(DiagnosticCatalog.RelationIndexPair, "an index-name or index data item is compared "
+                    + "with an operand ISO §8.8.4.2.13 does not pair it with — \"Relation tests may be made only "
+                    + "between\" two index-names, an index-name and a numeric data item or numeric literal, or an index "
+                    + "data item and an index-name or another index data item");
+                break;
+            case RelationComparabilityBreach.NumericAgainstCharacter when data.Edition.Permissive:
+                data.Edition.Warning(DiagnosticCatalog.RelationNumericNotInteger, "a numeric operand that is not an "
+                    + "integer literal or an integer numeric data item of usage display or national is compared with a "
+                    + "character operand (ISO §8.8.4.2.5) — accepted under --permissive as the character comparison of "
+                    + "its value's text");
+                break;
+            case RelationComparabilityBreach.NumericAgainstCharacter:
+                data.Edition.Error(DiagnosticCatalog.RelationNumericNotInteger, "a numeric operand compared with an "
+                    + "operand of class alphanumeric, alphabetic or national shall be \"an integer literal or an integer "
+                    + "numeric data item of usage display or national\" (ISO §8.8.4.2.5; §8.8.4.2.1 item 6 is the only "
+                    + "such pair the standard defines) — a non-integer, COMPUTATIONAL, packed, floating-point or "
+                    + "arithmetic-expression operand has no defined comparison with it");
+                break;
         }
     }
+
+    /// <summary>The DATA ITEM a relation operand denotes, or null for an operand that is not one (a literal, a
+    /// figurative constant, a computed value, a reference-modified view — kb/Work PB602's identity question).</summary>
+    private static DataItem? OperandItem(BoundOperand o) => o is BoundFieldOperand { Place.DenotedItem: { } item } ? item : null;
 
     /// <summary>§8.3.3.6.3 SR3 over one side of a relation: <paramref name="figurative"/> compared with the DATA
     /// ITEM <paramref name="other"/> names — an elementary item's own category (a reference-modified view is
@@ -1543,13 +1590,28 @@ internal sealed class StatementValidation(DataBinder data)
         // rather than its storage category, neither of which raw `Pic` could see.
         static bool IsFormat3(CobolClass? c) => c is CobolClass.Object or CobolClass.Pointer;
         static bool IsNull(BoundOperand o) => o is BoundFigurative { Kind: 'N' };
+        // NULL's class opposite `other`: the other side's Format-3 class, class pointer opposite any other decidable
+        // operand, and "undecidable" (abstain) opposite an operand whose binding already failed (kb/Work PB960).
+        static CobolClass? NullReading(BoundOperand o, BoundOperand other) =>
+            !IsNull(o) ? IntrinsicArgumentRules.ClassOf(o)
+            : IntrinsicArgumentRules.CandidateClasses(other) switch
+            {
+                [] => null,
+                [var oc] when IsFormat3(oc) => oc,
+                _ => CobolClass.Pointer,
+            };
         // ⚠ NULL HAS NO CLASS OF ITS OWN IN A RELATION. §8.4.3.10.3 SR1 selects its reading from "the
         // associated data item's class" (a) pointer, b) message-tag) and §8.4.3.9 gives the object spelling
         // class object, so in a relation it takes the OTHER operand's class. The lattice reports it as class
         // POINTER — the right answer for every class-CLOSED operand slot it is asked about, and the wrong one
         // here, where `IF an-object-reference = NULL` is the relation §8.4.3.10.3 SR1 a) admits by name.
-        var lc = IsNull(left) ? IntrinsicArgumentRules.ClassOf(right) : IntrinsicArgumentRules.ClassOf(left);
-        var rc = IsNull(right) ? IntrinsicArgumentRules.ClassOf(left) : IntrinsicArgumentRules.ClassOf(right);
+        // ⛔ …BUT ONLY OPPOSITE A FORMAT-3 OPERAND (kb/Work PB1427). Taking the other side's class UNCONDITIONALLY
+        // gave NULL class alphanumeric opposite an alphanumeric item and class numeric opposite a numeric one, so
+        // `IF X = NULL` / `IF N = NULL` made neither side Format 3, left the band silent, and ran NULL as LOW-VALUE.
+        // §8.4.3.10.3 SR1 a) admits NULL only "in a pointer-or-object-reference relation condition"; opposite
+        // anything else it keeps the class the lattice gives it — pointer — and SR5 below refuses the pair.
+        var lc = NullReading(left, right);
+        var rc = NullReading(right, left);
         if (!IsFormat3(lc) && !IsFormat3(rc)) return;   // a general-relation or boolean condition — not this band
         // ⚠ CLASS MESSAGE-TAG — Format 3's third class — has no lattice member, because USAGE MESSAGE-TAG is
         // DECLINED non-support (COBOLNET1943, Annex A.3 item 4) and `ParseUsage` refuses it BY NAME at every
@@ -1592,26 +1654,20 @@ internal sealed class StatementValidation(DataBinder data)
                 + "defines the pointer comparison only \"where each operand is of the same category\")");
     }
 
-    /// <summary>True when a group (or elementary) item has any leaf of class boolean / object-reference / pointer —
-    /// the categories that make a strongly-typed group comparable only for equality (ISO §8.8.4.2.3 SR4).</summary>
+    /// <summary>True when a group (or elementary) item has any elementary item of a CLASS §8.8.4.2.3 SR4 names —
+    /// boolean, message-tag, object or pointer — which makes a strongly-typed group comparable only for equality.
+    /// ⛔ THE CLASS IS ASKED OF THE ONE §8.5.2.1 TABLE-2 LATTICE (<see cref="IntrinsicArgumentRules.ClassOfItem"/>),
+    /// never of a local category list (kb/Work PB1469): the list that stood here named three CATEGORIES —
+    /// boolean, object-reference and data-pointer — and so missed PROGRAM-POINTER and FUNCTION-POINTER, the other
+    /// two categories Table 2 gathers into class pointer; `IF T1 &gt; T2` over a strong group with a
+    /// program-pointer leaf compiled clean. (Class message-tag has no lattice member because USAGE MESSAGE-TAG is
+    /// declined non-support, COBOLNET1943; the day it lands, the lattice gains it and this sees it unchanged.)</summary>
     private static bool ContainsNonOrderableLeaf(DataItem item)
     {
         if (item.IsElementary)
-            return item.Pic?.Category is PicCategory.Boolean or PicCategory.ObjectReference or PicCategory.Pointer;
+            return IntrinsicArgumentRules.ClassOfItem(item) is CobolClass.Boolean or CobolClass.Object or CobolClass.Pointer;
         foreach (var c in item.Children)
             if (ContainsNonOrderableLeaf(c)) return true;
-        return false;
-    }
-
-    /// <summary>True when a group (or elementary) item has any SIGNED fixed-point numeric leaf — the one shape
-    /// whose §8.8.4.2.12 element-by-element ordering (algebraic per element, §8.8.4.2.4) diverges from the
-    /// whole-group character-image ordering the emitter performs (P10 Step 16 staged residue).</summary>
-    private static bool ContainsSignedNumericLeaf(DataItem item)
-    {
-        if (item.IsElementary)
-            return item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Signed: true };
-        foreach (var c in item.Children)
-            if (ContainsSignedNumericLeaf(c)) return true;
         return false;
     }
 }

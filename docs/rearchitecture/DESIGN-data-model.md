@@ -420,8 +420,9 @@ REFUSED a legal move between two differently-named subgroups at the same relativ
 equivalence is therefore no longer deferred — it is what the walk decides.
 
 **The consumers, all on the one predicate:** §14.9.25.3 SR2 (`CheckStrongMove`, and through `MoveBinder` every
-implicit move — `… FROM`, `… INTO`), §8.8.4.2.3 SR1 + §8.8.4.2.12 (`CheckRelationalOperands`, the ONE relation
-chokepoint), and the activation boundary's one sentence written three times — §14.8.2.2 (arguments), §14.8.3.2
+implicit move — `… FROM`, `… INTO`), §8.8.4.2.3 SR1 (`CheckRelationalOperands`, the ONE relation chokepoint) and
+§8.8.4.2.12 (`RelationPair.Classify` → `StrongGroupComparison`, which pairs the two operands' elementary items by
+POSITION — the same correspondence this predicate proves — and compares them element by element), and the activation boundary's one sentence written three times — §14.8.2.2 (arguments), §14.8.3.2
 (returning items), §9.3.8.2.3 rule 7 (interface conformance) — in `OoConformance.StrongTypeMismatch`, reached from
 BOTH `DescriptionMismatch` (BY REFERENCE, RETURNING, override and prototype signatures) and `ContentMismatch` (BY
 CONTENT / BY VALUE), because §14.8.2.2's sentence qualifies neither mode. That last one also completes

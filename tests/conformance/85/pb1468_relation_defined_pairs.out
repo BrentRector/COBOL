@@ -1,0 +1,12 @@
+01 ND = XA   EQ
+02 NS = XA   EQ
+03 XE < ND   LT
+04 12 = XA   NE
+05 ND = SP   NE
+06 NB = ND   EQ
+07 NS < NB   LT
+08 I1 = I2   EQ
+09 I1 = 3    EQ
+10 I1 < NB   LT
+11 IDA = I1  EQ
+12 IDA = I2  NE

@@ -805,8 +805,8 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             // WRITTEN HERE, in the relation arm, ABOVE the checkpoint (kb/Work PB399). They are now in
             // StatementValidation.CheckRelationalOperands, beside the class-boolean and strongly-typed-group
             // rules of the same §8.8.4.2 band, because a rule about what may be COMPARED belongs to the ONE
-            // BoundRelational construction site and not to one of its callers: §14.9.13.4 GR2 makes an EVALUATE
-            // subject↔object pair a comparison "as if the corresponding relation condition were written", and
+            // BoundRelational construction site and not to one of its callers: §14.9.13.3 SR7 a) makes an EVALUATE
+            // pair's objects "valid operands for comparison … in accordance with 8.8.4.2", and
             // written here the bands screened `IF P >= Q` and said nothing about `EVALUATE P WHEN Q THRU R` or
             // `EVALUATE P WHEN X` — the second of which reached the BACKEND and failed as a raw C# CS1503.
             // SEARCH WHEN, PERFORM UNTIL and the abbreviated-relation path had the same hole.
@@ -1072,14 +1072,59 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// on boolean operands is 0844; an EVALUATE THRU range over a boolean subject trips the same check,
     /// §14.9.13.3 SR4). Figurative ZERO is boolean zeros by context (§8.3.3.6.4 GR4); every other figurative
     /// against a boolean operand is non-boolean.</summary>
-    public BoundRelational CheckedRelational(BoundOperand left, string op, BoundOperand right)
+    public BoundCondition CheckedRelational(BoundOperand left, string op, BoundOperand right)
     {
         // The edition-invariant §8.8.4.2.2 / §8.8.4.2.3 SR band (class-boolean comparability + the
         // strongly-typed-group rules) is the ONE StatementValidation home (10t/3 — the 10o deviation-(b)
         // pure-lift discharged); the node is always built (a PURE emission check, no verdict).
-        ctx.Validation.CheckRelationalOperands(left, op, right);
+        ctx.Validation.CheckRelationalOperands(Written(left), op, Written(right));
+        // ⛔ WHICH COMPARISON THE PAIR IS, asked of the ONE classifier the screens above also ask (kb/Work PB1469):
+        // two same-type strongly-typed groups compare ELEMENT BY ELEMENT (ISO §8.8.4.2.12), which is lowered here
+        // to the relations between their elementary items — never the whole-group image a Flat pair compares.
+        if (RelationPair.Classify(left, right) is RelationPairShape.StrongElementOrder
+            && left is BoundFieldOperand { Place: var lp } && right is BoundFieldOperand { Place: var rp })
+        {
+            if (_strongGroups.Lower(lp, rp, op, out string? unbuilt) is { } elementOrder) return elementOrder;
+            ctx.Edition.Error(DiagnosticCatalog.StrongGroupComparisonMember, $"the comparison of the strongly-typed "
+                + $"groups '{lp.Item.CobolName}' and '{rp.Item.CobolName}' reaches {unbuilt}, which this "
+                + "implementation cannot yet compare element by element (ISO §8.8.4.2.12)");
+            return Refused($"strongly-typed group comparison over {unbuilt}");
+        }
         return new BoundRelational(left, op, right);
     }
+
+    /// <summary>The OTHER comparison node's construction, through the SAME checkpoint (kb/Work PB1468). An EVALUATE
+    /// THROUGH range lowers to <see cref="BoundRangeMembership"/> instead of the inclusive
+    /// <see cref="CheckedRelational"/> pair when it carries an IN alphabet-name or EC-RANGE-INVALID checking — but it
+    /// is still §14.9.13.4 GR4 a) 5.'s "selection-subject &gt;= left-part AND selection-subject &lt;= right-part", so
+    /// every §8.8.4.2 operand rule is owed to both of those relations. Built anywhere else, the node skipped the
+    /// checkpoint: `EVALUATE NB WHEN "0001" THRU "0020" IN AL` (NB COMP) and `EVALUATE I1 WHEN "1" THRU "5" IN AL`
+    /// (I1 an index-name) compiled clean while the identical ranges without the phrase were refused.</summary>
+    public BoundCondition CheckedRangeMembership(BoundOperand subject, BoundOperand lo, BoundOperand hi, bool checkInvalid,
+        string? alphabet)
+    {
+        ctx.Validation.CheckRelationalOperands(Written(subject), ">=", lo);
+        ctx.Validation.CheckRelationalOperands(Written(subject), "<=", hi);
+        return new BoundRangeMembership(subject, lo, hi, CheckInvalid: checkInvalid, Alphabet: alphabet);
+    }
+
+    /// <summary>The operand each implementor's intermediate result item stands for (§14.9.13.4 GR3's EVALUATE subject
+    /// value — <c>EvaluateBinder.BindSubjectValue</c>), keyed by the intermediate operand INSTANCE the statement's
+    /// pairs all share. ⛔ THE §8.8.4.2 OPERAND RULES ARE ABOUT THE OPERAND THE PROGRAMMER WROTE, the principle
+    /// <c>SendingValueTemp.Materialize</c> states for its own store: re-running them against the intermediate judges a
+    /// description the implementor chose. An index-name subject's intermediate is a numeric item, so without this
+    /// `EVALUATE I1 WHEN I2 WHEN IDA` — two §8.8.4.2.13 pairs — was refused as numeric-against-index (kb/Work
+    /// PB1468). The EMITTED node keeps the intermediate; only the checkpoint reads through.</summary>
+    private readonly Dictionary<BoundOperand, BoundOperand> _writtenOperand = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Record that <paramref name="intermediate"/> holds the value of the written <paramref name="written"/>.</summary>
+    public void RecordIntermediate(BoundOperand intermediate, BoundOperand written) => _writtenOperand[intermediate] = written;
+
+    /// <summary>The operand as written: <paramref name="o"/> itself unless it is a recorded intermediate.</summary>
+    private BoundOperand Written(BoundOperand o) => _writtenOperand.TryGetValue(o, out var w) ? w : o;
+
+    /// <summary>The §8.8.4.2.12 element-order lowering (kb/Work PB1469) — per unit, stateless beyond the context.</summary>
+    private readonly StrongGroupComparison _strongGroups = new(ctx);
 
     /// <summary>ISO §8.8.4.7.3 SR2 — a sign condition is Format 2 (the IEEE sign-bit test, §8.8.4.7.4 GR2) iff
     /// data-name-1 is a single data item of a standard floating-point usage that is NOT enclosed in parentheses.

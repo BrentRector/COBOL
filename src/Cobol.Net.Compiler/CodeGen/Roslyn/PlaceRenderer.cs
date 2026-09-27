@@ -458,6 +458,40 @@ internal static class PlaceRenderer
         _ => $"{Read(group)}.CurrentImage()",
     };
 
+    /// <summary>⛔ THE ONE §8.5.1.12 CARRIER OF A GROUP PAIRED WITH A VARIABLE-LENGTH GROUP — for every operation
+    /// that takes a compatible pair component by component: the §14.9.25.4 GR9 MOVE's sending operand and both
+    /// operands of the §8.8.4.2.17 comparison (kb/Work PB1467 moved it here from the MOVE emitter so the two
+    /// cannot decompose a group differently). A variable-length group is its own composer; a FIXED-length group is
+    /// its record image decomposed at the spans of ITS tables that correspond to <paramref name="other"/>'s
+    /// dynamic-capacity tables (<c>VariableLengthCompatibility.CorrespondingSpans</c> — the PAIR's
+    /// correspondence, §8.5.1.12.2; kb/Work PB965). Null when this implementation cannot compose the group's
+    /// current extent (the caller emits its named loud). <paramref name="variableContext"/> /
+    /// <paramref name="fixedContext"/> name the operand in a run-time reason, as <see cref="GroupImage"/>'s
+    /// <c>context</c> does.</summary>
+    public static string? VarGroupCarrier(Place g, DataItem other, string variableContext, string fixedContext) =>
+        VariableLengthCompatibility.IsVariableLength(g.Item)
+            ? g.Item.CurrentExtentImageCapable
+                ? VarGroupImage(g, variableContext)
+                : null
+            : VariableLengthCompatibility.CorrespondingSpans(g.Item, other) is { } spans && g.ImageCapable
+                ? RuntimeApi.VarGroupFromFixedImage(SendingGroupImage(g, fixedContext), SpanArray(spans))
+                : null;
+
+    /// <summary>The flat <c>(offset, width)</c> C# array literal <c>CobolVarGroup.FromFixedImage</c> /
+    /// <c>ToFixedImage</c> take.</summary>
+    public static string SpanArray(int[] spans) => $"new int[] {{ {string.Join(", ", spans)} }}";
+
+    /// <summary>Each variable-length component's offset in a variable-length group's FIXED run — where
+    /// <c>CobolVarGroup.Compare</c> interleaves the components with the fixed material (§8.8.4.2.17; kb/Work
+    /// PB1467). Arm for arm the twin of <see cref="VarGroupImage"/>: the cell-backed window's layout is known at
+    /// compile time, a record struct's is its generated contiguous layout.</summary>
+    public static string VarGroupComponentOffsets(Place group) => group switch
+    {
+        OdoGroupPlace o => VarGroupComponentOffsets(o.Inner),
+        RedefViewPlace { Coding: VarGroupWindow g } => $"new int[] {{ {string.Join(", ", g.DynFixedAt)} }}",
+        _ => RuntimeApi.VarGroupComponentOffsets(Read(group)),
+    };
+
     /// <summary>The EXTENT TABLE that travels beside <see cref="VarGroupCurrentImage"/> (determination D-FRA (v);
     /// kb/Work PB1053): where each variable-length component of the group ends in that image — the generated
     /// <c>CurrentExtents()</c>, or the cell's composition of the same table. Arm for arm the twin of

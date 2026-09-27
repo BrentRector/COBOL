@@ -480,9 +480,9 @@ content-validation half is separately answered by the declined A.4.14 facility (
     `FromImage`. Only the TRANSFER readers ask it (DISPLAY, a MOVE's sending group, through the `transfer:`
     flag of `PlaceRenderer.GroupImage` / `SendingGroupImage` / `OperandText.AsStorageImage`). ⛔ It is NOT
     folded into `IsImageCapable`: the placeholder image is not injective (two groups differing only in a
-    pointer render alike) and has no inverse, so §8.8.4.2.12 equality — image-based for the two-way codec —
-    and every read-back (CALL/INVOKE copy-back, READ, a group MOVE receiver) keep asking the two-way
-    capability and stay refused.
+    pointer render alike) and has no inverse, so every read-back (CALL/INVOKE copy-back, READ, a group MOVE
+    receiver) keeps asking the two-way capability and stays refused. (A strongly-typed group RELATION never
+    reads an image at all: §8.8.4.2.12 compares it element by element — see the TYPEDEF paragraph below.)
   - **The slots belong to the CELL, never to the item**, and that is the whole point: EXTERNAL sharing,
     ADDRESS OF aliasing and `SET ADDRESS OF` re-pointing all mean "two descriptions of ONE storage area", so a
     pointer member re-pointed through one description is visible through every other. Each cell surface now
@@ -1055,9 +1055,14 @@ a containing group drops out of the STATIC record codec exactly like the Tier-C 
 `DataItem.CurrentExtentImageCapable`; kb/Work PB204) — the §8.5.1.12 model as a wire form: the fixed run with every
 variable component collapsed to nothing, plus each component's current content in order. **That codec, not a byte
 image, is what every whole-group operation the standard admits over such a group now runs on** — the §14.8.2.2 /
-§14.8.3.2 activation-boundary crossing and, since kb/Work PB393, §14.9.25.4 GR9's MOVE. Only the operations that
-genuinely need a FIXED record window (WRITE/RELEASE, comparison) and the two shapes the composer cannot reach
-(CONFORMANCE.md A.1 item 57) stay staged LOUD.
+§14.8.3.2 activation-boundary crossing, since kb/Work PB393 §14.9.25.4 GR9's MOVE, and since kb/Work PB1467 the
+§8.8.4.2.17 RELATION: `PlaceRenderer.VarGroupCarrier` (the ONE reader of a group paired with a variable-length group,
+shared by the MOVE and the comparison) decomposes both operands and `CobolVarGroup.Compare` walks them at the
+variable side's component offsets — fixed material and component pairs in order, each a §8.8.4.2.7 comparison with
+space extension (a dynamic-length item at its current length, a table element-wise with the larger table's remainder
+against spaces, §14.6.9.3). The relation is screened at bind by §8.5.1.12.1 through the MOVE's own reader
+(`VariableLengthCompatibility.PairRefusal`) → **COBOLNET2492**. Only the operations that genuinely need a FIXED record
+window (WRITE/RELEASE) and the two shapes the composer cannot reach (CONFORMANCE.md A.1 item 57) stay staged LOUD.
 
 **CORE ships whole:** declaration (all phrases, order-independent) · out-of-line growable storage · CAPACITY
 read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding · bounds/capacity ECs
@@ -1065,11 +1070,12 @@ read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding 
 ALL over current capacity · `INITIALIZE <dynamic-table>` · **`INITIALIZE` of a group CONTAINING one** (§14.9.20.4
 GR10 — the per-occurrence loop over the current capacity, capacity unchanged) · **whole-group `MOVE` of a
 variable-length group** in either direction and to or from a compatible FIXED group (§14.9.25.4 GR9 over the
-§8.5.1.12 component carrier, screened at bind by §14.9.25.3 SR9 → **COBOLNET1931**) · **the CORRESPONDING verbs
+§8.5.1.12 component carrier, screened at bind by §14.9.25.3 SR9 → **COBOLNET1931**) · **the relation condition over
+a compatible pair** (§8.8.4.2.17, screened by §8.5.1.12.1 → **COBOLNET2492**) · **the CORRESPONDING verbs
 over an occurs-depending group** · the 2014 edition gate + matrix/VCR rows. **Staged LOUD
 (diagnostic, not a silent wrong answer):** whole-group image of a containing group in the statements that need a
-FIXED record window — WRITE/RELEASE and comparison (§14.6.9; the two shapes CONFORMANCE.md A.1 item 57 excludes
-from the current-extent composer stay loud in MOVE as well) · ref-mod of a
+FIXED record window — WRITE/RELEASE (§14.6.9; the two shapes CONFORMANCE.md A.1 item 57 excludes from the
+current-extent composer stay loud in MOVE and in a relation as well) · ref-mod of a
 subordinate (**1526**, §13.7.1 SR6) · REDEFINES **object** carries an OCCURS clause of any format, dynamic included
 (**1701**, §13.18.44.3 SR5 sentence 1) · REDEFINES **subject** IS a dynamic table (**1525**, §13.18.44.4 GR1 +
 §8.5.1.9.1 — the one side no syntax rule names) · REDEFINES either side a variable-length group, i.e. with a
@@ -1132,7 +1138,7 @@ raises EC-FLOW-SEARCH (GR31). INITIALIZE: per §14.9.20 GR10 (":28023") all
 occurrences up to current capacity are initialized by the INITIALIZE statement's OWN stores (the CATEGORY DEFAULTS /
 REPLACING / VALUE-phrase), NOT the OCCURS grow-seed, capacity unchanged (a naive re-seed with the VALUE-inclusive
 image would be WRONG for a VALUE element). Implemented as an `InitializeDynLoop(var,
-{tablePath}.Capacity, body)` (a RUN-TIME-bounded loop, sibling of `InitializeLoop`) over an `InitializeDynCursor`
+{tablePath}.Capacity, body)` (a RUN-TIME-bounded loop, sibling of `InitializeLoop`) over a `DynElementCursor` (the shared `PlaceCursor`)
 that yields a `DynTablePlace` (writes via `RefReceiving`, within bounds so no growth). A group CONTAINING a dynamic
 table (the other GR10 case) is a variable-length group → staged LOUD (the §14.6.9 1527 family). → `dyn_search`/
 `dyn_initialize`; (5) the staged-loud
@@ -1266,9 +1272,28 @@ in a class condition — split by descriptor: `strong-move-mismatch`/`strong-com
 strong group compares for equality/inequality only; the NAMED spec rule) and `typedef-renames-staged`
 (RENAMES-in-TYPEDEF, staged); **1555/1556/1557** SAME AS subject-entry / referenced-entry / cycle rule families
 (§13.16.3 SR12 + §13.18.49.3); **1558** EXTERNAL-type conformance (§13.18.22 GR2/SR5); **0899**
-`strong-group-ordering-signed-leaf` (ordering same-type strong groups with a SIGNED numeric leaf needs the
-§8.8.4.2.12 element-by-element algebraic order the image comparison cannot honor — equality and unsigned/character
-orderings are image-equivalent and live).
+`strong-group-comparison-member` (a strong-group relation that reaches a dynamic-capacity table member, an OCCURS
+DEPENDING ON object inside a table, or a REDEFINES storage tier the element walk cannot reach — the residue of the
+§8.8.4.2.12 element order below).
+
+**Strongly-typed group RELATIONS compare element by element (§8.8.4.2.12; kb/Work PB1469).** "Each elementary item
+of the first operand is compared with the corresponding elementary item of the second operand, in accordance with
+the rules for comparison of elementary items and in the order in which the elementary items are specified." The ONE
+relation construction site (`ConditionBinder.CheckedRelational`) asks the ONE pair classifier (`RelationPair`,
+`Binding/RelationPairShape.cs`: Flat · StrongElementOrder · VariableLengthGroup) and LOWERS a same-type strong pair
+(`StrongGroupComparison`) into `BoundRelational`s between corresponding leaves, composed lexicographically
+(`a₁ < b₁ ∨ (a₁ = b₁ ∧ …)`, ending FALSE for a strict operator and TRUE for `<=`/`>=`; equality is the conjunction).
+Each leaf pair is therefore rendered by the SAME rule a relation written between those two items uses — algebraic
+for every numeric usage (float, signed DISPLAY, packed), the collating sequence for character leaves, identity for
+pointer leaves — so no leaf kind is special-cased and the next one is automatic. Leaves are reached by the shared
+`PlaceCursor` (lifted from INITIALIZE, `Binding/Procedure/PlaceCursor.cs`) from the operand's RESOLVED place, so a
+subscripted strong group keeps its subscripts; a fixed OCCURS expands per occurrence, and an OCCURS DEPENDING
+occurrence beyond the minimum is guarded by `data-name-1 >= k` (§13.18.38.4 GR8 — one count serves both operands:
+outside the group it is one item, inside it SR20 places it before the table so it was already compared equal).
+Correspondence is by leaf POSITION (§8.5.3.1 defines equivalence over elementary items, not group structure);
+REDEFINES entries are set aside (⚠ determination — the redefined entry's storage is already compared at its
+position). §8.8.4.2.3 SR4's equality-only screen asks the §8.5.2.1 class lattice (`IntrinsicArgumentRules.ClassOfItem`),
+so all three pointer categories are class pointer.
 
 **Implemented (the CORE increments).** (1)
 grammar (`STRONG` token + `typedefClause`; `EditionGateHints.TypedefClause` → 0900; the
@@ -1299,8 +1324,8 @@ reference (registered globally — clones ARE referenceable). Golden `typedef_88
 `ExpandType` — the external-record attribution itself is LIVE, see the EXTERNAL-type paragraph above), **1535**
 RENAMES-in-TYPEDEF staged (the in-template level-66 guard in `BindEntries`, descriptor `typedef-renames-staged`) +
 the NAMED §8.8.4.2.3 SR4 equality-only rule for a strong group with boolean/object/pointer elements (descriptor
-`strong-compare-ordering`, in the relation checkpoint), **0899** `strong-group-ordering-signed-leaf` (the
-§8.8.4.2.12 signed-leaf element ordering, staged). An INDEXED-BY type referenced ≥2× is LEGAL and works: each clone's
+`strong-compare-ordering`, in the relation checkpoint; asked of the CLASS), and the §8.8.4.2.12 element-order
+relation (golden `strong_group_element_order`). An INDEXED-BY type referenced ≥2× is LEGAL and works: each clone's
 INDEXED BY names are re-declared with their own cells (`DataBinder.RegisterIndexes`, kb/Work PB919), referenced
 as `IX OF A` / `IX OF B` (§8.4.2.2.3 SR6). Goldens `typedef_indexed` (a single INDEXED-type reference works),
 `typedef_same_as` (elementary+VALUE / group+qualified / nested renumbered / OCCURS composition / strong-copy

@@ -10,9 +10,10 @@ namespace CobolNet.Tests.Conformance;
 /// strong-external pairing — the former COBOLNET1534 stage is LIFTED, the accepted form is the
 /// <c>typedef_external</c> golden); COBOLNET1535 — a RENAMES inside a TYPEDEF (not cloned into references,
 /// §13.18.58.4 GR1, staged) and a strong group with a boolean/object/pointer element compared with an ordering
-/// operator (§8.8.4.2.3 SR4 — the complete spec rule: equality/inequality only); COBOLNET0899
-/// <c>strong-group-ordering-signed-leaf</c> — an ordering over same-type strong groups with a SIGNED numeric
-/// leaf (the §8.8.4.2.12 element-by-element algebraic ordering, staged). A type whose OCCURS has an INDEXED BY
+/// operator (§8.8.4.2.3 SR4 — the complete spec rule: equality/inequality only — asked of the CLASS, so a
+/// program-pointer leaf is refused as a data-pointer one is). An ordering over same-type strong groups with a SIGNED
+/// numeric leaf is LEGAL and compiles (§8.8.4.2.12 element by element — kb/Work PB1469 retired the COBOLNET0899
+/// stage; the values are run-verified by the <c>strong_group_element_order</c> golden). A type whose OCCURS has an INDEXED BY
 /// phrase referenced ≥2× is LEGAL and works — each clone declares its own index cells (kb/Work PB919; the former
 /// COBOLNET1531 stage is retired). The positive companions (INDEXED-type references — also the
 /// <c>typedef_indexed</c> golden — and a strong boolean-group EQUALITY compare) must NOT trip a guard.
@@ -114,12 +115,12 @@ public sealed class TypedefResidueTests
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1535");
     }
 
-    /// <summary>§8.8.4.2.12 (P10 Step 16, staged loud): an ORDERING relation between same-type strong groups
-    /// containing a SIGNED numeric leaf needs the element-by-element ALGEBRAIC comparison (§8.8.4.2.4), which
-    /// the whole-group image comparison cannot honor — COBOLNET0899 <c>strong-group-ordering-signed-leaf</c>.
-    /// The EQUALITY compare of the same shape stays legal (image-equal ⟺ element-equal).</summary>
+    /// <summary>§8.8.4.2.12 — an ORDERING relation between same-type strong groups with a SIGNED numeric leaf is
+    /// legal (§8.8.4.2.3 SR4 restricts only boolean / message-tag / object / pointer contents) and compares element
+    /// by element, the signed pair algebraically (§8.8.4.2.4). It was staged COBOLNET0899 while the relation was a
+    /// whole-group image (kb/Work PB1469); the run-time VALUES are the <c>strong_group_element_order</c> golden's.</summary>
     [Fact]
-    public void StrongSignedGroupOrderingCompare_Staged0899()
+    public void StrongSignedGroupOrderingCompare_CompilesClean()
     {
         const string decl = """
             IDENTIFICATION DIVISION.
@@ -137,13 +138,43 @@ public sealed class TypedefResidueTests
                 END-IF.
                 STOP RUN.
             """;
-        var (okLt, diagLt) = EditionHarness.Compile(decl.Replace("{0}", "TR12A").Replace("{1}", "<"), 2002);
-        Assert.False(okLt, "an ordering compare of a signed-leaf strong group must be staged loud (ISO §8.8.4.2.12)");
-        EditionHarness.AssertHasDiagnostic(diagLt, "COBOLNET0899");
+        foreach (var (id, op) in new[] { ("TR12A", "<"), ("TR12B", "="), ("TR12C", ">=") })
+        {
+            var (ok, diag) = EditionHarness.Compile(decl.Replace("{0}", id).Replace("{1}", op), 2002);
+            Assert.True(ok, $"'R1 {op} R2' over signed-leaf strong groups must compile clean (ISO §8.8.4.2.12): "
+                + string.Join("; ", diag));
+        }
+    }
 
-        var (okEq, diagEq) = EditionHarness.Compile(decl.Replace("{0}", "TR12B").Replace("{1}", "="), 2002);
-        Assert.True(okEq, $"an EQUALITY compare of the same signed-leaf strong groups must compile clean: "
-            + string.Join("; ", diagEq));
+    /// <summary>§8.8.4.2.3 SR4 names the CLASS pointer, which §8.5.2.1 Table 2 makes of THREE categories —
+    /// data-pointer, program-pointer and function-pointer. A PROGRAM-POINTER leaf makes a strong group
+    /// equality-only exactly as a data-pointer leaf does (kb/Work PB1469: the screen listed categories and let this
+    /// ordering compile, and the run unit aborted on it); the EQUALITY compare of the same groups stays legal.</summary>
+    [Fact]
+    public void StrongProgramPointerGroupOrderingCompare_Rejected1535()
+    {
+        const string decl = """
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. {0}.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 PREC-T TYPEDEF STRONG.
+               05 PP USAGE PROGRAM-POINTER.
+            01 R1 TYPE PREC-T.
+            01 R2 TYPE PREC-T.
+            PROCEDURE DIVISION.
+            MAIN-PARA.
+                IF R1 {1} R2
+                    DISPLAY "X"
+                END-IF.
+                STOP RUN.
+            """;
+        var (okGt, diagGt) = EditionHarness.Compile(decl.Replace("{0}", "TR35P").Replace("{1}", ">"), 2002);
+        Assert.False(okGt, "an ordering compare of a program-pointer strong group must be rejected (ISO §8.8.4.2.3 SR4)");
+        EditionHarness.AssertHasDiagnostic(diagGt, "COBOLNET1535");
+
+        var (okEq, diagEq) = EditionHarness.Compile(decl.Replace("{0}", "TR35Q").Replace("{1}", "="), 2002);
+        Assert.True(okEq, "an EQUALITY compare of program-pointer strong groups is legal: " + string.Join("; ", diagEq));
     }
 
     /// <summary>kb/Work PB919 — a type whose OCCURS carries an INDEXED BY phrase, referenced twice, yields two tables

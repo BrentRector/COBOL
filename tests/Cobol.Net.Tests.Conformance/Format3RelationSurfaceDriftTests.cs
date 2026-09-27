@@ -7,8 +7,8 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// ⛔ THE DRIFT TEST FOR "ONE RELATION CHECKPOINT" (kb/Work PB399).
 /// <para>ISO §8.8.4.2's operand rules belong to the relation CONDITION, not to the statement that writes one.
-/// §14.9.13.4 GR2 says so for EVALUATE outright — a selection pair is evaluated "as if the corresponding
-/// relation condition were written" — and §14.9.13.3 SR7 a) delegates to §8.8.4.2 by name: the selection
+/// For EVALUATE, §14.9.13.3 SR7 a) delegates to §8.8.4.2 by name (kb/Work PB1468 removed a "§14.9.13.4 GR2"
+/// quotation here that is in no clause of the standard): the selection
 /// objects "shall be valid operands for comparison to the corresponding operand in the set of selection
 /// subjects in accordance with 8.8.4.2, Simple relation conditions."</para>
 /// <para>The §8.8.4.2.2 Format 3 band (message-tag / object / pointer operands) used to be written inside
@@ -55,7 +55,7 @@ public sealed class Format3RelationSurfaceDriftTests
     [Theory]
     // The written relation condition — the ONE surface the band ever screened.
     [InlineData("PB399S1", "    IF WS-P = WS-X DISPLAY \"X\" END-IF.")]
-    // An EVALUATE selection pair (§14.9.13.4 GR2's "as if the corresponding relation condition were written").
+    // An EVALUATE selection pair (§14.9.13.3 SR7 a) — "valid operands for comparison … in accordance with 8.8.4.2").
     [InlineData("PB399S2", "    EVALUATE WS-P WHEN WS-X DISPLAY \"X\" END-EVALUATE.")]
     // A PERFORM UNTIL condition.
     [InlineData("PB399S3", "    PERFORM UNTIL WS-P = WS-X CONTINUE END-PERFORM.")]
