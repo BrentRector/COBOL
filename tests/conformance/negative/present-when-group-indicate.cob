@@ -1,7 +1,7 @@
       *> reject-at: 2002 2014 2023
       *> ISO §13.15.3 SR17 — the GROUP INDICATE clause shall not be specified
       *> in an entry in which the PRESENT WHEN clause is specified (GROUP
-      *> INDICATE IS a fixed-condition PRESENT WHEN, §13.18.29.4 GR1 —
+      *> INDICATE IS a fixed-condition PRESENT WHEN, §13.18.28.4 GR1 —
       *> COBOLNET1559).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. RWPWGIP10RP.

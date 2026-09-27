@@ -349,7 +349,7 @@ public sealed class ReportVaryingModel
 /// <summary>One PRINTABLE item (an entry with a COLUMN clause, ISO §13.18.14): its column operands (one per
 /// repetition — a multiple COLUMN clause is a repeating entry, §13.15.4 GR3), the synthetic
 /// <see cref="DataItem"/> carrying its PICTURE/JUSTIFIED/BLANK WHEN ZERO, its value-source OPERAND LIST, the
-/// GROUP INDICATE flag (§13.18.29), its field-local PRESENT WHEN chain (the conditions BELOW the line entry —
+/// GROUP INDICATE flag (§13.18.28), its field-local PRESENT WHEN chain (the conditions BELOW the line entry —
 /// the line's own chain already gates the whole line), and the entry's VARYING counters (§13.18.64).</summary>
 public sealed class ReportFieldModel
 {
@@ -367,6 +367,10 @@ public sealed class ReportFieldModel
     /// is the ONE reader for both shapes and the model cannot answer "which operand prints in repetition n"
     /// two different ways.</summary>
     public required IReadOnlyList<ReportFieldSource> Sources { get; init; }
+
+    /// <summary>The entry carries a GROUP INDICATE clause — ISO §13.18.28.4 GR1: "the same effect as a PRESENT
+    /// WHEN clause" whose condition is the report engine's per-detail-group state, so the emitter ANDs it into
+    /// this item's presence test beside <see cref="PresentWhen"/> (kb/Work PB1244).</summary>
     public bool GroupIndicate { get; init; }
 
     /// <summary>The operand that supplies repetition <paramref name="rep"/> (0-based) — ISO §13.18.63.4 GR23 /
@@ -1017,8 +1021,7 @@ public sealed partial class DataBinder
         {
             if (int.TryParse(ge.levelNumber().GetText(), out int level) && level == 1)
             {
-                kind = ge.reportGroupClause().Select(c => c.reportTypeClause()?.reportGroupType())
-                    .LastOrDefault(t => t is not null) is { } t ? GroupKindOf(t) : ReportGroupKindModel.Detail;
+                kind = WrittenGroupKind(ge);
                 firstLineClause = true;
             }
             foreach (var clause in ge.reportGroupClause())
@@ -1097,6 +1100,11 @@ public sealed partial class DataBinder
     /// <item>SR13 — "A COLUMN clause shall be specified in each elementary entry that has a VALUE clause." A
     /// column-less VALUE entry printed nothing, in silence.</item>
     /// <item>SR15 — "If BLANK WHEN ZERO or JUSTIFIED is specified, a COLUMN clause shall also be specified."</item>
+    /// <item>§13.18.28.3 SR1 — "The GROUP INDICATE clause may be specified only within a detail report group
+    /// description, in an elementary entry that also contains a COLUMN clause and a SOURCE or VALUE clause." Its
+    /// elementary half is SR11 above; the detail-group, COLUMN and SOURCE-or-VALUE halves had NO site, so the
+    /// clause in a control heading, or on an entry that prints nothing, compiled in silence (kb/Work PB1245).
+    /// The group's TYPE is read from its level-01 entry, which precedes every subordinate entry.</item>
     /// </list>
     /// SR8 is <see cref="ScreenReportLineNesting"/> (its §13.18.35.3 SR4 twin), SR9 is the binder's
     /// <c>ReportColumnWithoutLine</c> arm, and SR12/SR14 are the PICTURE arm, which needs the analysed picture.
@@ -1104,10 +1112,12 @@ public sealed partial class DataBinder
     /// defined by this entry and all its subordinate entries").</summary>
     private void ScreenReportEntryClausePresence(Core.ReportGroupEntryContext[] entries, ReportModel model)
     {
+        var groupKind = ReportGroupKindModel.Detail;
         for (int i = 0; i < entries.Length; i++)
         {
             var ge = entries[i];
             int.TryParse(ge.levelNumber().GetText(), out int level);
+            if (level == 1) groupKind = WrittenGroupKind(ge);
             bool elementary = i + 1 >= entries.Length
                 || !int.TryParse(entries[i + 1].levelNumber().GetText(), out int next) || next <= level;
             bool column = false, source = false, value = false, sum = false, picture = false, groupIndicate = false,
@@ -1153,6 +1163,23 @@ public sealed partial class DataBinder
                 Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"{where} specifies BLANK WHEN ZERO or "
                     + "JUSTIFIED without a COLUMN clause; if BLANK WHEN ZERO or JUSTIFIED is specified, a COLUMN "
                     + "clause shall also be specified (ISO §13.15.3 SR15)");
+            if (groupIndicate)
+            {
+                // §13.18.28.3 SR1 — the three placement conditions the elementary rule (§13.15.3 SR11, above)
+                // leaves open. The COLUMN and SOURCE-or-VALUE halves are asked of an elementary entry only: a group
+                // entry writing the clause is already the §13.15.3 error, and naming its missing COLUMN too would
+                // report one fault twice.
+                var faults = new List<string>();
+                if (groupKind != ReportGroupKindModel.Detail)
+                    faults.Add($"is in a {ReportGroupTypeWords(groupKind)} report group");
+                if (elementary && !column) faults.Add("has no COLUMN clause");
+                if (elementary && !source && !value) faults.Add("has neither a SOURCE nor a VALUE clause");
+                if (faults.Count > 0)
+                    Edition.Error(DiagnosticCatalog.ReportGroupIndicatePlacement, $"{where} specifies GROUP INDICATE "
+                        + $"but {string.Join(" and ", faults)}; the GROUP INDICATE clause may be specified only within "
+                        + "a detail report group description, in an elementary entry that also contains a COLUMN "
+                        + "clause and a SOURCE or VALUE clause (ISO §13.18.28.3 SR1)");
+            }
         }
     }
 
@@ -1769,15 +1796,11 @@ public sealed partial class DataBinder
             }
 
             // GROUP INDICATE shall not share an entry with PRESENT WHEN (ISO §13.15.3 SR17 — GROUP INDICATE IS
-            // a fixed-condition PRESENT WHEN, §13.18.29.4 GR1).
+            // a fixed-condition PRESENT WHEN, §13.18.28.4 GR1).
             if (groupIndicate && ownCond is not null)
                 Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': the GROUP "
                     + "INDICATE clause shall not be specified in an entry in which the PRESENT WHEN clause is "
                     + "specified (ISO §13.15.3 SR17)");
-            if (groupIndicate && columns.Any(c => c.Relative))
-                Edition.Error(DiagnosticCatalog.ReportIndicateRelativeColumn, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': GROUP "
-                    + "INDICATE on an entry with a relative (PLUS) COLUMN operand (ISO §13.18.29 / §13.18.14) is "
-                    + "not yet implemented");
 
             // VARYING (§13.18.64): SR1 — the entry shall also contain OCCURS or a multiple LINE or multiple
             // COLUMN clause. All three vehicles set `repeatingEntry`/`columns`: OCCURS is LIVE on the horizontal
@@ -2240,6 +2263,14 @@ public sealed partial class DataBinder
         : t.CF() is not null || (t.CONTROL() is not null && t.FOOTING() is not null) ? ReportGroupKindModel.ControlFooting
         : t.PF() is not null || (t.PAGE() is not null && t.FOOTING() is not null) ? ReportGroupKindModel.PageFooting
         : ReportGroupKindModel.ReportFooting;
+
+    /// <summary>The group type a level-01 entry's written TYPE clause names, for the flat-entry screens that run
+    /// before the group is built (<see cref="ScreenReportLineClauses"/>, <see cref="ScreenReportEntryClausePresence"/>):
+    /// through <see cref="GroupKindOf"/>, and <see cref="ReportGroupKindModel.Detail"/> — the group model's own
+    /// default — when the entry writes none.</summary>
+    private static ReportGroupKindModel WrittenGroupKind(Core.ReportGroupEntryContext ge) =>
+        ge.reportGroupClause().Select(c => c.reportTypeClause()?.reportGroupType())
+            .LastOrDefault(t => t is not null) is { } t ? GroupKindOf(t) : ReportGroupKindModel.Detail;
 
     /// <summary>Map a TYPE clause (ISO §13.18.57 Format 2 + the SR9 abbreviations) onto the group model,
     /// capturing the CH/CF control operand.</summary>

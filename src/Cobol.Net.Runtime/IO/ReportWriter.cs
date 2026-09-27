@@ -163,10 +163,13 @@ public sealed class ReportGroup(ReportGroupKind kind, string name, int controlLe
     /// GENERATE / TERMINATE call (kb/Work PB369).</para></summary>
     public int Index { get; internal set; } = -1;
 
-    /// <summary>The (column, width) spans of this group's GROUP INDICATE printable items (ISO §13.18.29): they
-    /// print on the first presentation after an INITIATE / page advance / control break and are blanked on
-    /// every other presentation.</summary>
-    public List<(int Column, int Width)> IndicateFields { get; } = [];
+    /// <summary>ISO §13.18.28.4 GR1 — the GROUP INDICATE condition of THIS detail group: true from an INITIATE
+    /// (a), a page advance (b) or a control break (c) until the next GENERATE issued for this group has been
+    /// processed. It is per group because the rule is per group — "true only on the first occasion that a
+    /// GENERATE is issued for the current detail group after any of the following events" — so a GENERATE of
+    /// another detail group neither reads nor consumes it (kb/Work PB1244). Only <see cref="CobolReport"/> writes
+    /// it; a non-detail group never holds it, since §13.18.28.3 SR1 admits the clause only in a detail group.</summary>
+    internal bool GroupIndicatePending { get; set; }
 
     /// <summary>The group's NEXT GROUP clause (ISO §13.18.37; §13.15.3 SR6 — level 1 only), null when none.</summary>
     public ReportNextGroup? NextGroup { get; set; }
@@ -228,7 +231,6 @@ public sealed class CobolReport(
     private bool _firstBodyOnPage;         // the §13.18.35.4 GR5b3 FIRST DETAIL placement
     private bool _rhOnThisPage;            // a report heading printed on the current page (GR5b2)
     private bool _pfOnThisPage;            // a page footing printed on the current page (GR5b5)
-    private bool _indicateFresh;           // GROUP INDICATE freshness (§13.18.29 — run / page / control-group start)
     private bool _suppressCurrent;         // §14.9.45 — a SUPPRESS executed in the presenting group's USE BEFORE REPORTING
     private int _physLine;                 // physical line position on the current page (0 = top, nothing printed)
 
@@ -425,7 +427,7 @@ public sealed class CobolReport(
         _firstBodyOnPage = true;
         _rhOnThisPage = false;
         _pfOnThisPage = false;
-        _indicateFresh = true;                         // §13.18.29 — the run's first presentation indicates
+        ArmGroupIndicate();                            // §13.18.28.4 GR1a — every detail's next GENERATE indicates
         _physLine = 0;
         _nextGroupSave = 0;                            // §13.18.37.4 — no NEXT GROUP carries across an INITIATE
         _resetPageCounterAtAdvance = false;
@@ -485,7 +487,7 @@ public sealed class CobolReport(
             // §14.9.16.4 GR5a / §13.18.16.4 GR4a: save current values, restore the PRIOR values so the ending
             // groups' CFs (and any reference to a control item while they print) see the pre-break contents,
             // print CFs minor→break, then restore the new current values and print CHs break→minor.
-            _indicateFresh = true;   // §13.18.29 — a control break starts a new group instance
+            ArmGroupIndicate();   // §13.18.28.4 GR1c — a control break re-arms every detail group
             var current = new string[_controls.Count];
             for (int i = 0; i < _controls.Count; i++)
             {
@@ -515,8 +517,31 @@ public sealed class CobolReport(
 
         // GR4d / GR5b: the specified detail — unless summary reporting (GR2).
         if (detailName is not null && _details.TryGetValue(detailName, out var detail))
+        {
             PresentBody(detail);
+            // §13.18.28.4 GR1 — this GENERATE WAS the "first occasion that a GENERATE is issued for the current
+            // detail group" since the last event, whether or not the group printed: a SUPPRESS (§14.9.45) or an
+            // all-absent PRESENT WHEN leaves the GENERATE issued all the same. Consumed only AFTER the
+            // presentation, because the page advance of this group's own page-fit test (§13.18.35.4 GR4) is an
+            // event b) that precedes its lines and must re-arm the condition they read.
+            detail.GroupIndicatePending = false;
+        }
     }
+
+    /// <summary>ISO §13.18.28.4 GR1 a/b/c — an INITIATE, a page advance or a control break makes the next
+    /// GENERATE of EVERY detail group its "first occasion" again.</summary>
+    private void ArmGroupIndicate()
+    {
+        foreach (var d in _details.Values) d.GroupIndicatePending = true;
+    }
+
+    /// <summary>The ISO §13.18.28.4 GR1 condition of the report group whose lines are being composed: true exactly
+    /// when that group is a detail group presenting on its first GENERATE since an INITIATE, a page advance or a
+    /// control break. A GROUP INDICATE printable item's generated compose reads it as its PRESENT WHEN condition
+    /// (GR1: "the same effect as a PRESENT WHEN clause"), so an indicated item that is not presented is ABSENT
+    /// (§13.18.41.4 GR2b) — it places nothing and moves no horizontal counter — rather than overwritten with
+    /// spaces after the fact. Set by <see cref="PresentBody"/> before the group's first line is composed.</summary>
+    public bool GroupIndicatePresent { get; private set; }
 
     /// <summary>The most-major control level whose CURRENT value differs from its prior (§13.18.16.4 GR3 —
     /// tested major→minor, the first change wins; FINAL never breaks mid-report, GR2). Null when no break.</summary>
@@ -692,6 +717,7 @@ public sealed class CobolReport(
             if (!fit) AdvancePage();   // §13.18.35.4 GR4 tail → the §14.9.16.4 GR6 sequence
         }
 
+        GroupIndicatePresent = group.GroupIndicatePending;   // §13.18.28.4 GR1 — read AFTER this group's own page advance
         bool isFirst = true;
         for (int i = 0; i < lines.Length; i++)
         {
@@ -709,11 +735,10 @@ public sealed class CobolReport(
             }
             else
                 target = SubsequentTarget(lines[i]);
-            PresentLine(target, lines[i], group);
+            PresentLine(target, lines[i]);
         }
         _firstBodySinceInitiate = false;
         _firstBodyOnPage = false;
-        if (group.Kind == ReportGroupKind.Detail) _indicateFresh = false;   // §13.18.29 — repeats now suppress
         if (applyNextGroup) ApplyNextGroup(group);   // §13.18.37.4 GR2 — after the group's last line is printed
         EndOfGroupSumReset(group);
     }
@@ -922,7 +947,7 @@ public sealed class CobolReport(
         _firstBodyOnPage = true;
         _rhOnThisPage = false;
         _pfOnThisPage = false;
-        _indicateFresh = true;                                               // §13.18.29 — a new page indicates
+        ArmGroupIndicate();                                                  // §13.18.28.4 GR1b — a page advance
     }
 
     /// <summary>Present the page heading (placement ISO §13.18.35.4 GR5b2: absolute → integer-1; relative with no
@@ -944,7 +969,7 @@ public sealed class CobolReport(
                 : _rhOnThisPage ? LineCounter + RelativeValue(l)              // GR5b2 second form
                 : _heading + RelativeValue(l) - 1;                            // GR5b2 first form
             isFirst = false;
-            PresentLine(target, l, ph);
+            PresentLine(target, l);
         }
     }
 
@@ -966,7 +991,7 @@ public sealed class CobolReport(
                 : l.Kind == ReportLineKind.Absolute ? l.Value
                 : _footing + RelativeValue(l);                                // GR5b4
             isFirst = false;
-            PresentLine(target, l, pf);
+            PresentLine(target, l);
         }
         _pfOnThisPage = true;
         ApplyNextGroup(pf);   // §13.18.37.4 GR5
@@ -1003,7 +1028,7 @@ public sealed class CobolReport(
                 : _pfOnThisPage ? LineCounter + RelativeValue(l)                                   // GR5b5
                 : _footing + RelativeValue(l);                                                     // GR5b5
             isFirst = false;
-            PresentLine(target, l, group);
+            PresentLine(target, l);
         }
         if (group.Kind == ReportGroupKind.ReportHeading) _rhOnThisPage = true;
         ApplyNextGroup(group);   // §13.18.37.4 GR3 (a report footing carries none — §13.18.37.3 SR4)
@@ -1017,7 +1042,7 @@ public sealed class CobolReport(
     /// physical line advances one line — the §13.18.35.4 GR3 overlap rule's EC-REPORT-LINE-OVERLAP seam (checking
     /// default-off, §18.16); on an empty page there is no printed line to overlap and line 1 is where the stream
     /// already is (see the travel computation below).</summary>
-    private void PresentLine(long target, ReportGroupLine line, ReportGroup group)
+    private void PresentLine(long target, ReportGroupLine line)
     {
         if (target < 1) target = 1;
         // ISO §13.18.38.4 GR12c/GR12d: the datum a later occurrence of this same line steps from is the page
@@ -1028,15 +1053,6 @@ public sealed class CobolReport(
             SeedAnchor(line.Anchor, target - (line.Kind == ReportLineKind.Step ? line.Value : 0));
         LineCounter = target;                     // §13.18.35.4 GR6 — BEFORE the compose
         string image = line.Compose();            // §13.18.53.4 GR1/GR3 — evaluated at presentation time
-        if (group.Kind == ReportGroupKind.Detail && !_indicateFresh && group.IndicateFields.Count > 0)
-        {
-            // GROUP INDICATE (ISO §13.18.29): on a repeated presentation the indicated items present as spaces.
-            var chars = image.ToCharArray();
-            foreach (var (col, width) in group.IndicateFields)
-                for (int i = 0; i < width && col - 1 + i < chars.Length; i++)
-                    chars[col - 1 + i] = ' ';
-            image = new string(chars);
-        }
         // ⛔ A PAGE'S LINE 1 IS WHERE THE PRINT STREAM ALREADY RESTS, NOT ONE ADVANCE BELOW IT (kb/Work PB484).
         // §13.18.35.4 GR6: "the report's LINE-COUNTER is set equal to that line number and the line is now
         // printed on the page at that vertical location" — line number n IS page line n, and GR7's "Any

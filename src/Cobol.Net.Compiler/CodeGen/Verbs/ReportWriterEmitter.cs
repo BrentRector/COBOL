@@ -107,19 +107,24 @@ internal sealed class ReportWriterEmitter(
     /// its exact single-statement emission (the characterization-pinned text).</summary>
     private void EmitFieldPlacements(ReportModel r, ReportFieldModel f, bool needsHc, CodeWriter w)
     {
-        if (!needsHc && f.Columns.Count == 1 && f.PresentWhen.Count == 0 && f.Varyings.Count == 0
-            && f.RepetitionGuards.Count == 0)
+        if (!needsHc && f.Columns.Count == 1 && f.PresentWhen.Count == 0 && !f.GroupIndicate
+            && f.Varyings.Count == 0 && f.RepetitionGuards.Count == 0)
         {
             w.Line($"{RuntimeApi.ReportPlace("__ln", f.Column, FieldImage(r, f, 0))};");
             return;
         }
-        // The placement's presence: the PRESENT WHEN chain (§13.18.41.4 GR2b) AND every enclosing repeating
-        // entry's OCCURS … DEPENDING test (§13.18.38.4 GR13 / §13.18.63.4 GR22 — both "may suppress the
-        // appearance of the item"). An absent item places nothing and never advances the horizontal counter (GR3f).
+        // The placement's presence — ALL THREE suppressors §13.18.63.4 GR22 names ("a GROUP INDICATE, PRESENT
+        // WHEN, or OCCURS clause with the DEPENDING phrase may suppress the appearance of the item"), in one test:
+        // the PRESENT WHEN chain (§13.18.41.4 GR2b); the GROUP INDICATE condition, which §13.18.28.4 GR1 makes "the
+        // same effect as a PRESENT WHEN clause" whose condition the engine owns (CobolReport.GroupIndicatePresent,
+        // per detail group — kb/Work PB1244); and every enclosing repeating entry's OCCURS … DEPENDING test
+        // (§13.18.38.4 GR13). An absent item places nothing and never advances the horizontal counter, so an
+        // indicated item with a relative COLUMN operand needs nothing of its own.
         string[] tests = [.. f.PresentWhen.Select(c => $"({cond.Render(c)})"),
+                          .. f.GroupIndicate ? [$"__RPT_{r.CsIndex}.GroupIndicatePresent"] : (string[])[],
                           .. f.RepetitionGuards.Select(RepetitionTest)];
         using IDisposable? guard = tests.Length > 0
-            ? w.Block($"if ({string.Join(" && ", tests)})   // presence (§13.18.41.4 GR2b / §13.18.38.4 GR13)")
+            ? w.Block($"if ({string.Join(" && ", tests)})   // presence (§13.18.41.4 GR2b / §13.18.28.4 GR1 / §13.18.38.4 GR13)")
             : null;
         // VARYING counters (§13.18.64.4 GR3): the first occurrence takes FROM (default 1) and "for the second and
         // subsequent occurrences, the value of arithmetic-expression-2 is added" — so occurrence n holds
@@ -338,14 +343,6 @@ internal sealed class ReportWriterEmitter(
                     w.Line($"__rg{r.CsIndex}_{gi}.NextGroup = new ReportNextGroup(ReportNextGroupKind.{ng.Kind}, "
                         + $"{ng.Value}, {(ng.Reset ? "true" : "false")});");
                 w.Line($"__RPT_{r.CsIndex}.AddGroup(__rg{r.CsIndex}_{gi});");
-                // GROUP INDICATE items (§13.18.29): the engine blanks them on repeated presentations — one span
-                // per absolute COLUMN operand (a relative operand with GROUP INDICATE is staged loud at bind).
-                foreach (var ln in group.Lines)
-                    foreach (var f in ln.Fields)
-                        if (f.GroupIndicate)
-                            foreach (var spec in f.Columns)
-                                if (!spec.Relative)
-                                    w.Line($"__rg{r.CsIndex}_{gi}.IndicateFields.Add(({spec.Value}, {f.PrintItem.DisplayTextWidth}));");
             }
             // CONTROL hierarchy (§13.18.16), major→minor: get/set image delegates over the typed storage — the
             // CALL boundary's one string-carrier pair (CallStringRead/CallStringWrite), reused verbatim.

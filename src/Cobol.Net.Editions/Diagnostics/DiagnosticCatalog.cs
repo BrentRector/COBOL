@@ -834,6 +834,17 @@ public static class DiagnosticCatalog
         + "and if BLANK WHEN ZERO or JUSTIFIED is specified, a COLUMN clause shall also be specified (SR15).",
         "ISO §13.15.3 SR10/SR11/SR13/SR15");
 
+    /// <summary>COBOLNET2519 — a GROUP INDICATE clause outside the placement §13.18.28.3 SR1 admits: a report
+    /// group that is not a DETAIL, or an elementary entry lacking the COLUMN clause or the SOURCE-or-VALUE clause
+    /// that makes it a printed item. Only the rule's elementary half (§13.15.3 SR11, COBOLNET2247) had a site, so
+    /// the clause in a control heading, or on a column-less entry, compiled in silence (kb/Work PB1245).</summary>
+    public static readonly DiagnosticDescriptor ReportGroupIndicatePlacement = new(
+        "COBOLNET2519", "report-group-indicate-placement", EditionSeverity.Error,
+        "A GROUP INDICATE clause is specified outside a detail report group description, or in an elementary "
+        + "entry without a COLUMN clause or without a SOURCE or VALUE clause. ISO §13.18.28.3 SR1: \"The GROUP "
+        + "INDICATE clause may be specified only within a detail report group description, in an elementary entry "
+        + "that also contains a COLUMN clause and a SOURCE or VALUE clause.\"", "ISO §13.18.28.3 SR1");
+
     /// <summary>A NEXT GROUP clause (ISO §13.18.37) that a syntax rule forbids where it is written (kb/Work PB957):
     /// outside a level 1 entry (§13.15.3 SR6); an integer beyond the page limit, or 9999 when the report is not
     /// divided into pages (§13.18.37.3 SR1); an absolute or NEXT PAGE form in a report that is not divided into
@@ -931,10 +942,12 @@ public static class DiagnosticCatalog
         NotImplemented, "report-condition-function", EditionSeverity.Error,
         "A FUNCTION reference inside a report PRESENT WHEN condition is not yet implemented.",
         "ISO §13.18.41", RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor ReportIndicateRelativeColumn = new(
-        NotImplemented, "report-indicate-relative-column", EditionSeverity.Error,
-        "GROUP INDICATE on an entry with a relative (PLUS) COLUMN operand is not yet implemented.",
-        "ISO §13.18.29 / §13.18.14", RecognizedNotImplemented);
+    // ⛔ `ReportIndicateRelativeColumn` (`report-indicate-relative-column`, COBOLNET0899) LIVED HERE AND IS GONE
+    // (kb/Work PB1244), and this comment stands where it did so it is not re-added. It refused GROUP INDICATE on an
+    // entry with a relative (PLUS) COLUMN operand — legal source (§13.18.28.3 SR1 asks only for "a COLUMN clause") —
+    // because the engine blanked a fixed column span after composing the line. GROUP INDICATE is now what
+    // §13.18.28.4 GR1 says it is, a PRESENT WHEN on the item, so the relative operand needs nothing of its own.
+    // COBOLNET0899 is the shared recognized-not-implemented code and stays; only this NAME is retired, never reused.
     // ⛔ `ReportNonDisplayItem` LIVED HERE AND IS GONE (kb/Work PB541). It staged a "not supported" refusal of
     // every non-DISPLAY printable item under a §13.15 citation that says no such thing, which refused the
     // NATIONAL half of §13.18.60.3 SR7 along with the usages the rule really excludes. The rule now has its own
