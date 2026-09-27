@@ -28,6 +28,10 @@ CASES = [
     ("bash scripts/push-main.sh", False),
     ("cd /e/claude-skills && git push -q origin main", False),
     ("cd /e/COBOL && git push origin HEAD:main", True),
+    ("cd E:/CobolSharp && git push origin HEAD:main", True),     # the pre-rename folder name is still this repo
+    ("cd scripts && git push origin main", True),               # a relative cd never leaves the repo
+    ("cd /e/COBOL-private && git push origin main", True),      # a sibling of this repo's name (fail closed)
+    ("cd /e/Sites/wiseowlsoftware.com && git push origin main", False),
     ("python - <<'EOF'\nprint('a" + BS + "nb')\nEOF", True),
     ("python - <<'EOF'\nprint('plain')\nEOF", False),
     ('dotnet test x.csproj --filter "~Drift|~EditionGate" > log.txt', True),
