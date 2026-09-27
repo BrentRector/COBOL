@@ -74,17 +74,9 @@ public sealed class RecordSizeModelTests
         Assert.Equal(max, file.VaryMax);
     }
 
-    /// <summary>GR8 a) for a dynamic-capacity table: its "minimum number of table elements" is its minimum
-    /// capacity — §13.18.38.4 GR16, "Integer-4 is the minimum capacity of the table" — so A (2 bytes) plus two
-    /// 3-byte occurrences = 8. (The re-summation this replaced counted one occurrence, 5.)</summary>
-    [Fact]
-    public void DynamicCapacityTable_CountsItsMinimumCapacityInTheMinimum()
-    {
-        var file = Single("       FD  F1 RECORD IS VARYING IN SIZE.\r\n       01  R1.\r\n           05 A PIC X(2).\r\n"
-            + "           05 T OCCURS DYNAMIC FROM 2 TO 5.\r\n              10 E PIC X(3).");
-        Assert.Equal(8, file.VaryMin);
-    }
-
+    /// <summary>Binds <paramref name="fileSection"/> and returns its one file. ⛔ The source must bind CLEAN, binder
+    /// errors included: a size measured on source the compile refuses is not a record size (kb/Work PB1604 — e.g.
+    /// a dynamic-capacity table under an FD record, which COBOLNET1526 refuses per §8.5.1.9.1 3)).</summary>
     private static FileModel Single(string fileSection)
     {
         string src = "       IDENTIFICATION DIVISION.\r\n"
@@ -112,6 +104,7 @@ public sealed class RecordSizeModelTests
             var program = tree!.compilationGroup().SelectMany(g => g.programUnit()).First();
             var data = new DataBinder();
             data.Bind(program);
+            Assert.False(data.Edition.HasErrors, string.Join("\n", data.Edition.Diagnostics));
             return Assert.Single(data.Files);
         }
         finally { try { File.Delete(path); } catch { /* best-effort */ } }

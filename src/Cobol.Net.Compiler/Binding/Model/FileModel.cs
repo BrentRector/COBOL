@@ -473,18 +473,21 @@ public sealed class FileModel
 
     /// <summary>GR8 b)'s maximum for a record with variable-length members (kb/Work PB981): a dynamic-length
     /// item contributes its MAXIMUM size (§8.5.1.10.1 — <see cref="DataItem.DynMaxSize"/> characters, two bytes
-    /// each when national, D-N1) and a dynamic-capacity table its maximum capacity, the same "maximum number of
-    /// table elements" GR8 b) names for every table. Every other member is <see cref="DataItem.ByteWidth"/>'s
-    /// own sum, so this is that sum with the variable-length members filled in, never a second layout.</summary>
+    /// each when national, D-N1). Every other member is <see cref="DataItem.ByteWidth"/>'s own sum, so this is
+    /// that sum with the variable-length members filled in, never a second layout.
+    /// <para>⛔ A DYNAMIC-LENGTH ELEMENTARY ITEM IS THE ONLY VARIABLE-LENGTH MEMBER A RECORD CAN HOLD, so this
+    /// walk has no dynamic-capacity-table arm (kb/Work PB1604, discharged): a dynamic-capacity table "may be
+    /// defined in any place, other than the file section" (§8.5.1.9.1 3)), and COBOLNET1526
+    /// (<c>DataBinder.DynamicResolve</c>) refuses one under any FD / SD record — written there directly, or
+    /// arriving through a TYPE or SAME AS clause — so no record reaches this walk with one
+    /// (<c>OccursDynamicGuardTests.FileSectionDynamicTable_EveryRoute_Rejected1526</c> pins every route). Were
+    /// that rule ever relaxed, GR8 b)'s maximum for such a table is the implementor's MAXIMUM capacity
+    /// (§8.5.1.9.1, DOC-A.1-60), never its TO phrase, which is only the EXPECTED capacity and "may be exceeded
+    /// with a nonfatal exception".</para></summary>
     internal static long MaxDynamicExtent(DataItem item) =>
         item.IsDynamicLength ? (long)item.DynMaxSize * (item.Pic?.Category is PicCategory.National ? 2 : 1)
-        : item.IsDynamicTable ? (long)(item.OccursSpec?.Max ?? 0) * PerOccurrenceMax(item)
         : item.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(item) ? (long)item.ByteWidth * (item.Occurs ?? 1)
         : item.Children.Where(c => c.RedefinesTargetName is null).Sum(MaxDynamicExtent) * (item.Occurs ?? 1);
-
-    private static long PerOccurrenceMax(DataItem table) =>
-        table.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(table) ? table.ByteWidth
-        : table.Children.Where(c => c.RedefinesTargetName is null).Sum(MaxDynamicExtent);
 
     /// <summary>⛔ THE ONE "does this record have a fixed character window?" predicate — D-FRA
     /// (docs/CONFORMANCE.md §3, kb/Work PB981). A record description that is a dynamic-length elementary item,
@@ -557,12 +560,13 @@ public sealed class FileModel
                 + (os.Min == 0 ? 0 : BitLayout.StrideBits(table) * (os.Min - 1) + BitLayout.WidthBits(table)))
         : item.Children.Where(c => c.RedefinesTargetName is null).Sum(c => MinExtent(c) * c.MinimumOccurrences);
 
-    /// <summary>Whether a table whose occurrence count varies — an occurs-depending table or a dynamic-capacity
-    /// table — lies strictly beneath <paramref name="item"/> (a redefinition contributes nothing to GR8's sum, so
-    /// one beneath a redefining entry does not count).</summary>
+    /// <summary>Whether an occurs-depending table — the one table in a record whose occurrence count varies —
+    /// lies strictly beneath <paramref name="item"/> (a redefinition contributes nothing to GR8's sum, so one
+    /// beneath a redefining entry does not count). A dynamic-capacity table cannot be in a record: see
+    /// <see cref="MaxDynamicExtent"/> (§8.5.1.9.1 3), COBOLNET1526).</summary>
     private static bool HasVaryingTableBeneath(DataItem item) =>
         item.Children.Any(c => c.RedefinesTargetName is null
-            && (c.OccursSpec is { DependingName: not null } or { IsDynamic: true } || HasVaryingTableBeneath(c)));
+            && (c.OccursSpec is { DependingName: not null } || HasVaryingTableBeneath(c)));
 
     /// <summary>⛔ THE RECORD AREA'S WIDTH IN BYTES — what every connector registration, the SORT/MERGE record
     /// length and the fixed-file attributes read (ISO §13.18.43.4 GR2: "The implicit or explicit RECORD clause

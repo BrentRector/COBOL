@@ -132,6 +132,46 @@ public sealed class OccursDynamicGuardTests
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1526");
     }
 
+    /// <summary>§8.5.1.9.1 3) holds on EVERY route a description reaches a file record by, not only the one
+    /// written in place (kb/Work PB1604): a dynamic-capacity table arriving through a TYPE clause (whole record or
+    /// a subordinate group), through SAME AS, or written in a SORT-MERGE file description is refused with
+    /// COBOLNET1526. This is what makes the record-sizing walks (<c>FileModel.MaxDynamicExtent</c> /
+    /// <c>MinRecordSize</c>, <c>RecordLayout.KeyWindowOf</c>) correct in having no dynamic-capacity-table arm:
+    /// a route this test does not refuse would let a record be sized without its table.</summary>
+    [Theory]
+    [InlineData("FD F.\n01 R TYPE TT.\nSD S.\n01 SR PIC X.")]
+    [InlineData("FD F.\n01 R.\n   05 A PIC X(2).\n   05 G TYPE TT.\nSD S.\n01 SR PIC X.")]
+    [InlineData("FD F.\n01 R SAME AS TT-W.\nSD S.\n01 SR PIC X.")]
+    [InlineData("FD F.\n01 R PIC X.\nSD S.\n01 SR.\n   05 A PIC X(2).\n   05 T OCCURS DYNAMIC FROM 2 TO 5.\n      10 E PIC X(3).")]
+    public void FileSectionDynamicTable_EveryRoute_Rejected1526(string fileSection)
+    {
+        var (ok, diag) = EditionHarness.Compile("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. FDYNR.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "fdynr.dat" ORGANIZATION IS SEQUENTIAL.
+                SELECT S ASSIGN TO "fdynr.srt".
+            DATA DIVISION.
+            FILE SECTION.
+            """ + "\n" + fileSection + "\n" + """
+            WORKING-STORAGE SECTION.
+            01 TT TYPEDEF.
+               05 T OCCURS DYNAMIC FROM 2 TO 5.
+                  10 E PIC X(3).
+            01 TT-W.
+               05 T OCCURS DYNAMIC FROM 2 TO 5.
+                  10 E PIC X(3).
+            PROCEDURE DIVISION.
+            MAIN-PARA.
+                DISPLAY "X".
+                STOP RUN.
+            """, 2023);
+        Assert.False(ok, "a dynamic-capacity table under a FILE SECTION record must be rejected (ISO §8.5.1.9.1 3))");
+        EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1526");
+    }
+
     /// <summary>The positive companions: a well-formed FROM/TO, and a Format 1 VALUE on the SUBORDINATE of a GROUP
     /// dynamic table with NO OCCURS TO (the element's per-occurrence seed at capacity = FROM, §13.18.63.4 GR9 +
     /// §14.6.2.3.2 item 6 — never a VALUE-derived capacity, which is the FORMAT 2 GR16's job alone), both compile

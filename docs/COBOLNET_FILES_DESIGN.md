@@ -121,8 +121,9 @@ operation is applied to a group containing it"* (§8.5.1.11.2).
   count and otherwise writes `RecordFraming.VoidExtents` (offsets -1, corresponding to no layout).
 - **The implied RECORD clause** (§13.18.43.4 GR5, implementor-defined) is Format 2 exactly when a record is
   variable-length (`FileModel.ImpliesVariableFormat`; `RecordSizeVaries` is the one question every registration
-  and `SortBinder.SortVaryingOf` ask). `MaxRecordSize` counts a dynamic-length item at its maximum size and a
-  dynamic table at its maximum capacity (GR8 b); `FileModel.RecordMax` reaches the connector as `RecordMax`, the
+  and `SortBinder.SortVaryingOf` ask). `MaxRecordSize` counts a dynamic-length item at its maximum size (GR8 b) —
+  the only variable-length member a record can hold, since COBOLNET1526 refuses a dynamic-capacity table under any
+  FD / SD record (§8.5.1.9.1 3); kb/Work PB1604); `FileModel.RecordMax` reaches the connector as `RecordMax`, the
   §14.9.30.4 GR14/GR15 truncation bound, separately from the area width the image is padded to — an unlimited
   dynamic-length record must not size every READ's area buffer.
 - **SD records.** `SortBinder.SortRecordOf` admits a variable-length record whose extent composes.
@@ -1636,8 +1637,8 @@ character positions (`ImageWidth`), which counted a national record at half its 
 redefining children (GR8's *"excluding redefinitions and renamings"*), already takes an ODO table's maximum
 occurrences, and already lays a bit-bearing subtree out by the §8.5.1.6.3 walk (GR4's *"the entire byte in which
 that data item ends"*). `FileModel.MinRecordSize` is GR8 a): the same `ByteWidth` wherever no table varies beneath
-an item, and otherwise each varying table at `DataItem.MinimumOccurrences` (an ODO's integer-1, a dynamic-capacity
-table's minimum capacity integer-4 — §13.18.38.4 GR16), a bit-bearing ODO subtree placed by the bit walk. A
+an item, and otherwise each occurs-depending table at `DataItem.MinimumOccurrences` (its integer-1; a record holds
+no dynamic-capacity table — §8.5.1.9.1 3), COBOLNET1526), a bit-bearing ODO subtree placed by the bit walk. A
 parallel leaf re-summation would be the same rule twice — and it was: the one this replaced rounded each bit leaf to
 a byte of its own, so two `PIC 1(3) USAGE BIT` items had minimum 2 over maximum 1.
 
