@@ -1656,7 +1656,7 @@ public sealed partial class DataBinder
     /// maps the rest.</summary>
     private string? FigurativeNotACharacter(Core.FigurativeConstantContext fig, LiteralPhraseRules r)
     {
-        Edition.Error(r.Code, $"{r.What}: {fig.GetText()} — the figurative constant is not a character of the native "
+        Edition.Error(r.Code, $"{r.What}: {ConcatFolder.Spelling(fig)} — the figurative constant is not a character of the native "
             + "character set, so it cannot be an operand of this clause (ISO §12.3.7.4 GR10 names HIGH-VALUE and "
             + "LOW-VALUE; §8.3.3.6.4 GR1 SPACE, QUOTE and ZERO)");
         return null;
@@ -1671,7 +1671,7 @@ public sealed partial class DataBinder
         LiteralPhraseRules r)
     {
         if (literal1.Category == (r.National ? PicCategory.National : PicCategory.Alphanumeric)) return literal1.Value;
-        Edition.Error(r.Code, $"{r.What}: {fig.GetText()} — each noninteger literal shall be "
+        Edition.Error(r.Code, $"{r.What}: {ConcatFolder.Spelling(fig)} — each noninteger literal shall be "
             + $"{(r.National ? "a NATIONAL literal (N\"…\")" : "an alphanumeric literal")} "
             + $"(ISO §12.3.7.3 {r.Rule(r.ClassItem)})");
         return null;

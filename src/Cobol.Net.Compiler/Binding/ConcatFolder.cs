@@ -117,11 +117,11 @@ internal static class ConcatFolder
             {
                 var folded = report is null ? Walk(ce, env, report: null) : Fold(ce, report, env);
                 if (ce.concatOperand().All(op => IsZeroLengthOperand(op, env)))
-                    ReportZeroLength("ALL " + string.Join(" & ", ce.concatOperand().Select(op => op.GetText())), report);
+                    ReportZeroLength(Spelling(fig), report);
                 return folded;
             }
             string token = al.GetText();
-            if (CobolLiteral.IsZeroLength(token)) ReportZeroLength("ALL " + token, report);
+            if (CobolLiteral.IsZeroLength(token)) ReportZeroLength(Spelling(fig), report);
             return new Folded(CobolLiteral.ClassOf(token) switch
             {
                 LiteralClass.National => PicCategory.National,
@@ -137,8 +137,21 @@ internal static class ConcatFolder
                 + "§8.3.3.6.3 SR2; §13.10.3 SR2)");
             return new Folded(PicCategory.Alphanumeric, k.Text);
         }
-        if (CobolLiteral.IsZeroLength(k.RawText)) ReportZeroLength($"ALL {word}", report);
+        if (CobolLiteral.IsZeroLength(k.RawText)) ReportZeroLength(Spelling(fig), report);
         return new Folded(k.Category, k.Text);
+    }
+
+    /// <summary>⛔ THE ONE spelling of a figurative constant in a diagnostic — <c>ALL "AB"</c>, <c>ALL "A" &amp; K</c>,
+    /// <c>ALL K</c>. ANTLR's <c>GetText()</c> joins a rule's tokens with no separator, so a message built from it read
+    /// <c>ALL"AB"</c>; the separator the source carries is restored here, once, for every message naming the
+    /// figurative (kb/Work PB1627).</summary>
+    public static string Spelling(Core.FigurativeConstantContext fig)
+    {
+        if (fig.ALL() is null) return fig.GetText();
+        string literal1 = fig.allLiteral()?.concatenationExpression() is { } ce
+            ? string.Join(" & ", ce.concatOperand().Select(op => op.GetText()))
+            : fig.GetChild(1).GetText();
+        return "ALL " + literal1;
     }
 
     /// <summary>Whether a concatenation operand is a zero-length literal — asked STRUCTURALLY (contiguous delimiters,
@@ -209,7 +222,7 @@ internal static class ConcatFolder
         bool Refused, string Described)
     {
         public static Term Literal(PicCategory cls, string value, string described) => new(cls, value, null, false, described);
-        public static Term Figurative(Core.FigurativeConstantContext fig) => new(null, "", fig, false, $"figurative constant '{fig.GetText()}'");
+        public static Term Figurative(Core.FigurativeConstantContext fig) => new(null, "", fig, false, $"figurative constant '{Spelling(fig)}'");
         public static Term Symbolic(string value, string word) => new(null, value, null, false, $"symbolic-character '{word}'");
         public static Term Refusal(string written) => new(null, "", null, true, written);
     }
@@ -262,7 +275,7 @@ internal static class ConcatFolder
             // §8.8.3.2 SR1 second sentence: neither operand shall be a figurative constant that begins with the
             // word ALL (any ALL form — ALL "lit" / ALL X"…" / ALL B"…" / ALL SPACE / ALL symbolic-character …).
             if (fig.ALL() is null) return Term.Figurative(fig);
-            report?.Error(DiagnosticCatalog.ConcatAllFigurative, $"'{fig.GetText()}': a figurative constant beginning "
+            report?.Error(DiagnosticCatalog.ConcatAllFigurative, $"'{Spelling(fig)}': a figurative constant beginning "
                 + "with ALL shall not be a concatenation-expression operand (ISO §8.8.3.2 SR1)");
             return Term.Refusal(fig.GetText());
         }

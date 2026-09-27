@@ -306,7 +306,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         if (fig.lowValueWord() is not null) return new BoundFigurative('L');
         if (fig.quoteWord() is not null) return new BoundFigurative('Q');
         if (fig.NULL_() is not null) return new BoundFigurative('N');
-        return BoundOperandError.Refused(ctx.Edition, $"figurative constant '{fig.GetText()}'");
+        return BoundOperandError.Refused(ctx.Edition, $"figurative constant '{ConcatFolder.Spelling(fig)}'");
     }
 
     /// <summary>The bound operand of a symbolic character (§12.3.7.4 GR11; kb/Work PB110): the ALL literal of its
@@ -977,11 +977,11 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             if (fig.zeroWord() is not null && fig.ALL() is null) return new BoundNumLiteral("0");
             // The bare BoundExprError here carried no diagnostic and rendered as a RUNTIME NotImplemented —
             // the wrong stage for a syntax-rule violation (kb/Work PB155).
-            ctx.Edition.Error("COBOLNET0844", $"figurative constant '{fig.GetText()}' is not a numeric "
+            ctx.Edition.Error("COBOLNET0844", $"figurative constant '{ConcatFolder.Spelling(fig)}' is not a numeric "
                 + "operand (ISO §8.8.1.1 — the only figurative constant an arithmetic expression admits is ZERO "
                 + "(ZEROS, ZEROES); §8.3.3.6.3 SR1a — where the literal is restricted to a numeric literal, ZERO "
                 + "is permitted WITHOUT the ALL phrase)" + where);
-            return BoundExprError.Refused(ctx.Edition, $"figurative constant '{fig.GetText()}' in a numeric context");
+            return BoundExprError.Refused(ctx.Edition, $"figurative constant '{ConcatFolder.Spelling(fig)}' in a numeric context");
         }
         if ((nn.NATLIT() ?? nn.BOOLLIT()) is not null)
         {

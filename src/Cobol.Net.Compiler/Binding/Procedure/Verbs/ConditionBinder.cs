@@ -105,10 +105,10 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 return new BoundBoolAll(literal1.Value, IsAllLiteral: true);   // the ONE Format-6 construction site (kb/Work PB157)
             // kb/Work PB1029 — this refusal carried no diagnostic (`COMPUTE B = B B-AND SPACE` compiled clean and
             // aborted the run unit); it is the §8.8.2 operand list's figurative half, reported as its siblings are.
-            ctx.Edition.Error("COBOLNET1511", $"'{fig.GetText()}' is not a valid boolean operand — the only figurative "
+            ctx.Edition.Error("COBOLNET1511", $"'{ConcatFolder.Spelling(fig)}' is not a valid boolean operand — the only figurative "
                 + "constants a boolean expression admits are ZERO (ZEROS, ZEROES) and ALL literal where the literal is a "
                 + "boolean literal (ISO §8.8.2)");
-            return BoundBoolError.Refused(ctx.Edition, $"figurative constant '{fig.GetText()}' in a boolean expression "
+            return BoundBoolError.Refused(ctx.Edition, $"figurative constant '{ConcatFolder.Spelling(fig)}' in a boolean expression "
                 + "(ISO §8.8.2)");
         }
         // A sole data reference to a category-boolean item.
