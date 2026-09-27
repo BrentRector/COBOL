@@ -1854,7 +1854,11 @@ answer that every organization's WRITE and REWRITE asks, in the connector, befor
    item 3; Annex A.1 item 108). `HostFile.IsMediumBoundary` is the one classification of the host's refusal and
    `FileStatusCode.ForWriteFailure` maps it ('34', else '30'); `SequentialConnector.Write`, `WriteAdvancing` and
    `Rewrite` are the only three entry points a record reaches the medium through, and each wraps its body in
-   that one catch. A keyed store meets the host only at the CLOSE, whose failure is '30'.
+   that one catch. A keyed store meets the host only at the CLOSE, whose failure is '30'. The READ side has the
+   twin catch (kb/Work PB1512): `SequentialConnector.Read` and `StartFirstLast` are the only entry points that
+   read the medium, and a host failure there is §9.1.13.6 item 1's '30' with the file position invalidated
+   (`ReadFailed`), never an escaping exception. An OPEN whose body failed releases its handles
+   (`AbandonOpen`) without letting a refused final flush replace the OPEN's own status.
 4. **Does the file's recorded organization allow this connector to write?** A keyed store's header records its
    organization (D10's no-sidecar format), and §12.4.5.10.3 GR1 makes it permanent, so a SEQUENTIAL connector's
    OPEN I-O or EXTEND over one is the '39' conflict (`SequentialConnector.FixedAttributeConflict`; DOC-A.1-129).
@@ -1900,7 +1904,7 @@ The codec serializes the base (first) definition; a REDEFINES sub-view is materi
 
 ### REWRITE record-length rules are organization-dependent: a RECORD SEQUENTIAL REWRITE must equal the replaced record's length (14.9.35 GR16) or it is status 44; a RELATIVE or INDEXED REWRITE may change length (14.9.35 GR18) but must stay within the RECORD IS VARYING bounds (14.9.35 GR20) or it is status 44. On any 44 no logical updating takes place and the record area is unchanged (14.9.35 GR14).
 
-For a record-sequential file the connector remembers the last-read frame start and length; REWRITE re-serializes, compares the serialized length to the remembered length, and returns 44 when they differ (GR16 — the in-place frame cannot change size). For a relative or indexed file the record length is allowed to differ (GR18), so REWRITE checks only that the serialized length lies within the file's RECORD IS VARYING minimum/maximum, returning 44 otherwise (GR20).
+`SequentialConnector.RewriteRecord` dispatches on the ORGANIZATION — the axis §14.9.35.4 states the rules on — never on fixed-versus-varying (kb/Work PB1168). For a RECORD sequential file, fixed-length or variable, the connector remembers the last-read frame start and length and returns 44 unless record-name-1's byte count EQUALS it (GR16 — the in-place frame cannot change size); the count is §13.18.43.4 GR13's, which the emitter passes as a constant for a fixed-length file (`SequentialIoEmitter.RewriteLengthArg`), because the runtime's default on a fixed file is the WRITE's whole-record-area rule. For a LINE sequential file GR17 a)–d) apply in order, comparing that same untrimmed byte count with the replaced line: more bytes is 44, fewer are space-filled to the line's length (GR21's trailing-space rule is WRITE's, not REWRITE's). A WRITE makes its length decision once for both of its arms (`WrittenLength` / `OutsideVaryingBounds`), so a print-control WRITE is held to the RECORD IS VARYING bounds exactly as a plain one (kb/Work PB1190). For a relative or indexed file the record length is allowed to differ (GR18), so REWRITE checks only that the serialized length lies within the file's RECORD IS VARYING minimum/maximum, returning 44 otherwise (GR20).
 
 ### Read-position state machine: a sequential READ (NEXT or PREVIOUS) issued after a prior unsuccessful sequential READ is 46; a sequential REWRITE or DELETE without a preceding successful READ is 43; START establishes an inclusive file-position indicator.
 

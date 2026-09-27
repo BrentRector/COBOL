@@ -80,6 +80,51 @@ public sealed class FileBoundaryTests : IDisposable
         c.Close();   // its own final flush is refused too: §9.1.13.6 item 1's '30' through Close's catch
     }
 
+    /// <summary>§9.1.13.6 item 1 on the READ side (kb/Work PB1512): a host failure while a sequential READ or
+    /// START FIRST/LAST reads the medium is the permanent error '30' — never an escaping IOException — and the
+    /// unsuccessful READ leaves no valid file position, so the next sequential READ is '46' (§14.9.30.4 GR18,
+    /// §9.1.13.7 item 6). The failure is produced by the host itself, measured per host: Linux refuses a read of
+    /// <c>/proc/self/mem</c> at address 0 with EIO, and Windows refuses a read of a byte range another handle has
+    /// LOCKED. A host offering neither must be neither of them, so the test cannot pass on a CI host by not
+    /// running.</summary>
+    [Fact]
+    public void SequentialRead_HostFailure_Is30_AndInvalidatesThePosition()
+    {
+        FileStream? locker = null;
+        string path;
+        if (OperatingSystem.IsLinux() && File.Exists("/proc/self/mem")) path = "/proc/self/mem";
+        else if (OperatingSystem.IsWindows())
+        {
+            path = Host("locked.dat");
+            File.WriteAllBytes(path, Encoding.Latin1.GetBytes(new string('A', 64)));
+        }
+        else
+        {
+            Assert.False(OperatingSystem.IsLinux() || OperatingSystem.IsWindows(), "the host failure was not exercised");
+            return;
+        }
+        var c = new SequentialConnector(path, recordWidth: 16, lineSequential: false);
+        Assert.Equal(FileStatusCode.Success, c.Open(FileOpenMode.Input));
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                locker = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                locker.Lock(0, 64);
+            }
+            Assert.False(c.Read(previous: false, out _));
+            Assert.Equal(FileStatusCode.PermanentError, c.Status);
+            Assert.False(c.Read(previous: false, out _));
+            Assert.Equal(FileStatusCode.NoValidNextRecord, c.Status);   // '46' — the '30' READ left no position
+            Assert.Equal(FileStatusCode.PermanentError, c.StartFirstLast(last: false));
+        }
+        finally
+        {
+            locker?.Dispose();   // releases the region lock with the handle
+            c.Close();
+        }
+    }
+
     // ── §9.1.13.5 item 4: the store's capacity ───────────────────────────────────────────────────────────
 
     /// <summary>The capacity is the largest array the store is composed in and loaded from.</summary>

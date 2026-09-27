@@ -136,13 +136,22 @@ public sealed class SequentialConnector : FileConnector
     internal void PositionReversed()
     {
         Reversed = true;
-        // ⛔ THE ONE PRESENCE ANSWER PER OPEN (kb/Work PB323): OptionalAbsent is what the OPEN's own probe
-        // concluded, so this never runs a second File.Exists — which would also answer FALSE for a file that
-        // is present but refused. A non-optional absent file never reaches here at all: its OPEN INPUT is
-        // '35' and §14.9.27.4 GR25 a) sends ReversedPhraseEffect home before it calls this.
-        long n = OptionalAbsent ? 0 : ExistingRecordCount();
-        _readOrdinal = n > 0 ? n + 1 : 0;
+        _readOrdinal = _reversedRecordCount > 0 ? _reversedRecordCount + 1 : 0;
     }
+
+    /// <summary>Does the OPEN statement about to run on this connector carry the REVERSED phrase? Set by the
+    /// registry's ONE open dispatch (<c>FileRegistry.OpenCore</c>) before EVERY open of a sequential connector,
+    /// so it always describes the current statement and can never leak into the next one.</summary>
+    internal bool ReversedRequested { private get; set; }
+
+    /// <summary>The record count <see cref="PositionReversed"/> positions from, MEASURED INSIDE THE OPEN BODY
+    /// (<see cref="OpenCore"/>'s INPUT arm) and only for a REVERSED open. ⛔ It used to be measured after the
+    /// OPEN had returned, from <see cref="PositionReversed"/> itself — the one read of the physical file left
+    /// outside <c>FileConnector.Open</c>'s try, against <c>FileRegistry.SharedOpenAttempt</c>'s rule that
+    /// nothing after a successful open may touch it (kb/Work PB713), so a host failure while counting escaped
+    /// the run unit instead of becoming the OPEN's '30' (kb/Work PB1512's sibling sweep). An absent OPTIONAL
+    /// file counts none — THE ONE PRESENCE ANSWER PER OPEN (kb/Work PB323), never a second probe.</summary>
+    private long _reversedRecordCount;
 
     /// <inheritdoc/>
     /// <remarks>The record sequential organization's §14.9.30.4 GR9 pre-read conflict target: the ordinal
@@ -341,7 +350,7 @@ public sealed class SequentialConnector : FileConnector
         // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
         // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
         StreamWriter Open(FileShare s) => new(HostFile.OpenConnectorWriteStream(HostPath, mode, s),
-            FileCharacterSet.Medium) { NewLine = "\r\n" };
+            FileCharacterSet.Medium) { NewLine = _lineEnd };
         try { return Open(share); }
         catch (IOException) when (fallbackShare is { } old) { return Open(old); }
     }
@@ -379,14 +388,21 @@ public sealed class SequentialConnector : FileConnector
         }
         if (_lineSequential)
         {
-            // Counted through the connector's OWN encoding (Latin1 — one byte per character), the same reader
-            // shape OpenCore's INPUT arm builds, so "record" here means exactly what a READ of this file would
-            // deliver. File.ReadLines would have decoded UTF-8 and allocated a string per line to discard it.
+            // Counted under the SAME delimiter rule a READ applies (ReadPhysicalLine, DOC-A.1-114): a record ends
+            // at an LF (a CR LF pair ends at its LF) and a lone CR is data, so the count is the LF bytes plus a
+            // final record with no delimiter. StreamReader.ReadLine would also end a record at a lone CR — the
+            // rule kb/Work PB1540 removed from the reader — and decode and allocate a string per line besides.
             using var fs = HostFile.OpenAuxiliary(HostPath, FileMode.Open, FileAccess.Read);
-            using var r = new StreamReader(fs, Encoding.Latin1);
+            Span<byte> buffer = stackalloc byte[4096];
             long n = 0;
-            while (r.ReadLine() is not null) n++;
-            return n;
+            bool open = false;   // bytes seen since the last delimiter: a final, undelimited record
+            for (int got; (got = fs.Read(buffer)) > 0;)
+            {
+                ReadOnlySpan<byte> chunk = buffer[..got];
+                n += chunk.Count((byte)'\n');
+                open = chunk[^1] != (byte)'\n';
+            }
+            return open ? n + 1 : n;
         }
         // Fixed-width record-sequential: arithmetic over the file's length. No handle at all, which is why this
         // arm never showed PB713 (FileInfo.Length is metadata).
@@ -744,7 +760,29 @@ public sealed class SequentialConnector : FileConnector
         : base(hostPath, recordWidth, varyMin, varyMax)
     {
         _lineSequential = lineSequential;
+        _lineEnd = lineSequential ? LineSequentialDelimiter : PrintLineEnd;
     }
+
+    /// <summary>⛔ THE LINE SEQUENTIAL LINE DELIMITER — Annex A.1 item 114, <c>docs/CONFORMANCE.md</c>
+    /// <c>DOC-A.1-114</c>: the HOST platform's newline (CR LF on Windows, LF on Linux and macOS). §12.4.5.10.3
+    /// GR2: <i>"Each record in a line sequential file is terminated by an implementor-defined line
+    /// delimiter"</i>. The standard leaves it open, so CLAUDE.md rule 1's precedent decides: GnuCOBOL writes a
+    /// line sequential file in the C library's text mode, i.e. the host newline. (It was CR LF on every host
+    /// until kb/Work PB1540, so a file written on Linux was not a Linux text file.) The READ side accepts BOTH
+    /// forms on every host — see <see cref="ReadPhysicalLine"/>.</summary>
+    internal static readonly string LineSequentialDelimiter = Environment.NewLine;
+
+    /// <summary>The PRINT STREAM's line control — the line end of a record sequential file written with an
+    /// ADVANCING phrase or a LINAGE clause (the one on-disk shape a record sequential print file has; the
+    /// report writer's lines are the same stream). CR LF on every host. It is not a line sequential file, so
+    /// item 114 does not govern it; kb/Work PB1540 changed the line sequential delimiter only.</summary>
+    private const string PrintLineEnd = "\r\n";
+
+    /// <summary>This connector's ONE line end — <see cref="LineSequentialDelimiter"/> on a line sequential file,
+    /// <see cref="PrintLineEnd"/> on a record sequential print stream. Every line this connector ends — a
+    /// record's delimiter, an ADVANCING or LINAGE line, the CLOSE of an open line — writes exactly this, so a
+    /// margin line, a page-fill line and a record's delimiter are the same bytes on one file.</summary>
+    private readonly string _lineEnd;
 
     /// <inheritdoc/>
     /// <remarks>Both §9.1.7.2 types of sequential file — record sequential and line sequential — record this
@@ -829,6 +867,7 @@ public sealed class SequentialConnector : FileConnector
         // the OPEN statement that wrote it, and ReversedPhraseEffect re-establishes it AFTER this body runs
         // (kb/Work PB668). Without this, `OPEN INPUT F REVERSED. CLOSE F. OPEN INPUT F.` read backward.
         Reversed = false;
+        _reversedRecordCount = 0;
         _varyingStarts = null;   // rebuilt on demand against THIS open's physical file
         // §9.1.16 record-lock identity: this connector has released nothing yet. The MINT lives on the shared
         // physical-file state (kb/Work PB739), and only the OUTPUT and EXTEND arms below touch it — INPUT and
@@ -855,6 +894,9 @@ public sealed class SequentialConnector : FileConnector
                     // is the file lock against OTHER RUN UNITS, and a boolean cannot be both.
                     _reader = OpenReader(HostShare, at: 0, fallbackShare: null);
                     NoticeIfLayoutDisagrees();
+                    // OPEN INPUT … REVERSED: the count its position needs is taken HERE, inside the OPEN's try,
+                    // so a host failure is this OPEN's '30' (see _reversedRecordCount).
+                    if (ReversedRequested) _reversedRecordCount = ExistingRecordCount();
                     break;
 
                 case FileOpenMode.Output:
@@ -938,10 +980,15 @@ public sealed class SequentialConnector : FileConnector
     /// what keeps that true of the arms added later, and it is the same two lines the CLOSE runs.</remarks>
     protected override void AbandonOpen()
     {
-        _reader?.Dispose();
-        _writer?.Dispose();
-        _reader = null;
-        _writer = null;
+        // Both handles go whatever either disposal throws: a writer whose final flush is refused would otherwise
+        // leave the reader held — a file lock no COBOL statement can remove (kb/Work PB771's reason for this
+        // member) — and FileConnector.Open reports the refusal as nothing more than the OPEN's own status.
+        try { _reader?.Dispose(); }
+        finally
+        {
+            try { _writer?.Dispose(); }
+            finally { _reader = null; _writer = null; }
+        }
     }
 
     /// <summary>Report a FIXED-LENGTH record-sequential file whose byte length is not a whole multiple of its
@@ -979,7 +1026,7 @@ public sealed class SequentialConnector : FileConnector
         {
             // An unterminated line — an AFTER write's record — is ended here; a line some travel already ended
             // gets nothing (kb/Work PB864).
-            if (_lineOpen) { _writer?.Write("\r\n"); _lineOpen = false; }
+            if (_lineOpen) { _writer?.Write(_lineEnd); _lineOpen = false; }
             _reader?.Dispose();
             _writer?.Dispose();   // a flush failure here maps to '30' on FileConnector.Close (§9.1.13.6 item 1)
         }
@@ -1061,7 +1108,7 @@ public sealed class SequentialConnector : FileConnector
         // nothing left OPEN. Where a line IS open (an AFTER write's record, presented after its advance), the one
         // implicit advance is placed FIRST, as GR25 f) places AFTER's: see ImplicitAdvanceIsBefore (kb/Work PB964).
         if ((_printControl || page is not null) && !_lineSequential)
-            return WriteAdvancingRecord(image, 1, before: ImplicitAdvanceIsBefore, page);
+            return WriteAdvancingRecord(image, length, 1, before: ImplicitAdvanceIsBefore, page);
         // §14.9.51.4 GR23: "For a line sequential file, if the record area contains one or more characters that
         // are not in the implementor-defined character set defined for a line sequential file, the execution of
         // the WRITE statement is unsuccessful and the I-O status in the write file connector is set to '71'."
@@ -1073,14 +1120,12 @@ public sealed class SequentialConnector : FileConnector
         // file coded character set is REFUSED, never written as '?' — the record sequential twin of the '71'
         // above, which already covers a line sequential file (its character set excludes the same characters).
         // Asked of what the WRITE TRANSFERS: a varying record's positions past its length never reach the medium.
-        if (!_lineSequential && RecordHasCharacterWithoutByteImage(
-                image.AsSpan(0, Math.Min(image.Length, IsVarying ? (length >= 0 ? length : image.Length) : RecordWidth))))
+        int len = WrittenLength(image, length);
+        if (!_lineSequential && RecordHasCharacterWithoutByteImage(image.AsSpan(0, Math.Min(image.Length, len))))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
+        if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14
         if (IsVarying)
         {
-            int len = length >= 0 ? length : image.Length;
-            if (len < VaryMin || len > VaryMax)
-                return Status = FileStatusCode.RecordSizeViolation;   // '44' §13.18.43 GR14a
             if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(FitRecord(image, len)), page)) return LinageViolationStatus(); }
             else
             {
@@ -1096,6 +1141,28 @@ public sealed class SequentialConnector : FileConnector
         ReleaseRecord();   // §14.9.51.4 GR12 — released to the operating environment, and numbered there
         return WriteSucceeded();   // a LINE SEQUENTIAL LINAGE write travels the page too (EmitLineSequentialRecord)
     }
+
+    /// <summary>⛔ THE ONE LENGTH DECISION OF A WRITE, asked by BOTH write arms — the plain record
+    /// (<see cref="WriteRecord"/>) and the print-control line (<see cref="WriteAdvancingRecord"/>), which a
+    /// print or LINAGE file's plain WRITE is rerouted to. §13.18.43.4 GR13: the number of bytes in the record is
+    /// data-name-1's content (a), passed as <paramref name="length"/>, else the record's own (b/c) — the image's
+    /// length on a variable-length file, the record area's width on a fixed one (every record of a fixed file is
+    /// integer-1 bytes, GR6).
+    /// <para>⛔ The print arm had no length at all (kb/Work PB1190): a RECORD VARYING … DEPENDING file's
+    /// ADVANCING write — and, once one had been seen, every later plain WRITE, rerouted to the print arm ahead
+    /// of the varying branch — skipped §14.9.51.4 GR14's bound and presented the whole record area, so a
+    /// DEPENDING value outside the bounds wrote the record with '00'. The two-arm dispatch: the plain arm had the
+    /// rule, the print arm never did.</para></summary>
+    private int WrittenLength(string image, int length) =>
+        !IsVarying ? RecordWidth : length >= 0 ? length : image.Length;
+
+    /// <summary>§14.9.51.4 GR14 — <i>"The number of bytes in the runtime representation of literal-1, the data
+    /// item referenced by identifier-1, or the record referenced by record-name-1 … shall not be larger than the
+    /// largest or smaller than the smallest number of bytes allowed by the RECORD IS VARYING clause … If this
+    /// rule is violated, the execution of the WRITE statement is unsuccessful and the I-O status of the write file
+    /// connector is set to '44'"</i> (§9.1.13.7 item 4 a); §13.18.43.4 GR14 a)). GR15 then says the write does
+    /// not take place, so every write arm asks it before anything reaches the medium.</summary>
+    private bool OutsideVaryingBounds(int len) => IsVarying && (len < VaryMin || len > VaryMax);
 
     /// <summary>A line sequential record and its delimiter (ISO §9.1.13.2 — a line sequential record is
     /// delimited, not fixed-width).
@@ -1147,17 +1214,19 @@ public sealed class SequentialConnector : FileConnector
     /// AFTER, advance then write the trimmed image; for BEFORE, write then advance. <paramref name="lines"/> = -1
     /// means ADVANCING PAGE — a form feed on a file with no LINAGE clause (GR25 h), a reposition to the next
     /// logical page on one that has (GR25 g). The leading/trailing newline structure matches the legacy print
-    /// stream; the LOGICAL-page geometry lives in <see cref="Position"/> and <see cref="Present"/>.</summary>
-    public string WriteAdvancing(string image, int lines, bool before, LinagePage? page)
+    /// stream; the LOGICAL-page geometry lives in <see cref="Position"/> and <see cref="Present"/>.
+    /// <paramref name="length"/> is the record length exactly as <see cref="Write"/> takes it (the DEPENDING
+    /// item's content, −1 = the record's own size — <see cref="WrittenLength"/>).</summary>
+    public string WriteAdvancing(string image, int lines, bool before, LinagePage? page, int length = -1)
     {
-        try { return WriteAdvancingRecord(image, lines, before, page); }
+        try { return WriteAdvancingRecord(image, length, lines, before, page); }
         catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30' — see Write
     }
 
     /// <summary>The body of <see cref="WriteAdvancing"/>, inside its medium-boundary catch — and the one
     /// <see cref="WriteRecord"/> reroutes a print or LINAGE file's plain WRITE to, so the reroute stays inside the
     /// catch that WRITE already opened.</summary>
-    private string WriteAdvancingRecord(string image, int lines, bool before, LinagePage? page)
+    private string WriteAdvancingRecord(string image, int length, int lines, bool before, LinagePage? page)
     {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
         if (!IsOpen || _writer is null) return Status = FileStatusCode.WriteNotOpenForOutput;
@@ -1173,10 +1242,14 @@ public sealed class SequentialConnector : FileConnector
         // U+0000–U+00FF the byte of the same value, so there is NO print-specific character map: one that wrote a
         // character above U+007F as '?' would be a second, silent answer to the question this refusal answers
         // (kb/Work PB690; DOC-A.1-159 / DOC-A.1-31).
-        if (!_lineSequential && RecordHasCharacterWithoutByteImage(image))
+        // The ONE length decision (kb/Work PB1190): what the '91' test asks of, GR14's bound, and the characters
+        // presented are all the record at §13.18.43.4 GR13's length — the plain arm's rule, now this arm's too.
+        int len = WrittenLength(image, length);
+        if (!_lineSequential && RecordHasCharacterWithoutByteImage(image.AsSpan(0, Math.Min(image.Length, len))))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
+        if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14/GR15
         _printControl = true;
-        string text = TrimRecordEnd(image);
+        string text = TrimRecordEnd(IsVarying ? FitRecord(image, len) : image);
         // §14.9.51.4 GR25 e)/f) — the ONE advance, placed before or after the presentation by the statement's
         // own word. On a LINAGE file both halves travel the LOGICAL page (GR25 g), GR26 a)); on any other print
         // file they are the plain stream. The pair is written once, and the page-awareness lives inside
@@ -1239,7 +1312,7 @@ public sealed class SequentialConnector : FileConnector
     /// line reaches the medium, so a margin line, a page-fill line and an ADVANCING line are the same byte.</summary>
     private void AdvanceLines(int lines)
     {
-        for (int i = 0; i < lines; i++) _writer!.Write("\r\n");
+        for (int i = 0; i < lines; i++) _writer!.Write(_lineEnd);
         if (lines > 0) _lineOpen = false;   // the travel ended the line the device stood on
     }
 
@@ -1253,6 +1326,31 @@ public sealed class SequentialConnector : FileConnector
     /// phrase. It selects the record NUMBER (GR21 rules b/c), and nothing else about the read changes — which is
     /// why the reposition below feeds the SAME physical read body rather than a second reader.</para></summary>
     public bool Read(bool previous, out string image)
+    {
+        try { return ReadRecord(previous, out image); }
+        catch (IOException) { image = new string(' ', RecordWidth); return ReadFailed(); }   // '30' — see ReadFailed
+    }
+
+    /// <summary>⛔ THE READ-SIDE MEDIUM BOUNDARY'S ONE CATCH SHAPE (kb/Work PB1512) — the twin of the write side's
+    /// (<see cref="WriteRecord"/>'s summary, kb/Work PB1192), written at each public entry point that reads the
+    /// medium — <see cref="Read"/> and <see cref="StartFirstLast"/> — and nowhere below them. A host failure while
+    /// the record is being fetched (a region another process has locked, a device error) is §9.1.13.6 item 1's
+    /// permanent error: <i>"I-O status = 30. A permanent error exists and no further information is available
+    /// concerning the input-output operation."</i> Before this, the <see cref="IOException"/> escaped the
+    /// statement and killed the run unit, while the OPEN, CLOSE, WRITE and REWRITE arms of the same connector
+    /// already answered with a status. The READ is unsuccessful, so §14.9.30.4 GR18 sets the file position
+    /// indicator to "no valid record position" (the next sequential READ is then '46', §9.1.13.7 item 6); the
+    /// status reaches the §9.1.13.1 exception path (USE procedures, the Annex A.1 item 103 action) like any
+    /// other '30'.</summary>
+    private bool ReadFailed()
+    {
+        InvalidateFilePosition();
+        Status = FileStatusCode.PermanentError;
+        return false;
+    }
+
+    /// <summary>The body of <see cref="Read"/>, inside its medium-boundary catch.</summary>
+    private bool ReadRecord(bool previous, out string image)
     {
         image = new string(' ', RecordWidth);
         if (SequentialReadGuard() is { } guard) { Status = guard; return false; }   // '47'/'46'/'10' — FileConnector
@@ -1319,9 +1417,16 @@ public sealed class SequentialConnector : FileConnector
         {
             NoteRecordRead(data, extents);
             image = Fit(data);   // §14.9.30.4 GR14/GR15 fill — national-aware (kb/Work PB327)
-            // A VARYING record outside the file's min/max is §14.9.30 GR14's '04'. Fixed-length record
-            // sequential: min == max == RecordWidth, so a partial (short) final record is '04' too; a
-            // longer-than-max record cannot occur (the frame is read in RecordWidth chunks).
+            // A VARYING record outside the file's min/max is §14.9.30.4 GR14's '04' (§9.1.13.2 item 3): its
+            // length is the frame's length word. A FIXED-length record sequential file carries no length at all
+            // — §9.1.7.2 makes a record sequential record's length "determined by any information the implementor
+            // may add to the record on the physical storage medium", and this format adds none (docs/CONFORMANCE.md
+            // DOC-A.1-146 (a); GnuCOBOL's fixed-length format, CLAUDE.md rule 1) — so its physical record IS the
+            // next integer-1 bytes of the READING description (kb/Work PB1514). Such a record is never longer
+            // than the maximum, by that definition, and is shorter only at the end of the file: that partial
+            // final record is the '04'. A file written under another record length is not detected here — no
+            // boundary exists on the medium to detect it by; RecordLayoutNotice reports the arithmetic case at
+            // OPEN.
             shortLong = IsVarying ? data.Length < VaryMin || data.Length > VaryMax : data.Length < RecordWidth;
         }
         else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
@@ -1452,11 +1557,17 @@ public sealed class SequentialConnector : FileConnector
         return total;
     }
 
-    /// <summary>Read one physical line's DATA (up to and consuming a CR / LF / CRLF terminator), matching
-    /// <see cref="StreamReader.ReadLine"/> semantics, and report the terminator's byte width (0 at a final line with
-    /// no terminator) so the caller can track the physical byte offset for a line-sequential REWRITE (§14.9.35.4
-    /// GR17). Returns null only at end-of-file with no characters read. Char-by-char rather than ReadLine because
-    /// ReadLine hides the terminator width, which the byte anchor needs (under Latin1 one char == one byte).</summary>
+    /// <summary>Read one physical line's DATA, up to and consuming its line delimiter, and report the delimiter's
+    /// byte width (0 at a final line with no delimiter) so the caller can track the physical byte offset for a
+    /// line-sequential REWRITE (§14.9.35.4 GR17). Returns null only at end-of-file with no characters read.
+    /// <para>⛔ THE DELIMITER READ IS DOC-A.1-114's (Annex A.1 item 114): an LF, or a CR LF pair, on EVERY host,
+    /// so a file written on either platform reads back on the other — and NOTHING ELSE. A lone CR (one not
+    /// followed by LF) is record DATA, as GnuCOBOL reads it (CLAUDE.md rule 1's precedent, kb/Work PB1540); CR is
+    /// outside the line sequential character set (item 115), so the READ that delivers it answers '09'
+    /// (§14.9.30.4 GR16). Before PB1540 a lone CR ended the record, which is <see cref="StreamReader.ReadLine"/>'s
+    /// rule, not this determination's.</para>
+    /// <para>Char-by-char rather than ReadLine because ReadLine hides the delimiter width, which the byte anchor
+    /// needs (under Latin1 one char == one byte).</para></summary>
     private string? ReadPhysicalLine(out int delimBytes)
     {
         delimBytes = 0;
@@ -1467,11 +1578,7 @@ public sealed class SequentialConnector : FileConnector
         {
             char c = (char)ci;
             if (c == '\n') { delimBytes = 1; break; }
-            if (c == '\r')
-            {
-                if (_reader.Peek() == '\n') { _reader.Read(); delimBytes = 2; } else delimBytes = 1;
-                break;
-            }
+            if (c == '\r' && _reader.Peek() == '\n') { _reader.Read(); delimBytes = 2; break; }
             sb.Append(c);
             ci = _reader.Read();
             if (ci < 0) break;                                      // final line with no terminator
@@ -1482,10 +1589,12 @@ public sealed class SequentialConnector : FileConnector
     // ── REWRITE ──────────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>Sequential <c>REWRITE record</c> (ISO §14.9.35): replace the last-read record in place. Valid only
-    /// when open I-O (else 49) and the immediately-previous op was a successful READ (else 43). On a varying file
-    /// the rewritten record's length (<paramref name="length"/> = the DEPENDING item's content, GR13a, or the
-    /// image's own length, GR13b/c) must lie within the declared bounds (GR20 → '44') AND — record sequential —
-    /// equal the size of the record being replaced (GR16 → '44'; the in-place frame cannot change size).</summary>
+    /// when open I-O (else 49) and the immediately-previous op was a successful READ (else 43).
+    /// <paramref name="length"/> is §13.18.43.4 GR13's number of bytes in the record — the DEPENDING item's
+    /// content (a), or the number of bytes in record-name-1 (b/c), which the compiler passes for a fixed-length
+    /// file; −1 = the image's own length on a variable-length file, the record area's width on a fixed one.
+    /// The size rules then split on the ORGANIZATION, never on fixed-versus-varying (kb/Work PB1168): see
+    /// <see cref="RewriteRecordSequential"/> and <see cref="RewriteLine"/>.</summary>
     /// <param name="extents">The replacing record's EXTENT TABLE (D-FRA (v); kb/Work PB1053). The frame keeps its
     /// size (GR16), so it replaces the table the replaced frame carried only when it has as many components; a
     /// frame whose table cannot take it has that table VOIDED (it would otherwise describe the replaced record),
@@ -1496,48 +1605,77 @@ public sealed class SequentialConnector : FileConnector
         catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30' — see Write
     }
 
-    /// <summary>The body of <see cref="Rewrite"/>, inside its medium-boundary catch.</summary>
+    /// <summary>The body of <see cref="Rewrite"/>, inside its medium-boundary catch: the all-organization
+    /// preconditions, the §13.18.43.4 GR14 a) bounds of a variable-length file, and then ONE dispatch on the
+    /// organization, because that is the axis §14.9.35.4 states its size rules on — GR16 under "For a record
+    /// sequential file", GR17 under "For a line sequential file".
+    /// <para>⛔ THE SIZE RULE WAS KEYED ON THE WRONG AXIS (kb/Work PB1168). It read <c>IsVarying &amp;&amp; len !=
+    /// LastReadLength</c>, so GR16 ran for every VARYING file and for no FIXED one — a 10-byte record-name-1
+    /// REWRITE over a 20-byte record of a fixed file was padded and replaced the record with '00' — and it ran
+    /// ahead of the line sequential arm, so a varying LINE SEQUENTIAL REWRITE of a shorter record got GR16's '44'
+    /// where GR17 c) pads it and succeeds.</para></summary>
     private string RewriteRecord(string image, int length, RecordExtents? extents)
     {
         if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
         if (!PrevOpWasSuccessfulRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;
-        int len = IsVarying ? (length >= 0 ? length : image.Length) : RecordWidth;
-        if (IsVarying && (len < VaryMin || len > VaryMax))
-            return Status = FileStatusCode.RecordSizeViolation;       // '44' §14.9.35 GR20
-        if (IsVarying && len != LastReadLength)
-            return Status = FileStatusCode.RecordSizeViolation;       // '44' §14.9.35 GR16 (record sequential)
-        if (!_lineSequential && _lastReadBlockStart >= 0 && _reader is { BaseStream: { CanSeek: true, CanWrite: true } stream })
-        {
-            string record = FitRecord(image, len);
-            if (RecordHasCharacterWithoutByteImage(record))
-                return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' — the WRITE's rule (R47)
-            if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record);
-            RecordExtents? replacing = Framed(record, image, extents).Extents;
-            string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
-                ? replacing : RecordFraming.VoidExtents(_lastReadTableCount));
-            return OverwriteInPlace(stream, _lastReadBlockStart - table.Length, table, record);
-        }
-        if (_lineSequential && _lastLineStart >= 0 && _reader is { BaseStream: { CanSeek: true, CanWrite: true } lstream })
-        {
-            // §14.9.35.4 GR17 (line-sequential REWRITE): (a) a preceding partial ('06') read ⇒ '44'; (d) a record
-            // area holding a character outside the line sequential character set ⇒ '71'; (b) a record LONGER than
-            // the one being replaced ⇒ '44'; (c) otherwise space-pad the trimmed record to the replaced length and
-            // overwrite in place ⇒ '00'. Padding to _lastLineBytes keeps the physical byte span (and the delimiter
-            // position) invariant, so the overwrite is exact; the trimmed length matches the line-sequential WRITE model.
-            if (_lastReadLinePartial) return Status = FileStatusCode.RecordSizeViolation;                // '44' GR17a / §9.1.13.7 item 4d
-            // GR17 d) now routes through the SHARED set instead of the private CR/LF test it carried before
-            // kb/Work PB329 — the delimiters are only the two members the framing forces out, and a REWRITE and a
-            // WRITE of the identical record area must reach the identical verdict (Annex A.1 item 115).
-            if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;   // '71' GR17d
-            string content = TrimRecordEnd(Fit(image));
-            if (content.Length > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;     // '44' GR17b
-            content = FitRecord(content, _lastLineBytes);                                                // '00' GR17c (span-invariant)
-            return OverwriteInPlace(lstream, _lastLineStart, content);
-        }
-        // A non-seekable line-sequential / record-sequential REWRITE cannot overwrite in place → report a permanent
-        // error so the program's FILE STATUS / declarative path observes it (never a silent no-op).
-        return Status = FileStatusCode.PermanentError;
+        // §13.18.43.4 GR13 — the number of bytes in the record: data-name-1's content (a), else the bytes in the
+        // record (b/c), which the compiler passes for a fixed-length file. −1 is the image's own length.
+        int len = length >= 0 ? length : IsVarying ? image.Length : RecordWidth;
+        // §13.18.43.4 GR14 a) / §9.1.13.7 item 4 a) — a record outside the RECORD IS VARYING bounds, whatever
+        // the organization.
+        if (IsVarying && (len < VaryMin || len > VaryMax)) return Status = FileStatusCode.RecordSizeViolation;
+        return _lineSequential ? RewriteLine(image, len) : RewriteRecordSequential(image, len, extents);
     }
+
+    /// <summary>§14.9.35.4 GR16 — <i>"For a record sequential file, if the number of bytes in the data item
+    /// referenced by identifier-1, the runtime representation of literal-1, or the record referenced by
+    /// record-name-1 is not equal to the number of bytes in the record being replaced, the execution of the
+    /// REWRITE statement is unsuccessful and the I-O status in the rewrite file connector is set to '44'"</i>
+    /// (§9.1.13.7 item 4 b)). EVERY record sequential file, fixed-length or variable: a fixed file's records are
+    /// integer-1 bytes (§13.18.43.4 GR6), so a shorter record description cannot replace one, and GR14 then
+    /// leaves the record and the record area as they were. The frame therefore never changes size, which is
+    /// what makes the overwrite in place exact.</summary>
+    private string RewriteRecordSequential(string image, int len, RecordExtents? extents)
+    {
+        if (len != LastReadLength) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR16
+        if (_lastReadBlockStart < 0 || _reader is not { BaseStream: { CanSeek: true, CanWrite: true } stream })
+            return NotRewritableInPlace();
+        string record = FitRecord(image, len);
+        if (RecordHasCharacterWithoutByteImage(record))
+            return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' — the WRITE's rule (R47)
+        if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record);
+        RecordExtents? replacing = Framed(record, image, extents).Extents;
+        string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
+            ? replacing : RecordFraming.VoidExtents(_lastReadTableCount));
+        return OverwriteInPlace(stream, _lastReadBlockStart - table.Length, table, record);
+    }
+
+    /// <summary>§14.9.35.4 GR17, the line sequential REWRITE, in its own order: a) a READ that transferred only
+    /// part of the record ⇒ '44' (§9.1.13.7 item 4 d)); d) a record area holding a character outside the line
+    /// sequential character set ⇒ '71'; b) a record of MORE bytes than the record being replaced ⇒ '44';
+    /// c) a record of fewer bytes is space-filled to the replaced record's length and replaces it ⇒ '00'.
+    /// <para>⛔ b) and c) compare <paramref name="len"/> — the number of bytes in record-name-1 (or data-name-1's
+    /// content), UNTRIMMED. The trailing-space rule a line sequential WRITE applies (§14.9.51.4 GR21, "any spaces
+    /// to the right of the rightmost non-space character are not transferred") is a WRITE rule; GR17 has none,
+    /// and comparing the trimmed content let a 10-byte record-name-1 replace a 2-byte line whenever its last
+    /// eight bytes were spaces (kb/Work PB1168). The replacement is the record padded to the replaced line's
+    /// length, so the physical byte span and the delimiter's position are unchanged.</para></summary>
+    private string RewriteLine(string image, int len)
+    {
+        if (_lastLineStart < 0 || _reader is not { BaseStream: { CanSeek: true, CanWrite: true } stream })
+            return NotRewritableInPlace();
+        if (_lastReadLinePartial) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 a)
+        // GR17 d) routes through the SHARED set (kb/Work PB329): a REWRITE and a WRITE of the identical record
+        // area reach the identical verdict (Annex A.1 item 115).
+        if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;   // '71' GR17 d)
+        if (len > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 b)
+        return OverwriteInPlace(stream, _lastLineStart, FitRecord(FitRecord(image, len), _lastLineBytes));   // '00' GR17 c)
+    }
+
+    /// <summary>A REWRITE whose record cannot be overwritten in place — a stream that cannot seek or write, or no
+    /// record anchor — reports §9.1.13.6 item 1's permanent error, so the program's FILE STATUS and declarative
+    /// path observe it (never a silent no-op).</summary>
+    private string NotRewritableInPlace() => Status = FileStatusCode.PermanentError;
 
     /// <summary>⛔ THE ONE IN-PLACE OVERWRITE — the record-sequential and the line-sequential REWRITE arms
     /// differ in the rules that VALIDATE the replacement (§14.9.35.4 GR16/GR20 versus GR17 a)–d)) and not at
@@ -1599,6 +1737,15 @@ public sealed class SequentialConnector : FileConnector
     /// bind to a loud runtime stage that killed the run unit). Positioning is INCLUSIVE, matching the keyed
     /// connectors: the next sequential READ delivers the record START selected.</para></summary>
     public string StartFirstLast(bool last)
+    {
+        // The read-side medium boundary (ReadFailed): the scan below reads the medium. An unsuccessful START
+        // invalidates the file position indicator (§14.9.41.4 GR7), exactly as ReadFailed does for a READ.
+        try { return StartFirstLastRecord(last); }
+        catch (IOException) { ReadFailed(); return Status; }   // '30' §9.1.13.6 item 1
+    }
+
+    /// <summary>The body of <see cref="StartFirstLast"/>, inside its medium-boundary catch.</summary>
+    private string StartFirstLastRecord(bool last)
     {
         if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent) return StartFail();                        // GR5 / §9.1.13.5 item 3 b)

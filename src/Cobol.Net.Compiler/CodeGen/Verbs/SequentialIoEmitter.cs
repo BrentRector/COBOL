@@ -597,6 +597,20 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     public string? VaryingLengthArg(FileModel file) =>
         VaryingDepending(file) is { } dep ? RuntimeApi.HostInt32(RuntimeApi.TableOcc(PlaceRenderer.Read(dep))) : null;
 
+    /// <summary>The record-length argument of a sequential-organization REWRITE — §13.18.43.4 GR13's number of
+    /// bytes in the record, which §14.9.35.4 GR16 (record sequential: '44' unless it EQUALS the replaced record's)
+    /// and GR17 b)/c) (line sequential: '44' when greater, space-filled when less) compare. The DEPENDING item's
+    /// content when the file has one (GR13 a)); on a FIXED-length file the byte size of record-name-1 itself
+    /// (GR13 b)), a compile-time constant in the same byte basis that sizes the file's records
+    /// (<see cref="FileModel.RecordWidth"/> is the widest of these) — the runtime's −1 on a fixed file means the
+    /// WRITE's whole-record-area rule, which is exactly what a shorter record-name-1 must NOT get here (kb/Work
+    /// PB1168), and an image's character count is not a byte count for every record shape (a pointer-class
+    /// record sends no character image); and −1 on a variable-length file without DEPENDING, whose image is the
+    /// record at its current length (GR13 b)/c)).</summary>
+    private static string RewriteLengthArg(BoundRewrite rw, string? dependingArg) =>
+        dependingArg ?? (rw.File.RecordSizeVaries ? "-1"
+            : RecordLayout.PhysicalWidth(rw.Record.Item).ToString(System.Globalization.CultureInfo.InvariantCulture));
+
     /// <summary>After a SUCCESSFUL read of a RECORD VARYING … DEPENDING file, store the just-read record's length
     /// into the DEPENDING item (ISO §13.18.43 GR15; GR12 — an unsuccessful READ leaves it unchanged, so the call
     /// site sits inside the success branch).</summary>
@@ -678,7 +692,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // and the GR12 lock discipline. Unconditional (kb/Work PB683), and the runtime body governs every
         // connector, opted in or not (kb/Work PB669). The status lands on the connector either way.
         var (retryKind, retryAmount) = RenderRetry(rw.Retry);
-        string rwLenArg = VaryingLengthArg(rw.File) ?? "-1";
+        string rwLenArg = RewriteLengthArg(rw, VaryingLengthArg(rw.File));
         w.Line($"{RuntimeApi.FileRewriteShared(FileKeyExpr(rw.File), image, rwLenArg, RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordAreaExtents(rw.Record))};");
         // The §9.1.14 status snapshot for a --permissive INVALID KEY phrase, taken before the status store and
         // the USE hook — the WRITE arm above carries the full reasoning (kb/Work PB691).

@@ -2,6 +2,8 @@
  "enabled": [
   "pb1543_nbsp_is_a_text_word_character",
   "pb1468_relation_defined_pairs",
+  "pb1190_varying_advancing_bounds",
+  "pb1168_rs_rewrite_size_gr16",
   "pb1491_continued_literal_logical_line",
   "pb1380_renames_ref_mod",
   "pb1350_text_words_85",

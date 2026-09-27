@@ -655,7 +655,17 @@ public abstract class FileConnector
         // none, and §14.9.27.4 GR25 leaves the file unaffected. Any handle the body took on its way to failing
         // goes back HERE, because Close() answers '42' for a connector that is not open and never reaches
         // CloseCore (kb/Work PB771).
-        if (!_openMode) AbandonOpen();
+        // ⛔ The release is OUTSIDE the try above, so a host refusal during it escaped the OPEN as an unhandled
+        // IOException (kb/Work PB1512's sibling: an INDEXED OPEN OUTPUT on a full device threw from
+        // KeyedConnector.AbandonOpen). The OPEN's outcome is already decided and stored — `s` is its I-O status —
+        // and the disposal that refuses a final flush has still closed the host handle, so the refusal adds no
+        // outcome of its own: it is not allowed to REPLACE the status with a crash (SharedExtendOpenDriftTests:
+        // an OPEN has only I-O statuses as outcomes).
+        if (!_openMode)
+        {
+            try { AbandonOpen(); }
+            catch (IOException) { }   // the status above stands (§14.9.27.4 GR25 — the unsuccessful OPEN's own)
+        }
         // ⛔ NOTHING IS RECORDED HERE, AND THE ABSENCE IS THE DESIGN (kb/Work PB802). §9.1.6's fixed file
         // attributes "apply to the file at the time it is created", and the two moments the OPEN statement
         // CREATES a file — GR18's OUTPUT, GR17's absent OPTIONAL I-O/EXTEND — are exactly the moments each

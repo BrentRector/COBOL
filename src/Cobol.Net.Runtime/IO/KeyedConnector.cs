@@ -158,8 +158,10 @@ public abstract class KeyedConnector : FileConnector
     /// (whatever the persist did) and from <see cref="AbandonOpen"/>.</summary>
     protected void ReleaseFileLock()
     {
-        _store?.Dispose();
-        _store = null;
+        // The field is cleared whatever the disposal throws (a final flush refused on an exhausted medium — the
+        // disposal still closes the host handle), so a later CLOSE or re-OPEN never meets a disposed handle.
+        try { _store?.Dispose(); }
+        finally { _store = null; }
     }
 
     /// <inheritdoc/>

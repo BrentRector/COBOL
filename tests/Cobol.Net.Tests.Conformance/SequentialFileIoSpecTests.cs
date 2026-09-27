@@ -110,12 +110,16 @@ public sealed class SequentialFileIoSpecTests
         Assert.Equal("OPEN FS=05\nATEND FS=10", Run(prog));
     }
 
-    /// <summary>CA18 — §14.9.35.4 GR17 (line-sequential REWRITE in place): (equal) a same-length record replaces the
-    /// line, '00'; (b) a record LONGER than the one being replaced ⇒ '44', the line unchanged; (c) a SHORTER record
-    /// is space-padded to the replaced length and written, '00'. The buggy path returned '30' for every
-    /// line-sequential REWRITE (the seekable in-place branch was guarded by !_lineSequential).</summary>
+    /// <summary>CA18 — §14.9.35.4 GR17 (line-sequential REWRITE in place): (equal) a record of as many bytes as the
+    /// line replaces it, '00'; (b) a record of MORE bytes than the line ⇒ '44', the line unchanged. The byte count
+    /// compared is record-name-1's — five bytes for every REWRITE REC here, whatever its trailing spaces (kb/Work
+    /// PB1168: GR17 has no trailing-space rule — the WRITE statement's is §14.9.51.4 GR21). The space-fill of
+    /// §14.9.35.4 GR17 c), for a record of FEWER bytes, needs a variable-length record and is the golden
+    /// 2023/pb1168_ls_rewrite_gr17.
+    /// The buggy path returned '30' for every line-sequential REWRITE (the seekable in-place branch was guarded
+    /// by !_lineSequential).</summary>
     [Fact]
-    public void LineSequential_Rewrite_Gr17_Equal00_Longer44_Shorter00()
+    public void LineSequential_Rewrite_Gr17_Equal00_Longer44()
     {
         const string prog = """
             IDENTIFICATION DIVISION.
@@ -144,8 +148,8 @@ public sealed class SequentialFileIoSpecTests
                 CLOSE F.
                 STOP RUN.
             """;
-        // Input lines HELLO(5), AB(2), CDEFG(5). WORLD==HELLO ⇒ '00', line becomes WORLD; XYZ(3) > AB(2) ⇒ '44'
-        // GR17b, AB unchanged; HI(2) < CDEFG(5) ⇒ '00' GR17c, space-padded to "HI   " within the byte span.
+        // Input lines HELLO(5), AB(2), CDEFG(5); REC is 5 bytes. 5 == HELLO(5) ⇒ '00', line becomes WORLD;
+        // 5 > AB(2) ⇒ '44' GR17 b), AB unchanged; 5 == CDEFG(5) ⇒ '00', line becomes "HI   ".
         Assert.Equal("R1=00\nR2=44\nR3=00\nL1=[WORLD]\nL2=[AB   ]\nL3=[HI   ]",
             Run(prog, ("lsrew.txt", "HELLO\nAB\nCDEFG\n")));
     }

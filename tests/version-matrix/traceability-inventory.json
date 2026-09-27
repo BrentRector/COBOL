@@ -10506,13 +10506,13 @@
   "ordinal": 3,
   "subject": "I-O status",
   "rule-digest": "2f93339ac9a7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Read; src/Cobol.Net.Runtime/IO/FileStatus.cs#RecordLengthShortLong",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadRecord; docs/CONFORMANCE.md#DOC-A.1-146",
   "test-ref": "conformance:2002/io_status_04",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1514: Rule (cite.py --check 9.1.13.2 \"A READ statement is successfully executed but the physical record from the file is shorter than or longer than the minimum or maximum length\" -> OK §9.1.13.2 3)); its statement-level twin is §14.9.30.4 GR14 (record sequential). SequentialConnector.Read: shortLong = IsVarying ? len<VaryMin || len>VaryMax : len<RecordWidth; the record is delivered (Fit truncates on the right) and the READ is successful. Line sequential is excluded (its conditions are '06'/'09'), keyed files carry record sizes in the framed store header so a mismatch is the OPEN's '39' (§14.9.27.4 GR10; kb/Work PB802), never a READ-time '04'. Probe out/probe/iostat-04 (RECORD VARYING 1..20 written, read through VARYING 3..10): 15-byte record -> 04 truncated to 10, 2-byte record -> 04, 5-byte -> 00, then 10: both the longer and shorter legs verified. Golden io_status_04 pins the fixed-length short final record. || REFUTED: PARTIAL — Only the RECORD VARYING leg is verified. For a fixed-length record-sequential file the physical record length is not kept: the reader slices the byte stream in its own RecordWidth chunks, so a physical record LONGER than the reader's maximum is never seen as one record and never gets '04' - it is delivered as several records each reported '00'. The code comment 'a longer-than-max record cannot occur (the frame is read in RecordWidth chunks)' is a deduction that measurement refutes. The cited golden io_status_04 pins the same fragmentation on the short side (two 5-byte physical records merged into one 10-byte record reported '00'). || Editions (adjudicator, verbatim): 85,2002,2014,2023 (E.2 item 15: the 2023 text only clarifies WHEN '04' is set)",
-  "state": "GAP"
+  "notes": "kb/Work PB1514 landed (w67p). cite.py --check 9.1.13.2 'A READ statement is successfully executed but the physical record from the file is shorter than or longer than the minimum or maximum length' -> OK §9.1.13.2 3). The VARYING leg was verified. The FIXED-length leg is now a documented determination (docs/CONFORMANCE.md DOC-A.1-146 (a)): §9.1.7.2 ('the length of each record is determined by any information the implementor may add to the record on the physical storage medium', cite.py OK §9.1.7.2) - this format adds none, so a fixed file's physical record is the next integer-1 bytes of the READING description (GnuCOBOL's fixed-length format, CLAUDE.md rule 1). A physical record is then never longer than the maximum, and shorter only at the end of the file, which is the '04'. The golden io_status_04 is re-derived from that rule (it pinned the undefined §14.9.30.4 GR14 fill; it now shows only the bytes read, and adds a 15-byte record read as a 10-byte '00' record and a 5-byte '04' record).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.13.2-4",
@@ -10686,13 +10686,13 @@
   "ordinal": 1,
   "subject": "I-O status",
   "rule-digest": "496b685aec5d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#Open; src/Cobol.Net.Runtime/IO/FileConnector.cs#Close; src/Cobol.Net.Runtime/IO/FileRegistry.cs#DeleteFile; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Read; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileStatus.cs#PermanentError",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadFailed; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#StartFirstLast; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Read; src/Cobol.Net.Runtime/IO/FileConnector.cs#Open; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#ReleaseFileLock",
+  "test-ref": "unit:FileBoundaryTests.SequentialRead_HostFailure_Is30_AndInvalidatesThePosition; unit:FileBoundaryTests.SequentialWrite_OnAFullMedium_Is34_AtTheWrite; unit:FileBoundaryTests.WriteFailure_MediumExhaustionIs34_AnyOtherFailureIs30",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1512: Rule (cite.py --check 9.1.13.6 \"A permanent error exists and no further information is available concerning the input-output operation\" -> OK §9.1.13.6 1)); §9.1.13.1 makes the status the carrier of the condition, set 'during the execution of a CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK or WRITE statement'. The '30' mapping exists ONLY on OPEN (FileConnector.Open catches IOException/ArgumentException/NotSupportedException), CLOSE (FileConnector.Close, kb/Work PB140), DELETE FILE (FileStatusCode.ForDeleteFileFailure) and two explicit REWRITE/PREVIOUS non-seekable arms. The READ and WRITE bodies of SequentialConnector have NO catch, and neither FileRegistry nor CobolFile wraps them. MEASURED (out/probe/iostat-30, pinned cobol.exe): OPEN INPUT -> 00, then another process takes a byte-range lock on the file (FileStream.Lock), then READ -> the run unit dies with 'Unhandled exception. System.IO.IOException: The process cannot access the file because another process has locked a portion of the file' from System.IO.RandomAccess.ReadAtOffset, exit code -532462766; the program's FILE STATUS item never receives '30' and no USE/declarative runs. Spec-derived expectation: the READ is unsuccessful, I-O status '30' (fatal first digit 3), exception processing per §9.1.13.1, then the implementor's continue/terminate choice. The sequential WRITE path (StreamWriter buffer flush / ReleaseRecord Flush) has the same uncaught shape by reading (not measured). Keyed organizations load/persist the store at OPEN/CLOSE, which ARE mapped. Two-arm dispatch: the OPEN/CLOSE arms were fixed (PB140, PB860) and the READ/WRITE arms never were. No existing register note (PB713 fixed one OPEN EXTEND IOException path only).",
-  "state": "GAP"
+  "notes": "kb/Work PB1512 landed (w67p). cite.py --check 9.1.13.6 'A permanent error exists and no further information is available concerning the input-output operation' -> OK §9.1.13.6 1). Every statement that touches the host now maps a host IOException to an I-O status: OPEN/CLOSE/DELETE FILE (before), WRITE/WRITE ADVANCING/REWRITE ('34'/'30', kb/Work PB1192), and now READ and START FIRST/LAST (SequentialConnector.Read / StartFirstLast -> ReadFailed: '30', file position invalidated, §14.9.30.4 GR18 / §14.9.41.4 GR7). Keyed record verbs never touch the host between OPEN and CLOSE (the store is in memory). Sibling sweep: an unsuccessful OPEN's handle release (FileConnector.Open -> AbandonOpen, KeyedConnector.ReleaseFileLock) could throw outside OPEN's try - now caught, the OPEN's own status stands; OPEN … REVERSED counted the records AFTER the open returned, against SharedOpenAttempt's PB713 rule - now counted inside the OPEN body (ReversedRequested). Witness: a real host read failure per host (Linux /proc/self/mem EIO; Windows a locked byte range) -> '30', then '46', and START FIRST '30'.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.13.6-2",
@@ -10836,13 +10836,13 @@
   "ordinal": 4,
   "subject": "I-O status",
   "rule-digest": "8cb702a5a928",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Write; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RewriteRecordSequential; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OutsideVaryingBounds",
+  "test-ref": "conformance:85/pb1168_rs_rewrite_size_gr16; conformance:85/pb1190_varying_advancing_bounds",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1168: §9.1.13.7 4) '44' boundary violation, four arms (cite.py --check 9.1.13.7 \"an attempt is made to rewrite a record to a sequential file and the record is not the same size as the record being replaced\" -> OK §9.1.13.7 4) b)). a) RECORD VARYING bounds: probe s44/p44.cob WRITE with DEPENDING 3/9 against FROM 4 TO 8 -> 44/44, 6 -> 00; REWRITE length 5 vs record read of 6 -> 44; indexed VARYING 6 TO 10 WRITE with 5 and 11 -> 44 (FileConnector.Stored returns null). CONFORMS. c) RECORD CONTAINS 4 TO 8 (format 3; FileModel maps it to a variable-length Varying, the §13.18.43.4 GR17 implementor choice): WRITE of a 2-byte record -> 44. CONFORMS. d) line sequential REWRITE after a '06' READ: probe s44/p44d.cob read1 06 then REWRITE -> 44 (SequentialConnector.Rewrite `_lastReadLinePartial`). CONFORMS. b) DIVERGES: SequentialConnector.Rewrite tests size only `IsVarying && len != LastReadLength`; for a fixed-length (implied or explicit format 1) record sequential file len is forced to RecordWidth, so a REWRITE of a shorter record-name never reaches 44. Probe logic4x/p1.cob: FD SF with 01 SA PIC X(10) and 01 SB PIC X(5), WRITE SA, OPEN I-O, READ, REWRITE SB -> '00' and the medium now holds 'BBBBB     ' (padded); §14.9.35.4 GR16 (cite.py --check OK §14.9.35.4 16)) and item b) require '44' with the record unreplaced. Latitude check: the §9.1.13.1 'If more than one value applies, the implementor determines' sentence governs ordering only (e.g. indexed WRITE testing size before open mode), not this single-status case. No spec-derived golden exercises any 44 arm. || Editions (adjudicator, verbatim): 1985/2002/2014/2023 for items a)-c); item d) 2023 only (line sequential organization)",
-  "state": "GAP"
+  "notes": "kb/Work PB1168 landed (w67p). Item 4 b) ('an attempt is made to rewrite a record to a sequential file and the record is not the same size as the record being replaced', cite.py OK §9.1.13.7 4) b)) now holds on a FIXED-length record sequential file too (it held only for a varying one); a), c), d) were already verified (registrar 15d) and a) now also binds the print-control WRITE arm (PB1190).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.13.7-5",
@@ -43611,13 +43611,13 @@
   "ordinal": 14,
   "subject": "REWRITE statement",
   "rule-digest": "3ed6451c3be2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/FileRegistry.cs#RewriteShared",
-  "test-ref": "conformance:2023/l1m8_rewrite_unsuccessful_no_update",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RewriteRecordSequential; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RewriteLine",
+  "test-ref": "conformance:2023/l1m8_rewrite_unsuccessful_no_update; conformance:85/pb1168_rs_rewrite_size_gr16; conformance:2023/pb1168_ls_rewrite_gr17",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Six unsuccessful REWRITEs (49/43/23/21/23/22, GR3/5/21/22/23/25 c)) each leave the record area and the file unchanged. But PB1168 (open) shows a GR16 fixed-length record-sequential size mismatch returning 00 and replacing the record, and a GR17 b) line-sequential case doing the same, which breaches GR14's no-update. CONFORMS on PB1168's landing with its pa.cob golden.",
-  "state": "GAP"
+  "notes": "kb/Work PB1168 landed (w67p): the two unsuccessful REWRITEs that used to update the record - GR16's fixed-length size mismatch and GR17 b)'s longer line sequential record - are now '44' with the record on the medium unchanged (both goldens read it back). The six other unsuccessful arms were verified by golden lane 2.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-15",
@@ -43641,13 +43641,13 @@
   "ordinal": 16,
   "subject": "REWRITE statement",
   "rule-digest": "2f85ae4da381",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitRewrite",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RewriteRecordSequential; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#RewriteLengthArg",
+  "test-ref": "conformance:85/pb1168_rs_rewrite_size_gr16",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1168 (registrar 14c). \"For a record sequential file, if the number of bytes in the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is not equal to the number of bytes in the record being replaced, the execution of the REWRITE statement is unsuccessful and the I-O status ... is set to '44'.\" SequentialConnector.Rewrite computes `int len = IsVarying ? (...) : RecordWidth;` and tests `if (IsVarying && len != LastReadLength)` - the size comparison exists ONLY for a varying file. A FIXED-length file (explicit RECORD CONTAINS, or the implicit Format 1 D-FRA chooses for multi-01 FDs without variable-length records, 13.18.43.4 GR5 a)) holds records of integer-1 bytes (13.18.43.4 GR6), so a record-name-1 shorter than the record width is 'not equal' and shall give '44'; the runtime pads it with FitRecord and overwrites, '00'. Probe pa.cob (FD with 01 R1 X(10) + 01 R2 X(20), implicit Format 1 => 20-byte records): READ record 2, `REWRITE R1 FROM W10` -> observed RW10-ON20=00 and record 2 becomes 'XXXXXXXXXX' + 10 spaces; spec: '44', record 2 stays 20 B's. The varying arm conforms (probe pb.cob, RECORD VARYING 10 TO 20: 20-byte REWRITE over a 10-byte record -> 44, 10 over 20 -> 44, file unchanged). cite.py --check 14.9.35.4 GR16 / 13.18.43.4 GR6 / GR5 a) -> OK. (GnuCOBOL's cob_rewrite compares the record-area size with record-name-1's size for ORGANIZATION SEQUENTIAL and returns 44 - corroboration only.) [editions as adjudicated: 2023; ISO 1989:2023 Annex E lists no 2014->2023 change to this rule (E.3.3 item 41 touches GR10 only), so 2014 identically; the 1985/2002 wording is not derivable from the 2023 text]",
-  "state": "GAP"
+  "notes": "kb/Work PB1168 landed (w67p). cite.py --check 14.9.35.4 'For a record sequential file, if the number of bytes in the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is not equal to the number of bytes in the record being replaced' -> OK §14.9.35.4 16). SequentialConnector.RewriteRecord now dispatches on the ORGANIZATION: every record sequential file, fixed or varying, takes RewriteRecordSequential's equality test against LastReadLength; the emitter passes record-name-1's byte size (RecordLayout.PhysicalWidth) for a fixed-length file. Golden: implicit format 1 (integer-1 = 20) REWRITE of a 10-byte R1 -> 44 and record 2 unchanged; a 20-byte R2 -> 00; an explicit RECORD CONTAINS 12 over an 8-byte record -> 44. Before: '00' and the record replaced (fixed arm had no test).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-17",
@@ -43656,13 +43656,13 @@
   "ordinal": 17,
   "subject": "REWRITE statement",
   "rule-digest": "8678dcf677f1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/FileConnector.cs#TrimRecordEnd; src/Cobol.Net.Runtime/IO/LineSequentialCharacterSet.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#RewriteLine",
+  "test-ref": "conformance:2023/pb1168_ls_rewrite_gr17; conformance-test:SequentialFileIoSpecTests.LineSequential_Rewrite_Gr17_Equal00_Longer44; conformance-test:SequentialFileIoSpecTests.LineSequential_RewriteAfterOverLengthRead_IsPartial44",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1168 (registrar 14c). Four sub-rules a)-d). a) partial read -> 44: `_lastReadLinePartial` -> RecordSizeViolation (conformance-test:SequentialFileIoSpecTests.LineSequential_RewriteAfterOverLengthRead_IsPartial44). d) character outside the set -> 71: RecordAreaOutsideLineCharacterSet (PB329 landed; DOC-A.1-115). b)/c) DIVERGE on two mechanisms: (1) the RECORD-sequential GR16 equality test `if (IsVarying && len != LastReadLength) return 44` runs BEFORE the line-sequential branch, so on a varying line-sequential file a SHORTER record gets '44' where c) requires space-padding and success - probe pc.cob (LINE SEQUENTIAL, RECORD VARYING 1 TO 20, 01 R1 X(10), 01 R2 X(20)): READ a 20-char line, `REWRITE R1` -> observed 44, spec '00' with the line becoming 'SHORT' + 15 spaces; (2) b) compares 'the number of bytes in ... the record referenced by record-name-1', but the code compares `TrimRecordEnd(Fit(image)).Length` - trailing spaces stripped (WRITE's GR21 rule, which GR17 does not state) - so a record LONGER than the line is accepted when its surplus is spaces - probe pc.cob (FD G, 01 G1 X(10), line 'AB'): `MOVE \"HI\" TO G1 REWRITE G1` -> observed 00 and the line becomes 'HI'; spec '44' (10 bytes > 2), line unchanged. The existing CA18 test (LineSequential_Rewrite_Gr17_Equal00_Longer44_Shorter00) passes under both readings (its 'XYZ' in X(5) over 'AB' is 5>2 either way) so it does not pin the divergence. National-space padding in c) was read (FitRecord's national pairs) but not probed. cite.py --check 14.9.35.4 GR17 b)/c) and 14.9.51.4 GR21 -> OK. [editions as adjudicated: 2023; ISO 1989:2023 Annex E lists no 2014->2023 change to this rule (E.3.3 item 41 touches GR10 only), so 2014 identically; the 1985/2002 wording is not derivable from the 2023 text]",
-  "state": "GAP"
+  "notes": "kb/Work PB1168 landed (w67p). GR17 a)-d) run in RewriteLine, reached only for a line sequential file (GR16's equality test is RewriteRecordSequential's), and b)/c) compare the UNTRIMMED byte count of record-name-1 (or data-name-1's content) with the replaced line - GR17 has no trailing-space rule; §14.9.51.4 GR21's is WRITE's (cite.py --check 14.9.35.4 'is greater than the number of bytes in the record being replaced' -> OK §14.9.35.4 17)). Golden: varying LS REWRITE of a 10-byte record over a 20-byte line -> 00, line = SHORT + 15 spaces (c); fixed LS 10-byte G1 over the 2-byte line AB -> 44, line unchanged (b). a) and d) unchanged (PB329). The CA18 test's derivation comment is corrected (it gave the trimmed reading).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-18",
@@ -49641,13 +49641,13 @@
   "ordinal": 14,
   "subject": "WRITE statement",
   "rule-digest": "2ed0d2829339",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#WriteAdvancing; src/Cobol.Net.Runtime/IO/FileRegistry.cs#WriteAnyOrg",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#WrittenLength; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OutsideVaryingBounds; src/Cobol.Net.Runtime/IO/FileRegistry.cs#WriteAnyOrg",
+  "test-ref": "conformance:85/pb1190_varying_advancing_bounds",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1190 (registrar 14c). GR14: the record size 'shall not be larger than the largest or smaller than the smallest number of bytes allowed by the RECORD IS VARYING clause ... If this rule is violated, the execution of the WRITE statement is unsuccessful and the I-O status of the write file connector is set to '44'.' (cite.py --check 14.9.51.4 -> OK rule 14). The plain sequential arm (Write, IsVarying branch) and RelativeConnector/IndexedConnector (Stored -> null -> '44') enforce it: PROBE pa.cob V9/V2 plain -> 44; pb.cob relative random VARYING 3 TO 8, VL=9 and VL=2 -> 44. BUT the print-control arm never sees the length: FileRegistry.WriteAnyOrg calls f.WriteAdvancing(image, advance.Lines, ...) with no length parameter, and SequentialConnector.Write itself reroutes to WriteAdvancing(image, 1, ...) whenever _printControl or a LINAGE page is present, before the IsVarying check. PROBE E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/write-p2/pa.cob: FD VF RECORD IS VARYING IN SIZE FROM 3 TO 8 DEPENDING ON VL; VL=9 WRITE VR AFTER ADVANCING 1 LINE -> '00' (expected '44'); VL=2 WRITE VR BEFORE ADVANCING 1 LINE -> '00' (expected '44'); then VL=5 plain WRITE -> '00' but the medium holds all 8 X's with no length prefix (the DEPENDING length is dropped on every write once the connector has seen print control). DIVERGES on the print/LINAGE arm; the literal-1/identifier-1 (FILE phrase, A.4.13 Not claimed) and FORMAT clause (A.4.8) halves are outside the claimed surface.",
-  "state": "GAP"
+  "notes": "kb/Work PB1190 landed (w67p). cite.py --check 14.9.51.4 'shall not be larger than the largest or smaller than the smallest number of bytes allowed by the RECORD IS VARYING clause' -> OK §14.9.51.4 14). The WRITE's length decision is ONE member (WrittenLength) asked by both arms, and the bound (OutsideVaryingBounds) runs in both - the print-control arm (WriteAdvancingRecord, which a print/LINAGE file's plain WRITE is rerouted to) now receives the DEPENDING length through FileRegistry.WriteAnyOrg. Golden: VARYING 3 TO 8 DEPENDING ON VL, AFTER ADVANCING with VL=9 -> 44 and BEFORE ADVANCING with VL=2 -> 44, nothing written; plain VL=5 -> 00 and the file reads back one 5-byte record.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-15",
@@ -49656,13 +49656,13 @@
   "ordinal": 15,
   "subject": "WRITE statement",
   "rule-digest": "a8b0bec83863",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileRegistry.cs#WriteShared; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitWrite",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#WriteAdvancing; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OutsideVaryingBounds",
+  "test-ref": "conformance:85/pb1190_varying_advancing_bounds",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1190 (registrar 14c). GR15: 'If the execution of a WRITE statement is unsuccessful, the write operation does not take place, the content of the record area is unaffected, and the I-O status ... is set' (cite.py --check 14.9.51.4 -> OK rule 15). Every unsuccessful arm returns before any stream/store traffic ('48', '44', '71', '24', '22', '34', '21', and the WITH LOCK preflight '53'/'54' which WriteShared answers before WriteAnyOrg). The runtime receives the record area as an image string and never writes back into it. PROBE pa.cob: after '48' SR still 'BBBBB'/'CCCCC'; after '44' VR still 'XXXXXXXX' and nothing reached wp2a-v.dat for the two plain '44' writes; pb.cob: the refused '21' indexed record never entered the file. Transfer of control: EOP phrases guarded on successful status (SequentialIoEmitter snapshot), INVALID KEY only on '2x' (EmitInvalid), USE hook after the status store. The print-arm GR14 miss is recorded under GR-14.9.51.4-14, not here. Golden conformance:85/l1_open_not_open_statements pins 'write does not take place' but not the record-area half, so it is not named as closing this row: test-needed. || REFUTED: PARTIAL — The write-does-not-take-place half fails on the print-control arm. On a record-sequential RECORD VARYING file, a WRITE with an ADVANCING phrase whose DEPENDING length is outside the VARYING bounds is UNSUCCESSFUL under GR14 ('44'), and GR15 then requires that the write operation not take place. The runtime skips the bound check on that arm (the mechanism the adjudicator filed under GR14), so the record reaches the medium. The observable file content therefore breaks GR15 as well as GR14's status. The other unsuccessful arms verified: 48/44 plain/24/22/21/71/53-54. One mechanism (the print arm with no length parameter), so a fix of the GR14 finding closes this too.",
-  "state": "GAP"
+  "notes": "kb/Work PB1190 landed (w67p): the print-control arm's GR14 '44' now precedes any presentation, so the write does not take place (the golden reads the file back: only the in-bounds record is on the medium). The other unsuccessful arms (48/44 plain/24/22/21/71/53-54) were verified by the refuter.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-16",
@@ -63416,7 +63416,7 @@
   "test-ref": "",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 103: 'I-O status (action taken for fatal exception conditions). This item is required. This item shall be documented' (9.1.13). cite.py --check 9.1.13.1 'The implementor may either continue or terminate the execution of the run unit' -> 'OK  §9.1.13.1   (General)' — full sentence set: 'the implementor determines what action is taken after the execution of any applicable exception processing statement, or if none applies, after completion of the normal input-output control system error processing ... If the implementor chooses to continue ..., control is transferred to the end of the statement that produced the fatal exception condition unless the rules for that statement define other behavior. Any NOT AT END or NOT INVALID KEY phrase ... is ignored'. §14.6.13.1.3 3): 'If the exception condition is a fatal EC-I-O exception condition, then the rules for 9.1.13, I-O status apply, then if the implementor has not specified otherwise, the following rules apply' (rules 4-8; 5/7 terminate when checking is enabled) — the determination does not 'specify otherwise', so the checking-ON arm is the standard's. Latitude -> CLAUDE.md rule 1 -> GnuCOBOL 3.2 (tests/external/gnucobol-3.2.tar.xz cobc/codegen.c ~l.11089-11093, the generated error handler: a declarative for the file is performed; otherwise 'if (!(... flag_select_features & COB_SELECT_FILE_STATUS)) cob_fatal_error (COB_FERROR_FILE)'); consistent with COBOLNET_DESIGN.md item 14's terminate recommendation. PROBE r103.cob (--std 2023, pin 80de60472): F2 with FILE STATUS OPEN INPUT missing -> 'AFTER OPEN F2 (FILE STATUS) 35' (continue: CONFORMS); F1 no FS no USE OPEN INPUT missing -> 'AFTER OPEN F1 (NO FS, NO USE)', exit 0 (determination: abnormal termination, nonzero exit) -> DIVERGES on this arm. Checking-ON arm per doc-rows-1 probe (>>TURN EC-I-O CHECKING ON -> 'abnormal run-unit termination: EC-I-O-PERMANENT-ERROR (fatal): I-O status 35', exit 1) matches rules 5/7. PB1512 (open): host IOException on sequential READ/WRITE unmapped. FileStatus.cs LineRecordInvalidChar's summary ('a program without a FILE STATUS item or a USE declarative terminates here') states the DETERMINATION, so it becomes true when the terminate arm lands. PARTIAL: continue arm and checking-ON arm hold; the no-FS/no-USE terminate arm and the 30 mapping do not. Owning notes: kb/Work/PB322 (determination E, the fatal-status action; add DOC-A.1-103's terminate arm) and kb/Work/PB1512 (claims DOC-A.1-103). Witnesses needed: a golden per arm (FS continue; no-FS terminate nonzero exit; checking-ON terminate).",
+  "notes": "A.1 item 103: 'I-O status (action taken for fatal exception conditions). This item is required. This item shall be documented' (9.1.13). cite.py --check 9.1.13.1 'The implementor may either continue or terminate the execution of the run unit' -> 'OK  §9.1.13.1   (General)' — full sentence set: 'the implementor determines what action is taken after the execution of any applicable exception processing statement, or if none applies, after completion of the normal input-output control system error processing ... If the implementor chooses to continue ..., control is transferred to the end of the statement that produced the fatal exception condition unless the rules for that statement define other behavior. Any NOT AT END or NOT INVALID KEY phrase ... is ignored'. §14.6.13.1.3 3): 'If the exception condition is a fatal EC-I-O exception condition, then the rules for 9.1.13, I-O status apply, then if the implementor has not specified otherwise, the following rules apply' (rules 4-8; 5/7 terminate when checking is enabled) — the determination does not 'specify otherwise', so the checking-ON arm is the standard's. Latitude -> CLAUDE.md rule 1 -> GnuCOBOL 3.2 (tests/external/gnucobol-3.2.tar.xz cobc/codegen.c ~l.11089-11093, the generated error handler: a declarative for the file is performed; otherwise 'if (!(... flag_select_features & COB_SELECT_FILE_STATUS)) cob_fatal_error (COB_FERROR_FILE)'); consistent with COBOLNET_DESIGN.md item 14's terminate recommendation. PROBE r103.cob (--std 2023, pin 80de60472): F2 with FILE STATUS OPEN INPUT missing -> 'AFTER OPEN F2 (FILE STATUS) 35' (continue: CONFORMS); F1 no FS no USE OPEN INPUT missing -> 'AFTER OPEN F1 (NO FS, NO USE)', exit 0 (determination: abnormal termination, nonzero exit) -> DIVERGES on this arm. Checking-ON arm per doc-rows-1 probe (>>TURN EC-I-O CHECKING ON -> 'abnormal run-unit termination: EC-I-O-PERMANENT-ERROR (fatal): I-O status 35', exit 1) matches rules 5/7. PB1512 (landed w67p): a host IOException on a sequential READ, START, WRITE or REWRITE is now '30' (GR-9.1.13.6-1), so the status this action applies to always arrives. FileStatus.cs LineRecordInvalidChar's summary ('a program without a FILE STATUS item or a USE declarative terminates here') states the DETERMINATION, so it becomes true when the terminate arm lands. PARTIAL: continue arm and checking-ON arm hold; the no-FS/no-USE terminate arm does not. Owning note: kb/Work/PB322 (determination E, the fatal-status action; add DOC-A.1-103's terminate arm). Witnesses needed: a golden per arm (FS continue; no-FS terminate nonzero exit; checking-ON terminate).",
   "state": "GAP"
  },
  {
@@ -63576,13 +63576,13 @@
   "ordinal": 114,
   "subject": "Line delimiter, specification of",
   "rule-digest": "7831faee1b9a",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-114; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenWriter; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadPhysicalLine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-114; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#LineSequentialDelimiter; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadPhysicalLine; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ExistingRecordCount",
+  "test-ref": "conformance:2023/pb1540_ls_lone_cr_is_data; conformance-test:LinageConformanceTests.Bytes_LineSequential_EveryPlacementMix; conformance:2023/pb964_ls_plain_write_after_after",
   "derivation": "",
   "editions": "2023",
-  "notes": "cite.py --check 12.4.5.10.3 \"Each record in a line sequential file is terminated by an implementor-defined line delimiter\" -> OK §12.4.5.10.3 2). The delimiter is latitude, and ISO is silent, so GnuCOBOL governs under CLAUDE.md rule 1. GnuCOBOL 3.x (gnucobol-3.x libcob/fileio.c): LINE SEQUENTIAL opens in C text mode ('w'/'r' unless COB_UNIX_LF), and lineseq_write emits '\\n', with '\\r' only under cob_ls_uses_cr, which is never set by default. That gives the host newline. lineseq_read drops a CR only when LF follows ('looks like \\r was part of the data'), otherwise the CR is data, and its cob_ls_validate turns a byte below space into '09'. That is exactly this row, and it agrees with DOC-A.1-115's set. Code at pin 80de60472: scratchpad/doc2/out/run/d4/p114w.cob -> od 'A B \\r \\n C D E \\r \\n' (CR LF on every host, via the hard-coded NewLine = \"\\r\\n\" at SequentialConnector.cs:341). scratchpad/doc2/out/run/d4/p114r.cob reading 'AAAAAAAA\\rBB\\nCC' into PIC X(5) -> [AAAAA] 06, [AAA  ] 00, [BB   ] 00, [CC   ] 00, 10. The lone CR ended a record where the row makes it data ('AAA\\rB' then '09'). So this DIVERGES, owned by kb/Work PB1540 (open, inventory_rows [DOC-A.1-114]). No owner decision records CR LF (refuter doc-rows-1 checked; grep CONFORMANCE/FILES_DESIGN 'line delimiter': none). The golden 2023/pb964_ls_plain_write_after_after pins CR LF and must be re-derived per host by PB1540. DOC-ROWS-2 REFUTER (citation): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md).",
-  "state": "GAP"
+  "notes": "kb/Work PB1540 landed (w67p). cite.py --check 12.4.5.10.3 'Each record in a line sequential file is terminated by an implementor-defined line delimiter' -> OK §12.4.5.10.3 2). The §7 determination (host newline written; LF or CR LF read on every host; a lone CR is data and '09') is now the code: SequentialConnector.LineSequentialDelimiter (Environment.NewLine) is every line end a line sequential connector writes (record delimiter, ADVANCING/LINAGE lines, CLOSE of an open line); ReadPhysicalLine ends a record only at LF or CR LF; ExistingRecordCount counts under the same rule. Witnesses: the golden reads 'AB<CR>CD<LF>EF<CR><LF>GH' as AB<CR>CD '09', EF '00', GH '00', '10'; LinageConformanceTests pin the host bytes of every write arm; pb964 is re-derived host-independently. The record sequential PRINT stream keeps CR LF (not governed by item 114; DOC-A.1-146 (c′)).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-115",
@@ -64056,13 +64056,13 @@
   "ordinal": 146,
   "subject": "RECORD clause (calculations to derive size of records on storage medium)",
   "rule-digest": "4eeb6f8ea988",
-  "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-146; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordWidth; src/Cobol.Net.Runtime/IO/FileConnector.cs#FitRecord",
-  "test-ref": "conformance:85/pb1276_record_contains_sizes_file",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-146; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#LineSequentialDelimiter; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadRecord",
+  "test-ref": "conformance:85/pb1276_record_contains_sizes_file; conformance:2002/io_status_04; conformance:2023/pb1540_ls_lone_cr_is_data",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Re-verdicted by kb/Work PB1276 (w61f); now owned by kb/Work PB1540. The §7 determination (docs/CONFORMANCE.md DOC-A.1-146) is written and its arm (a) - a Format 1 record is exactly integer-1 bytes, positions no description covers are spaces - now holds (golden 85/pb1276_record_contains_sizes_file; was: the description's size). Still divergent: arm (c)'s line delimiter is CR LF on every host where the determination states the host newline (kb/Work PB1540, the row's remaining ⚠). PARTIAL.",
-  "state": "GAP"
+  "notes": "Re-verdicted by kb/Work PB1540 (w67p). Arm (c)'s delimiter is now the host newline the determination states (the row's remaining ⚠ is gone). The determination also gains the fixed-length physical record rule (kb/Work PB1514: no record boundaries on the medium; the reading description's integer-1 bytes) and arm (c′), the record sequential print stream (CR LF line controls, a variable-length record presented at its GR13 length and refused '44' outside the VARYING bounds - kb/Work PB1190). Arm (a) holds (golden 85/pb1276_record_contains_sizes_file).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-147",

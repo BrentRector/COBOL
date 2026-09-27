@@ -927,6 +927,10 @@ public sealed class FileRegistry
         // ⛔ ONE call site for BOTH entry points — the plain Open and OpenShared both funnel through here
         // (kb/Work PB324 landed on top of PB321's unified dispatch).
         if (!Associate(name, assign, assignDynamic)) return;
+        // The REVERSED phrase reaches the connector BEFORE its OPEN body runs, because the position it asks for
+        // needs a record count, and nothing after a successful open may read the physical file (the PB713 rule
+        // below, in SharedOpenAttempt; kb/Work PB1512). Set on every open, so it describes THIS statement only.
+        if (Require(name) is SequentialConnector sequential) sequential.ReversedRequested = tape == OpenTapePhrase.Reversed;
         // SharedOpenAttempt sets the connector status on the terminal attempt, and RetryLoop lands an exhausted
         // retry on the CONFLICT'S OWN status (§14.7.9.3 closing paragraph → §9.1.13.9 item 1 = '61'), so there is
         // nothing left to override afterwards — the former `if (status == Deadlock) SetStatusOf(…)` line existed
@@ -1531,8 +1535,9 @@ public sealed class FileRegistry
             ? f.Write(image, length, page, extents)
             // §14.9.51.4 GR25 e)/f) — ONE advance, placed by the statement's words; the combined COBOL-2023
             // BEFORE AFTER form arrives as Before, because GR25 f) puts its advance after the presentation
-            // exactly as GR25 e) does (kb/Work PB712 deleted the third, two-amount arm).
-            : f.WriteAdvancing(image, advance.Lines, advance.Kind == WriteAdvanceKind.Before, page),
+            // exactly as GR25 e) does (kb/Work PB712 deleted the third, two-amount arm). The record length rides
+            // this arm too: §14.9.51.4 GR14's bound is an ALL FILES rule, not a plain-WRITE one (kb/Work PB1190).
+            : f.WriteAdvancing(image, advance.Lines, advance.Kind == WriteAdvanceKind.Before, page, length),
         RelativeConnector r => r.Write(image, length, extents),
         IndexedConnector ix => ix.Write(image, length, extents),
         _ => FileStatusCode.PermanentError,

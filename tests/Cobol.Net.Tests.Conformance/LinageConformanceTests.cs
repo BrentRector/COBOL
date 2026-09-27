@@ -75,17 +75,23 @@ public sealed class LinageConformanceTests
     private static readonly CobolNetCompiler CobolNetBytes2023 = new(2023);
 
     /// <summary>Compile-and-run, then assert the EXACT bytes the program left on the medium. The expected string
-    /// is written with explicit <c>\r\n</c> because the physical newline of this connector is CRLF on every host
-    /// (the writer sets <c>NewLine = "\r\n"</c>), so a margin line, a page-fill line and an ADVANCING line are
-    /// the same two bytes everywhere.</summary>
-    private static void AssertBytes(string source, string fileName, string expected, int edition = 85)
+    /// is written with explicit <c>\r\n</c> for every line end: a record sequential PRINT stream ends its lines
+    /// with CR LF on every host, so a margin line, a page-fill line and an ADVANCING line are the same two bytes
+    /// everywhere. On a LINE SEQUENTIAL file (<paramref name="org"/> names the organization) every one of those
+    /// line ends is the line delimiter instead, which Annex A.1 item 114 makes the HOST newline
+    /// (docs/CONFORMANCE.md DOC-A.1-114; kb/Work PB1540) — the same line structure, host bytes.</summary>
+    private static void AssertBytes(string source, string fileName, string expected, int edition = 85, string org = "")
     {
         var (ok, _, detail, bytes) =
             (edition == 85 ? CobolNetBytes : CobolNetBytes2023).CompileRunAndReadFile(source, fileName);
         Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.NotNull(bytes);
+        if (org.Contains("LINE SEQUENTIAL", StringComparison.Ordinal))
+            expected = expected.Replace("\r\n", Environment.NewLine, StringComparison.Ordinal);
         Assert.Equal(expected, System.Text.Encoding.Latin1.GetString(bytes!));
     }
+
+    private const string LineSequentialOrg = "\n        ORGANIZATION IS LINE SEQUENTIAL";
 
     /// <summary>A LINAGE print program over one file: <paramref name="assign"/> is both the ASSIGN literal and
     /// the host file name, <paramref name="org"/> an ORGANIZATION phrase (or empty).</summary>
@@ -272,7 +278,7 @@ public sealed class LinageConformanceTests
                 MOVE "CCCC" TO P-REC.
                 WRITE P-REC.
             """), file,
-            "\r\nAAAA\r\nBBBB\r\nCCCC\r\n", edition);
+            "\r\nAAAA\r\nBBBB\r\nCCCC\r\n", edition, org);
 
     [Theory]
     [InlineData("LNGBYD", "lngbyd.prt", "", 85)]
@@ -284,7 +290,7 @@ public sealed class LinageConformanceTests
                 MOVE "BBBB" TO P-REC.
                 WRITE P-REC.
             """), file,
-            "\fAAAA\r\nBBBB\r\n", edition);
+            "\fAAAA\r\nBBBB\r\n", edition, org);
 
     [Theory]
     // The OTHER placements keep their own answers — the plain WRITE's placement is the only thing PB964 moved.
@@ -297,14 +303,14 @@ public sealed class LinageConformanceTests
     [InlineData("LNGBYH", "lngbyh.prt", "BEFORE ADVANCING 1 LINE", "", "AAAA\r\nBBBB\r\nCCCC\r\n")]
     [InlineData("LNGBYI", "lngbyi.prt", "AFTER ADVANCING 1 LINE", "AFTER ADVANCING 0 LINES", "\r\nAAAABBBB\r\nCCCC\r\n")]
     public void Bytes_LineSequential_EveryPlacementMix(string programId, string file, string first, string second, string expected)
-        => AssertBytes(BytesProgram(programId, file, "\n        ORGANIZATION IS LINE SEQUENTIAL", "RECORD CONTAINS 4 CHARACTERS", $"""
+        => AssertBytes(BytesProgram(programId, file, LineSequentialOrg, "RECORD CONTAINS 4 CHARACTERS", $"""
                 MOVE "AAAA" TO P-REC.
                 WRITE P-REC {first}.
                 MOVE "BBBB" TO P-REC.
                 WRITE P-REC {second}.
                 MOVE "CCCC" TO P-REC.
                 WRITE P-REC.
-            """), file, expected, 2023);
+            """), file, expected, 2023, LineSequentialOrg);
 
     [Fact]
     // ⛔ THE SECOND ARM OF THE WRITE DISPATCH — a LINE SEQUENTIAL LINAGE file gets the SAME logical page. This is
@@ -317,7 +323,7 @@ public sealed class LinageConformanceTests
     // AAAA lands on page-1 body line 1 = physical 4, BBBB on body line 2 = physical 5, its advance overflows
     // (GR26 a)) to page-2 body line 1 = physical 11, and CCCC lands there.
     public void Bytes_LineSequentialLinageFile_GetsTheSameMargins()
-        => AssertBytes(BytesProgram("LNGBY5", "lngby5.prt", "\n        ORGANIZATION IS LINE SEQUENTIAL",
+        => AssertBytes(BytesProgram("LNGBY5", "lngby5.prt", LineSequentialOrg,
             "LINAGE IS 2 LINES LINES AT TOP 3 LINES AT BOTTOM 2", """
                 MOVE "AAAA" TO P-REC.
                 WRITE P-REC.
@@ -326,7 +332,7 @@ public sealed class LinageConformanceTests
                 MOVE "CCCC" TO P-REC.
                 WRITE P-REC.
             """), "lngby5.prt",
-            "\r\n\r\n\r\nAAAA\r\nBBBB\r\n\r\n\r\n\r\n\r\n\r\nCCCC\r\n", edition: 2023);
+            "\r\n\r\n\r\nAAAA\r\nBBBB\r\n\r\n\r\n\r\n\r\n\r\nCCCC\r\n", edition: 2023, org: LineSequentialOrg);
 
     // ── GR7 counter rules (§13.18.34 GR7c1–c4 / GR7d) ─────────────────────────────────────────────────────
 

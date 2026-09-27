@@ -83,21 +83,25 @@
            CLOSE LINF.
       *> ---- C. WRITE: GR23, and the medium left unchanged.
            OPEN OUTPUT OUTF.
-           MOVE "JKLMN" TO O-REC.
+           MOVE "JKLMNOP" TO O-REC.
            WRITE O-REC.
            DISPLAY "W1=" OUT-ST.
            MOVE LOW-VALUE TO O-REC(3:1).
            WRITE O-REC.
            DISPLAY "W2=" OUT-ST.
-           MOVE "UVWXY" TO O-REC.
+           MOVE "UVWXYZA" TO O-REC.
            WRITE O-REC.
            DISPLAY "W3=" OUT-ST.
            CLOSE OUTF.
-      *> ---- D. REWRITE: GR17 d) reaches the SAME set.
+      *> ---- D. REWRITE: GR17 d) reaches the SAME set. The lines are
+      *>         written full-width (7 non-space characters): GR17 b)
+      *>         compares O-REC's 7 bytes with the line being replaced,
+      *>         and a line WRITE trimmed of trailing spaces (GR21) is
+      *>         shorter, so its REWRITE would be '44' (kb/Work PB1168).
            OPEN I-O OUTF.
            READ OUTF AT END DISPLAY "EOF3".
            DISPLAY "R3=" OUT-ST "[" O-REC "]".
-           MOVE "PQRST" TO O-REC.
+           MOVE "PQRSTUV" TO O-REC.
            REWRITE O-REC.
            DISPLAY "X1=" OUT-ST.
            READ OUTF AT END DISPLAY "EOF4".

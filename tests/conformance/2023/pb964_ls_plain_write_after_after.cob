@@ -18,7 +18,10 @@
       *> ONE-character record sequential record (§12.4.5.10.3 GR3),
       *> because a same-width line sequential read-back splits a
       *> welded line again and hides the defect. Each byte displays as
-      *> itself, CR as "<" and LF as "/".
+      *> itself and LF as "/"; a CR is not shown, because the line
+      *> delimiter is the HOST newline -- CR LF on Windows, LF on Linux
+      *> and macOS (docs/CONFORMANCE.md DOC-A.1-114, kb/Work PB1540) --
+      *> and it is the LF that ends the line on every host.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB964LSW.
        ENVIRONMENT DIVISION.
@@ -63,11 +66,14 @@
            STOP RUN.
        SHOW-BYTE.
            EVALUATE BY-REC
-               WHEN X"0D" MOVE "<" TO WS-CH
+               WHEN X"0D" CONTINUE
                WHEN X"0A" MOVE "/" TO WS-CH
                           ADD 1 TO WS-LINES
+                          PERFORM APPEND-CH
                WHEN OTHER MOVE BY-REC TO WS-CH
-           END-EVALUATE
+                          PERFORM APPEND-CH
+           END-EVALUATE.
+       APPEND-CH.
            STRING WS-CH DELIMITED BY SIZE INTO WS-LINE
                WITH POINTER WS-PTR
            END-STRING.
