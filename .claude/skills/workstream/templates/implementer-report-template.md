@@ -15,6 +15,11 @@ owner may overturn is marked ⚠ DETERMINATION with the reading chosen and the r
 Three to six lines: the ONE place the rule now lives, what was deleted, which sibling arms were fixed (answer "which arm
 did you fix?" explicitly), and any drift test that pins the shape. Name files only where the lander must look.
 
+## For the next implementer (⛔ required — it becomes `orient.py`'s LEARNED section)
+One line per source file you changed: `path#Member` — the entry point that now owns the rule, the helper to REUSE
+(not copy), and the trap that cost you turns. The same lines go into each note's `## Landing` section, because
+`scripts/spec/orient.py` reads landed notes, and this is the only way the next wave starts where you finished.
+
 ## Goldens
 One line each: path · PROGRAM-ID · editions it runs at · how the expected value was derived (rule, not measurement).
 Negatives: path · `reject-at:` editions · code. (One positive at the introducing edition + one negative below it is the

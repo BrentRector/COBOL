@@ -94,6 +94,21 @@ lead + keyword siblings. Measured on its first run: 411 open actionable defects 
 a six-slot wave carries ~25–30 defects instead of ~10. Wave 65, grouped by hand, split `ConditionRenderer.cs`'s five
 defects across two implementers (A and E) and left three of `ReferenceFormatProcessor.cs`'s five behind.
 
+⭐ **ORIENTATION IS PAID ONCE, NOT ONCE PER WAVE — owner 2026-09-27 ("over many waves, more of the same orientation
+… can we reduce the repeated work?").** Every dispatch spec tells the implementer to run `python scripts/spec/orient.py
+<the files its notes name>` BEFORE reading any source (MANDATORY-PRACTICES P6; `check_practices.py` refuses a spec
+without it). It prints each file's outline with line numbers, cited clauses, covering tests, what LANDED notes learned
+about the file (their code sites and mechanisms, newest first), the open notes naming it, and recent commits. It is
+derived on each run and never goes stale. Measured baseline (wave 65, 7 transcripts, 1,401 turns): 63 % of tool calls
+were reads/searches, 15 % of turns and 43 % of tool-result bytes came before the first edit. Estimate: ~25 turns saved
+per implementer (≈ 200 → 175), about **15 % of its tokens** on the cost law, about one weekly point per six-slot wave.
+Verify on wave 67 with the same measurement (turns to first edit, read calls, pre-edit bytes).
+
+⭐ **COMMAND CHAINING — MANDATORY-PRACTICES P14, enforced by the guard hook.** Never chain anything after a verdict
+command (build, test, gate, push-main, battery); capture its status with `; echo "EXIT=$?"` if needed. Independent
+commands go as PARALLEL tool calls in ONE turn. A blanket no-chaining ban (carlymr/carlys-claude-skills) was
+considered and rejected in that form: split chains become extra turns, and turns are the quadratic cost.
+
 **⭐ Lander throughput — owner decision 2026-09-22 ("do all that we can").** The lander is the serial bottleneck: train
 47's lander took 84 min, and its whole-Conformance leg measured 9.6 min on a quiet host, 18.5 min at battery #84 and
 30.6 min in train 48, because up to seventeen implementers were running the SAME whole assembly on the same 32 cores.

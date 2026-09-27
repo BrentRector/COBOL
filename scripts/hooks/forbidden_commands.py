@@ -14,6 +14,13 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
                             property (FullyQualifiedName~X).
   unredirected filtered     a filtered `dotnet test` whose output is neither redirected nor piped floods the context
   dotnet test               and hides the verdict line; log it and read the verdict line (the gate skill).
+  chaining after a verdict  a build / test / gate / push-main command followed by `&&`, `||` or `;` and another
+                            command: the chain's exit status is its LAST command's, so the verdict is masked or acted
+                            on unread (`dotnet test … && git commit` committed on a false green). Allowed after it: an
+                            `echo … $?` that CAPTURES the status, and once captured, read-only commands on the log.
+                            Owner 2026-09-27 (adopting the no-chaining idea from carlymr/carlys-claude-skills in a
+                            targeted form: independent commands go as parallel tool calls in one turn, because a
+                            blanket ban would add turns, and agent cost is quadratic in turns).
 
 Exit 2 blocks the call and returns stderr to the agent. Anything unparseable passes (a hook must never wedge a session).
 """
@@ -95,5 +102,53 @@ if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
         block("a filtered `dotnet test` must redirect its output to a log (or pipe it through tail/grep) and read the "
               "verdict line — unredirected output floods the context and hides the verdict. Prefer "
               "scripts/build-local.{ps1,sh}.")
+
+# 5. chaining after a verdict command
+VERDICT = re.compile(r"\bdotnet\s+(?:test|build)\b|build-local\.(?:ps1|sh)\b|push-main\.sh\b|battery\.sh\b|"
+                     r"guard(?:-fast)?\.sh\b")
+READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-String|Get-Content|findstr|type)\b")
+
+
+def _segments(text: str):
+    """Split a command line on top-level `&&`, `||` and `;`, ignoring quoted text (a separator inside a quoted
+    string or a `bash -c '…'` argument is not a separator of THIS command line)."""
+    out, cur, q, i = [], [], None, 0
+    while i < len(text):
+        ch = text[i]
+        if q:
+            cur.append(ch)
+            if ch == q:
+                q = None
+        elif ch in "'\"":
+            q = ch
+            cur.append(ch)
+        elif text.startswith("&&", i) or text.startswith("||", i):
+            out.append("".join(cur)); cur = []; i += 2; continue
+        elif ch == ";" or ch == "\n":
+            out.append("".join(cur)); cur = []
+        else:
+            cur.append(ch)
+        i += 1
+    out.append("".join(cur))
+    return [s.strip() for s in out if s.strip()]
+
+
+segs = _segments(commands)
+for i, seg in enumerate(segs[:-1]):
+    if not VERDICT.search(seg):
+        continue
+    captured = False
+    for nxt in segs[i + 1:]:
+        if re.match(r"^\s*echo\b", nxt) and ("$?" in nxt or "PIPESTATUS" in nxt or "$LASTEXITCODE" in nxt):
+            captured = True
+            continue
+        if captured and READ_ONLY.match(nxt):
+            continue
+        block(f"`{nxt[:60]}` is chained after the verdict command `{seg[:60]}`: the chain's exit status is its LAST "
+              "command's, so the verdict is masked or acted on unread. Run the verdict command alone (redirect it to "
+              "a log), read its verdict line, then run the next step as its own call. To capture the status in the "
+              "same call, append `; echo \"EXIT=$?\"` (read-only commands may follow that). Independent commands go "
+              "as parallel tool calls in one turn.")
+        break
 
 sys.exit(0)

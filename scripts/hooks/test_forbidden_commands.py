@@ -39,6 +39,17 @@ CASES = [
     ('dotnet test x.csproj --filter "FullyQualifiedName~Drift"', True),
     ('dotnet test x.csproj --filter "FullyQualifiedName~Drift" 2>&1 | tail -5', False),
     ("dotnet test x.csproj", False),
+    # 5. chaining after a verdict command
+    ("dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
+    ("dotnet build CobolSharp.sln -c Debug && dotnet test x.csproj > t.log", True),
+    ("bash scripts/push-main.sh > p.log 2>&1; git log -1", True),
+    ("pwsh -File scripts/build-local.ps1 -Filter X *> b.log || true", True),
+    ("bash scripts/push-main.sh > p.log 2>&1; echo \"rc=$?\"; grep -E landed p.log | tail -2", False),
+    ("dotnet build CobolSharp.sln -c Debug -v q 2>&1 | grep -E 'error|Build succeeded'", False),
+    ("cd /e/COBOL && dotnet build CobolSharp.sln -c Debug > b.log 2>&1", False),
+    ("timeout 580 bash -c 'tail -n +1 -f b.log | grep -m1 VERDICT' ; tail -3 b.log", False),
+    ("git status --short && git log --oneline -3", False),
+    ("bash -c 'dotnet test x.csproj > t.log && echo done'", False),
 ]
 
 

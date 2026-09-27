@@ -69,7 +69,11 @@ constructs one after another) but still gets ONE comprehensive gate for the whol
 
 1. **Redirect the FULL output to a file.** Never `| tail -N` — it drops the failing test NAME, the one thing you
    need. Then grep the file for the summary line and for `crash|abort|Failed: *[1-9]`.
-2. **Never `&&`-chain `git commit` or `git push` onto a test run or its tail.** The exit code of `tail` is not the
+2. **Never chain ANYTHING after a verdict command** (build, test, `build-local`, `push-main.sh`, battery) with `&&`,
+   `||` or `;` — MANDATORY-PRACTICES P14, and the guard hook (`scripts/hooks/forbidden_commands.py` rule 5) now BLOCKS
+   it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
+   Independent commands go as parallel tool calls in one turn. The original case:
+   **never `&&`-chain `git commit` or `git push` onto a test run or its tail.** The exit code of `tail` is not the
    verdict. Read the verdict, THEN commit as a separate call. This has been violated after the rule was written.
 3. **Never edit source files while a gate is running.** The parallel legs compile from the WORKING TREE, so mid-run
    edits manufacture phantom failures. Staging first does not protect you. Prep only docs and commit messages.
