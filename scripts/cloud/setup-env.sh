@@ -13,9 +13,9 @@
 # GitHub (the repo AND the private specs-private submodule) goes through the separate GitHub proxy regardless — but
 # that proxy only authorizes repositories ATTACHED TO THE SESSION, so the specs-private submodule (the licensed PDF,
 # needed only by render-spec-page.py and the figure audits — specs/ISO_COBOL.md and cite.py are in the main repo)
-# clones only when BrentRector/CobolSharp-private is attached too; otherwise "could not read Username … terminal
+# clones only when BrentRector/COBOL-private is attached too; otherwise "could not read Username … terminal
 # prompts disabled". `claude --cloud` attaches ONE repository; the claude.ai/code page attaches both ("+" beside the
-# repo chip, or the link https://claude.ai/code?repositories=BrentRector/CobolSharp,BrentRector/CobolSharp-private).
+# repo chip, or the link https://claude.ai/code?repositories=BrentRector/COBOL,BrentRector/COBOL-private).
 #
 # What the VM lacks that this repo needs (everything else — git, python3, java 21 for ANTLR — is pre-installed):
 #   * .NET 10 SDK — global.json pins 10.0.100 (rollForward latestMinor); CI uses setup-dotnet 10.0.x

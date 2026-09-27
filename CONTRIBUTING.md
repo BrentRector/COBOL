@@ -1,6 +1,6 @@
-# Contributing to CobolSharp
+# Contributing to WiseOwl COBOL
 
-Thank you for your interest in CobolSharp (COBOL.NET) — a COBOL compiler that implements ISO/IEC 1989:2023, with
+Thank you for your interest in WiseOwl COBOL — a COBOL compiler that implements ISO/IEC 1989:2023, with
 correct support for the 1985, 2002 and 2014 editions, and compiles COBOL to idiomatic typed-native C# built by
 Roslyn.
 
@@ -36,7 +36,7 @@ it decides → GnuCOBOL → IBM Enterprise COBOL or Micro Focus. That choice is 
 
 ## Contributor License Agreement
 
-CobolSharp is distributed under the [Business Source License 1.1](LICENSE), and the licensor also offers commercial
+WiseOwl COBOL is distributed under the [Business Source License 1.1](LICENSE), and the licensor also offers commercial
 licenses. So that every contribution can be distributed under all of those terms, **each contributor signs the
 [Contributor License Agreement](CLA.md) once**, before their first pull request can be merged. You keep the
 copyright in your contribution; the agreement grants the project the licenses it needs to ship it.
@@ -50,8 +50,8 @@ Prerequisites: the **.NET 10 SDK**, **PowerShell 7+** (`pwsh`, used for ANTLR pa
 scripts), **Python 3.14+** and **Java 21+** (for ANTLR).
 
 ```bash
-git clone https://github.com/BrentRector/CobolSharp.git
-cd CobolSharp
+git clone https://github.com/BrentRector/COBOL.git
+cd COBOL
 dotnet build CobolSharp.sln
 ```
 

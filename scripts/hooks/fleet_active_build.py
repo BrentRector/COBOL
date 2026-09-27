@@ -156,7 +156,7 @@ def same_path(a, b) -> bool:
     """Path equality that survives Windows' case-insensitive filesystem.
 
     The two sides are built from different strings — one from the payload's `cwd`, one from a `.git` file's
-    `gitdir:` line — so `E:\\CobolSharp` and `e:\\cobolsharp` are both spellings that occur in practice and a
+    `gitdir:` line — so `E:\\COBOL` and `e:\\COBOL` are both spellings that occur in practice and a
     raw `==` would silently answer "different tree" for the same tree.
     """
     return os.path.normcase(str(a)) == os.path.normcase(str(b))
@@ -274,7 +274,7 @@ def agents_sharing_tree(caller_cwd: str, foreign: list) -> tuple[list, "pathlib.
     return sharing, caller_tree
 
 
-# Git Bash / MSYS spell a Windows drive path as `/e/CobolSharp/…` (or `/cygdrive/e/…`). On Windows `pathlib`
+# Git Bash / MSYS spell a Windows drive path as `/e/COBOL/…` (or `/cygdrive/e/…`). On Windows `pathlib`
 # calls that path ROOTED but not ABSOLUTE (it has no drive), so `Path(cwd) / p` yields `E:\e\CobolSharp\…` — a
 # directory that does not exist and whose ancestors carry no `.git`. The caller's tree then became UNKNOWN and
 # the guard reverted to the session-wide rule: every foreign live agent denied, in EVERY worktree, for the whole

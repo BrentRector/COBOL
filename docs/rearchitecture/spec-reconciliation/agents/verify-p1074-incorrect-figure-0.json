@@ -6,7 +6,7 @@
     "pdf_says": "Figure D.3 legend, lower group: the box captioned \"Runtime Module\" is drawn with a SOLID single-line border (visually identical to the \"Compilation Unit\" and \"Source Unit\" boxes in the upper legend group). Only the box below it, \"Runtime Element\", is drawn with a dashed border. The \"Run Unit\" box above it has the heavy double-weight border.",
     "markdown_says": "| Symbol | Meaning |\n|--------|---------|\n| (solid double border box) | Run Unit |\n| (dashed border box) | Runtime Module |\n| (small dashed border box) | Runtime Element |",
     "why_it_matters": "The markdown legend makes Runtime Module and Runtime Element share the same symbol (both 'dashed'), so the legend can no longer distinguish them and the reader cannot decode the lower half of Figure D.3. The figure's whole purpose is the three-way symbol distinction (run unit / runtime module / runtime element) mirroring the upper legend's four-way distinction; collapsing two of the three destroys it.",
-    "reproduce": "cd E:/CobolSharp && python scripts/spec/page_workunit.py 1074 --out E:/Temp/specrecon/v1074 --dpi 300"
+    "reproduce": "cd E:/COBOL && python scripts/spec/page_workunit.py 1074 --out E:/Temp/specrecon/v1074 --dpi 300"
   },
   "verdict": {
     "real": true,

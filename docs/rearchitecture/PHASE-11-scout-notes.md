@@ -43,7 +43,7 @@
 
 ### Semantics
 
-## §15.13 BOOLEAN-OF-INTEGER (spec file E:/CobolSharp/specs/ISO_COBOL.md, line 34594)
+## §15.13 BOOLEAN-OF-INTEGER (spec file E:/COBOL/specs/ISO_COBOL.md, line 34594)
 
 General (15.13.1): "The BOOLEAN-OF-INTEGER function returns a boolean item of usage bit representing the binary value of argument-1. Argument-2 specifies the length of the boolean data item that is returned. The function type is boolean." Per §15.2 item 2, a boolean function is "of the class and category boolean" with "implicit usage bit".
 
@@ -134,7 +134,7 @@ Neither §15.13 nor §15.45 has function-local EC rules. The EC machinery is ent
 
 ### Semantics
 
-=== §15.14 BYTE-LENGTH (spec file E:/CobolSharp/specs/ISO_COBOL.md, line 34634) ===
+=== §15.14 BYTE-LENGTH (spec file E:/COBOL/specs/ISO_COBOL.md, line 34634) ===
 
 GENERAL (§15.14.1): "The BYTE-LENGTH function returns an integer equal to the length of the argument in bytes. The type of the function is integer."
 
@@ -318,7 +318,7 @@ Range via §15.5.5: "If the LEAP-SECOND directive with the OFF phrase is in effe
 
 ### Semantics
 
-Header format in E:/CobolSharp/specs/ISO_COBOL.md: sections are `## 15.NN Title`, subsections `### 15.NN.M` (EXCEPT §15.67.4 and §15.68.4 which are mis-leveled as `## 15.67.4` / `## 15.68.4`).
+Header format in E:/COBOL/specs/ISO_COBOL.md: sections are `## 15.NN Title`, subsections `### 15.NN.M` (EXCEPT §15.67.4 and §15.68.4 which are mis-leveled as `## 15.67.4` / `## 15.68.4`).
 
 === §15.90 TEST-DATE-YYYYMMDD (type: integer; argument rule 1: "Argument-1 shall be an integer") ===
 §15.90.4 Returned value rule 1 — an if/else-if CHAIN, so precedence is year → month → day:
@@ -603,7 +603,7 @@ DIAGNOSTIC WORDING CITATIONS: reject unsupported locale-module syntax citing "IS
 
 ### Semantics
 
-ALL § numbers verified against E:/CobolSharp/specs/ISO_COBOL.md (ISO/IEC 1989:2023).
+ALL § numbers verified against E:/COBOL/specs/ISO_COBOL.md (ISO/IEC 1989:2023).
 
 == §13.18.44 REDEFINES clause (line 21470) ==
 General (13.18.44.1): "The REDEFINES clause allows the same computer storage area to be described by different data description entries."
@@ -678,7 +678,7 @@ SR3 (line 17215): "The REDEFINES clause shall not be specified in the same data 
 
 # Intrinsic subsystem scout report (read-only; all paths absolute)
 
-## 1. IntrinsicCatalog.cs — E:\CobolSharp\src\Cobol.Net.Compiler\Binding\IntrinsicCatalog.cs (201 lines)
+## 1. IntrinsicCatalog.cs — E:\COBOL\src\Cobol.Net.Compiler\Binding\IntrinsicCatalog.cs (201 lines)
 
 ### Enums
 - `IntrinsicType` (line 10): `{ Alphanumeric, Boolean, National, Numeric, Integer, Index }` — §15.2 function-type column. **Boolean IS present** (doc comment: Boolean → bool conceptually, but see ResultCategory below).
@@ -717,7 +717,7 @@ XML doc explicitly says: "(Boolean-type rows are all Deferred; they fall to Nume
 BOOLEAN-OF-INTEGER :133 (Type Boolean, "ii", 2,2) · BYTE-LENGTH :134 ("s") · DATE-TO-YYYYMMDD :139 (OptionalTrailing 1,3 "iii") · DAY-TO-YYYYDDD :140 · YEAR-TO-YYYY :141 · INTEGER-OF-BOOLEAN :161 ("s") · LOCALE-COMPARE :162 · LOCALE-DATE :163 · LOCALE-TIME :164 · LOCALE-TIME-FROM-SECONDS :165 · SECONDS-PAST-MIDNIGHT :166 · STANDARD-COMPARE :167 · TEST-DATE-YYYYMMDD :168 · TEST-DAY-YYYYDDD :169 · TEST-NUMVAL :170 · TEST-NUMVAL-C :171 (OptionalTrailing 1,2 "ss") · CONCATENATE :174 (window 2002→RemovedIn 2023).
 Fold rows with empty RuntimeMethod (NOT Deferred, name-routed in the binder): HIGHEST-ALGEBRAIC :159, LOWEST-ALGEBRAIC :160, SMALLEST-ALGEBRAIC :196. LENGTH :113 carries RuntimeMethod "Length" (reused for the runtime-residue arm); WHEN-COMPILED :120 carries "WhenCompiled" (rendered as a baked constant).
 
-## 2. IntrinsicBinder.cs — E:\CobolSharp\src\Cobol.Net.Compiler\Binding\Procedure\Verbs\IntrinsicBinder.cs (844 lines)
+## 2. IntrinsicBinder.cs — E:\COBOL\src\Cobol.Net.Compiler\Binding\Procedure\Verbs\IntrinsicBinder.cs (844 lines)
 
 `internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)` :36. `internal static Func<DateTimeOffset> CompileClock` :41.
 
@@ -759,23 +759,23 @@ Switch on `args[0]`:
 ### BindArgOperand (:701–713, internal — also reached back from UdfBinder)
 OMITTED → COBOLNET1544 error operand; unconsumed `fnArgPhraseWord` → `BoundOperandError`; nonNumericLiteral → `NonNumericOperand` (:717–727: concat fold via `host.Expr.ConcatOperand`, figurative, STRINGLIT → `BoundStringLiteral`, NATLIT → `host.Expr.NationalLiteralOperand`, **BOOLLIT → `host.Expr.BooleanLiteralOperand`**); else `OperandOf(host.Expr.BindExpr(a.arithmeticExpression()))`.
 
-## 3. Renderer — E:\CobolSharp\src\Cobol.Net.Compiler\CodeGen\Emit\IntrinsicRenderer.cs
+## 3. Renderer — E:\COBOL\src\Cobol.Net.Compiler\CodeGen\Emit\IntrinsicRenderer.cs
 `internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)` :33.
 - `public NumX RenderNum(BoundIntrinsicCall ic)` :49. Deferred/empty-RuntimeMethod loud guard :52–53 (`EmitText.LoudValue("long", $"FUNCTION {sig.Name} (catalogued, not yet implemented)")`); string-class-in-numeric-context guard :54–55; Float family → `RenderFloat` :57 (:197–215 — doubles + `FromDouble` at ws=max(Receiver.Scale,9); Real receiver stays binary64). Then `switch (sig.RuntimeMethod)` :59–192 with a loud default :190–191. MEAN is special: catalog says "MeanScaled" but the renderer computes SumScaled + one division (SDIDI branch under StandardDecimal :116–118, else NumDivide :121–126) — **there is NO CobolIntrinsics.MeanScaled runtime body; "MeanScaled" is a dispatch key only**.
 - `public string RenderString(BoundIntrinsicCall ic)` :269. Deferred guard :272–273; `switch (sig.RuntimeMethod)` :274–329, loud default :328. EC arms map EcStatus→EcFn("Status") :318 … EcFileN :325–327 (arg forms loud, VCR 68/69). WHEN-COMPILED renders the baked `WhenCompiledStamp` constant :287 (Lazy, :43–44).
 - Arg helpers: `Arg`/`Dbl`/`IntArg` (:219–230, AsInt truncates via NumRescale), `AlignedArgs(Ex)` (:234–248), `StrArgList` :250, `CommaFlag` :252 (DECIMAL-POINT IS COMMA), `Collate(ic)` :259–260 (appends `, __COLLATE` / `, __COLLATE_NAT`).
 - String-channel arg helpers: `ArgNum` under `ReceiverContext.None` :375, `ArgInt` :379, `Str` :384 via exhaustive `StrArgVisitor` :390–403 — note `Visit(BoundBoolOperand n) => Loud(n)` :402 (a boolean operand in a string-arg position is currently loud).
-- RuntimeApi seams (E:\CobolSharp\src\Cobol.Net.Compiler\CodeGen\Roslyn\RuntimeApi.cs): `Intrinsic(method, args)` :555–556 → `CobolIntrinsics.{method}({args})`; `DateFn` :559–560 → `CobolDate.{method}`; `EcFn(method, args="")` :563–564 → `EcFunctions.{method}`; `ModuleNameFn(int kind)` :567 → `CobolModule.Name(kind)` (runtime at Runtime\Control\CobolModule.cs:25); boolean: `BoolNot` :24, `BoolOp` :29, `BoolOpAll` :32, `BoolOpName(char)` :37 (nameof-anchored to CobolBool.And/Or/Xor).
+- RuntimeApi seams (E:\COBOL\src\Cobol.Net.Compiler\CodeGen\Roslyn\RuntimeApi.cs): `Intrinsic(method, args)` :555–556 → `CobolIntrinsics.{method}({args})`; `DateFn` :559–560 → `CobolDate.{method}`; `EcFn(method, args="")` :563–564 → `EcFunctions.{method}`; `ModuleNameFn(int kind)` :567 → `CobolModule.Name(kind)` (runtime at Runtime\Control\CobolModule.cs:25); boolean: `BoolNot` :24, `BoolOp` :29, `BoolOpAll` :32, `BoolOpName(char)` :37 (nameof-anchored to CobolBool.And/Or/Xor).
 
 ### Seams a NEW intrinsic must touch (checklist)
 1. Catalog row flip/add — IntrinsicCatalog.cs (Bind, RuntimeMethod, window). 2. If Runtime: a runtime body (CobolIntrinsics partial / CobolDate / EcFunctions) + a `RenderNum` or `RenderString` case keyed on the exact RuntimeMethod string. 3. If Fold: a `BindXxxFold` beside BindLengthFold (:562) + a name-routed dispatch line in BindIntrinsicCore (:201–208 pattern). 4. If phrase-keyword shaped: a `BindXxx` special-bind + a `BoundIntrinsicCall` init-property (BoundTree.cs:150–190 — TrimMode/FindLast/FindAnycase/SubstituteModes/Convert*/ModuleNameKind precedent) + grammar phrase words already arrive via `fnArgPhraseWord`/bare-word (no grammar change needed for IDENTIFIER-shaped words like LOCALE). 5. If result category ≠ Numeric: catalog `Type` (+ ResultCategory arm for Boolean). 6. If Ec*-named: EC gate is automatic (:260). 7. Conformance golden + window negative in the same commit.
 
-## 4. BoundIntrinsicCall — E:\CobolSharp\src\Cobol.Net.Compiler\Binding\Bound\BoundTree.cs:150–190
+## 4. BoundIntrinsicCall — E:\COBOL\src\Cobol.Net.Compiler\Binding\Bound\BoundTree.cs:150–190
 `public sealed record BoundIntrinsicCall(IntrinsicSig Sig, IReadOnlyList<BoundOperand> Args, PicCategory ResultCategory, bool Collate = false) : BoundExpr` with init props: `CollateNat` :157, `TrimMode` :161, `FindLast` :165, `FindAnycase` :169, `SubstituteModes` :174, `ConvertSource` :178, `ConvertDest` :182, `ConvertDestHex` :185, `ModuleNameKind` :189. Args are BoundOperands, NOT BoundExprs.
 
 ## 5. Boolean representation in the greenfield (the P10 base)
 - **D-B1:** a boolean value IS a '0'/'1' character string; `PicCategory.Boolean` (PicInfo.cs:29 — PIC 1 [USAGE BIT], one alphanumeric char per boolean position; bit-packing is named future residue).
-- **Runtime:** `CobolBool` (E:\CobolSharp\src\Cobol.Net.Runtime\Values\Text\CobolBool.cs) — `And/Or/Xor(string?, string?)` (§8.8.2 r9 right-zero-extension, r10 max-length result), `Not` :39, `Equal` :50 (equality-only), `IsTrue` :62 (§8.8.4.3.4 GR1), `Resize(v, width)` :67 (the §14.9.8 GR3 boolean-store discipline — left-align, right-zero-fill/truncate), `AndAll/OrAll/XorAll/EqualAll` :79–86 (figurative ALL forms). All string-in/string-out.
+- **Runtime:** `CobolBool` (E:\COBOL\src\Cobol.Net.Runtime\Values\Text\CobolBool.cs) — `And/Or/Xor(string?, string?)` (§8.8.2 r9 right-zero-extension, r10 max-length result), `Not` :39, `Equal` :50 (equality-only), `IsTrue` :62 (§8.8.4.3.4 GR1), `Resize(v, width)` :67 (the §14.9.8 GR3 boolean-store discipline — left-align, right-zero-fill/truncate), `AndAll/OrAll/XorAll/EqualAll` :79–86 (figurative ALL forms). All string-in/string-out.
 - **Bound tree:** `BoundBoolExpr` abstract (BoundTree.cs:249) → `BoundBoolLiteral(string Bits)` :252, `BoundBoolRef(Place)` :255, `BoundBoolAll(string Bits)` :260, `BoundBoolBinary(BoundBoolExpr, char Op, BoundBoolExpr)` :264, `BoundBoolNot` :267, `BoundBoolError` :270. Bridges: `BoundBoolOperand(BoundBoolExpr)` : BoundOperand :275 (relation operand); `BoundBooleanCondition(BoundBoolExpr)` : BoundCondition :294. A boolean LITERAL as an intrinsic ARG arrives as `BoundStringLiteral { Category = PicCategory.Boolean }` (ExpressionBinder.BooleanLiteralOperand, ExpressionBinder.cs:92–101, 8191-cap COBOLNET0814).
 - **Binder:** ConditionBinder owns §8.8.2 — `MakeBoolBinary` :78–84 (rule-4 COBOLNET1511), `BindBoolOperandValue` :89–121 admits ONLY boolean literals / figurative ZERO / ALL B"…" / category-boolean items — **a FUNCTION call is NOT currently an admissible §8.8.2 boolean operand** (it would fail the sole-data-ref arm → COBOLNET1511). `Gr3Width` :144 computes the COMPUTE-store width.
 - **Renderer:** `BooleanRenderer` (CodeGen\Emit\BooleanRenderer.cs, static) renders BoundBoolExpr → C# string exprs over CobolBool via the generated `IBoundBoolExprVisitor` (Render :20; a category-boolean item reads as its string via `PlaceRenderer.Read` :25).
@@ -848,7 +848,7 @@ COBOLNET1501 not-an-intrinsic :126 · **COBOLNET1502 introduced-later** :140 (al
 
 ### Findings
 
-# IntrinsicRenderer + runtime scout report (read-only; all paths absolute under E:\CobolSharp)
+# IntrinsicRenderer + runtime scout report (read-only; all paths absolute under E:\COBOL)
 
 ## 1. Channel dispatch — who chooses RenderNum vs RenderString
 
@@ -979,18 +979,18 @@ The NUMVAL family all lives in **Exact.cs** (not Text.cs): `Numval` :194-239 (pa
 
 ### Findings
 
-## How conformance tests are wired in E:/CobolSharp
+## How conformance tests are wired in E:/COBOL
 
 ### 1. Corpus layout + discovery (tests/conformance/)
 
 Four dirs: `tests/conformance/2002/` (247 files), `2014/` (68), `2023/` (32), `negative/` (195 files ≈ ~97 .cob/.err pairs). Each edition dir AND negative/ carries a `manifest.json` with two arrays: `"enabled"` and `"pending"`. TWO runners consume the corpus:
 
-**A. Greenfield runner (the one that gates new work): `E:\CobolSharp\tests\Cobol.Net.Tests.Conformance\CorpusRunnerTests.cs`**
+**A. Greenfield runner (the one that gates new work): `E:\COBOL\tests\Cobol.Net.Tests.Conformance\CorpusRunnerTests.cs`**
 - Discovery is manifest-driven, NOT pure filesystem-glob. `Load(dir)` (CorpusRunnerTests.cs:25-31) parses `manifest.json`; `EnabledPositive()` (:52-59) yields (edition, name) for every enabled entry in 2002/2014/2023.
 - Positive golden runner: `EnabledProgram_CompilesStrict_AndMatchesOutIfPresent(string edition, string name)` (CorpusRunnerTests.cs:61-88). Compiles `<dir>/<name>.cob` via `CobolNet.CompilerDriver.Compile(new CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition)))` STRICT; if a sibling `<name>.out` exists it runs via `CutRunner.Run(dll, tmp)` and asserts `Assert.Equal(CutRunner.Normalize(File.ReadAllText(outFile)), CutRunner.Normalize(stdout))` (:85) — LF normalization + per-line trailing-space trim, no trailing newline. No `.out` = compile-only entry (:80).
 - Integrity fact: `Manifest_CoversEveryProgram_NoOverlap` (CorpusRunnerTests.cs:34-50) — every on-disk `*.cob` must be listed (enabled ⊕ pending), no phantoms, no overlap. So a new `.cob` dropped WITHOUT a manifest entry FAILS THE BUILD; a new pair is asserted only once added to `"enabled"`. `"pending"` = catalogued but not asserted (the mass-red guard).
 
-**B. Legacy runner (auto-discovery): `E:\CobolSharp\tests\CobolSharp.Tests.Integration\ConformanceTests.cs`**
+**B. Legacy runner (auto-discovery): `E:\COBOL\tests\CobolSharp.Tests.Integration\ConformanceTests.cs`**
 - `Cases()` (:30-42) filesystem-globs `tests/conformance/<ver>/*.cob` with a sibling `.out` — a new pair IS auto-picked-up here with no code change, which is why legacy exclusions matter (see §4).
 
 ### 2. Negative tests (how P10's exception_file_n_below_2002 ran)
@@ -1011,7 +1011,7 @@ Because the legacy `ConformanceTests` auto-discovers every `.cob`+`.out`, a gold
 
 ### 5. VERSION TEST MATRIX registry
 
-- **Canonical file: `E:\CobolSharp\tests\version-matrix\constructs.json`** — `{"constructs": [ {row}, ... ]}`. Row fields: `id` (kebab, e.g. "exception-file-n-2002"), optional `status` ("active" default | "pending" = catalogued, compile assertions skipped), `description`, `display`, `diagnosticCode`, `citation`, `introducedIn` (int), `removedIn` (int|null), optional `obsoleteIn`, `expectDiagnostic`, optional `expectDiagnosticBelow`, `vcr` (citation of VERSION_CHANGE_REFERENCE row or introducing standard), `source` (inline \n-joined minimal COBOL program). Vendor constructs live in `vendor-constructs.json`, never here.
+- **Canonical file: `E:\COBOL\tests\version-matrix\constructs.json`** — `{"constructs": [ {row}, ... ]}`. Row fields: `id` (kebab, e.g. "exception-file-n-2002"), optional `status` ("active" default | "pending" = catalogued, compile assertions skipped), `description`, `display`, `diagnosticCode`, `citation`, `introducedIn` (int), `removedIn` (int|null), optional `obsoleteIn`, `expectDiagnostic`, optional `expectDiagnosticBelow`, `vcr` (citation of VERSION_CHANGE_REFERENCE row or introducing standard), `source` (inline \n-joined minimal COBOL program). Vendor constructs live in `vendor-constructs.json`, never here.
 - **Executor: `tests\Cobol.Net.Tests.Conformance\VersionMatrixTests.cs`** — `Construct_MatchesEditionExpectation(string constructId, int edition)` (:76-101); expected outcome `ExpectCompiles` = `edition >= IntroducedIn && (RemovedIn is null || edition < RemovedIn)` (:50-51); a reject cell asserts the diagnostic code: `edition < IntroducedIn ? ExpectDiagnosticBelow ?? ExpectDiagnostic : ExpectDiagnostic` (:97-99). Also `RemovedConstruct_CompilesPermissive_WithWarning` (:115), `ObsoleteConstruct_CompilesEverywhere_WarnsFromObsoleteEdition` (:141, fixed 0903 band).
 - **Generated renderings (committed):** `scripts/gen-constructs.ps1` emits `src\Cobol.Net.Editions\ConstructRegistry.g.cs` (Entries list) and `src\Cobol.Net.Editions\Constructs.g.cs` (one `public const string PascalId = "kebab-id";` per row); `ConstructRegistryDriftTests` asserts they equal constructs.json. So adding a matrix row = edit constructs.json + re-run gen-constructs.ps1 + commit both .g.cs files.
 
@@ -1069,7 +1069,7 @@ Because the legacy `ConformanceTests` auto-discovers every `.cob`+`.out`, a gold
 
 ### Findings
 
-# Tier-C REDEFINES Surface — Complete Map (E:/CobolSharp, branch main @ 45fe74dd)
+# Tier-C REDEFINES Surface — Complete Map (E:/COBOL, branch main @ 45fe74dd)
 
 ## 1. RedefinesModel.cs (src/Cobol.Net.Compiler/Binding/Model/RedefinesModel.cs) — complete
 

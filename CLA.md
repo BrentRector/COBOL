@@ -1,8 +1,8 @@
-# CobolSharp Individual Contributor License Agreement
+# WiseOwl COBOL Individual Contributor License Agreement
 
-*Version 1.0*
+*Version 1.1*
 
-Thank you for contributing to CobolSharp (the "Project"), a project of Brent Rector (the "Licensor"). This agreement
+Thank you for contributing to WiseOwl COBOL (the "Project"), a project of Brent Rector (the "Licensor"). This agreement
 records the license you grant for your contributions. It does not transfer ownership: you keep the copyright in your
 contributions and may use them for any other purpose.
 

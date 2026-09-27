@@ -1,4 +1,4 @@
-# COBOL.NET — Claude Code Instructions
+# WiseOwl COBOL — Claude Code Instructions
 
 ## ⛔ Non-negotiable process rules
 Owner-emphasized, each earned by a correction. These eight are the SSOT; `PROMPT.md` holds the standing doctrine
@@ -66,7 +66,7 @@ Owner-emphasized, each earned by a correction. These eight are the SSOT; `PROMPT
 4. Before the session ends: update the `kb/Work/` notes you touched, update §0, add a DEVLOG entry.
 
 ## The project
-COBOL.NET (`src/Cobol.Net.*`, exe `cobol`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
+WiseOwl COBOL (repo `BrentRector/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
 COBOL record IS a .NET `record struct`, an elementary item IS a native field. **There is NO byte `ProgramState`
 substrate — never fall back to the legacy byte engine.** The legacy `CobolSharp.Compiler` survives only as a
 differential oracle until the P15 cut-over, and that differential is opt-in

@@ -97,7 +97,7 @@ Companion docs — this one defers to them, never duplicates them:
 
 ## 1. Current state — MEASURED, not assumed
 
-Every row below is a run of the prebuilt `E:/CobolSharp/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe`
+Every row below is a run of the prebuilt `E:/COBOL/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe`
 (2026-08-09 18:24) on a probe with a unique PROGRAM-ID, `--std 2023` unless stated. Console output is verbatim.
 
 | # | Surface (A.4.9 item) | Probe | Measured result |

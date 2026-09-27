@@ -10,7 +10,7 @@
 
 set -u
 
-ROOT="E:/CobolSharp"
+ROOT="E:/COBOL"
 CSV_SUMMARY="nist_summary.csv"
 FAIL_LOG="nist_failures.log"
 

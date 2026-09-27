@@ -1247,7 +1247,7 @@ the single origin of every numeric argument. Measure the WHOLE population after 
    of the TWO bodies". Never drop it to go faster; an adjudicator's CONFORMS is worth what its refuter leaves.
 5. **⚠ CI RUNS ON LINUX AND THIS SESSION BROKE IT ONCE.** A "cross-platform" test helper built by STRING
    SUBSTITUTION left `exit /b 7` for POSIX `sh` (rc=2, not 7). `feedback_wsl_linux_repro` now names the TRIGGER:
-   **writing any per-OS branch**, not seeing a red. Build on Windows, run under WSL (`/mnt/e/CobolSharp`,
+   **writing any per-OS branch**, not seeing a red. Build on Windows, run under WSL (`/mnt/e/COBOL`,
    `~/.dotnet/dotnet`, `--no-build`) — 2 minutes against a ~30-minute round trip.
 
 **BATCH MECHANICS THAT CHANGED — use these, the old commands mislead.**
@@ -4371,7 +4371,7 @@ this plan's §0 + `CLAUDE.md` PIVOT STATE to "G8 COMPLETE".
 Before starting, confirm P6/P7 landed the neutral seam (grep to verify — all must exist):
 
 ```bash
-cd E:/CobolSharp
+cd E:/COBOL
 grep -rln "interface ICodeGenBackend"     src/Cobol.Net.Compiler/CodeGen   # P7 Step 1 seam
 grep -rln "record BoundCompilation"        src/Cobol.Net.Compiler/Binding   # P6 immutable result
 grep -rln "record AccessPath"              src/Cobol.Net.Compiler/Binding   # P7 Step 11 structural Place
@@ -4642,7 +4642,7 @@ When P16 is DONE, these exist with these responsibilities (grounded in `DESIGN-b
 Run the COMPLETE battery and confirm all green + neutral + equivalent:
 
 ```bash
-cd E:/CobolSharp
+cd E:/COBOL
 dotnet build Cobol.Net.sln -v quiet                                                   # all projects incl. Backend.Cil
 dotnet test  tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj -v quiet     # Roslyn: ~2003 green, 0 diffs
 dotnet test  tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj -v quiet                   # incl. BackendContract

@@ -11,8 +11,8 @@
     <PackageId>CobolSharp</PackageId>
     <Version>0.1.0</Version>
     <Description>COBOL compiler targeting .NET — compiles ISO/IEC 1989:2023 COBOL to CIL assemblies</Description>
-    <PackageProjectUrl>https://github.com/BrentRector/CobolSharp</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/BrentRector/CobolSharp</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/BrentRector/COBOL</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/BrentRector/COBOL</RepositoryUrl>
     <PackageTags>cobol;compiler;dotnet;cil</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

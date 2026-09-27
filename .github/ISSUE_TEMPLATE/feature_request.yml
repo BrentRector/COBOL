@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        CobolSharp implements standard COBOL. A missing **standard** feature is a conformance finding — please use
+        WiseOwl COBOL implements standard COBOL. A missing **standard** feature is a conformance finding — please use
         that form instead. Non-standard dialect extensions are generally out of scope unless the standard leaves the
         behavior to the implementor.
   - type: textarea

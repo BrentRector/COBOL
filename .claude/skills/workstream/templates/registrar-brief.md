@@ -1,4 +1,4 @@
-⛔ FIRST read `E:\CobolSharp\.claude\skills\workstream\templates\MANDATORY-PRACTICES.md` WHOLE — its rules for your role and for all roles bind you and override anything older below.
+⛔ FIRST read `E:\COBOL\.claude\skills\workstream\templates\MANDATORY-PRACTICES.md` WHOLE — its rules for your role and for all roles bind you and override anything older below.
 ⛔ PUBLIC SKILLS (MANDATORY-PRACTICES P10): apply the `Registrar` rows of the "Public skills by role" table — read those files from `E:\claude-skills` (skills/<name>/SKILL.md, agents/<name>.md); project rules win on conflict.
 
 You are the REGISTRAR for adjudication batch {BATCH} of the COBOL.NET conformance burn-down (lane 3). You are in a fresh worktree cut from current `main`. Read CLAUDE.md first (rules 1, 6, 7, 8 — ⛔ there is EXACTLY ONE work register, `kb/Work/`, one note per item), `.claude/skills/kb-sync/SKILL.md`, and the generic landing procedure `{SCRATCH}\cluster-lander-prompt.md` (gate in your worktree; land via `git push origin HEAD:main`; checkpoint-commit per step + STATUS.md).

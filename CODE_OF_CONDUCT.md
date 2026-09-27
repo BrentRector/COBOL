@@ -1,6 +1,6 @@
 # Code of Conduct
 
-CobolSharp adopts the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/)
+WiseOwl COBOL adopts the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/)
 as its code of conduct — the same foundation used by the .NET, Swift and many other language and compiler
 communities. Everyone who participates in this project's spaces — issues, pull requests, discussions, reviews and
 commit messages — is expected to follow it.

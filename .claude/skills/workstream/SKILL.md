@@ -165,7 +165,7 @@ the work, not to wait. Stage the earliest-stage, largest jobs behind the near-do
   checkpoint reached main inside a landing, and the next lander's rebase then had to choose between two agents'
   checkpoints for one path.)
 - ⛔ **`git stash` IS FORBIDDEN IN THIS REPO — WIP GOES INTO A COMMIT.** The stash stack lives in the COMMON git
-  directory (`git rev-parse --git-common-dir` → `E:\CobolSharp\.git`), so it is SHARED by every linked worktree:
+  directory (`git rev-parse --git-common-dir` → `E:\COBOL\.git`), so it is SHARED by every linked worktree:
   `git stash list` run from an isolated implementer worktree shows the other agents' entries and `stash pop` takes
   `stash@{0}` whoever pushed it. PB713's implementer ran `… && git stash pop -q` after a `git stash push` that had
   created nothing (its file was untracked), so the pop consumed the REGISTRAR's stash; it was restored with

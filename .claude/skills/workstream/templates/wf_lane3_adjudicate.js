@@ -63,7 +63,7 @@ ${STOP ? `⛔ GRACEFUL STOP (MANDATORY-PRACTICES P3): before EACH rule check for
 in your checkpoint file and return at once with what is decided (summary starting "STOPPED"). Never start a probe once it exists.
 ` : ''}You work in the COBOL.NET project. SOURCE OF TRUTH FOR CODE: the PINNED worktree ${PIN} (read-only snapshot, so verdicts
 are attributable; it carries its OWN built compiler at ${PIN}/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe — use THAT
-for probes, never the main tree's). SPEC: E:\\CobolSharp\\specs\\ISO_COBOL.md (ISO/IEC 1989:2023). Read E:\\CobolSharp\\CLAUDE.md
+for probes, never the main tree's). SPEC: E:\\COBOL\\specs\\ISO_COBOL.md (ISO/IEC 1989:2023). Read E:\\COBOL\\CLAUDE.md
 first — its eight rules bind you. You may run python scripts under ${PIN}/scripts (cite.py) and the pinned cobol.exe
 (compile-and-run a scratch program under ${OUT}/probe/<slug>/). You MUST NOT run dotnet build/test, git, or write inside
 any repository tree; write only under ${OUT}.

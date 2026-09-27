@@ -5,7 +5,7 @@
 **Please do not report security vulnerabilities through public GitHub issues, discussions or pull requests.**
 
 Report them privately through GitHub's
-[private vulnerability reporting](https://github.com/BrentRector/CobolSharp/security/advisories/new)
+[private vulnerability reporting](https://github.com/BrentRector/COBOL/security/advisories/new)
 (the **Security** tab → **Report a vulnerability**). Only the maintainer can see the report.
 
 Please include as much of the following as you can:
@@ -26,7 +26,7 @@ Please include as much of the following as you can:
 
 ## Supported versions
 
-CobolSharp has not yet made a versioned release. Security fixes are made on the `main` branch only.
+WiseOwl COBOL has not yet made a versioned release. Security fixes are made on the `main` branch only.
 
 | Version | Supported |
 |---|---|

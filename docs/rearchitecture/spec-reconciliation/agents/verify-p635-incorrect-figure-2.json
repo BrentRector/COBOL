@@ -6,7 +6,7 @@
     "pdf_says": "DELETE Format 2 (file), 14.9.10.2. The EXCEPTION block is printed as ONE tall square bracket spanning both alternatives with a full-height vertical choice-indicator bar immediately inside each bracket:  [ |  ON EXCEPTION imperative-statement-3 / NOT ON EXCEPTION imperative-statement-4  | ] .",
     "markdown_says": "```\nDELETE FILE [ OVERRIDE ] { file-name-1 } ...\n  [ retry-phrase ]\n  \u2310 ON EXCEPTION imperative-statement-3     \u00ac\n  | NOT ON EXCEPTION imperative-statement-4 |\n  [ END-DELETE ]\n```",
     "why_it_matters": "Same lost choice indicator as Format 1. Without the bars the bracket reads as 'at most one of ON EXCEPTION / NOT ON EXCEPTION', but 14.9.10.4 GR 20 c)/d) and GR 21 b) describe behaviour in which both phrases may be present on the same DELETE FILE statement. Legal source is made to look illegal.",
-    "reproduce": "cd E:/CobolSharp && python scripts/spec/page_workunit.py 635 --out E:/Temp/specrecon/v635 --dpi 300"
+    "reproduce": "cd E:/COBOL && python scripts/spec/page_workunit.py 635 --out E:/Temp/specrecon/v635 --dpi 300"
   },
   "verdict": {
     "real": true,
