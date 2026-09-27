@@ -295,8 +295,22 @@ if [ -z "$MAIN_RUN" ]; then
   exit 0
 fi
 gh run watch "$MAIN_RUN" --exit-status --interval 15 >/dev/null 2>&1
-MAIN_CONCLUSION="$(gh run view "$MAIN_RUN" --json conclusion --jq .conclusion 2>/dev/null)"
-say "push-main: main run $MAIN_RUN = ${MAIN_CONCLUSION:-unknown}"
+# ⛔ A MISSING OBSERVATION IS NOT A NEGATIVE ONE (kb/Work PB1639). `gh run view` can answer EMPTY on a transient
+# API failure (measured 2026-09-27 on ca28783e3: conclusion '', job enumeration failed, the run itself 'success'),
+# and the old test `!= success` reported that silence as "CI IS RED … ALREADY ON MAIN". Re-read until a verdict
+# arrives; if none does, say UNVERIFIED — never red, never green.
+MAIN_CONCLUSION=""
+for _ in $(seq 1 12); do
+  MAIN_CONCLUSION="$(gh run view "$MAIN_RUN" --json conclusion --jq .conclusion 2>/dev/null)"
+  [ -n "$MAIN_CONCLUSION" ] && break
+  sleep 10
+done
+say "push-main: main run $MAIN_RUN = ${MAIN_CONCLUSION:-<no verdict read>}"
+if [ -z "$MAIN_CONCLUSION" ]; then
+  say "  ⚠ UNVERIFIED: no conclusion could be read for main run $MAIN_RUN in 2 min — the commit IS on main; read it by hand:"
+  say "    gh run view $MAIN_RUN --json conclusion"
+  exit 3
+fi
 if [ "$MAIN_CONCLUSION" != "success" ]; then
   report_red "$MAIN_RUN" "AND IT IS ALREADY ON MAIN"
   say "  ⛔ THE COMMIT IS ON MAIN AND ITS MAIN-BRANCH RUN IS NOT GREEN — report this as a BLOCKING finding."

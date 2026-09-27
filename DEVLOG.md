@@ -13,6 +13,15 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1735 — 2026-09-27 05:26 PDT — PB1639: push-main no longer reads an unanswered verdict as red
+
+Landing ca28783e3 ended with "⛔ CI IS RED ON ca28783e3035 — AND IT IS ALREADY ON MAIN", yet that main run
+(36318722784) concluded success. The script's single `gh run view --json conclusion` read came back empty (a
+transient API failure; job enumeration failed in the same breath), and `!= success` turned the silence into red. It
+now re-reads for up to two minutes and reports `⚠ UNVERIFIED` (exit 3) when no verdict arrives: a missing observation
+is neither a negative nor a positive. I confirmed main green by hand (`gh run list`: 36318722784 completed/success)
+before landing anything on top.
+
 ## Entry 1734 — 2026-09-27 05:06 PDT — PB1633 retired (the NULL is GR4's, and so is the exception); PB1638 filed for the vendor SET … TO ENTRY spelling
 
 PB1633 claimed that `SET PP TO ADDRESS OF PROGRAM "n"` for a program CONTAINED in the setting program wrongly yields
