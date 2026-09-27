@@ -308,8 +308,8 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
     {
         // literal-1 / literal-2 — SR13 is the only rule about them, and only the non-numeric formats have a
         // zero-length spelling (ISO §3.178: "alphanumeric, boolean, or national literal that contains zero
-        // characters"). A concatenation expression is zero-length exactly when every operand is (§8.8.3.3 GR2),
-        // tested STRUCTURALLY so ConcatFolder's own reporting does not run a second time on this operand.
+        // characters"). A concatenation expression is zero-length exactly when its folded value is (§8.8.3.3 GR2),
+        // asked of the diagnostic-free fold so ConcatFolder's own reporting does not run a second time here.
         if (operand.valueOperand()?.nonNumericLiteral() is { } nn)
             return !IsZeroLengthLiteral(nn) || Sending(table,
                 $"the sending operand {nn.GetText()} is a zero-length literal; \"neither literal-1 nor literal-2 "
@@ -439,14 +439,13 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
     /// <summary>ISO §3.178 asked of a <c>nonNumericLiteral</c>: a figurative constant is never zero-length
     /// (§8.3.3.6.4 GR3 b) — "when a figurative constant is other than ALL literal-1, the length of the string is
     /// one character" — and the ALL form's literal-1 cannot be zero-length either, §8.3.3.6.3 SR2), a
-    /// concatenation expression is zero-length exactly when every operand is (§8.8.3.3 GR2), and each plain
-    /// format answers <see cref="CobolLiteral.IsZeroLength"/>.</summary>
-    private static bool IsZeroLengthLiteral(Core.NonNumericLiteralContext nn)
+    /// concatenation expression is zero-length exactly when its value is (§8.8.3.3 GR2 — asked of the diagnostic-free
+    /// <see cref="ConcatFolder.Peek"/>, so a constant-name operand counts by the literal it stands for, kb/Work
+    /// PB1406), and each plain format answers <see cref="CobolLiteral.IsZeroLength"/>.</summary>
+    private bool IsZeroLengthLiteral(Core.NonNumericLiteralContext nn)
     {
         if (nn.figurativeConstant() is not null) return false;
-        if (nn.concatenationExpression() is { } cat)
-            return cat.concatOperand().All(o => o.figurativeConstant() is null
-                                                && CobolLiteral.IsZeroLength(o.GetText()));
+        if (nn.concatenationExpression() is { } cat) return ConcatFolder.Peek(cat, data.LiteralEnv).Value.Length == 0;
         return CobolLiteral.IsZeroLength(nn.GetText());
     }
 

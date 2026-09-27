@@ -31,10 +31,11 @@ using Core = CobolParserCore;
 ///
 /// <para>A hexadecimal literal IS §8.3.3.2 Format 2 of an alphanumeric one (the PB130 determination on the CALL
 /// twin), and a §8.8.3 concatenation expression folds FIRST because §8.8.3.3 GR3 makes it "equivalent to a
-/// literal of the same class and value" — the fold is collating-independent here because the rule has already
-/// excluded the figurative constants that would consult a PROGRAM COLLATING SEQUENCE, which is why the two
-/// collating arguments are optional (the id paragraphs are screened before any DATA DIVISION binds, so no
-/// alphabet exists to pass).</para>
+/// literal of the same class and value". The fold is NOT collating-independent: the rule excludes a figurative
+/// constant AS literal-1, but a concatenation operand may be one (§8.8.3.2 SR1), and a HIGH-/LOW-VALUE operand
+/// takes the collating sequence of the context — so every caller names its <see cref="LiteralEnvironment"/>
+/// (the id paragraphs, screened before any table exists, pass <see cref="LiteralEnvironment.Unscoped"/>;
+/// kb/Work PB1406).</para>
 /// </summary>
 internal static class ExternalizedName
 {
@@ -48,20 +49,18 @@ internal static class ExternalizedName
     /// <param name="tag">The literal's name in its own clause — "literal-1" everywhere but the REPOSITORY
     /// program-specifier, where §12.3.8.2 numbers it literal-3.</param>
     /// <param name="rule">The citation appended to every message, e.g. <c>ISO §11.10.3 SR1</c>.</param>
+    /// <param name="env">The literal environment a concatenation-expression literal folds in.</param>
     /// <param name="rejectZeroLength">False ONLY for §11.3.3 SR1 (CLASS-ID), which omits the exclusion.</param>
-    /// <param name="collate">The active alphanumeric PROGRAM COLLATING SEQUENCE, when one is bound.</param>
-    /// <param name="natCollate">Its national twin, when one is bound.</param>
     /// <summary>The value an AS-phrase literal gives, WITHOUT diagnosing — for a reader that must know the
     /// externalized name but is not the phrase's screen (OoRepositoryScope, kb/Work PB974). Null for any literal
     /// <see cref="Screen"/> would reject, so both agree on which names exist.</summary>
     public static string? Peek(Core.LiteralContext lit) =>
         Screen(lit, new EditionContext(2023), DiagnosticCatalog.ExternalizedNameLiteral, "", "", "",
-            rejectZeroLength: true);
+            LiteralEnvironment.Unscoped, rejectZeroLength: true);
 
     public static string? Screen(
         Core.LiteralContext lit, EditionContext edition, DiagnosticDescriptor code,
-        string where, string tag, string rule, bool rejectZeroLength = true,
-        AlphabetDef? collate = null, NationalAlphabetDef? natCollate = null)
+        string where, string tag, string rule, LiteralEnvironment env, bool rejectZeroLength = true)
     {
         void Reject(string why) => edition.Error(code, $"{where}: {why}");
 
@@ -79,7 +78,7 @@ internal static class ExternalizedName
         string value;
         if (nn.concatenationExpression() is { } ce)
         {
-            var folded = ConcatFolder.Fold(ce, edition, collate, natCollate);
+            var folded = ConcatFolder.Fold(ce, edition, env);
             if (folded.Category is not (PicCategory.Alphanumeric or PicCategory.National))
             {
                 Reject($"{tag} folds to a {folded.Category.ToString().ToLowerInvariant()} literal; {rule} "

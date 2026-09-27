@@ -679,13 +679,19 @@ nonNumericLiteral
     ;
 
 // ISO §8.8.3.1 general format: {literal-1 | concatenation-expression-1} & literal-2 — left-recursive in the
-// spec, flattened here to operand (& operand)+. Operands are literals of class alphanumeric (STRINGLIT and its
-// X"…" hex format), national, or boolean, or figurative constants (§8.8.3.2 SR1); numeric literals are NOT
-// operands (SR1 admits only the three classes), so `5 & …` is a parse error by construction. The SR1
-// same-class rule, the no-ALL-figurative rule, and the SR2–SR4 8,191-position caps are BIND-time checks
-// (ConcatFolder — a superset parse, per the repo's parse-wide/bind-narrow doctrine). Gated 2002+ by the
-// VersionConformancePass parse arm (concat-operator-2002 → COBOLNET0900 below 2002); the grammar itself is
-// edition-agnostic (superset parse at every --std).
+// spec, flattened here to operand (& operand)+; ConcatFolder folds the class back LEFT-to-right, pair by pair
+// (§8.8.3.3 GR1 — kb/Work PB1406). Operands are literals of class alphanumeric (STRINGLIT and its X"…" hex
+// format), national, or boolean, or figurative constants (§8.8.3.2 SR1); numeric literals are NOT operands (SR1
+// admits only the three classes), so `5 & …` is a parse error by construction. A WORD is an operand too: the two
+// words that stand for a literal — a constant-name (§13.10.3 SR2: "anywhere that a format specifies a literal of
+// the class and category of constant-name-1") and a symbolic-character (a figurative constant its SPECIAL-NAMES
+// SYMBOLIC CHARACTERS clause defines, §12.3.7.4 GR11 a)
+// — are both user-defined words, which the parse cannot tell apart from a data-name, so the arm admits any
+// cobolWord and ConcatFolder resolves it (COBOLNET2473 for a word that stands for no literal). The SR1 same-class
+// rule, the no-ALL-figurative rule, and the SR2–SR4 8,191-position caps are BIND-time checks too (a superset
+// parse, per the repo's parse-wide/bind-narrow doctrine). Gated 2002+ by the VersionConformancePass parse arm
+// (concat-operator-2002 → COBOLNET0900 below 2002); the grammar itself is edition-agnostic (superset parse at
+// every --std).
 concatenationExpression
     : concatOperand (AMPERSAND concatOperand)+
     ;
@@ -696,6 +702,7 @@ concatOperand
     | BOOLLIT
     | HEXLIT
     | figurativeConstant
+    | cobolWord          // a constant-name or a symbolic-character (kb/Work PB1406); LAST, after the keyword figuratives
     ;
 
 signedNumericLiteral

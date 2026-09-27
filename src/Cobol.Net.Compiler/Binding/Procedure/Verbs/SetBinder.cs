@@ -982,7 +982,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             : nn.HEXLIT() is { } x ? CobolLiteral.DecodeHex(x.GetText())
             : nn.NATLIT() is { } nat ? CobolLiteral.Decode(nat.GetText())
             : nn.concatenationExpression() is { } ce
-                && ConcatFolder.Fold(ce, ctx.Edition, ctx.Data.Collating, ctx.Data.NationalCollating) is { Category: PicCategory.Alphanumeric or PicCategory.National } f
+                && ConcatFolder.Fold(ce, ctx.Edition, ctx.Data.LiteralEnv) is { Category: PicCategory.Alphanumeric or PicCategory.National } f
                     ? f.Value
             : null;
         if (value is null)

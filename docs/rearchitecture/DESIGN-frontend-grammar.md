@@ -636,6 +636,23 @@ statement-scoped 2002 gate for a national/boolean literal-1, the §8.3.3 hexadec
 zero-length check (COBOLNET1648) and the §8.8.3.2 SR1 same-class check (COBOLNET1540) — the tree walk, as for the
 bare literals.
 
+**The `&` operand and its class (kb/Work PB1406, 2026-09-26).** `concatOperand : STRINGLIT | NATLIT | BOOLLIT |
+HEXLIT | figurativeConstant | cobolWord`. The `cobolWord` arm is how §8.8.3.1's literal-1 / literal-2 admit the two
+WORDS that stand for a literal — a constant-name (§13.10.3 SR2) and a symbolic-character, a figurative constant by
+§12.3.7.4 GR11 a) — which the parse cannot tell from a data-name, so the arm admits any word and
+`ConcatFolder` resolves it through its `LiteralEnvironment` (COBOLNET2473 for a word that stands for no literal;
+COBOLNET2474 for a symbolic-character operand in a §12.3.7.3 SR11 SPECIAL-NAMES literal). `&` appears in no
+other rule, so a word followed by `&` in a position that also admits an identifier is predicted as a
+concatenation by one token of lookahead. The grammar still FLATTENS the left-recursive format to `operand (&
+operand)+`; `ConcatFolder` folds the class back pairwise, left to right (§8.8.3.3 GR1 a/b/c per pair), so `SPACE &
+SPACE & N"AB"` is the alphanumeric expression `SPACE & SPACE` concatenated with a national literal — COBOLNET1540 —
+never a chain classed by its first non-figurative operand. Every fold site names its `LiteralEnvironment`
+(`Program`, `SpecialNames(nationalPhrase, sr11)` or `Unscoped`): the environment carries the HIGH-/LOW-VALUE
+characters of the position (the program collating sequences outside SPECIAL-NAMES, §12.3.7.4 GR10's native
+extremes of the clause's NATIONAL phrase inside it) and the constant-name / symbolic-character tables, and its
+constructor is private so no site can omit the national table again. The ALL literal-1 arm above
+(`allLiteralOperand`) does NOT yet share this operand model — it admits quoted literals only.
+
 **3.3e The computer paragraphs (kb/Work PB78, 2026-08-18).** `objectComputerParagraph : OBJECT_COMPUTER DOT
 (({!objectComputerClauseAhead()}? computerName)? objectComputerClause* DOT)?` — ISO §12.3.6.2's `[computer-name-1]`
 is optional and the two clauses (`programCollatingSequenceClause | characterClassificationClause`) may follow the

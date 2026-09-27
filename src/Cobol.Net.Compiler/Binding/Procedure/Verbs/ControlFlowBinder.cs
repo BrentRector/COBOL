@@ -34,7 +34,7 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
         // literal context would glue the operands and mis-decode).
         return stop.literal() is { } slit
             ? new BoundStopLiteral(slit.nonNumericLiteral()?.concatenationExpression() is { } ce
-                ? ConcatFolder.Fold(ce, ctx.Edition, ctx.Data.Collating).Value
+                ? ConcatFolder.Fold(ce, ctx.Edition, ctx.Data.LiteralEnv).Value
                 : CobolLiteral.Decode(slit.GetText()))
             : new BoundStop(BindTerminationStatus(stop.statusPhrase()));
     }

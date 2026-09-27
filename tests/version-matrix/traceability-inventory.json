@@ -9351,13 +9351,13 @@
   "ordinal": 1,
   "subject": "Concatenation expressions",
   "rule-digest": "fda715f89870",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#ClassOf; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#FigurativeChar; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#concatenationExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#concatOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#nonNumericLiteral",
-  "test-ref": "conformance:negative/concat_class_mismatch",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Walk; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Classify; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Append",
+  "test-ref": "conformance:negative/concat_class_mismatch; conformance:negative/pb1406-concat-figurative-pair-class; conformance:2002/pb1406_concat_word_operands",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1406 (registrar 15b). Rule (--check 8.8.3.2 \"Both operands shall be of the same class, either alphanumeric, boolean, or national, except that a figurative constant may be specified as one or both operands\" -> OK; \"Neither literal-1 nor literal-2 shall be a figurative constant that begins with the word ALL\" -> OK). VERIFIED halves: class mismatch -> COBOLNET1540 (\"AB\" & N\"CD\"; N\"A\" & SPACE & \"B\"; SPACE & B\"1\" — SPACE has no boolean character, §8.3.3.6.4 GR5); ALL prohibition -> COBOLNET1541 for ALL \"B\" and ALL SYM-A; X\"..\" counts as alphanumeric; NX/BX formats class correctly (probe NX=[ABC], BX=[11111000]). DEFECTS: (a) REJECTS LEGAL SOURCE — the 'figurative constant may be specified' permission fails for the symbolic-character figurative (§8.3.2.2.29, --check OK): `\"X\" & SYM-A` is a parse error (finding concat-operand-word-substitution); (b) UNDER-REJECTS — the fold classifies the whole flattened chain by its first non-figurative operand, so `MOVE SPACE & SPACE & N\"AB\" TO W-N` compiles clean and runs ([  AB]); per the left-recursive format concatenation-expression-1 = SPACE & SPACE has class alphanumeric (GR1b, --check OK) and is NOT a figurative constant, so the outer pair is alphanumeric & national — an SR1 violation that shall draw COBOLNET1540 (finding concat-flattened-class). NULL & \"A\" -> 1540 (NULL has no character value; documented posture). The class half is covered by conformance:negative/concat_class_mismatch (spec-derived .err COBOLNET1540); the ALL half has no negative test. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1406 (w62k). cite.py --check 8.8.3.2 \"except that a figurative constant may be specified as one or both operands\" -> OK SR1. Asked of EACH (accumulated, next) pair of the flattened chain: SPACE & SPACE & N\"AB\" and ZERO & ZERO & B\"1\" are an alphanumeric concatenation expression (GR1b) concatenated with a national/boolean literal -> COBOLNET1540 (before: accepted, ran [  AB] / [0010]); a numeric constant-name operand -> 1540; a figurative or symbolic-character with no character value in the pair's class (boolean) -> 1540; ALL figurative -> 1541 unchanged. Every legal chain classifies as before (literal_concat, pb306 goldens green).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.3.2-2",
@@ -9411,13 +9411,13 @@
   "ordinal": 1,
   "subject": "Concatenation expressions",
   "rule-digest": "43995998c157",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#ClassOf; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Walk; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#ClassOf; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#OperandLiteralClass",
+  "test-ref": "conformance:2002/pb1406_concat_word_operands; conformance:negative/pb1406-concat-figurative-pair-class",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1406 (registrar 15b). --check 8.8.3.3 \"when one of the operands is a figurative constant, the class of the literal or concatenation expression that constitutes the other operand\" -> OK; \"when both of the operands are figurative constants, the class alphanumeric\" -> OK. ClassOf = first non-figurative operand's class, else alphanumeric. VERIFIED: a) ZERO & N\"A\" & SPACE -> national [0A  ]; B\"1\" & BX\"F\" & ZERO -> boolean 11111000; b) SPACE & QUOTE -> alphanumeric [ \"], FUNCTION LENGTH(SPACE & ZERO & HIGH-VALUE)=3, HIGH-VALUE & \"A\" & LOW-VALUE ords 256/66/1 (alphanumeric extremes); c) same-class chains. EDGE NOT CONFORMING: the flattened classification does not apply a)/b) pairwise over the left-recursive shape — for SPACE & SPACE & N\"AB\" the inner expression is alphanumeric (b) and the outer operand pair is then alphanumeric & national, but ClassOf answers national and the program is accepted (finding concat-flattened-class; observable only as the SR1 under-reject — every LEGAL chain classifies identically either way). Branch a) for a symbolic-character operand is unreachable (parse error, finding concat-operand-word-substitution). The golden conformance:2002/literal_concat covers a) and c) but has no all-figurative (b) case — test-ref left empty. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1406 (w62k). cite.py --check 8.8.3.3 \"the class of the literal or concatenation expression that constitutes the other operand\" -> OK a); \"when both of the operands are figurative constants, the class alphanumeric\" -> OK b). ONE walk (ConcatFolder.Walk) answers ClassOf (the diagnostic-free routing predicate for ConditionBinder / OoBinder), Peek and Fold, folding GR1 a/b/c pairwise left to right; the SPECIAL-NAMES ALPHABET/CLASS class screen (OperandLiteralClass) now asks it instead of the leading operand's prefix, so CLASS NSP FOR NATIONAL IS SPACE & N\"A\" is national (was a class error). Golden: SYM-A & SYM-B & \"!\" = AB!, KN & N\"Y\" & SPACE national, B\"0\" & KB & ZERO boolean (routes the boolean relation).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.3.3-2",
@@ -9426,13 +9426,13 @@
   "ordinal": 2,
   "subject": "Concatenation expressions",
   "rule-digest": "9a85b899d0c1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#FigurativeChar; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#Decode",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Append; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#FigurativeChar; src/Cobol.Net.Compiler/Binding/LiteralEnvironment.cs#HighValue",
+  "test-ref": "conformance:2002/pb1406_concat_word_operands; conformance:2002/literal_concat",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1406 (registrar 15b). --check 8.8.3.3 \"If both literal-1 and literal-2 are specified and both are zero-length literals the value of the concatenation expression is a zero-length literal\" -> OK (first sentence in the same GR, OK). Fold appends each operand's decoded value; figurative = one character (§8.3.3.6.4 GR3a, --check OK). PROBE: embedded delimiters 'IT''S' & \"A\"\"B\" -> IT'SA\"B; NX\"00410042\" & N\"C\" -> ABC; \"\" & \"\" moved to X(8) -> all spaces (zero-length source, §8.3.3 padding); FUNCTION LENGTH(\"A\" & \"\" & \"B\") = 2; golden values AB&CD, 88 VALUE, national/boolean VALUE, FIG chain all correct. The value half is covered by conformance:2002/literal_concat, but the zero-length second sentence has no golden — test-ref left empty (test-needed for the zero-length leg). || REFUTED: DIVERGES — GR2 makes the value of a concatenation the concatenation of the values of its literals AND figurative constants, so a figurative operand must fold to the character that figurative stands for in its context. In the SPECIAL-NAMES paragraph, §12.3.7.4 GR10 binds HIGH-VALUE under the NATIONAL phrase to the highest character of the native NATIONAL collating sequence. The implementation realizes that as U+FFFF: DataBinder.Switches.cs AlphabetFigurative returns ￿ for national. But the SPECIAL-NAMES concat sites call ConcatFolder.Fold(cat, Edition, collate: null), at DataBinder.Switches.cs:1014 (CLASS/literal operand) and :1664 (LiteralCharsOf). With no national table, FigurativeChar returns the ALPHANUMERIC pin U+00FF for class national. So N\"A\" & HIGH-VALUE folds to a value different from the one the same HIGH-VALUE has as a bare literal in the same clause. The adjudicator's probes covered only SPACE/ZERO/QUOTE, embedded delimiters, NX and zero-length. All of those are correct (re-probed RZ1: [AB\" 0], [A 0\"], \"\"&\"\" -> [] and MOVE -> spaces). No HIGH-/LOW-VALUE value was probed in a context-dependent position. Secondary sites also drop the national table: ControlFlowBinder.cs:37 (STOP literal) and OoBinder.cs:181 call Fold without natCollate, so a national concat with HIGH-/LOW-VALUE under a declared national PCS takes U+00FF/U+0000 there. ExpressionBinder and SetBinder do pass it. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900); the zero-length sentence applies where zero-length literals exist",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1406 (w62k). cite.py --check 8.8.3.3 \"If both literal-1 and literal-2 are specified and both are zero-length literals the value of the concatenation expression is a zero-length literal\" -> OK. The refuter's DIVERGES: SPECIAL-NAMES folds passed no national table, so N\"A\" & HIGH-VALUE took U+00FF where GR10 (--check 12.3.7.4 \"When specified as literals in the SPECIAL-NAMES paragraph, the figurative constants HIGH-VALUE and LOW-VALUE\" -> OK) requires the native national extreme. Every Fold/ClassOf/FigurativeChar site now names a LiteralEnvironment (private ctor: Program / SpecialNames(nationalPhrase, sr11) / Unscoped), so STOP, INVOKE, the boolean channel, OPTIONS and the AS-phrase screens can no longer drop the national table. Golden: CLASS NHI FOR NATIONAL IS N\"A\" & HIGH-VALUE admits NX\"FFFF\" and not NX\"00FF\"; \"\" & \"\" moved to X(4) is spaces (zero-length leg, --check 14.6.8.5 NOTE -> OK); LENGTH(KA & \"\" & K2) = 3.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.3.3-3",
@@ -57726,13 +57726,13 @@
   "ordinal": 0,
   "subject": "Concatenation expressions",
   "rule-digest": "40ce57a61c30",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#concatenationExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#concatOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#nonNumericLiteral; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#concatOperand; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Classify; src/Cobol.Net.Compiler/Binding/LiteralEnvironment.cs",
+  "test-ref": "conformance:2002/pb1406_concat_word_operands; conformance:2002/literal_concat; conformance:negative/pb1406-concat-operand-not-literal; conformance:negative/concat_below_2002",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1406 (registrar 15b). General format {literal-1 | concatenation-expression-1} & literal-2 (cite.py --check 8.8.3 \"A concatenation expression consists of two operands separated by the concatenation operator\" -> OK). The grammar flattens the left recursion to concatOperand (AMPERSAND concatOperand)+ — equivalent for the chain shape (probe: \"A\" & \"B\" & \"C\" & \"D\" & \"E\" -> ABCDE). But concatOperand admits only lexical tokens (STRINGLIT/NATLIT/BOOLLIT/HEXLIT) and the keyword figurativeConstant rule, so two things a format 'literal' position must admit are PARSE ERRORS here: (1) a symbolic-character figurative — §8.3.2.2.29 \"A symbolic-character is a user-defined figurative constant\" (--check OK), §8.3.3.6.3 SR1 \"A figurative constant may be used whenever 'literal' appears in a format\" (--check OK) and §8.8.3.2 SR1 admits a figurative constant as either operand: `MOVE \"X\" & SYM-A TO W-X` -> COBOL0309 'A literal value is expected here, not a data-name'; `MOVE SYM-A & \"X\"` -> COBOL0001 unexpected '&' (the same SYM-A as a plain MOVE/DISPLAY operand works: XA); (2) a constant-name — §13.10.3 SR2 \"constant-name-1 may be used anywhere that a format specifies a literal of the class and category of constant-name-1\" (--check OK): `01 K CONSTANT AS \"Q\". MOVE \"X\" & K TO W-X` -> COBOL0309. Expected: \"XA\" / \"XQ\". Finding: concat-operand-word-substitution. Probe dir probe/concat (pinned cobol.exe) CCN1/CCN7/CCN9/c5. No existing golden exercises the word-operand arms. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1406 (w62k). cite.py --check 8.8.3.1 \"exactly one of `literal-1` or `concatenation-expression-1` shall be selected as the left operand\" -> OK. literal-1/literal-2 admit the two WORDS that stand for a literal: a constant-name (--check 13.10.3 \"constant-name-1 may be used anywhere that a format specifies a literal of the class and category of constant-name-1\" -> OK SR2) and a symbolic-character (--check 12.3.7.4 \"Symbolic-character-1 defines a figurative constant\" -> OK GR11). concatOperand gained a cobolWord arm; ConcatFolder resolves it through LiteralEnvironment (constant first, then symbolic-character), a word naming neither -> COBOLNET2473. Before: \"X\" & SYM-A / \"X\" & K were COBOL0309 and SYM-A & \"X\" COBOL0001 (probes w62k/probe/q01-q03); after: XA / AX / XQ. At 85 the & operator is refused COBOLNET0900 (concat_below_2002). The ALL literal-1 concatenation (§8.3.3.6.3 SR2, allLiteralOperand) is a separate arm reported as a lead, not this row.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.8.4.2.2",

@@ -158,6 +158,20 @@ public static class DiagnosticCatalog
         "COBOLNET1545", "concat-result-too-long", EditionSeverity.Error,
         "The value resulting from concatenation shall be at most 8,191 character positions (alphanumeric, "
         + "boolean, or national).", "ISO §8.8.3.2 SR2–SR4");
+    /// <summary>kb/Work PB1406: a word written as a concatenation operand that stands for no literal.</summary>
+    public static readonly DiagnosticDescriptor ConcatOperandNotLiteral = new(
+        "COBOLNET2473", "concat-operand-not-literal", EditionSeverity.Error,
+        "An operand of a concatenation expression is a literal (ISO §8.8.3.1 — literal-1 & literal-2) or a figurative "
+        + "constant (§8.8.3.2 SR1). The only words that stand for one are a constant-name (§13.10.3 SR2) and a "
+        + "symbolic-character, which is a figurative constant (§12.3.7.4 GR11); a data-name or any other word is not.",
+        "ISO §8.8.3.1 · §13.10.3 SR2 · §12.3.7.4 GR11");
+    /// <summary>kb/Work PB1406: §12.3.7.3 SR11 asked of a concatenation operand inside SPECIAL-NAMES.</summary>
+    public static readonly DiagnosticDescriptor ConcatSymbolicCharacterInSpecialNames = new(
+        "COBOLNET2474", "concat-symbolic-character-in-special-names", EditionSeverity.Error,
+        "ISO §12.3.7.3 syntax rule 11: \"Literal-1, literal-2, literal-3, literal-4, literal-5, literal-6, and "
+        + "literal-9 shall specify neither a symbolic-character figurative constant nor a zero-length literal.\" A "
+        + "concatenation expression written in one of those positions shall not have a symbolic-character operand.",
+        "ISO §12.3.7.3 SR11");
 
     // ── COBOLNET1547/1548/1549 — constant entries + CONSTANT RECORD, one code per rule family (§13.10 /
     //    §13.18.15; P10 Step 15). 1547 = the §13.10 constant-entry syntax rules; 1548 = the receiving-operand

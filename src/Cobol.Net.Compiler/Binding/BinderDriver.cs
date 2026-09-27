@@ -409,7 +409,8 @@ internal sealed class BinderDriver
                     + "program that is contained within another program (ISO §11.10.3 SR2)");
             else if (ExternalizedName.Screen(asPhrase.literal(), edition,
                          DiagnosticCatalog.ExternalizedNameLiteral,
-                         $"{kind} '{name}' AS {asPhrase.literal().GetText()}", "literal-1", rule) is { } lit1)
+                         $"{kind} '{name}' AS {asPhrase.literal().GetText()}", "literal-1", rule,
+                         LiteralEnvironment.Unscoped) is { } lit1)
                 externalized = lit1;
         }
 

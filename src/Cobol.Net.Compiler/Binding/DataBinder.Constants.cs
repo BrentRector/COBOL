@@ -208,7 +208,7 @@ public sealed partial class DataBinder
     {
         if (nn.concatenationExpression() is { } ce)
         {
-            var folded = ConcatFolder.Fold(ce, Edition, Collating, NationalCollating);
+            var folded = ConcatFolder.Fold(ce, Edition, LiteralEnv);
             return new ConstantDef(name, folded.Category, folded.Value, false, isGlobal, folded.RawText);
         }
         if (nn.figurativeConstant() is not null)

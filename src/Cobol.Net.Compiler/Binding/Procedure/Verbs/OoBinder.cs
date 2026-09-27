@@ -177,8 +177,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // class may — including INVOKE literal-1 (§14.9.23.3 SR2); a boolean-class concat stays null → 0823.
         var mnLit = inv.invokeMethodName().literal();
         string? methodName = mnLit?.nonNumericLiteral()?.concatenationExpression() is { } mce
-            ? ConcatFolder.ClassOf(mce) is not PicCategory.Boolean
-                ? ConcatFolder.Fold(mce, ctx.Edition, ctx.Data.Collating).Value : null
+            ? ConcatFolder.ClassOf(mce, ctx.Data.LiteralEnv) is not PicCategory.Boolean
+                ? ConcatFolder.Fold(mce, ctx.Edition, ctx.Data.LiteralEnv).Value : null
             : OoDecodeMethodNameLiteral(mnLit);
         if (methodName is null)
         {

@@ -1604,8 +1604,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                                 ? ExternalizedName.Screen(asPhrase.literal(), Edition,
                                     DiagnosticCatalog.ExternalClauseAsLiteral,
                                     $"file '{name}' IS EXTERNAL AS {asPhrase.literal().GetText()}", "literal-1",
-                                    "ISO §13.18.22.3 SR3", rejectZeroLength: true,
-                                    collate: Collating, natCollate: NationalCollating)
+                                    "ISO §13.18.22.3 SR3", LiteralEnv, rejectZeroLength: true)
                                 : null)
                             ?? name.ToUpperInvariant();
                     }
@@ -4893,8 +4892,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         string? externalizedAs = externalAs is null ? null
             : ExternalizedName.Screen(externalAs.literal(), Edition, DiagnosticCatalog.ExternalClauseAsLiteral,
                 $"{entryWhere} IS EXTERNAL AS {externalAs.literal().GetText()}", "literal-1",
-                "ISO §13.18.22.3 SR3", rejectZeroLength: true,
-                collate: Collating, natCollate: NationalCollating);
+                "ISO §13.18.22.3 SR3", LiteralEnv, rejectZeroLength: true);
         var item = new DataItem
         {
             Level = level,
@@ -5386,7 +5384,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // a rejected operand draws exactly one diagnostic and the ConcatFolder is never entered for it.
         if (!IsLiteralValueOperand(op)) { ReportNonLiteralValueOperand(op, where, position); return null; }
         return op.nonNumericLiteral()?.concatenationExpression() is { } ce
-            ? ConcatFolder.Fold(ce, Edition, Collating, NationalCollating).RawText
+            ? ConcatFolder.Fold(ce, Edition, LiteralEnv).RawText
             // ALL over a concatenated literal-1 (§8.3.3.6.3 SR2 — kb/Work PB71): `ALL` + the folded literal re-quoted,
             // so the raw-text ALL reader (CobolLiteral.AllLiteralRaw) sees ONE literal of the right class.
             : op.nonNumericLiteral()?.figurativeConstant()?.allLiteral() is { } al && al.allLiteralOperand().Length > 1
@@ -5618,9 +5616,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (lit?.valueClauseOperand() is not { } op) return null;
         if (op.nonNumericLiteral()?.figurativeConstant() is { } fig && fig.allLiteral() is null && fig.cobolWord() is null)
-            return ConcatFolder.FigurativeChar(fig, PicCategory.Alphanumeric, Collating, NationalCollating) is { } alnum
+            return ConcatFolder.FigurativeChar(fig, PicCategory.Alphanumeric, LiteralEnv) is { } alnum
                 ? new EditLiteral(alnum.ToString(), EditLiteralClass.Figurative,
-                    ConcatFolder.FigurativeChar(fig, PicCategory.National, Collating, NationalCollating)?.ToString())
+                    ConcatFolder.FigurativeChar(fig, PicCategory.National, LiteralEnv)?.ToString())
                 : new EditLiteral(fig.GetText(), EditLiteralClass.NotAlphanumericOrNational);
         if (RawValueOperandText(op, where, LiteralPosition.Editing) is not { } raw) return null;
         string written = CobolLiteral.AllLiteralRaw(raw) ?? raw;   // ALL literal-1 / symbolic-character: literal-1 (GR3c)

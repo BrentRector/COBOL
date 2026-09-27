@@ -174,7 +174,7 @@ public sealed class OoClassTable
             return ExternalizedName.Screen(phrase.literal(), edition,
                        DiagnosticCatalog.ExternalizedNameLiteral,
                        $"{kind} '{declared}' AS {phrase.literal().GetText()}", "literal-1", rule,
-                       rejectZeroLength)
+                       LiteralEnvironment.Unscoped, rejectZeroLength)
                    ?? declared;
         }
 

@@ -193,7 +193,7 @@ internal static class OptionsBinder
         if (fill.literal() is { } lit)
         {
             string raw = lit.nonNumericLiteral()?.concatenationExpression() is { } ce && edition is not null
-                ? ConcatFolder.Fold(ce, edition, null).RawText
+                ? ConcatFolder.Fold(ce, edition, LiteralEnvironment.Unscoped).RawText
                 : lit.GetText();
             char? c = OneByteHexAlphanumeric(raw);
             if (c is null)

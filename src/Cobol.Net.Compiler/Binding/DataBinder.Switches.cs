@@ -499,7 +499,7 @@ public sealed partial class DataBinder
     {
         if (!int.TryParse(lit.GetText(), out _) && !decimal.TryParse(lit.GetText(), System.Globalization.NumberStyles.Number,
                 System.Globalization.CultureInfo.InvariantCulture, out _))
-            return LiteralCharsOf(lit);
+            return LiteralCharsOf(lit, national: false, sr11: false);   // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8
         Edition.Error("COBOLNET0892", $"CURRENCY SIGN {lit.GetText()}: {operand} shall be an alphanumeric or "
             + $"national literal, not a numeric one (ISO §12.3.7.3 SR{rule})");
         return null;
@@ -533,7 +533,7 @@ public sealed partial class DataBinder
             if (cur.PIC_STRING()?.GetText() is { } sym && !sym.Equals("SYMBOL", StringComparison.OrdinalIgnoreCase))
                 Edition.Error("COBOLNET0892", $"CURRENCY SIGN: expected 'WITH PICTURE SYMBOL', found 'PICTURE {sym}' (ISO §12.3.7)");
             if (lits.Length > 1 && CurrencyTextLiteral(lits[1], "literal-8", "26") is null) return;
-            string literal8 = lits.Length > 1 ? LiteralCharsOf(lits[1]) : "";
+            string literal8 = lits.Length > 1 ? LiteralCharsOf(lits[1], national: false, sr11: false) : "";
             if (literal8.Length != 1)
             {
                 Edition.Error("COBOLNET0892", "CURRENCY SIGN: the PICTURE SYMBOL literal shall be a single "
@@ -635,7 +635,7 @@ public sealed partial class DataBinder
         {
             if (ExternalizedName.Screen(asPhrase.literal(), Edition, DiagnosticCatalog.RepositoryProgramSpecifier,
                     $"REPOSITORY {kind} '{name}' AS {asPhrase.literal().GetText()}", tag, "ISO §12.3.8.3 SR2",
-                    collate: Collating, natCollate: NationalCollating) is not { } literal) return null;
+                    LiteralEnv) is not { } literal) return null;
             externalized = literal;
         }
         var spec = new RepositorySpecification(kind, re.externalizedNamePhrase() is null ? null : externalized,
@@ -1027,10 +1027,11 @@ public sealed partial class DataBinder
         // here and folds to the one literal SR10 then classes. Refusing it would reject conforming source.
         if (nn?.concatenationExpression() is { } cat)
         {
-            // The collating arguments are NULL deliberately: a figurative HIGH-/LOW-VALUE written INSIDE
-            // SPECIAL-NAMES takes the NATIVE extremes (the ALPHABET binder's GR10 note), and the PCS is not
-            // resolved until after this walk anyway.
-            var folded = ConcatFolder.Fold(cat, Edition, collate: null);
+            // A figurative HIGH-/LOW-VALUE written INSIDE SPECIAL-NAMES takes the NATIVE extremes of the
+            // clause's NATIONAL phrase (§12.3.7.4 GR10) — neither clause here has one — and SR11 forbids a
+            // symbolic-character operand in literal-9 (the posture this screen gives literal-4 as well).
+            var folded = ConcatFolder.Fold(cat, Edition, LiteralEnvironment.SpecialNames(this, nationalPhrase: false,
+                refusesSymbolicCharacters: true));
             if (folded.Category is not (PicCategory.Alphanumeric or PicCategory.National))
             {
                 Edition.Error("COBOLNET0898", $"{what}: {operand} shall be an alphanumeric "
@@ -1582,7 +1583,8 @@ public sealed partial class DataBinder
                         + $"through the maximum number of characters in that set (ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
                     return null;
                 }
-                if (OperandLiteralClass(lit) == r.LiteralClass) return LiteralCharsOf(lit);
+                if (OperandLiteralClass(lit, r.National) == r.LiteralClass)
+                    return LiteralCharsOf(lit, r.National, sr11: true);
                 // The class rule. A noninteger literal of the wrong class: name the rule, then RECOVER with the
                 // literal's characters when it is a string at all, so one bad operand does not cascade.
                 Edition.Error(r.Code, $"{r.What}: {text} — each noninteger literal shall be "
@@ -1598,7 +1600,7 @@ public sealed partial class DataBinder
                 // §12.3.7.3 SR11 — literal-1 … literal-6 "shall specify neither a symbolic-character figurative
                 // constant nor a zero-length literal": a symbolic-character name reaches here as a word, and it is
                 // THAT rule it breaks, not the class rule below (kb/Work PB226).
-                if (_paragraphSymbolicNames.Contains(w.GetText()) || SymbolicCharacters.ContainsKey(w.GetText()))
+                if (IsSymbolicCharacterName(w.GetText()))
                 {
                     Edition.Error(r.Code, $"{r.What}: {w.GetText()} — an operand shall not be a symbolic-character "
                         + "figurative constant (ISO §12.3.7.3 SR11)");
@@ -1686,13 +1688,18 @@ public sealed partial class DataBinder
     /// PREFIX: the former alphanumeric test asked <c>CobolLiteral.IsStringLiteral</c>, which answers true for EVERY
     /// prefixed quoted literal, so N"A" and B"1" passed as alphanumeric and <c>ALPHABET A IS N"A"</c> /
     /// <c>CLASS C IS N"0" THRU N"9"</c> compiled clean (kb/Work PB976). A §8.8.3.3 concatenation expression is of
-    /// its operands' one class (§8.8.3.2 SR1), which its leading prefix names.</summary>
-    private static LiteralClass? OperandLiteralClass(Core.LiteralContext lit)
+    /// the class §8.8.3.3 GR1 folds pairwise — THE ConcatFolder answer, never the leading operand's prefix, which
+    /// called <c>SPACE &amp; N"A"</c> alphanumeric (kb/Work PB1406).</summary>
+    private LiteralClass? OperandLiteralClass(Core.LiteralContext lit, bool national)
     {
-        string text = lit.GetText();
-        if (lit.nonNumericLiteral()?.concatenationExpression() is not null)
-            return text.Length == 0 ? null : text[0] switch { 'N' or 'n' => LiteralClass.National, 'B' or 'b' => LiteralClass.Boolean, _ => LiteralClass.Alphanumeric };
-        return CobolLiteral.ClassOf(text);
+        if (lit.nonNumericLiteral()?.concatenationExpression() is { } ce)
+            return ConcatFolder.ClassOf(ce, LiteralEnvironment.SpecialNames(this, national, refusesSymbolicCharacters: true)) switch
+            {
+                PicCategory.National => LiteralClass.National,
+                PicCategory.Boolean => LiteralClass.Boolean,
+                _ => LiteralClass.Alphanumeric,
+            };
+        return CobolLiteral.ClassOf(lit.GetText());
     }
 
     /// <summary>⛔ THE ONE §12.3.7.4 GR10 mapping of a figurative constant written INSIDE the SPECIAL-NAMES
@@ -1706,7 +1713,7 @@ public sealed partial class DataBinder
     /// <see cref="AlphabetExtremes"/> keeps.</para></summary>
     private static string? AlphabetFigurative(string word, bool national) => word.ToUpperInvariant() switch
     {
-        "HIGH-VALUE" or "HIGH-VALUES" => national ? "\uFFFF" : "\u00FF",
+        "HIGH-VALUE" or "HIGH-VALUES" => NativeHighValue(national).ToString(),
         "LOW-VALUE" or "LOW-VALUES" => "\u0000",
         "SPACE" or "SPACES" => " ",
         "QUOTE" or "QUOTES" => "\"",
@@ -1714,15 +1721,31 @@ public sealed partial class DataBinder
         _ => null,
     };
 
+    /// <summary>The highest character of the NATIVE collating sequence — §12.3.7.4 GR10's HIGH-VALUE inside
+    /// SPECIAL-NAMES: the native national sequence is the UTF-16 code-unit order (D-N3), so U+FFFF; the alphanumeric
+    /// one keeps the U+00FF pin <see cref="AlphabetFigurative"/> documents. ONE statement for that word-keyed operand
+    /// mapping and for the concatenation fold's <see cref="LiteralEnvironment.SpecialNames"/> context.</summary>
+    internal static char NativeHighValue(bool national) => national ? '\uFFFF' : '\u00FF';
 
-    /// <summary>The characters of an alphabet-entry string literal: a §8.8.3.3 GR3 concatenation folded first, the
-    /// §8.3.3.2 hexadecimal format decoded pairwise, otherwise the literal's own characters. ⛔ It never resolves an
-    /// ORDINAL — that is SR14 b1/c1's job and it lives in <see cref="AlphabetOperands"/>, so the ALPHABET path can
-    /// no longer inherit the CLASS clause's descriptor, message and rule number (kb/Work PB770 leg d).</summary>
-    private string LiteralCharsOf(Core.LiteralContext lit)
+    /// <summary>Whether <paramref name="word"/> is a symbolic-character name of this paragraph — declared by any
+    /// SYMBOLIC CHARACTERS clause, read syntactically because the clauses are order-free (kb/Work PB226), or already
+    /// bound. The ONE recognition §12.3.7.3 SR11 asks, of a bare operand and of a concatenation operand alike.</summary>
+    internal bool IsSymbolicCharacterName(string word) =>
+        _paragraphSymbolicNames.Contains(word) || SymbolicCharacters.ContainsKey(word);
+
+    /// <summary>The literal environment of a position OUTSIDE the SPECIAL-NAMES paragraph (kb/Work PB1406).</summary>
+    internal LiteralEnvironment LiteralEnv => LiteralEnvironment.Program(this);
+
+    /// <summary>The characters of an alphabet-entry string literal: a §8.8.3.3 GR3 concatenation folded first — in
+    /// the SPECIAL-NAMES environment of the clause's NATIONAL phrase (§12.3.7.4 GR10), with §12.3.7.3 SR11's
+    /// symbolic-character prohibition when <paramref name="sr11"/> —, the §8.3.3.2 hexadecimal format decoded
+    /// pairwise, otherwise the literal's own characters. ⛔ It never resolves an ORDINAL — that is SR14 b1/c1's job
+    /// and it lives in <see cref="AlphabetOperands"/>, so the ALPHABET path can no longer inherit the CLASS clause's
+    /// descriptor, message and rule number (kb/Work PB770 leg d).</summary>
+    private string LiteralCharsOf(Core.LiteralContext lit, bool national, bool sr11)
     {
         if (lit.nonNumericLiteral()?.concatenationExpression() is { } ce)
-            return ConcatFolder.Fold(ce, Edition, collate: null).Value;
+            return ConcatFolder.Fold(ce, Edition, LiteralEnvironment.SpecialNames(this, national, sr11)).Value;
         string text = lit.GetText();
         if (CobolLiteral.IsStringLiteral(text)) return CobolLiteral.Decode(text);
         if (text.Length >= 3 && text[0] is 'X' or 'x' && text[1] is '"' or '\'') return CobolLiteral.DecodeHex(text);

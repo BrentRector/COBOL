@@ -465,7 +465,9 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   the `&` operator joins alphanumeric (incl. `X"…"` hex) / national / boolean literals and figurative
   constants into ONE literal; §8.8.3.3 GR3 makes the result a compile-time literal usable anywhere a literal
   of its class may appear — implemented in the greenfield `src/Cobol.Net.*` as the `Binding/ConcatFolder.cs`
-  fold (NO runtime operator; no emitter leg), with the §8.8.3.2 SRs as `COBOLNET1540/1541/1545`, the
+  fold (NO runtime operator; no emitter leg) — operands include a constant-name and a symbolic-character, and the
+  class is folded pairwise per §8.8.3.3 GR1 (kb/Work PB1406) — with the §8.8.3.2 SRs as `COBOLNET1540/1541/1545`
+  (a word standing for no literal `COBOLNET2473`; §12.3.7.3 SR11's symbolic-character operand `COBOLNET2474`), the
   `concat-operator-2002` VersionConformancePass parse-arm gate (0900 at `--std 85`), the enabled
   `tests/conformance/2002/literal_concat` golden (+ `concat_below_2002` / `concat_class_mismatch` negatives)
   and the active version-matrix row. Never existed in the legacy oracle (GreenfieldOnly).
