@@ -154,6 +154,16 @@ internal static class ConcatFolder
         return "ALL " + literal1;
     }
 
+    /// <summary>The same spelling for a whole literal operand in a diagnostic: a figurative constant by
+    /// <see cref="Spelling(Core.FigurativeConstantContext)"/>, a concatenation expression with its <c>&amp;</c> separated,
+    /// anything else as written. A message that printed <c>lit.GetText()</c> said <c>ALLZERO</c> and <c>"$"&amp;SYM-A</c>
+    /// (kb/Work PB1631).</summary>
+    public static string Spelling(Core.LiteralContext lit) =>
+        lit.nonNumericLiteral() is not { } nn ? lit.GetText()
+        : nn.figurativeConstant() is { } fig ? Spelling(fig)
+        : nn.concatenationExpression() is { } ce ? string.Join(" & ", ce.concatOperand().Select(op => op.GetText()))
+        : nn.GetText();
+
     /// <summary>Whether a concatenation operand is a zero-length literal — asked STRUCTURALLY (contiguous delimiters,
     /// <see cref="CobolLiteral.IsZeroLength"/>), never as "decodes to nothing": a malformed hexadecimal literal decodes
     /// to nothing too, and is LiteralScreenPass's COBOLNET1635, not SR2. A constant-name is its literal (§13.10.4

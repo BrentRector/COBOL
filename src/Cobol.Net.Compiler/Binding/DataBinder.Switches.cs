@@ -500,7 +500,7 @@ public sealed partial class DataBinder
         if (!int.TryParse(lit.GetText(), out _) && !decimal.TryParse(lit.GetText(), System.Globalization.NumberStyles.Number,
                 System.Globalization.CultureInfo.InvariantCulture, out _))
             return LiteralCharsOf(lit, national: false, sr11: false);   // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8
-        Edition.Error("COBOLNET0892", $"CURRENCY SIGN {lit.GetText()}: {operand} shall be an alphanumeric or "
+        Edition.Error("COBOLNET0892", $"CURRENCY SIGN {ConcatFolder.Spelling(lit)}: {operand} shall be an alphanumeric or "
             + $"national literal, not a numeric one (ISO §12.3.7.3 SR{rule})");
         return null;
     }

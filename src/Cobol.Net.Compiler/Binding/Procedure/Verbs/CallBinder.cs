@@ -578,8 +578,9 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // activating element learns the formal's description, and GR9's second branch / GR10 make the
                 // ACTIVATING element perform the argument crossing against it — "a COMPUTE statement without the
                 // ROUNDED phrase" for a numeric formal — so the emitter needs the same fact this conformance
-                // screen reads. Recorded for EVERY argument, not only the ones a check below rejects.
-                var arg = args[i] with { Formal = f.Item };
+                // screen reads. Recorded for EVERY argument, not only the ones a check below rejects. The same
+                // formal decides how a figurative ZERO reads (§14.8.2.3.3 2) a); kb/Work PB1634).
+                var arg = args[i] with { Formal = f.Item, Value = ParameterConformance.ArgumentForFormal(args[i].Value, f.Item) };
                 args[i] = arg;
                 if (arg.Omitted)
                 {
@@ -716,7 +717,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             return null;
         }
         ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass,
-            $"{verb} '{lit.GetText()}': the literal program name shall be an alphanumeric or national literal "
+            $"{verb} '{ConcatFolder.Spelling(lit)}': the literal program name shall be an alphanumeric or national literal "
             + $"(ISO {clause})");
         return null;
     }
@@ -957,6 +958,25 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         return (lit, bareLit, dref ?? ConditionBinder.SoleDataReference(arith), boolExpr, arith);
     }
 
+    /// <summary>⛔ THE ONE answer to "may this literal-position operand cross BY VALUE?" — CALL §14.9.4.3 SR23 and
+    /// its INVOKE twin §14.9.23.3 SR16 are the same sentence ("If literal-2 or its corresponding formal parameter
+    /// is specified with the BY VALUE phrase, literal-2 shall be a numeric literal"), so both screens ask here
+    /// (kb/Work PB1631: INVOKE's copy admitted only NULL and refused BY VALUE ZERO).
+    /// <list type="bullet">
+    /// <item>A numeric literal.</item>
+    /// <item>The figurative ZERO without ALL. It is a numeric literal wherever a literal is restricted to numeric
+    /// (§8.3.3.6.3 SR1 a), <see cref="ExpressionBinder.IsNumericRestrictedZero"/>). <c>ALL ZERO</c> is not one:
+    /// the former <c>zeroWord() is not null</c> test admitted it.</item>
+    /// <item>NULL, which is not literal-2 at all (kb/Work PB1630). §8.4.3.1.2 makes it an IDENTIFIER (Format 8,
+    /// predefined-address; Format 6, predefined-object) of class pointer (§8.4.3.10.1) or object (§8.4.3.7.3
+    /// SR2), which the grammar carries on the figurative arm. As identifier-4 it answers to §14.9.4.3 SR22
+    /// ("identifier-4 shall be of class numeric, object, or pointer"), which both of its classes satisfy.</item>
+    /// </list></summary>
+    internal static bool ByValueLiteralAdmitted(Core.LiteralContext lit) =>
+        lit.numericLiteral() is not null
+        || ExpressionBinder.IsNumericRestrictedZero(lit.nonNumericLiteral()?.figurativeConstant())
+        || lit.nonNumericLiteral()?.figurativeConstant()?.NULL_() is not null;
+
     /// <summary>ISO §14.9.4.3 SR23 — "If literal-2 or its corresponding formal parameter is specified with the
     /// BY VALUE phrase, literal-2 shall be a numeric literal." Reported BY NAME (kb/Work PB238): the rule was
     /// previously enforced only as a side effect of the grammar's expression spine, which bottoms out at
@@ -965,21 +985,9 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     /// second subject (a keyword-less literal-2 whose FORMAL carries the phrase).</summary>
     private void Sr23LiteralIsNumeric(Core.LiteralContext lit, string subject)
     {
-        // The figurative ZERO is a numeric literal wherever a literal is restricted to numeric (§8.3.3.6.3
-        // SR1a) — and it never reaches here under an explicit BY VALUE, where ZERO_ARITH takes the earlier
-        // `arithmeticExpression` alternative; the keyword-less arm can still spell it, so admit it by rule.
-        if (lit.numericLiteral() is not null
-            || lit.nonNumericLiteral()?.figurativeConstant()?.zeroWord() is not null)
-            return;
-        // NULL is not literal-2 at all (kb/Work PB1630): §8.4.3.1.2 makes it an IDENTIFIER (Format 8,
-        // predefined-address; Format 6, predefined-object) of class pointer (§8.4.3.10.1) or object (§8.4.3.7.3
-        // SR2), which the grammar carries on the figurative arm. As identifier-4 it answers to §14.9.4.3 SR22 —
-        // "identifier-4 shall be of class numeric, object, or pointer" — which both of its classes satisfy; its
-        // conformance to the formal is §14.8.2.3.3's (ParameterConformance.ContentConformanceReason).
-        if (lit.nonNumericLiteral()?.figurativeConstant()?.NULL_() is not null)
-            return;
+        if (ByValueLiteralAdmitted(lit)) return;
         ctx.Edition.Error(DiagnosticCatalog.CallByValueLiteralKind,
-            $"CALL … USING {lit.GetText()} with {subject}: literal-2 shall be a NUMERIC literal "
+            $"CALL … USING {ConcatFolder.Spelling(lit)} with {subject}: literal-2 shall be a NUMERIC literal "
             + "(ISO §14.9.4.3 SR23)");
     }
 

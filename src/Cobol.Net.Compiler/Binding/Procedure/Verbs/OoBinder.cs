@@ -628,11 +628,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         if (arg.ByValueWritten)
         {
             // SR16: "If literal-2 or its corresponding formal parameter is specified with the BY VALUE phrase,
-            // literal-2 shall be a numeric literal" — a nonnumeric literal-2 is refused by name. NULL is not
-            // literal-2 but identifier-5 (§8.4.3.1.3 SR7), and §14.9.23.3 SR15 admits its class, object.
-            if (arg.Literal?.nonNumericLiteral() is { } byValueText && byValueText.figurativeConstant()?.NULL_() is null)
+            // literal-2 shall be a numeric literal" — CALL's SR23 word for word, so it is asked of THE ONE
+            // predicate (kb/Work PB1631): a numeric literal, ZERO without ALL (§8.3.3.6.3 SR1 a)), or NULL,
+            // which is identifier-5 rather than literal-2 (§8.4.3.1.3 SR7) and whose class SR15 admits.
+            if (arg.Literal is { } byValueLit && !CallBinder.ByValueLiteralAdmitted(byValueLit))
             {
-                Err($"BY VALUE {byValueText.GetText()}: literal-2 shall be a numeric literal when the BY VALUE phrase is "
+                Err($"BY VALUE {ConcatFolder.Spelling(byValueLit)}: literal-2 shall be a numeric literal when the BY VALUE phrase is "
                     + "specified (ISO §14.9.23.3 SR16)");
                 return null;
             }
@@ -1004,8 +1005,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // zero — §8.3.3.6.3 SR1 a) makes ZERO the one figurative a numeric literal's position admits, and §8.8.1.1 names
         // it among a COMPUTE's operands — so it takes the numeric-literal lane (its verdict and its carrier split), and
         // only a character-carried formal takes the fill below (kb/Work PB1617).
-        if (literal2 is BoundFigurative { Kind: 'Z' } && formal is { IsGroup: false, Pic.Category: PicCategory.Numeric })
-            literal2 = new BoundNumericLiteral("0");
+        literal2 = ParameterConformance.ArgumentForFormal(literal2, formal);
         string literalText = constantName ?? nonNumCtx?.GetText() ?? numLitRaw ?? foldedAlnum ?? "";
         switch (literal2)
         {

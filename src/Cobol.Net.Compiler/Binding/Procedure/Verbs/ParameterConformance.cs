@@ -104,6 +104,20 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                 + $"(ISO §14.8.2 via {site.ImportingRule})");
     }
 
+    /// <summary>⛔ THE ONE reading of a figurative ZERO argument into an elementary NUMERIC formal (kb/Work PB1617
+    /// for INVOKE, PB1634 for CALL). §14.8.2.3.3 2) a): "If the formal parameter is numeric, the conformance rules
+    /// are the same as for a COMPUTE statement with the argument as the sending operand", and a COMPUTE reads the
+    /// figurative ZERO as the numeric value zero (§8.8.1.1 names it among an arithmetic expression's operands;
+    /// §8.3.3.6.3 SR1 a) makes it the one figurative a numeric literal's position admits). So the argument IS the
+    /// numeric literal 0: it takes the numeric-literal verdict and the numeric carrier. The character fill is for
+    /// a character-carried formal only. Before CALL asked this, a ZERO into a <c>PIC 9(4) BINARY</c> formal crossed
+    /// as the one-character fill "0" and landed as its character code, 48, BY VALUE, BY CONTENT and keyword-less
+    /// alike.</summary>
+    internal static BoundOperand? ArgumentForFormal(BoundOperand? value, DataItem formal) =>
+        value is BoundFigurative { Kind: 'Z' } && formal is { IsGroup: false, Pic.Category: PicCategory.Numeric }
+            ? new BoundNumericLiteral("0")
+            : value;
+
     /// <summary>ISO §14.8.2.3.3's conformance verdict for ONE bound BY CONTENT / BY VALUE argument, dispatched
     /// on the argument's SHAPE onto the rules that live with their BY REFERENCE sibling in
     /// <see cref="CobolNet.Compiler.Oo.OoConformance"/> (kb/Work PB165). Null when conformant.

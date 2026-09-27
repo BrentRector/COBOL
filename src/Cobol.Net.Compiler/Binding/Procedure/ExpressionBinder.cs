@@ -309,6 +309,14 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         return BoundOperandError.Refused(ctx.Edition, $"figurative constant '{ConcatFolder.Spelling(fig)}'");
     }
 
+    /// <summary>⛔ THE ONE §8.3.3.6.3 SR1 a) test: "If the literal is restricted to a numeric literal, the only
+    /// figurative constant permitted is ZERO (ZEROS, ZEROES) without the ALL phrase." The grammar has a distinct
+    /// <c>ALL zeroWord</c> alternative, so <c>zeroWord()</c> alone also answers true for <c>ALL ZERO</c>. The ALL
+    /// test is part of the rule (kb/Work PB218), and every numeric-restricted literal position asks it here: the
+    /// arithmetic operand, CALL §14.9.4.3 SR23 and INVOKE §14.9.23.3 SR16 (kb/Work PB1631).</summary>
+    internal static bool IsNumericRestrictedZero(Core.FigurativeConstantContext? fig) =>
+        fig?.zeroWord() is not null && fig.ALL() is null;
+
     /// <summary>The bound operand of a symbolic character (§12.3.7.4 GR11; kb/Work PB110): the ALL literal of its
     /// ONE character — GR10 ("one or more of the character") is the figurative fill in a fixed-length association
     /// (§8.3.3.6.4 GR2) and one character where the context does not size it (GR3 b), exactly BoundAllLiteral's
@@ -974,7 +982,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             // `ZERO()` are non-null and the old `fig.zeroWord() is not null` arm admitted it. Measured before the
             // fix: `IF ALL ZEROS IS POSITIVE` compiled clean and evaluated `0 > 0`, under a comment quoting the
             // very rule that bars it — a citation enforcing nothing is worse than no citation.
-            if (fig.zeroWord() is not null && fig.ALL() is null) return new BoundNumLiteral("0");
+            if (IsNumericRestrictedZero(fig)) return new BoundNumLiteral("0");
             // The bare BoundExprError here carried no diagnostic and rendered as a RUNTIME NotImplemented —
             // the wrong stage for a syntax-rule violation (kb/Work PB155).
             ctx.Edition.Error("COBOLNET0844", $"figurative constant '{ConcatFolder.Spelling(fig)}' is not a numeric "
