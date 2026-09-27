@@ -18,8 +18,9 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Saturday 2026-09-26, evening</h3>
-    <p><strong>Landed today — three CI-proven landings.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test. <span class="pill good">train 61</span> landed COPY/REPLACE text-words, runtime I-O boundaries with owner decision R47, one PICTURE-clause identity for OO and CALL conformance, record sizing from the RECORD clause, and floating-point ROUNDED MODE and size error. <span class="pill good">train 62</span> landed the file-control clause screens (SUPPRESS WHEN, COLLATING SEQUENCE, FILE STATUS), one literal screen for length and hexadecimal grouping, and one argument-conformance mechanism now shared by CALL, user-defined functions and INVOKE.</p>
+    <h3>In flight — Saturday 2026-09-26, late evening</h3>
+    <p><strong>Landed today — four CI-proven landings.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test. <span class="pill good">train 61</span> landed COPY/REPLACE text-words, runtime I-O boundaries with owner decision R47, one PICTURE-clause identity for OO and CALL conformance, record sizing from the RECORD clause, and floating-point ROUNDED MODE and size error. <span class="pill good">train 62</span> landed the file-control clause screens (SUPPRESS WHEN, COLLATING SEQUENCE, FILE STATUS), one literal screen for length and hexadecimal grouping, and one argument-conformance mechanism now shared by CALL, user-defined functions and INVOKE.</p>
+    <p><span class="pill good">train 63</span> landed compile-time arithmetic by edition (Standard Arithmetic at 2002/2014, System.Decimal at 2023), the unchecked zero divisor terminating on every lane (owner-confirmed), and concatenation word operands with the pairwise class fold.</p>
     <p><strong>Next</strong> (after the weekly quota resets): the concatenation-operand half of the literal work (PB1406), the prototype-definition match left on PB1115, and a fresh fix wave; comprehensive battery #87 is owed.</p>
   </div>
   <div class="cardgrid">
