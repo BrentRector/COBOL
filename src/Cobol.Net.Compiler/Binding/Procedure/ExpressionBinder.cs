@@ -281,9 +281,11 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // hexadecimal), boolean or national literal-1, and the category rides on the literal's class through
         // BoundAllLiteral.Of. Two arms of four were written here: `ALL B"1"` (the grammar HAD the token) parsed and
         // died at RUN time exactly as `ALL X"41"` once did — the PB4 shape, one arm later, under the remark that
-        // records it — and `ALL N"…"` had no grammar arm at all.
-        if (fig.allLiteral() is { } al)
-            return BoundAllLiteral.Of(al.allLiteralOperand().Select(o => o.GetText()).ToArray());
+        // records it — and `ALL N"…"` had no grammar arm at all. Literal-1 in every written shape — a quoted literal,
+        // a §8.8.3 concatenation expression, a constant-name (kb/Work PB1627) — folds through the ONE reader, which
+        // reports §8.3.3.6.3 SR2 and the concatenation's §8.8.3.2 rules.
+        if (ConcatFolder.FoldAllLiteral(fig, ctx.Data.LiteralEnv, ctx.Edition) is { } literal1)
+            return BoundAllLiteral.Of(literal1);
         // Format 7 — ALL symbolic-character-1 (§8.3.3.6.2; §12.3.7.4 GR11 — kb/Work PB110): the one-character
         // figurative the SYMBOLIC CHARACTERS clause defined, as the ALL literal of that character (§8.3.3.6.4
         // GR10's "one or more of the character" IS the fill semantics BoundAllLiteral carries in every context).
@@ -293,9 +295,9 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 return SymbolicOperand(sym) is BoundAllLiteral al7
                     ? al7 with { BeginsWithAll = true }   // the EXPLICIT ALL form — the word is written
                     : SymbolicOperand(sym);
-            ctx.Edition.Error(DiagnosticCatalog.SymbolicCharactersViolation, $"ALL {symWord.GetText()}: "
-                + "symbolic-character-1 shall be specified in the SYMBOLIC CHARACTERS clause of the SPECIAL-NAMES "
-                + "paragraph (ISO §8.3.3.6.3 SR4)");
+            ctx.Edition.Error(DiagnosticCatalog.SymbolicCharactersViolation, $"ALL {symWord.GetText()}: the word names "
+                + "no constant-name (§13.10.3 SR2) and no symbolic-character — symbolic-character-1 shall be specified in "
+                + "the SYMBOLIC CHARACTERS clause of the SPECIAL-NAMES paragraph (ISO §8.3.3.6.3 SR4)");
             return BoundOperandError.Refused(ctx.Edition, $"ALL {symWord.GetText()}");
         }
         if (fig.zeroWord() is not null) return new BoundFigurative('Z');

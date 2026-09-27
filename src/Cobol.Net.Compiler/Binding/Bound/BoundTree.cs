@@ -522,19 +522,27 @@ public sealed record BoundAllLiteral(string Literal) : BoundOperand
 
     /// <summary>THE constructor from the literal's RAW source text (kb/Work PB71): the value through
     /// <see cref="CobolNet.Common.CobolLiteral.Decode"/>, the category through the ONE literal-class classifier
-    /// (<see cref="CobolNet.Common.CobolLiteral.ClassOf"/>). Every producer of an ALL literal — the
-    /// figurative-constant binder, INITIALIZE REPLACING, a Report Writer VALUE — builds through this, so a
-    /// national or boolean literal-1 keeps its category everywhere.</summary>
-    public static BoundAllLiteral Of(params string[] rawLiterals) =>
-        new(string.Concat(rawLiterals.Select(CobolNet.Common.CobolLiteral.Decode)))   // a concatenated literal-1 (§8.3.3.6.3 SR2) folds by §8.8.3.3 GR2
+    /// (<see cref="CobolNet.Common.CobolLiteral.ClassOf"/>). Every producer of an ALL literal from raw VALUE text —
+    /// INITIALIZE REPLACING, a Report Writer VALUE — builds through this, so a national or boolean literal-1 keeps
+    /// its category everywhere; the raw text is already ONE literal (the VALUE reader folds a concatenated or
+    /// constant-name literal-1 first, <c>DataBinder.RawValueOperandText</c>). The figurative-constant binder builds
+    /// from the parse tree through the <see cref="ConcatFolder.Folded"/> overload.</summary>
+    public static BoundAllLiteral Of(string rawLiteral) =>
+        new(CobolNet.Common.CobolLiteral.Decode(rawLiteral))
         {
-            Category = CobolNet.Common.CobolLiteral.ClassOf(rawLiterals[0]) switch      // one class across the operands (§8.8.3.2 SR1 — the version pass reports a mix)
+            Category = CobolNet.Common.CobolLiteral.ClassOf(rawLiteral) switch
             {
                 CobolNet.Common.LiteralClass.National => PicCategory.National,
                 CobolNet.Common.LiteralClass.Boolean => PicCategory.Boolean,
                 _ => PicCategory.Alphanumeric,
             },
         };
+
+    /// <summary>The ALL figurative over a literal-1 already folded by <see cref="CobolNet.Binding.ConcatFolder.FoldAllLiteral"/>
+    /// — the figurative-constant binder's constructor, which carries the fold's class and decoded value as they are
+    /// (a concatenated literal-1's class is the pairwise §8.8.3.3 GR1 fold, never its first operand's prefix).</summary>
+    internal static BoundAllLiteral Of(CobolNet.Binding.ConcatFolder.Folded literal1) =>
+        new(literal1.Value) { Category = literal1.Category };
 }
 
 /// <summary>An operand the binder could not give a meaning to — the backend emits a loud runtime guard (§1.4).

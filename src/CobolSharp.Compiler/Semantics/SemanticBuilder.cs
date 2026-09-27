@@ -2084,7 +2084,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
         if (nonNum?.figurativeConstant() is { } fig)
         {
             // ALL STRINGLIT: the pattern string must be repeated to fill parent at comparison time
-            if (fig.ALL() != null && fig.allLiteral()?.allLiteralOperand().FirstOrDefault()?.STRINGLIT() is { } allSlit)
+            if (fig.ALL() != null && fig.allLiteral()?.STRINGLIT() is { } allSlit)
             {
                 var allText = allSlit.GetText();
                 if (allText.Length >= 2)

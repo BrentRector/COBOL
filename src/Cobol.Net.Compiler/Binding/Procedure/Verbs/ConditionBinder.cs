@@ -98,9 +98,11 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         if (nn?.figurativeConstant() is { } fig)
         {
             if (fig.zeroWord() is not null) return new BoundBoolAll("0");   // figurative ZERO — boolean zeros by context (§8.3.3.6.4 GR4)
-            if (fig.allLiteral() is { } al && al.allLiteralOperand().All(o => o.BOOLLIT() is not null))   // ALL B"…" (a concatenated literal-1 folds — kb/Work PB71)
-                return new BoundBoolAll(string.Concat(al.allLiteralOperand().Select(o => CobolLiteral.Decode(o.GetText()))),
-                    IsAllLiteral: true);   // the ONE Format-6 construction site (kb/Work PB157)
+            // ALL literal-1 of class boolean (a concatenated or constant-name literal-1 folds through the ONE Format 6
+            // reader, classed by §8.8.3.3 GR1 — kb/Work PB71, PB1627). The routing predicate IsBooleanValueOperand
+            // asked the SAME fold diagnostic-free, so the route and the reported class cannot disagree.
+            if (ConcatFolder.FoldAllLiteral(fig, ctx.Data.LiteralEnv, ctx.Edition) is { Category: PicCategory.Boolean } literal1)
+                return new BoundBoolAll(literal1.Value, IsAllLiteral: true);   // the ONE Format-6 construction site (kb/Work PB157)
             // kb/Work PB1029 — this refusal carried no diagnostic (`COMPUTE B = B B-AND SPACE` compiled clean and
             // aborted the run unit); it is the §8.8.2 operand list's figurative half, reported as its siblings are.
             ctx.Edition.Error("COBOLNET1511", $"'{fig.GetText()}' is not a valid boolean operand — the only figurative "
@@ -153,7 +155,8 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     {
         var nn = vo.nonNumericLiteral();
         if (nn?.BOOLLIT() is not null) return true;
-        if (nn?.figurativeConstant()?.allLiteral() is { } al && al.allLiteralOperand().All(o => o.BOOLLIT() is not null)) return true;   // ALL B"…" (kb/Work PB71)
+        if (nn?.figurativeConstant() is { } fig
+            && ConcatFolder.FoldAllLiteral(fig, ctx.Data.LiteralEnv, report: null) is { Category: PicCategory.Boolean }) return true;   // ALL B"…" (kb/Work PB71, PB1627)
         // A concatenation expression whose class is boolean (§8.8.3.3 GR1) routes through the boolean channel
         // like the equivalent single B"…" literal it folds to (GR3). ClassOf is diagnostic-free — the fold
         // (and its SR diagnostics) happens exactly once, on the bind path this predicate selects.

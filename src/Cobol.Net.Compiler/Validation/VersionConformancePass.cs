@@ -2318,38 +2318,22 @@ internal sealed class VersionConformancePass
         /// <summary>The <c>ALL literal</c> figurative's literal-1 (ISO §8.3.3.6.3 SR2 — kb/Work PB71): a national or
         /// boolean literal-1 is the same COBOL-2002 introduction as the bare literal (statement-scoped, as above —
         /// a VALUE clause's is the data/PIC gate's). The tokens are direct children of figurativeConstant, not of
-        /// nonNumericLiteral, so the override above never saw them — `ALL B"1"` at --std 85 was ungated. A
-        /// CONCATENATED literal-1 is a §8.8.3 concatenation expression and takes its syntax rules here, once per
-        /// written figurative: SR1's one class and SR2–SR4's 8,191-position result (the value folds through the
-        /// binder's diagnostic-free <see cref="ConcatFolder.FoldAll"/>, so nothing else asks them — kb/Work PB1393).</summary>
+        /// nonNumericLiteral, so the override above never saw them — `ALL B"1"` at --std 85 was ungated. Only the
+        /// EDITION gates live here. A CONCATENATED literal-1 is THE §8.8.3 concatenationExpression node (kb/Work
+        /// PB1627), so the &amp; gate is <see cref="VisitConcatenationExpression"/>'s on recognition, and §8.3.3.6.3
+        /// SR2 and the §8.8.3.2 rules are the binder's, through the one Format 6 reader
+        /// <c>ConcatFolder.FoldAllLiteral</c> — they need the program's constant-names, which a parse walk has not
+        /// got (the rules used to be asked here, over a quoted-only operand list).</summary>
         public override object? VisitFigurativeConstant(CobolParserCore.FigurativeConstantContext ctx)
         {
-            var ops = ctx.allLiteral()?.allLiteralOperand() ?? [];
-            if (ops.Length == 0) return base.VisitChildren(ctx);
-            bool nat = ops.Any(o => o.NATLIT() is not null), bl = ops.Any(o => o.BOOLLIT() is not null);
-            if ((nat || bl) && InStatement(ctx))
+            if (ctx.allLiteral() is not { } al || !InStatement(ctx)) return base.VisitChildren(ctx);
+            // The literal-1 tokens: the one quoted literal, or a concatenation's quoted operands.
+            var ops = al.concatenationExpression()?.concatOperand();
+            bool nat = ops?.Any(o => o.NATLIT() is not null) ?? al.NATLIT() is not null;
+            bool bl = ops?.Any(o => o.BOOLLIT() is not null) ?? al.BOOLLIT() is not null;
+            if (nat || bl)
                 _p.Check(nat ? Constructs.NationalData2002 : Constructs.BooleanData2002,
                     nat ? "the figurative ALL N\"…\"" : "the figurative ALL B\"…\"");
-            // A concatenated literal-1 uses the & operator — the COBOL-2002 introduction (§8.8.3), position-blind.
-            if (ops.Length > 1) _p.Check(Constructs.ConcatOperator2002, "a concatenation expression (the & operator) as ALL literal-1");
-            // §8.3.3.6.3 SR2 — literal-1 "shall be neither a figurative constant nor a zero-length literal". Asked
-            // STRUCTURALLY (CobolLiteral.IsZeroLength — contiguous delimiters), never as "decodes to nothing": a
-            // malformed hexadecimal literal-1 decodes to nothing too, and is LiteralScreenPass's COBOLNET1635, not
-            // this rule. The operands of a concatenated literal-1 are of ONE class (§8.8.3.2 SR1).
-            if (ops.All(o => CobolLiteral.IsZeroLength(o.GetText())))
-                _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.AllLiteralZeroLength.Code,
-                    EditionSeverity.Error, DiagnosticCatalog.AllLiteralZeroLength.Id,
-                    $"'{ctx.GetText()}': the literal-1 of an ALL figurative shall not be a zero-length literal (ISO §8.3.3.6.3 SR2)",
-                    "", "ISO §8.3.3.6.3 SR2"));
-            if (ops.Select(o => CobolLiteral.ClassOf(o.GetText())).Distinct().Count() > 1)
-                _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.ConcatClassMismatch.Code,
-                    EditionSeverity.Error, DiagnosticCatalog.ConcatClassMismatch.Id,
-                    $"'{ctx.GetText()}': the operands of a concatenated ALL literal-1 shall be of the same class (ISO §8.8.3.2 SR1)",
-                    "", "ISO §8.8.3.2 SR1"));
-            if (ops.Length > 1 && ConcatFolder.ResultLengthViolation(ConcatFolder.FoldAll(ctx.allLiteral())) is { } tooLong)
-                _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.ConcatResultTooLong.Code,
-                    EditionSeverity.Error, DiagnosticCatalog.ConcatResultTooLong.Id,
-                    $"the concatenated ALL literal-1: {tooLong}", "", "ISO §8.8.3.2 SR2–SR4"));
             return base.VisitChildren(ctx);
         }
 

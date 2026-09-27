@@ -1536,7 +1536,8 @@ public sealed partial class DataBinder
                 // clause answering a different question (kb/Work PB976's sweep) — and the CLASS clause decoded it
                 // as the characters of its own spelling (`ALL"AB"`).
                 if (fig.ALL() is not null)
-                    return fig.allLiteral() is { } all ? AllLiteralCharacters(all, r)
+                    return ConcatFolder.FoldAllLiteral(fig, LiteralEnvironment.SpecialNames(this, r.National,
+                            refusesSymbolicCharacters: true), Edition) is { } literal1 ? AllLiteralCharacters(fig, literal1, r)
                         : AlphabetFigurative(fig.GetChild(1).GetText(), r.National) is { } oneChar ? oneChar
                         : FigurativeNotACharacter(fig, r);
                 if (AlphabetFigurative(fig.GetText(), r.National) is { } figValue) return figValue;
@@ -1662,24 +1663,18 @@ public sealed partial class DataBinder
     }
 
     /// <summary>The characters of an <c>ALL literal-1</c> operand: literal-1 itself (§8.3.3.6.4 GR3 c, "the length
-    /// of the string is the length of literal-1"). Each operand of a concatenated ALL literal is held to the
-    /// clause's class rule.</summary>
-    private string? AllLiteralCharacters(Core.AllLiteralContext all, LiteralPhraseRules r)
+    /// of the string is the length of literal-1"), folded by the ONE Format 6 reader
+    /// (<see cref="ConcatFolder.FoldAllLiteral"/> — a quoted literal, a concatenation expression classed by the
+    /// pairwise §8.8.3.3 GR1 fold, or a constant-name) and held to the clause's class rule as ONE literal: a
+    /// concatenation expression is "equivalent to a literal of the same class and value" (§8.8.3.3 GR3).</summary>
+    private string? AllLiteralCharacters(Core.FigurativeConstantContext fig, ConcatFolder.Folded literal1,
+        LiteralPhraseRules r)
     {
-        var chars = new System.Text.StringBuilder();
-        foreach (var op in all.allLiteralOperand())
-        {
-            string raw = op.GetText();
-            if (CobolLiteral.ClassOf(raw) != r.LiteralClass)
-            {
-                Edition.Error(r.Code, $"{r.What}: ALL {raw} — each noninteger literal shall be "
-                    + $"{(r.National ? "a NATIONAL literal (N\"…\")" : "an alphanumeric literal")} "
-                    + $"(ISO §12.3.7.3 {r.Rule(r.ClassItem)})");
-                return null;
-            }
-            chars.Append(CobolLiteral.Decode(raw));
-        }
-        return chars.ToString();
+        if (literal1.Category == (r.National ? PicCategory.National : PicCategory.Alphanumeric)) return literal1.Value;
+        Edition.Error(r.Code, $"{r.What}: {fig.GetText()} — each noninteger literal shall be "
+            + $"{(r.National ? "a NATIONAL literal (N\"…\")" : "an alphanumeric literal")} "
+            + $"(ISO §12.3.7.3 {r.Rule(r.ClassItem)})");
+        return null;
     }
 
     /// <summary>The CLASS of a noninteger literal operand — alphanumeric (§8.3.3.2, incl. the hexadecimal format

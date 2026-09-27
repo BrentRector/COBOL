@@ -498,14 +498,14 @@ internal sealed class ExpressionBinder
         if (figCtx.ALL() != null)
         {
             // ALL STRINGLIT / ALL HEXLIT: repeating literal pattern
-            var allStr = figCtx.allLiteral()?.allLiteralOperand().FirstOrDefault()?.STRINGLIT();
+            var allStr = figCtx.allLiteral()?.STRINGLIT();
             if (allStr != null)
             {
                 var raw = allStr.GetText();
                 string allText = raw.Length >= 2 ? raw[1..^1] : "";
                 return new BoundFigurativeExpression(FigurativeKind.None, allText);
             }
-            var allHex = figCtx.allLiteral()?.allLiteralOperand().FirstOrDefault()?.HEXLIT();
+            var allHex = figCtx.allLiteral()?.HEXLIT();
             if (allHex != null)
             {
                 var raw = allHex.GetText();

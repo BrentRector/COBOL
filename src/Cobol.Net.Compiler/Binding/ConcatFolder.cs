@@ -85,19 +85,77 @@ internal static class ConcatFolder
     public static Folded Peek(Core.ConcatenationExpressionContext ctx, LiteralEnvironment env) =>
         Walk(ctx, env, report: null);
 
-    /// <summary>Fold the literal-1 of an <c>ALL literal-1</c> figurative — one literal or a concatenation of them
-    /// (§8.3.3.6.3 SR2) — to its equivalent single literal, DIAGNOSTIC-FREE (the version pass's ALL arm reports a
-    /// class mix, a zero-length literal-1 and, through <see cref="ResultLengthViolation"/>, an over-long result, once
-    /// per written figurative — this fold runs at several binder sites): the value is the operands' decoded texts concatenated (§8.8.3.3 GR2), the class
-    /// the first operand's. The text-plumbed DATA-division paths re-quote it through <see cref="Folded.RawText"/>
-    /// (kb/Work PB71 — a VALUE ALL "A" &amp; "B" used to reach the raw-text ALL reader as the source text).</summary>
-    public static Folded FoldAll(Core.AllLiteralContext al)
+    /// <summary>THE reader of Format 6's literal-1 (<c>ALL literal-1</c>, §8.3.3.6.2), folded to its equivalent single
+    /// literal — or null when <paramref name="fig"/> is not Format 6 (a keyword figurative, with or without ALL, and
+    /// <c>ALL symbolic-character-1</c>, Format 7, which the caller's own arm reads).
+    /// <para>§8.3.3.6.3 SR2 — "Literal-1 shall be an alphanumeric, boolean, or national literal, any of which may be a
+    /// concatenation expression. The literal shall be neither a figurative constant nor a zero-length literal." — so
+    /// literal-1 is written three ways, and all three resolve HERE (kb/Work PB1627):</para>
+    /// <list type="bullet">
+    /// <item>one quoted literal token — its own class and decoded value;</item>
+    /// <item>a §8.8.3 concatenation expression — THE <see cref="Walk"/> every other concatenation takes, so its operands
+    /// are every §8.8.3.2 SR1 operand (a figurative constant, a constant-name, a symbolic-character) and its class is
+    /// the pairwise §8.8.3.3 GR1 fold. (A second, quoted-only operand model here used to refuse <c>ALL "A" &amp; SPACE</c>
+    /// and <c>ALL "A" &amp; K</c>, and classed a concatenation by its first operand.)</item>
+    /// <item>a constant-name — the <c>ALL cobolWord</c> parse arm, since the parse cannot tell it from a
+    /// symbolic-character: §13.10.3 SR2 lets constant-name-1 stand "anywhere that a format specifies a literal of the
+    /// class and category of constant-name-1". A constant-name wins over the Format 7 reading, as it does in
+    /// <see cref="Classify"/>.</item>
+    /// </list>
+    /// With <paramref name="report"/> it reports SR2 (a numeric constant-name → <c>COBOLNET2491</c>; a zero-length
+    /// literal-1 → <c>COBOLNET1648</c>) and, for a concatenation, every §8.8.3.2 rule <see cref="Fold"/> reports; every
+    /// binder site that ACCEPTS a Format 6 figurative reports through here, and the per-position diagnostic dedup
+    /// (<c>EditionContext.AddOnce</c>) keeps a figurative read at two sites to one report. Without it the fold is
+    /// DIAGNOSTIC-FREE, for routing predicates. The value is always best-effort, so the caller's plumbing continues
+    /// after a reported error (the driver halts before emit). The text-plumbed DATA-division paths re-quote it through
+    /// <see cref="Folded.RawText"/> (kb/Work PB71).</summary>
+    public static Folded? FoldAllLiteral(Core.FigurativeConstantContext fig, LiteralEnvironment env, EditionContext? report)
     {
-        var ops = al.allLiteralOperand();
-        var cat = ops[0].NATLIT() is not null ? PicCategory.National
-            : ops[0].BOOLLIT() is not null ? PicCategory.Boolean : PicCategory.Alphanumeric;
-        return new Folded(cat, string.Concat(ops.Select(o => CobolLiteral.Decode(o.GetText()))));
+        if (fig.allLiteral() is { } al)
+        {
+            if (al.concatenationExpression() is { } ce)
+            {
+                var folded = report is null ? Walk(ce, env, report: null) : Fold(ce, report, env);
+                if (ce.concatOperand().All(op => IsZeroLengthOperand(op, env)))
+                    ReportZeroLength("ALL " + string.Join(" & ", ce.concatOperand().Select(op => op.GetText())), report);
+                return folded;
+            }
+            string token = al.GetText();
+            if (CobolLiteral.IsZeroLength(token)) ReportZeroLength("ALL " + token, report);
+            return new Folded(CobolLiteral.ClassOf(token) switch
+            {
+                LiteralClass.National => PicCategory.National,
+                LiteralClass.Boolean => PicCategory.Boolean,
+                _ => PicCategory.Alphanumeric,   // X"…" is the hexadecimal FORMAT of the alphanumeric literal (§8.3.3.2)
+            }, CobolLiteral.Decode(token));
+        }
+        if (fig.ALL() is null || fig.cobolWord()?.GetText() is not { } word || env.Constant(word) is not { } k) return null;
+        if (k.Category is not (PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean))
+        {
+            report?.Error(DiagnosticCatalog.AllLiteralClass, $"'ALL {word}': constant-name {word} is a numeric literal "
+                + "— the literal-1 of an ALL figurative shall be an alphanumeric, boolean, or national literal (ISO "
+                + "§8.3.3.6.3 SR2; §13.10.3 SR2)");
+            return new Folded(PicCategory.Alphanumeric, k.Text);
+        }
+        if (CobolLiteral.IsZeroLength(k.RawText)) ReportZeroLength($"ALL {word}", report);
+        return new Folded(k.Category, k.Text);
     }
+
+    /// <summary>Whether a concatenation operand is a zero-length literal — asked STRUCTURALLY (contiguous delimiters,
+    /// <see cref="CobolLiteral.IsZeroLength"/>), never as "decodes to nothing": a malformed hexadecimal literal decodes
+    /// to nothing too, and is LiteralScreenPass's COBOLNET1635, not SR2. A constant-name is its literal (§13.10.4
+    /// GR1); a figurative constant is one character (§8.3.3.6.4 GR3a).</summary>
+    private static bool IsZeroLengthOperand(Core.ConcatOperandContext op, LiteralEnvironment env) =>
+        op.cobolWord()?.GetText() is { } word ? env.Constant(word) is { } k && CobolLiteral.IsZeroLength(k.RawText)
+        : op.figurativeConstant() is null && CobolLiteral.IsZeroLength(op.GetText());
+
+    /// <summary>§8.3.3.6.3 SR2's second sentence — literal-1 "shall be neither a figurative constant nor a zero-length
+    /// literal" (a concatenation of zero-length literals IS one, §8.8.3.3 GR2). The figurative-constant half cannot be
+    /// written: the grammar's literal-1 is a quoted literal, a concatenation expression or a constant-name, and a
+    /// constant-name is never a figurative constant (§13.10.3 SR6).</summary>
+    private static void ReportZeroLength(string written, EditionContext? report) =>
+        report?.Error(DiagnosticCatalog.AllLiteralZeroLength, $"'{written}': the literal-1 of an ALL figurative "
+            + "shall not be a zero-length literal (ISO §8.3.3.6.3 SR2)");
 
     /// <summary>Fold <paramref name="ctx"/> to its equivalent single literal (§8.8.3.3 GR2/GR3) in the literal
     /// environment <paramref name="env"/> (its HIGH-/LOW-VALUE characters and its constant-name and

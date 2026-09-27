@@ -5385,10 +5385,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (!IsLiteralValueOperand(op)) { ReportNonLiteralValueOperand(op, where, position); return null; }
         return op.nonNumericLiteral()?.concatenationExpression() is { } ce
             ? ConcatFolder.Fold(ce, Edition, LiteralEnv).RawText
-            // ALL over a concatenated literal-1 (§8.3.3.6.3 SR2 — kb/Work PB71): `ALL` + the folded literal re-quoted,
-            // so the raw-text ALL reader (CobolLiteral.AllLiteralRaw) sees ONE literal of the right class.
-            : op.nonNumericLiteral()?.figurativeConstant()?.allLiteral() is { } al && al.allLiteralOperand().Length > 1
-            ? "ALL" + ConcatFolder.FoldAll(al).RawText
+            // ALL literal-1 (§8.3.3.6.3 SR2 — kb/Work PB71, PB1627): `ALL` + literal-1 folded by the ONE Format 6
+            // reader (a quoted literal, a concatenation expression, or a constant-name) and re-quoted, so the
+            // raw-text ALL reader (CobolLiteral.AllLiteralRaw) sees ONE literal of the right class.
+            : op.nonNumericLiteral()?.figurativeConstant() is { } allFig
+              && ConcatFolder.FoldAllLiteral(allFig, LiteralEnv, Edition) is { } literal1
+            ? "ALL" + literal1.RawText
             // [ALL] symbolic-character-1 (§8.3.3.6.2 Format 7; §12.3.7.4 GR11 — kb/Work PB110): the figurative's ONE
             // character as an ALL literal of its class — GR2's fill in a VALUE association, exactly like ALL "c".
             : op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symAll && SymbolicRaw(symAll.GetText()) is { } rawAll
@@ -5416,11 +5418,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     private bool IsLiteralValueOperand(Core.ValueClauseOperandContext op)
     {
         if (op.nonNumericLiteral() is { } nn)
-            // ALL cobolWord is the ONE word-bearing figurative alternative (§8.3.3.6.2 Format 7); SR4 requires the
-            // word to be declared in SYMBOLIC CHARACTERS. Every other alternative — STRINGLIT / NATLIT / BOOLLIT /
-            // HEXLIT, a concatenation expression, ALL literal-1, and the keyword figuratives ZERO / SPACE /
-            // HIGH-VALUE / LOW-VALUE / QUOTE / NULL — is a literal by shape.
-            return nn.figurativeConstant()?.cobolWord() is not { } symWord || SymbolicOf(symWord.GetText()) is not null;
+            // ALL cobolWord is the ONE word-bearing figurative alternative: Format 7 (§8.3.3.6.2), whose word SR4
+            // requires to be declared in SYMBOLIC CHARACTERS, or Format 6 over a constant-name literal-1 (§13.10.3
+            // SR2 — kb/Work PB1627). Every other alternative — STRINGLIT / NATLIT / BOOLLIT / HEXLIT, a concatenation
+            // expression, ALL literal-1, and the keyword figuratives ZERO / SPACE / HIGH-VALUE / LOW-VALUE / QUOTE /
+            // NULL — is a literal by shape.
+            return nn.figurativeConstant()?.cobolWord()?.GetText() is not { } symWord
+                || SymbolicOf(symWord) is not null || FindConstant(symWord) is not null;
         // §8.3.3.3.2 rule 2 makes a written sign part of the numeric literal, so strip the unary arms before
         // asking what the primary is (`VALUE -9999` is literal-1, not an arithmetic expression).
         var u = op.unaryExpression();
@@ -5495,10 +5499,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symWord)
         {
             Edition.Error(DiagnosticCatalog.UndefinedReference, $"{where}: {position.Operand} "
-                + $"'ALL {symWord.GetText()}' names no symbolic character — symbolic-character-1 shall be "
-                + "specified in the SYMBOLIC CHARACTERS clause of the SPECIAL-NAMES paragraph (ISO §8.3.3.6.3 "
-                + "SR4), and no other word is a figurative constant, so the operand identifies no resource "
-                + "(ISO §8.4.2.1).");
+                + $"'ALL {symWord.GetText()}' names no symbolic character and no constant-name — symbolic-character-1 "
+                + "shall be specified in the SYMBOLIC CHARACTERS clause of the SPECIAL-NAMES paragraph (ISO §8.3.3.6.3 "
+                + "SR4), and the only other word ALL may precede is a constant-name standing for literal-1 (§13.10.3 "
+                + "SR2), so the operand identifies no resource (ISO §8.4.2.1).");
             return;
         }
         // The BARE-word arm only (the SAME accessor the predicate used): a SIGNED or suffixed operand is not a

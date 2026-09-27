@@ -1849,6 +1849,15 @@ public static class DiagnosticCatalog
         "The literal-1 of the figurative constant ALL literal-1 is a zero-length literal. ISO §8.3.3.6.3 SR2: "
         + "\"Literal-1 shall be an alphanumeric, boolean, or national literal … The literal shall be neither a "
         + "figurative constant nor a zero-length literal.\" Write at least one character.", "ISO §8.3.3.6.3 SR2");
+    // §8.3.3.6.3 SR2's first sentence — literal-1 "shall be an alphanumeric, boolean, or national literal" (kb/Work
+    // PB1627). A quoted literal-1 is one of the three by construction of the grammar; the one spelling that can be of
+    // another class is a constant-name (§13.10.3 SR2 lets it stand for a literal of its OWN class), so `ALL K` with K
+    // a numeric constant is refused by this rule rather than read as a symbolic-character.
+    public static readonly DiagnosticDescriptor AllLiteralClass = new(
+        "COBOLNET2491", "all-literal-class", EditionSeverity.Error,
+        "The literal-1 of the figurative constant ALL literal-1 is a constant-name that stands for a numeric literal. "
+        + "ISO §8.3.3.6.3 SR2: \"Literal-1 shall be an alphanumeric, boolean, or national literal, any of which may be "
+        + "a concatenation expression.\"", "ISO §8.3.3.6.3 SR2");
     // §8.3.2.1 rule 5 — an intrinsic-function-name "identified in a function-specifier in the REPOSITORY paragraph"
     // shall not be used as a user-defined word (kb/Work PB65 FMT-15.43.2 / FMT-15.58.2): under `REPOSITORY. FUNCTION
     // HIGHEST-ALGEBRAIC INTRINSIC.` a table named HIGHEST-ALGEBRAIC compiled clean and `HIGHEST-ALGEBRAIC(A1)`

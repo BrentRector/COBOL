@@ -271,7 +271,7 @@ internal sealed class StringStatementBinder
                 if (fig.lowValueWord() != null) return "\x00";
                 if (fig.quoteWord() != null) return "\"";
                 // ALL "literal" — extract the literal string
-                if (fig.allLiteral()?.allLiteralOperand().FirstOrDefault()?.STRINGLIT() is { } allSl)
+                if (fig.allLiteral()?.STRINGLIT() is { } allSl)
                 {
                     string raw = allSl.GetText();
                     if (raw.Length >= 2) return raw[1..^1];

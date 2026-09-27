@@ -749,16 +749,17 @@ signedIntegerLiteral
     : (PLUS | MINUS)? INTEGERLIT
     ;
 
-// The literal-1 of the ALL figurative (§8.3.3.6.3 SR2): one literal of any class — plain / hexadecimal alphanumeric,
-// national N"…" / NX"…", boolean B"…" / BX"…" — or a concatenation of them (§8.8.3; the operands shall be of one
-// class, §8.8.3.2 SR1 — VersionConformancePass reports a mix, and a zero-length literal-1). Greedy: the ALL binds the
-// WHOLE concatenation (kb/Work PB71).
+// The literal-1 of the ALL figurative (§8.3.3.6.3 SR2): "an alphanumeric, boolean, or national literal, any of which
+// may be a concatenation expression" — one quoted literal of any class (plain / hexadecimal alphanumeric, national
+// N"…" / NX"…", boolean B"…" / BX"…"), or THE §8.8.3 concatenationExpression, the same rule every other literal
+// position uses, so its operands are every §8.8.3.2 SR1 operand: a figurative constant ("may be specified as one or
+// both operands") and a constant-name or symbolic-character word included (kb/Work PB1627 — a second, quoted-only
+// operand rule here refused `ALL "A" & SPACE` and `ALL "A" & K`). Greedy: the ALL binds the WHOLE concatenation
+// (kb/Work PB71). A constant-name literal-1 written ALONE is the figurativeConstant `ALL cobolWord` arm below (the
+// parse cannot tell it from a symbolic-character); ConcatFolder.FoldAllLiteral is the one reader of both shapes.
 allLiteral
-    : allLiteralOperand (AMPERSAND allLiteralOperand)*
-    ;
-
-allLiteralOperand
-    : STRINGLIT
+    : concatenationExpression
+    | STRINGLIT
     | HEXLIT
     | NATLIT
     | BOOLLIT
@@ -788,7 +789,9 @@ figurativeConstant
     | ALL highValueWord
     | ALL lowValueWord
     | ALL quoteWord
-    | ALL cobolWord   // Format 7 — ALL symbolic-character-1 (§8.3.3.6.2; SR4: a SYMBOLIC CHARACTERS name — kb/Work PB110);
-                      // LAST so the keyword forms and ALL literal-1 win; the bare form is a word reference (the
-                      // constant-name substitution seams)
+    | ALL cobolWord   // Format 7 — ALL symbolic-character-1 (§8.3.3.6.2; SR4: a SYMBOLIC CHARACTERS name — kb/Work PB110),
+                      // OR Format 6 over a constant-name literal-1 (§13.10.3 SR2 — kb/Work PB1627): the parse cannot
+                      // tell the two words apart, so ConcatFolder.FoldAllLiteral resolves a constant-name first and
+                      // the Format 7 readers take the rest. LAST so the keyword forms and ALL literal-1 win; the bare
+                      // form is a word reference (the constant-name substitution seams)
     ;
