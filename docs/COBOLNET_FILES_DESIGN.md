@@ -1837,7 +1837,7 @@ answer that every organization's WRITE and REWRITE asks, in the connector, befor
 
 1. **Can the record be written in the file coded character set?** `FileCharacterSet` (Annex A.1 item 31, owner
    decision kb/Work R47): ISO/IEC 8859-1, one byte per character position. `FileConnector.RecordHasCharacterWithoutByteImage`
-   refuses a record holding a character above U+00FF on a file with no converting CODE-SET — '91'
+   refuses a record holding a character above U+00FF on a file with no CODE-SET, and one holding a character the CODE-SET alphabet does not represent on a file with one (`CodeSetConversion.HasCharacterWithoutImage`, §13.18.13.4 GR6 b; kb/Work PB1150, PB1542) — '91'
    (§9.1.13.11; DOC-A.1-110) on every organization and on the report writer's line, '71' on a line sequential
    file, whose character set (`LineSequentialCharacterSet`, item 115) excludes the same characters. Every record
    write encodes through `FileCharacterSet.Medium`, a STRICT Latin-1 encoding, so a path that skipped the refusal

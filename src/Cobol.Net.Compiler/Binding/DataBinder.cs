@@ -5268,11 +5268,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// the ONE resolver; a class mismatch or an undeclared name is COBOLNET1672). SR3: with record description
     /// entries and no SELECT WHEN, one class only, every elementary item of that usage, signed items SIGN SEPARATE.
     /// GR2/GR6: the on-medium coded character set, decided by <see cref="CodedCharacterSet.Medium"/> — the ONE
-    /// classifier, so this binder names no set. <c>Identity</c> (NATIVE; STANDARD-1/2 on the ASCII-coincident
-    /// native set — GR7 c; UTF-16 on the D-N1 substrate; the ASCII code-name) converts as the identity and is
-    /// CLAIMED, and nothing is emitted for it. <c>Translated</c> (an implementor code-name whose GR7 i
-    /// correspondence with the native set is a single-byte code — EBCDIC, kb/Work PB793) is CLAIMED and carried
-    /// to the connector, which applies GR6 a/b at the medium boundary. <c>NotProvided</c> (a literal-phrase
+    /// classifier, so this binder names no set. <c>Identity</c> (NATIVE; UTF-16 on the D-N1 substrate — the
+    /// whole-channel identity sets) converts as the identity and is CLAIMED, and nothing is emitted for it.
+    /// <c>Translated</c> (an implementor code-name whose GR7 i correspondence with the native set is a
+    /// single-byte code — EBCDIC, kb/Work PB793 — and the ISO/IEC 646 sets STANDARD-1/2 (GR7 c) and the ASCII
+    /// code-name, whose identity correspondence covers only 128 characters, kb/Work PB1542) is CLAIMED and
+    /// carried to the connector, which applies GR6 a/b at the medium boundary and refuses, at the WRITE or
+    /// REWRITE, a record character outside the set. <c>NotProvided</c> (a literal-phrase
     /// alphabet's remapped ordinals; UTF-8 / UCS-4 as variable-width medium encodings) is the DOCUMENTED A.3
     /// item 27 non-support (COBOLNET1672 — "dependent upon a device capable of supporting the specified code";
     /// CONFORMANCE.md §2 row 27), never a silent identity.</summary>
@@ -5323,9 +5325,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 + "associated with the file and no SELECT WHEN clauses are specified, either alphabet-name-1 or "
                 + "alphabet-name-2 may be specified, but not both (ISO §13.18.13.3 SR3)");
         // GR2/GR6 — which conversion the set asks for. ONE question, asked of the SET (CodedCharacterSet.Medium)
-        // rather than answered from a list of phrase names here: an identity correspondence converts as the
-        // identity byte-for-byte and needs nothing; a single-byte code whose correspondence this processor has
-        // (§12.3.7.4 GR7 i) is carried to the connector, which replaces each character per GR6 a/b; a set whose
+        // rather than answered from a list of phrase names here: an identity correspondence over the whole
+        // one-byte channel converts byte-for-byte and needs nothing; a single-byte code whose correspondence this
+        // processor has (§12.3.7.4 GR7 c / GR7 i — including ISO/IEC 646's 128-character identity, which the
+        // connector needs in order to REFUSE what the set lacks, kb/Work PB1542) is carried to the connector,
+        // which replaces each character per GR6 a/b; a set whose
         // medium form is neither is the documented A.3 item 27 non-support — refused loudly, never a silent
         // identity (that would be a wrong answer for an EBCDIC-shaped alphabet).
         foreach (var (set, name) in new[] { (alnumSet, alnumName), (natSet, natName) })

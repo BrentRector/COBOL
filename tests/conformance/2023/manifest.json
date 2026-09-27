@@ -665,7 +665,8 @@
   "l1_write_from_space",
   "l1_write_from_national_fn",
   "l1_write_indexed_every_key",
-  "pb690_line_sequential_byte_image_2023"
+  "pb690_line_sequential_byte_image_2023",
+  "pb1542_code_set_line_sequential"
  ],
  "pending": [
   "pb485_value_only_format1"

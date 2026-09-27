@@ -768,8 +768,9 @@ public abstract class FileConnector
     /// <summary>⛔ THE FILE'S §13.18.13 CODE-SET CONVERSION, or null for the native character set — §13.18.13.4
     /// GR7, "<i>If the CODE-SET clause is not specified, the native character set is assumed for data on the
     /// external media</i>". Set by the emitter right after registration for exactly the files whose CODE-SET
-    /// clause names a coded character set whose correspondence with the native one is not the identity (the
-    /// <see cref="NationalRecordArea"/> pattern). GR2 makes it a property established at OPEN and constant for
+    /// clause names a coded character set that is not the whole native one-byte channel under the identity — a
+    /// translated code (EBCDIC) or a smaller set (ISO/IEC 646: STANDARD-1, STANDARD-2, ASCII) — the
+    /// <see cref="NationalRecordArea"/> pattern. GR2 makes it a property established at OPEN and constant for
     /// the connector, so it is declared once rather than re-derived per record.</summary>
     public CodeSetConversion? CodeSet { get; internal set; }
 
@@ -783,16 +784,20 @@ public abstract class FileConnector
     protected string ToMedium(string nativeImage) => CodeSet is null ? nativeImage : CodeSet.ToMedium(nativeImage);
 
     /// <summary>⛔ THE ONE ANSWER TO "can this record be written in the file's coded character set?" for every
-    /// organization's WRITE and REWRITE (owner decision kb/Work R47; Annex A.1 item 31; kb/Work PB690): true when
-    /// the record holds a character with no byte image — <see cref="FileCharacterSet.HasCharacterWithoutByteImage"/>
-    /// — on a file whose medium form is the file coded character set itself, i.e. one with no
-    /// <see cref="CodeSet"/> conversion (a converting CODE-SET decides representability by its own
-    /// correspondence, §13.18.13). The statement is then unsuccessful before anything reaches the medium:
-    /// '91' (<see cref="FileStatusCode.CharacterWithoutByteImage"/>) for a record sequential, report, relative or
-    /// indexed file; a line sequential file reaches '71' first, through its own character set, which excludes the
-    /// same characters (<see cref="LineSequentialCharacterSet"/>).</summary>
+    /// organization's WRITE and REWRITE (owner decision kb/Work R47; Annex A.1 item 31; kb/Work PB690, PB1150,
+    /// PB1542): true when the record holds a character with no image in the FILE'S coded character set — with no
+    /// <see cref="CodeSet"/>, the ISO/IEC 8859-1 file character set
+    /// (<see cref="FileCharacterSet.HasCharacterWithoutByteImage"/>); with one, the CODE-SET alphabet's own set,
+    /// because §13.18.13.4 GR6 b replaces "<i>each native coded character in the record … with its associated coded
+    /// character as defined in the alphabet being used</i>" and a character with no associated coded character
+    /// cannot be replaced (<see cref="CodeSetConversion.HasCharacterWithoutImage"/>). The statement is then
+    /// unsuccessful before anything reaches the medium: '91' (<see cref="FileStatusCode.CharacterWithoutByteImage"/>)
+    /// for a record sequential, report, relative or indexed file — decided HERE, at the output statement, even for
+    /// an indexed or relative store that reaches the medium only at CLOSE, so the persist can never meet a record
+    /// it cannot encode; a line sequential file reaches '71' first, through its own character set, which excludes
+    /// the same characters (<c>SequentialConnector.RecordAreaOutsideLineCharacterSet</c>).</summary>
     protected bool RecordHasCharacterWithoutByteImage(ReadOnlySpan<char> record) =>
-        CodeSet is null && FileCharacterSet.HasCharacterWithoutByteImage(record);
+        CodeSet?.HasCharacterWithoutImage(record) ?? FileCharacterSet.HasCharacterWithoutByteImage(record);
 
     /// <summary>Pad (right) or truncate <paramref name="s"/> to exactly <paramref name="width"/> characters —
     /// the ALPHANUMERIC fill (§14.9.30.4 GR15: "a trailing space is defined to be the alphanumeric space

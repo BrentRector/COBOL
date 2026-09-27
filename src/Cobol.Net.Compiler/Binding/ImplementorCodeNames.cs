@@ -37,7 +37,9 @@ namespace CobolNet.Binding;
 /// character set specified by code-name-1 and the characters of the native … coded character set</i>", as the
 /// native character each code unit 0…<see cref="OrdinalCount"/>−1 of THIS set represents — or NULL when that
 /// correspondence is the IDENTITY (the set's code unit n IS native character U+00nn). It is what
-/// §13.18.13.4 GR6 replaces on each side of a CODE-SET conversion.</param>
+/// §13.18.13.4 GR6 replaces on each side of a CODE-SET conversion; an identity row with fewer characters than
+/// the one-byte channel (ASCII) still converts, through the identity table
+/// <see cref="CodedCharacterSet.MediumCorrespondence"/> derives from <see cref="OrdinalCount"/> (kb/Work PB1542).</param>
 public sealed record ImplementorCodeName(string Name, bool National, int OrdinalCount,
     CollatingTable? Table, char[]? MediumCorrespondence);
 

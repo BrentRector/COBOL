@@ -283,7 +283,8 @@
   "pb1192_relative_write_boundary_85",
   "pb690_file_character_set_85",
   "pb690_report_line_byte_image_85",
-  "pb1098_organization_permanence_85"
+  "pb1098_organization_permanence_85",
+  "pb1542_code_set_unrepresentable_85"
  ],
  "pending": []
 }

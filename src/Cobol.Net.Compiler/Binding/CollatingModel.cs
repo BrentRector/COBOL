@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
+using CodeSetConversion = CobolNet.Runtime.IO.CodeSetConversion;
 
 namespace CobolNet.Binding;
 
@@ -298,18 +299,30 @@ public sealed record CodedCharacterSet(string Phrase, bool National, CollatingTa
     /// item 27 refusal is a PROPERTY OF THE SET rather than a list of phrase names in the file-description
     /// binder (kb/Work PB770 wrote it as <c>Table is not null || Phrase is "UTF-8" or "UCS-4"</c>, which would
     /// have refused every code-name set that ever gained a table).</summary>
-    public CodeSetMedium Medium => CodeName is { } cn
-        ? cn.MediumCorrespondence is null ? CodeSetMedium.Identity : CodeSetMedium.Translated
-        // The identity-correspondence keyword sets: NATIVE (GR7 d), STANDARD-1/STANDARD-2 (GR7 c — ISO/IEC 646
-        // IRV IS this native set's first 128 positions, implementor item 188) and UTF-16 (GR7 h on the D-N1
-        // substrate). A literal-phrase alphabet's remapped ordinals (GR7 k4) and UTF-8 / UCS-4 as variable-width
-        // MEDIUM encodings are the documented A.3 item 27 non-support.
-        : Table is not null || Phrase is "UTF-8" or "UCS-4" ? CodeSetMedium.NotProvided
-        : CodeSetMedium.Identity;
+    public CodeSetMedium Medium => MediumNotProvided ? CodeSetMedium.NotProvided
+        : MediumCorrespondence is null ? CodeSetMedium.Identity : CodeSetMedium.Translated;
+
+    /// <summary>The documented A.3 item 27 non-support: a literal-phrase alphabet's remapped ordinals (GR7 k4) and
+    /// UTF-8 / UCS-4 as variable-width MEDIUM encodings. A code-name's set is never one — its row carries its
+    /// own correspondence (GR7 i).</summary>
+    private bool MediumNotProvided => CodeName is null && (Table is not null || Phrase is "UTF-8" or "UCS-4");
 
     /// <summary>§13.18.13.4 GR6's correspondence, as the native character each medium code unit represents —
-    /// non-null exactly when <see cref="Medium"/> is <see cref="CodeSetMedium.Translated"/>.</summary>
-    public char[]? MediumCorrespondence => CodeName?.MediumCorrespondence;
+    /// non-null exactly when <see cref="Medium"/> is <see cref="CodeSetMedium.Translated"/>: a code-name's own
+    /// translated correspondence (EBCDIC, GR7 i), OR the identity over the set's characters when the set is the
+    /// identity but SMALLER than the one-byte record channel — STANDARD-1 / STANDARD-2 (GR7 c, ISO/IEC 646 IRV,
+    /// this native set's first 128 positions, implementor item 188) and the <c>ASCII</c> code-name (the same
+    /// set). ⛔ Those carry the identity table rather than nothing because GR6 b replaces a native character
+    /// only "<i>with its associated coded character as defined in the alphabet being used</i>", so a record
+    /// character above U+007F has none and must be REFUSED by the output statement — which the runtime can do
+    /// only if it knows where the set ends (kb/Work PB1542: with no table, <c>é</c> was written as X'E9' with
+    /// status '00'). The whole-channel identity sets — NATIVE (GR7 d) and UTF-16 (GR7 h on the D-N1 substrate) —
+    /// need no conversion: the file character set's own screen covers them (<c>FileCharacterSet</c>).</summary>
+    public char[]? MediumCorrespondence => MediumNotProvided ? null
+        : CodeName?.MediumCorrespondence
+          ?? (OrdinalCount < CodeSetConversion.ChannelUnits
+              ? Enumerable.Range(0, OrdinalCount).Select(unit => (char)unit).ToArray()
+              : null);
 
     /// <summary>The character at 1-based <paramref name="ordinal"/> (GR11 b/c — SYMBOLIC CHARACTERS; GR12 a —
     /// a numeric CLASS literal under IN), as a native STRING (a UCS-4/UTF-8 supplementary character is its UTF-16
@@ -350,13 +363,17 @@ public sealed record CodedCharacterSet(string Phrase, bool National, CollatingTa
 /// three states a CODE-SET clause can be in, decided once by <see cref="CodedCharacterSet.Medium"/>.</summary>
 public enum CodeSetMedium
 {
-    /// <summary>The set's correspondence with the native character set is the IDENTITY, so GR6's replacement is
-    /// a no-op and the record crosses the boundary byte-exactly. No conversion is emitted.</summary>
+    /// <summary>The set's correspondence with the native character set is the IDENTITY over the WHOLE one-byte
+    /// record channel (NATIVE, UTF-16), so GR6's replacement is a no-op and the record crosses the boundary
+    /// byte-exactly. No conversion is emitted; the file character set's own screen refuses what the channel
+    /// cannot carry.</summary>
     Identity,
 
     /// <summary>The set is a single-byte code whose correspondence with the native set this processor realizes:
     /// GR6 a replaces each medium code unit with its native character on input, GR6 b the reverse on output,
-    /// through <see cref="CodedCharacterSet.MediumCorrespondence"/>.</summary>
+    /// through <see cref="CodedCharacterSet.MediumCorrespondence"/> — a translated code (EBCDIC), or the identity
+    /// over FEWER characters than the channel holds (ISO/IEC 646: STANDARD-1, STANDARD-2, ASCII), which the
+    /// connector needs so an output statement can refuse a character outside the set (kb/Work PB1542).</summary>
     Translated,
 
     /// <summary>The set names a medium representation this processor does not provide — Annex A §A.3 item 27,

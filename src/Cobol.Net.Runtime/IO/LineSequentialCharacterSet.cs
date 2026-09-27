@@ -11,7 +11,11 @@ namespace CobolNet.Runtime.IO;
 /// (U+007F) through U+00FF are inside, so an ordinary 8-bit text file reads without '09'. An alphanumeric
 /// character above U+00FF is outside because it has no byte image in the file's coded character set (owner
 /// decision kb/Work R47, <see cref="FileCharacterSet"/>; kb/Work PB690) — so a WRITE or REWRITE of one is the
-/// standard's '71' on this organization, where every other organization answers '91'. A national record
+/// standard's '71' on this organization, where every other organization answers '91'. ⛔ The ceiling IS the
+/// file's coded character set, so a file with a CODE-SET clause takes the CODE-SET alphabet's set instead
+/// (§13.18.13.4 GR6; kb/Work PB1542): under STANDARD-1, STANDARD-2 or ASCII an alphanumeric character above
+/// U+007F is outside, under EBCDIC every U+0020–U+00FF character is inside — the same membership
+/// <see cref="CodeSetConversion.Represents"/> answers for every other organization's '91'. A national record
 /// area's characters are written as UTF-16BE (§13.18.60.4 GR8 / D-N1) and keep no ceiling.</para>
 /// <para><b>WHY ONE TYPE:</b> the standard names this one set from three places and they must never disagree —
 /// §14.9.30.4 GR16 (a successful READ whose record area holds one ⇒ I-O status '09', §9.1.13.2 item 7),
@@ -41,10 +45,14 @@ public static class LineSequentialCharacterSet
     public const int Lowest = ' ';
 
     /// <summary>True when <paramref name="codePoint"/> is a member of the line sequential character set of a
-    /// record area of the given class — alphanumeric (<paramref name="national"/> false) stops at
-    /// <see cref="FileCharacterSet.Highest"/>, national has no ceiling (see the type remarks).</summary>
-    public static bool Contains(int codePoint, bool national) =>
-        codePoint >= Lowest && (national || codePoint <= FileCharacterSet.Highest);
+    /// record area of the given class — alphanumeric (<paramref name="national"/> false) is bounded by the file's
+    /// coded character set: <see cref="FileCharacterSet.Highest"/> with no CODE-SET, the CODE-SET alphabet's own
+    /// membership (<paramref name="codeSet"/>, <see cref="CodeSetConversion.Represents"/>) with one; national has
+    /// no ceiling (see the type remarks).</summary>
+    public static bool Contains(int codePoint, bool national, CodeSetConversion? codeSet) =>
+        codePoint >= Lowest && (national || (codeSet is null
+            ? codePoint <= FileCharacterSet.Highest
+            : codePoint <= char.MaxValue && codeSet.Represents((char)codePoint)));
 
     /// <summary>True when the record area holds at least one character OUTSIDE the set — the single predicate
     /// behind '09' (READ), '71' (WRITE) and '71' (REWRITE).
@@ -56,20 +64,22 @@ public static class LineSequentialCharacterSet
     /// golden <c>2002/pb327_national_line_sequential_fill</c>). <paramref name="national"/> is the connector's
     /// <c>NationalRecordArea</c>, the same flag <c>FitRecord</c>/<c>TrimRecordEnd</c> read, so the three
     /// record-area rules agree on what a character is. A trailing ODD byte is half a national position, whose
-    /// content §14.9.30.4 GR14/GR15 leave undefined; it forms no character and is not tested.</para></summary>
-    public static bool HasCharacterOutside(ReadOnlySpan<char> recordArea, bool national)
+    /// content §14.9.30.4 GR14/GR15 leave undefined; it forms no character and is not tested.</para>
+    /// <para><paramref name="codeSet"/> is the connector's CODE-SET conversion, or null — REQUIRED so no caller
+    /// can ask the question without saying which coded character set the file is in (kb/Work PB1542).</para></summary>
+    public static bool HasCharacterOutside(ReadOnlySpan<char> recordArea, bool national, CodeSetConversion? codeSet)
     {
         if (!national)
         {
             foreach (char c in recordArea)
-                if (!Contains(c, national: false)) return true;
+                if (!Contains(c, national: false, codeSet)) return true;
             return false;
         }
         // Every unit of a national area on this channel is one BYTE of a UTF-16BE pair; a unit above U+00FF is
         // not a byte at all, so it cannot form a national character (FileCharacterSet's one-char-per-byte rule).
         if (FileCharacterSet.HasCharacterWithoutByteImage(recordArea)) return true;
         for (int i = 0; i + 1 < recordArea.Length; i += 2)
-            if (!Contains((recordArea[i] << 8) | recordArea[i + 1], national: true)) return true;
+            if (!Contains((recordArea[i] << 8) | recordArea[i + 1], national: true, codeSet)) return true;
         return false;
     }
 }

@@ -2027,7 +2027,10 @@ identical stdout). The remaining items below stand as the mechanical defaults (o
     `Medium` + `MediumCorrespondence` (the medium codec, §13.18.13.4 GR2/GR6 — the ONE classifier that says whether
     a set crosses the storage boundary as the identity, through a conversion, or not at all: `CodeSetMedium`
     `Identity` / `Translated` / `NotProvided`, the last being the documented A.3 item 27 non-support. A `Translated`
-    set hands the emitter its 256-entry GR7 i correspondence, which the connector applies as
+    set — a code-name's GR7 i correspondence (EBCDIC, 256 entries) or the 128-entry identity of an ISO/IEC 646
+    set (STANDARD-1/2 by GR7 c, the ASCII code-name), carried so the output statement can refuse what the set
+    lacks with '91' / '71' (kb/Work PB1150, PB1542) — hands the emitter its correspondence, which the connector
+    applies as
     `CobolNet.Runtime.IO.CodeSetConversion` at the ONE physical boundary of each organization —
     `SequentialConnector.NextFrame` and its `EmitRecord`/`EmitRecordLine`/`OverwriteInPlace` twins, and
     `RecordFraming`'s store payload for RELATIVE and INDEXED. The §9.1.7.2 framing this processor adds AROUND a

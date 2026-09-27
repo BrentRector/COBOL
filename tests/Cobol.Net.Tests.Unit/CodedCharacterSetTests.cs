@@ -13,6 +13,39 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class CodedCharacterSetTests
 {
+    /// <summary>§13.18.13.4 GR6's medium classification (kb/Work PB1542): an identity set SMALLER than the one-byte
+    /// record channel — STANDARD-1 / STANDARD-2 (GR7 c) and the ASCII code-name — carries its identity table so
+    /// the connector can refuse what the set lacks; the whole-channel identity sets carry nothing; EBCDIC carries
+    /// its 256-entry page; a literal-phrase alphabet and UTF-8 / UCS-4 stay the A.3 item 27 non-support.</summary>
+    [Fact]
+    public void Medium_CarriesACorrespondence_ExactlyWhenTheSetIsNotTheWholeChannelIdentity()
+    {
+        foreach (var iso646 in new[]
+                 {
+                     new CodedCharacterSet("STANDARD-1", National: false, null),
+                     new CodedCharacterSet("STANDARD-2", National: false, null),
+                     new CodedCharacterSet("ASCII", National: false, null, ImplementorCodeNames.Ascii),
+                 })
+        {
+            Assert.Equal(CodeSetMedium.Translated, iso646.Medium);
+            Assert.Equal(Enumerable.Range(0, 128).Select(u => (char)u), iso646.MediumCorrespondence!);
+        }
+        foreach (var whole in new[]
+                 {
+                     new CodedCharacterSet("NATIVE", National: false, null),
+                     new CodedCharacterSet("UTF-16", National: true, null),
+                 })
+        {
+            Assert.Equal(CodeSetMedium.Identity, whole.Medium);
+            Assert.Null(whole.MediumCorrespondence);
+        }
+        var ebcdic = new CodedCharacterSet("EBCDIC", National: false, ImplementorCodeNames.Ebcdic.Table, ImplementorCodeNames.Ebcdic);
+        Assert.Equal(CodeSetMedium.Translated, ebcdic.Medium);
+        Assert.Equal(256, ebcdic.MediumCorrespondence!.Length);
+        Assert.Equal(CodeSetMedium.NotProvided, new CodedCharacterSet("UTF-8", National: true, null).Medium);
+        Assert.Null(new CodedCharacterSet("UTF-8", National: true, null).MediumCorrespondence);
+    }
+
     /// <summary>The identity sets: ordinal n is code unit / scalar n−1; STANDARD-1/2 stop at 128 (ISO/IEC 646 IRV);
     /// UCS-4/UTF-8 ordinals skip the surrogate block (not scalar values) and reach the supplementary planes as
     /// surrogate PAIRS (one character, two code units).</summary>

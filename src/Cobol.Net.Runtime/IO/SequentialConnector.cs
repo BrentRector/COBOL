@@ -1007,9 +1007,13 @@ public sealed class SequentialConnector : FileConnector
     /// <para>The subject is the RECORD AREA, which is what all three rules name — not the trimmed image a line
     /// sequential WRITE presents, and not the length-limited prefix a varying record transfers. Trailing area
     /// positions are spaces, which are IN the set, so the wider subject cannot manufacture a status; a character
-    /// outside the set anywhere in the area is what the rules ask about.</para></summary>
+    /// outside the set anywhere in the area is what the rules ask about.</para>
+    /// <para>The set's alphanumeric ceiling is the file's coded character set, so the connector's CODE-SET
+    /// conversion travels with the question (kb/Work PB1542): a character a STANDARD-1 CODE-SET cannot represent
+    /// is '71' on the WRITE, exactly as '91' on every other organization, and a medium byte outside that set is
+    /// '09' on the READ.</para></summary>
     private bool RecordAreaOutsideLineCharacterSet(ReadOnlySpan<char> recordArea) =>
-        _lineSequential && LineSequentialCharacterSet.HasCharacterOutside(recordArea, NationalRecordArea);
+        _lineSequential && LineSequentialCharacterSet.HasCharacterOutside(recordArea, NationalRecordArea, CodeSet);
 
     // ── WRITE ────────────────────────────────────────────────────────────────────────────────────────────────
 

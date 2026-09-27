@@ -179,7 +179,10 @@ public static class FileStatusCode
     /// docs/CONFORMANCE.md DOC-A.1-110): a WRITE or REWRITE whose record holds a character with no byte image in
     /// the file's coded character set — a character above <see cref="FileCharacterSet.Highest"/> written to a
     /// record sequential, report, relative or indexed file with no CODE-SET conversion (owner decision
-    /// kb/Work R47; Annex A.1 item 31, DOC-A.1-31; kb/Work PB690). The statement is unsuccessful, nothing reaches
+    /// kb/Work R47; Annex A.1 item 31, DOC-A.1-31; kb/Work PB690), or, on a file with one, a character the
+    /// CODE-SET alphabet's coded character set does not represent (§13.18.13.4 GR6 b — a character above U+007F
+    /// under STANDARD-1 / STANDARD-2 / ASCII, above U+00FF under EBCDIC; kb/Work PB1150, PB1542). One condition,
+    /// one status: the file's coded character set is whichever the file is in. The statement is unsuccessful, nothing reaches
     /// the medium and the record area is unchanged — never the silent <c>?</c> Latin-1's replacement fallback
     /// used to write. A LINE SEQUENTIAL file answers the standard's own '71' instead
     /// (<see cref="LineRecordInvalidChar"/>): §9.1.13.10 item 1 is that organization's value for a record-area

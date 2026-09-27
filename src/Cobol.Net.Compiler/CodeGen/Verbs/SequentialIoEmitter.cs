@@ -241,10 +241,11 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         EmitCodeSetRegistration(w, file);        // §13.18.13.4 GR2/GR6 (kb/Work PB793)
     }
 
-    /// <summary>§13.18.13.4 GR2's on-medium coded character set, told to the connector: the GR7 i correspondence
-    /// the CODE-SET clause's alphabet defines, as a char[] literal indexed by medium code unit. Emitted ONLY when
-    /// the correspondence is not the identity (§13.18.13.4 GR7's default and the identity-correspondence sets need
-    /// no conversion at all), so every other program's registration is unchanged byte for byte.</summary>
+    /// <summary>§13.18.13.4 GR2's on-medium coded character set, told to the connector: the GR7 c / GR7 i
+    /// correspondence the CODE-SET clause's alphabet defines, as a char[] literal indexed by medium code unit — one
+    /// entry per character of the set (<c>CodedCharacterSet.MediumCorrespondence</c>). Emitted ONLY when the set
+    /// is not the whole-channel identity (§13.18.13.4 GR7's default and NATIVE / UTF-16 need no conversion at
+    /// all), so every other program's registration is unchanged byte for byte.</summary>
     private static void EmitCodeSetRegistration(CodeWriter w, FileModel file)
     {
         if (file.CodeSetCorrespondence is not { } map) return;

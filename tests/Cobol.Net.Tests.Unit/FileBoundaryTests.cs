@@ -230,11 +230,11 @@ public sealed class FileBoundaryTests : IDisposable
     [Fact]
     public void LineSequentialCharacterSet_AlphanumericStopsAtU00FF_NationalDoesNot()
     {
-        Assert.False(LineSequentialCharacterSet.HasCharacterOutside("A" + EAcute, national: false));
-        Assert.True(LineSequentialCharacterSet.HasCharacterOutside("A" + Euro, national: false));
+        Assert.False(LineSequentialCharacterSet.HasCharacterOutside("A" + EAcute, national: false, codeSet: null));
+        Assert.True(LineSequentialCharacterSet.HasCharacterOutside("A" + Euro, national: false, codeSet: null));
         // N"€" as its UTF-16BE bytes: 0x20 0xAC.
-        Assert.False(LineSequentialCharacterSet.HasCharacterOutside(new string([(char)0x20, (char)0xAC]), national: true));
-        Assert.True(LineSequentialCharacterSet.HasCharacterOutside(new string([(char)0x00, (char)0x0A]), national: true));
+        Assert.False(LineSequentialCharacterSet.HasCharacterOutside(new string([(char)0x20, (char)0xAC]), national: true, codeSet: null));
+        Assert.True(LineSequentialCharacterSet.HasCharacterOutside(new string([(char)0x00, (char)0x0A]), national: true, codeSet: null));
     }
 
     private static long Composed(FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames)
