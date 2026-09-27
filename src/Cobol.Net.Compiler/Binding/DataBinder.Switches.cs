@@ -709,6 +709,7 @@ public sealed partial class DataBinder
         Core.CharacterClassificationClauseContext? ccClause = null;
         var classClauses = new List<Core.ClassDefinitionClauseContext>();
         var symbolicClauses = new List<Core.SymbolicCharactersClauseContext>();
+        var currencyClauses = new List<Core.CurrencySignClauseContext>();
         // The names THIS source element declares — a containing element's inherited names may be re-declared
         // (§8.4.6.1: each source element "may use identical user-defined words"), its own may not (§8.4.2.1).
         var ownDls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -760,7 +761,8 @@ public sealed partial class DataBinder
             //      ORDER TABLE ordering-names, the dynamic-length-structure clause its names, …);
             //   2. ALPHABET — references locale-names (§12.3.7.3 SR24 "Locale-name-2 shall be a locale-name defined
             //      by the LOCALE clause") and, syntactically, symbolic-character names (SR11 — read above);
-            //   3. after the whole configuration section, CLASS / SYMBOLIC CHARACTERS (their IN alphabet-name) and
+            //   3. after the whole configuration section, CLASS / SYMBOLIC CHARACTERS (their IN alphabet-name), then
+            //      CURRENCY SIGN (a symbolic-character concatenation operand in literal-7 — kb/Work PB1628), and
             //      the OBJECT-COMPUTER clauses (PROGRAM COLLATING SEQUENCE's alphabets, CHARACTER CLASSIFICATION's
             //      locale-names).
             // The general format itself PRINTS alphabet-name-clause BEFORE the LOCALE clause (§12.3.7.2; §5.2.1
@@ -784,7 +786,11 @@ public sealed partial class DataBinder
                 if (entry.classDefinitionClause() is { } cd) { classClauses.Add(cd); continue; }
                 if (entry.symbolicCharactersClause() is { } sc) { symbolicClauses.Add(sc); continue; }
                 if (entry.decimalPointClause() is { } dp) { SwitchBindDecimalPoint(dp); continue; }
-                if (entry.currencySignClause() is { } cur) { SwitchBindCurrency(cur); continue; }
+                // CURRENCY SIGN binds after SYMBOLIC CHARACTERS (kb/Work PB1628): literal-7 may be a concatenation
+                // expression (§8.8.3.3 GR3 makes it "equivalent to a literal"; §12.3.7.3 SR18 bars only a figurative
+                // constant AS literal-7, and SR11's symbolic-character bar does not name literal-7/8), and a
+                // symbolic-character operand's VALUE is declared by that clause, wherever it stands in the source.
+                if (entry.currencySignClause() is { } cur) { currencyClauses.Add(cur); continue; }
                 // §12.3.7 CURSOR / CRT STATUS (Annex A.4.2 item 25) — the SCREEN module's environment-division
                 // surface. ⚠ Both clauses PARSED and were read by no binder at all until kb/Work PB260, so
                 // `CRT STATUS IS WS-CRT` compiled clean with ZERO diagnostics: a declined facility that a program
@@ -807,6 +813,11 @@ public sealed partial class DataBinder
         if (ccClause is not null) ResolveClassification(ccClause);
         foreach (var cd in classClauses) SwitchBindClass(cd);           // after the alphabets exist (PB110)
         foreach (var sc in symbolicClauses) SwitchBindSymbolic(sc);
+        foreach (var cur in currencyClauses)                             // after the symbolic characters (PB1628)
+        {
+            using var _ = Edition.At(cur);
+            SwitchBindCurrency(cur);
+        }
         FinalizeCurrencySigns();   // §12.3.7.3 r25 — the implied '$' clause, once every explicit clause is in
     }
 
