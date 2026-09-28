@@ -110,6 +110,32 @@ were reads/searches, 15 % of turns and 43 % of tool-result bytes came before the
 per implementer (≈ 200 → 175), about **15 % of its tokens** on the cost law, about one weekly point per six-slot wave.
 Verify on wave 67 with the same measurement (turns to first edit, read calls, pre-edit bytes).
 
+⭐ **THE FIX LANE IS A ROLLING WAVE — owner 2026-09-27 ("fix related work together … minimize repetitive context
+gathering"; "use this new rolling functionality as it reduces context and token use").** Every fix-lane dispatch is
+`Workflow({scriptPath: ".claude/skills/workstream/templates/wf_rolling_wave.js", args})`. There is no wave barrier:
+- **Rolling pool.** `concurrency` workers pull groups from one queue, so a freed slot is refilled the moment an
+  implementer returns, never after the slowest of the wave.
+- **Trains as branches finish.** A lander train starts when `train_size` branches are ready. Trains are serialized,
+  and each lander re-reads the DEVLOG top and rebases onto whatever the previous train landed. A final remainder of at
+  least `min_final_train` branches gets a train; a smaller one is held for the next queue's first train.
+- **Same-file successors.** A file with more open notes than the cluster cap (`fix_clusters.py` caps at 5) becomes
+  two or more groups, and each later one declares `after: '<predecessor letter>'`. The successor waits for its
+  predecessor, merges its branch, and orients from that report's "For the next implementer" section and STATUS.md
+  instead of re-surveying the file. The predecessor's branch is HELD from the trains and lands THROUGH the successor,
+  which contains it; if the successor produces nothing landable, the predecessor lands alone. A successor may also
+  follow a group in the same technological area (a runtime file, then its emitter).
+- **Why.** Orientation was ~46 % of every implementer's tokens (waves 45–57): a successor pays the file's context
+  once, not once per cluster. It is a FRESH agent, not a longer transcript, because of the quadratic cost law above:
+  the cap exists because the sixth defect in one transcript costs more than a new agent, and the successor keeps the
+  cheap part (the learned context) without the expensive part (the long transcript).
+- **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), devlog_n, previous_train,
+  lead_id_blocks: ["PBa-PBb", …] (one block per train), groups: [{ letter, lead, notes, codes, after? }] }`.
+- **Specs.** Render them with `make_dispatch_specs.py <groups.json>`, which takes the same groups plus `slug`,
+  `group`, `root`, `files`, `body`, an optional `pred` text (predecessor or resume instructions) and the optional
+  `after` (ignored by the renderer; the workflow uses it). Spec files are keyed on the full letter:
+  `msg-w<wave>-<letter lower-cased>.txt`. `check_practices.py <groups.json>` refuses two groups whose `root` names
+  the same primary `src/` file unless one declares `after:` the other.
+
 ⭐ **COMMAND CHAINING — MANDATORY-PRACTICES P14, enforced by the guard hook.** Never chain anything after a verdict
 command (build, test, gate, push-main, battery); capture its status with `; echo "EXIT=$?"` if needed. Independent
 commands go as PARALLEL tool calls in ONE turn. A blanket no-chaining ban (carlymr/carlys-claude-skills) was
@@ -157,8 +183,8 @@ the work, not to wait. Stage the earliest-stage, largest jobs behind the near-do
 - ⛔ **Never spend a lander on a 1–2 cluster landing** unless nothing else is ready — that is the k = 1 corner of the
   table above, at twice the cost per cluster. If only one cluster is finished, hold it and dispatch the lander when
   the train is full; a blocking fix is the exception and is landed alone on purpose, said so in the report.
-- ⭐ **A free implementer slot is filled within the TURN it frees**, from `python scripts/spec/work.py next` — never
-  at the next convenient moment. ⓜ The fix lane ran at **under 15 % utilization** of the ≤3 cap for six days
+- ⭐ **A free implementer slot is filled within the TURN it frees** — mechanically, by the rolling wave (§2,
+  `templates/wf_rolling_wave.js`), whose queue is filled from `fix_clusters.py` — never at the next convenient moment. ⓜ The fix lane ran at **under 15 % utilization** of the ≤3 cap for six days
   (~2.7 mechanisms/day delivered against ~24/day of capacity) purely because slots sat empty behind landings and
   behind the evidence lane. Keep a standing queue of apply-ready contracts so the dispatch is one turn.
 - A worktree-isolated agent cannot run git against the shared checkout (the harness refuses `-C`, `cd`, EnterWorktree):
