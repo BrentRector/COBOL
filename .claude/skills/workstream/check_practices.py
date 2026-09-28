@@ -33,8 +33,12 @@ BRIEFS = {
                                      r'status_delta\.py'],
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
+    # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
     'wf_rolling_wave.js': [r'STOP', r"agentType: 'cobol-implementer'", r"agentType: 'cobol-lander'", r'StructuredOutput',
-                           r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py'],
+                           r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
+                           r"status: 'NO-RESULT', error"],
+    # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
+    'MANDATORY-PRACTICES.md': [r'stall_watch\.py'],
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.

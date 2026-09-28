@@ -16,6 +16,17 @@ const W = args.wave
 const CONC = args.concurrency || 6
 const TRAIN = args.train_size || 5
 const MIN_FINAL = args.min_final_train || 3
+// kb/Work/PB1704: a model call can HANG. Wave 70's group C agent finished and gated its work, then never produced
+// another token; nothing noticed for 90 minutes and the final train waited on it (a workflow cannot stop one of its
+// own agents). An implementer not back after `implementer_ceiling_min` (default 240) is recorded STALLED and the
+// wave moves on; stall_watch.py (run beside every workflow) is what notices within minutes.
+const CEILING_MIN = args.implementer_ceiling_min === undefined ? 240 : args.implementer_ceiling_min
+function withCeiling(p, minutes, onTimeout) {
+  if (!minutes) return p
+  let t
+  const timer = new Promise(res => { t = setTimeout(() => res(onTimeout()), minutes * 60000) })
+  return Promise.race([p.finally(() => clearTimeout(t)), timer])
+}
 // AUTHORIZATION: a workflow agent sees the session's LATEST user message as its context, and that message may be about
 // something else entirely (measured 2026-09-27: all nine wave-68 implementers returned BLOCKED because the latest
 // message was a LinkedIn question). So every prompt carries the owner's direction for this fleet verbatim.
@@ -70,7 +81,7 @@ function successorNote(g) {
 }
 
 function runGroup(g) {
-  return agent(
+  return withCeiling(agent(
     AUTH + `You are the wave-${W} fix-lane implementer for group ${g.letter} (${g.notes}). ` + successorNote(g) +
     `Your dispatch spec is the file ${S}\\msg-w${W}-${g.letter.toLowerCase()}.txt — read it WHOLE and follow it exactly; ` +
     `it names your brief, codes, report path, scratch dir, gate and checkpoint protocol. ` +
@@ -78,7 +89,11 @@ function runGroup(g) {
     `⛔ YOUR LAST ACTION MUST BE THE StructuredOutput CALL — never end on a report file or a summary message (three agents in waves 65-67 did, and their finished branches were stranded): ` +
     `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, the gate filter and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids).`,
     { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: 'opus' }
-  ).then(r => r ? { ...r, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes } : { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT' })
+  ).then(r => r ? { ...r, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes } : { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT' }),
+  CEILING_MIN, () => {
+    log(`${g.letter}: no return after ${CEILING_MIN} min; recorded STALLED, the wave moves on (PB1704)`)
+    return { letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes, status: 'STALLED' }
+  })
 }
 
 function landable(r) {
