@@ -19,9 +19,11 @@ public static class EditionHarness
 
     /// <summary>Compile <paramref name="source"/> targeting <paramref name="edition"/> on either severity axis
     /// (P2.7): returns success plus BOTH channels — the failing errors and the non-failing warnings (permissive
-    /// removals, 0903 flags).</summary>
+    /// removals, 0903 flags). <paramref name="copybooks"/> (file name → library text), when given, is staged beside
+    /// the program and that directory is named as a <c>--copy</c> search path, as a user names theirs (the default
+    /// COBOL library never includes the source file's own directory — DOC-A.1-40, kb/Work PB1355).</summary>
     public static (bool Ok, IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings) CompileFull(
-        string source, int edition, bool permissive = false)
+        string source, int edition, bool permissive = false, IReadOnlyDictionary<string, string>? copybooks = null)
     {
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Ed_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
@@ -29,8 +31,11 @@ public static class EditionHarness
         {
             string src = Path.Combine(dir, "prog.cob");
             src = CompiledProgramCache.StageSource(src, source);
+            foreach (var (name, text) in copybooks ?? new Dictionary<string, string>())
+                File.WriteAllText(Path.Combine(Path.GetDirectoryName(src)!, name), text);
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive));
+                src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive,
+                CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!]));
             return (r.Success, r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")], r.Warnings);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
@@ -38,9 +43,10 @@ public static class EditionHarness
 
     /// <summary>Compile <paramref name="source"/> targeting <paramref name="edition"/> (strict); returns success
     /// and the diagnostics (empty on success). Delegates to <see cref="CompileFull"/>.</summary>
-    public static (bool Ok, IReadOnlyList<string> Diagnostics) Compile(string source, int edition)
+    public static (bool Ok, IReadOnlyList<string> Diagnostics) Compile(string source, int edition,
+        IReadOnlyDictionary<string, string>? copybooks = null)
     {
-        var (ok, errors, _) = CompileFull(source, edition);
+        var (ok, errors, _) = CompileFull(source, edition, copybooks: copybooks);
         return (ok, errors);
     }
 

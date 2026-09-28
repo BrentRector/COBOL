@@ -20,7 +20,8 @@ namespace CobolNet.Tests.Conformance;
 internal static class VersionMatrixCatalogue
 {
     internal sealed record Construct(string Id, string Description, int IntroducedIn, int? RemovedIn, string Vcr,
-        string Source, string Status, string? ExpectDiagnostic, int? ObsoleteIn, string? ExpectDiagnosticBelow);
+        string Source, string Status, string? ExpectDiagnostic, int? ObsoleteIn, string? ExpectDiagnosticBelow,
+        IReadOnlyDictionary<string, string>? Copybooks = null);
 
     internal static IReadOnlyList<Construct> All { get; } = LoadCatalogue();
 
@@ -110,7 +111,12 @@ internal static class VersionMatrixCatalogue
                 e.TryGetProperty("status", out var s) ? s.GetString()! : "active",
                 e.TryGetProperty("expectDiagnostic", out var d) ? d.GetString() : null,
                 e.TryGetProperty("obsoleteIn", out var o) && o.ValueKind != JsonValueKind.Null ? o.GetInt32() : null,
-                e.TryGetProperty("expectDiagnosticBelow", out var db) ? db.GetString() : null));
+                e.TryGetProperty("expectDiagnosticBelow", out var db) ? db.GetString() : null,
+                // A row whose program COPYs library text carries that text (file name -> content): it is staged
+                // beside the program and named as a --copy directory (kb/Work PB1355 — a missing text is CBL3620).
+                e.TryGetProperty("copybooks", out var cb)
+                    ? cb.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!, StringComparer.Ordinal)
+                    : null));
         }
 
         return list;
@@ -157,7 +163,7 @@ public abstract class VersionMatrixTestsBase<TSlot>
     {
         var c = VersionMatrixCatalogue.ById[constructId];
         bool expectCompiles = VersionMatrixCatalogue.ExpectCompiles(c, edition);
-        var (ok, diagnostics) = EditionHarness.Compile(c.Source, edition);
+        var (ok, diagnostics) = EditionHarness.Compile(c.Source, edition, c.Copybooks);
 
         if (expectCompiles)
         {
@@ -205,7 +211,7 @@ public abstract class VersionMatrixTestsBase<TSlot>
     public void IntroducedConstruct_IsRejectedUnderPermissive(string constructId, int edition)
     {
         var c = VersionMatrixCatalogue.ById[constructId];
-        var (ok, errors, warnings) = EditionHarness.CompileFull(c.Source, edition, permissive: true);
+        var (ok, errors, warnings) = EditionHarness.CompileFull(c.Source, edition, permissive: true, copybooks: c.Copybooks);
         Assert.False(ok, $"[{constructId}] is a COBOL-{c.IntroducedIn} introduction and must be REJECTED at "
             + $"COBOL-{edition} under --permissive as well as strict — permissive is the migration mode for "
             + $"REMOVED constructs, not a licence for future ones ({c.Vcr}). It compiled"
@@ -232,7 +238,7 @@ public abstract class VersionMatrixTestsBase<TSlot>
     public void RemovedConstruct_CompilesPermissive_WithWarning(string constructId, int edition)
     {
         var c = VersionMatrixCatalogue.ById[constructId];
-        var (ok, errors, warnings) = EditionHarness.CompileFull(c.Source, edition, permissive: true);
+        var (ok, errors, warnings) = EditionHarness.CompileFull(c.Source, edition, permissive: true, copybooks: c.Copybooks);
         Assert.True(ok, $"[{constructId}] permissive at COBOL-{edition} must COMPILE (the §10 #1 migration "
             + $"contract): {string.Join("\n", errors)}");
         if (c.ExpectDiagnostic is { } code)
@@ -260,7 +266,7 @@ public abstract class VersionMatrixTestsBase<TSlot>
     public void ObsoleteConstruct_CompilesEverywhere_WarnsFromObsoleteEdition(string constructId, int edition)
     {
         var c = VersionMatrixCatalogue.ById[constructId];
-        var (ok, errors, warnings) = EditionHarness.CompileFull(c.Source, edition);
+        var (ok, errors, warnings) = EditionHarness.CompileFull(c.Source, edition, copybooks: c.Copybooks);
         Assert.True(ok, $"[{constructId}] must COMPILE at COBOL-{edition} (archaic ≠ removed): {string.Join("\n", errors)}");
         if (edition >= c.ObsoleteIn)
         {

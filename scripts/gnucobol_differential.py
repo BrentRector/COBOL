@@ -48,16 +48,32 @@ def std_of(cmd: str) -> tuple[str, str]:
     return '2023', 'DEFAULT_DIALECT'
 
 
-def compile_once(exe: str, src: str, std: str, out_dll: str):
+def copy_dirs(cmd: str, case_dir: str) -> list[str]:
+    """The copybook directories a GnuCOBOL compile command names with `-I DIR` / `-IDIR`, resolved against the case
+    directory the command runs in. GnuCOBOL's `-I` and our `--copy` are the same thing — a place of the default
+    COBOL library after the working directory (DOC-A.1-40) — so a case that names one compiles with it here too. A
+    directory spelled with a shell variable is not the case's own and is left out."""
+    return [os.path.join(case_dir, m) for m in re.findall(r'(?:^|\s)-I\s*([^\s$]+)(?=\s|$)', cmd)]
+
+
+def compile_once(exe: str, src: str, std: str, out_dll: str, cwd: str | None = None,
+                 copy: list[str] | tuple[str, ...] = ()):
     """One compile attempt → (returncode, diagnostics, artifact_exists, runner_error).
 
     Everything the evidence rule needs, and nothing inferred. `runner_error` is non-empty only when the
     PROCESS could not be observed at all (timeout, launch failure) — distinct from a process that ran and
     said something.
+
+    `cwd` is the case directory: GnuCOBOL's testsuite runs `cobc` inside the test directory its AT_DATA files were
+    written to, so that is where a case's copybooks sit, and the working directory is the first place of the
+    default COBOL library (docs/CONFORMANCE.md DOC-A.1-40) — the source file's own directory is not one (kb/Work
+    PB1355). Without it the compiler runs in the source's directory. `copy` is the case's `-I` directories
+    (`copy_dirs`), each passed as `--copy`.
     """
     try:
-        r = subprocess.run([exe, src, '--std', std, '-o', out_dll],
-                           capture_output=True, text=True, timeout=60)
+        r = subprocess.run([exe, src, '--std', std, '-o', out_dll, *(a for c in copy for a in ('--copy', c))],
+                           capture_output=True, text=True, timeout=60,
+                           cwd=cwd or os.path.dirname(os.path.abspath(src)))
         return r.returncode, r.stdout + r.stderr, os.path.exists(out_dll), ''
     except subprocess.TimeoutExpired:
         return -1, '<<TIMEOUT>>', False, 'TimeoutExpired'
@@ -122,26 +138,24 @@ def run_case(args):
 
     d = os.path.join(workroot, re.sub(r'[^A-Za-z0-9_.-]', '_', gid))
     os.makedirs(d, exist_ok=True)
-    for fn, content in group['data'].items():
-        p = os.path.join(d, os.path.basename(fn))
-        try:
-            with open(p, 'w', encoding='utf-8', newline='\n') as fh:
-                fh.write(content.lstrip('\n'))
-        except OSError:
-            return None
+    # Each AT_DATA file lands at ITS OWN relative path under the case directory (`SUB/copy.inc` in SUB/), exactly
+    # where GnuCOBOL's testsuite writes it: flattening it to its basename used to hide every OF/IN library.
+    if not gx.materialize(group, d):
+        return None
 
     std, tier = std_of(chk['command'])
     out_dll = os.path.join(d, '_out.dll')
+    copy = copy_dirs(chk['command'], d)
 
     # ⛔ EVIDENCE-REQUIRED VERDICTS (plan §11 A12e). A compile is retried ONCE when it produced no evidence,
     # because the first attempt made no observation to retry the interpretation of — see compile_once().
-    rc, diag, artifact, runner_error = compile_once(exe, os.path.join(d, os.path.basename(prim)), std, out_dll)
+    rc, diag, artifact, runner_error = compile_once(exe, gx.case_path(d, prim), std, out_dll, cwd=d, copy=copy)
     if not runner_error and not has_evidence(rc, diag, artifact):
         try:
             os.remove(out_dll)
         except OSError:
             pass
-        rc, diag, artifact, runner_error = compile_once(exe, os.path.join(d, os.path.basename(prim)), std, out_dll)
+        rc, diag, artifact, runner_error = compile_once(exe, gx.case_path(d, prim), std, out_dll, cwd=d, copy=copy)
 
     def _rec(verdict, codes, first):
         return {'id': gid, 'file': group['file'], 'title': group['title'][:160],

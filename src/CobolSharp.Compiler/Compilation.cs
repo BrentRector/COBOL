@@ -351,8 +351,8 @@ public sealed class Compilation
         // matching placeholder in the consumer's own source. COPY library-name qualifiers are
         // raw placeholders (XXXXX047) resolved against the copy library directory, so expanding
         // first does not disturb them.
-        var copyProcessor = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
-            strict: Options.Config.IsStrict);
+        // Library text that cannot be located is CBL3620 on every dialect (§7.2.3.4 GR2; kb/Work PB1355).
+        var copyProcessor = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath);
         // Library text starts in the format in effect for its COPY statement (§7.3.24.3 3), kb/Work PB1067). This
         // legacy path numbers COPY statements by NORMALIZED line, which is the physical line wherever the format map
         // is uniform — every source without a >>SOURCE switch, the whole NIST corpus this oracle serves.

@@ -227,6 +227,32 @@ def primary_source(g: dict) -> tuple[str, dict] | None:
     return next((s for s in srcs if s in chk['command']), srcs[0]), chk
 
 
+def case_path(case_dir: str, member: str) -> str | None:
+    """Where an AT_DATA member lives under its case directory: at its OWN relative path (`SUB/copy.inc` in SUB/),
+    exactly where GnuCOBOL's testsuite writes it — flattening it to its basename hides every OF/IN library. None
+    for a member that would land outside the case directory."""
+    rel = os.path.normpath(member)
+    if os.path.isabs(rel) or rel == '..' or rel.startswith('..' + os.sep):
+        return None
+    return os.path.join(case_dir, rel)
+
+
+def materialize(g: dict, case_dir: str) -> bool:
+    """Write every AT_DATA member of group `g` under `case_dir` at its own relative path (THE one materializer,
+    shared by the differential and `--out`). False when a member cannot be placed there."""
+    for fn, content in g['data'].items():
+        p = case_path(case_dir, fn)
+        if p is None:
+            return False
+        try:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, 'w', encoding='utf-8', newline='\n') as fh:
+                fh.write(content.lstrip('\n'))
+        except OSError:
+            return False
+    return True
+
+
 def is_case(g: dict) -> bool:
     return primary_source(g) is not None
 
@@ -299,10 +325,9 @@ def main() -> int:
         idx = []
         for g in cobol_groups:
             d = os.path.join(a.out, re.sub(r'[^A-Za-z0-9_.:-]', '_', g['id']).replace(':', '_'))
-            os.makedirs(d, exist_ok=True)
-            for fn, content in g['data'].items():
-                with open(os.path.join(d, fn), 'w', encoding='utf-8', newline='\n') as fh:
-                    fh.write(content.lstrip('\n'))
+            if not materialize(g, d):
+                print(f'!! {g["id"]}: a member would land outside its case directory; skipped', file=sys.stderr)
+                continue
             idx.append({**g, 'dir': d})
         with open(os.path.join(a.out, '_index.json'), 'w', encoding='utf-8') as fh:
             json.dump(idx, fh, indent=1)

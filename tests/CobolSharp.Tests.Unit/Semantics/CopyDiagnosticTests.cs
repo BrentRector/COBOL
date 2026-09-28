@@ -9,9 +9,8 @@ namespace CobolSharp.Tests.Unit.Semantics;
 
 /// <summary>
 /// Item 9 (DEVLOG 307): CopyProcessor diagnostics (Deliverable A). A missing copybook is reported
-/// (CBL3620, dialect-gated — Default/--nist keep the lenient comment so the NIST copy-library suite is
-/// unaffected); a circular include is reported unconditionally (CBL3621). Source-mapping into the
-/// copybook (Deliverable B) is deferred.
+/// (CBL3620, on every dialect — §7.2.3.4 GR2, kb/Work PB1355); a circular include is reported
+/// unconditionally (CBL3621). Source-mapping into the copybook (Deliverable B) is deferred.
 /// </summary>
 public class CopyDiagnosticTests
 {
@@ -51,9 +50,10 @@ public class CopyDiagnosticTests
         => Assert.Contains(Compile(MissingCopySource, DialectMode.StrictCobol85), d => d.Code == "CBL3620");
 
     [Fact]
-    public void Default_MissingCopybook_NoCBL3620()
-        // Staged: permissive Default / --nist keep the lenient "*> ... not found" comment fallback.
-        => Assert.DoesNotContain(Compile(MissingCopySource, DialectMode.Default), d => d.Code == "CBL3620");
+    public void Default_MissingCopybook_ReportsCBL3620()
+        // §7.2.3.4 GR2: library text that cannot be located is an error on every dialect (kb/Work PB1355) — the
+        // lenient comment fallback is gone.
+        => Assert.Contains(Compile(MissingCopySource, DialectMode.Default), d => d.Code == "CBL3620");
 
     [Fact]
     public void Strict_ResolvedCopybook_NoCBL3620()

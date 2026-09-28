@@ -184,6 +184,7 @@ public static class Constructs
     public const string UserWordLocation2023 = "user-word-location-2023";
     public const string FixedFormWordContinuationRemoved2023 = "fixed-form-word-continuation-removed-2023";
     public const string CopyReplacingNonPseudoTextRemoved2023 = "copy-replacing-non-pseudo-text-removed-2023";
+    public const string ReplaceAlsoLast2002 = "replace-also-last-2002";
     public const string Col7ContinuationObsolete2023 = "col7-continuation-obsolete-2023";
     public const string PaddingCharacterRemoved2014 = "padding-character-removed-2014";
     public const string UserWordPadding2014 = "user-word-padding-2014";

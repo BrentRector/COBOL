@@ -176,14 +176,13 @@ internal static class TextWordScanner
             char c = text[pos];
             if (IsSeparatorSpace(c)) { pos++; continue; }
 
-            if (c == '*' && pos + 1 < n && text[pos + 1] == '>')
+            if (IsDebugLineCarrierAt(text, pos))
             {
-                if (string.CompareOrdinal(text, pos, ReferenceFormatProcessor.DebugLineCarrier, 0,
-                        ReferenceFormatProcessor.DebugLineCarrier.Length) == 0)
-                {
-                    pos += ReferenceFormatProcessor.DebugLineCarrier.Length;   // the debugging line's text is scanned
-                    continue;
-                }
+                pos += ReferenceFormatProcessor.DebugLineCarrier.Length;       // the debugging line's text is scanned
+                continue;
+            }
+            if (CommentStartsAt(text, pos))
+            {
                 while (pos < n && text[pos] != '\n') pos++;                    // a comment is a single space
                 continue;
             }
@@ -230,6 +229,36 @@ internal static class TextWordScanner
         }
         word = default;
         return false;
+    }
+
+    /// <summary>Whether a comment begins at <paramref name="pos"/> (outside a literal): the floating comment indicator
+    /// <c>*&gt;</c> (§6.2.3.2), other than the fixed-form debugging-line carrier the §6.5 conversion writes in its
+    /// place. The ONE reading of a comment indicator in text manipulation — <see cref="TryNext"/> skips what it
+    /// starts, and <see cref="HoldsComment"/> finds what a replacing action produces.</summary>
+    public static bool CommentStartsAt(string text, int pos)
+        => text[pos] == '*' && pos + 1 < text.Length && text[pos + 1] == '>' && !IsDebugLineCarrierAt(text, pos);
+
+    private static bool IsDebugLineCarrierAt(string text, int pos)
+        => string.CompareOrdinal(text, pos, ReferenceFormatProcessor.DebugLineCarrier, 0,
+            ReferenceFormatProcessor.DebugLineCarrier.Length) == 0;
+
+    /// <summary>Whether <paramref name="text"/> holds a comment: a <see cref="CommentStartsAt">comment indicator</see>
+    /// in the text between its text-words — never one inside a literal, which is a text-word of its own. Comments were
+    /// removed from source and library text by the §6.5 logical conversion before text manipulation began, so in text
+    /// a COPY or REPLACE replacing action produces a comment can only be one the replacement SPELLED — a partial-word
+    /// result such as <c>*&gt;1</c> (kb/Work PB1356; §7.2.3.4 GR13 / §7.2.4.4 GR9).</summary>
+    public static bool HoldsComment(string text)
+    {
+        int pos = 0;
+        while (true)
+        {
+            int gapStart = pos;
+            bool more = TryNext(text, ref pos, out var word);
+            int gapEnd = more ? word.Start : text.Length;
+            for (int i = gapStart; i < gapEnd; i++)
+                if (CommentStartsAt(text, i)) return true;
+            if (!more) return false;
+        }
     }
 
     /// <summary>Take a literal text-word apart (see <see cref="LiteralParts"/>).</summary>

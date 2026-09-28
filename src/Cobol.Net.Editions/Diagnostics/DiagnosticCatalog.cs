@@ -2339,6 +2339,40 @@ public static class DiagnosticCatalog
         "A COPY statement appears within a COPY statement, or is not preceded by a space.",
         "ISO §7.2.3.3 SR1 / SR2");
 
+    /// <summary>COBOLNET2572 — a COPY REPLACING or REPLACE operand whose CONTENT breaks the operand syntax rules
+    /// (kb/Work PB1353). The rules are written twice, word for word — §7.2.3.3 SR6/SR9/SR10/SR11/SR12/SR13 (COPY) and
+    /// §7.2.4.3 SR3/SR9/SR10/SR5/SR6/SR7 (REPLACE) — and checked by ONE screen (CopyProcessor.ScreenOperandPair).
+    /// Before, an empty or comma-only pseudo-text-1 was silently dropped, a multi-word partial-word used only its first
+    /// word, and a literal partial-word, a directive line inside pseudo-text or an over-long text-word compiled.</summary>
+    public static readonly DiagnosticDescriptor ReplacingOperandContent = new(
+        "COBOLNET2572", "replacing-operand-content", EditionSeverity.Error,
+        "A REPLACING operand of a COPY or REPLACE statement breaks an operand syntax rule: pseudo-text-1 holds no "
+        + "text-word other than a separator comma or semicolon; partial-word-1 is not exactly one text-word, or "
+        + "partial-word-2 more than one; a partial-word is an alphanumeric, boolean or national literal; a compiler "
+        + "directive line is written inside an operand; or a text-word is longer than 65,535 characters.",
+        "ISO §7.2.3.3 SR6 / SR9–SR13; §7.2.4.3 SR3 / SR5–SR7 / SR9 / SR10");
+
+    /// <summary>COBOLNET2573 — a pseudo-text delimiter that is not separated as §8.3.5 6) requires (kb/Work PB1353):
+    /// an opening <c>==</c> not immediately preceded by a space, or a closing <c>==</c> not immediately followed by a
+    /// space, comma, semicolon or period (<c>==XX==BY</c>, <c>BY==YY==</c>).</summary>
+    public static readonly DiagnosticDescriptor PseudoTextDelimiterPlacement = new(
+        "COBOLNET2573", "pseudo-text-delimiter-placement", EditionSeverity.Error,
+        "A pseudo-text delimiter is not separated from its neighbour: an opening == shall be immediately preceded by a "
+        + "space, and a closing == immediately followed by a space, comma, semicolon or period.",
+        "ISO §8.3.5 6) / 8) c)");
+
+    /// <summary>COBOLNET2574 — a replacing action that produces text its statement's rule forbids (kb/Work PB1356):
+    /// §7.2.3.4 GR13 (COPY: a COPY statement, a SOURCE FORMAT directive, a comment or a blank line) and §7.2.4.4 GR9
+    /// (REPLACE: the same, and a REPLACE statement). Checked on the text each match produces — a pseudo-text-2 once
+    /// per operand pair, a LEADING/TRAILING result word per match (CopyProcessor.ForbiddenIn). A blank line cannot be
+    /// produced: logical conversion discarded every blank line before text manipulation (§6.5 2)). Before, such text
+    /// was spliced and processed (or silently lost downstream).</summary>
+    public static readonly DiagnosticDescriptor ReplacingResultForbidden = new(
+        "COBOLNET2574", "replacing-result-forbidden", EditionSeverity.Error,
+        "The replacing action of a COPY or REPLACE statement produces a COPY statement, a REPLACE statement (REPLACE "
+        + "only), a SOURCE FORMAT directive, or a comment.",
+        "ISO §7.2.3.4 GR13 / §7.2.4.4 GR9");
+
     // ── The INVOKE twins of the PB132 CALL operand screens (kb/Work PB1137): the rules are written in the same
     // words for both activation statements and are checked by ONE screen (ActivationOperandScreen); each statement
     // keeps its own code because each has its own clause, exactly as COBOLNET2237 twins COBOLNET1685. ──

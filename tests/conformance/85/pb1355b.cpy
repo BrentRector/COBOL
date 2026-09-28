@@ -1,0 +1,1 @@
+       01 PB1355B-V PIC X(4) VALUE "DFLT".

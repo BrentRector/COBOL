@@ -1,0 +1,1 @@
+       01 PB1355A-V PIC X(3) VALUE "CBL".

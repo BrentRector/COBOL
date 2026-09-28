@@ -72,17 +72,36 @@ a space (or a line end, or a closing `==`) follows (§8.3.5 2)/3)), so `Z,ZZ9` a
 is ONE word from its prefix (`X" N" NX" B" BX"`) through its closing delimiter with doubled quotes inside; `&` is a
 word of its own; `==` is the pseudo-text delimiter. Its three consumers:
 
-- **Locating COPY** — `FindCopyKeyword` returns the next text-word `COPY`, so it cannot fire in a literal, a comment
-  or a longer word; a `COPY` glued behind `.`/`,`/`;` forms no text-word and is reported (§7.2.3.3 SR2, COBOLNET2451).
+- **Locating COPY and REPLACE** — `FindStatementKeyword(text, pos, keyword, onGlued)` returns the next text-word
+  `COPY` / `REPLACE`, so it cannot fire in a literal, a comment, a directive line or a longer word, and a REPLACE is
+  found wherever it stands, not only first on a line (§7.2.4.3 SR1, kb/Work PB1358); a keyword glued behind
+  `.`/`,`/`;` forms no text-word and is reported (SR2: COBOLNET2451 for COPY, COBOLNET2449 for REPLACE).
 - **Parsing the statements** — `ParseCopyStatement` reads the §7.2.3.2 general format in order
   (`{text-name-1 | literal-1} [{OF|IN} …] [SUPPRESS [PRINTING]] [REPLACING …] .`) through a `StatementCursor`, and
   the REPLACE statement uses the same cursor and the same `ParseReplacingOperands`. A statement ends at its
   SEPARATOR period (§7.2.3.4 GR6), never at a `.` inside pseudo-text or a literal; a word out of order is
-  COBOLNET2449, SR4/SR5 literal forms COBOLNET2450, a COPY within a COPY statement COBOLNET2451 (SR1).
+  COBOLNET2449, SR4/SR5 literal forms COBOLNET2450, a COPY within a COPY statement COBOLNET2451 (SR1). Each operand
+  pair is screened by ONE `ScreenOperandPair` against its statement's `OperandRules` row — the §7.2.3.3 / §7.2.4.3
+  content rules are word-for-word twins (COBOLNET2572) — and `ReadOperand` checks the §8.3.5 6) separation of each
+  `==` (COBOLNET2573) (kb/Work PB1353). A directive line CONSUMED before the operand is read (`>>SOURCE` by logical
+  conversion, `>>DEFINE`/`>>IF`/… by this driver) leaves only a blank line and is not yet seen (PB1353, open).
+- **The REPLACE states** — `ApplyReplaceStatements` parses format 1 `REPLACE [ALSO] …` and format 2
+  `REPLACE [LAST] OFF` and drives `ReplaceStates` (§7.2.4.4 GR4–GR7): the active operands plus a LIFO stack of
+  inactive ones; ALSO pushes and activates current-then-pushed operands, LAST OFF pops, a plain format 1 or OFF
+  cancels the queue (kb/Work PB1357). ALSO/LAST are gated by constructs row `replace-also-last-2002`.
 - **Matching** — `ApplyReplacements` compares text-words with `TextWord.MatchesForReplacing`, the ONE
   implementation of §7.2.3.4 9) c) / §7.2.4.4 8) c): character-strings case-insensitively; literals by prefix
   (case-insensitive), content un-doubled, the quotation symbol not compared, content case-SENSITIVE in `"…"` and
   `N"…"` and insensitive in the hexadecimal and boolean formats. Separator commas/semicolons are dropped (c) 1.).
+  What a match PRODUCES is screened in the same pass by the statement's `ResultRule` (`ForbiddenIn`: §7.2.3.4 GR13 /
+  §7.2.4.4 GR9 — no COPY statement, REPLACE statement (REPLACE only), SOURCE FORMAT directive or comment, the
+  comment asked of the produced TEXT by `TextWordScanner.HoldsComment` since the scanner skips a comment; a blank
+  line cannot arise, §6.5 2) discarded it; COBOLNET2574), and a COPY with REPLACING met inside library text is COBOLNET1640 (GR12) (kb/Work PB1356).
+- **Locating library text** — `FindCopybook` over `LibraryPlaces()` (the working directory, then each configured
+  search path) and `LocateInLibrary` (as spelled, then — unless the FILE NAME holds a period —
+  `.CPY .CBL .COB .cpy .cbl .cob`): the DOC-A.1-40
+  determination; the source file's own directory is not searched, and a text not found is CBL3620 on every path
+  (kb/Work PB1355).
 
 A fixed-form debugging line reaches the stage as `ReferenceFormatProcessor.DebugLineCarrier` (a `*>` comment
 carrying the Unicode noncharacter U+FDD0) + its text; the scanner skips only the carrier, so the line's text-words

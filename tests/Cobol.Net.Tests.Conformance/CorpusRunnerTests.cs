@@ -172,9 +172,12 @@ public abstract class CorpusRunnerTestsBase<TSlot>
             string dll = Path.Combine(tmp, name + ".dll");
             // kb/Work PB803 — a golden may declare its own compile options in its leading comment block
             // (`*> options: sign-encoding=ascii`); one with no header compiles exactly as it always did.
+            // A golden's library text sits beside it, and the edition directory is named as a COPY search path
+            // (`--copy DIR`) exactly as a user names theirs: the default COBOL library (DOC-A.1-40, kb/Work
+            // PB1355) is the working directory plus the --copy directories, never the source file's own.
             var r = CompiledProgramCache.Compile(ConformanceCorpus.ApplySourceOptions(
                 File.ReadAllText(src),
-                new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition))));
+                new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition), CopyPaths: [dir])));
             Assert.True(r.Success, $"[{edition}/{name}] must compile strict: {string.Join("\n", r.Errors)}");
             if (!File.Exists(outFile)) return;   // compile-only entry (no expected output recorded)
             var (ran, stdout, detail) = CutRunner.Run(dll, tmp);

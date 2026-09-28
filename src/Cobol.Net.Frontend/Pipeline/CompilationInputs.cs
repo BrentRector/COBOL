@@ -61,6 +61,14 @@ public sealed class CompilationInputs
         return exists;
     }
 
+    /// <summary>The compiler process's working directory, read once per compilation (null until read) — the first
+    /// place of the default COBOL library (DOC-A.1-40, kb/Work PB1355), so the output depends on it. Each probe made
+    /// there is recorded by <see cref="FileExists"/> / <see cref="DirectoryExists"/> as a full path.</summary>
+    public string? WorkingDirectory { get; private set; }
+
+    /// <summary>Read the working directory (<see cref="WorkingDirectory"/>), recording it.</summary>
+    public string GetWorkingDirectory() => WorkingDirectory ??= Directory.GetCurrentDirectory();
+
     /// <summary>Read an environment variable, recording its name and value (null = unset).</summary>
     public string? GetEnvironmentVariable(string name)
     {

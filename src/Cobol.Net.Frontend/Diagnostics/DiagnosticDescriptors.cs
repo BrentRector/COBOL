@@ -727,10 +727,9 @@ public static partial class DiagnosticDescriptors
         "'COLLATING' omitted from the SORT/MERGE SEQUENCE phrase; non-standard (accepted as a CCVS leniency)");
 
     // ══════════════════════════════════════
-    // CBL3620–3622: COPY preprocessing (ISO §7.2.3). CBL3620 (missing copybook) is dialect-gated to
-    // named-strict modes — Default/--nist keep the lenient "*> ... not found" comment so the NIST
-    // copy-library suite is unaffected; CBL3621 (circular) / CBL3622 (depth) are unconditional, since
-    // a recursive/over-deep include is always a real bug and never occurs in the corpus. (DEVLOG 307)
+    // CBL3620–3622: COPY preprocessing (ISO §7.2.3). All three are unconditional errors: CBL3620 is library
+    // text that cannot be located (§7.2.3.4 GR1/GR2 — at every edition and on every path since kb/Work PB1355;
+    // the search is the DOC-A.1-40 determination); CBL3621 a circular include; CBL3622 over-deep nesting.
     // ══════════════════════════════════════
     public static readonly DiagnosticDescriptor CBL3620 = new("CBL3620", DiagnosticSeverity.Error,
         "COPY copybook '{0}' not found. Searched: {1}");

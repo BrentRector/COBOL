@@ -1,0 +1,1 @@
+       01 PB1355B-V PIC X(3) VALUE "LIB".

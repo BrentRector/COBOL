@@ -27,8 +27,8 @@ public sealed class CopyConditionalProcessorTests : IDisposable
     private (string Text, DiagnosticBag Diags) Run(string mainText)
     {
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", strict: true, dialectLevel: 2023, permissive: false);
-        string text = ConditionalCompilationProcessor.ProcessWithCopy(mainText, _dir, copy,
+        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
+        string text = ConditionalCompilationProcessor.ProcessWithCopy(mainText, copy,
             CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
         return (text, bag);
     }

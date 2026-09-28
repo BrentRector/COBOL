@@ -97,16 +97,18 @@ public sealed class SourceLineMapTests : IDisposable
     {
         Copybook("three.cpy", "01 C1 PIC X.\n01 C2 PIC X.\n01 C3 PIC X.\n");
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", strict: true, dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
         var main = MappedText.Identity("01 A PIC X.\nCOPY three.\n01 B PIC X.\n", "t.cob");
-        var m = ConditionalCompilationProcessor.ProcessWithCopyMapped(main, _dir, copy,
+        var m = ConditionalCompilationProcessor.ProcessWithCopyMapped(main, copy,
             CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
         Assert.False(bag.HasErrors, string.Join("\n", bag.Diagnostics));
         var lines = m.Text.Split('\n');
         int b = Array.FindIndex(lines, l => l.Contains("01 B PIC X"));
         Assert.Equal(("t.cob", 3), (m.Lines[b].File, m.Lines[b].Line));
         int c2 = Array.FindIndex(lines, l => l.Contains("01 C2"));
-        Assert.EndsWith("three.cpy", m.Lines[c2].File);
+        // The path is the one the search FOUND: DOC-A.1-40 tries `.CPY` before `.cpy`, and on a case-insensitive file
+        // system (Windows) `three.CPY` is this same file (kb/Work PB1355).
+        Assert.EndsWith("three.cpy", m.Lines[c2].File, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, m.Lines[c2].Line);
         int a = Array.FindIndex(lines, l => l.Contains("01 A PIC X"));
         Assert.Equal(("t.cob", 1), (m.Lines[a].File, m.Lines[a].Line));
@@ -117,10 +119,10 @@ public sealed class SourceLineMapTests : IDisposable
     {
         // REPLACE is Step 3 of the merged text-manipulation driver (ISO §7.2.1), run over the expanded group.
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", strict: true, dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
         var m = ConditionalCompilationProcessor.ProcessWithCopyMapped(
             MappedText.Identity("01 A PIC X.\nREPLACE ==A== BY ==B==.\n01 C PIC X.\n01 A PIC X.\n", "t.cob"),
-            _dir, copy, CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
+            copy, CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
         var lines = m.Text.Split('\n');
         Assert.DoesNotContain(lines, l => l.Contains("REPLACE"));
         int c = Array.FindIndex(lines, l => l.Contains("01 C PIC X"));

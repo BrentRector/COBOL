@@ -23,11 +23,14 @@ public sealed class DiagnosticPositionTests : IDisposable
     private void Write(string name, string content) => File.WriteAllText(Path.Combine(_dir, name), content);
 
     /// <summary>Compile <paramref name="mainName"/> (already written into the test directory) and return every
-    /// error + warning line the driver produced.</summary>
+    /// error + warning line the driver produced. The test directory, which holds the copybooks too, is named as a
+    /// <c>--copy</c> search path, as a user names theirs: the default COBOL library is the working directory plus the
+    /// --copy directories, never the source file's own (docs/CONFORMANCE.md DOC-A.1-40, kb/Work PB1355).</summary>
     private (bool Ok, List<string> Lines) Compile(string mainName, int edition = 2023, bool checkOnly = true)
     {
         var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-            Path.Combine(_dir, mainName), Path.Combine(_dir, "out.dll"), DialectLevel: edition, CheckOnly: checkOnly));
+            Path.Combine(_dir, mainName), Path.Combine(_dir, "out.dll"), DialectLevel: edition, CheckOnly: checkOnly,
+            CopyPaths: [_dir]));
         return (r.Success, [.. r.Errors, .. r.Warnings]);
     }
 

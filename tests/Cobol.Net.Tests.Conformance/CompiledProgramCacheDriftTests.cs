@@ -98,11 +98,12 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
     {
         string src = Write("src/prog.cob", WithCopy);
         string cpy = Write("src/PB985CPY.cpy", Copybook("ONE"));
-        var first = Through(Options(src));
+        var o = Options(src, copyPaths: [Path.Combine(_dir, "src")]);
+        var first = Through(o);
         Assert.True(first.Result.Success, string.Join("\n", first.Result.Errors));
-        Assert.True(Through(Options(src)).Hit);
+        Assert.True(Through(o).Hit);
         File.WriteAllText(cpy, Copybook("TWO"));
-        var after = Through(Options(src));
+        var after = Through(o);
         Assert.False(after.Hit, "an edited copybook must miss");
         var (_, stdout, _) = CutRunner.Run(after.Result.OutputDll, Path.Combine(_dir, "run"));
         Assert.Equal("TWO", stdout);
@@ -111,12 +112,13 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
     [Fact]
     public void ACopybookThatNewlyShadowsTheOneFound_Misses()
     {
-        // Locating library text is implementor-defined (ISO §7.2.3.4 GR3) and CopyProcessor searches the source
-        // directory FIRST, so a copybook appearing there shadows the one the earlier compile found on the COPY
-        // path — an input that exists only as a probe that answered "absent".
+        // Locating library text is implementor-defined (ISO §7.2.3.4 GR3) and the default library searches its
+        // places in order (DOC-A.1-40: the working directory, then each --copy DIR), so a copybook appearing in an
+        // EARLIER --copy directory shadows the one the earlier compile found in a later one — an input that exists
+        // only as a probe that answered "absent".
         string src = Write("src/prog.cob", WithCopy);
         Write("lib/PB985CPY.cpy", Copybook("LIB"));
-        var o = Options(src, copyPaths: [Path.Combine(_dir, "lib")]);
+        var o = Options(src, copyPaths: [Path.Combine(_dir, "src"), Path.Combine(_dir, "lib")]);
         Assert.True(Through(o).Result.Success);
         Assert.True(Through(o).Hit);
         Write("src/PB985CPY.cpy", Copybook("NEAR"));
@@ -317,7 +319,7 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
         }
         Assert.NotEmpty(sources);
         Write("cp/PB985CPY.cpy", Copybook("DIR"));
-        sources.Add(Options(Write("cp/prog.cob", WithCopy)));
+        sources.Add(Options(Write("cp/prog.cob", WithCopy), copyPaths: [Path.Combine(_dir, "cp")]));
         sources.Add(new CompilerDriver.Options(TestRepo.Nist("programs", "NC101A.cob"), "x.dll", NistTestName: "NC101A",
             DialectLevel: 85));
 

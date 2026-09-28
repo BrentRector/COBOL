@@ -70,7 +70,8 @@ internal static class Program
         };
         var copyOption = new Option<string[]>("--copy")
         {
-            Description = "A COPY copybook search directory (repeatable).",
+            Description = "A COPY library-text search directory (repeatable), searched in order after the current "
+                + "working directory; the source file's own directory is searched only when named here.",
             Arity = ArgumentArity.OneOrMore,
             AllowMultipleArgumentsPerToken = false,   // `--copy A --copy B`, never grabbing the source positional
             HelpName = "DIR",

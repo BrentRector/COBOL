@@ -53,7 +53,7 @@ public static class ConditionalCompilationProcessor
     public static string Process(string text, IReadOnlySet<string>? leaveDirectives = null,
         DiagnosticBag? diagnostics = null, string? sourcePath = null, int dialectLevel = 2023,
         bool permissive = false)
-        => new Run(leaveDirectives, diagnostics, sourcePath, copy: null, sourceDir: null,
+        => new Run(leaveDirectives, diagnostics, sourcePath, copy: null,
                 dialectLevel, permissive, inputs: null, implicitOps: [])
             .Render(text);
 
@@ -66,20 +66,20 @@ public static class ConditionalCompilationProcessor
     /// expanded text. Greenfield-only — the legacy pipeline keeps the separate <see cref="Process"/> + COPY calls,
     /// byte-identical. Design SSOT: <c>docs/rearchitecture/DESIGN-cc-in-copy.md</c>.
     /// </summary>
-    public static string ProcessWithCopy(string text, string sourceDir, CopyProcessor copyProcessor,
+    public static string ProcessWithCopy(string text, CopyProcessor copyProcessor,
         IReadOnlySet<string>? leaveDirectives, DiagnosticBag? diagnostics, string? sourcePath, int dialectLevel,
         bool permissive = false)
-        => ProcessWithCopyMapped(MappedText.Identity(text, sourcePath ?? "<source>"), sourceDir, copyProcessor,
+        => ProcessWithCopyMapped(MappedText.Identity(text, sourcePath ?? "<source>"), copyProcessor,
             leaveDirectives, diagnostics, sourcePath, dialectLevel, permissive).Text;
 
     /// <summary>The MAPPED driver (kb/Work PB82): the same interleaved CC + COPY + REPLACE manipulation over a text
     /// that carries its per-line origins, returning the resultant text with ITS origins — main-source lines keep
     /// their physical line, copied lines carry the copybook's path and line, so every downstream position (the
     /// parser's, the binder's, EXCEPTION-LOCATION's) can name what the user edits.</summary>
-    public static MappedText ProcessWithCopyMapped(MappedText text, string sourceDir, CopyProcessor copyProcessor,
+    public static MappedText ProcessWithCopyMapped(MappedText text, CopyProcessor copyProcessor,
         IReadOnlySet<string>? leaveDirectives, DiagnosticBag? diagnostics, string? sourcePath, int dialectLevel,
         bool permissive = false, CompilationInputs? inputs = null)
-        => Manipulate(text, sourceDir, copyProcessor, leaveDirectives, diagnostics, sourcePath, dialectLevel,
+        => Manipulate(text, copyProcessor, leaveDirectives, diagnostics, sourcePath, dialectLevel,
             permissive, inputs, implicitOps: []).Text;
 
     /// <summary>The mapped driver with its DIRECTIVE ENCOUNTERS (kb/Work PB1066): the resultant text, plus — for
@@ -87,15 +87,14 @@ public static class ConditionalCompilationProcessor
     /// changed the state this driver holds. <paramref name="implicitOps"/> is the §14.9.28.4 GR14 implicit PUSH ALL /
     /// POP ALL program a PREVIOUS run's parse placed (<see cref="ConditionalCompilationResult.KeyImplicitOps"/>),
     /// each applied immediately before the directive encounter it is keyed to; empty on the first run.</summary>
-    public static ConditionalCompilationResult Manipulate(MappedText text, string sourceDir, CopyProcessor copyProcessor,
+    public static ConditionalCompilationResult Manipulate(MappedText text, CopyProcessor copyProcessor,
         IReadOnlySet<string>? leaveDirectives, DiagnosticBag? diagnostics, string? sourcePath, int dialectLevel,
         bool permissive, CompilationInputs? inputs, IReadOnlyList<KeyedDirectiveOp> implicitOps)
     {
-        copyProcessor.RegisterSourceDir(sourceDir);
-        var run = new Run(leaveDirectives, diagnostics, sourcePath, copyProcessor, sourceDir,
+        var run = new Run(leaveDirectives, diagnostics, sourcePath, copyProcessor,
             dialectLevel, permissive, inputs, implicitOps);
         var expanded = run.Render(text);
-        var resultant = CopyProcessor.ApplyReplaceStatements(expanded, diagnostics, sourcePath ?? "<source>");   // Step 3 — REPLACE over the expanded compilation group
+        var resultant = CopyProcessor.ApplyReplaceStatements(expanded, diagnostics, EditionInfo.Of(dialectLevel, permissive));   // Step 3 — REPLACE over the expanded compilation group
         if (run.Encounters.Count == 0) return new ConditionalCompilationResult(resultant, []);
         // Each encounter's line in the driver's OUTPUT frame, carried through REPLACE (which may drop and join lines)
         // to the RESULTANT frame the parser's tokens use.
@@ -159,7 +158,7 @@ public static class ConditionalCompilationProcessor
         private readonly CompilationInputs _inputs;
 
         public Run(IReadOnlySet<string>? leaveDirectives,
-            DiagnosticBag? diagnostics, string? sourcePath, CopyProcessor? copy, string? sourceDir,
+            DiagnosticBag? diagnostics, string? sourcePath, CopyProcessor? copy,
             int dialectLevel, bool permissive, CompilationInputs? inputs, IReadOnlyList<KeyedDirectiveOp> implicitOps)
         {
             _implicitOps = implicitOps;

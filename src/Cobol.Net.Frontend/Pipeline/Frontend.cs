@@ -180,17 +180,15 @@ public sealed class Frontend
         MappedText normalized, ReferenceFormatMap referenceFormats, string sourcePath, DiagnosticBag diagnostics,
         IReadOnlyList<KeyedDirectiveOp> implicitOps)
     {
-        string sourceDir = Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? ".";
-
         // The MERGED text-manipulation driver (ISO §7.2.1) — conditional compilation INTERLEAVED with COPY, so a
         // >>DEFINE/>>IF/>>EVALUATE INSIDE a copybook is processed (the CC-before-COPY split could not see them), while
         // a main-source >>IF still gates a COPY (omitted-branch COPY is never expanded) and REPLACE (Step 3) runs over
         // the expanded group. leave* keep the post-85 directive families flowing to their dedicated stages below.
         // COPY runs BEFORE NIST substitution so placeholders inside copied library text are substituted.
-        var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath, strict: false,
+        var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
             dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs);
         copy.RegisterReferenceFormat(sourcePath, referenceFormats);
-        var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, sourceDir, copy, LeftDirectives,
+        var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, copy, LeftDirectives,
             diagnostics, sourcePath, DialectLevel, Permissive, Inputs, implicitOps);
         var mapped = manipulated.Text;
 

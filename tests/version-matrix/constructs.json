@@ -2303,7 +2303,7 @@
   },
   {
    "id": "copy-replacing-non-pseudo-text-removed-2023",
-   "description": "Non-pseudo-text COPY REPLACING operands (identifier/literal/word forms) - permitted through 2014, REMOVED by ISO 2023 (Annex E.2 item 1 bullet 4; ==pseudo-text== is the only conforming shape). Emit site: CopyProcessor (frontend); the source uses a deliberately-missing copybook (the non-strict comment fallback) so the gate is exercised without copybook plumbing.",
+   "description": "Non-pseudo-text COPY REPLACING operands (identifier/literal/word forms) - permitted through 2014, REMOVED by ISO 2023 (Annex E.2 item 1 bullet 4; ==pseudo-text== is the only conforming shape). Emit site: CopyProcessor (frontend); the row's copybooks entry stages the library text beside the program (a missing text is CBL3620 at every edition since kb/Work PB1355).",
    "display": "a non-pseudo-text COPY REPLACING operand (identifier/literal/word)",
    "diagnosticCode": "COBOLNET0902",
    "citation": "Annex E.2 item 1 bullet 4; VCR row 4 — emit site: CopyProcessor.OnNonPseudoTextOperand (frontend)",
@@ -2311,8 +2311,24 @@
    "removedIn": 2023,
    "expectDiagnostic": "COBOLNET0902",
    "vcr": "VCR row 4 (E.2 item 1 bullet 4); W3 preprocessor threading (DEVLOG 598)",
-   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMCR1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\nCOPY NOSUCHBOOK REPLACING KWRD BY K-NEW.\n01 W PIC 9 VALUE 5.\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY W.\n    STOP RUN.\n"
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMCR1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\nCOPY VMCR1BK REPLACING KWRD BY K-NEW.\n01 W PIC 9 VALUE 5.\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY W K-NEW.\n    STOP RUN.\n",
+   "copybooks": {
+    "VMCR1BK.cpy": "01 KWRD PIC X VALUE \"K\".\n"
+   }
   },
+ {
+  "id": "replace-also-last-2002",
+  "status": "active",
+  "description": "The REPLACE statement's stacking phrases — format 1 REPLACE ALSO and format 2 REPLACE LAST OFF (ISO §7.2.4.2; the §7.2.4.4 GR4-GR7 active / inactive-LIFO / canceled state machine). PROVISIONAL pre-2023 edge (zero Annex E hits => predates 2023; per decision 1, as constant-entry-2002): a COBOL-2002 introduction. ACTIVE since kb/Work PB1357: CopyProcessor.ApplyReplaceStatements parses both phrases and drives ReplaceStates; the introduction gate is its Gate() on the ALSO / LAST word (frontend, COBOLNET0900 below 2002).",
+  "display": "REPLACE ALSO / REPLACE LAST OFF",
+  "diagnosticCode": "COBOLNET0900",
+  "citation": "ISO §7.2.4.2 / §7.2.4.4 GR4-GR7 — emit site: CopyProcessor.ApplyReplaceStatements (frontend)",
+  "introducedIn": 2002,
+  "removedIn": null,
+  "expectDiagnostic": "COBOLNET0900",
+  "vcr": "ISO §7.2.4.2 format 1 ALSO / format 2 LAST; provisional edge per decision 1",
+  "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMRAL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 AA PIC X(2) VALUE \"AA\".\n01 BB PIC X(2) VALUE \"BB\".\nPROCEDURE DIVISION.\nMAIN.\nREPLACE ==XX1== BY ==AA==.\nREPLACE ALSO ==XX2== BY ==BB==.\n    DISPLAY XX1 XX2.\nREPLACE LAST OFF.\n    DISPLAY XX1.\nREPLACE OFF.\n    STOP RUN.\n"
+ },
   {
    "id": "col7-continuation-obsolete-2023",
    "description": "The fixed continuation indicator (hyphen in column 7), incl. literal continuation - OBSOLETE as of ISO 2023 (Annex F.2 item 4; use the floating indicator), warning-only (the element remains conforming). Emit site: the frontend ReferenceFormatProcessor, once per compilation.",

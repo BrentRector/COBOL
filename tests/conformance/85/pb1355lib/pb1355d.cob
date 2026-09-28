@@ -1,0 +1,1 @@
+       01 PB1355D-V PIC X(3) VALUE "COB".
