@@ -1732,7 +1732,10 @@
   "pb1142-multiply-alphanumeric-function",
   "pb1230-constant-dup-same-value",
   "w66g-pb1300-composed-based-level",
-  "w66g-pb1475-strong-type-dpc-differs"
+  "w66g-pb1475-strong-type-dpc-differs",
+  "pb1509-sum-wide-addend-85",
+  "pb1305-report-varying-85",
+  "pb1234-report-control-float-85"
  ],
  "pending": []
 }

@@ -158,7 +158,9 @@
   "pb1144_dyn_move_recreate",
   "pb1267_dyn_initialized_seed",
   "pb1269_dyn_overflow_resume_next",
-  "pb1411_dyn_vargroup_element_receiver"
+  "pb1411_dyn_vargroup_element_receiver",
+  "pb1509_sum_counter_wide_standard_decimal",
+  "pb1305_report_varying_standard_decimal"
  ],
  "pending": []
 }

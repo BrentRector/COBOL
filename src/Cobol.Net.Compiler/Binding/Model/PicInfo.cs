@@ -695,11 +695,17 @@ public sealed record PicInfo(
     /// entry's own analyzed PICTURE, and SIGNED unconditionally per GR1's last sentence.
     /// <para>USAGE BINARY, not a fixed-width binary usage: GR1 derives the counter's capacity from the digit
     /// COUNT, which is <see cref="NumericTruncation.DigitCount"/>, while COMP-5 and the BINARY-* family hold
-    /// their container's native range instead. The engine accumulates in a <c>long</c>, so the profile is capped
-    /// at the 18 digits that carrier holds — the same ceiling the report engine has always had.</para></summary>
+    /// their container's native range instead.</para>
+    /// <para>⛔ THE DIGIT COUNT IS THE PICTURE'S, NOT A CARRIER'S (kb/Work PB1666). The engine accumulates in an
+    /// <c>Int128</c> (<c>CobolReport.SumEntry</c>), the carrier <see cref="ClrType"/> gives any 19–38-digit
+    /// numeric item, so every counter a numeric or numeric-edited PICTURE can describe (≤ 31 digit positions,
+    /// §13.18.40.3 SR14) keeps its full GR1 digit count. This used to clamp at 18 — the old <c>long</c> carrier's
+    /// ceiling — so a PIC 9(20) SUM entry reported a false size error past 9.2·10^18 and printed spaces. The only
+    /// counter still bounded is an alphanumeric or national PICTURE of more than 38 positions (one digit per
+    /// character position, <c>DataBinder.SumCounterDigits</c>), capped at the 38 digits the carrier holds.</para></summary>
     public static PicInfo SumCounterItem(int digits, int scale)
     {
-        int d = System.Math.Clamp(digits, 1, 18);
+        int d = System.Math.Clamp(digits, 1, 38);
         return new PicInfo(PicCategory.Numeric, Usage.Binary, Length: d, Digits: d, Scale: scale, Signed: true)
             { SignKind = SignKindFor(Usage.Binary, signed: true, sign: null) };
     }

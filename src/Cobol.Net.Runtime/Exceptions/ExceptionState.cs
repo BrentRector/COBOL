@@ -1081,6 +1081,21 @@ public sealed class ExceptionEngine
     public void ReportSumSizeError(string detail)
         => FatalIfEnabled(ReportSumSizeChecking, "EC-REPORT-SUM-SIZE", detail);
 
+    /// <summary>True while the currently-executing statement has EC-REPORT-VARYING checking enabled (fatal).</summary>
+    public bool ReportVaryingChecking
+    {
+        get => _checking.ReportVarying;
+        set => _checking.ReportVarying = value;
+    }
+
+    /// <summary>Raise EC-REPORT-VARYING (§13.18.64.4 GR5 — "If the evaluation of arithmetic-expression-1 or
+    /// arithmetic-expression-2 produces a noninteger value and the VARYING clause was specified in a report
+    /// description entry, the EC-REPORT-VARYING exception condition is set to exist"; Table 13 Fatal) when checking
+    /// is enabled; otherwise return, and the caller's lenient outcome stands — GR5 leaves "the content of the print
+    /// line" undefined (§A.2 item 63), and the counter takes the value's integer part (kb/Work PB1305).</summary>
+    public void ReportVaryingError(string detail)
+        => FatalIfEnabled(ReportVaryingChecking, "EC-REPORT-VARYING", detail);
+
     /// <summary>True while the currently-executing statement has EC-REPORT-LINE-OVERLAP checking enabled
     /// (nonfatal).</summary>
     public bool ReportLineOverlapChecking
@@ -1873,6 +1888,16 @@ public static class ExceptionState
 
     /// <inheritdoc cref="ExceptionEngine.ReportSumSizeError"/>
     public static void ReportSumSizeError(string detail) => E.ReportSumSizeError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.ReportVaryingChecking"/>
+    public static bool ReportVaryingChecking
+    {
+        get => E.ReportVaryingChecking;
+        set => E.ReportVaryingChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ReportVaryingError"/>
+    public static void ReportVaryingError(string detail) => E.ReportVaryingError(detail);
 
     /// <inheritdoc cref="ExceptionEngine.ReportLineOverlapChecking"/>
     public static bool ReportLineOverlapChecking

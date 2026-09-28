@@ -1,0 +1,11 @@
+CN EXACT
+CS EXACT
+LINE 01 [05           ]
+LINE 02 [05           ]
+LINE 03 [CN=1.00 S=010]
+LINE 04 [05           ]
+LINE 05 [CN=0.33 S=005]
+LINE 06 [CS=7    S=015]
+LINE 07 [05           ]
+LINE 08 [CN=0.33 S=005]
+LINE 09 [CS=8    S=005]

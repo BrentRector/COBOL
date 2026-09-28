@@ -1467,14 +1467,45 @@ internal static class RuntimeApi
         $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetPageCounter)}((long)({valueExpr}));";
 
     /// <summary>Read a SUM counter's content, unscaled at the counter's own scale (ISO §13.18.54.4 GR1/GR4) —
-    /// <c>CobolReport.SumValue</c>. <paramref name="counterId"/> is the ENTRY's ordinal, GR1's identity.</summary>
-    public static string ReportSumRead(int reportIndex, int depth, int counterId) =>
-        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SumValue)}({counterId})";
+    /// <c>CobolReport.SumValue</c>. <paramref name="counterId"/> is the ENTRY's ordinal, GR1's identity.
+    /// <para>The engine carries every counter in an <see cref="Int128"/> (kb/Work PB1509/PB1560/PB1666); the read
+    /// lands it in <paramref name="clrType"/>, the counter's OWN carrier (<c>PicInfo.ClrType</c> of its GR1
+    /// profile — <c>long</c> up to 18 digits, <c>Int128</c> beyond), so every consumer sees the type any other
+    /// numeric item of that profile has. The narrowing is exact: the engine never holds a value past the
+    /// counter's digits (its GR3 size-error test), and a procedure-division write arrives stored through the
+    /// same profile.</para></summary>
+    public static string ReportSumRead(int reportIndex, int depth, int counterId, string clrType)
+    {
+        string read = $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SumValue)}({counterId})";
+        return clrType == "Int128" ? read : $"(({clrType}){read})";
+    }
+
+    /// <summary>The prior-control key of a floating-point CONTROL item (ISO §13.18.16.4 GR3; kb/Work PB1234) —
+    /// <c>CobolReport.FloatControlKey</c>, the item's exact bit pattern, over its OWN carrier value
+    /// (<paramref name="carrier"/> is a <c>float</c> or a <c>double</c> expression; the overload follows it).</summary>
+    public static string ReportFloatControlKey(string carrier) =>
+        $"{nameof(CobolReport)}.{nameof(CobolReport.FloatControlKey)}({carrier})";
+
+    /// <summary>The value a floating-point CONTROL item's key holds, on the item's own carrier —
+    /// <c>CobolReport.FloatControlSingle</c> / <c>FloatControlDouble</c> (the GR4 a) restore half).</summary>
+    public static string ReportFloatControlValue(string key, bool single) =>
+        $"{nameof(CobolReport)}.{(single ? nameof(CobolReport.FloatControlSingle) : nameof(CobolReport.FloatControlDouble))}({key})";
+
+    /// <summary>The break test of a floating-point CONTROL item — <c>CobolReport.FloatControlEqual</c> as a method
+    /// group for the engine's equality delegate.</summary>
+    public static string ReportFloatControlEqual => $"{nameof(CobolReport)}.{nameof(CobolReport.FloatControlEqual)}";
+
+    /// <summary>A report VARYING FROM/BY value landed as the Int128 integer ISO §13.18.64.4 GR1 makes the counter,
+    /// raising EC-REPORT-VARYING for a noninteger value (GR5) — <c>CobolReport.VaryingInteger</c>. The argument
+    /// list is the value's own lane: <c>(unscaled, scale, detail)</c> for fixed point, <c>(value, detail)</c> for
+    /// a float or a standard-decimal intermediate (kb/Work PB1305).</summary>
+    public static string ReportVaryingInteger(string args) =>
+        $"{nameof(CobolReport)}.{nameof(CobolReport.VaryingInteger)}({args})";
 
     /// <summary>Alter a SUM counter's content from the procedure division (ISO §13.18.54.4 GR12) —
-    /// <c>CobolReport.SetSumValue</c>, at the counter's own scale.</summary>
+    /// <c>CobolReport.SetSumValue</c>, at the counter's own scale, widened to the engine's Int128 carrier.</summary>
     public static string ReportSumWrite(int reportIndex, int depth, int counterId, string valueExpr) =>
-        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetSumValue)}({counterId}, (long)({valueExpr}));";
+        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetSumValue)}({counterId}, (Int128)({valueExpr}));";
 
     /// <summary>Decode a DISPLAY image back into a native numeric leaf, preserving unset positions from the
     /// current value — <c>CobolNum.StoreDisplay</c>.</summary>

@@ -550,7 +550,10 @@
   "w66g_pb1475_strong_type_locale_identification",
   "pb1130_report_sum_size_line_overlap",
   "pb1272_present_when_snapshot",
-  "pb1188_report_nonfatal_raise"
+  "pb1188_report_nonfatal_raise",
+  "pb1509_sum_counter_wide_native",
+  "pb1305_report_varying_expression",
+  "pb1234_report_control_float"
   ],
   "pending": []
 }

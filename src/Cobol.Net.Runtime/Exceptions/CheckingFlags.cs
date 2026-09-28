@@ -207,6 +207,10 @@ public struct CheckingFlags
     /// presentation of a sum counter whose size error indicator is set (GR4); kb/Work PB1130.</summary>
     public bool ReportSumSize;
 
+    /// <summary>EC-REPORT-VARYING — a report VARYING clause's FROM or BY arithmetic expression evaluated to a
+    /// noninteger value (§13.18.64.4 GR5); kb/Work PB1305.</summary>
+    public bool ReportVarying;
+
     /// <summary>EC-REPORT-LINE-OVERLAP — a report line printed on or above a line already printed on the page,
     /// other than a relative line with an integer-2 of zero (§13.18.35.4 GR3); kb/Work PB1247 / PB1130.</summary>
     public bool ReportLineOverlap;

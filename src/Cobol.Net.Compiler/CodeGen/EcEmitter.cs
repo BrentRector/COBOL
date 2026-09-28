@@ -466,6 +466,10 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         // four neighbours the lenient outcome is not "the verb does nothing": the counter keeps the ADD-with-SIZE-ERROR
         // result and the printable item is spaces, whether or not the raise happens.
         ("EC-REPORT-SUM-SIZE", "ReportSumSizeChecking"),        // §13.18.54.4 GR3 / GR4 — overflow of a sum counter
+        // kb/Work PB1305 — a VARYING FROM/BY expression that evaluates to a noninteger value, raised by the compose of
+        // the line that carries the counter (the GENERATE / TERMINATE that prints it). The lenient outcome is GR5's
+        // undefined print-line content: the counter takes the value's integer part.
+        ("EC-REPORT-VARYING", "ReportVaryingChecking"),         // §13.18.64.4 GR5 — VARYING clause expression noninteger
         ("EC-BOUND-TABLE-LIMIT", "BoundTableLimitChecking"),    // §14.9.39.4 GR30 — growth past the implementor max
         ("EC-ORDER-NOT-SUPPORTED", "OrderNotSupportedChecking"),// §15.85.4 r2 — STANDARD-COMPARE's ordering table / level unavailable
         ("EC-LOCALE-MISSING", "LocaleMissingChecking"),        // §14.9.39.4 GR24 / §8.2.1 — a locale not available (SET LOCALE; a named IS LOCALE sequence at use)

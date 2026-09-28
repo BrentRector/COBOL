@@ -334,12 +334,42 @@ public sealed class CobolReport(
 
     private readonly List<ControlEntry> _controls = [];   // major→minor (FINAL, if present, is index 0 — GR2)
 
+    // ── The floating-point prior-control channel (ISO §13.18.16.4 GR3/GR4; kb/Work PB1234) ────────────────────
+    // GR3 defines a prior control "having the same data description as the corresponding data item", and GR4 a)
+    // stores the priors INTO the control items before the control footings print and restores the new current
+    // values afterwards — a same-usage copy each way, which §14.9.25.4 GR6 c) makes a transfer "without change".
+    // A CONTROL entry saves its item as a string key, so a floating-point item's key is its BIT PATTERN: the
+    // character (DISPLAY) image is a rounded rendering, and restoring through it would hand the program back a
+    // value an ulp away from the one it held. The break test compares VALUES (−0 equals +0, as the program's own
+    // relation condition answers) and treats an identical bit pattern as equal (a NaN control item that has not
+    // changed has not broken).
+
+    /// <summary>The prior-control key of a binary32 control item: its exact bit pattern (8 hex digits).</summary>
+    public static string FloatControlKey(float value) => BitConverter.SingleToInt32Bits(value).ToString("X8");
+
+    /// <summary>The prior-control key of a binary64 control item: its exact bit pattern (16 hex digits).</summary>
+    public static string FloatControlKey(double value) => BitConverter.DoubleToInt64Bits(value).ToString("X16");
+
+    /// <summary>The binary32 value a <see cref="FloatControlKey(float)"/> key holds — the restore half.</summary>
+    public static float FloatControlSingle(string key) =>
+        BitConverter.Int32BitsToSingle(int.Parse(key, System.Globalization.NumberStyles.HexNumber));
+
+    /// <summary>The binary64 value a <see cref="FloatControlKey(double)"/> key holds — the restore half.</summary>
+    public static double FloatControlDouble(string key) =>
+        BitConverter.Int64BitsToDouble(long.Parse(key, System.Globalization.NumberStyles.HexNumber));
+
+    /// <summary>§13.18.16.4 GR3's "equality with the corresponding prior control" for two keys of ONE floating-
+    /// point control item (both from the same <c>FloatControlKey</c> overload, so of one width): equal bit
+    /// patterns, or equal values.</summary>
+    public static bool FloatControlEqual(string a, string b) =>
+        a == b || (a.Length == 8 ? FloatControlSingle(a) == FloatControlSingle(b) : FloatControlDouble(a) == FloatControlDouble(b));
+
     /// <summary>ONE <c>SUM … [UPON …]</c> GROUP of a SUM clause (ISO §13.18.54.3 SR1 — the SUM keyword may appear
     /// more than once, and §13.18.54.4 GR1 still gives the ENTRY one counter): the group's addend total, already
     /// at the counter's scale (GR9 sums a group's addends together), and the group's OWN UPON filter — GR7 c) 2)
     /// accumulates "whenever any GENERATE statement is executed for a detail referenced by the UPON phrase", and
     /// the phrase belongs to its group. Null = no UPON phrase (GR7 c) 1) — every GENERATE for this report).</summary>
-    private readonly record struct SumTerm(Func<long> Addend, string[]? UponDetails)
+    private readonly record struct SumTerm(Func<Int128> Addend, string[]? UponDetails)
     {
         /// <summary>HOW MANY TIMES this term accumulates on a GENERATE of <paramref name="detailName"/> (GR7 c)):
         /// once with no UPON phrase (GR7 c) 1.), else once per appearance of the detail in the phrase — GR7: "It is
@@ -364,7 +394,12 @@ public sealed class CobolReport(
     /// prints in.</summary>
     private sealed class SumEntry(int digits, int resetLevel, ReportGroup printedIn, int presentSlot)
     {
-        public long Value;
+        /// <summary>The counter's content, unscaled at its own scale. ⛔ THE CARRIER IS <see cref="Int128"/>, THE
+        /// WIDEST NATIVE FIXED-POINT CARRIER THE COMPILER USES (the 19–38-digit tier of <c>PicInfo.ClrType</c>),
+        /// NOT A <c>long</c> (kb/Work PB1509/PB1560/PB1666). GR1 derives the counter's digit count from the
+        /// entry's PICTURE, and a numeric PICTURE may describe up to 31 digit positions (§13.18.40.3 SR14), so
+        /// a <c>long</c> — 18 digits — wrapped a 20-digit total modulo 2^64 or reported a false size error.</summary>
+        public Int128 Value;
 
         /// <summary>⛔ ISO §13.18.54.4 GR1 — "Each entry containing a SUM clause establishes an independent sum
         /// counter AND SIZE ERROR INDICATOR" (kb/Work PB1130). Set by an addition that is a size error (GR3);
@@ -376,33 +411,41 @@ public sealed class CobolReport(
         /// <summary>The largest magnitude the counter holds, unscaled: 10^digits − 1, where digits is "the
         /// corresponding number of digits, excluding insertion editing characters, in the PICTURE clause of the
         /// entry" (GR1) — the counter is therefore NOT the carrier's 64-bit range, and an addition past it is the
-        /// GR3 size error.
-        /// <para>⚠ The counter's CARRIER is a <c>long</c>, which holds every 18-digit value but not every 19-digit
-        /// one: a PICTURE of 19 or more digits is bounded by the carrier instead (<see cref="long.MaxValue"/>), so
-        /// such a counter never reports a size error GR3 does not state — an addition past the carrier is still a
-        /// size error rather than a wrap. The wider carrier those PICTUREs need is a separate change (reported
-        /// with kb/Work PB1130's landing).</para></summary>
-        public long Max { get; } = MaxOfDigits(digits);
+        /// GR3 size error. The <see cref="Int128"/> carrier holds every 38-digit value, which covers every
+        /// counter a numeric or numeric-edited PICTURE can describe (≤ 31 digits); only an alphanumeric or
+        /// national PICTURE of more than 38 character positions (an X(n) SUM entry counts one digit per position,
+        /// <c>DataBinder.SumCounterDigits</c>) is bounded by the carrier instead — the compiler registers such a
+        /// counter with 38 digits (<c>PicInfo.SumCounterItem</c>), so an addition past the carrier is still a size
+        /// error rather than a wrap.</summary>
+        public Int128 Max { get; } = MaxOfDigits(digits);
 
-        private static long MaxOfDigits(int digits)
-        {
-            if (digits >= 19) return long.MaxValue;   // the carrier's own bound — see Max
-            long max = 9;
-            for (int i = 1; i < Math.Max(digits, 1); i++) max = max * 10 + 9;
-            return max;
-        }
+        private static Int128 MaxOfDigits(int digits) => Pow10.AsWide(Math.Clamp(digits, 1, 38)) - 1;
 
         /// <summary>ISO §13.18.54.4 GR3 — add <paramref name="addend"/> "consistent with the general rules of the
         /// ADD statement with the ON SIZE ERROR phrase": when the sum's magnitude exceeds <see cref="Max"/> the
         /// counter is left unchanged (§14.7.5 1) — with the phrase, "the values of all of the resultant data items
         /// remain unchanged from the values they had at the start of the execution of the arithmetic statement")
         /// and the size error indicator is set. Returns false on a size error.</summary>
-        public bool Add(long addend)
+        public bool Add(Int128 addend)
         {
-            Int128 sum = (Int128)Value + addend;
-            if (Int128.Abs(sum) > Max) { SizeError = true; return false; }
-            Value = (long)sum;
+            // CHECKED: |Value| ≤ Max < 10^38 but the addend is any Int128, so the exact sum of a 38-digit counter
+            // and a large addend can pass Int128.MaxValue (≈ 1.70·10^38). Such a sum is past every capacity the
+            // counter can have, so the overflow IS the GR3 size error — never a wrap into range.
+            Int128 sum;
+            try { sum = checked(Value + addend); }
+            catch (OverflowException) { SizeError = true; return false; }
+            if (sum > Max || sum < -Max) { SizeError = true; return false; }
+            Value = sum;
             return true;
+        }
+
+        /// <summary>An addition whose addend could not be formed within the Int128 intermediate — a size error by
+        /// construction (see the accumulation in <c>GenerateCore</c>): the counter is unchanged and its indicator
+        /// set, exactly as <see cref="Add"/> leaves it. Always returns false.</summary>
+        public bool FailAdd()
+        {
+            SizeError = true;
+            return false;
         }
 
         /// <summary>GR2 / §14.9.21.4 GR1 a) — the counter set to zero and its size error indicator unset.</summary>
@@ -483,18 +526,20 @@ public sealed class CobolReport(
     /// SR1 — "the SUM keyword may appear more than once"). <paramref name="addend"/> yields that group's addend
     /// total, already at the counter's scale (GR9); <paramref name="uponDetails"/> restricts its accumulation to
     /// the named details (GR7 c) 2); null = every GENERATE for this report, GR7 c) 1).</summary>
-    public void AddSumTerm(int id, Func<long> addend, string[]? uponDetails) =>
+    public void AddSumTerm(int id, Func<Int128> addend, string[]? uponDetails) =>
         _sums[id].Terms.Add(new SumTerm(addend, uponDetails));
 
     /// <summary>A SUM counter's current value (unscaled, at the counter's scale) — read by the generated compose
     /// of the printable item the counter is the source of (ISO §13.18.54.4 GR4), and by a procedure division
-    /// statement that names the counter (GR5 + GR12).</summary>
-    public long SumValue(int id) => _sums[id].Value;
+    /// statement that names the counter (GR5 + GR12). The compiler's read narrows it to the counter's own CLR
+    /// carrier (<c>RuntimeApi.ReportSumRead</c>), which holds every value the counter's digits admit.</summary>
+    public Int128 SumValue(int id) => _sums[id].Value;
 
     /// <summary>Alter a SUM counter's content from the procedure division (ISO §13.18.54.4 GR12 — "It is
     /// permissible for procedure division statements to alter the content of sum counters"). The value is
-    /// unscaled, at the counter's own scale (GR1 — derived from the entry's PICTURE).</summary>
-    public void SetSumValue(int id, long value) => _sums[id].Value = value;
+    /// unscaled, at the counter's own scale (GR1 — derived from the entry's PICTURE), and already stored through
+    /// the counter's GR1 profile by the writing statement.</summary>
+    public void SetSumValue(int id, Int128 value) => _sums[id].Value = value;
 
     /// <summary>ISO §13.18.54.4 GR4 — may sum counter <paramref name="id"/> be moved to its printable item? True
     /// while its size error indicator is unset ("the content of the sum counter is moved, according to the general
@@ -508,6 +553,45 @@ public sealed class CobolReport(
         ExceptionState.ReportSumSizeError($"report {Name}: sum counter {id + 1} is presented with its size error "
             + "indicator set (ISO §13.18.54.4 GR4)");
         return false;
+    }
+
+    // ── VARYING (ISO §13.18.64.4) ──────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>A VARYING FROM or BY value (ISO §13.18.64.4 GR3 a)/b)) as the INTEGER GR1 makes the counter —
+    /// "an independent temporary integer data item that shall be large enough to contain the maximum expected
+    /// value", so the carrier is <see cref="Int128"/>, the widest native fixed-point carrier (kb/Work PB1305). A
+    /// fixed-point value arrives UNSCALED at <paramref name="scale"/>. When it has a nonzero fraction, GR5 applies:
+    /// "the EC-REPORT-VARYING exception condition is set to exist, the execution of the INITIATE, GENERATE, or
+    /// TERMINATE statement is unsuccessful, and the content of the print line is undefined" — raised here (fatal,
+    /// >>TURN-gated); with checking off the value's integer part is returned, one of the contents GR5 leaves
+    /// undefined.</summary>
+    public static Int128 VaryingInteger(Int128 unscaled, int scale, string detail)
+    {
+        if (scale <= 0) return unscaled * Pow10.AsWide(-scale);
+        Int128 unit = Pow10.AsWide(scale);
+        if (unscaled % unit != 0) ExceptionState.ReportVaryingError(detail);
+        return unscaled / unit;   // C# integer division truncates toward zero
+    }
+
+    /// <summary>The <see cref="VaryingInteger(Int128, int, string)"/> arm for a floating-point value (a VARYING
+    /// expression over a float operand, or a transcendental function): GR5's noninteger test is on the value
+    /// itself, and a non-finite value is not an integer either.</summary>
+    public static Int128 VaryingInteger(double value, string detail)
+    {
+        if (!double.IsFinite(value)) { ExceptionState.ReportVaryingError(detail); return 0; }
+        double whole = Math.Truncate(value);
+        if (whole != value) ExceptionState.ReportVaryingError(detail);
+        return (Int128)whole;
+    }
+
+    /// <summary>The <see cref="VaryingInteger(Int128, int, string)"/> arm for a standard-decimal intermediate
+    /// (ARITHMETIC IS STANDARD-DECIMAL, §11.9.5.2 GR3): the value is an integer exactly when truncating it and
+    /// rounding it away from zero land on the same integer.</summary>
+    public static Int128 VaryingInteger(CobolDec value, string detail)
+    {
+        Int128 whole = value.ToUnscaledIntermediate(0, CobolRounding.Truncation);
+        if (value.ToUnscaledIntermediate(0, CobolRounding.AwayFromZero) != whole) ExceptionState.ReportVaryingError(detail);
+        return whole;
     }
 
     // ── INITIATE (ISO §14.9.21.4) ──────────────────────────────────────────────────────────────────────────────
@@ -648,9 +732,16 @@ public sealed class CobolReport(
             {
                 int times = t.Fires(detailName);
                 if (times == 0) continue;
-                long addend = t.Addend();
+                // The addend total at the counter's scale. Forming it can itself be the GR3 size error: an
+                // alignment to the counter's scale past the Int128 intermediate raises CobolSizeError (the
+                // checked NumericRenderer.Align), and a term's addends summed past it raise OverflowException
+                // (the emitted checked sum). Either value is past every counter capacity, so the addition is a
+                // size error — the counter keeps its content, as ADD … ON SIZE ERROR keeps it (§14.7.5 1)).
+                Int128? addend;
+                try { addend = t.Addend(); }
+                catch (Exception e) when (e is CobolSizeError or OverflowException) { addend = null; }
                 for (int n = 0; n < times; n++)
-                    if (!_sums[k].Add(addend))
+                    if (addend is not { } a ? !_sums[k].FailAdd() : !_sums[k].Add(a))
                         ExceptionState.ReportSumSizeError($"report {Name}: an addition into sum counter {k + 1} is a "
                             + "size error (ISO §13.18.54.4 GR3)");
             }

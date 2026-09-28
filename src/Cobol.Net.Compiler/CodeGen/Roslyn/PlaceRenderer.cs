@@ -107,8 +107,9 @@ internal static class PlaceRenderer
         // The OCCURS DYNAMIC CAPACITY register (§13.18.38 GR15): a read-only view over the table's current capacity.
         CapacityRegisterPlace c => $"{RenderPath(c.Table, AccessDir.Sending)}.Capacity",
         // A REPORT SECTION sum counter (§13.18.54.4 GR1/GR4/GR12): RWCS engine state, read at the counter's own
-        // scale. The identity is the ENTRY's ordinal, never GR5's data-name (kb/Work PB882).
-        ReportSumCounterPlace s => RuntimeApi.ReportSumRead(s.ReportIndex, s.Depth, s.CounterId),
+        // scale and landed in the counter's own CLR carrier (kb/Work PB1666). The identity is the ENTRY's
+        // ordinal, never GR5's data-name (kb/Work PB882).
+        ReportSumCounterPlace s => RuntimeApi.ReportSumRead(s.ReportIndex, s.Depth, s.CounterId, s.RegisterItem.Pic!.ClrType),
         // A report's PAGE-COUNTER (ISO §8.4.3.15.4 GR1 — a temporary unsigned integer maintained per report):
         // RWCS engine state, scale 0. Reachable on the SENDING side only through a receiving place that is then
         // read back (a rounded/size-error resultant); the plain sending reference is BoundReportCounterRef, and

@@ -81,8 +81,10 @@ public sealed class ControlClauseCitationDriftTests
         Assert.DoesNotContain("violates no CONTROL syntax rule at all", emitter);
         Assert.Contains("§13.18.60.3 SR10", binder);
         Assert.Contains("§8.4.5", binder);
-        // The emitter's surviving loud is the FLOAT limb, and it must say what is actually missing — the
-        // prior-control RESTORE channel — not "no character image", which was false of every limb but one.
-        Assert.Contains("no prior-control RESTORE channel", emitter);
+        // The FLOAT limb is no longer a loud (kb/Work PB1234): no §13.18.16.3 rule excludes a floating-point
+        // data-name-1, so the emitter gives it the prior-control channel GR3/GR4 require — the item's bit pattern
+        // on its own carrier. The old loud message must not come back, and the float arm must stay present.
+        Assert.DoesNotContain("no prior-control RESTORE channel", emitter);
+        Assert.Contains("ReportFloatControlKey", emitter);
     }
 }

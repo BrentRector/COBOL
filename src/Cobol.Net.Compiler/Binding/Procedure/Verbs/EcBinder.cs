@@ -385,12 +385,16 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
     /// EC-REPORT-SUM-SIZE (§13.18.54.4 GR3 — an addition into a sum counter, at a GENERATE; GR4 — a counter whose
     /// size error indicator is set, printed by either verb), and — kb/Work PB1188 — EC-REPORT-PAGE-LIMIT
     /// (§13.18.35.4 GR2 — a group split between two pages), EC-REPORT-COLUMN-OVERLAP (§13.18.14.4 GR4) and
-    /// EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5). Their raise sites are inside the engine call the verb's node emits
-    /// (<c>CobolReport.PresentLine</c>, the accumulation loop, <c>SumPresentable</c>, and <c>CobolReport.Place</c>,
-    /// which the group's line compose calls while the engine presents it), so they bind as precisely as the
-    /// preconditions do.</summary>
+    /// EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5), and — kb/Work PB1305 — EC-REPORT-VARYING (§13.18.64.4 GR5 — a
+    /// VARYING FROM/BY expression evaluated to a noninteger value while the entry's line is composed). Their raise
+    /// sites are inside the engine call the verb's node emits (<c>CobolReport.PresentLine</c>, the accumulation
+    /// loop, <c>SumPresentable</c>, <c>CobolReport.Place</c> and <c>CobolReport.VaryingInteger</c>, the last two
+    /// called by the group's line compose while the engine presents it), so they bind as precisely as the
+    /// preconditions do. (GR5 also names INITIATE, but an INITIATE presents no report group, so no VARYING
+    /// expression is evaluated there.)</summary>
     private static readonly string[] ReportProductionNames =
-        ["EC-REPORT-LINE-OVERLAP", "EC-REPORT-SUM-SIZE", "EC-REPORT-PAGE-LIMIT", "EC-REPORT-COLUMN-OVERLAP", "EC-REPORT-PAGE-WIDTH"];
+        ["EC-REPORT-LINE-OVERLAP", "EC-REPORT-SUM-SIZE", "EC-REPORT-PAGE-LIMIT", "EC-REPORT-COLUMN-OVERLAP", "EC-REPORT-PAGE-WIDTH",
+         "EC-REPORT-VARYING"];
 
     /// <summary>The conditions a GENERATE raises (ISO §14.9.16.4 GR7 EC-REPORT-INACTIVE, §14.9.49.4 GR10
     /// EC-FLOW-REPORT, and the <see cref="ReportProductionNames"/>). PRECISE, as <see cref="InitiateNames"/>.</summary>

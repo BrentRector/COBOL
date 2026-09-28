@@ -8,7 +8,7 @@
       *> related to such specifications." The CONTROL clause is not on SR10's list, so this is illegal source.
       *> Until kb/Work PB177 arm C's follow-up it compiled clean and staged a RUNTIME loud - the mis-tier a
       *> SYNTAX rule never permits. (The FLOAT operand of that same runtime guard is NOT this case: no syntax
-      *> rule bars it, and it stays loud because the prior-control RESTORE half has no float channel.)
+      *> rule bars it, and since kb/Work PB1234 it is saved and restored through its own float channel.)
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB177N8.
        ENVIRONMENT DIVISION.

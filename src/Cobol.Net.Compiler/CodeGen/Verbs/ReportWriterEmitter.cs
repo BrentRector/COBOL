@@ -199,17 +199,21 @@ internal sealed class ReportWriterEmitter(
         // FROM + n × BY. It is written as that CLOSED FORM over the repetition ordinal, not as an accumulator,
         // because an entry made repeating by an OCCURS clause (§13.18.38 Format 3) is REPLAYED into one field per
         // repetition and an accumulator local to a field could not span them. The two forms are equal, not
-        // approximately: GR3 adds arithmetic-expression-2 itself, and both operands are truncated to scale 0 ONCE
-        // (the noninteger case is the EC-REPORT-VARYING seam, GR5; checking default-off, SSOT §18.16).
+        // approximately: GR3 adds arithmetic-expression-2 itself, and both operands are landed as integers ONCE
+        // (VaryValue — a noninteger value is GR5's EC-REPORT-VARYING).
+        // ⛔ THE COUNTER IS AN Int128 (kb/Work PB1305). GR1: "an independent temporary integer data item that shall
+        // be large enough to contain the maximum expected value" — the expression's own range, which the numeric
+        // renderer widens to Int128 for any operator. The locals were `long`, so `FROM 2 * 3 - 5` was a CS0266
+        // backend crash on conforming source.
         for (int k = 0; k < f.Varyings.Count; k++)
         {
-            w.Line($"long {VaryName(f, k)} = {VaryValue(f.Varyings[k].From)};   // VARYING {f.Varyings[k].Name} FROM (§13.18.64.4 GR3a)");
-            w.Line($"long {VaryName(f, k)}b = {VaryValue(f.Varyings[k].By)};   // … BY (§13.18.64.4 GR3b)");
+            w.Line($"Int128 {VaryName(f, k)} = {VaryValue(r, f.Varyings[k], f.Varyings[k].From, "FROM")};   // VARYING {f.Varyings[k].Name} FROM (§13.18.64.4 GR3a)");
+            w.Line($"Int128 {VaryName(f, k)}b = {VaryValue(r, f.Varyings[k], f.Varyings[k].By, "BY")};   // … BY (§13.18.64.4 GR3b)");
         }
         for (int rep = 0; rep < f.Columns.Count; rep++)
         {
             for (int k = 0; k < f.Varyings.Count; k++)
-                w.Line($"long {VaryName(f, k)}_{rep} = {VaryName(f, k)} + {f.RepetitionOrdinal + rep}L * {VaryName(f, k)}b;"
+                w.Line($"Int128 {VaryName(f, k)}_{rep} = {VaryName(f, k)} + {f.RepetitionOrdinal + rep} * {VaryName(f, k)}b;"
                     + $"   // occurrence {f.RepetitionOrdinal + rep + 1} (§13.18.64.4 GR3)");
             var spec = f.Columns[rep];
             // The operand this repetition takes (§13.18.63.4 GR23 / §13.18.53.4 GR4 — the ONE cycling reader is
@@ -278,10 +282,24 @@ internal sealed class ReportWriterEmitter(
     /// uid + the counter's index within the entry's VARYING clause.</summary>
     private static string VaryName(ReportFieldModel f, int k) => $"__rv{f.PrintItem.Uid}_{k}";
 
-    /// <summary>A VARYING FROM/BY value as a scale-0 C# expression (ISO §13.18.64.4 GR3a/GR3b; absent ⇒ 1).
-    /// A noninteger evaluation truncates (GR5's undefined-content case — the EC-REPORT-VARYING seam).</summary>
-    private string VaryValue(BoundExpr? e) =>
-        e is null ? "1" : NumericRenderer.Align(num.Render(e, ReceiverContext.None), 0);
+    /// <summary>A VARYING FROM/BY value as an <see cref="Int128"/> integer C# expression (ISO §13.18.64.4 GR3a/GR3b;
+    /// absent ⇒ 1). The value lands in its OWN lane — fixed point unscaled at its scale, binary64, or a
+    /// standard-decimal intermediate — through <c>CobolReport.VaryingInteger</c>, which applies GR5: "If the
+    /// evaluation of arithmetic-expression-1 or arithmetic-expression-2 produces a noninteger value and the VARYING
+    /// clause was specified in a report description entry, the EC-REPORT-VARYING exception condition is set to
+    /// exist". A scale-0 fixed-point value is an integer by construction and needs no test.</summary>
+    private string VaryValue(ReportModel r, ReportVaryingModel v, BoundExpr? e, string phrase)
+    {
+        if (e is null) return "(Int128)1";
+        NumX x = num.Render(e, ReceiverContext.None);
+        string detail = CsLiteral($"report {r.Name}: VARYING {v.Name} {phrase} evaluated to a noninteger value "
+            + "(ISO §13.18.64.4 GR5)");
+        if (x.Real || x.Dec) return RuntimeApi.ReportVaryingInteger($"{x.Expr}, {detail}");
+        string unscaled = NumericRenderer.Align(x, x.Scale);   // the unsigned-wide lane lands in Int128 here
+        return x.Scale == 0 && !x.U
+            ? $"(Int128)({unscaled})"
+            : RuntimeApi.ReportVaryingInteger($"{unscaled}, {x.Scale}, {detail}");
+    }
 
     /// <summary>A PRESENT WHEN chain as ONE C# boolean expression — the AND of the chain (ISO §13.18.41.4 GR2b:
     /// an absent ancestor absents every subordinate, so presence = every condition true).</summary>
@@ -431,24 +449,14 @@ internal sealed class ReportWriterEmitter(
                     w.Line($"__RPT_{r.CsIndex}.AddControl(true, static () => \"\", static __v => {{ }});   // FINAL (§13.18.16.4 GR2 — never breaks)");
                     continue;
                 }
-                // ⛔ THREE LIMBS, THREE REASONS — and the message must name the one that fired (kb/Work PB177
-                // arm C follow-up: the repaired message described the float/INDEX limb only, so a CONTROL
-                // operand this backend could not RESOLVE reported "has no character image", which is neither
-                // true of it nor a lead to the actual problem).
                 // ⛔ CITATION REPAIRED (kb/Work PB177 arm C): this said "ISO §13.18.16.3 SR3", but SR3 is
                 // "Data-name-1 shall not be subject to any OCCURS clauses" — a real clause answering a
                 // different question. The §13.18.16.3 SHAPE rules (SR3/SR5/SR7) and the §13.18.60.3 SR10 INDEX
-                // rule are now REJECTED AT BIND TIME by DataBinder.ControlOperandShapeViolation, so an INDEX
-                // operand no longer reaches this guard at all. What survives here is an implementation limit,
-                // labelled as one:
-                //   • an unresolved operand — the shapes ReferenceResolver returns null for, which today are
-                //     the dynamic-capacity table entry and a leaf beneath one (both ALSO rejected at bind now,
-                //     by the IsTable arm), so this limb is a backstop for a resolver shape not yet enumerated;
-                //   • a FLOAT operand (COMP-1/COMP-2) — which violates NO syntax rule and is deliberately still
-                //     loud: the read half would work (CallStringRead renders the DISPLAY image), but the
-                //     RESTORE half has no float arm — CallStringWrite falls to `_GF = __v;`, a string→double
-                //     CS0029 — so unguarding it turns a runtime loud into a BACKEND CRASH. The prior-control
-                //     restore channel is what is missing, not the image.
+                // rule are REJECTED AT BIND TIME by DataBinder.ControlOperandShapeViolation, so an INDEX operand
+                // never reaches this loop. What survives here is ONE implementation limit, labelled as one: an
+                // unresolved operand — the shapes ReferenceResolver returns null for, which today are the
+                // dynamic-capacity table entry and a leaf beneath one (both ALSO rejected at bind, by the IsTable
+                // arm), so this limb is a backstop for a resolver shape not yet enumerated.
                 // ⛔ A REFERENCE-MODIFIED OPERAND IS SAVED AND COMPARED AS ITS SLICE, NOT AS THE WHOLE ITEM
                 // (kb/Work PB205). §13.18.16.3 SR4 expressly permits the ref-mod and §13.18.16.4 GR3 then defines
                 // the prior control as having "the same data description as the corresponding data item" — which
@@ -464,10 +472,24 @@ internal sealed class ReportWriterEmitter(
                         + "this backend can save and restore as the prior control value (ISO §13.18.16.4 GR3)"));
                     continue;
                 }
-                if (place.Item.Pic is { IsFloat: true })
+                // ⛔ A FLOATING-POINT CONTROL ITEM SAVES AND RESTORES ITS BIT PATTERN (kb/Work PB1234). No syntax
+                // rule of §13.18.16.3 excludes a floating-point data-name-1, and GR3's prior control has "the same
+                // data description as the corresponding data item", so GR4 a)'s store and restore are same-usage
+                // copies. The character-image channel below has no float restore (a string→double assignment),
+                // and a DISPLAY image is a ROUNDED rendering besides, so the item was a run-time loud at program
+                // activation. The float arm reads the item on its OWN carrier (the same-usage MOVE read), keys it
+                // by its bits (CobolReport.FloatControlKey), writes it back through the item's own encoding, and
+                // breaks on a VALUE change (CobolReport.FloatControlEqual). A reference-modified operand denotes a
+                // character slice, not the item (§8.4.3.3.4 GR5/GR6 — Place.DenotedItem is null for it), and keeps
+                // the character arm.
+                if (place.DenotedItem is not null && place.Item.Pic is { IsFloat: true } fpic)
                 {
-                    w.Line(LoudStmt($"report {r.Name}: CONTROL operand '{ctl.Display}' is a floating-point item, "
-                        + "which has no prior-control RESTORE channel in this backend (ISO §13.18.16.4 GR3)"));
+                    string carrier = NumericRenderer.FloatCarrierRead(place, SendingRef.SameUsageMove);
+                    string restored = RuntimeApi.ReportFloatControlValue("__v", fpic.IsSingle);
+                    string store = place.Item.StoreAsImage ? NumericRenderer.ImageOfCarrier(restored, place.Item) : restored;
+                    w.Line($"__RPT_{r.CsIndex}.AddControl(false, () => {RuntimeApi.ReportFloatControlKey(carrier)}, "
+                        + $"__v => {{ {PlaceRenderer.Write(place, store)} }}, {RuntimeApi.ReportFloatControlEqual});"
+                        + "   // floating-point CONTROL (§13.18.16.4 GR3/GR4)");
                     continue;
                 }
                 // The prior-control save/compare/restore key is the item's CHARACTER IMAGE (§13.18.16.4 GR3 —
@@ -492,14 +514,20 @@ internal sealed class ReportWriterEmitter(
             }
             // SUM counters (§13.18.54): the addend delegate yields the addends' total at the counter's scale
             // (GR3 — ADD-consistent accumulation; GR9 — multiple addends sum together).
-            // ARITHMETIC IS STANDARD / STANDARD-DECIMAL (§8.8.1.5.1 names the SUM clause; P10 Step 12): this
-            // native path IS the standard-decimal result, documented rather than routed — each GR3 accumulation
-            // is ONE addition of fixed-point values into a fixed-point counter, and an aligned addition of a
-            // ≤31-digit counter and a ≤31-digit addend total is ≤32 significant digits, EXACT both in this
-            // Int128 accumulation and in a 34-digit SDIDI (§8.8.1.5.2 — an exact ≤34-digit result never
-            // rounds), then stored to the counter's own picture identically; the two engines are
-            // digit-identical for every reachable SUM shape (report SUM addends are fixed-point by
-            // §13.18.54.3, never float).
+            // ⛔ ONE CARRIER, NEVER A NARROWING CAST (kb/Work PB1509/PB1560/PB1666). The counter, every addend and
+            // the term's total are Int128 end to end — the carrier the compiler gives every 19–38-digit numeric
+            // item — and GR1's digit count (up to the 31 digit positions a numeric PICTURE may describe,
+            // §13.18.40.3 SR14) is the engine's capacity. The delegate used to be `() => (long)(…)`, so a 20-digit
+            // addend wrapped modulo 2^64 into a wrong printed total with no size error. An alignment or a term
+            // total past Int128 is past every counter's capacity: the checked Align raises CobolSizeError and the
+            // checked term sum OverflowException, and the engine takes either as GR3's size error.
+            // The arithmetic MODE (§11.9.5.2 GR1 NATIVE / GR3 STANDARD-DECIMAL — both name the SUM clause) selects
+            // how each ADDEND is evaluated: an arithmetic-expression addend renders through the unit's own lane
+            // (a CobolDec SDIDI under STANDARD-DECIMAL, landed by NumericRenderer.Align's Dec arm), exactly as the
+            // same expression in a COMPUTE would. The ACCUMULATION itself is one aligned addition of two
+            // fixed-point values ≤ 31 digits each, whose ≤ 32-digit exact result both engines represent without
+            // rounding (§8.8.1.5.2 — a 34-digit SDIDI never rounds a ≤ 34-digit value), so the Int128 addition IS
+            // the standard-decimal result as well as the native one.
             foreach (var sum in r.Sums)
             {
                 int printedGi = r.Groups.IndexOf(sum.PrintedIn);
@@ -524,11 +552,19 @@ internal sealed class ReportWriterEmitter(
                             // (GR1), and that alignment IS the transfer, so the clause's ROUNDED phrase governs
                             // it (GR4: "the content of the sum counter is computed according to the general
                             // rules for the COMPUTE statement with the ROUNDED phrase"; kb/Work PB852).
-                            ? "(" + NumericRenderer.Align(num.Render(v, ReceiverContext.None), sum.Scale, sum.Rounding) + ")"
-                            : LoudValue("long", $"report {r.Name}: SUM addend '{a.Written}' was rejected at bind "
+                            ? "(Int128)(" + NumericRenderer.Align(num.Render(v, ReceiverContext.None), sum.Scale, sum.Rounding) + ")"
+                            : LoudValue("Int128", $"report {r.Name}: SUM addend '{a.Written}' was rejected at bind "
                                 + "(ISO §13.18.54.3 SR5)"))
                         .ToList();
-                    string addend = addends.Count == 0 ? "0L" : string.Join(" + ", addends);
+                    // Each addend is widened to the engine's Int128 carrier BEFORE the term's addends are summed, and
+                    // the sum is CHECKED: two 18-digit long addends summed in long wrapped, and a sum past Int128 is
+                    // past every counter's capacity — the engine turns that OverflowException into the GR3 size error.
+                    string addend = addends.Count switch
+                    {
+                        0 => "(Int128)0",
+                        1 => addends[0],
+                        _ => $"checked({string.Join(" + ", addends)})",
+                    };
                     // null = no UPON phrase (GR7 c) 1) — every GENERATE for this report). An UPON phrase whose
                     // operands were ALL rejected emits the EMPTY filter instead, so a suppressed COBOLNET2046
                     // accumulates on NOTHING rather than on everything: the absence of the phrase and the
@@ -539,7 +575,7 @@ internal sealed class ReportWriterEmitter(
                         : upon.Count == 0
                             ? "System.Array.Empty<string>()"
                             : "new[] { " + string.Join(", ", upon.Select(d => CsLiteral(d.Detail!.Name!))) + " }";
-                    w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, () => (long)({addend}), {uponArg});");
+                    w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, () => {addend}, {uponArg});");
                 }
             }
         }
