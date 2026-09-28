@@ -62,24 +62,43 @@ public sealed class CobolDynTable<T>
     /// CAPACITY register reads this; SEARCH/PERFORM VARYING bound to it.</summary>
     public long Capacity => _count;
 
-    /// <summary>A SENDING element reference (§8.5.1.9.2): a 1-based occurrence in 1..current-capacity. An
-    /// out-of-range occurrence continues benignly through a fresh scratch slot — the COBOL-85 / subscript-checking-off
-    /// policy (matches <see cref="CobolTable.At{T}"/>); EC-BOUND-SUBSCRIPT under CHECKING ON is a later wiring.</summary>
+    /// <summary>The occurrences that exist now — 1..current capacity — as one span over the store, for an operation
+    /// that ranges over the whole current table in place: the Format-2 table SORT (ISO §14.9.40.4 GR20, whose
+    /// "number of occurrences … determined by the rules in the OCCURS clause" is the current capacity for a
+    /// dynamic-capacity table, §8.5.1.9.1; kb/Work PB1174). Never past the capacity: the store's spare slots are
+    /// not occurrences.</summary>
+    public Span<T> CurrentOccurrences => _store.AsSpan(0, _count);
+
+    /// <summary>A SENDING element reference (§8.5.1.9.2): a 1-based occurrence in 1..current-capacity — "the result
+    /// of the operation is the same as for a fixed-capacity table whose number of occurrences is the current
+    /// capacity of the table", so an occurrence outside it is §8.4.2.3.4 2)'s out-of-range subscript and sets
+    /// EC-BOUND-SUBSCRIPT exactly as <see cref="CobolTable.At{T}"/> does (kb/Work PB1268 — this arm used to return
+    /// the scratch slot in silence while the fixed-table accessor raised). With checking off the reference continues
+    /// benignly through a fresh scratch slot, the same policy.</summary>
     public ref T RefSending(long occ)
     {
         if (occ >= 1 && occ <= _count) return ref _store[(int)(occ - 1)];
+        ExceptionState.SubscriptError(
+            $"subscript {occ} is outside 1..{_count}, the current capacity (ISO 8.5.1.9.2, 8.4.2.3.4 GR2)");
         _scratch = _seedAt((int)occ);
         return ref _scratch;
     }
 
     /// <summary>A RECEIVING element reference (§8.5.1.9.3): an occurrence &gt; the current capacity GROWS the table to
-    /// it, seeding any skipped intermediate occurrences. An occurrence &lt; 1 is benign scratch. An implicit growth
+    /// it, seeding any skipped intermediate occurrences. An occurrence &lt; 1 is not a growth case — §8.4.2.3.4 2)'s
+    /// "not a positive integer" — so it sets EC-BOUND-SUBSCRIPT, as the fixed-table accessor does (kb/Work PB1268),
+    /// and with checking off continues through the benign scratch slot. An implicit growth
     /// past the expected capacity (TO integer-5) raises the nonfatal EC-BOUND-OVERFLOW through
     /// <see cref="RaiseImplicitOverflow"/> — the ONE §8.5.1.9.6 1) raise every implicit capacity change shares — and
     /// the growth proceeds regardless, a declarative's RESUME AT NEXT STATEMENT included (kb/Work PB1269).</summary>
     public ref T RefReceiving(long occ)
     {
-        if (occ < 1) { _scratch = _seedAt((int)occ); return ref _scratch; }
+        if (occ < 1)
+        {
+            ExceptionState.SubscriptError($"subscript {occ} is not a positive integer (ISO 8.4.2.3.4 GR2)");
+            _scratch = _seedAt((int)occ);
+            return ref _scratch;
+        }
         if (occ > _count)
         {
             RaiseImplicitOverflow(occ, "implicit growth");

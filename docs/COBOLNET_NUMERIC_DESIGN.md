@@ -961,8 +961,8 @@ repair belongs in the decode and not in a guard at the two MOVE call sites: the 
 had their own copy of the hole.
 
 **Why three methods and not two.** The size rule is a rule about *an alphanumeric sending operand*, and several
-callers decode a character image that is **not** one: the storage-form bridges (`CobolTable.Occ`,
-`CobolString.RefModPosition`) and INSPECT's re-store of a replaced numeric image all decode a NUMERIC item's own
+callers decode a character image that is **not** one: the NON-numeric `--permissive` position operand
+(`CobolTable.Occ(string)`) and INSPECT's re-store of a replaced numeric image all decode a character item's own
 image, whose size its own PICTURE already fixes, and GR6 d) 3 b)'s figurative leg replicates across the
 RECEIVER's digit positions. Those take `DigitMagnitude`. ⚠ MEASURED, so the next reader need not re-derive it:
 pointing those sites at the capped entry changed no answer on any shape probed (a group-aliased

@@ -25,6 +25,17 @@ namespace CobolNet.CodeGen;
 /// </summary>
 internal static class PlaceRenderer
 {
+    /// <summary>⛔ THE ONE CODEGEN-TIME INTEGER COUNT READ — data-name-1 of an OCCURS DEPENDING table (§13.18.38.4
+    /// GR7's "current number of occurrences"), a RECORD VARYING DEPENDING length, a report DEPENDING count — as the
+    /// <c>long</c> the runtime positions by. A numeric item reads through its OWN profile
+    /// (<c>CobolTable.Occ(x, _P_n)</c>): the count is a numeric SENDING item referenced during item identification,
+    /// so §14.6.13.2 rule 2's EC-DATA-INCOMPATIBLE check applies to a count stored as its character image exactly
+    /// as it does to a subscript (kb/Work PB1117 — the profile-less read decoded that image through a tolerant
+    /// digit scan, so the condition was unreachable and a signed image's sign was dropped). Every emitter that
+    /// needs a count calls THIS, never <c>RuntimeApi.TableOcc(Read(p), …)</c> by hand.</summary>
+    public static string CountRead(Place p) =>
+        RuntimeApi.TableOcc(Read(p), p.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false } ? p.Item.ProfileName : null);
+
     /// <summary>A C# expression that reads <paramref name="p"/>'s current value.</summary>
     public static string Read(Place p) => p switch
     {
@@ -277,6 +288,10 @@ internal static class PlaceRenderer
                 // A formal parameter's root renders through its *-ARG-OMITTED guard (kb/Work PB971).
                 RootFieldSegment r => r.Guard is { } g ? g.Render(r.CsField) : r.CsField,
                 MemberSegment m => path + "." + m.CsMember,
+                // An OCCURS DEPENDING level carries §13.18.38.4 GR7's reference-time bound check when the
+                // compilation group can enable EC-BOUND-ODO (kb/Work PB1268).
+                FixedTableSegment { Odo: { } o } f => RuntimeApi.TableAtOdo(path, f.OneBasedIndex,
+                    CountRead(o.Depending), o.MinOccurs, o.MaxOccurs),
                 FixedTableSegment f => RuntimeApi.TableAt(path, f.OneBasedIndex),
                 DynTableSegment d => $"{path}.{(dir == AccessDir.Sending ? "RefSending" : "RefReceiving")}({d.OneBasedIndex})",
                 _ => path,
@@ -696,12 +711,12 @@ internal static class PlaceRenderer
     /// is the group's own — BIT positions for a subtree holding USAGE BIT leaves (§8.5.1.6.3; kb/Work PB173),
     /// character positions otherwise — so this is the extent the <c>AsBits</c>/<c>FromBits</c> channel slices at.</summary>
     public static string LengthExpr(OdoGroupPlace p) =>
-        RuntimeApi.TableOdoExtent(RuntimeApi.TableOcc(Read(p.Depending)), p.MinOccurs, p.MaxOccurs, p.FixedUnits, p.ElemUnits);
+        RuntimeApi.TableOdoExtent(CountRead(p.Depending), p.MinOccurs, p.MaxOccurs, p.FixedUnits, p.ElemUnits);
 
     /// <summary>The same extent in CHARACTER positions — <see cref="LengthExpr"/> rounded up (the identity when the
     /// positions already ARE characters). This is what the <c>AsImage</c>/<c>FromImage</c> channel slices at.</summary>
     public static string CharLengthExpr(OdoGroupPlace p) =>
-        RuntimeApi.TableOdoExtentChars(RuntimeApi.TableOcc(Read(p.Depending)), p.MinOccurs, p.MaxOccurs,
+        RuntimeApi.TableOdoExtentChars(CountRead(p.Depending), p.MinOccurs, p.MaxOccurs,
             p.FixedUnits, p.ElemUnits, p.PositionsPerCharacter);
 
     /// <summary>⛔ THE ONE RENDERER OF A TABLE'S OCCURRENCE COUNT (the <see cref="AllCount"/> model): the fixed
@@ -715,7 +730,7 @@ internal static class PlaceRenderer
     public static string OccurrenceCount(AllCount c) => c switch
     {
         AllCount.Fixed f => f.Occurs.ToString(),
-        AllCount.Odo o => RuntimeApi.TableOdoExtent(RuntimeApi.TableOcc(Read(o.Depending)), o.MinOccurs, o.MaxOccurs, 0, 1),
+        AllCount.Odo o => RuntimeApi.TableOdoExtent(CountRead(o.Depending), o.MinOccurs, o.MaxOccurs, 0, 1),
         AllCount.Capacity cap => Read(cap.Register),
         _ => throw new InvalidOperationException($"unknown occurrence count {c.GetType().Name}"),
     };

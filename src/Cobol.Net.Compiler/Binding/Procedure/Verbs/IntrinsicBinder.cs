@@ -2787,26 +2787,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             if (IsAllSegment(innerSegs[i]))
             {
                 exprs[i] = $"{indexVar}[{counts.Count}]";
-                if (level.OccursSpec is { Depending: { } dep } odoSpec)
+                // The level's range is the ONE current-occurrence-count model (fixed / ODO / dynamic capacity).
+                if (ctx.Refs.CurrentOccurrenceCount(level, outerExprs) is not { } count)
                 {
-                    if (ctx.Refs.ResolveItem(dep) is not { } depPlace)
-                    {
-                        args.Add(BoundOperandError.Unbuilt(ctx.Edition, $"table(ALL) over OCCURS DEPENDING table '{name}': data-name-1 '{dep.CobolName}' could not be addressed"));
-                        return true;
-                    }
-                    counts.Add(new AllCount.Odo(depPlace, odoSpec.Min, level.Occurs ?? 1));
+                    args.Add(BoundOperandError.Unbuilt(ctx.Edition, level.OccursSpec is { Depending: { } dep }
+                        ? $"table(ALL) over OCCURS DEPENDING table '{name}': data-name-1 '{dep.CobolName}' could not be addressed"
+                        : $"table(ALL) over dynamic-capacity table '{name}': the table could not be addressed"));
+                    return true;
                 }
-                else if (level.IsDynamicTable)
-                {
-                    if (level.OccursSpec?.CapacityRegister is not { } reg
-                        || ReferenceResolver.BuildTablePath(level, outerExprs) is not { } tablePath)
-                    {
-                        args.Add(BoundOperandError.Unbuilt(ctx.Edition, $"table(ALL) over dynamic-capacity table '{name}': the table could not be addressed"));
-                        return true;
-                    }
-                    counts.Add(new AllCount.Capacity(new CapacityRegisterPlace(tablePath, reg)));
-                }
-                else counts.Add(new AllCount.Fixed(level.Occurs!.Value));
+                counts.Add(count);
             }
             else if (ctx.Refs.RenderIndexSegment(innerSegs[i]) is { } rendered)
                 exprs[i] = rendered;

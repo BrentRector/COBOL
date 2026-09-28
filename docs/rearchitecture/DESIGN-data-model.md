@@ -54,10 +54,10 @@ Consequences, all called out by the survey/critique:
    order-dependent on a bind-time side effect*. The data model has no single owning phase.
 2. **Reconciled by C# overload resolution.** Because the field type is undecided when the binder emits reference text,
    the runtime exposes *polymorphic overloads* so the SAME emitted string compiles either way:
-   `CobolTable.Occ(long)` / `Occ(string)` (`CobolTable.cs:48,51`); `CobolNum.StoreDisplay(…, long)` /
+   `CobolTable.Occ(long, in NumProfile)` / `Occ(string, in NumProfile)` (`CobolTable.cs#Occ`); `CobolNum.StoreDisplay(…, long)` /
    `(…, Int128)` / `(…, string)` (`CobolNum.cs:227,231,235`); `FormatDisplay(Int128,…)` / `(string,…)`
    (`CobolNum.cs:212,220`). Elegant, but it means a representation bug is **invisible until the generated C# hits
-   Roslyn** and picks the wrong overload. ⛔ **Or picks NONE**, which is how kb/Work PB201 landed: `PositionRead` emitted `CobolTable.Occ(<field>)` for every carrier, and a `double`, an unscaled `Int128`/`ulong`, a `ManagedPointer` or a group's `record struct` has no overload at all — CS1503 in the default lane, on legal source. The guard is now the carrier list `ReferenceResolver.{Unscaled,Scaled}PositionCarriers`, held to the runtime methods' real overloads by `PositionCarrierOverloadDriftTests`.
+   Roslyn** and picks the wrong overload. ⛔ **Or picks NONE**, which is how kb/Work PB201 landed: `PositionRead` emitted `CobolTable.Occ(<field>)` for every carrier, and a `double`, an unscaled `Int128`/`ulong`, a `ManagedPointer` or a group's `record struct` has no overload at all — CS1503 in the default lane, on legal source. The guard is now the carrier list `ReferenceResolver.{Numeric,NonNumeric}PositionCarriers`, held to the runtime methods' real overloads by `PositionCarrierOverloadDriftTests`.
 3. **Recompute-on-read.** `IsCharacterImage` / `IsImageCapable` / `ImageWidth` / `StrongRoot` are recursive
    computed properties (`DataItem.cs:74-83,245-300`) re-walked at ~119 sites — each an O(subtree) walk, and each
    silently sensitive to whenever `StoreAsImage` last flipped.

@@ -539,9 +539,21 @@ public static partial class CobolNum
     /// <summary>The integer ordinal position <paramref name="unscaled"/> at <paramref name="scale"/> denotes —
     /// the VALUE, de-scaled, truncating toward zero. The caller has already raised its position's exception
     /// condition for a fractional value (<see cref="HasFraction"/>); with that condition's checking OFF the
-    /// truncated position is the lenient continue, matching the surrounding out-of-range scratch policy.</summary>
-    public static long PositionOf(Int128 unscaled, int scale) =>
-        Position(scale > 0 ? unscaled / Pow10Wide(scale) : unscaled);
+    /// truncated position is the lenient continue, matching the surrounding out-of-range scratch policy.
+    /// <para>A NEGATIVE scale is a trailing-P item (<c>PIC 9P</c> stores <c>2</c> for the value 20 — the signed
+    /// scale of <see cref="NumProfile.FractionDigits"/>), whose VALUE is the stored digits times 10^|scale|; reading
+    /// the storage instead positioned occurrence 2 for the subscript 20 (kb/Work PB1117's sibling sweep). A
+    /// product past <c>long</c>'s range saturates by sign, as <see cref="Position(Int128)"/> does.</para></summary>
+    public static long PositionOf(Int128 unscaled, int scale) => scale switch
+    {
+        > 0 => Position(unscaled / Pow10Wide(scale)),
+        < 0 when unscaled == 0 => 0,
+        // |unscaled| ≤ long.MaxValue and at most 18 places keep the product inside Int128 (< 10^37); beyond
+        // either bound the value is past every table's range, so it saturates by sign.
+        < 0 when -scale <= 18 && Int128.Abs(unscaled) <= long.MaxValue => Position(unscaled * Pow10Wide(-scale)),
+        < 0 => unscaled > 0 ? long.MaxValue : long.MinValue,
+        _ => Position(unscaled),
+    };
 
     /// <summary>⛔ THE ONE NARROWING of a wide position value to the <c>long</c> every table/ref-mod accessor
     /// takes, and it SATURATES rather than wraps. ISO §8.4.2.3.4 GR2: "If the value of the subscript is not a

@@ -533,7 +533,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
     {
         var w = ctx.Writer;
         string bound = s.DynTable is { } dt ? $"{dt}.Capacity"
-            : s.DependItem is { } dp ? RuntimeApi.TableOcc(PlaceRenderer.Read(dp))
+            : s.DependItem is { } dp ? PlaceRenderer.CountRead(dp)
             : $"{s.Count}L";
         // CA36 (ISO §14.9.37.4 GR1b2): when the AT END phrase is ABSENT and EC-RANGE checking is ON, a raised
         // EC-RANGE-SEARCH-INDEX/-NO-MATCH must transfer to an applicable exception-processing statement (a USE

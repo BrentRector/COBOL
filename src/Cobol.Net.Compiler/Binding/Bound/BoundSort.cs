@@ -52,11 +52,13 @@ public sealed record BoundSort(
 /// <summary><c>SORT data-name-2 …</c> (ISO §14.9.40 Format 2, COBOL-2002+): the in-place table sort over the typed
 /// element array (COBOLNET_DESIGN §8.2 — the one sanctioned divergence from the image store: Format 2 operates on
 /// the typed array directly with a typed comparer). <paramref name="Keys"/> are element-relative member paths; an
-/// empty path is the table element itself (GR23). The whole fixed-OCCURS extent sorts (GR20/GR24).
-/// <paramref name="Table"/> is carried (not its type name) because the element's storage type is finalized by the
-/// POST-bind whole-group analysis (StoreAsImage) — the emitter reads <c>Table.ElementType</c> then.</summary>
+/// empty path is the table element itself (GR23). <paramref name="Count"/> is the table's CURRENT occurrence count
+/// (GR20 — "determined by the rules in the OCCURS clause": the fixed integer, an OCCURS DEPENDING data-name-1, or a
+/// dynamic-capacity table's current capacity), and only those occurrences are sorted and placed back (GR24; kb/Work
+/// PB1174). <paramref name="Table"/> is carried (not its type name) because the element's storage type is finalized
+/// by the POST-bind whole-group analysis (StoreAsImage) — the emitter reads <c>Table.ElementType</c> then.</summary>
 public sealed record BoundTableSort(
-    string ArrayPath, DataItem Table,
+    string ArrayPath, DataItem Table, AllCount Count,
     IReadOnlyList<BoundTableSortKey> Keys, bool DuplicatesInOrder, SortCollation Collating) : BoundStatement;
 
 /// <summary>One Format-2 table-sort key: the C# member path RELATIVE to an element variable (empty = the element

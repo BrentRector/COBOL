@@ -259,7 +259,7 @@ internal sealed class ReportWriterEmitter(
     private string RepetitionTest(ReportRepetitionGuard g)
     {
         if (g.Spec.DependingItem is not { } dn || refs.ResolveItem(dn) is not { } place) return "true";
-        string v = RuntimeApi.HostInt32(RuntimeApi.TableOcc(PlaceRenderer.Read(place)));   // the ONE integer-read of a count item
+        string v = RuntimeApi.HostInt32(PlaceRenderer.CountRead(place));   // the ONE integer-read of a count item
         return $"{g.Ordinal} < ({v} >= {g.Spec.Min} && {v} <= {g.Spec.Max - 1} ? {v} : {g.Spec.Max})";
     }
 

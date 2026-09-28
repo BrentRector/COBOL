@@ -193,7 +193,7 @@ internal static class OperandText
     /// already holds per connector (a READ) or per sort store (a RETURN).</summary>
     public static string CurrentRecordLength(BoundCurrentRecord n) =>
         n.Depending is { } dep
-            ? RuntimeApi.HostInt32(RuntimeApi.TableOcc(PlaceRenderer.Read(dep)))
+            ? RuntimeApi.HostInt32(PlaceRenderer.CountRead(dep))
             : $"(int){(n.File.IsSortMerge
                 ? RuntimeApi.SortLastReturnedLength(EmitText.FileKeyExpr(n.File))
                 : RuntimeApi.FileLastReadLength(EmitText.FileKeyExpr(n.File)))}";

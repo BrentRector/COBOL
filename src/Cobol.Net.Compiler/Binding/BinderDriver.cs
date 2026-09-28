@@ -114,10 +114,13 @@ internal sealed class BinderDriver
         // its factory's or object's external descriptions (§14.9.23.4 GR7 d)), so the same zero-scaffolding switch the
         // program units carry decides whether a class half emits them at all.
         bool externalDescribe = Procedure.EcBinder.ExternalNames.Any(turn.AnyEnabledFor);
+        bool odoReferenceChecking = turn.AnyEnabledFor("EC-BOUND-ODO");   // §13.18.38.4 GR7 (kb/Work PB1268)
         foreach (var cls in classes)
         {
             cls.Data.ExternalDescribe = externalDescribe;
             cls.FactoryData.ExternalDescribe = externalDescribe;
+            cls.Data.OdoReferenceChecking = odoReferenceChecking;
+            cls.FactoryData.OdoReferenceChecking = odoReferenceChecking;
         }
 
         OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
@@ -594,6 +597,7 @@ internal sealed class BinderDriver
         data.ArgMismatchChecking = session.Turn.EnabledAtHeader(
             "EC-PROGRAM-ARG-MISMATCH", unit.Ctx.procedureDivision(), int.MaxValue);
         data.ExternalDescribe = Procedure.EcBinder.ExternalNames.Any(session.Turn.AnyEnabledFor);
+        data.OdoReferenceChecking = session.Turn.AnyEnabledFor("EC-BOUND-ODO");   // §13.18.38.4 GR7 (kb/Work PB1268)
 
         // GLOBAL FD inheritance (ISO §13.18.30: the file-name of a GLOBAL FD is a GLOBAL name, visible in every
         // directly/indirectly contained program; §13.18.27 GR1–2 — nearest container first, a local declaration

@@ -214,7 +214,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         foreach (var s in path.Segments)
             segs.Add(s switch
             {
-                FixedTableSegment ft when !IsConstIndex(ft.OneBasedIndex) => new FixedTableSegment(HoistIndex(ft.OneBasedIndex, w)),
+                FixedTableSegment ft when !IsConstIndex(ft.OneBasedIndex) => ft with { OneBasedIndex = HoistIndex(ft.OneBasedIndex, w) },
                 DynTableSegment dt when !IsConstIndex(dt.OneBasedIndex) => new DynTableSegment(HoistIndex(dt.OneBasedIndex, w)),
                 _ => s,
             });

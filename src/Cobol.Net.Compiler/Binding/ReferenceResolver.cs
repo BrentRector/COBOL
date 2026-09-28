@@ -960,11 +960,11 @@ public sealed class ReferenceResolver(DataBinder data)
         for (DataItem? n = accessItem; n is not null; n = n.Parent)
             if (n.IsDynamicTable)
             {
-                if (BuildAccessPath(accessItem, indexExprs) is not { } dynPath) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
+                if (BuildAccessPath(accessItem, indexExprs, OdoReferenceCheckFor) is not { } dynPath) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
                 return new DynTablePlace(dynPath, item);
             }
         // An unsubscripted reference to an OCCURS table (whole-table op) is a later slice → AccessPath null → loud.
-        if (BuildAccessPath(accessItem, indexExprs) is not { } path) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
+        if (BuildAccessPath(accessItem, indexExprs, OdoReferenceCheckFor) is not { } path) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
         // (Resolving a group no longer mutates WholeGroupReferenced — the "which groups are whole-image operands"
         // analysis is the post-bind UsageCollectionPass, which walks the BOUND tree and collects ONLY true
         // whole-group operands, not every RESOLVED group. PHASE-05 Step 5, §14.9.25.4 MOVE GR4.)
@@ -1821,7 +1821,8 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <summary>The STRUCTURAL access path for an item — the <see cref="MemberPlace"/>/<see cref="DynTablePlace"/>
     /// twin of the string <see cref="AccessPath"/>: each chain node is a field segment, each OCCURS level a fixed or
     /// dynamic table segment carrying its (D10 transitional) index string. Null on a subscript-count mismatch.</summary>
-    private static AccessPath? BuildAccessPath(DataItem item, IReadOnlyList<string> indexExprs)
+    private static AccessPath? BuildAccessPath(DataItem item, IReadOnlyList<string> indexExprs,
+        Func<DataItem, OdoReferenceCheck?>? odo = null)
     {
         var chain = new List<DataItem>();
         for (DataItem? n = item; n is not null; n = n.Parent) chain.Add(n);
@@ -1836,7 +1837,7 @@ public sealed class ReferenceResolver(DataBinder data)
         {
             segs.Add(first ? RootOf(seg) : new MemberSegment(seg.CsName));
             first = false;
-            if (seg.Occurs is not null) segs.Add(new FixedTableSegment(indexExprs[si++]));       // fixed OCCURS → CobolTable.At
+            if (seg.Occurs is not null) segs.Add(new FixedTableSegment(indexExprs[si++], odo?.Invoke(seg)));   // fixed OCCURS → CobolTable.At
             else if (seg.IsDynamicTable) segs.Add(new DynTableSegment(indexExprs[si++]));         // dynamic OCCURS → RefSending/RefReceiving
         }
         return new AccessPath(segs);
@@ -1846,6 +1847,36 @@ public sealed class ReferenceResolver(DataBinder data)
     /// the string <see cref="TablePath"/> (also the base of a whole-dynamic-table INITIALIZE element path). Null when
     /// an ancestor is itself a table (an ambiguous whole-table reference).</summary>
     internal static AccessPath? BuildTablePath(DataItem table) => BuildTablePath(table, []);
+
+    /// <summary>⛔ THE ONE MODEL OF A TABLE LEVEL'S CURRENT OCCURRENCE COUNT (the <see cref="AllCount"/> the backend
+    /// renders through <c>PlaceRenderer.OccurrenceCount</c>): a fixed table's OCCURS integer (§13.18.38.4 GR4); an
+    /// occurs-depending table's data-name-1, which "represents the current number of occurrences of the subject of
+    /// the entry" (GR7 — clamped to [integer-1, integer-2] with EC-BOUND-ODO outside); a dynamic-capacity table's
+    /// current capacity (§8.5.1.9.1), whose register view carries the OUTER index expressions of a nested table.
+    /// Every statement that ranges over the CURRENT occurrences of a table it sends asks HERE — a table(ALL)
+    /// argument (§15.3) and the Format-2 table SORT (§14.9.40.4 GR20, kb/Work PB1174, whose sort used to reorder
+    /// the whole PHYSICAL array). INITIALIZE keeps its own <c>InitializeBinder.TableCount</c> because its operand is
+    /// a RECEIVING one: §13.18.38.4 GR8b gives a receiving group holding its own data-name-1 the MAXIMUM, a question
+    /// this sending-count model does not ask. <see langword="null"/> when the count
+    /// cannot be addressed (an unresolvable data-name-1, or a dynamic table with no reachable register) — the caller
+    /// reports it in its own words.</summary>
+    internal AllCount? CurrentOccurrenceCount(DataItem table, IReadOnlyList<string> outerIndexExprs) =>
+        table.IsDynamicTable
+            ? (table.OccursSpec?.CapacityRegister is { } reg && BuildTablePath(table, outerIndexExprs) is { } path
+                ? new AllCount.Capacity(new CapacityRegisterPlace(path, reg)) : null)
+        : table.OccursSpec is { Depending: { } dep } odo
+            ? (ResolveItem(dep) is { } depPlace ? new AllCount.Odo(depPlace, odo.Min, table.Occurs ?? odo.Max) : null)
+        : table.Occurs is { } n ? new AllCount.Fixed(n)
+        : null;
+
+    /// <summary>The §13.18.38.4 GR7 check a subscripted reference through <paramref name="level"/> carries
+    /// (<see cref="OdoReferenceCheck"/>, kb/Work PB1268): data-name-1's place and integer-1/integer-2 for an OCCURS
+    /// DEPENDING level, when the compilation group can enable EC-BOUND-ODO at all; <see langword="null"/> otherwise
+    /// (a fixed level, or no enabling >>TURN — the zero-scaffolding invariant). The bounds are the SAME the extent
+    /// model uses (<see cref="CurrentOccurrenceCount"/>), so the superordinate and the element checks agree.</summary>
+    private OdoReferenceCheck? OdoReferenceCheckFor(DataItem level) =>
+        data.OdoReferenceChecking && CurrentOccurrenceCount(level, []) is AllCount.Odo o
+            ? new OdoReferenceCheck(o.Depending, o.MinOccurs, o.MaxOccurs) : null;
 
     /// <summary>The STRUCTURAL whole-table path to a table that may itself lie under OTHER tables — one index
     /// expression per enclosing table level, outermost first (the D10 transitional string carrier): the
@@ -2500,14 +2531,14 @@ public sealed class ReferenceResolver(DataBinder data)
     {
         // ⛔ NO GROUP / POINTER / OBJECT-REFERENCE ARM, AND THAT IS A REACHABILITY FACT, NOT AN OMISSION
         // (kb/Work PB201). This method runs only when the fast path COMMITS to rendering the segment, and
-        // <see cref="HasPositionOverload"/> lets it commit only for a carrier <c>CobolTable.Occ</c> declares a
-        // parameter for — <c>long</c>, <c>string</c>, <c>Int128</c>, <c>ulong</c>, <c>UInt128</c>. A group's
+        // <see cref="HasPositionOverload"/> lets it commit only for a carrier the position read declares a
+        // parameter for — <c>long</c> or <c>string</c> for a non-numeric operand (numeric ones add the wide tiers). A group's
         // carrier is its per-program <c>record struct</c> and a pointer's is <c>ManagedPointer</c>, so
         // both now route to D18 and are screened by <c>ExpressionBinder.OperandRef</c> instead — the same
         // COBOLNET0844 over the same §8.8.1.1, minus this method's position phrase.
         // ⚠ THE INTERSECTION IS NARROWER THAN THAT LIST, and it is the second precondition that narrows it: only
-        // an item <c>IntrinsicArgumentRules.IsArithmeticOperandClass</c> REJECTED is ever queued, and the three
-        // wide/unsigned carriers belong to class NUMERIC items, which it accepts. So what reaches HERE is
+        // an item <c>IntrinsicArgumentRules.IsArithmeticOperandClass</c> REJECTED is ever queued, and the
+        // numeric-only carriers belong to class NUMERIC items, which it accepts. So what reaches HERE is
         // exactly: an index DATA item (an <c>IndexCell</c> is a <c>long</c>) and the string-carrier categories
         // — alphanumeric, national, boolean, numeric-edited and their edited forms.
         string what = item.Pic is { Usage: Usage.Index }
@@ -2541,26 +2572,28 @@ public sealed class ReferenceResolver(DataBinder data)
     /// arithmetic-expression-1", and §8.4.3.3.4 rule 5)c) says the same for a leftmost-position/length. Reading the
     /// storage instead is what made <c>W-E(W-S)</c> with <c>W-S = 2.0</c> index occurrence 20 and return the
     /// out-of-range scratch.</para>
-    /// <para>A scale-0 item (the overwhelming majority) keeps the EXACT previous text — the bare
-    /// <c>CobolTable.Occ(path)</c> — so the generated C# for ordinary subscripts is byte-identical and no
-    /// de-scaling division is emitted where none is needed. A scaled item passes its scale to the overload that
-    /// de-scales and raises the position's own Table 13 condition on a fractional value.</para>
+    /// <para>⛔ A NUMERIC item reads through its OWN PROFILE, at every scale and in both positions:
+    /// <c>CobolTable.Occ(path, _P_n)</c> / <c>CobolString.RefModPosition(path, _P_n)</c>. The profile carries the
+    /// scale (GR1b's integrality, and a trailing-P item's multiplier), the sign, and the byte form §14.6.13.2 rule
+    /// 2's check needs when the post-bind whole-group analysis stores the item as its character image — a position
+    /// is ITEM IDENTIFICATION, which rule 1 names as checked even inside a class condition (kb/Work PB1117). The
+    /// profile-less form this replaced decoded that image through a tolerant digit scan: EC-DATA-INCOMPATIBLE was
+    /// unreachable and a signed image's sign was dropped. Only a NON-numeric operand — the two <c>--permissive</c>
+    /// carriers COBOLNET0844 admits — keeps the bare <c>CobolTable.Occ(path)</c> digit decode.</para>
     /// <para>⚠ The runtime call is spelled out rather than routed through <c>RuntimeApi</c>: this text is produced
     /// at BIND time (the D10 transitional string carrier) and the binder cannot reference the CodeGen assembly.
     /// When PHASE 15 CUT 2.5 removes the SUBSCRIPT lexer mode and the carrier becomes <c>BoundExpr</c>, this
     /// rendering moves to the renderer with the rest of it.</para></summary>
     private string? PositionRead(DataItem item, SegmentPosition position)
     {
-        // Scale 0 — an integer item — has no integrality question to answer, so neither position can raise and the
-        // position kind is irrelevant: keep the ONE historical text unchanged for both.
-        int scale = item.Pic?.Scale ?? 0;
+        bool numeric = item.Pic is { Category: PicCategory.Numeric };
         // ⛔ THE BET ON OVERLOAD RESOLUTION IS ONLY GOOD FOR THE CARRIERS THAT HAVE AN OVERLOAD (kb/Work PB201).
-        if (!HasPositionOverload(item, scale)) return null;
+        if (!HasPositionOverload(item, numeric)) return null;
         if (AccessPath(item, []) is not { } path) return null;
-        if (scale <= 0) return $"CobolTable.Occ({path})";
+        if (!numeric) return $"CobolTable.Occ({path})";
         return position == SegmentPosition.Subscript
-            ? $"CobolTable.Occ({path}, {scale})"
-            : $"CobolString.RefModPosition({path}, {scale})";
+            ? $"CobolTable.Occ({path}, {item.ProfileName})"
+            : $"CobolString.RefModPosition({path}, {item.ProfileName})";
     }
 
     /// <summary>⛔ THE FAST PATH'S ADMISSION TEST (kb/Work PB201): can the C# text <see cref="PositionRead"/> is
@@ -2568,18 +2601,17 @@ public sealed class ReferenceResolver(DataBinder data)
     /// and lets C# overload resolution supply the conversion — the deliberate design that lets ONE text serve a
     /// carrier the post-bind whole-group analysis has not chosen yet — but that bet is good ONLY for the carrier
     /// types the emitted helper declares a parameter for.
-    /// <para><b>The overload sets are the whole rule.</b> <c>CobolTable.Occ</c> takes
-    /// <c>long | string | Int128 | ulong | UInt128</c> unscaled and <c>long | string | Int128</c> with a scale;
-    /// <c>CobolString.RefModPosition</c> takes the scaled three. The remaining carriers
-    /// <see cref="DataItem.ElementType"/> can produce — <c>double</c>/<c>float</c> (a COMP-1/COMP-2
+    /// <para><b>The overload sets are the whole rule.</b> A NUMERIC operand renders the profile arity —
+    /// <c>CobolTable.Occ(x, in NumProfile)</c> / <c>CobolString.RefModPosition(x, in NumProfile)</c> — which takes
+    /// <c>long | string | Int128 | ulong | UInt128</c> at every scale (the profile carries the scale); a
+    /// NON-numeric <c>--permissive</c> operand renders <c>CobolTable.Occ(x)</c>, which takes <c>long | string</c>.
+    /// The remaining carriers <see cref="DataItem.ElementType"/> can produce — <c>double</c>/<c>float</c> (a COMP-1/COMP-2
     /// leaf), <c>ManagedPointer</c>/<c>ProgramPointer</c>, an object reference, and a GROUP's <c>record struct</c>
     /// name — have none, and the emitted text was therefore not C# that compiles.
     /// ⚠ The FLOAT exclusion is a RULE, not a missing overload: a <c>double</c> operand can be
     /// fractional and §8.4.2.3.4 GR1b sets EC-BOUND-SUBSCRIPT when the expression "does not result in an
     /// integer", a test the scale-less overload does not perform — so a float belongs on the D18
-    /// route, where the §15.4 temp applies the rule once, to the result. The unsigned-binary carriers are
-    /// admitted UNSCALED only for the same reason from the other side: there is no scaled overload for them, and
-    /// a scaled one has an integrality question to answer.
+    /// route, where the §15.4 temp applies the rule once, to the result.
     /// MEASURED, six shapes, before this fix: <c>TE(FD1)</c> with <c>FD1 USAGE COMP-2</c>,
     /// <c>TE(BIG)</c> with <c>BIG PIC 9(20) COMP</c> and <c>TE(W-U)</c> with
     /// <c>W-U USAGE BINARY-DOUBLE UNSIGNED</c> each failed the BACKEND with
@@ -2588,7 +2620,7 @@ public sealed class ReferenceResolver(DataBinder data)
     /// GROUP subscript under <c>--permissive</c> emitted the record struct (<c>CS1503 '_T_0' to 'long'</c>) or, for
     /// a class-tier BASED group, a name with no C# field at all (<c>CS0103</c>).</para>
     /// <para><b>Why a route and not only wider overloads.</b> The three INTEGER carriers above genuinely were
-    /// missing overloads and got them (they are also needed by the second emitter, <c>RuntimeApi.TableOcc</c>,
+    /// missing overloads and got them (they are also needed by the second emitter, <c>PlaceRenderer.CountRead</c>,
     /// which renders the OCCURS DEPENDING current count at CODEGEN time and has no route to fall back to). But
     /// overloads alone can never close this: a group's carrier can never have a runtime overload, being a
     /// per-program generated type, and a pointer has no numeric value to convert at all. The
@@ -2602,29 +2634,27 @@ public sealed class ReferenceResolver(DataBinder data)
     /// posture on failure is the caller's pre-existing one. The pre-promotion reading of <c>ElementType</c> is
     /// likewise safe in the one direction it can be wrong — promotion only ever moves a leaf TO
     /// <c>CharImage</c>/<c>string</c>, which is in the set, so a leaf admitted here stays admitted.</para></summary>
-    private static bool HasPositionOverload(DataItem item, int scale)
+    private static bool HasPositionOverload(DataItem item, bool numeric)
     {
         string carrier = item.ElementType;
-        foreach (string admitted in scale > 0 ? ScaledPositionCarriers : UnscaledPositionCarriers)
+        foreach (string admitted in numeric ? NumericPositionCarriers : NonNumericPositionCarriers)
             if (admitted == carrier) return true;
         return false;
     }
 
-    /// <summary>The carrier types <c>CobolTable.Occ(<i>x</i>)</c> declares a parameter for — the ONE list
-    /// <see cref="HasPositionOverload"/> reads for a scale-0 operand, exposed so
-    /// <c>PositionCarrierOverloadDriftTests</c> can compare it
-    /// to the runtime method's ACTUAL overloads by reflection. Adding an overload without widening this list
-    /// leaves the fast path routing a carrier it could now render; widening this list without the overload puts
-    /// the CS1503 back. The test fails on either.</summary>
-    internal static readonly string[] UnscaledPositionCarriers =
+    /// <summary>The carrier types the NUMERIC position read — <c>CobolTable.Occ(<i>x</i>, in NumProfile)</c> and
+    /// <c>CobolString.RefModPosition(<i>x</i>, in NumProfile)</c> — declares a parameter for: the ONE list
+    /// <see cref="HasPositionOverload"/> reads for a numeric operand, exposed so
+    /// <c>PositionCarrierOverloadDriftTests</c> can compare it to both runtime methods' ACTUAL overloads by
+    /// reflection. Adding an overload without widening this list leaves the fast path routing a carrier it could
+    /// now render; widening this list without the overload puts the CS1503 back. The test fails on either.
+    /// <c>Int128</c> must be here for a second reason: the D18 §15.4 segment temp is a 30-digit / scale-9 item —
+    /// the wide tier — and <see cref="MaterializeViaFragment"/> reads it back through <see cref="PositionRead"/>.</summary>
+    internal static readonly string[] NumericPositionCarriers =
         ["long", "string", "Int128", "ulong", "UInt128"];
 
-    /// <summary>The carrier types <c>CobolTable.Occ(<i>x</i>, int)</c> and
-    /// <c>CobolString.RefModPosition(<i>x</i>, int)</c> declare a parameter for. It is NOT a superset of the
-    /// unscaled list: the unsigned-binary carriers have no scaled overload (a scaled operand has an integrality
-    /// question, so D18 is the right route for them), while <c>Int128</c> must be here because the D18 §15.4
-    /// segment temp is a 30-digit / scale-9 item — the wide tier — and
-    /// <see cref="MaterializeViaFragment"/> reads it back through <see cref="PositionRead"/>, so dropping it
-    /// would break the very route this guard sends work to.</summary>
-    internal static readonly string[] ScaledPositionCarriers = ["long", "string", "Int128"];
+    /// <summary>The carrier types <c>CobolTable.Occ(<i>x</i>)</c> declares a parameter for — a NON-numeric
+    /// position operand, which only <c>--permissive</c> admits (COBOLNET0844): an index data item's <c>long</c>
+    /// and a character item's <c>string</c>. Held to the runtime overloads by the same drift test.</summary>
+    internal static readonly string[] NonNumericPositionCarriers = ["long", "string"];
 }

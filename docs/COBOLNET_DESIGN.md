@@ -846,7 +846,10 @@ value of the typed RECORD KEY / RELATIVE KEY field.
 - **SORT/MERGE:** SD record is a typed struct; the sort store holds serialized images ordered by the same `CobolKey`
   policy; key offsets AND WIDTHS are BYTE windows into the deterministic serialized image, computed at compile time
   (a national position is two of those bytes — §13.18.60.4 GR8, D-N1). Format-2 in-place table SORT operates on the
-  typed array directly (the one place the two SORT forms diverge — a typed comparer). **A key's COMPARATOR is
+  typed array directly (the one place the two SORT forms diverge — a typed comparer), over the table's CURRENT
+  occurrences only (§14.9.40.4 GR20): `CobolTable.SortInPlace` receives the span the one
+  `ReferenceResolver.CurrentOccurrenceCount` model names — an OCCURS DEPENDING data-name-1's count, a
+  dynamic-capacity table's `CurrentOccurrences`, a fixed table's whole array (kb/Work PB1174). **A key's COMPARATOR is
   selected by the key's CLASS, never by the statement** (§14.9.40.4 GR5 / §14.9.24.4 GR5 resolve TWO sequences and
   each key takes the one its class names): the bound key carries a `CollatingClass`, the file sort passes it to the
   runtime as `CobolSort.KeyClass` and the table sort picks the comparer's carrier argument from it. A NATIONAL key

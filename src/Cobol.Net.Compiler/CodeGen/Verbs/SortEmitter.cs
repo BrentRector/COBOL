@@ -486,7 +486,7 @@ internal sealed class SortEmitter(EmitContext ctx,
             // §13.18.43 GR13a: the released record's length = the RECORD VARYING DEPENDING ON item's current value.
             // The runtime slices the area to it AFTER the range test — an emitted reference modification would
             // raise EC-BOUND-REF-MOD for a value past the area, a condition no RELEASE rule names.
-            w.Line($"{RuntimeApi.SortReleaseStatement(sd, image, min, max, $"(int){RuntimeApi.TableOcc(PlaceRenderer.Read(dep))}")};");
+            w.Line($"{RuntimeApi.SortReleaseStatement(sd, image, min, max, $"(int){PlaceRenderer.CountRead(dep)}")};");
             return;
         }
         // GR13b/c (no DEPENDING — incl. a varying m-TO-n SD): the named record's own size; the image renders at
@@ -561,8 +561,7 @@ internal sealed class SortEmitter(EmitContext ctx,
         var weightsArg = ts.Keys
             .Select(k => TableWeightsArg(ts.Collating, CollatingSelection.Of(k.Key.OperandPic), id, declared))
             .ToList();
-        w.Line($"var __ta{id} = {ts.ArrayPath};   // SORT table (ISO §14.9.40.4 Format 2 — in place, GR18/GR24)");
-        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
+        w.Line($"var __ta{id} = {ts.ArrayPath};   // SORT table (ISO §14.9.40.4 Format 2 — in place, GR18/GR24)");        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
         w.Line("{");
         w.Indent();
         w.Line("int __c;");
@@ -576,11 +575,16 @@ internal sealed class SortEmitter(EmitContext ctx,
         w.Line("return 0;   // GR19c — equal on every key; OrderBy stability keeps the pre-sort order (GR3c)");
         w.Outdent();
         w.Line("};");
-        // Through CobolTable.Sorted, never a bare Enumerable.OrderBy: the framework's array sort re-throws a
+        // Through CobolTable.SortInPlace, never a bare Enumerable.OrderBy: the framework's array sort re-throws a
         // comparer's exception as InvalidOperationException, which would hide a key comparison's fatal COBOL
         // exception condition from the statement guard (kb/Work PB230 — measured, not deduced).
-        w.Line($"var __ts{id} = {RuntimeApi.TableSorted($"__ta{id}", $"__tc{id}")};");
-        w.Line($"System.Array.Copy(__ts{id}, __ta{id}, __ts{id}.Length);   // GR24 — placed back in data-name-2");
+        // GR20 — only the CURRENT occurrences are sorted and placed back (GR24): an OCCURS DEPENDING table's
+        // data-name-1 count (clamped, EC-BOUND-ODO outside — §13.18.38.4 GR7), a dynamic-capacity table's current
+        // capacity, a fixed table's whole array (kb/Work PB1174 — the physical array used to be sorted).
+        string occurrences = ts.Count is AllCount.Capacity
+            ? RuntimeApi.TableCurrentOccurrences($"__ta{id}", null)
+            : RuntimeApi.TableCurrentOccurrences($"__ta{id}", PlaceRenderer.OccurrenceCount(ts.Count));
+        w.Line($"{RuntimeApi.TableSortInPlace(occurrences, $"__tc{id}")};   // GR24 — placed back in data-name-2");
     }
 
     /// <summary>The shorter-operand extension a BOOLEAN comparison takes (ISO §8.8.4.2.8 rule 2 — "as though the

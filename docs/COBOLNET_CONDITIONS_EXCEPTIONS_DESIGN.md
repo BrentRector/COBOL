@@ -254,7 +254,7 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   comparison runs inside a FRAMEWORK-OWNED comparer**: the table SORT (§14.9.40 Format 2) hands a
   `Comparison<T>` to the runtime's array sort, which catches whatever a comparer throws and re-throws it as
   `InvalidOperationException` — so the fatal EC never matched the statement guard and the run unit died
-  unhandled instead of running the program's own USE declarative. `CobolTable.Sorted` undoes that wrapper with
+  unhandled instead of running the program's own USE declarative. `CobolTable.SortInPlace` undoes that wrapper with
   `ExceptionDispatchInfo` at the ONE place a COBOL comparer meets the framework, covering any future comparer
   raise by construction. Measured, not deduced; pinned as the sweep golden's L12; with checking OFF the flag test short-circuits before the O(digits) scan and the decode stays the
   tolerant deterministic one the standard's "undefined" permits, byte-identical to a pre-slice build.

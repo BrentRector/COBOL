@@ -54,8 +54,22 @@ public sealed record RootFieldSegment(string CsField, OmittedFormalGuard? Guard 
 public sealed record MemberSegment(string CsMember) : AccessSegment;
 
 /// <summary>A FIXED OCCURS subscript — the accumulated path is wrapped in <c>CobolTable.At(path, index)</c>
-/// (ISO §8.4.2.3.4 GR2, benign out-of-range). <paramref name="OneBasedIndex"/> is the D10 transitional index string.</summary>
-public sealed record FixedTableSegment(string OneBasedIndex) : AccessSegment;
+/// (ISO §8.4.2.3.4 GR2, benign out-of-range). <paramref name="OneBasedIndex"/> is the D10 transitional index string.
+/// <paramref name="Odo"/>, when present, is the level's OCCURS DEPENDING bound that the reference itself must test
+/// (<see cref="OdoReferenceCheck"/>).</summary>
+public sealed record FixedTableSegment(string OneBasedIndex, OdoReferenceCheck? Odo = null) : AccessSegment;
+
+/// <summary>⛔ §13.18.38.4 GR7 AT AN ELEMENT REFERENCE (kb/Work PB1268): "At the time the subject of entry is
+/// referenced or any data item subordinate or superordinate to the subject of entry is referenced, the value of the
+/// data item referenced by data-name-1 shall fall within the bounds from integer-1 through integer-2. If the value of
+/// the data item does not fall within the specified bounds, the EC-BOUND-ODO exception condition is set to exist."
+/// The SUPERORDINATE reference was already checked where a group's current extent is computed
+/// (<c>CobolTable.OdoExtent</c>); a reference to the SUBJECT or to an item SUBORDINATE to it passes through this
+/// table level's subscript, so the check rides the segment: <c>CobolTable.At(path, index, count, min, max)</c>.
+/// Attached only when the compilation group can enable EC-BOUND-ODO at all (<c>DataBinder.OdoReferenceChecking</c>,
+/// the zero-scaffolding invariant): with no such >>TURN the raise could never fire and the reference renders as
+/// before. <paramref name="Depending"/> is data-name-1's place, resolved in the referencing unit's context.</summary>
+public sealed record OdoReferenceCheck(Place Depending, int MinOccurs, int MaxOccurs);
 
 /// <summary>An OCCURS DYNAMIC subscript (§8.5.1.9.2/.9.3, D9) — the accessor is direction-specific
 /// (<c>RefSending</c> on a read, <c>RefReceiving</c> on a write), chosen at RENDER time from the operation.

@@ -290,6 +290,13 @@ public sealed partial class DataBinder
     /// check against them, §14.8.4; a group with no EC-EXTERNAL TURN emits nothing — zero-scaffolding).</summary>
     public bool ExternalDescribe { get; set; }
 
+    /// <summary>True when any enabling <c>&gt;&gt;TURN</c> event anywhere in the compilation group covers
+    /// EC-BOUND-ODO — the gate for attaching §13.18.38.4 GR7's element-reference check
+    /// (<see cref="Model.OdoReferenceCheck"/>) to a subscripted OCCURS DEPENDING level. The run-time
+    /// <c>BoundOdoChecking</c> flag still decides per statement; this only keeps a group that can never enable the
+    /// condition free of the data-name-1 read at every element reference (zero-scaffolding).</summary>
+    public bool OdoReferenceChecking { get; set; }
+
     /// <summary>
     /// Bind the LINKAGE SECTION and the PROCEDURE DIVISION header's USING/RETURNING operands. Runs inside
     /// <c>Bind</c> right after WORKING-STORAGE (so linkage items join the same forest, name index, and

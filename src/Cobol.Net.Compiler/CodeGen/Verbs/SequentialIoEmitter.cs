@@ -595,7 +595,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// writes the record's own size (GR13b/c — on a varying file the runtime takes the image's length; on a
     /// fixed file it pads to the record width).</summary>
     public string? VaryingLengthArg(FileModel file) =>
-        VaryingDepending(file) is { } dep ? RuntimeApi.HostInt32(RuntimeApi.TableOcc(PlaceRenderer.Read(dep))) : null;
+        VaryingDepending(file) is { } dep ? RuntimeApi.HostInt32(PlaceRenderer.CountRead(dep)) : null;
 
     /// <summary>The record-length argument of a sequential-organization REWRITE — §13.18.43.4 GR13's number of
     /// bytes in the record, which §14.9.35.4 GR16 (record sequential: '44' unless it EQUALS the replaced record's)

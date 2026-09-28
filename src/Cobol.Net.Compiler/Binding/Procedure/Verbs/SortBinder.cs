@@ -137,7 +137,9 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // (kb/Work PB1018's sibling sweep). An ambiguous or undeclared name is reported by the resolver itself.
         bool declared = ctx.Symbols.TryResolve(name, ctx.ActiveScope, out _);
         DataItem? table = declared ? ctx.Refs.ResolveTableOperand(operand)?.Item : null;
-        if (table?.Occurs is null)
+        // SR13 is "an OCCURS clause", every format of it: a dynamic-capacity table (OCCURS DYNAMIC, §13.18.38
+        // Format 4) has no fixed integer but is a table all the same (DataItem.IsTable).
+        if (table is not { IsTable: true })
         {
             if (declared && table is null && ctx.Refs.WasDiagnosed(operand)) return BoundRejected.Reported(ctx.Edition);
             ctx.Validation.RejectStatementOperand($"SORT of '{name}' — neither a SELECTed/SD file nor an OCCURS "
@@ -150,6 +152,12 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 + "sort over a shared-storage view — deferred)");
         if (SortArrayPath(table) is not { } arrayPath)
             return new BoundUnsupported($"SORT of table '{name}' nested under another OCCURS (deferred)");
+        // §14.9.40.4 GR20 — "The number of occurrences of table elements referenced by data-name-2 is determined by
+        // the rules in the OCCURS clause": the CURRENT count (§13.18.38.4 GR7 for OCCURS DEPENDING, the current
+        // capacity for a dynamic-capacity table), never the physical array (kb/Work PB1174).
+        if (ctx.Refs.CurrentOccurrenceCount(table, []) is not { } count)
+            return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
+                $"SORT of table '{name}': its current number of occurrences cannot be addressed (ISO §14.9.40.4 GR20)");
 
         var keys = new List<BoundTableSortKey>();
         if (s.sortKeyPhrase().Length == 0)
@@ -239,7 +247,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
 
         var (collating, collErr) = SortBindCollating(s.sortCollatingPhrase());
         if (collErr is { } ce) return ce;
-        return new BoundTableSort(arrayPath, table, keys, s.sortDuplicatesPhrase() is not null, collating);
+        return new BoundTableSort(arrayPath, table, count, keys, s.sortDuplicatesPhrase() is not null, collating);
     }
 
     // ── MERGE (ISO §14.9.24) ───────────────────────────────────────────────────────────────────────────────

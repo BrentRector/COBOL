@@ -88,31 +88,39 @@ public static class CobolString
         || (!omitted && length < 0) || (length == 0 && !allowZeroLength)
         || (length > 0 && length > size - leftmost + 1);
 
-    /// <summary>A SCALED reference-modifier leftmost-position or length (ISO §8.4.3.3.4 rule 5)c); fix-queue
-    /// PB41): "If the evaluation of leftmost-position or length results in a non-integer value, a zero value, or a
-    /// value that references a position outside the area of identifier-1, the EC-BOUND-REF-MOD exception condition
-    /// is set to exist." §8.4.3.3.3 SR4 makes both positions arithmetic expressions, so a scaled numeric item is
-    /// legal there and its VALUE — not its unscaled storage — is the ordinal position.
-    /// <para>The exact twin of <c>CobolTable.Occ(…, scale)</c> for the subscript position, differing ONLY in which
-    /// Table 13 condition it names; the shared de-scale/integrality arithmetic is
-    /// <c>CobolNum.HasFraction</c>/<c>PositionOf</c>. Returns <c>long</c> because the rendered ref-mod positions
-    /// are long-valued COBOL expressions that <c>RuntimeApi.RefModStart</c>/<c>RefModLength</c> cast at the call
-    /// site. Checking OFF truncates toward zero and continues, the same lenient posture
-    /// <see cref="RefMod(string,int,int,bool)"/> takes for an out-of-range position.</para>
-    /// <para>The three arities mirror the subscript side's, and for the same reason: the item's storage form
-    /// (native <c>long</c>, character image, or the <see cref="Int128"/> wide tier of a D18 function-position
-    /// temp) is decided after the bind-time expression text is produced.</para></summary>
-    public static long RefModPosition(long unscaled, int scale) => RefModScaled(unscaled, scale);
+    /// <summary>A NUMERIC data item as a reference-modifier leftmost-position or length, decoded through the
+    /// item's own profile (ISO §8.4.3.3.4 rule 5)c); fix-queue PB41): "If the evaluation of leftmost-position or
+    /// length results in a non-integer value, a zero value, or a value that references a position outside the
+    /// area of identifier-1, the EC-BOUND-REF-MOD exception condition is set to exist." §8.4.3.3.3 SR4 makes both
+    /// positions arithmetic expressions, so a scaled numeric item is legal there and its VALUE — not its unscaled
+    /// storage — is the ordinal position; the scale is the profile's <see cref="NumProfile.FractionDigits"/>.
+    /// <para>The exact twin of <c>CobolTable.Occ(…, in NumProfile)</c> for the subscript position, differing ONLY
+    /// in which Table 13 condition it names; the shared de-scale/integrality arithmetic is
+    /// <c>CobolNum.HasFraction</c>/<c>PositionOf</c>, and the character-image arm is the SAME §14.6.13.2 rule 2
+    /// checked read (<see cref="CobolNum.ParseImageSending"/>): a position is item identification, which rule 1
+    /// names as checked even inside a class condition (kb/Work PB1117 — the tolerant digit scan it replaced made
+    /// EC-DATA-INCOMPATIBLE unreachable here and dropped a signed image's sign). Returns <c>long</c> because the
+    /// rendered ref-mod positions are long-valued COBOL expressions that <c>RuntimeApi.RefModStart</c>/
+    /// <c>RefModLength</c> cast at the call site. Checking OFF truncates toward zero and continues, the same
+    /// lenient posture <see cref="RefMod(string,int,int,bool)"/> takes for an out-of-range position.</para>
+    /// <para>The carrier overloads mirror the subscript side's, and for the same reason: the item's storage form
+    /// is decided after the bind-time expression text is produced.</para></summary>
+    public static long RefModPosition(long unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
 
-    /// <inheritdoc cref="RefModPosition(long,int)"/>
-    public static long RefModPosition(string image, int scale) =>
-        // A ref-mod position is an arithmetic expression (§8.4.3.3.3 SR4) — a NUMERIC item, whose image size
-        // its own PICTURE fixes, so the tolerant digit decode applies and NOT the §14.9.25.4 GR6 d) 3 size
-        // rule, which is a rule about an alphanumeric SENDING operand and about nothing else (kb/Work PB426).
-        RefModScaled(CobolNum.DigitMagnitude(image), scale);
+    /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
+    public static long RefModPosition(Int128 unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
 
-    /// <inheritdoc cref="RefModPosition(long,int)"/>
-    public static long RefModPosition(Int128 unscaled, int scale) => RefModScaled(unscaled, scale);
+    /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
+    public static long RefModPosition(string image, in NumProfile item) => item.ImageExceedsInt128
+        ? RefModPosition(CobolNum.ParseImageU128Sending(image, item), item)
+        : RefModScaled(CobolNum.ParseImageSending(image, item), item.FractionDigits);
+
+    /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
+    public static long RefModPosition(ulong unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
+
+    /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
+    public static long RefModPosition(UInt128 unscaled, in NumProfile item) =>
+        unscaled > (UInt128)Int128.MaxValue ? long.MaxValue : RefModScaled((Int128)unscaled, item.FractionDigits);
 
     private static long RefModScaled(Int128 unscaled, int scale)
     {

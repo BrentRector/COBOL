@@ -133,12 +133,18 @@ internal static class RuntimeApi
     public static string NumParseImage(string image, string profile, bool sending) =>
         $"{nameof(CobolNum)}.{(sending ? nameof(CobolNum.ParseImageSending) : nameof(CobolNum.ParseImage))}({image}, {profile})";
 
-    /// <summary>The table SORT (ISO §14.9.40 Format 2) — <c>CobolTable.Sorted(elements, comparison)</c>: the
-    /// stable <c>OrderBy</c> §14.9.40.4 GR19c/GR3c want, with the framework array sort's comparer-exception
-    /// wrapper undone so a key comparison's fatal COBOL exception condition still reaches the statement guard
-    /// (kb/Work PB230).</summary>
-    public static string TableSorted(string elements, string comparison) =>
-        $"{nameof(CobolTable)}.{nameof(CobolTable.Sorted)}({elements}, {comparison})";
+    /// <summary>The table SORT (ISO §14.9.40 Format 2) — <c>CobolTable.SortInPlace(occurrences, comparison)</c>
+    /// over the table's CURRENT occurrences (GR20; kb/Work PB1174): the stable <c>OrderBy</c> §14.9.40.4 GR19c/GR3c
+    /// want, with the framework array sort's comparer-exception wrapper undone so a key comparison's fatal COBOL
+    /// exception condition still reaches the statement guard (kb/Work PB230).</summary>
+    public static string TableSortInPlace(string occurrences, string comparison) =>
+        $"{nameof(CobolTable)}.{nameof(CobolTable.SortInPlace)}({occurrences}, {comparison})";
+
+    /// <summary>The current occurrences of a table as a span: a fixed or OCCURS DEPENDING table's array prefix of
+    /// <paramref name="count"/> elements, or a dynamic-capacity table's <c>CurrentOccurrences</c>.</summary>
+    public static string TableCurrentOccurrences(string table, string? count) => count is null
+        ? $"{table}.{nameof(CobolDynTable<int>.CurrentOccurrences)}"
+        : $"System.MemoryExtensions.AsSpan({table}, 0, {count})";
 
     /// <summary>The checked read of a BOOLEAN sending operand — <c>CobolBool.Sending(value)</c>: raises the fatal
     /// EC-DATA-INCOMPATIBLE for content that is not all <c>'0'</c>/<c>'1'</c> under checking (ISO §14.6.13.2
@@ -952,13 +958,22 @@ internal static class RuntimeApi
         $"{nameof(CobolString)}.{nameof(CobolString.CompareFig)}({a}, {b}, "
         + $"figIsLeft: {(figIsLeft ? "true" : "false")}{weightsArg})";
 
-    /// <summary>An OCCURS-DEPENDING current count read — <c>CobolTable.Occ</c>.</summary>
-    public static string TableOcc(string expr) => $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr})";
+    /// <summary>An integer count read — <c>CobolTable.Occ</c>, through the item's profile when it is numeric
+    /// (the checked §14.6.13.2 rule 2 read; <c>PlaceRenderer.CountRead</c> is the one caller).</summary>
+    public static string TableOcc(string expr, string? profile) => profile is null
+        ? $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr})"
+        : $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr}, {profile})";
 
     /// <summary>A FIXED OCCURS element access — the ref-returning <c>CobolTable.At(path, oneBasedIndex)</c>
     /// (ISO §8.4.2.3.4 GR2 — a benign out-of-range occurrence, subscript-checking off in COBOL-85).</summary>
     public static string TableAt(string path, string oneBasedIndex) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.At)}({path}, {oneBasedIndex})";
+
+    /// <summary>An OCCURS DEPENDING element access that also tests data-name-1 against integer-1..integer-2 at the
+    /// reference (ISO §13.18.38.4 GR7, EC-BOUND-ODO; kb/Work PB1268) — <c>CobolTable.At(path, index, count, min,
+    /// max)</c>.</summary>
+    public static string TableAtOdo(string path, string oneBasedIndex, string count, int minOccurs, int maxOccurs) =>
+        $"{nameof(CobolTable)}.{nameof(CobolTable.At)}({path}, {oneBasedIndex}, {count}, {minOccurs}, {maxOccurs})";
 
     /// <summary>The current POSITION extent of an occurs-depending GROUP operand (ISO §13.18.38 GR8) — the fixed
     /// prefix plus data-name-1's clamped value × the element width — <c>CobolTable.OdoExtent</c>. The unit is the
