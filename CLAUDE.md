@@ -24,6 +24,9 @@ Owner-emphasized, each earned by a correction. These eight are the SSOT; `PROMPT
    do not scope. Deferral, a GAP, or rejecting legal source is debt, and only an explicit owner decision.
 4. **Fix the root architectural cause.** No workarounds, no papering over, no relabeling a bug a "quirk", never
    change valid COBOL to dodge a compiler bug. Every bug is a pattern — sweep for its siblings.
+   **⛔ NO WRAPPERS, SHIMS, FORWARDERS, ALIASES OR COMPATIBILITY LAYERS, anywhere: compilers, runtime, tests,
+   scripts, tooling, skills.** There is NO backward-compatibility requirement. When something moves, is renamed or
+   is replaced, change EVERY caller and delete the old one in the same change (owner, repeated 2026-09-28).
 5. **RE-DESIGN AND RE-ARCHITECT WHEN NECESSARY — a stated scope is an estimate, never a ceiling.** This compiler
    is production quality and must stay supportable for MORE THAN A DECADE, so when a queue entry, finding or
    design doc says "one clause, no structural change" and implementation proves otherwise, the answer is the
