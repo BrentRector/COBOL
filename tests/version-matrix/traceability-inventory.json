@@ -5886,13 +5886,13 @@
   "ordinal": 9,
   "subject": "Identifier",
   "rule-digest": "e12e9ae857ba",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs",
-  "test-ref": "conformance:2002/pb399_format3_relation_legal_shapes",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#predefinedNull; src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs#BoundPredefinedNull; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NullAdmittingOperand",
+  "test-ref": "conformance:2002/pb399_format3_relation_legal_shapes; conformance:2002/pb1427_null_operand_model; conformance:2002/pb1630_null_argument_crossing; unit:PredefinedNullContextDriftTests.NullToken_IsSpelledOnlyByThePredefinedNullRule",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1427 (registrar 15b). SR9 (cite.py --check 8.4.3.1.3 9) OK): Format 8 is the 8.4.3.10 predefined address NULL. Probe p1.cob: SET P TO NULL then IF P = NULL -> TRUE; pb399 golden (cites 8.4.3.10) covers NULL as a relation operand; conformance:negative/pb148-display-null pins a NULL misuse. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — 8.4.3.1.2 makes NULL an IDENTIFIER (Format 8, predefined-address), and 8.4.3.10.3 SR1 restricts it to pointer contexts. The grammar carries NULL_ as an arm of figurativeConstant (CobolExpressions.g4:776) and of objectReference, so NULL behaves as a figurative literal. It is accepted in a relation against an alphanumeric item and runs as LOW-VALUE. The pointer SET/IF half does work.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1427 LANDED (wave 68 Y). SR9 'Predefined-address NULL is defined in 8.4.3.10' (cite.py OK 8.4.3.1.3 9)). NULL is now identifier Format 8 as 8.4.3.1.2 writes it ('Format 8 (predefined-address)', cite.py OK): its own grammar rule predefinedNull (no longer a figurativeConstant arm) and ONE bound node BoundPredefinedNull produced only by ExpressionBinder.NullAdmittingOperand in an 8.4.3.10.3 SR1 context. The refuter's PARTIAL (NULL accepted opposite an alphanumeric item and run as LOW-VALUE) no longer reproduces: IF X = NULL is COBOLNET0869 (PB1468 relation half) and every non-SR1 slot is COBOLNET2576.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-10",
@@ -7101,13 +7101,13 @@
   "ordinal": 1,
   "subject": "NULL address pointer and message tag content",
   "rule-digest": "695b4cd6d616",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#figurativeConstant; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInitializeReplacingSetCategoryIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#Sr23LiteralIsNumeric; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs; src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NullAdmittingOperand; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#RefusePredefinedNull; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckFormat3Relation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindArgOperand",
+  "test-ref": "conformance:negative/pb1427-null-string-inspect-length; conformance:negative/pb148-display-null; conformance:negative/pb216-status-null; conformance:2002/pb1427_null_operand_model; conformance:2002/pb1630_null_argument_crossing; unit:PredefinedNullContextDriftTests.BoundPredefinedNull_HasOneProducer_AndEveryCallerIsAnSr1Context",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1427 (registrar 15c). Rule (cite.py --check 8.4.3.10.3 'it may be used only as a sending operand in an INITIALIZE or a SET statement; as an argument in a program-prototype format CALL statement' -> OK §8.4.3.10.3 1) a); '... or in a pointer-or-object-reference relation condition' -> OK; b) message-tag half -> OK). Two halves. a) POINTER HALF -- DIVERGES in BOTH directions. Correctly screened (probes in E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/null/): MOVE NULL TO X / TO P -> COBOLNET0809; IF P = X -> 0869; Format-1 CALL USING NULL -> 0899 (not program-prototype format, correct); SET N TO NULL -> 0867; STOP ... STATUS NULL / DISPLAY NULL have negative witnesses (pb216, pb148). UNDER-REJECTS (NULL treated as LOW-VALUE, compiles and runs): IFX.cob `IF X = NULL` (X PIC X(4)) -> 'NE'; IFN.cob `IF N = NULL` (N PIC 9(4)) -> 'NE'; EVALX.cob `EVALUATE X WHEN NULL` -> 'W OTHER'; INSP.cob `INSPECT X TALLYING T FOR ALL NULL` -> '0000'; STRG.cob `STRING NULL DELIMITED SIZE INTO X` -> writes a NUL into X; LEN.cob `FUNCTION LENGTH(NULL)` -> '0001' (an intrinsic activation is not the function-prototype format SR1 a) names; §8.4.3.2.2 prints function-prototype-name-1 and intrinsic-function-name-1 as distinct arms). Every one must be rejected: the associated item is not of class pointer, or the context is not in SR1 a)'s list. REJECTS LEGAL SOURCE: INITIALIZE P REPLACING DATA-POINTER DATA BY NULL -> COBOLNET1982 'BY the literal NULL: identifier-2 shall be specified' although NULL IS an identifier (§8.4.3.1.2 Format 8 -> OK) and SR1 a) admits it as an INITIALIZE sending operand; CALL prototype USING BY VALUE NULL -> COBOLNET1762 'literal-2 shall be a NUMERIC literal'. CRASHES: CALL prototype USING BY CONTENT NULL to a pointer / program-pointer formal compiles and aborts at run time with EC-PROGRAM-ARG-MISMATCH (PROTOC3.cob, PROTOPP.cob). Not probed: NULL as a function-prototype activation argument and as a method-invocation argument -- same routing, sweep targets. b) MESSAGE-TAG HALF: unreachable -- the MCS facility is declined (docs/CONFORMANCE.md §4 item 1; COBOLNET1943/2205); no derived selector covers it (see GR-8.4.3.10.4-4). PB939 (open) owns only the VALUE-clause arm of the under-rejection; the other contexts are unowned.",
-  "state": "GAP"
+  "notes": "kb/Work PB1427 LANDED (wave 68 Y). SR1 'This item may be used only in the following cases, depending upon the associated data item's class' (cite.py OK 1)); a) 'it may be used only as a sending operand in an INITIALIZE or a SET statement; as an argument in a program-prototype format CALL statement, a function-prototype format function activation, or a method invocation; or in a pointer-or-object-reference relation condition' (cite.py OK 1) a)). ONE screen: every operand slot binds NULL through NonNumericLiteralOperand, which refuses it (COBOLNET2576), except the SR1 contexts, which bind through NullAdmittingOperand (INITIALIZE REPLACING, CALL / function-prototype / INVOKE arguments, relation and EVALUATE operands; SET through its own grammar senders). Measured on the w68y build: STRING NULL, INSPECT ... FOR ALL NULL, INSPECT REPLACING, UNSTRING DELIMITED BY NULL, FUNCTION LENGTH(NULL), ADD NULL, COMPUTE = NULL, MOVE NULL, DISPLAY NULL, STOP RUN WITH ERROR STATUS NULL, concatenation, NULL = NULL each COBOLNET2576 (were run as LOW-VALUE; NULL = NULL crashed codegen); INITIALIZE P/PP/O REPLACING ... BY NULL, SET, IF P = NULL, EVALUATE P WHEN NULL and the CALL / FUNCTION / INVOKE argument slots run (goldens). The per-statement arms 0809/1694/1704 for NULL are gone. SR1 b) (message-tag) has no reachable subject: USAGE MESSAGE-TAG is DECLINED non-support (COBOLNET1943, Annex A.3 item 4).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.10.4-1",
@@ -7116,13 +7116,13 @@
   "ordinal": 1,
   "subject": "NULL address pointer and message tag content",
   "rule-digest": "460f5174a165",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#ManagedPointer.Null; src/Cobol.Net.Runtime/Control/CallAbi.cs#Omitted; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#Sr23LiteralIsNumeric; src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs#ReplacementFor; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#ArgCarrierText; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfArg",
+  "test-ref": "conformance:2002/pb1427_null_operand_model; conformance:2002/pb1630_null_argument_crossing",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1427 (registrar 15c). Rule (cite.py --check 8.4.3.10.4 'the predefined address NULL references a data item of category data-pointer that contains the null address' -> OK §8.4.3.10.4 1)). VERIFIED CONFORMING in the SET / relation / INITIALIZE contexts (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/null/NULLOK2.cob, --std 2002 and 2023): initial P = NULL -> 'P0 NULL'; SET P TO ADDRESS OF X -> 'P1 NOT', 'P1B NOTNULL', NULL = P -> 'P1C NOT' (never equal to a real item's address); SET P TO NULL -> 'P2 NULL'; INITIALIZE P ALL TO VALUE -> 'P4 NULL'; bare INITIALIZE P -> 'P5 NULL'. DIVERGES in the CALL-argument context SR1 a) admits: NULL associated with a data-pointer formal is NOT treated as 'a data item of category data-pointer'. Probe E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/null/PROTOC3.cob (prototype PNT, formal `01 L-P USAGE POINTER` BY REFERENCE; `CALL PNT USING BY CONTENT NULL`): compiles clean, then 'abnormal run-unit termination: CALL argument #1: its carrier (ManagedPointer`1) cannot be read through a pointer or object-reference formal ... EC-PROGRAM-ARG-MISMATCH'; control PROTOC2.cob with a pointer item holding an address prints 'GOT ADDR'. Spec-expected: the callee receives the null data address and prints 'GOT NULL'. And PROTOV.cob `CALL PNQ USING BY VALUE NULL` (BY VALUE pointer formal) is REJECTED with COBOLNET1762 'literal-2 shall be a NUMERIC literal (§14.9.4.3 SR23)' although NULL is identifier-4 (§8.4.3.1.2 Format 8) of class pointer, which §14.9.4.3 SR22 admits (--check OK). Mechanism: finding 'NULL-as-literal'.",
-  "state": "GAP"
+  "notes": "kb/Work PB1427 LANDED (wave 68 Y). GR1 'When associated with a data-pointer, the predefined address NULL references a data item of category data-pointer that contains the null address' (cite.py OK 8.4.3.10.4 1)). INITIALIZE WP REPLACING DATA-POINTER DATA BY NULL is the GR4 SET WP TO NULL (was COBOLNET1982, NULL read as literal-1): the golden prints P1 NULL after P0 ADDR; the prototype CALL / function / INVOKE argument NULL reaches a pointer formal as its null (pb1630 golden, C NULL / V NULL / F NULL / IP NULL — the function lane had regressed to 2576 mid-change and is restored by BindArgOperand's nullAdmitting leg).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.10.4-2",
@@ -7146,13 +7146,13 @@
   "ordinal": 3,
   "subject": "NULL address pointer and message tag content",
   "rule-digest": "c365e8e66487",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Control/ProgramPointer.cs#Null; src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#ProgramPointer.Null; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs#ReplacementFor; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#ArgCarrierText",
+  "test-ref": "conformance:2002/pb1427_null_operand_model; conformance:2002/pb1630_null_argument_crossing",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1427 (registrar 15c). Rule (cite.py --check 8.4.3.10.4 'the predefined address NULL references a data item of category program-pointer that contains the NULL program address' -> OK §8.4.3.10.4 3)). ProgramPointer is a readonly struct whose default IS the null program address. VERIFIED in SET/relation/INITIALIZE (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/null/NULLOK2.cob): initial PP = NULL -> 'Q0 NULL'; SET PP TO ADDRESS OF PROGRAM \"NULLOK2\" -> 'Q1 NOT', 'Q1B NOTNULL' (a real program's address is never NULL); SET PP TO NULL -> 'Q2 NULL'; INITIALIZE PP -> 'Q4 NULL'. DIVERGES in the prototype-CALL argument context: E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/null/PROTOPP.cob (formal `01 L-P USAGE PROGRAM-POINTER`, `CALL PPT USING BY CONTENT NULL`) compiles and aborts at run time with the same EC-PROGRAM-ARG-MISMATCH carrier message, while control PROTOPP2.cob passing a program-pointer item SET TO NULL prints 'GOT NULL' -- the spec-expected output for both. Same mechanism as GR-8.4.3.10.4-1 (finding 'NULL-as-literal').",
-  "state": "GAP"
+  "notes": "kb/Work PB1427 LANDED (wave 68 Y). GR3 'When associated with a program-pointer, the predefined address NULL references a data item of category program-pointer that contains the NULL program address' (cite.py OK 8.4.3.10.4 3)). INITIALIZE WQ REPLACING PROGRAM-POINTER DATA BY NULL after SET WQ TO ENTRY prints Q1 NULL (IF NULL = WQ, NULL on the left); a program-pointer formal receives NULL BY CONTENT as its null (pb1630 Q NULL).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.10.4-4",
@@ -17721,13 +17721,13 @@
   "ordinal": 8,
   "subject": "File description entry",
   "rule-digest": "f62781c2bcd6",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection; src/Cobol.Net.Compiler/Binding/DataBinder.cs#MaterializeImpliedRecord",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1171-report-fd-record-entry; conformance:85/pb1171_report_file_legal_references",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1238, 14d). Rule: 'Format 3 is the file description entry for a report file. No record description entries or constant entries shall be associated with the file description entry for a report file.' (cite.py --check 13.4.5.3 -> OK §13.4.5.3 8)). The only code reading SR8 is MaterializeImpliedRecord's early return for IsReportFile (it skips synthesizing a record); nothing rejects a report FD that HAS records. Probe probe/fde/sr8_record (FD F REPORT IS RP. followed by 01 R PIC X(10)., RD RP PAGE LIMIT 60) compiles clean and runs. And Format 3 has no LINAGE clause: probe/fde/sr5_report_linage (FD F LINAGE IS 20 LINES REPORT IS RP.) compiles clean and runs. Expected: compile-time error for both. Finding 2. || Editions (adjudicator): 85, 2002, 2014, 2023 (report writer module, report FD Format 3; no Annex E item touches 13.4.5) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection; src/Cobol.Net.Compiler/Binding/DataBinder.cs#MaterializeImpliedRecord (SR8 honored only as 'nothing to synthesize')",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1171 LANDED (wave 68 Y; the row moved from PB1238, whose FD-format determination covers SR4/SR5, not this). SR8 'Format 3 is the file description entry for a report file. No record description entries or constant entries shall be associated with the file description entry for a report file.' (cite.py OK 13.4.5.3 8)). Asked in the FD loop after the clauses (the REPORT clause may follow any other): an FD with a REPORT clause and any subordinate entry is COBOLNET2578 (probe ws3rpt0 compiled clean). A report FD with no entry keeps no implied record (MaterializeImpliedRecord returns for a report file).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.4.5.3-9",
@@ -17736,13 +17736,13 @@
   "ordinal": 9,
   "subject": "File description entry",
   "rule-digest": "a92facb5c44a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ScreenReportFileReference; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveFile",
+  "test-ref": "conformance:negative/pb1171-report-file-io-reference; conformance:negative/pb1171-sort-merge-report-file; conformance:85/pb1171_report_file_legal_references",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1239, 14d). Rule: the subject of an FD with a REPORT clause 'may be referenced in the procedure division only by the USE statement, the WHEN phrase of a PERFORM statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase' (cite.py --check 13.4.5.3 -> OK §13.4.5.3 9)). The only screen is StatementValidation's 'file.IsReportFile && mode is Input or IO' (COBOLNET2371, citing §14.9.27.3 SR1 / §13.18.46.3 SR3): probe/fde/sr9_open_input and sr9_open_io are correctly refused, sr9_open_extend_ok correctly compiles. But probe/fde/sr9_read (READ F INTO W on the report file), sr9_delete_file (DELETE FILE F) and sr9_unlock (UNLOCK F) all compile clean and RUN. (WRITE FILE F is refused only as declined A.4.13; START F only for a missing FIRST/LAST phrase — neither for SR9.) Expected: compile-time error naming SR9 for every procedure-division reference outside the four permitted contexts. Finding 4. || Editions (adjudicator): 85, 2002, 2014, 2023 (report writer module, report FD Format 3; no Annex E item touches 13.4.5) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs (line ~1308, OPEN INPUT/I-O only); src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1171 LANDED (wave 68 Y). SR9 'The subject of a file description entry that specifies a REPORT clause may be referenced in the procedure division only by the USE statement, the WHEN phrase of a PERFORM statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase' (cite.py OK 13.4.5.3 9)). ONE screen, StatementValidation.ScreenReportFileReference (COBOLNET2577), asked by ResolveFile — THE statement file-name resolution — for every statement except OPEN and CLOSE (admitsReportFile; OPEN's INPUT / I-O half stays §14.9.27.3 SR1, COBOLNET2371), so READ, START, UNLOCK, DELETE, DELETE FILE, MERGE / RETURN file-name-1 and any future file statement are refused by construction; SORT / MERGE USING-GIVING now resolve through ResolveFile; FUNCTION EXCEPTION-FILE asks it of its argument; USE and PERFORM WHEN do not resolve through it and stay admitted. Measured on the w68y build: READ / START FIRST / UNLOCK / DELETE FILE / SORT GIVING / SORT USING / MERGE USING / EXCEPTION-FILE of a report file each COBOLNET2577 (were clean and ran); OPEN OUTPUT / EXTEND, INITIATE / GENERATE / TERMINATE, CLOSE and a USE declarative on the file still compile and run (golden OPENED / CLOSED WORLD).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.4.5.4-1",
@@ -22326,13 +22326,13 @@
   "ordinal": 3,
   "subject": "GLOBAL clause",
   "rule-digest": "ae60e962448d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveRecordName; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#FileWhoseRecordIs; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveRecordName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs",
+  "test-ref": "conformance:negative/pb1193-write-global-record-local-fd; conformance:negative/pb1193-rewrite-global-record-local-fd; conformance:85/pb1193_global_record_under_local_fd",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Rule: \"If the GLOBAL clause is not specified in the file description entry of a containing program, the file shall not be referenced directly or indirectly by any input-output statements in any contained program, unless they are defined as external files in each of the source elements in which they are referenced.\" cite.py --check 13.18.27.3 \"the file shall not be referenced directly or indirectly by any input-output statements in any contained program\" -> OK §13.18.27.3 3). PROBES @0caa7d5 (--std 2023; 85/2002 identical on the WRITE shape). DIRECT: containee `READ F` / `CLOSE F` / `WRITE R` against a non-GLOBAL FD -> COBOLNET1639 'not defined' (the file-name and a non-global record are simply not visible — correct outcome). EXTERNAL exception: container and containee each declare `FD F IS EXTERNAL`; containee WRITE -> container reads back EXTRN (allowed, correct). INDIRECT (the arm the rule exists for): a record `01 R GLOBAL` under a non-GLOBAL FD is legitimately visible in the containee (§13.18.27.3 SR1 b); a containee MOVE to it compiles and runs), and a containee `WRITE R` / `REWRITE R` is refused — but ONLY through §14.9.51.3 SR5 / §14.9.35.3 SR1 (COBOLNET1757: \"'R' is not a logical record of any file description entry\"), a false reason for this program: R IS a logical record of FD F. There is no mechanism of this rule's own; the refusal is an accident of StatementValidation.ResolveRecordName/FileWhoseRecordIs looking only at the containee's own FDs. The outcome is right on every shape probed, the diagnosis is not and is not durable — PARTIAL. Owning note kb/Work PB1193 (open): its body names SR-13.18.27.3-3 and owes the dedicated check (record visible via its own GLOBAL, FD not GLOBAL -> refuse under the containee I-O rule), not re-reported. No spec-derived test (test-needed). || Owning note: kb/Work/PB1193.",
-  "state": "GAP"
+  "notes": "kb/Work PB1193 LANDED (wave 68 Y). SR3 'If the GLOBAL clause is not specified in the file description entry of a containing program, the file shall not be referenced directly or indirectly by any input-output statements in any contained program' (cite.py OK 13.18.27.3 3)). DIRECT references: a non-GLOBAL FD's file-name is merged into no contained unit's FilesByName (BinderDriver: only f.IsGlobal files are), so every contained I/O statement naming it is an undefined name. INDIRECT references are the record-name operands — WRITE / REWRITE (their SR21 / SR3) and RELEASE (this SR3, passed as its containedRule) — refused by ResolveRecordName when the record is a GLOBAL record of a container's non-global FD (DataBinder.ContainerLocalFiles). The EXTERNAL exception needs no arm: a contained program that describes the file EXTERNAL has its own FD, so the record-name is not 'defined in a containing program'.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.27.3-4",
@@ -26931,13 +26931,13 @@
   "ordinal": 3,
   "subject": "REPORT clause",
   "rule-digest": "a92facb5c44a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckOpenModeForFile",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ScreenReportFileReference; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveFile; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckOpenModeForFile",
+  "test-ref": "conformance:negative/pb1171-report-file-io-reference; conformance:85/pb1171_report_file_legal_references",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1035. SR3: subject of an FD with a REPORT clause may be referenced in the procedure division only by USE, the WHEN phrase of PERFORM, CLOSE, or OPEN OUTPUT/EXTEND (cite.py --check 13.18.46.3 OK). Only the OPEN INPUT/I-O arm is screened (COBOLNET2371 via CheckOpenModeForFile, conformance:negative/pb318-open-report-file-input). Probe probe/report-clause/sr3.cob: `READ RPT END ...` and `UNLOCK RPT` on a report file compile and run clean (OK). Other statements referencing the file are unscreened. Owned by OPEN kb/Work PB1035 (inventory_rows SR-13.18.46.3-3) - not re-reported. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer optional module), 2002, 2014, 2023 - clause text unchanged in substance; no Annex E change entry for the REPORT clause",
-  "state": "GAP"
+  "notes": "kb/Work PB1035 (landed by PB1171, wave 68 Y — the same mechanism). §13.18.46.3 SR3 states §13.4.5.3 SR9 word for word from the REPORT clause's side ('may be referenced in the procedure division only by the USE statement, the WHEN phrase of a PERFORM statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase', cite.py OK 13.18.46.3 3)); it is the same ONE screen, ScreenReportFileReference, asked from ResolveFile. PB1035's probe `READ RPTF` after OPEN EXTEND and `UNLOCK RPTF` are COBOLNET2577 now (were clean and printed RAN).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.46.4-1",
@@ -39801,13 +39801,13 @@
   "ordinal": 9,
   "subject": "MERGE statement",
   "rule-digest": "1a8a5fcba024",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveFile",
+  "test-ref": "conformance:negative/pb1171-sort-merge-report-file",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1035 (open). cite.py --check 14.9.24.3 \"is not for a report file and is not a sort-merge file description entry\" -> OK §14.9.24.3 9). Sort-merge half VERIFIED: an SD in USING (msr9b) or GIVING (msr9c) -> COBOLNET1757 (the message cites §14.9.40.3 SR8, SORT's rule). Report-file half DEFECT: `FD RPTF REPORT IS RP.` named in USING (msr9a) or GIVING (msr9d) compiles rc=0 at 2023. The mechanism is kb/Work PB1035 (open: the §13.18.46.3 SR3 report-file reference screen covers only OPEN, and its fixer brief already lists SORT/MERGE USING/GIVING) — this row should be added to PB1035's inventory_rows, not filed separately. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1035 / PB1171 (landed wave 68 Y). MERGE SR9 'File-name-2, file-name-3, and file-name-4 shall be described in a file description entry that is not for a report file and is not a sort-merge file description entry.' (cite.py OK 14.9.24.3 9)). MERGE shares SortMapIoFiles with SORT and passes its own sentence: `MERGE SW … USING IN1 RPF GIVING IN2` is COBOLNET2577 (was clean); an SD among them is COBOLNET1757 citing SR9 (was cited as the SORT rule).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-10",
@@ -43236,13 +43236,13 @@
   "ordinal": 3,
   "subject": "REWRITE statement",
   "rule-digest": "bb8e9d349065",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindExternalAndGlobal",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveRecordName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#BindRewrite; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData",
+  "test-ref": "conformance:negative/pb1193-rewrite-global-record-local-fd; conformance:85/pb1193_global_record_under_local_fd",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1193 (registrar 14c). \"If record-name-1 is defined in a containing program and is referenced in a contained program, the file description entry for the file associated with record-name-1 shall contain a GLOBAL clause.\" A GLOBAL FD's records join the GLOBAL roots (DataBinder.Linkage) and its file-name joins the contained program's FilesByName (BinderDriver); a non-GLOBAL FD's records are not visible, so the reference fails resolution. Probe pe.cob (FD F without GLOBAL, contained program does `REWRITE R1`) -> error COBOLNET1639 'R1' is not defined; pf.cob (FD F GLOBAL) compiles and runs. The rule is enforced by the scope mechanism rather than a REWRITE-specific diagnostic; the message cites 8.4.2.1, not this SR. cite.py --check 14.9.35.3 SR3 -> OK. No spec-derived negative fixture for REWRITE. || REFUTED: PARTIAL — The adjudicator's premise is false: it says 'a non-GLOBAL FD's records are not visible, so the reference fails'. But §13.18.27.3 SR1 b) lets a file-section 01 record carry its OWN GLOBAL clause, which makes it a global name even when the FD has no GLOBAL. SR3 exists for exactly that case, and it has no mechanism of its own. REWRITE R1 is rejected only because the compiler silently DROPS the GLOBAL clause on a file-section 01 record (a separate defect): a plain MOVE to that global record in the contained program is also rejected with 'R1 is not defined', although it is legal. So the rejection is an accident of that defect, and the diagnostic gives the wrong reason (§8.4.2.1 undefined name instead of §14.9.35.3 SR3). Fix that defect and SR3 is no longer enforced at all. The simple case (neither the FD nor the record GLOBAL) is correctly rejected, so this is PARTIAL. [editions as adjudicated: 2023; ISO 1989:2023 Annex E lists no 2014->2023 change to this rule (E.3.3 item 41 touches GR10 only), so 2014 identically; the 1985/2002 wording is not derivable from the 2023 text]",
-  "state": "GAP"
+  "notes": "kb/Work PB1193 LANDED (wave 68 Y). SR3 'If record-name-1 is defined in a containing program and is referenced in a contained program, the file description entry for the file associated with record-name-1 shall contain a GLOBAL clause.' (cite.py OK 14.9.35.3 3)). The REWRITE twin of SR21 through the same ResolveRecordName arm (the caller passes its own sentence as containedRule): a contained REWRITE of a GLOBAL record under a non-GLOBAL FD is COBOLNET1757 naming SR3 (was the false 'not a logical record' reason). ResolveRecordName is called before the sequential/keyed reroute, so every organization is under it.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.35.3-4",
@@ -46116,13 +46116,13 @@
   "ordinal": 8,
   "subject": "SORT statement",
   "rule-digest": "e75720871a44",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveFile",
+  "test-ref": "conformance:negative/pb1171-sort-merge-report-file",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1171 (registrar 14c). cite.py --check 14.9.40.3 \"is not for a report file and is not a sort-merge file description entry\" OK (SR8). Two halves. (1) not a sort-merge file description entry: SortMapIoFiles `if (f.IsSortMerge) return ... (ISO §14.9.40.3 SR8)` -> COBOLNET1757; PROBES s8usd (USING SW2, an SD) and s8gsd (GIVING SW2) rc 70 COBOLNET1757 — conforms. (2) not for a report file: NO check — SortMapIoFiles never asks whether the FD carries a REPORT clause. PROBES --std 2023 with `FD RPF REPORT IS RPT` (RD RPT PAGE LIMIT 60): s8grp `SORT SW ASCENDING K1 USING IN1 GIVING RPF` rc 0; s8urp `... USING RPF GIVING OU1` rc 0 — both SR8 violations compile clean (a report file is sequential, so the organization gate does not catch it either). Harm: under-rejects. Verdict DIVERGES (one half enforced, the other absent). No kb/Work note covers it (searched 'SR-14.9.40.3-8', '14.9.40.3 SR8', 'report file' + GIVING). [editions as adjudicated: 85, 2002, 2014, 2023 (Format 1).]",
-  "state": "GAP"
+  "notes": "kb/Work PB1171 LANDED (wave 68 Y). SR8 'File-name-2 and file-name-3 shall be described in a file description entry that is not for a report file and is not a sort-merge file description entry.' (cite.py OK 14.9.40.3 8)). SortMapIoFiles resolves each USING / GIVING name through ResolveFile with this sentence as the statement rule, so a report file is COBOLNET2577 naming SR8 (probes s8grp SORT … GIVING RPF and s8urp USING RPF were rc 0); the sort-merge half stays the SD refusal (COBOLNET1757). An undeclared USING / GIVING name is now the ONE §8.4.2.1 verdict (COBOLNET1639) rather than a private 'is not declared' message.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-9",
@@ -49281,13 +49281,13 @@
   "ordinal": 12,
   "subject": "WRITE statement",
   "rule-digest": "562c8eeb5c94",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#BindWrite; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#UnsupportedOrg; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ScreenSortMergeFile",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#BindWrite; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ScreenReportFileReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#UnsupportedOrg",
+  "test-ref": "conformance:negative/pb1171-report-fd-record-entry",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1171 (registrar 14c). SR12: 'The file description entry associated with the write file shall not contain the REPORT clause and shall not be a sort-merge file description entry.' (--check OK). SORT-MERGE HALF conforms: `SD S. 01 SR ... WRITE SR` -> COBOLNET1692 via UnsupportedOrg -> ScreenSortMergeFile (probe probe/write-statement-p1/ws2sd.cob); the keyed arm (which does not call UnsupportedOrg) is unreachable for an SD because §12.4.5.2 SR9 rejects ORGANIZATION RELATIVE/INDEXED on a sort-merge entry first (ws4sdr COBOLNET1900). No negative test pins WRITE of an SD record (pb140 covers CLOSE/DELETE only). REPORT HALF DIVERGES: nothing in BindWrite or the keyed arm tests file.IsReportFile; the only IsReportFile screen is OPEN's mode check. `FD P REPORT IS RP. 01 PR PIC X(10).` + `INITIATE RP / GENERATE DL / WRITE PR / GENERATE DL / TERMINATE RP` compiles clean and runs; the report file receives 'HELLO\\r\\nINJECTED\\r\\nHELLO\\r\\n' (probe ws4rpt.cob) - a record written into a report file by a statement SR12 forbids. The record description itself is already illegal (§13.4.5.3 SR8 'No record description entries or constant entries shall be associated with the file description entry for a report file.' --check OK) and is also accepted (ws3rpt0 rc=0) - the root mechanism. Expected: a compile-time error for the WRITE (SR12) and for the FD's record entry (§13.4.5.3 SR8). No register note owns this (PB345/PB677/PB694 are different defects). [editions as adjudicated: 1985, 2002, 2014, 2023 (base WRITE statement; the 2023 text records no change to this rule in Annex E)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1171 LANDED (wave 68 Y). SR12 'The file description entry associated with the write file shall not contain the REPORT clause and shall not be a sort-merge file description entry.' (cite.py OK 14.9.51.3 12)). Both halves now: the REPORT half is ScreenReportFileReference asked of the file ResolveRecordName returned (COBOLNET2577), the sort-merge half UnsupportedOrg / ScreenSortMergeFile (COBOLNET1692). The record such a WRITE names is itself refused at its entry (§13.4.5.3 SR8, COBOLNET2578); probe ws4rpt (WRITE PR between GENERATEs, which injected INJECTED into the report output) now reports both. WRITE FILE is declined (Annex A.4.13), so the record is the only write-file operand.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.51.3-13",
@@ -49416,13 +49416,13 @@
   "ordinal": 21,
   "subject": "WRITE statement",
   "rule-digest": "b017efc722cd",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#FileWhoseRecordIs; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveRecordName",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#ResolveRecordName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#BindWrite; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData",
+  "test-ref": "conformance:negative/pb1193-write-global-record-local-fd; conformance:85/pb1193_global_record_under_local_fd",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1193 (registrar 14c). SR21: 'If record-name-1 is defined in a containing program and is referenced in a contained program, the file description entry for the file-name associated with record-name-1 shall contain a GLOBAL clause.' (--check OK). Enforced by scope: a non-GLOBAL FD's record-name is not visible in the contained program, so `WRITE R` there fails name resolution (probe ws3nest0: COBOLNET1639 'R' is not defined, rc=70); with `FD F IS GLOBAL` the contained WRITE resolves through FilesByName to the container's one connector and runs (ws3nest1 prints DONE). The diagnostic is the generic undefined-name one rather than an SR21-specific message, which is adequate (§8.4.2.1). No spec-derived golden writes a GLOBAL FD's record from a contained program (pb123_exception_file_global_fd has no WRITE), so test-ref is empty. || REFUTED: PARTIAL — The adjudicator's premise is false: it says a non-GLOBAL FD's record is not visible in the contained program, so WRITE R fails name resolution. But 13.18.27.3 SR1 b) lets a file-section 01 record carry its OWN GLOBAL clause, and SR21 exists for exactly that case: the record is visible, yet the FD has no GLOBAL, so WRITE must be rejected. The pinned compiler rejects that shape only because it ignores record-level GLOBAL in the file section entirely: MOVE \"HELLO\" TO R is refused too, with a false 'R is not defined' message. So the SR21 outcome depends on a separate defect, and there is no SR21-specific check. Once record-level GLOBAL is honoured, WRITE R would pass silently. Same finding as the REWRITE twin, SR-14.9.35.3-3. A separate wrong-rejection defect also needs a note: a GLOBAL 01 under a non-GLOBAL FD is not visible to contained programs. [editions as adjudicated: 1985, 2002, 2014, 2023 (base WRITE statement; the 2023 text records no change to this rule in Annex E)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1193 LANDED (wave 68 Y). SR21 'If record-name-1 is defined in a containing program and is referenced in a contained program, the file description entry for the file-name associated with record-name-1 shall contain a GLOBAL clause.' (cite.py OK 14.9.51.3 21)). The record is visible through its own GLOBAL clause (13.18.27.3 SR1 b), cite.py OK) under a non-GLOBAL FD; ResolveRecordName finds its FD in DataBinder.ContainerLocalFiles (the containers' non-global files, recorded by BinderDriver beside the GLOBAL-FD merge) and refuses the contained WRITE BY SR21 (COBOLNET1757). Before: the same WRITE was refused 'not a logical record of any file description entry' — the refuter's PARTIAL (right outcome, false reason, no SR21 check). A GLOBAL FD's record written by the contained program still runs (golden F2 WROTE); the contained MOVE into the global record runs (golden C OUTER / F1 INNER).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.51.3-22",
@@ -57606,13 +57606,13 @@
   "ordinal": 0,
   "subject": "NULL address pointer and message tag content",
   "rule-digest": "57a051c943cd",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NULL_; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#figurativeConstant; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressSender; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#BoundFigurative",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#predefinedNull; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NULL_",
+  "test-ref": "conformance:2002/pb1427_null_operand_model; unit:PredefinedNullContextDriftTests.NullToken_IsSpelledOnlyByThePredefinedNullRule",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1427 (registrar 15c). Rule: the general format is the single required word NULL (cite.py --check 8.4.3.10.2 context; §8.4.3.1.2 'Format 8 (predefined-address)' -> OK; §8.4.3.1.3 SR9 'Predefined-address NULL is defined in 8.4.3.10' -> OK). The WORD is recognized: NULL_ token, and SET/IF/INITIALIZE-TO-VALUE probes in E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/null/NULLOK2.cob compile and run. PARTIAL, not CONFORMS, because §8.4.3.1.2 makes NULL an IDENTIFIER (Format 8) while the grammar carries it only as an arm of figurativeConstant (CobolExpressions.g4 ~776, 'carried in the grammar's figurative rule for parse convenience only' per IntrinsicArgumentRules.cs:389) plus the two SET-specific arms; every identifier-only slot therefore sees it as literal-1 (INITIALIZE REPLACING identifier-2, CALL Format 2 BY VALUE identifier-4) and every literal slot admits it as LOW-VALUE. See the findings 'NULL-as-literal' (rejects legal / crashes) and 'NULL-as-LOW-VALUE' (under-rejects). Editions: the pointer category and NULL predefined address are COBOL-2002 introductions (the 2023 Annex E covers 2014->2023 only and lists no change); the message-tag reading is 2023 (E.3.2 item 1 'Asynchronous messaging' -> OK).",
-  "state": "GAP"
+  "notes": "kb/Work PB1427 LANDED (wave 68 Y). The general format is the single word NULL; the grammar spells it by ONE rule, predefinedNull : NULL_ (carried by nonNumericLiteral, the SET senders setAddressSender / objectReference, callByReference and invokeArgument's BY REFERENCE arm), no longer an arm of figurativeConstant — the drift test fails if NULL_ is spelled in any other parser rule (the reservedGatedWord COBOL-85 user-word gate excepted).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.11.2",

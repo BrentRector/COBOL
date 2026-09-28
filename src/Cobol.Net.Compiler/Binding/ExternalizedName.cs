@@ -75,6 +75,14 @@ internal static class ExternalizedName
             Reject($"{tag} shall not be a figurative constant ({rule})");
             return null;
         }
+        // The predefined NULL is an identifier, not a literal (kb/Work PB1427) — the ONE §8.4.3.10.3 SR1 refusal, not
+        // the boolean-literal verdict the last arm below would have given it.
+        if (nn.predefinedNull() is not null)
+        {
+            PredefinedNullRule.Report(edition, $"{where}: {tag}, which shall be an alphanumeric or national literal "
+                + $"({rule}),");
+            return null;
+        }
         string value;
         if (nn.concatenationExpression() is { } ce)
         {
@@ -90,12 +98,15 @@ internal static class ExternalizedName
         else if (nn.STRINGLIT() is { } s) value = CobolLiteral.Decode(s.GetText());
         else if (nn.HEXLIT() is { } x) value = CobolLiteral.DecodeHex(x.GetText());
         else if (nn.NATLIT() is { } nat) value = CobolLiteral.Decode(nat.GetText());
-        else
+        else if (nn.BOOLLIT() is not null)
         {
             Reject($"{tag} shall be an alphanumeric or national literal — a boolean literal is not an "
                    + $"externalized name ({rule})");
             return null;
         }
+        else
+            throw new InvalidOperationException($"{where}: nonNumericLiteral alternative '{nn.GetText()}' has no "
+                + "externalized-name decoding — the grammar rule grew an arm this screen does not read");
         if (rejectZeroLength && value.Length == 0)
         {
             Reject($"{tag} shall not be a zero-length literal ({rule})");

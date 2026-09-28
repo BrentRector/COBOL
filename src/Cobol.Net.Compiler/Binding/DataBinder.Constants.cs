@@ -247,11 +247,24 @@ public sealed partial class DataBinder
                 + $"constant (ISO §13.10.3 SR6; '{nn.GetText()}')");
             return null;
         }
+        // The predefined NULL is an identifier, not literal-1, and §13.10.3 SR7 makes every operand of
+        // arithmetic-expression-1 a literal — so no alternative of the AS operand admits it (kb/Work PB1427; this
+        // decoder used to take it for the boolean arm and threw).
+        if (nn.predefinedNull() is not null)
+        {
+            PredefinedNullRule.Report(Edition, $"the AS operand of {where}, which is literal-1 or an arithmetic "
+                + "expression whose operands are all literals (ISO §13.10.2; §13.10.3 SR7)");
+            return null;
+        }
+        // ⛔ EVERY alternative is named: a new nonNumericLiteral arm fails loudly here instead of being decoded as the
+        // last one listed.
         var (cat, value) =
             nn.STRINGLIT() is { } s ? (PicCategory.Alphanumeric, CobolLiteral.Decode(s.GetText()))
             : nn.HEXLIT() is { } x ? (PicCategory.Alphanumeric, CobolLiteral.DecodeHex(x.GetText()))
             : nn.NATLIT() is { } nat ? (PicCategory.National, CobolLiteral.Decode(nat.GetText()))
-            : (PicCategory.Boolean, CobolLiteral.Decode(nn.BOOLLIT()!.GetText()));
+            : nn.BOOLLIT() is { } b ? (PicCategory.Boolean, CobolLiteral.Decode(b.GetText()))
+            : throw new InvalidOperationException($"{where}: nonNumericLiteral alternative '{nn.GetText()}' has no "
+                + "constant-entry decoding — the grammar rule grew an arm this decoder does not read");
         return new ConstantDef(name, cat, value, null, isGlobal,
             new ConcatFolder.Folded(cat, value).RawText, spec);
     }

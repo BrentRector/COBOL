@@ -45,7 +45,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             {
                 string name = spec.dataReference().GetText();
                 // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-                if (!ctx.Validation.ResolveFile(name, "OPEN", out var file)) return BoundRejected.Reported(ctx.Edition);
+                if (!ctx.Validation.ResolveFile(name, "OPEN", out var file, admitsReportFile: true)) return BoundRejected.Reported(ctx.Edition);
                 // §14.9.27.3 SR8: OPEN … SHARING WITH ALL OTHER (clause or phrase) requires a LOCK MODE clause,
                 // unless file-name-1 is subject to an APPLY COMMIT clause. The effective mode is THIS group's
                 // phrase over the file-control clause — §14.9.27.4 GR23: "If there is no SHARING phrase on the
@@ -98,7 +98,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         {
             string name = phrase.fileName().GetText();
             // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-            if (!ctx.Validation.ResolveFile(name, "CLOSE", out var file)) return BoundRejected.Reported(ctx.Edition);
+            if (!ctx.Validation.ResolveFile(name, "CLOSE", out var file, admitsReportFile: true)) return BoundRejected.Reported(ctx.Edition);
             // §13.4.6.3 SR3: an SD file-name in a CLOSE — the statement previously compiled and ran against an
             // unregistered connector whose fail-open status read '00' (kb/Work PB140).
             if (ctx.Validation.ScreenSortMergeFile(file, "CLOSE") is not null)
@@ -174,8 +174,15 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             return recordAnswer.Refusal(ctx.Edition);   // the resolver's answer (kb/Work PB1030)
         if (!ctx.Validation.ResolveRecordName(record, rn.GetText(), "WRITE",
                 "record-name-1 \"is the name of a logical record in the file section of the data division and "
-                + "may be qualified\" (ISO §14.9.51.3 SR5)", out var file))
+                + "may be qualified\" (ISO §14.9.51.3 SR5)",
+                "ISO §14.9.51.3 SR21 — \"If record-name-1 is defined in a containing program and is referenced in a "
+                + "contained program, the file description entry for the file-name associated with record-name-1 shall "
+                + "contain a GLOBAL clause.\"", out var file))
             return BoundRejected.Reported(ctx.Edition);   // ResolveRecordName REPORTED; a refused operand is not an unbuilt one
+        // §14.9.51.3 SR12's REPORT half (its sort-merge half is UnsupportedOrg's) — kb/Work PB1171.
+        if (!ctx.Validation.ScreenReportFileReference(file, "WRITE", "ISO §14.9.51.3 SR12 — \"The file description "
+                + "entry associated with the write file shall not contain the REPORT clause\""))
+            return BoundRejected.Reported(ctx.Edition);
         // The WRITE lock/RETRY phrases (§14.9.51 Format 1/2 — [retry-phrase] [WITH LOCK | WITH NO LOCK]) bind
         // for EVERY organization; the emitter routes a lock-relevant statement through the governed runtime entry.
         BoundRecordLock wlock = fileLock.CheckRecordLockPhrase(file, w.recordLockPhrase(), "WRITE");   // §14.9.51 SR22 → COBOLNET1512
@@ -329,8 +336,15 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             return recordAnswer.Refusal(ctx.Edition);   // the resolver's answer (kb/Work PB1030)
         if (!ctx.Validation.ResolveRecordName(record, rn.GetText(), "REWRITE",
                 "record-name-1 \"is the name of a logical record in the file section of the data division and "
-                + "may be qualified\" (ISO §14.9.35.3 SR1)", out var file))
+                + "may be qualified\" (ISO §14.9.35.3 SR1)",
+                "ISO §14.9.35.3 SR3 — \"If record-name-1 is defined in a containing program and is referenced in a "
+                + "contained program, the file description entry for the file associated with record-name-1 shall "
+                + "contain a GLOBAL clause.\"", out var file))
             return BoundRejected.Reported(ctx.Edition);   // ResolveRecordName REPORTED; a refused operand is not an unbuilt one
+        // §14.9.35.3 SR11's REPORT half, asked of the record's file (the FILE format is declined) — kb/Work PB1171.
+        if (!ctx.Validation.ScreenReportFileReference(file, "REWRITE", "ISO §14.9.35.3 SR11 — \"File-name-1 shall "
+                + "not reference a report file or a sort-merge file description entry\""))
+            return BoundRejected.Reported(ctx.Edition);
         BoundRecordLock rlock = fileLock.CheckRecordLockPhrase(file, rw.recordLockPhrase(), "REWRITE");   // §14.9.35 SR4 → COBOLNET1512
         RetrySpec? rretry = fileLock.BindVerbRetry(rw.retryPhrase());                                      // §14.7.9 / §14.9.35 GR11
         if (!file.IsSequential) return keyedIo.BindRewrite(rw, file, record, rlock, rretry);   // relative/indexed REWRITE (ISO 14.9.35 GR18-25)

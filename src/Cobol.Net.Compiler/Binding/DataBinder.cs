@@ -254,6 +254,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// targets and to map a WRITE/REWRITE record-name back to its owning file.</summary>
     public Dictionary<string, FileModel> FilesByName { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Every file of every CONTAINING program that is NOT a global name here — its FD has no GLOBAL clause
+    /// (ISO §13.18.27.3 SR1 d)), so its file-name is not in <see cref="FilesByName"/>. It is still reachable through a
+    /// record: a file-section level-1 entry may carry its own GLOBAL clause (SR1 b)), and the record-name is then
+    /// visible here. Read ONLY by <c>StatementValidation.ResolveRecordName</c>, to refuse WRITE / REWRITE of such a
+    /// record by §14.9.51.3 SR21 / §14.9.35.3 SR3 (kb/Work PB1193); filled by <c>BinderDriver.BindUnitData</c> beside
+    /// the GLOBAL FD merge.</summary>
+    public List<FileModel> ContainerLocalFiles { get; } = [];
+
     /// <summary>Names DECLARED in the SCREEN SECTION, which is REFUSED as the declined Annex A.4.2 module
     /// (COBOLNET1560; <see cref="ScreenFacility"/>). Two consumers, both still needed after the refusal:
     /// <list type="number">
@@ -1610,6 +1618,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     }
                     if (ge.GLOBAL() is not null) file.IsGlobal = true;
                 }
+            // §13.4.5.3 SR8 — "Format 3 is the file description entry for a report file. No record description
+            // entries or constant entries shall be associated with the file description entry for a report file."
+            // Asked after the clause loop because the REPORT clause may follow any other clause (kb/Work PB1171:
+            // such a record used to compile, and a WRITE of it injected a line into the report output).
+            if (file.IsReportFile && fd.dataDescriptionEntry() is { Length: > 0 } entries)
+                Edition.Error(DiagnosticCatalog.ReportFileRecordEntry, $"file description entry '{name}' specifies a "
+                    + $"REPORT clause and has {entries.Length} record description or constant "
+                    + $"entr{(entries.Length == 1 ? "y" : "ies")} subordinate to it — ISO §13.4.5.3 SR8: \"No record "
+                    + "description entries or constant entries shall be associated with the file description entry "
+                    + "for a report file.\" Remove them; the report's lines come from its REPORT SECTION description.");
             // §13.16.3 SR7's FD half — every WRITTEN record of an EXTERNAL / GLOBAL FD has a data-name
             // (DataBinder.ClausePlacement.cs; kb/Work PB518). Before the implied record, which is not written.
             ScreenFileRecordEntryNames(file);
@@ -4221,6 +4239,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         List<EditingPhraseSpec>? editingSpecs = null;   // PICTURE EDITING phrases (§13.18.40.2), threaded to PictureAnalyzer
         LocaleEditSpec? pictureLocale = null;           // PICTURE format 2 — the LOCALE phrase (§13.18.40.2; PB64 T6)
         List<TableValueSpec>? tableValues = null;       // Format 2 (table) VALUE phrases (§13.18.63.2)
+        bool valueClauseWritten = false;                 // §13.16.3 SR10 asks whether the clause was WRITTEN
         bool gluedMultiLiteral = false;                 // a Format-1 VALUE with >1 operand (no FROM) — the glued-list reject
         // USAGE OBJECT REFERENCE, as WRITTEN — the four independent axes §13.18.60.2 prints, kept raw here and
         // adjudicated into an ObjectRefDescriptor below (OoBindObjectRefDescriptor), where the class table and
@@ -4444,6 +4463,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     redefinesTargetName = redefTarget;
                 else if (clause.Context.valueClause() is { } value)
                 {
+                    valueClauseWritten = true;
                     string valueWhere = $"data item '{cobolName ?? "FILLER"}'";
                     // ⛔ §13.18.63.3 SR33 — "Formats 3 and 5 may be specified only when the level-number of the
                     // subject of the entry is 88." This arm binds only non-88 entries (BindEntry returns early
@@ -4598,7 +4618,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // the PRINTED general format (folio 503): FUNCTION-POINTER's TO phrase carries NO brackets while
         // PROGRAM-POINTER's does, so every function-pointer is restricted and a bare one is nonconforming.
         bool isFunctionPointer = entryUsage is Usage.FunctionPointer;
-        if (UsageFamilies.AdmitsNoValueLiteral(entryUsage) && (rawValue is not null || tableValues is not null))
+        // §13.16.3 SR10 is a rule about the SUBJECT — "shall not be specified" — so it keys on the clause having been
+        // WRITTEN, not on a value having been read: an operand the literal-position screen refused (`VALUE NULL`,
+        // COBOLNET2576 — kb/Work PB1427) leaves no value, and the subject's own violation is reported as well.
+        if (UsageFamilies.AdmitsNoValueLiteral(entryUsage) && valueClauseWritten)
         {
             Edition.Error(DiagnosticCatalog.ValueOnNonLiteralUsage, $"{entryWhere}: the VALUE clause shall not be "
                 + $"specified with USAGE {UsageFamilies.UsageWord(entryUsage)} ({UsageFamilies.NoValueClauseRule(entryUsage)})");
@@ -5017,6 +5040,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // §13.18.52.3 SR1/SR2 speak about the entry that WROTE the SIGN clause — screened post-forest by
         // CheckSignClauses (DataBinder.SignClause.cs), where group-ness and the inherited usage are known.
         if (ownSign is not null) _signClauseWritten.Add(item);
+        // §13.16.3 SR10 for the ACQUIRED usage (the post-forest arm below) asks the same question the own-usage arm
+        // asks — was a VALUE clause written on this entry — so it reads this set, never the value (kb/Work PB1427).
+        if (valueClauseWritten) _valueClauseWritten.Add(item);
         // The Format 2 (table) VALUE's ALL-FORMATS literal screen (§13.18.63.3 SR2/SR3 + SR16's pull-in). The
         // clause's GEOMETRY (SR18–SR23) and its §13.18.63.4 GR12–GR16 resolution are the post-forest
         // ResolveTableValues pass — they read the entry's OCCURS ANCESTORS, which do not exist yet here.
@@ -5508,10 +5534,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // ALL cobolWord is the ONE word-bearing figurative alternative: Format 7 (§8.3.3.6.2), whose word SR4
             // requires to be declared in SYMBOLIC CHARACTERS, or Format 6 over a constant-name literal-1 (§13.10.3
             // SR2 — kb/Work PB1627). Every other alternative — STRINGLIT / NATLIT / BOOLLIT / HEXLIT, a concatenation
-            // expression, ALL literal-1, and the keyword figuratives ZERO / SPACE / HIGH-VALUE / LOW-VALUE / QUOTE /
-            // NULL — is a literal by shape.
-            return nn.figurativeConstant()?.cobolWord()?.GetText() is not { } symWord
-                || SymbolicOf(symWord) is not null || FindConstant(symWord) is not null;
+            // expression, ALL literal-1, and the keyword figuratives ZERO / SPACE / HIGH-VALUE / LOW-VALUE / QUOTE —
+            // is a literal by shape. The predefined NULL is NOT: it is an identifier (§8.4.3.1.2 Format 8), and
+            // §8.4.3.10.3 SR1 names no VALUE clause among the places it may be written (kb/Work PB1427 / PB939 —
+            // counted a literal here, `PIC X VALUE NULL` stored LOW-VALUE).
+            return nn.predefinedNull() is null
+                && (nn.figurativeConstant()?.cobolWord()?.GetText() is not { } symWord
+                || SymbolicOf(symWord) is not null || FindConstant(symWord) is not null);
         // §8.3.3.3.2 rule 2 makes a written sign part of the numeric literal, so strip the unary arms before
         // asking what the primary is (`VALUE -9999` is literal-1, not an arithmetic expression).
         var u = op.unaryExpression();
@@ -5562,6 +5591,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// shape.</summary>
     private readonly HashSet<Core.ValueClauseOperandContext> _valueOperandDiagnosed = [];
 
+    /// <summary>The entries that WROTE a VALUE clause (data-item formats 1 and 2) — the subject of §13.16.3 SR10, "The
+    /// VALUE clause shall not be specified for data items of class index, message-tag, object, or pointer". Kept apart
+    /// from <see cref="DataItem.RawValue"/> because a refused operand (`VALUE NULL`, COBOLNET2576) stores no value
+    /// while the clause is still specified, and the acquired-usage arm is asked after the forest is built.</summary>
+    private readonly HashSet<DataItem> _valueClauseWritten = [];
+
     /// <summary>THE report for a VALUE operand that occupies a literal position and is not a literal (kb/Work
     /// PB732) — the data-division arm of the R30 "a word that names nothing" chokepoint, which
     /// <c>ReferenceResolver.Resolve</c> closes for the PROCEDURE DIVISION and which the VALUE clause never
@@ -5583,6 +5618,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (!_valueOperandDiagnosed.Add(op)) return;
         position ??= LiteralPosition.Value;
         using var _ = Edition.At(op);
+        if (op.nonNumericLiteral()?.predefinedNull() is not null)
+        {
+            PredefinedNullRule.Report(Edition, $"{position.Operand} of {where}, where {position.Format},");
+            return;
+        }
         if (op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symWord)
         {
             Edition.Error(DiagnosticCatalog.UndefinedReference, $"{where}: {position.Operand} "
@@ -6033,7 +6073,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // reached it, so `01 G USAGE INDEX. 05 A VALUE 1.` is the same violation as `05 A USAGE INDEX VALUE 1.`,
         // with the same diagnostic BindEntry reports for the written clause (kb/Work PB515: the acquired spelling
         // compiled clean and seeded the index item). The value is dropped after the report, as there.
-        if (acquired && UsageFamilies.AdmitsNoValueLiteral(effective) && (item.RawValue is not null || item.TableValues is not null))
+        if (acquired && UsageFamilies.AdmitsNoValueLiteral(effective)
+            && (_valueClauseWritten.Contains(item) || item.RawValue is not null || item.TableValues is not null))
         {
             Edition.Error(DiagnosticCatalog.ValueOnNonLiteralUsage, $"data item '{name}': the VALUE clause shall not "
                 + $"be specified with USAGE {UsageFamilies.UsageWord(effective)}, inherited from its group "

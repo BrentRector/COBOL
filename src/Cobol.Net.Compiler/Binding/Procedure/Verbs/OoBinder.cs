@@ -137,6 +137,16 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // its USING arguments and its written RETURNING identifier. §8.4.3.4.4 GR1 defines the inline form
         // as the equivalent INVOKE, so both syntaxes reach this same resolution and the same §14.8 checks.
         var site = InvocationSite.OfInvokeStatement(inv);
+        // §14.9.23.3 SR9 — "Identifier-3 shall be an address-identifier or shall reference a data item defined in the
+        // file, working-storage, local-storage, or linkage section": BY REFERENCE NULL is neither, refused by THAT rule
+        // (it drew the §8.9 reserved-word diagnostic through `dataReference`) — CallBinder's SR3 arm is the twin
+        // (kb/Work PB1427). BY CONTENT / BY VALUE NULL are the §8.4.3.10.3 SR1 a) method-invocation argument.
+        foreach (var a in inv.invokeUsing()?.invokeArgument() ?? [])
+            if (a.predefinedNull() is not null)
+                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.InvokeOperandSection,
+                    "INVOKE … USING BY REFERENCE NULL: ISO §14.9.23.3 SR9 — identifier-3 \"shall be an address-identifier "
+                    + "or shall reference a data item defined in the file, working-storage, local-storage, or linkage "
+                    + "section\", and the predefined NULL (§8.4.3.7 / §8.4.3.10) is neither; pass it BY CONTENT or BY VALUE");
         // INVOKE (§14.9.23, OO) is a COBOL-2002 introduction; the edition gate fires on RECOGNITION in the
         // VersionConformancePass parse arm (VisitInvokeStatement), never on the BoundInvoke node this method
         // builds. It keyed on the node until kb/Work PB353, which was wrong BOTH ways: an INVOKE whose target
@@ -998,7 +1008,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // no-truncation requirements are ignored for literal arguments), so an overflow converts per the MOVE
         // rules rather than erroring. A constant-name arrived above already substituted (§13.10.4 GR1).
         literal2 ??= foldedAlnum is not null ? new BoundStringLiteral(foldedAlnum)
-            : nonNumCtx is not null ? host.Expr.NonNumericLiteralOperand(nonNumCtx)
+            : nonNumCtx is not null ? host.Expr.NullAdmittingOperand(nonNumCtx)   // §8.4.3.10.3 SR1 a): a method-invocation argument
             : numLitRaw is not null ? new BoundNumericLiteral(numLitRaw)
             : null;
         // Into a numeric formal §14.8.2.3.3 rule 2a's COMPUTE reads the figurative constant ZERO as the numeric value
@@ -1050,7 +1060,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
                     ? new BoundInvokeArg(formal, null, numLit.Text, null, WriteBack: false, ByContent: true)
                     : new BoundInvokeArg(formal, null, null, numLit.Text, WriteBack: false, ByContent: true);
-            case BoundFigurative { Kind: 'N' }:
+            case BoundPredefinedNull:
                 // ⛔ NULL IS AN IDENTIFIER, identifier-5 (kb/Work PB1137 + PB1630): §8.4.3.1.3 SR7 lists the
                 // predefined-object references among the identifier formats, §8.4.3.7.3 SR2 describes the NULL object
                 // reference as "class object and category object reference", and §8.4.3.10.3 SR1 a) admits the NULL
@@ -1065,7 +1075,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 }
                 return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
                     { PredefinedNull = true };
-            case BoundFigurative { Kind: not 'N' } or BoundAllLiteral:
+            case BoundFigurative or BoundAllLiteral:
                 // ⛔ A FIGURATIVE CONSTANT IS literal-2 TOO (kb/Work PB1617): §8.3.3.6.3 SR1 — "A figurative constant
                 // may be used whenever 'literal' appears in a format" — and this switch refused every one but NULL as
                 // "not yet carried". It takes the shared §14.8.2.3.3 verdict (rule 2a refuses any but ZERO into a

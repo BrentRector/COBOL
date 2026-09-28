@@ -1352,8 +1352,12 @@ callArgument
     | arithmeticExpression
     ;
 
+// predefinedNull is admitted ONLY so CallBinder can refuse it by §14.9.4.3 SR3's name (superset parse, bind narrow):
+// identifier-2 "shall reference an address-identifier or a data item defined in the file, working-storage,
+// local-storage, or linkage section", and the predefined NULL is neither — without the arm it matched `dataReference`
+// and drew the §8.9 reserved-word diagnostic, a rule it does not break (kb/Work PB1427).
 callByReference
-    : BY? REFERENCE (addressIdentifier | dataReference | OMITTED)
+    : BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
     ;
 
 // BY is an OPTIONAL word before VALUE exactly as before REFERENCE/CONTENT — only VALUE is underlined in the
@@ -1677,7 +1681,7 @@ setAddressReceiver
 setAddressSender
     : dataAddressIdentifier
     | dataReference
-    | NULL_
+    | predefinedNull
     ;
 
 // §8.4.3.1.2 identifier FORMAT 9 — "address-identifier": `{ data-address-identifier-1 |
@@ -1776,7 +1780,7 @@ setObjectReferenceStatement
 
 objectReference
     : dataReference
-    | NULL_
+    | predefinedNull
     | SELF
     | SUPER
     ;

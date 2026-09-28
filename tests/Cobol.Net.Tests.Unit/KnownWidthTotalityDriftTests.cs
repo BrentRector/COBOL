@@ -38,7 +38,7 @@ public sealed class KnownWidthTotalityDriftTests
     public void KnownWidth_CoversEveryBoundOperandLeaf_OrAdjudicatesIt()
     {
         string tree = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "Bound", "BoundTree.cs"));
-        var leaves = Regex.Matches(tree, @"public sealed record (?<t>Bound\w+)\([^)]*\)\s*:\s*BoundOperand")
+        var leaves = Regex.Matches(tree, @"public sealed record (?<t>Bound\w+)(\([^)]*\))?\s*:\s*BoundOperand")
             .Select(m => m.Groups["t"].Value).ToHashSet();
         Assert.True(leaves.Count >= 8, $"the BoundOperand leaf scan found only {leaves.Count} — the regex "
             + "no longer matches BoundTree.cs's record shapes; fix the scan, not the assertion");

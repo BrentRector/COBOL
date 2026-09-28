@@ -52,10 +52,10 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             // RAISE identifier-1 — an exception OBJECT (§14.9.29.3 SR2/SR3; §14.6.13.1.5). NOT TURN-gated
             // (§7.3.25 takes exception-NAMES only) and never fatal by itself (GR2).
             var oref = r.objectReference();
-            if (oref.NULL_() is not null || oref.SUPER() is not null)
+            if (oref.predefinedNull() is not null || oref.SUPER() is not null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0848",
-                    $"RAISE {(oref.NULL_() is not null ? "NULL" : "SUPER")}: NULL and SUPER shall not be "
+                    $"RAISE {(oref.predefinedNull() is not null ? "NULL" : "SUPER")}: NULL and SUPER shall not be "
                     + "specified as the raised object (ISO §14.9.29.3 SR2)");
             }
             ctx.EcState.Raise = true;   // the machinery gate — the object channel is live once used

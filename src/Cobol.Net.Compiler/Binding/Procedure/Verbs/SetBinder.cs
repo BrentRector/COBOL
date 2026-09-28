@@ -80,7 +80,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // answer PB817 filed as "the other end, which a fixer will otherwise miss".
             var sorRefs = sor.dataReference();
             var objRef = sor.objectReference();
-            bool sorNull = objRef.NULL_() is not null;
+            bool sorNull = objRef.predefinedNull() is not null;
             bool sorSelf = objRef.SELF() is not null;
             bool sorSuper = objRef.SUPER() is not null;
             return SetFormatSelection.Select(_fmt.KindsOf(sorRefs), SetDirections.To, out _) switch

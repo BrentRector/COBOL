@@ -765,6 +765,24 @@ banned substrate.)* See §14.8 for the `CobolString` vs `CobolStrings` roster sp
 - **Figurative constants** map: SPACE→`' '`, ZERO→`'0'`/`0L` (by receiver category), QUOTE→`'"'`, **HIGH-VALUE →
   U+00FF (alphanumeric) / U+FFFF (national), LOW-VALUE → U+0000** (the cross-subsystem settlement — §14.9), ALL "x"
   repeat-to-width.
+- **The predefined NULL is an IDENTIFIER, never a figurative constant** (kb/Work PB1427). §8.4.3.1.2 lists it as
+  identifier Format 8 (predefined-address) and the NULL arm of Format 6 (predefined-object); §8.3.3.6.2's seven
+  figurative formats do not include it. The grammar gives it its own rule, `predefinedNull`, carried by
+  `nonNumericLiteral` (every operand slot that parsed it while it was a `figurativeConstant` arm still parses it —
+  superset parse) and by the SET senders, `callByReference` and `invokeArgument`'s BY REFERENCE arm. It binds to
+  ONE node, `BoundPredefinedNull`, produced ONLY by `ExpressionBinder.NullAdmittingOperand` in a §8.4.3.10.3 SR1
+  context (INITIALIZE REPLACING, a program-prototype CALL / function-prototype activation / method-invocation
+  argument, a relation or EVALUATE operand); every other slot binds through `NonNumericLiteralOperand`, which refuses
+  it — **COBOLNET2576**, the one SR1 screen — so a slot nobody thought about is refused by construction instead of
+  running NULL as LOW-VALUE. Admission is not acceptance: each context then decides NULL against its other operand
+  or formal (the Format-3 relation band, §14.8.2 conformance, INITIALIZE's SET-form category agreement). The
+  renderers throw on it outside those contexts. The positions that decode a literal WITHOUT the operand model — a
+  constant entry's AS operand, every VALUE clause operand (data item, condition-name, report group; the one
+  `DataBinder.IsLiteralValueOperand` predicate, which does not count NULL a literal), a concatenation operand, an
+  externalized name — refuse it with the same code and the same text, `PredefinedNullRule.Report`; §13.16.3 SR10's
+  class-pointer VALUE screen (COBOLNET2168) keys on the clause being WRITTEN, so `USAGE POINTER VALUE NULL` draws
+  both rules. `PredefinedNullContextDriftTests` pins the producer and its callers, the one reporter, and that every
+  literal decoder outside the PROCEDURE DIVISION binders decides the `predefinedNull` arm.
 - **A typed `StringLvalue` IS a `Place`** (§14.1) — not a second abstraction.
 
 ### 7.4 Hard problems
@@ -895,7 +913,11 @@ names → the standard `__outer` ref-bridges), `StatementValidation.ResolveRecor
 operand rule, shared by WRITE §14.9.51.3 SR5, REWRITE §14.9.35.3 SR1 and RELEASE §14.9.32.3 SR1, and the
 successor to `SequentialIoBinder.FileOfRecord`, which tested CONTAINMENT where the rule says IDENTITY
 (`COBOLNET_FILES_DESIGN.md` §"The `record-name-1` operand") — resolves a contained WRITE/REWRITE of the owner's
-record through the merge, and the I-O status routes to the owner's local status item (§12.4.5.8.4 GR1 NOTE 1);
+record through the merge, and the I-O status routes to the owner's local status item (§12.4.5.8.4 GR1 NOTE 1).
+A record may be GLOBAL when its FD is not (§13.18.27.3 SR1 b)): the record-name is visible in a contained program
+and its FILE is not, so the container's non-global FileModels are kept in `DataBinder.ContainerLocalFiles` for ONE
+question — `ResolveRecordName` refuses a contained WRITE / REWRITE of such a record by WRITE §14.9.51.3 SR21 /
+REWRITE §14.9.35.3 SR3 (COBOLNET1757; kb/Work PB1193), never by the false "not a logical record" arm;
 OPTIONAL files (OPEN INPUT missing → 05 + EOF; non-optional missing → 35);
 sequential RELATIVE WRITE assigns the next slot and MOVEs it into the RELATIVE KEY field; LINAGE (LINAGE-COUNTER,
 page reset/overflow, footing area, END-OF-PAGE). After each I/O verb the compiler stores `LastStatus` into the FILE

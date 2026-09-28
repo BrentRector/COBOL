@@ -108,6 +108,10 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             // BooleanData2002 (the B"…" literal introduction) gates on RECOGNITION in the VersionConformancePass
             // parse-arm (VisitNonNumericLiteral, statement-scoped); Step 14h.4b.
             return new BoundBoolLiteral(CobolLiteral.Decode(bl.GetText()));
+        // The predefined NULL is no boolean operand and a boolean expression is no §8.4.3.10.3 SR1 context: the ONE
+        // SR1 refusal (COBOLNET2576), through the literal mapping that owns it (kb/Work PB1427).
+        if (nn?.predefinedNull() is not null && host.Expr.NonNumericLiteralOperand(nn) is BoundOperandError nullErr)
+            return BoundBoolError.Carry(nullErr.Feature, nullErr.IsUnbuilt);
         if (nn?.figurativeConstant() is { } fig)
         {
             if (fig.zeroWord() is not null) return new BoundBoolAll("0");   // figurative ZERO — boolean zeros by context (§8.3.3.6.4 GR4)
@@ -1230,7 +1234,9 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // variable-length groups" and which cite.py's rule_path nonetheless prints, kb/Work PB222) and
         // §8.3.3.2 Format 2 makes X"…" an alphanumeric literal — fell past every arm here and staged loud as
         // "comparison operand" at run time, while the SAME literal worked in a MOVE (DA3).
-        if (host.Expr.NonNumericLiteralOperand(vo?.nonNumericLiteral()) is { } litOp) return litOp;
+        // §8.4.3.10.3 SR1: a relation condition is a context NULL may occupy — the checkpoint's §8.8.4.2.3 SR5
+        // band then decides it against the other operand (pointer / object / message-tag only, COBOLNET0869).
+        if (host.Expr.NullAdmittingOperand(vo?.nonNumericLiteral()) is { } litOp) return litOp;
         if (vo?.arithmeticExpression() is { } expr)
             return SoleDataRef(expr) is { } dref ? host.Expr.FieldOperand(dref)
                 // ⛔ THE SOLE-FUNCTION SHORT-CIRCUIT (kb/Work PB172), the fourth member of the family above and

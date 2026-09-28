@@ -221,6 +221,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // every class and position. The lexer already restricts a BOOLLIT's content to [01]+ (CobolLexer.g4).
         if (nn.NATLIT() is { } nat) return NationalLiteralOperand(nat.GetText());
         if (nn.BOOLLIT() is { } b) return BooleanLiteralOperand(b.GetText());
+        if (nn.predefinedNull() is { } pn) return RefusePredefinedNull(pn);
         return null;
     }
 
@@ -230,6 +231,35 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     public BoundOperand LiteralOperand(Core.LiteralContext lit) =>
         NonNumericLiteralOperand(lit.nonNumericLiteral())
         ?? new BoundNumericLiteral(CheckLiteral(lit.GetText()));
+
+    /// <summary>⛔ THE ONE PRODUCER OF <see cref="BoundPredefinedNull"/> — the operand slot of a §8.4.3.10.3 SR1
+    /// context, which the predefined NULL may occupy: "it may be used only as a sending operand in an INITIALIZE or
+    /// a SET statement; as an argument in a program-prototype format CALL statement, a function-prototype format
+    /// function activation, or a method invocation; or in a pointer-or-object-reference relation condition" (SR1
+    /// a; SR1 b's message-tag relation condition is the same relation slot). Every other slot binds through
+    /// <see cref="NonNumericLiteralOperand"/>, which REFUSES NULL (COBOLNET2576) — so a slot nobody thought about is
+    /// refused by construction instead of running NULL as LOW-VALUE (kb/Work PB1427).
+    /// <para>Admission is not acceptance: each caller still decides NULL against its other operand or formal —
+    /// the relation checkpoint's §8.8.4.2.3 SR5 band (COBOLNET0869), the §14.8.2 argument conformance
+    /// (<c>ParameterConformance</c>), INITIALIZE's §14.9.20.3 SR4 category agreement. The callers are pinned by
+    /// <c>PredefinedNullContextDriftTests</c>: a new one must be an SR1 context.</para></summary>
+    public BoundOperand? NullAdmittingOperand(Core.NonNumericLiteralContext? nn) =>
+        nn?.predefinedNull() is not null ? BoundPredefinedNull.Instance : NonNumericLiteralOperand(nn);
+
+    /// <summary>The <c>literal</c>-node twin of <see cref="NullAdmittingOperand(Core.NonNumericLiteralContext?)"/>
+    /// — the same §8.4.3.10.3 SR1 admission, else <see cref="LiteralOperand"/>'s mapping.</summary>
+    public BoundOperand NullAdmittingOperand(Core.LiteralContext lit) =>
+        NullAdmittingOperand(lit.nonNumericLiteral()) ?? new BoundNumericLiteral(CheckLiteral(lit.GetText()));
+
+    /// <summary>The §8.4.3.10.3 SR1 refusal — the ONE diagnostic for NULL written in a slot the rule does not list
+    /// (kb/Work PB1427). It replaced the per-statement NULL arms (the STOP/GOBACK status, DISPLAY, MOVE screens),
+    /// each of which re-stated the rule for its own verb while every verb without an arm ran NULL as LOW-VALUE. The
+    /// text is <see cref="PredefinedNullRule"/>'s, shared with the positions outside the operand model.</summary>
+    private BoundOperandError RefusePredefinedNull(Core.PredefinedNullContext pn)
+    {
+        PredefinedNullRule.Report(ctx.Edition, "this operand position");
+        return BoundOperandError.Refused(ctx.Edition, $"NULL at line {pn.Start.Line}");
+    }
 
     /// <summary>Bind a §8.8.3 concatenation expression as a literal operand: fold to the equivalent single
     /// literal (§8.8.3.3 GR2/GR3 — the ONE ConcatFolder chokepoint enforces the §8.8.3.2 SRs) and produce the
@@ -305,7 +335,6 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         if (fig.highValueWord() is not null) return new BoundFigurative('H');
         if (fig.lowValueWord() is not null) return new BoundFigurative('L');
         if (fig.quoteWord() is not null) return new BoundFigurative('Q');
-        if (fig.NULL_() is not null) return new BoundFigurative('N');
         return BoundOperandError.Refused(ctx.Edition, $"figurative constant '{ConcatFolder.Spelling(fig)}'");
     }
 
@@ -1009,6 +1038,13 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 + "(ISO §8.8.1.1 — arithmetic operands shall be numeric; §8.3.3.2.1 — both formats of the "
                 + "alphanumeric literal are of class and category alphanumeric)" + where);
             return BoundExprError.Refused(ctx.Edition, $"literal {text} in a numeric context");
+        }
+        // The predefined NULL in an arithmetic position: no §8.4.3.10.3 SR1 context is one, so it is the ONE SR1
+        // refusal (COBOLNET2576) rather than §8.8.1.1's — NULL is not a literal whose class failed the screen.
+        if (nn.predefinedNull() is { } pn)
+        {
+            RefusePredefinedNull(pn);
+            return BoundExprError.Refused(ctx.Edition, $"NULL in a numeric context");
         }
         // ⛔ NO SILENT FALL-THROUGH. Every `nonNumericLiteral` alternative the grammar lists is covered above, so
         // reaching here means the RULE grew an alternative this screen has not read — which is exactly the

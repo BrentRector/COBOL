@@ -273,10 +273,13 @@ public sealed class StopGobackExitCodeTests
     // literal arm, skipped the rule entirely: measured, `STATUS WS-K` with `01 WS-K CONSTANT AS 1.5` compiled
     // clean and exited 1.
     [InlineData("STOP RUN WITH ERROR STATUS WS-K.", "COBOLNET1704", "§14.9.42.3 SR3 via §13.10.4 GR1")]
-    // NULL is not literal-1 and not an identifier: §8.3.3.6.2 lists no NULL format (it is a predefined address /
-    // object reference, §8.4.3.10.1) and §8.4.3.10.3 SR1 confines it to INITIALIZE/SET, a prototype argument, or
-    // a pointer-or-object-reference relation condition.
-    [InlineData("STOP RUN WITH ERROR STATUS NULL.", "COBOLNET1704", "§8.4.3.10.3 SR1")]
+    // NULL is not literal-1 (§8.3.3.6.2 lists no NULL figurative format); it is an IDENTIFIER (§8.4.3.1.2 Format 8),
+    // so it fills the identifier-1 slot, and the rule it breaks FIRST is the one deciding whether it may be written
+    // there at all: §8.4.3.10.3 SR1 confines it to INITIALIZE/SET, a prototype argument or a pointer-or-object-
+    // reference relation condition. §14.9.42.3 SR2's category test cannot even be asked — NULL references a
+    // data-pointer item only through an associated data item (§8.4.3.10.4 GR1), and a STATUS phrase associates
+    // none. So it draws the ONE §8.4.3.10.3 SR1 code (kb/Work PB1427), not the position's own 1704.
+    [InlineData("STOP RUN WITH ERROR STATUS NULL.", "COBOLNET2576", "§8.4.3.10.3 SR1")]
     // A BIT group is neither an integer data item nor a display/national one — the arm the ONE §8.5.2.1 usage
     // reader keeps rejecting (usage bit) while it admits the NATIONAL and the ALPHANUMERIC group (PB217/PB411).
     [InlineData("STOP RUN WITH ERROR STATUS WS-BITGRP.", "COBOLNET1704", "§14.9.42.3 SR2")]

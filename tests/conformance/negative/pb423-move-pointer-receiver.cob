@@ -10,6 +10,10 @@
 *> 'CobolNet.Runtime.ManagedPointer'" - in place of a COBOL diagnostic. 13.18.60.3 SR9 is the rule the
 *> programmer wants instead: a data-pointer data item may be referenced "in a SET statement", never a MOVE.
 *>
+*> The sender is an alphanumeric data item, a legal MOVE sender, so the receiver is the ONLY violation: `MOVE NULL
+*> TO P` (this case's original spelling) now stops at the sender, which ISO 8.4.3.10.3 SR1 refuses first
+*> (COBOLNET2576, kb/Work PB1427), and would no longer witness the receiving arm.
+*>
 *> The edition band starts at 2002 because USAGE POINTER is a COBOL-2002 element (13.18.60); below it the
 *> declaration itself is gated and the program would be rejected for a different reason.
        IDENTIFICATION DIVISION.
@@ -17,6 +21,7 @@
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 P USAGE POINTER.
+       01 A PIC X(4) VALUE "ABCD".
        PROCEDURE DIVISION.
-           MOVE NULL TO P
+           MOVE A TO P
            STOP RUN.

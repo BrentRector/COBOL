@@ -335,6 +335,9 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     public NumX Visit(BoundCurrentRecord n) => AlnumNum(OperandText.CurrentRecordImage(n), _sending);
     // BoundAllLiteral (ALL "x" in a numeric context) and BoundBoolOperand (a class-boolean operand) are not numeric
     // operands — the former loud `_ =>` default handled them; now explicit (byte-identical loud value; §8.8.1).
+    public NumX Visit(BoundPredefinedNull n) =>
+        throw new InvalidOperationException("the predefined NULL reached a numeric rendering: only a §8.4.3.10.3 SR1 context "
+        + "binds it (ExpressionBinder.NullAdmittingOperand), and every such context renders it itself (kb/Work PB1427)");
     public NumX Visit(BoundAllLiteral n) => new(EmitText.LoudValue("long", $"bound operand '{nameof(BoundAllLiteral)}'"), 0);
     public NumX Visit(BoundBoolOperand n) => new(EmitText.LoudValue("long", $"bound operand '{nameof(BoundBoolOperand)}'"), 0);
 

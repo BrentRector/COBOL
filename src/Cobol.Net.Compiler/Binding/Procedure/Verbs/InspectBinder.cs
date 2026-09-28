@@ -364,18 +364,15 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         if (c.functionCall() is { } fc) return (host.Intrinsic.IntrinsicOperand(fc), false);
         if (c.inlineMethodInvocation() is { } imi)   // §8.4.3.1.2 Format 4; kb/Work PB428
             return (host.Oo.OoInlineInvocationOperand(imi), false);
-        // §8.8.3.3 GR3: a concatenation expression is the equivalent single literal — fold and use it as the
-        // INSPECT literal operand (not Figurative: the fold result is a plain literal value).
-        if (c.literal()?.nonNumericLiteral()?.concatenationExpression() is { } ce)
-            return (host.Expr.ConcatOperand(ce), false);
-        if (c.literal()?.nonNumericLiteral()?.STRINGLIT() is { } s)
-            return (new BoundStringLiteral(CobolLiteral.Decode(s.GetText())), false);
-        // National/boolean literal operands decode char-correct (the class-mix SR validation across the
-        // INSPECT operand set is §14.9.22.3 SR4, recorded by InspectCharOperand and enforced in BindPhrases — kb/Work PB980).
-        if (c.literal()?.nonNumericLiteral()?.NATLIT() is { } nlit)
-            return (host.Expr.NationalLiteralOperand(nlit.GetText()), false);
-        if (c.literal()?.nonNumericLiteral()?.BOOLLIT() is { } blit)
-            return (host.Expr.BooleanLiteralOperand(blit.GetText()), false);
+        // ⛔ THE ONE nonNumericLiteral MAPPING (kb/Work DA3), not a private copy of it (kb/Work PB1427). This arm
+        // used to decode concatenation / STRINGLIT / NATLIT / BOOLLIT by hand — a copy with no HEXLIT arm, so
+        // `INSPECT … FOR ALL X"41"` (§8.3.3.2 Format 2 is the ALPHANUMERIC literal) fell to the tail below and was
+        // refused as "a numeric literal", and with no NULL arm, so the predefined NULL — which is no INSPECT
+        // operand (§8.4.3.10.3 SR1) — drew the same wrong reason. The mapping folds a concatenation (§8.8.3.3
+        // GR3), decodes each literal class char-correct (the SR4 class mix is recorded by InspectCharOperand and
+        // enforced in BindPhrases — kb/Work PB980), and refuses NULL by the ONE SR1 screen (COBOLNET2576).
+        if (host.Expr.NonNumericLiteralOperand(c.literal()?.nonNumericLiteral()) is { } litOp)
+            return (litOp, false);
         if (c.dataReference() is { } dref)
         {
             // A bare symbolic character IS a figurative constant (§12.3.7.4 GR11; kb/Work PB110) — one character,
@@ -401,7 +398,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         fig.zeroWord() is not null ? '0'
         : fig.spaceWord() is not null ? ' '
         : fig.highValueWord() is not null ? '\u00ff'
-        : fig.lowValueWord() is not null || fig.NULL_() is not null ? '\u0000'
+        : fig.lowValueWord() is not null ? '\u0000'
         : fig.quoteWord() is not null ? '"'
         : ' ';
 }

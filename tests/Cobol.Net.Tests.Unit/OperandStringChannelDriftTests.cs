@@ -168,7 +168,10 @@ public sealed class OperandStringChannelDriftTests
         // OperandText.CurrentRecordImage, so the intrinsic-argument channel forwards rather than going loud.
         // No intrinsic argument can BE one today (it is built only for a READ/RETURN INTO implicit MOVE), and
         // a loud arm for an unreachable-but-imageable operand is precisely PB25's wrong-stage failure.
-        string[] delegated = ["BoundFieldOperand", "BoundFigurative", "BoundAllLiteral", "BoundCurrentRecord"];
+        // BoundPredefinedNull (kb/Work PB1427) is DELEGATED to the one rule, which THROWS: the predefined NULL is
+        // bound only in a §8.4.3.10.3 SR1 context and no intrinsic argument is one (COBOLNET2576 refuses it first).
+        string[] delegated = ["BoundFieldOperand", "BoundFigurative", "BoundAllLiteral", "BoundCurrentRecord",
+                              "BoundPredefinedNull"];
         // BoundAddressOperand (kb/Work PB1021) is class pointer: neither channel can image it, and both answer LOUD.
         string[] divergent = ["BoundBoolOperand", "BoundComputedOperand",
                               "BoundStringLiteral", "BoundOperandError", "BoundAddressOperand"];

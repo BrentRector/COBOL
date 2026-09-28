@@ -109,7 +109,9 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
                 BoundOperand value = item.inlineMethodInvocation() is { } iimi
                         ? host.Oo.OoInlineInvocationOperand(iimi)   // §8.4.3.1.2 Format 4; kb/Work PB428
                     : item.functionCall() is { } ifc ? host.Intrinsic.IntrinsicOperand(ifc)
-                    : lit is not null ? host.Expr.LiteralOperand(lit)
+                    // §8.4.3.10.3 SR1 a)/b): NULL "may be used only as a sending operand in an INITIALIZE …
+                    // statement" — it is identifier-2 (§8.4.3.1.2 Format 8), carried on the literal slot.
+                    : lit is not null ? host.Expr.NullAdmittingOperand(lit)
                     : item.dataReference() is { } sref ? host.Expr.FieldOperand(sref)
                     : BoundOperandError.Refused(ctx.Edition, "INITIALIZE REPLACING sending operand");
                 // ISO §14.9.20.3 SR3 — "for each DATA-POINTER, FUNCTION-POINTER, MESSAGE-TAG, OBJECT-REFERENCE,
@@ -119,7 +121,9 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
                 // operand (§14.9.39). Unreachable until the words became spellable (kb/Work PB415).
                 string senderText = lit?.GetText() ?? item.dataReference()?.GetText()
                     ?? item.functionCall()?.GetText() ?? "the sending operand";
-                if (lit is not null)
+                // NULL is identifier-2, not literal-1 (kb/Work PB1427): SR3 is satisfied, and SR4's SET is valid for
+                // every SET-form category (CheckSetFormCategoryAgreement), so only a real literal takes SR3.
+                if (lit is not null && value is not BoundPredefinedNull)
                     ctx.Validation.CheckInitializeReplacingSetCategoryIdentifier(cats, lit.GetText());
                 else
                     CheckSetFormCategoryAgreement(cats, value, senderText);
@@ -560,16 +564,22 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             // category-names spellable, so the arm PB418 staged LOUD is now the real SET. ⛔ THE ERROR ARM IS A
             // "CANNOT HAPPEN" GUARD, NOT A STAGED FEATURE: §14.9.20.3 SR3 (COBOLNET1982) has already refused
             // literal-1 for these categories, and SR4's category agreement (COBOLNET1983) refuses every sender
-            // that is not a data item of the named category — a function-identifier among them, since no SET
+            // that is neither a data item of the named category nor the predefined NULL (identifier-2 by
+            // §8.4.3.1.2 Format 8, kb/Work PB1427) — a function-identifier among them, since no SET
             // format admits one (§14.9.39). It stays because `EmitAction`'s switch has no default arm, so a
             // non-place operand reaching the emitter would be dropped in silence rather than diagnosed.
             return q is InitializeQualification.ViaReplacing
-                ? ReplacementFor(cat, spec) is BoundFieldOperand { Place: var sp }
-                    ? new InitializeSetFrom(cur.ToPlace(), sp)                                  // GR4 + GR6b
-                    : new InitializeErrorAction($"INITIALIZE REPLACING {cat} … BY a function-identifier into "
+                ? ReplacementFor(cat, spec) switch
+                {
+                    BoundFieldOperand { Place: var sp } => new InitializeSetFrom(cur.ToPlace(), sp),   // GR4 + GR6b
+                    // `REPLACING … BY NULL` (kb/Work PB1427): GR4's SET receiving-operand TO NULL — the same
+                    // action the GR6c default gives, written this time rather than implied.
+                    BoundPredefinedNull => new InitializeSetNull(cur.ToPlace()),
+                    _ => new InitializeErrorAction($"INITIALIZE REPLACING {cat} … BY a function-identifier into "
                         + $"'{item.CobolName ?? "FILLER"}' (ISO §14.9.20.4 GR4 makes the implicit statement a SET, "
-                        + "and §14.9.39 admits no function-identifier as a SET sending operand)")
-                : new InitializeSetNull(cur.ToPlace());                                         // GR4 SET … TO the predefined NULL
+                        + "and §14.9.39 admits no function-identifier as a SET sending operand)"),
+                }
+                : new InitializeSetNull(cur.ToPlace());                                        // GR4 SET … TO the predefined NULL
         if (SenderFor(q, cat, effectiveValue, spec) is not { } source) return null;
         // §14.9.20.4 GR7: "When a dynamic-length elementary item is initialized, its length is set to zero."
         // ⚖ DETERMINATION D-DL1 (docs/CONFORMANCE.md §3; kb/Work PB418) — GR7 IS THE GR6c ARM'S RULE, NOT A
@@ -724,6 +734,10 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         foreach (var cat in InitializeCategories.All)
         {
             if (!cats.Contains(cat) || !InitializeCategories.IsSetForm(cat)) continue;
+            // The predefined NULL is a valid SET sending operand for each of the five categories: §14.9.20.4 GR6's
+            // table gives it as the default of every one (the address NULL of §8.4.3.10.4 GR1–GR4, the null object
+            // reference of §8.4.3.7), so `SET <an item of the category> TO NULL` is valid, which is SR4's question.
+            if (value is BoundPredefinedNull) continue;
             var senderCat = value is BoundFieldOperand { Place.Item: { } si } ? InitializeItemCategory(si) : null;
             if (senderCat != cat)
                 ctx.Validation.CheckInitializeReplacingSetCategoryAgrees(cat, senderCat, senderText);
@@ -849,7 +863,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     /// that initial value is composed from the SAME text by <c>ValueInitializer</c> through THAT classifier, so a
     /// second word map here is a sender that fails to reproduce the very thing it is defined as reproducing. This
     /// site was the SIXTH private reading, and it differed: it sent <c>NULL</c> to a pointer-class
-    /// <c>BoundFigurative('N')</c> where the shared reading sends it to <c>'L'</c>. The standard is with the
+    /// NULL operand where the shared reading sends it to <c>'L'</c>. The standard is with the
     /// shared reading here — §8.3.3.6.2 prints SEVEN figurative-constant formats and NULL is none of them
     /// (§8.4.3.10.1: "<i>NULL is a predefined address of class pointer or a predefined content of class
     /// message-tag</i>"), which is why GR6c's own table spells the pointer rows "Predefined address NULL" and the

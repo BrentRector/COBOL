@@ -586,10 +586,14 @@ internal sealed class BinderDriver
         // NOTE 1: an EXTERNAL non-GLOBAL FD's name is not visible in contained programs.) The record-name half
         // of §13.18.30 rides the standard GLOBAL-root bridges (DataBinder.CallBindExternalAndGlobal adds a
         // GLOBAL FD's records to CallGlobalRoots).
+        // A container's NON-global FD is recorded too, for one question only: a GLOBAL record under it (§13.18.27.3
+        // SR1 b)) is visible here while its file is not, and WRITE / REWRITE of it is refused by name (kb/Work PB1193).
         for (var anc = unit.Parent; anc is not null; anc = anc.Parent)
             foreach (var f in anc.Data.Files)
                 if (f.IsGlobal)
                     data.FilesByName.TryAdd(f.CobolName, f);
+                else
+                    data.ContainerLocalFiles.Add(f);
 
         // GLOBAL RD inheritance (ISO §13.18.27.3 SR1 e) / §13.18.27.4 GR1–GR2; kb/Work PB369) — the report-name,
         // its groups and its sum counters, nearest container first so the nearer declaration hides. Like a GLOBAL

@@ -1220,10 +1220,8 @@ public static class DiagnosticCatalog
         + "usage display or usage national.\"; syntax rule 3: \"If literal-1 is numeric, it shall be an "
         + "integer.\"; syntax rule 4: \"Literal-1 shall not be a zero-length literal.\" (GOBACK's §14.9.18.3 "
         + "SR6/SR7/SR8 are the same three rules for the same shared phrase, over identifier-2 — GOBACK's "
-        + "identifier-1 is the RAISING object.) The code also carries the slot's ADMISSIBILITY where the "
-        + "operand is neither identifier-1 nor literal-1: NULL is a predefined address / object reference "
-        + "(§8.4.3.10.1) whose §8.4.3.10.3 SR1 admits it only in INITIALIZE/SET, a prototype argument, or a "
-        + "pointer-or-object-reference relation condition.",
+        + "identifier-1 is the RAISING object.) NULL written in the phrase is COBOLNET2576, the one §8.4.3.10.3 "
+        + "SR1 context screen.",
         "ISO §14.9.42.3 SR2/SR3/SR4");
     // ── The §13.18.60.3 USAGE DECLARATION-PLACEMENT family (kb/Work PB183) ────────────────────────────────
     // Three syntax rules about WHERE a usage phrase may be written, none of which existed anywhere in the
@@ -1905,6 +1903,42 @@ public static class DiagnosticCatalog
         + "index-name compared with an alphanumeric operand or an arithmetic expression, and an index data item "
         + "compared with a numeric literal, a numeric data item or a figurative constant, are none of these. SET a "
         + "numeric data item from the index first and compare that.", "ISO §8.8.4.2.13");
+    // kb/Work PB1427 — the ONE §8.4.3.10.3 SR1 context screen for the predefined NULL. It replaced the per-statement
+    // NULL arms (STOP/GOBACK status 1704, DISPLAY 1694, MOVE 0809 …) that each re-stated the rule for one verb while
+    // every verb nobody had written an arm for ran NULL as LOW-VALUE (STRING, INSPECT, UNSTRING, FUNCTION LENGTH).
+    // Reported only through CobolNet.Binding.PredefinedNullRule (PredefinedNullContextDriftTests).
+    public static readonly DiagnosticDescriptor PredefinedNullContext = new(
+        "COBOLNET2576", "predefined-null-context", EditionSeverity.Error,
+        "NULL is written where ISO §8.4.3.10.3 syntax rule 1 does not admit it. NULL is an identifier — the "
+        + "predefined address of class pointer (§8.4.3.10.1), the predefined content of class message-tag, or the "
+        + "null object reference of class object (§8.4.3.7.3 SR2) — never a literal or a figurative constant, and "
+        + "\"it may be used only as a sending operand in an INITIALIZE or a SET statement; as an argument in a "
+        + "program-prototype format CALL statement, a function-prototype format function activation, or a method "
+        + "invocation; or in a pointer-or-object-reference relation condition\" (SR1 a; SR1 b adds the message-tag "
+        + "relation condition). A MOVE, DISPLAY, STRING, UNSTRING or INSPECT operand, an arithmetic operand, an "
+        + "intrinsic-function argument, a VALUE clause operand, a constant entry's AS operand, an externalized name and "
+        + "a termination status are none of these. SET a pointer or "
+        + "object-reference data item TO NULL and use that item instead.", "ISO §8.4.3.10.3 SR1");
+    // kb/Work PB1171 — the report-file reference restriction, asked where a procedure-division file-name resolves
+    // (StatementValidation.ResolveFile / ScreenReportFileReference) and at WRITE / REWRITE of such a file's record.
+    public static readonly DiagnosticDescriptor ReportFileReference = new(
+        "COBOLNET2577", "report-file-reference", EditionSeverity.Error,
+        "A statement references a REPORT FILE — a file whose file description entry specifies a REPORT clause — "
+        + "where the standard forbids it. \"The subject of a file description entry that specifies a REPORT clause "
+        + "may be referenced in the procedure division only by the USE statement, the WHEN phrase of a PERFORM "
+        + "statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase\" (ISO §13.4.5.3 "
+        + "SR9; §13.18.46.3 SR3). The statements restate it for their own operands: SORT §14.9.40.3 SR8 and MERGE "
+        + "§14.9.24.3 SR9 (a USING or GIVING file \"not for a report file\"), WRITE §14.9.51.3 SR12 and REWRITE "
+        + "§14.9.35.3 SR11. A report file is written only by INITIATE, GENERATE and TERMINATE; use an ordinary "
+        + "sequential file for any other input-output.", "ISO §13.4.5.3 SR9");
+    public static readonly DiagnosticDescriptor ReportFileRecordEntry = new(
+        "COBOLNET2578", "report-file-record-entry", EditionSeverity.Error,
+        "A file description entry that specifies a REPORT clause has record description entries or constant "
+        + "entries subordinate to it: \"Format 3 is the file description entry for a report file. No record "
+        + "description entries or constant entries shall be associated with the file description entry for a report "
+        + "file.\" (ISO §13.4.5.3 SR8). The report file's lines are composed by the report writer from the report "
+        + "description entries of the REPORT SECTION; remove the entries, or describe a separate file for records.",
+        "ISO §13.4.5.3 SR8");
     public static readonly DiagnosticDescriptor AllLiteralClass = new(
         "COBOLNET2491", "all-literal-class", EditionSeverity.Error,
         "The literal-1 of the figurative constant ALL literal-1 is a constant-name that stands for a numeric literal. "

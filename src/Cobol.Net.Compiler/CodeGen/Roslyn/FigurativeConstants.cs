@@ -101,9 +101,9 @@ internal static class FigurativeConstants
             'S' => ' ',
             'Q' => '"',
             'H' when nat => natCollate!.HighValue,
-            'L' or 'N' when nat => natCollate!.LowValue,
+            'L' when nat => natCollate!.LowValue,
             'H' => !pinned && collate is { } hc ? hc.HighValue : 'ÿ',
-            'L' or 'N' => !pinned && collate is { } lc ? lc.LowValue : '\0',
+            'L' => !pinned && collate is { } lc ? lc.LowValue : '\0',
             _ => ' ',
         };
     }
@@ -124,14 +124,14 @@ internal static class FigurativeConstants
         return kind switch
         {
             'H' when nat => SymbolDisplay.FormatLiteral(natCollate!.HighValue, quote: true),
-            'L' or 'N' when nat => SymbolDisplay.FormatLiteral(natCollate!.LowValue, quote: true),
+            'L' when nat => SymbolDisplay.FormatLiteral(natCollate!.LowValue, quote: true),
             'H' when !pinned && collate is { } hc => SymbolDisplay.FormatLiteral(hc.HighValue, quote: true),
-            'L' or 'N' when !pinned && collate is { } lc => SymbolDisplay.FormatLiteral(lc.LowValue, quote: true),
+            'L' when !pinned && collate is { } lc => SymbolDisplay.FormatLiteral(lc.LowValue, quote: true),
             'Z' => "'0'",
             'S' when cat is PicCategory.Boolean => "'0'",   // DETERMINATION D-B2 — see FillChar's remarks
             'S' => "' '",
             'H' => "'\\u00ff'",
-            'L' or 'N' => "'\\u0000'",
+            'L' => "'\\u0000'",
             'Q' => "'\\\"'",
             _ => "' '",
         };

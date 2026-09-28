@@ -48,7 +48,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
         var send = sa.setAddressSender();
         Place? source = null;
         BoundAddressOf? address = null;
-        bool toNull = send.NULL_() is not null;
+        bool toNull = send.predefinedNull() is not null;
         if (send.dataAddressIdentifier() is { } dai)
         {
             // identifier-6 as a §8.4.3.11 data-address-identifier — §8.4.3.11.4 GR1: "Data-address-identifier

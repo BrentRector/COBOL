@@ -170,7 +170,7 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         // §8.4.3.2.3 SR9 below where the formal is known.
         var operands = new List<BoundOperand?>();
         foreach (var a in argCtxs)
-            operands.Add(a.OMITTED() is not null ? null : host.Intrinsic.BindArgOperand(a));
+            operands.Add(a.OMITTED() is not null ? null : host.Intrinsic.BindArgOperand(a, nullAdmitting: true));
 
         // Positional correspondence (§14.8.2.1): one argument per USING formal, "with the exception of trailing
         // formal parameters that are specified with an OPTIONAL phrase in the procedure division header of the
@@ -393,6 +393,10 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
                 => new BoundCallArg(CobolPassMode.Value, null, new BoundNumericLiteral("0")),
             BoundNumericLiteral or BoundStringLiteral or BoundFigurative or BoundAllLiteral or BoundComputedOperand
                 => new BoundCallArg(formal.ByValue ? CobolPassMode.Value : CobolPassMode.Content, null, op),
+            // §8.4.3.10.3 SR1 a): the predefined NULL "as an argument in … a function-prototype format function
+            // activation" — it references no storage-section item, so it crosses BY CONTENT (BY VALUE to a BY VALUE
+            // formal) as the storage-free NULL carrier CallEmitter renders for every lane (kb/Work PB1630, PB1427).
+            BoundPredefinedNull => new BoundCallArg(formal.ByValue ? CobolPassMode.Value : CobolPassMode.Content, null, op),
             _ => null,
         };
         return arg is null ? null : arg with { Formal = formal.Item };

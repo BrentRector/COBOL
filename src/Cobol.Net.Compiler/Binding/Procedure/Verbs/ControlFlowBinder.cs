@@ -144,14 +144,8 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
             case BoundStringLiteral { Value.Length: 0 }:
                 StatusError("the status literal shall not be a zero-length literal", "SR4", "SR8");
                 break;
-            // NULL — neither identifier-1 nor literal-1 (§8.4.3.10.1/.3 SR1). Loud-named rather than rendered:
-            // the predefined address has no character value the GR5 mapping could interpret.
-            case BoundFigurative { Kind: 'N' }:
-                ctx.Edition.Error(DiagnosticCatalog.TerminationStatusOperand,
-                    "NULL is a predefined address / object reference, not a literal or an identifier, and ISO "
-                    + "§8.4.3.10.3 SR1 admits it only as an INITIALIZE/SET sending operand, a prototype argument, "
-                    + "or in a pointer-or-object-reference relation condition — not in a termination-status phrase");
-                return BoundOperandError.Refused(ctx.Edition, "NULL in a termination-status phrase");
+            // NULL never reaches here: the phrase is no §8.4.3.10.3 SR1 context, so the ONE literal mapping refused
+            // it (COBOLNET2576, kb/Work PB1427) and handed back a BoundOperandError.
             // SR2/SR6 — an integer data item, OR a data item with usage display or usage national.
             case BoundFieldOperand { Place: var place } when !AdmittedStatusItem(place):
                 StatusError($"the status operand '{text}' shall reference an integer data item or a data "

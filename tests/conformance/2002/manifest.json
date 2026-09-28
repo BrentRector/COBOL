@@ -3,6 +3,7 @@
   "enabled": [
   "pb1465_boolean_paren_after_operator",
   "pb1432_operand_eval_resume",
+  "pb1427_null_operand_model",
   "pb1352_directive_lines_not_replaced",
   "pb1067_library_text_source_format",
   "w67q_pb1132_ls_activation_reseed",

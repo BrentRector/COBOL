@@ -202,7 +202,7 @@ internal sealed class DataStatementBinder
             return null;
 
         var objRef = ctx.objectReference();
-        if (objRef.NULL_() != null)
+        if (objRef.predefinedNull() != null)
             return new BoundSetPointerStatement(target.Symbol, PointerSetSourceKind.Null);
         if (objRef.dataReference() != null
             && _ctx.Expression.BindDataReferenceWithSubscripts(objRef.dataReference())

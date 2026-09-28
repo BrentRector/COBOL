@@ -223,7 +223,8 @@ invokeArgument
     // and the carrier of the predefined NULL object reference (§8.4.3.7 — an identifier-5, which `figurativeConstant`
     // spells): without it `USING BY VALUE NULL` was a parse error (kb/Work PB1137). The binder decides it.
     : BY? VALUE (addressIdentifier | arithmeticExpression | literal)
-    | BY? REFERENCE (addressIdentifier | dataReference | OMITTED)
+    // predefinedNull: admitted only so OoBinder refuses it by §14.9.23.3 SR9's name — the CALL twin (kb/Work PB1427).
+    | BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
     // SELF is identifier-5 (§8.4.3.8 — an identifier format whose only role bar is "shall not be a receiving
     // operand"), so the BY CONTENT brace and the keyword-less form admit it (kb/Work PB1137); NULL rides `literal`.
     | BY? CONTENT (addressIdentifier | SELF | {boolExprAhead()}? booleanExpression | literal | arithmeticExpression)

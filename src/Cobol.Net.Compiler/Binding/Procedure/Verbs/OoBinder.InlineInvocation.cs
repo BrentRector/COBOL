@@ -182,7 +182,7 @@ internal sealed partial class OoBinder
         // §8.4.3.4.3 SR2, screened BEFORE resolution because both rejected shapes are RECEIVER shapes and the
         // general format admits them syntactically (the P3 superset parse: `objectReference` is INVOKE's own
         // receiver rule — see CobolOO.g4).
-        if (target.NULL_() is not null)
+        if (target.predefinedNull() is not null)
         {
             ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
                 "an inline method invocation's identifier-1 shall be of class object; the predefined object "

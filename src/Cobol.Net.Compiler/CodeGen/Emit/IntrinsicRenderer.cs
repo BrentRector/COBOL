@@ -1642,6 +1642,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // already makes.
         public string Visit(BoundFigurative n) => OperandText.AsString(n, owner.Num);
         public string Visit(BoundAllLiteral n) => OperandText.AsString(n, owner.Num);
+        public string Visit(BoundPredefinedNull n) => OperandText.AsString(n, owner.Num);   // throws — never an intrinsic argument
         // A boolean EXPRESSION argument (§8.4.3.2.3 SR8; kb/Work PB65): its '0'/'1' image through the ONE boolean
         // renderer — INTEGER-OF-BOOLEAN(BIT-A B-AND BIT-B) reads the combined bit string.
         public string Visit(BoundBoolOperand n) => BooleanRenderer.Render(n.Expr, owner.Num);

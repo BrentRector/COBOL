@@ -289,6 +289,15 @@ internal static class ConcatFolder
                 + "with ALL shall not be a concatenation-expression operand (ISO §8.8.3.2 SR1)");
             return Term.Refusal(fig.GetText());
         }
+        // The predefined NULL is an identifier (§8.4.3.1.2 Format 8), neither a literal nor a figurative constant, so
+        // §8.8.3.2 SR1 does not list it and §8.4.3.10.3 SR1 names no concatenation — the ONE NULL-context code.
+        if (op.predefinedNull() is not null)
+        {
+            if (report is not null)
+                PredefinedNullRule.Report(report, "a concatenation-expression operand (ISO §8.8.3.2 SR1 admits "
+                    + "alphanumeric, boolean and national literals and figurative constants)");
+            return Term.Refusal("NULL");
+        }
         string word = op.cobolWord().GetText();
         // §13.10.3 SR2: a constant-name stands for its literal — "as if [the] literal were written" (§13.10.4 GR1).
         if (env.Constant(word) is { } k)

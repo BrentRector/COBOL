@@ -366,6 +366,16 @@ off-by-one through every later counter check.
   qualifiers. data-name-1 then resolves through `ResolveClauseOperand` (survivor-counting, silent for an
   operand the capture refused). `OccursOperandCaptureDriftTests` pins the callers of the dropping
   `KeyReference` capture to the named report operands whose own rules permit or screen what it drops.
+- **The report FILE is the report writer's alone** (kb/Work PB1171). §13.4.5.3 SR8 — "No record description
+  entries or constant entries shall be associated with the file description entry for a report file" — is asked
+  in the FD loop after the clauses (`DataBinder`, **COBOLNET2578**). §13.4.5.3 SR9 (= §13.18.46.3 SR3) — the
+  file-name "may be referenced in the procedure division only by the USE statement, the WHEN phrase of a PERFORM
+  statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase" — is ONE screen,
+  `StatementValidation.ScreenReportFileReference` (**COBOLNET2577**), asked by `ResolveFile` for every statement
+  except OPEN and CLOSE (`admitsReportFile`), so a new file statement is refused a report file by construction;
+  SORT / MERGE USING-GIVING resolve through `ResolveFile` with their own restatement (§14.9.40.3 SR8, §14.9.24.3
+  SR9), WRITE / REWRITE ask it of their record's file (§14.9.51.3 SR12, §14.9.35.3 SR11), and FUNCTION
+  EXCEPTION-FILE asks it of its argument. OPEN's INPUT / I-O half stays §14.9.27.3 SR1 (COBOLNET2371).
 
 ## 4. Emission (`CodeGen/Verbs/ReportWriterEmitter.cs`)
 

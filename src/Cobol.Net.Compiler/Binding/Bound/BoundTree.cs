@@ -493,9 +493,27 @@ public sealed record BoundCurrentRecord(Place Area, FileModel File, Place? Depen
 public sealed record BoundComputedOperand(BoundExpr Expr) : BoundOperand;
 
 /// <summary>A figurative constant operand (ISO §8.3.3.6). <paramref name="Kind"/> ∈ {Z=ZERO, S=SPACE, H=HIGH-VALUE,
-/// L=LOW-VALUE, Q=QUOTE, N=NULL}; its value is materialized against the receiving / other operand's category and
-/// width (a single occurrence in DISPLAY, the receiver width in MOVE, the other operand's width in a comparison).</summary>
+/// L=LOW-VALUE, Q=QUOTE}; its value is materialized against the receiving / other operand's category and width (a
+/// single occurrence in DISPLAY, the receiver width in MOVE, the other operand's width in a comparison). NULL is
+/// NOT one — it is <see cref="BoundPredefinedNull"/>.</summary>
 public sealed record BoundFigurative(char Kind) : BoundOperand;
+
+/// <summary>The predefined NULL — an IDENTIFIER (ISO §8.4.3.1.2 Format 8 predefined-address, and the NULL arm of
+/// Format 6 predefined-object), never a figurative constant or a literal: "a predefined address of class pointer or
+/// a predefined content of class message-tag" (§8.4.3.10.1), and as the null object reference "class object and
+/// category object reference" (§8.4.3.7.3 SR2). Its class is the associated data item's (§8.4.3.10.3 SR1), so the
+/// node carries none; the consumers that admit it decide it against their other operand or formal.
+/// <para>⛔ It is produced ONLY in a §8.4.3.10.3 SR1 context — <see cref="ExpressionBinder.NullAdmittingOperand"/>
+/// is the one producer, and every other operand slot is refused by
+/// <see cref="ExpressionBinder.NonNumericLiteralOperand"/> before a consumer can see it (kb/Work PB1427: as
+/// <c>BoundFigurative('N')</c> it reached every generic figurative consumer and ran as LOW-VALUE).</para></summary>
+public sealed record BoundPredefinedNull : BoundOperand
+{
+    /// <summary>The one instance — NULL has no operand-specific state.</summary>
+    public static BoundPredefinedNull Instance { get; } = new();
+
+    private BoundPredefinedNull() { }
+}
 
 /// <summary>The figurative <c>ALL "literal"</c> (ISO §8.3.3.6.4 Format 6): the multi-character <paramref name="Literal"/>
 /// repeated to the associated width (the receiver in a MOVE, the other operand in a comparison — GR2) or used once in a

@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-225 drift tests.
+226 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -168,6 +168,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [PlaceStorageFormSwitchDriftTests](../tests/Cobol.Net.Tests.Unit/PlaceStorageFormSwitchDriftTests.cs) | ⛔ A SWITCH OVER A Place's STORAGE FORM MUST NOT MEET A PlaceDecorator IN ITS DEFAULT ARM (kb/Work PB393). | `src` |
 | [PointerUsageOperandDriftTests](../tests/Cobol.Net.Tests.Unit/PointerUsageOperandDriftTests.cs) | ⛔ THE DRIFT GUARD FOR THE TO-LESS POINTER OPERAND (kb/Work PB848). | — |
 | [PositionCarrierOverloadDriftTests](../tests/Cobol.Net.Tests.Unit/PositionCarrierOverloadDriftTests.cs) | ⛔ THE BIND-TIME RENDERER NAMES A FIELD AND LETS C# OVERLOAD RESOLUTION SUPPLY THE CONVERSION — SO THE SET OF CARRIERS IT MAY NAME IS THE RUNTIME METHOD'S OVERLOAD SET, AND NOTHING ELSE (kb/Work PB201). | — |
+| [PredefinedNullContextDriftTests](../tests/Cobol.Net.Tests.Unit/PredefinedNullContextDriftTests.cs) | ⛔ THE PREDEFINED NULL HAS ONE OPERAND MODEL, AND ONLY A §8.4.3.10.3 SR1 CONTEXT MAY PRODUCE IT (kb/Work PB1427). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Frontend/Grammar` |
 | [PrintedFormatAlternativeDriftTests](../tests/Cobol.Net.Tests.Unit/PrintedFormatAlternativeDriftTests.cs) | ⛔ THE GRAMMAR SHAPE THAT MAKES THE NEXT FORMAT AUTOMATIC, HELD TRUE (kb/Work PB412, PB421). | `src/Cobol.Net.Frontend/Grammar`, `specs/ISO_COBOL.md` |
 | [ProcedureNameUniquenessDriftTests](../tests/Cobol.Net.Tests.Unit/ProcedureNameUniquenessDriftTests.cs) | kb/Work PB466 — the invariant that keeps procedure-name resolution able to ANSWER the question ISO §8.4.2.2.1 asks: a procedure-name scope records every declaration of a spelling, so "is this reference unique?" is still decidable at the reference. | `src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/SectionInfo.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/OoMethodScope.cs`, `src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs` |
 | [ProcedureRangeDeclarativesDriftTests](../tests/Cobol.Net.Tests.Unit/ProcedureRangeDeclarativesDriftTests.cs) | kb/Work PB433 — the SECTION travels with a resolved procedure-name, and §14.9.28.3 SR11 is asked of it. | `src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/ProcedureResolution.cs`, `src/Cobol.Net.Compiler/Binding` |

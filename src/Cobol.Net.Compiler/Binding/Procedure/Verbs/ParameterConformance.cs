@@ -146,7 +146,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             // pointer or object operand (§14.9.25.3 SR1 for the MOVE, which §14.8.2.2 rule 2 also asks of a group
             // formal). The alphanumeric-figurative arm below used to answer it, so NULL crossed into a PIC X formal as
             // a one-character fill and into a pointer formal as a string the slot adapter refused at run time.
-            BoundFigurative { Kind: 'N' } => SlotWindow.CarriedBySlot(formal) ? null
+            BoundPredefinedNull => SlotWindow.CarriedBySlot(formal) ? null
                 : "NULL is the predefined address of class pointer (ISO §8.4.3.10.1) or the predefined object reference "
                 + "of class object (§8.4.3.7.3 SR2); §14.8.2.3.3 transfers it only into a formal parameter of class "
                 + "pointer or object reference, by the SET rules, and a formal of any other class takes its argument by a "
@@ -170,7 +170,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             // SPACE, which then reached the callee's managed slot as a string (run-time EC-PROGRAM-ARG-MISMATCH on the
             // CALL lane, a backend CS1503 on the INVOKE lane once INVOKE carried figuratives). NULL is the one
             // figurative such a SET admits, and it is left to the lanes that carry it.
-            BoundStringLiteral or BoundAllLiteral or BoundFigurative { Kind: not 'N' } or BoundNumericLiteral
+            BoundStringLiteral or BoundAllLiteral or BoundFigurative or BoundNumericLiteral
                 when SlotWindow.CarriedBySlot(formal) =>
                 "§14.8.2.3.3 transfers a value into a formal parameter of class pointer or object reference by the SET "
                 + "rules, and a literal or a figurative constant other than NULL is not a sending operand of any SET format",

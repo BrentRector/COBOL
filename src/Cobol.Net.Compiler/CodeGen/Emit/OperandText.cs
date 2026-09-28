@@ -561,6 +561,9 @@ internal static class OperandText
         // A bare figurative is intercepted PCS-aware at AsString's ENTRY (the collating context lives on the
         // renderer, not this visitor); this arm is the unreachable native-pin fallback the visitor interface requires.
         public string Visit(BoundFigurative n) => $"new string({FigurativeConstants.Fill(n.Kind, null)}, 1)";   // DISPLAY shows one occurrence (GR3)
+        public string Visit(BoundPredefinedNull n) =>
+            throw new InvalidOperationException("the predefined NULL reached a character rendering: only a §8.4.3.10.3 SR1 context "
+            + "binds it (ExpressionBinder.NullAdmittingOperand), and every such context renders it itself (kb/Work PB1427)");
         public string Visit(BoundAllLiteral n) => EmitText.CsLiteral(n.Literal);                          // length-unspecified: the literal once (GR3c)
         // EVERY intrinsic-result operand is intercepted at AsString's ENTRY (it needs the per-unit INSTANCE
         // renderer — P7 Step 12): alphanumeric/national/boolean through the string channel, numeric through
@@ -598,6 +601,7 @@ internal static class OperandText
             n.Expr is BoundIntrinsicCall ic
                 && ic.ResultCategory is PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean;
         public bool Visit(BoundFigurative n) => false;
+        public bool Visit(BoundPredefinedNull n) => false;   // an identifier of class pointer / object, never a string
         public bool Visit(BoundNumericLiteral n) => false;
         public bool Visit(BoundOperandError n) => false;
         public bool Visit(BoundAddressOperand n) => false;   // class pointer — never string-carried (kb/Work PB1021)

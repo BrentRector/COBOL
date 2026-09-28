@@ -392,6 +392,7 @@ public sealed class SendingValueOnceDriftTests
             nameof(BoundFigurative),        // no intermediate — receiver-sized, and GR1's antecedent excludes it
             nameof(BoundNumericLiteral),    // no intermediate — a literal's value cannot change
             nameof(BoundOperandError),      // no intermediate — already diagnosed
+            nameof(BoundPredefinedNull),    // no intermediate — §8.4.3.10.1 a predefined address, no storage (PB1427)
             nameof(BoundStringLiteral),     // no intermediate — a literal's value cannot change
         ];
         var actual = typeof(BoundOperand).Assembly.GetTypes()

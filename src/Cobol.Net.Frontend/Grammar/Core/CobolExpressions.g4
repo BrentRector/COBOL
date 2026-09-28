@@ -720,6 +720,10 @@ numericLiteral
 // between that reading and "a concatenation whose first operand is ALL "A"" (illegal — §8.8.3.2 SR1) toward the
 // lower alternative. A concatenation that merely CONTAINS an ALL figurative (`"X" & ALL "A"`) still parses as a
 // concatenation and is rejected COBOLNET1541 by ConcatFolder as before.
+// ⛔ predefinedNull is NOT a literal and NOT a figurative constant — see its rule below. It is an arm HERE only as
+// the parse CARRIER: this rule's slot set is exactly the set of operand positions that parsed NULL while it was
+// (wrongly) a figurativeConstant arm, so every position still PARSES it (superset parse) and the binder decides —
+// ExpressionBinder refuses it everywhere except the §8.4.3.10.3 SR1 contexts (kb/Work PB1427).
 nonNumericLiteral
     : figurativeConstant
     | concatenationExpression
@@ -727,6 +731,18 @@ nonNumericLiteral
     | NATLIT
     | BOOLLIT
     | HEXLIT
+    | predefinedNull
+    ;
+
+// ISO §8.4.3.1.2 identifier FORMAT 8 (predefined-address) and the NULL arm of FORMAT 6 (predefined-object): NULL is
+// an IDENTIFIER — §8.4.3.10.1: "NULL is a predefined address of class pointer or a predefined content of class
+// message-tag"; §8.4.3.7.3 SR2: "NULL is implicitly described as class object and category object reference" —
+// never one of the §8.3.3.6.2 figurative formats. It used to be a `figurativeConstant` arm, which
+// is how every generic figurative consumer read it as LOW-VALUE: `STRING NULL …` stored a NUL, `INSPECT … FOR ALL
+// NULL` tallied, `FUNCTION LENGTH(NULL)` answered 1 (kb/Work PB1427). ONE rule, read by every slot that names it
+// (`nonNumericLiteral`, the SET senders `setAddressSender` / `objectReference`), so the binder has one node to ask.
+predefinedNull
+    : NULL_
     ;
 
 // ISO §8.8.3.1 general format: {literal-1 | concatenation-expression-1} & literal-2 — left-recursive in the
@@ -753,6 +769,7 @@ concatOperand
     | BOOLLIT
     | HEXLIT
     | figurativeConstant
+    | predefinedNull     // NO operand (§8.8.3.2 SR1) — admitted so ConcatFolder refuses it by name (kb/Work PB1427)
     | cobolWord          // a constant-name or a symbolic-character (kb/Work PB1406); LAST, after the keyword figuratives
     ;
 
@@ -832,8 +849,7 @@ figurativeConstant
     | highValueWord
     | lowValueWord
     | quoteWord
-    | NULL_
-    | ALL allLiteral    // Format 6 — ALL literal-1 (§8.3.3.6.3 SR2: an alphanumeric, boolean or national literal, which
+    | ALL allLiteral   // Format 6 — ALL literal-1 (§8.3.3.6.3 SR2: an alphanumeric, boolean or national literal, which
                         // may be a concatenation expression; kb/Work PB71 — ONE arm for the four literal kinds)
     | ALL zeroWord
     | ALL spaceWord

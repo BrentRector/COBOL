@@ -144,15 +144,49 @@ internal sealed class StatementValidation(DataBinder data)
     /// <param name="name">The file-name as written.</param>
     /// <param name="verb">The statement, for the message, e.g. "OPEN".</param>
     /// <param name="file">The resolved model when this returns true.</param>
-    /// <returns>true when the name identifies a file connector; false after reporting.</returns>
-    public bool ResolveFile(string name, string verb, [NotNullWhen(true)] out FileModel? file)
+    /// <param name="admitsReportFile">True ONLY for the statements §13.4.5.3 SR9 lists — CLOSE, and OPEN (whose
+    /// INPUT / I-O half is <see cref="CheckOpenModeForFile"/>'s). Every other statement resolving a file-name is
+    /// refused a report file by <see cref="ScreenReportFileReference"/>, so a new statement is screened by
+    /// construction (kb/Work PB1171).</param>
+    /// <param name="statementRule">The statement's own restatement of the report-file rule, quoted with its
+    /// citation, when it has one (SORT §14.9.40.3 SR8, MERGE §14.9.24.3 SR9).</param>
+    /// <returns>true when the name identifies a file connector the statement may reference; false after
+    /// reporting.</returns>
+    public bool ResolveFile(string name, string verb, [NotNullWhen(true)] out FileModel? file,
+                            bool admitsReportFile = false, string? statementRule = null)
     {
-        if (data.FilesByName.TryGetValue(name, out file)) return true;
+        if (data.FilesByName.TryGetValue(name, out file))
+            return admitsReportFile || ScreenReportFileReference(file, verb, statementRule);
         data.Edition.Error(DiagnosticCatalog.UndefinedReference,
             $"'{name}' is not defined as a file — {verb} names file-name-1 in its general format, and no SELECT "
             + "or file description entry in this source element gives that name, so the statement's reference "
             + "identifies no resource (ISO §8.4.2.1: \"a statement shall contain a reference that uniquely "
             + "identifies that resource\"). Check the spelling, or add the file to the FILE-CONTROL paragraph.");
+        return false;
+    }
+
+    /// <summary>⛔ THE ONE REPORT-FILE REFERENCE RULE (kb/Work PB1171) — ISO §13.4.5.3 SR9, stated a second time
+    /// from the REPORT clause's side as §13.18.46.3 SR3: "The subject of a file description entry that specifies a
+    /// REPORT clause may be referenced in the procedure division only by the USE statement, the WHEN phrase of a
+    /// PERFORM statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase." It used to be
+    /// asked by OPEN alone (COBOLNET2371, its INPUT / I-O half), so READ, START, DELETE, DELETE FILE, UNLOCK, a
+    /// SORT / MERGE USING or GIVING file and WRITE of a report FD's record compiled clean and ran against the report
+    /// writer's file. <see cref="ResolveFile"/> asks it for every statement that is not in the list; the statements
+    /// whose operand is not a file-name ask it themselves (SORT/MERGE USING/GIVING through ResolveFile with their
+    /// own rule; WRITE §14.9.51.3 SR12 and REWRITE §14.9.35.3 SR11 on the file of the record they resolved — such a
+    /// record is already refused at its entry, §13.4.5.3 SR8 COBOLNET2578, and the statement's own rule is reported
+    /// as well, because every rule a statement violates is, kb/Work PB352).</summary>
+    /// <returns>true when <paramref name="file"/> is not a report file; false after reporting.</returns>
+    public bool ScreenReportFileReference(FileModel file, string verb, string? statementRule = null)
+    {
+        if (!file.IsReportFile) return true;
+        data.Edition.Error(DiagnosticCatalog.ReportFileReference,
+            $"{verb} '{file.CobolName}' — '{file.CobolName}' is a report file (its file description entry specifies "
+            + "a REPORT clause), and ISO §13.4.5.3 SR9: \"The subject of a file description entry that specifies a "
+            + "REPORT clause may be referenced in the procedure division only by the USE statement, the WHEN phrase "
+            + "of a PERFORM statement, the CLOSE statement, or the OPEN statement with the OUTPUT or EXTEND phrase\""
+            + (statementRule is null ? "" : $"; {statementRule}")
+            + ". A report file is written only through INITIATE, GENERATE and TERMINATE.");
         return false;
     }
 
@@ -533,9 +567,18 @@ internal sealed class StatementValidation(DataBinder data)
     /// <param name="refText">The operand as written, for the message.</param>
     /// <param name="verb">WRITE | REWRITE | RELEASE.</param>
     /// <param name="rule">The caller's own syntax rule, quoted verbatim with its citation.</param>
+    /// <param name="containedRule">The caller's own rule for a record-name "defined in a containing program and
+    /// … referenced in a contained program" (WRITE §14.9.51.3 SR21, REWRITE §14.9.35.3 SR3), quoted verbatim.</param>
     /// <param name="file">The owning file when this returns true.</param>
-    /// <returns>true when the reference IS a logical record of a file description entry.</returns>
-    public bool ResolveRecordName(Place record, string refText, string verb, string rule,
+    /// <returns>true when the reference IS a logical record of a file description entry visible here.</returns>
+    /// <remarks>⛔ A RECORD CAN BE VISIBLE WHEN ITS FILE IS NOT (kb/Work PB1193). §13.18.27.3 SR1 b) lets a
+    /// file-section level-1 entry carry its OWN GLOBAL clause, which makes the record-name a global name
+    /// (§13.18.27.4 GR1) under an FD that has none — so a contained program resolves the record, but the file stays
+    /// the container's alone, and SR21 / SR3 are exactly the rule for that case ("the file description entry … shall
+    /// contain a GLOBAL clause"). The record is found in <see cref="DataBinder.ContainerLocalFiles"/> and refused BY
+    /// THAT RULE; it used to fall to the "not a logical record of any file description entry" arm below, a false
+    /// reason that would have become a silent acceptance the day that arm learned about global records.</remarks>
+    public bool ResolveRecordName(Place record, string refText, string verb, string rule, string containedRule,
                                   [NotNullWhen(true)] out FileModel? file)
     {
         file = null;
@@ -552,6 +595,15 @@ internal sealed class StatementValidation(DataBinder data)
                 return false;
             }
         if (FileWhoseRecordIs(record.Item) is { } owner) { file = owner; return true; }
+        if (data.ContainerLocalFiles.FirstOrDefault(f => f.Records.Contains(record.Item)) is { } hiddenFile)
+        {
+            data.Edition.Error(DiagnosticCatalog.StatementOperandRule,
+                $"{verb} '{refText}' — '{refText}' is a logical record of '{hiddenFile.CobolName}', which a containing "
+                + "program describes without the GLOBAL clause; the record's own GLOBAL clause (ISO §13.18.27.3 SR1 b)) "
+                + $"makes the record-name visible here, not the file. {containedRule}. Specify GLOBAL in the file "
+                + $"description entry of '{hiddenFile.CobolName}', or write the {verb} in the program that describes it.");
+            return false;
+        }
         DataItem root = record.Item;
         while (root.Parent is { } up) root = up;
         data.Edition.Error(DiagnosticCatalog.StatementOperandRule,
@@ -1589,7 +1641,7 @@ internal sealed class StatementValidation(DataBinder data)
         // bit / national GROUP onto its §13.18.29.4 as-if picture and reports an INDEX item as class index
         // rather than its storage category, neither of which raw `Pic` could see.
         static bool IsFormat3(CobolClass? c) => c is CobolClass.Object or CobolClass.Pointer;
-        static bool IsNull(BoundOperand o) => o is BoundFigurative { Kind: 'N' };
+        static bool IsNull(BoundOperand o) => o is BoundPredefinedNull;
         // NULL's class opposite `other`: the other side's Format-3 class, class pointer opposite any other decidable
         // operand, and "undecidable" (abstain) opposite an operand whose binding already failed (kb/Work PB960).
         static CobolClass? NullReading(BoundOperand o, BoundOperand other) =>
@@ -1610,6 +1662,17 @@ internal sealed class StatementValidation(DataBinder data)
         // `IF X = NULL` / `IF N = NULL` made neither side Format 3, left the band silent, and ran NULL as LOW-VALUE.
         // §8.4.3.10.3 SR1 a) admits NULL only "in a pointer-or-object-reference relation condition"; opposite
         // anything else it keeps the class the lattice gives it — pointer — and SR5 below refuses the pair.
+        // NULL opposite NULL: §8.4.3.10.3 SR1 — "This item may be used only in the following cases, depending upon
+        // the associated data item's class" — and neither operand is a data item for NULL to be associated with, so
+        // no case applies; it is the ONE SR1 refusal, COBOLNET2576 (kb/Work PB1427). The pair must stop here: no
+        // renderer reads NULL, because every admitted slot compares it against the class of its other operand.
+        if (IsNull(left) && IsNull(right))
+        {
+            PredefinedNullRule.Report(data.Edition, "a relation comparing NULL with NULL, which has no data-item operand "
+                + "for NULL to be associated with (SR1 admits it only \"depending upon the associated data item's "
+                + "class\") — compare a pointer, object-reference or message-tag data item with NULL —");
+            return;
+        }
         var lc = NullReading(left, right);
         var rc = NullReading(right, left);
         if (!IsFormat3(lc) && !IsFormat3(rc)) return;   // a general-relation or boolean condition — not this band

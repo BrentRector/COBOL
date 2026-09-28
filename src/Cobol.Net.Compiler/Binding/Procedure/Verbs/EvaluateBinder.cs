@@ -837,7 +837,10 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // category alphanumeric). That is DA3's defect exactly, in the one copy DA3's extraction missed:
         // ExpressionBinder.NonNumericLiteralOperand's own remark lists the three it collapsed. Measured on
         // 9a89fbd1 before the fix, not deduced.
-        if (host.Expr.NonNumericLiteralOperand(vo.nonNumericLiteral()) is { } litOp) return litOp;
+        // NULL as a subject/object: §14.9.13.3 SR7 a) makes a selection object "valid operands for comparison … in
+        // accordance with 8.8.4.2", i.e. the pair is a relation condition — a §8.4.3.10.3 SR1 context — and the
+        // relation checkpoint decides the class pairing.
+        if (host.Expr.NullAdmittingOperand(vo.nonNumericLiteral()) is { } litOp) return litOp;
         if (vo.arithmeticExpression() is { } expr)
             // ⛔ ARM FOR ARM IN THE SAME ORDER AS ConditionBinder.ComparisonOperandOf, DELIBERATELY (kb/Work
             // PB224). §14.9.13.4 GR2 makes an EVALUATE subject/object comparison "as if" the corresponding

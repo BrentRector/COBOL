@@ -233,6 +233,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // names neither; a literal's value cannot change. No description of their own ⇒ no intermediate.
         BoundNumericLiteral or BoundStringLiteral or BoundFigurative or BoundAllLiteral => null,
         BoundOperandError => null,                 // already diagnosed
+        BoundPredefinedNull => null,               // §8.4.3.10.1 — a predefined address, no storage to change
         BoundBoolOperand => null,                  // the §8.8.2 boolean-expression channel (COMPUTE Format 2)
         // An address-identifier (kb/Work PB1021) is "a unique data item of class pointer" CREATED at the reference
         // (§8.4.3.11.4 GR1 / §8.4.3.13.4 GR1) — it has no storage an earlier store could change.

@@ -216,6 +216,16 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     args.Add(ra);
                     continue;
                 }
+                // §14.9.4.3 SR3 — BY REFERENCE passes identifier-2, "an address-identifier or a data item defined in
+                // the file, working-storage, local-storage, or linkage section". The predefined NULL is an identifier
+                // (§8.4.3.1.2 Format 8) that references neither, so it is refused by THAT rule's name (kb/Work
+                // PB1427); BY CONTENT / BY VALUE NULL are the §8.4.3.10.3 SR1 a) argument the arms below admit.
+                if (byRef.predefinedNull() is not null)
+                    return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CallOperandSection,
+                        "CALL … USING BY REFERENCE NULL: ISO §14.9.4.3 SR3 — identifier-2 \"shall reference an "
+                        + "address-identifier or a data item defined in the file, working-storage, local-storage, or "
+                        + "linkage section\", and the predefined address NULL (§8.4.3.10) is neither; pass it BY CONTENT "
+                        + "or BY VALUE");
                 if (byRef.dataReference() is not { } byRefDref)
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "CALL … USING BY REFERENCE with neither an identifier nor OMITTED "
                         + "(ISO §14.9.4.2)");
@@ -270,8 +280,8 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     args.Add(new BoundCallArg(CobolPassMode.Content, cp, null));
                 }
                 else if (cLit is { } clit)
-                    args.Add(new BoundCallArg(CobolPassMode.Content, null, host.Expr.LiteralOperand(clit)));
-                else if (cBareLit is { } cbl && host.Expr.NonNumericLiteralOperand(cbl) is { } cblOp)
+                    args.Add(new BoundCallArg(CobolPassMode.Content, null, host.Expr.NullAdmittingOperand(clit)));
+                else if (cBareLit is { } cbl && host.Expr.NullAdmittingOperand(cbl) is { } cblOp)
                     args.Add(new BoundCallArg(CobolPassMode.Content, null, cblOp));
                 else if (cArith is { } cax)
                     // Format-2 arithmetic-expression-1: bind through the ONE expression path and pass its value.
@@ -323,7 +333,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     // "no viable alternative" (the numeric spelling never reaches here: `arithmeticExpression`
                     // is the earlier alternative and subsumes every numeric literal and the figurative ZERO).
                     Sr23LiteralIsNumeric(vlit, "BY VALUE");
-                    args.Add(new BoundCallArg(CobolPassMode.Value, null, host.Expr.LiteralOperand(vlit)));
+                    args.Add(new BoundCallArg(CobolPassMode.Value, null, host.Expr.NullAdmittingOperand(vlit)));
                 }
                 else if (vDref is { } vdref && ctx.Refs.Probe(vdref) is not null)
                 {
@@ -461,7 +471,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // §14.9.4.3 SR23's SECOND subject — "or its corresponding formal parameter is specified with
                 // the BY VALUE phrase" — which had no reachable arm at all before the mode was derived here.
                 if (bLitMode is CobolPassMode.Value) Sr23LiteralIsNumeric(bLit, "a BY VALUE formal parameter");
-                args.Add(new BoundCallArg(bLitMode, null, host.Expr.LiteralOperand(bLit)));
+                args.Add(new BoundCallArg(bLitMode, null, host.Expr.NullAdmittingOperand(bLit)));
             }
             else if (a.booleanExpression() is { } bBool)
             {
@@ -476,8 +486,8 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     // corresponding formal by the loop below (a BY VALUE formal draws its own diagnostic).
                     args.Add(BooleanContentArg(nbx));
                 else if (nLit is { } nlit)
-                    args.Add(new BoundCallArg(CobolPassMode.Content, null, host.Expr.LiteralOperand(nlit)));
-                else if (nBareLit is { } nbl && host.Expr.NonNumericLiteralOperand(nbl) is { } nblOp)
+                    args.Add(new BoundCallArg(CobolPassMode.Content, null, host.Expr.NullAdmittingOperand(nlit)));
+                else if (nBareLit is { } nbl && host.Expr.NullAdmittingOperand(nbl) is { } nblOp)
                     args.Add(new BoundCallArg(Gr9BareLiteralMode(calleeFormals, args.Count), null, nblOp));
                 else if (nDref is { } ndref)
                 {
@@ -969,13 +979,13 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     /// the former <c>zeroWord() is not null</c> test admitted it.</item>
     /// <item>NULL, which is not literal-2 at all (kb/Work PB1630). §8.4.3.1.2 makes it an IDENTIFIER (Format 8,
     /// predefined-address; Format 6, predefined-object) of class pointer (§8.4.3.10.1) or object (§8.4.3.7.3
-    /// SR2), which the grammar carries on the figurative arm. As identifier-4 it answers to §14.9.4.3 SR22
+    /// SR2), carried by the grammar's `predefinedNull` rule (kb/Work PB1427). As identifier-4 it answers to §14.9.4.3 SR22
     /// ("identifier-4 shall be of class numeric, object, or pointer"), which both of its classes satisfy.</item>
     /// </list></summary>
     internal static bool ByValueLiteralAdmitted(Core.LiteralContext lit) =>
         lit.numericLiteral() is not null
         || ExpressionBinder.IsNumericRestrictedZero(lit.nonNumericLiteral()?.figurativeConstant())
-        || lit.nonNumericLiteral()?.figurativeConstant()?.NULL_() is not null;
+        || lit.nonNumericLiteral()?.predefinedNull() is not null;
 
     /// <summary>ISO §14.9.4.3 SR23 — "If literal-2 or its corresponding formal parameter is specified with the
     /// BY VALUE phrase, literal-2 shall be a numeric literal." Reported BY NAME (kb/Work PB238): the rule was

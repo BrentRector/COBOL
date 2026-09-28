@@ -83,11 +83,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
 
         // Release phase source (ISO §14.9.40 GR9a): USING file list or INPUT PROCEDURE pc range.
         var usingFiles = new List<FileModel>();
-        if (s.sortUsingPhrase() is { } up && SortMapIoFiles(up.dataReferenceList(), usingFiles) is { } uerr)
-        {
-            ctx.Validation.RejectStatementOperand(uerr);   // PB236
-            return BoundRejected.Reported(ctx.Edition);
-        }
+        if (s.sortUsingPhrase() is { } up && !SortMapIoFiles(up.dataReferenceList(), usingFiles, merge: false))
+            return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         PcRange? inputProc = null;
         if (s.sortInputProcedurePhrase() is { } ipp)
         {
@@ -97,11 +94,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         }
         // Return phase target (GR9c): GIVING file list or OUTPUT PROCEDURE pc range.
         var givingFiles = new List<FileModel>();
-        if (s.sortGivingPhrase() is { } gp && SortMapIoFiles(gp.dataReferenceList(), givingFiles) is { } gerr)
-        {
-            ctx.Validation.RejectStatementOperand(gerr);   // PB236
-            return BoundRejected.Reported(ctx.Edition);
-        }
+        if (s.sortGivingPhrase() is { } gp && !SortMapIoFiles(gp.dataReferenceList(), givingFiles, merge: false))
+            return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         PcRange? outputProc = null;
         if (s.sortOutputProcedurePhrase() is { } opp)
         {
@@ -280,11 +274,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         if (collErr is { } ce) return ce;
 
         var usingFiles = new List<FileModel>();
-        if (SortMapIoFiles(m.mergeUsingPhrase().dataReferenceList(), usingFiles) is { } uerr)
-        {
-            ctx.Validation.RejectStatementOperand(uerr);   // PB236
-            return BoundRejected.Reported(ctx.Edition);
-        }
+        if (!SortMapIoFiles(m.mergeUsingPhrase().dataReferenceList(), usingFiles, merge: true))
+            return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         if (usingFiles.Count < 2)
         {
             ctx.Validation.RejectStatementOperand("MERGE requires at least two USING files (ISO §14.9.24.2 "
@@ -293,11 +284,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         }
 
         var givingFiles = new List<FileModel>();
-        if (m.mergeGivingPhrase() is { } gp && SortMapIoFiles(gp.dataReferenceList(), givingFiles) is { } gerr)
-        {
-            ctx.Validation.RejectStatementOperand(gerr);   // PB236
-            return BoundRejected.Reported(ctx.Edition);
-        }
+        if (m.mergeGivingPhrase() is { } gp && !SortMapIoFiles(gp.dataReferenceList(), givingFiles, merge: true))
+            return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         PcRange? outputProc = null;
         if (m.mergeOutputProcedurePhrase() is { } opp)
         {
@@ -343,7 +331,10 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // is RELEASE's alone, and CheckReleaseRecord asks it of a reference that already IS a logical record.
         if (!ctx.Validation.ResolveRecordName(record, rn.GetText(), "RELEASE",
                 "record-name-1 \"shall be the name of a logical record in a sort-merge file description entry "
-                + "and it may be qualified\" (ISO §14.9.32.3 SR1)", out var file))
+                + "and it may be qualified\" (ISO §14.9.32.3 SR1)",
+                "ISO §13.18.27.3 SR3 — \"If the GLOBAL clause is not specified in the file description entry of a "
+                + "containing program, the file shall not be referenced directly or indirectly by any input-output "
+                + "statements in any contained program\"", out var file))
             return BoundRejected.Reported(ctx.Edition);
         if (!ctx.Validation.CheckReleaseRecord(file, rn.GetText())) return BoundRejected.Reported(ctx.Edition);
         // RELEASE ... FROM is an IMPLICIT MOVE and is bound as one (ISO §14.9.32.4 GR4 a); kb/Work PB348), so
@@ -607,21 +598,34 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// <summary>Map a USING/GIVING file list to <see cref="FileModel"/>s. Each shall be an FD file — never an SD
     /// (ISO §14.9.40.3 SR8) — and, in this slice, sequential (the implicit OPEN/READ/WRITE/CLOSE of GR12/GR15 go
     /// through the sequential connector; relative GIVING key-numbering 1..n is the G5 relative slice).</summary>
-    private string? SortMapIoFiles(Core.DataReferenceListContext? list, List<FileModel> files)
+    /// <remarks>The name resolves through the ONE statement file-name resolution, <c>ResolveFile</c>, which also
+    /// refuses a REPORT file with the statement's own restatement of §13.4.5.3 SR9 — SORT §14.9.40.3 SR8 / MERGE
+    /// §14.9.24.3 SR9, "described in a file description entry that is not for a report file" (kb/Work PB1171; this
+    /// method used to look the name up privately and asked only the sort-merge half). A failure there is REPORTED
+    /// and answers false; so does every other refusal here, each reported once.</remarks>
+    private bool SortMapIoFiles(Core.DataReferenceListContext? list, List<FileModel> files, bool merge)
     {
+        string verb = merge ? "MERGE USING/GIVING" : "SORT USING/GIVING";
+        string reportRule = merge
+            ? "ISO §14.9.24.3 SR9 — \"File-name-2, file-name-3, and file-name-4 shall be described in a file "
+              + "description entry that is not for a report file and is not a sort-merge file description entry\""
+            : "ISO §14.9.40.3 SR8 — \"File-name-2 and file-name-3 shall be described in a file description entry "
+              + "that is not for a report file and is not a sort-merge file description entry\"";
         foreach (var dref in list?.dataReference() ?? [])
         {
             string name = dref.cobolWord()?.GetText() ?? dref.GetText();
-            if (!ctx.Data.FilesByName.TryGetValue(name, out var f))
-                return $"SORT/MERGE USING/GIVING file '{name}' is not declared";
+            if (!ctx.Validation.ResolveFile(name, verb, out var f, statementRule: reportRule))
+                return false;
             if (f.IsSortMerge)
-                return $"SORT/MERGE USING/GIVING file '{name}' shall not be a sort-merge file (ISO §14.9.40.3 SR8)";
+                return ctx.Validation.RejectStatementOperand(
+                    $"{verb} file '{name}' shall not be a sort-merge file ({(merge ? "ISO §14.9.24.3 SR9" : "ISO §14.9.40.3 SR8")})");
             if (!f.IsSequential)
-                return $"SORT/MERGE USING/GIVING on {f.Organization} file '{name}' (sequential slice; "
-                    + "relative/indexed USING-GIVING — incl. the GR15b relative key 1..n — are the G5 keyed slice)";
+                return ctx.Validation.RejectStatementOperand(
+                    $"SORT/MERGE USING/GIVING on {f.Organization} file '{name}' (sequential slice; "
+                    + "relative/indexed USING-GIVING — incl. the GR15b relative key 1..n — are the G5 keyed slice)");
             files.Add(f);
         }
-        return null;
+        return true;
     }
 
     /// <summary>An INPUT/OUTPUT PROCEDURE name pair → the inclusive pc range (ISO §14.9.40 GR10/GR13 — the range

@@ -2324,6 +2324,13 @@ false having reported (COBOLNET1757), in `ResolveFile`'s shape. It enforces two 
    used in a general format or syntax rule, then reference-modification is not permitted"*). The printed
    RELEASE format writes `record-name-1`, not `identifier-1`. A reference modifier rides on the `RefModPlace`
    DECORATOR and leaves `Place.Item` untouched, which is exactly why a containment test could not see it.
+3. **A visible record whose FILE is not visible.** §13.18.27.3 SR1 b) lets a file-section level-1 entry carry
+   its OWN GLOBAL clause, so under a non-GLOBAL FD the record-name is a global name in contained programs while
+   the file is not. WRITE §14.9.51.3 SR21 and REWRITE §14.9.35.3 SR3 are written for exactly that reference
+   (*"the file description entry for the file associated with record-name-1 shall contain a GLOBAL clause"*);
+   each caller passes its own sentence as `containedRule`, and the owning FD is found in
+   `DataBinder.ContainerLocalFiles` — the containers' non-global files, recorded beside the GLOBAL-FD merge
+   (kb/Work PB1193). RELEASE passes §13.18.27.3 SR3, the general rule the other two specialise.
 
 RELEASE's second half — *"in a **sort-merge** file description entry"* — is RELEASE's alone and stays in
 `CheckReleaseRecord`, which is now asked only of a reference that already IS a logical record and so takes a

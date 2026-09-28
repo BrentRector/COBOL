@@ -325,7 +325,7 @@ internal static class IntrinsicArgumentRules
     /// first arm here as well — hence the type test names the shapes rather than defaulting to them.</para>
     /// </remarks>
     public static CobolClass? ClassOf(BoundOperand op) =>
-        op is BoundFigurative or BoundAllLiteral
+        op is BoundFigurative or BoundAllLiteral or BoundPredefinedNull
             ? (CandidateClasses(op) is [var only] ? only : null)
             : ClassOf1(op);
 
@@ -392,11 +392,11 @@ internal static class IntrinsicArgumentRules
         // GR5/GR6/GR7/GR8 — SPACE, HIGH-VALUE, LOW-VALUE, QUOTE are CHARACTER values, alphanumeric by GR1 or
         // national in a national context. Never numeric, never boolean.
         BoundFigurative { Kind: 'S' or 'H' or 'L' or 'Q' } => [CobolClass.Alphanumeric, CobolClass.National],
-        // NULL/NULLS is NOT a figurative constant — §8.3.3.6.2 lists Formats 1–7 and NULL is none of them
-        // (the old comment cited a §8.3.3.7 the standard does not have — kb/Work PB148). It is the predefined
-        // object reference (§8.4.3.7) / predefined address (§8.4.3.10), carried in the grammar's figurative
-        // rule for parse convenience only: class pointer, so every class-closed operand slot rejects it.
-        BoundFigurative { Kind: 'N' } => [CobolClass.Pointer],
+        // NULL is NOT a figurative constant — §8.3.3.6.2 lists Formats 1–7 and NULL is none of them (kb/Work
+        // PB148). It is the predefined address (§8.4.3.10.1, class pointer) / object reference (§8.4.3.7), an
+        // identifier with its own grammar rule and bound node (kb/Work PB1427): class pointer, so every
+        // class-closed slot of an SR1 context (an INITIALIZE MOVE-form category, a non-slot formal) rejects it.
+        BoundPredefinedNull => [CobolClass.Pointer],
         BoundFigurative => [],                                   // an unmodelled kind screens as before: fail open
         BoundAllLiteral all => ClassOfCategory(all.Category) is { } ac ? [ac] : [],
         _ => ClassOf1(op) is { } c ? [c] : [],

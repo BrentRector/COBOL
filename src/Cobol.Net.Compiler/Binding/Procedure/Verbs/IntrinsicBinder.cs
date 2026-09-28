@@ -843,6 +843,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 + $" — argument-1 shall be the name of a file connector specified in an FD statement (ISO {clause})");
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name} argument");
         }
+        // §13.4.5.3 SR9: a report file's name "may be referenced in the procedure division only by" USE, PERFORM's
+        // WHEN phrase, CLOSE and OPEN OUTPUT / EXTEND — a function argument is none of them (kb/Work PB1171).
+        if (!ctx.Validation.ScreenReportFileReference(file, $"FUNCTION {sig.Name}"))
+            return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name} argument");
         host.Ec.EcNoteFunction();
         return new BoundIntrinsicCall(sig, [], sig.ResultCategory) { FileArg = file };
     }
@@ -1469,6 +1473,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         BoundFieldOperand { Place.Item: { } item } => item.ImageWidth,
         BoundAllLiteral a => a.Literal.Length,   // §8.3.3.6.4 GR3c — a length-unspecified context takes the literal once
         BoundFigurative => 1,                    // §8.3.3.6.4 GR3b — a bare figurative is ONE character
+        BoundPredefinedNull => null,             // §8.4.3.10.1 — an address of class pointer: no character width
         _ => null,   // computed results / error operands — genuinely runtime
     };
 
@@ -2609,8 +2614,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// <c>BindExpr</c>→<c>RefExpr</c> mapping (its category decides string-vs-numeric rendering; a bare
     /// index-name reads its occurrence number, §13.18.38); anything arithmetic binds through <c>BindExpr</c>
     /// and wraps as a computed operand (<see cref="OperandOf"/>). OMITTED is barred for an intrinsic argument
-    /// (§8.4.3.2 SR7); an unconsumed phrase word is a loud named operand — never a silent skip (§1.4).</summary>
-    internal BoundOperand BindArgOperand(Core.FunctionArgumentContext a)
+    /// (§8.4.3.2 SR7); an unconsumed phrase word is a loud named operand — never a silent skip (§1.4).
+    /// <para><paramref name="nullAdmitting"/> is true ONLY for a function-prototype activation (UdfBinder): §8.4.3.10.3
+    /// SR1 a) admits the predefined NULL "as an argument in … a function-prototype format function activation", and an
+    /// intrinsic-function argument is no such context (§8.4.3.2.2 distinguishes intrinsic-function-name-1 from
+    /// function-prototype-name-1), so every intrinsic keeps the ONE SR1 refusal, COBOLNET2576 (kb/Work PB1427).</para></summary>
+    internal BoundOperand BindArgOperand(Core.FunctionArgumentContext a, bool nullAdmitting = false)
     {
         if (a.OMITTED() is not null)
         {
@@ -2629,7 +2638,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 + "literal, or expression (ISO §15.3)");
             return BoundOperandError.Refused(ctx.Edition, $"intrinsic argument '{kw.GetText()}'");
         }
-        if (a.nonNumericLiteral() is { } nn) return NonNumericOperand(nn);
+        if (a.nonNumericLiteral() is { } nn)
+            // Asked of the parse node first, so an ordinary literal is bound ONCE (by NonNumericOperand) and its
+            // screens report once.
+            return nullAdmitting && nn.predefinedNull() is not null
+                ? host.Expr.NullAdmittingOperand(nn)!
+                : NonNumericOperand(nn);
         // §8.4.3.2.3 SR8 — "a boolean expression" as an argument (kb/Work PB65, FMT-15.45.2): bound through the ONE
         // boolean-expression binder; the class-boolean operand every §15.3 item-3 rule (INTEGER-OF-BOOLEAN,
         // BOOLEAN-OF-INTEGER's siblings) admits and the renderer images as its '0'/'1' string.
