@@ -58,6 +58,13 @@ mid-leg. Every dispatch prompt says: start the job in the background to a log, t
 push-main, append `echo "PUSH-MAIN-EXIT=$?"` to its log and block on that).
 
 **A killed agent is replaced by a FRESH agent that reads the checkpoint** (`STATUS.md` + `git log`, or the `.jsonl`).
+⭐ **The handoff is STAMPED (kb/Work/PB1698, 2026-09-28).** STATUS.md's first line is `STATUS-AT: <sha>`, which names
+the commit it describes and is written after that commit. A resumer or same-file successor runs
+`python scripts/spec/status_delta.py <worktree>`:
+- CURRENT: the summary covers the whole branch.
+- STALE: read only the commits it lists.
+- UNSTAMPED or DIVERGED: read them all.
+The stamp makes a stale summary detectable without re-reading the branch; the summary stays navigation, never evidence.
 Resume via `SendMessage` only when the agent is within a step of finishing. A workflow resumes with `resumeFromRunId`,
 but design its stages to read inputs from disk (`out-<slug>.json`) so a rewritten script never re-runs completed work.
 

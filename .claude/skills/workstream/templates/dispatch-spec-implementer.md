@@ -64,7 +64,10 @@ REGISTER: flip each note's `status` and write its `closes_rows` IN THE COMMIT TH
 when it closes none). Run `python scripts/spec/work.py check`. Do NOT open a list anywhere — new defects are LEADS in your
 report, each with its repro path and code site (file:line) so the registrar does not re-survey.
 
-CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, plus `STATUS.md` (DONE / NEXT /
-BLOCKED / GATE / batch paths / codes used). Turn cap 220 — at the cap, checkpoint, write NEXT, return SPLIT.
+CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, THEN rewrite `STATUS.md` (DONE /
+NEXT / BLOCKED / GATE / batch paths / codes used) with FIRST LINE `STATUS-AT: <output of git rev-parse HEAD>` — the
+commit it describes (P4; STATUS.md is gitignored, so writing it never moves HEAD). RESUMING or MERGING a predecessor:
+run `python scripts/spec/status_delta.py <that worktree>` FIRST and read the summary plus ONLY the commits it lists.
+Turn cap 220 — at the cap, checkpoint, write NEXT, return SPLIT.
 
 Report ≤ 60 lines, following `templates/implementer-report-template.md`, one section per note.

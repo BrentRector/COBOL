@@ -17,7 +17,9 @@ POINTER = 'MANDATORY-PRACTICES.md'
 # role → (file, required patterns). Every brief must point at the practices file; the patterns are the practices
 # that are cheapest to lose silently.
 BRIEFS = {
-    'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance'],
+    # P4: the stamped handoff (kb/Work/PB1698) — STATUS.md names the commit it describes; a resumer reads the delta.
+    'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'STATUS-AT:',
+                                      r'status_delta\.py'],
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance'],
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'tail -n \+1 -f', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN'],
     'lander-brief.md': [r'claude-skills', POINTER, r'push-main'],
@@ -27,11 +29,12 @@ BRIEFS = {
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'NEVER run the whole Conformance', r'\\STOP',
                                      r'tail -n \+1 -f', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
-                                     r'Turn cap 220', r'code site', r'RUN BY NAME', r'drift_rules\.py'],
+                                     r'Turn cap 220', r'code site', r'RUN BY NAME', r'drift_rules\.py', r'STATUS-AT:',
+                                     r'status_delta\.py'],
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     'wf_rolling_wave.js': [r'STOP', r"agentType: 'cobol-implementer'", r"agentType: 'cobol-lander'", r'StructuredOutput',
-                           r'g\.after', r'held\[', r'push-main\.sh'],
+                           r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py'],
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.

@@ -64,7 +64,8 @@ function successorNote(g) {
   }
   return `⛔ SAME-FILE SUCCESSOR: your predecessor group ${g.after} (${p.notes}) returned ${p.status} on branch ${p.branch} ` +
     `(worktree ${p.worktree}, head ${p.head}, report ${p.report}). FIRST \`git merge ${p.branch}\` into your branch, then read that ` +
-    `report's "For the next implementer" section and its STATUS.md as your orientation for the shared file; its notes land through ` +
+    `report's "For the next implementer" section and its STATUS.md as your orientation for the shared file — run ` +
+    `\`python scripts/spec/status_delta.py ${p.worktree}\` and read ONLY the commits it lists beyond the summary; its notes land through ` +
     `YOUR branch (list them as landed-via-predecessor). `
 }
 
