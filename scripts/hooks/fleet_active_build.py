@@ -76,6 +76,16 @@ import time
 
 WINDOW_SECONDS = 120
 
+# ⛔ An agent inside a LONG TOOL CALL writes nothing to its transcript until the tool returns (kb/Work PB1702). The
+# assistant line carrying the `tool_use` is flushed when the call STARTS; the `tool_result` line only when it ENDS. A
+# gate that blocks on `timeout 580 … tail -f <log>` therefore leaves the transcript untouched for up to ten minutes
+# while the agent is plainly live — measured 2026-09-28, wave 69: three finishers' transcripts went 20+ minutes
+# without a write while their gates ran, and a watchdog keyed on mtime alone called them dead. So a transcript whose
+# LAST record is an unanswered tool call is live for as long as a tool call can last: the shell tools' 600 s maximum
+# plus a margin. The bound is what keeps a KILLED agent (which also leaves a dangling tool call) from denying forever.
+TOOL_WINDOW_SECONDS = 660
+TAIL_BYTES = 262144
+
 # `dotnet clean/publish/run` rewrite or delete the same outputs a live agent is executing, so they are in scope
 # too. `dotnet --version`, `dotnet tool`, `dotnet nuget` etc. are not.
 BUILD_VERBS = ("build", "test", "clean", "publish", "run", "msbuild")
@@ -327,18 +337,58 @@ def live_agent_transcripts(session_id: str) -> list:
     if not projects.is_dir():
         return []
 
-    cutoff = time.time() - WINDOW_SECONDS
+    now = time.time()
     live = []
     # ~/.claude/projects/<sanitized-cwd>/<session-id>/subagents/**/agent-*.jsonl
     # Globbing on the session id rather than deriving the sanitized cwd keeps this correct whatever the
     # sanitization rule is, and scopes the guard to THIS session.
     for path in projects.glob(f"*/{session_id}/subagents/**/agent-*.jsonl"):
         try:
-            if path.stat().st_mtime >= cutoff:
+            if is_live(path, now):
                 live.append(path)
         except OSError:
             continue
     return live
+
+
+def is_live(path: pathlib.Path, now: float) -> bool:
+    """Written within WINDOW_SECONDS, or ending on an unanswered tool call written within TOOL_WINDOW_SECONDS."""
+    age = now - path.stat().st_mtime
+    if age <= WINDOW_SECONDS:
+        return True
+    return age <= TOOL_WINDOW_SECONDS and pending_tool_call(path)
+
+
+def pending_tool_call(path: pathlib.Path) -> bool:
+    """Does the transcript END on a tool call that has no result yet — i.e. is the agent inside a tool right now?
+
+    Reads only the tail. The last record that is either an assistant message or a tool result decides it: an
+    assistant message carrying `tool_use` ⇒ pending; a user record carrying `tool_result`, or an assistant message
+    without `tool_use` (the turn ended) ⇒ not pending. Any parse problem ⇒ False, which leaves the plain mtime rule
+    in force: this can only ADD liveness the old rule missed, never remove liveness it found.
+    """
+    try:
+        with path.open("rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - TAIL_BYTES))
+            tail = f.read().decode("utf-8", errors="replace")
+    except OSError:
+        return False
+    for line in reversed(tail.splitlines()):
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        content = (rec.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        kinds = {c.get("type") for c in content if isinstance(c, dict)}
+        if rec.get("type") == "assistant":
+            return "tool_use" in kinds
+        if rec.get("type") == "user" and "tool_result" in kinds:
+            return False
+    return False
 
 
 def deny_reason(live: list, tree: "pathlib.Path | None" = None) -> str:
@@ -351,8 +401,9 @@ def deny_reason(live: list, tree: "pathlib.Path | None" = None) -> str:
         else "a working tree that could not be determined, so the session-wide rule applies"
     )
     return (
-        f"BLOCKED — {len(live)} subagent transcript(s) were written in the last {WINDOW_SECONDS}s, so a "
-        f"fleet is LIVE in {where}: {detail}. Building or testing now changes the binary those agents are "
+        f"BLOCKED — {len(live)} subagent(s) are LIVE (transcript written in the last {WINDOW_SECONDS}s, or "
+        f"inside a tool call started in the last {TOOL_WINDOW_SECONDS}s), so a fleet is running in {where}: "
+        f"{detail}. Building or testing now changes the binary those agents are "
         f"probing, which is what made a 60-agent run unusable on 2026-08-04 (PB15). "
         f"Do ONE of: (a) wait for the completion notification, then build; "
         f"(b) stop the fleet with TaskStop if its results are no longer worth having; "
@@ -511,6 +562,36 @@ def self_test() -> int:
         msg = deny_reason(sharing, tree)
         check("message: names the live agents", "agent-main1" in msg and "agent-main2" in msg, True)
         check("message: names the shared tree", str(fx["main"]) in msg, True)
+
+    # ── 2b. Liveness (PB1702): an agent INSIDE a long tool call writes nothing until the call returns ──────────
+    with tempfile.TemporaryDirectory() as tmp:
+        base = pathlib.Path(tmp)
+        tool_use = {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash"}]}}
+        tool_res = {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1"}]}}
+        ended = {"type": "assistant", "message": {"content": [{"type": "text", "text": "done"}]}}
+        now = time.time()
+
+        def transcript(name: str, records: list, age: float) -> pathlib.Path:
+            p = base / f"agent-{name}.jsonl"
+            p.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+            os.utime(p, (now - age, now - age))
+            return p
+
+        for name, records, age, expected in [
+            ("fresh write -> LIVE", [tool_use, tool_res], 30, True),
+            # THE CASE THIS EXISTS FOR: wave 69's finishers, blocked 5+ minutes on `timeout 580 … tail -f gate.log`.
+            ("in a tool call for 5 min -> LIVE", [tool_res, tool_use], 300, True),
+            ("tool call answered, quiet 5 min -> not live", [tool_use, tool_res], 300, False),
+            ("turn ended, quiet 5 min -> not live", [tool_use, tool_res, ended], 300, False),
+            # A KILLED agent also leaves a dangling tool call: bounded, so it cannot deny forever.
+            ("dangling tool call older than any tool can run -> not live", [tool_res, tool_use], 900, False),
+            ("unparseable tail, quiet 5 min -> not live (old rule stands)", [], 300, False),
+        ]:
+            p = transcript(name.split()[0] + str(age), records, age)
+            if not records:
+                p.write_text("{not json\n", encoding="utf-8")
+                os.utime(p, (now - age, now - age))
+            check(f"liveness: {name}", is_live(p, now), expected)
 
     # ── 3. The verb matcher, both ways — `dotnet --version` must stay OUT of scope ─────────────────────────
     for cmd, expected in [
