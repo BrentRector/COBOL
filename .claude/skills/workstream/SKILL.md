@@ -58,6 +58,11 @@ mid-leg. Every dispatch prompt says: start the job in the background to a log, t
 push-main, append `echo "PUSH-MAIN-EXIT=$?"` to its log and block on that).
 
 **A killed agent is replaced by a FRESH agent that reads the checkpoint** (`STATUS.md` + `git log`, or the `.jsonl`).
+⭐ **EVERY FLEET-OPTIMIZATION EXPERIMENT IS RECORDED (owner 2026-09-28, for a later research report).** When an
+experiment, measurement or design attempt on the fleet ends, write `docs/rearchitecture/evidence/fleet-optimization/
+YYYY-MM-DD-<slug>.{md,json}` in the format of that directory's README. The `.md` holds the question, hypothesis,
+design, every attempt, result, limits and decision. The `.json` holds the raw per-agent data from
+`scripts/telemetry/workflow_metrics.py`, because transcripts are pruned. Failures and null results are recorded too.
 ⭐ **The handoff is STAMPED (kb/Work/PB1698, 2026-09-28).** STATUS.md's first line is `STATUS-AT: <sha>`, which names
 the commit it describes and is written after that commit. A resumer or same-file successor runs
 `python scripts/spec/status_delta.py <worktree>`:

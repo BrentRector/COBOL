@@ -1,0 +1,470 @@
+{
+ "_frozen": "⛔ FROZEN EVIDENCE — the raw per-agent data of one fleet-optimization experiment, measured by scripts/telemetry/workflow_metrics.py from the workflow transcripts on the day it ran; never edited to stay current (owner decision kb/Work/PB785). The write-up beside it (same name, .md) carries the design and the analysis.",
+ "experiment": "2026-09-28-stamped-handoff-pilot",
+ "note": "kb/Work/PB1698",
+ "workflow_run": "wf_2190fcf0-fec",
+ "scenario": {
+  "branch": "worktree-wf_e9a82a33-6b6-4",
+  "head": "aaf1823fc",
+  "stamp": "59f19d6e8",
+  "uncovered_truth": [
+   "aaf1823fc"
+  ],
+  "commits_since_base": 6
+ },
+ "arms": {
+  "OLD": "unstamped STATUS.md + resume rule \"read it and git log\"",
+  "NEW": "STATUS.md stamped STATUS-AT 59f19d6e8 + status_delta.py"
+ },
+ "scoring": "correct = named aaf1823fc as uncovered AND said the branch was never gated AND resumed on top of it; NEW-1 hand-checked (regex miss)",
+ "workflow_dir": "wf_2190fcf0-fec",
+ "agents": 8,
+ "returned": 8,
+ "rows": [
+  {
+   "agent": "a2ab74a3b5685fac3",
+   "label": "ab-NEW-1",
+   "turns": 9,
+   "tool_calls": 14,
+   "tokens": 595586,
+   "fresh": 55442,
+   "token_parts": {
+    "input": 18,
+    "output": 55,
+    "cache_read": 540144,
+    "cache_write": 55369
+   },
+   "wall_s": 130.2,
+   "first": "2026-09-28T17:09:14.967Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088 DONE: a contained program inherits WITH DEBUGGING MODE (\"|=\" own clause, not assign); golden 85/pb1088_dbg_contained",
+      "commit": "3a35da9d0",
+      "evidence": "stat: kb/Work/PB1088.md, 85/pb1088_dbg_contained.cob/.out, 85 manifest, traceability-inventory.json; batch file w68u/batch-PB1088.json exists (18:22). Arrived through merge 33e2a7b4e of worktree-wf_8b2b0670-764-4."
+     },
+     {
+      "note": "PB1213 DONE: one screen for dynamic-length-or-variable-length-group (BASED SR2 COBOLNET2560, CONSTANT SR12 + GR6 via ItemLength.Positions, REDEFINES SR17, FILE STATUS SR3)",
+      "commit": "c64bfcb35",
+      "evidence": "stat: 20 files; kb/Work/PB1213.md, 2014 + negative manifests (+1/+2), inventory; w68u/batch-PB1213.json exists (19:18)"
+     },
+     {
+      "note": "PB1284 DONE: RENAMES range screened (SR8 COBOLNET2561; bit-area SR10 COBOLNET2562). STATUS gives no hash for it; the commit is 4dad050e5",
+      "commit": "4dad050e5",
+      "evidence": "stat: 19 files; kb/Work/PB1284.md, 2002 + 85 manifests +1 each, negative manifest +3, inventory; w68u/batch-PB1284.json exists (19:25)"
+     },
+     {
+      "note": "PB1273 DONE: PROPERTY clause recorded on the item (DataItem.Property); SR1 in BindEntry, SR21 + SR3 table rows, SR2/3/5/6 in OoBindPropertyClauses (COBOLNET2563); IsSubjectToOccurs asks IsTable",
+      "commit": "59f19d6e8",
+      "evidence": "stat: 27 files; kb/Work/PB1273.md, 2002/pb1273_property_subject.cob/.out, negative manifest +5, inventory; w68u/batch-PB1273.json exists (19:36). This is the STATUS-AT commit."
+     },
+     {
+      "note": "PB1579 PARTIAL and NOT in STATUS: an uncommitted working-tree snapshot preserved by the orchestrator after the agent died. It adds IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]) as the one integer-literal text reader; HostValue(IntegerLiteralContext) now delegates to it. It rewires 4 sites: the OCCURS integer constant-name bound (DataBinder.Constants.cs OccursBoundValue now raises COBOLNET2427 IntegerOperandBeyondLimit for an over-range constant instead of \"not an INTEGER constant-name\"), the Format 2 VALUE subscript (DataBinder.cs ~5784; a negative over-range literal now saturates to int.MinValue, not int.MaxValue), and ReferenceResolver ReadParsedLiterals plus the subscript literal read (~801, ~848)",
+      "commit": "aaf1823fc",
+      "evidence": "git show aaf1823fc: 4 files +64/-10, Brent Rector 2026-09-27 19:59. No golden, no kb/Work/PB1579.md change, no scripts/semgrep change (git diff origin/main..branch -- scripts/semgrep is empty), no batch-PB1579.json in w68u/. Never verified: w68u/build2.log (19:40, succeeded) and probes w68u/p/rmbig|rm2g|rm99|kbig|kbig2.cob (19:40-19:41) predate the 19:59 snapshot, so there is no record of the edits being built or probed."
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc384f0c826ee7f2b4520475faecc2b94",
+      "what_it_contains": "'WIP checkpoint: group U's in-progress edits preserved after its agent died on an API error (wave 68)' is the in-progress PB1579 code: the new IntegerOperandRules.TryHostValue text reader (IntegerOperandPass.cs), with 4 call sites moved onto it: DataBinder.Constants.cs OccursBoundValue (over-range integer constant -> COBOLNET2427), DataBinder.cs Format 2 VALUE subscript, and ReferenceResolver.cs ref-mod literals + subscript literal. It is code only: no tests/goldens, no kb note update, no semgrep rule extension, and it has never been built or gated."
+     }
+    ],
+    "gate_state": "status_delta.py reports STALE by 1: STATUS-AT is 59f19d6e8 and HEAD is aaf1823fc (base 4b0f3e22a = origin/main; the branch has 6 commits past it). 59f19d6e8 is an ancestor of HEAD, so the summary is accurate for everything up to 59f19d6e8, and aaf1823fc is the only commit it does not describe. GATE: never run on this branch, neither the wave-local filtered gate nor the comprehensive battery. PB1088/PB1213/PB1284/PB1273 each have goldens, manifest entries, kb note edits and inventory edits in their commits (checked by stat only; their tests were not re-run). Their record_verdicts batches exist as files in w68u/; that they were \"applied\" is only STATUS's claim and was not checked. aaf1823fc (PB1579) is unverified: the last recorded build (build2.log 19:40, Build succeeded) predates the 19:59 snapshot, and whether it compiles is unknown. A read-only look finds the referenced symbols in scope (SignedIntegerLiteral.Screen returns a non-null string; `where`, DiagnosticCatalog.IntegerOperandBeyondLimit and Edition.Error are available in OccursBoundValue). Diagnostic codes COBOLNET2560-2563 are all used, with none spare for PB1579. Two things for review: (a) HostValue(IntegerLiteralContext) used NumberStyles.None and now goes through TryHostValue, which accepts a leading sign, so a signed text that reaches it would read as a negative value where it used to saturate to HostLimit; (b) the PB1579 note's site list is stale. At the commit that filed it (5360450b8), DataBinder.cs:1690/:3994, DataBinder.Reports.cs:1409/:1724/:2140 and DataBinder.Odo.cs:65-66 already read through HostValue; only ReferenceResolver:853-855 was a live int.TryParse. Open lead (not from this group's items): debugging lines (indicator D) are always comments at --std 85 under WITH DEBUGGING MODE, at ReferenceFormatProcessor.LogicalConversion.cs:99, probe w68u/p/dline85.cob.",
+    "next_step": "Resume PB1579 in worktree E:\\COBOL\\.claude\\worktrees\\wf_e9a82a33-6b6-4 at HEAD aaf1823fc, keeping its edits. (1) Build CobolSharp.sln to establish that the snapshot compiles. (2) Probe with 11-digit literals, before (origin/main build) and after, using the existing w68u/p probes rmbig.cob (RD CONTROLS CX(1:77777777777)), rm2g/rm99 and kbig/kbig2 (OCCURS integer constant-name beyond the limit, expecting COBOLNET2427 and no layout allocation), plus a negative over-range Format 2 VALUE subscript; derive each expected verdict from the spec and check it with `python scripts/spec/cite.py --check` (§4.5, §13.10.3 SR2, §13.10.4 GR1, §8.4.2.3.4 GR2, §13.18.16.3 SR4). (3) Triage the remaining int/long.TryParse sites on COBOL integer-literal text: Model/Place.cs:801-802, InitializeBinder.cs:323, ConditionBinder.cs:208, OoBinder.cs:885-886, IntrinsicBinder.cs:918/1583, ParameterConformance.cs:429/478, DataBinder.Switches.cs:500, CodeGen RuntimeApi.cs:855/892 and CallEmitter.cs:190. Route through TryHostValue/HostValue those that read a COBOL integer literal; level-number reads are LevelNumberPass's and are out of scope. (4) Extend semgrep rule cobolnet-integer-n-parsed-outside-host-value in scripts/semgrep/invariants.yml. Its regex matches only the `integerLiteral().GetText()` accessor form, which is why it missed token, constant-text and expression-text parses; add a drift-proof pattern and record why in the note. (5) Add goldens (positive plus negative for COBOLNET2427 on an OCCURS constant, and the ref-mod over-range) with manifest entries. Update kb/Work/PB1579.md: correct the stale site list, set status and closes_rows or closes_rows_reason. Write w68u/batch-PB1579.json and commit with a forensic message. (6) Run the wave-local filtered GATE for all of group U (PB1088/1213/1284/1273/1579), then rewrite STATUS.md with STATUS-AT set to the new HEAD.",
+    "commits_read": 1
+   }
+  },
+  {
+   "agent": "af72e84db99283cff",
+   "label": "ab-NEW-2",
+   "turns": 9,
+   "tool_calls": 10,
+   "tokens": 561577,
+   "fresh": 46813,
+   "token_parts": {
+    "input": 18,
+    "output": 59,
+    "cache_read": 514764,
+    "cache_write": 46736
+   },
+   "wall_s": 87.8,
+   "first": "2026-09-28T17:09:14.968Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088",
+      "commit": "3a35da9d0",
+      "evidence": "Merged in via 33e2a7b4e; kb/Work/PB1088.md on branch: status landed, closes_rows [GR-12.3.5.4-1]; golden tests/conformance/85/pb1088_dbg_contained.{cob,out} + 85 manifest entry in branch diff; batch w68u/batch-PB1088.json present"
+     },
+     {
+      "note": "PB1213",
+      "commit": "c64bfcb35",
+      "evidence": "kb/Work/PB1213.md status landed, closes_rows [SR-13.18.5.3-2, SR-13.10.3-12, GR-13.10.4-6]; VariableLengthCompatibility.cs + ItemLength.cs in diff; golden 2014/pb1213_varlen_neighbours + negatives pb1213-based-variable-length-group, pb1213-constant-length-variable-group; batch-PB1213.json present"
+     },
+     {
+      "note": "PB1284",
+      "commit": "4dad050e5",
+      "evidence": "STATUS omits its hash; commit 4dad050e5 is the PB1284 checkpoint. kb/Work/PB1284.md status landed, closes_rows [SR-13.18.45.3-8, SR-13.18.45.3-10]; goldens 85/pb1284_renames_range_fixed, 2002/pb1284_renames_bit_whole_bytes + 3 negatives; batch-PB1284.json present"
+     },
+     {
+      "note": "PB1273",
+      "commit": "59f19d6e8",
+      "evidence": "kb/Work/PB1273.md status landed, closes_rows [SR-13.18.42.3-1,-2,-3,-5,-6]; PropertyClauseSpec.cs, DataItem.cs, DataBinder.Oo.cs in diff; golden 2002/pb1273_property_subject + 5 negatives; batch-PB1273.json present"
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "PB1579 work in progress, committed by the orchestrator after the agent died (WIP preserved, never built or tested). It adds IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]) in Validation/IntegerOperandPass.cs, which accepts an optional sign plus digits and saturates at HostLimit or int.MinValue. HostValue(IntegerLiteralContext) now delegates to it, so its NumberStyles.None becomes AllowLeadingSign. It changes 4 of the 5 non-level-number int/long.TryParse sites found at the merge base: (1) DataBinder.Constants.cs:434, where an OCCURS bound given by an integer constant-name now reads through TryHostValue and a value beyond the limit raises COBOLNET2427 IntegerOperandBeyondLimit; (2) DataBinder.cs:5781, the Format 2 VALUE subscript read (long.TryParse+Clamp is replaced by TryHostValue); (3) and (4) ReferenceResolver.cs ReadParsedLiterals (ref-mod start/length) and the SUBSCRIPT-mode single-literal read. It does NOT touch scripts/semgrep/invariants.yml (rule cobolnet-integer-n-parsed-outside-host-value still matches only the integerLiteral().GetText() accessor form), kb/Work/PB1579.md (still status open, closes_rows []), goldens, manifests or docs."
+     }
+    ],
+    "gate_state": "No gate has run on this branch (STATUS: 'GATE: not yet run'). No build or test run covers aaf1823fc. The PB1579 edits could not be compile-checked because this step was read-only. They do look consistent: the DiagnosticCatalog.IntegerOperandBeyondLimit symbol exists, and TryHostValue's overloads line up with its call sites. PB1088/1213/1284/1273 were per-item checkpoints with batches applied, but there has been no wave-local filtered gate over the combined branch and no comprehensive battery. The branch head is aaf1823fc. The worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4 is clean (checked with status --porcelain and no optional locks). The branch is 12 commits behind origin/main (merge base 4b0f3e22a). status_delta.py returned STALE by 1 (STATUS-AT 59f19d6e8, head aaf1823fc), and that one commit is described above. Open lead from STATUS, not yet filed as a kb/Work note: under WITH DEBUGGING MODE at --std 85, debugging lines (indicator D) are always treated as comments (ReferenceFormatProcessor.LogicalConversion.cs:99; probe w68u/p/dline85.cob).",
+    "next_step": "Continue PB1579 in the branch worktree, starting from aaf1823fc: (1) Build CobolSharp.sln to confirm the WIP compiles. (2) Probe each converted site with an 11-digit literal (existing probes are w68u/p/kbig.cob and kbig2.cob for the constant OCCURS bound, and rmbig.cob for ref-mod; add one for a Format 2 VALUE negative subscript). Compare against a pre-fix build to capture before/after. (3) Finish the sweep of the remaining int/long.TryParse sites in Binding/ and decide, with a citation, which ones read a COBOL integer literal. Candidates: Place.cs:801-802, InitializeBinder.cs:323, OoBinder.cs:885-886 (ref-mod text), ConditionBinder.cs:208, IntrinsicBinder.cs:918/1583, ParameterConformance.cs:429/478, Switches.cs:500. The levelNumber() reads are grammar-bounded and probably out of scope, but confirm that. Route each literal-reading site through TryHostValue/HostValue. (4) Extend the semgrep rule cobolnet-integer-n-parsed-outside-host-value so it catches bare TryParse on literal text beyond the integerLiteral() accessor form, and record why it missed these sites. (5) Add a golden/negative, e.g. a CONSTANT above the limit used as an OCCURS bound giving COBOLNET2427. Then register it in the manifest and update docs/CONFORMANCE.md §3 and DIAGNOSTICS.md if needed. (6) Set kb/Work/PB1579.md to landed with closes_rows, or write a closes_rows_reason since inventory_rows is []. Write the batch and commit. (7) Then run the GATE (wave-local filtered) over the whole group U branch.",
+    "commits_read": 6
+   }
+  },
+  {
+   "agent": "a104e93f6dd65c7fb",
+   "label": "ab-NEW-3",
+   "turns": 12,
+   "tool_calls": 12,
+   "tokens": 808827,
+   "fresh": 57580,
+   "token_parts": {
+    "input": 24,
+    "output": 73,
+    "cache_read": 751247,
+    "cache_write": 57483
+   },
+   "wall_s": 138.7,
+   "first": "2026-09-28T17:09:14.968Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088 finished: a contained program inherits WITH DEBUGGING MODE (the flag is OR'd with its own clause instead of overwritten). Golden 85/pb1088_dbg_contained is added and registered in the manifest, and kb/Work/PB1088.md is status landed with closes_rows [GR-12.3.5.4-1]. The branch has it through merge 33e2a7b4e (parents 4b0f3e22a and 3a35da9d0).",
+      "commit": "3a35da9d0",
+      "evidence": "git show --stat: DataBinder.cs +7, 85/manifest.json +1, pb1088_dbg_contained.cob/.out, traceability-inventory.json; the note's frontmatter on the branch confirms landed. The batch w68u/batch-PB1088.json exists. That it was 'applied' is taken from STATUS and was not re-verified."
+     },
+     {
+      "note": "PB1213 finished: one screen for dynamic-length-or-variable-length-group (VariableLengthCompatibility), BASED SR2 as COBOLNET2560, CONSTANT SR12 and GR6 through ItemLength.Positions. The golden, 2 negatives, DIAGNOSTICS.md and two design docs are updated. Note status landed, closes_rows [SR-13.18.5.3-2, SR-13.10.3-12, GR-13.10.4-6].",
+      "commit": "c64bfcb35",
+      "evidence": "git show --stat (20 files: ItemLength.cs, VariableLengthCompatibility.cs, DiagnosticCatalog.cs, 2014/pb1213_varlen_neighbours, 2 negatives, docs). Note frontmatter checked on the branch; batch-PB1213.json and land-PB1213.md exist."
+     },
+     {
+      "note": "PB1284 finished: RENAMES range content screened, SR8 as COBOLNET2561 and bit-area SR10 as COBOLNET2562. Goldens 85/pb1284_renames_range_fixed and 2002/pb1284_renames_bit_whole_bytes plus 3 negatives. Note status landed, closes_rows [SR-13.18.45.3-8, SR-13.18.45.3-10]. STATUS gave no SHA for this item; the commit is 4dad050e5.",
+      "commit": "4dad050e5",
+      "evidence": "git show --stat (19 files) and the note frontmatter on the branch; batch-PB1284.json and land-PB1284.md exist."
+     },
+     {
+      "note": "PB1273 finished: the PROPERTY clause is recorded on DataItem, SR1 in BindEntry, SR21 and SR3 as table rows, SR2/3/5/6 as COBOLNET2563, and IsSubjectToOccurs now asks IsTable. Golden 2002/pb1273_property_subject plus 5 negatives, and COBOLNET_OO_SLICE_BRIEFS.md updated. Note status landed, closes_rows [SR-13.18.42.3-1,-2,-3,-5,-6]. This is the commit STATUS-AT is stamped at.",
+      "commit": "59f19d6e8",
+      "evidence": "git show --stat (27 files) and the note frontmatter on the branch; batch-PB1273.json and land-PB1273.md exist."
+     },
+     {
+      "note": "PB1579 is IN PROGRESS, not done. This is the commit STATUS does not cover. The orchestrator saved the dead agent's uncommitted edits here, and they were never compiled together. It adds IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]) in Validation/IntegerOperandPass.cs, the single reader for integer-literal text. It accepts an optional sign and digits and saturates to HostLimit, or to int.MinValue for a negative. HostValue(IntegerLiteralContext) now delegates to it, which is a behaviour change: NumberStyles.None became AllowLeadingSign. That needs checking against line 227, which still uses NumberStyles.None. The sites routed through it: (1) the OCCURS bound from an integer constant in DataBinder.Constants.cs about line 437, which now raises COBOLNET2427 (IntegerOperandBeyondLimit) instead of reporting 'not an INTEGER constant-name'; (2) the Format 2 VALUE subscript in DataBinder.cs about line 5784, where a long.TryParse had put int.MaxValue in place of a large negative; (3) ReferenceResolver.ReadParsedLiterals and the subscript literal at about line 848. Not done: the semgrep rule, the kb note, goldens, the land file and the batch.",
+      "commit": "aaf1823fc",
+      "evidence": "git show aaf1823fc (4 files, +64/-10). Worktree mtimes: DataBinder.Constants.cs and IntegerOperandPass.cs 19:42, but the compiler dll and build2.log are 19:40, so those edits were never built. scripts/semgrep/invariants.yml is unchanged on the branch: rule cobolnet-integer-n-parsed-outside-host-value, line 169, still matches only the integerLiteral() accessor form. kb/Work/PB1579.md is still status open with empty closes_rows. No batch-PB1579.json or land-PB1579.md exists. The probes p/kbig.cob (01 K CONSTANT AS 77777777777 / OCCURS K), p/kbig2.cob (literal OCCURS 77777777777) and p/rmbig.cob (RD CONTROLS CX(1:77777777777)) exist, and only rmbig was compiled (19:40)."
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "The orchestrator's WIP checkpoint of the dead agent's uncommitted PB1579 edits, never built as a set: TryHostValue added to IntegerOperandRules (IntegerOperandPass.cs +39), with the OCCURS-constant bound (DataBinder.Constants.cs +17, which now raises COBOLNET2427), the Format 2 VALUE subscript (DataBinder.cs) and the ref-mod and subscript literal readers (ReferenceResolver.cs) routed through it. It has no semgrep, kb note, golden, doc or DEVLOG changes."
+     }
+    ],
+    "gate_state": "No gate of any kind has run on this branch. STATUS says 'GATE: not yet run', and the scratch directory holds only build logs. The last build (build2.log, 19:40 on 09-27) succeeded with 0 warnings and 0 errors, but it came before the 19:42 edits to DataBinder.Constants.cs and IntegerOperandPass.cs. The branch HEAD aaf1823fc has therefore never been compiled, and the repo sets TreatWarningsAsErrors=true. Goldens and negatives for PB1088, PB1213, PB1284 and PB1273 are committed, but none has run in a gate after the combined changes. The branch's merge-base is 4b0f3e22a. STATUS names its base as 8dab50862, which is slightly wrong: the merge's first parent is 4b0f3e22a, one commit after 8dab50862. main (ee68c406b) is 13 commits ahead, including the wave-69 binder landings (X, Y, Z, V2, S, R, T, W), so main must be merged in before the gate. The worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4 is clean at aaf1823fc. All four codes (COBOLNET2560-2563) are used; PB1579 as drafted reuses the existing IntegerOperandBeyondLimit (COBOLNET2427) and needs no new code. Not verified: whether the 4 record_verdicts batches were actually applied (taken from STATUS).",
+    "next_step": "Continue PB1579 in the worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4. (1) Build CobolSharp.sln so the unbuilt WIP in aaf1823fc compiles. Check that HostValue(IntegerLiteralContext), now sign-accepting, still agrees with the NumberStyles.None screen at IntegerOperandPass.cs:227. (2) Probe p/kbig.cob, p/kbig2.cob and p/rmbig.cob against the ISO §4.5 limit rule, verifying the §/GR with scripts/spec/cite.py --check. kbig should give the same COBOLNET2427 as kbig2, and rmbig's saturated ref-mod length must be reported, not compile clean. (3) Triage the remaining int/long.TryParse sites on COBOL integer text, leaving out level-number sites: Place.cs:801-802, ConditionBinder.cs:208, InitializeBinder.cs:323, IntrinsicBinder.cs:918 and :1583, OoBinder.cs:885-886, ParameterConformance.cs:429 and :478, DataBinder.Switches.cs:500. Route the in-scope ones through TryHostValue. (4) Extend the semgrep rule cobolnet-integer-n-parsed-outside-host-value in scripts/semgrep/invariants.yml, with testdata in scripts/semgrep/testdata/Violations.cs, so the TryParse forms that were missed are caught, and record why the rule missed them. (5) Add a golden or negative for each changed behaviour (at least the kbig constant OCCURS bound giving COBOLNET2427). Update kb/Work/PB1579.md to status landed with closes_rows, or closes_rows_reason since it claims no rows, and update docs/CONFORMANCE.md §3 if needed. Write land-PB1579.md and batch-PB1579.json. (6) Update STATUS, merge origin/main (13 commits ahead) into the branch, rebuild the solution, and run the wave-local filtered gate for all five items.",
+    "commits_read": 5
+   }
+  },
+  {
+   "agent": "a9c09e5771af3fd8b",
+   "label": "ab-NEW-4",
+   "turns": 11,
+   "tool_calls": 11,
+   "tokens": 698627,
+   "fresh": 48728,
+   "token_parts": {
+    "input": 22,
+    "output": 71,
+    "cache_read": 649899,
+    "cache_write": 48635
+   },
+   "wall_s": 108.1,
+   "first": "2026-09-28T17:09:14.969Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "commits_read": 6,
+    "done_notes": [
+     {
+      "note": "PB1088",
+      "commit": "3a35da9d0",
+      "evidence": "Came in through merge 33e2a7b4e from worktree-wf_8b2b0670-764-4. Touches kb/Work/PB1088.md (status landed, closes_rows GR-12.3.5.4-1), DataBinder.cs, and golden 85/pb1088_dbg_contained with its manifest entry and inventory. Batch file w68u/batch-PB1088.json exists."
+     },
+     {
+      "note": "PB1213",
+      "commit": "c64bfcb35",
+      "evidence": "Touches ItemLength.cs, VariableLengthCompatibility.cs, DataBinder.Constants/UsageDeclaration/cs, IntrinsicBinder, and DiagnosticCatalog (COBOLNET2560). Adds golden 2014/pb1213_varlen_neighbours plus 2 negatives, with DIAGNOSTICS.md and design docs. Note status is landed, closes_rows SR-13.18.5.3-2, SR-13.10.3-12, GR-13.10.4-6. Batch file exists."
+     },
+     {
+      "note": "PB1284",
+      "commit": "4dad050e5",
+      "evidence": "STATUS gives no SHA; I found it on the branch. Adds RenamesRangeFault (2561) and the bit-area rule (2562), goldens 85/pb1284_renames_range_fixed and 2002/pb1284_renames_bit_whole_bytes, and 3 negatives. Note status is landed, closes_rows SR-13.18.45.3-8 and -10. Batch file exists."
+     },
+     {
+      "note": "PB1273",
+      "commit": "59f19d6e8",
+      "evidence": "Adds DataItem.Property and PropertyClauseSpec, changes DataBinder.Oo/ClausePlacement/RecordLayout/OoDriver, and adds 2563. Golden 2002/pb1273_property_subject plus 5 negatives, a drift-test row, and OO_SLICE_BRIEFS doc. Note status is landed, closes_rows 13.18.42.3 SR1/2/3/5/6. Batch file exists."
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "This is PB1579 work in progress. It was committed after the agent died, and nobody has built or tested it. (1) IntegerOperandPass.cs adds IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]). It is the single reader of integer-literal text: optional sign plus ASCII digits. Past the host range it saturates to HostLimit (=int.MaxValue), or to int.MinValue when negative. HostValue(IntegerLiteralContext) now delegates to it. (2) DataBinder.Constants.cs ~L437 handles an OCCURS bound that is a constant-name: an over-range integer constant now raises DiagnosticCatalog.IntegerOperandBeyondLimit (the existing COBOLNET2427 descriptor, src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs:5245) and returns null. Before, it was refused with ConstantEntryRule. (3) DataBinder.cs ~L5784: the Format 2 VALUE subscript's long.TryParse+Clamp is replaced by TryHostValue. (4) ReferenceResolver.cs ReadParsedLiterals (ref-mod start/length) and the SUBSCRIPT-mode single-literal read now use TryHostValue instead of int.TryParse. Not done yet: no semgrep rule change, no Violations.cs testdata, no golden or negative, no kb/Work/PB1579.md update (still status open, closes_rows []), no batch, no DEVLOG. If the old `using System.Globalization` / `CultureInfo` in DataBinder.Constants.cs is now unused, it may produce a warning."
+     }
+    ],
+    "gate_state": "No gate has run on this branch: no wave-local filtered gate and no comprehensive run. The STATUS says \"GATE: not yet run\", and nothing on the branch contradicts that. The four landed commits (3a35da9d0, c64bfcb35, 4dad050e5, 59f19d6e8) were checkpointed with builds and probes, according to the prior agent's build1/build2 logs. WIP commit aaf1823fc has never been compiled. The worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4 is clean at aaf1823fc.\n\nThe branch forks from origin/main at 4b0f3e22a. The STATUS says \"base: 8dab50862\", which is inaccurate but an ancestor. origin/main is now 12 commits ahead (up to ee68c406b), so the merge will need a rebase or merge check before landing.\n\nstatus_delta.py result: STALE by 1 commit (aaf1823fc).\n\nDiscrepancies in the handoff: (1) it has no SHA for PB1284 (it is 4dad050e5); (2) the base is wrong; (3) its NEXT for PB1579 does not say that aaf1823fc already converted 4 sites.\n\nPB1579's own site list (DataBinder.cs:1690/:3994, Reports.cs:1409/:1724/:2140, Odo.cs:65-66) came from an older tree. At branch head those sites already call HostValue. Of the listed sites, only ReferenceResolver was still a TryParse, and aaf1823fc converted it.",
+    "next_step": "Continue PB1579 from aaf1823fc, in this order:\n1. Build CobolSharp.sln to confirm the WIP compiles, and fix any unused-using or diagnostic-argument problems in DataBinder.Constants.cs.\n2. Re-run the prior agent's probes against the built compiler, before and after the change: E:/Temp/claude/E--COBOL/eb162d4b-e0bb-4027-b8a0-86fd190d20be/scratchpad/w68u/p/kbig.cob, kbig2.cob (OCCURS integer constant with 11 digits), rmbig.cob and rm99 (ref-mod literal).\n3. Triage the remaining integer-literal TryParse sites the grep still shows in Binding. Level-number reads in Reports.cs and DataBinder.cs:765 are not integer-n. The candidates are Place.cs:801-802, ConditionBinder.cs:208, InitializeBinder.cs:323, IntrinsicBinder.cs:918/1583, OoBinder.cs:885-886, ParameterConformance.cs:429/478 and DataBinder.Switches.cs:500. Route each one whose rule reads an integer literal through TryHostValue or HostValue.\n4. Extend the semgrep rule cobolnet-integer-n-parsed-outside-host-value in scripts/semgrep/invariants.yml. It missed these sites because its regex matches only `(int|long).(Try)?Parse(... integerLiteral().GetText())`. It cannot see token `.Text`, arithmeticExpression GetText, or constant IntegerText. Add the matching Violations.cs testdata lines.\n5. Add a golden or negative for an over-range OCCURS constant (COBOLNET2427) and for an over-range ref-mod literal, with manifest entries.\n6. Update kb/Work/PB1579.md (status, closes_rows or closes_rows_reason, since inventory_rows is []) and DIAGNOSTICS.md if any wording changes, then commit and write batch-PB1579.json.\n7. Run the wave-local filtered gate over group U's goldens and negatives (PB1088/1213/1284/1273/1579) and read the verdict line.\n8. Update STATUS.md with a new STATUS-AT stamp."
+   }
+  },
+  {
+   "agent": "ace9e253806e55d49",
+   "label": "ab-OLD-1",
+   "turns": 15,
+   "tool_calls": 16,
+   "tokens": 1013040,
+   "fresh": 81983,
+   "token_parts": {
+    "input": 30,
+    "output": 86,
+    "cache_read": 931057,
+    "cache_write": 81867
+   },
+   "wall_s": 158.0,
+   "first": "2026-09-28T17:09:13.764Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088 is done: a contained program now inherits WITH DEBUGGING MODE (OR, not assign). Golden 85/pb1088_dbg_contained. kb/Work/PB1088.md says status: landed, closes_rows [GR-12.3.5.4-1], and the inventory is updated.",
+      "commit": "3a35da9d0",
+      "evidence": "git show --stat: DataBinder.cs +7, the 85 manifest plus .cob/.out, PB1088.md, traceability-inventory.json. It reached this branch through merge 33e2a7b4e (parents 4b0f3e22a and 3a35da9d0). batch-PB1088.json exists in the w68u scratch dir."
+     },
+     {
+      "note": "PB1213 is done: one screen for dynamic-length-or-variable-length-group (BASED SR2 COBOLNET2560, CONSTANT SR12, GR6 through ItemLength.Positions). Golden 2014/pb1213_varlen_neighbours plus 2 negatives. Note is landed with closes_rows [SR-13.18.5.3-2, SR-13.10.3-12, GR-13.10.4-6].",
+      "commit": "c64bfcb35",
+      "evidence": "20 files changed, including DiagnosticCatalog, DIAGNOSTICS.md row COBOLNET2560, the 2014 and negative manifests and the inventory. batch-PB1213.json exists."
+     },
+     {
+      "note": "PB1284 is done: RENAMES range content is screened (SR8 COBOLNET2561, SR10 COBOLNET2562). Goldens 85/pb1284_renames_range_fixed and 2002/pb1284_renames_bit_whole_bytes plus 3 negatives. Note is landed with closes_rows [SR-13.18.45.3-8, SR-13.18.45.3-10]. STATUS left out this commit's SHA.",
+      "commit": "4dad050e5",
+      "evidence": "19 files changed. batch-PB1284.json exists."
+     },
+     {
+      "note": "PB1273 is done: the PROPERTY clause is recorded on DataItem; SR1 in BindEntry, SR21 and SR3 table rows, SR2/3/5/6 through COBOLNET2563; IsSubjectToOccurs now asks IsTable. Golden 2002/pb1273_property_subject plus 5 negatives. Note is landed with closes_rows for SR-13.18.42.3-1/2/3/5/6.",
+      "commit": "59f19d6e8",
+      "evidence": "27 files changed. batch-PB1273.json exists. build2.log (19:40, after this commit) says 'Build succeeded, 0 Warning(s) 0 Error(s)'."
+     },
+     {
+      "note": "PB1579 is PARTLY done, although STATUS lists it only as NEXT. The dead agent's uncommitted edits were checkpointed. They add IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]), and HostValue now delegates to it. It is wired into 4 sites: DataBinder.Constants.cs (the OCCURS integer constant-name bound; beyond the host limit it now raises IntegerOperandBeyondLimit/COBOLNET2427 instead of 'not an INTEGER constant-name'); DataBinder.cs Format 2 VALUE subscript (was long.TryParse plus a clamp); ReferenceResolver.ReadParsedLiterals start and length; and the ReferenceResolver subscript-literal read. Still missing: a build, probes, the semgrep rule extension, goldens, the note flip, a batch file and a DEVLOG entry. PB1579.md is still status: open.",
+      "commit": "aaf1823fc",
+      "evidence": "git show aaf1823fc: 4 files, +64/-10, committed 19:59:50, 20 minutes after the last successful build (build2.log 19:40), so the edits were never compiled. The semgrep rule and testdata are untouched on the branch (git diff 4b0f3e22a..branch -- scripts/semgrep is empty). There is no batch-PB1579.json in w68u/."
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "'WIP checkpoint: group U's in-progress edits preserved after its agent died on an API error (wave 68)'. This is PB1579 work in progress: the new TryHostValue reader in Validation/IntegerOperandPass.cs, and conversions in DataBinder.Constants.cs (~l.434-452), DataBinder.cs (~l.5784), and ReferenceResolver.cs (~l.797-810 and ~l.848). STATUS says PB1579 is NEXT as if nothing had started. It has never been built, gated, or given goldens, a semgrep change or a note flip."
+     }
+    ],
+    "gate_state": "NOTHING has been gated. STATUS says 'GATE: not yet run' and I found no gate log in w68u/: only b1.log, build1.log and build2.log, which are builds. build2.log (19:40) shows a clean build after PB1273, but the PB1579 edits in aaf1823fc came later and are unbuilt. The 4 finished items have goldens and manifest rows, and their kb notes are flipped to landed on the branch, but none of those goldens has been run in a gate. None of the 5 commits has a DEVLOG entry (DEVLOG.md and plan §0 are unchanged against base), so all are WIP checkpoints. The recorded batch JSONs exist for PB1088, PB1213, PB1284 and PB1273; STATUS says they were applied and I did not check that. The branch is NOT pushed: there is no origin/worktree-wf_e9a82a33-6b6-4. The worktree at E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4 is clean at aaf1823fc. STATUS gives the wrong base: the real merge-base with main is 4b0f3e22a (DEVLOG 1744), not 8dab50862, which is only 3a35da9d0's parent. main is now 13 commits ahead (up to ee68c406b) and touches DataBinder.cs, DataBinder.Constants.cs, DataBinder.Oo.cs, ReferenceResolver.cs, OoDriver.cs, DiagnosticCatalog.cs, DIAGNOSTICS.md, every conformance manifest and traceability-inventory.json, so merging main before landing will conflict at least in the manifests, inventory and DIAGNOSTICS.md. main's hunks in ReferenceResolver.cs and Constants.cs do not overlap the PB1579 regions. Codes COBOLNET2560-2563 are not used on main: main added 2572-2578 and others, so there is no collision. One lead is unfiled: debugging lines (indicator D) are always comments at --std 85 under WITH DEBUGGING MODE (ReferenceFormatProcessor.LogicalConversion.cs:99, probe w68u/p/dline85.cob).",
+    "next_step": "Resume PB1579 on top of aaf1823fc; do not restart it. (1) Build CobolSharp.sln in the worktree to prove the unbuilt aaf1823fc edits compile (TreatWarningsAsErrors is on). (2) Probe each converted site with an 11-digit literal, before (a main build) and after: an OCCURS bound given by an integer constant-name over the host limit should now give COBOLNET2427; a Format 2 VALUE negative subscript of 20+ digits; a ref-mod start and length literal; a subscript literal. (3) Run `cite.py --check` on every citation the WIP comments carry (§4.5, §8.3.3.3.2, §13.10.4 GR1, §13.10.3 SR2). (4) Sweep the remaining TryParse siblings and decide which read COBOL integer literals: Model/Place.cs:801-802, Verbs/OoBinder.cs:885-886, Verbs/ConditionBinder.cs:208, Verbs/InitializeBinder.cs:323, Verbs/IntrinsicBinder.cs:918 and 1583, Verbs/ParameterConformance.cs:429 and 478, DataBinder.Switches.cs:500. (5) Extend semgrep rule cobolnet-integer-n-parsed-outside-host-value (scripts/semgrep/invariants.yml:154) and its testdata/Violations.cs. It missed these sites because its pattern-regex only matches the `integerLiteral()...GetText()` accessor form, not token `.Text`, `exprs[i].GetText()`, a constant's IntegerText, or SignedIntegerLiteral.Screen. (6) Add goldens and negatives, flip kb/Work/PB1579.md with closes_rows or closes_rows_reason, and write batch-PB1579.json. (7) Run the wave-local GATE over all 5 items, merge main (ee68c406b), add the DEVLOG entry, then commit and push.",
+    "commits_read": 6
+   }
+  },
+  {
+   "agent": "a21c8b996dc3b4070",
+   "label": "ab-OLD-2",
+   "turns": 11,
+   "tool_calls": 12,
+   "tokens": 704701,
+   "fresh": 28978,
+   "token_parts": {
+    "input": 22,
+    "output": 69,
+    "cache_read": 675723,
+    "cache_write": 28887
+   },
+   "wall_s": 127.7,
+   "first": "2026-09-28T17:09:14.967Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088 done: a contained program inherits WITH DEBUGGING MODE (OR, not assign) in DataBinder.cs; golden 85/pb1088_dbg_contained; kb/Work/PB1088 is status: landed on the branch with closes_rows GR-12.3.5.4-1. It was committed on the predecessor branch worktree-wf_8b2b0670-764-4, whose parent is 8dab50862, and came into this branch through merge 33e2a7b4e.",
+      "commit": "3a35da9d0",
+      "evidence": "git show --stat 3a35da9d0 lists DataBinder.cs, the 85 golden .cob/.out, the 85 manifest, PB1088.md and the inventory. 33e2a7b4e has parents 4b0f3e22a and 3a35da9d0."
+     },
+     {
+      "note": "PB1213 done: one VariableLengthCompatibility screen for dynamic-length or variable-length groups (BASED SR2 COBOLNET2560, CONSTANT SR12, REDEFINES SR17, FILE STATUS SR3). CONSTANT LENGTH OF reads ItemLength.Positions. Golden 2014/pb1213_varlen_neighbours plus 2 negatives. Note is status: landed with closes_rows SR-13.18.5.3-2, SR-13.10.3-12 and GR-13.10.4-6.",
+      "commit": "c64bfcb35",
+      "evidence": "git show --stat c64bfcb35: 20 files, including DiagnosticCatalog 2560, ItemLength.cs, IntrinsicBinder.cs and 2 negative .cob/.err pairs."
+     },
+     {
+      "note": "PB1284 done: RENAMES range content is screened (SR8 COBOLNET2561) and the bit-area whole-bytes rule is checked (SR10 COBOLNET2562). Goldens 85/pb1284_renames_range_fixed and 2002/pb1284_renames_bit_whole_bytes plus 3 negatives. Note is status: landed with closes_rows SR-13.18.45.3-8 and -10. STATUS.md leaves out this commit's SHA.",
+      "commit": "4dad050e5",
+      "evidence": "git show --stat 4dad050e5: 19 files."
+     },
+     {
+      "note": "PB1273 done: the PROPERTY clause is recorded on DataItem. SR1 is in BindEntry; SR21 and SR3 table rows; SR2/3/5/6 are checked per carrying item (COBOLNET2563). IsSubjectToOccurs now asks IsTable. Golden 2002/pb1273_property_subject plus 5 negatives. Note is status: landed. The last recorded build (w68u/build2.log, 19:40, after this commit) succeeded with 0 warnings and 0 errors.",
+      "commit": "59f19d6e8",
+      "evidence": "git show --stat 59f19d6e8: 27 files. build2.log reads 'Build succeeded. 0 Warning(s) 0 Error(s)'."
+     },
+     {
+      "note": "PB1579 in progress, NOT done. The orchestrator saved the dead agent's uncommitted edits as a WIP commit. They add IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]) in Validation/IntegerOperandPass.cs, and HostValue(IntegerLiteralContext) now delegates to it. They re-route 4 call sites: the OCCURS constant-name bound in DataBinder.Constants.cs:~437 (now raises IntegerOperandBeyondLimit / COBOLNET2427 for an over-range constant), the Format 2 VALUE subscript in DataBinder.cs:~5784, and ReferenceResolver ReadParsedLiterals plus the single-literal subscript reader. Not done: the semgrep rule, a probe, goldens, the kb/Work/PB1579.md update (still status: open, closes_rows []), and any build of these edits.",
+      "commit": "aaf1823fc",
+      "evidence": "git show aaf1823fc: 4 files, +64/-10. No semgrep, test or kb change. build2.log (19:40) is older than this commit (19:59)."
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "The orchestrator's WIP checkpoint of group U's uncommitted PB1579 edits, made after the agent died. It adds IntegerOperandRules.TryHostValue (text-based: optional sign plus ASCII digits, saturating at HostLimit or int.MinValue, with a 'saturated' out flag) and re-routes the OCCURS constant bound (with a new COBOLNET2427 error), the Format 2 VALUE subscript, and 3 ReferenceResolver TryParse sites. STATUS.md's NEXT line still describes PB1579 as unstarted and names HostValue rather than the new TryHostValue."
+     },
+     {
+      "sha": "33e2a7b4e",
+      "what_it_contains": "Merge of predecessor branch worktree-wf_8b2b0670-764-4 (bringing in 3a35da9d0) onto the real branch base 4b0f3e22a (DEVLOG 1744). STATUS.md gives 'base: 8dab50862', but that is the predecessor commit's parent. This branch's merge-base with main is 4b0f3e22a."
+     }
+    ],
+    "gate_state": "No gate has run on this branch: STATUS says 'GATE: not yet run', and no gate log exists in w68u/. The last recorded build (w68u/build2.log, 19:40, green) predates the WIP commit aaf1823fc (19:59), so the PB1579 edits have never been compiled. The worktree E:\\COBOL\\.claude\\worktrees\\wf_e9a82a33-6b6-4 is clean at HEAD aaf1823fc. The branch is NOT on origin (ls-remote has no match). The branch holds landing-state flips for PB1088, PB1213, PB1284 and PB1273 (status: landed plus closes_rows), all still status: open on main. main is 13 commits ahead of the merge-base 4b0f3e22a (wave-68 groups R/S/T/V2/W/Y/Z/X plus trains 68/69 and the PB1698 stamped handoff). These files changed on both sides, so conflicts are likely at merge time: DataBinder.cs, DataBinder.Constants.cs, DataBinder.Oo.cs, ReferenceResolver.cs, IntrinsicBinder.cs, OoDriver.cs, DiagnosticCatalog.cs, docs/DIAGNOSTICS.md, the DATA_MODEL/INTRINSICS design docs, all four conformance manifests and traceability-inventory.json. COBOLNET2560-2563 do not yet appear in main's DiagnosticCatalog, so there is no code collision today. Record_verdicts batches batch-PB1088/1213/1284/1273.json exist in E:\\Temp\\claude\\E--COBOL\\eb162d4b-e0bb-4027-b8a0-86fd190d20be\\scratchpad\\w68u\\. STATUS calls them applied, and the matching inventory edits are in each commit. There is no PB1579 batch. The STATUS lead (debugging lines under WITH DEBUGGING MODE at --std 85, ReferenceFormatProcessor.LogicalConversion.cs:99, probe w68u/p/dline85.cob) is still unfiled: no kb/Work note on main mentions dline85, and no match for its text turned up.",
+    "next_step": "Continue PB1579 from WIP commit aaf1823fc; do not restart it.\n(1) Build CobolSharp.sln in the wf_e9a82a33-6b6-4 worktree to confirm aaf1823fc compiles.\n(2) Probe each re-routed site with an 11-digit and a 20+-digit negative literal against the HEAD build, and against the pre-WIP build if one is needed for the 'before' observation: an OCCURS bound through an integer CONSTANT, a Format 2 VALUE FROM subscript, and a ref-mod or subscript literal.\n(3) Triage the TryParse sites still in Binding/, because the note's line list was already stale when it was filed at 5360450b8 (its DataBinder/Reports/Odo sites already used HostValue then). The candidates are Place.cs:801-802, ConditionBinder.cs:208, InitializeBinder.cs:323, IntrinsicBinder.cs:918 and :1583, OoBinder.cs:885-886, ParameterConformance.cs:429 and :478, and DataBinder.Switches.cs:500. The levelNumber TryParse sites in DataBinder.Reports.cs and DataBinder.cs:765 read level numbers, not integer-n. Route through TryHostValue or HostValue each site that reads a COBOL integer literal.\n(4) Extend the semgrep rule cobolnet-integer-n-parsed-outside-host-value in scripts/semgrep/invariants.yml, plus a testdata violation. Its regex matches only the `integerLiteral().GetText()` accessor form, which is why it missed token-text, constant-text and expression-text sites.\n(5) Add goldens, update kb/Work/PB1579.md (status, closes_rows or closes_rows_reason) and DOCS, and file the debugging-line lead as a kb/Work note.\n(6) Update STATUS.md with the PB1579 commit.\n(7) Run the wave-local gate, then hand off for the merge with main, where the conflicts listed above are expected.",
+    "commits_read": 7
+   }
+  },
+  {
+   "agent": "a023e1ec5729fd573",
+   "label": "ab-OLD-3",
+   "turns": 19,
+   "tool_calls": 20,
+   "tokens": 1362731,
+   "fresh": 33800,
+   "token_parts": {
+    "input": 38,
+    "output": 170,
+    "cache_read": 1328931,
+    "cache_write": 33592
+   },
+   "wall_s": 168.1,
+   "first": "2026-09-28T17:09:14.968Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088: a contained program inherits WITH DEBUGGING MODE (OR-ed, not assigned) in DataBinder.cs. Golden 85/pb1088_dbg_contained. The kb note is flipped to landed with closes_rows [GR-12.3.5.4-1]. Made on the predecessor branch worktree-wf_8b2b0670-764-4 and merged in by 33e2a7b4e.",
+      "commit": "3a35da9d0",
+      "evidence": "git show --stat 3a35da9d0 (kb/Work/PB1088.md, DataBinder.cs +7, 85 manifest and golden, inventory json). Branch kb/Work/PB1088.md reads status: landed. The batch file w68u/batch-PB1088.json exists."
+     },
+     {
+      "note": "PB1213: one dynamic-length-or-variable-length-group screen (BASED SR2 COBOLNET2560, CONSTANT SR12, REDEFINES SR17, FILE STATUS SR3). CONSTANT LENGTH OF now reads ItemLength.Positions. Golden 2014/pb1213_varlen_neighbours plus 2 negatives. The note is landed with closes_rows [SR-13.18.5.3-2, SR-13.10.3-12, GR-13.10.4-6].",
+      "commit": "c64bfcb35",
+      "evidence": "git show --stat c64bfcb35 (20 files incl. ItemLength.cs, VariableLengthCompatibility.cs, DiagnosticCatalog +11, inventory). Branch note reads status: landed."
+     },
+     {
+      "note": "PB1284: the RENAMES range is screened for SR8 (COBOLNET2561) and the bit area for SR10 (COBOLNET2562). Goldens 85/pb1284_renames_range_fixed and 2002/pb1284_renames_bit_whole_bytes plus 3 negatives. The note is landed with closes_rows [SR-13.18.45.3-8, SR-13.18.45.3-10]. STATUS lists this item without a SHA; the SHA is 4dad050e5.",
+      "commit": "4dad050e5",
+      "evidence": "git show --stat 4dad050e5 (19 files, DataBinder.cs +82, DiagnosticCatalog +21). Branch note reads status: landed."
+     },
+     {
+      "note": "PB1273: the PROPERTY clause is recorded on DataItem. SR1 is checked in BindEntry, SR21 and SR3 are table rows, SR2/3/5/6 are in OoBindPropertyClauses (COBOLNET2563), and IsSubjectToOccurs now asks IsTable. Golden 2002/pb1273_property_subject plus 5 negatives. The note is landed with closes_rows for SR-13.18.42.3-1/2/3/5/6.",
+      "commit": "59f19d6e8",
+      "evidence": "git show --stat 59f19d6e8 (27 files). Branch note reads status: landed. build2.log (19:40) shows the build succeeded and 1 unit test passed after this work."
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "PB1579 work in progress, committed at 19:59 after the agent died ('group U's in-progress edits preserved after its agent died on an API error'). Four source files, +64/-10. (1) IntegerOperandPass.cs adds a new string reader, IntegerOperandRules.TryHostValue(text, out int value[, out bool saturated]): optional sign plus ASCII digits, saturating at HostLimit, or at int.MinValue for a negative. HostValue(IntegerLiteralContext) is rerouted through it, which changes it from NumberStyles.None to AllowLeadingSign plus a digit check. (2) DataBinder.Constants.cs (~L437): an OCCURS bound given by an integer constant-name now uses TryHostValue and raises IntegerOperandBeyondLimit (COBOLNET2427) when the value saturates. (3) DataBinder.cs (~L5784): the Format 2 VALUE subscript now uses TryHostValue instead of long.TryParse plus Clamp. (4) ReferenceResolver.cs: ReadParsedLiterals (start and length) and the subscript-literal reader use TryHostValue. It differs from STATUS NEXT, which says 'int.TryParse sites -> IntegerOperandRules.HostValue'. NOT BUILT: the last build log, w68u/build2.log, is from 19:40, before this commit. NOT PROBED: p/kbig.cob (CONSTANT 77777777777 as an OCCURS bound) and p/kbig2.cob (OCCURS 77777777777 literal) were written at 19:41 and have no recorded output. There is no golden or negative test, no kb note update, no semgrep change, no inventory change, and the new message's citations ('ISO §4.5', 'docs/CONFORMANCE.md §3') have not been run through cite.py --check."
+     },
+     {
+      "sha": "33e2a7b4e",
+      "what_it_contains": "Merge of worktree-wf_8b2b0670-764-4 (3a35da9d0, PB1088) into this branch. Its first parent is main at 4b0f3e22a ('The fix lane is a rolling wave with same-file successors', DEVLOG 1744). The branch's real merge base with main is therefore 4b0f3e22a, not the 8dab50862 that STATUS 'base:' implies. The merge contains no content beyond PB1088."
+     }
+    ],
+    "gate_state": "No gate has run on this branch: not wave-local, not comprehensive, not the differential. STATUS says 'GATE: not yet run' and no gate log exists in the w68u scratchpad.\n\nWhat has been verified:\n- A solution build (build2.log, 19:40) succeeded, and 1 filtered unit test passed. That build covers 3a35da9d0 through 59f19d6e8.\n- DIAGNOSTICS.md was regenerated (gendiag.log).\n\nWhat has not been verified:\n- aaf1823fc (PB1579 work in progress) has never been built or probed.\n- The traceability-inventory changes in each commit fit the 'batch applied' claims, but I did not check them row by row against w68u/batch-*.json.\n\nBranch state:\n- Worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4 is clean at aaf1823fc.\n- The branch is 13 commits behind main.\n- A trial `git merge-tree` against main conflicts in docs/DIAGNOSTICS.md (generated; regenerate it) and in tests/conformance/{2002,2014,85,negative}/manifest.json. Source files auto-merge.\n- COBOLNET2560-2563 do not collide with main.\n- There is no DEVLOG entry or plan §0 edit on the branch.\n\nLead: the debugging-lines lead (indicator D is always a comment at --std 85 under WITH DEBUGGING MODE, ReferenceFormatProcessor.LogicalConversion.cs:99, probe w68u/p/dline85.cob) is recorded only in the PB1088 note prose. No kb/Work note for it exists on main (searched PB16xx/PB17xx).\n\nPB1579 remains status: open.\n- The note's seven named sites are stale. At the filing commit 5360450b8, six of them already call HostValue; only ReferenceResolver was still TryParse.\n- These TryParse calls on literal text in Binding have not been reviewed yet: Model/Place.cs:801-802, Procedure/Verbs/ConditionBinder.cs:208, InitializeBinder.cs:323, IntrinsicBinder.cs:918 and :1583 (long), OoBinder.cs:885-886, ParameterConformance.cs:429 and :478, DataBinder.Switches.cs:500.\n- The levelNumber() TryParse calls in DataBinder.Reports.cs and DataBinder.cs:765 read level numbers, which the grammar bounds to two digits. They are probably out of scope, but that is a judgment still to make.\n- The semgrep rule cobolnet-integer-n-parsed-outside-host-value (scripts/semgrep/invariants.yml:154-169) is unchanged. Its regex only matches `integerLiteral()...GetText()`, so it misses token `.Text`, constant `IntegerText` and expression `GetText()` forms. This is the 'why it missed these' that PB1579 asks for.",
+    "next_step": "Finish PB1579 on top of aaf1823fc, in worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4:\n\n1. Build CobolSharp.sln and confirm aaf1823fc compiles.\n2. Probe w68u/p/kbig.cob and kbig2.cob, plus an 11-digit ref-mod literal and a 20+-digit negative Format 2 VALUE subscript. Run each against a main build (before) and the branch build (after), and record the results. Expected: kbig gets COBOLNET2427 exactly as kbig2 does, not 'not an INTEGER constant-name'.\n3. Validate the new message's citations with `python scripts/spec/cite.py --check` (§4.5, and §13.10.4 GR1 / §8.3.3.3.2 quoted in the comments).\n4. Review the remaining TryParse sites listed in gate_state and route each through TryHostValue/HostValue where its operand is a COBOL integer literal.\n5. Extend the semgrep rule so the string, token and constant forms are caught, and add cases to scripts/semgrep/testdata/Violations.cs.\n6. Add goldens and negatives for the probed behaviour.\n7. Update kb/Work/PB1579.md: status, closes_rows or closes_rows_reason, and correct the stale site list.\n8. Commit.\n9. Merge main (13 commits): resolve the four manifest.json conflicts by union and regenerate docs/DIAGNOSTICS.md from DiagnosticCatalog.\n10. Rebuild the solution and run the wave-local gate for all five items. Then write the DEVLOG entry and have the debugging-lines lead filed as a kb/Work note.",
+    "commits_read": 7
+   }
+  },
+  {
+   "agent": "aca8bca09c571ba9c",
+   "label": "ab-OLD-4",
+   "turns": 14,
+   "tool_calls": 15,
+   "tokens": 908662,
+   "fresh": 29151,
+   "token_parts": {
+    "input": 28,
+    "output": 95,
+    "cache_read": 879511,
+    "cache_write": 29028
+   },
+   "wall_s": 132.2,
+   "first": "2026-09-28T17:09:14.968Z",
+   "unparsed": 0,
+   "returned": true,
+   "result": {
+    "done_notes": [
+     {
+      "note": "PB1088: a contained program inherits WITH DEBUGGING MODE (OR, not assign); golden 85/pb1088_dbg_contained. Came in through merge 33e2a7b4e of predecessor worktree-wf_8b2b0670-764-4. Its kb/Work note says status: landed, closes_rows [GR-12.3.5.4-1]. The debugging-lines lead is written up in the note's 'Sibling lead' section.",
+      "commit": "3a35da9d0",
+      "evidence": "git log main..branch; git show branch:kb/Work/PB1088.md (status landed; line 43 'Sibling lead — debugging lines'); batch-PB1088.json and land-PB1088.md are in the w68u scratch folder"
+     },
+     {
+      "note": "PB1213: one screen for dynamic-length-or-variable-length-group (BASED SR2 COBOLNET2560, CONSTANT SR12, REDEFINES SR17, FILE STATUS SR3); CONSTANT LENGTH OF reads ItemLength.Positions. Note status landed, closes_rows [SR-13.18.5.3-2, SR-13.10.3-12, GR-13.10.4-6].",
+      "commit": "c64bfcb35",
+      "evidence": "commit subject; git show branch:kb/Work/PB1213.md; batch-PB1213.json is present"
+     },
+     {
+      "note": "PB1284: RENAMES range screened (SR8 COBOLNET2561, SR10 bit layout COBOLNET2562). The STATUS file gives no SHA for it; the commit is 4dad050e5. Note status landed, closes_rows [SR-13.18.45.3-8, SR-13.18.45.3-10].",
+      "commit": "4dad050e5",
+      "evidence": "commit subject; git show branch:kb/Work/PB1284.md; batch-PB1284.json is present"
+     },
+     {
+      "note": "PB1273: the PROPERTY clause is recorded on the item; SR1 in BindEntry; SR21 and SR3 elementary table rows; SR2/3/5/6 per carrying item (COBOLNET2563); IsSubjectToOccurs now asks IsTable. Note status landed, closes_rows [SR-13.18.42.3-1/2/3/5/6].",
+      "commit": "59f19d6e8",
+      "evidence": "commit subject; git show branch:kb/Work/PB1273.md; batch-PB1273.json is present (19:36)"
+     },
+     {
+      "note": "PB1579 is PARTIAL and not done, although the STATUS file lists it as NEXT and not started. The dead agent's uncommitted edits were saved as a WIP commit. That commit adds IntegerOperandRules.TryHostValue(string, out int[, out bool saturated]) in Validation/IntegerOperandPass.cs and re-bases HostValue on it. It also rewires 4 sites: DataBinder.Constants.cs (an OCCURS bound given by a constant-name now raises IntegerOperandBeyondLimit when the value is out of host range), DataBinder.cs Format 2 VALUE subscript (about line 5786), and ReferenceResolver.ReadParsedLiterals plus the subscript-literal reader (about lines 804, 807 and 848). NOT done: (a) the semgrep rule cobolnet-integer-n-parsed-outside-host-value in scripts/semgrep/invariants.yml:154-169 is unchanged; its regex matches only the `integerLiteral()...GetText()` accessor form, which is why it missed these sites. (b) The rest of the sweep is not triaged. Raw int/long.TryParse is still at Model/Place.cs:801-802, Verbs/ConditionBinder.cs:208, InitializeBinder.cs:323, IntrinsicBinder.cs:918 and 1583, OoBinder.cs:885-886, ParameterConformance.cs:429 and 478, and DataBinder.Switches.cs:500. The levelNumber() TryParse sites in DataBinder.Reports.cs and DataBinder.cs:765 read level numbers, not integer-n. The line numbers the note names are stale: Odo.cs:65-66 and the Reports sites already call HostValue at the branch base. (c) No golden, negative test, batch, land-PB1579.md, DEVLOG entry or note flip exists (kb/Work/PB1579.md is status open, closes_rows []). (d) The WIP has NEVER BEEN BUILT: the last build log (build2.log, 19:40, succeeded) is older than the probes (kbig.cob / kbig2.cob, 19:41) and the 19:59 WIP commit. No probe output for kbig exists.",
+      "commit": "aaf1823fc",
+      "evidence": "git show aaf1823fc (4 files, +64/-10); git grep of TryParse under src/Cobol.Net.Compiler/Binding on the branch; timestamps in the w68u scratch folder"
+     }
+    ],
+    "uncovered_commits": [
+     {
+      "sha": "aaf1823fc",
+      "what_it_contains": "'WIP checkpoint: group U's in-progress edits preserved after its agent died on an API error (wave 68)'. This is the partial, unbuilt PB1579 work: the TryHostValue reader in IntegerOperandPass.cs and 4 rewired sites in DataBinder.Constants.cs, DataBinder.cs and ReferenceResolver.cs. The STATUS file still says PB1579 is NEXT with nothing done."
+     },
+     {
+      "sha": "33e2a7b4e",
+      "what_it_contains": "The merge of predecessor branch worktree-wf_8b2b0670-764-4 (3a35da9d0, PB1088) onto main 4b0f3e22a. The STATUS 'base:' line says 8dab50862, but the real merge-base with main is 4b0f3e22a (DEVLOG 1744). 8dab50862 is only the predecessor's parent."
+     }
+    ],
+    "gate_state": "No gate has run on this branch: the wave-local filtered gate, the full Conformance suite and the GnuCOBOL differential are all unrun, which matches the STATUS 'GATE: not yet run'. The last known build succeeded at 19:40 (w68u/build2.log, 0 warnings, 0 errors). That build covers PB1273 but NOT the PB1579 WIP in aaf1823fc, which has never been compiled or probed. Record_verdicts batches for PB1088, PB1213, PB1273 and PB1284 are reported applied, and their notes read status landed. PB1579 has no batch. The worktree E:/COBOL/.claude/worktrees/wf_e9a82a33-6b6-4 is clean at aaf1823fc. The branch was cut from main 4b0f3e22a, and main is now 13 commits ahead. Those commits touch DataBinder.cs, DataBinder.Constants.cs and ReferenceResolver.cs. By hunk ranges they do not overlap the branch's hunks, but that is not verified by an actual merge.",
+    "next_step": "Resume PB1579 from aaf1823fc; do not start it fresh. 1) Build CobolSharp.sln to confirm the WIP compiles. 2) Probe w68u/p/kbig.cob (a CONSTANT 77777777777 used as the OCCURS bound) and kbig2.cob (a literal OCCURS 77777777777). The expected result is the COBOLNET2427 IntegerOperandBeyondLimit diagnostic from both; the constant path is the new one, and the literal is the control. Also probe an 11-digit literal at the ref-mod and subscript sites and at a Format 2 VALUE subscript with a negative 20-digit literal. 3) Triage the remaining raw TryParse sites (Place.cs:801-802, ConditionBinder.cs:208, InitializeBinder.cs:323, IntrinsicBinder.cs:918 and 1583, OoBinder.cs:885-886, ParameterConformance.cs:429 and 478, DataBinder.Switches.cs:500) and route the integer-literal ones through TryHostValue or HostValue. 4) Extend the semgrep rule cobolnet-integer-n-parsed-outside-host-value in scripts/semgrep/invariants.yml so that int/long.TryParse on literal, token or constant text is also caught. 5) Add a golden and negatives, a land-PB1579.md, a batch, a DEVLOG entry, and flip kb/Work/PB1579.md. 6) Run the wave-local GATE for the whole group U branch (PB1088, PB1213, PB1284, PB1273, PB1579), then update STATUS.md (fix the base line to 4b0f3e22a and record aaf1823fc).",
+    "commits_read": 6
+   }
+  }
+ ]
+}
