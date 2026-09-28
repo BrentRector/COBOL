@@ -1,0 +1,63 @@
+{"id": "C1", "date": "2026-09-28", "skill": "spec-compliance-audit", "section": "1. Decompose the standard into a rule catalog; 2. The traceability inventory", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C1", "date": "2026-09-28", "skill": "review", "section": "Scale (completeness critic)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C3", "date": "2026-09-28", "skill": "review", "section": "Step 6 - Adversarial verification (right answer, wrong reason)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C3", "date": "2026-09-28", "skill": "spec-oracle", "section": "Failure modes (a right answer for a wrong reason)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C4", "date": "2026-09-28", "skill": "agent-fleet", "section": "10. Adversarial refuters on closing verdicts", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C4", "date": "2026-09-28", "skill": "spec-compliance-audit", "section": "6. The adversarial refuter on every CLOSING verdict", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C5", "date": "2026-09-28", "skill": "agent-fleet", "section": "11. Self-review before a large review fleet", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C19", "date": "2026-09-28", "skill": "agent-fleet", "section": "5. Use a graceful STOP file", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C23", "date": "2026-09-28", "skill": "agent-fleet", "section": "6. Fill a freed implementer slot in the same turn it frees", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C26", "date": "2026-09-28", "skill": "agent-fleet", "section": "6. The lander gates the WHOLE test suite, unfiltered", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C39", "date": "2026-09-28", "skill": "engineering-standards", "section": "5. Verify the values, not 'it ran'", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C40", "date": "2026-09-28", "skill": "test-gate", "section": "Standards (expected values from the authority)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C40", "date": "2026-09-28", "skill": "engineering-standards", "section": "5. Compute expected results from the authority", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C42", "date": "2026-09-28", "skill": "test-gate", "section": "Always first: build fresh", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C43", "date": "2026-09-28", "skill": "test-gate", "section": "After the push: CI is the final authority", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C44", "date": "2026-09-28", "skill": "test-gate", "section": "Read the verdict line, not the exit code", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C44", "date": "2026-09-28", "skill": "agent-fleet", "section": "1. Command chaining, rule (a)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C45", "date": "2026-09-28", "skill": "test-gate", "section": "A gate that has never failed proves nothing", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C45", "date": "2026-09-28", "skill": "engineering-standards", "section": "5. A guard that cannot fail is not a guard", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C45", "date": "2026-09-28", "skill": "automating-agent-guardrails", "section": "1. Contract: self-test in CI", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C46", "date": "2026-09-28", "skill": "test-gate", "section": "A filter that matches nothing is a silent green", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C47", "date": "2026-09-28", "skill": "test-gate", "section": "A missing observation is not a negative one", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C48", "date": "2026-09-28", "skill": "test-gate", "section": "A missing observation is not a negative one (case by case)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C49", "date": "2026-09-28", "skill": "test-gate", "section": "A missing observation is not a negative one (selector complement)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C49", "date": "2026-09-28", "skill": "engineering-standards", "section": "5. Vary the axis your current subject holds fixed", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C51", "date": "2026-09-28", "skill": "test-gate", "section": "After the push: CI is the final authority", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C51", "date": "2026-09-28", "skill": "agent-fleet", "section": "6. Watch CI for every pushed head", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C53", "date": "2026-09-28", "skill": "test-gate", "section": "The three tiers (a landing gate covers the whole affected assembly)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C53", "date": "2026-09-28", "skill": "agent-fleet", "section": "6. The lander gates the WHOLE test suite, unfiltered", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C56", "date": "2026-09-28", "skill": "test-gate", "section": "Confirm the new tests actually ran, by name", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C60", "date": "2026-09-28", "skill": "engineering-standards", "section": "3. Never change valid input to dodge a bug in the tool", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C61", "date": "2026-09-28", "skill": "engineering-standards", "section": "3. Every bug is a pattern", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C61", "date": "2026-09-28", "skill": "variant-analysis", "section": "Every bug is a pattern (intro)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C61", "date": "2026-09-28", "skill": "review", "section": "Step 7 - Sweep for siblings", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C62", "date": "2026-09-28", "skill": "engineering-standards", "section": "1. No hacks, no shims, no fallbacks; 4. Never ship a half-feature", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C63", "date": "2026-09-28", "skill": "engineering-standards", "section": "4. Completeness; When re-architecture is required", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C75", "date": "2026-09-28", "skill": "test-gate", "section": "A gate that has never failed proves nothing (scope)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C75", "date": "2026-09-28", "skill": "engineering-standards", "section": "5. Ask what a check's scope EXCLUDES", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C88", "date": "2026-09-28", "skill": "automating-agent-guardrails", "section": "2. Role agent definitions (cacheTtl: 1h)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C95", "date": "2026-09-28", "skill": "agent-fleet", "section": "9. Never poll a running fleet's output directory", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C96", "date": "2026-09-28", "skill": "test-gate", "section": "A missing observation is not a negative one", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C96", "date": "2026-09-28", "skill": "agent-fleet", "section": "2. Reconcile the returns against the expected worklist", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C101", "date": "2026-09-28", "skill": "agent-fleet", "section": "5. An agent never ends its turn while its own background job is running", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C111", "date": "2026-09-28", "skill": "agent-fleet", "section": "2. Give each agent its own input file", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C111", "date": "2026-09-28", "skill": "spec-compliance-audit", "section": "3. One agent per rule, with a self-contained input", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C114", "date": "2026-09-28", "skill": "agent-fleet", "section": "3. State the bar, not just the output format", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C114", "date": "2026-09-28", "skill": "spec-compliance-audit", "section": "3. State the bar, not only the format", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C122", "date": "2026-09-28", "skill": "spec-oracle", "section": "Why other oracles are not authority", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C123", "date": "2026-09-28", "skill": "spec-oracle", "section": "2. When a diagram, table or figure decides the question", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C124", "date": "2026-09-28", "skill": "spec-oracle", "section": "1. Find the governing rule (decision forks)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C125", "date": "2026-09-28", "skill": "spec-oracle", "section": "3. Write down the expected result and a CHECKED citation; Failure modes (inheriting)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C125", "date": "2026-09-28", "skill": "agent-fleet", "section": "2. Don't put a fact in a brief that you haven't verified", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C127", "date": "2026-09-28", "skill": "spec-oracle", "section": "Failure modes (a valid rule with an impossible premise)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C127", "date": "2026-09-28", "skill": "review", "section": "Step 6 (the premise, not only the rule)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C128", "date": "2026-09-28", "skill": "test-gate", "section": "A gate that has never failed proves nothing (scope)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C129", "date": "2026-09-28", "skill": "spec-oracle", "section": "Failure modes (a real clause answering a different question)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C129", "date": "2026-09-28", "skill": "review", "section": "Step 6 (the citation answers the question asked)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C130", "date": "2026-09-28", "skill": "spec-oracle", "section": "Where the spec leaves latitude", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C136", "date": "2026-09-28", "skill": "engineering-standards", "section": "3. A remembered pattern is a hypothesis; re-measure the premise", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C136", "date": "2026-09-28", "skill": "variant-analysis", "section": "Step 5: Probe every candidate with a minimal repro", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C137", "date": "2026-09-28", "skill": "spec-compliance-audit", "section": "2. One inventory; 7. Rank by what the defect DOES", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C137", "date": "2026-09-28", "skill": "review", "section": "Step 8 - Report (findings become tracked work)", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
+{"id": "C140", "date": "2026-09-28", "skill": "spec-compliance-audit", "section": "7. Records which rows it CLOSED", "version": "1.12.0", "commit": "fc991f84875b9d388a54223211aeae12f6c73ad2"}
