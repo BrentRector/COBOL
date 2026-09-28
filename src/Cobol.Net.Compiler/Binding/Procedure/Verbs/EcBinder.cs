@@ -421,10 +421,12 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
     /// the function queries it under the element-kind rule (<see cref="ArgOmittedName"/>).</summary>
     private static readonly string[] FunctionActivationNames = ["EC-FUNCTION-NOT-FOUND"];
 
-    /// <summary>The EC-EXTERNAL family a CALL raises through <c>CobolCallException</c> when the activated
-    /// element's external descriptions do not conform (ISO §14.8.4 / §14.9.4.4 GR3e; the checkable trio —
-    /// EC-EXTERNAL-IMP has no raise site, this implementation defines no implementor-specific external checks).
-    /// The site-enabled subset ALSO drives the emitted CALL-site mask (§14.8.4.1's activating-element half).</summary>
+    /// <summary>The EC-EXTERNAL family an ACTIVATION raises when the activated element's external descriptions do not
+    /// conform (ISO §14.8.4): a CALL through <c>CobolCallException</c> (§14.9.4.4 GR3e), an INVOKE's method activation
+    /// through <c>CobolFatalException</c> (§14.9.23.4 GR7 d); kb/Work PB1138). The checkable trio — EC-EXTERNAL-IMP has
+    /// no raise site, this implementation defines no implementor-specific external checks. The site-enabled subset is
+    /// ALSO §14.8.4.1's activating-element half: the statement guard sets its checking flags
+    /// (<c>EcEmitter.FatalAmbientGates</c>), which the activation boundary reads.</summary>
     internal static readonly string[] ExternalNames =
     [
         "EC-EXTERNAL-FORMAT-CONFLICT", "EC-EXTERNAL-DATA-MISMATCH", "EC-EXTERNAL-FILE-MISMATCH",
@@ -546,6 +548,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
                 case BoundKeyedStart k: Query(IoNames, k.File); break;
                 case BoundInvoke or BoundInvokeUniversal:
                     Query(OoInvokeNames);   // §14.9.23.4 GR5 / GR7b
+                    Query(ExternalNames);   // §14.9.23.4 GR7 d) — a method activation is an EC-EXTERNAL raise point (§14.8.4; kb/Work PB1138)
                     break;
                 // CA37 is PRECISE: EC-FLOW-SEARCH can only arise from a capacity SET (§14.9.39.4 GR31), which is
                 // one bound node, so the guard binds exactly there. Its twin EC-BOUND-TABLE-LIMIT is NOT precise

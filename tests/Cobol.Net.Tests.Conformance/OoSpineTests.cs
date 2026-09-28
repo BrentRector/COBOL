@@ -2302,8 +2302,9 @@ public sealed class OoSpineTests
     // ── The UNIVERSAL wave (D10, §13.18.60.4 / §14.9.23 GR7c / §14.9.39 F5 / §8.8.4.2 F3 — DEVLOG 608) ──────
 
     /// <summary>One driver + two classes whose same-named method takes DIFFERENT PIC formals — THE
-    /// polymorphic hazard: a wrong-shaped crossing through universal must raise EC-OO-UNIVERSAL at run
-    /// (GR7c), never deliver silently wrong data (both formals project to C# <c>ref long</c>).
+    /// polymorphic hazard: a wrong-shaped crossing through universal must NOT bind (§9.3.6 match rule 3 —
+    /// EC-OO-METHOD, kb/Work PB1500), never deliver silently wrong data (both formals project to C# <c>ref long</c>);
+    /// a BOUND method's residual violation (a RETURNING description that differs) is GR7c's EC-OO-UNIVERSAL.
     ///
     /// <para>⚠ The <c>&gt;&gt;TURN</c> is REQUIRED for these tests to assert the EC NAME, and its position is
     /// load-bearing: §14.9.23.4 GR7c sets EC-OO-UNIVERSAL only "if checking for it is enabled in BOTH the
@@ -2349,6 +2350,14 @@ public sealed class OoSpineTests
         MAIN.
             ADD 1 TO LK-N.
         END METHOD BUMP.
+        METHOD-ID. RD4.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-R PIC 9(4).
+        PROCEDURE DIVISION RETURNING LK-R.
+        MAIN.
+            MOVE 42 TO LK-R.
+        END METHOD RD4.
         END OBJECT.
         END CLASS CUH4A.
 
@@ -2374,15 +2383,18 @@ public sealed class OoSpineTests
         """;
 
     [Fact]
-    public void Universal_WrongShapedArg_EcOoUniversal()
+    public void Universal_WrongShapedArg_NoMatch_EcOoMethod()
     {
-        // U holds a CUH8B (formal 9(8)); the caller crosses N4 (9(4)) — same C# type, WRONG description.
+        // U holds a CUH8B (formal 9(8)); the caller crosses N4 (9(4)) — same C# type, WRONG description. §9.3.6 match
+        // rule 3 e) makes the description a condition of RESOLUTION, so BUMP is not bound and step 6) sets EC-OO-METHOD
+        // (kb/Work PB1500) — never silently wrong data, and never GR7c's conformance violation of an unbound method.
         var (ok, stdout, detail) = CompileAndRun(UnivHazard("OOUV10", """
             INVOKE CUH8B "NEW" RETURNING U.
             INVOKE U "BUMP" USING N4.
         """));
-        Assert.False(ok, "a nonconforming universal crossing must FAIL: " + stdout);
-        Assert.Contains("EC-OO-UNIVERSAL", detail);
+        Assert.False(ok, "a non-matching universal INVOKE must FAIL: " + stdout);
+        Assert.Contains("EC-OO-METHOD", detail);
+        Assert.DoesNotContain("EC-OO-UNIVERSAL", detail);
     }
 
     [Fact]
@@ -2398,26 +2410,57 @@ public sealed class OoSpineTests
     }
 
     [Fact]
-    public void Universal_ArityMismatch_EcOoUniversal()
+    public void Universal_ArityMismatch_NoMatch_EcOoMethod()
     {
+        // §9.3.6 match rule 1 (an equal number of parameters) is a condition of resolution — kb/Work PB1500.
         var (ok, _, detail) = CompileAndRun(UnivHazard("OOUV12", """
             INVOKE CUH4A "NEW" RETURNING U.
             INVOKE U "BUMP".
+        """));
+        Assert.False(ok);
+        Assert.Contains("EC-OO-METHOD", detail);
+        Assert.DoesNotContain("EC-OO-UNIVERSAL", detail);
+    }
+
+    [Fact]
+    public void Universal_ReturningPresenceMismatch_NoMatch_EcOoMethod()
+    {
+        // BUMP declares no RETURNING — §9.3.6 match rule 1: "if there is a returning item in the invocation there shall be
+        // a returning item in the invoked method", so BUMP is not bound (kb/Work PB1500).
+        var (ok, _, detail) = CompileAndRun(UnivHazard("OOUV13", """
+            INVOKE CUH4A "NEW" RETURNING U.
+            INVOKE U "BUMP" USING N4 RETURNING N8.
+        """));
+        Assert.False(ok);
+        Assert.Contains("EC-OO-METHOD", detail);
+        Assert.DoesNotContain("EC-OO-UNIVERSAL", detail);
+    }
+
+    [Fact]
+    public void Universal_ReturningDescriptionMismatch_Bound_EcOoUniversal()
+    {
+        // RD4 RETURNING PIC 9(4) into the caller's PIC 9(8): the pair can meet in a MOVE, so §9.3.6 match rule 7 BINDS
+        // GET — and §14.8.3.3 then requires the SAME PICTURE, which §14.9.23.4 GR7 c) checks of the bound method:
+        // EC-OO-UNIVERSAL, checking being enabled in both elements (kb/Work PB1500).
+        var (ok, _, detail) = CompileAndRun(UnivHazard("OOUVRD", """
+            INVOKE CUH4A "NEW" RETURNING U.
+            INVOKE U "RD4" RETURNING N8.
         """));
         Assert.False(ok);
         Assert.Contains("EC-OO-UNIVERSAL", detail);
     }
 
     [Fact]
-    public void Universal_ReturningPresenceMismatch_EcOoUniversal()
+    public void Universal_ReturningReferenceClassMismatch_NoMatch_EcOoMethod()
     {
-        // BUMP declares no RETURNING — supplying one is the runtime analog of the typed dual-0828.
-        var (ok, _, detail) = CompileAndRun(UnivHazard("OOUV13", """
+        // RD4 RETURNING PIC 9(4) into an OBJECT REFERENCE: no MOVE or SET can deliver it, so §9.3.6 match rules 6/7
+        // fail and nothing is bound (kb/Work PB1500).
+        var (ok, _, detail) = CompileAndRun(UnivHazard("OOUVRC", """
             INVOKE CUH4A "NEW" RETURNING U.
-            INVOKE U "BUMP" USING N4 RETURNING N8.
+            INVOKE U "RD4" RETURNING U.
         """));
         Assert.False(ok);
-        Assert.Contains("EC-OO-UNIVERSAL", detail);
+        Assert.Contains("EC-OO-METHOD", detail);
     }
 
     [Fact]

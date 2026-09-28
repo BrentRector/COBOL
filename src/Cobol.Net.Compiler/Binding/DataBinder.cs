@@ -1049,21 +1049,30 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     file.LockMode = MapLockMode(lm);
                 else if (clauses.fileCollatingSequenceClause() is { } col)   // §12.4.5.7 — introduction-gated post-bind; resolved in ResolveFileCollating
                     CaptureFileCollating(file, col);
+                // RESERVE clause (ISO §12.4.5.14) — integer-1 is captured because §12.4.5.3 GR1 d) makes "The same
+                // value for integer-1 in the RESERVE clause" part of an external file connector's entry identity
+                // (kb/Work PB1079): FileModel.ReserveAreas is read by the EC-EXTERNAL-FILE-MISMATCH fingerprint.
+                else if (clauses.fileReserveClause() is { } res)
+                    file.ReserveAreas = CobolNet.Validation.IntegerOperandRules.HostValue(res.integerLiteral());
                 // RECORD DELIMITER clause (ISO §12.4.5.11) — DECLINED, ACCEPT-INERT, and diagnosed by name at
                 // EVERY edition on BOTH arms of its required choice (kb/Work PB292). STANDARD-1 is Annex A.3
                 // item 26, a processor-dependent element whose §12.4.5.11.4 GR2 medium is a tape drive; a
                 // feature-name-1 names nothing because §12.4.5.11.3 SR2's available-name set is this
                 // implementation's to specify and is EMPTY (Annex A.1 item 150 is optional — docs/CONFORMANCE.md
-                // §7). Nothing is captured on the FileModel and that is deliberate: §12.4.5.11.4 GR5's
-                // implementor method (the 4-byte length prefix) frames every variable-length record whatever the
-                // clause says, so a stored delimiter would be a field nothing reads
-                // (feedback_a_dead_lookup_is_also_unverified). §4.2.6 ¶3 makes the WARNING the obligation this
-                // discharges; §12.4.5.11.4 GR1 keeps the framing out of the record area, so the accept is inert
-                // in the program's own terms. This arm is LAST because every preceding clause has a distinct
-                // leading token and `recordKeyClause` already back-tracks past `RECORD DELIMITER`.
+                // §7). The clause does not change the I-O: §12.4.5.11.4 GR5's implementor method (the 4-byte
+                // length prefix) frames every variable-length record whatever the clause says. §4.2.6 ¶3 makes
+                // the WARNING the obligation this discharges; §12.4.5.11.4 GR1 keeps the framing out of the record
+                // area, so the accept is inert in the program's own terms. The phrase written IS captured
+                // (FileModel.RecordDelimiter), for the one reader that needs it: §12.4.5.3 GR1 c) makes "Either
+                // the STANDARD-1 phrase or a consistent value of feature-name-1" part of an external file
+                // connector's entry identity (kb/Work PB1079). This arm is LAST because every preceding clause
+                // has a distinct leading token and `recordKeyClause` already back-tracks past `RECORD DELIMITER`.
                 else if (clauses.recordDelimiterClause() is { } rd)
+                {
+                    file.RecordDelimiter = rd.STANDARD_1() is not null ? "STANDARD-1" : rd.cobolWord().GetText().ToUpperInvariant();
                     Edition.Declined(DiagnosticCatalog.RecordDelimiterUnsupported,
                         $"the RECORD DELIMITER clause on file '{name}' ({Spelled(rd)})");
+                }
             }
             // §12.4.5.5.2 SR2 — "The DYNAMIC and RANDOM phrases shall not be specified for a sequential file."
             // A FILE CONTROL ENTRY rule, so it belongs HERE, beside the clauses it relates, and not on any verb:

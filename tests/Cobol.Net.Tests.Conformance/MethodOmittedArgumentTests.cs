@@ -228,8 +228,10 @@ public sealed class MethodOmittedArgumentTests
             END CLASS CMOA5.
             """), "§9.3.8.2.3 rule 8");
 
-    /// <summary>§9.3.6 match rule 3 b) through a universal receiver: a spelled OMITTED needs an OPTIONAL formal,
-    /// checked at runtime (§14.9.23.4 GR7c) — the nonconforming crossing stops before the method runs.</summary>
+    /// <summary>§9.3.6 match rule 3 b) through a universal receiver: a spelled OMITTED needs an OPTIONAL formal, so a
+    /// method whose formal is not OPTIONAL does not MATCH the invocation and is never bound; with no matching method
+    /// in the hierarchy, §9.3.6 6) sets EC-OO-METHOD (§14.9.23.4 GR7 b); kb/Work PB1500) — the run unit stops before
+    /// the method runs.</summary>
     [Fact]
     public void Universal_OmittedIntoNonOptionalFormal_StopsAtRuntime()
     {
@@ -273,7 +275,7 @@ public sealed class MethodOmittedArgumentTests
         Assert.Contains("BEFORE", all);
         Assert.DoesNotContain("IN REQ", all);
         Assert.DoesNotContain("AFTER", all);
-        Assert.Contains("does not conform", all);
+        Assert.Contains("EC-OO-METHOD", all);
     }
 
     /// <summary>§8.8.4.8.3 SR1 inside a METHOD: data-name-1 shall be a formal parameter of THAT source element —

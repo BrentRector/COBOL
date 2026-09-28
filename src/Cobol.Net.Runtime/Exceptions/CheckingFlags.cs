@@ -123,6 +123,21 @@ public struct CheckingFlags
     /// synchronously on the same run unit; the METHOD's half is a compile-time literal baked per method.</summary>
     public bool OoUniversal;
 
+    /// <summary>EC-EXTERNAL-FORMAT-CONFLICT — the ACTIVATING element's half of §14.8.4.1's "enabled in both the
+    /// activating and activated runtime elements" for §14.8.4.3 (kb/Work PB1138). Set around a CALL, an INVOKE or a
+    /// statement carrying an activation by the emitted statement guard; read by the activation boundary
+    /// (<c>ProgramTable.CallProgram</c>, <c>ExternalStore.DescribeAtMethodActivation</c>) before the activated
+    /// element's checking scope opens. The activated element's half is its compile-time before-Environment-division mask.</summary>
+    public bool ExternalFormatConflict;
+
+    /// <summary>EC-EXTERNAL-DATA-MISMATCH — the activating half of §14.8.4.1 for §14.8.4.2; see
+    /// <see cref="ExternalFormatConflict"/>.</summary>
+    public bool ExternalDataMismatch;
+
+    /// <summary>EC-EXTERNAL-FILE-MISMATCH — the activating half of §14.8.4.1 for §14.8.4.4; see
+    /// <see cref="ExternalFormatConflict"/>.</summary>
+    public bool ExternalFileMismatch;
+
     /// <summary>EC-BOUND-TABLE-LIMIT — a dynamic-capacity table grown past the implementor maximum
     /// (§14.9.39.4 GR30).</summary>
     public bool BoundTableLimit;

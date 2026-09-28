@@ -156,13 +156,40 @@ public sealed class ExceptionRaiseHelperDriftTests
         foreach ((string ec, string? flag) in EmitterGates)
         {
             if (flag is null) continue;                  // an unconditional raise site — no helper by design
-            // EC-OO-UNIVERSAL is the ONE flagged gate with no runtime helper, and the gate table says why:
-            // §14.9.23.4 GR7c raises only when checking is enabled in BOTH elements, so this flag carries the
-            // ACTIVATOR's half to the callee's GENERATED __CobolInvoke, which tests it there.
-            if (string.Equals(ec, "EC-OO-UNIVERSAL", StringComparison.OrdinalIgnoreCase)) continue;
+            // The ACTIVATING-HALF gates have no runtime helper, and the gate table says why: each condition is raised
+            // only when checking is enabled in BOTH elements (§14.8.4.1; §14.9.23.4 GR7c), so the flag carries the
+            // ACTIVATOR's half to an activation boundary, which tests it there. Their reader is asserted below
+            // (EveryExternalActivatingFlag_SetsItsOwnBitOfTheActivatingMask) and by the goldens that raise them.
+            if (EcEmitter.ActivatingHalfGates.Contains(ec)) continue;
             Assert.True(raised.Contains(ec),
                 $"EcEmitter sets ExceptionState.{flag} for {ec}, but no ExceptionEngine …Error helper raises {ec} — "
                 + "the condition would be armed at every statement that enables it and raised at none.");
+        }
+    }
+
+    /// <summary>kb/Work PB1138 — the EC-EXTERNAL activating-half flags are read by the activation boundary through
+    /// <see cref="ExceptionEngine.ExternalActivatingMask"/>, so the pairing a raise helper proves for the other gates
+    /// is proved here the same BEHAVIOURAL way: the flag the emitter sets for an EC-EXTERNAL name, ALONE, turns on
+    /// exactly that name's <see cref="CobolNet.Runtime.ExternalChecks"/> bit — never a neighbour's, and never none.</summary>
+    [Fact]
+    public void EveryExternalActivatingFlag_SetsItsOwnBitOfTheActivatingMask()
+    {
+        var external = EmitterGates.Where(g => g.Key.StartsWith("EC-EXTERNAL-", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, external.Count);   // the checkable trio (EC-EXTERNAL-IMP has no raise site)
+        foreach (var (ec, flag) in external)
+        {
+            Assert.NotNull(flag);
+            Assert.Contains(ec, EcEmitter.ActivatingHalfGates);
+            var engine = new ExceptionEngine();
+            foreach (var f in FlagProperties) f.SetValue(engine, string.Equals(f.Name, flag, StringComparison.Ordinal));
+            var expected = ec switch
+            {
+                "EC-EXTERNAL-FORMAT-CONFLICT" => CobolNet.Runtime.ExternalChecks.FormatConflict,
+                "EC-EXTERNAL-DATA-MISMATCH" => CobolNet.Runtime.ExternalChecks.DataMismatch,
+                "EC-EXTERNAL-FILE-MISMATCH" => CobolNet.Runtime.ExternalChecks.FileMismatch,
+                _ => CobolNet.Runtime.ExternalChecks.None,
+            };
+            Assert.Equal((int)expected, engine.ExternalActivatingMask);
         }
     }
 

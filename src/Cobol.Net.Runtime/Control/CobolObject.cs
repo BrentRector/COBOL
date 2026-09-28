@@ -27,19 +27,21 @@ public abstract class CobolObject
     /// <summary>Dynamic/universal method dispatch (D10/D-U2; §14.9.23.3 SR6/SR7): each emitted class
     /// overrides with a switch over the methods it DECLARES that are not overrides (an override wins through
     /// C# virtual dispatch from the BASE class's case; inherited methods resolve through the <c>default:</c>
-    /// base chain — the chain IS §9.3.6 resolution order), unboxing each <see cref="CobolInvokeArg"/> after
-    /// a descriptor-equality check (§14.9.23.4 GR7c — runtime conformance; mismatch → EC-OO-UNIVERSAL,
-    /// Table 13 fatal). Reaching THIS default means no class in the hierarchy declares the name →
-    /// EC-OO-METHOD (GR7b). <paramref name="returning"/> is null exactly when the INVOKE had no RETURNING —
-    /// presence mismatches in either direction are EC-OO-UNIVERSAL in the generated cases.</summary>
+    /// base chain — the chain IS §9.3.6 resolution order). A generated case first decides whether its method
+    /// MATCHES the invocation (§9.3.6 match rules: argument count, RETURNING presence both directions, each
+    /// <see cref="CobolInvokeArg"/>'s descriptor); a method that does not match hands the search to its base, and
+    /// only a BOUND method's residual violation is §14.9.23.4 GR7c's EC-OO-UNIVERSAL. Reaching THIS root means no
+    /// class in the hierarchy declares a MATCHING method of that name → EC-OO-METHOD (§9.3.6 6); GR7b).
+    /// <paramref name="returning"/> is null exactly when the INVOKE had no RETURNING.</summary>
     public virtual void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning) =>
         throw new CobolFatalException("EC-OO-METHOD",
-            $"INVOKE: the runtime class '{GetType().Name}' does not implement a method named '{name}' "
-            + "(ISO §14.9.23.4 GR7b)");
+            $"INVOKE: the runtime class '{GetType().Name}' implements no method named '{name}' that matches "
+            + "the invocation (ISO §9.3.6 6); §14.9.23.4 GR7b)");
 
     /// <summary>Normalize an identifier-2 method-name value (§14.9.23.4 GR2a): the content IS a
     /// user-defined word — case-insensitive (§8.3.2.2), and the PIC X trailing-space padding is not part
-    /// of the name. Generated case labels are the COBOL spelling uppercased.</summary>
+    /// of the name. The ONE word mapping: the INVOKE literal is normalized through it at bind time, and every
+    /// generated case label is the method's EXTERNALIZED name through it (<c>OoMethodSymbol.DispatchKey</c>).</summary>
     public static string NormalizeMethodName(string raw) => raw.TrimEnd().ToUpperInvariant();
 
     /// <summary>The INVOKE null-receiver guard (§14.9.23.4 GR5): emitted before every instance dispatch —

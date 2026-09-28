@@ -81,13 +81,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             argMismatchChecking: EnabledProgramNames().Contains("EC-PROGRAM-ARG-MISMATCH"));
 
         var ecProg = EnabledProgramNames();
-        // The ACTIVATING half of §14.8.4.1's both-elements rule: this CALL statement's enabled EC-EXTERNAL-*
-        // set becomes the pending site mask the activation boundary latches for the activated element's
-        // Describe gate (§14.9.4.4 GR3e — "enabled ... in both the activated program and activating runtime
-        // element"). Zero-scaffolding: an EC-free site emits nothing (the boundary re-zeroes after every call).
-        int siteExternalMask = ecProg.Sum(ExternalBit);
-        if (siteExternalMask != 0)
-            w.Line($"ExceptionState.ExternalCheckMask = {siteExternalMask};   // §14.8.4.1 — this CALL's EC-EXTERNAL enablement (the activating element)");
+        // The ACTIVATING half of §14.8.4.1's both-elements rule is NOT emitted here: this CALL statement's enabled
+        // EC-EXTERNAL-* names are statement-guard checking flags (EcEmitter.FatalAmbientGates), and the activation
+        // boundary (ProgramTable.CallProgram) reads them before the activated element's checking scope opens — the
+        // ONE handshake the CALL, a function activation and an INVOKE's method activation share (kb/Work PB1138).
         // ── §14.9.4.4 GR3h/GR3i: the CALL statement's exception partition (kb/Work PB233) ────────────────────
         // ON EXCEPTION is the ONLY phrase that diverts a failed activation. GR3h item 1 names it explicitly,
         // and §14.6.13.1.3 #1 admits only "a conditional phrase WITHOUT the NOT phrase" — so a CALL written
@@ -280,8 +277,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// failures; GR3e: the §14.8.4 external-conformance trio). All are Table 13 Fatal and GR3h item 1 gives the
     /// ON EXCEPTION phrase both families, so they share one catch arm. The partition itself is
     /// <see cref="CobolCallException.IsProgramOrExternal"/> — written down ONCE, next to the carrier, so this
-    /// compile-time split and the emitted runtime filter cannot drift apart. Also the source of this CALL's
-    /// §14.8.4.1 EC-EXTERNAL site mask and of GR3d's ACTIVATING-half argument-checking flag.</summary>
+    /// compile-time split and the emitted runtime filter cannot drift apart. Also the source of GR3d's
+    /// ACTIVATING-half argument-checking flag.</summary>
     private List<string> EnabledProgramNames() =>
         EnabledCallNames().Where(RuntimeApi.CallEcIsProgramOrExternal).ToList();
 
@@ -292,16 +289,6 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// which is why they need an arm of their own rather than a share of the family arm.</summary>
     private List<string> EnabledOtherCallNames() =>
         EnabledCallNames().Where(n => !RuntimeApi.CallEcIsProgramOrExternal(n)).ToList();
-
-    /// <summary>The <see cref="ExternalChecks"/> bit of one EC-EXTERNAL level-3 name (0 for any other name) —
-    /// the emitted CALL-site mask is the OR over the statement's enabled set.</summary>
-    private static int ExternalBit(string ec) => ec switch
-    {
-        "EC-EXTERNAL-FORMAT-CONFLICT" => (int)ExternalChecks.FormatConflict,
-        "EC-EXTERNAL-DATA-MISMATCH" => (int)ExternalChecks.DataMismatch,
-        "EC-EXTERNAL-FILE-MISMATCH" => (int)ExternalChecks.FileMismatch,
-        _ => 0,
-    };
 
     /// <summary>Emit ONE name-filtered <c>catch (CobolCallException)</c> arm of a CALL under enabled checking
     /// (§9.1.13-style bridge for the inter-program family: the runtime latched the Table 13 level-3 name in

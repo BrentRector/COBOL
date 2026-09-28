@@ -311,17 +311,42 @@ implementing one interface, polymorphic dispatch through an interface-typed refe
 The signature is `void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)`:
 the mutable `CobolInvokeArg.Value` is the SR6 BY-REFERENCE
 write-back channel and its `Descriptor` carries the runtime-conformance encoding
-(`OoClassTable.ConformanceDescriptor`, ONE rule beside DescriptionMismatch — §14.9.23.4 GR7c checks
-§14.8.2/§14.8.3 AT RUNTIME through string equality. On a mismatch/arity/RETURNING-presence violation the
-EC-OO-UNIVERSAL exception condition is set to exist WHEN checking for it is enabled in BOTH the activated
-method and the activating runtime element (§14.9.23.4 GR7c); the method invocation is then unsuccessful and
-control continues per GR7g through the §14.6.13 EC machinery (declaratives / >>TURN), like every other EC.
-When checking is not enabled in both, EC-OO-UNIVERSAL is NOT set to exist; a nonconforming crossing cannot
-proceed in a typed-native model, so the implementor's abnormal-termination surface applies (a Table-13
-fatal, §14.6.13.1.3). ANY LENGTH is moot — no implementation anywhere yet). A UNIVERSAL reference emits as **`CobolObject?`** (CobolObject IS the
+(`OoConformance.ConformanceDescriptor`, ONE rule beside DescriptionMismatch), compared by string equality AT
+RUNTIME in the order §14.9.23.4 GR7 prescribes (kb/Work PB1500):
+- **GR7 b) — resolution.** §9.3.6's match rules decide whether a method is BOUND at all: rule 1 (argument count,
+  trailing OPTIONAL formals counting as equal; RETURNING present on both sides or neither), rule 3 (every universal
+  argument is BY REFERENCE: an OMITTED one needs an OPTIONAL formal, any other one the formal's descriptor) and
+  rules 6/7 (the RETURNING items share a SET/MOVE class, `OoConformance.ReturningMatchClass`). A method that does
+  not match is NOT bound: its case `break`s out of the switch into `base.__CobolInvoke`, the search continues up the
+  INHERITS chain (§9.3.6 2)/4)), and the CobolObject root sets EC-OO-METHOD (§9.3.6 6)) — a declarative on
+  EC-OO-METHOD selects it.
+- **GR7 c) — the bound method's conformance.** What §9.3.6 does not restate: an ANY LENGTH formal or returning item
+  ("neither a formal parameter nor the returning item in the invoked method shall be described with the ANY LENGTH
+  clause") and a RETURNING pair of one match class whose descriptions differ (§14.8.3.3). The EC-OO-UNIVERSAL
+  exception condition is set to exist WHEN checking for it is enabled in BOTH the activated method and the
+  activating runtime element; the method invocation is then unsuccessful and control continues per GR7g through
+  the §14.6.13 EC machinery (declaratives / >>TURN), like every other EC. When checking is not enabled in both,
+  EC-OO-UNIVERSAL is NOT set to exist; a nonconforming crossing cannot proceed in a typed-native model, so the
+  implementor's abnormal-termination surface applies (`CobolImplementorFatalException`, no EC name).
+- **GR7 d) — the external items (every INVOKE form, typed and universal, and PROPERTY accessors).** A method has
+  no external items of its own (§13.4.3 SR1 keeps FILE SECTION out of a method; a method WORKING-STORAGE EXTERNAL
+  item is refused), so its activation checks its factory's or object's: each class half with external items emits
+  `private static void __DescribeExternals(int __self)` (the same `OoEmitter.EmitExternalDescribes` a program's
+  `DescribeExternals()` is), and every method prologue — before the module-stack push, i.e. before GR7 e)'s
+  transfer — calls `ExternalStore.DescribeAtMethodActivation(__DescribeExternals, <mask>)`. §14.8.4.1's pair: the
+  activating half is the INVOKE statement guard's EC-EXTERNAL checking flags (the CALL boundary reads the same
+  flags), the method's half is `OoMethodSymbol.ExternalCheckMaskHere`, folded before the METHOD's Environment
+  division. A violation is a `CobolFatalException` carrying the Table 13 name, so the INVOKE's guard selects it like
+  EC-OO-METHOD (kb/Work PB1138).
+
+The case LABEL is the method's `OoMethodSymbol.DispatchKey` — its EXTERNALIZED name under the one case-insensitive
+word mapping (`CobolObject.NormalizeMethodName`) the INVOKE literal (bind time) and identifier-2 (run time) take:
+§8.3.2.2 1) maps a universal method-name "to the externalized name of the method to be invoked", the same roster
+key the typed path resolves by (PB303), so `METHOD-ID M2 AS "MixedExt"` answers `"MixedExt"` and not `"M2"`
+(kb/Work PB1405). A UNIVERSAL reference emits as **`CobolObject?`** (CobolObject IS the
 runtime universal type, GR2b defers non-COBOL interop, no cast at dispatch sites). Roster rule: cases only
 for methods the type DECLARES that are NOT overrides (the base's case + C# virtual dispatch delivers
-overrides — proven by oo_universal_inherit's DERIVED-VOICE); `default:` chains base — the chain IS §9.3.6;
+overrides — proven by oo_universal_inherit's DERIVED-VOICE); an absent or non-matching name chains base — the chain IS §9.3.6;
 zero non-override methods ⇒ no override emitted; BOTH type halves get switches (a universal can hold a
 factory object). Box forms are CANONICAL BY DESCRIPTOR (each side's storage form is computed independently
 per unit, so "box per your own storage" would desync): `S:*` →
@@ -337,7 +362,7 @@ the narrowing tool is an OBJECT VIEW, deferred to the EC-OO/object-view wave). O
 `object.ReferenceEquals(l, r)` in the ConditionRenderer's object branch BEFORE the figurative branch, so
 NULL never width-materializes). Descriptor-vs-DescriptionMismatch drift protection is a UNIT MATRIX over
 pictures ANALYZED by `PictureAnalyzer` (`PictureClauseIdentityDriftTests.ConformanceDescriptor_AgreesWithTheComparator_OverEveryCarriedPair`,
-kb/Work PB1166) plus the behavioral EC-OO-UNIVERSAL / conforming-crossing pair over the 9(4)/9(8) hazard. Both
+kb/Work PB1166) plus the behavioral EC-OO-METHOD (no match) / conforming-crossing pair over the 9(4)/9(8) hazard. Both
 projections read the ONE PICTURE-clause identity (`PicInfo.Clause` — expanded character-string, currency STRING,
 DECIMAL-POINT IS COMMA when a period/comma symbol is present), so a plain `X(n)` keeps the bare `S:n:J` key the
 alphanumeric-group image pairs with and every other alphanumeric picture adds its clause key; a bit / national

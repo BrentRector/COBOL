@@ -376,6 +376,19 @@ public sealed class FileModel
     /// default is no record locking).</summary>
     public LockModeInfo? LockMode { get; set; }
 
+    /// <summary>The RESERVE clause's integer-1 (ISO §12.4.5.14), or null when the entry writes no RESERVE clause.
+    /// The managed I-O model's buffering is the stream's, so no allocation reads it; its reader is the external
+    /// file connector's entry identity, which §12.4.5.3 GR1 d) makes include "The same value for integer-1 in the
+    /// RESERVE clause" (<c>OoEmitter.SelectFingerprint</c>, kb/Work PB1079).</summary>
+    public int? ReserveAreas { get; set; }
+
+    /// <summary>The RECORD DELIMITER clause's phrase as written — <c>STANDARD-1</c> or the uppercased
+    /// feature-name-1 (ISO §12.4.5.11) — or null when the entry writes no such clause. The clause is declined
+    /// accept-inert (kb/Work PB292; it changes no framing), so its one reader is the external file connector's
+    /// entry identity: §12.4.5.3 GR1 c) requires "Either the STANDARD-1 phrase or a consistent value of
+    /// feature-name-1 in the RECORD DELIMITER clause" (<c>OoEmitter.SelectFingerprint</c>, kb/Work PB1079).</summary>
+    public string? RecordDelimiter { get; set; }
+
     /// <summary>Whether an I-O-CONTROL APPLY COMMIT clause (ISO §12.4.6.3) names this file — the STATIC,
     /// source-level property the standard calls "subject to an APPLY COMMIT clause", as distinct from
     /// §12.4.6.3.4 GR5's runtime notion of a clause being <i>active</i>. Set by

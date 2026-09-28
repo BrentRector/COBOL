@@ -24,6 +24,13 @@ public sealed record OoMethodSymbol(
     /// (kb/Work PB303).</summary>
     public string ExternalizedName { get; init; } = Name;
 
+    /// <summary>The key a UNIVERSAL dispatch selects this method by (kb/Work PB1405): §8.3.2.2 1) treats a universal
+    /// INVOKE's method-name "as a COBOL word that maps to the externalized name of the method to be invoked", so the
+    /// key is <see cref="ExternalizedName"/> — the same roster key the typed path resolves by — under the ONE
+    /// case-insensitive word mapping the invocation side applies (<see cref="CobolNet.Runtime.CobolObject.NormalizeMethodName"/>,
+    /// the roster's <c>OrdinalIgnoreCase</c> comparer at run time). Never <see cref="Name"/>: an AS phrase replaces it.</summary>
+    public string DispatchKey => CobolNet.Runtime.CobolObject.NormalizeMethodName(ExternalizedName);
+
     /// <summary>The emitted C# method name. Starts as the sanitized-uppercase COBOL name; an OVERRIDE adopts
     /// its base slot's name verbatim (C# requires the override member name to match), and a collision with
     /// the owning class's type name (C# CS0542) or an emitted field takes a deterministic suffix — always a
@@ -49,6 +56,14 @@ public sealed record OoMethodSymbol(
     /// program-level directive earlier in the file is picked up for free, since the fold walks every event with
     /// a lower line.</para></summary>
     public bool OoUniversalCheckingHere { get; set; }
+
+    /// <summary>The METHOD's half of §14.8.4.1's "enabled in both the activating and activated runtime elements":
+    /// the <c>ExternalChecks</c> bits of the EC-EXTERNAL conditions enabled "before the Environment division" of this
+    /// method (<c>BinderDriver.ExternalMaskAt</c>, the one fold the program units' mask takes too), baked by
+    /// <c>OoEmitter.EmitMethod</c> as the self mask of the method activation's external-item registrations
+    /// (§14.9.23.4 GR7 d); kb/Work PB1138). Folded at bind time for the same reason as
+    /// <see cref="OoUniversalCheckingHere"/>: codegen owns no TurnState.</summary>
+    public int ExternalCheckMaskHere { get; set; }
 
     /// <summary>True for a FACTORY method (§11.4) — the SELF/SUPER roster selector and diagnostic wording;
     /// its formals' profiles/statics live on the FACTORY class, so CONTENT-conversion call sites qualify by

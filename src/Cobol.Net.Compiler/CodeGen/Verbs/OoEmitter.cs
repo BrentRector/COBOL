@@ -59,7 +59,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         : root.CsName;
 
     /// <summary>An ADDRESS-OF-taken method LINKAGE root (kb/Work PB1019, method arm) lives in its per-activation
-    /// <c>StorageCell</c> (<see cref="PtrActivationSeed"/>), so its crossing value is read from that storage: a
+    /// <c>StorageCell</c> (<see cref="ActivationPointerSeeds"/>), so its crossing value is read from that storage: a
     /// root that crosses as characters (<see cref="OoCrossingType"/> <c>string</c> — a group, or an elementary item
     /// stored as its image) is the cell's whole backing image; a typed crossing reads the item through its
     /// place (the window over the cell).</summary>
@@ -125,13 +125,16 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// <para>Storage duration follows the owning section. A RECURSIVE unit's static-WS based root and a method
     /// WORKING-STORAGE root emit STATIC members (§13.5.4 GR1 / §8.6.4 static items — one copy on the class); a method
     /// LOCAL-STORAGE / LINKAGE root's member is per ACTIVATION, so it is not <c>readonly</c> — <see cref="EmitMethod"/>
-    /// re-seeds it on entry (<see cref="PtrActivationSeed"/>) and restores the activator's on exit.</para></summary>
+    /// re-seeds it on entry (<see cref="ActivationPointerSeeds"/>) and restores the activator's on exit.</para></summary>
     public void EmitPointerBackings(DataBinder data, CodeWriter w)
     {
         foreach (var (backing, cellField, canonical, cellWidth) in data.PtrAddressableBackings)
         {
             bool isStatic = data.StaticAddressableCells.Contains(cellField);
-            bool perActivation = !isStatic && data.OoMethodScopedRoots.Contains(canonical);
+            // A method's LOCAL-STORAGE / LINKAGE cell and a program's LOCAL-STORAGE cell are re-seeded at each activation
+            // (ActivationPointerSeeds — kb/Work PB956 / PB1132), so neither is readonly.
+            bool perActivation = !isStatic
+                && (data.OoMethodScopedRoots.Contains(canonical) || data.LocalStorageRoots.Contains(canonical));
             string mod = isStatic ? "private static readonly" : perActivation ? "private" : "private readonly";
             string rmod = isStatic ? "private static" : "private";
             w.Line($"{mod} StorageCell {cellField} = {AddressableCellInit(canonical, cellWidth)};   // ADDRESS-OF-taken record — cell storage (ISO §8.4.3.11; Phase-4b inc 2)");
@@ -159,13 +162,19 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         $"new StorageCell {{ Ref = {RuntimeApi.StrStore(new DataEmitter(Ctx).ImageInitOf(canonical), $"{cellWidth}")} }}"
         + new DataEmitter(Ctx).CellDynSeeds(canonical);   // the cell's dynamic-length half (kb/Work PB1026)
 
-    /// <summary>The per-ACTIVATION data-pointer members of one method (kb/Work PB956): for each cell-backed
-    /// LOCAL-STORAGE / LINKAGE root, the member and the fresh value an activation starts from — a BASED root's
-    /// implicit pointer starts NULL (§13.18.5.4 GR2), an ADDRESS-OF-taken record starts a fresh cell holding its
-    /// initial image (§8.6.4 — local storage is initialized on each activation).</summary>
-    private IEnumerable<(string Member, string Type, string Fresh)> PtrActivationSeed(DataBinder data, OoMethodSymbol m)
+    /// <summary>⛔ THE PER-ACTIVATION DATA-POINTER SEEDS — ONE function for the method arm (kb/Work PB956) AND the
+    /// cached-singleton program arm (kb/Work PB1132, <c>ProgramEmitter.EmitCallMethod</c>): for each cell-backed root of
+    /// <paramref name="roots"/> — the activation's LOCAL-STORAGE roots and its non-formal LINKAGE roots — the member and
+    /// the fresh value an activation starts from. A BASED root's implicit pointer starts NULL (§13.18.5.4 GR2 "The implicit
+    /// data-address pointer has an initial value of NULL"; §14.6.2.3.2 action 5 for local storage, and §8.6.5 ends a
+    /// linkage-section association "at the end of the execution of the runtime element"); an ADDRESS-OF-taken record
+    /// starts a fresh cell holding its initial image (§8.6.4 — local storage is "allocated and set to initial state each
+    /// time the runtime element containing them is activated"). These are exactly the storage channels the root-field
+    /// re-initialization loops skip (a cell-backed root has no root field), so every loop that re-initializes automatic
+    /// data for an activation also emits these.</summary>
+    internal IEnumerable<(string Member, string Type, string Fresh)> ActivationPointerSeeds(DataBinder data, IEnumerable<DataItem> roots)
     {
-        foreach (var root in m.Binding!.LocalRoots.Concat(m.Binding!.LinkageRoots))
+        foreach (var root in roots)
         {
             if (root.Class is not { IsCellBacked: true } cls || !ReferenceEquals(cls.Canonical, root)) continue;
             if (cls.BasedPointerField is { } addr)
@@ -192,11 +201,17 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// "escaped from <c>Call</c>" an exact test for GR3i's "the program was successfully called" (kb/Work
     /// PB233). The main-program entry (<c>Activate</c>) calls it itself. A complete-record REDEFINES
     /// contributes nothing (GR6's explicit exemption — the descriptor is built from the base record only).
-    /// RECORD DELIMITER / RESERVE / COLLATING SEQUENCE are not modeled by <see cref="FileModel"/>, so they are
-    /// identical by construction and absent from the fingerprint.</summary>
-    public void EmitExternalDescribes(DataBinder data, string unitPath, CodeWriter w)
+    /// The file connector's §12.4.5.3 GR1 identity is <see cref="SelectFingerprint"/>.</summary>
+    /// <param name="data">The describing element's data.</param>
+    /// <param name="unitPath">The describer's run-unit identity (the program's path, or the class half's C# name).</param>
+    /// <param name="signature">The emitted member's declaration: the program ABI's <c>public void DescribeExternals()</c>,
+    /// or a class half's <c>private static void __DescribeExternals(int __self)</c>, which each method's prologue passes
+    /// to <c>ExternalStore.DescribeAtMethodActivation</c> with the METHOD's own mask (kb/Work PB1138).</param>
+    /// <param name="selfMask">The C# expression of the activated element's §14.8.4.1 mask.</param>
+    /// <param name="w">The writer.</param>
+    public void EmitExternalDescribes(DataBinder data, string unitPath, string signature, string selfMask, CodeWriter w)
     {
-        using (w.Block("public void DescribeExternals()"))
+        using (w.Block(signature))
         {
             foreach (var ext in data.CallExternalBackings)
             {
@@ -208,7 +223,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 w.Line($"ExternalStore.Describe({CsLiteral(unitPath)}, {CsLiteral(ext.ExternalName)}, "
                     + $"new ExternalDescriptor(\"record\", ByteCount: {ext.Width}, ValueImage: {valueSpec}, "
                     + $"StrongTypeKey: {strongKey}, ConstantRecord: {(ext.Record.IsConstantRecord ? "true" : "false")}), "
-                    + $"{data.ExternalCheckMask});   // §14.8.4.3 / §13.18.22.4 GR6");
+                    + $"{selfMask});   // §14.8.4.3 / §13.18.22.4 GR6");
             }
             foreach (var f in data.Files.Where(f => f.IsExternal))
             {
@@ -218,23 +233,67 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     : CsLiteral(string.Join(";", f.Linage.Operands.Select(op => op.DataName is null
                         ? $"={op.Literal}"
                         : BinderDriver.ExternalItemIdentity(op.Item) ?? "!")));
-                string fingerprint = CsLiteral(
-                    // §12.4.5.3 GR1 b requires "A consistent specification for data-name-1, device-name-1, and
-                    // literal-1 in the ASSIGN clause" — all THREE operands, so the USING data-name is part of the
-                    // identity, not just the TO target. Consistency rule (the implementor's, GR1 b's second
-                    // sentence): the same data-name spelling, qualifiers included.
-                    $"OPT={f.Optional}|ASSIGN={f.AssignTarget.ToUpperInvariant()}"
-                    + $"|USING={string.Join(" OF ", new[] { f.AssignUsingName ?? "" }.Concat(f.AssignUsingQualifiers)).ToUpperInvariant()}"
-                    + $"|ORG={f.Organization}|ACC={f.AccessMode}"
-                    + $"|KEY={(f.RecordKeyName?.ToUpperInvariant() ?? "")}"
-                    + $"|ALT={string.Join(",", f.AlternateKeyNames.Select(a => $"{a.Name.ToUpperInvariant()}:{a.Duplicates}"))}"
-                    + $"|SHARE={f.Sharing}|LOCK={(f.LockMode is { } lm ? $"{lm.Kind},{lm.Multiple}" : "")}");
                 w.Line($"ExternalStore.Describe({CsLiteral(unitPath)}, {CsLiteral(f.ExternalName!)}, "
                     + $"new ExternalDescriptor(\"file\", FileStatusRef: {ItemRef(f.FileStatusName, f.FileStatusItem)}, "
                     + $"RelativeKeyRef: {ItemRef(f.RelativeKeyName, f.RelativeKeyItem)}, LinageRef: {linage}, "
-                    + $"SelectFingerprint: {fingerprint}), {data.ExternalCheckMask});   // §14.8.4.2 / §14.8.4.4 / §12.4.5.3 GR1");
+                    + $"SelectFingerprint: {CsLiteral(SelectFingerprint(f))}), {selfMask});   // §14.8.4.2 / §14.8.4.4 / §12.4.5.3 GR1");
             }
         }
+    }
+
+    /// <summary>⛔ THE ONE §12.4.5.3 GR1 IDENTITY of an external file connector's file control entry — the string two
+    /// describers' <c>ExternalStore.Describe</c> registrations compare for EC-EXTERNAL-FILE-MISMATCH (§14.8.4.4: "the
+    /// rules specified in 12.4.5, File control entry General rule 1 apply"). One segment per GR1 item that the entry
+    /// can make differ: a) OPTIONAL, b) the ASSIGN operands, c) the RECORD DELIMITER phrase, d) RESERVE integer-1,
+    /// e) organization, f) access mode, g) the COLLATING SEQUENCE clauses, j) the prime key's description and relative
+    /// location, k) each alternate key's description, relative location, DUPLICATES and SUPPRESS WHEN phrase (and so
+    /// their number), l) sharing mode, m) lock mode. h) RELATIVE KEY and i) FILE STATUS are the §14.8.4.2 external-item
+    /// references the descriptor carries beside it (<c>RelativeKeyRef</c> / <c>FileStatusRef</c>). The split-key
+    /// <c>SOURCE IS</c> operands of j)/k) (data-name-6 / data-name-3) never reach here — the form is declined
+    /// (Annex A.3 item 40, kb/Work PB358). Every segment is built from the bound <see cref="FileModel"/>; kb/Work
+    /// PB1079 measured c), d), g), j)'s and k)'s descriptions and locations, and k)'s SUPPRESS WHEN missing from it,
+    /// so a mismatch in any of them ran the activated program with no condition.</summary>
+    internal static string SelectFingerprint(FileModel f)
+    {
+        // §12.4.5.3 GR1 j)/k) "The same data description entry for data-name-… as well as their relative location
+        // within the associated record": the key's name as written (part of its data description entry), its
+        // elementary/group shape and byte extent, its §14.8 conformance description (category, usage, PICTURE clause
+        // identity, sign) and its byte offset within the record area (RecordLayout.OffsetOf, the same offset the
+        // connector registers the key window at).
+        static string KeyEntry(string name, DataItem? item) => item is null ? name.ToUpperInvariant()
+            : $"{name.ToUpperInvariant()}@{RecordLayout.OffsetOf(item)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"}"
+              + $":{(item.IsGroup ? "G" : "E")}{item.ByteWidth}:{OoConformance.ConformanceDescriptor(item)}";
+        // k) "the same SUPPRESS WHEN phrase" — the operand as the literal position read it (form, class, characters,
+        // figurative kind), so `SUPPRESS WHEN "XX"` and `SUPPRESS WHEN SPACE` differ and an absent phrase is empty.
+        static string Suppress(SuppressWhenOperand? s) => s is null ? ""
+            : $"{s.Form}/{s.Class}/{s.FigurativeKind}/{s.Characters.Length}:{s.Characters}";
+        // g) "The same specification of COLLATING SEQUENCE clauses": the file-level clause's alphabet-names, and each
+        // key-level clause's alphabet-name-3 against the KEY POSITION it names (P = the prime key, A<i> = the i-th
+        // alternate), so the rule compares what the clause says about the file's keys; sorted, because the clauses'
+        // order in the entry is not part of their specification.
+        string KeyPosition(string keyName)
+        {
+            if (string.Equals(f.RecordKeyName, keyName, StringComparison.OrdinalIgnoreCase)) return "P";
+            int i = f.AlternateKeyNames.FindIndex(a => string.Equals(a.Name, keyName, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 ? $"A{i}" : keyName.ToUpperInvariant();
+        }
+        string fileColl = f.FileLevelCollating is { } fc ? $"{fc.Alnum?.ToUpperInvariant()}/{fc.Nat?.ToUpperInvariant()}" : "";
+        string keyColl = string.Join(",", f.KeyLevelCollating
+            .SelectMany(c => c.KeyNames.Select(k => $"{KeyPosition(k)}={c.Alphabet.ToUpperInvariant()}"))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+        // b) "A consistent specification for data-name-1, device-name-1, and literal-1 in the ASSIGN clause" — all
+        // THREE operands, so the USING data-name is part of the identity, not just the TO target. Consistency rule
+        // (the implementor's, GR1 b's second sentence; docs/CONFORMANCE.md §7 DOC-A.1-72): the same data-name
+        // spelling, qualifiers included.
+        return $"OPT={f.Optional}|ASSIGN={f.AssignTarget.ToUpperInvariant()}"
+            + $"|USING={string.Join(" OF ", new[] { f.AssignUsingName ?? "" }.Concat(f.AssignUsingQualifiers)).ToUpperInvariant()}"
+            // c) "Either the STANDARD-1 phrase or a consistent value of feature-name-1" — consistency rule: the same
+            // phrase (the clause is declined accept-inert, kb/Work PB292, so the written phrase is all there is).
+            + $"|DELIM={f.RecordDelimiter}|RESERVE={f.ReserveAreas}"
+            + $"|ORG={f.Organization}|ACC={f.AccessMode}|COLL={fileColl};{keyColl}"
+            + $"|KEY={(f.RecordKeyName is { } rk ? KeyEntry(rk, f.RecordKeyItem) : "")}"
+            + $"|ALT={string.Join(",", f.AlternateKeyNames.Select(a => $"{KeyEntry(a.Name, a.Item)}:{a.Duplicates}:{Suppress(a.SuppressWhen)}"))}"
+            + $"|SHARE={f.Sharing}|LOCK={(f.LockMode is { } lm ? $"{lm.Kind},{lm.Multiple}" : "")}";
     }
 
     private void EmitFileMembers(string csName, DataBinder data, BoundProgram bound, CodeWriter w)
@@ -367,6 +426,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // resolves its own activation LOCAL (EmitMethod).
             ObjectComputerEmit.EmitMembers(data, w, classificationField: false);
             EmitExternalBackings(data, w);       // M2-OO-1i inc 5: a class EXTERNAL FD record → the shared run-unit cell
+            // §14.9.23.4 GR7 d) (kb/Work PB1138): each METHOD activation checks the external items its statements can
+            // reference — this factory's or object's — so the half renders their registrations once, and every method
+            // prologue passes them to the activation boundary with its own §14.8.4.1 mask (EmitMethod).
+            if (WantsExternalDescribes(data) && roster.Count > 0)
+                EmitExternalDescribes(data, csName, "private static void __DescribeExternals(int __self)", "__self", w);
             EmitPointerBackings(data, w);        // BASED bridges + ADDRESS-OF cells of object/factory AND method data (kb/Work PB956)
             U.ReportWriter.EmitReportMembers(w);              // M2-OO-1i review: a class REPORT SECTION's engine fields + compose methods (Report Writer is complete)
             EmitFileMembers(csName, data, bound, w);   // M2-OO-1i: object/factory file connectors + report construction register in an emitted ctor
@@ -395,19 +459,6 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         w.Line();
     }
 
-    /// <summary>Emit the class's <c>__CobolInvoke</c> override (D10/D-U2/D-U4): a switch over the methods
-    /// this type DECLARES that are NOT overrides (an override needs no case — the BASE class's case calls
-    /// <c>this.M(…)</c> and C# virtual dispatch delivers the override; 0829 guarantees identical
-    /// descriptors), <c>default:</c> chains <c>base.__CobolInvoke</c> — the chain IS §9.3.6 resolution
-    /// order, and the CobolObject root raises EC-OO-METHOD (GR7b). Each case enforces §14.9.23.4 GR7c at
-    /// runtime — arity, per-argument conformance-descriptor equality (D-U3: the SAME rule as the
-    /// compile-time strict check), RETURNING presence BOTH directions — raising EC-OO-UNIVERSAL (Table 13,
-    /// fatal; unconditionally — the EC-OO-NULL/METHOD precedent: proceeding with a nonconforming crossing
-    /// in a typed-native model is never an option). Box forms are CANONICAL BY DESCRIPTOR (D-U6a — never
-    /// by either side's StoreAsImage — the read-only projection of the Storage the group-tail StorageFormPass computes): S:* → string; N:Display:* →
-    /// the display IMAGE string (bridged by the FormatDisplay/StoreDisplay overload pair); other N:* →
-    /// the native value; O:* → the CobolObject reference. A type declaring zero non-override methods
-    /// emits no override.</summary>
     /// <summary>Render the §14.9.23.4 GR7c two-arm stop for one <c>__CobolInvoke</c> conformance check.
     ///
     /// <para>GR7c sets EC-OO-UNIVERSAL "if checking for it is enabled in BOTH the activated method and the
@@ -420,80 +471,136 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// nonconforming crossing still cannot proceed into typed-native code, so the stop is a
     /// <c>CobolImplementorFatalException</c>, which carries NO EC name and therefore cannot be selected by any
     /// statement guard's <c>EcName ==</c> match (§14.6.13.1.1 NOTE 3 undefined-results latitude).</para></summary>
-    private static string OoUnivStop(OoMethodSymbol m, string cond, string detailExpr)
+    private static string OoUnivStop(OoMethodSymbol m, string cond, string detailExpr) =>
+        $"if ({cond}) {{ {OoUnivThrow(m, detailExpr)} }}";
+
+    /// <summary>The unconditional form of <see cref="OoUnivStop"/> — for a violation the bound method carries whatever
+    /// the arguments (an ANY LENGTH formal or returning item, §14.9.23.4 GR7 c)).</summary>
+    private static string OoUnivThrow(OoMethodSymbol m, string detailExpr)
     {
         string both = m.OoUniversalCheckingHere ? "ExceptionState.OoUniversalChecking" : "false";
-        return $"if ({cond}) {{ if ({both}) throw new CobolFatalException(\"EC-OO-UNIVERSAL\", {detailExpr}); "
-            + $"throw new CobolImplementorFatalException({detailExpr}); }}";
+        return $"if ({both}) throw new CobolFatalException(\"EC-OO-UNIVERSAL\", {detailExpr}); "
+            + $"throw new CobolImplementorFatalException({detailExpr});";
     }
 
+    /// <summary>Emit the class's <c>__CobolInvoke</c> override (D10/D-U2/D-U4): a switch over the methods
+    /// this type DECLARES that are NOT overrides (an override needs no case — the BASE class's case calls
+    /// <c>this.M(…)</c> and C# virtual dispatch delivers the override; 0829 guarantees identical
+    /// descriptors), keyed by each method's EXTERNALIZED name (<see cref="OoMethodSymbol.DispatchKey"/>), and a
+    /// method that is absent or does not MATCH falls out of the switch into <c>base.__CobolInvoke</c> — the chain IS
+    /// §9.3.6 resolution order, and the CobolObject root raises EC-OO-METHOD (§9.3.6 6); GR7 b)). Each case first
+    /// decides the §9.3.6 match — arity, RETURNING presence BOTH directions, per-argument conformance-descriptor
+    /// equality (D-U3: the SAME rule as the compile-time strict check) — and only a bound method's residual
+    /// violations (§14.9.23.4 GR7 c): an ANY LENGTH formal or returning item, a RETURNING description that differs)
+    /// raise EC-OO-UNIVERSAL (<see cref="EmitCobolInvokeCase"/>; kb/Work PB1500). Box forms are CANONICAL BY DESCRIPTOR (D-U6a — never
+    /// by either side's StoreAsImage — the read-only projection of the Storage the group-tail StorageFormPass computes): S:* → string; N:Display:* →
+    /// the display IMAGE string (bridged by the FormatDisplay/StoreDisplay overload pair); other N:* →
+    /// the native value; O:* → the CobolObject reference. A type declaring zero non-override methods
+    /// emits no override.</summary>
     private void EmitCobolInvoke(string cobolName, IReadOnlyList<OoMethodSymbol> roster, CodeWriter w)
     {
         var cases = roster.Where(m => m.OverrideOf is null).ToList();
         if (cases.Count == 0) return;
         w.Line();
         using (w.Block("public override void __CobolInvoke(string __name, CobolInvokeArg[] __a, CobolInvokeArg? __ret)"))
-        using (w.Block("switch (__name)"))
         {
-            foreach (var m in cases)
+            using (w.Block("switch (__name)"))
             {
-                using (w.Block($"case {Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.Name.ToUpperInvariant(), quote: true)}:"))
-                {
-                    // §14.8.2.1 and §9.3.6 match rule 1: fewer arguments than formals is an EQUAL number when every formal to the
-                    // right of the last argument is OPTIONAL — so the least admissible count is one past the
-                    // last NON-optional formal (kb/Work PB757).
-                    int formals = m.Binding!.Formals.Count;
-                    int minArgs = m.Binding!.Formals.FindLastIndex(f => !f.Optional) + 1;
-                    w.Line(OoUnivStop(m, minArgs == formals ? $"__a.Length != {formals}" : $"__a.Length < {minArgs} || __a.Length > {formals}",
-                        $"$\"INVOKE '{cobolName}' '{m.Name}': {{__a.Length}} argument(s) for {formals} formal(s) "
-                        + "(ISO §14.9.23.4 GR7c/§14.8.2.1 — runtime conformance through a universal receiver)\""));
-                    for (int i = 0; i < formals; i++)
-                    {
-                        var f = m.Binding!.Formals[i];
-                        string want = OoConformance.ConformanceDescriptor(f.Item);
-                        string wantLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(want, quote: true);
-                        // A position past the supplied arguments is a trailing omission (§14.9.23.4 GR9); the
-                        // arity stop above has already proved every such formal OPTIONAL.
-                        string present = i < minArgs ? "" : $"__a.Length > {i} && ";
-                        // §9.3.6 match rule 3 b): a spelled OMITTED argument needs an OPTIONAL formal and is otherwise
-                        // "considered to match exactly" — so it is exempt from the descriptor check, and against
-                        // a non-OPTIONAL formal its descriptor fails that check, which is the violation.
-                        string exempt = f.Optional ? $"__a[{i}].Descriptor != {RuntimeApi.ObjOmittedDescriptor} && " : "";
-                        w.Line(OoUnivStop(m, $"{present}{exempt}__a[{i}].Descriptor != {wantLit}",
-                            // The formal's descriptor is concatenated as its own C# literal, never spliced into the
-                            // interpolated text: it can carry a currency string or PICTURE EDITING literal
-                            // (PictureClauseIdentity.Key, kb/Work PB1166) — user text with quotes or braces.
-                            $"$\"INVOKE '{cobolName}' '{m.Name}': argument {i + 1} does not conform to the formal "
-                            + $"(caller {{__a[{i}].Descriptor}}, formal \" + {wantLit} + \") (ISO §14.9.23.4 GR7c/§14.8.2)\""));
-                        w.Line($"bool __o{i} = {(i < minArgs ? "" : $"__a.Length <= {i} || ")}__a[{i}].Omitted;   // §14.9.23.4 GR9");
-                        w.Line($"var __p{i} = __o{i} ? default! : {OoUnivUnbox(f.Item, $"__a[{i}].Value")};");
-                    }
-                    if (m.Binding!.Returning is null)
-                        w.Line(OoUnivStop(m, "__ret is not null",
-                            $"\"INVOKE '{cobolName}' '{m.Name}': RETURNING specified but the method declares none "
-                            + "(ISO §14.9.23.4 GR7c/§14.8.3)\""));
-                    else
-                    {
-                        string rl = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
-                            OoConformance.ConformanceDescriptor(m.Binding!.Returning), quote: true);
-                        w.Line(OoUnivStop(m, $"__ret is null || __ret.Descriptor != {rl}",
-                            $"\"INVOKE '{cobolName}' '{m.Name}': the RETURNING item is absent or does not conform "
-                            + "(ISO §14.9.23.4 GR7c/§14.8.3)\""));
-                    }
-                    string argList = string.Join(", ", Enumerable.Range(0, m.Binding!.Formals.Count).Select(i => OoArgPair($"__p{i}", $"__o{i}")));
-                    w.Line(m.Binding!.Returning is null
-                        ? $"this.{m.CsName}({argList});"
-                        : $"var __rv = this.{m.CsName}({argList});");
-                    for (int i = 0; i < m.Binding!.Formals.Count; i++)
-                        w.Line($"if (!__o{i}) __a[{i}].Value = {OoUnivRebox(m.Binding!.Formals[i].Item, $"__p{i}")};   // SR6 BY REFERENCE write-back");
-                    if (m.Binding!.Returning is not null)
-                        w.Line($"__ret!.Value = {OoUnivRebox(m.Binding!.Returning, "__rv")};");
-                    w.Line("return;");
-                }
+                foreach (var m in cases)
+                    // ⛔ THE CASE LABEL IS THE METHOD'S DISPATCH KEY (kb/Work PB1405): §8.3.2.2 1) maps a universal INVOKE's
+                    // method-name "to the externalized name of the method to be invoked", which is the roster key the TYPED
+                    // path resolves by (PB303) — never the declared METHOD-ID word, which an AS phrase replaces.
+                    using (w.Block($"case {Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.DispatchKey, quote: true)}:"))
+                        EmitCobolInvokeCase(cobolName, m, w);
             }
-            w.Line("default: base.__CobolInvoke(__name, __a, __ret); return;");
+            // §9.3.6 2)/4): a class that declares no method of this name, or whose method does not MATCH the invocation, hands
+            // the search to the class it inherits from; the CobolObject root is step 6) — EC-OO-METHOD (§14.9.23.4 GR7 b)).
+            w.Line("base.__CobolInvoke(__name, __a, __ret);");
         }
     }
+
+    /// <summary>One method's arm of the universal dispatch switch, in the order §14.9.23.4 GR7 prescribes (kb/Work PB1500).
+    ///
+    /// <para><b>GR7 b) — does this method MATCH?</b> §9.3.6's match rules are conditions of METHOD RESOLUTION: rule 1 (an
+    /// equal argument count, trailing OPTIONAL formals counting as equal; RETURNING present on both sides or neither),
+    /// rule 3 (every universal argument is BY REFERENCE, §14.9.23.3 SR6: an OMITTED one needs an OPTIONAL formal, any
+    /// other one the same class, category and description — the descriptor projection of the one strict-conformance
+    /// rule, <see cref="OoConformance.ConformanceDescriptor"/>), and rules 6)/7) (the RETURNING items can meet in a SET
+    /// or a MOVE at all — <see cref="OoConformance.ReturningMatchClass"/>). A method that does not match is not bound:
+    /// the arm <c>break</c>s out of the switch into the inherited class's search, and when no class matches, §9.3.6 6)
+    /// sets EC-OO-METHOD — never a conformance violation of a method that was never selected.</para>
+    ///
+    /// <para><b>GR7 c) — the bound method's conformance.</b> Once bound, "neither a formal parameter nor the returning
+    /// item in the invoked method shall be described with the ANY LENGTH clause, and the rules for conformance specified
+    /// in 14.8.2 … and 14.8.3 … apply": the residue §9.3.6 does not restate is an ANY LENGTH formal or returning item and
+    /// a RETURNING pair that can meet in a MOVE/SET but whose descriptions differ (§14.8.3.3). Those raise EC-OO-UNIVERSAL
+    /// through <see cref="OoUnivStop"/>.</para></summary>
+    private void EmitCobolInvokeCase(string cobolName, OoMethodSymbol m, CodeWriter w)
+    {
+        var formalsList = m.Binding!.Formals;
+        var returning = m.Binding!.Returning;
+        int formals = formalsList.Count;
+        // §14.8.2.1 and §9.3.6 match rule 1: fewer arguments than formals is an EQUAL number when every formal to the
+        // right of the last argument is OPTIONAL — so the least admissible count is one past the last NON-optional
+        // formal (kb/Work PB757).
+        int minArgs = formalsList.FindLastIndex(f => !f.Optional) + 1;
+        var noMatch = new List<string>
+        {
+            minArgs == formals ? $"__a.Length != {formals}" : $"__a.Length < {minArgs} || __a.Length > {formals}",
+            returning is null ? "__ret is not null" : "__ret is null",
+        };
+        for (int i = 0; i < formals; i++)
+        {
+            var f = formalsList[i];
+            string wantLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(OoConformance.ConformanceDescriptor(f.Item), quote: true);
+            // A position past the supplied arguments is a trailing omission (§14.9.23.4 GR9); the arity term above has
+            // already proved every such formal OPTIONAL.
+            string present = i < minArgs ? "" : $"__a.Length > {i} && ";
+            // §9.3.6 match rule 3 b): a spelled OMITTED argument needs an OPTIONAL formal and is then "considered to
+            // match exactly" — exempt from the descriptor term; against a non-OPTIONAL formal its descriptor fails it.
+            string exempt = f.Optional ? $"__a[{i}].Descriptor != {RuntimeApi.ObjOmittedDescriptor} && " : "";
+            noMatch.Add($"{present}{exempt}__a[{i}].Descriptor != {wantLit}");
+        }
+        if (returning is not null)
+            noMatch.Add(ReturningClassMismatch(OoConformance.ReturningMatchClass(OoConformance.ConformanceDescriptor(returning))));
+        w.Line($"if ({string.Join(" || ", noMatch.Select(t => $"({t})"))}) break;   // not a §9.3.6 match — the search continues upward");
+
+        // GR7 c): the bound method's ANY LENGTH formal or returning item is a violation whatever the argument.
+        if (formalsList.Any(f => f.Item.IsAnyLength) || returning is { IsAnyLength: true })
+        {
+            w.Line(OoUnivThrow(m, $"\"INVOKE '{cobolName}' '{m.Name}': a method whose formal parameter or returning item is "
+                + "described with the ANY LENGTH clause cannot be invoked through a universal object reference (ISO §14.9.23.4 GR7 c))\""));
+            return;
+        }
+        if (returning is not null)
+        {
+            string rl = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(OoConformance.ConformanceDescriptor(returning), quote: true);
+            w.Line(OoUnivStop(m, $"__ret!.Descriptor != {rl}",
+                $"$\"INVOKE '{cobolName}' '{m.Name}': the RETURNING item (caller {{__ret!.Descriptor}}, method \" + {rl} + \") "
+                + "does not conform (ISO §14.9.23.4 GR7 c)/§14.8.3.3)\""));
+        }
+        for (int i = 0; i < formals; i++)
+        {
+            w.Line($"bool __o{i} = {(i < minArgs ? "" : $"__a.Length <= {i} || ")}__a[{i}].Omitted;   // §14.9.23.4 GR9");
+            w.Line($"var __p{i} = __o{i} ? default! : {OoUnivUnbox(formalsList[i].Item, $"__a[{i}].Value")};");
+        }
+        string argList = string.Join(", ", Enumerable.Range(0, formals).Select(i => OoArgPair($"__p{i}", $"__o{i}")));
+        w.Line(returning is null ? $"this.{m.CsName}({argList});" : $"var __rv = this.{m.CsName}({argList});");
+        for (int i = 0; i < formals; i++)
+            w.Line($"if (!__o{i}) __a[{i}].Value = {OoUnivRebox(formalsList[i].Item, $"__p{i}")};   // SR6 BY REFERENCE write-back");
+        if (returning is not null)
+            w.Line($"__ret!.Value = {OoUnivRebox(returning, "__rv")};");
+        w.Line("return;");
+    }
+
+    /// <summary>The C# test that the caller's RETURNING descriptor is OUTSIDE <paramref name="matchClass"/> (§9.3.6 match
+    /// rules 6/7; <see cref="OoConformance.ReturningMatchClass"/>): an object-reference or pointer class admits exactly its
+    /// own prefix, the data class admits everything that is neither.</summary>
+    private static string ReturningClassMismatch(string matchClass) =>
+        matchClass.Length > 0
+            ? $"!__ret.Descriptor.StartsWith({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(matchClass, quote: true)}, StringComparison.Ordinal)"
+            : string.Join(" || ", OoConformance.ReturningReferenceClasses.Select(c =>
+                $"__ret.Descriptor.StartsWith({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(c, quote: true)}, StringComparison.Ordinal)"));
 
     /// <summary>D-U6a: true when the item's canonical UNIVERSAL box form is the display IMAGE string while
     /// its local crossing form is native — the FormatDisplay/StoreDisplay bridge applies both directions.</summary>
@@ -685,15 +792,19 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // place renders as its name, so the ordinary accessor is unchanged.
             var subjPlace = Refs.ResolveItem(subject);
             string getExpr = subjPlace is null ? subject.CsName : PlaceRenderer.Read(subjPlace);
+            // An accessor is a method activation too (§14.9.23.4 GR7 d) — its external-item check precedes its body.
+            string check = MethodExternalCheck(m) is { } mx ? mx + " " : "";
             if (m.Accessor == 'G')
-                w.Line($"public {pmods}{retType} {m.CsName}() => {getExpr};   // PROPERTY {m.PropertyName} GET (§13.18.42.4 GR1)");
+                w.Line(check.Length == 0
+                    ? $"public {pmods}{retType} {m.CsName}() => {getExpr};   // PROPERTY {m.PropertyName} GET (§13.18.42.4 GR1)"
+                    : $"public {pmods}{retType} {m.CsName}() {{ {check}return {getExpr}; }}   // PROPERTY {m.PropertyName} GET (§13.18.42.4 GR1)");
             else
             {
                 // The setter's one formal (§11.7.3 SR7) crosses through the SAME signature builder as every
                 // method, so a PROPERTY SET that overrides or implements a written SET method cannot drift from it.
                 string param = m.Binding!.Formals[0].ParamName;
                 string store = subjPlace is null ? $"{subject.CsName} = {param};" : PlaceRenderer.Write(subjPlace, param);
-                w.Line($"public {pmods}void {m.CsName}({sig}) {{ {store} }}   // PROPERTY {m.PropertyName} SET (GR2)");
+                w.Line($"public {pmods}void {m.CsName}({sig}) {{ {check}{store} }}   // PROPERTY {m.PropertyName} SET (GR2)");
             }
             w.Line();
             return;
@@ -712,6 +823,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // This body's formals, for the §8.8.4.8.4 GR1c forwarding recognition (CallUnitState.WholeFormalProbe)
             // that every CALL and INVOKE argument inside the body consults (kb/Work PB757). Cleared below.
             callState.MethodFormals = m.Binding!.Formals;
+            // §14.9.23.4 GR7 d) BEFORE e): the external items are checked as part of the ACTIVATION ATTEMPT, so a
+            // violation leaves before control is transferred — no module-stack frame, no storage seeded, no statement
+            // run ("the method invocation is not successful"; kb/Work PB1138).
+            if (MethodExternalCheck(m) is { } extCheck)
+                w.Line(extCheck + "   // §14.9.23.4 GR7 d) — the method activation's §14.8.4 external-item check");
             // ⛔ THE METHOD IS A RUNTIME ELEMENT AND MUST APPEAR ON THE MODULE-NAME STACK (fix-queue PB36).
             // §15.65.4 r5 names the four activation mechanisms outright — "This may be by a CALL statement, an
             // INVOKE statement, a function reference, or an inline invocation" — and INVOKE was the one missing,
@@ -731,7 +847,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // The per-ACTIVATION data-pointer members (kb/Work PB956): save the activator's, start this activation
             // fresh, and restore in the activation's finally — so a recursive INVOKE on the same object neither
             // inherits nor clobbers its caller's based address or LOCAL-STORAGE cell (§8.6.4; §8.6.5).
-            var ptrSeeds = PtrActivationSeed(Ctx.Data, m).ToList();
+            var ptrSeeds = ActivationPointerSeeds(Ctx.Data, m.Binding!.LocalRoots.Concat(m.Binding!.LinkageRoots)).ToList();
             for (int i = 0; i < ptrSeeds.Count; i++)
                 w.Line($"{ptrSeeds[i].Type} __ptrSv{i} = {ptrSeeds[i].Member}; {ptrSeeds[i].Member} = {ptrSeeds[i].Fresh};   // per-activation data-pointer storage (ISO §8.6.4)");
             // The ACTIVATION's nonfatal selector (kb/Work PB1010 — the method twin of ProgramTable's install): a
@@ -774,7 +890,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // one §13.18.44 storage area in two; and now that a collapsed GROUP emits no record-struct type
                 // at all it would be a CS0246 on legal source.
                 // An ADDRESS-OF-taken LINKAGE formal (kb/Work PB1019, method arm): its storage is the per-activation
-                // StorageCell PtrActivationSeed just re-seeded with the initial image (§14.2.3 GR6 for the RETURNING
+                // StorageCell ActivationPointerSeeds just re-seeded with the initial image (§14.2.3 GR6 for the RETURNING
                 // item and an omitted formal), so a PRESENT formal copies the argument into that cell — the same
                 // boundary copy every other formal takes, into the one storage its ADDRESS OF names (§8.4.3.11.4 GR1).
                 if (root.Class is { Tier: RedefinesTier.StringCanonical, IsCellBacked: true } cellCls
@@ -936,6 +1052,14 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         }
         w.Line();
     }
+
+    /// <summary>The method activation's §14.8.4 external-item check (§14.9.23.4 GR7 d); kb/Work PB1138): the containing
+    /// half's registrations (<c>__DescribeExternals</c>, emitted by <see cref="EmitTypeHalf"/> under the same
+    /// <see cref="WantsExternalDescribes"/> test) run by the activation boundary with THIS method's §14.8.4.1 mask. Null
+    /// when the half describes nothing — a group with no EC-EXTERNAL TURN, or a half with no external items.</summary>
+    private string? MethodExternalCheck(OoMethodSymbol m) => WantsExternalDescribes(Ctx.Data)
+        ? $"ExternalStore.DescribeAtMethodActivation(__DescribeExternals, {m.ExternalCheckMaskHere});"
+        : null;
 
     /// <summary>The C# (return-type, parameter-list) of a method or prototype — ONE builder shared by class
     /// method emission, interface member emission, and the covariant adapters, so the three can never drift
@@ -1173,6 +1297,15 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // the formal reads the argument's image through the pair's correspondence, each corresponding
                 // table fitted to the formal's occurrence count (§8.5.1.12.3 sentence 3).
                 w.Line($"string {tmp} = {RuntimeApi.VarGroupToFixedImage(PlaceRenderer.VarGroupImage(vsp, "INVOKE argument"), a.Formal.ImageWidth, CallEmitter.LayoutArray(vs))};");
+            // ⛔ A NUMERIC VALUE INTO AN IMAGE-CARRIED FIXED-POINT FORMAL (kb/Work PB1064): a method formal is a character
+            // channel (§14.2.3 GR8), so a numeric-DISPLAY formal is carried as its image — and a literal-2 or an
+            // arithmetic-expression-1 has no image, only a VALUE. §14.2.3 GR9 fills the formal's record by "a COMPUTE
+            // statement without the ROUNDED phrase", so the value is the SAME store the native arms below render
+            // (MethodNumericContent — one rule, two carriers), and the image is that record's storage image.
+            else if (stringCarried && a.Source is null && a.StringLiteral is null
+                     && a.Formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
+                     && MethodNumericContent(a, qualProfile) is { } imageValue)
+                w.Line($"string {tmp} = {RuntimeApi.NumFormatImage(imageValue, qualProfile)};");
             else if (a.Formal.IsGroup || (stringCarried && a.Source?.Item.IsGroup == true))
             {
                 // The image crossing. BY REFERENCE allows a SMALLER formal (§14.8.2.2 rule 1 — a PREFIX of
@@ -1190,9 +1323,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     : a.StringLiteral is { } slit
                     // An ANY LENGTH formal sees the literal AT ITS OWN length (§13.18.2 GR1) — no width-fit.
                     ? $"string {tmp} = {(a.Formal.IsAnyLength ? CsLiteral(slit) : RuntimeApi.StrStore(CsLiteral(slit), $"{CallEmitter.ElementaryFormalWindow(a.Formal)}"))};"
-                    // A numeric literal into an image-stored numeric formal: compose the formal's STORAGE image
-                    // (kb/Work PB970 — of its own byte form, not a zoned digit run) through the OWNER's internal
-                    // profile (the review's cross-class rule — qualified, never bare).
+                    // A numeric literal into an image-stored formal the arm above does not take (a non-numeric
+                    // category): compose the formal's STORAGE image (kb/Work PB970 — of its own byte form, not a
+                    // zoned digit run) through the OWNER's internal profile (qualified, never bare).
                     : $"string {tmp} = {RuntimeApi.NumFormatImage(EmitText.UnscaledAtScale(a.NumericLiteral!, a.Formal.Pic!.Scale), qualProfile)};");
             // The PICTURE-less carriers (object reference, data pointer, program pointer) cross VERBATIM: they
             // have no picture, no scale and no character image, so the crossing is a reference/handle copy and
@@ -1229,9 +1362,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // …through the ONE store (NumericRenderer.StoreExpr — kb/Work PB84): an SDIDI intermediate (a
             // STANDARD-DECIMAL expression, a native integer power) takes the CobolDec overload; this arm used to
             // spell the native store only, a Roslyn CS1503 on `INVOKE … BY CONTENT A ** 2`.
-            else if (a.ContentExpr is { } cex
-                     && Num.AsNum(new BoundComputedOperand(cex), ReceiverContext.None) is var ex)
-                w.Line($"{a.Formal.ElementType} {tmp} = ({a.Formal.ElementType}){NumericRenderer.StoreExpr(ex, a.Formal.Pic!.Scale, qualProfile, raiseOnSizeError: ecState.SizeTruncationChecking)};");
+            else if (a.ContentExpr is not null && MethodNumericContent(a, qualProfile) is { } exprValue)
+                w.Line($"{a.Formal.ElementType} {tmp} = ({a.Formal.ElementType}){exprValue};");
             else if (a.ByContent && a.Source is { } cp
                      && Num.AsNum(new BoundFieldOperand(cp), ReceiverContext.None) is var cx
                      && (cp.Item.Pic?.Digits != a.Formal.Pic!.Digits || cp.Item.Pic?.Scale != a.Formal.Pic.Scale
@@ -1262,9 +1394,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // ⛔ THROUGH THE SAME StoreExpr AS THE TWO IDENTIFIER/EXPRESSION ARMS (kb/Work PB640): it was
                 // the bare RuntimeApi.NumStore, so the unsigned-wide lane (StoreU) and the raising kernel the
                 // other two arms now select were both missing HERE — the third arm of one rule.
-                NumX lit = UnscaledLit(a.NumericLiteral!);
-                w.Line($"{a.Formal.ElementType} {tmp} = ({a.Formal.ElementType})"
-                    + $"{NumericRenderer.StoreExpr(lit, a.Formal.Pic!.Scale, qualProfile, raiseOnSizeError: ecState.SizeTruncationChecking)};");
+                w.Line($"{a.Formal.ElementType} {tmp} = ({a.Formal.ElementType}){MethodNumericContent(a, qualProfile)};");
             }
             if (fwdTest is not null)
             {
@@ -1389,6 +1519,21 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// Self/Super/Factory + UNIVERSAL dispatches all pick up; NEW needs none (the generated ctor runs no
     /// user statements, D4). Gated on <c>EcState.Active</c>, which spans class units.</summary>
     private void EmitInvokePickup(IActivatingStatement site) => U.Call.EmitPropagationPickup(site);
+
+    /// <summary>The VALUE a literal-2 or arithmetic-expression-1 argument stores into a fixed-point numeric method formal
+    /// (kb/Work PB1064): §14.2.3 GR9 fills the formal's record by "a COMPUTE statement without the ROUNDED phrase", so
+    /// it is the ONE numeric store (<see cref="NumericRenderer.StoreExpr"/> — PB84's SDIDI overloads, PB640's raising
+    /// kernel) into the formal's scale through the OWNER's profile, and the literal is the exact scaled integer of both
+    /// notations (PB263). A native formal casts it to its element type; an image-carried one formats it to its storage
+    /// image. Null when the argument is neither.</summary>
+    private string? MethodNumericContent(BoundInvokeArg a, string qualProfile)
+    {
+        NumX? value = a.ContentExpr is { } cex ? Num.AsNum(new BoundComputedOperand(cex), ReceiverContext.None)
+            : a.NumericLiteral is { } lit ? UnscaledLit(lit)
+            : null;
+        return value is not { } v ? null
+            : NumericRenderer.StoreExpr(v, a.Formal.Pic!.Scale, qualProfile, raiseOnSizeError: ecState.SizeTruncationChecking);
+    }
 
     private string OoStringReadOf(Place sp, BoundInvokeArg a, string qualProfile)
     {

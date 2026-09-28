@@ -1190,9 +1190,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
             retPlace = rp;
         }
-        // GR2a/§8.3.2.2: the selector is a user-defined word — normalize the LITERAL at bind time (the
-        // identifier-2 value normalizes at runtime via CobolObject.NormalizeMethodName).
-        return new BoundInvokeUniversal(receiver, methodLiteral?.TrimEnd().ToUpperInvariant(), methodSource,
+        // GR2a/§8.3.2.2: the selector is a user-defined word — normalize the LITERAL at bind time through the SAME
+        // mapping the identifier-2 value takes at run time and every case label is built from (OoMethodSymbol.DispatchKey).
+        return new BoundInvokeUniversal(receiver, methodLiteral is null ? null : CobolNet.Runtime.CobolObject.NormalizeMethodName(methodLiteral), methodSource,
             args, retPlace, retDesc);
     }
 

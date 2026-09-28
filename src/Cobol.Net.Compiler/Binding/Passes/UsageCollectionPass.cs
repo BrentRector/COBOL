@@ -47,11 +47,27 @@ internal static class UsageCollectionPass
         {
             Collect(cls.Data, [cls.Bound], OoFormalGroups(cls.Symbol.Methods));
             Collect(cls.FactoryData, [cls.FactoryBound], OoFormalGroups(cls.Symbol.FactoryMethods));
+            // ⛔ An ELEMENTARY method formal is a character channel's far end — the method twin of Collect's
+            // LinkageFormals arm (kb/Work PB1064; PB992 built the program arm). Every method formal is BY REFERENCE
+            // (the METHOD-side BY VALUE phrase is refused, DataBinder.Oo), so §14.2.3 GR8's "as if the formal parameter
+            // occupies the same storage area as the argument" holds for each: the characters an argument carries into
+            // it, or a group MOVE leaves in it for the argument, may be ones no numeric VALUE represents.
+            AddFormalChannels(cls.Data, cls.Symbol.Methods);
+            AddFormalChannels(cls.FactoryData, cls.Symbol.FactoryMethods);
         }
         foreach (var unit in ctx.Units) Collect(unit.Data, [unit.Bound]);
 
         static IEnumerable<DataItem> OoFormalGroups(IEnumerable<OoMethodSymbol> methods) =>
             methods.SelectMany(m => m.Binding!.Formals.Select(f => f.Item).Concat(m.Binding!.Returning is { } r ? [r] : Array.Empty<DataItem>()));
+
+        static void AddFormalChannels(DataBinder data, IEnumerable<OoMethodSymbol> methods)
+        {
+            // A PROPERTY-clause accessor (§13.18.42) has no LINKAGE formal of its own — its "formal" IS the object's
+            // property subject, a direct field body (OoEmitter.EmitMethod's PropertySubject arm), never a boundary.
+            foreach (var m in methods.Where(m => m.PropertySubject is null))
+                foreach (var f in m.Binding!.Formals)
+                    if (!f.Item.IsGroup) data.CharacterChannelItems.Add(f.Item);
+        }
     }
 
     /// <summary>Fill <paramref name="data"/>'s <see cref="DataBinder.WholeGroupReferenced"/> from the whole-group
@@ -183,16 +199,27 @@ internal static class UsageCollectionPass
             return false;
         }
         public bool Visit(BoundCancel n) { foreach (var (_, dn) in n.Targets) Op(dn); return false; }
+        // ⛔ THE INVOKE TWINS OF BoundCallProgram's CHANNELS (kb/Work PB1064 — the PB992 mechanism's missing arm): a
+        // method is an activated runtime element like a program, so §14.2.3 GR8's shared storage makes a BY REFERENCE
+        // argument's characters the formal's, and §14.9.23.4 GR8 places the RETURNING content into identifier-4.
         public bool Visit(BoundInvoke n)
         {
             P(n.Receiver); P(n.Returning);
-            if (n.Args is { } args) foreach (var a in args) P(a.Source);
+            if (n.Args is { } args)
+                foreach (var a in args)
+                {
+                    P(a.Source);
+                    if (a.WriteBack) Channel(a.Source);   // BY REFERENCE identifier (BY CONTENT copies — no channel)
+                }
+            Channel(n.Returning);
             return false;
         }
         public bool Visit(BoundInvokeUniversal n)
         {
             P(n.Receiver); P(n.MethodSource); P(n.Returning);
-            foreach (var a in n.Args) P(a.Source);
+            // §14.9.23.3 SR6: every argument through a universal receiver is BY REFERENCE.
+            foreach (var a in n.Args) { P(a.Source); Channel(a.Source); }
+            Channel(n.Returning);
             return false;
         }
         public bool Visit(BoundGoToDepending n) { Op(n.Selector); return false; }

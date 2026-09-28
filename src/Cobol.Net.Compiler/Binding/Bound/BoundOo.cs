@@ -129,8 +129,9 @@ public sealed record BoundInvokeArg(
 /// <summary>A bound UNIVERSAL-receiver INVOKE (deep-dive D10/D-U5): there is NO formal roster at compile
 /// time, so the bound facts differ in KIND from <see cref="BoundInvoke"/> — the method selector is a
 /// bind-normalized literal OR a data-item Place read at runtime (§14.9.23.3 SR7), and every argument
-/// carries its caller-side CONFORMANCE DESCRIPTOR (OoClassTable.ConformanceDescriptor — checked by the
-/// callee's generated switch at runtime per §14.9.23.4 GR7c, mismatch → EC-OO-UNIVERSAL). Every argument
+/// carries its caller-side CONFORMANCE DESCRIPTOR (OoConformance.ConformanceDescriptor — compared by the
+/// callee's generated switch at runtime: an argument mismatch means no §9.3.6 match, so EC-OO-METHOD; a bound
+/// method's RETURNING mismatch is §14.9.23.4 GR7c's EC-OO-UNIVERSAL — kb/Work PB1500). Every argument
 /// is BY REFERENCE (SR6 — implicit), so every argument writes back through its box.</summary>
 public sealed record BoundInvokeUniversal(
     Place Receiver, string? MethodLiteral, Place? MethodSource,

@@ -368,7 +368,7 @@ internal sealed class ProgramEmitter
                 // mask is zero there — store-only). A CALLed activation gets it from the activation BOUNDARY,
                 // which calls DescribeExternals() before Call() (§14.9.4.4 GR3e precedes GR3g — kb/Work PB233).
                 w.Line("void ICobolProgram.Activate() { DescribeExternals(); __Activate(); }");
-                _oo.EmitExternalDescribes(data, unit.Path, w);
+                _oo.EmitExternalDescribes(data, unit.Path, "public void DescribeExternals()", $"{data.ExternalCheckMask}", w);
             }
             else
                 w.Line("void ICobolProgram.Activate() => __Activate();");
@@ -511,6 +511,19 @@ internal sealed class ProgramEmitter
             // the SAME composed initializers the field declarations carry (the ONE ValueInitializer channel —
             // §13.18.63 VALUE semantics; the OoEmitMethod LS-local pattern, program-class edition). An LS
             // table's INDEXED BY cell resets with its table. Emitted only when an LS section EXISTS.
+            // ⛔ A CELL-BACKED root has no root field — a BASED item's storage is its implicit data-address pointer and an
+            // ADDRESS-OF-taken record's is its StorageCell — so the field loop below skips it, and those channels are
+            // re-seeded by the ONE per-activation seed the method arm uses (OoEmitter.ActivationPointerSeeds; kb/Work
+            // PB1132): §14.6.2.3.2 action 5 "The address of each based item is set to null", and the record's cell starts
+            // at its initial image. The activation's non-formal LINKAGE roots join it: §8.6.5 ends a linkage-section
+            // based association "at the end of the execution of the runtime element", so the next activation starts
+            // with none — NULL, the method arm's answer (a formal's storage is the activator's, adopted below, and the
+            // RETURNING item keeps the last-used state every other program RETURNING item keeps).
+            if (!unit.Initial && !unit.Recursive)
+                foreach (var (member, _, fresh) in _oo.ActivationPointerSeeds(unit.Data, unit.Data.LocalStorageRoots
+                             .Concat(unit.Data.LinkageRoots.Where(r => !ReferenceEquals(r, unit.Data.LinkageReturning)
+                                 && !unit.Data.LinkageFormals.Any(f => ReferenceEquals(f.Item, r))))))
+                    w.Line($"{member} = {fresh};   // per-activation data-pointer storage (ISO §14.6.2.3.2 action 5; §8.6.4; §8.6.5)");
             if (!unit.Initial && !unit.Recursive && unit.Data.LocalStorageRoots.Count > 0)
             {
                 var fields = new DataEmitter(Current.Ctx);

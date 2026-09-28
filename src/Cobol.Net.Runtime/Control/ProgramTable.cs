@@ -174,13 +174,12 @@ public sealed class ProgramTable
     public void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,
         string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false)
     {
-        // The EC-EXTERNAL enablement handshake, half 1 (§14.8.4.1 / §14.9.4.4 GR3e; kb/Work PB133): the
-        // site's pending mask is consumed by THIS activation attempt — success or failure — so a NOT-FOUND
-        // or RECURSIVE-CALL throw cannot leak it into the NEXT statement's activator latch. (The old code
-        // zeroed it only after a successful resolution.)
+        // The ACTIVATING element's EC-EXTERNAL half (§14.8.4.1 / §14.9.4.4 GR3e): the CALL statement guard's
+        // checking flags, read HERE, before this activation's own checking scope opens below. The flags are a
+        // saved-and-restored scope, so a failed attempt (NOT-FOUND, RECURSIVE-CALL) leaks nothing into the next
+        // statement — the invariant the retired pending-mask register had to enforce by hand (kb/Work PB1138).
         var excState = _owner.Exceptions;
-        int pendingExternalMask = excState.ExternalCheckMask;
-        excState.ExternalCheckMask = 0;
+        int activatingExternalMask = excState.ExternalActivatingMask;
         var n = ResolveVisible(name, callerPath, wantFunction: notFoundEc == "EC-FUNCTION-NOT-FOUND")
             ?? throw new CobolCallException(
                 notFoundEc == "EC-FUNCTION-NOT-FOUND"
@@ -233,13 +232,11 @@ public sealed class ProgramTable
         n.Active++;
         n.CalledSinceCancel = true;   // §14.9.5 GR7 — called in this run unit (cleared again by CANCEL)
         _owner.Modules.Push(n.Name, OutermostName(n), n.ParentPath is not null);   // §15.65.4 r7/r8 frame
-        // The EC-EXTERNAL enablement handshake (§14.8.4.1 / §14.9.4.4 GR3e): latch the CALL site's pending mask
-        // as the activated element's ACTIVATOR mask (the "activating runtime element" half of the pair), then
-        // zero the pending mask so a site-emit-free nested CALL correctly reads "checking not enabled". Both
-        // restore/re-zero on return — the mask never leaks across statements or activations.
+        // Latch the activating half (§14.8.4.1 / §14.9.4.4 GR3e) as the activated element's ACTIVATOR mask for its
+        // ExternalStore.Describe gate; restored on return, so a nested activation never sees its activator's.
         var exc = excState;
         int savedActivator = exc.ActivatorExternalMask;
-        exc.ActivatorExternalMask = pendingExternalMask;   // half 2 — captured before resolution (GR3e)
+        exc.ActivatorExternalMask = activatingExternalMask;   // captured before resolution (GR3e)
         // Per-activation scope for the Format-3 exception-checking PERFORM interceptor (ISO §14.9.28.4): snapshot
         // the frame-stack depth so a called program's raise is NOT intercepted by the caller's active WHEN frame
         // (the cross-activation GR1 "in range" reading is a documented STAGED item). TrimPerformTo on return also
@@ -284,7 +281,7 @@ public sealed class ProgramTable
         finally
         {
             n.Active--; _owner.Modules.Pop();
-            exc.ActivatorExternalMask = savedActivator; exc.ExternalCheckMask = 0;
+            exc.ActivatorExternalMask = savedActivator;
             exc.TrimPerformTo(savedPerformDepth);
             exc.NonfatalDispatcher = savedNonfatalDispatcher;
             exc.RestoreChecking(savedChecking);
@@ -401,10 +398,6 @@ public sealed class ProgramTable
         // NULL — which is why the old message's appeal to it was misplaced.) Table 13: Fatal.
         if (target.IsNull)
         {
-            // The EC-EXTERNAL handshake's half 1 applies to EVERY activation attempt, failed ones included
-            // (CallProgram's own rule): a NULL throw that skipped it would leak this site's pending mask into the
-            // NEXT statement's activator latch.
-            _owner.Exceptions.ExternalCheckMask = 0;
             throw new CobolCallException(
                 "CALL through a NULL program-pointer: the pointer contains the predefined address NULL "
                 + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-PTR-NULL)", "EC-PROGRAM-PTR-NULL");
@@ -426,7 +419,6 @@ public sealed class ProgramTable
     {
         if (target.IsNull)
         {
-            _owner.Exceptions.ExternalCheckMask = 0;   // half 1 of the EC-EXTERNAL handshake — see CallPointer
             throw new CobolCallException(
                 "function-identifier through a NULL function-pointer: the pointer contains the predefined address "
                 + "NULL, so no function is activated (ISO §8.4.3.2.4 GR6c — EC-FUNCTION-PTR-NULL)",

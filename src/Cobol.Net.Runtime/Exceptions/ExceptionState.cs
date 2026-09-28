@@ -1292,18 +1292,45 @@ public sealed class ExceptionEngine
         FatalIfEnabled(DataIncompatibleChecking, "EC-DATA-INCOMPATIBLE", detail);
     }
 
-    // ── EC-EXTERNAL enablement masks (§14.8.4.1 — the both-elements pairing) ──────────────────────────────────
+    // ── EC-EXTERNAL enablement (§14.8.4.1 — the both-elements pairing) ──────────────────────────────────────────
 
-    /// <summary>The pending CALL-site EC-EXTERNAL enablement mask (<see cref="ExternalChecks"/> bits): set by an
-    /// emitted CALL statement whose site has any EC-EXTERNAL-* checking enabled (§7.3.25 TURN state at the
-    /// statement — the ACTIVATING half of §14.8.4.1), consumed and zeroed by the activation boundary
-    /// (<c>ProgramTable.CallProgram</c>), which moves it into <see cref="ActivatorExternalMask"/> for the
-    /// activated element's registrations. Zero-scaffolding: an EC-free call site emits nothing and the boundary
-    /// re-zeroes after every activation, so the mask never leaks across statements.</summary>
-    public int ExternalCheckMask { get; set; }
+    /// <summary>EC-EXTERNAL-FORMAT-CONFLICT checking in the ACTIVATING statement — see
+    /// <see cref="CheckingFlags.ExternalFormatConflict"/>.</summary>
+    public bool ExternalFormatConflictChecking
+    {
+        get => _checking.ExternalFormatConflict;
+        set => _checking.ExternalFormatConflict = value;
+    }
 
-    /// <summary>The current activation's ACTIVATING-element EC-EXTERNAL mask (§14.8.4.1's other half): set by the
-    /// activation boundary from the captured <see cref="ExternalCheckMask"/>, saved/restored around nested
+    /// <summary>EC-EXTERNAL-DATA-MISMATCH checking in the ACTIVATING statement — see
+    /// <see cref="CheckingFlags.ExternalDataMismatch"/>.</summary>
+    public bool ExternalDataMismatchChecking
+    {
+        get => _checking.ExternalDataMismatch;
+        set => _checking.ExternalDataMismatch = value;
+    }
+
+    /// <summary>EC-EXTERNAL-FILE-MISMATCH checking in the ACTIVATING statement — see
+    /// <see cref="CheckingFlags.ExternalFileMismatch"/>.</summary>
+    public bool ExternalFileMismatchChecking
+    {
+        get => _checking.ExternalFileMismatch;
+        set => _checking.ExternalFileMismatch = value;
+    }
+
+    /// <summary>⛔ THE ACTIVATING ELEMENT'S EC-EXTERNAL HALF (§14.8.4.1), as <see cref="ExternalChecks"/> bits — read
+    /// from the statement guard's checking flags by EVERY activation boundary (a CALL or function activation in
+    /// <c>ProgramTable.CallProgram</c>, a method activation in <c>ExternalStore.DescribeAtMethodActivation</c>)
+    /// BEFORE the activated element's own checking scope opens. The flags are a saved-and-restored SCOPE (kb/Work
+    /// PB891), so the half can never leak into a later statement — which is why this replaced the pending
+    /// CALL-site mask register that every failure path had to remember to zero (kb/Work PB1138).</summary>
+    public int ExternalActivatingMask =>
+        (ExternalFormatConflictChecking ? (int)ExternalChecks.FormatConflict : 0)
+        | (ExternalDataMismatchChecking ? (int)ExternalChecks.DataMismatch : 0)
+        | (ExternalFileMismatchChecking ? (int)ExternalChecks.FileMismatch : 0);
+
+    /// <summary>The current activation's ACTIVATING-element EC-EXTERNAL mask (§14.8.4.1's other half): latched by
+    /// the activation boundary from <see cref="ExternalActivatingMask"/>, saved/restored around nested
     /// activations. The activated element's <c>ExternalStore.Describe</c> gate is this mask ANDed with its own
     /// before-Environment-division mask. Zero at the main-program activation (no activating element).</summary>
     public int ActivatorExternalMask { get; set; }
@@ -1960,12 +1987,29 @@ public static class ExceptionState
     /// <inheritdoc cref="ExceptionEngine.FloatOverflowError"/>
     public static void FloatOverflowError(string detail) => E.FloatOverflowError(detail);
 
-    /// <inheritdoc cref="ExceptionEngine.ExternalCheckMask"/>
-    public static int ExternalCheckMask
+    /// <inheritdoc cref="ExceptionEngine.ExternalFormatConflictChecking"/>
+    public static bool ExternalFormatConflictChecking
     {
-        get => E.ExternalCheckMask;
-        set => E.ExternalCheckMask = value;
+        get => E.ExternalFormatConflictChecking;
+        set => E.ExternalFormatConflictChecking = value;
     }
+
+    /// <inheritdoc cref="ExceptionEngine.ExternalDataMismatchChecking"/>
+    public static bool ExternalDataMismatchChecking
+    {
+        get => E.ExternalDataMismatchChecking;
+        set => E.ExternalDataMismatchChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ExternalFileMismatchChecking"/>
+    public static bool ExternalFileMismatchChecking
+    {
+        get => E.ExternalFileMismatchChecking;
+        set => E.ExternalFileMismatchChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ExternalActivatingMask"/>
+    public static int ExternalActivatingMask => E.ExternalActivatingMask;
 
     /// <inheritdoc cref="ExceptionEngine.ActivatorExternalMask"/>
     public static int ActivatorExternalMask

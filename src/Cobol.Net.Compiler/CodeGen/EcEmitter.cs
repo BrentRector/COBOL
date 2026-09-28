@@ -415,6 +415,14 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         // elements, and this flag is how the ACTIVATOR's half reaches the callee's __CobolInvoke, which runs
         // synchronously inside the guard. The method's half is a compile-time literal (OoEmitter.OoUnivStop).
         ("EC-OO-UNIVERSAL", "OoUniversalChecking"),             // §14.9.23.4 GR7c — universal-INVOKE conformance
+        // The EC-EXTERNAL trio (kb/Work PB1138): FLAGGED for the same reason as EC-OO-UNIVERSAL — the flag IS
+        // §14.8.4.1's ACTIVATING-element half, read by every activation boundary before the activated element's
+        // checking scope opens (ProgramTable.CallProgram for a CALL or function activation; the method prologue's
+        // ExternalStore.DescribeAtMethodActivation for an INVOKE, §14.9.23.4 GR7 d)). The catch arm takes the
+        // method arm's CobolFatalException; a CALL's failure is a CobolCallException its own partition handles.
+        ("EC-EXTERNAL-FORMAT-CONFLICT", "ExternalFormatConflictChecking"),   // §14.8.4.3
+        ("EC-EXTERNAL-DATA-MISMATCH", "ExternalDataMismatchChecking"),       // §14.8.4.2
+        ("EC-EXTERNAL-FILE-MISMATCH", "ExternalFileMismatchChecking"),       // §14.8.4.4
         ("EC-FLOW-SEARCH", "FlowSearchChecking"),               // §14.9.39.4 GR31 — capacity SET during a SEARCH
         ("EC-FLOW-USE", "FlowUseChecking"),                     // §14.9.49.4 GR2 — a USE procedure re-entered while active (kb/Work PB368)
         // §14.9.18.4 GR6 — a GOBACK executed within the RANGE of one of THIS program's GLOBAL declaratives
@@ -464,6 +472,16 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         ("EC-SIZE-EXPONENTIATION", null),                       // §14.7.5 case 1 — the exponentiation rules violated
         ("EC-SIZE-TRUNCATION", null),                           // §14.7.4.3 r7 / §11.9.11.2 r3d — a PROHIBITED-inexact intermediate
     ];
+
+    /// <summary>The FLAGGED gates whose flag is an ACTIVATING-ELEMENT HALF, not a raise-site switch: "enabled in both the
+    /// activating and activated" (§14.8.4.1 for the EC-EXTERNAL trio, §14.9.23.4 GR7 c) for EC-OO-UNIVERSAL), so the
+    /// flag is read by an ACTIVATION BOUNDARY — <c>ExceptionEngine.ExternalActivatingMask</c> at the CALL boundary and
+    /// a method prologue, a generated <c>__CobolInvoke</c> — and never by an <c>ExceptionEngine …Error</c> helper.
+    /// Derived from <see cref="Binding.Procedure.EcBinder.ExternalNames"/> so a fourth checkable EC-EXTERNAL name
+    /// joins by construction; <c>ExceptionRaiseHelperDriftTests</c> exempts exactly these from the helper census and
+    /// asserts the EC-EXTERNAL flags' boundary reader instead (kb/Work PB1138).</summary>
+    internal static readonly IReadOnlySet<string> ActivatingHalfGates =
+        new HashSet<string>([.. Binding.Procedure.EcBinder.ExternalNames, "EC-OO-UNIVERSAL"], StringComparer.Ordinal);
 
     /// <summary>The inner EC dispatch of a checked statement: the fatal ambient gates enabled at it (with USE F3
     /// dispatch on the raise) or, when none is enabled, a plain statement emission. Wrapped by

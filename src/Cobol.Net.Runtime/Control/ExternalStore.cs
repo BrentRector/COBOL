@@ -22,4 +22,26 @@ public static class ExternalStore
     public static void Describe(string describer, string name, ExternalDescriptor desc, int selfMask)
         => RunUnit.Current.External.Describe(describer, name, desc,
             (ExternalChecks)(Exceptions.ExceptionState.ActivatorExternalMask & selfMask));
+
+    /// <summary>⛔ THE METHOD ACTIVATION BOUNDARY's external-item check (ISO §14.9.23.4 GR7 d); kb/Work PB1138) — the INVOKE
+    /// twin of <c>ProgramTable.CallProgram</c>'s GR3e step, run by a generated method's prologue BEFORE control is
+    /// transferred to it (GR7 e). A method has no external items of its own (§13.4.3 SR1 keeps a FILE SECTION out of a
+    /// method, and a method WORKING-STORAGE EXTERNAL item is refused), so <paramref name="describe"/> registers the
+    /// external items of the factory or instance definition that contains it — the ones its statements reference.
+    /// §14.8.4.1's pair: the ACTIVATING half is the INVOKE statement guard's checking flags
+    /// (<c>ExceptionEngine.ExternalActivatingMask</c>), latched as the activator mask for the registrations, and the
+    /// activated method's half is <paramref name="selfMask"/>, folded at bind time before the method's Environment
+    /// division. A detected violation is "the method invocation is not successful" and GR7 g)'s exception processing:
+    /// the condition leaves as a <see cref="Exceptions.CobolFatalException"/> carrying its Table 13 name, which the
+    /// INVOKE statement's guard selects on exactly as it does EC-OO-METHOD and EC-OO-UNIVERSAL (an INVOKE has no
+    /// ON EXCEPTION phrase, so the CALL boundary's <see cref="CobolCallException"/> partition does not apply).</summary>
+    public static void DescribeAtMethodActivation(Action<int> describe, int selfMask)
+    {
+        var exc = RunUnit.Current.Exceptions;
+        int saved = exc.ActivatorExternalMask;
+        exc.ActivatorExternalMask = exc.ExternalActivatingMask;
+        try { describe(selfMask); }
+        catch (CobolCallException x) { throw new Exceptions.CobolFatalException(x.EcName, x.Message); }
+        finally { exc.ActivatorExternalMask = saved; }
+    }
 }

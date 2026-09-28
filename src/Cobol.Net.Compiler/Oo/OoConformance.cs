@@ -275,9 +275,10 @@ public static class OoConformance
 
     /// <summary>The RUNTIME projection of the strict-conformance rule (D-U3 — the universal-dispatch
     /// wave): ONE descriptor string per description, computed at BIND time on both sides of a universal
-    /// crossing; the generated <c>__CobolInvoke</c> switch compares for STRING EQUALITY and raises
-    /// EC-OO-UNIVERSAL on mismatch (ISO §14.9.23.4 GR7c — §14.8.2/§14.8.3 conformance through a universal
-    /// receiver is checked at runtime, §9.3.8.2.1 NOTE). Intended invariant: descriptor equality ⇔
+    /// crossing; the generated <c>__CobolInvoke</c> switch compares for STRING EQUALITY — an argument mismatch
+    /// means the method does not MATCH (§9.3.6 match rule 3, so resolution continues and ends in EC-OO-METHOD), a
+    /// RETURNING mismatch within one match class is §14.9.23.4 GR7 c)'s EC-OO-UNIVERSAL (kb/Work PB1500; conformance
+    /// through a universal receiver is checked at runtime, §9.3.8.2.1 NOTE). Intended invariant: descriptor equality ⇔
     /// <see cref="DescriptionMismatch"/> == null over every carried category — derived NEXT TO the one mismatch
     /// function so the two projections cannot drift (feedback_one_mechanism_per_job). ⚠ No unit test enumerates
     /// the categories (this comment used to say one did; none has ever existed): each axis is held only by the
@@ -318,11 +319,10 @@ public static class OoConformance
             PicCategory.Alphanumeric =>
                 // An ANY LENGTH item's length is runtime-varying (ISO §13.18.2 GR1) — encoded '*' so the pair
                 // semantics track DescriptionMismatch (ANY LENGTH must MATCH between the sides; when both carry
-                // it the length compare is void). Through UNIVERSAL dispatch §14.9.23.4 GR7c bans an
-                // ANY LENGTH formal outright: a concrete argument descriptor never equals 'S:*', so the crossing
-                // raises EC-OO-UNIVERSAL (loud) — the one permissive corner (an ANY LENGTH argument meeting an
-                // ANY LENGTH formal matches instead of raising) is a documented strictness delta, same family
-                // as the by-ref group-prefix delta above.
+                // it the length compare is void). Through UNIVERSAL dispatch a concrete argument never MATCHES an
+                // ANY LENGTH formal (§9.3.6 match rule 3 e) names the ANY LENGTH clause), so it resolves no method;
+                // an ANY LENGTH argument that does match one is §14.9.23.4 GR7 c)'s ban on the bound method, which
+                // OoEmitter.EmitCobolInvokeCase raises as EC-OO-UNIVERSAL (kb/Work PB1500).
                 // A picture that is not all X — alphabetic, edited, or mixed A/9/X — carries its PICTURE-clause
                 // identity (kb/Work PB1166: PIC A(5) is not PIC X(5)); a plain X(n) item keeps the bare "S:n:J"
                 // key the alphanumeric-group image pairs with. The one consequence is a documented LOUD delta: a
@@ -342,6 +342,21 @@ public static class OoConformance
             _ => "T:!",
         };
     }
+
+    /// <summary>The descriptor prefixes of the reference classes a RETURNING pair must share to MATCH (§9.3.6 match rules
+    /// 6 and 7, kb/Work PB1500): an object-reference or pointer returning item is received by a SET, which admits only
+    /// its own class and pointer category (§14.8.3.3 rule 1; §14.8.2.3.2's class-pointer paragraph), and every other
+    /// description is received by a MOVE, which neither of those can take part in. Object references are one class here
+    /// because which object classes a SET admits is a run-time question through a universal receiver
+    /// (<c>CobolObject.NarrowUniversal</c>).</summary>
+    public static readonly IReadOnlyList<string> ReturningReferenceClasses = ["O:", "P:D:", "P:P:"];
+
+    /// <summary>The §9.3.6 rule 6/7 match class of a RETURNING <paramref name="descriptor"/>: the one
+    /// <see cref="ReturningReferenceClasses"/> prefix it carries, or "" for the MOVE class. Two RETURNING items of one
+    /// class can meet in a SET or MOVE and so MATCH; whether their descriptions are the SAME is then §14.8.3.3's
+    /// conformance question, which §14.9.23.4 GR7 c) asks of the bound method.</summary>
+    public static string ReturningMatchClass(string descriptor) =>
+        ReturningReferenceClasses.FirstOrDefault(c => descriptor.StartsWith(c, StringComparison.Ordinal)) ?? "";
 
     /// <summary>The conformance descriptor of an ADDRESS-IDENTIFIER argument crossing a universal dispatch (kb/Work
     /// PB1137): §8.4.3.11.4 GR1 — "Data-address-identifier creates a unique data item of class pointer and category

@@ -4,8 +4,12 @@
       *> BOTH the activated method and the activating runtime element, the method invocation is not successful,
       *> and execution continues as specified in General rule 7g."
       *>
-      *> The argument is PIC 9(6) against a PIC 9(4) formal — a descriptor mismatch the compile-time check
-      *> cannot see, because the receiver is universal. Checking is enabled ONCE at the top of the compilation
+      *> The returning item is PIC 9(6) against the method's PIC 9(4) — a MOVE could deliver it, so §9.3.6
+      *> match rule 7 BINDS the method; the same-PICTURE rule of §14.8.3.3 is then the violation that
+      *> §14.9.23.4 GR7c detects at run time because the receiver is universal (kb/Work PB1500: an ARGUMENT
+      *> whose description differs is not
+      *> a violation of a bound method - it resolves no method, §9.3.6 6), EC-OO-METHOD - see
+      *> 2002/w67q_pb1500_universal_no_match). Checking is enabled ONCE at the top of the compilation
       *> group, so it covers both the activating program and the method: enabled in BOTH, so the condition IS
       *> set, the declarative selects, and RESUME AT NEXT STATEMENT keeps the run unit alive.
       *>
@@ -35,7 +39,7 @@
        MAIN-P.
            INVOKE CUNIV "NEW" RETURNING C.
            SET O TO C.
-           INVOKE O "TAKE" USING W.
+           INVOKE O "TAKE" RETURNING W.
            DISPLAY "AFTER".
            STOP RUN.
        END PROGRAM V55BOTH.
@@ -53,7 +57,7 @@
        DATA DIVISION.
        LINKAGE SECTION.
        01 LK PIC 9(4).
-       PROCEDURE DIVISION USING LK.
+       PROCEDURE DIVISION RETURNING LK.
        MAIN-P.
            DISPLAY "IN-TAKE".
        END METHOD TAKE.

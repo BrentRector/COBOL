@@ -851,8 +851,10 @@ public sealed class ExceptionConditionConformanceTests
              // only the ACTIVATOR has it enabled — the condition is therefore NOT set, the declarative must not
              // select, and NOTHING may be attributed to EC-OO-UNIVERSAL.
              //
-             // The nonconforming crossing still cannot proceed (PIC 9(6) argument into a PIC 9(4) formal, which
-             // only a universal receiver can defer to run time), so it stops as a CobolImplementorFatalException
+             // The nonconforming crossing still cannot proceed (a PIC 9(4) returning item delivered into a PIC 9(6)
+             // one: §9.3.6 match rule 7 BINDS the method — a MOVE could deliver it — and §14.8.3.3's same-PICTURE
+             // rule is then GR7c's, which only a universal receiver defers to run time; kb/Work PB1500 — an ARGUMENT
+             // mismatch resolves no method at all and is EC-OO-METHOD), so it stops as a CobolImplementorFatalException
              // — §14.6.13.1.1 NOTE 3 latitude, carrying NO exception-name. The assertion that the message does
              // NOT contain the EC name is the whole point of the test: attributing it would be the bug.
              // Its twin, where checking IS enabled in both, is the corpus golden ec_oo_universal_both.
@@ -883,7 +885,7 @@ public sealed class ExceptionConditionConformanceTests
             MAIN-P.
                 INVOKE CUNIVN "NEW" RETURNING C.
                 SET O TO C.
-                INVOKE O "TAKE" USING W.
+                INVOKE O "TAKE" RETURNING W.
                 DISPLAY "AFTER".
                 STOP RUN.
             END PROGRAM V55NOTB.
@@ -902,7 +904,7 @@ public sealed class ExceptionConditionConformanceTests
             DATA DIVISION.
             LINKAGE SECTION.
             01 LK PIC 9(4).
-            PROCEDURE DIVISION USING LK.
+            PROCEDURE DIVISION RETURNING LK.
             MAIN-P.
                 DISPLAY "IN-TAKE".
             END METHOD TAKE.

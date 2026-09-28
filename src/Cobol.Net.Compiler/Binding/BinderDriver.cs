@@ -97,8 +97,27 @@ internal sealed class BinderDriver
                 // that takes down the whole bind, which is exactly what it did to oo_property/oo_property_ref.
                 // Its enclosing CLASS-ID line is the right query point: the accessor is part of that definition
                 // and has no source position of its own to disagree with.
+            {
                 m.OoUniversalCheckingHere = turn.Enabled(
                     "EC-OO-UNIVERSAL", null, (m.Ctx?.Start ?? cls.Ctx.Start).Line);
+                // §14.8.4.1's ACTIVATED-method half (kb/Work PB1138): the EC-EXTERNAL conditions enabled "before the
+                // Environment division" of the method — its first division after METHOD-ID, the fold a program unit
+                // takes at its own (BindUnitData). A synthesized PROPERTY accessor has no divisions; its CLASS-ID line
+                // stands in, exactly as for the EC-OO-UNIVERSAL half above.
+                int divLine = m.Ctx is { } mc
+                    ? (mc.environmentDivision()?.Start ?? mc.dataDivision()?.Start ?? mc.procedureDivision()?.Start ?? mc.Stop).Line
+                    : cls.Ctx.Start.Line;
+                m.ExternalCheckMaskHere = ExternalMaskAt(turn, divLine);
+            }
+        // The group-level Describe gate reaches the class halves too (kb/Work PB1138): a method activation registers
+        // its factory's or object's external descriptions (§14.9.23.4 GR7 d)), so the same zero-scaffolding switch the
+        // program units carry decides whether a class half emits them at all.
+        bool externalDescribe = Procedure.EcBinder.ExternalNames.Any(turn.AnyEnabledFor);
+        foreach (var cls in classes)
+        {
+            cls.Data.ExternalDescribe = externalDescribe;
+            cls.FactoryData.ExternalDescribe = externalDescribe;
+        }
 
         OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
         var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
@@ -219,6 +238,17 @@ internal sealed class BinderDriver
     /// each naming the SAME corresponding external data item. Cross-compilation sameness (separately-built assemblies)
     /// is the runtime <c>ExternalTable</c> EC-EXTERNAL-DATA-MISMATCH check's face. (In-group LINAGE consistency,
     /// §13.4.5.4 GR2(c), is a separate longstanding requirement — not this 2023-gated check.)</summary>
+    /// <summary>⛔ THE ONE FOLD of an ACTIVATED element's §14.8.4.1 half — "the EC-EXTERNAL exception conditions to be
+    /// checked shall be enabled in both the activating and activated runtime elements, which for activated runtime
+    /// elements shall be before the Environment division": the <see cref="Runtime.ExternalChecks"/> bits of the
+    /// EC-EXTERNAL conditions the group's TurnState has enabled at <paramref name="divLine"/>, the element's first
+    /// division header after its identification. A program unit (<see cref="BindUnitData"/>) and a method (the
+    /// §14.9.23.4 GR7 d) fold above; kb/Work PB1138) both take it, so the two cannot answer the rule differently.</summary>
+    private static int ExternalMaskAt(TurnState turn, int divLine) =>
+        (turn.Enabled("EC-EXTERNAL-FORMAT-CONFLICT", null, divLine) ? (int)Runtime.ExternalChecks.FormatConflict : 0)
+        | (turn.Enabled("EC-EXTERNAL-DATA-MISMATCH", null, divLine) ? (int)Runtime.ExternalChecks.DataMismatch : 0)
+        | (turn.Enabled("EC-EXTERNAL-FILE-MISMATCH", null, divLine) ? (int)Runtime.ExternalChecks.FileMismatch : 0);
+
     private static void CheckExternalFileConsistency(IReadOnlyList<BoundUnit> units, EditionContext edition)
     {
         var byExternalName = units.SelectMany(u => u.Data.Files)
@@ -541,11 +571,7 @@ internal sealed class BinderDriver
             ?? unit.Ctx.dataDivision()?.Start.Line
             ?? unit.Ctx.procedureDivision()?.Start.Line
             ?? int.MaxValue;
-        int extMask = 0;
-        if (session.Turn.Enabled("EC-EXTERNAL-FORMAT-CONFLICT", null, divLine)) extMask |= (int)Runtime.ExternalChecks.FormatConflict;
-        if (session.Turn.Enabled("EC-EXTERNAL-DATA-MISMATCH", null, divLine)) extMask |= (int)Runtime.ExternalChecks.DataMismatch;
-        if (session.Turn.Enabled("EC-EXTERNAL-FILE-MISMATCH", null, divLine)) extMask |= (int)Runtime.ExternalChecks.FileMismatch;
-        data.ExternalCheckMask = extMask;
+        data.ExternalCheckMask = ExternalMaskAt(session.Turn, divLine);
         // §14.9.4.4 GR3d's ACTIVATED half (kb/Work PB133 wave C2b) — the same before-Environment-division
         // fold as the EC-EXTERNAL mask above.
         data.ArgMismatchChecking = session.Turn.Enabled("EC-PROGRAM-ARG-MISMATCH", null, divLine);
