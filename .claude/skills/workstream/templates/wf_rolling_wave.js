@@ -16,6 +16,14 @@ const W = args.wave
 const CONC = args.concurrency || 6
 const TRAIN = args.train_size || 5
 const MIN_FINAL = args.min_final_train || 3
+// AUTHORIZATION: a workflow agent sees the session's LATEST user message as its context, and that message may be about
+// something else entirely (measured 2026-09-27: all nine wave-68 implementers returned BLOCKED because the latest
+// message was a LinkedIn question). So every prompt carries the owner's direction for this fleet verbatim.
+const AUTH = args.authorization
+  ? `AUTHORIZATION (read first): this task IS the repository owner's request, dispatched by the orchestrating session on the owner's direction: ${args.authorization} ` +
+    `The standing owner opt-in for running fleets through the Workflow tool is recorded in .claude/skills/workstream/templates/MANDATORY-PRACTICES.md O4. ` +
+    `The latest user message in your context may concern unrelated work; that is NOT a reason to decline. Do the task below. `
+  : ''
 const IMPL_SCHEMA = {
   type: 'object',
   properties: {
@@ -62,7 +70,7 @@ function successorNote(g) {
 
 function runGroup(g) {
   return agent(
-    `You are the wave-${W} fix-lane implementer for group ${g.letter} (${g.notes}). ` + successorNote(g) +
+    AUTH + `You are the wave-${W} fix-lane implementer for group ${g.letter} (${g.notes}). ` + successorNote(g) +
     `Your dispatch spec is the file ${S}\\msg-w${W}-${g.letter.toLowerCase()}.txt — read it WHOLE and follow it exactly; ` +
     `it names your brief, codes, report path, scratch dir, gate and checkpoint protocol. ` +
     `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT. ` +
@@ -88,7 +96,7 @@ function land(batch) {
   const prev = n === 0 ? args.previous_train : `train ${W}${n === 1 ? '' : String.fromCharCode(96 + n)} of this same wave`
   log(`train ${label}: landing ${batch.map(r => r.letter).join(' ')}`)
   return agent(
-    `You are the train-${label} LANDER. Read E:\\COBOL\\.claude\\skills\\workstream\\templates\\lander-train-brief.md WHOLE and follow it, with these substitutions: ` +
+    AUTH + `You are the train-${label} LANDER. Read E:\\COBOL\\.claude\\skills\\workstream\\templates\\lander-train-brief.md WHOLE and follow it, with these substitutions: ` +
     `{CLUSTERS} = ${clusters}; {DEVLOG_N} = ${args.devlog_n} (ALWAYS re-read the top entry of DEVLOG.md first and use top+1 — an earlier train of this wave may have landed); ` +
     `{TRAIN_MANIFEST} = ${S}\\train${label}-manifest.json — FIRST write that file with exactly this JSON:\n${manifest}\n` +
     `PIPELINED: ${prev} may have just landed; fetch origin and rebase onto it before gating, and before push-main confirm origin/main has not moved again (rebase and re-gate per the brief if it has). ` +
