@@ -144,11 +144,24 @@ async function worker() {
       if (running === 0) { g = queue.shift() }                    // a predecessor never ran: start the successor fresh
       else { await new Promise(res => { const prev = wake; wake = () => { prev(); res() } }); continue }
     }
+    // ⛔ An agent that dies on an API error REJECTS rather than returning null. Before this try/finally, that rejection
+    // escaped the worker with `running` still counted and no wake-up sent, so a same-file successor parked on `wake`
+    // waited forever: wave 68 (2026-09-27) sat "running" for 16 h after its group U agent died. A rejection is now a
+    // NO-RESULT like a null return, and the count and the wake-up happen whatever the outcome.
     running++
-    const r = await runGroup(g)
-    running--
-    onResult(g, r)
-    const w = wake; wake = () => {}; w()
+    let r
+    try {
+      r = await runGroup(g)
+    } catch (e) {
+      r = { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT', error: String(e && e.message || e) }
+    } finally {
+      running--
+    }
+    try {
+      onResult(g, r)
+    } finally {
+      const w = wake; wake = () => {}; w()
+    }
   }
 }
 
