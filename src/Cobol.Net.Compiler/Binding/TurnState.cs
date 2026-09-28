@@ -148,6 +148,18 @@ public sealed class TurnState
     public bool Enabled(string level3, string? file, int statementLine) =>
         Fold(level3, file, statementLine) is { On: true };
 
+    /// <summary>⛔ THE ACTIVATED ELEMENT'S HALF OF AN "ENABLED IN BOTH" GATE — asked at its PROCEDURE DIVISION HEADER
+    /// (kb/Work PB1381). The parameter-conformance conditions §14.9.4.4 GR3 d) (EC-PROGRAM-ARG-MISMATCH) and
+    /// §14.9.23.4 GR7 c) (EC-OO-UNIVERSAL) are set "if checking for it is enabled in both the activated program
+    /// [method] and activating runtime element", and a TURN reaches the activated side through its header: §7.3.25.4
+    /// GR6 / GR8 enable or disable checking "for the procedure division statements and procedure division headers
+    /// that follow in the compilation group". So the fold point is the header's line — NOT the Environment division
+    /// line §14.8.4.1 fixes for the EC-EXTERNAL conditions alone (a TURN between the DATA DIVISION and the header
+    /// used to be ignored), and NOT the METHOD-ID line. <paramref name="header"/> is the element's
+    /// <c>procedureDivision</c>; <paramref name="absentLine"/> answers for an element that has none.</summary>
+    public bool EnabledAtHeader(string level3, Antlr4.Runtime.ParserRuleContext? header, int absentLine) =>
+        Enabled(level3, null, header?.Start.Line ?? absentLine);
+
     /// <summary>Did the event that ENABLED <paramref name="level3"/> at this statement carry WITH LOCATION
     /// (§7.3.25.4 GR7 — the EXCEPTION-LOCATION/-STATEMENT information capture)?</summary>
     public bool WithLocation(string level3, string? file, int statementLine) =>

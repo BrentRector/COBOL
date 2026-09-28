@@ -69,7 +69,7 @@ public sealed partial class DataBinder
                     + "is recognized but not yet implemented (kb/Work PB164; ISO §13.18.5 / §14.9.3)");
                 continue;
             }
-            string addr = NamingConvention.AddressCarrierName(root.CobolName ?? root.CsName);
+            string addr = NamingConvention.AddressCarrierName(root.CsName);
             cls.BasedPointerField = addr;
             _ptrBasedBridges.Add((cls.BackingCsName, cls.BackingCellCsName, addr, cls.Width));
         }
@@ -132,7 +132,7 @@ public sealed partial class DataBinder
     {
         var scope = method is null ? Model.Scope.Program : new Model.Scope(method.DataScope);
         if (quals.Count == 0)
-            return Symbols.TryResolve(name, scope, out var candidates) && candidates.Count > 0 ? candidates[0] : null;
+            return Symbols.TryResolveUnqualified(name, scope, out var candidates) && candidates.Count > 0 ? candidates[0] : null;
         var saved = ActiveMethodScope;
         ActiveMethodScope = method?.DataScope;
         try { return new ReferenceResolver(this).FindItem(name, quals); }

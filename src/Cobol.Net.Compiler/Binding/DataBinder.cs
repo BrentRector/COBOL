@@ -7225,7 +7225,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             foreach (var cand in candidates)
                 if (QualifierChainMatches(cand, quals) && !survivors.Contains(cand))
                     survivors.Add(cand);
-        return new NameCandidates<DataItem>(survivors);
+        // §8.4.6.2.1 3) AFTER qualification (rule 1 applies "the normal rules for qualification" over the whole
+        // set first): the survivors of the nearest declaring source element (kb/Work PB1047 / PB1243).
+        return new NameCandidates<DataItem>(Symbols.NearestDeclaring(survivors, static i => i));
     }
 
     /// <summary>The §8.4.2.2 candidate set of <paramref name="name"/> WITHIN one record — every entry of

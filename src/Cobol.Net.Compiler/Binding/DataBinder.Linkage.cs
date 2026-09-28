@@ -197,21 +197,90 @@ public sealed partial class DataBinder
                 yield return new CallBridge(idx.Cell, outer + idx.Cell, CallBridgeKind.Index, null);
     }
 
+    /// <summary>⛔ THE NESTING DISTANCE OF EVERY INHERITED GLOBAL DECLARATION (kb/Work PB1047 / PB1243) — the tier
+    /// ISO §8.4.6.2.1 3) selects on. Absent = 0: the item is this source element's own. n = the item is a global
+    /// name of the n-th containing program. Keyed by identity, because the SAME container item is inherited into
+    /// every contained program at a different distance.</summary>
+    private readonly Dictionary<DataItem, int> _inheritedGlobalDepth = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>How many containment levels out <paramref name="item"/> is declared: 0 for an item this source
+    /// element declares (or any item of a unit that inherits nothing), n for a GLOBAL item of its n-th container.</summary>
+    internal int DeclaringDepth(DataItem item) =>
+        _inheritedGlobalDepth.Count != 0 && _inheritedGlobalDepth.TryGetValue(item, out int depth) ? depth : 0;
+
+    /// <summary>True when this unit inherits any container's global data — the only case in which a candidate set
+    /// can span tiers, so the nearest-tier filter is free for every other unit.</summary>
+    internal bool InheritsGlobalData => _inheritedGlobalDepth.Count != 0;
+
+    /// <summary>Make one container GLOBAL root's whole subtree visible here, <paramref name="depth"/> containment
+    /// levels out (ISO §13.18.27.4 GR2 — "may reference that name without describing it again"): every data-name
+    /// (§8.4.6.2.2: "All data-names and screen-names subordinate to a global name are global names"), every
+    /// condition-name associated with one ("All condition-names associated with a global name are global names"),
+    /// every level-66 RENAMES of the record, and — by §8.4.6.2.3, "the scope of an index-name is identical to that
+    /// of the data-name that names the table" — every index-name (kb/Work PB919). Each item carries its depth, so
+    /// a nearer declaration of the same spelling wins by §8.4.6.2.1 3) at REFERENCE time
+    /// (<see cref="Model.SymbolTable.NearestDeclaring{T}"/>), not by being left out here. Called nearest container
+    /// first, after this unit's own data division has bound, so each name list stays in nearest-first order. The
+    /// cells stay the container's: this unit reaches them through the GLOBAL bridge
+    /// (<see cref="GlobalBridgesOf"/>) and never emits them.</summary>
+    internal void InheritGlobalSubtree(DataItem item, int depth)
+    {
+        _inheritedGlobalDepth[item] = depth;
+        if (item.CobolName is { } name)
+        {
+            if (!ByName.TryGetValue(name, out var list)) ByName[name] = list = [];
+            list.Add(item);
+        }
+        foreach (var cond in item.Own88s)
+        {
+            if (!Conditions.TryGetValue(cond.Name, out var conds)) Conditions[cond.Name] = conds = [];
+            conds.Add(cond);
+        }
+        foreach (var idx in item.Indexes) IndexNames.Inherit(idx, depth);
+        foreach (var child in item.Children) InheritGlobalSubtree(child, depth);
+        foreach (var ren in item.Renames66) InheritGlobalSubtree(ren, depth);
+    }
+
+    /// <summary>⛔ EVERY C# MEMBER NAME THIS UNIT'S GLOBAL ROOT <paramref name="g"/> OCCUPIES IN A CONTAINED UNIT'S
+    /// CLASS — the bridge members <see cref="GlobalBridgesOf"/> emits AND the root's own C# name (with its REDEFINES
+    /// canonical's), because that name is the STEM every derived member is spelled from: a REDEFINES class's
+    /// <c>_redef_</c> backing, its <c>_scell_</c> cell, a BASED class's <c>__addr_</c> pointer
+    /// (<see cref="Model.RedefinesClass.BackingCsName"/>). A contained unit uniques its local roots against these, so
+    /// a local stem never equals an inherited one and no derived member can re-spell a bridge (those prefixes cannot
+    /// begin a COBOL word). Reserving only the bridge members left a local <c>01 G</c> + <c>01 K REDEFINES G</c> the
+    /// stem <c>G</c>, and its class backing re-spelled the container's <c>_redef_G</c> bridge (CS0102; wave 69 Z,
+    /// found by the train-68b review).</summary>
+    internal IEnumerable<string> InheritedMemberNamesOf(DataItem g)
+    {
+        foreach (var bridge in GlobalBridgesOf(g, "")) yield return bridge.Field;
+        yield return g.CsName;
+        if (g.Class is { } cls) yield return cls.Canonical.CsName;
+    }
+
+    /// <summary>Reserve the C# member names a container's GLOBAL roots occupy in this unit's class
+    /// (<see cref="InheritedMemberNamesOf"/>), BEFORE this unit's data division binds, so a local root spelled like
+    /// a container's global root takes a distinct field name (<c>G_2</c>) — and every member derived from it a
+    /// distinct name — instead of colliding with a bridge (kb/Work PB1047 — every global root is bridged now,
+    /// including one a local declaration hides by §8.4.6.2.1 3) a), because its subordinate names remain
+    /// visible).</summary>
+    internal void ReserveInheritedMemberNames(IEnumerable<string> names) => _rootNames.UnionWith(names);
+
     /// <summary>The EXTERNAL records' synthesized run-unit backings (ISO §13.18.22; emitted as
     /// <c>ref</c>-properties over <c>ExternalStore</c>). (READ-ONLY view — P6 Step 5.)</summary>
     public IReadOnlyList<CallExternalBacking> CallExternalBackings => _callExternalBackings;
     private readonly List<CallExternalBacking> _callExternalBackings = [];
+
+    /// <summary>§14.9.4.4 GR3 d)'s ACTIVATED half (kb/Work PB133 wave C2b): this unit's EC-PROGRAM-ARG-MISMATCH
+    /// enablement at its PROCEDURE DIVISION header (§7.3.25.4 GR6 / GR8; <c>TurnState.EnabledAtHeader</c>, kb/Work
+    /// PB1381) — registered with the program table so a dynamic CALL's count check can apply the enabled-in-both
+    /// gate.</summary>
+    public bool ArgMismatchChecking { get; set; }
 
     /// <summary>This unit's before-Environment-division EC-EXTERNAL enablement mask (ISO §14.8.4.1 — the
     /// ACTIVATED-element half of the both-elements rule; <c>ExternalChecks</c> bits). Computed by
     /// <c>BinderDriver.BindUnitData</c> from the group TurnState folded at the unit's first
     /// post-Identification division header; emitted as the selfMask of the activation-entry
     /// <c>ExternalStore.Describe</c> registrations.</summary>
-    /// <summary>§14.9.4.4 GR3d's ACTIVATED half (kb/Work PB133 wave C2b): this unit's EC-PROGRAM-ARG-MISMATCH
-    /// enablement at its PD entry — registered with the program table so a dynamic CALL's count check can
-    /// apply the enabled-in-both gate.</summary>
-    public bool ArgMismatchChecking { get; set; }
-
     public int ExternalCheckMask { get; set; }
 
     /// <summary>True when any enabling <c>&gt;&gt;TURN</c> event anywhere in the compilation group covers an

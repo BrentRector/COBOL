@@ -94,8 +94,7 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
                 $"FUNCTION {name.ToUpperInvariant()} is declared in the REPOSITORY paragraph but the compilation "
                 + "group contains neither a FUNCTION-ID definition nor a FUNCTION-ID … IS PROTOTYPE for it — "
                 + "declare a function prototype (ISO §11.5 / §12.3.8.3 SR10) so its signature is available for a "
-                + "separately-compiled target, or provide the definition in this group (function references from "
-                + "class units remain a separate follow-up)");
+                + "separately-compiled target, or provide the definition in this group");
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name}");
         }
         return UdfActivate(name, fn, argCtxs, pointer: null);

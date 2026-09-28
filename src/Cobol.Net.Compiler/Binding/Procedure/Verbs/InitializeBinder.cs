@@ -198,8 +198,10 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         // does not resolve to an element Place (it is guarded loud), so detect it by name and expand the element's
         // stores under a RUN-TIME loop 1‥Capacity (RefReceiving within bounds does not grow). The stores are the
         // INITIALIZE statement's own (category defaults / REPLACING / VALUE-phrase) — NOT the OCCURS grow-seed.
+        // The candidates are the nearest declaring source element's (§8.4.6.2.1 3)): a contained program's own
+        // item hides a container's GLOBAL dynamic table of the same name (SymbolTable.TryResolveUnqualified).
         if (dref.dataReferenceSuffix().Length == 0
-            && ctx.Symbols.TryResolve(dref.cobolWord()?.GetText() ?? dref.GetText(), ctx.ActiveScope, out var dyns)
+            && ctx.Symbols.TryResolveUnqualified(dref.cobolWord()?.GetText() ?? dref.GetText(), ctx.ActiveScope, out var dyns)
             && dyns.FirstOrDefault(i => i.IsDynamicTable) is { } dtbl && ctx.Refs.TablePath(dtbl) is { } dtp)
         {
             string v = $"__ini{_initializeLoopVar++}";

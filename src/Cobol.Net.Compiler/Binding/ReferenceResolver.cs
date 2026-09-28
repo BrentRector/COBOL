@@ -106,7 +106,7 @@ public sealed class ReferenceResolver(DataBinder data)
         DataItem? recvItem = null;
         if (cls is null)
         {
-            recvItem = data.Symbols.TryResolve(recv, data.ActiveScope, out var recvItems) ? recvItems[0] : null;
+            recvItem = data.Symbols.TryResolveUnqualified(recv, data.ActiveScope, out var recvItems) ? recvItems[0] : null;
             if (recvItem?.Pic is not { Category: PicCategory.ObjectReference } rp) return null;
             var rd = rp.ObjectRef ?? ObjectRefDescriptor.Universal;
             if (rd.IsUniversal)
@@ -1495,13 +1495,17 @@ public sealed class ReferenceResolver(DataBinder data)
     /// methods' names are invisible) lives in <c>TryResolve</c>, no longer duplicated here.</summary>
     private DataItem? ResolveUnqualified(string name)
     {
-        if (!data.Symbols.TryResolve(name, data.ActiveScope, out var list)) return null;
+        // §8.4.6.2.1 3) — a contained program's own declaration hides a container's global one, and a nearer
+        // container's hides a farther one (kb/Work PB1047 / PB1243): the unit map holds every tier, and the ONE
+        // nearest-tier rule narrows it before ambiguity is asked.
+        if (!data.Symbols.TryResolveUnqualified(name, data.ActiveScope, out var list)) return null;
         if (list.Count > 1)
         {
             // §8.4.2.2.1 (kb/Work R33): "Qualification of a user-defined name is required unless … 1) No
-            // other name has the identical spelling." TryResolve returns ONE namespace tier — the §8.4.6.2.1
-            // rule-3a method overlay OR the unit map, never a mix — so a plural list is genuine same-tier
-            // ambiguity, not legal scope shadowing. Measured before enforcing: ZERO of 762 corpus+NIST
+            // other name has the identical spelling." TryResolve returns ONE namespace — the §8.4.6.2.1
+            // rule-3a method overlay OR the unit map, never a mix — and NearestDeclaring has narrowed the unit map
+            // to one source element, so a plural list is genuine same-element ambiguity, not legal scope
+            // shadowing. Measured before enforcing: ZERO of 762 corpus+NIST
             // programs hit this (the note's blast-radius sweep). Strict: null → ReportUnidentified's
             // N-declarations arm (dead until now — R30 built it, this makes it reachable).
             // --permissive: the traditional first-declared match, warned (the DA6/R29 disposition shape).

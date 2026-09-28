@@ -230,10 +230,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// or null — the ONE §8.4.3.2.3 SR4 test ("Function-pointer-name-1 shall be defined as a function-pointer data
     /// item") both function-identifier forms ask (with and without the word FUNCTION; kb/Work PB847). A name that
     /// resolves to anything else, or to more than one function-pointer, is not function-pointer-name-1 and takes
-    /// the ordinary paths — whose diagnostics already name those cases.</summary>
+    /// the ordinary paths — whose diagnostics already name those cases. The candidates are the NEAREST declaring
+    /// source element's (§8.4.6.2.1 3); <c>SymbolTable.TryResolveUnqualified</c>), so a contained program's own
+    /// FUNCTION-POINTER hides a container's GLOBAL one of the same name instead of counting it as a rival.</summary>
     private Place? FunctionPointerNamed(string name)
     {
-        if (!ctx.Symbols.TryResolve(name, ctx.ActiveScope, out var candidates)) return null;
+        if (!ctx.Symbols.TryResolveUnqualified(name, ctx.ActiveScope, out var candidates)) return null;
         DataItem? only = null;
         foreach (var c in candidates)
         {

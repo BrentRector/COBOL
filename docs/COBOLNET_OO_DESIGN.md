@@ -664,10 +664,13 @@ GOBACK → `BoundMethodReturn` (D8), EXIT METHOD → same in a method / 0827 out
 identifier bind through the same OO machinery (D-U7, EC-OO).
 
 ### Emitter seam
-OO binding lives in `CSharpEmitter.Oo.cs`: `OoClassUnit` (the ClassUnit counterpart of the program CallUnit), the two-phase bind
-(`OoBindClassData` for EVERY class — the synthetic-unit DataBinder + `OoBindMethodData` per method between
-`BindDeclarations`/`BindResolve`, so signatures exist before ANY body binds regardless of source order —
-then `OoBindClassBody`; class FILE SECTION staged 0899). OO emission lives in `CodeGen/Verbs/OoEmitter.cs`: `OoEmitter.EmitClassUnit` — the SAME per-unit
+OO binding lives in `Oo/OoDriver.cs` (a `BinderDriver` collaborator): `OoClassUnit` (the ClassUnit counterpart of the
+program unit), the two-phase bind (`BindClassData` for EVERY class — the synthetic-unit DataBinder + `OoBindMethodData`
+per method between `BindDeclarations`/`BindResolve`, so signatures exist before ANY body binds regardless of source
+order — then `BindClassBody`). `BinderDriver.Bind` runs `BindClassBody` only after EVERY program unit's DATA division
+has bound and the group's REPOSITORY tables (`BindSession.Repository`) exist, and hands each class binder the class
+REPOSITORY's user functions and program prototypes (`BinderDriver.UserFunctionsOf` / `ProgramPrototypesOf`) — §12.3.4
+GR1 applies a class definition's configuration section to its factory, object and methods (kb/Work PB1100). OO emission lives in `CodeGen/Verbs/OoEmitter.cs`: `OoEmitter.EmitClassUnit` — the SAME per-unit
 emitter-state switch as the program-class emitter renders `public class FOO : CobolObject` with FieldEmitter
 INSTANCE fields (VALUE → field initializers; the implicit public ctor IS New's creation step — D4) and
 method-WS STATIC fields (D3).

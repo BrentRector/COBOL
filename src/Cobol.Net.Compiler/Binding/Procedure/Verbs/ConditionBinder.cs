@@ -1290,6 +1290,9 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         var matches = qualifiers.Count == 0
             ? list
             : list.Where(c => ctx.Data.ConditionQualifierChainMatches(c, qualifiers)).ToList();
+        // §8.4.6.2.1 3) after qualification — a condition-name of this source element hides a container's global
+        // one, a nearer container's a farther one (kb/Work PB1047); placed by its conditional variable.
+        matches = ctx.Symbols.NearestDeclaring(matches, static c => c.Parent);
         // The NEGATIVE side of §13.16.3 SR23 (kb/Work PB567): no condition-name of this spelling is subordinate to
         // the written qualifiers, so this reference names no condition-name. It is not reported HERE because the
         // same word may still be a DATA-name those qualifiers do reach; the caller falls through to the data

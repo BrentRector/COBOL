@@ -43,6 +43,19 @@ internal sealed class BindSession
     /// 86,401 (GR4). Every unit's <see cref="DataBinder.LeapSecond"/> carries it to the intrinsic renderer.</summary>
     public bool LeapSecond { get; init; }
 
+    /// <summary>The compilation group's REPOSITORY resolution sources (<see cref="GroupRepository"/>), built ONCE by
+    /// <c>BinderDriver.Bind</c> after every DATA division has bound and before the FIRST procedure body binds —
+    /// a CLASS's method bodies as well as a program unit's (kb/Work PB1100). Reading it earlier is a driver-order
+    /// defect, so the getter throws rather than answering from an empty table.</summary>
+    public GroupRepository Repository
+    {
+        get => _repository ?? throw new InvalidOperationException(
+            "BindSession.Repository was read before BinderDriver.Bind built it (the tables need every unit's DATA "
+            + "division bound, and every procedure body — class and program — reads them)");
+        set => _repository = value;
+    }
+    private GroupRepository? _repository;
+
     private int _uidBand;
 
     /// <summary>Take the next disjoint 100k uid band (one per DataBinder, so nested-class struct/profile names
@@ -54,3 +67,11 @@ internal sealed class BindSession
         return band;
     }
 }
+
+/// <summary>The two whole-group tables a REPOSITORY specifier resolves against (ISO §12.3.8.4): the user-defined
+/// functions by user-function-name (GR11 a) / b) — definitions over same-name prototypes) and the program
+/// definitions by EXTERNALIZED name (GR10 a) / b)). One pair per compilation group; each source element narrows
+/// it to what ITS specifiers name (<c>BinderDriver.UserFunctionsOf</c> / <c>ProgramPrototypesOf</c>).</summary>
+internal sealed record GroupRepository(
+    IReadOnlyDictionary<string, UserFunctionSignature> UserFunctions,
+    IReadOnlyDictionary<string, CalleeSignature> ProgramDefinitions);

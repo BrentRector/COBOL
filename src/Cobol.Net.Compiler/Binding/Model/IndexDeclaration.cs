@@ -57,8 +57,16 @@ public sealed class IndexNameRegistry
     /// may have a name local to source element B … a) If the name is declared in source element B, the item in
     /// source element B is the referenced item", else the nearest containing element that declares it (3 b). So the
     /// survivors at the NEAREST depth are the set; two there are still ambiguous.</summary>
-    public NameCandidates<IndexDeclaration> Candidates(string name, Func<IndexDeclaration, bool> qualifies)
+    public NameCandidates<IndexDeclaration> Candidates(string name, Func<IndexDeclaration, bool> qualifies) =>
+        Candidates(name, qualifies, out _);
+
+    /// <summary><see cref="Candidates(string, Func{IndexDeclaration, bool})"/>, also reporting the nesting distance of
+    /// the source element the survivors belong to (<see cref="int.MaxValue"/> when none survive) — what
+    /// <see cref="SymbolTable.IndexCandidates"/> weighs against a same-spelled DATA-name's (kb/Work PB1047).</summary>
+    public NameCandidates<IndexDeclaration> Candidates(string name, Func<IndexDeclaration, bool> qualifies,
+                                                       out int nearestDepth)
     {
+        nearestDepth = int.MaxValue;
         if (!_byName.TryGetValue(name, out var list)) return new([]);
         int nearest = int.MaxValue;
         foreach (var (d, depth) in list)
@@ -66,6 +74,7 @@ public sealed class IndexNameRegistry
         List<IndexDeclaration> hits = [];
         foreach (var (d, depth) in list)
             if (depth == nearest && qualifies(d)) hits.Add(d);
+        nearestDepth = nearest;
         return new(hits);
     }
 }

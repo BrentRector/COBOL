@@ -79,9 +79,13 @@ public static class NamingConvention
     public static string FormalParameterName(string cobolWord) =>
         FormalParameterPrefix + DataItem.Sanitize(cobolWord).ToUpperInvariant();
 
-    /// <summary>A BASED record's address-carrier field name.</summary>
-    public static string AddressCarrierName(string cobolWord) =>
-        AddressCarrierPrefix + DataItem.Sanitize(cobolWord).ToUpperInvariant();
+    /// <summary>A BASED record's address-carrier field name, spelled from the root's C# name — the unit-unique STEM
+    /// (<c>DataBinder.InheritedMemberNamesOf</c>), never its COBOL word: a contained program's own BASED <c>B</c>
+    /// and a container's GLOBAL BASED <c>B</c> (bridged into the same class) are one word but two stems (<c>B</c>,
+    /// <c>B_2</c>), and a word-keyed name made them one member (CS0102; wave 69 Z). A keyword stem's verbatim
+    /// <c>@</c> is dropped — the prefix already keeps the name off every keyword.</summary>
+    public static string AddressCarrierName(string rootCsName) =>
+        AddressCarrierPrefix + rootCsName.TrimStart('@');
 
     /// <summary>A method-scope file's instance connector-key field name.</summary>
     public static string InstanceFileKeyName(string fileName) => InstanceFileKeyPrefix + DataItem.Sanitize(fileName);

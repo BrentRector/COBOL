@@ -43,18 +43,20 @@ public sealed record OoMethodSymbol(
     public OoClassSymbol Owner { get; set; } = null!;
 
     /// <summary>The METHOD's half of §14.9.23.4 GR7c's "enabled in BOTH" gate: whether EC-OO-UNIVERSAL checking
-    /// is enabled where THIS method is defined. Folded at BIND time from the compilation group's line-keyed
-    /// TurnState at the METHOD-ID line and baked by <c>OoEmitter</c> as a compile-time literal.
+    /// is enabled for THIS method's procedure division header. Folded at BIND time from the compilation group's
+    /// line-keyed TurnState (<c>TurnState.EnabledAtHeader</c>) and baked by <c>OoEmitter</c> as a compile-time
+    /// literal.
     ///
     /// <para>⛔ It is folded HERE and not in the emitter because CODEGEN OWNS NO TurnState — every
     /// <c>&gt;&gt;TURN</c> query in the compiler lives in the binder and codegen consumes only the results.
     /// Reading TurnState from an emitter would be a second mechanism for a job the binder already does.</para>
     ///
-    /// <para>The METHOD-ID line is the query point because the raise sites are in the <c>__CobolInvoke</c>
-    /// PROLOGUE — the arity, per-argument descriptor and RETURNING checks — which run before any statement of
-    /// the method body, so the state on ENTRY is what "enabled in the activated method" means. A class- or
-    /// program-level directive earlier in the file is picked up for free, since the fold walks every event with
-    /// a lower line.</para></summary>
+    /// <para>The HEADER line is the query point: the raise sites are in the <c>__CobolInvoke</c> PROLOGUE — the
+    /// arity, per-argument descriptor and RETURNING checks, i.e. the conformance of the header's USING / RETURNING
+    /// — which run before any statement of the method body, and ISO §7.3.25.4 GR6 / GR8 scope a TURN to the
+    /// "procedure division headers that follow". A TURN between METHOD-ID and the header therefore governs it
+    /// (kb/Work PB1381; the METHOD-ID line used to be asked). A class- or program-level directive earlier in the
+    /// file is picked up for free, since the fold walks every event with a lower line.</para></summary>
     public bool OoUniversalCheckingHere { get; set; }
 
     /// <summary>The METHOD's half of §14.8.4.1's "enabled in both the activating and activated runtime elements":

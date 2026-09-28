@@ -79,8 +79,10 @@ public sealed partial class DataBinder
     /// in <see cref="_inheritedConstants"/> until a local declaration shadows them.</summary>
     private readonly Dictionary<string, ConstantDef> _constants = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The names in <see cref="_constants"/> that came from a container, not from this unit's own entries.</summary>
-    private readonly HashSet<string> _inheritedConstants = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The names in <see cref="_constants"/> that came from a container, not from this unit's own entries,
+    /// each with the containment distance of the container that declared it (1 = the direct container) — the tier
+    /// <see cref="DropShadowedConstants"/> weighs against a same-spelled data-name's (kb/Work PB1047).</summary>
+    private readonly Dictionary<string, int> _inheritedConstants = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>ISO §13.18.27.4 GR1–GR2 for constant-names (kb/Work PB1009): "A constant-name, data-name, file-name,
     /// report-name, or screen-name described using a GLOBAL clause is a global name", and "A statement in a program
@@ -90,24 +92,30 @@ public sealed partial class DataBinder
     /// GR1 substitution model). The caller passes EVERY container, nearest first, and the first definition of a
     /// name wins — "directly or indirectly", with the nearest global declaration taking precedence. A local declaration of
     /// the same name shadows (§8.4.6): a local constant entry replaces the inherited one
-    /// (<see cref="BindConstantEntry"/>), and a local data-name removes it (<see cref="DropShadowedConstants"/>).</summary>
-    internal void InheritGlobalConstants(DataBinder container)
+    /// (<see cref="BindConstantEntry"/>), and a data-name declared NEARER removes it (<see cref="DropShadowedConstants"/>).
+    /// <paramref name="depth"/> is the container's containment distance (1 = the direct container).</summary>
+    internal void InheritGlobalConstants(DataBinder container, int depth)
     {
         foreach (var (name, def) in container._constants)
             if (def.IsGlobal && _constants.TryAdd(name, def))
-                _inheritedConstants.Add(name);
+                _inheritedConstants[name] = depth;
     }
 
-    /// <summary>After this unit's DATA DIVISION is bound: an inherited GLOBAL constant whose name this unit declares
-    /// as a data item is SHADOWED by it (§8.4.6 — the nearest declaration of a name is the one referenced), so it
-    /// leaves the table before any procedure reference can substitute it (kb/Work PB1009).</summary>
+    /// <summary>Once this unit's DATA DIVISION is bound AND every container's global data is inherited
+    /// (<see cref="InheritGlobalSubtree"/>): an inherited GLOBAL constant is SHADOWED by a data-name of the same
+    /// spelling declared in a NEARER source element — this unit's own, or a nearer container's global one — by ISO
+    /// §8.4.6.2.1 3) ("a) If the name is declared in source element B, the item in source element B is the referenced
+    /// item. b) … 1. The item in source element A if the name is declared in source element A"), so it leaves the
+    /// table before any procedure reference can substitute it (kb/Work PB1009; the nearer-container half kb/Work
+    /// PB1047 — an outer program's constant used to beat the middle program's global data-name).</summary>
     internal void DropShadowedConstants()
     {
-        foreach (string name in _inheritedConstants.Where(ByName.ContainsKey).ToList())
-        {
-            _constants.Remove(name);
-            _inheritedConstants.Remove(name);
-        }
+        foreach (var (name, depth) in _inheritedConstants.ToList())
+            if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth))
+            {
+                _constants.Remove(name);
+                _inheritedConstants.Remove(name);
+            }
     }
 
     /// <summary>The defined constant named <paramref name="name"/>, or null (§13.10.4 GR1 lookup).</summary>
