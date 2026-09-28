@@ -1,0 +1,38 @@
+<Project>
+  <!--
+    ⛔ RECORDING BUILDS ONLY (kb/Work PB1683; docs/rearchitecture/DESIGN-test-build-ci.md §3.13). Imported by
+    MSBuild's CustomAfterMicrosoftCommonTargets hook, which scripts/spec/record_impact_map.py passes on the command
+    line of the build it runs in its OWN detached worktree:
+
+        dotnet build CobolSharp.sln -c Debug -p:CustomAfterMicrosoftCommonTargets=<repo>/tools/impact/ImpactRecording.targets
+
+    Nothing in the tree imports it, so no gated, battery or shipped build ever contains the probe. It adds:
+      * ImpactProbe.cs to every assembly the impact map covers (the greenfield compiler, runtime and front end, the
+        legacy oracle the differential harness still loads, and
+        the three test assemblies, whose harness code is as much a dependency of a test as the compiler is);
+      * ImpactTestFramework.cs plus [assembly: Xunit.TestFramework] naming it, to the three test assemblies.
+    tools/impact/ImpactInstrumenter then rewrites the built assemblies to call the probe.
+  -->
+  <PropertyGroup>
+    <_CobolImpactProbed Condition="'$(MSBuildProjectName)' == 'Cobol.Net.Compiler' or '$(MSBuildProjectName)' == 'Cobol.Net.Runtime' or '$(MSBuildProjectName)' == 'Cobol.Net.Frontend' or '$(MSBuildProjectName)' == 'Cobol.Net.Editions' or '$(MSBuildProjectName)' == 'Cobol.Net.Cli' or '$(MSBuildProjectName)' == 'CobolSharp.Compiler' or '$(MSBuildProjectName)' == 'CobolSharp.Runtime'">true</_CobolImpactProbed>
+    <_CobolImpactTests Condition="'$(MSBuildProjectName)' == 'Cobol.Net.Tests.Conformance' or '$(MSBuildProjectName)' == 'Cobol.Net.Tests.Unit' or '$(MSBuildProjectName)' == 'Cobol.Net.Tests.Characterization'">true</_CobolImpactTests>
+  </PropertyGroup>
+
+  <!-- Each assembly carries its OWN internal ImpactProbe; through InternalsVisibleTo a test assembly also sees the
+       compiler's and runtime's copies, and CS0436 says "using the local one", which is exactly what the probe needs. -->
+  <PropertyGroup Condition="'$(_CobolImpactProbed)' == 'true' or '$(_CobolImpactTests)' == 'true'">
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_CobolImpactProbed)' == 'true' or '$(_CobolImpactTests)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)ImpactProbe.cs" Link="_impact\ImpactProbe.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(_CobolImpactTests)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)ImpactTestFramework.cs" Link="_impact\ImpactTestFramework.cs" />
+    <AssemblyAttribute Include="Xunit.TestFrameworkAttribute">
+      <_Parameter1>CobolNet.Impact.ImpactTestFramework</_Parameter1>
+      <_Parameter2>$(AssemblyName)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

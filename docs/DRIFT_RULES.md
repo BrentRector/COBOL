@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-226 drift tests.
+227 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -111,6 +111,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [GroupStoreTargetDriftTests](../tests/Cobol.Net.Tests.Unit/GroupStoreTargetDriftTests.cs) | kb/Work PB1411 — EVERY GROUP-LEVEL STORE IS CALLED ON PlaceRenderer.GroupTarget, the one receiver that reaches an element of a dynamic-capacity table through RefReceiving. | `src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs` |
 | [HostFileProbeDriftTests](../tests/Cobol.Net.Tests.Unit/HostFileProbeDriftTests.cs) | ⛔ THE RUNTIME ASKS THE OPERATING ENVIRONMENT ABOUT A PHYSICAL FILE IN EXACTLY ONE PLACE — HostFile, in Cobol.Net.Runtime/IO/FileSupport.cs — AND THE OPEN CONTRACT ASKS EACH QUESTION ONCE, ABOVE THE ORGANIZATIONS. | `src/Cobol.Net.Runtime/IO` |
 | [ImagePredicateDriftTests](../tests/Cobol.Net.Tests.Unit/ImagePredicateDriftTests.cs) | The image predicate's VALUE pin (kb/Work PB164): HasImageByteForm answers true for exactly the ByteForm-pinned set and false for ByteForm-less usages, and the binary forms' image width is StorageWidth (the V59 ONE-WIDTH invariant). | — |
+| [ImpactedTestsDriftTests](../tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs) | ⛔ THE IMPACT-DERIVED GATE FILTER NEVER SILENTLY NARROWS (kb/Work PB1683): scripts/spec/impacted_tests.py answers a change it cannot attribute — a file the recorded map has never seen, a grammar or build input, a file no test executed, a missing or stale map — with the WHOLE-assembly filter, and the recorder covers every product assembly. | `scripts/spec/impacted_tests.py`, `tools/impact/ImpactRecording.targets`, `scripts/spec/record_impact_map.py`, `src`, `src/Cobol.Net.Compiler/Mapped.cs`, `src/Cobol.Net.Compiler/NeverRecorded.cs` |
 | [ImplementorNamesDriftTests](../tests/Cobol.Net.Tests.Unit/ImplementorNamesDriftTests.cs) | The implementor system-name table (ImplementorNames — ISO §12.3.7.3 SR8, Annex A.1 items 189/190/191; kb/Work PB862) held against the three things that could drift from it, and the SPECIAL-NAMES entry shape (kb/Work PB716) held from both sides. | `docs/CONFORMANCE.md` |
 | [ImplicitMoveConstructionDriftTests](../tests/Cobol.Net.Tests.Unit/ImplicitMoveConstructionDriftTests.cs) | ⛔ A BOUND NODE BUILT AFTER BINDING IS NEVER CHECKED BY A BIND PASS. | `src/Cobol.Net.Compiler/CodeGen/Verbs`, `src/Cobol.Net.Compiler/CodeGen`, `src/Cobol.Net.Compiler` |
 | [ImplicitStatementSeriesDriftTests](../tests/Cobol.Net.Tests.Unit/ImplicitStatementSeriesDriftTests.cs) | ⛔ THE PER-IMPLICIT-STATEMENT RESUMPTION BOUNDARY STAYS AUTOMATIC (kb/Work PB419, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs`, `specs/ISO_COBOL.md`, `src/Cobol.Net.Compiler/Binding/Bound`, `src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs` |

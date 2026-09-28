@@ -3130,6 +3130,15 @@ already-derivable coverage; none change the pipeline.
   zero tests, so its exit code is never evidence that the filtered tests ran); add `--allow-build` when the run
   itself is what builds the project.
   Comprehensive: `bash scripts/battery.sh [outdir]` (§0 Gates).
+- Implementer gate filter, DERIVED (kb/Work PB1683; `docs/rearchitecture/DESIGN-test-build-ci.md` §3.13):
+  `python scripts/spec/impacted_tests.py --base <cut point> --plus "<the tests you added>"` — its last stdout line
+  is every Conformance test whose RECORDED execution reaches a changed method (a declaration change widens to the
+  file and the files naming its types), plus `~Drift|~EditionGate`, for
+  `build-local.ps1 -Filter`; it prints the whole-assembly `FullyQualifiedName~.` (and says why) whenever it cannot
+  bound the change. The map it reads is recorded once per main commit: `python scripts/spec/record_impact_map.py
+  [--commit <sha>]` (a detached worktree, a probe-instrumented build, every test assembly once with the compile
+  cache off; the map lands in `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree).
+  `impacted_tests.py --self-test` proves each conservative arm fires. The LANDER is unchanged (whole assemblies).
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` · legacy suite:
   `dotnet test tests/CobolSharp.Tests.Integration --filter FullyQualifiedName~ConformanceTests` ·

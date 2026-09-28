@@ -52,9 +52,14 @@ silent-failure-hunter.md and comment-analyzer.md (+ type-design-analyzer.md if y
 
 ⛔ SIBLING SWEEP (CLAUDE.md rule 4): every bug is a pattern. Which ARM of the dispatch did you fix, and where is the other?
 
-GATE: your own tests + `~Drift|~EditionGate` + the Unit assembly, ALWAYS with `-Priority BelowNormal`. A shared seam
-(any `.g4`, the MOVE emitter/classifier, the reference resolver, the EC emitter, code every verb shares) ADDS
-`~CorpusRunner|~Nist` — say so. ⛔ NEVER run the whole Conformance assembly — that is the lander's job.
+GATE — THE FILTER IS DERIVED, NEVER GUESSED (kb/Work PB1683): `python scripts/spec/impacted_tests.py --base
+$(git merge-base HEAD origin/main) --plus "DisplayName~<each golden you added>|FullyQualifiedName~<each new test class>"`
+prints it as its LAST stdout line — every Conformance test whose RECORDED execution reaches a file you changed, plus
+`~Drift|~EditionGate` — and pass it UNCHANGED to `build-local.ps1 -Filter`, ALWAYS with `-Priority BelowNormal` (Unit and
+Characterization run whole). Never trim it; never substitute name-guessed terms; a shared seam selects the corpus and
+NIST tests by itself. ⛔ NEVER run the whole Conformance assembly — that is the lander's job — UNLESS impacted_tests.py
+prints `FullyQualifiedName~.` (it cannot bound your change: no map for your base, a `.g4`/build file, a new src file…):
+then run exactly that and quote its reason in the report.
 ⛔ `python scripts/semgrep/verify.py` must not increase any rule's count (train 57 dropped a cluster for +20 BigInteger).
 Print a real verdict line; never leave a placeholder in the report.
 

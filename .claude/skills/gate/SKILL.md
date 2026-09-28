@@ -26,11 +26,11 @@ goes green while CI fails.
 
 ## Per commit — wave-local (~2 min)
 
-⭐ **Implementer variant (owner lever 2, 2026-09-13):** an implementer in its own worktree runs ONLY its own test classes plus `~Drift|~EditionGate` and the unfiltered Unit assembly; the corpus (`~CorpusRunner`) and NIST (`~Nist`) legs run once at the lander over the whole train (⛔ always in the landing union), then CI, then one battery per train. Exception: a change to the parser, preprocessor or NIST harness runs `~Nist` at the implementer too.
+⭐ **Implementer variant — the filter is DERIVED from the recorded impact map (kb/Work PB1683; DESIGN-test-build-ci.md §3.13):** an implementer in its own worktree runs `python scripts/spec/impacted_tests.py --base <its cut point> --plus "<every golden and test class it ADDED>"` and passes the LAST stdout line unchanged to `pwsh scripts/build-local.ps1 -Filter "<line>" -Priority BelowNormal`. That line is every Conformance test whose recorded execution reaches a changed file (corpus, NIST and VersionMatrix rows included when the change reaches them) plus `~Drift|~EditionGate`; Unit and Characterization run whole. When it prints `FullyQualifiedName~.` it could not bound the change (no map for the base, a `.g4`/build file, a new or never-executed src file) and says why on stderr — the one case an implementer runs the whole Conformance assembly. Name-guessed filters are retired: train 68b dropped two groups on whole-assembly reds their name-guessed gates never ran. The map is recorded per main commit by `python scripts/spec/record_impact_map.py` (a detached worktree, ~25 min at BelowNormal); the lander still runs the whole Conformance assembly unfiltered.
 
 1. `dotnet test tests/Cobol.Net.Tests.Characterization` (full — it is seconds)
-2. `dotnet test tests/Cobol.Net.Tests.Conformance --filter "FullyQualifiedName~<Area or the fix's own test class>"`
-   - add `--filter "FullyQualifiedName~VersionMatrix"` for an edition gate
+2. `dotnet test tests/Cobol.Net.Tests.Conformance --filter "<impacted_tests.py's filter>"` (build-local runs this leg)
+   - an edition gate adds `FullyQualifiedName~VersionMatrix` through `--plus`
 3. `dotnet test tests/Cobol.Net.Tests.Unit --filter "<the wave's tests>"`
 4. A `cobol` CLI compile-and-run probe
 

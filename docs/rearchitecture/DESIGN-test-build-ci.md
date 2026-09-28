@@ -701,6 +701,66 @@ pins it on the built bits. Re-measured on the real flow — populate at one comm
 a TEST-ONLY commit (that very test), rebuild, whole assembly: **build 5 s + 1 m 18 s, 13,133 hits / 27 misses,
 7,952 green.**
 
+### 3.13 THE PER-TEST IMPACT MAP — deriving the implementer's gate filter (kb/Work PB1683)
+
+**The defect it answers.** An implementer's gate ran the tests its author NAMED (its goldens, `~Drift|~EditionGate`,
+`~CorpusRunner|~Nist` on a "shared seam"). Train 68b dropped two groups on whole-assembly reds those names never
+reached — `DiagnosticPositionTests` after a COPY library-search change, and a `CONSTANT AS NULL` crash in
+`DataBinder.Constants.cs` — and wave 69 (four agents, 1.17 M tokens) existed only to finish them. The map records
+the fact the names were guessing: which tests execute which code.
+
+**Collection — a per-test hit recorder, chosen by measurement.** Per-test coverage from a coverage tool cannot
+attribute hits under xunit's parallel collections, and per-shard coverage bisected to tests multiplies the run.
+The recorder instead rides the test run itself, in its own RECORDING build, and costs one cold Conformance run:
+
+| piece | what it does |
+|---|---|
+| `tools/impact/ImpactRecording.targets` | imported ONLY through `-p:CustomAfterMicrosoftCommonTargets=…` (nothing in the tree imports it, so no gated, battery or shipped build carries a probe); compiles `ImpactProbe.cs` into the greenfield compiler, front end, editions, runtime and CLI, the legacy oracle the differential harness loads, and the three test assemblies; compiles `ImpactTestFramework.cs` into the test assemblies and names it in `[assembly: Xunit.TestFramework]` |
+| `tools/impact/ImpactInstrumenter` (Mono.Cecil) | rewrites each covered assembly once: every method with sequence points calls `ImpactProbe.Hit(id)` on entry, `id` being its entry in the probe table — its file and the LINE RANGES it owns (its sequence points, merged across the lines between two of them unless another method's point lies between, so braces, `else` lines and comments belong to it and a lambda's body to the lambda); members with no sequence points are charged to a TYPE-LEVEL entry; `implies` names each entry's type-chain static constructors; every `Process.Start` is redirected to the probe's twin |
+| `ImpactProbe` | one byte store per hit into the array of the running CONTEXT, an `AsyncLocal` every assembly's copy shares through `AppContext` data; a hit with no context lands in an AMBIENT array. In a child process (a compiled COBOL program loading the instrumented runtime) it records for the process and writes a hits file at exit, which the redirected `Process.Start` queued on the starting test |
+| `ImpactTestFramework` | xunit's own framework with the message bus wrapped: `ITestCollectionStarting` / `ITestClassStarting` / `ITestStarting` install a fresh context synchronously on the flow about to run it (the same `TestRunner.RunAsync` then awaits the test, so the context flows into constructor, body and every task it starts, while parallel tests keep their own); `…Finished` saves it with the children folded in. A `BeforeAfterTestAttribute` cannot do this — it is handed only the `MethodInfo`, which cannot tell a theory's rows apart, and the corpus theories are ~3,400 of the ~9,300 Conformance tests |
+| `scripts/spec/record_impact_map.py` | a DETACHED worktree at the commit, the recording build, the instrumenter, each test assembly once with `COBOLNET_COMPILE_CACHE=off` (a cache hit skips the compiler and would record nothing for it), and the merge into `<git common dir>/cobol-impact/<sha>.json.gz` — shared by every worktree of the repository. Its watchdog fails the recording when a listed test was never recorded or no test reached the compiler, front end or runtime |
+| `scripts/spec/impacted_tests.py` | the lookup: `--base <cut point>` (or explicit files, taken at the file level) → the filter, its last stdout line |
+
+**Measured cost.** At `dbea12428`, `BelowNormal` on the shared 32-core host: 35,578 probe entries; Conformance
+9,274 green in 15 m 19 s (cold, instrumented), Unit 29,693 green in 2 m 38 s, Characterization 33 in 2 s; build
+23 s, instrumentation 4 s; **18.7 min in all** — inside one cold Conformance leg of the battery, which is where it
+runs. The map is ~5 MB compressed.
+
+**How a change selects.** A hunk inside a method's owned lines selects the tests that executed that method (a
+static constructor's change, every test that touched its type). A comment-or-blank hunk selects nothing. ADDED
+code between members: an ordinary new method runs only when changed code calls it, except through overload
+resolution, so it selects the tests that reached any same-named method of the file's types; an override, virtual,
+operator, conversion, extension method, field, property, constant, a type with a base list or an attribute is a
+DECLARATION change. A declaration change — or any removed or changed line no method owns (a signature, a
+constant, an enum value) — selects every test that executed the file, plus every test that executed a file NAMING
+one of its outermost types (constants and enum values are compiled INTO their consumers). A theory row is
+selected by a `DisplayName~<its name argument>` term, a whole method or class when the term budget (150) requires.
+
+**⛔ Conservative by construction — the WHOLE assembly, and the reason, when it cannot bound the change:** no map
+for the base, or one older than it by anything but documentation (the line numbers are the map commit's); a
+`.g4`, project, build or source-generator input; a NEW src file; a declarations-only file no executed file names;
+non-C# data under `src/`; a changed method reached only outside every test's context in product code (a
+finalizer; in a test file that is xunit discovery running a theory's data source, and the file's classes are
+selected instead); corpus data no golden names. `ImpactedTestsDriftTests` (Unit) drives every arm through the
+script's `--self-test`, proves through the real command line that an unmapped file prints `FullyQualifiedName~.`,
+and requires every product project under `src/` to be in both the targets file and the recorder's `PROBED` list.
+
+**Holes it does not close (the lander's whole-assembly gate is their net):** a static cache built by one test
+from a method a later test never re-executes; a default-parameter or attribute change consumed by code that does
+not name the declaring type; a new type discovered by reflection with no base list.
+
+**What the replay measured — the map is a CORRECTNESS gate, not a narrowing one, for this compiler.** Every
+golden runs the whole pipeline, so a change to the preprocessor, binder or emitter reaches almost every test.
+FILE granularity selected the whole Conformance assembly for 20 of 22 branches of trains 65–69 and the two
+dropped 68b branches; METHOD granularity (the design above) still reaches 5,504–9,268 of 9,274 tests per train
+cluster (each cluster bundles three to five notes and 15–86 files), so every replayed cluster's filter is the whole
+assembly. For the two dropped 68b branches the map, recorded at their own base `4b0f3e22a`, selects the tests that
+went red. The derived filter is therefore NARROWER than the whole assembly only for a small, local change; its
+value is that the implementer's gate now runs every test the change can reach, which the name-guessed filter did
+not. The implementer gate cost that follows (a whole cold Conformance leg per implementer, which MANDATORY-PRACTICES
+I2 forbade for lander contention) is an owner decision recorded in kb/Work PB1683.
+
 ---
 
 ## 4. Current → target module changes

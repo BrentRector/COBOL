@@ -18,9 +18,10 @@ POINTER = 'MANDATORY-PRACTICES.md'
 # that are cheapest to lose silently.
 BRIEFS = {
     # P4: the stamped handoff (kb/Work/PB1698) — STATUS.md names the commit it describes; a resumer reads the delta.
+    # PB1683: the implementer's gate filter is DERIVED from the impact map.
     'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'STATUS-AT:',
-                                      r'status_delta\.py'],
-    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance'],
+                                      r'status_delta\.py', r'impacted_tests\.py --base'],
+    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'impacted_tests\.py --base'],
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'tail -n \+1 -f', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN'],
     'lander-brief.md': [r'claude-skills', POINTER, r'push-main'],
     'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main'],
@@ -30,7 +31,9 @@ BRIEFS = {
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'NEVER run the whole Conformance', r'\\STOP',
                                      r'tail -n \+1 -f', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'RUN BY NAME', r'drift_rules\.py', r'STATUS-AT:',
-                                     r'status_delta\.py'],
+                                     r'status_delta\.py',
+                                     # PB1683: the implementer's gate filter is DERIVED from the impact map
+                                     r'impacted_tests\.py --base'],
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
