@@ -4,6 +4,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Editions;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -72,7 +73,7 @@ public sealed class EditionContextTests
             foreach (bool permissive in new[] { false, true })
             {
                 var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                    src, Path.Combine(dir, "clean.dll"), Permissive: permissive));
+                    src, Path.Combine(dir, "clean.dll"), Permissive: permissive, SourceFormat: InitialReferenceFormat.Auto));
                 Assert.True(r.Success, string.Join("\n", r.Errors));
                 Assert.NotNull(r.Warnings);
                 Assert.Empty(r.Warnings);

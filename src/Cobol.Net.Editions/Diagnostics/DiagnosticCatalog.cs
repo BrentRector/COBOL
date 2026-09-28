@@ -2322,6 +2322,17 @@ public static class DiagnosticCatalog
         + "ISO §6.2.3.2 SR3: \"All the characters forming a multiple-character floating indicator shall be specified "
         + "on the same line.\" Write the whole indicator on one line.", "ISO §6.2.3.2 SR3");
 
+    /// <summary>COBOLNET2616 — the indicator area of a fixed-form line holds a character that is not a fixed indicator
+    /// (kb/Work PB1494). §6.2.2 lists <c>*</c>, <c>/</c>, <c>-</c> and space (and COBOL-85's debugging indicator
+    /// <c>D</c>); the NIST CCVS column-7 conventions (S/Y debugging, P/J/H/E/U excluded alternates, any other letter a
+    /// primary-configuration line) are honored under <c>--nist</c> only. Before, every compilation silently dropped a
+    /// line marked E and silently compiled one marked X. The line is still read as source after the diagnostic.</summary>
+    public static readonly DiagnosticDescriptor FixedIndicatorInvalid = new(
+        "COBOLNET2616", "fixed-indicator-invalid", EditionSeverity.Error,
+        "The indicator area (column 7) of a fixed-form line holds a character that is not a fixed indicator. ISO "
+        + "§6.2.2 lists * and / (comment line), - (continuation line) and space (source line); write one of them, or "
+        + "compile a NIST CCVS program with --nist.", "ISO §6.2.2 / §6.3.3");
+
     /// <summary>COBOLNET2450 — COPY literal-1 / literal-2 that is not a plain alphanumeric literal (kb/Work PB1354):
     /// a concatenation expression or figurative constant (§7.2.3.3 SR4), or a national or boolean literal (SR5
     /// "Literal-1 and literal-2 shall be alphanumeric literals").</summary>

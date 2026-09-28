@@ -6,6 +6,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Bound;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -251,7 +252,7 @@ SKIPPER.
             string src = Path.Combine(dir, "pb909.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "pb909.dll"), DialectLevel: 2023, CheckOnly: true));
+                src, Path.Combine(dir, "pb909.dll"), DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, r.Errors, r.Warnings);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

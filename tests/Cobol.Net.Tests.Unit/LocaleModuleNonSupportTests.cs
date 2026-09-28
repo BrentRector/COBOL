@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -41,7 +42,7 @@ public sealed class LocaleModuleNonSupportTests
                 + "       01 R PIC X(20).\n       01 S PIC 9(8) VALUE 3600.\n"
                 + "       PROCEDURE DIVISION.\n       MAIN.\n" + procedureBody + "           STOP RUN.\n");
             return CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "a49.dll"), DialectLevel: edition, CheckOnly: true)).Errors;
+                src, Path.Combine(dir, "a49.dll"), DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto)).Errors;
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
     }

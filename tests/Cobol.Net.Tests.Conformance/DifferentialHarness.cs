@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -29,7 +30,7 @@ public sealed class DifferentialHarness
             string src = Path.Combine(tempDir, "p.cob");
             File.WriteAllText(src,
                 "IDENTIFICATION DIVISION.\nPROGRAM-ID. P.\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY \"OK\".\n    STOP RUN.\n");
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(tempDir, "p.dll")));
+            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(tempDir, "p.dll"), SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(result.Success, $"{result.Status}: {string.Join("\n", result.Errors)}");
         }
         finally

@@ -6,6 +6,7 @@ using CobolNet.Binding.Procedure;
 using CobolNet.Runtime;
 using CobolNet.Runtime.IO;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -205,7 +206,7 @@ public sealed class CurrentDateOffsetDeterminationTests : CobolNetTestBase
         try
         {
             IntrinsicBinder.CompileClock = () => at;
-            var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023));
+            var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(result.Success, string.Join("\n", result.Errors));
             generated = File.ReadAllText(result.GeneratedCsPath!);
         }

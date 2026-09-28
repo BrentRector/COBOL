@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -169,7 +170,7 @@ public sealed class ObjectRefDescriptorDriftTests
             string src = Path.Combine(dir, "prog.cob");
             src = CompiledProgramCache.StageSource(src, source);
             var r = CompiledProgramCache.Compile(new CobolNet.CompilerDriver.Options(
-                src, Path.Combine(dir, "prog.dll"), DialectLevel: 2002));
+                src, Path.Combine(dir, "prog.dll"), DialectLevel: 2002, SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, string.Join("\n", r.Errors));
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

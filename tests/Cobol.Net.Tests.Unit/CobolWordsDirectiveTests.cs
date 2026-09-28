@@ -210,7 +210,7 @@ public sealed class CobolWordsDirectiveTests
             string src = Path.Combine(dir, "cw.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "cw.dll"), DialectLevel: 2023, CheckOnly: true));
+                src, Path.Combine(dir, "cw.dll"), DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return r.Errors;
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

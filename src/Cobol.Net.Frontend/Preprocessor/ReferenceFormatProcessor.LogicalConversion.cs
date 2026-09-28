@@ -10,12 +10,13 @@ public static partial class ReferenceFormatProcessor
     /// <see cref="FixedFormConverter"/>): one resultant line per physical line, each ending in <c>\n</c>, except a
     /// continuation line, which is appended to the latest logical line.</summary>
     public static string ConvertFixedToFree(string sourceText)
-        => string.Concat(new FixedFormConverter(gates: null, lineOffset: 0).Convert(sourceText).Lines.Select(l => l + "\n"));
+        => string.Concat(new FixedFormConverter(gates: null, lineOffset: 0, ccvsIndicators: false).Convert(sourceText)
+            .Lines.Select(l => l + "\n"));
 
     /// <summary>The MAPPED fixed→free conversion of a whole text originating in <paramref name="file"/> (kb/Work PB82).</summary>
     public static MappedText ConvertFixedToFreeMapped(string sourceText, string file)
     {
-        var (l, o) = ConvertFixedToFreeMapped(sourceText, gates: null, 0);
+        var (l, o) = ConvertFixedToFreeMapped(sourceText, gates: null, 0, ccvsIndicators: false);
         return Mapped(l, o, file);
     }
 
@@ -25,8 +26,9 @@ public static partial class ReferenceFormatProcessor
     /// <param name="lineOffset">The file-relative index (0-based) of this text's first line — nonzero when
     /// converting one SOURCE-FORMAT SEGMENT of a larger file, so the <see cref="ReferenceFormatDiagnostics"/> continuation
     /// diagnostics and the origins report the file line, not the segment-relative one.</param>
-    private static (List<string> Lines, List<int> Origins) ConvertFixedToFreeMapped(string sourceText, ReferenceFormatDiagnostics? gates, int lineOffset)
-        => new FixedFormConverter(gates, lineOffset).Convert(sourceText);
+    private static (List<string> Lines, List<int> Origins) ConvertFixedToFreeMapped(string sourceText,
+        ReferenceFormatDiagnostics? gates, int lineOffset, bool ccvsIndicators)
+        => new FixedFormConverter(gates, lineOffset, ccvsIndicators).Convert(sourceText);
 
     /// <summary>
     /// THE ISO §6.5 LOGICAL CONVERSION of one fixed-form text — a whole file, one SOURCE FORMAT segment, or a
@@ -56,7 +58,7 @@ public static partial class ReferenceFormatProcessor
     /// part of the literal".</item>
     /// </list>
     /// </summary>
-    private sealed class FixedFormConverter(ReferenceFormatDiagnostics? gates, int lineOffset)
+    private sealed class FixedFormConverter(ReferenceFormatDiagnostics? gates, int lineOffset, bool ccvsIndicators)
     {
         private readonly List<string> _lines = [];
         private readonly List<int> _origins = [];
@@ -72,6 +74,12 @@ public static partial class ReferenceFormatProcessor
         /// its free-text body is commentary until the next Area-A header. See <see cref="CommentEntryParagraphs"/>.</summary>
         private bool _inCommentEntry;
 
+        /// <summary>True while the text is in an IDENTIFICATION DIVISION — the only place a comment-entry paragraph
+        /// exists (kb/Work PB1494: a PROCEDURE DIVISION paragraph named REMARKS was dropped with every line after it).
+        /// A text starts in one (a program's IDENTIFICATION DIVISION header is where it begins), an IDENTIFICATION /
+        /// ID DIVISION header or a <c>*-ID</c> paragraph re-enters it, and any other division header leaves it.</summary>
+        private bool _inIdentificationDivision = true;
+
         public (List<string> Lines, List<int> Origins) Convert(string sourceText)
         {
             int lineNo = lineOffset;
@@ -80,23 +88,41 @@ public static partial class ReferenceFormatProcessor
             return (_lines, _origins);
         }
 
+        /// <summary>The kind of line an indicator-area character marks (§6.3.3 "The indicator area identifies the type
+        /// of a source line in accordance with the indicators specified in 6.2.2"). The NIST CCVS conventions — letters
+        /// §6.2.2 does not list — are a dialect, honored only under <c>--nist</c> (kb/Work PB1494).</summary>
+        private enum LineKind { Source, Comment, Continuation, Debugging, CcvsExcluded, NotAnIndicator }
+
+        private LineKind KindOf(char indicator) => indicator switch
+        {
+            ' ' => LineKind.Source,
+            '*' or '/' => LineKind.Comment,
+            '-' => LineKind.Continuation,
+            'D' or 'd' => LineKind.Debugging,                   // COBOL-85's debugging line
+            _ when !ccvsIndicators => LineKind.NotAnIndicator,
+            'S' or 's' or 'Y' or 'y' => LineKind.Debugging,
+            'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u' => LineKind.CcvsExcluded,
+            _ => LineKind.Source,                               // CCVS: a primary-configuration line
+        };
+
         private void ConvertLine(string line, int lineNo)
         {
             char indicator = line.Length > IndicatorColumn ? line[IndicatorColumn] : ' ';
             string area = ProgramTextArea(line);
-            if (IsCommentEntryText(indicator, area))
+            var kind = KindOf(indicator);
+            if (IsCommentEntryText(kind, area))
             {
                 Discard(lineNo);
                 return;
             }
 
-            switch (indicator)
+            switch (kind)
             {
-                case '*' or '/':   // a comment line (§6.2.2 fixed comment indicators; §6.5 2))
+                case LineKind.Comment:   // a comment line (§6.2.2 fixed comment indicators; §6.5 2))
                     Discard(lineNo);
                     break;
 
-                case 'D' or 'd' or 'S' or 's' or 'Y' or 'y':
+                case LineKind.Debugging:
                     Emit(DebugLineCarrier + area.TrimEnd(), lineNo, LiteralState.Outside);
                     break;
 
@@ -123,12 +149,17 @@ public static partial class ReferenceFormatProcessor
                 // key offsets away from the fixed-width FILE-RECORD-INFO work area the records are written
                 // through. The test's own working-storage key images use the 'T' form, so 'T' is the active
                 // configuration (kept as ordinary code) and 'U' is the excluded alternate.
-                case 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u':
+                case LineKind.CcvsExcluded:
                     Discard(lineNo);
                     break;
 
-                case '-':
+                case LineKind.Continuation:
                     Continue(area, lineNo);
+                    break;
+
+                case LineKind.NotAnIndicator:
+                    gates?.OnInvalidIndicator(lineNo, indicator);   // COBOLNET2616, then read as a source line
+                    Source(area, lineNo);
                     break;
 
                 default:
@@ -235,14 +266,20 @@ public static partial class ReferenceFormatProcessor
         /// itself, or its Area-B body) — commentary, discarded like a comment line. A comment, debugging or
         /// excluded-alternate line is processed by its own arm; a continuation line inside the paragraph continues
         /// its commentary.</summary>
-        private bool IsCommentEntryText(char indicator, string area)
+        private bool IsCommentEntryText(LineKind kind, string area)
         {
-            if (indicator == '-') return _inCommentEntry;   // a continuation inside the paragraph continues its text
-            if (indicator is '*' or '/' or 'D' or 'd' or 'S' or 's' or 'Y' or 'y'
-                    or 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u')
-                return false;
+            if (kind == LineKind.Continuation) return _inCommentEntry;   // continues the paragraph's text
+            if (kind is not (LineKind.Source or LineKind.NotAnIndicator)) return false;
             string? firstAreaAWord = FirstAreaAWord(area);
-            if (firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
+            if (firstAreaAWord is not null && DivisionHeader(area, firstAreaAWord) is { } division)
+            {
+                _inIdentificationDivision = division is "IDENTIFICATION" or "ID";
+                _inCommentEntry = false;
+                return false;
+            }
+            if (firstAreaAWord is not null && firstAreaAWord.EndsWith("-ID", StringComparison.OrdinalIgnoreCase))
+                _inIdentificationDivision = true;           // PROGRAM-ID / CLASS-ID / ... (the header is optional)
+            if (_inIdentificationDivision && firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
                 return _inCommentEntry = true;              // start (or continue, back-to-back) a comment-entry
             if (_inCommentEntry && firstAreaAWord is not null)
                 _inCommentEntry = false;                    // the next Area-A header ends it
@@ -309,8 +346,9 @@ public static partial class ReferenceFormatProcessor
     /// <para>The introduction gate is asked in FIXED form only. Fixed form is the one reference format a COBOL-85
     /// source can be written in, and there the fixed indicators <c>*</c> and <c>/</c> are its comments; free form is
     /// itself a COBOL-2002 introduction that WiseOwl COBOL reaches below 2002 only through its documented
-    /// auto-detection extension (docs/CONFORMANCE.md DOC-A.1-158), and a free-form source has no comment but the
-    /// floating one, so gating it there would gate the extension's only comment rather than a construct.</para></summary>
+    /// <c>--source-format free|auto</c> selection (docs/CONFORMANCE.md DOC-A.1-158; kb/Work PB1362), and a free-form
+    /// source has no comment but the floating one, so gating it there would gate the extension's only comment rather
+    /// than a construct.</para></summary>
     private static void FloatingComment(ReferenceFormatDiagnostics? diagnostics, string text, int at, int lineNo, int column,
         bool fixedForm)
     {
@@ -394,6 +432,17 @@ public static partial class ReferenceFormatProcessor
         int end = start;
         while (end < sourceArea.Length && sourceArea[end] is not (' ' or '.')) end++;
         return sourceArea[start..end];
+    }
+
+    /// <summary>The division a division header names — <paramref name="firstWord"/> when the Area-A text is
+    /// <c>&lt;word&gt; DIVISION</c> — or null.</summary>
+    private static string? DivisionHeader(string sourceArea, string firstWord)
+    {
+        int at = sourceArea.IndexOf(firstWord, StringComparison.Ordinal) + firstWord.Length;
+        ReadOnlySpan<char> rest = sourceArea.AsSpan(at).TrimStart(' ');
+        return rest.StartsWith("DIVISION", StringComparison.OrdinalIgnoreCase)
+               && (rest.Length == 8 || rest[8] is ' ' or '.')
+            ? firstWord.ToUpperInvariant() : null;
     }
 
     /// <summary>A COBOL word-forming character (§8.3.1 — letters, digits, hyphen; the underscore joined at

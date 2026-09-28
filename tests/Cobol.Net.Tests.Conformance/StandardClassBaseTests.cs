@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -29,7 +30,7 @@ public sealed class StandardClassBaseTests
         {
             string src = CompiledProgramCache.StageSource(Path.Combine(dir, "prog.cob"), source);
             string dll = Path.Combine(dir, "prog.dll");
-            var r = CompiledProgramCache.Compile(new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: edition));
+            var r = CompiledProgramCache.Compile(new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: edition, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, "must compile strict: " + string.Join("\n", r.Errors));
             return CutRunner.Run(dll, dir);
         }

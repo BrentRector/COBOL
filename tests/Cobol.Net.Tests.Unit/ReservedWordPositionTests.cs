@@ -5,6 +5,7 @@ using CobolNet.Validation;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Generated;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -30,7 +31,7 @@ public sealed class ReservedWordPositionTests : CobolNetTestBase
         string path = Path.Combine(TempDir, "pos.cob");
         File.WriteAllText(path, source);
         var bag = new DiagnosticBag();
-        var tree = new CobolNet.Frontend.Frontend { DialectLevel = dialectLevel }.Parse(path, bag);
+        var tree = new CobolNet.Frontend.Frontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = dialectLevel }.Parse(path, bag);
         Assert.True(tree is not null && !bag.HasErrors,
             $"snippet must parse: {string.Join("; ", bag.Diagnostics.Select(d => d.ToString()))}");
         var hits = new List<CobolParserCore.CobolWordContext>();

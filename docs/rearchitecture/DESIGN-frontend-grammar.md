@@ -754,6 +754,18 @@ Target changes:
 `ReferenceFormatProcessor` (`ReferenceFormatProcessor.LogicalConversion.cs`) IS the §6.5 logical conversion, for both
 reference formats, and the only place source comments are recognized. Its model:
 
+- **The initial format is a SELECTION, fixed by default** (kb/Work PB1362). §7.3.24.3 2) "The default reference format
+  of a compilation group is fixed form"; `InitialReferenceFormat` (`--source-format fixed|free|auto`,
+  `CompilerDriver.Options.SourceFormat`, `Frontend.InitialFormat`) is the §4.2.10 3) selection mechanism, and
+  `IsFixedForm` runs only under `auto` — no detector can be the default, because the sequence area may hold any
+  character (§6.3.2) and text past margin R is legal, so every detector misreads some conforming fixed-form text.
+  Library text starts in the format in effect for its COPY statement (§7.3.24.3 3)).
+- **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
+  directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
+  line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the
+  state, and a SOURCE FORMAT directive on the first line may be in either format (§7.3.24.3 4)).
+  `CompilerDirectiveLine.TryParse` has ONE reading — only spaces before `>>` — shared with every later stage.
+
 - **Lines, not a character buffer.** The resultant compilation group is a list of lines with a parallel origin list
   (kb/Work PB82) — one resultant line per physical line, except a fixed-form continuation line, which occupies none.
 - **The join target is the LATEST LOGICAL line** (§6.5 6) a)/b) "appended immediately to the right of the last
@@ -762,6 +774,11 @@ reference formats, and the only place source comments are recognized. Its model:
   never touches the literal state a continued line left open (§6.3.5 "Comment lines and blank lines may be
   interspersed among lines containing the parts of a literal"). Writing the join against "the last line written" is
   what made an interspersed comment line receive the continuation and a blank line crash the origin tracking.
+- **The indicator area holds a §6.2.2 fixed indicator or it is diagnosed** (kb/Work PB1494): `*` `/` `-` space, and
+  COBOL-85's debugging `D`; anything else is COBOLNET2616 and the line is read as source. The NIST CCVS column-7
+  conventions (S/Y debugging, P/J/H/E/U excluded alternates, any other letter a primary-configuration line) are a
+  DIALECT — `ccvsIndicators`, on only under `--nist` (`FixedFormConverter.KindOf`). The obsolete comment-entry reading
+  of AUTHOR … REMARKS applies only inside an IDENTIFICATION DIVISION (`_inIdentificationDivision`).
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
 - **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
@@ -777,8 +794,8 @@ reference formats, and the only place source comments are recognized. Its model:
   preceded by a separator space — COBOLNET2495; the text after it is still the comment), SR3 (a continuation line
   completing a `*>` or `>>` begun at the end of the line it continues — COBOLNET2496), and the 2002 introduction
   gate `floating-comment-indicator-2002` (COBOLNET0900, once per compilation), asked in FIXED form only — free form
-  is itself a 2002 introduction reached below 2002 only through the auto-detection extension, and its only comment is
-  the floating one.
+  is itself a 2002 introduction reached below 2002 only through the `--source-format free|auto` selection, and its
+  only comment is the floating one.
 - **The next case is automatic.** The floating literal continuation indicator (§6.5 4) and 8); kb/Work PB1359) and
   the continuation-line validation (§6.2.3.2 SR6; kb/Work PB1492) are further steps of the same per-line pass over
   the same literal state — not a second scanner.

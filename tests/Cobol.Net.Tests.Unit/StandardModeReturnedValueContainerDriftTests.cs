@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -148,7 +149,7 @@ public sealed class StandardModeReturnedValueContainerDriftTests : CobolNetTestB
             """;
         string srcPath = Path.Combine(TempDir, programId + ".cob");
         File.WriteAllText(srcPath, source);
-        var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023));
+        var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
         Assert.True(result.Success, $"[{programId}] {reference} must compile: {string.Join("\n", result.Errors)}");
         Assert.NotNull(result.GeneratedCsPath);
         return File.ReadAllText(result.GeneratedCsPath!);

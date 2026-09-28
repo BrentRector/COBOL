@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Frontend.Diagnostics;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -32,7 +33,7 @@ public sealed class SpecialNamesLocaleEditionTests
         try
         {
             var diags = new DiagnosticBag();
-            new CnFrontend { DialectLevel = edition }.Parse(path, diags);
+            new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = edition }.Parse(path, diags);
             return diags;
         }
         finally { try { File.Delete(path); } catch { /* best-effort */ } }
@@ -94,7 +95,7 @@ public sealed class SpecialNamesLocaleEditionTests
                 + "       01 X PIC X(3) VALUE \"AbC\".\n"
                 + "       PROCEDURE DIVISION.\n       MAIN.\n           DISPLAY X\n           STOP RUN.\n");
             return CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "snloc.dll"), DialectLevel: 2023, CheckOnly: true)).Errors;
+                src, Path.Combine(dir, "snloc.dll"), DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto)).Errors;
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
     }

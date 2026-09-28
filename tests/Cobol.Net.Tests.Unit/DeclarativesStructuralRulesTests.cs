@@ -6,6 +6,7 @@ using CobolNet.CodeGen;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -362,7 +363,7 @@ public sealed class DeclarativesStructuralRulesTests
         try
         {
             var diags = new DiagnosticBag();
-            var tree = new CnFrontend { DialectLevel = level }.Parse(path, diags);
+            var tree = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = level }.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var edition = new EditionContext(level);
             new CSharpEmitter().Bind(tree!, edition);

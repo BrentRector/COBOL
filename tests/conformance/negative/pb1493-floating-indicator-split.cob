@@ -1,4 +1,4 @@
-*> reject-at: 85 2002 2014 2023
+      *> reject-at: 85 2002 2014 2023
       *> ISO §6.2.3.2 SR3 "All the characters forming a multiple-
       *>   character floating indicator shall be specified on the same
       *>   line" (cite.py --check: OK §6.2.3.2 3)). The continued line

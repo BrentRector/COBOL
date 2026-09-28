@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Diagnostics;
+using CobolNet.Frontend.Preprocessor;
 using CobolNet;                                          // CompilerDriver (the greenfield compiler)
 using CobolNet.Tests.Shared;                             // ProcessObserver — the ONE child-process observer
 using LegacyCompilation = CobolSharp.Compiler.Compilation;
@@ -125,7 +126,7 @@ public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
 
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel));
+            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
             if (!result.Success)
                 return (false, "", $"[cobolnet compile] {result.Status}: {string.Join("\n", result.Errors)}");
 
@@ -154,7 +155,7 @@ public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
 
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel));
+            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
             if (!result.Success)
                 return (false, "", $"[cobolnet compile] {result.Status}: {string.Join("\n", result.Errors)}", null);
 
@@ -192,7 +193,7 @@ public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
                 string csrc = Path.Combine(dir, name + ".cob");
                 csrc = CompiledProgramCache.StageSource(csrc, companion);
                 var cr = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                    csrc, Path.Combine(dir, name + ".dll"), DialectLevel: dialectLevel));
+                    csrc, Path.Combine(dir, name + ".dll"), DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
                 if (!cr.Success)
                     return (false, "", $"[cobolnet compile {name}] {cr.Status}: {string.Join("\n", cr.Errors)}");
             }
@@ -200,7 +201,7 @@ public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
             string src = Path.Combine(dir, "prog.cob");
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel));
+            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
             if (!result.Success)
                 return (false, "", $"[cobolnet compile] {result.Status}: {string.Join("\n", result.Errors)}");
 
@@ -221,7 +222,7 @@ public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
 
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel));
+            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
             if (!result.Success)
                 return (-1, "", $"[cobolnet compile] {result.Status}: {string.Join("\n", result.Errors)}");
 

@@ -70,8 +70,12 @@ def compile_once(exe: str, src: str, std: str, out_dll: str, cwd: str | None = N
     PB1355). Without it the compiler runs in the source's directory. `copy` is the case's `-I` directories
     (`copy_dirs`), each passed as `--copy`.
     """
+    # kb/Work PB1362: the compiler's default reference format is now FIXED (ISO 7.3.24.3 2)); the committed
+    # differential baseline was measured under reference-format DETECTION, so the run keeps selecting it
+    # (`--source-format auto`) until the harness mirrors each case's own cobc format flags.
     try:
-        r = subprocess.run([exe, src, '--std', std, '-o', out_dll, *(a for c in copy for a in ('--copy', c))],
+        r = subprocess.run([exe, src, '--std', std, '--source-format', 'auto', '-o', out_dll,
+                            *(a for c in copy for a in ('--copy', c))],
                            capture_output=True, text=True, timeout=60,
                            cwd=cwd or os.path.dirname(os.path.abspath(src)))
         return r.returncode, r.stdout + r.stderr, os.path.exists(out_dll), ''

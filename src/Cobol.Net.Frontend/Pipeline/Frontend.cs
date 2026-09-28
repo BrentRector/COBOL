@@ -52,6 +52,11 @@ public sealed class Frontend
     /// Defaults strict, matching <c>EditionContext</c>.</summary>
     public bool Permissive { get; init; }
 
+    /// <summary>The reference format the compilation group starts in (the CLI's <c>--source-format</c>; kb/Work
+    /// PB1362) — fixed form unless selected otherwise, ISO §7.3.24.3 2) "The default reference format of a compilation
+    /// group is fixed form". See <see cref="Preprocessor.InitialReferenceFormat"/>.</summary>
+    public Preprocessor.InitialReferenceFormat InitialFormat { get; init; } = Preprocessor.InitialReferenceFormat.Fixed;
+
     /// <summary>The compilation's AMBIENT-INPUT record (kb/Work PB985): the source read, every copybook probe and
     /// read, every environment variable a directive consulted. A driver that must record reads it makes BEFORE the
     /// front end (the source-existence probe, the NIST copy library) passes its own instance here.</summary>
@@ -168,7 +173,7 @@ public sealed class Frontend
         // column-aware pass can see the col-7 indicator, so the per-edition obligations emit HERE. Mapped (kb/Work
         // PB82): a fixed-form continuation JOINS physical lines, and the map records which line each output came from.
         var text = ReferenceFormatProcessor.NormalizeToFreeFormMapped(raw, DialectLevel, Permissive, diagnostics, sourcePath,
-            initialFixed: null, out var formats);
+            InitialFormat.InitialFixed(), out var formats, ccvsIndicators: NistTestName is not null);   // kb/Work PB1494
         return (text, formats);
     }
 
@@ -186,7 +191,7 @@ public sealed class Frontend
         // the expanded group. leave* keep the post-85 directive families flowing to their dedicated stages below.
         // COPY runs BEFORE NIST substitution so placeholders inside copied library text are substituted.
         var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
-            dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs);
+            dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs, ccvsIndicators: NistTestName is not null);
         copy.RegisterReferenceFormat(sourcePath, referenceFormats);
         var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, copy, LeftDirectives,
             diagnostics, sourcePath, DialectLevel, Permissive, Inputs, implicitOps);

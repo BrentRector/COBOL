@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Tests.Shared;                             // TestRepo — the ONE repo-root locator
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -111,7 +112,7 @@ MAIN.
             string src = Path.Combine(dir, "pb446.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "pb446.dll"), DialectLevel: edition, CheckOnly: true));
+                src, Path.Combine(dir, "pb446.dll"), DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, r.Errors);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

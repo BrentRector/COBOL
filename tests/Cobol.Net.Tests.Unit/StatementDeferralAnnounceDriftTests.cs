@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -119,7 +120,7 @@ MAIN.
             string src = Path.Combine(dir, "pb236.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "pb236.dll"), DialectLevel: 2023, CheckOnly: true));
+                src, Path.Combine(dir, "pb236.dll"), DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, r.Errors, r.Warnings);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

@@ -38,6 +38,9 @@ public static class CompilerDriver
     /// 178 — and the owner's answer is both conventions behind one option, defaulting to
     /// <see cref="Runtime.SignEncoding.Ibm"/> (IBM / Micro Focus compatibility). Orthogonal to
     /// <paramref name="DialectLevel"/>: every edition grants the same latitude.</param>
+    /// <param name="SourceFormat">The reference format the compilation group starts in (CLI <c>--source-format</c>;
+    /// kb/Work PB1362): fixed form, ISO §7.3.24.3 2)'s default, unless free form or the documented auto-detection
+    /// extension is selected (§4.2.10 3) — docs/CONFORMANCE.md DOC-A.1-158).</param>
     public sealed record Options(
         string SourcePath,
         string? OutputPath = null,
@@ -46,7 +49,8 @@ public static class CompilerDriver
         IReadOnlyList<string>? CopyPaths = null,
         bool Permissive = false,
         bool CheckOnly = false,
-        SignEncoding SignEncoding = SignEncoding.Ibm);
+        SignEncoding SignEncoding = SignEncoding.Ibm,
+        Frontend.Preprocessor.InitialReferenceFormat SourceFormat = Frontend.Preprocessor.InitialReferenceFormat.Fixed);
 
     /// <summary>Which phase a compilation reached (drives the CLI's exit code).</summary>
     public enum Outcome { Success, SourceNotFound, FrontendError, BindError, BackendError }
@@ -100,6 +104,7 @@ public static class CompilerDriver
             DialectLevel = options.DialectLevel,
             // The preprocessor-level removal gates (VCR 2/4, W3 — DEVLOG 598) honor the same severity axis.
             Permissive = options.Permissive,
+            InitialFormat = options.SourceFormat,   // kb/Work PB1362 — §7.3.24.3 2) fixed by default
         };
         foreach (string dir in options.CopyPaths ?? [])
             frontend.AddCopySearchPath(dir);

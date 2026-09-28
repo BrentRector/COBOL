@@ -4,6 +4,7 @@ using CobolNet;
 using CobolNet.Binding.Procedure;
 using CobolNet.Runtime;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -49,7 +50,7 @@ public sealed class WhenCompiledStampTests : CobolNetTestBase
         try
         {
             IntrinsicBinder.CompileClock = () => clock;
-            var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023));
+            var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(result.Success, string.Join("\n", result.Errors));
             Assert.NotNull(result.GeneratedCsPath);
             return File.ReadAllText(result.GeneratedCsPath!);
@@ -99,10 +100,10 @@ public sealed class WhenCompiledStampTests : CobolNetTestBase
         string dir2 = Directory.CreateDirectory(Path.Combine(TempDir, "d2")).FullName;
 
         var r1 = CompilerDriver.Compile(new CompilerDriver.Options(
-            srcPath, OutputPath: Path.Combine(dir1, "out.dll"), DialectLevel: 2023));
+            srcPath, OutputPath: Path.Combine(dir1, "out.dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
         Assert.True(r1.Success, string.Join("\n", r1.Errors));
         var r2 = CompilerDriver.Compile(new CompilerDriver.Options(
-            srcPath, OutputPath: Path.Combine(dir2, "out.dll"), DialectLevel: 2023));
+            srcPath, OutputPath: Path.Combine(dir2, "out.dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
         Assert.True(r2.Success, string.Join("\n", r2.Errors));
 
         Assert.Equal(

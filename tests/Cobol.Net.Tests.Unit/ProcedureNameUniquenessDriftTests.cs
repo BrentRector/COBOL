@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -181,7 +182,7 @@ public sealed class ProcedureNameUniquenessDriftTests
         {
             string src = Path.Combine(dir, $"{tag}_{edition}.cob");
             File.WriteAllText(src, source);
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: edition, CheckOnly: true));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return [.. r.Errors];
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

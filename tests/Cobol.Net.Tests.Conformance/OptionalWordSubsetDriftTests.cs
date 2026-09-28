@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -882,7 +883,7 @@ public sealed class OptionalWordSubsetDriftTests
                 string src = Path.Combine(dir, unit + ".cob");
                 src = CompiledProgramCache.StageSource(src, source);
                 string dll = Path.Combine(dir, unit + ".dll");
-                var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: f.Edition));
+                var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: f.Edition, SourceFormat: InitialReferenceFormat.Auto));
                 Assert.True(r.Success,
                     $"ISO §{f.Clause}: the optional words [{spelling}] must compile at --std {f.Edition} " +
                     $"(§5.2.3 — they are printed WITHOUT an underline): {string.Join("\n", r.Errors)}");

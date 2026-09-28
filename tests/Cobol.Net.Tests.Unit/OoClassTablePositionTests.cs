@@ -3,6 +3,7 @@
 using System.Text.RegularExpressions;
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -107,7 +108,7 @@ public sealed class OoClassTablePositionTests
         {
             string path = Path.Combine(dir, "PT" + label + ".cob");
             File.WriteAllText(path, source);
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(path, DialectLevel: 2023, CheckOnly: true));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(path, DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.False(r.Success, $"{label}: expected a rejection");
             string all = string.Join("\n", r.Errors);
             var unpositioned = r.Errors.Where(e => e.Contains("error COBOLNET", StringComparison.Ordinal)

@@ -100,6 +100,23 @@ public sealed class CliParserTests
         Assert.NotEmpty(Errors("a.cob", "--sign-encoding", "--run"));
     }
 
+    /// <summary>kb/Work PB1362 — <c>--source-format</c>: ISO §7.3.24.3 2) "The default reference format of a
+    /// compilation group is fixed form", so an ABSENT option is fixed form; <c>free</c> and <c>auto</c> are the
+    /// §4.2.10 3) selection of the nonstandard behavior; anything else is a CLI argument error.</summary>
+    [Fact]
+    public void SourceFormat_DefaultsToFixed_SelectsFreeOrAuto_AndRejectsAnythingElse()
+    {
+        const CobolNet.Frontend.Preprocessor.InitialReferenceFormat Fixed = CobolNet.Frontend.Preprocessor.InitialReferenceFormat.Fixed;
+        Assert.Equal(Fixed, Resolve("a.cob").SourceFormat);
+        Assert.Equal(Fixed, Resolve("a.cob", "--source-format", "fixed").SourceFormat);
+        Assert.Equal(CobolNet.Frontend.Preprocessor.InitialReferenceFormat.Free,
+            Resolve("a.cob", "--source-format=FREE").SourceFormat);
+        Assert.Equal(CobolNet.Frontend.Preprocessor.InitialReferenceFormat.Auto,
+            Resolve("a.cob", "--source-format", "auto").SourceFormat);
+        Assert.Contains(Errors("a.cob", "--source-format", "variable"), m => m.Contains("--source-format must be one of"));
+        Assert.NotEmpty(Errors("a.cob", "--source-format", "--run"));
+    }
+
     [Fact]
     public void Flags_And_Full_Sweep_Pattern()
     {

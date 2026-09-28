@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -30,7 +31,7 @@ public sealed class DiagnosticPositionTests : IDisposable
     {
         var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
             Path.Combine(_dir, mainName), Path.Combine(_dir, "out.dll"), DialectLevel: edition, CheckOnly: checkOnly,
-            CopyPaths: [_dir]));
+            CopyPaths: [_dir], SourceFormat: InitialReferenceFormat.Auto));
         return (r.Success, [.. r.Errors, .. r.Warnings]);
     }
 

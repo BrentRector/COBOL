@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -314,7 +315,7 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
             string text = File.ReadAllText(path);
             if (!Regex.IsMatch(text, "EXCEPTION-LOCATION|DEBUG-ITEM|DEBUG-LINE", RegexOptions.IgnoreCase)) continue;
             sources.Add(ConformanceCorpus.ApplySourceOptions(text,
-                new CompilerDriver.Options(path, "x.dll", DialectLevel: int.Parse((string)row[0]))));
+                new CompilerDriver.Options(path, "x.dll", DialectLevel: int.Parse((string)row[0]), SourceFormat: InitialReferenceFormat.Auto)));
             if (sources.Count == 12) break;
         }
         Assert.NotEmpty(sources);

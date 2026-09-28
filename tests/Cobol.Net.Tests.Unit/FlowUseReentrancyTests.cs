@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -257,7 +258,7 @@ public sealed class FlowUseReentrancyTests : CobolNetTestBase
         string srcPath = Path.Combine(TempDir, "gen.cob");
         File.WriteAllText(srcPath, source);
         var r = CompilerDriver.Compile(
-            new CompilerDriver.Options(srcPath, Path.Combine(TempDir, "gen.dll"), DialectLevel: dialectLevel));
+            new CompilerDriver.Options(srcPath, Path.Combine(TempDir, "gen.dll"), DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
         Assert.True(r.Success, string.Join("\n", r.Errors));
         return File.ReadAllText(r.GeneratedCsPath!);
     }

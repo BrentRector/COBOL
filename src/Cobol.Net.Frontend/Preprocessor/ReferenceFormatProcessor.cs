@@ -9,9 +9,10 @@ using CobolNet.Frontend.Diagnostics;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
-/// Detects and converts fixed-form COBOL reference format to free-form.
-/// Fixed-form: columns 1-6 sequence, 7 indicator, 8-72 source, 73+ comment.
-/// Free-form: no column restrictions.
+/// THE ISO §6.5 logical conversion: reads fixed-form and free-form reference format and produces the logical
+/// free-form text every later stage reads. Fixed-form: columns 1-6 sequence, 7 indicator, 8-72 program text, 73+
+/// outside margin R. Free-form: no column restrictions. A compilation group starts in fixed form unless the
+/// <see cref="InitialReferenceFormat"/> selection says otherwise (§7.3.24.3 2); kb/Work PB1362).
 /// </summary>
 public static partial class ReferenceFormatProcessor
 {
@@ -86,14 +87,16 @@ public static partial class ReferenceFormatProcessor
     private const string SourceFormatWord = "SOURCE";
 
     /// <summary>
-    /// Auto-detect whether source is fixed-form or free-form, and normalize to free-form. Each
+    /// Normalize a compilation group to logical free form, starting in <paramref name="initial"/> — fixed form, the
+    /// standard default (§7.3.24.3 2)), unless selected otherwise. Each
     /// <c>&gt;&gt;SOURCE FORMAT [IS] {FIXED|FREE}</c> directive (ISO §7.3.24) switches the reference format of the
     /// text that FOLLOWS it, up to the next directive — the source is partitioned into homogeneous-format segments
     /// (§7.3.24.3 GR1) and each is converted in its own format. The directive line is discarded (§6.5 logical
     /// conversion, step 1) and left as a blank line so downstream source-line numbers stay aligned.
     /// </summary>
-    public static string NormalizeToFreeForm(string sourceText)
-        => NormalizeToFreeForm(sourceText, dialectLevel: 85, permissive: false, diagnostics: null, sourcePath: "<source>");
+    public static string NormalizeToFreeForm(string sourceText, InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
+        => NormalizeToFreeForm(sourceText, dialectLevel: 85, permissive: false, diagnostics: null, sourcePath: "<source>",
+            initial);
 
     /// <summary>
     /// The edition-aware overload (W3 preprocessor threading, VCR rows 2/4/94 — DEVLOG 598): fixed-form
@@ -102,75 +105,57 @@ public static partial class ReferenceFormatProcessor
     /// compilation), and continuing a COBOL WORD across lines is REMOVED at 2023 (Annex E.2 item 1 bullet 2
     /// → COBOLNET0902, error strict / warning permissive — the pre-removal join semantics preserved).
     /// </summary>
-    public static string NormalizeToFreeForm(
-        string sourceText, int dialectLevel, bool permissive, DiagnosticBag? diagnostics, string sourcePath)
-        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath).Text;
+    public static string NormalizeToFreeForm(string sourceText, int dialectLevel, bool permissive,
+        DiagnosticBag? diagnostics, string sourcePath, InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
+        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath, initial).Text;
 
     /// <summary>The MAPPED normalizer (kb/Work PB82): the free-form text plus, per output line, the physical line of
     /// <paramref name="sourcePath"/> it came from — a fixed-form continuation JOINS lines, so the output line count is
     /// smaller than the source's and every later stage (COPY, the parser, the binder) would otherwise number lines the
     /// user cannot find. The string overload is this one's <c>.Text</c>.</summary>
-    public static MappedText NormalizeToFreeFormMapped(
-        string sourceText, int dialectLevel, bool permissive, DiagnosticBag? diagnostics, string sourcePath)
-        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath, initialFixed: null, out _);
+    public static MappedText NormalizeToFreeFormMapped(string sourceText, int dialectLevel, bool permissive,
+        DiagnosticBag? diagnostics, string sourcePath, InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
+        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath, initial.InitialFixed(),
+            out _);
 
     /// <summary>The ONE §6.5 logical-conversion walker, for source text AND library text (§6.5 applies to both "in
     /// the order that lines of source text and library text are obtained"), also reporting the reference format it
     /// read each physical line in (<paramref name="formats"/>).</summary>
-    /// <param name="initialFixed">The format the text starts in: for library text, the format in effect for its COPY
-    /// statement (§7.3.24.3 3) — kb/Work PB1067); null for a compilation group, whose initial format is detected
-    /// (the documented extension over §7.3.24.3 2)'s fixed-form default, DEVLOG 931).</param>
+    /// <param name="initialFixed">The format the text starts in: for a compilation group, its
+    /// <see cref="InitialReferenceFormat"/> selection (fixed form by default, §7.3.24.3 2) — kb/Work PB1362); for
+    /// library text, the format in effect for its COPY statement (§7.3.24.3 3) — kb/Work PB1067). Null DETECTS it
+    /// (<see cref="IsFixedForm"/>) — the documented <see cref="InitialReferenceFormat.Auto"/> extension, and the library
+    /// text of a COPY statement read in a detected-free text (<see cref="ReferenceFormatMap.LibraryTextDefaultAt"/>).</param>
+    /// <param name="ccvsIndicators">Honor the NIST CCVS column-7 conventions (S/Y debugging lines, P/J/H/E/U excluded
+    /// alternates, any other letter a primary-configuration line) — the <c>--nist</c> dialect only (kb/Work PB1494);
+    /// otherwise a character that is not a fixed indicator (§6.2.2) is diagnosed.</param>
     public static MappedText NormalizeToFreeFormMapped(string sourceText, int dialectLevel, bool permissive,
-        DiagnosticBag? diagnostics, string sourcePath, bool? initialFixed, out ReferenceFormatMap formats)
+        DiagnosticBag? diagnostics, string sourcePath, bool? initialFixed, out ReferenceFormatMap formats,
+        bool ccvsIndicators = false)
     {
         var gates = diagnostics is null ? null : new ReferenceFormatDiagnostics(dialectLevel, permissive, diagnostics, sourcePath);
         var lines = sourceText.Split('\n');
 
-        // Locate the >>SOURCE FORMAT switches: line index → the declared format (fixed?). Each switch partitions
-        // the source into a homogeneous-format SEGMENT (§7.3.24.3 GR1); the directive line is discarded (§6.5
-        // step 1) and the new format governs from the NEXT line. A continued character-string cannot cross a
-        // switch (§7.3.3 SR8c), so each segment's continuation/literal state is self-contained.
-        // A MALFORMED directive (an operand that is neither FIXED nor FREE) is still a directive line: it is
-        // recognized by its WORD, diagnosed, and CONSUMED — `Fixed` is null and the format in effect is carried
-        // on unchanged (kb/Work PB794). Leaving it in the text is what produced `COBOL0001: unexpected '>'`
-        // before PB725 and, once PB725 taught the driver to swallow the word, silence.
-        var switches = new List<(int Index, bool? Fixed)>();
-        var stackOps = new List<(int Index, DirectiveStackOp Op)>();   // §7.3.20 / §7.3.22 — kb/Work PB941
-        for (int i = 0; i < lines.Length; i++)
-            if (TryMatchStackOp(lines[i], i + 1, out var stackOp)) stackOps.Add((i, stackOp));
-            else if (TryMatchDirective(lines[i], out string operand))
-            {
-                // The §7.3 compiler-directive facility's introduction gate for the ONE directive that cannot be
-                // gated with its siblings: this stage CONSUMES the >>SOURCE FORMAT line (it must — the following
-                // segment's reference format depends on it), so the line never reaches the shared
-                // directive-recognition point in ConditionalCompilationProcessor. Same producer, same row
-                // (source-format-directive-2002 → COBOLNET0900), just an earlier stage (kb/Work PB725) — and, at
-                // PB794, the same arrangement for the OPERAND: one row, one COBOLNET1911 producer, one stage
-                // earlier. Both gates are silent when this overload carries no DiagnosticBag.
-                gates?.OnSourceFormatDirective(i + 1, operand);
-                switches.Add((i, CompilerDirectiveCatalog.TryOperandWord(SourceFormatWord, operand, out string w)
-                    && w is "FIXED" or "FREE" ? w == "FIXED" : null));
-            }
+        // The initial format: the one the caller selected (fixed form by default, §7.3.24.3 2)) or inherited from the
+        // COPY statement (3)), or — only under the documented Auto extension — the one IsFixedForm detects in the text
+        // before the first line that could be a >>SOURCE directive in either reading (kb/Work PB1362).
+        bool firstFixed = initialFixed ?? IsFixedForm(string.Join('\n', lines[..FirstSourceDirectiveCandidate(lines)]));
+        var segments = FormatSegments(lines, firstFixed, gates);
 
-        // No directive → the whole file is one segment in the implementor-default format. Our default is
-        // structural AUTO-DETECTION (a documented extension over the standard's fixed-form GR2 default; it is what
-        // classifies the NIST fixed corpus and free-form real-world source without a directive — DEVLOG 931).
-        if (switches.Count == 0)
+        // No format boundary → the whole text is one segment in its initial format.
+        if (segments.Count == 0)
         {
-            bool wholeFixed = initialFixed ?? IsFixedForm(sourceText);
-            formats = ReferenceFormatMap.Create(wholeFixed, detected: initialFixed is null, []);
-            if (!wholeFixed) return ConvertFreeFormMapped(sourceText, gates, sourcePath);
-            var (fl, fo) = ConvertFixedToFreeMapped(sourceText, gates, 0);
+            formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, []);
+            if (!firstFixed) return ConvertFreeFormMapped(sourceText, gates, sourcePath);
+            var (fl, fo) = ConvertFixedToFreeMapped(sourceText, gates, 0, ccvsIndicators);
             return Mapped(fl, fo, sourcePath);
         }
 
-        // Per-segment. The INITIAL segment (before the first directive) is in the given initial format, or
-        // auto-detected; each subsequent segment is in the format its preceding directive declared (GR4 bootstrap: a
-        // leading directive makes the initial segment empty, so its format governs from the next line). Emit one
-        // output line per source line, the directive lines blanked — a fixed segment's continuation joins reduce its
-        // line count exactly as the whole-file path already does.
-        bool firstFixed = initialFixed ?? IsFixedForm(string.Join('\n', lines[..switches[0].Index]));
-        var segments = WithPoppedFormats(switches, stackOps, firstFixed);
+        // Per-segment. The INITIAL segment (before the first boundary) is in the initial format; each subsequent
+        // segment is in the format its boundary left in force (GR4 bootstrap: a leading directive makes the initial
+        // segment empty, so its format governs from the next line). Emit one output line per source line, the
+        // directive lines blanked — a fixed segment's continuation joins reduce its line count exactly as the
+        // whole-file path already does.
         // A segment boundary at 0-based line i changes the format from the NEXT line: 1-based line i + 2.
         formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null,
             segments.Select(s => (s.Index + 2, s.Fixed)));
@@ -188,7 +173,8 @@ public static partial class ReferenceFormatProcessor
             {
                 if (segFixed)
                 {
-                    var (sl, so) = ConvertFixedToFreeMapped(string.Join('\n', lines[segStart..segEnd]), gates, segStart);
+                    var (sl, so) = ConvertFixedToFreeMapped(string.Join('\n', lines[segStart..segEnd]), gates, segStart,
+                        ccvsIndicators);
                     outLines.AddRange(sl);
                     outOrigins.AddRange(so);
                 }
@@ -214,45 +200,88 @@ public static partial class ReferenceFormatProcessor
     }
 
     /// <summary>
-    /// The segment boundaries once PUSH/POP are applied to the reference format (§7.3.20 / §7.3.22; kb/Work
-    /// PB941): the &gt;&gt;SOURCE switches, each resolved to the format it leaves in force (a malformed operand
-    /// selects none and carries the current one on — kb/Work PB794), merged in line order with every &gt;&gt;POP
-    /// that RESTORES a different format than the one in force. The format is carried by the ONE
-    /// <see cref="DirectiveStateStack"/> — this stage's share of the directive state, as the conditional-
-    /// compilation driver holds the compilation variables. A PUSH/POP written before the first &gt;&gt;SOURCE can
-    /// only save and restore <paramref name="initialFixed"/>, so the auto-detected initial segment is unaffected.
+    /// The reference-format segment boundaries of a text, found by reading it IN ORDER with the format in effect as
+    /// state (§6.5: "the reference format mode is determined" by each SOURCE FORMAT directive line as the lines are
+    /// obtained): a &gt;&gt;SOURCE line (discarded — §6.5 1)) resolved to the format it leaves in force (a malformed
+    /// operand selects none and carries the current one on — kb/Work PB794), and every &gt;&gt;POP that RESTORES a
+    /// different format than the one in force (it keeps its line; §7.3.20 / §7.3.22, kb/Work PB941). The format is
+    /// carried by the ONE <see cref="DirectiveStateStack"/> — this stage's share of the directive state, as the
+    /// conditional-compilation driver holds the compilation variables.
+    /// <para>⛔ A line is a directive line only in the program-text area OF THE FORMAT IN EFFECT
+    /// (<see cref="DirectiveText"/>, kb/Work PB1361): character positions 8–72 of a source line in fixed form — the
+    /// sequence area may hold any character (§6.3.2) — and the whole line in free form. Recognizing it by a character
+    /// class instead ("digits or spaces before <c>&gt;&gt;</c>") missed a fixed-form directive whose sequence area was
+    /// not numeric, and took a directive preceded by program text, or written past margin R in free form, as a
+    /// switch — the following text was then read in the wrong format.</para>
+    /// <para>The §7.3 compiler-directive facility's introduction gate and operand check for the ONE directive that
+    /// cannot be gated with its siblings are asked here: this stage CONSUMES the &gt;&gt;SOURCE FORMAT line (it must —
+    /// the following segment's reference format depends on it), so the line never reaches the shared
+    /// directive-recognition point in ConditionalCompilationProcessor. Same producer, same row
+    /// (source-format-directive-2002 → COBOLNET0900; COBOLNET1911 for the operand), one stage earlier (kb/Work PB725,
+    /// PB794). Both are silent when the conversion carries no DiagnosticBag.</para>
+    /// <para>Recognition is by the directive WORD through the ONE compiler-directive line parse
+    /// (<see cref="CompilerDirectiveLine"/>), never by the whole line's shape: the end-anchored regex that preceded it
+    /// failed to match a legal <c>&gt;&gt;SOURCE FORMAT FIXED *&gt; switch</c>, so the line stayed in the text and the
+    /// following segment was read in the WRONG reference format (kb/Work PB794).</para>
     /// </summary>
-    private static List<(int Index, bool Fixed, bool KeepsLine)> WithPoppedFormats(
-        List<(int Index, bool? Fixed)> switches, List<(int Index, DirectiveStackOp Op)> stackOps, bool initialFixed)
+    private static List<(int Index, bool Fixed, bool KeepsLine)> FormatSegments(
+        string[] lines, bool initialFixed, ReferenceFormatDiagnostics? gates)
     {
         bool current = initialFixed;
         var state = new DirectiveStateStack().Carry(Constructs.SourceFormatDirective2002,
             new DirectiveValueCarrier<bool>(() => current, saved => current = saved));
-        var segments = new List<(int Index, bool Fixed, bool KeepsLine)>(switches.Count);
-        int o = 0;
-        foreach (var (index, fixedForm) in switches)
+        var segments = new List<(int Index, bool Fixed, bool KeepsLine)>();
+        for (int i = 0; i < lines.Length; i++)
         {
-            for (; o < stackOps.Count && stackOps[o].Index < index; o++) ApplyStackOp(stackOps[o].Index, stackOps[o].Op);
-            current = fixedForm ?? current;
-            segments.Add((index, current, false));
+            CompilerDirectiveLine d = default;
+            bool isDirective = DirectiveText(lines[i], current) is { } text && CompilerDirectiveLine.TryParse(text, out d);
+            // §7.3.24.3 4): "A SOURCE FORMAT directive that is the first line of a compilation group or library text
+            // may be in either fixed form or free form" — so `>>SOURCE FORMAT FREE` in column 1 of line 1 is a
+            // directive even though the text starts in fixed form, where column 1 is the sequence area.
+            if (!isDirective && i == 0 && DirectiveText(lines[0], !current) is { } other
+                && CompilerDirectiveLine.TryParse(other, out d) && d.Word == SourceFormatWord)
+                isDirective = true;
+            if (!isDirective) continue;
+            if (DirectiveStackOp.TryParse(d, i + 1, out var op))
+            {
+                bool before = current;
+                state.Apply(op);
+                if (current != before) segments.Add((i, current, true));
+            }
+            else if (d.Word == SourceFormatWord)
+            {
+                gates?.OnSourceFormatDirective(i + 1, d.Operand);
+                if (CompilerDirectiveCatalog.TryOperandWord(SourceFormatWord, d.Operand, out string w) && w is "FIXED" or "FREE")
+                    current = w == "FIXED";
+                segments.Add((i, current, false));
+            }
         }
-        for (; o < stackOps.Count; o++) ApplyStackOp(stackOps[o].Index, stackOps[o].Op);
         return segments;
-
-        void ApplyStackOp(int index, DirectiveStackOp op)
-        {
-            bool before = current;
-            state.Apply(op);
-            if (current != before) segments.Add((index, current, true));
-        }
     }
 
-    /// <summary>Match a <c>&gt;&gt;PUSH</c> / <c>&gt;&gt;POP</c> line in the raw (pre-normalization) text — the same
-    /// margin-R cut and fixed-form sequence-area allowance as <see cref="TryMatchDirective"/>.</summary>
-    private static bool TryMatchStackOp(string rawLine, int line, out DirectiveStackOp op)
+    /// <summary>The program-text area in which a compiler directive line is recognized, in the reference format in
+    /// effect (§7.3.3 SR3: "When the reference format is fixed-form, a compiler directive shall be written in the
+    /// program-text area"; SR2: "A compiler directive shall be preceded only by zero, one, or more space
+    /// characters") — character positions 8 through margin R of a SOURCE line in fixed form (a comment, debugging or
+    /// continuation line holds no directive), the whole line in free form — or null when the line holds none.</summary>
+    private static string? DirectiveText(string rawLine, bool fixedForm)
     {
-        string l = rawLine.TrimEnd('\r');
-        return DirectiveStackOp.TryParse(l.Length > MarginR ? l[..MarginR] : l, line, out op, allowSequenceArea: true);
+        string line = rawLine.TrimEnd('\r');
+        if (!fixedForm) return line;
+        return line.Length > SourceAreaStart && line[IndicatorColumn] == ' ' ? ProgramTextArea(line) : null;
+    }
+
+    /// <summary>For the <see cref="InitialReferenceFormat.Auto"/> detector only: the index of the first line that is a
+    /// &gt;&gt;SOURCE directive in EITHER reading (the format is not known yet — it is what is being detected), or
+    /// the line count. The detector classifies the text before it.</summary>
+    private static int FirstSourceDirectiveCandidate(string[] lines)
+    {
+        for (int i = 0; i < lines.Length; i++)
+            foreach (bool fixedForm in (ReadOnlySpan<bool>)[true, false])
+                if (DirectiveText(lines[i], fixedForm) is { } text
+                    && CompilerDirectiveLine.TryParse(text, SourceFormatWord, out _))
+                    return i;
+        return lines.Length;
     }
 
     /// <summary>Assemble output lines and their source lines into a <see cref="MappedText"/> of <paramref name="file"/>.</summary>
@@ -266,26 +295,6 @@ public static partial class ReferenceFormatProcessor
     /// <summary>Our documented margin R (Annex A item 158 / CONFORMANCE.md §7): the program-text area is columns
     /// 8–72, so column position <see cref="SourceAreaStart"/>+<see cref="SourceAreaWidth"/> = 72.</summary>
     private const int MarginR = SourceAreaStart + SourceAreaWidth;
-
-    /// <summary>Match a <c>&gt;&gt;SOURCE</c> directive line by its WORD — through the ONE compiler-directive line
-    /// parse (<see cref="CompilerDirectiveLine"/>), which knows the optional space after the indicator (§7.3.3
-    /// SR5) and removes a trailing inline comment (SR3/SR4). Text past margin R is ignored first (§6.3 — columns
-    /// 73+ are outside the program-text area; in fixed form they hold the card-image sequence tag the corpus
-    /// uses), and the fixed-form sequence area is allowed before the indicator because this stage runs BEFORE
-    /// normalization.
-    ///
-    /// <para>⛔ Recognition is by the directive WORD, never by the whole line's shape: the end-anchored regex this
-    /// replaced (<c>>>\s*SOURCE\s+(?:FORMAT\s+)?(?:IS\s+)?(FREE|FIXED)…</c>) failed to match a legal
-    /// <c>&gt;&gt;SOURCE FORMAT FIXED *&gt; switch</c>, so the line stayed in the text, the following segment was
-    /// read in the WRONG reference format, and the error surfaced on a line the user had not written wrong
-    /// (kb/Work PB794). A word-keyed match cannot fail that way — a malformed operand is now diagnosed, not
-    /// unseen.</para></summary>
-    private static bool TryMatchDirective(string rawLine, out string operand)
-    {
-        string l = rawLine.TrimEnd('\r');
-        return CompilerDirectiveLine.TryParse(
-            l.Length > MarginR ? l[..MarginR] : l, SourceFormatWord, out operand, allowSequenceArea: true);
-    }
 
     /// <summary>
     /// The per-compilation diagnostics of reference format — the ones only the §6.5 logical conversion can raise,
@@ -328,6 +337,14 @@ public static partial class ReferenceFormatProcessor
                 $"the floating indicator {indicator} is split across a continued line and its continuation line; all the "
                 + "characters of a multiple-character floating indicator shall be on the same line (ISO §6.2.3.2 SR3)",
                 new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn), default);
+
+        /// <summary>§6.3.3 / §6.2.2 — COBOLNET2616: the indicator area holds a character that is not a fixed indicator
+        /// (kb/Work PB1494). Every such line is reported; it is then read as a source line.</summary>
+        public void OnInvalidIndicator(int line, char indicator)
+            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FixedIndicatorInvalid.Code,
+                $"the indicator area (column 7) holds '{indicator}', which is not a fixed indicator: ISO §6.2.2 lists "
+                + "*, / (comment line), - (continuation line) and space (source line); a NIST CCVS program's column-7 "
+                + "conventions are honored under --nist", new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn), default);
 
         /// <summary>Any col-7 '-' continuation — OBSOLETE at 2023 (Annex F.2 item 4; VCR row 94).</summary>
         public void OnContinuation(int line)
@@ -384,6 +401,8 @@ public static partial class ReferenceFormatProcessor
     }
 
     /// <summary>
+    /// The <see cref="InitialReferenceFormat.Auto"/> extension's detector — NEVER the default (kb/Work PB1362: it reads
+    /// conforming fixed-form source with a non-numeric or blank sequence area and text past margin R as free form).
     /// Heuristic detection of fixed-form. Checks:
     /// - Lines are consistently >= 7 chars
     /// - Column 7 often contains space, *, or -

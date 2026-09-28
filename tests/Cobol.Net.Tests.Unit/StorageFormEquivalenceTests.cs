@@ -7,6 +7,7 @@ using CobolNet.CodeGen;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -34,10 +35,15 @@ internal static class StorageFormEquivalence
 
     /// <summary>Bind one .cob file and return (divergences, parsed-ok). A program that fails the FRONTEND (parse /
     /// missing COPY) is skipped (parsed-ok=false) — it exercises no StorageForm.</summary>
-    internal static (List<string> Divergences, bool Ok) Analyze(string path, int dialect)
+    /// <param name="nistTestName">A NIST CCVS program is read as the NIST harness reads it (<c>--nist</c>): its
+    /// column-7 letters are CCVS conventions only in that dialect (kb/Work PB1494), never §6.2.2 indicators.</param>
+    internal static (List<string> Divergences, bool Ok) Analyze(string path, int dialect, string? nistTestName = null)
     {
         var diags = new DiagnosticBag();
-        var frontend = new CnFrontend { DialectLevel = dialect };
+        var frontend = new CnFrontend
+        {
+            InitialFormat = InitialReferenceFormat.Auto, DialectLevel = dialect, NistTestName = nistTestName,
+        };
         // Resolve the NIST COPY library the SM/COPY suite needs (sibling copylib/, the CLI convention).
         if (Path.GetDirectoryName(Path.GetFullPath(path)) is { } srcDir
             && Path.GetFullPath(Path.Combine(srcDir, "..", "copylib")) is { } copylib && Directory.Exists(copylib))
@@ -219,7 +225,7 @@ public abstract class StorageFormNistEquivalenceTestsBase<TSlot>
         var allDivergences = new List<string>();
         foreach (string p in slice)
         {
-            var (divergences, ok) = StorageFormEquivalence.Analyze(p, 85);
+            var (divergences, ok) = StorageFormEquivalence.Analyze(p, 85, Path.GetFileNameWithoutExtension(p));
             if (!ok) continue;
             parsed++;
             allDivergences.AddRange(divergences.Select(d => $"{Path.GetFileName(p)}: {d}"));

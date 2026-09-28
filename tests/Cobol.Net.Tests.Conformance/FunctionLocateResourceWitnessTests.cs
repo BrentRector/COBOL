@@ -4,6 +4,7 @@ using CobolNet;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -32,7 +33,7 @@ public sealed class FunctionLocateResourceWitnessTests
     {
         string src = Path.Combine(dir, name + ".cob");
         src = CompiledProgramCache.StageSource(src, source);
-        var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, name + ".dll"), DialectLevel: 2023));
+        var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, name + ".dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
         Assert.True(r.Success, $"compile {name}: {string.Join("; ", r.Errors)}");
     }
 

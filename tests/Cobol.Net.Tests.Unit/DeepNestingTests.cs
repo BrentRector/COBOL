@@ -4,6 +4,7 @@ using System.Text;
 using CobolNet;
 using CobolNet.CodeGen;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -60,7 +61,7 @@ public sealed class DeepNestingTests : CobolNetTestBase
         PhysicalModel.Observer.Value = models.Add;   // AsyncLocal: only this test's own compilation reports here
         try
         {
-            var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, Path.Combine(TempDir, $"deep{depth}.dll")));
+            var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, Path.Combine(TempDir, $"deep{depth}.dll"), SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(result.Success, $"depth-{depth} compile failed: {result.Status}: {string.Join("\n", result.Errors)}");
         }
         finally { PhysicalModel.Observer.Value = null; }

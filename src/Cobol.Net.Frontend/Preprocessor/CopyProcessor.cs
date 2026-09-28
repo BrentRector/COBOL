@@ -17,7 +17,8 @@ public sealed class CopyProcessor(
     string sourceName = "<source>",
     int dialectLevel = 85,
     bool permissive = false,
-    CompilationInputs? inputs = null)
+    CompilationInputs? inputs = null,
+    bool ccvsIndicators = false)   // the --nist column-7 conventions for library text too (kb/Work PB1494)
 {
     /// <summary>The compilation's ambient-input gateway (kb/Work PB985): every copybook probe and read below goes
     /// through it, so the record names each library text the group incorporated AND each candidate that was not
@@ -771,7 +772,7 @@ public sealed class CopyProcessor(
     private MappedText NormalizeCopybookMapped(string text, string copybookPath, bool? copyFixed)
     {
         var mapped = ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, dialectLevel, permissive,
-            diagnostics: null, copybookPath, copyFixed, out var formats);
+            diagnostics: null, copybookPath, copyFixed, out var formats, ccvsIndicators);
         _referenceFormats[copybookPath] = formats;
         return mapped;
     }

@@ -4,6 +4,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Frontend.Diagnostics;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -47,7 +48,7 @@ public sealed class SymbolTableTests
         try
         {
             var diags = new DiagnosticBag();
-            var tree = new CnFrontend { DialectLevel = 2002 }.Parse(path, diags);
+            var tree = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = 2002 }.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var program = tree!.compilationGroup().SelectMany(g => g.programUnit()).First();
             var data = new DataBinder(new EditionContext(2002));

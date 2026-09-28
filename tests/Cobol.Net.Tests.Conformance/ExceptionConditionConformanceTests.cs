@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -1793,7 +1794,7 @@ public sealed class ExceptionConditionConformanceTests
                     STOP RUN.
                 """);
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "prog.dll"), DialectLevel: 2023));
+                src, Path.Combine(dir, "prog.dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             string generated = File.ReadAllText(Path.Combine(dir, "prog.g.cs"));
             Assert.DoesNotContain("ExceptionState", generated);

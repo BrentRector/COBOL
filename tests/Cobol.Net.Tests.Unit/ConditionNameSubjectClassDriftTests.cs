@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -121,7 +122,7 @@ public sealed class ConditionNameSubjectClassDriftTests
         {
             string src = Path.Combine(dir, "CNDRIFT.cob");
             File.WriteAllText(src, Program(decls, tests));
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, $"{klass}: " + string.Join("\n", r.Errors));
             Assert.NotNull(r.GeneratedCsPath);
 
@@ -213,7 +214,7 @@ public sealed class ConditionNameSubjectClassDriftTests
         {
             string src = Path.Combine(dir, "CNDRIFT.cob");
             File.WriteAllText(src, Program(decls, "            CONTINUE."));
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, CheckOnly: true));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             var codes = r.Errors
                 .SelectMany(e => e.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 .Where(w => w.StartsWith("COBOLNET", StringComparison.Ordinal))

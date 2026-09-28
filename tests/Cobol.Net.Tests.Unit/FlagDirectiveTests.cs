@@ -160,7 +160,7 @@ public sealed class FlagDirectiveTests
             string src = Path.Combine(dir, "flag.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "flag.dll"), DialectLevel: 2023, CheckOnly: true));
+                src, Path.Combine(dir, "flag.dll"), DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             return r.Warnings;
         }

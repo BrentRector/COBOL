@@ -4,6 +4,7 @@ using CobolNet;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -125,7 +126,7 @@ public sealed class RunUnitScopeHostTests
         {
             string src = CompiledProgramCache.StageSource(Path.Combine(dir, "RUSCOPE.cob"), Program);
             var r = CompiledProgramCache.Compile(
-                new CompilerDriver.Options(src, Path.Combine(dir, "RUSCOPE.dll"), DialectLevel: 2002));
+                new CompilerDriver.Options(src, Path.Combine(dir, "RUSCOPE.dll"), DialectLevel: 2002, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, $"compile RUSCOPE: {string.Join("; ", r.Errors)}");
             CompileHost(dir);
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "RUSCOPEHOST.dll"), dir);

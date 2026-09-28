@@ -338,7 +338,8 @@ public sealed class Compilation
 
         rawText = ReferenceFormatProcessor.StripNistArchiveMarkers(rawText);
         string normalizedText = ReferenceFormatProcessor.NormalizeToFreeFormMapped(rawText, dialectLevel: 85,
-            permissive: false, diagnostics: null, sourcePath, initialFixed: null, out var referenceFormats).Text;
+            permissive: false, diagnostics: null, sourcePath, initialFixed: null, out var referenceFormats,
+            ccvsIndicators: true).Text;   // the legacy oracle keeps its CCVS column-7 reading (kb/Work PB1494)
 
         // Conditional compilation (>>DEFINE / >>IF / >>ELSE / >>END-IF) runs on the free-form text BEFORE COPY
         // expansion, so an >>IF may include or omit COPY statements in its branches (ISO §7.3.16 GR1). It is an

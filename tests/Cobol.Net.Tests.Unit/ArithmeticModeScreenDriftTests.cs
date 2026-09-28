@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -188,7 +189,7 @@ public sealed class ArithmeticModeScreenDriftTests : CobolNetTestBase
     {
         string src = Path.Combine(TempDir, $"{tag}_{dialect}.cob");
         File.WriteAllText(src, source);
-        var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: dialect));
+        var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: dialect, SourceFormat: InitialReferenceFormat.Auto));
         // BOTH channels: 0806/0900 are errors, 0903 is a WARNING, and a test that read only Errors would report
         // "the obsolescence flag is missing" for a compiler that emits it perfectly.
         return [.. r.Errors, .. r.Warnings];

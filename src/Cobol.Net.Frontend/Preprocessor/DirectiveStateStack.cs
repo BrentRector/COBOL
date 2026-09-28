@@ -38,10 +38,10 @@ public readonly record struct DirectiveStackOp(int Line, DirectiveStackKind Kind
     }
 
     /// <summary>Parse <paramref name="rawLine"/> as a PUSH/POP directive line (see the other overload).</summary>
-    public static bool TryParse(string rawLine, int line, out DirectiveStackOp op, bool allowSequenceArea = false)
+    public static bool TryParse(string rawLine, int line, out DirectiveStackOp op)
     {
         op = default;
-        return CompilerDirectiveLine.TryParse(rawLine, out var d, allowSequenceArea) && TryParse(d, line, out op);
+        return CompilerDirectiveLine.TryParse(rawLine, out var d) && TryParse(d, line, out op);
     }
 }
 

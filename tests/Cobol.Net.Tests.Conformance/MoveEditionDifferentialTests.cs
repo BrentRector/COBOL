@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -71,7 +72,7 @@ public sealed class MoveEditionDifferentialTests
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
             var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll,
-                DialectLevel: edition, Permissive: permissive));
+                DialectLevel: edition, Permissive: permissive, SourceFormat: InitialReferenceFormat.Auto));
             if (!result.Success)
                 return (false, "", $"[compile] {result.Status}: {string.Join("\n", result.Errors)}");
             return CutRunner.Run(dll, dir);

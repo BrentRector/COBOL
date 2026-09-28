@@ -9,6 +9,7 @@ using CobolNet.Frontend.Generated;
 using CobolNet.Tests.Shared;
 using CobolNet.Validation;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -89,7 +90,7 @@ public sealed class FormatWordDriftTests
 
     private static (CobolParserCore.CompilationUnitContext? Tree, CnFrontend Fe) Parse(string path, int edition)
     {
-        var fe = new CnFrontend { DialectLevel = edition };
+        var fe = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = edition };
         fe.AddCopySearchPath(Path.GetDirectoryName(path)!);
         return (fe.Parse(path, new DiagnosticBag()), fe);
     }

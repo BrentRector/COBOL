@@ -20,6 +20,8 @@ namespace CobolNet.Cli;
 /// (ISO §13.18.52.4 GR4 / GR5 b). A REPRESENTATION axis, orthogonal to <paramref name="DialectLevel"/> and
 /// <paramref name="Permissive"/>: every edition grants the identical latitude. Defaults to
 /// <see cref="CobolNet.Runtime.SignEncoding.Ibm"/> — IBM / Micro Focus compatibility.</param>
+/// <param name="SourceFormat">The reference format the source starts in (<c>--source-format</c>; kb/Work PB1362):
+/// fixed form, ISO §7.3.24.3 2)'s default, unless <c>free</c> or <c>auto</c> is selected.</param>
 internal sealed record CliOptions(
     string SourcePath,
     string? OutputPath,
@@ -28,4 +30,6 @@ internal sealed record CliOptions(
     IReadOnlyList<string> CopyPaths,
     bool Run,
     bool Permissive,
-    CobolNet.Runtime.SignEncoding SignEncoding = CobolNet.Runtime.SignEncoding.Ibm);
+    CobolNet.Runtime.SignEncoding SignEncoding = CobolNet.Runtime.SignEncoding.Ibm,
+    CobolNet.Frontend.Preprocessor.InitialReferenceFormat SourceFormat =
+        CobolNet.Frontend.Preprocessor.InitialReferenceFormat.Fixed);

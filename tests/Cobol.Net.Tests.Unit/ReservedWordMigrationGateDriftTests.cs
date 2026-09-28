@@ -3,6 +3,7 @@
 using CobolNet;
 using CobolNet.Editions;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -119,7 +120,7 @@ public sealed class ReservedWordMigrationGateDriftTests
             wordOrEmpty.Length == 0 ? "" : " " + wordOrEmpty));
         return CompilerDriver.Compile(new CompilerDriver.Options(
             src, Path.Combine(dir, $"p{tag}.dll"), DialectLevel: edition, Permissive: permissive,
-            CheckOnly: true)).Success;
+            CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto)).Success;
     }
 
     /// <summary>⛔ THE REGRESSION THAT LET RW104A PRINT IN THE WRONG PLACE. For every reservation-gated word and

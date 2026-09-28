@@ -9,6 +9,7 @@ using Antlr4.Runtime.Tree;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Generated;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -28,7 +29,7 @@ public sealed class PerformFormat3ParseTests
         try
         {
             var diags = new DiagnosticBag();
-            var tree = new CnFrontend { DialectLevel = edition }.Parse(path, diags);
+            var tree = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = edition }.Parse(path, diags);
             return (tree, diags);
         }
         finally { try { File.Delete(path); } catch { /* best-effort */ } }

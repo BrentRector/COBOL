@@ -1,4 +1,4 @@
-*> reject-at: 85 2002 2014 2023
+      *> reject-at: 85 2002 2014 2023
       *> ISO 12.3.7.3 SR16 e2 (cite.py --check 12.3.7.3 "When the IN
       *> phrase is not specified, the ordinal position specified by
       *> integer-1 shall exist in the native alphanumeric character set"

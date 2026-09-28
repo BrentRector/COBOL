@@ -39,20 +39,19 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
     /// Parse <paramref name="line"/> as a compiler-directive line. Returns false when the line is not one —
     /// which is the common case, so the cheap tests come first and nothing is allocated on the way out.
     /// </summary>
-    /// <param name="line">One source line. A trailing carriage return is tolerated (the text may still be CRLF).</param>
+    /// <param name="line">The PROGRAM-TEXT AREA of one line — the whole line in free form, character positions 8 to
+    /// margin R in fixed form (§7.3.3 SR3), which the reference-format stage extracts in the format in effect before
+    /// asking (kb/Work PB1361) and every later stage already holds. Only spaces may precede the indicator (§7.3.3
+    /// SR2). A trailing carriage return is tolerated (the text may still be CRLF).</param>
     /// <param name="directive">The word and its operand, on success.</param>
-    /// <param name="allowSequenceArea">Permit digits and spaces before the indicator — the FIXED-FORM reading, for
-    /// the one stage that runs before reference-format normalization (§6.3: the sequence area occupies columns 1-6
-    /// and the directive is written in the program-text area). In free form only spaces may precede it (§7.3.3
-    /// SR2), which is the default.</param>
-    public static bool TryParse(string line, out CompilerDirectiveLine directive, bool allowSequenceArea = false)
+    public static bool TryParse(string line, out CompilerDirectiveLine directive)
     {
         directive = default;
         if (line.Length == 0) return false;
         ReadOnlySpan<char> s = line.AsSpan().TrimEnd('\r');
 
         int i = 0;
-        while (i < s.Length && (s[i] == ' ' || s[i] == '\t' || (allowSequenceArea && char.IsAsciiDigit(s[i])))) i++;
+        while (i < s.Length && (s[i] == ' ' || s[i] == '\t')) i++;
         if (i + 1 >= s.Length || s[i] != '>' || s[i + 1] != '>') return false;
         i += 2;
         while (i < s.Length && (s[i] == ' ' || s[i] == '\t')) i++;   // SR5: the space after the indicator is optional
@@ -72,10 +71,10 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
     /// The per-stage form: a stage that owns one directive asks for its own word and gets the operand text the
     /// whole compiler agrees on.
     /// </summary>
-    public static bool TryParse(string line, string word, out string operand, bool allowSequenceArea = false)
+    public static bool TryParse(string line, string word, out string operand)
     {
         operand = "";
-        if (!TryParse(line, out var d, allowSequenceArea)
+        if (!TryParse(line, out var d)
             || !d.Word.Equals(word, StringComparison.OrdinalIgnoreCase)) return false;
         operand = d.Operand;
         return true;

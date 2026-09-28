@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Text;
 using CobolNet.Tests.Shared;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Characterization;
 
@@ -76,7 +77,7 @@ public static class CompilerProbe
         {
             string dll = Path.Combine(dir, "p.dll");
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                sourcePath, dll, DialectLevel: edition, CheckOnly: !emit));
+                sourcePath, dll, DialectLevel: edition, CheckOnly: !emit, SourceFormat: InitialReferenceFormat.Auto));
             var diags = r.Errors.Concat(r.Warnings).ToList();   // errors then warnings; the snapshot sorts for stability
             string? cs = emit && r.GeneratedCsPath is { } p && File.Exists(p) ? File.ReadAllText(p) : null;
             return new ProbeResult(r.Success, diags, cs);

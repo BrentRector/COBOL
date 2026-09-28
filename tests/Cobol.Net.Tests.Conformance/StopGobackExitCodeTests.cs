@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -382,7 +383,7 @@ public sealed class StopGobackExitCodeTests
     {
         string src = Path.Combine(dir, name + ".cob");
         src = CompiledProgramCache.StageSource(src, source);
-        var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, name + ".dll"), DialectLevel: 2023));
+        var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, name + ".dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
         Assert.True(r.Success, $"compile {name}: {string.Join("; ", r.Errors)}");
     }
 

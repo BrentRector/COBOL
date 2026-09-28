@@ -18,13 +18,89 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class ReferenceFormatLogicalConversionTests
 {
-    private static (MappedText Text, DiagnosticBag Bag) Convert(string source, int std = 2023)
+    private static (MappedText Text, DiagnosticBag Bag) Convert(string source, int std = 2023,
+        InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
     {
         var bag = new DiagnosticBag();
-        return (ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, std, permissive: false, bag, "t.cob"), bag);
+        return (ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, std, permissive: false, bag, "t.cob", initial), bag);
     }
 
     private static string[] Codes(DiagnosticBag bag) => bag.Diagnostics.Select(d => d.Code).ToArray();
+
+    [Theory] // kb/Work PB1362 — §7.3.24.3 2) "The default reference format of a compilation group is fixed form":
+    // with no directive and no selection, a non-numeric or blank sequence area and text past margin R stay fixed.
+    [InlineData("ABC001 DISPLAY \"X\".\n", "DISPLAY \"X\".")]
+    [InlineData("       DISPLAY \"X\".                                                     TAG00001\n", "DISPLAY \"X\".")]
+    public void NoDirective_NoSelection_IsReadInFixedForm(string src, string expectedLine)
+        => Assert.Equal(expectedLine, Convert(src).Text.Text.Split('\n')[0].Trim());
+
+    [Fact] // kb/Work PB1362 — the Free selection reads the same text from column 1 (the §4.2.10 3) mechanism).
+    public void FreeSelection_ReadsFromColumnOne()
+        => Assert.Equal("ABC001 DISPLAY \"X\".",
+            Convert("ABC001 DISPLAY \"X\".\n", initial: InitialReferenceFormat.Free).Text.Text.Split('\n')[0]);
+
+    [Theory] // kb/Work PB1361 — §7.3.3 SR2/SR3 + §6.3.2: a directive is recognized in the program-text area OF THE
+    // FORMAT IN EFFECT. Fixed: positions 8-72 of a source line, the sequence area holding anything; free: the line.
+    // Each row: the text, then the resultant first two lines — a consumed directive leaves an empty slot and the next
+    // line is read FREE (from column 1); otherwise the next line is read FIXED (from column 8).
+    [InlineData("SEQ001 >>SOURCE FORMAT FREE\nDISPLAY \"F\".\n", "", "DISPLAY \"F\".")]               // letters in cols 1-6
+    [InlineData("       12 >>SOURCE FORMAT FREE\n       DISPLAY \"F\".\n", "12 >>SOURCE FORMAT FREE", "DISPLAY \"F\".")]
+    [InlineData("      *>>SOURCE FORMAT FREE\n     X DISPLAY \"F\".\n", "", "DISPLAY \"F\".")]           // a comment line
+    public void FixedFormDirective_IsRecognizedInTheProgramTextArea(string src, string first, string second)
+    {
+        string[] lines = Convert(src, std: 2002).Text.Text.Split('\n');
+        Assert.Equal(first, lines[0].TrimEnd());
+        Assert.Equal(second, lines[1].TrimEnd());
+    }
+
+    [Theory] // kb/Work PB1361 — in free form the whole line is the program-text area (§6.4.1): a directive past column
+    // 72 switches the format, and a sequence number before `>>` makes the line program text, not a directive.
+    [InlineData(74, "000100     DISPLAY \"G\".", "DISPLAY \"G\".")]
+    [InlineData(0, "000100     DISPLAY \"G\".", "DISPLAY \"G\".")]
+    public void FreeFormDirective_AnywhereAfterSpaces_Switches(int indent, string fixedLine, string expected)
+    {
+        string src = ">>SOURCE FORMAT FREE\n" + new string(' ', indent) + ">>SOURCE FORMAT FIXED\n" + fixedLine + "\n";
+        Assert.Equal(expected, Convert(src, std: 2002).Text.Text.Split('\n')[2].Trim());
+    }
+
+    [Theory] // kb/Work PB1494 — §6.3.3 / §6.2.2: a character that is not a fixed indicator is COBOLNET2616 and the line
+    // is read as source; the NIST CCVS letters keep their CCVS meaning only under --nist (ccvsIndicators).
+    [InlineData('E', false, true, "DISPLAY \"L\".")]
+    [InlineData('X', false, true, "DISPLAY \"L\".")]
+    [InlineData('E', true, false, "")]                 // CCVS: an excluded alternate line (discarded)
+    [InlineData('X', true, false, "DISPLAY \"L\".")]   // CCVS: a primary-configuration line
+    [InlineData('D', false, false, "<debug>DISPLAY \"L\".")]   // COBOL-85's debugging line, with or without --nist
+    public void IndicatorArea_OnlyFixedIndicators_OutsideNist(char indicator, bool ccvs, bool diagnosed, string line)
+    {
+        var bag = new DiagnosticBag();
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped("000100" + indicator + "DISPLAY \"L\".\n", 2023,
+            permissive: false, bag, "t.cob", initialFixed: true, out _, ccvsIndicators: ccvs);
+        Assert.Equal(diagnosed, Codes(bag).Contains("COBOLNET2616"));
+        Assert.Equal(line.Replace("<debug>", ReferenceFormatProcessor.DebugLineCarrier), m.Text.Split('\n')[0]);
+    }
+
+    [Fact] // kb/Work PB1494 — §6.5 5): a source line's program-text area is copied. The comment-entry reading of
+    // AUTHOR / INSTALLATION / DATE-WRITTEN / DATE-COMPILED / SECURITY / REMARKS belongs to the IDENTIFICATION DIVISION;
+    // a PROCEDURE DIVISION paragraph so named and the lines after it were silently dropped.
+    public void CommentEntryParagraphs_AreOnlyInTheIdentificationDivision()
+    {
+        string src = "000100 IDENTIFICATION DIVISION.\n"
+                   + "000200 PROGRAM-ID. P.\n"
+                   + "000300 AUTHOR. ANY TEXT, \"EVEN QUOTES.\n"
+                   + "000400     MORE COMMENT-ENTRY TEXT.\n"
+                   + "000500 PROCEDURE DIVISION.\n"
+                   + "000600 REMARKS.\n"
+                   + "000700     DISPLAY \"IN-REMARKS\".\n";
+        string[] lines = Convert(src).Text.Text.Split('\n');
+        Assert.Equal(["", ""], lines[2..4]);                           // the comment-entry is commentary
+        Assert.Equal("REMARKS.", lines[5]);                            // a procedure paragraph is program text
+        Assert.Equal("DISPLAY \"IN-REMARKS\".", lines[6].Trim());
+    }
+
+    [Fact] // kb/Work PB1361 — SR2: in free form "000100 >>SOURCE ..." is program text; the line is kept, not consumed.
+    public void FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective()
+        => Assert.Equal("000100 >>SOURCE FORMAT FIXED",
+            Convert(">>SOURCE FORMAT FREE\n000100 >>SOURCE FORMAT FIXED\n", std: 2002).Text.Text.Split('\n')[1]);
 
     [Theory] // §6.3.5 "Comment lines and blank lines may be interspersed among lines containing the parts of a literal".
     [InlineData("000600* a comment with a \"quote")]
@@ -103,10 +179,11 @@ public sealed class ReferenceFormatLogicalConversionTests
         => Assert.Equal(diagnosed, Codes(Convert(src).Bag).Contains("COBOLNET2496"));
 
     [Theory] // The 2002 introduction gate (floating-comment-indicator-2002) — fixed form only, once per compilation.
-    [InlineData("000100     MOVE A TO X. *> c\n000200     MOVE A TO X. *> d\n", 85, 1)]
-    [InlineData("000100     MOVE A TO X. *> c\n", 2002, 0)]
-    [InlineData("000100* a fixed comment line is COBOL-85\n000200     MOVE A TO X.\n", 85, 0)]
-    [InlineData("MOVE A TO X. *> c\n", 85, 0)]   // auto-detected free form (a >>SOURCE line would be gated itself)
-    public void FloatingComment_IntroductionGate_FixedFormOnly(string src, int std, int expected)
-        => Assert.Equal(expected, Codes(Convert(src, std).Bag).Count(c => c == "COBOLNET0900"));
+    [InlineData("000100     MOVE A TO X. *> c\n000200     MOVE A TO X. *> d\n", 85, 1, InitialReferenceFormat.Fixed)]
+    [InlineData("000100     MOVE A TO X. *> c\n", 2002, 0, InitialReferenceFormat.Fixed)]
+    [InlineData("000100* a fixed comment line is COBOL-85\n000200     MOVE A TO X.\n", 85, 0, InitialReferenceFormat.Fixed)]
+    // free form selected by --source-format (a >>SOURCE line would be gated itself); kb/Work PB1362
+    [InlineData("MOVE A TO X. *> c\n", 85, 0, InitialReferenceFormat.Free)]
+    public void FloatingComment_IntroductionGate_FixedFormOnly(string src, int std, int expected, InitialReferenceFormat initial)
+        => Assert.Equal(expected, Codes(Convert(src, std, initial).Bag).Count(c => c == "COBOLNET0900"));
 }

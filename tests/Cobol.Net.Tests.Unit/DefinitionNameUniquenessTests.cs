@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -41,7 +42,7 @@ public sealed class DefinitionNameUniquenessTests : CobolNetTestBase
         string srcPath = Path.Combine(TempDir, "dnu.cob");
         File.WriteAllText(srcPath, source);
         var result = CompilerDriver.Compile(new CompilerDriver.Options(
-            srcPath, Path.Combine(TempDir, "dnu.dll"), DialectLevel: dialectLevel, CheckOnly: true));
+            srcPath, Path.Combine(TempDir, "dnu.dll"), DialectLevel: dialectLevel, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
         return result.Success ? "" : string.Join("\n", result.Errors);
     }
 

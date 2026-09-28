@@ -336,13 +336,13 @@
   "ordinal": 1,
   "subject": "Reference format",
   "rule-digest": "1937f8d5669e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#TryMatchDirective; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#WithPoppedFormats",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#DirectiveText",
+  "test-ref": "conformance:2002/pb1361_directive_in_format_in_effect; unit:ReferenceFormatLogicalConversionTests.FreeFormDirective_AnywhereAfterSpaces_Switches",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1361: 'If the line is a SOURCE FORMAT directive, the reference format mode is determined and the SOURCE FORMAT directive line is logically discarded.' (--check OK §6.5 1)). NormalizeToFreeFormMapped collects the switches (TryMatchDirective, word-keyed via CompilerDirectiveLine, margin-R cut, sequence area allowed), partitions into segments whose format is the declared one, and emits a BLANK line in the directive's slot (line 178) — discarded content, line numbering preserved. Malformed operand is consumed and diagnosed (PB794, landed). Adversarial: a '*' comment line whose text is '>>SOURCE FORMAT FREE' is NOT taken as a directive (rf15.cob -> [OK15]); a free-form '*> >>SOURCE FORMAT FIXED' comment likewise (rf16.cob -> [OK16]). Unit tests SourceFormatTests (tests/CobolSharp.Tests.Unit/Preprocessor) drive CobolNet.Frontend's ReferenceFormatProcessor directly with spec-derived expectations (directive line blank; following segment in the declared format). || REFUTED: DIVERGES — The directive line must be recognized (and the mode determined) in whichever format is in effect. TryMatchDirective / TryMatchStackOp cut EVERY raw line at MarginR (col 72) before matching, but in free form the ENTIRE line is the program-text area (§6.4.1) and a directive may be preceded by any number of spaces (§7.3.3 SR2). A legal free-form '>>SOURCE FORMAT FIXED' whose operand lies past column 72 is truncated to '>>SOURCE FORMA', diagnosed COBOLNET1911 as malformed, the mode is NOT switched, and the following fixed-form lines are then misread (COBOL0001). Main paths hold (fixed/free directive lines, indented free directive with inline comment, library-text directives + revert per §7.3.24.3 GR3/GR5: probes p3/p4/p5/p7/p8 all correct), so the defect is the margin-R cut applied format-blind. || Editions (adjudicator, verbatim): 2002/2014/2023 (the >>SOURCE FORMAT directive is part of the §7.3 compiler-directive facility; a COBOL-85 source has no directive line — gated COBOLNET0900) || Registrar 15d witness fix: test-ref 'unit:SourceFormatTests.DirectiveLine_BecomesBlank_PreservesLineCount' dropped (a LEGACY CobolSharp test, not in tests/Cobol.Net.Tests.Unit)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1361 (w70b): '1) If the line is a SOURCE FORMAT directive, the reference format mode is determined and the SOURCE FORMAT directive line is logically discarded.' (cite.py --check 6.5 -> OK §6.5 1)). The mode is now STATE of an in-order walk over the lines, and a directive line is recognized against the program-text area of the mode in effect: a free-form '>>SOURCE FORMAT FIXED' whose operand lies past column 72 switches the mode (the golden's line 13 starts it at column 75), where the format-blind margin-R cut used to truncate it to '>>SOURCE FORMA' (COBOLNET1911) and leave the mode unchanged. The directive line is discarded to an empty slot as before.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.5-2",
@@ -396,12 +396,12 @@
   "ordinal": 5,
   "subject": "Reference format",
   "rule-digest": "ff0cdad9ea7f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ConvertFixedToFree; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#CommentEntryParagraphs; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FirstAreaAWord",
-  "test-ref": "",
+  "verdict": "PARTIAL",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#IsCommentEntryText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#KindOf",
+  "test-ref": "unit:ReferenceFormatLogicalConversionTests.CommentEntryParagraphs_AreOnlyInTheIdentificationDivision; unit:ReferenceFormatLogicalConversionTests.IndicatorArea_OnlyFixedIndicators_OutsideNist; conformance:negative/pb1494-indicator-not-fixed",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1494: 'If the line is a fixed-form line, contains a source indicator, and is not a continuation line, the program text area of that line is copied to the resultant compilation group.' (--check OK §6.5 5)). The default arm copies cols 8-72 (margin R, DOC-A.1-158; golden conformance:2023/l1_margin_r_program_text_area pins the area boundary). BUT a space-indicator line whose first Area-A word is AUTHOR/INSTALLATION/DATE-WRITTEN/DATE-COMPILED/SECURITY/REMARKS is NOT copied: it and every following source line up to the next Area-A word are rewritten as '*>' comments, at EVERY edition and in EVERY division (the COBOL-85 comment-entry heuristic is unscoped). REMARKS is not a reserved word in ISO 1989:2023 (grep of the spec: no occurrence), so it is a legal paragraph-name. Probe rf18.cob (paragraphs MAIN-PARA / REMARKS / LAST-PARA, fall-through): prints only 'START' — the REMARKS paragraph's DISPLAY \"IN-REMARKS\" is SILENTLY dropped; expected START then IN-REMARKS. rf17.cob `PERFORM REMARKS` -> COBOL0001 (the paragraph no longer exists). Also noted (not decisive, indicator characters outside §6.2.2's four are undefined): indicators D/d S/s Y/y P/p J/j H/h E/e U/u silently make the line a comment (NIST CCVS accommodations) with no diagnostic. Finding F5. || Editions (adjudicator, verbatim): 85/2002/2014/2023 retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FirstAreaAWord (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
+  "notes": "kb/Work PB1494 (w70b): '5) If the line is a fixed-form line, contains a source indicator, and is not a continuation line, the program text area of that line is copied to the resultant compilation group.' (cite.py --check 6.5 -> OK §6.5 5)). FIXED: the obsolete comment-entry reading (AUTHOR/INSTALLATION/DATE-WRITTEN/DATE-COMPILED/SECURITY/REMARKS header and its Area-B body discarded as commentary) now applies only inside an IDENTIFICATION DIVISION, so a PROCEDURE DIVISION paragraph named REMARKS and the lines after it are copied (probe rf18: before, only START printed and the rest was silently dropped; after, the lines reach the parser, which then rejects REMARKS as a keyword - a separate reserved-word lead); and a line whose indicator area is not a fixed indicator (§6.2.2, OK) is diagnosed COBOLNET2616 instead of being silently dropped (E) or compiled (X) - the CCVS letters are honored under --nist only. PARTIAL residue: at 2002+ a FIXED-FORM identification comment paragraph is still discarded whole, so the §6.5 5) copy does not happen and the identification-comments-removed-2002 gate (COBOLNET0902) never sees the paragraph that free form reports - registered as a w70b lead.",
   "state": "GAP"
  },
  {
@@ -1401,13 +1401,13 @@
   "ordinal": 2,
   "subject": "Compiler directives",
   "rule-digest": "407508469427",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#DirectiveText",
+  "test-ref": "conformance:negative/pb1361-directive-after-program-text; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; unit:ReferenceFormatLogicalConversionTests.FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1361 (registrar 15a). §7.3.3 SR2 'A compiler directive shall be preceded only by zero, one, or more space characters.' (cite.py --check 7.3.3 OK). TryParse accepts only spaces (and tab, the implementor's tab treatment) before '>>' (digits too only in the allowSequenceArea mode used by the fixed-form pre-normalization scan, where columns 1-6 are the sequence area, not program text). Probes: S2A 'DISPLAY \"S2A\". >>TURN EC-ALL CHECKING OFF' and S2B '... >>DEFINE VV AS 1' are rejected (COBOL0001 at the '>'). The rejection is a generic parse error, not a named diagnostic. No spec-derived test targets this rule specifically. || REFUTED: PARTIAL — The pre-normalization >>SOURCE / >>PUSH / >>POP scan (ReferenceFormatProcessor.TryMatchDirective / TryMatchStackOp -> CompilerDirectiveLine.TryParse(allowSequenceArea:true)) models the fixed-form sequence area as 'any run of digits or spaces anywhere before >>'. That is wrong both ways: (a) it ACCEPTS a directive preceded by non-space program text - '       12 >>SOURCE FORMAT FREE' (digits in the program-text area, fixed form) and '000100 >>SOURCE FORMAT FIXED' written in a FREE-form segment both switch the format, violating SR2; (b) it MISSES a legal fixed-form directive whose sequence area is non-numeric (§6.3.2: the sequence number area 'may consist of any character in the computer's coded character set'): 'ABCDEF >>SOURCE FORMAT FREE' after an explicit >>SOURCE FORMAT FIXED is not recognized, the following lines are read in the wrong reference format, and the program compiles and silently prints nothing. The post-normalization stages (DEFINE/IF) get SR2 right (X7, Y5). Half verified, half defective => PARTIAL. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1361 (w70b): '2) A compiler directive shall be preceded only by zero, one, or more space characters.' (cite.py --check 7.3.3 -> OK §7.3.3 2)). CompilerDirectiveLine.TryParse has ONE reading (only spaces/tab before >>); the allowSequenceArea 'digits or spaces' mode is deleted. The reference-format stage hands it the program-text area of the format in effect (DirectiveText: positions 8 to margin R of a source line in fixed form, §7.3.3 SR3 'When the reference format is fixed-form, a compiler directive shall be written in the program-text area' -> OK §7.3.3 3); the whole line in free form), so '       12 >>SOURCE FORMAT FREE' (fixed) and '000100 >>SOURCE FORMAT FIXED' (free) are program text, not switches, and are rejected (COBOL0001); the post-normalization stages already held the same reading.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-3",
@@ -3726,13 +3726,13 @@
   "ordinal": 2,
   "subject": "SOURCE FORMAT directive",
   "rule-digest": "0a3560ea5346",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#IsFixedForm",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/InitialReferenceFormat.cs#InitialReferenceFormat; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#InitialFormat; src/Cobol.Net.Compiler/CompilerDriver.cs#Options; src/Cobol.Net.Cli/Program.cs#BuildParser",
+  "test-ref": "conformance:85/pb1362_fixed_form_default; unit:CliParserTests.SourceFormat_DefaultsToFixed_SelectsFreeOrAuto_AndRejectsAnythingElse; unit:ReferenceFormatLogicalConversionTests.NoDirective_NoSelection_IsReadInFixedForm",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1362 (registrar 15a). Rule: 'The default reference format of a compilation group is fixed form.' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 2)). Code: with no directive (and for the initial segment before the first directive) NormalizeToFreeFormMapped AUTO-DETECTS via the IsFixedForm heuristic (numeric sequence area, or a col-7 glyph vetoed by any text past col 72, over a >60% ratio); CONFORMANCE.md DOC-A.1-158 calls this 'an implementor extension beyond the standard'. It is not a permitted one: §4.2.10 3) (--check OK) allows different functionality for a required element only 'provided that standard-conforming behavior is also implemented and that an implementor-defined mechanism exists for selection of the nonstandard behavior' - there is no option that selects the fixed default. Probes, all legal fixed-form programs with no directive, all REJECTED: p1 (blank sequence area, no comment lines, card tags in cols 73-80 -> COBOL0001 near 'SFP10001'); p2 (same plus a '*' comment line -> 'unexpected *'); p3 (sequence area 'ABCDEF', which §6.3.2 permits -> 'unexpected ABCDEF'). Expected: each compiles and DISPLAYs Pn-OK. Harm: rejects legal source. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility; X3.23-1985 has no directives and only fixed reference format); the fixed default's consequence also governs 1985, whose only format is fixed",
-  "state": "GAP"
+  "notes": "kb/Work PB1362 (w70b): '2) The default reference format of a compilation group is fixed form.' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 2)). The initial format is now a SELECTION whose default is FIXED at every entry point (CLI --source-format, CompilerDriver.Options.SourceFormat, Frontend.InitialFormat); free and the structural auto-detection (IsFixedForm) are the §4.2.10 3) implementor-defined selection mechanism for a nonstandard behavior ('provided that standard-conforming behavior is also implemented and that an implementor-defined mechanism exists for selection of the nonstandard behavior', cite.py --check 4.2.10 -> OK §4.2.10 3)), documented in docs/CONFORMANCE.md DOC-A.1-158. Probes rf7/rf8/sf_p1/sf_p2/sf_p3 (letters or blank in the sequence area, tags past margin R, a '*' comment line) now compile fixed and print their OK lines; under --source-format auto they still fail as before, which is the extension's documented hazard.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.24.3-3",
@@ -3756,13 +3756,13 @@
   "ordinal": 4,
   "subject": "SOURCE FORMAT directive",
   "rule-digest": "ea453b6ec6f6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#TryMatchDirective; src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments",
+  "test-ref": "conformance:2002/pb1361_directive_in_format_in_effect; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; unit:ReferenceFormatLogicalConversionTests.FloatingIndicatorInsideALiteral_IsContent",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1361 (registrar 15a). Rule: 'A SOURCE FORMAT directive that is the first line of a compilation group or library text may be in either fixed form or free form.' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 4)). Code: TryMatchDirective scans every raw line with allowSequenceArea:true before any format is decided, so both forms are recognized on line 1: p6a (`000100 >>SOURCE FORMAT IS FREE` then free text past col 72) and p6c (`       >>SOURCE FORMAT FREE`, col 8) run correctly; p6b (free `>>SOURCE FIXED` at col 1, then fixed lines with cols 73-80 tags) runs correctly. Defect: a fixed-form first line whose sequence area holds non-digits - p6d `SEQ001 >>SOURCE FORMAT FREE` - is not recognized ('unexpected SEQ001'), because CompilerDirectiveLine.TryParse admits only digits/spaces before the indicator, while §6.3.2 lets the sequence area hold 'any character' (--check OK). Expected P6D-OK. Same mechanism as GR1 defect (b). Existing unit:SourceFormatTests.TopOfFile_Directive_GovernsWholeFile covers only the free-form half; no fixed-form-first-line test. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility; X3.23-1985 has no directives and only fixed reference format)",
-  "state": "GAP"
+  "notes": "kb/Work PB1361 (w70b): '4) A SOURCE FORMAT directive that is the first line of a compilation group or library text may be in either fixed form or free form.' (cite.py --check 7.3.24.3 -> OK §7.3.24.3 4)). FormatSegments reads line 1 in the format in effect and, failing that, as a SOURCE FORMAT directive in the other format, so '>>SOURCE FORMAT FREE' in column 1 of line 1 switches a text that starts fixed, and 'SEQ001 >>SOURCE FORMAT FREE' (letters in the sequence area, §6.3.2 'may consist of any character' -> OK §6.3.2) is a fixed-form directive (probe p6d prints P6D-OK; before: COBOL0001 unexpected 'SEQ001').",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.24.3-5",
@@ -57352,11 +57352,11 @@
   "subject": "SOURCE FORMAT directive",
   "rule-digest": "08ebfd22913e",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#TryMatchDirective; src/Cobol.Net.Editions/DirectiveOperandSyntax.cs#DirectiveOperandSyntax",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Editions/DirectiveOperandSyntax.cs#DirectiveOperandSyntax; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments",
   "test-ref": "conformance:negative/pb794-source-format-unknown; conformance:negative/pb794-source-format-literal; conformance:2023/pb794_directive_operands; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_AcceptsAConformingOperand",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": ">> SOURCE FORMAT IS { FIXED | FREE }, verified against the PRINTED page (folio 84): SOURCE, FIXED and FREE are underlined required words, FORMAT and IS are 5.2.3 optional words, and the braces are a plain required choice. The optional words are the row's optionalWords, so >>SOURCE FREE and >>SOURCE FORMAT IS FREE both select FREE; an operand that is neither, or none at all, is COBOLNET1911 and the line is still consumed (the reference format in effect carries on, since the directive selected none). kb/Work PB794.",
+  "notes": ">> SOURCE FORMAT IS { FIXED | FREE }, verified against the PRINTED page (folio 84): SOURCE, FIXED and FREE are underlined required words, FORMAT and IS are 5.2.3 optional words, and the braces are a plain required choice. The optional words are the row's optionalWords, so >>SOURCE FREE and >>SOURCE FORMAT IS FREE both select FREE; an operand that is neither, or none at all, is COBOLNET1911 and the line is still consumed (the reference format in effect carries on, since the directive selected none). kb/Work PB794. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#TryMatchDirective (kb/Work PB1361 (w70b) replaced the format-blind TryMatchDirective pre-scan with the in-order FormatSegments walk, which recognizes the directive by its word through CompilerDirectiveLine in the program-text area of the format in effect)",
   "state": "OK"
  },
  {

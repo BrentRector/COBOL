@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -61,7 +62,7 @@ public sealed class CheckOnlyCompileTests
         try
         {
             string src = WriteTemp(dir, "CHKOK", GoodProgram);
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, CheckOnly: true));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             // No runnable assembly and no generated C# were written (the backend + file writes are skipped).
             Assert.Empty(Directory.GetFiles(dir, "*.dll"));
@@ -80,9 +81,9 @@ public sealed class CheckOnlyCompileTests
         try
         {
             string src = WriteTemp(dir, "CHK23", EditionGated2023);
-            var check = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: edition, CheckOnly: true));
+            var check = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             var full = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, OutputPath: Path.Combine(dir, "full.dll"), DialectLevel: edition));
+                src, OutputPath: Path.Combine(dir, "full.dll"), DialectLevel: edition, SourceFormat: InitialReferenceFormat.Auto));
             Assert.Equal(expectSuccess, check.Success);
             // The edition-gating verdict is identical whether or not the backend runs.
             Assert.Equal(full.Success, check.Success);
@@ -101,7 +102,7 @@ public sealed class CheckOnlyCompileTests
         try
         {
             string src = WriteTemp(dir, "CHK23", EditionGated2023);
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 85, CheckOnly: true));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 85, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.Equal(CompilerDriver.Outcome.BindError, r.Status);
             // The DELETE FILE introduction gate reports through the edition band (COBOLNET09xx).
             Assert.Contains(r.Errors, e => e.Contains("COBOLNET09"));
@@ -136,7 +137,7 @@ public sealed class CheckOnlyCompileTests
         try
         {
             string src = WriteTemp(dir, "CHKLOUD", BindsCleanEmitsLoud);
-            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, CheckOnly: true));
+            var r = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             // No emit artifacts: the CheckOnly path returns before EmitBound (GeneratedCsPath stays null and no
             // .g.cs/.dll is written) — the observable "EmitBound is not invoked" contract.

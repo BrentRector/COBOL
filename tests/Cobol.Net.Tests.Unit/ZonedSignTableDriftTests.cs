@@ -3,6 +3,7 @@
 using CobolNet.Binding.Model;
 using CobolNet.Runtime;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -124,7 +125,7 @@ public sealed class ZonedSignTableDriftTests
             Digits = 3, FractionDigits = 0, Signed = true,
             Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned,
         }.SignEncoding);
-        Assert.Equal(SignEncoding.Ibm, new CobolNet.CompilerDriver.Options("x.cob").SignEncoding);
+        Assert.Equal(SignEncoding.Ibm, new CobolNet.CompilerDriver.Options("x.cob", SourceFormat: InitialReferenceFormat.Auto).SignEncoding);
 
         var pic = new PicInfo(PicCategory.Numeric, Usage.Display, Length: 3, Digits: 3, Scale: 0, Signed: true);
         Assert.DoesNotContain("SignEncoding", pic.ProfileInitializer(SignEncoding.Ibm));

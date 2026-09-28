@@ -4,6 +4,7 @@ using System.Diagnostics;
 using CobolNet.Tests.Shared;                             // ProcessObserver — the ONE child-process observer
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -28,7 +29,7 @@ public sealed class AcceptDifferentialTests
             string src = Path.Combine(dir, "prog.cob");
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialect));
+            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: dialect, SourceFormat: InitialReferenceFormat.Auto));
             if (!result.Success)
                 return (false, "", $"[compile] {result.Status}: {string.Join("\n", result.Errors)}");
 

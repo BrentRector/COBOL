@@ -3,6 +3,7 @@
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -143,7 +144,7 @@ public sealed class KeywordSpellingDriftTests
             string src = Path.Combine(dir, "prog.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, CheckOnly: true));
+                src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, r.Success ? [] : [.. r.Errors]);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

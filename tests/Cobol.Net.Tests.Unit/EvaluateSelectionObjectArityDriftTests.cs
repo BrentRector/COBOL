@@ -6,6 +6,7 @@ using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -100,7 +101,7 @@ public sealed class EvaluateSelectionObjectArityDriftTests
         try
         {
             var diags = new DiagnosticBag();
-            var tree = new CnFrontend { DialectLevel = 2023 }.Parse(path, diags);
+            var tree = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = 2023 }.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics.Select(d => d.ToString())));
             Assert.NotNull(tree);
 

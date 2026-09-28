@@ -20,7 +20,7 @@ public class SourceFormatTests
         string src =
             "000100 IDENTIFICATION DIVISION.\n" +
             "000200 PROGRAM-ID. X.\n" +
-            ">>SOURCE FORMAT IS FREE\n" +
+            "000300 >>SOURCE FORMAT IS FREE\n" +       // §7.3.3 SR3: in fixed form, in the program-text area
             "PROCEDURE DIVISION.\n" +
             "MAIN. DISPLAY \"HI\".\n";
         string free = Norm(src);
@@ -60,7 +60,8 @@ public class SourceFormatTests
            // no continuation joins.
     public void DirectiveLine_BecomesBlank_PreservesLineCount()
     {
-        string src = "IDENTIFICATION DIVISION.\n>>SOURCE FORMAT IS FREE\nPROGRAM-ID. Z.\n";
+        // The text starts in fixed form (§7.3.24.3 2)), so the mid-file directive is in the program-text area (§7.3.3 SR3).
+        string src = "       IDENTIFICATION DIVISION.\n       >>SOURCE FORMAT IS FREE\nPROGRAM-ID. Z.\n";
         string free = Norm(src);
         Assert.Equal(src.Split('\n').Length, free.Split('\n').Length);   // no continuation joins ⇒ line count preserved
         Assert.Equal("", free.Split('\n')[1].Trim());                    // the discarded directive occupies a blank slot
@@ -74,7 +75,7 @@ public class SourceFormatTests
         string src =
             "000100 DISPLAY \"HI\".\n" +
             "\n" +                              // blank source line terminating the fixed segment
-            ">>SOURCE FORMAT IS FREE\n" +
+            "000300 >>SOURCE FORMAT IS FREE\n" +       // §7.3.3 SR3: in fixed form, in the program-text area
             "DISPLAY \"BYE\".\n";
         string free = Norm(src);
         Assert.Equal(src.Split('\n').Length, free.Split('\n').Length);   // no line lost

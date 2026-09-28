@@ -30,8 +30,8 @@ public sealed class ReferenceFormatMap
     /// <paramref name="line"/> of this text — §7.3.24.3 3)'s "reference format that was in effect for the COPY
     /// statement" — or null when this text holds no format to hand on and the library text's own is detected.
     /// <para>A format a directive stated, or one the library text inherited, is handed on as the rule says. A
-    /// DETECTED format is this compiler's documented extension over §7.3.24.3 2)'s fixed-form default (text with no
-    /// SOURCE FORMAT directive is classified by its structure — DEVLOG 931): a text detected FIXED showed the fixed
+    /// DETECTED format comes only from the documented <c>--source-format auto</c> extension over §7.3.24.3 2)'s
+    /// fixed-form default (text is classified by its structure — kb/Work PB1362): a text detected FIXED showed the fixed
     /// column structure and hands fixed form on; a text detected FREE showed only that it is not column-bound —
     /// seven-space indentation is legal in both formats — which says nothing of the library text, so that library text
     /// is classified by its own structure, exactly as the compilation group was.</para></summary>

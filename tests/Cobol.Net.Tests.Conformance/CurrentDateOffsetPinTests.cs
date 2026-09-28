@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -44,7 +45,7 @@ public sealed class CurrentDateOffsetPinTests
                     DISPLAY CD
                     STOP RUN.
                 """);
-            var compiled = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: 2023));
+            var compiled = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(compiled.Success, string.Join("\n", compiled.Errors));
 
             var (ok, stdout, detail) = CutRunner.Run(dll, dir, null,

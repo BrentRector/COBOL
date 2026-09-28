@@ -189,7 +189,7 @@ public sealed class ExceptionCheckingPerformDirectiveBanDriftTests
         try
         {
             var diags = new DiagnosticBag();
-            var frontend = new CnFrontend { DialectLevel = 2023 };
+            var frontend = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = 2023 };
             var tree = frontend.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var edition = new EditionContext(2023);

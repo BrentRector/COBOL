@@ -3,6 +3,7 @@
 using System.Text.Json;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -116,6 +117,13 @@ internal static class ConformanceCorpus
                         : throw new InvalidOperationException(
                             $"'*> options: sign-encoding={kv[1]}' is not one of "
                             + string.Join(", ", CobolNet.Runtime.ZonedSign.OptionSpellings)),
+                    // kb/Work PB1362: the corpus runs under the auto-detection extension it was authored against; a
+                    // golden that pins the STANDARD default (fixed form, §7.3.24.3 2)) or free form states it here.
+                    "source-format" => InitialReferenceFormatOption.TryParse(kv[1], out var fmt)
+                        ? options with { SourceFormat = fmt }
+                        : throw new InvalidOperationException(
+                            $"'*> options: source-format={kv[1]}' is not one of "
+                            + string.Join(", ", InitialReferenceFormatOption.OptionSpellings)),
                     _ => throw new InvalidOperationException($"'*> options:' key '{kv[0]}' is not recognized"),
                 };
             }
@@ -175,9 +183,11 @@ public abstract class CorpusRunnerTestsBase<TSlot>
             // A golden's library text sits beside it, and the edition directory is named as a COPY search path
             // (`--copy DIR`) exactly as a user names theirs: the default COBOL library (DOC-A.1-40, kb/Work
             // PB1355) is the working directory plus the --copy directories, never the source file's own.
+            // kb/Work PB1362: the corpus was authored against reference-format DETECTION, so it compiles under the
+            // `--source-format auto` extension; a golden pinning the standard default says `source-format=fixed`.
             var r = CompiledProgramCache.Compile(ConformanceCorpus.ApplySourceOptions(
                 File.ReadAllText(src),
-                new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition), CopyPaths: [dir])));
+                new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition), CopyPaths: [dir], SourceFormat: InitialReferenceFormat.Auto)));
             Assert.True(r.Success, $"[{edition}/{name}] must compile strict: {string.Join("\n", r.Errors)}");
             if (!File.Exists(outFile)) return;   // compile-only entry (no expected output recorded)
             var (ran, stdout, detail) = CutRunner.Run(dll, tmp);
@@ -267,7 +277,7 @@ public sealed class CorpusRunnerTests
     [Fact]
     public void SourceOptionsHeader_IsScopedToTheCommentBlock_AndRefusesWhatItCannotHonour()
     {
-        var baseline = new CobolNet.CompilerDriver.Options("x.cob");
+        var baseline = new CobolNet.CompilerDriver.Options("x.cob", SourceFormat: InitialReferenceFormat.Auto);
         Assert.Equal(CobolNet.Runtime.SignEncoding.Ibm,
             ConformanceCorpus.ApplySourceOptions("       IDENTIFICATION DIVISION.\n", baseline).SignEncoding);
         Assert.Equal(CobolNet.Runtime.SignEncoding.Ascii,
@@ -300,6 +310,6 @@ public sealed class CorpusRunnerTests
         string src = File.ReadAllText(
             Path.Combine(ConformanceCorpus.Root, "2023", "pb803_sign_encoding_ascii.cob"));
         Assert.Equal(CobolNet.Runtime.SignEncoding.Ascii,
-            ConformanceCorpus.ApplySourceOptions(src, new CobolNet.CompilerDriver.Options("x.cob")).SignEncoding);
+            ConformanceCorpus.ApplySourceOptions(src, new CobolNet.CompilerDriver.Options("x.cob", SourceFormat: InitialReferenceFormat.Auto)).SignEncoding);
     }
 }

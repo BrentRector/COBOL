@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Compiler;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -39,7 +40,7 @@ public sealed class SizeErrorDispositionTests
         {
             string src = Path.Combine(dir, "prog.cob"), dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: 2023));
+            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, "[compile] " + string.Join("\n", r.Errors));
             return CutRunner.RunExit(dll, dir);
         }

@@ -8,6 +8,7 @@ using CobolNet.Runtime;
 using CobolNet.Runtime.Collation;
 using CobolNet.Runtime.Exceptions;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -240,7 +241,7 @@ public sealed class StandardCompareTests
                 + "       MAIN.\n" + body
                 + "           STOP RUN.\n");
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "sc.dll"), DialectLevel: edition, CheckOnly: true));
+                src, Path.Combine(dir, "sc.dll"), DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, r.Errors, r.Warnings);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

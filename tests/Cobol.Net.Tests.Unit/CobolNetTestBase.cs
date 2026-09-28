@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Diagnostics;
 using CobolNet;
+using CobolNet.Frontend.Preprocessor;
 using CobolNet.Tests.Shared;                             // ProcessObserver — the ONE child-process observer
 
 namespace CobolNet.Tests.Unit;
@@ -35,7 +36,7 @@ public abstract class CobolNetTestBase : IDisposable
         string dllPath = Path.Combine(TempDir, "prog.dll");
         File.WriteAllText(srcPath, source);
 
-        var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, dllPath, DialectLevel: dialectLevel));
+        var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, dllPath, DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
         if (!result.Success)
             return (false, "", $"{result.Status}: {string.Join("\n", result.Errors)}");
 

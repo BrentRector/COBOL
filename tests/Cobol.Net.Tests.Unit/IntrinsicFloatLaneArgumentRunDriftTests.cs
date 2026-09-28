@@ -6,6 +6,7 @@ using CobolNet.Binding;
 using CobolNet.CodeGen.Emit;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -243,6 +244,6 @@ public sealed class IntrinsicFloatLaneArgumentRunDriftTests : CobolNetTestBase
             """;
         string srcPath = Path.Combine(TempDir, programId + ".cob");
         File.WriteAllText(srcPath, source);
-        return CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023, Permissive: true));
+        return CompilerDriver.Compile(new CompilerDriver.Options(srcPath, DialectLevel: 2023, Permissive: true, SourceFormat: InitialReferenceFormat.Auto));
     }
 }

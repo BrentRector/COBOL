@@ -3,6 +3,7 @@
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -159,7 +160,7 @@ public sealed class UseTierEditionInvarianceDriftTests
             string src = Path.Combine(dir, "usetier.cob");
             src = CompiledProgramCache.StageSource(src, Source.Replace("{0}", directives));
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "usetier.dll"), DialectLevel: edition));
+                src, Path.Combine(dir, "usetier.dll"), DialectLevel: edition, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, $"--std {edition}: " + string.Join("\n", r.Errors));
             Assert.NotNull(r.GeneratedCsPath);
             return File.ReadAllText(r.GeneratedCsPath!);

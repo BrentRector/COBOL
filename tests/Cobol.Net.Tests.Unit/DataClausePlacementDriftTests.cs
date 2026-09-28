@@ -9,6 +9,7 @@ using CobolNet.Binding;
 using CobolNet.Frontend.Cst;
 using CobolNet.Frontend.Diagnostics;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -207,7 +208,7 @@ public sealed class DataClausePlacementDriftTests
         try
         {
             var diags = new DiagnosticBag();
-            var tree = new CnFrontend().Parse(path, diags);
+            var tree = new CnFrontend() { InitialFormat = InitialReferenceFormat.Auto }.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             Assert.NotNull(tree);
             var program = tree!.compilationGroup().SelectMany(g => g.programUnit()).First();

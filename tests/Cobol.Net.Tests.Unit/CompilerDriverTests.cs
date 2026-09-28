@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -51,7 +52,7 @@ public sealed class CompilerDriverTests : CobolNetTestBase
     public void CompilerDriver_ReportsSourceNotFound()
     {
         var result = CompilerDriver.Compile(new CompilerDriver.Options(
-            Path.Combine(TempDir, "does-not-exist.cob")));
+            Path.Combine(TempDir, "does-not-exist.cob"), SourceFormat: InitialReferenceFormat.Auto));
         Assert.Equal(CompilerDriver.Outcome.SourceNotFound, result.Status);
         Assert.False(result.Success);
     }
@@ -61,5 +62,5 @@ public sealed class CompilerDriverTests : CobolNetTestBase
     // LATEST standard (2023), not 85. Edition-specific callers (the NIST harness, the differential harness, per-edition
     // conformance) pass DialectLevel explicitly, so this default flip does not affect them.
     public void CompilerDriver_DefaultsToLatestEdition()
-        => Assert.Equal(2023, new CompilerDriver.Options("x.cob").DialectLevel);
+        => Assert.Equal(2023, new CompilerDriver.Options("x.cob", SourceFormat: InitialReferenceFormat.Auto).DialectLevel);
 }

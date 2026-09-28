@@ -4,6 +4,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Frontend.Diagnostics;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 using CnFrontend = CobolNet.Frontend.Frontend;
 
 namespace CobolNet.Tests.Unit;
@@ -183,7 +184,7 @@ public sealed class ImplicitRecordRedefinitionTests
         try
         {
             var diags = new DiagnosticBag();
-            var tree = new CnFrontend { DialectLevel = 2023 }.Parse(path, diags);
+            var tree = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = 2023 }.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             Assert.NotNull(tree);
             var ed = new EditionContext(2023);

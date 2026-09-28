@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -31,7 +32,7 @@ public sealed class SequentialFileIoSpecTests
             src = CompiledProgramCache.StageSource(src, source);
             string dll = Path.Combine(dir, "prog.dll");
             var r = CompiledProgramCache.Compile(new CobolNet.CompilerDriver.Options(
-                src, dll, DialectLevel: edition, Permissive: permissive));
+                src, dll, DialectLevel: edition, Permissive: permissive, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, $"must compile at --std {edition}"
                 + (permissive ? " --permissive: " : " strict: ") + string.Join("\n", r.Errors));
             var (ran, stdout, detail) = CutRunner.Run(dll, dir);

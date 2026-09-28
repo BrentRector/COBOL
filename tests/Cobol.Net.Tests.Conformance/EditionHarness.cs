@@ -3,6 +3,7 @@
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -35,7 +36,7 @@ public static class EditionHarness
                 File.WriteAllText(Path.Combine(Path.GetDirectoryName(src)!, name), text);
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
                 src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive,
-                CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!]));
+                CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!], SourceFormat: InitialReferenceFormat.Auto));
             return (r.Success, r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")], r.Warnings);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
@@ -84,7 +85,7 @@ public static class EditionHarness
             string src = Path.Combine(dir, "prog.cob");
             src = CompiledProgramCache.StageSource(src, source);
             string dll = Path.Combine(dir, "prog.dll");
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: edition, Permissive: permissive));
+            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: edition, Permissive: permissive, SourceFormat: InitialReferenceFormat.Auto));
             if (!r.Success) return (false, "", $"[compile] {r.Status}: {string.Join("\n", r.Errors)}");
             return CutRunner.Run(dll, dir);
         }

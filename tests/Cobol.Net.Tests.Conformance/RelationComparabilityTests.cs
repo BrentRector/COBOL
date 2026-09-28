@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -262,7 +263,7 @@ public sealed class RelationComparabilityTests
         {
             string src = CompiledProgramCache.StageSource(Path.Combine(dir, "prog.cob"), source);
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, "prog.dll"),
-                DialectLevel: edition, CheckOnly: true));
+                DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             return r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")];
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

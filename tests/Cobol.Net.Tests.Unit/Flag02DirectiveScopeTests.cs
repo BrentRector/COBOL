@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Unit;
 
@@ -78,7 +79,7 @@ public sealed class Flag02DirectiveScopeTests
             string src = Path.Combine(dir, "flag02.cob");
             File.WriteAllText(src, source);
             var r = CompilerDriver.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "flag02.dll"), DialectLevel: edition, CheckOnly: true));
+                src, Path.Combine(dir, "flag02.dll"), DialectLevel: edition, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             return r.Warnings;
         }

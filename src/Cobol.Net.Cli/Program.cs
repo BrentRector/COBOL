@@ -3,6 +3,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using CobolNet;
+using CobolNet.Frontend.Preprocessor;
 using CobolNet.Runtime;
 
 namespace CobolNet.Cli;
@@ -96,10 +97,27 @@ internal static class Program
                 result.AddError($"--sign-encoding must be one of {string.Join(", ", ZonedSign.OptionSpellings)} (got {v}).");
         });
 
+        // kb/Work PB1362: the reference format the source starts in. ISO §7.3.24.3 2) makes FIXED form the default;
+        // free form and the structural auto-detection are the implementor-defined selection mechanism §4.2.10 3)
+        // requires for a nonstandard behavior (docs/CONFORMANCE.md DOC-A.1-158). A >>SOURCE FORMAT directive in the
+        // text switches the format whichever one it started in. An unknown value is a CLI argument error.
+        var sourceFormatOption = new Option<string?>("--source-format")
+        {
+            Description = "Reference format the source starts in, before any >>SOURCE FORMAT directive: fixed "
+                + "(default — ISO 7.3.24.3), free, or auto (detect fixed or free form from the text's layout).",
+            HelpName = string.Join("|", InitialReferenceFormatOption.OptionSpellings),
+        };
+        sourceFormatOption.Validators.Add(result =>
+        {
+            if (result.GetValueOrDefault<string?>() is { } v && !InitialReferenceFormatOption.TryParse(v, out _))
+                result.AddError($"--source-format must be one of "
+                    + $"{string.Join(", ", InitialReferenceFormatOption.OptionSpellings)} (got {v}).");
+        });
+
         var root = new RootCommand("cobol — translate a COBOL source unit to typed-native .NET (the Roslyn backend).")
         {
             sourceArgument, outputOption, nistOption, stdOption, permissiveOption, copyOption, runOption,
-            signEncodingOption,
+            signEncodingOption, sourceFormatOption,
         };
 
         CliOptions Resolve(ParseResult parse)
@@ -117,11 +135,13 @@ internal static class Program
             // The validator above has already refused any unparseable value, so a false here can only be the
             // ABSENT option — the documented IBM default (kb/Work PB803).
             _ = ZonedSign.TryParseOption(parse.GetValue(signEncodingOption), out var signEncoding);
+            // Likewise: false can only be the absent option — fixed form, the standard default (kb/Work PB1362).
+            _ = InitialReferenceFormatOption.TryParse(parse.GetValue(sourceFormatOption), out var sourceFormat);
 
             return new CliOptions(
                 source, parse.GetValue(outputOption), nistName, std,
                 parse.GetValue(copyOption) ?? [], parse.GetValue(runOption), parse.GetValue(permissiveOption),
-                signEncoding);
+                signEncoding, sourceFormat);
         }
 
         // A no-emit BATCH check subcommand (the INV-1 continuity sweep fast path): parse + edition-validate +
@@ -184,7 +204,7 @@ internal static class Program
     {
         var result = CompilerDriver.Compile(new CompilerDriver.Options(
             options.SourcePath, options.OutputPath, options.NistTestName, options.DialectLevel, options.CopyPaths,
-            options.Permissive, SignEncoding: options.SignEncoding));
+            options.Permissive, SignEncoding: options.SignEncoding, SourceFormat: options.SourceFormat));
 
         // Edition warnings (obsolete/archaic 0903 flags; removed constructs under --permissive) print to stderr
         // ALWAYS — success or failure — so migration users see them without a failing build (P2.1).
