@@ -1,0 +1,13 @@
+{
+ "_frozen": "⛔ FROZEN EVIDENCE — append-only log of learnings-consolidation runs (kb/Work/PB1711). Each object records how far a run read the DEVLOG; the next run reads only entries above the latest consolidated_through_entry. Never edit a past object.",
+ "runs": [
+  {
+   "run": "consolidation-1",
+   "date": "2026-09-28",
+   "consolidated_through_entry": 1755,
+   "entries_read": [1, 1755],
+   "candidates": 145,
+   "note": "First consolidation (the agent that wrote the withdrawn LEARNINGS.md, claude-skills c686033/c27bbd1), started ~12:05 PDT when DEVLOG's top entry was 1755. Entries 1756-1757 landed during the run and may have been partly read; the next run starts at 1756 and uses provenance to merge any overlap. Candidates did not record source entry numbers; validators' cited sources are captured into candidates.jsonl as provenance where available."
+  }
+ ]
+}
