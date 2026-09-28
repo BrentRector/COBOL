@@ -718,8 +718,8 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
 
     /// <summary>Is the operand described with a STANDARD floating-point usage (§3.166 / §3.167 — the
     /// FLOAT-BINARY and FLOAT-DECIMAL families, read from the ONE place they are written down).</summary>
-    private static bool IsStandardFloat(BoundFieldOperand f) => f.Place.Item.OperandPic is { IsFloat: true } p
-        && (UsageFamilies.IsStandardBinaryFloat(p.Usage) || UsageFamilies.IsStandardDecimalFloat(p.Usage));
+    private static bool IsStandardFloat(BoundFieldOperand f) =>
+        f.Place.Item.OperandPic is { } p && UsageFamilies.IsStandardFloat(p.Usage);
 
     /// <summary>One floating-point class question over the operand's OWN carrier: its typed <c>float</c>/<c>double</c>
     /// field, or — for a float stored as its IEEE window (a REDEFINES view, a whole-group-aliased leaf) — the

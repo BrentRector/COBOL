@@ -10161,13 +10161,13 @@
   "ordinal": 1,
   "subject": "Simple sign condition",
   "rule-digest": "25711529bf72",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#BindSignConditionOn; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#BindComparison; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsFormat2FloatSign; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#BindOperandExpr",
-  "test-ref": "conformance:2023/pb171_sign_condition_operands",
+  "test-ref": "conformance:2023/pb171_sign_condition_operands; conformance:2002/ca8_float_sign_format2; conformance:2014/pb1471_sign_condition_float_partition",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1471 (registrar 15c). SR1: 'Arithmetic-expression-1 shall be any single numeric data item described with a usage other than a standard floating-point usage, or any form of arithmetic expression' (cite.py --check 8.8.4.7.3 1) OK). The operand-closure half is enforced. A non-numeric item is refused: probe p3.cob, IF X IS POSITIVE with X PIC X(3), gives COBOLNET0844, although the message cites §8.8.1.1 rather than the SR1 text the binder passes. Also refused: a non-numeric literal (PB171 landed), an ALL literal (PB218 landed) and an address-identifier (PB1021). The operand is the whole expression, breadth-first (pb171 AB-P/AB-N). The NOTE's parenthesized standard float (FB) is Format 1 (probe: +0 NOT POSITIVE). The PARTITION half diverges. A single FLOAT-SHORT/-LONG/-EXTENDED item has a 'usage other than a standard floating-point usage' (§3.166/§3.167), so it is an arithmetic-expression-1, but IsFormat2FloatSign (Pic.IsFloat) classifies it as Format 2 (see the finding). pb171 is spec-derived for the closure shapes it pins. Its FL=-2 FLOAT-SHORT line passes under either format, so it does not witness the partition.",
-  "state": "GAP"
+  "notes": "kb/Work PB1471 LANDED (wave 70 A). SR1: 'Arithmetic-expression-1 shall be any single numeric data item described with a usage other than a standard floating-point usage, or any form of arithmetic expression' (cite.py --check 8.8.4.7.3 1) OK). The operand closure was already enforced (non-numeric item COBOLNET0844, non-numeric literal PB171, ALL literal PB218, address-identifier PB1021; pb171 pins them). The PARTITION half now conforms: ConditionBinder.IsFormat2FloatSign asks UsageFamilies.IsStandardFloat (the ONE §3.166/§3.167 set), so a bare FLOAT-SHORT / FLOAT-LONG / FLOAT-EXTENDED (and COMP-1 / COMP-2) item is arithmetic-expression-1 and takes GR1's algebraic test. Witness: conformance:2002/ca8_float_sign_format2 (FLOAT-LONG/-SHORT/-EXTENDED +0 NOT POSITIVE, -0 NOT NEGATIVE, IS ZERO, EVALUATE WHEN POSITIVE/NEGATIVE -> OTHER) and conformance:2014/pb1471_sign_condition_float_partition (FLOAT-LONG beside FLOAT-BINARY-64 in one program; (FB) parenthesized is Format 1).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.4.7.3-2",
@@ -10176,13 +10176,13 @@
   "ordinal": 2,
   "subject": "Simple sign condition",
   "rule-digest": "8d5f5fdb9881",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsFormat2FloatSign; src/Cobol.Net.Frontend/Expressions/SoleOperand.cs",
-  "test-ref": "",
+  "test-ref": "conformance:2014/pb1471_sign_condition_float_partition; conformance:2014/l1c32_sign_condition_format2",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1471 (registrar 15c). SR2: 'Data-name-1 shall be the name of a single data item in the data division described with a standard floating-point usage, and that name shall not be enclosed in parentheses' (cite.py --check 8.8.4.7.3 2) OK). §3.166/§3.167 define the standard floating-point usages as float-binary-32/-64/-128 and float-decimal-16/-34 only. The 'not enclosed in parentheses' half conforms: SoleDataReference returns null for a parenthesized, unary or operator form, so (FB) is Format 1 (probe). The usage half DIVERGES. IsFormat2FloatSign is ctx.Refs.Probe(dref) is { Item.Pic.IsFloat: true }, and PicInfo.IsFloat includes Float/Double (COMP-1/COMP-2), FloatShort, FloatLong and FloatExtended. PicInfo.IsStandardFloat, the correct §3.166/§3.167 set, exists but is not used. Probe p2.cob: FLOAT-LONG 0 IS POSITIVE gives true, -0 IS NEGATIVE gives true, and FLOAT-EXTENDED 0 IS POSITIVE gives true. Spec (Format 1, GR1): all false. Edge not verified: a subscripted or qualified data-name-1 (SoleDataReference admits subscripts).",
-  "state": "GAP"
+  "notes": "kb/Work PB1471 LANDED (wave 70 A). SR2: 'Data-name-1 shall be the name of a single data item in the data division described with a standard floating-point usage, and that name shall not be enclosed in parentheses' (cite.py --check 8.8.4.7.3 2) OK); §3.166 'usages float-binary-32, float-binary-64, and float-binary-128', §3.167 'usages float-decimal-16 and float-decimal-34' (cite.py OK). Both halves conform: the usage half is UsageFamilies.IsStandardFloat (was PicInfo.IsFloat, which admitted FLOAT-SHORT/-LONG/-EXTENDED and COMP-1/COMP-2); the parenthesis half is SoleDataReference (null for a parenthesized, unary or operator form). Both call sites (BindSignConditionOn and the EVALUATE BindPartialComparison) share the one predicate. Witness pb1471_sign_condition_float_partition: FLOAT-BINARY-64 and -32 +0 IS POSITIVE true; (FB) +0 NOT POSITIVE; FLOAT-LONG +0 NOT POSITIVE; EVALUATE FB WHEN POSITIVE selects, EVALUATE FL WHEN POSITIVE does not.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.4.7.4-1",
@@ -10191,13 +10191,13 @@
   "ordinal": 1,
   "subject": "Simple sign condition",
   "rule-digest": "af34fb2ba800",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsFormat2FloatSign; src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs#RenderSign",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs#RenderSign; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsFormat2FloatSign",
+  "test-ref": "conformance:2002/ca8_float_sign_format2; conformance:2014/pb1471_sign_condition_float_partition; conformance:2023/pb171_sign_condition_operands",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1471 (registrar 15c). GR1a: 'If the POSITIVE phrase is specified, the result is true if the value is greater than zero, and false if the value is zero or less than zero' (cite.py --check 8.8.4.7.4 OK, 1) a)). RenderSign's Format-1 arm (algebraic >0/<0/==0, CompareU for unsigned-wide, DecSign for SDIDI after PB84 landed) is correct and was probed: N=-5 NEGATIVE true, N - N ZERO true, unsigned M=0 NOT POSITIVE true, N*-2 POSITIVE true (--std 85); (FB) with FB=+0.0 NOT POSITIVE. DIVERGES because SR1 makes a single FLOAT-SHORT / FLOAT-LONG / FLOAT-EXTENDED item a Format 1 operand (§3.166/§3.167 exclude those usages from the standard floating-point usages), but it is routed to the Format-2 sign-BIT test. IsFormat2FloatSign tests Item.Pic.IsFloat, which includes FloatShort/FloatLong/FloatExtended and COMP-1/COMP-2, instead of PicInfo.IsStandardFloat. Probe p2.cob (2023 and --std 2002): after MOVE 0 TO FL (FLOAT-LONG), IF FL IS POSITIVE prints FL0 POS (spec: false, because zero is not greater than zero). FLOAT-EXTENDED and FLOAT-SHORT behave the same way. After COMPUTE FL = FL * -1, IF FL IS NEGATIVE prints NEG (spec: false). EVALUATE FL WHEN POSITIVE selects POSITIVE for 0. The answer is wrong in every edition from 2002 on: FLOAT-LONG exists since 2002, but Format 2 not until 2014. The golden conformance:2002/ca8_float_sign_format2 PINS this wrong answer (F2-PZERO-POS / F2-NZERO-NEG on FLOAT-LONG). It is not spec-derived and must be corrected with the fix.",
-  "state": "GAP"
+  "notes": "kb/Work PB1471 LANDED (wave 70 A). GR1a POSITIVE 'false if the value is zero or less than zero', GR1b NEGATIVE 'false if it is zero or greater than zero', GR1c ZERO 'true if the value is zero, and false otherwise' (cite.py --check 8.8.4.7.4 1) OK). RenderSign's Format-1 arm (algebraic >0/<0/==0, CompareU for unsigned-wide, DecSign for SDIDI) was already correct; the divergence was the partition routing implementor-defined floats to the Format-2 sign-bit arm, fixed in IsFormat2FloatSign. Witness ca8_float_sign_format2 (2002): FLOAT-LONG / FLOAT-SHORT / FLOAT-EXTENDED +0.0 IS POSITIVE false, -0.0 IS NEGATIVE false, both IS ZERO true, EVALUATE WHEN POSITIVE / NEGATIVE on a zero selects OTHER, 3.5 IS POSITIVE true. That golden previously PINNED the wrong sign-bit answer on FLOAT-LONG and was rewritten from the rule.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.4.7.4-2",
@@ -10206,13 +10206,13 @@
   "ordinal": 2,
   "subject": "Simple sign condition",
   "rule-digest": "8a7be27ff1e3",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs#RenderSign; src/Cobol.Net.Compiler/CodeGen/Emit/SendingRef.cs#SignCondition; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsFormat2FloatSign",
-  "test-ref": "",
+  "test-ref": "conformance:2014/pb1471_sign_condition_float_partition; conformance:2014/l1c32_sign_condition_format2",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1471 (registrar 15c). GR2a/b: POSITIVE/NEGATIVE is true iff 'the sign of the content ... is positive/negative as specified for its basic floating-point interchange format ... regardless of whether the content ... would evaluate to true in a NUMERIC class test or a ZERO sign test'. GR2c: ZERO is true for a valid representation of zero 'regardless of whether the sign ... is positive or negative' (cite.py --check 8.8.4.7.4 2) OK). RenderSign's Format2Float arm emits !double.IsNegative(v) / double.IsNegative(v) / v == 0.0. That reads the sign bit (NaN and Inf included; widening binary32 to double preserves the sign), keeps ZERO sign-agnostic, and gives false for NaN. SendingRef.SignCondition suppresses EC-DATA-NOT-FINITE per §14.6.13.2 rule 3. Probed with p1b.cob: FLOAT-BINARY-64 +0 POSITIVE true, +0 ZERO true, -0 NEGATIVE true, -0 ZERO true, -0 NOT POSITIVE true, -2.5 NEGATIVE true and NOT ZERO; FLOAT-BINARY-32 +0 POS, -0 NEG; EVALUATE FB WHEN POSITIVE with +0 selects POSITIVE. FLOAT-BINARY-128 and FLOAT-DECIMAL-16/-34 are refused with COBOLNET1564 as processor-dependent (Annex A.3 items 17/19), so their GR2 behavior is outside the claim, not a divergence. PARTIAL for two reasons: (1) the NaN and infinity edges the NOTE singles out were verified by reading only; no probe constructed a NaN or Inf. (2) The SAME predicate over-applies this rule to FLOAT-SHORT/-LONG/-EXTENDED, which the GR-8.8.4.7.4-1 / SR-8.8.4.7.3-2 finding owns.",
-  "state": "GAP"
+  "notes": "kb/Work PB1471 LANDED (wave 70 A). GR2a/b: POSITIVE/NEGATIVE is true iff 'the sign of the content of the data item identified by data-name-1 is positive/negative ... regardless of whether the content of that item would evaluate to true in a NUMERIC class test or a ZERO sign test'; GR2c ZERO sign-agnostic (cite.py --check 8.8.4.7.4 2) OK). RenderSign's Format2Float arm reads the sign bit (double.IsNegative; binary32 widening preserves the sign of zero and NaN), and SendingRef.SignCondition suppresses EC-DATA-NOT-FINITE per §14.6.13.2 rule 3. Both PARTIAL residues are closed: (1) the non-finite edges are now PROBED by golden, not read: SET CONTENT (§14.9.39.4 GR33/34) -Inf POSITIVE F / NEGATIVE T / ZERO F, +NaN POSITIVE T / NEGATIVE F / ZERO F, -NaN POSITIVE F / NEGATIVE T; (2) the over-application to FLOAT-SHORT/-LONG/-EXTENDED is gone (IsFormat2FloatSign asks UsageFamilies.IsStandardFloat). FLOAT-BINARY-128 and FLOAT-DECIMAL-16/-34 are refused with COBOLNET1564 as processor-dependent (Annex A.3 items 17/19), outside the claim.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.4.8.3-1",
@@ -50242,11 +50242,11 @@
   "subject": "Intrinsic functions",
   "rule-digest": "1bd92724d69d",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#NotAlwaysIntegral",
-  "test-ref": "conformance:2023/pb124_always_integral_zoo; conformance:negative/pb124-char-item-div-literal; conformance:negative/pb124-char-scaled-additive; conformance:2023/pb58_argument_predicates_legal; conformance:negative/pb58-char-fraction; conformance:negative/pb58-dateofint-frac",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#NotAlwaysIntegral; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#CollectAdditive",
+  "test-ref": "conformance:2023/pb124_always_integral_zoo; conformance:negative/pb124-char-item-div-literal; conformance:negative/pb124-char-scaled-additive; conformance:2023/pb58_argument_predicates_legal; conformance:negative/pb58-char-fraction; conformance:negative/pb58-dateofint-frac; conformance:85/pb617_integer_arg_literal_constant; conformance:negative/pb617-integer-expr-literal-sum; unit:IntegerArgumentConstantWitnessTests.TheIntegerScreen_JudgesTheLiteralConstantByValue",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "LANDED (kb/Work PB124 wave 2): the expression half of type 6 is now screened for the PROVABLY not-always-integral shapes, and ONLY those - soundness is the design: an arm fires only when a witness valuation yielding a non-integer exists. Arm 1: a root quotient of a BARE numeric item by an integral literal d>1 (always-integral only when d divides the item's picture granularity 10^-scale - so I/2 rejects, 9PP-item/100 stays legal). Arm 2: a scale>0 item occurring PURELY as additive leaves with net coefficient k where 10^scale does not divide k (consecutive results less than 1 apart). THE ROW'S OWN CLAIM WAS NARROWED (validate_the_premise): 'a division, a scaled operand inside an expression are decidable' is FALSE as stated - (I/2)*2, I/I, 362880/PIC-9, SCALED*10, SCALED-SCALED are all always-integral legal source, each defeats a broader screen, and the pb124_always_integral_zoo golden pins the whole complement compiling AND running. Everything outside the two sound arms fails open, as the original screen's doc demanded. The runtime landing of a residual non-integral value (silent truncation in Char) remains the documented fail-open disposition - a bind screen cannot see values, and the sound arms now catch the decidable shapes.",
+  "notes": "LANDED (kb/Work PB124 wave 2): the expression half of type 6 is now screened for the PROVABLY not-always-integral shapes, and ONLY those - soundness is the design: an arm fires only when a witness valuation yielding a non-integer exists. Arm 1: a root quotient of a BARE numeric item by an integral literal d>1 (always-integral only when d divides the item's picture granularity 10^-scale - so I/2 rejects, 9PP-item/100 stays legal). Arm 2: a scale>0 item occurring PURELY as additive leaves with net coefficient k where 10^scale does not divide k (consecutive results less than 1 apart). THE ROW'S OWN CLAIM WAS NARROWED (validate_the_premise): 'a division, a scaled operand inside an expression are decidable' is FALSE as stated - (I/2)*2, I/I, 362880/PIC-9, SCALED*10, SCALED-SCALED are all always-integral legal source, each defeats a broader screen, and the pb124_always_integral_zoo golden pins the whole complement compiling AND running. Everything outside the two sound arms fails open, as the original screen's doc demanded. The runtime landing of a residual non-integral value (silent truncation in Char) remains the documented fail-open disposition - a bind screen cannot see values, and the sound arms now catch the decidable shapes. ARM 3 (kb/Work PB617, wave 70 A): the LITERAL CONSTANT witness. CollectAdditive now folds every literal-only term of the additive spine exactly (ExactValue: +, -, *, /, unary -, integral literal exponent) into a constant and tracks whether every other term is provably integral (ProvablyIntegral: an integer item, or +, -, *, power over such terms); when both hold and the constant is not an integer, the expression's value is the constant plus an integer for EVERY valuation, so it is refused: CHAR(1.5 + 1) (2.5), CHAR(W-I + 0.5), CHAR((1.5)), CHAR(3 / 2 + 1). The constant is judged by VALUE: CHAR(1.5 + 0.5), CHAR(W-I + 1.5 + 1.5), CHAR(0.5 * 138) stay admitted; a term the fold can neither value nor prove integral (W-S * 2, W-I / 2, a function, a zero divide) keeps the screen failing open. DETERMINATION: the fold is exact/algebraic, not the arithmetic mode's rounded intermediate - type 6's 'will always result in an integer value' is a property of the expression. Witnesses: unit IntegerArgumentConstantWitnessTests (18 shapes), conformance:85/pb617_integer_arg_literal_constant, conformance:negative/pb617-integer-expr-literal-sum.",
   "state": "OK"
  },
  {

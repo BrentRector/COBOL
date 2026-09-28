@@ -302,9 +302,12 @@ the usage-keyed arm in `ClassOfItem` beside `Usage.Index`'s.
 
 `IntegerViolation` decides §15.3 type 6 — "an arithmetic expression that will always result in an
 integer value **or** an integer data item" — for four operand shapes: a DATA ITEM, a nested numeric function
-(§8.4.3.2.3 SR11), a numeric LITERAL, and the two provably-not-always-integral EXPRESSION shapes (a bare-item/literal
-quotient at the root, and a non-integral item appearing purely as additive leaves with an uncancelled net
-coefficient); every other expression fails open, because "always results in an integer value" is not generally
+(§8.4.3.2.3 SR11), a numeric LITERAL, and the three provably-not-always-integral EXPRESSION shapes (a bare-item/literal
+quotient at the root; a non-integral item appearing purely as additive leaves with an uncancelled net
+coefficient; and — kb/Work PB617 — an additive spine whose literal-only terms fold EXACTLY to a non-integer constant
+while every other term is provably integral, so `CHAR(1.5 + 1)` and `CHAR(W-I + 0.5)` are refused on VALUE and
+`CHAR(1.5 + 0.5)` is admitted; the fold is the algebraic value, never an arithmetic mode's rounded intermediate);
+every other expression fails open, because "always results in an integer value" is not generally
 decidable (§4.2.2 discretion). The item test is `PicInfo.IsIntegerDescription` — **the ONE primitive**, and both of
 type 6's disqualifying shapes live in it: a declared SCALE > 0, and a FLOATING-POINT usage (kb/Work PB248 — a float
 item is PICTURE-less, so it carries scale 0 and a scale-only test admitted it; §14.6.8.3 sets its content to "the

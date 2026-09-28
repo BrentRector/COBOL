@@ -1369,9 +1369,9 @@ internal static class IntrinsicArgumentRules
         // constant and step the item by 10^(−scale) — consecutive results are less than 1 apart, so a
         // non-integer value exists. An occurrence inside a NON-additive subtree voids the witness (the subtree
         // moves with the item — `SCALED - (SCALED * 1)` nets to zero through it), so such items are skipped.
-        var net = new Dictionary<DataItem, (int Coeff, int Scale, bool Float, bool Opaque)>();
-        CollectAdditive(expr, 1, net);
-        foreach (var (item, (coeff, scale, isFloat, opaque)) in net)
+        var spine = new AdditiveSpine();
+        CollectAdditive(expr, 1, spine);
+        foreach (var (item, (coeff, scale, isFloat, opaque)) in spine.Net)
         {
             if (opaque || coeff == 0) continue;
             // ⛔ THE FLOAT WITNESS NEEDS NO GRANULARITY TEST, and applying the fixed-point one to it would
@@ -1389,33 +1389,179 @@ internal static class IntrinsicArgumentRules
                 + ", so the sum does not always result in an integer value — ISO §15.3 "
                 + "type 6 admits an arithmetic expression only when it ALWAYS results in one";
         }
+        // THE CONSTANT WITNESS (kb/Work PB617). Every surviving item term is integral — an integer item, or a
+        // scaled item whose net coefficient its granularity cancels, or a float netting to zero — so when every
+        // OTHER term is provably integral too (RestIntegral), the expression's value is the literal constant plus
+        // an integer for EVERY valuation: it is never an integer when the constant is not one. `1.5 + 1` (2.5)
+        // and `W-I + 0.5` are refused on that VALUE, while `1.5 + 0.5` (2) and `3 - 1` are admitted — the
+        // question is the sum, never the presence of a fraction in some literal. A term the fold cannot value
+        // and cannot prove integral (a numeric function, a quotient over an item) clears RestIntegral: FAIL OPEN.
+        if (spine.RestIntegral && !spine.Constant.IsInteger)
+            return $"is an arithmetic expression whose literal terms sum to {spine.Constant} and whose every other "
+                + "term is an integer, so its value is never an integer — ISO §15.3 type 6 admits an arithmetic "
+                + "expression only when it ALWAYS results in an integer value";
         return null;
+    }
+
+    /// <summary>What <see cref="CollectAdditive"/> learns about an additive spine (+, −, unary −): the signed leaf
+    /// count of every item whose DESCRIPTION admits a non-integral value, the exact signed sum of the terms the
+    /// literal fold can value (<see cref="ExactValue"/>), and whether every remaining term is provably an
+    /// integer.</summary>
+    private sealed class AdditiveSpine
+    {
+        public readonly Dictionary<DataItem, (int Coeff, int Scale, bool Float, bool Opaque)> Net = new();
+        public ExactRational Constant = ExactRational.Zero;
+        public bool RestIntegral = true;
     }
 
     /// <summary>Walk an additive spine, accumulating the signed leaf count of every item whose DESCRIPTION
     /// admits a non-integral value (<see cref="NonIntegralItemReason"/> — a scale&gt;0 item OR a floating-point
-    /// one); any occurrence under a non-additive node marks the item OPAQUE (the witness argument no longer
-    /// holds for it).</summary>
-    private static void CollectAdditive(BoundExpr e, int sign, Dictionary<DataItem, (int, int, bool, bool)> net)
+    /// one) and the exact sum of its literal-only terms; any occurrence under a non-additive node marks the item
+    /// OPAQUE (the witness argument no longer holds for it) and — unless that node is provably integral — voids
+    /// the constant witness.</summary>
+    private static void CollectAdditive(BoundExpr e, int sign, AdditiveSpine spine)
     {
         switch (e)
         {
             case BoundBinary { Op: '+' } b:
-                CollectAdditive(b.Left, sign, net); CollectAdditive(b.Right, sign, net); break;
+                CollectAdditive(b.Left, sign, spine); CollectAdditive(b.Right, sign, spine); break;
             case BoundBinary { Op: '-' } b:
-                CollectAdditive(b.Left, sign, net); CollectAdditive(b.Right, -sign, net); break;
+                CollectAdditive(b.Left, sign, spine); CollectAdditive(b.Right, -sign, spine); break;
             case BoundNegate n:
-                CollectAdditive(n.Operand, -sign, net); break;
+                CollectAdditive(n.Operand, -sign, spine); break;
             case BoundNumRef { Place.DenotedItem: not null, Place.Item: { IsGroup: false, Pic: { } p } and { } it }
                 when AdmitsNonIntegralValue(p):
-                net[it] = net.TryGetValue(it, out var v)
-                    ? (v.Item1 + sign, p.Scale, p.IsFloat, v.Item4) : (sign, p.Scale, p.IsFloat, false);
+                spine.Net[it] = spine.Net.TryGetValue(it, out var v)
+                    ? (v.Coeff + sign, p.Scale, p.IsFloat, v.Opaque) : (sign, p.Scale, p.IsFloat, false);
                 break;
             default:
-                foreach (var it in NonIntegralItemsBeneath(e))
-                    net[it.Item] = net.TryGetValue(it.Item, out var prior)
-                        ? (prior.Item1, it.Scale, it.Float, true) : (0, it.Scale, it.Float, true);
+                if (ExactValue(e) is { } constant)
+                    spine.Constant += sign < 0 ? -constant : constant;
+                else if (!ProvablyIntegral(e))
+                {
+                    spine.RestIntegral = false;
+                    foreach (var it in NonIntegralItemsBeneath(e))
+                        spine.Net[it.Item] = spine.Net.TryGetValue(it.Item, out var prior)
+                            ? (prior.Coeff, it.Scale, it.Float, true) : (0, it.Scale, it.Float, true);
+                }
                 break;
+        }
+    }
+
+    /// <summary>Is <paramref name="e"/> an integer for EVERY valuation of the items it references? Sound, not
+    /// complete: true only for a literal fold with an integral value, an item whose description admits only
+    /// integers, and +, −, ×, unary − and a non-negative integral literal power over such terms. A quotient over
+    /// an item, a function and every other shape answer false — the caller then fails open.
+    /// <para>⛔ It must agree with <see cref="NonIntegralItemsBeneath"/>: a subtree that returns true here has no
+    /// item beneath it that admits a non-integral value, which is why <see cref="CollectAdditive"/> may skip the
+    /// opaque marking for it.</para></summary>
+    private static bool ProvablyIntegral(BoundExpr e) => e switch
+    {
+        _ when ExactValue(e) is { } v => v.IsInteger,
+        // Category NUMERIC only: any other operand an extension admits (a de-edited numeric-edited item, say) is
+        // not provably integral, and the screen fails open over it.
+        BoundNumRef { Place.DenotedItem: not null, Place.Item: { IsGroup: false, Pic: { Category: PicCategory.Numeric } p } }
+            => !AdmitsNonIntegralValue(p),
+        BoundBinary { Op: '+' or '-' or '*' } b => ProvablyIntegral(b.Left) && ProvablyIntegral(b.Right),
+        BoundNegate n => ProvablyIntegral(n.Operand),
+        BoundPower { Exp: var x } pw => ProvablyIntegral(pw.Base) && ExactValue(x) is { IsInteger: true, Sign: >= 0 },
+        _ => false,
+    };
+
+    /// <summary>The EXACT algebraic value of a literal-only subtree (numeric literals under +, −, ×, ÷, unary −
+    /// and an integral literal exponent of modest magnitude), or null when the subtree references anything else,
+    /// divides by zero (the zero-divide screen's business) or raises to a power this fold declines.
+    /// <para>⚠ DETERMINATION — the value is the ALGEBRAIC one (§8.3.3.3.2 / §8.3.3.3.3 GR5's literal values
+    /// combined exactly), not a value rounded to an arithmetic mode's intermediate: §15.3 type 6 asks whether the
+    /// expression "will always result in an integer value", a property of the expression, and an exact fold is the
+    /// only reading under which the screen's verdict cannot depend on the ARITHMETIC clause.</para></summary>
+    private static ExactRational? ExactValue(BoundExpr e)
+    {
+        switch (e)
+        {
+            case BoundNumLiteral lit:
+                return TryLiteralValue(lit.Text, out var sig, out int exp10) ? ExactRational.FromScaled(sig, exp10) : null;
+            case BoundNegate n:
+                return ExactValue(n.Operand) is { } v ? -v : null;
+            case BoundBinary b when ExactValue(b.Left) is { } l && ExactValue(b.Right) is { } r:
+                return b.Op switch
+                {
+                    '+' => l + r,
+                    '-' => l - r,
+                    '*' => l * r,
+                    '/' when r.Sign != 0 => l / r,
+                    _ => null,
+                };
+            case BoundPower pw when ExactValue(pw.Base) is { } bv && ExactValue(pw.Exp) is { IsInteger: true } ev
+                && System.Numerics.BigInteger.Abs(ev.Numerator) <= MaxFoldedExponent
+                && (bv.Sign != 0 || ev.Sign > 0):
+                return bv.Pow((int)ev.Numerator);
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>The largest literal exponent <see cref="ExactValue"/> folds — a bound on the fold's work, never on
+    /// what the source may say: a larger exponent is left unfolded and the screen fails open.</summary>
+    private const int MaxFoldedExponent = 64;
+
+    /// <summary>An exact rational in lowest terms with a positive denominator — the carrier of
+    /// <see cref="ExactValue"/>'s fold. A decimal literal is num/10^k; a quotient of literals may leave any
+    /// denominator, which is why this is not a scaled decimal.</summary>
+    private readonly record struct ExactRational
+    {
+        public System.Numerics.BigInteger Numerator { get; }
+        public System.Numerics.BigInteger Denominator { get; }
+
+        private ExactRational(System.Numerics.BigInteger num, System.Numerics.BigInteger den)
+        {
+            if (den.Sign < 0) { num = -num; den = -den; }
+            var g = System.Numerics.BigInteger.GreatestCommonDivisor(num, den);
+            if (!g.IsZero && !g.IsOne) { num /= g; den /= g; }
+            Numerator = num;
+            Denominator = num.IsZero ? System.Numerics.BigInteger.One : den;
+        }
+
+        public static ExactRational Zero => new(0, 1);
+
+        /// <summary>significand × 10^exp10 — <see cref="TryLiteralValue"/>'s decomposition of a literal.</summary>
+        public static ExactRational FromScaled(System.Numerics.BigInteger significand, int exp10) => exp10 >= 0
+            ? new(significand * System.Numerics.BigInteger.Pow(10, exp10), 1)
+            : new(significand, System.Numerics.BigInteger.Pow(10, -exp10));
+
+        public bool IsInteger => Denominator.IsOne;
+        public int Sign => Numerator.Sign;
+
+        public static ExactRational operator -(ExactRational a) => new(-a.Numerator, a.Denominator);
+        public static ExactRational operator +(ExactRational a, ExactRational b) =>
+            new(a.Numerator * b.Denominator + b.Numerator * a.Denominator, a.Denominator * b.Denominator);
+        public static ExactRational operator -(ExactRational a, ExactRational b) => a + -b;
+        public static ExactRational operator *(ExactRational a, ExactRational b) =>
+            new(a.Numerator * b.Numerator, a.Denominator * b.Denominator);
+        /// <summary>Division; the caller guarantees a nonzero divisor.</summary>
+        public static ExactRational operator /(ExactRational a, ExactRational b) =>
+            new(a.Numerator * b.Denominator, a.Denominator * b.Numerator);
+
+        /// <summary>this^n for |n| ≤ <see cref="MaxFoldedExponent"/>; the caller guarantees a nonzero base when
+        /// n &lt; 0.</summary>
+        public ExactRational Pow(int n) => n >= 0
+            ? new(System.Numerics.BigInteger.Pow(Numerator, n), System.Numerics.BigInteger.Pow(Denominator, n))
+            : new(System.Numerics.BigInteger.Pow(Denominator, -n), System.Numerics.BigInteger.Pow(Numerator, -n));
+
+        /// <summary>The value as the diagnostic prints it: a decimal numeral when the denominator is a product of
+        /// 2s and 5s (every sum of decimal literals), otherwise the fraction.</summary>
+        public override string ToString()
+        {
+            var den = Denominator;
+            int twos = 0, fives = 0;
+            while (den.IsEven) { den /= 2; twos++; }
+            while (den % 5 == 0) { den /= 5; fives++; }
+            if (!den.IsOne) return $"{Numerator}/{Denominator}";
+            int k = Math.Max(twos, fives);
+            var scaled = System.Numerics.BigInteger.Abs(Numerator * System.Numerics.BigInteger.Pow(10, k) / Denominator);
+            string digits = scaled.ToString().PadLeft(k + 1, '0');
+            string text = k == 0 ? digits : $"{digits[..^k]}.{digits[^k..]}";
+            return Numerator.Sign < 0 ? "-" + text : text;
         }
     }
 

@@ -201,7 +201,7 @@ internal static class ClassConditionModel
             usage is { } u2 && !DisplayOrNational(u2) && category is not PicCategory.Numeric,
         ClassOperandRule.NumericCategory => category is { } c && c is not PicCategory.Numeric,
         ClassOperandRule.StandardFloatUsage => category is not null
-            && !(usage is { } u3 && (UsageFamilies.IsStandardBinaryFloat(u3) || UsageFamilies.IsStandardDecimalFloat(u3))),
+            && !(usage is { } u3 && UsageFamilies.IsStandardFloat(u3)),
         _ => false,
     };
 

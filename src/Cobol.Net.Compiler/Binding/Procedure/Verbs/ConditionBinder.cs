@@ -1183,7 +1183,11 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
 
     private bool IsFormat2FloatSign(Core.ValueOperandContext? operand) =>
         SoleDataReference(operand?.arithmeticExpression()) is { } dref
-        && ctx.Refs.Probe(dref) is { Item.Pic.IsFloat: true };   // Probe — a routing predicate is diagnostic-free (R30)
+        && ctx.Refs.Probe(dref) is { Item.Pic: { } pic }      // Probe — a routing predicate is diagnostic-free (R30)
+        // ⛔ STANDARD float (§3.166 / §3.167), never PicInfo.IsFloat: FLOAT-SHORT / FLOAT-LONG / FLOAT-EXTENDED and
+        // COMP-1 / COMP-2 are floating-point but NOT standard, so SR1 makes a bare one arithmetic-expression-1 and
+        // GR1's ALGEBRAIC test answers (a FLOAT-LONG zero IS POSITIVE is false — kb/Work PB1471).
+        && UsageFamilies.IsStandardFloat(pic.Usage);
 
     /// <summary>The operand's sole unparenthesized data reference, or null when the arithmetic expression carries
     /// any operator, a unary sign, or enclosing parentheses (the list patterns fail for ≥2 sub-terms, and
