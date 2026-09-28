@@ -1412,18 +1412,26 @@ internal static class RuntimeApi
 
     // ── Report Writer (CobolReport; ISO §13.14–§13.18) ──
 
-    /// <summary>A space-filled report-line buffer — <c>CobolReport.NewLine</c>.</summary>
-    public static string ReportNewLine(int width) =>
-        $"{nameof(CobolReport)}.{nameof(CobolReport.NewLine)}({width})";
+    /// <summary>A fresh, empty line of the report at <paramref name="reportIndex"/> — <c>CobolReport.NewLine</c>.
+    /// Emitted inside the declaring program's line compose, so the engine is this program's own (depth 0).</summary>
+    public static string ReportNewLine(int reportIndex) =>
+        $"{ReportEngine(reportIndex)}.{nameof(CobolReport.NewLine)}()";
 
-    /// <summary>Place a printable item's image at its COLUMN (§13.18.14) — <c>CobolReport.Place</c>.</summary>
-    public static string ReportPlace(string lineVar, int column, string image) =>
-        ReportPlace(lineVar, column.ToString(), image);
+    /// <summary>Place a printable item's image at its COLUMN (§13.18.14) — <c>CobolReport.Place</c>, which tests the
+    /// §13.18.14.4 GR4 column overlap and GR5 page width as it places (kb/Work PB1188).</summary>
+    public static string ReportPlace(int reportIndex, string lineVar, int column, string image) =>
+        ReportPlace(reportIndex, lineVar, column.ToString(), image);
 
-    /// <summary>The variable-column form of <see cref="ReportPlace(string,int,string)"/> — a relative (PLUS)
+    /// <summary>The variable-column form of <see cref="ReportPlace(int,string,int,string)"/> — a relative (PLUS)
     /// COLUMN operand places against the line's horizontal counter (§13.18.14.4 GR8).</summary>
-    public static string ReportPlace(string lineVar, string columnExpr, string image) =>
-        $"{nameof(CobolReport)}.{nameof(CobolReport.Place)}({lineVar}, {columnExpr}, {image})";
+    public static string ReportPlace(int reportIndex, string lineVar, string columnExpr, string image) =>
+        $"{ReportEngine(reportIndex)}.{nameof(CobolReport.Place)}({lineVar}, {columnExpr}, {image})";
+
+    /// <summary>Is slot <paramref name="slot"/> of report group <paramref name="groupIndex"/>'s presence snapshot
+    /// present — <c>CobolReport.IsPresent</c> (§13.18.41.4 GR2; kb/Work PB1272). Emitted inside the declaring
+    /// program's line compose (depth 0).</summary>
+    public static string ReportIsPresent(int reportIndex, int groupIndex, int slot) =>
+        $"{ReportEngine(reportIndex)}.{nameof(CobolReport.IsPresent)}({groupIndex}, {slot})";
 
     /// <summary>The per-program-instance engine field of the report at <paramref name="reportIndex"/>
     /// (<c>ReportModel.CsIndex</c>) — the ONE spelling of that field, so the emitter and the place renderer
@@ -1432,6 +1440,13 @@ internal static class RuntimeApi
     /// report (ISO §13.18.27.4 GR2; kb/Work PB369) is one engine, owned by the program that declares it and reached
     /// from a contained program through the <c>__outer</c> chain.</para></summary>
     public static string ReportEngine(int reportIndex, int depth = 0) => $"{OuterChain(depth)}__RPT_{reportIndex}";
+
+    /// <summary>Ask the engine of the report at <paramref name="reportIndex"/> whether sum counter
+    /// <paramref name="counterId"/> may be moved to its printable item — false (and EC-REPORT-SUM-SIZE raised) while
+    /// its size error indicator is set (ISO §13.18.54.4 GR4; kb/Work PB1130). Emitted inside the declaring program's
+    /// line compose, so the engine is this program's own (depth 0).</summary>
+    public static string ReportSumPresentable(int reportIndex, int counterId) =>
+        $"{ReportEngine(reportIndex)}.{nameof(CobolReport.SumPresentable)}({counterId})";
 
     /// <summary>The instance-chain prefix from a contained program's class to its <paramref name="depth"/>-th
     /// container (<c>__outer.</c> repeated; empty for 0) — the ONE spelling of the walk the generated contained

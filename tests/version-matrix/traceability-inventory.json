@@ -7686,13 +7686,13 @@
   "ordinal": 4,
   "subject": "Report counters",
   "rule-digest": "cf9c288b45e0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#ApplyNextGroup",
-  "test-ref": "conformance:85/pb957_next_group_forms",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine",
+  "test-ref": "conformance:85/pb957_next_group_forms; conformance:85/pb1247_line_placement_unpaged_85",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1247 (registrar 15c). cite.py --check 8.4.3.15.4 \"The value of LINE-COUNTER after the printing of a report group is the same as the line number of the last line printed\" -> OK 4). PresentLine sets LineCounter = target BEFORE compose (a SOURCE LINE-COUNTER prints its own line number - ReportWriterConformanceTests GR6 facts), the one ApplyNextGroup runs after the last line. Probe a2.cob: D3 (LINE PLUS 1, LINE PLUS 2) from LC 3 -> lines 4 and 6, LC=0006 (H); D2 NEXT GROUP NEXT PAGE -> LC=FOOTING 9 (E). Pinned by conformance:85/pb957_next_group_forms (NEXT GROUP final values) and conformance:2002/pb1001_line_next_page (SOURCE LINE-COUNTER per line). || REFUTED: PARTIAL — GR4's first sentence requires LINE-COUNTER to equal the page line on which each line is printed. §13.18.35.3 SR3 permits LINE PLUS 0 ('Integer-2 may be zero'), and §13.18.35.4 GR3 gives it overprint semantics on the preceding line. PresentLine sets LineCounter = target but forces a physical advance of 1 when advance < 1 (the overlap seam), then records _physLine = target. A PLUS 0 line is therefore printed one line below the line LINE-COUNTER names, and every later line of the page is one line lower than LINE-COUNTER says. The second half (the final value after a group, and NEXT GROUP taking over) does hold on the adjudicator's probes. Because one half is broken, the verdict is PARTIAL. [editions as adjudicated: 1985 (Report Writer optional module), 2002, 2014, 2023 - clause 8.4.3.15 text]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1247: every line prints on the page line LINE-COUNTER names, LINE PLUS 0 included.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.15.4-5",
@@ -20661,13 +20661,13 @@
   "ordinal": 4,
   "subject": "COLUMN clause",
   "rule-digest": "cc25fe669606",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Runtime/IO/ReportWriter.cs#ReportLineImage; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#ReportColumnOverlapError; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#NonfatalAmbientGates",
+  "test-ref": "conformance:2002/pb1188_report_nonfatal_raise",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1223, 14d). Rule: a column position is used by only one printable item; 'If this rule is violated the EC-REPORT-COLUMN-OVERLAP exception condition is set to exist and the results are undefined.' (cite.py --check 13.18.14.4 -> OK 4)). The 'results undefined' half is vacuous; the EC half is not implemented: ReportWriter.Place overwrites silently and EC-REPORT-COLUMN-OVERLAP has no raise site anywhere in src (grep: only ExceptionCatalog.cs:197). docs/COBOLNET_REPORT_WRITER_DESIGN.md §5 itself lists it among 'seams with no raise site'. Probe p3.cob (>>TURN EC-ALL CHECKING ON, 2023): `COLUMN 2 PIC XXX VALUE \"AAA\"` + `COLUMN 3 PIC X VALUE \"B\"` printed ' ABA' and FUNCTION EXCEPTION-STATUS after the GENERATE was spaces (expected 'EC-REPORT-COLUMN-OVERLAP'). Compile-time half (SR8a overlap screen) is part-1's row. See finding F-EC-SEAMS. || Editions (adjudicator): 2002, 2014, 2023 (Format 1 multiple/relative/alignment forms); the absolute single-operand COLUMN NUMBER IS integer-1 form also 85. Annex E records no 2023 change to the clause. || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs (EC-REPORT-COLUMN-OVERLAP catalogued only)",
-  "state": "GAP"
+  "notes": "kb/Work PB1188: the composed line records which columns a printable item uses (ReportLineImage); an item placed over a used column sets EC-REPORT-COLUMN-OVERLAP and, raised, is not placed (GR8 resume at the next item): \" AAA C\". Absent items never reach Place (§13.18.41.4 GR3 e)). With checking off the item overwrites (results undefined).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.14.4-5",
@@ -21112,11 +21112,11 @@
   "subject": "CONTROL clause",
   "rule-digest": "9de8224bb74d",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Terminate",
-  "test-ref": "conformance:2023/pb205_control_ref_mod; conformance:2023/rw_suppress",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Terminate; src/Cobol.Net.Runtime/IO/ReportWriter.cs#TerminateCore",
+  "test-ref": "conformance:2023/pb205_control_ref_mod; conformance:2023/rw_suppress; conformance:85/pb1187_terminate_restore_last_85",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "TERMINATE runs the same control-break processing as a highest-level break, so every defined control footing prints minor to major. The golden's last two printed lines are exactly that pair (MIN=070 RUN=070 then MAJ=070) with no further detail. kb/Work PB688 (2026-09-05): the golden moved from tests/conformance/2002 to tests/conformance/2023 - it observes the report by re-reading the report file through ORGANIZATION IS LINE SEQUENTIAL, which is a COBOL-2023 introduction (12.4.5.10.3 GR2; the Foreword's main-changes list over ISO/IEC 1989:2014), so the program is not expressible at 2002. The RULE's editions are unchanged.",
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1187: at TERMINATE the prior controls stay in the control data items through every control footing and the PF/RF printed after them; the restore is §14.9.46.4 GR3 d), the last action.",
   "state": "OK"
  },
  {
@@ -23286,13 +23286,13 @@
   "ordinal": 1,
   "subject": "LINE clause",
   "rule-digest": "8b6991986b24",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#LineCounter; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportRepetitionOf",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.Source_Gr6_LineCounterComposesAfterCounterUpdate",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#LineCounter",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.Source_Gr6_LineCounterComposesAfterCounterUpdate; conformance:85/pb1247_line_placement_unpaged_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1247, 14d). cite.py --check 13.18.35.4 \"The report's LINE-COUNTER identifier contains the line number within the page of the most recent line to have been printed.\" OK (13.18.35.4 1)). Each LINE clause becomes one ReportGroupLine, and a multiple LINE clause a set of lines through the GR9 repetition (conformance:2002/pb565_report_vertical_repetition). PresentLine sets LineCounter = target BEFORE composing and writing, so LINE-COUNTER is always the number of the line just printed. Probes: paged pg.cob ends with LC=19 = the RF line; ov.cob LC=1 after LINE PLUS 1 + LINE PLUS 0. The NUMBER LINE-COUNTER holds is itself wrong where GR5 c) is violated (unpaged RH/RF - GR-13.18.35.4-5), but that is GR5's defect; GR1's relation holds on every path read. || REFUTED: DIVERGES — GR1's second sentence ties LINE-COUNTER to the line number within the page of the most recent line PRINTED. Wherever a LINE PLUS 0 appears, PresentLine's forced physical advance prints the line one physical line below the number LINE-COUNTER holds, and every later line of the group drifts with it, so LINE-COUNTER no longer names the line most recently printed. The adjudicator filed that under GR3/GR7 and kept GR1's relation as holding, but the relation GR1 states is exactly the one that breaks. The same holds for the unpaged RH/RF misplacement it attributed to GR5. The cited test-ref (Source_Gr6_LineCounterComposesAfterCounterUpdate) is a SOURCE GR6 test and does not pin GR1. || Editions (adjudicator): 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d) || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.LineCounter; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportRepetitionOf",
-  "state": "GAP"
+  "notes": "kb/Work PB1247: the physical line and LINE-COUNTER agree after a LINE PLUS 0 overprint; an abandoned (raised-overlap) line leaves LINE-COUNTER naming the last line printed.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.35.4-2",
@@ -23301,13 +23301,13 @@
   "ordinal": 2,
   "subject": "LINE clause",
   "rule-digest": "893af88a882e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLines; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#ReportPageLimitError",
+  "test-ref": "conformance:2002/pb1188_report_nonfatal_raise",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1223, 14d). cite.py --check 13.18.35.4 \"If this rule is violated the EC-REPORT-PAGE-LIMIT exception condition is set to exist and the results are undefined.\" OK (13.18.35.4 2)). EC-REPORT-PAGE-LIMIT is catalogued (ExceptionCatalog.cs:203, nonfatal) and has NO raise site in src (grep). Probe pl.cob: RD PAGE LIMIT 6 HEADING 1 FIRST DETAIL 2 LAST DETAIL 5; a detail of six LINE PLUS 1 lines (all relative, so no SR6 c)/d) forbids it at compile time); >>TURN EC-REPORT-PAGE-LIMIT CHECKING ON; GENERATE prints L1..L6 on physical lines 2..7 - line 7 is past the page limit 6 - and FUNCTION EXCEPTION-STATUS is spaces, LINE-COUNTER 7. Expected: EC-REPORT-PAGE-LIMIT set to exist (EXCEPTION-STATUS = EC-REPORT-PAGE-LIMIT); the placement is then undefined, so only the EC half is testable. PB326's note lists this among six report 'geometry seams' without a raise site; no open kb/Work note owns it. || Editions (adjudicator): One-page half: 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d). The EC-REPORT-PAGE-LIMIT half exists only where exception conditions do (2002+); not derivable from Annex E - flagged, not asserted. || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentLine; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs",
-  "state": "GAP"
+  "notes": "kb/Work PB1188: a line of a paged report placed below the page limit is the group split between two pages; EC-REPORT-PAGE-LIMIT is set and, raised, the rest of the group is abandoned (resume at the next report group). The golden: DE-L lines 2..7 on a 6-line page lose L6, the next detail goes to the next page. With checking off the line prints below the limit (results undefined).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.35.4-3",
@@ -23316,13 +23316,13 @@
   "ordinal": 3,
   "subject": "LINE clause",
   "rule-digest": "24fba0d48d4b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#FlushPendingLine",
+  "test-ref": "conformance:85/pb1247_line_placement_unpaged_85; conformance:2002/pb1130_report_sum_size_line_overlap",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1247, 14d). cite.py --check 13.18.35.4 \"except that the non-space characters of a relative line specified with an integer-2 of zero will overwrite the corresponding characters of the preceding line\" OK (13.18.35.4 3)); integer-2 zero is legal (13.18.35.3 3): 'Integer-2 may be zero'). PresentLine: `if (advance < 1 && _physLine != 0) advance = 1;` pushes every target at/above the current physical line ONE LINE DOWN, then `_physLine = (int)target` records the lower number, so the physical cursor and the line numbering drift apart by one for the rest of the report. Probe ov.cob (unpaged; DE = LINE PLUS 1 'ABC' col 1 / LINE PLUS 0 'XYZ' col 5; GENERATE twice): observed four physical lines 'ABC' / '    XYZ' / 'ABC' / '    XYZ'; expected (GR3 + GR7 b): LC+0 is the same line) two lines 'ABC XYZ' / 'ABC XYZ'. LINE-COUNTER after the first GENERATE is 1 (right), but the second group's line 2 lands on physical line 3. EC-REPORT-LINE-OVERLAP (ExceptionCatalog.cs:201) has no raise site: g6b.cob (LINE 5, LINE 5, both unconditional, >>TURN EC-REPORT CHECKING ON) prints the second line on physical 6 with EXCEPTION-STATUS spaces. || Editions (adjudicator): Overprint half: 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d). EC-REPORT-LINE-OVERLAP half: where exception conditions exist (2002+); not derivable from Annex E - flagged. || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentLine",
-  "state": "GAP"
+  "notes": "kb/Work PB1247/PB1130: a relative line with integer-2 zero overwrites the preceding line's characters (the held line is merged); any other overlap sets EC-REPORT-LINE-OVERLAP (raised when checking is enabled).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.35.4-4",
@@ -23346,13 +23346,13 @@
   "ordinal": 5,
   "subject": "LINE clause",
   "rule-digest": "8d7c40e355c7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentHeadingFooting; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentPageHeading; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentPageFooting",
-  "test-ref": "conformance:85/pb484_report_line_placement",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#FirstLineTarget; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentHeadingFooting",
+  "test-ref": "conformance:85/pb484_report_line_placement; conformance:85/pb1247_line_placement_unpaged_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1247, 14d). cite.py --check 13.18.35.4 \"If the first LINE NUMBER clause of the report group is relative and the report is not divided into pages, the report group's first line number is obtained by adding integer-2 to the current value of the report's LINE-COUNTER.\" OK (13.18.35.4 5) c)); b) 1. checked OK. Paged arms VERIFIED by probe pg.cob (PAGE LIMIT 20 HEADING 2 FIRST DETAIL 6 LAST DETAIL 14 FOOTING 16; RH PLUS 2, PH PLUS 1, DE PLUS 3 x3, PF PLUS 1, RF PLUS 2): RH 3 (=2+2-1, b1), PH 4 (LC+1 after RH, b2), DE 6/9/12 (FIRST DETAIL, then LC+3, b3), PF 17 (=16+1, b4), RF 19 (LC+2 after PF, b5) - all exact. a) is covered by conformance:2002/pb1001_line_next_page, 'which LINE clause is first' by conformance:2023/rw_present_when, c) for BODY groups by pb484. DEFECT: PresentHeadingFooting has no unpaged arm - it applies b1/b5 with the zero page regions of an unpaged RD. Probe rh3.cob (RD without PAGE; RH LINE PLUS 3, DE LINE PLUS 1 x3, RF LINE PLUS 2): observed RHEAD line 2, DET 3/4/5, RFOOT 6; expected by c): RH 0+3=3, DET 4/5/6, RF 6+2=8. Probe rf.cob (RH PLUS 1, RF PLUS 2): RFOOT observed on 5, expected 4+2=6; rf2.cob (RF PLUS 5): observed 5, expected 9 - the unpaged RD's regions are zero, so the footing target is 0+n (PLUS 5 -> line 5), and when 0+n is at/above the cursor (PLUS 2 -> 2) the GR3 seam pushes it to the next line. RH PLUS 1 is right only through the target<1 clamp. Harm: wrong-answer for every unpaged report with a report footing or a relative report heading above PLUS 1. || Editions (adjudicator): 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d) || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentHeadingFooting; src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentPageHeading; src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentPageFooting",
-  "state": "GAP"
+  "notes": "kb/Work PB1247: GR5 is one method for every group type; GR5 c) (not divided into pages: LINE-COUNTER + integer-2) now reaches the RH and RF too.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.35.4-6",
@@ -23376,13 +23376,13 @@
   "ordinal": 7,
   "subject": "LINE clause",
   "rule-digest": "80cfb9903bd4",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#SubsequentTarget; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine",
-  "test-ref": "conformance:85/pb484_report_line_placement",
+  "test-ref": "conformance:85/pb484_report_line_placement; conformance:85/pb1247_line_placement_unpaged_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1247, 14d). cite.py --check 13.18.35.4 \"b) If the LINE clause is relative, the new line number is determined by adding integer-2 to the report's LINE-COUNTER.\" OK (13.18.35.4 7) b)); \"When each subsequent line number of the report group has been calculated, the report's LINE-COUNTER is set equal to that number and the line is now printed on the page at that vertical location.\" OK (7)). SubsequentTarget: Absolute -> Value (a), else LineCounter + integer-2 (b); PresentLine sets LC and writes; unoccupied lines become blank lines. Verified: pb484 (7 b), blank lines), probe g6c (LINE 3 then LINE 17 -> physical 3 and 17, LC 17, 7 a)). PARTIAL: the 'printed at that vertical location' half fails whenever the new number is not below the physical cursor - LINE PLUS 0 (legal) prints one line LOWER and every later line of the report inherits the offset (ov.cob: the second group's line 2 prints on physical 3). Same mechanism as GR-13.18.35.4-3. || Editions (adjudicator): 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d) || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.SubsequentTarget; src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport.PresentLine",
-  "state": "GAP"
+  "notes": "kb/Work PB1247: LINE PLUS 0 yields line number LINE-COUNTER + 0 and is printed at that vertical location - no forced advance.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.35.4-8",
@@ -25716,13 +25716,13 @@
   "ordinal": 1,
   "subject": "PRESENT WHEN clause",
   "rule-digest": "a85a5e3510b5",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#LinePresent; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EvaluatePresent",
-  "test-ref": "conformance:2023/rw_present_when",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#PresencePlan; src/Cobol.Net.Runtime/IO/ReportWriter.cs#BeginPresentation; src/Cobol.Net.Runtime/IO/ReportWriter.cs#BeginGroup",
+  "test-ref": "conformance:2023/rw_present_when; conformance:2002/pb1272_present_when_snapshot",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1272. \"The PRESENT WHEN clause specifies a condition under which a report section entry will be processed.\" (cite.py --check 13.18.41.1 OK). A general/descriptive statement: the clause's condition is captured on every report entry and gates the entry's processing (lines, printable items, sum counters). The precise processing semantics are GR2/GR3 and the defects found there (evaluation timing; all-lines-absent early return) are recorded against GR-13.18.41.4-2, not here. Golden rw_present_when witnesses line- and item-level processing under the condition. || REFUTED: PARTIAL — GR1 says the condition governs whether a report section entry is PROCESSED. The adjudicator itself found two wrong-answer processing defects (logged under GR2) that falsify this general statement on the pinned compiler: (1) item-level and SUM chains are evaluated at use time after the page-fit advance, so the condition that governs processing is not the one the rule set evaluates; (2) a PRESENT level-01 CF entry (no PRESENT WHEN of its own) is not processed at all when every LINE below it is absent - PresentBody returns before EndOfGroupSumReset. An entry with no false condition going unprocessed contradicts GR1 directly. A general rule cannot CONFORM while its only operative realization DIVERGES; the line/item gating that works makes it PARTIAL, not NOT-IMPLEMENTED. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (PRESENT WHEN was introduced with the 2002 report writer; not in ISO 1989:1985; 2023 Annex E lists no change) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroup (reportPresentWhenClause arm ~L1646, chain capture ~L1804/L1819/L1952) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroup (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "notes": "kb/Work PB1272: the condition governs whether each report section entry (line, printable item, sum counter) is processed, evaluated once per presentation before any LINE clause (GR2); the two processing defects the refuter recorded (use-time evaluation; a present 01-level group skipped when every line is absent) are fixed.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.41.1-2",
@@ -25761,13 +25761,13 @@
   "ordinal": 1,
   "subject": "PRESENT WHEN clause",
   "rule-digest": "abdcae19628e",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPresentWhenClause; src/Cobol.Net.Frontend/Grammar/Core/CobolDeclined.g4#validatePresentWhenClause; src/Cobol.Net.Compiler/Validation/DeclinedFacilityPass.cs",
-  "test-ref": "conformance:2023/rw_present_when",
+  "test-ref": "conformance:2023/rw_present_when; conformance:negative/declined-validate-present-when",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1272. \"If the PRESENT WHEN clause is specified in a report group description entry, the general rules for format 1 apply, otherwise, the general rules for format 2 apply.\" (cite.py --check 13.18.41.4 OK). The dispatch is by placement, exactly as the rule says: a report group description entry reaches reportPresentWhenClause (format-1 semantics, implemented), any other data description entry reaches validatePresentWhenClause (format 2 = VALIDATE facility, declined by name COBOLNET1708 per CONFORMANCE.md §5 item 3; PB283 owns that facility's rows GR-13.18.41.1-2/GR-13.18.41.4-4..6). Both arms witnessed: conformance:2023/rw_present_when (format 1 in an RD) and conformance:negative/declined-validate-present-when (format 2 in WORKING-STORAGE), with the positive control 2023/declined_rw_present_varying_control. || REFUTED: PARTIAL — The dispatch by placement is correct (probed): report-group entries reach format 1; FILE SECTION, LINKAGE and WORKING-STORAGE data description entries reach validatePresentWhenClause at both 2002 and 2023; SCREEN SECTION rejects PRESENT (not a data description entry, correct). But the rule's second arm says 'the general rules for format 2 apply' and the compiler instead refuses the clause (COBOLNET1708, VALIDATE facility declined). That is two halves with one implemented - the task's PARTIAL shape - and it is exactly the reasoning the adjudicator applied to FMT-13.18.41.2 (PARTIAL for the declined format-2 half). Scoring the dispatch CONFORMS while the FMT row is PARTIAL for the same declined arm is internally inconsistent. The format-2 half's debt is owned by PB283 (A.4.14 VALIDATE rows); DOCUMENTED-NON-SUPPORT is not this refuter's call. Additionally the format-1 arm it dispatches to diverges (GR-13.18.41.4-2). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (PRESENT WHEN was introduced with the 2002 report writer; not in ISO 1989:1985; 2023 Annex E lists no change)",
-  "state": "GAP"
+  "notes": "kb/Work PB1272 + owner decision kb/Work R43 item 2 (a rule half inside a declined facility takes its LIVE half verdict): the dispatch by placement is right (report group entry -> format 1, any other data description entry -> format 2); the format-1 arm now conforms (PB1272, GR-13.18.41.4-2); the format-2 arm is the declined VALIDATE facility (COBOLNET1708, docs/CONFORMANCE.md section 5 item 3; rows GR-13.18.41.4-4..6 DOCUMENTED-NON-SUPPORT, kb/Work PB283) and is non-support by R43 item 1.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.41.4-2",
@@ -25776,13 +25776,13 @@
   "ordinal": 2,
   "subject": "PRESENT WHEN clause",
   "rule-digest": "58bdcbf352e2",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EvaluatePresent; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#BeginPresentation; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SetPresence; src/Cobol.Net.Runtime/IO/ReportWriter.cs#BeginGroup; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#PresencePlan; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitPresenceProbe",
+  "test-ref": "conformance:2002/pb1272_present_when_snapshot; conformance:2023/rw_present_when",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1272. GR2: \"condition-1 of each PRESENT WHEN clause is evaluated before the processing of any LINE clauses for the report group\"; b) false => \"the effect on processing is as though the entry were omitted from the description of the report group\" ... non-elementary => subordinates absent irrespective of their own clauses ... \"if the entry is a level-01 entry, the effect on processing is as though the entire report group description were omitted\" (all cite.py --check 13.18.41.4 OK). VERIFIED CORRECT: line chains AND ancestor conditions (non-elementary absence absents subordinates irrespective; level-01 absence omits lines AND NEXT GROUP) — probe pwa.cob output AAA1/BBB CCC/NG, AAA2 only, nothing for G=0 (M 3 directly after M 2), '    CCC' for I=0: all as spec. DEFECT 1 (timing): only LINE-level chains are snapshotted in BeginPresentation; item-level (below the line entry) chains are evaluated inside the compose delegate at PresentLine time, and SUM chains are re-evaluated in EndOfGroupSumReset after printing — both AFTER the page-fit test's page advance, whose page-heading/footing USE BEFORE REPORTING declaratives may change the operands. Probe pwc.cob (PAGE LIMIT 6 HEADING 1 FIRST DETAIL 2 LAST DETAIL 4; PH declarative MOVE 1 TO WS-F; item `OPT PRESENT WHEN WS-F = 0`; WS-F=0 before each GENERATE): 4th GENERATE fails the fit test, the advance runs the PH declarative, and the compiler prints '4' where the spec (evaluated before LINE processing, WS-F=0) requires '4 OPT'. DEFECT 2 (all-lines-absent != group omitted): PresentBody returns at first<0 whenever every LINE is absent, skipping EndOfGroupSumReset even when the 01 entry is present — GR2b only omits the whole group for a level-01 entry. Probe pwb.cob (DE SUM WS-AMT RESET ON WS-K; CF WS-K whose only line is PRESENT WHEN WS-SHOW = 1, WS-SHOW=0 at the first break): prints '2 07', spec requires '2 04' (§13.18.54.4 GR2 resets 'at the end of the processing of the control footing for the specified level of control'; the CF is processed as a 01-only description, which GR2 itself treats as a reset point: 'it is assumed to be present and to consist of a 01-level entry alone'). Harm: wrong-answer. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (PRESENT WHEN was introduced with the 2002 report writer; not in ISO 1989:1985; 2023 Annex E lists no change) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroup (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "notes": "kb/Work PB1272: every condition-1 of the group (line, printable item, SUM entry) and every OCCURS DEPENDING count is ONE snapshot per presentation, taken by the generated presence probe before the page fit test (GR2) and read by the placement, the compose and the sum reset; a group with no present line is still processed (its own counters reset) unless its level-01 entry is absent (GR2 b)). The golden: an item condition stays true across the page advance its group caused (4 OPT), and a control footing whose only line is absent still resets its counter (CNT=04).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.41.4-3",
@@ -25791,13 +25791,13 @@
   "ordinal": 3,
   "subject": "PRESENT WHEN clause",
   "rule-digest": "386d42a08af8",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PlaceAfterSavedNextGroup; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.PresentWhen_Gr3g_AbsentSumNeitherPrintsNorResets",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#BeginGroup; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLines; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PlaceAfterSavedNextGroup; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.PresentWhen_Gr3g_AbsentSumNeitherPrintsNorResets; conformance:2002/pb1272_present_when_snapshot; conformance:2002/pb1188_report_nonfatal_raise",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1272. GR3 a)-g) (cite.py --check 13.18.41.4 '3) d)' and '3) g)' OK). a) first-line positioning ignores absent lines: PresentBody/PH/PF/RH-RF take `first` = first PRESENT line — implemented. d) page fit disregards absent lines: trial sum and PlaceAfterSavedNextGroup skip !present[i] — implemented (no dedicated golden). g) absent SUM entry neither printed (compose guard) nor reset (EndOfGroupSumReset `s.Present?.Invoke() == false`) — implemented and witnessed by the cited spec-derived test; but its reset half re-evaluates the chain after printing (see GR-13.18.41.4-2 timing finding). b), c), e), f) are exemptions from rules the compiler does not enforce at all: §13.18.35.3 SR6 a/b/d/e and §13.18.14.3 SR7/SR8 (the 'subject to a different PRESENT WHEN clause' compile-time rules, cite.py --check 13.18.35.3 OK) have no screen in DataBinder.Reports.cs, and the runtime EC-REPORT-LINE-OVERLAP (§13.18.35.4 GR3), EC-REPORT-COLUMN-OVERLAP (§13.18.14.4 GR4) and EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5) are catalogued in ExceptionCatalog but never raised (PresentLine has only a clamp 'seam'). The exemptions are therefore vacuous and unverifiable here; the missing base rules belong to the LINE/COLUMN rows. PARTIAL: three of seven legs verified, four unverifiable. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (PRESENT WHEN was introduced with the 2002 report writer; not in ISO 1989:1985; 2023 Annex E lists no change)",
-  "state": "GAP"
+  "notes": "kb/Work PB1272 / PB1188: a) the first line is the first PRESENT line (PresentLines); b) the runtime line-overlap test (EC-REPORT-LINE-OVERLAP) sees only present lines; c) d) the page fit trial and the page-limit test see only present lines; e) f) an absent printable item never reaches CobolReport.Place, so it neither occupies columns (EC-REPORT-COLUMN-OVERLAP) nor is measured against the page width (EC-REPORT-PAGE-WIDTH); g) an absent SUM entry is neither printed nor reset, both halves reading ONE snapshot slot. The compile-time base rules GR3 b)/c)/e)/f) exempt from (§13.18.35.3 SR6, §13.18.14.3 SR7/SR8) are their own rows.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.41.4-4",
@@ -28027,11 +28027,11 @@
   "subject": "SUM clause",
   "rule-digest": "acf4be3f6dec",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSumModel; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddSum; src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#SumCounterItem",
-  "test-ref": "conformance:85/pb882_report_sum_counter_identity; conformance:negative/pb882-sum-counter-ambiguous; conformance:85/pb883_report_sum_expression",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSumModel; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddSum; src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#SumCounterItem; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SumCounterDigits",
+  "test-ref": "conformance:85/pb882_report_sum_counter_identity; conformance:negative/pb882-sum-counter-ambiguous; conformance:85/pb883_report_sum_expression; conformance:85/pb1296_sum_counter_digits_85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Each ENTRY establishes an independent counter, so the identity is the entry's ORDINAL in its report description (ReportSumModel.Id) and the engine holds the counters in a List indexed by it; GR5's data-name rides alongside as ReportSumModel.Name. It used to BE the id, with CobolReport._sums keyed by it, so two entries legally sharing a data-name shared one counter and the second registration destroyed the first (measured 0022 0022 where GR1 owes 0011 0022). The counter's own profile - signed whatever the PICTURE's sign, digits integral AND fractional derived from the entry's PICTURE - is PicInfo.SumCounterItem. kb/Work PB882.",
+  "notes": "kb/Work PB1296: the counter digit count is derived per category from the entry PICTURE excluding insertion editing characters (numeric: the 9s; numeric-edited: every digit position; alphanumeric/national: each non-insertion character position); one counter per ENTRY (PB882). The engine carrier caps a counter at 18 digits (a 19+-digit PICTURE is a reported lead).",
   "state": "OK"
  },
  {
@@ -28041,13 +28041,13 @@
   "ordinal": 2,
   "subject": "SUM clause",
   "rule-digest": "5c2c5e2ba47c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Initiate",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#ProcessControlFootings; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Runtime/IO/ReportWriter.cs#BeginGroup; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Initiate",
+  "test-ref": "conformance:85/pb1297_sum_reset_level_upon_85; conformance:2002/pb1272_present_when_snapshot; conformance:2002/pb1130_report_sum_size_line_overlap",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1296 + PB1297. GR2 (cite.py --check 13.18.54.4 'If no such control footing is defined, it is assumed to be present and to consist of a 01-level entry alone' OK). INITIATE zeroes (GR1a loop) and reset-where-printed is right (conformance-test:ReportWriterConformanceTests.Sum_Gr7_AccumulatesPerGenerate_ResetsWherePrinted). But EndOfGroupSumReset resets a RESET ON counter only when a registered ControlFooting of that level is presented, so with no CF defined for the level the counter NEVER resets. Probe p2 (CONTROLS FINAL WS-C; DET: SUM WS-K RESET ON WS-C, no CF WS-C; K=1,2 under C=1 then 3,4 under C=2): observed '1 01 / 1 03 / 2 06 / 2 10'; spec-derived '1 01 / 1 03 / 2 03 / 2 07' (the assumed CF WS-C ends at the break, resetting before GENERATE's accumulation). Also no size error indicator exists to 'unset' (see GR4). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1297: a RESET ON counter resets at the end of its LEVEL (declared or assumed control footing, ProcessControlFootings - the 1->2 break restarts RESET ON WS-C with no CF declared); a counter with no RESET phrase resets at the end of the group it prints in on EVERY presentation path (the page footing page total restarts: PT=04 then PT=01), including a group with no present line (kb/Work PB1272); INITIATE zeroes counters and indicators (PB1130).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-3",
@@ -28071,13 +28071,13 @@
   "ordinal": 4,
   "subject": "SUM clause",
   "rule-digest": "d9571f554412",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Generate; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumEntry; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumPresentable; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#FieldImage; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SumCounterDigits",
+  "test-ref": "conformance:85/pb1296_sum_counter_digits_85; conformance:2002/pb1130_report_sum_size_line_overlap",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1296. GR4 'If the associated size error indicator is set, an EC-REPORT-SUM-SIZE exception condition is set to exist and the printable item is filled with spaces' (cite.py --check 13.18.54.4 OK); GR3 'Each addition is tested for size error' (OK). The engine accumulates into an unbounded long (s.Value += t.Addend()) with no size-error test and no indicator; EC-REPORT-SUM-SIZE is catalogued (ExceptionCatalog L205) but never raised. Probe p1: PIC 99 SUM WS-K, WS-K=60, two GENERATEs -> counter 120 exceeds GR1's 2 digits; observed '20' (MOVE truncation); spec: printable filled with spaces (and EC-REPORT-SUM-SIZE set). Source-item half (counter moved to printable) conforms (pb883/pb882 goldens). ROUNDED placement is a documented DETERMINATION (accumulation, RW design doc) - not disputed here. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Runtime/IO/ReportWriter.cs#Generate (s.Value += t.Addend()) | src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs (SUM printable face ~L254)",
-  "state": "GAP"
+  "notes": "kb/Work PB1296 (with PB1130): the counter is moved to its printable item unless its size error indicator is set, when EC-REPORT-SUM-SIZE is raised and the item is spaces. The capacity the indicator is set against is GR1s digit count PER CATEGORY (SumCounterDigits): ZZ9 / Z(3) / $$$9 are three digits, 9,999 four, X(4) four, XXBX three; 99 overflows at 120 and prints spaces.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-5",
@@ -28116,13 +28116,13 @@
   "ordinal": 7,
   "subject": "SUM clause",
   "rule-digest": "0090a48bcc09",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Fires; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Generate; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveUponDetail",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Fires; src/Cobol.Net.Runtime/IO/ReportWriter.cs#GenerateCore; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveUponDetail",
+  "test-ref": "conformance:85/pb1297_sum_reset_level_upon_85; conformance:85/pb883_report_sum_expression",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294 + PB1297. GR7 (cite.py --check 13.18.54.4 'When a GENERATE statement for such a detail is executed, the adding takes place as many times as data-name-2 appears in the UPON phrase' OK -> 7) c) 2.). c)1 and c)2 implemented (conformance-test:ReportWriterConformanceTests.Sum_Gr7_AccumulatesPerGenerate_ResetsWherePrinted / Sum_Gr7c2_UponRestrictsToNamedDetail); duplicated identifier-1 adds twice (probe p1: SUM WS-K WS-K -> 240 correct). DEFECT: SumTerm.Fires returns a bool, so 'UPON DET DET' adds ONCE per GENERATE - probe p1 (WS-K=60, 2 GENERATE DET) prints 120, spec 240. a)/b) (data-name-1 timing) NOT-IMPLEMENTED (staged loud), and a cross-report UPON detail is staged loud (COBOLNET0899 report-sum-upon-cross-report). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1297: a detail named n times in a term UPON phrase adds n times, each addition its own GR3 size error test (SumTerm.Fires returns the count): UPON DE-A DE-A prints 02 04 06 08 for K = 1..4. No UPON: every GENERATE; identifier-1 repeated: added per reference.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-8",
@@ -37596,13 +37596,13 @@
   "ordinal": 3,
   "subject": "GENERATE statement",
   "rule-digest": "e5737149427c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#GenerateCore; src/Cobol.Net.Runtime/IO/ReportWriter.cs#DetectBreakLevel; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddControl",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.ControlBreak_Gr4a_CfSeesPriorValue_ChSeesNew",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#DetectBreakLevel; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddControl; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitReportConstruction",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.ControlBreak_Gr4a_CfSeesPriorValue_ChSeesNew; conformance:85/pb1131_control_break_collating_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1131 (open). GR3: \"each execution of the GENERATE statement causes the specified control data items to be saved and subsequently compared so as to sense for control breaks. This processing is described by the CONTROL clause.\" (cite.py --check 14.9.16.4 OK, 3)). The first GENERATE saves Prior = Get() for each control. Each later GENERATE calls DetectBreakLevel, which walks major to minor, skips FINAL and returns the first change. On a break the priors are replaced by the new current values. Verified for a three-level hierarchy (FINAL K1 K2) in probe out/probe/generate/g1.cob (pinned cobol.exe, --std 2023). Unverified edge, which belongs to the §13.18.16 rows: §13.18.16.4 GR3 tests 'for equality with the corresponding prior control' (cite.py OK), but the engine compares the character images ordinally. Two values that are equal but have different images would therefore break, for example ALSO-equivalent characters under a PROGRAM COLLATING SEQUENCE. The CONTROL-clause adjudication should probe that edge. || REFUTED: PARTIAL — GR3 is the save-and-COMPARE step, and the compare is wrong. §12.3.6.4 GR11 c) says the program collating sequence determines the truth value of alphanumeric comparisons 'Implicitly specified by the presence of a CONTROL clause in a report description entry'. §13.18.16.4 GR3 makes the test one 'for equality with the corresponding prior control'. CobolReport.DetectBreakLevel instead compares the character images with string.Equals(..., StringComparison.Ordinal). So under a PROGRAM COLLATING SEQUENCE with ALSO, or a locale-based one, two values the program itself treats as equal still sense a control break. The save half and the major-to-minor stop-at-first-change half are correct. || editions as adjudicated: 85, 2002, 2014, 2023 (Report Writer is present in every edition; the 2023 Annex E lists no change to GENERATE)",
-  "state": "GAP"
+  "notes": "kb/Work PB1131: the save is the control item's image; the break test is the program's equality comparison under the program collating sequence (§12.3.6.4 GR11 c), §13.18.16.4 GR3), emitted as the collated CobolString.Compare a relation condition renders.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.16.4-4",
@@ -37671,13 +37671,13 @@
   "ordinal": 8,
   "subject": "GENERATE statement",
   "rule-digest": "f242026ec572",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#ReportLineOverlapError; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#GenerateNames",
+  "test-ref": "conformance:2002/pb1130_report_sum_size_line_overlap",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1130 (open). GR8: \"If a nonfatal exception condition is raised during the execution of a GENERATE statement, execution resumes at the next report item, line, or report group, whichever follows in logical order.\" (cite.py --check 14.9.16.4 OK, 8)). Table 13 lists four nonfatal report conditions that GENERATE processing can raise: EC-REPORT-COLUMN-OVERLAP, EC-REPORT-LINE-OVERLAP (§13.18.35.4 GR3, cite.py OK), EC-REPORT-PAGE-LIMIT and EC-REPORT-PAGE-WIDTH. None has a raise site anywhere in src. They appear only in ExceptionCatalog.cs, and ReportWriter.PresentLine carries only a comment calling the overlap clamp an 'EC-REPORT-LINE-OVERLAP seam'. The engine has no resumption point at item, line or group granularity. A nonfatal condition raised from inside a compose delegate (for example EC-DATA-CONVERSION) goes through ExceptionState.NonfatalIfEnabled, which continues in place, not 'at the next report item'. No code implements the GR8 rule. PB326 (landed) recorded these four as remaining CONTENT/GEOMETRY seams. PB1037 (open, analysis) is only a drift-test note. No open defect note owns the rows. || editions as adjudicated: 2002, 2014, 2023 (the exception-condition model, and with it every nonfatal EC-REPORT-* name, begins at 2002; COBOL-85 has no exception conditions)",
-  "state": "GAP"
+  "notes": "kb/Work PB1130: the engine's nonfatal raise (EC-REPORT-LINE-OVERLAP, §13.18.35.4 GR3) runs the declarative and GENERATE resumes at the next line (the overlapping line is abandoned, LINE-COUNTER untouched); a nonfatal condition raised while composing an item (a SOURCE move) records and the compose continues with the next item. The OTHER nonfatal report conditions (PAGE-LIMIT, PAGE-WIDTH, COLUMN-OVERLAP) have no raise site - that is their own rules' defect (GR-13.18.35.4-2, GR-13.18.14.4-4, kb/Work PB1188), not this resumption rule's.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.17.3-1",
@@ -38541,13 +38541,13 @@
   "ordinal": 1,
   "subject": "INITIATE statement",
   "rule-digest": "87891f7e9b5f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Initiate; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Initiate; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumEntry; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumPresentable",
+  "test-ref": "conformance:2002/pb1130_report_sum_size_line_overlap",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1130 (open). Rule: 'a) All sum counters and all size error indicators are set to zero. b) LINE-COUNTER is set to zero. c) PAGE-COUNTER is set to 1.' (cite.py --check 14.9.21.4 \"All sum counters and all size error indicators are set to zero.\" -> OK §14.9.21.4 1) a)). CODE: CobolReport.Initiate sets every _sums[i].Value=0, LineCounter=0, PageCounter=1. PROBE p1.cob (2023): R-B dirtied to LC=003 PC=009 by an earlier INITIATE/GENERATE/MOVE, then `INITIATE R-A R-B` -> both 'LC=000 PC=001' (b,c CONFORM); re-INITIATE of R-A after TERMINATE restarts the SUM at 0 ('S=05', a sum-counter half CONFORMS). THE OTHER HALF IS ABSENT: SumEntry is `public long Value` with NO size error indicator at all (grep SizeError/SUM-SIZE in ReportWriter.cs: only a doc comment); §13.18.54.4 GR1 'establishes an independent sum counter and size error indicator' and GR3 'Each addition is tested for size error' (cite.py --check 13.18.54.4 OK) have no implementation, so GR1a's 'size error indicators are set to zero' has nothing to reset. Observable: p1.cob sums 60+60 into `PIC 99 SUM WS-N` and prints 'S=20'; §13.18.54.4 GR4 ('If the associated size error indicator is set ... the printable item is filled with spaces', --check OK) owes 'S=  '. A two-halved rule with one half verified => PARTIAL. No open kb/Work note owns the indicator (PB326/PB482 name EC-REPORT-SUM-SIZE only as a remaining seam; both landed) - see finding. Also: DISPLAY LINE-COUNTER / PAGE-COUNTER crashes at run time (dossier_gaps lead), so the probe moves them to WS first. || editions as adjudicated: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1130: each SUM entry carries its PICTURE's digit bound and a size error indicator (§13.18.54.4 GR1/GR3); INITIATE zeroes the counters AND unsets the indicators (GR1 a)); the golden re-INITIATEs after a size error and prints S=05.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.21.4-2",
@@ -47721,13 +47721,13 @@
   "ordinal": 1,
   "subject": "SUPPRESS statement",
   "rule-digest": "48146abb243f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindSuppress; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitSuppress; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SuppressPrinting; src/Cobol.Net.Runtime/IO/ReportWriter.cs#RunBeforeReporting",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindSuppress; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitSuppress; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SuppressPrinting",
+  "test-ref": "conformance:85/pb1186_suppress_named_group_85",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1186 (registrar 14c). GR1 \"inhibits printing only for the report group named in the USE procedure within which the SUPPRESS statement appears\" (cite.py --check 14.9.45.4 OK). BindSuppress resolves the group statically but binds BoundSuppress(report) ONLY; the emitter calls <engine>.SuppressPrinting(), which sets a per-REPORT bool _suppressCurrent; RunBeforeReporting consumes that flag for WHATEVER group presents next and never clears it before running the selector. A SUPPRESS executed outside the named group's own presentation (legal: §14.9.49.3 SR4 lets a declarative section be PERFORMed from nondeclarative code or another declarative; cite.py --check OK) therefore inhibits a DIFFERENT group. Repro stale.cob: USE BEFORE REPORTING DET-A { SUPPRESS PRINTING }; main: INITIATE; PERFORM SUP-SECTION; GENERATE DET-B; GENERATE DET-B -> file has ONE 'DET-B' line; spec-derived expected TWO. Repro cross.cob: DET-A's declarative PERFORMs DET-B's declarative section (which SUPPRESSes); GENERATE DET-A; GENERATE DET-B -> file EMPTY; expected 'DET-A' only. The in-place case conforms (conformance:2023/rw_suppress). Finding: suppress-flag-keyed-by-report. [editions as adjudicated: 2014, 2023 (not an Annex E 2014->2023 addition, so present in 2014); 85/2002 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d, RW accepted at every edition)]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1186: SUPPRESS names its declarative's group and inhibits only that group, only while that group's own BEFORE REPORTING hook runs; performed from elsewhere (§14.9.49.3 SR4) it has no effect.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.45.4-2",
@@ -47736,13 +47736,13 @@
   "ordinal": 2,
   "subject": "SUPPRESS statement",
   "rule-digest": "7fb1c9dea00b",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#SuppressPrinting; src/Cobol.Net.Runtime/IO/ReportWriter.cs#RunBeforeReporting",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb1186_suppress_named_group_85",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1186 (registrar 14c). GR2 \"The effect of the SUPPRESS statement is limited to the current instance of the report group.\" (cite.py --check OK). The one-shot flag is consumed at the next RunBeforeReporting, which gives GR2 for a SUPPRESS executed during the group's own hook (conformance:2023/rw_suppress: per-GENERATE conditional suppression, rows 10/30 print, 20 suppressed). But a flag set outside any presentation survives into a LATER instance. Repro stale2.cob: DET-A's declarative is 'IF WS-HIDE = 1 SUPPRESS PRINTING'; main: MOVE 1 TO WS-HIDE; PERFORM SUP-SECTION; MOVE 0 TO WS-HIDE; GENERATE DET-A; GENERATE DET-A -> ONE 'DET-A' line; expected TWO (no SUPPRESS executed during either instance's presentation). Same mechanism as GR1 (suppress-flag-keyed-by-report). [editions as adjudicated: 2014, 2023 (not an Annex E 2014->2023 addition, so present in 2014); 85/2002 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d, RW accepted at every edition)]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1186: the suppression state is scoped to the hook of the current instance (cleared on entry, restored on exit), so a later instance is never inhibited.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.45.4-3",
@@ -47841,13 +47841,13 @@
   "ordinal": 3,
   "subject": "TERMINATE statement",
   "rule-digest": "a4dc6df17e36",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#TerminateCore",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb1187_terminate_restore_last_85",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1187 (registrar 14c). cite.py --check 14.9.46.4 \"The contents of any control data items are changed to their prior values\" -> OK §14.9.46.4 3) a). GR3 is an ORDERED list: a) control items <- prior values, b) each control footing minor->major as a most-major break, c) the report footing, d) control items restored to their values at the start of TERMINATE. TerminateCore does a) and b) correctly, then runs d) (the restore loop `_controls[i].Set(current[i])`) INSIDE the control block, BEFORE the page footing and c) the report footing, so the RF (and the last page's PF, §13.18.57.4 GR6f) are produced with the CURRENT values, not the prior ones. Repro out/probe/terminate-statement/p1.cob: RD CONTROL IS FINAL WS-A WS-B; WS-A=1 WS-B=1; INITIATE; GENERATE DET-1; MOVE 3 TO WS-A; MOVE 4 TO WS-B; TERMINATE; RF SOURCEs WS-A and WS-B. Observed report: `DE 1 1 / CFB 1 1 / CFA 1 1 / CFF 1 / RF 3 4`; spec-derived: `... / RF 1 1` (step d follows step c). Identical at --std 85 and 2002 (q85.cob, q2002.cob). a), b) (including CF FINAL), and d) itself (DISPLAY after TERMINATE shows A=3 B=4) verified correct. Existing ControlBreak_Gr4a test does not discriminate (control unchanged between last GENERATE and TERMINATE, and no RF SOURCE of a control item). No kb/Work note owns this row. [editions as adjudicated: 1985 (Report Writer module), 2002, 2014, 2023]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1187: a) priors in, b) control footings, c) the final page footing and the report footing, d) restore LAST - one bracket.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.46.4-4",
@@ -47871,13 +47871,13 @@
   "ordinal": 5,
   "subject": "TERMINATE statement",
   "rule-digest": "b60fcbc68efc",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLines; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#TerminateNames",
+  "test-ref": "conformance:2002/pb1188_report_nonfatal_raise; conformance:2002/pb1130_report_sum_size_line_overlap",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1188 (registrar 14c). cite.py --check 14.9.46.4 \"execution resumes at the next report item, line, or report group\" -> OK §14.9.46.4 5). The rule governs continuation after a NONFATAL exception raised during TERMINATE. The report engine (ReportWriter.cs) raises only EC-FLOW-REPORT, EC-REPORT-ACTIVE, EC-REPORT-INACTIVE and EC-REPORT-FILE-MODE (all Fatal); every Nonfatal report EC in ExceptionCatalog (EC-REPORT-PAGE-LIMIT §13.18.35.4 GR2, EC-REPORT-LINE-OVERLAP, EC-REPORT-PAGE-WIDTH, EC-REPORT-COLUMN-OVERLAP) has NO raise site in src (grep over src/ finds only the catalog entries). cite.py --check 13.18.35.4 \"EC-REPORT-PAGE-LIMIT\" -> OK §13.18.35.4 2). So there is no code path on which the GR5 continuation can occur: a >>TURN-checked program whose final control footing or report footing violates the page limit during TERMINATE never raises, never runs its declarative, and the 'resume at the next item/line/group' semantics are unimplemented. PB326 (landed) names these as the remaining 'CONTENT/GEOMETRY seams' but no open kb/Work note owns them. [editions as adjudicated: 2002, 2014, 2023 (exception conditions arrived with ISO 2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1188: every nonfatal report condition raised during TERMINATE resumes at the next unit in logical order - an overlapping item is not placed (COLUMN-OVERLAP), an overlapping line is abandoned (LINE-OVERLAP), a group split by the page limit is abandoned and the next group follows (PAGE-LIMIT: the golden CONTROL FOOTING FINAL loses F7/F8 and the report footing still prints); PAGE-WIDTH truncates and prints as its GR states.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.46.4-6",
@@ -59316,13 +59316,13 @@
   "ordinal": 0,
   "subject": "PRESENT WHEN clause",
   "rule-digest": "6caa522fad59",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPresentWhenClause; src/Cobol.Net.Frontend/Grammar/Core/CobolDeclined.g4#validatePresentWhenClause; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportPresentWhenClause; src/Cobol.Net.Compiler/Validation/DeclinedFacilityPass.cs",
-  "test-ref": "conformance:2023/rw_present_when",
+  "test-ref": "conformance:2023/rw_present_when; conformance:negative/declined-validate-present-when; conformance:negative/present-when-at-85",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1272. Two formats with the same spelling: Format 1 (report-writer) `PRESENT WHEN condition-1` and Format 2 (validation) `PRESENT WHEN condition-2` (cite.py --check 13.18.41.2 \"Format 2 (validation)\" OK). Format 1 = reportPresentWhenClause (PRESENT WHEN condition), accepted at 01, group and elementary report entries (probe pwa.cob compiled and ran at all three levels), introduction-gated to 2002 (negative/present-when-at-85). Format 2 = validatePresentWhenClause, parsed and refused by name as part of the VALIDATE facility (COBOLNET1708; negative/declined-validate-present-when) which docs/CONFORMANCE.md §5 item 3 declares Not claimed (Annex A.4.14). PARTIAL because format 2 is a declined-facility half; its witness debt is owned by the landed PB283 analysis (A.4.14 VALIDATE rows) — not a new decision. Format 1 half CONFORMS. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (PRESENT WHEN was introduced with the 2002 report writer; not in ISO 1989:1985; 2023 Annex E lists no change)",
-  "state": "GAP"
+  "notes": "kb/Work PB1272 + owner decision kb/Work R43 item 2: format 1 (reportPresentWhenClause, 2002+, negative/present-when-at-85) conforms and its semantics now do too (PB1272); format 2 is the declined VALIDATE facility half (COBOLNET1708, docs/CONFORMANCE.md section 5 item 3, kb/Work PB283), non-support by R43 item 1, so the row takes the live half verdict.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.42.2",

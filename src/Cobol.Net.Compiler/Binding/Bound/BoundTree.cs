@@ -1805,13 +1805,15 @@ public sealed record BoundInitiate(IReadOnlyList<ReportModel> Reports) : BoundSt
 public sealed record BoundGenerate(ReportModel Report, ReportGroupModel? Detail) : BoundStatement;
 
 /// <summary><c>SUPPRESS PRINTING</c> (ISO §14.9.45): inhibit the PRINTING of the current instance of the report
-/// group named by the lexically-enclosing USE BEFORE REPORTING procedure (GR1/SR1). <paramref name="Report"/> is
-/// that group's owning report, resolved at bind time (the target group is a static, lexical property — GR1). The
-/// per-instance suppression itself is a RUNTIME effect (GR2): the emitted call sets a one-shot flag the report
-/// engine consumes at the next group presentation, inhibiting print lines, page advance, NEXT GROUP, and
-/// LINE-COUNTER changes (GR3 a–d) — but NOT sum-counter accumulation (GR7) or the end-of-group sum reset (GR2;
-/// only PRESENT WHEN / OCCURS DEPENDING absence skips the reset, §13.18.54.4 GR10).</summary>
-public sealed record BoundSuppress(ReportModel Report) : BoundStatement;
+/// group named by the lexically-enclosing USE BEFORE REPORTING procedure (GR1/SR1). <paramref name="Group"/> IS
+/// that group and <paramref name="Report"/> its owning report, both resolved at bind time (the target group is a
+/// static, lexical property — GR1: "only for the report group named in the USE procedure within which the
+/// SUPPRESS statement appears"). The per-instance suppression itself is a RUNTIME effect (GR2): the emitted call
+/// names the group, and the engine honours it only while THAT group's own hook is running (kb/Work PB1186),
+/// inhibiting print lines, page advance, NEXT GROUP, and LINE-COUNTER changes (GR3 a–d) — but NOT sum-counter
+/// accumulation (GR7) or the end-of-group sum reset (GR2; only PRESENT WHEN / OCCURS DEPENDING absence skips the
+/// reset, §13.18.54.4 GR10).</summary>
+public sealed record BoundSuppress(ReportModel Report, ReportGroupModel Group) : BoundStatement;
 
 /// <summary><c>TERMINATE report-name…</c> (ISO §14.9.46): final control footings + report footing, report →
 /// inactive (GR3); unrolls in written order (GR4); does NOT close the file (GR6).</summary>

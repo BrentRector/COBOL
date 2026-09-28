@@ -1,0 +1,40 @@
+GENERATE DE-C
+EC EC-REPORT-COLUMN-OVERLAP       
+GENERATE DE-L
+EC EC-REPORT-PAGE-LIMIT           
+GENERATE DE-S
+GENERATE DE-T
+GENERATE DE-W
+EC EC-REPORT-PAGE-WIDTH           
+TERMINATE R-L
+TERMINATE R-T
+EC EC-REPORT-PAGE-LIMIT           
+R-C
+LINE 01 [ AAA C]
+R-L
+LINE 02 [L1    ]
+LINE 03 [L2    ]
+LINE 04 [L3    ]
+LINE 05 [L4    ]
+LINE 06 [L5    ]
+(page)
+LINE 02 [S1    ]
+LINE 03 [C1    ]
+LINE 04 [C2    ]
+LINE 05 [C3    ]
+(page)
+LINE 01 [RF    ]
+R-T
+LINE 01 [D1    ]
+(page)
+LINE 01 [F1    ]
+LINE 02 [F2    ]
+LINE 03 [F3    ]
+LINE 04 [F4    ]
+LINE 05 [F5    ]
+LINE 06 [F6    ]
+(page)
+LINE 01 [RT    ]
+R-W
+LINE 01 [W     ]
+  TAIL [ 123 ] LENGTH 0999

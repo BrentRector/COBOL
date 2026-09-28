@@ -468,6 +468,20 @@ public sealed class FileRegistry
     public void WriteAdvancing(string name, string image, int lines, bool before, LinagePage? page) =>
         SequentialOf(name, "WRITE ADVANCING").WriteAdvancing(image, lines, before, page);
 
+    /// <summary>Make <paramref name="drain"/> the holder of the connector's one held-back print line (see
+    /// <see cref="FileConnector.HeldLineDrain"/>; kb/Work PB1247). A DIFFERENT holder is drained first: its line
+    /// was produced earlier, so it reaches the medium before anything the new holder writes.</summary>
+    internal void HoldLine(string name, Action drain)
+    {
+        var connector = SequentialOf(name, "REPORT");
+        if (connector.HeldLineDrain is { } previous && !ReferenceEquals(previous, drain))
+        {
+            connector.HeldLineDrain = null;
+            previous();
+        }
+        connector.HeldLineDrain = drain;
+    }
+
     /// <summary>The sequential connector a sequential-surface entry acts on: an unregistered name and a keyed
     /// connector are both compiler defects (the binder routes keyed files to the keyed entries), so both are
     /// LOUD — the old <c>TryGetValue</c> guard wrote nothing and reported nothing (kb/Work PB360).</summary>

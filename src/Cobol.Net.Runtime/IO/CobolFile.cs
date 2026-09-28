@@ -125,6 +125,11 @@ public static class CobolFile
     public static void WriteAdvancing(string name, string image, int lines, bool before, LinagePage? page)
         => _reg.WriteAdvancing(name, image, lines, before, page);
 
+    /// <summary>Make <paramref name="drain"/> the holder of the one held-back print line of the connector of
+    /// <paramref name="name"/> — the report writer's (ISO §13.18.35.4 GR3; kb/Work PB1247) — writing out any line
+    /// a different holder still holds first (<see cref="FileConnector.HeldLineDrain"/>).</summary>
+    internal static void HoldLine(string name, Action drain) => _reg.HoldLine(name, drain);
+
     // ⛔ No ungoverned READ / REWRITE / BEFORE-AND-AFTER-WRITE entry exists on this facade any more, and none may
     // come back (kb/Work PB683): the emitted code reaches those verbs ONLY through ReadShared / RewriteShared /
     // WriteShared, which decide record-lock governance where the OPEN statement's own SHARING phrase is visible

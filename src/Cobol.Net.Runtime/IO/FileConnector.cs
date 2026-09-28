@@ -734,6 +734,13 @@ public abstract class FileConnector
     /// file has any; sequential and relative files answer the shared empty list.</summary>
     protected virtual IReadOnlyList<FixedFileAttributes.KeyDescriptor> DeclaredKeys => [];
 
+    /// <summary>The drain of the ONE print line held back on this connector — the report writer's:
+    /// <see cref="CobolReport"/> keeps its most recent report line unwritten so that a relative line with an
+    /// integer-2 of zero can overwrite it (ISO §13.18.35.4 GR3; kb/Work PB1247). Whoever writes next to the device
+    /// claims it first (<see cref="FileRegistry.HoldLine"/>), which writes out a different holder's line, and
+    /// <see cref="Close"/> writes out the holder's line before the file closes. Null = nothing held.</summary>
+    internal Action? HeldLineDrain { get; set; }
+
     /// <summary>CLOSE the file (ISO §14.9.6): the not-open guard ('42', §9.1.13.7 item 2), then the
     /// organization's <see cref="CloseCore"/> under the OPEN twin's exception mapping — an OS-level close
     /// failure (a flush that cannot complete, a store that cannot persist) is the §9.1.13.6 item 1 permanent
@@ -743,6 +750,14 @@ public abstract class FileConnector
     public string Close()
     {
         if (!IsOpen) return Status = FileStatusCode.FileNotOpen;
+        // A producer that holds its last line back writes it out FIRST — on EVERY close path (the CLOSE statement,
+        // the run unit's implicit CloseAll, a CANCEL), because they all funnel through here. One-shot: the next
+        // OPEN starts with none.
+        if (HeldLineDrain is { } drain)
+        {
+            HeldLineDrain = null;
+            drain();
+        }
         string s;
         try { s = CloseCore(); }
         catch (UnauthorizedAccessException) { s = FileStatusCode.PermanentError; }

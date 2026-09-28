@@ -62,6 +62,8 @@ internal sealed class ReportWriterEmitter(
                     + $"   // {r.Name} PAGE-COUNTER (ISO §8.4.3.15.4 GR1)");
         foreach (var r in reports)
             foreach (var (group, gi) in r.Groups.Select((g, i) => (g, i)))
+            {
+                EmitPresenceProbe(r, group, gi, w);
                 foreach (var (line, li) in group.Lines.Select((l, i) => (l, i)))
                 {
                     // Profiles first (declaration order is irrelevant for statics, but keep them adjacent).
@@ -70,6 +72,70 @@ internal sealed class ReportWriterEmitter(
                             w.Line($"private static readonly NumProfile {f.PrintItem.ProfileName} = {pic.ProfileInitializer(ctx.SignEncoding)};");
                     EmitCompose(r, group, gi, line, li, w);
                 }
+            }
+    }
+
+    /// <summary>⛔ ONE PRESENCE SNAPSHOT PER GROUP PRESENTATION (kb/Work PB1272) — the slots of one report group's
+    /// conditioned entries, in a fixed order: each conditioned LINE (its PRESENT WHEN chain AND its enclosing
+    /// OCCURS … DEPENDING counts, <see cref="LinePresent"/>), each conditioned printable item (its field-local
+    /// chain AND its repetition guards), each conditioned SUM entry the group prints (its FULL chain). ISO
+    /// §13.18.41.4 GR2 evaluates every condition-1 of the group "before the processing of any LINE clauses for the
+    /// report group" and §13.18.38.4 GR13 evaluates data-name-1 "just before the processing for the first LINE
+    /// clause", so the engine runs the probe ONCE, before the page-fit test, and the placement, the compose and the
+    /// sum reset all read its answers. The compose used to evaluate an item's chain itself — after the page advance
+    /// the group's own fit test had caused — and the engine re-ran a SUM entry's chain at the end of the group.
+    /// A GROUP INDICATE condition is NOT a slot: §13.18.28.4 GR1 makes it the engine's own state, which this
+    /// group's page advance legitimately re-arms (kb/Work PB1244).</summary>
+    private sealed class PresencePlan
+    {
+        public List<string> Tests { get; } = [];
+        public Dictionary<ReportLineModel, int> Lines { get; } = new(ReferenceEqualityComparer.Instance);
+        public Dictionary<ReportFieldModel, int> Fields { get; } = new(ReferenceEqualityComparer.Instance);
+        public Dictionary<ReportSumModel, int> Sums { get; } = new(ReferenceEqualityComparer.Instance);
+
+        /// <summary>The slot of a conditioned entry, −1 for an unconditional one.</summary>
+        public static int SlotOf<T>(Dictionary<T, int> slots, T entry) where T : notnull =>
+            slots.TryGetValue(entry, out int k) ? k : -1;
+    }
+
+    private readonly Dictionary<ReportGroupModel, PresencePlan> _plans = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The group's <see cref="PresencePlan"/>, built once and shared by the probe, the compose methods
+    /// and the construction, so the three agree on every slot number.</summary>
+    private PresencePlan PlanOf(ReportModel r, ReportGroupModel group)
+    {
+        if (_plans.TryGetValue(group, out var plan)) return plan;
+        plan = new PresencePlan();
+        foreach (var l in group.Lines)
+        {
+            if (LinePresent(l) is { } lp) { plan.Lines[l] = plan.Tests.Count; plan.Tests.Add(lp); }
+            foreach (var f in l.Fields)
+                if (f.PresentWhen.Count > 0 || f.RepetitionGuards.Count > 0)
+                {
+                    plan.Fields[f] = plan.Tests.Count;
+                    plan.Tests.Add(string.Join(" && ", [.. f.PresentWhen.Select(c => $"({cond.Render(c)})"),
+                                                         .. f.RepetitionGuards.Select(RepetitionTest)]));
+                }
+        }
+        foreach (var s in r.Sums)
+            if (ReferenceEquals(s.PrintedIn, group) && s.PresentWhen.Count > 0)
+            {
+                plan.Sums[s] = plan.Tests.Count;
+                plan.Tests.Add(PresentExpr(s.PresentWhen));
+            }
+        _plans[group] = plan;
+        return plan;
+    }
+
+    /// <summary>The per-group presence probe the engine runs once per presentation (see <see cref="PresencePlan"/>);
+    /// nothing for a group with no conditioned entry.</summary>
+    private void EmitPresenceProbe(ReportModel r, ReportGroupModel group, int gi, CodeWriter w)
+    {
+        var plan = PlanOf(r, group);
+        if (plan.Tests.Count == 0) return;
+        using (w.Block($"private void __RPT_P_{r.CsIndex}_{gi}(bool[] __p)   // {r.Name} {group.Kind} presence (ISO §13.18.41.4 GR2 / §13.18.38.4 GR13)"))
+            for (int k = 0; k < plan.Tests.Count; k++)
+                w.Line($"__p[{k}] = {plan.Tests[k]};");
     }
 
     /// <summary>Emit one report line's compose method: a space-filled buffer of the report's line width, each
@@ -84,7 +150,7 @@ internal sealed class ReportWriterEmitter(
     {
         using (w.Block($"private string __RPT_C_{r.CsIndex}_{gi}_{li}()   // {r.Name} {group.Kind} line {li + 1}"))
         {
-            w.Line($"var __ln = {RuntimeApi.ReportNewLine(r.LineWidth)};");
+            w.Line($"var __ln = {RuntimeApi.ReportNewLine(r.CsIndex)};");
             // The horizontal counter (§13.18.14.4 GR7 — the rightmost occupied column, 0 at line start) exists
             // only when some operand is relative; every placed item then updates it (GR9).
             bool needsHc = line.Fields.Any(f => f.Columns.Any(c => c.Relative));
@@ -97,32 +163,34 @@ internal sealed class ReportWriterEmitter(
                          .Select(c => c.AnchorId).Distinct().Order())
                 w.Line($"int __ra{a} = 0;   // §13.18.38.4 GR12 — a repeating entry's step anchor");
             foreach (var f in line.Fields)
-                EmitFieldPlacements(r, f, needsHc, w);
-            w.Line("return new string(__ln);");
+                EmitFieldPlacements(r, gi, PresencePlan.SlotOf(PlanOf(r, group).Fields, f), f, needsHc, w);
+            w.Line("return __ln.ToString();");
         }
     }
 
     /// <summary>Emit one printable entry's placements into the compose body (see <see cref="EmitCompose"/>).
     /// The COBOL-85 shape — one absolute operand, unconditional, no VARYING, in an all-absolute line — keeps
     /// its exact single-statement emission (the characterization-pinned text).</summary>
-    private void EmitFieldPlacements(ReportModel r, ReportFieldModel f, bool needsHc, CodeWriter w)
+    /// <param name="gi">The group's index in its report — the engine's <c>ReportGroup.Index</c>.</param>
+    /// <param name="presentSlot">The item's slot in the group's presence snapshot (<see cref="PresencePlan"/>),
+    /// −1 when it carries neither a PRESENT WHEN chain nor a repetition guard.</param>
+    private void EmitFieldPlacements(ReportModel r, int gi, int presentSlot, ReportFieldModel f, bool needsHc, CodeWriter w)
     {
-        if (!needsHc && f.Columns.Count == 1 && f.PresentWhen.Count == 0 && !f.GroupIndicate
-            && f.Varyings.Count == 0 && f.RepetitionGuards.Count == 0)
+        if (!needsHc && f.Columns.Count == 1 && presentSlot < 0 && !f.GroupIndicate && f.Varyings.Count == 0)
         {
-            w.Line($"{RuntimeApi.ReportPlace("__ln", f.Column, FieldImage(r, f, 0))};");
+            w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", f.Column, FieldImage(r, f, 0))};");
             return;
         }
         // The placement's presence — ALL THREE suppressors §13.18.63.4 GR22 names ("a GROUP INDICATE, PRESENT
         // WHEN, or OCCURS clause with the DEPENDING phrase may suppress the appearance of the item"), in one test:
-        // the PRESENT WHEN chain (§13.18.41.4 GR2b); the GROUP INDICATE condition, which §13.18.28.4 GR1 makes "the
-        // same effect as a PRESENT WHEN clause" whose condition the engine owns (CobolReport.GroupIndicatePresent,
-        // per detail group — kb/Work PB1244); and every enclosing repeating entry's OCCURS … DEPENDING test
-        // (§13.18.38.4 GR13). An absent item places nothing and never advances the horizontal counter, so an
-        // indicated item with a relative COLUMN operand needs nothing of its own.
-        string[] tests = [.. f.PresentWhen.Select(c => $"({cond.Render(c)})"),
-                          .. f.GroupIndicate ? [$"__RPT_{r.CsIndex}.GroupIndicatePresent"] : (string[])[],
-                          .. f.RepetitionGuards.Select(RepetitionTest)];
+        // the PRESENT WHEN chain (§13.18.41.4 GR2b) and every enclosing repeating entry's OCCURS … DEPENDING test
+        // (§13.18.38.4 GR13) as the group's presence SNAPSHOT recorded them before any LINE clause was processed
+        // (kb/Work PB1272); and the GROUP INDICATE condition, which §13.18.28.4 GR1 makes "the same effect as a
+        // PRESENT WHEN clause" whose condition the engine owns (GroupIndicatePresent, per detail group — kb/Work
+        // PB1244). An absent item places nothing and never advances the horizontal counter, so an indicated item
+        // with a relative COLUMN operand needs nothing of its own.
+        string[] tests = [.. presentSlot >= 0 ? [RuntimeApi.ReportIsPresent(r.CsIndex, gi, presentSlot)] : (string[])[],
+                          .. f.GroupIndicate ? [$"__RPT_{r.CsIndex}.GroupIndicatePresent"] : (string[])[]];
         using IDisposable? guard = tests.Length > 0
             ? w.Block($"if ({string.Join(" && ", tests)})   // presence (§13.18.41.4 GR2b / §13.18.28.4 GR1 / §13.18.38.4 GR13)")
             : null;
@@ -151,12 +219,12 @@ internal sealed class ReportWriterEmitter(
             switch (spec.Kind)
             {
                 case ReportColumnKindModel.Absolute:
-                    w.Line($"{RuntimeApi.ReportPlace("__ln", spec.Value, image)};");
+                    w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", spec.Value, image)};");
                     if (needsHc) w.Line($"__hc = {spec.Value + f.PrintItem.DisplayTextWidth - 1};   // §13.18.14.4 GR9");
                     break;
                 case ReportColumnKindModel.Relative:
                     w.Line($"__hc += {spec.Value};   // §13.18.14.4 GR8 — leftmost = horizontal counter + integer-2");
-                    w.Line($"{RuntimeApi.ReportPlace("__ln", "__hc", image)};");
+                    w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", "__hc", image)};");
                     w.Line($"__hc += {f.PrintItem.DisplayTextWidth - 1};   // §13.18.14.4 GR9");
                     break;
                 case ReportColumnKindModel.AnchorSeed:
@@ -164,11 +232,11 @@ internal sealed class ReportWriterEmitter(
                     // says AND remember the column, because §13.18.38.4 GR12 measures the later repetitions from
                     // the column this one occupies, not from the horizontal counter (which holds its RIGHTMOST).
                     w.Line($"__ra{spec.AnchorId} = __hc + {spec.Value};   // §13.18.14.4 GR8 + §13.18.38.4 GR12");
-                    w.Line($"{RuntimeApi.ReportPlace("__ln", $"__ra{spec.AnchorId}", image)};");
+                    w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", $"__ra{spec.AnchorId}", image)};");
                     w.Line($"__hc = __ra{spec.AnchorId} + {f.PrintItem.DisplayTextWidth - 1};   // §13.18.14.4 GR9");
                     break;
                 default:
-                    w.Line($"{RuntimeApi.ReportPlace("__ln", $"__ra{spec.AnchorId} + {spec.Value}", image)};"
+                    w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", $"__ra{spec.AnchorId} + {spec.Value}", image)};"
                         + $"   // §13.18.38.4 GR12 — {spec.Value} columns right of repetition 0");
                     if (needsHc)
                         w.Line($"__hc = __ra{spec.AnchorId} + {spec.Value + f.PrintItem.DisplayTextWidth - 1};   // §13.18.14.4 GR9");
@@ -181,9 +249,9 @@ internal sealed class ReportWriterEmitter(
     /// §13.18.63.4 GR22). GR13: the repetition count is data-name-1 when its value lies in integer-1 through
     /// (integer-2 − 1), and integer-2 otherwise ("the report group is processed as though the OCCURS clause had
     /// been written without the TO and DEPENDING phrases"), so repetition <c>Ordinal</c> appears exactly when it
-    /// is below that count. data-name-1 is read HERE, at presentation time; §13.18.35 composes a group's lines in
-    /// order, so every placement of one group sees the one value GR13's "just before the processing for the first
-    /// LINE clause of the report group" fixes.</summary>
+    /// is below that count. The test is one term of the group's presence probe (<see cref="PresencePlan"/>), so
+    /// data-name-1 is read once per presentation, at the point GR13 names — "just before the processing for the
+    /// first LINE clause of the report group" — and every placement of the group sees that one value.</summary>
     private string RepetitionTest(ReportRepetitionGuard g)
     {
         if (g.Spec.DependingItem is not { } dn || refs.ResolveItem(dn) is not { } place) return "true";
@@ -195,8 +263,9 @@ internal sealed class ReportWriterEmitter(
     /// can absent a whole line: the §13.18.41 PRESENT WHEN chain and the §13.18.38.4 GR13 count of every
     /// enclosing repeating entry with a DEPENDING phrase. Composing them here rather than in two delegates is
     /// what keeps §13.18.35.4 GR4c's "these clauses are taken into account in computing the trial sum" true of
-    /// both at once — the engine reads presence once per presentation and the page-fit test reads the same
-    /// answer. Null when the line is unconditional (the characterization-pinned three-argument construction).</summary>
+    /// both at once — the line's slot of the group's presence snapshot (<see cref="PresencePlan"/>) holds the one
+    /// answer the placement and the page-fit test both read. Null when the line is unconditional (the
+    /// characterization-pinned three-argument construction).</summary>
     private string? LinePresent(ReportLineModel l)
     {
         if (l.PresentWhen.Count == 0 && l.RepetitionGuards.Count == 0) return null;
@@ -263,11 +332,17 @@ internal sealed class ReportWriterEmitter(
                 // ENTRY ORDINAL (GR1) — `First(Id == name)` used to pick whichever entry spelled its data-name
                 // first (kb/Work PB882).
                 var sum = r.Sums[s.CounterId];
-                source = new BoundFieldOperand(new ReportSumCounterPlace(r.CsIndex, s.CounterId, sum.Register));
                 // §13.18.54.4 GR4 — with the clause's ROUNDED phrase "the content of the sum counter is computed
                 // according to the general rules for the COMPUTE statement with the ROUNDED phrase".
-                rounding = sum.Rounding;
-                break;
+                string moved = move.ConvertSource(
+                    new BoundFieldOperand(new ReportSumCounterPlace(r.CsIndex, s.CounterId, sum.Register)),
+                    f.PrintItem, rounding: sum.Rounding);
+                // ⛔ …but only while the counter's SIZE ERROR INDICATOR is unset (GR4: "If the associated size error
+                // indicator is set, an EC-REPORT-SUM-SIZE exception condition is set to exist and the printable item
+                // is filled with spaces" — kb/Work PB1130). The engine answers the indicator and raises the
+                // condition; the fill is unconditional, so it is decided here and not by the raise.
+                return $"({RuntimeApi.ReportSumPresentable(r.CsIndex, s.CounterId)} "
+                    + $"? {moved} : {CsLiteral(new string(' ', f.PrintItem.DisplayTextWidth))})";
             case FieldComputeSource { Value: { } expr } cs:
                 // §13.18.53.4 GR2 — "Arithmetic-expression-1 specifies the operand of an implicit COMPUTE
                 // statement that is executed implicitly whenever the associated item is printed. If the ROUNDED
@@ -321,22 +396,25 @@ internal sealed class ReportWriterEmitter(
                 + $"{r.LastControlHeading}, {r.LastDetail}, {r.Footing});");
             foreach (var (group, gi) in r.Groups.Select((g, i) => (g, i)))
             {
-                // A conditioned line carries its PRESENT WHEN chain as a delegate the engine evaluates once per
-                // presentation, BEFORE any LINE processing (§13.18.41.4 GR2); unconditional lines keep the
-                // three-argument construction (the characterization-pinned text). A line that seeds or steps
-                // from a §13.18.38.4 GR12c/GR12d step anchor adds the anchor triple, which then forces the
-                // PRESENT argument to be written out even when it is null. A first line whose LINE clause carries
-                // the NEXT PAGE phrase (§13.18.35.2 Format 1; kb/Work PB1001) adds it as a NAMED argument, so every
-                // phrase-less line keeps its text.
+                // A conditioned line carries its slot in the group's presence snapshot, which the engine takes
+                // once per presentation, BEFORE any LINE processing (§13.18.41.4 GR2; kb/Work PB1272);
+                // unconditional lines keep the three-argument construction (the characterization-pinned text). A
+                // line that seeds or steps from a §13.18.38.4 GR12c/GR12d step anchor adds the anchor triple,
+                // which then forces the slot argument to be written out even when it is −1. A first line whose
+                // LINE clause carries the NEXT PAGE phrase (§13.18.35.2 Format 1; kb/Work PB1001) adds it as a
+                // NAMED argument, so every phrase-less line keeps its text.
+                var plan = PlanOf(r, group);
                 string lines = group.Lines.Count == 0
                     ? "System.Array.Empty<ReportGroupLine>()"
                     : "new[] { " + string.Join(", ", group.Lines.Select((l, li) =>
                         $"new ReportGroupLine(ReportLineKind.{l.Kind}, {l.Value}, __RPT_C_{r.CsIndex}_{gi}_{li}"
-                        + (LinePresent(l) is { } lp ? $", () => {lp}" : l.Anchor > 0 ? ", null" : "")
+                        + (plan.Lines.TryGetValue(l, out int ls) ? $", {ls}" : l.Anchor > 0 ? ", -1" : "")
                         + (l.Anchor > 0 ? $", {l.Anchor}, {l.RelativeBase}, {l.TrialInterval}" : "")
                         + (l.NextPage ? ", nextPage: true" : "") + ")")) + " }";
                 w.Line($"var __rg{r.CsIndex}_{gi} = new ReportGroup(ReportGroupKind.{group.Kind}, "
                     + $"{CsLiteral(group.Name ?? "")}, {group.ControlLevel}, {lines});");
+                if (plan.Tests.Count > 0)
+                    w.Line($"__rg{r.CsIndex}_{gi}.SetPresence({plan.Tests.Count}, __RPT_P_{r.CsIndex}_{gi});");
                 // The NEXT GROUP clause (§13.18.37; kb/Work PB957) — the bound runtime record, written verbatim; the
                 // engine applies it after the group's last line (GR2).
                 if (group.NextGroup is { } ng)
@@ -399,7 +477,18 @@ internal sealed class ReportWriterEmitter(
                 string set = CallEmitter.CallPlaceIsString(place)
                     ? CallEmitter.CallStringWrite(place, "__v")
                     : PlaceRenderer.Write(place, RuntimeApi.NumStoreDisplay("__v", place.Item.ProfileName, PlaceRenderer.Read(place)));
-                w.Line($"__RPT_{r.CsIndex}.AddControl(false, () => {CallEmitter.CallStringRead(place)}, __v => {{ {set} }});");
+                // ⛔ THE BREAK TEST IS THE PROGRAM'S COMPARISON (kb/Work PB1131). §12.3.6.4 GR11 c): the program
+                // collating sequences "are used to determine the truth value of any alphanumeric comparisons and
+                // national comparisons … Implicitly specified by the presence of a CONTROL clause", and §13.18.16.4
+                // GR3's test is one "for equality with the corresponding prior control" — an operand of the SAME
+                // data description, so the comparison class is the item's own against itself, asked of the ONE
+                // class rule a relation condition asks (CollateArgFor over the operand's category — a reference-
+                // modified operand answers the slice's category, §8.4.3.3.4 GR6 c)). No sequence ⇒ no argument:
+                // the engine's code-unit compare of two equal-length images IS that comparison.
+                var cat = CollatingSelection.OperandCategory(new BoundFieldOperand(place));
+                string collate = ctx.CollateArgFor(cat, cat);
+                string equal = collate.Length == 0 ? "" : $", static (__a, __b) => {RuntimeApi.StrCompare("__a", "__b", collate)} == 0";
+                w.Line($"__RPT_{r.CsIndex}.AddControl(false, () => {CallEmitter.CallStringRead(place)}, __v => {{ {set} }}{equal});");
             }
             // SUM counters (§13.18.54): the addend delegate yields the addends' total at the counter's scale
             // (GR3 — ADD-consistent accumulation; GR9 — multiple addends sum together).
@@ -414,11 +503,13 @@ internal sealed class ReportWriterEmitter(
             foreach (var sum in r.Sums)
             {
                 int printedGi = r.Groups.IndexOf(sum.PrintedIn);
-                // A conditioned SUM entry passes its PRESENT WHEN chain — false at a presentation suppresses
-                // the end-of-group reset (§13.18.41.4 GR3g / §13.18.54.4 GR10); the print half rides the
-                // printable face's identical chain inside the compose.
-                string sumPresent = sum.PresentWhen.Count > 0 ? $", () => {PresentExpr(sum.PresentWhen)}" : "";
-                w.Line($"__RPT_{r.CsIndex}.AddSum({sum.Id}, {sum.ResetLevel}, "
+                // A conditioned SUM entry passes its slot in its group's presence snapshot — absent at a
+                // presentation suppresses the end-of-group reset (§13.18.41.4 GR3g / §13.18.54.4 GR10), and the
+                // printable face reads the same snapshot, so one answer governs both halves (kb/Work PB1272).
+                string sumPresent = PresencePlan.SlotOf(PlanOf(r, sum.PrintedIn).Sums, sum) is var ss and >= 0 ? $", {ss}" : "";
+                // GR1's digit count rides the registration: it is the counter's capacity, and an addition past it is
+                // the GR3 size error that sets the entry's indicator (kb/Work PB1130).
+                w.Line($"__RPT_{r.CsIndex}.AddSum({sum.Id}, {sum.Register.Pic?.Digits ?? 18}, {sum.ResetLevel}, "
                     + $"__rg{r.CsIndex}_{printedGi}{sumPresent});");
                 // ONE TERM PER `SUM … [UPON …]` GROUP (§13.18.54.3 SR1 + §13.18.54.4 GR1/GR7c2 — kb/Work
                 // PB482): the counter belongs to the ENTRY, the UPON filter belongs to its own group, and GR9
@@ -565,10 +656,13 @@ internal sealed class ReportWriterEmitter(
             ctx.Writer.Line($"{Engine(r)}.Terminate({SelectorArgument(r)});");
     }
 
-    /// <summary>SUPPRESS PRINTING (§14.9.45): set the one-shot suppression flag on the engine of the report that
-    /// owns the enclosing USE BEFORE REPORTING group (resolved at bind, <see cref="BoundSuppress.Report"/>). The
-    /// engine consumes it at the next group presentation (GR2 — current instance only), inhibiting printing,
-    /// page advance, NEXT GROUP and LINE-COUNTER changes but NOT the end-of-group sum reset.</summary>
+    /// <summary>SUPPRESS PRINTING (§14.9.45): name the group of the enclosing USE BEFORE REPORTING procedure
+    /// (resolved at bind, <see cref="BoundSuppress.Group"/>) to its report's engine, which inhibits the CURRENT
+    /// instance of that group only when the statement executes during that group's own hook (GR1/GR2; kb/Work
+    /// PB1186) — printing, page advance, NEXT GROUP and LINE-COUNTER changes, but NOT the end-of-group sum reset.
+    /// The argument is the group's ordinal in its report description: the <c>ReportGroup.Index</c> that
+    /// <see cref="EmitReportConstruction"/>'s AddGroup order assigns and the §14.9.49.4 GR4 selector switches on.</summary>
     public void EmitSuppress(BoundSuppress s) =>
-        ctx.Writer.Line($"{Engine(s.Report)}.SuppressPrinting();");
+        ctx.Writer.Line($"{Engine(s.Report)}.SuppressPrinting({s.Report.Groups.IndexOf(s.Group)});   "
+            + $"// §14.9.45.4 GR1 — {s.Group.Name ?? "(unnamed group)"}");
 }

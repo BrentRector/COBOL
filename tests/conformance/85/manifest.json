@@ -292,7 +292,13 @@
   "pb690_file_character_set_85",
   "pb690_report_line_byte_image_85",
   "pb1098_organization_permanence_85",
-  "pb1542_code_set_unrepresentable_85"
+  "pb1542_code_set_unrepresentable_85",
+  "pb1131_control_break_collating_85",
+  "pb1186_suppress_named_group_85",
+  "pb1187_terminate_restore_last_85",
+  "pb1247_line_placement_unpaged_85",
+  "pb1296_sum_counter_digits_85",
+  "pb1297_sum_reset_level_upon_85"
  ],
  "pending": []
 }

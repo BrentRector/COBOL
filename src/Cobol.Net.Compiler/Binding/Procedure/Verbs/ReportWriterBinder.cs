@@ -179,7 +179,7 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
                 "SUPPRESS PRINTING may appear only in a USE BEFORE REPORTING procedure (ISO §14.9.45.3 SR1)");
         }
         var report = ctx.Data.VisibleReports.First(r => r.Groups.Contains(group));
-        return new BoundSuppress(report);
+        return new BoundSuppress(report, group);
     }
 
     /// <summary>⛔ THE ONE CHECK of the rule the three report-driving verbs each restate (kb/Work PB369): "If

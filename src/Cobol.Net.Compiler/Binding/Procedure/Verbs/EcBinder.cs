@@ -380,13 +380,25 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
     /// sites are <c>CobolReport.Initiate</c>'s three preconditions, reached from exactly this bound node.</summary>
     private static readonly string[] InitiateNames = ["EC-REPORT-ACTIVE", "EC-REPORT-FILE-MODE", "EC-FLOW-REPORT"];
 
+    /// <summary>The conditions the report groups a GENERATE or TERMINATE PRODUCES can raise (kb/Work PB1130):
+    /// EC-REPORT-LINE-OVERLAP (§13.18.35.4 GR3 — a line printed on or above one already printed) and
+    /// EC-REPORT-SUM-SIZE (§13.18.54.4 GR3 — an addition into a sum counter, at a GENERATE; GR4 — a counter whose
+    /// size error indicator is set, printed by either verb), and — kb/Work PB1188 — EC-REPORT-PAGE-LIMIT
+    /// (§13.18.35.4 GR2 — a group split between two pages), EC-REPORT-COLUMN-OVERLAP (§13.18.14.4 GR4) and
+    /// EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5). Their raise sites are inside the engine call the verb's node emits
+    /// (<c>CobolReport.PresentLine</c>, the accumulation loop, <c>SumPresentable</c>, and <c>CobolReport.Place</c>,
+    /// which the group's line compose calls while the engine presents it), so they bind as precisely as the
+    /// preconditions do.</summary>
+    private static readonly string[] ReportProductionNames =
+        ["EC-REPORT-LINE-OVERLAP", "EC-REPORT-SUM-SIZE", "EC-REPORT-PAGE-LIMIT", "EC-REPORT-COLUMN-OVERLAP", "EC-REPORT-PAGE-WIDTH"];
+
     /// <summary>The conditions a GENERATE raises (ISO §14.9.16.4 GR7 EC-REPORT-INACTIVE, §14.9.49.4 GR10
-    /// EC-FLOW-REPORT). PRECISE, as <see cref="InitiateNames"/>.</summary>
-    private static readonly string[] GenerateNames = ["EC-REPORT-INACTIVE", "EC-FLOW-REPORT"];
+    /// EC-FLOW-REPORT, and the <see cref="ReportProductionNames"/>). PRECISE, as <see cref="InitiateNames"/>.</summary>
+    private static readonly string[] GenerateNames = ["EC-REPORT-INACTIVE", "EC-FLOW-REPORT", .. ReportProductionNames];
 
     /// <summary>The conditions a TERMINATE raises (ISO §14.9.46.4 GR1 EC-REPORT-INACTIVE, §14.9.49.4 GR10
-    /// EC-FLOW-REPORT). PRECISE, as <see cref="InitiateNames"/>.</summary>
-    private static readonly string[] TerminateNames = ["EC-REPORT-INACTIVE", "EC-FLOW-REPORT"];
+    /// EC-FLOW-REPORT, and the <see cref="ReportProductionNames"/>). PRECISE, as <see cref="InitiateNames"/>.</summary>
+    private static readonly string[] TerminateNames = ["EC-REPORT-INACTIVE", "EC-FLOW-REPORT", .. ReportProductionNames];
 
     /// <summary>The EC-PROGRAM family a CALL/CANCEL raises through <c>CobolCallException</c>.
     /// <para>⛔ NOT EC-PROGRAM-ARG-OMITTED (kb/Work PB971). It sat here as though the ACTIVATOR raised it; §14.9.4.4

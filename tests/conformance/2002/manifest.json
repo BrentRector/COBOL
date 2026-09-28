@@ -540,7 +540,10 @@
   "pb1630_null_argument_crossing",
   "pb1230_constant_literal_as_written",
   "w66g_pb1300_type_same_as_composition",
-  "w66g_pb1475_strong_type_locale_identification"
+  "w66g_pb1475_strong_type_locale_identification",
+  "pb1130_report_sum_size_line_overlap",
+  "pb1272_present_when_snapshot",
+  "pb1188_report_nonfatal_raise"
   ],
   "pending": []
 }

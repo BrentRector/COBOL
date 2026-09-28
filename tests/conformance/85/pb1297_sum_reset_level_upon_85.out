@@ -1,0 +1,14 @@
+R-A
+LINE 01 [1 01 01 02]
+LINE 02 [1 03 03 04]
+LINE 03 [2 03 06 06]
+LINE 04 [2 07 10 08]
+R-B
+LINE 01 [DET       ]
+LINE 02 [DET       ]
+LINE 03 [DET       ]
+LINE 05 [PT=04     ]
+(page)
+LINE 01 [DET       ]
+LINE 02 [DET       ]
+LINE 05 [PT=01     ]

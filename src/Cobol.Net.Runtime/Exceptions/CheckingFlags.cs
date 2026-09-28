@@ -203,6 +203,26 @@ public struct CheckingFlags
     /// the extend mode (§14.9.21.4 GR3).</summary>
     public bool ReportFileMode;
 
+    /// <summary>EC-REPORT-SUM-SIZE — a sum counter addition that is a size error (§13.18.54.4 GR3), and the
+    /// presentation of a sum counter whose size error indicator is set (GR4); kb/Work PB1130.</summary>
+    public bool ReportSumSize;
+
+    /// <summary>EC-REPORT-LINE-OVERLAP — a report line printed on or above a line already printed on the page,
+    /// other than a relative line with an integer-2 of zero (§13.18.35.4 GR3); kb/Work PB1247 / PB1130.</summary>
+    public bool ReportLineOverlap;
+
+    /// <summary>EC-REPORT-PAGE-LIMIT — a report line of a paged report placed beyond the page limit, i.e. a report
+    /// group split between two pages (§13.18.35.4 GR2); kb/Work PB1188.</summary>
+    public bool ReportPageLimit;
+
+    /// <summary>EC-REPORT-COLUMN-OVERLAP — a printable item using a column position another printable item of the
+    /// same line already uses (§13.18.14.4 GR4); kb/Work PB1188.</summary>
+    public bool ReportColumnOverlap;
+
+    /// <summary>EC-REPORT-PAGE-WIDTH — a printable item whose final column exceeds the page width (§13.18.14.4
+    /// GR5); kb/Work PB1188.</summary>
+    public bool ReportPageWidth;
+
     /// <summary>EC-ORDER-NOT-SUPPORTED — FUNCTION STANDARD-COMPARE naming a cultural ordering table this
     /// processor does not provide, or an ordering level the table does not define (§15.85.4 r2).</summary>
     public bool OrderNotSupported;

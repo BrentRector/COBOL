@@ -192,6 +192,15 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         // engine's (flag, name) pair and therefore outside the §14.6.13.1.4 #3 selection it runs (kb/Work PB367b).
         ("EC-RANGE-INVALID", "RangeInvalidChecking"),       // §14.7.8 r2 — an inverted alphanumeric/national THRU range
         ("EC-STORAGE-NOT-AVAIL", "StorageNotAvailChecking"),// §14.9.39 F16 GR37/GR38 — a dynamic-length resize
+        // The Report Writer's NONFATAL raise sites (kb/Work PB1247 / PB1130 / PB1188), all raised while a GENERATE or
+        // TERMINATE produces the report. Each resumes where §14.9.16.4 GR8 / §14.9.46.4 GR5 put it — "at the next
+        // report item, line, or report group, whichever follows in logical order": CobolReport.PresentLine abandons
+        // an overlapping LINE and, past the page limit, the rest of the GROUP; CobolReport.Place abandons an
+        // overlapping ITEM; a page-width violation is truncated and printed as §13.18.14.4 GR5 states outright.
+        ("EC-REPORT-LINE-OVERLAP", "ReportLineOverlapChecking"),// §13.18.35.4 GR3 — overlapping report lines (GENERATE / TERMINATE)
+        ("EC-REPORT-PAGE-LIMIT", "ReportPageLimitChecking"),    // §13.18.35.4 GR2 — a report group split between two pages
+        ("EC-REPORT-COLUMN-OVERLAP", "ReportColumnOverlapChecking"),// §13.18.14.4 GR4 — two printable items in one column
+        ("EC-REPORT-PAGE-WIDTH", "ReportPageWidthChecking"),    // §13.18.14.4 GR5 — a printable item past the page width
     ];
 
     /// <summary>Open the EC region of a NESTED SOURCE statement list — an IF branch, an inline-PERFORM body, an
@@ -452,6 +461,11 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         ("EC-REPORT-ACTIVE", "ReportActiveChecking"),           // §14.9.21.4 GR2  — INITIATE of an active report
         ("EC-REPORT-INACTIVE", "ReportInactiveChecking"),       // §14.9.16.4 GR7 / §14.9.46.4 GR1 — GENERATE/TERMINATE of an inactive report
         ("EC-REPORT-FILE-MODE", "ReportFileModeChecking"),      // §14.9.21.4 GR3  — INITIATE with the connector not open OUTPUT/EXTEND
+        // kb/Work PB1130 — a sum counter's size error (§13.18.54.4 GR3, at the GENERATE that adds) and the presentation
+        // of a counter whose size error indicator is set (GR4, at the GENERATE / TERMINATE that prints it). Unlike its
+        // four neighbours the lenient outcome is not "the verb does nothing": the counter keeps the ADD-with-SIZE-ERROR
+        // result and the printable item is spaces, whether or not the raise happens.
+        ("EC-REPORT-SUM-SIZE", "ReportSumSizeChecking"),        // §13.18.54.4 GR3 / GR4 — overflow of a sum counter
         ("EC-BOUND-TABLE-LIMIT", "BoundTableLimitChecking"),    // §14.9.39.4 GR30 — growth past the implementor max
         ("EC-ORDER-NOT-SUPPORTED", "OrderNotSupportedChecking"),// §15.85.4 r2 — STANDARD-COMPARE's ordering table / level unavailable
         ("EC-LOCALE-MISSING", "LocaleMissingChecking"),        // §14.9.39.4 GR24 / §8.2.1 — a locale not available (SET LOCALE; a named IS LOCALE sequence at use)

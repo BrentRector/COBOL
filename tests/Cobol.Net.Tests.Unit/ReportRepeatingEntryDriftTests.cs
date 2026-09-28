@@ -140,9 +140,18 @@ public sealed class ReportRepeatingEntryDriftTests
             Assert.Contains($"ReportLineKind.{kind}", runtime, StringComparison.Ordinal);
         }
         // The engine reads a Step line's anchor, and it is the ONE subsequent-line rule all four group
-        // presentations share (it was four copies of `LineCounter + l.Value` before PB565's vertical axis).
+        // presentations share (it was four copies of `LineCounter + l.Value` before PB565's vertical axis). Since
+        // kb/Work PB1272 the four presentations share ONE line loop too, `PresentLines`, so the rule has exactly
+        // one call site and every presentation reaches it through that loop — never a loop of its own.
         Assert.Contains("private long SubsequentTarget(ReportGroupLine l)", runtime, StringComparison.Ordinal);
-        Assert.Equal(4, Regex.Matches(runtime, @"SubsequentTarget\((?:l|lines\[i\])\)").Count);
+        Assert.Single(Regex.Matches(runtime, @"SubsequentTarget\(l\)"));
+        foreach (string presentation in new[] { "PresentBody", "PresentPageHeading", "PresentPageFooting", "PresentHeadingFooting" })
+        {
+            int start = runtime.IndexOf($"private void {presentation}(", StringComparison.Ordinal);
+            Assert.True(start >= 0, $"{presentation} is no longer an engine method — re-derive this guard");
+            int end = runtime.IndexOf("\n    }", start, StringComparison.Ordinal);
+            Assert.Contains("PresentLines(", runtime[start..end], StringComparison.Ordinal);
+        }
     }
 
     /// <summary>A repetition's VARYING counter is the CLOSED form over the repetition ordinal, never an

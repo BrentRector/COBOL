@@ -214,7 +214,9 @@ public sealed class GlobalReportScopeTests
                        SUPPRESS PRINTING.
             """, "           GENERATE DET-1."));
         string inner = Inner(cs);
-        Assert.Contains("__outer.__RPT_0.SuppressPrinting();", inner);
+        // The engine is told WHICH group — DET-1, ordinal 0, the same key the selector's `case 0` switches on —
+        // because §14.9.45.4 GR1 inhibits only the group the USE procedure names (kb/Work PB1186).
+        Assert.Contains("__outer.__RPT_0.SuppressPrinting(0);", inner);
         Assert.Matches(new Regex(@"case 0: if \(!__globalOnly\) \{ __RunUse\(0, "), inner);
         Assert.Contains("return false;", inner);   // no GLOBAL declarative outward — the walk ends here
     }

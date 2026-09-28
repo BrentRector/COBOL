@@ -1,0 +1,20 @@
+CNT=01
+CNT=03
+CNT=04
+CNT=01
+R-A
+LINE 01 [PH    ]
+LINE 02 [1     ]
+LINE 03 [2 OPT ]
+LINE 04 [3 OPT ]
+(page)
+LINE 01 [PH    ]
+LINE 02 [4 OPT ]
+LINE 03 [5 OPT ]
+R-B
+LINE 01 [1     ]
+LINE 02 [1     ]
+LINE 03 [2     ]
+LINE 04 [BRK   ]
+LINE 05 [3     ]
+LINE 06 [BRK   ]

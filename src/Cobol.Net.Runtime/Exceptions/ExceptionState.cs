@@ -1067,6 +1067,91 @@ public sealed class ExceptionEngine
     public void ReportFileModeError(string detail)
         => FatalIfEnabled(ReportFileModeChecking, "EC-REPORT-FILE-MODE", detail);
 
+    /// <summary>True while the currently-executing statement has EC-REPORT-SUM-SIZE checking enabled (fatal).</summary>
+    public bool ReportSumSizeChecking
+    {
+        get => _checking.ReportSumSize;
+        set => _checking.ReportSumSize = value;
+    }
+
+    /// <summary>Raise EC-REPORT-SUM-SIZE (§13.18.54.4 GR3 — a sum counter addition is a size error; GR4 — a sum
+    /// counter whose size error indicator is set is presented; Table 13 Fatal) when checking is enabled; otherwise
+    /// return, and the caller's lenient outcome stands exactly as GR3/GR4 state it — the counter is left as the
+    /// ADD with ON SIZE ERROR leaves it and its indicator is set; the printable item is filled with spaces.</summary>
+    public void ReportSumSizeError(string detail)
+        => FatalIfEnabled(ReportSumSizeChecking, "EC-REPORT-SUM-SIZE", detail);
+
+    /// <summary>True while the currently-executing statement has EC-REPORT-LINE-OVERLAP checking enabled
+    /// (nonfatal).</summary>
+    public bool ReportLineOverlapChecking
+    {
+        get => _checking.ReportLineOverlap;
+        set => _checking.ReportLineOverlap = value;
+    }
+
+    /// <summary>Raise EC-REPORT-LINE-OVERLAP (§13.18.35.4 GR3; Table 13 NF) when checking is enabled, running the
+    /// qualifying declarative (§14.6.13.1.4). Returns whether the condition was RAISED: §14.9.16.4 GR8 /
+    /// §14.9.46.4 GR5 — "If a nonfatal exception condition is raised during the execution of a GENERATE
+    /// [TERMINATE] statement, execution resumes at the next report item, line, or report group" — so a true
+    /// answer tells the report engine to abandon the overlapping line; with checking off nothing is raised and
+    /// GR3's "the results are undefined" leaves the line to the engine.</summary>
+    public bool ReportLineOverlapError(string detail)
+    {
+        if (!ReportLineOverlapChecking) return false;
+        NonfatalIfEnabled(true, "EC-REPORT-LINE-OVERLAP");
+        return true;
+    }
+
+    /// <summary>True while the currently-executing statement has EC-REPORT-PAGE-LIMIT checking enabled (nonfatal).</summary>
+    public bool ReportPageLimitChecking
+    {
+        get => _checking.ReportPageLimit;
+        set => _checking.ReportPageLimit = value;
+    }
+
+    /// <summary>Raise EC-REPORT-PAGE-LIMIT (§13.18.35.4 GR2 — a report group split between two pages; Table 13 NF)
+    /// when checking is enabled. Returns whether it was RAISED — the engine then resumes at the next report group
+    /// (§14.9.16.4 GR8 / §14.9.46.4 GR5; kb/Work PB1188); with checking off GR2's "the results are undefined"
+    /// leaves the group to the engine.</summary>
+    public bool ReportPageLimitError(string detail)
+    {
+        if (!ReportPageLimitChecking) return false;
+        NonfatalIfEnabled(true, "EC-REPORT-PAGE-LIMIT");
+        return true;
+    }
+
+    /// <summary>True while the currently-executing statement has EC-REPORT-COLUMN-OVERLAP checking enabled
+    /// (nonfatal).</summary>
+    public bool ReportColumnOverlapChecking
+    {
+        get => _checking.ReportColumnOverlap;
+        set => _checking.ReportColumnOverlap = value;
+    }
+
+    /// <summary>Raise EC-REPORT-COLUMN-OVERLAP (§13.18.14.4 GR4 — two printable items of one line use a column
+    /// position; Table 13 NF) when checking is enabled. Returns whether it was RAISED — the engine then resumes at
+    /// the next report item, leaving the overlapping one unplaced (§14.9.16.4 GR8 / §14.9.46.4 GR5; kb/Work
+    /// PB1188); with checking off GR4's "the results are undefined" leaves the item to the engine.</summary>
+    public bool ReportColumnOverlapError(string detail)
+    {
+        if (!ReportColumnOverlapChecking) return false;
+        NonfatalIfEnabled(true, "EC-REPORT-COLUMN-OVERLAP");
+        return true;
+    }
+
+    /// <summary>True while the currently-executing statement has EC-REPORT-PAGE-WIDTH checking enabled (nonfatal).</summary>
+    public bool ReportPageWidthChecking
+    {
+        get => _checking.ReportPageWidth;
+        set => _checking.ReportPageWidth = value;
+    }
+
+    /// <summary>Raise EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5 — a printable item ends past the page width; Table 13
+    /// NF) when checking is enabled. GR5 states the outcome itself — "the report line is truncated, and the report
+    /// line is printed" — so the engine does that whether or not the condition was raised, and nothing is
+    /// returned (kb/Work PB1188).</summary>
+    public void ReportPageWidthError(string detail) => NonfatalIfEnabled(ReportPageWidthChecking, "EC-REPORT-PAGE-WIDTH");
+
     /// <summary>True while the currently-executing statement has EC-BOUND-TABLE-LIMIT checking enabled (fatal).</summary>
     public bool BoundTableLimitChecking
     {
@@ -1778,6 +1863,56 @@ public static class ExceptionState
 
     /// <inheritdoc cref="ExceptionEngine.ReportFileModeError"/>
     public static void ReportFileModeError(string detail) => E.ReportFileModeError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.ReportSumSizeChecking"/>
+    public static bool ReportSumSizeChecking
+    {
+        get => E.ReportSumSizeChecking;
+        set => E.ReportSumSizeChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ReportSumSizeError"/>
+    public static void ReportSumSizeError(string detail) => E.ReportSumSizeError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.ReportLineOverlapChecking"/>
+    public static bool ReportLineOverlapChecking
+    {
+        get => E.ReportLineOverlapChecking;
+        set => E.ReportLineOverlapChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ReportLineOverlapError"/>
+    public static bool ReportLineOverlapError(string detail) => E.ReportLineOverlapError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.ReportPageLimitChecking"/>
+    public static bool ReportPageLimitChecking
+    {
+        get => E.ReportPageLimitChecking;
+        set => E.ReportPageLimitChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ReportPageLimitError"/>
+    public static bool ReportPageLimitError(string detail) => E.ReportPageLimitError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.ReportColumnOverlapChecking"/>
+    public static bool ReportColumnOverlapChecking
+    {
+        get => E.ReportColumnOverlapChecking;
+        set => E.ReportColumnOverlapChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ReportColumnOverlapError"/>
+    public static bool ReportColumnOverlapError(string detail) => E.ReportColumnOverlapError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.ReportPageWidthChecking"/>
+    public static bool ReportPageWidthChecking
+    {
+        get => E.ReportPageWidthChecking;
+        set => E.ReportPageWidthChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.ReportPageWidthError"/>
+    public static void ReportPageWidthError(string detail) => E.ReportPageWidthError(detail);
 
     /// <inheritdoc cref="ExceptionEngine.BoundTableLimitChecking"/>
     public static bool BoundTableLimitChecking

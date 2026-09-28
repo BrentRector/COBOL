@@ -2447,6 +2447,32 @@ public sealed partial class DataBinder
         return new FieldDataSource(b, qls);
     }
 
+    /// <summary>⛔ ISO §13.18.54.4 GR1 — the sum counter's digit count, "derived from the corresponding number of
+    /// digits, excluding insertion editing characters, in the PICTURE clause of the entry containing the SUM
+    /// clause". It is the counter's CAPACITY: an addition past it is the GR3 size error, and a set size error
+    /// indicator prints the item as spaces (GR4), so an undercount is a wrong answer on every report (kb/Work
+    /// PB1296). The count is per category, over the categories §13.18.54.3 SR2 admits (a receiving operand of a
+    /// numeric MOVE):
+    /// <list type="bullet">
+    /// <item>numeric — the '9' positions (<see cref="PicInfo.Digits"/>, the digits the item stores);</item>
+    /// <item>numeric-edited — every DIGIT POSITION (<see cref="PicInfo.DigitPositions"/>: '9', 'Z', '*' and the
+    /// floating-insertion positions), not <see cref="PicInfo.Digits"/>, which counts only the '9's — PIC ZZ9 is a
+    /// three-digit counter, and reading it as a one-digit one made every total past 9 print as spaces;</item>
+    /// <item>alphanumeric / national, edited or not — each character position except an insertion editing
+    /// character ('B', '0', '/' — the simple insertion of §13.18.40.5 GR1): the MOVE of an unsigned integer into such an
+    /// item places one digit per position, so X(4) holds a four-digit counter. The clamp this replaced read the
+    /// category's zero '9' count as ONE digit, printing "4" for a total of 24 (or spaces once the size error
+    /// indicator existed).</item>
+    /// </list></summary>
+    private static int SumCounterDigits(PicInfo pic) => pic.Category switch
+    {
+        PicCategory.Numeric => pic.Digits,
+        PicCategory.NumericEdited => pic.DigitPositions,
+        _ => pic.EditMask is { } mask
+            ? mask.Count(c => c is not ('B' or '0' or '/'))
+            : DataItem.DisplayTextWidthOf(pic),
+    };
+
     /// <summary>Bind ONE ENTRY's SUM clause (ISO §13.18.54) into a <see cref="ReportSumModel"/>: the counter id
     /// (the entry's data-name, GR5, else synthesized), the addend TERMS, their UPON operands, and the RESET
     /// operand. The counter's scale derives from the entry's PICTURE (GR1).
@@ -2481,7 +2507,7 @@ public sealed partial class DataBinder
                 DeclaredAt = Edition.Cursor,
                 CobolName = entryName,
                 CsName = NamingConvention.SumCounterName(model.Name, model.Sums.Count),
-                Pic = PicInfo.SumCounterItem(pic?.Digits ?? 18, pic?.Scale ?? 0),
+                Pic = PicInfo.SumCounterItem(pic is null ? 18 : SumCounterDigits(pic), pic?.Scale ?? 0),
                 Uid = _uidCounter++,
             },
             // Preserve a floating-point-edited / national-edited PICTURE gate for the post-bind GateData report-Sums
