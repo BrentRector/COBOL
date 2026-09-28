@@ -261,6 +261,12 @@ internal static class RuntimeApi
     public static string SetExitStatus(string status) =>
         $"{nameof(RunUnit)}.{nameof(RunUnit.SetExitStatus)}({status})";
 
+    /// <summary>The CURRENT run unit's factory object of a class (ISO §9.3.14.2 — created before its first
+    /// reference by a run unit; kb/Work PB1069) — <c>RunUnit.Current.FactoryObject&lt;F&gt;()</c>, where
+    /// <paramref name="factoryCs"/> is the generated factory type.</summary>
+    public static string FactoryObject(string factoryCs) =>
+        $"{nameof(RunUnit)}.{nameof(RunUnit.Current)}.{nameof(RunUnit.FactoryObject)}<{factoryCs}>()";
+
     // ── Editing (CobolEdit) ──
 
     /// <summary>Edit a numeric value into a PICTURE mask — <c>CobolEdit.Format</c>. <paramref name="cfgArgs"/> is

@@ -105,15 +105,15 @@ public sealed class CobolCallException(string message, string ecName = "EC-PROGR
 /// The static facade over the run unit's <see cref="ProgramTable"/> (the emitted surface — generated run-unit
 /// drivers call <c>ProgramRegistry.Reset()/Register(...)/RunMain(...)</c> and call sites emit
 /// <c>CallProgram/Cancel</c>; kept name-stable pre-G8, DESIGN-runtime-library §2.1). Every member forwards to
-/// <c>RunUnit.Current.Programs</c>; <see cref="Reset"/> maps to the run-unit lifecycle
-/// (<see cref="RunUnit.ResetCurrent"/> — the ambient run unit is established lazily, which keeps the emitted
-/// driver byte-stable).
+/// <c>RunUnit.Current.Programs</c>; <see cref="Reset"/> is the run-unit lifecycle's BEGIN
+/// (<see cref="RunUnit.Begin"/>), keeping the emitted driver's name byte-stable.
 /// </summary>
 public static class ProgramRegistry
 {
-    /// <summary>Run-unit start: reset the ambient run unit's program/external/module state
-    /// (see <see cref="RunUnit.ResetCurrent"/> — the exact pre-P8 semantics).</summary>
-    public static void Reset() => RunUnit.ResetCurrent();
+    /// <summary>Run-unit start — the emitted driver's first statement: begin a NEW run unit and make it the ambient
+    /// one (<see cref="RunUnit.Begin"/>; kb/Work PB1069). Every piece of run-unit state is fresh because the run
+    /// unit is a new object, not because a list of members was cleared.</summary>
+    public static void Reset() => RunUnit.Begin();
 
     /// <inheritdoc cref="ProgramTable.Register"/>
     public static void Register(

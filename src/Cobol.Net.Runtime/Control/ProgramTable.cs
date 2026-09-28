@@ -57,17 +57,6 @@ public sealed class ProgramTable
 
     public ProgramTable(RunUnit owner) => _owner = owner;
 
-    /// <summary>Clear all registrations, the external store, and the MODULE-NAME stack (run-unit start — the
-    /// exact pre-P8 <c>ProgramRegistry.Reset()</c> semantics).</summary>
-    public void Reset()
-    {
-        _byPath.Clear();
-        _order.Clear();
-        _probedModules.Clear();
-        _owner.External.Reset();
-        _owner.Modules.Reset();   // the FUNCTION MODULE-NAME call-name stack (§15.65)
-    }
-
     /// <summary>Register one program unit (emitted once per unit at run-unit start, containers before containees).
     /// <paramref name="staticReset"/> — supplied ONLY by a RECURSIVE-and-not-INITIAL unit with static WS
     /// storage or unit-scoped file connectors (kb/Work PB168) — re-initializes that unit's STATIC WS fields

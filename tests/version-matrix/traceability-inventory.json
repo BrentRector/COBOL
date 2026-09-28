@@ -32422,11 +32422,11 @@
   "subject": "Execution",
   "rule-digest": "f8661eb21261",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Control/CobolPtr.cs#Allocate; src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/Control/CobolPtr.cs#Allocate; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject",
+  "test-ref": "unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1069 (open). Rule: 'Any storage obtained with an ALLOCATE statement and not yet released by a FREE statement is released.' (cite.py --check 14.6.11 -> OK, rule 3). ALLOCATE yields a managed StorageCell (CobolPtr.Allocate) with no process-static registry, so storage becomes unreachable when the run unit's program registry is dropped (ProgramTable.Reset via RunUnit.ResetCurrent; staticReset re-seeds RECURSIVE static WS at run-unit start) and is released at process exit on the CLI path. Unverified/defective edge: In a host that runs several run units in ONE process (RunUnit.Run / the conformance test host), the FACTORY object of every class is a process-lifetime singleton - OoEmitter emits `public static readonly <Factory> __Instance = new();` (src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs, the FACTORY-class extras) - which RunUnit.ResetCurrent / ProgramTable.Reset cannot reach, so any instance object, ALLOCATEd cell or dynamic table/string referenced from factory data survives the run unit's termination and is visible to the next run unit. Same mechanism class as kb/Work PB1069 (open: run-unit state not scoped to the run unit), which names Switches/ReportFlow/Locale/Scratch but not the factory singletons. Decided by reading, not probed (the CLI runs one run unit per process, where process exit releases everything). || editions as adjudicated: 2002, 2014, 2023 (ALLOCATE/FREE)",
+  "editions": "2002,2014,2023",
+  "notes": "w68w (kb/Work PB1069): cite.py --check 14.6.11 'Any storage obtained with an ALLOCATE statement and not yet released by a FREE statement is released' -> OK 14.6.11 3). ALLOCATE storage is a managed StorageCell; everything the run unit owns (program instances, EXTERNAL, and now the factory objects, formerly process statics) hangs off the RunUnit object, which the next run unit replaces, so such storage becomes unreachable and is reclaimed. Still PARTIAL: a POINTER in STATIC working-storage (a RECURSIVE program's or a FUNCTION-ID's WS, re-initialized only at the NEXT run unit's registration; a pre-2023 METHOD's WS, never re-initialized) keeps its storage reachable past termination - the static-WS lead reported by w68w. retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent (ResetCurrent is deleted; RunUnit.Begin constructs a new run unit instead (kb/Work PB1069))",
   "state": "GAP"
  },
  {
@@ -32437,11 +32437,11 @@
   "subject": "Execution",
   "rule-digest": "b2653e7e8f8d",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#CloseAll; src/Cobol.Net.Runtime/Control/CobolObject.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#CloseAll; src/Cobol.Net.Runtime/Control/CobolObject.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject",
+  "test-ref": "conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1069 (open). Rule: 'All instance objects are destroyed. NOTE Any open files in an object are closed before the object is destroyed.' (cite.py --check 14.6.11 -> OK, rule 4). The NOTE half holds: an instance file's connector is registered under a minted per-object key (FileRegistry.MintInstanceKey) in the run-unit registry, so RunMain's CloseAll closes it at termination. Destruction: instance objects are managed objects with no COBOL-observable finalization; they become unreachable when the run unit's programs are dropped. Defective edge: In a host that runs several run units in ONE process (RunUnit.Run / the conformance test host), the FACTORY object of every class is a process-lifetime singleton - OoEmitter emits `public static readonly <Factory> __Instance = new();` (src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs, the FACTORY-class extras) - which RunUnit.ResetCurrent / ProgramTable.Reset cannot reach, so any instance object, ALLOCATEd cell or dynamic table/string referenced from factory data survives the run unit's termination and is visible to the next run unit. Same mechanism class as kb/Work PB1069 (open: run-unit state not scoped to the run unit), which names Switches/ReportFlow/Locale/Scratch but not the factory singletons. Decided by reading, not probed (the CLI runs one run unit per process, where process exit releases everything). || editions as adjudicated: 2002, 2014, 2023 (OO)",
+  "editions": "2002,2014,2023",
+  "notes": "w68w (kb/Work PB1069): cite.py --check 14.6.11 'All instance objects are destroyed' -> OK 14.6.11 4). The factory object is now the run unit's (RunUnit.FactoryObject, section 9.3.14.2 'created before it is first referenced by a run unit'), so objects reachable from factory data no longer outlive the run unit (witness: a second run unit in one process sees fresh factory data, COUNT 1 not 2). Still PARTIAL: an OBJECT REFERENCE in STATIC working-storage (RECURSIVE/FUNCTION-ID WS until the next run unit's registration; pre-2023 METHOD WS indefinitely) keeps its object alive past termination - the static-WS lead reported by w68w.",
   "state": "GAP"
  },
  {
@@ -32451,13 +32451,13 @@
   "ordinal": 5,
   "subject": "Execution",
   "rule-digest": "6816a81466c2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Control/RunUnit.cs#Locale; src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin; src/Cobol.Net.Runtime/Control/RunUnit.cs#Locale",
+  "test-ref": "unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1069 (open). Rule: 'If a locale was in use in the run unit, the implementor specifies whether the locale is reset to the locale in effect when the run unit was activated.' (cite.py --check 14.6.11 -> OK, rule 5) and Annex A.1 item 168 'Run unit termination (whether locale reset). This item is required. This item shall be documented in the implementor's user documentation.' (cite.py --check A.1 -> OK, item 168). The behavior is determinate: SET LOCALE changes only the run unit's LocaleState (no CultureInfo.CurrentCulture / host setlocale write exists in src/Cobol.Net.Runtime), so the host's locale is never changed and nothing is reset at termination; RunUnit.ResetCurrent does NOT reset LocaleState either (kb/Work PB1069, open, owns that carry-over into the next in-process run unit). But the required determination DOC-A.1-168 is ABSENT from docs/CONFORMANCE.md §7 (grep: no row; the catalog row exists in spec-rule-catalog.json). An implementor-specified rule with an undocumented choice is PARTIAL. See finding 'DOC-A.1-168 undocumented'. || editions as adjudicated: 2002, 2014, 2023 (locale facility)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "w68w (kb/Work PB1069): cite.py --check 14.6.11 'the implementor specifies whether the locale is reset to the locale in effect when the run unit was activated' -> OK 14.6.11 5). Determination DOC-A.1-168 = yes, always: the locale state is a member of the RunUnit object (LocaleState), SET LOCALE never touches the process culture, and every new run unit (RunUnit.Begin from the generated Main, RunUnit.Run from a host) is a NEW object, so the next run unit starts from the process culture. The witness reflects over every RunUnit field and fails on any carried from the previous run unit. retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent (ResetCurrent (the hand-listed reset of the ambient run unit) is deleted; RunUnit.Begin constructs a new run unit instead (kb/Work PB1069))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.11-6",
@@ -32467,11 +32467,11 @@
   "subject": "Execution",
   "rule-digest": "1460b6941c5f",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject",
+  "test-ref": "unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "OWNED BY kb/Work PB1069 (open). Rule: 'Any resources occupied by dynamic-capacity tables or dynamic-length elementary items are freed.' (cite.py --check 14.6.11 -> OK, rule 6). Both carriers are managed objects (CobolDynTable<T>, a .NET String for a dynamic-length item - CONFORMANCE.md DOC-A.1-62) held by program/record instances, so they are freed with the run unit's programs and at process exit. Defective edge: In a host that runs several run units in ONE process (RunUnit.Run / the conformance test host), the FACTORY object of every class is a process-lifetime singleton - OoEmitter emits `public static readonly <Factory> __Instance = new();` (src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs, the FACTORY-class extras) - which RunUnit.ResetCurrent / ProgramTable.Reset cannot reach, so any instance object, ALLOCATEd cell or dynamic table/string referenced from factory data survives the run unit's termination and is visible to the next run unit. Same mechanism class as kb/Work PB1069 (open: run-unit state not scoped to the run unit), which names Switches/ReportFlow/Locale/Scratch but not the factory singletons. Decided by reading, not probed (the CLI runs one run unit per process, where process exit releases everything). || editions as adjudicated: 2014, 2023 (dynamic-capacity tables and dynamic-length elementary items)",
+  "editions": "2023",
+  "notes": "w68w (kb/Work PB1069): cite.py --check 14.6.11 'Any resources occupied by dynamic-capacity tables or dynamic-length elementary items are freed' -> OK 14.6.11 6). Dynamic items are managed storage owned through the RunUnit object (factory data now included), freed when the next run unit replaces it. Still PARTIAL for dynamic items in STATIC working-storage (RECURSIVE/FUNCTION-ID WS reset only at the next run unit's registration; pre-2023 METHOD WS never) - the static-WS lead reported by w68w. retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent (ResetCurrent is deleted; RunUnit.Begin constructs a new run unit instead (kb/Work PB1069))",
   "state": "GAP"
  },
  {
@@ -47122,11 +47122,11 @@
   "subject": "STOP statement",
   "rule-digest": "744f674efc7a",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#RunMain; src/Cobol.Net.Runtime/Control/RunUnit.cs#Run; src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs#Visit",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#RunMain; src/Cobol.Net.Runtime/Control/RunUnit.cs#Run; src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs#Visit; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin; src/Cobol.Net.Runtime/IO/FileConnector.cs#Close; src/Cobol.Net.Runtime/IO/FileRegistry.cs#CloseAll",
+  "test-ref": "conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData; unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1178 (registrar 14c). GR1 -> §14.6.11 (cite.py OK for GR1 and for §14.6.11 items 1 and 2). STOP RUN emits 'throw new StopRun()'; it unwinds through ProgramTable.RunMain whose finally calls _owner.Files.CloseAll() (item 2). Probe q1: main OPEN OUTPUT + WRITE, CALL sub, sub STOP RUN WITH ERROR STATUS 7 inside an inline PERFORM -> exit 7, q1out.txt holds 'LINE-ONE' (closed/flushed), neither 'SUB-AFTER' nor 'MAIN-AFTER-CALL' runs. Item 1 (implicit COMMIT for APPLY COMMIT) and item 7 (implicit SEND for MCS messages) belong to facilities CONFORMANCE.md §5 declares Not claimed (commit/rollback rows 6-7, MCS row 4; APPLY COMMIT refused COBOLNET1709) - declined-module witness debt owned by PB260/PB261/PB281-PB283, not a new defect. Items 3/4/6 (ALLOCATE storage, instance objects, dynamic tables) are managed memory released at process exit - no observable, unverified. Item 5 (locale reset) is implementor-specified; no published determination verified. Item 2's 'even when an error occurs during the execution of one or more of the CLOSE statements' edge not verified. Verified half = item 2 only -> PARTIAL. [editions as adjudicated: 1985, 2002, 2014, 2023 (STOP RUN is in every edition; §14.9.42 of the 2023 text)]",
+  "notes": "w68w (kb/Work PB1178 -> transferred to PB1069, which owns the residue). GR1 -> section 14.6.11 items. Item 2 (implicit CLOSE of every open file): ProgramTable.RunMain's finally -> FileRegistry.CloseAll, and the 'even when an error occurs during the execution of one or more of the CLOSE statements' edge holds by construction: FileConnector.Close maps an OS close failure (IOException / UnauthorizedAccessException) to status 30 and still leaves open mode, never throwing, so CloseAll's loop reaches every connector; CloseAll runs no declarative (the emitted code does). Item 4 (instance objects destroyed) and item 5 (locale reset, determination DOC-A.1-168) now hold across run units: a new run unit is a new RunUnit object and factory objects are the run unit's (PB1069, witnesses above). Still PARTIAL on items 3/4/6 for STATIC working-storage (a POINTER / OBJECT REFERENCE / dynamic item in a RECURSIVE or FUNCTION-ID WS, reset only at the next run unit's registration, or a pre-2023 METHOD's WS, never reset) - PB1069's open remainder. Items 1 and 7 belong to declined facilities (commit/rollback, MCS; PB260/PB261/PB281-PB283).",
   "state": "GAP"
  },
  {
@@ -47136,13 +47136,13 @@
   "ordinal": 2,
   "subject": "STOP statement",
   "rule-digest": "365022f65013",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs#ExitStatus; src/Cobol.Net.Runtime/Control/RunUnit.cs#ExitStatus",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs#ExitStatus; src/Cobol.Net.Runtime/Control/RunUnit.cs#ExitStatus; docs/CONFORMANCE.md#DOC-A.1-192",
   "test-ref": "conformance-test:StopGobackExitCodeTests.TerminationStatus_SetsProcessExitCode; conformance-test:StopGobackExitCodeTests.StatusBeyondTheHostExitCode_IsClampedNeverWrapped",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1178 (narrowing half landed w59b). cite.py --check 14.9.42.4 \"the operating system will indicate an error termination of the run unit if such a capability exists\" -> OK 2). FIXED: a large STATUS value no longer WRAPS onto exit 0 (STOP RUN WITH ERROR STATUS 4294967296 now exits 2147483647, was 0). STILL PARTIAL on an owner determination: docs/CONFORMANCE.md item 192's value-wins precedence (GnuCOBOL-surveyed, rule-1 precedence) makes WITH ERROR STATUS 0 / \"ABEND\" / SPACE exit 0, so the OS reports NORMAL for an ERROR phrase - GR2 and GR5 both apply and the standard states no precedence. Whether ERROR with a value that maps to 0 must still exit nonzero is the owner's call (named in the w59b report).",
-  "state": "GAP"
+  "notes": "w68w (kb/Work PB1178): cite.py --check 14.9.42.4 'If the ERROR phrase is specified, the operating system will indicate an error termination of the run unit if such a capability exists within the operating system' -> OK 14.9.42.4 2). The host's one termination channel is the process exit code (Environment.ExitCode), shared with GR5's value. Without a STATUS value, WITH ERROR exits 1 (the error indication). With a value, the recorded determination (docs/CONFORMANCE.md DOC-A.1-192 and section 3 'STOP RUN / GOBACK termination status': the value, when present, wins; GR5's implementor latitude settled by CLAUDE.md rule 1 precedence - GnuCOBOL passes the one integer to exit(status), surveyed kb/Work PB169; confirmed under the standing owner-decision protocol on PB1178) makes WITH ERROR STATUS 0 exit 0 (witness InlineData added by w68w). The former wrap (4294967296 -> exit 0, a NORMAL termination for ERROR) is gone: the value is clamped through the one saturating narrowing (re-probed on the w68w build: exit 2147483647).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.42.4-3",
@@ -47151,13 +47151,13 @@
   "ordinal": 3,
   "subject": "STOP statement",
   "rule-digest": "d630e8b4ccd9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs#ExitStatus; src/Cobol.Net.Runtime/Control/RunUnit.cs#ExitStatus",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs#ExitStatus; src/Cobol.Net.Runtime/Control/RunUnit.cs#ExitStatus; docs/CONFORMANCE.md#DOC-A.1-192",
   "test-ref": "conformance-test:StopGobackExitCodeTests.TerminationStatus_SetsProcessExitCode",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1178 (narrowing half landed w59b). The NORMAL twin of GR-14.9.42.4-2: the wrap is fixed, and WITH NORMAL STATUS 7 exits 7 under item 192's value-wins precedence - the same open owner determination (GR3 vs GR5).",
-  "state": "GAP"
+  "notes": "w68w (kb/Work PB1178): GR3 (NORMAL) is GR2's twin: WITH NORMAL exits 0 (the normal indication), and with a STATUS value the value is passed (WITH NORMAL STATUS 7 exits 7) under the same recorded DOC-A.1-192 determination (value wins; section 3 'STOP RUN / GOBACK termination status'). Witnessed by TerminationStatus_SetsProcessExitCode's NORMAL rows.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.42.4-4",
@@ -55372,11 +55372,11 @@
   "subject": "RANDOM function",
   "rule-digest": "0225aa1e4349",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/Intrinsics/RandomSequence.cs#RandomSequence; src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent",
+  "code-location": "src/Cobol.Net.Runtime/Intrinsics/RandomSequence.cs#RandomSequence; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin",
   "test-ref": "conformance:2023/l1_random_unseeded_first_reference; unit:RunUnitStateDriftTests.Random_DoesNotContinueAcrossARunUnitReset; unit:RunUnitStateDriftTests.Random_IsScopedToTheRunUnit_AndContinuesWithinIt",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "15.75.3 r4 - the run unit's FIRST reference omits argument-1, so the implementor's seed applies: the value is in 15.75.4 r1's codomain, r5's next number continues that sequence, and an explicit RANDOM(7) then REPLACES it and reproduces per r3 + 15.75.4 r2. The seed VALUE stays unpinned (DOC-A.1-144: per-process OS entropy). The sequence is RUN-UNIT state (kb/Work PB307): RunUnit.Random, reset by RunUnit.ResetCurrent and fresh in every RunUnit.Run scope, so a second run unit in one process begins the implementor's sequence instead of continuing the first's - witnessed in-process by the unit tests (the conformance runner is one process per run unit, so no golden can observe the boundary). retired-witness: src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Float.cs#_random (kb/Work PB307: the process-global static is deleted; the sequence is run-unit state on RunUnit.Random)",
+  "notes": "15.75.3 r4 - the run unit's FIRST reference omits argument-1, so the implementor's seed applies: the value is in 15.75.4 r1's codomain, r5's next number continues that sequence, and an explicit RANDOM(7) then REPLACES it and reproduces per r3 + 15.75.4 r2. The seed VALUE stays unpinned (DOC-A.1-144: per-process OS entropy). The sequence is RUN-UNIT state (kb/Work PB307): RunUnit.Random, reset by RunUnit.ResetCurrent and fresh in every RunUnit.Run scope, so a second run unit in one process begins the implementor's sequence instead of continuing the first's - witnessed in-process by the unit tests (the conformance runner is one process per run unit, so no golden can observe the boundary). retired-witness: src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Float.cs#_random (kb/Work PB307: the process-global static is deleted; the sequence is run-unit state on RunUnit.Random) retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent (ResetCurrent is deleted; the new run unit RunUnit.Begin constructs carries a fresh RandomSequence (kb/Work PB1069))",
   "state": "OK"
  },
  {
@@ -63561,13 +63561,13 @@
   "ordinal": 113,
   "subject": "Life cycle for objects (timing and algorithm for taking part in continued execution)",
   "rule-digest": "5022dae37571",
-  "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-113; src/Cobol.Net.Runtime/Control/CobolObject.cs#CobolObject; src/Cobol.Net.Runtime/IO/CobolFile.cs#EnqueueInstanceClose; src/Cobol.Net.Runtime/Control/RunUnit.cs#Current",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-113; src/Cobol.Net.Runtime/Control/CobolObject.cs#CobolObject; src/Cobol.Net.Runtime/IO/FileRegistry.cs#EnqueueInstanceClose",
+  "test-ref": "unit:InstanceFileFinalizerTests.AnUnreachableObjectsFile_IsClosedInItsOwnRunUnit_BeforeTheNextOpen",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py --check 9.3.14.3 \"The timing and algorithm for the mechanism that determines whether or not an instance object can take part in the continued execution of the run unit is implementor-defined\" -> OK §9.3.14.3; cite.py --check 9.1.4 \"For file connectors in an object when the object is deleted\" -> OK §9.1.4 (Open mode). The timing is latitude, and GC reachability is the §9.3.14.3 NOTE's own garbage-collection model. GnuCOBOL has no OO runtime, so it offers no precedent; the choice is the .NET platform's. This row is voluntary (A.1 113: need not be documented), written so the inventory record can exist (PB1535 option c). Code at pin 80de60472: ~CobolObject (CobolObject.cs:102-105) calls CobolFile.EnqueueInstanceClose. That reaches _reg => RunUnit.Current.Files (CobolFile.cs:17), and RunUnit.Current is `_current.Value ??= new RunUnit()` over an AsyncLocal (RunUnit.cs:24,28). On the finalizer thread this mints an ORPHAN run unit, so the close is queued where nothing drains it. A file-owning unreachable object's connector therefore stays open until run-unit end (PB1532 repro gc2.cob: second object's OPEN OUTPUT -> '61'). File-less objects and the run-unit-end backstop behave as the row says, so this is PARTIAL. Owned by kb/Work PB1532 (open, inventory_rows [DOC-A.1-113]). Witness needed: a golden or unit test that drops a file-owning object, forces collection, and re-OPENs its file '00'. Collection timing itself cannot be pinned.",
-  "state": "GAP"
+  "notes": "w68w (kb/Work PB1532): cite.py --check 9.3.14.3 'An instance object is destroyed either when it is determined that the object cannot take part in the continued execution of the run unit' -> OK; cite.py --check 9.1.4 'For file connectors in an object when the object is deleted' -> OK. The determination (reachability decided by the .NET GC; the finalizer closes the object's files in the run unit that created it) now holds: the object captures its creating run unit's FileRegistry when it tracks its first instance file, and the finalizer enqueues there instead of resolving the empty AsyncLocal on the finalizer thread (which reached an orphan run unit). Witness: object dropped + GC.Collect + WaitForPendingFinalizers, then a second connector's OPEN OUTPUT of the same file is 00 (61 on the old shape, measured). retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#Current (the CobolFile facade enqueue (which resolved RunUnit.Current on the finalizer thread) is deleted; the finalizer enqueues on the captured owning FileRegistry (kb/Work PB1532)) retired-witness: src/Cobol.Net.Runtime/IO/CobolFile.cs#EnqueueInstanceClose (the CobolFile facade enqueue (which resolved RunUnit.Current on the finalizer thread) is deleted; the finalizer enqueues on the captured owning FileRegistry (kb/Work PB1532))",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-114",
@@ -64372,11 +64372,11 @@
   "subject": "Run unit (relationship and interaction with non-COBOL components)",
   "rule-digest": "c70a61408693",
   "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-167; src/Cobol.Net.Runtime/Control/RunUnit.cs#Run; src/Cobol.Net.Runtime/Control/RunUnit.cs#Current; src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent; src/Cobol.Net.Runtime/Control/ProgramTable.cs#AbnormalTermination; src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#CallProgram; src/Cobol.Net.Runtime/Control/Signals/StopRun.cs; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#Main",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-167; src/Cobol.Net.Runtime/Control/RunUnit.cs#Run; src/Cobol.Net.Runtime/Control/RunUnit.cs#Current; src/Cobol.Net.Runtime/Control/ProgramTable.cs#AbnormalTermination; src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#CallProgram; src/Cobol.Net.Runtime/Control/Signals/StopRun.cs; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#Main; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin",
   "test-ref": "",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 167 conditionally required (condition met: CONFORMANCE.md items 65/141/120 name a .NET host as a supported non-COBOL activator) + documented. cite.py --check 14.6.1 \"the requirements for the relationship and interaction between the COBOL and the non-COBOL modules are defined by the implementor\" -> OK §14.6.1; cite.py --check 14.6.11 \"run unit\" -> OK §14.6.11; cite.py --check 14.6.12 \"run unit\" -> OK §14.6.12. Determination = earlier d5 draft (items 16, 19, 65, 120, 141 assembled) with its STOP RUN arm REPLACED by owner decision kb/Work R48 (end the run unit only; files closed; run-unit state incl. SET LOCALE reset; one documented catchable result carrying the exit status; never Environment.Exit; the standalone executable still exits with the status). The rule-1 GnuCOBOL process-exit precedence is overridden by the owner there. code reading at pin 80de60472 (a host build is outside this role): Control/Signals/StopRun.cs 'public sealed class StopRun : Exception' propagates out of ProgramRegistry.CallProgram / ICobolProgram.Call into a host; RunUnit.Run (RunUnit.cs:122-129) closes files in its finally but lets StopRun escape to the host; RunUnit.Current (:28) lazily creates an ambient run unit whose files nothing closes; a fatal EC reaches ProgramTable's AbnormalTermination (ProgramTable.cs:172-176: stderr + Environment.ExitCode = 1) only on the RunMain path; RunUnit.ResetCurrent (:136-141) resets Programs and Random only, so switches, LocaleState and report state carry over (kb/Work PB1069); ExitStatus writes Environment.ExitCode at the write site (RunUnit.cs:109). Owning notes: kb/Work PB1149 (claims DOC-A.1-167), PB1253 (host entry / implicit CLOSE), PB1069 (run-unit state scoping). The exception type's name is the implementer's (PB1149) to choose and add to this row at landing. Witness needed at landing: a unit: test driving RunUnit.Run with a STOP RUN program holding an open file, asserting the file closed, the documented exception caught with the status, and a second RunUnit.Run starting clean.",
+  "notes": "A.1 item 167 conditionally required (condition met: CONFORMANCE.md items 65/141/120 name a .NET host as a supported non-COBOL activator) + documented. cite.py --check 14.6.1 \"the requirements for the relationship and interaction between the COBOL and the non-COBOL modules are defined by the implementor\" -> OK §14.6.1; cite.py --check 14.6.11 \"run unit\" -> OK §14.6.11; cite.py --check 14.6.12 \"run unit\" -> OK §14.6.12. Determination = earlier d5 draft (items 16, 19, 65, 120, 141 assembled) with its STOP RUN arm REPLACED by owner decision kb/Work R48 (end the run unit only; files closed; run-unit state incl. SET LOCALE reset; one documented catchable result carrying the exit status; never Environment.Exit; the standalone executable still exits with the status). The rule-1 GnuCOBOL process-exit precedence is overridden by the owner there. code reading at pin 80de60472 (a host build is outside this role): Control/Signals/StopRun.cs 'public sealed class StopRun : Exception' propagates out of ProgramRegistry.CallProgram / ICobolProgram.Call into a host; RunUnit.Run (RunUnit.cs:122-129) closes files in its finally but lets StopRun escape to the host; RunUnit.Current (:28) lazily creates an ambient run unit whose files nothing closes; a fatal EC reaches ProgramTable's AbnormalTermination (ProgramTable.cs:172-176: stderr + Environment.ExitCode = 1) only on the RunMain path; RunUnit.ResetCurrent (:136-141) resets Programs and Random only, so switches, LocaleState and report state carry over (kb/Work PB1069); ExitStatus writes Environment.ExitCode at the write site (RunUnit.cs:109). Owning notes: kb/Work PB1149 (claims DOC-A.1-167), PB1253 (host entry / implicit CLOSE), PB1069 (run-unit state scoping). The exception type's name is the implementer's (PB1149) to choose and add to this row at landing. Witness needed at landing: a unit: test driving RunUnit.Run with a STOP RUN program holding an open file, asserting the file closed, the documented exception caught with the status, and a second RunUnit.Run starting clean. retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent (ResetCurrent is deleted; RunUnit.Begin constructs a new run unit instead (kb/Work PB1069))",
   "state": "GAP"
  },
  {
@@ -64386,13 +64386,13 @@
   "ordinal": 168,
   "subject": "Run unit termination (whether locale reset)",
   "rule-digest": "cfc0375f0b6d",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-168; src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent; src/Cobol.Net.Runtime/Control/RunUnit.cs#Locale; src/Cobol.Net.Runtime/Control/LocaleState.cs; src/Cobol.Net.Runtime/Collation/Locale/LocaleManager.cs#SetLocale",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-168; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin; src/Cobol.Net.Runtime/Control/RunUnit.cs#Locale",
+  "test-ref": "unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit; conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "A.1 item 168 required + documented. cite.py --check 14.6.11 'the implementor specifies whether the locale is reset to the locale in effect when the run unit was activated' -> OK §14.6.11 5). Determination: 'reset' — the only answer consistent with the existing rows DOC-A.1-120 (the run unit reads the process culture once at start; SET LOCALE state is per run unit, never pushed to the process) and DOC-A.1-167 (same batch: nothing carries over into the next run unit), and with PB1069's own fix (scope run-unit state to the run unit). GnuCOBOL has no run-unit locale separate from the C process locale, so rule-1 precedence gives no contrary model; the implementation's architecture (per-run-unit LocaleState, no process-culture writes) already makes 'reset' the host-visible answer. Code at pin 80de60472: grep for 'CurrentCulture =', 'DefaultThreadCurrentCulture =', 'setlocale' in src/Cobol.Net.Runtime -> no hits (the process locale is never written: conforms for the host side); RunUnit.Locale is an instance member (RunUnit.cs:74) so RunUnit.Run gives a fresh one; RunUnit.ResetCurrent (RunUnit.cs:136-141) resets only Programs and Random, so on the ambient path RunUnit.Locale set by SET LOCALE survives into the next run unit (DIVERGES; kb/Work PB1069 still open, claims DOC-A.1-168). No probe: a second run unit in one process needs a host build this role may not run. Witness needed at landing: a unit: test running two run units through the ambient path, SET LOCALE in the first, asserting the second sees the process default. Owning note: kb/Work/PB1069.",
-  "state": "GAP"
+  "notes": "w68w (kb/Work PB1069): the determination (yes - a run unit's locale never leaves the run unit) is now true on BOTH run-unit paths: the ambient path's hand reset list (RunUnit.ResetCurrent, which left RunUnit.Locale) is replaced by RunUnit.Begin, which constructs a new RunUnit. docs/CONFORMANCE.md DOC-A.1-168 carries the determination, the implementing site and the witnesses. retired-witness: src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent (ResetCurrent is deleted; RunUnit.Begin constructs a new run unit instead (kb/Work PB1069))",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-169",

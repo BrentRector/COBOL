@@ -67,6 +67,7 @@ public sealed class StopGobackExitCodeTests
     [InlineData("STOP RUN WITH ERROR STATUS 42.", 42)]     // GR5: the value is passed
     [InlineData("STOP RUN WITH ERROR.", 1)]                // GR2: no value → the error indication
     [InlineData("STOP RUN WITH NORMAL STATUS 7.", 7)]      // GR5: the value wins over NORMAL
+    [InlineData("STOP RUN WITH ERROR STATUS 0.", 0)]       // GR5: the value wins over ERROR too (DOC-A.1-192; kb/Work PB1178)
     [InlineData("STOP RUN WITH NORMAL.", 0)]               // GR3: normal indication, no value
     [InlineData("STOP RUN WITH ERROR STATUS WS-CODE.", 13)]// GR5: a data-item status value
     [InlineData("STOP RUN.", 0)]                           // no status phrase — the default (regression lock)

@@ -22,7 +22,4 @@ public static class ExternalStore
     public static void Describe(string describer, string name, ExternalDescriptor desc, int selfMask)
         => RunUnit.Current.External.Describe(describer, name, desc,
             (ExternalChecks)(Exceptions.ExceptionState.ActivatorExternalMask & selfMask));
-
-    /// <inheritdoc cref="ExternalTable.Reset"/>
-    public static void Reset() => RunUnit.Current.External.Reset();
 }

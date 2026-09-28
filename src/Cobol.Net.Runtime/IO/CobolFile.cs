@@ -19,10 +19,6 @@ public static class CobolFile
     /// <summary>Reset the file registry (emitted once at program start).</summary>
     public static void Init() => _reg.Reset();
 
-    /// <summary>GC-finalizer-thread enqueue of a per-object connector close (§9.1.4 NOTE; see
-    /// <see cref="FileRegistry.EnqueueInstanceClose"/>).</summary>
-    internal static void EnqueueInstanceClose(string key) => _reg.EnqueueInstanceClose(key);
-
     /// <summary>Mint a UNIQUE per-object connector key for an instance file (M2-OO-1i, ISO §9.1.4).</summary>
     public static string MintInstanceKey(string baseKey) => _reg.MintInstanceKey(baseKey);
 

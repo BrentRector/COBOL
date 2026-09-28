@@ -36,9 +36,19 @@ public static class CobolTable
         return ref Scratch<T>.Slot;
     }
 
+    /// <summary>The out-of-range reference's scratch cell (checking off: the reference reads the empty value and a
+    /// store into it is discarded). <b>One per THREAD</b> (kb/Work PB1069): it is returned by <c>ref</c>, so a
+    /// process-wide cell let two run units on two threads that both took an out-of-range subscript write one
+    /// location between the reset above and the caller's use. A run unit executes on one thread at a time and the
+    /// cell is overwritten before every use, so a per-thread cell carries nothing between run units.</summary>
     private static class Scratch<T>
     {
-        public static T Slot = default!;
+        [ThreadStatic] private static Cell? s_cell;
+
+        /// <summary>This thread's cell (created on the thread's first out-of-range reference of type T).</summary>
+        public static ref T Slot => ref (s_cell ??= new Cell()).Value;
+
+        private sealed class Cell { public T Value = default!; }
     }
 
     /// <summary>A subscript data item's occurrence-number value. The two overloads let the compiler emit ONE

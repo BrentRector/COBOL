@@ -14,10 +14,12 @@ namespace CobolNet.Runtime;
 /// concurrently each see their own (uniform threading model — the former <c>[ThreadStatic]</c>-vs-plain-static
 /// split is gone). The pre-existing static facades (<see cref="ProgramRegistry"/>, <see cref="ExceptionState"/>,
 /// <see cref="CobolFile"/>, <see cref="CobolModule"/>, <see cref="ExternalStore"/>) remain the emitted surface
-/// as thin delegators over <see cref="Current"/>, so generated code is byte-stable pre-G8; <see cref="Current"/>
-/// lazily establishes an ambient run unit, which is what makes the emitted
-/// <c>ProgramRegistry.Reset(); CobolFile.Init(); …</c> run-unit driver work unchanged (the §14.6.11 implicit
-/// CloseAll and the §14.6.12 abnormal-termination surface are runtime-side — <see cref="ProgramTable.RunMain"/>).
+/// as thin delegators over <see cref="Current"/>, so generated code is byte-stable pre-G8. <b>A new run unit is a
+/// NEW <see cref="RunUnit"/> object, on every path</b> (kb/Work PB1069): the emitted driver's
+/// <c>ProgramRegistry.Reset()</c> is <see cref="Begin"/>, and a host's <see cref="Run"/> constructs one too — so no
+/// member can be forgotten by a hand-written reset list (the switch, locale and report-flow state all were, and
+/// survived into the next run unit a host began in the same process). The §14.6.11 implicit CloseAll and the
+/// §14.6.12 abnormal-termination surface are runtime-side — <see cref="ProgramTable.RunMain"/>.
 /// </summary>
 public sealed class RunUnit
 {
@@ -65,7 +67,9 @@ public sealed class RunUnit
     /// (ISO §14.9.49.4 GR10 — <see cref="ReportFlowState"/> records why the range is the RUN UNIT's).</summary>
     public ReportFlowState ReportFlow { get; } = new();
 
-    /// <summary>The run unit's clock (ISO §14.9.1.4 GR7; injectable — a test may set a fixed clock).</summary>
+    /// <summary>The run unit's clock (ISO §14.9.1.4 GR7; injectable — a test may set a fixed clock). HOST
+    /// CONFIGURATION, not run-unit state: a run unit <see cref="Begin"/> starts inherits it from the ambient run unit
+    /// it replaces (<see cref="HostConfiguration"/>).</summary>
     public IClock Clock { get; set; } = SystemClock.Instance;
 
     /// <summary>The run unit's LOCALE state (ISO §8.2.1 / §14.6.6; DESIGN-locale-facility §4.3): the two implementor
@@ -79,8 +83,36 @@ public sealed class RunUnit
     /// COMPILE-time switch — SOURCE-COMPUTER … WITH DEBUGGING MODE — is what gates whether the debug scaffolding is
     /// emitted at all; this is the second switch that gates whether emitted triggers actually fire). The emitted
     /// <c>__RunDebug</c> helper reads it, giving a future CLI <c>--debug-mode off</c> override a single home without
-    /// perturbing generated code.</summary>
+    /// perturbing generated code. HOST CONFIGURATION like <see cref="Clock"/> (<see cref="HostConfiguration"/>).</summary>
     public bool DebugMode { get; set; } = true;
+
+    /// <summary>The names of the members that are HOST CONFIGURATION rather than run-unit state: set by the host
+    /// (or a test) that embeds the runtime, not by any COBOL statement, and carried from the ambient run unit into
+    /// the one <see cref="Begin"/> starts in its place — a host that injects a fixed clock and then runs a compiled
+    /// program's <c>Main</c> (whose first statement begins the run unit) keeps its clock. Every OTHER member is
+    /// fresh in a new run unit; <c>RunUnitStateDriftTests</c> holds both halves by reflection.</summary>
+    public static IReadOnlyList<string> HostConfiguration { get; } = [nameof(Clock), nameof(DebugMode)];
+
+    /// <summary>The run unit's FACTORY OBJECTS, one per class, created at the first reference in THIS run unit
+    /// (ISO §9.3.14.2: "A factory object is created before it is first referenced by a run unit", and "deleted
+    /// after it is last referenced by a run unit" — both lifetimes are the RUN UNIT's; kb/Work PB1069). A factory
+    /// used to be a process-lifetime <c>static readonly</c> singleton on its generated class, so its factory data —
+    /// and every instance object, ALLOCATEd area and dynamic item reachable from it — outlived the run unit and was
+    /// visible to the next one a host began in the same process, contrary to §14.6.11 items 3, 4 and 6. Keyed by
+    /// the generated factory type; a run unit executes on one logical thread, so the table needs no lock.</summary>
+    private readonly Dictionary<Type, CobolObject> _factoryObjects = [];
+
+    /// <summary>The factory object of the class whose generated factory type is <typeparamref name="T"/> in this
+    /// run unit, created on first reference (the emitted <c>__Instance</c> property reads it). Creation runs the
+    /// generated constructor — the factory's VALUE initialization and its file registrations (§9.1.4) — once per
+    /// run unit.</summary>
+    public T FactoryObject<T>() where T : CobolObject, new()
+    {
+        if (_factoryObjects.TryGetValue(typeof(T), out var existing)) return (T)existing;
+        var created = new T();
+        _factoryObjects.Add(typeof(T), created);
+        return created;
+    }
 
     private long _exitStatus;
 
@@ -115,28 +147,47 @@ public sealed class RunUnit
     /// value to <c>Environment.ExitCode</c> at the write site (so the status crosses assembly boundaries).</summary>
     public static void SetExitStatus(long status) => Current.ExitStatus = status;
 
-    /// <summary>Establish a FRESH ambient run unit for the duration of <paramref name="body"/> — the one
-    /// lifecycle boundary (begin = a clean run unit; end = the §14.6 implicit CloseAll + ambient restore).
-    /// The DEFAULT emitted run-unit driver does not call this (it stays on the lazy-ambient
-    /// <c>ProgramRegistry.Reset()</c> path for byte-stability); hosts embedding multiple run units use it.</summary>
+    /// <summary>Establish a FRESH ambient run unit for the duration of <paramref name="body"/> — the host's
+    /// lifecycle boundary (begin = a new run unit, <see cref="StartAfter"/>; end = the §14.6.11 implicit CloseAll +
+    /// ambient restore). Hosts embedding several run units use it; the emitted driver uses <see cref="Begin"/>.</summary>
     public static void Run(Action<RunUnit> body)
     {
-        var ru = new RunUnit();
         var prior = _current.Value;
+        var ru = StartAfter(prior);
         _current.Value = ru;
         try { body(ru); }
         finally { ru.Files.CloseAll(); _current.Value = prior; }
     }
 
-    /// <summary>Reset the AMBIENT run unit's program/external/module state — the exact semantics of the
-    /// pre-P8 <c>ProgramRegistry.Reset()</c> (clear registrations + EXTERNAL store + MODULE-NAME stack), plus the
-    /// FUNCTION RANDOM sequence (§15.75.3 r4); files
-    /// and the last-exception status reset through their own emitted entry points, exactly as before). Called
-    /// by the <see cref="ProgramRegistry"/> shim from the emitted run-unit driver.</summary>
-    public static void ResetCurrent()
+    /// <summary>Begin a NEW run unit and make it the ambient one — the emitted run-unit driver's first statement
+    /// (<c>ProgramRegistry.Reset()</c>). Every member of the new run unit is fresh (program table, EXTERNAL store,
+    /// MODULE-NAME stack, files, switches (§12.3.7.4 4) — the implementor-defined scope is the run unit), locale
+    /// (§14.6.11 5), FUNCTION RANDOM sequence
+    /// (§15.75.3 r4), report flow, exception status, factory objects (§9.3.14.2) and the termination status),
+    /// because it is a new object — only the <see cref="HostConfiguration"/> carries over. The run unit it
+    /// replaces is not touched: its own termination (<see cref="ProgramTable.RunMain"/>'s finally, or
+    /// <see cref="Run"/>'s) closed its files, and dropping the last reference to it releases everything it owned
+    /// (§14.6.11 items 3, 4 and 6 — ALLOCATEd storage, instance objects, dynamic items — are managed memory).</summary>
+    public static RunUnit Begin()
     {
-        RunUnit ru = Current;
-        ru.Programs.Reset();
-        ru.Random.Reset();   // §15.75.3 r4: the next RANDOM is again the run unit's FIRST reference (kb/Work PB307)
+        var ru = StartAfter(_current.Value);
+        _current.Value = ru;
+        return ru;
+    }
+
+    /// <summary>A new run unit that follows <paramref name="prior"/> (null = none): fresh state, the prior's
+    /// <see cref="HostConfiguration"/>, and the process exit code restated from the new run unit's own
+    /// termination status (0) — <c>Environment.ExitCode</c> is the flushed copy of <see cref="ExitStatus"/>, so a
+    /// status the PREVIOUS run unit's STOP RUN set must not become this run unit's.</summary>
+    private static RunUnit StartAfter(RunUnit? prior)
+    {
+        var ru = new RunUnit();
+        if (prior is not null)
+        {
+            ru.Clock = prior.Clock;
+            ru.DebugMode = prior.DebugMode;
+        }
+        ru.ExitStatus = 0;
+        return ru;
     }
 }

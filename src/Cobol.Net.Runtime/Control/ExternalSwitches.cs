@@ -14,7 +14,4 @@ public static class ExternalSwitches
 
     /// <inheritdoc cref="SwitchStore.Set"/>
     public static void Set(string implementorName, bool isOn) => RunUnit.Current.Switches.Set(implementorName, isOn);
-
-    /// <inheritdoc cref="SwitchStore.Reset"/>
-    public static void Reset() => RunUnit.Current.Switches.Reset();
 }

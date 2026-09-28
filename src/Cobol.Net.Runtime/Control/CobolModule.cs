@@ -24,9 +24,6 @@ public static class CobolModule
     /// <inheritdoc cref="ModuleStack.Pop"/>
     public static void Pop() => RunUnit.Current.Modules.Pop();
 
-    /// <inheritdoc cref="ModuleStack.Reset"/>
-    public static void Reset() => RunUnit.Current.Modules.Reset();
-
     /// <inheritdoc cref="ModuleStack.Name"/>
     public static string Name(int kind) => RunUnit.Current.Modules.Name(kind);
 }

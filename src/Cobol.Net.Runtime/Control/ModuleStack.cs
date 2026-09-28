@@ -62,8 +62,6 @@ public sealed class ModuleStack
     /// <summary>Pop the current element on activation return (paired with every push in a finally).</summary>
     public void Pop() { if (_stack.Count > 0) _stack.RemoveAt(_stack.Count - 1); }
 
-    /// <summary>Clear the stack at run-unit start (called from the run-unit reset).</summary>
-    public void Reset() => _stack.Clear();
 
     /// <summary>Resolve MODULE-NAME for the keyword selector (0 CURRENT · 1 ACTIVATING · 2 NESTED · 3 STACK ·
     /// 4 TOP-LEVEL). Returns the §15.65.4-defined value, trimmed (a dynamic-length result — r1, no trailing

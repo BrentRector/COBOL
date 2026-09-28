@@ -78,6 +78,14 @@ public abstract class CobolObject
     /// chain here (the finalizer closes them all).</summary>
     private System.Collections.Generic.List<string>? __instFiles;
 
+    /// <summary>The file registry of the RUN UNIT that created this object — the registry its instance files were
+    /// registered in, captured on the constructing thread when the first one is tracked. The finalizer enqueues
+    /// its closes HERE (kb/Work PB1532): it runs on the GC finalizer thread, where the ambient
+    /// <see cref="RunUnit.Current"/> (an <see cref="System.Threading.AsyncLocal{T}"/>) is empty, so resolving the
+    /// registry there reached a fresh ORPHAN run unit whose queue nothing drains, and the file stayed open until
+    /// run-unit termination (a later OPEN OUTPUT of the same physical file: status 61).</summary>
+    private FileRegistry? __instFilesOwner;
+
     /// <summary>Every COBOL object suppresses finalization by default — the overwhelming common case owns no files,
     /// and a finalizer on the universal object root would put EVERY object on the GC finalization queue. Only an
     /// object that actually tracks an instance file re-registers (<see cref="__TrackInstanceFile"/>), so the §9.1.4
@@ -89,19 +97,25 @@ public abstract class CobolObject
     /// finalizer this object suppressed at construction.</summary>
     protected void __TrackInstanceFile(string key)
     {
-        if (__instFiles is null) { __instFiles = new(); System.GC.ReRegisterForFinalize(this); }
+        if (__instFiles is null)
+        {
+            __instFiles = new();
+            __instFilesOwner = RunUnit.Current.Files;
+            System.GC.ReRegisterForFinalize(this);
+        }
         __instFiles.Add(key);
     }
 
     /// <summary>The §9.1.4 implicit CLOSE at object deletion: request close of every instance-file connector this
     /// object owns. This runs on the GC finalizer THREAD, so it must NOT touch the single-thread file registries
-    /// directly — it only ENQUEUES each key (<see cref="CobolFile.EnqueueInstanceClose"/>, lock-free); the mutator
-    /// thread performs the actual close when it next drains (§9.1.4's NOTE licenses this GC-deferred timing; the
-    /// run-unit <c>CobolFile.CloseAll()</c> drains + is the backstop). Reached only for file-owning objects (see the
-    /// ctor's SuppressFinalize).</summary>
+    /// directly — it only ENQUEUES each key on the OWNING run unit's registry (<see cref="__instFilesOwner"/>;
+    /// <see cref="FileRegistry.EnqueueInstanceClose"/>, lock-free), never on whatever run unit the finalizer thread
+    /// happens to resolve (kb/Work PB1532). The mutator thread performs the actual close when it next drains, at
+    /// its next OPEN or at run-unit termination (§9.1.4's NOTE licenses this GC-deferred timing). Reached only for
+    /// file-owning objects (see the ctor's SuppressFinalize).</summary>
     ~CobolObject()
     {
-        if (__instFiles is { } fs)
-            foreach (var k in fs) CobolFile.EnqueueInstanceClose(k);
+        if (__instFiles is { } fs && __instFilesOwner is { } owner)
+            foreach (var k in fs) owner.EnqueueInstanceClose(k);
     }
 }

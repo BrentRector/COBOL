@@ -28,8 +28,4 @@ public sealed class RandomSequence
         _current = new Random(seed);
         return _current.NextDouble();
     }
-
-    /// <summary>Forget the current sequence (run-unit start — <see cref="RunUnit.ResetCurrent"/>), so the next
-    /// argument-less reference is again r4's "first reference ... in the run unit".</summary>
-    public void Reset() => _current = null;
 }

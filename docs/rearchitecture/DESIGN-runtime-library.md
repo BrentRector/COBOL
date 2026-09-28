@@ -106,22 +106,32 @@ public sealed class RunUnit
     public IClock         Clock      { get; set; } = SystemClock.Instance;   // was AcceptSource.Now
     public RandomSequence Random     { get; }   // was static CobolIntrinsics._random (kb/Work PB307, §15.75.3 r4)
 
-    /// Establish an ambient run unit for the duration of `body` (the generated Main wrapper calls this once).
+    /// A host's run unit for the duration of `body`; the generated Main begins its own with RunUnit.Begin().
     public static void Run(Action<RunUnit> body)
     {
-        var ru = new RunUnit();
-        var prior = _current.Value; _current.Value = ru;
+        var prior = _current.Value;
+        var ru = StartAfter(prior);   // a NEW object; only HostConfiguration carries over
+        _current.Value = ru;
         try { body(ru); }
         finally { ru.Files.CloseAll(); _current.Value = prior; }
     }
 }
 ```
-**No run-unit state in a static — enforced.** `RunUnit.ResetCurrent` (the emitted driver's
-`ProgramRegistry.Reset()`) resets the program table, EXTERNAL store, MODULE-NAME stack and the FUNCTION RANDOM
-sequence; `RunUnitStateDriftTests.NoWritableStatic_OutsideTheDocumentedProcessStores` enumerates every writable
-static field in `Cobol.Net.Runtime` and fails on one not documented there as PROCESS-lifetime (console encoding,
-collation-subsystem configuration, the overwritten-before-use subscript scratch cell). The RANDOM sequence was the
-sixth process-global store the consolidation missed (kb/Work PB307).
+**A new run unit is a new `RunUnit` object — on every path.** `RunUnit.Begin()` (the emitted driver's
+`ProgramRegistry.Reset()`) and `RunUnit.Run` both construct one, so every member — program table, EXTERNAL store,
+MODULE-NAME stack, files, switches, locale, RANDOM sequence, report flow, exception status, the per-class FACTORY
+OBJECTS (`RunUnit.FactoryObject<F>()`, ISO §9.3.14.2: created before the first reference "by a run unit") and the
+termination status — is fresh by construction. Only the declared HOST CONFIGURATION (`RunUnit.HostConfiguration`:
+the clock seam and the object-time debug switch) is carried from the ambient run unit being replaced. The earlier
+shape reset a HAND LIST of members on the one ambient object, and the switch, locale and report-flow state (and the
+process-static factory singletons) survived into the next run unit (kb/Work PB1069);
+`RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit` now reflects over every field instead of a list.
+
+**No run-unit state in a static — enforced.** `RunUnitStateDriftTests.NoWritableStatic_OutsideTheDocumentedProcessStores`
+enumerates every writable static field in `Cobol.Net.Runtime` and fails on one not documented there as
+PROCESS-lifetime (console encoding, collation-subsystem configuration, the per-thread overwritten-before-use
+subscript scratch cell). The RANDOM sequence was the sixth process-global store the consolidation missed (kb/Work
+PB307).
 
 Rationale: `AsyncLocal` (not `ThreadStatic`) because the correct scope is the *logical* run-unit activation, and it
 subsumes `CobolModule`'s existing thread-locality while also being correct across `await`/thread-pool hops. Hot

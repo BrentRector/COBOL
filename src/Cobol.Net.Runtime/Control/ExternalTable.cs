@@ -145,7 +145,4 @@ public sealed class ExternalTable
         IsNonExternal(d.FileStatusRef) || IsNonExternal(d.RelativeKeyRef) || IsNonExternal(d.LinageRef);
 
     private static bool IsNonExternal(string? r) => r is { } s && s.Split(';').Contains("!");
-
-    /// <summary>Drop every cell and descriptor (run-unit start hygiene; called from the run-unit reset).</summary>
-    public void Reset() { _cells.Clear(); _describers.Clear(); }
 }

@@ -313,11 +313,13 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             .Concat(cls.Symbol.FactoryImplements.Select(i => i.CsName)));
         var extras = new List<string>
         {
-            // The singleton (§9.3.14.2 "created before it is first referenced" — .NET static-readonly type
-            // initialization satisfies it exactly). A factory whose superclass is a COBOL class needs `new` to
-            // shadow that class's singleton; the runtime BASE__FACTORY declares none, so there is nothing to hide.
-            $"public {(cls.Symbol.Base is { IsStandard: false } ? "new " : "")}static readonly {cls.Symbol.FactoryCsName} "
-                + $"{NamingConvention.FactoryInstanceField} = new();",
+            // The factory object (§9.3.14.2: "created before it is first referenced by a run unit" and "deleted
+            // after it is last referenced by a run unit") is the CURRENT RUN UNIT's, created on first reference
+            // (RunUnit.FactoryObject) — never a process-lifetime static, which outlived the run unit with all its
+            // factory data (kb/Work PB1069). A factory whose superclass is a COBOL class needs `new` to shadow
+            // that class's accessor; the runtime BASE__FACTORY declares none, so there is nothing to hide.
+            $"public {(cls.Symbol.Base is { IsStandard: false } ? "new " : "")}static {cls.Symbol.FactoryCsName} "
+                + $"{NamingConvention.FactoryInstanceField} => {RuntimeApi.FactoryObject(cls.Symbol.FactoryCsName)};",
         };
         // New's creation step (§16.2.1.2 GR1), exactly when the class has BaseFactoryInterface through INHERITS
         // (§16.2; §9.3.9): a covariant override of BASE__FACTORY.__Create, so New invoked on a subclass's factory —

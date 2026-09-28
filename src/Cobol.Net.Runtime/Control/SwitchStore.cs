@@ -49,7 +49,4 @@ public sealed class SwitchStore
     /// <summary>Alter the switch's status (ISO §14.9.39 Format 3 GR5: the switch is modified so that a
     /// condition-name associated with it evaluates per the ON/OFF phrase; §12.3.7 GR3).</summary>
     public void Set(string implementorName, bool isOn) => _states[implementorName] = isOn;
-
-    /// <summary>Clear all switch state (test isolation only — within a run unit switches persist, GR4).</summary>
-    public void Reset() => _states.Clear();
 }
