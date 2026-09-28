@@ -7,7 +7,7 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 > (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/agent-fleet/SKILL.md` instead
 > (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
 > what is specific to WiseOwl COBOL — commands, paths, kb/Work, push-main, the owner's dated decisions and
-> measurements — and wins on conflict. Pinned: **brent-tools 1.8.1** (`tools/claude-skills`, kb/Work/PB1699). A
+> measurements — and wins on conflict. Pinned: **brent-tools 1.9.0** (`tools/claude-skills`, kb/Work/PB1699). A
 > practice improved here is written into the public base first, then consumed by moving the pin.
 
 # Workstream — token-frugal, restart-safe orchestration

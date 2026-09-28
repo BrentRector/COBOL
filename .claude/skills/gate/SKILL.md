@@ -7,7 +7,7 @@ description: Use before every commit and before every merge to choose and run th
 > (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/test-gate/SKILL.md` instead
 > (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
 > what is specific to WiseOwl COBOL — commands, paths, CI and push-main, the owner's dated decisions — and wins on
-> conflict. Pinned: **brent-tools 1.8.1** (`tools/claude-skills`, kb/Work/PB1699).
+> conflict. Pinned: **brent-tools 1.9.0** (`tools/claude-skills`, kb/Work/PB1699).
 
 # Gate
 

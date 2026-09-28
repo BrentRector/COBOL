@@ -66,9 +66,11 @@ REGISTER: flip each note's `status` and write its `closes_rows` IN THE COMMIT TH
 when it closes none). Run `python scripts/spec/work.py check`. Do NOT open a list anywhere — new defects are LEADS in your
 report, each with its repro path and code site (file:line) so the registrar does not re-survey.
 
-CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, THEN rewrite `STATUS.md` (DONE /
-NEXT / BLOCKED / GATE / batch paths / codes used) with FIRST LINE `STATUS-AT: <output of git rev-parse HEAD>` — the
-commit it describes (P4; STATUS.md is gitignored, so writing it never moves HEAD). RESUMING or MERGING a predecessor:
+CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, and after EVERY commit (the small
+trailing ones too: a gate-red fix, a regenerated index) rewrite `STATUS.md` (DONE / NEXT / BLOCKED / GATE / batch
+paths / codes used) with FIRST LINE `STATUS-AT: <output of git rev-parse HEAD>` — the commit it describes (P4;
+STATUS.md is gitignored, so writing it never moves HEAD). A hook refuses your next commit and your finish while the
+stamp is not HEAD (kb/Work/PB1701). RESUMING or MERGING a predecessor:
 run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <that worktree>` FIRST and read the summary plus ONLY the commits it lists.
 Turn cap 220 — at the cap, checkpoint, write NEXT, return SPLIT.
 

@@ -52,7 +52,11 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/devlog_staged.py\"",
-            "if": "Bash(git commit*)",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/tools/claude-skills/skills/agent-fleet/references/status_guard.py\"",
             "timeout": 30
           },
           {
@@ -69,6 +73,11 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/forbidden_commands.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/tools/claude-skills/skills/agent-fleet/references/status_guard.py\"",
             "timeout": 30
           },
           {
@@ -98,6 +107,22 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/unpushed.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/tools/claude-skills/skills/agent-fleet/references/status_guard.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/tools/claude-skills/skills/agent-fleet/references/status_guard.py\"",
             "timeout": 30
           }
         ]
