@@ -33,9 +33,20 @@ public enum PicPending
 /// range. <see cref="Literals"/> is the RAW operand text (decoded at emit — the Format-1 currency); <see cref="From"/>
 /// is subscript-1 (one integer per OCCURS dimension, SR20); <see cref="To"/> is the optional subscript-2 (SR21), null
 /// for the no-TO form (GR14 = fill to the table maximum). <see cref="Ordinal"/> is the source order (GR15 last-FROM
-/// wins on an overlap).</summary>
+/// wins on an overlap). <see cref="FromWritten"/> / <see cref="ToWritten"/> are the subscripts AS WRITTEN, one per
+/// entry of <see cref="From"/> / <see cref="To"/>: a subscript beyond the host range is carried SATURATED in the
+/// integer list (kb/Work PB1579 — still out of every table's range), and a diagnostic quotes the written text, never
+/// the saturated number.</summary>
 public sealed record TableValueSpec(
-    IReadOnlyList<string> Literals, IReadOnlyList<int> From, IReadOnlyList<int>? To, int Ordinal);
+    IReadOnlyList<string> Literals, IReadOnlyList<int> From, IReadOnlyList<int>? To, int Ordinal,
+    IReadOnlyList<string> FromWritten, IReadOnlyList<string>? ToWritten)
+{
+    /// <summary>The FROM subscripts as the source wrote them, space-separated.</summary>
+    public string FromText => string.Join(" ", FromWritten);
+
+    /// <summary>The TO subscripts as the source wrote them, space-separated; empty for the no-TO form.</summary>
+    public string ToText => ToWritten is { } t ? string.Join(" ", t) : "";
+}
 
 /// <summary>
 /// A bound DATA DIVISION item: a node in the record tree. Elementary items (<see cref="Pic"/> non-null) become
@@ -615,6 +626,15 @@ public sealed class DataItem
     [DescriptionCopy(DescriptionCopyKind.Alignment,
         "ISO §13.18.57.4 GR2 d) — the TYPE clause's level-1 alignment of a group-typed subject; SAME AS (§13.18.49.4 GR1) copies data-name-1's description, TYPE clause included, and GR1 of the TYPE clause excludes the template's alignment")]
     public bool AlignedAsLevelOne { get; set; }
+
+    /// <summary>The PROPERTY clause as written on this entry (ISO §13.18.42), or null (kb/Work PB1273). Set by
+    /// <c>DataBinder.BindEntry</c>, which also asks §13.18.42.3 SR1's placement; the clause's other syntax rules are
+    /// asked of THIS item — never of a name lookup — by the clause-placement table (SR3's elementary half, §13.16.3
+    /// SR21) and <c>DataBinder.OoBindPropertyClauses</c> (SR2, SR3's qualification half, SR4, SR5, SR6), which then
+    /// synthesizes the accessors (§13.18.42.4 GR1/GR2).</summary>
+    [DescriptionCopy(DescriptionCopyKind.EntryOnly,
+        "PROPERTY (ISO §13.18.42) is in neither GR-1 exclusion list (§13.18.57.4 GR1, §13.18.49.4 GR1), so a TYPE / SAME AS subject or a reproduced TYPEDEF member written in an object's working storage defines the property its own entry would; §13.18.42.3 then judges the copy at its own site. Not onto a compiler temporary: a temporary is never object data and defines no accessor method")]
+    public PropertyClauseSpec? Property { get; set; }
 
     /// <summary>True for an ANY LENGTH elementary level-1 LINKAGE entry (ISO §13.18.2 — the item's length varies
     /// at runtime and is the length of the corresponding argument of the activating element, GR1; PICTURE is

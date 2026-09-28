@@ -783,7 +783,7 @@ VCR row) with the ParseArm gate on `VisitGroupUsageClause`; the edition-gate swe
 `RefModPlace.Category` (§8.4.3.3.3 SR1 last sentence), `ReferenceResolver.RefModExclusion`, `MoveBinder`'s
 `MoveReceiverCategory` + the sender category (Table 16 national row), `Table16Operand.Of(Place)`,
 `ConditionBinder`'s comparison class, `InspectBinder`/`StringBinder`/`UnstringBinder` operand screens,
-`IntrinsicBinder.LengthPositions` (r1/r2 — drop the `IsElementary` guard, read `OperandPic`),
+`ItemLength.Positions` (r1/r2 — drop the `IsElementary` guard, read `OperandPic`),
 `IsStringOperand`, `DISPLAY-OF`/`NATIONAL-OF` argument screens, `DataBinder`'s §13.18.49.3 SR9 SIGN guard (the
 "GROUP-USAGE is not modeled" branch becomes the real check),
 ⛔ **`PlaceRenderer.Write`'s reference-modification BOOLEAN PAD and `MoveEmitter`'s `RefModSlice` FIGURATIVE

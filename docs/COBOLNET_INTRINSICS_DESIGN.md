@@ -347,7 +347,7 @@ variable-length group) anywhere beneath it, in ANY combination — goes to the O
 LENGTH or DYNAMIC LENGTH elementary item is its current length (r6 makes it a BYTE count, so a national
 dynamic-length item reads the storage channel — `BoundIntrinsicCall.LengthInBytes`); an elementary BOOLEAN item is
 its boolean positions (r1 — a USAGE BIT item OCCUPIES ceil(n/8) bytes, D19); and every FIXED item is
-`LengthPositions` (r2 national positions for an elementary usage-national item; r3 "alphanumeric character
+`ItemLength.Positions` — the ONE fixed-item fold, which §13.10.4 GR6 `CONSTANT AS LENGTH OF` also reads (kb/Work PB1213) — (r2 national positions for an elementary usage-national item; r3 "alphanumeric character
 positions" for everything else — an alphanumeric group, a DISPLAY/COMP/PACKED leaf, an INDEX/POINTER/COMP-1/COMP-2
 carrier — which under the 1-byte-per-position model IS `DataItem.ByteWidth`, the BYTE-LENGTH authority; the pinned
 per-usage widths are on `ByteWidth`'s doc and CONFORMANCE.md). A type-name argument with an ODO subordinate takes

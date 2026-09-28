@@ -629,48 +629,64 @@ public sealed partial class DataBinder
         return clone;
     }
 
-    /// <summary>Scan the OBJECT/FACTORY WORKING-STORAGE parse entries for PROPERTY clauses (§13.18.42) and
-    /// SYNTHESIZE the accessor method symbols (D-P1 — the PINNED §11.7.4 GR1a implementor naming
-    /// <c>__GET_&lt;P&gt;</c>/<c>__SET_&lt;P&gt;</c>): GET returns the SUBJECT item's description; SET takes
-    /// one formal of it. The emitter renders DIRECT field bodies — observably identical to the spec's
-    /// implicit MOVE methods (GR1/GR2 :21214-21229) because the descriptions are identical by construction.
-    /// SR checks are the 0842 family; WITH NO GET/SET suppresses the accessor; explicit GET/SET PROPERTY
-    /// methods (already on the roster) take precedence — a clause + an explicit accessor for the same
-    /// property is the §11.7 SR5 duplicate (0842).</summary>
-    internal void OoBindPropertyClauses(OoClassSymbol cls, Core.WorkingStorageSectionContext? ws, bool factory)
+    /// <summary>SYNTHESIZE the accessor method symbols (D-P1 — the PINNED §11.7.4 GR1a implementor naming
+    /// <c>__GET_&lt;P&gt;</c>/<c>__SET_&lt;P&gt;</c>) for every OBJECT/FACTORY working-storage item that carries a
+    /// PROPERTY clause (§13.18.42): GET returns the SUBJECT item's description; SET takes one formal of it. The
+    /// emitter renders DIRECT field bodies — observably identical to the spec's implicit MOVE methods (§13.18.42.4
+    /// GR1/GR2) because the descriptions are identical by construction. WITH NO GET/SET suppresses the accessor;
+    /// explicit GET/SET PROPERTY methods (already on the roster) take precedence — a clause + an explicit accessor
+    /// for the same property is the §11.7 SR5 duplicate (0842).
+    /// <para>⛔ THE SUBJECT IS THE ITEM THAT CARRIES THE CLAUSE (<see cref="DataItem.Property"/>, kb/Work PB1273).
+    /// This used to walk the PARSE entries and find each subject by FIRST NAME MATCH over the whole forest, so with
+    /// two same-named items the accessor bound whichever came first in tree order — a wrong answer, and the one
+    /// SR3 exists to prevent. The §13.18.42.3 screens asked here are the ones that need the finished object name
+    /// space and ancestry: SR2 (subject to an OCCURS clause, by ancestry too), SR3's qualification half, SR4
+    /// (superclass collision), SR5 (CONSTANT RECORD requires WITH NO SET) and SR6 (no ACTIVE-CLASS object
+    /// reference). SR1 is <c>BindEntry</c>'s; SR3's elementary half and §13.16.3 SR21 are the clause-placement
+    /// table's.</para></summary>
+    internal void OoBindPropertyClauses(OoClassSymbol cls, bool factory)
     {
-        foreach (var entry in ws?.dataDescriptionEntry() ?? [])
+        string where = $"class '{cls.Name}'{(factory ? " (FACTORY)" : "")}";
+        // The object (or factory) data — this binder's roots that are not a METHOD's (OoIsObjectData), in
+        // working storage (SR1 has refused every other placement at BindEntry, where the clause stays recorded).
+        var objectItems = Roots.Where(r => !OoMethodScopedRoots.Contains(r)).SelectMany(Flatten).ToList();
+        foreach (var subject in objectItems)
         {
-            var clauses = entry.dataDescriptionBody()?.dataDescriptionClauses()?.dataDescriptionClause();
-            var pc = clauses?.Select(c => c.propertyClause()).FirstOrDefault(c => c is not null);
-            if (pc is null) continue;
-            string where = $"class '{cls.Name}'{(factory ? " (FACTORY)" : "")}";
-            // §13.16.3 SR21 — asked of the ENTRY'S OWN CLAUSES, before any subject lookup (kb/Work PB521): a TYPEDEF
-            // entry is a template BindEntries keeps off Roots, so a lookup-first check never saw it, and a BASED
-            // entry used to be refused only by the whole-unit "BASED in a class" stage that kb/Work PB956 lifted.
-            bool based = clauses!.Any(c => c.basedClause() is not null);
-            bool typedef = clauses!.Any(c => c.typedefClause() is not null);
-            if (based || typedef)
-            {
-                Edition.Error(DiagnosticCatalog.PropertyWithBasedOrTypedef, $"{where}: '{entry.dataName()?.GetText() ?? "FILLER"}' "
-                    + $"specifies the PROPERTY clause together with {(based && typedef ? "the BASED and TYPEDEF clauses" : based ? "a BASED clause" : "a TYPEDEF clause")} "
-                    + "— the PROPERTY clause shall not be specified in the same data description entry as a BASED "
-                    + "clause or a TYPEDEF clause (ISO §13.16.3 SR21)");
-                continue;
-            }
-            if (entry.dataName()?.GetText() is not { } subjName)
+            if (subject.Property is not { } pc || subject.Section is not EntrySection.WorkingStorage) continue;
+            // SR3's ELEMENTARY half is the placement table's ElementaryOnly row (CheckElementaryOnlyClauses), which
+            // runs over the finished forest in BindResolve — after this pass — and reports it. A group defines no
+            // accessor meanwhile.
+            if (subject.Children.Count > 0) continue;
+            using var _ = Edition.At(subject);
+            if (subject.CobolName is not { } subjName)
             {
                 Edition.Error("COBOLNET0842", $"{where}: a PROPERTY clause requires a named data item "
                     + "(ISO §13.18.42 — FILLER cannot be a property subject)");
                 continue;
             }
-            var subject = Roots.SelectMany(Flatten).FirstOrDefault(i =>
-                string.Equals(i.CobolName, subjName, StringComparison.OrdinalIgnoreCase));
-            if (subject is null) continue;   // the entry failed to bind — already diagnosed
-            if (subject.Occurs is not null)
+            string? fault =
+                RecordLayout.OccursSubjectOf(subject) is { } table
+                    ? (ReferenceEquals(table, subject) ? "it is" : $"it is subordinate to '{table.CobolName ?? "FILLER"}', which is")
+                      + " described with an OCCURS clause; the PROPERTY clause shall not be specified for data items "
+                      + "subject to an OCCURS clause (ISO §13.18.42.3 SR2)"
+                : objectItems.Count(i => string.Equals(i.CobolName, subjName, StringComparison.OrdinalIgnoreCase)) > 1
+                    ? $"the name '{subjName}' is not unique in the {(factory ? "factory" : "object")} data, so a "
+                      + "reference to it requires qualification; the PROPERTY clause may be specified only for an "
+                      + "elementary item whose name does not require qualification for uniqueness of reference "
+                      + "(ISO §13.18.42.3 SR3)"
+                : IsConstantRecordItem(subject) && !pc.NoSet
+                    ? "it is in a CONSTANT RECORD, which cannot be stored into, and the clause does not say WITH NO "
+                      + "SET; if the PROPERTY clause is specified in a data item described with the CONSTANT RECORD "
+                      + "clause, or in any data item subordinate to one, the SET phrase shall be specified "
+                      + "(ISO §13.18.42.3 SR5)"
+                : subject.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass }
+                    ? "it is an object reference described with the ACTIVE-CLASS phrase; the PROPERTY clause shall not "
+                      + "be specified for data items of usage object reference described with an ACTIVE-CLASS phrase "
+                      + "(ISO §13.18.42.3 SR6)"
+                : null;
+            if (fault is not null)
             {
-                Edition.Error("COBOLNET0842", $"{where}: property subject '{subjName}' shall not carry "
-                    + "OCCURS (ISO §13.18.42.3 SR2 — no table subjects)");
+                Edition.Error(DiagnosticCatalog.PropertyClauseRule, $"{where}: property subject '{subjName}': {fault}");
                 continue;
             }
             // Superclass property-name collision (§13.18.42.3 SR4): walk the base chain's accessor rosters.
@@ -680,11 +696,9 @@ public sealed partial class DataBinder
                     Edition.Error("COBOLNET0842", $"{where}: property '{subjName}' collides with a property "
                         + $"of superclass '{b.Name}' (ISO §13.18.42.3 SR4)");
 
-            bool noGet = pc.NO() is not null && pc.GET() is not null;
-            bool noSet = pc.NO() is not null && pc.SET() is not null;
-            if (!noGet)
+            if (!pc.NoGet)
                 AddAccessor('G', NamingConvention.GetAccessorName(subjName));
-            if (!noSet)
+            if (!pc.NoSet)
                 AddAccessor('S', NamingConvention.SetAccessorName(subjName));
 
             void AddAccessor(char kind, string csName)
@@ -695,7 +709,7 @@ public sealed partial class DataBinder
                 {
                     CsName = csName, Owner = cls, IsFactory = factory,
                     Accessor = kind, PropertyName = subjName, PropertySubject = subject,
-                    IsFinal = pc.FINAL() is not null,
+                    IsFinal = pc.IsFinal,
                 };
                 m.Binding = new OoMethodBinding();   // synthesized accessors carry their signature immediately
                 if (kind == 'G') m.Binding.Returning = subject; else m.Binding.Formals.Add(new OoFormal(subject, 0, "__V"));

@@ -318,11 +318,18 @@ internal static class RecordLayout
     /// <see cref="OffsetOf"/>'s own OCCURS bail, which answers a different question ("this item has no single
     /// fixed position") — folding the two is what made an SR4 violation report itself as an SR6 failure under a
     /// sentence that was FALSE of the operand (kb/Work PB354 part 2).</summary>
-    public static bool IsSubjectToOccurs(DataItem item)
+    public static bool IsSubjectToOccurs(DataItem item) => OccursSubjectOf(item) is not null;
+
+    /// <summary>The entry whose OCCURS clause <paramref name="item"/> is subject to — the item itself or its nearest
+    /// ancestor that carries one — or null. ANY format of the clause counts (§13.18.38: fixed, occurs-depending and
+    /// Format-4 dynamic-capacity alike), so the test is <see cref="DataItem.IsTable"/>, never <c>Occurs</c> alone:
+    /// <c>Occurs</c> is null for a dynamic-capacity table, and asking it let an item under OCCURS DYNAMIC pass every
+    /// "subject to an OCCURS clause" rule (kb/Work PB1273's sweep; the CONTROL SR3 arm fell into the same trap).</summary>
+    public static DataItem? OccursSubjectOf(DataItem item)
     {
         for (var p = item; p is not null; p = p.Parent)
-            if (p.Occurs is not null) return true;
-        return false;
+            if (p.IsTable) return p;
+        return null;
     }
 
     /// <summary>The item's 01 record description entry is one of <paramref name="file"/>'s records — ISO

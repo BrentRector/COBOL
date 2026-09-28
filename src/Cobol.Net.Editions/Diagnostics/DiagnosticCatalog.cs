@@ -5554,6 +5554,52 @@ public static class DiagnosticCatalog
         + "rule it caught.",
         "ISO §13.18.57.4 GR1 · §13.18.49.4 GR1 · §13.16.3 SR5/SR13/SR16");
 
+    /// <summary>COBOLNET2560 — the subject of a BASED entry is a dynamic-length elementary item or a variable-length
+    /// group (kb/Work PB1213). The twin of COBOLNET1797 (SR1, class object); the shape is asked through
+    /// <c>VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup</c>, the one screen of that pair, and
+    /// never through the BASED cell's carriage gates. <c>DataBinder.CheckUsageDeclarations</c> is the one site.</summary>
+    public static readonly DiagnosticDescriptor BasedSubjectVariableLength = new(
+        "COBOLNET2560", "based-subject-variable-length", EditionSeverity.Error,
+        "ISO §13.18.5.3 syntax rule 2: \"The subject of the entry shall not be a dynamic-length elementary item or "
+        + "a variable-length group.\" A variable-length group is §8.5.1.12.1's — a group with a dynamic-length "
+        + "elementary item or a dynamic-capacity table subordinate to it; an occurs-depending group is not one.",
+        "ISO §13.18.5.3 SR2");
+
+    /// <summary>COBOLNET2561 — an item within a level-66 RENAMES range has a shape §13.18.45.3 SR8 bars (kb/Work
+    /// PB1284). The range is enumerated over the declaration tree (§13.18.45.4 GR1/GR2) by
+    /// <c>DataBinder.RenamesRangeFault</c>; the strongly-typed arms of the same rule are COBOLNET1532's.</summary>
+    public static readonly DiagnosticDescriptor RenamesRangeContent = new(
+        "COBOLNET2561", "renames-range-content", EditionSeverity.Error,
+        "ISO §13.18.45.3 syntax rule 8: \"None of the items within the range, including data-name-2 and data-name-3, "
+        + "if specified, shall be of class object, message-tag, or pointer, a strongly-typed group item, an item "
+        + "subordinate to a strongly-typed group item, a variable-length data item, or an occurs-depending table.\" "
+        + "This code names the class, variable-length (a dynamic-length elementary item or dynamic-capacity table, "
+        + "§8.5.1.11.1) and occurs-depending arms; the strongly-typed arms report COBOLNET1532.",
+        "ISO §13.18.45.3 SR8");
+
+    /// <summary>COBOLNET2562 — a RENAMES … THROUGH area is not a whole number of bytes (kb/Work PB1284). Reachable
+    /// only through USAGE BIT items, which §8.5.1.6.3 packs into shared bytes; measured on <c>BitLayout</c>.</summary>
+    public static readonly DiagnosticDescriptor RenamesAreaNotWholeBytes = new(
+        "COBOLNET2562", "renames-area-not-whole-bytes", EditionSeverity.Error,
+        "ISO §13.18.45.3 syntax rule 10: \"The area described by data-name-2 THROUGH data-name-3 shall define an "
+        + "integral number of bytes.\" Adjacent same-level USAGE BIT items share a byte (§8.5.1.6.3), so a range of "
+        + "bit items can describe a fractional number of bytes.",
+        "ISO §13.18.45.3 SR10");
+
+    /// <summary>COBOLNET2563 — a PROPERTY clause breaks one of §13.18.42.3's syntax rules (kb/Work PB1273): SR1 (only in
+    /// the working-storage section of a factory or instance definition — <c>DataBinder.BindEntry</c>), SR3's elementary
+    /// half (the clause-placement table's ElementaryOnly row), and SR2 / SR3's qualification half / SR5 / SR6, asked of
+    /// the item that carries the clause by <c>DataBinder.OoBindPropertyClauses</c>. The site names the rule it caught.
+    /// SR4 (superclass collision) and the duplicate-accessor rule keep COBOLNET0842; §13.16.3 SR21 keeps COBOLNET2333.</summary>
+    public static readonly DiagnosticDescriptor PropertyClauseRule = new(
+        "COBOLNET2563", "property-clause-rule", EditionSeverity.Error,
+        "A PROPERTY clause is written where ISO §13.18.42.3 does not admit it: SR1 — only in the working-storage section "
+        + "of a factory definition or an instance definition; SR2 — not for a data item subject to an OCCURS clause; "
+        + "SR3 — only for an elementary item whose name does not require qualification for uniqueness of reference; "
+        + "SR5 — in or under a CONSTANT RECORD, the SET phrase (WITH NO SET) shall be specified; SR6 — not for an "
+        + "object reference described with ACTIVE-CLASS. The site names the rule it caught.",
+        "ISO §13.18.42.3 SR1/SR2/SR3/SR5/SR6");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

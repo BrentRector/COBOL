@@ -42,9 +42,9 @@ using Core = CobolParserCore;
 /// out circularity — no division by zero SR1c, the final result truncated to its integer part §7.3.6.3 GR3;
 /// intermediate results ride the edition's compile-time arithmetic mode, <see cref="CompileTimeArithmetic.For"/> —
 /// standard arithmetic at 2002/2014, the documented .NET <see cref="decimal"/> mode from 2023, kb/Work PB1592);
-/// <b>AS LENGTH OF data-name-2</b> (GR6 — the value of the §15.50 LENGTH function: <c>DataItem.ImageWidth</c>,
-/// THE character-position width authority the FUNCTION LENGTH fold reads, which is maximum-allocation based
-/// so the GR6 occurs-depending exception holds); <b>AS BYTE-LENGTH OF</b> (GR5) is STAGED LOUD — the §15.14
+/// <b>AS LENGTH OF data-name-2</b> (GR6 — the value of the §15.50 LENGTH function: <c>ItemLength.Positions</c>,
+/// THE §15.50.4 r1/r2/r3 fold the FUNCTION LENGTH binder reads, which is maximum-allocation based so the GR6
+/// occurs-depending exception holds); <b>AS BYTE-LENGTH OF</b> (GR5) is STAGED LOUD — the §15.14
 /// BYTE-LENGTH intrinsic is itself a Deferred catalog row and the byte-width authority lands once, with it.
 /// The <b>FROM compilation-variable-name-1</b> leg (GR1 — the &gt;&gt;DEFINE tie-in) is STAGED LOUD: the
 /// preprocessor's compilation-variable store is local to the text stage (<c>ConditionalCompilationProcessor.
@@ -347,12 +347,13 @@ public sealed partial class DataBinder
     }
 
     /// <summary>AS LENGTH OF data-name-2 (§13.10.4 GR6): the value of the §15.50 LENGTH function — the item's
-    /// length in character positions, read from <c>DataItem.ImageWidth</c> (THE width authority the FUNCTION
-    /// LENGTH fold reads; maximum-allocation based, so the GR6 occurs-depending-group exception — "the maximum
-    /// size of the data item is used" — holds by construction). SR checks: SR3 all subscripts shall be
-    /// literals; §8.4.2.3.3 SR2/SR3/SR5 the subscript count against the item's OCCURS depth, through
-    /// <see cref="ReferenceResolver.ScreenSubscriptArity"/> (kb/Work PB1016); SR10 no ANY LENGTH operand; SR12 no
-    /// dynamic-length operand. data-name-2 must already be bound
+    /// length in boolean, national or alphanumeric positions, read from <see cref="ItemLength.Positions"/> (THE
+    /// §15.50.4 r1/r2/r3 fold the FUNCTION LENGTH binder reads; maximum-allocation based, so the GR6
+    /// occurs-depending-group exception — "the maximum size of the data item is used" — holds by construction).
+    /// SR checks: SR3 all subscripts shall be literals; §8.4.2.3.3 SR2/SR3/SR5 the subscript count against the
+    /// item's OCCURS depth, through <see cref="ReferenceResolver.ScreenSubscriptArity"/> (kb/Work PB1016); SR10 no
+    /// ANY LENGTH operand; SR12 no dynamic-length elementary item or variable-length group operand, through
+    /// <see cref="VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup"/>. data-name-2 must already be bound
     /// (definition-before-reference — SR4 rules out the reverse dependence).</summary>
     private ConstantDef? BindConstantLength(
         string name, bool isGlobal, string spec, Core.DataReferenceContext dref, string where)
@@ -413,14 +414,22 @@ public sealed partial class DataBinder
                 + "described with the ANY LENGTH clause (ISO §13.10.3 SR10)");
             return null;
         }
-        if (HasDynamicTable(item))
+        // §13.10.3 SR12 — "Data-name-1 and data-name-2 shall not be dynamic-length elementary items or
+        // variable-length groups", through the ONE screen of that pair (kb/Work PB1213). This asked a private
+        // dynamic-capacity-TABLE walk, so a group made variable-length by a DYNAMIC LENGTH leaf passed and LENGTH
+        // OF yielded its fixed part, while a DYNAMIC LENGTH operand itself fell to the GR6 "not computable" arm.
+        if (VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(item) is { } variableShape)
         {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the LENGTH OF operand shall not be a "
-                + "dynamic-length item or a group containing a dynamic-capacity table — its length has no "
-                + "compile-time maximum (ISO §13.10.3 SR12)");
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: LENGTH OF '{DataBinder.WrittenText(dref)}' "
+                + $"— the operand is {variableShape}; data-name-2 shall not be a dynamic-length elementary item or "
+                + "a variable-length group (ISO §13.10.3 SR12)");
             return null;
         }
-        int width = item.ImageWidth;
+        // §13.10.4 GR6 — "determined as specified in the LENGTH intrinsic function": THE §15.50.4 r1/r2/r3 fold, the
+        // one FUNCTION LENGTH takes (kb/Work PB1213). This read DataItem.ImageWidth, a second copy that had drifted
+        // from the function's: 4 for an alphanumeric group of X(2) + N(2) where r3 counts 6, and a USAGE BIT item's
+        // byte occupancy where r1 counts its boolean positions.
+        int width = ItemLength.Positions(item);
         if (width <= 0)
         {
             // A TYPE-clause reference not yet expanded / a pending PICTURE-less usage — loud, never a wrong 0.
@@ -431,9 +440,6 @@ public sealed partial class DataBinder
         }
         string text = width.ToString(CultureInfo.InvariantCulture);
         return new ConstantDef(name, PicCategory.Numeric, text, text, isGlobal, text, spec);
-
-        static bool HasDynamicTable(DataItem item) =>
-            item.IsDynamicTable || item.Children.Any(HasDynamicTable);
     }
 
     // ── The data-division substitution chokepoints (§13.10.3 SR2) ────────────────────────────────────────────
@@ -449,9 +455,20 @@ public sealed partial class DataBinder
         string word = bound.cobolWord().GetText();
         if (_constants.TryGetValue(word, out var k))
         {
+            // THE ONE integer-literal reader (kb/Work PB1579): an integer constant beyond the host range is still an
+            // INTEGER constant-name — a TryParse here refused it as "not an INTEGER constant-name". Substituted for
+            // integer-n (§13.10.4 GR1), it meets the limit the written literal meets: IntegerOperandPass screens a
+            // LITERAL pre-bind (COBOLNET2427), and a constant is known only here, so the same verdict is raised here
+            // — never a saturated bound handed to the layout, which then tried to allocate it.
             if (k is { Category: PicCategory.Numeric, IntegerText: { } it }
-                && int.TryParse(it, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int kv))
-                return kv;
+                && CobolNet.Validation.IntegerOperandRules.TryHostValue(it, out int kv, out bool beyondLimit))
+            {
+                if (!beyondLimit) return kv;
+                Edition.Error(DiagnosticCatalog.IntegerOperandBeyondLimit,
+                    CobolNet.Validation.IntegerOperandRules.BeyondLimitMessage(where,
+                        $"the OCCURS bound '{word}', the integer {it},"));
+                return null;
+            }
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the OCCURS bound '{word}' shall be "
                 + "an INTEGER constant-name (ISO §13.10.3 SR2 — only an integer constant may specify an OCCURS "
                 + "integer position)");

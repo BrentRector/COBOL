@@ -497,8 +497,12 @@ public sealed partial class DataBinder
     /// would have reported a CLASS-clause violation on a program with no CLASS clause).</summary>
     private string? CurrencyTextLiteral(Core.LiteralContext lit, string operand, string rule)
     {
-        if (!int.TryParse(lit.GetText(), out _) && !decimal.TryParse(lit.GetText(), System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.InvariantCulture, out _))
+        // The literal's CLASS is the grammar's answer (§8.3.3.3.1: "Numeric literals are of the class and category
+        // numeric" — the lexer's numeric-literal rule decides it), never
+        // a C# parse of its text (kb/Work PB1579): `int.TryParse || decimal.TryParse` answered "not numeric" for a
+        // 30- or 31-digit numeric literal (beyond decimal's range), which then fell into the alphanumeric path and
+        // was refused under the wrong rule.
+        if (lit.numericLiteral() is null)
             return LiteralCharsOf(lit, national: false, sr11: false);   // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8
         Edition.Error("COBOLNET0892", $"CURRENCY SIGN {ConcatFolder.Spelling(lit)}: {operand} shall be an alphanumeric or "
             + $"national literal, not a numeric one (ISO §12.3.7.3 SR{rule})");

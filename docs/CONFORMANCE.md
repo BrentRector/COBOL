@@ -497,7 +497,12 @@ of an unsupported facility.
   PAGE line count, a report LINE or COLUMN, an ordinal — is limited to **2,147,483,647**; a larger literal is
   `COBOLNET2427` (§4.5: "Translation may be unsuccessful due to factors other than lack of conformance", whose
   NOTE names "the limits of an implementation"), screened once for every `integerLiteral` by
-  `Validation/IntegerOperandPass` and read by the binder only through `IntegerOperandRules.HostValue`. Exempt,
+  `Validation/IntegerOperandPass` and read by the binder only through `IntegerOperandRules.HostValue`. The same
+  limit meets an integer the binder reaches by another road — an integer constant-name substituted for integer-n
+  (§13.10.4 GR1: OCCURS K where K is 77777777777) and a reference-modification literal of a CONTROL, TYPE CF or
+  SUM … RESET ON operand (§13.18.16.3 SR4; the prior control is laid out as the slice, §13.18.16.4 GR3) — through
+  the one text reader `IntegerOperandRules.TryHostValue`, which reports "integer literal, saturated" rather than
+  "not an integer literal", and the one sentence `BeyondLimitMessage` (kb/Work PB1579). Exempt,
   because their value is carried at full width: PERFORM integer-1 TIMES, WRITE ADVANCING integer-1 LINES, and
   the DYNAMIC LENGTH LIMIT (clamped by A.1 item 62's own determination). **(2) a run-time integer value handed to a host
   `int` or `long`** — a GO TO … DEPENDING selector, a reference-modifier position or length, a PERFORM TIMES

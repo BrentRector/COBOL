@@ -13626,13 +13626,13 @@
   "ordinal": 1,
   "subject": "SOURCE-COMPUTER paragraph",
   "rule-digest": "de1a3322ccf8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#InheritConfiguration; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitProgramUnit",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#InheritConfiguration",
+  "test-ref": "conformance:85/pb1088_dbg_contained",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1088: Rule: 'All clauses of the SOURCE-COMPUTER paragraph apply to the source unit in which they are explicitly or implicitly specified and to any source unit contained within that source unit.' (cite.py --check 12.3.5.4 -> OK §12.3.5.4 1)). At 2002/2014/2023 the paragraph's format is SOURCE-COMPUTER. [computer-name-1]. and computer-name-1 has no semantics (nothing in src reads sourceComputerParagraph().computerName()), so the rule holds vacuously; §12.3.3 SR1 ('The configuration section shall not be specified in a program that is contained within another program', --check OK) is enforced (COBOLNET1643), and §12.3.4 GR1 inheritance runs through DataBinder.InheritConfiguration. At 1985 the one real clause, WITH DEBUGGING MODE, is NOT inherited: InheritConfiguration copies DebuggingModeDeclared = container.DebuggingModeDeclared, but BinderDriver then calls data.Bind -> BindDeclarations, whose line 445 REASSIGNS DebuggingModeDeclared from the contained unit's OWN environment division only (EnvDivisions(program).Any(...sourceComputerParagraph()?.debuggingModeClause() is not null)), which is always false for a contained program (it may not have a configuration section) — the inherited true is overwritten. The version-conformance pass models the opposite (VisitProgramUnit comment: 'contained programs INHERIT the switch (the '85 rule)'), a two-arm split. PROBE (pinned cobol.exe, --std 85): probe/source-computer-paragraph/nest85.cob — outer SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE.; contained SCINNER with USE FOR DEBUGGING ON ALL PROCEDURES displaying DEBUG-NAME; outer CALLs it. Observed: OUTER / INNER — identical to control ctl85.cob with no DEBUGGING MODE; the debugging section was treated as comment lines. Expected (switch applies to the contained unit per this GR; object-time switch ON per the compiler's CCVS posture, as golden conformance:85/wavef_dbg_proc shows for the uncontained case): OUTER / DBG N=P-IN / INNER. The 1985 debug facility's text is not in the 2023 spec; the inheritance expectation rests on this GR's 'all clauses' plus §12.3.4 GR1 and the compiler's own validator. No spec-derived test covers the contained-unit case. [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023 (SOURCE-COMPUTER exists at every edition; the only clause beyond computer-name-1 is the 1985 WITH DEBUGGING MODE, deleted 2002, so the rule has observable content only at 1985)]",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1088: every SOURCE-COMPUTER clause reaches contained units through InheritConfiguration; WITH DEBUGGING MODE is now OR-ed into the inherited value in BindDeclarations instead of assigned over it (the one unconditional reassignment among the inherited fields), so a contained program's USE FOR DEBUGGING section compiles under its container's switch.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.5.4-2",
@@ -18381,13 +18381,13 @@
   "ordinal": 12,
   "subject": "Constant entry",
   "rule-digest": "f5207160c929",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs#DynamicLengthOrVariableLengthGroup",
+  "test-ref": "conformance:negative/pb1213-constant-length-variable-group; conformance:2014/pb1213_varlen_neighbours",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1213, 14d). SR12 (cite OK) with §8.5.1.12.1 (cite OK: 'A variable-length group is a group item whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate item'). HasDynamicTable walks only item.IsDynamicTable. Probe sr12_vlg2: `01 G. 05 A PIC X(2). 05 W PIC X DYNAMIC LENGTH. 01 K CONSTANT AS LENGTH OF G.` compiles and DISPLAY K prints 2 — must be rejected. Dynamic-capacity-table group rejected correctly (COBOLNET1547 SR12). Elementary DYNAMIC LENGTH item is rejected but only incidentally, via the width<=0 arm citing GR6 'not computable' instead of SR12. F-SR12-VLG. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1213: LENGTH OF a dynamic-length elementary item or a variable-length group (including one made variable by a DYNAMIC LENGTH leaf) is refused citing SR12; an item that IS a dynamic-capacity table (its element, e.g. LENGTH OF T (1)) and an occurs-depending group are neither shape and stay legal (the private table walk had refused the former).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.10.4-1",
@@ -18471,13 +18471,13 @@
   "ordinal": 6,
   "subject": "Constant entry",
   "rule-digest": "0acc482b85e7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength",
-  "test-ref": "conformance:2002/pb1016_constant_length_subscripts",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/Model/ItemLength.cs#Positions",
+  "test-ref": "conformance:2002/pb1016_constant_length_subscripts; conformance:2014/pb1213_varlen_neighbours",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1213, 14d). GR6 (cite OK incl. 'when data-name-2 is an occurs-depending group item, the maximum size of the data item is used'). Verified: ODO group H X(2) + E X(3) OCCURS 1 TO 4 -> 14 (maximum); PIC N(3) -> 3; COMP-5 / packed -> equal FUNCTION LENGTH; qualified X OF G2 -> 5; GROUP-USAGE NATIONAL group -> 5 = FUNCTION LENGTH; literal-subscripted element -> 3; golden LEN=7. Defects: a VARIABLE-LENGTH GROUP (a DYNAMIC LENGTH leaf) is accepted and yields 2 (SR12, F-SR12-VLG); data-name-2 declared AFTER the entry is rejected ('reads only PRECEDING declarations') (F-FORWARD-REF). -> PARTIAL. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1213: the CONSTANT AS LENGTH OF value is THE §15.50.4 r1/r2/r3 fold FUNCTION LENGTH reads (ItemLength.Positions, moved out of IntrinsicBinder), no longer DataItem.ImageWidth: an alphanumeric group of X(2)+N(2) is 6 (was 4), a USAGE BIT PIC 1(8) is 8 boolean positions (was its 1-byte occupancy); an occurs-depending group takes its maximum (GR6's exception) = byte width.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.14.3-1",
@@ -19746,13 +19746,13 @@
   "ordinal": 2,
   "subject": "BASED clause",
   "rule-digest": "35dd2aaf3eb6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#ForceStringCanonical; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#VariableLengthCellResidueOf; src/Cobol.Net.Compiler/Binding/DataBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#CheckUsageDeclarations; src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs#DynamicLengthOrVariableLengthGroup",
+  "test-ref": "conformance:negative/pb1213-based-variable-length-group; conformance:2014/pb1213_varlen_neighbours",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "(kb/Work PB1213, 14d). cite.py --check 13.18.5.3 'The subject of the entry shall not be a dynamic-length elementary item or a variable-length group.' OK §13.18.5.3 2); variable-length group is defined in §8.5.1.12.1 (--find located it there; 8.5.1.12 --check FAILs, the text is in the subclause) as 'a group item whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate item'. No code screens this rule (no SR2 site exists; grep of src for the rule finds only comments quoting it). Three shapes probed: (a) E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/based/sr2a.cob `01 D PIC X DYNAMIC LENGTH BASED.` -> COBOLNET1563 via §13.16.3 SR18 (correct outcome by a real, applicable rule). (b) sr2b.cob `01 G BASED. 05 A PIC X(3). 05 D PIC X DYNAMIC LENGTH.` COMPILES AND RUNS at 2023 and 2014 (prints A=ABC D=HELLO) - under-rejects: ForceStringCanonical admits dynamic-length leaves onto the cell's dynamic slots (the PB1026 carriage built for EXTERNAL/ADDRESS OF) and the BASED arm never asks SR2. (c) sr2c.cob `01 G BASED. 05 A PIC X(3). 05 T PIC X(2) OCCURS DYNAMIC CAPACITY IN C.` is rejected, but by COBOLNET1695 'recognized but not yet implemented (kb/Work PB164)' - a carriage-residue message, not the SR2 violation; if the cell ever gains dynamic-table carriage this shape silently opens too. Expected: a named SR2 diagnostic for (b) and (c) at every edition that has the constructs. || Editions (adjudicator): 2014, 2023 (dynamic-length items and dynamic-capacity tables do not exist before 2014) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#ForceStringCanonical; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#VariableLengthCellResidueOf; src/Cobol.Net.Compiler/Binding/DataBinder.cs#(BASED declaration validation ~L4644)",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1213: a BASED subject that is a variable-length group (a dynamic-length elementary item or dynamic-capacity table subordinate, at any depth) is refused COBOLNET2560 in the post-forest declaration pass, for written and TYPE/SAME AS-composed BASED alike, asked of the SHAPE through the one screen of the pair; the elementary spelling is refused by §13.16.3 SR18 (COBOLNET1563). The BASED fixed-length group still allocates. Dynamic items do not exist below 2014.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.5.4-1",
@@ -25851,13 +25851,13 @@
   "ordinal": 1,
   "subject": "PROPERTY clause",
   "rule-digest": "b67ac2161fe4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry; src/Cobol.Net.Compiler/Oo/OoDriver.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry",
+  "test-ref": "conformance:negative/pb1273-property-in-method-storage; conformance:2002/pb1273_property_subject",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1273. Rule: \"The PROPERTY clause may be specified only in the working-storage section of a factory definition or an instance definition.\" (cite.py --check 13.18.42.3 -> OK, SR 1). The BindEntry arm for propertyClause is an empty block ('binds in the OO pass'), and the OO pass reads only the OBJECT/FACTORY working-storage, so a PROPERTY clause anywhere else is silently INERT. Probes: sr1_program_ws (`01 N PIC 9 PROPERTY.` in a program's WORKING-STORAGE) -> compiles, runs, displays 0; sr1_method_ls (PROPERTY in a method's LOCAL-STORAGE) -> compiles, displays 3. (A method WORKING-STORAGE is itself refused at 2023 by COBOLNET0902, so that leg was not observable.) No diagnostic searched for: grep of src for a placement screen on DataClauseKind.Property found none. Expected: a compile-time diagnostic naming SR1 for each. Harm: under-rejects. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry (propertyClause arm, empty) | src/Cobol.Net.Compiler/Oo/OoDriver.cs (OoBindPropertyClauses called only for OBJECT/FACTORY working-storage)",
-  "state": "GAP"
+  "notes": "kb/Work PB1273: BindEntry records the PROPERTY clause on the item and refuses it (COBOLNET2563) unless the entry is in the working-storage section of an object or factory definition — a program / function element, a method's data, or any other section of a class. The clause used to be silently inert everywhere the OO pass did not look.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.42.3-2",
@@ -25866,13 +25866,13 @@
   "ordinal": 2,
   "subject": "PROPERTY clause",
   "rule-digest": "eb366234533c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#OccursSubjectOf",
+  "test-ref": "conformance:negative/pb1273-property-under-occurs",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1273. Rule: \"The PROPERTY clause shall not be specified for data items subject to an OCCURS clause.\" (cite.py --check 13.18.42.3 -> OK, SR 2). 'Subject to an OCCURS clause' includes an item subordinate to an OCCURS entry. The code tests only `subject.Occurs is not null` (the entry's own OCCURS). Probe sr2_direct_occurs (`05 E PIC 9 OCCURS 3 PROPERTY.`) -> COBOLNET0842 SR2 (correct). Probe sr2_under_occurs (`05 T OCCURS 3. 10 E PIC 9 VALUE 1 PROPERTY.`) -> NOT diagnosed; the accessor is synthesized and the backend dies: 'error CS0103: The name 'E' does not exist in the current context' (generated C#). Expected: COBOLNET0842 SR2. Harm: crashes (compiler back-end failure on an illegal program instead of the diagnostic). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1273: 'subject to an OCCURS clause' is asked by ancestry and in every OCCURS format through RecordLayout.OccursSubjectOf (IsTable — the dynamic-capacity table Occurs==null hole closed for every caller of IsSubjectToOccurs); a subordinate of an OCCURS group reached the C# backend (CS0103) before.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.42.3-3",
@@ -25881,13 +25881,13 @@
   "ordinal": 3,
   "subject": "PROPERTY clause",
   "rule-digest": "e044baafaa34",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ClausePlacementRules; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
+  "test-ref": "conformance:negative/pb1273-property-name-needs-qualification; unit:DataClausePlacementDriftTests.EveryElementaryOnlySubject_IsRefusedOnAGroup; conformance:2002/pb1273_property_subject",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1273. Rule: \"The PROPERTY clause may be specified only for an elementary item whose name does not require qualification for uniqueness of reference.\" (cite.py --check 13.18.42.3 -> OK, SR 3). Neither half is screened, and the subject is found by `Roots.SelectMany(Flatten).FirstOrDefault(name match)` -- the FIRST item of that name, not the entry that carries the clause. Probe sr3_group (`01 G PROPERTY. 05 X PIC 9.`) -> not diagnosed; backend 'CS0029: Cannot implicitly convert type 'CSR3G._T_0' to 'string''. Probe sr3_qualified (`01 R1. 05 N PIC X VALUE 'A'. 01 R2. 05 N PIC 9 VALUE 7 PROPERTY.`, client `DISPLAY N OF A`) -> compiles and prints `A`: the accessor was bound to R1's N, which does NOT carry the clause -- a wrong answer on top of the missing rejection. Expected: a compile-time SR3 diagnostic for both. Harm: wrong-answer (qualified case) / crashes (group case). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1273: the elementary half is an ElementaryOnly row of the data-clause placement table (a group PROPERTY is refused and defines no accessor); the qualification half counts same-named items in the object/factory data and refuses a non-unique name. The accessor's subject is the item carrying the clause, not the first same-named item (the wrong-answer arm).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.42.3-4",
@@ -25911,13 +25911,13 @@
   "ordinal": 5,
   "subject": "PROPERTY clause",
   "rule-digest": "2fcc72359d29",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1273-property-constant-record-without-no-set; conformance:2002/pb1273_property_subject",
   "derivation": "",
-  "editions": "2023",
-  "notes": "Owned by kb/Work PB1273. Rule: \"If the PROPERTY clause is specified in a data item described with the CONSTANT RECORD clause, or in any data item subordinate to a data item described with the CONSTANT RECORD clause, the SET phrase shall be specified.\" (cite.py --check 13.18.42.3 -> OK, SR 5). No check exists in OoBindPropertyClauses (reads only BASED/TYPEDEF/FILLER/OCCURS/superclass). Probe sr5_const_record (`01 CR CONSTANT RECORD. 05 N PIC 9 VALUE 1 PROPERTY.` -- no WITH NO SET) -> compiles and runs clean, synthesizing a SETTER into a constant. Control sr5_const_record_noset (WITH NO SET) -> compiles, `DISPLAY N OF A` -> 4 (correct). Expected: a compile-time SR5 diagnostic. Harm: under-rejects (a client could store into a constant record through the setter). || Editions (adjudicator's statement, normalized to 2023 by registrar 14e): 2023 text; CONSTANT RECORD predates 2023 (Annex E.2 item 10 speaks of it 'previously'); applies wherever both the OO PROPERTY clause and CONSTANT RECORD exist (2002+)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1273: an item in or under a CONSTANT RECORD whose PROPERTY clause lacks WITH NO SET is refused COBOLNET2563; with WITH NO SET it defines the GET accessor only.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.42.3-6",
@@ -25926,13 +25926,13 @@
   "ordinal": 6,
   "subject": "PROPERTY clause",
   "rule-digest": "531fe0c9e438",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1273-property-active-class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1273. Rule: \"The PROPERTY clause shall not be specified for data items of usage object reference described with an ACTIVE-CLASS phrase.\" (cite.py --check 13.18.42.3 -> OK, SR 6). No check in OoBindPropertyClauses (grep of src for ACTIVE-CLASS finds no PROPERTY screen). Probe sr6_active_class (`01 O USAGE OBJECT REFERENCE ACTIVE-CLASS PROPERTY.` in OBJECT WS) -> compiles and runs clean. Expected: a compile-time SR6 diagnostic. Harm: under-rejects. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1273: a PROPERTY subject whose object-reference descriptor is ACTIVE-CLASS (ObjectRefKind.ActiveClass) is refused COBOLNET2563.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.42.4-1",
@@ -26647,11 +26647,11 @@
   "subject": "REDEFINES clause",
   "rule-digest": "095ae15781f7",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ClassifyRedefinesClasses; src/Cobol.Net.Compiler/Binding/DataBinder.cs#Sr17Shape",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ClassifyRedefinesClasses; src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs#DynamicLengthOrVariableLengthGroup",
   "test-ref": "conformance:negative/pb177-redefines-dynamic-length-target",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "SR17 (cite.py --check 13.18.44.3 'Neither data-name-2 nor the subject of the entry shall be a variable-length group or a dynamic-length elementary item.' OK). Symmetric screen over both sides (COBOLNET1698). Probes: sr17_vlgroup_target (target group with a DYNAMIC LENGTH subordinate) -> 1698; sr17_dynlen_subject -> COBOLNET1563 (§13.16.3 SR18 bars REDEFINES with DYNAMIC LENGTH in one entry, an earlier legitimate barrier); NOTE 3's legal shape sr17_note3_ok (REDEFINES under a variable-length group) -> 0013 correct. Goldens: pb177-redefines-dynamic-length-target, pb177-redefines-vl-group-subject, pb177-redefines-dynamic-subordinate; unit:RedefinesClassificationTests.TierD_VariableLengthSide_RejectedSr17. || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (dynamic-length elementary items and dynamic-capacity tables; Annex E.3 item 17 of 2023 treats them as pre-existing)",
+  "notes": "SR17 (cite.py --check 13.18.44.3 'Neither data-name-2 nor the subject of the entry shall be a variable-length group or a dynamic-length elementary item.' OK). Symmetric screen over both sides (COBOLNET1698). Probes: sr17_vlgroup_target (target group with a DYNAMIC LENGTH subordinate) -> 1698; sr17_dynlen_subject -> COBOLNET1563 (§13.16.3 SR18 bars REDEFINES with DYNAMIC LENGTH in one entry, an earlier legitimate barrier); NOTE 3's legal shape sr17_note3_ok (REDEFINES under a variable-length group) -> 0013 correct. Goldens: pb177-redefines-dynamic-length-target, pb177-redefines-vl-group-subject, pb177-redefines-dynamic-subordinate; unit:RedefinesClassificationTests.TierD_VariableLengthSide_RejectedSr17. || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (dynamic-length elementary items and dynamic-capacity tables; Annex E.3 item 17 of 2023 treats them as pre-existing) retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#Sr17Shape (kb/Work PB1213 folded DataBinder.Sr17Shape into the one screen VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup, which ClassifyRedefinesClasses now asks for both sides)",
   "state": "OK"
  },
  {
@@ -26811,13 +26811,13 @@
   "ordinal": 8,
   "subject": "RENAMES clause",
   "rule-digest": "6022b8937694",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CheckStrongTypeDeclarations",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RenamesRangeFault; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CheckStrongTypeDeclarations",
+  "test-ref": "conformance:negative/pb1284-renames-odo-in-range; conformance:negative/pb1284-renames-dynamic-in-range; conformance:85/pb1284_renames_range_fixed",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1284. SR8 'None of the items within the range, including data-name-2 and data-name-3, if specified, shall be of class object, message-tag, or pointer, a strongly-typed group item, an item subordinate to a strongly-typed group item, a variable-length data item, or an occurs-depending table.' cite.py --check 13.18.45.3 -> OK. Strongly-typed arms ENFORCED by CheckStrongTypeDeclarations COBOLNET1532 (probes sr8strong, sr5strong01). Pointer/object/message-tag can sit in a range only at level 1 or under a strong group (§13.18.60.3 SR14, probes sr8ptr/sr8pp/sr8obj/sr8mt rejected by 1724/1943), so the only unscreened path is a level-1 operand: sr5ptr01 (RENAMES a 01 POINTER) ACCEPTED. Occurs-depending / variable-length arms NOT screened: sr8odo (A THRU T, T OCCURS 1 TO 3 DEPENDING ON N) ACCEPTED, prints 'AB   ' (85: 'AB'); sr8odog (RENAMES G, G containing an ODO) ACCEPTED, prints blank; sr8dyn2 (range containing PIC X DYNAMIC LENGTH) ACCEPTED, prints ABCD; sr8dyn3 (RENAMES the dynamic-length item) ACCEPTED; sr8occdyn (range containing OCCURS DYNAMIC) accepted with warning 1756 and aborts at run time. Expected: every one rejected. Finding F-range-content. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the RENAMES clause is in every edition; the rule text is the 2023 §13.18.45.3 wording); the object/message-tag/pointer/strongly-typed/dynamic arms apply from their introducing editions",
-  "state": "GAP"
+  "notes": "kb/Work PB1284: the range (GR1: data-name-2 and its subordinates; GR2: data-name-2 through the last entry of data-name-3's subtree, declaration order, groups and REDEFINES views included) is screened before either RENAMES form binds: an occurs-depending table, a variable-length data item (dynamic-length elementary item or dynamic-capacity table, §8.5.1.11.1) or an item of class object/message-tag/pointer (SR14's phrase reader) is refused COBOLNET2561; the strongly-typed arms stay COBOLNET1532 (§13.18.57.3 SR3). A range ending before a trailing ODO table is legal and unchanged.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.45.3-9",
@@ -26841,13 +26841,13 @@
   "ordinal": 10,
   "subject": "RENAMES clause",
   "rule-digest": "afcc363b65d4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines; src/Cobol.Net.Compiler/Binding/Model/BitLayout.cs#StartBitOf",
+  "test-ref": "conformance:negative/pb1284-renames-bit-area-fractional; conformance:2002/pb1284_renames_bit_whole_bytes",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1284. SR10 'The area described by data-name-2 THROUGH data-name-3 shall define an integral number of bytes.' cite.py --check 13.18.45.3 -> OK. docs/CONFORMANCE.md USAGE BIT determination: adjacent same-level bit items share a byte (packed). No integral-bytes test exists in ResolveRedefines (window measured in ImageWidth positions). Probe sr10bit2 (05 A PIC 1(3) BIT, 05 B PIC 1(2) BIT, 05 C PIC 1(3) BIT; 66 X2 RENAMES A THRU B) ACCEPTED, prints 10111 — a 5-bit area. Expected: rejected. (sr10bitd A THRU B = 8 bits is legal and accepted.) Finding F-range-content. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (only bit data items, introduced with USAGE BIT, can make the area non-integral; vacuous in 85)",
-  "state": "GAP"
+  "notes": "kb/Work PB1284: the THROUGH area is measured in bits on THE ONE bit layout (BitLayout.StartBitOf + RunBits) for a record holding a USAGE BIT leaf — the only way an area can be fractional (§8.5.1.6.3 packs same-level bit items) — and a non-multiple of 8 is refused COBOLNET2562; whole-byte bit ranges (3+5, 3+5+4+4 bits) compile.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.45.3-11",

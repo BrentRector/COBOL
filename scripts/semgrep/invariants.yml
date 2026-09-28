@@ -155,18 +155,27 @@ rules:
     languages: [csharp]
     severity: ERROR
     message: >-
-      kb/Work PB1058 - an integer-n literal is read into the binder's model through ONE reader,
-      Validation.IntegerOperandRules.HostValue, which the pre-bind IntegerOperandPass pairs with the COBOLNET2427
-      implementation-limit screen (ISO 4.5). An int.Parse here took the whole compiler down with an unhandled
-      OverflowException on PAGE LIMIT / COLUMN / LINAGE 77777777777; an int.TryParse silently dropped the clause
-      (OCCURS 77777777777 compiled clean). Read the operand through HostValue.
+      kb/Work PB1058 / PB1579 - the TEXT of a COBOL integer literal is read through ONE reader,
+      Validation.IntegerOperandRules.HostValue (an integerLiteral node) or TryHostValue (a token, a bound literal's
+      Text, a constant's integer text), which saturates an over-range value and says so, and which the pre-bind
+      IntegerOperandPass pairs with the COBOLNET2427 implementation-limit screen (ISO 4.5). An int.Parse here took
+      the whole compiler down on PAGE LIMIT / COLUMN / LINAGE 77777777777; an int.TryParse answered "not an integer
+      literal" for an 11-digit one and sent it down ANOTHER branch - OCCURS 77777777777 compiled clean, an integer
+      constant-name was refused as not an integer, a CONTROL ref-mod literal as not a literal. Read the text through
+      the one reader; ask a literal's CLASS of the grammar (numericLiteral()), never of a C# parse.
     paths:
       include:
         - "src/Cobol.Net.Compiler/Binding/"
-    # The accessor form only: a local holding an IntegerLiteralContext has no spelling a regex can tell from any
-    # other literal (`lit.GetText()` is also the CURRENCY SIGN literal's), so those sites are held by review and by
-    # the pre-bind screen, which makes a throwing parse unreachable only if the reader is HostValue.
-    pattern-regex: '\b(?:int|long)\.(?:Try)?Parse\([^;\n]*integerLiteral\(\)(?:\[[^\]]*\])?(?:\?)?\.GetText\(\)'
+        - "src/Cobol.Net.Compiler/Validation/"
+    # Any C# parse of PARSE-TREE text (`.GetText()`) or of a token's / bound literal's `.Text` - the COBOL literal
+    # spellings a regex can see. The PB1058 form matched only the `integerLiteral().GetText()` accessor, and the
+    # seven PB1579 sites (`exprs[0].GetText()`, `only.Text`, `lit.GetText()`, `nl.Text`, ...) each read through
+    # another spelling, held "by review" - which is how they survived. A level-number is not a literal (a one- or
+    # two-digit word the lexer bounds), so its parse is exempt. A value first copied into a local is still
+    # invisible to a regex; the reader's own summary names that residue.
+    patterns:
+      - pattern-regex: '\b(?:int|long)\.(?:Try)?Parse\([^;\n]*(?:\.GetText\(\)|\.Text\b)'
+      - pattern-not-regex: '\b(?:int|long)\.(?:Try)?Parse\([^;\n]*levelNumber\(\)'
   # -- One narrowing of a COBOL integer value to a host int / long (kb/Work PB1033) ----------------------------
   - id: cobolnet-integer-value-cast-narrowed
     languages: [csharp]

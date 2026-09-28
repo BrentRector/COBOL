@@ -71,6 +71,7 @@ public sealed class DataClausePlacementDriftTests
         [DataClauseKind.Picture] = "PIC X(3)",
         [DataClauseKind.Justified] = "JUSTIFIED RIGHT",
         [DataClauseKind.BlankWhenZero] = "BLANK WHEN ZERO",
+        [DataClauseKind.Property] = "PROPERTY",
     };
 
     [Fact]

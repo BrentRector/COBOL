@@ -440,7 +440,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // here, so it never triggers) or treated as comment lines (switch absent — the '85 rule). It
         // reads the MODELLED clause (kb/Work PB830 — it used to be a token-text scan of the computerAttributes sink; VCR
         // Table 7 rows 7.9/7.17).
-        DebuggingModeDeclared = EnvDivisions(program).Any(env => env.configurationSection()?.configurationParagraph()
+        // ⛔ OR-ed into the value InheritConfiguration copied, never assigned over it: §12.3.5.4 GR1 "All clauses of
+        // the SOURCE-COMPUTER paragraph apply to the source unit in which they are explicitly or implicitly specified
+        // and to any source unit contained within that source unit", and a contained program cannot restate the
+        // clause (§12.3.3 SR1), so inheritance is its only route. An assignment here reset every contained unit to
+        // false and compiled its USE FOR DEBUGGING section as comment lines (kb/Work PB1088).
+        DebuggingModeDeclared |= EnvDivisions(program).Any(env => env.configurationSection()?.configurationParagraph()
             .Any(p => p.sourceComputerParagraph()?.debuggingModeClause() is not null)
             ?? false);
 
@@ -2046,8 +2051,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// the reader §13.18.34.3 SR1 and the key clauses' SR1 share.</item>
     /// <item>SR4 — <i>"shall not be subject to a BASED clause in its data description"</i>: the item or a group it is
     /// subordinate to is BASED.</item>
-    /// <item>SR3 — <i>"shall not reference a dynamic-length elementary item or a variable-length group"</i> (§8.5.1.12's
-    /// definition, <see cref="VariableLengthCompatibility.IsVariableLength"/>).</item>
+    /// <item>SR3 — <i>"shall not reference a dynamic-length elementary item or a variable-length group"</i> (the one
+    /// screen of that pair, <see cref="VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup"/>).</item>
     /// <item>SR2 — <i>"a two-character data item of the category alphanumeric, defined in the working-storage,
     /// local-storage, or linkage section"</i>. The category is <see cref="ItemCategory.IsAlphanumeric"/>, so a
     /// two-character alphanumeric GROUP qualifies — §13.18.29.4 GR3 makes a group with no GROUP-USAGE clause "an
@@ -2070,10 +2075,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             : SubjectToBased(item)
                 ? "is subject to a BASED clause; data-name-1 shall not be subject to a BASED clause in its data "
                   + "description (ISO §12.4.5.8.3 SR4)"
-            : item.IsDynamicLength || VariableLengthCompatibility.IsVariableLength(item)
-                ? $"is {(item.IsDynamicLength ? "a dynamic-length elementary item" : "a variable-length group")}; "
-                  + "data-name-1 shall not reference a dynamic-length elementary item or a variable-length group "
-                  + "(ISO §12.4.5.8.3 SR3)"
+            : VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(item) is { } variableShape
+                ? $"is {variableShape}; data-name-1 shall not reference a dynamic-length elementary item or a "
+                  + "variable-length group (ISO §12.4.5.8.3 SR3)"
             : FileStatusShapeFault(item) is { } shape
                 ? $"is {shape}; data-name-1 shall reference a two-character data item of the category alphanumeric, "
                   + "defined in the working-storage, local-storage, or linkage section (ISO §12.4.5.8.3 SR2)"
@@ -3271,6 +3275,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // FIXED one-character item. §13.18.2.3 SR2/SR3/SR4 and the DYNAMIC LENGTH shape rules are re-screened at
         // the copy's own site by the placement sweeps, which CLEAR the flag where the new site fails them.
         if (entryCopy) to.IsAnyLength |= from.IsAnyLength;   // EntryOnly: §13.18.2.3 SR2's linkage parameter shape
+        if (entryCopy) to.Property ??= from.Property;          // EntryOnly: a temporary is never object data (§13.18.42.3 SR1)
         // BASED (§13.18.5) is in neither GR-1 exclusion list, so the subject of `01 X TYPE T` over
         // `01 T TYPEDEF BASED …` IS a based item (§13.18.58.4 GR3; kb/Work PB1300). §13.18.57.4 GR4 — "that BASED
         // clause applies and any BASED clause specified in the description of type-name-1 is ignored for this
@@ -4262,6 +4267,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         Core.UsageClauseContext? firstUsage = null;
         List<Core.UsageClauseContext>? extraUsages = null;   // non-null only once a SECOND clause is written
         bool isBased = false;          // BASED (ISO §13.18.5 — a storage template; Phase-4b increment 2)
+        PropertyClauseSpec? property = null;   // PROPERTY (ISO §13.18.42; kb/Work PB1273)
         bool isAnyLength = false;      // ANY LENGTH (ISO §13.18.2 — a runtime-length LINKAGE formal; PHASE-09 Step 11)
         bool isDynamicLength = false;  // DYNAMIC LENGTH (ISO §8.5.1.10 / §13.18.19 — a variable-length min-0 string; P12 wave 2)
         Int128? dynLengthLimit = null; // integer-1 of the LIMIT phrase (§13.18.19.4 GR2); null = the phrase is absent
@@ -4362,8 +4368,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 else if (clause.Context.globalClause() is not null)
                     { /* §13.18.27 — binds post-build in CallBindExternalAndGlobal; the §13.16.3 co-clause rules
                          read it off `written`, so no decode flag is needed here (kb/Work PB487). */ }
-                else if (clause.Context.propertyClause() is not null)
-                    { /* §13.18.42 (OO) — binds in the OO pass; the co-clause rules read it off `written`. */ }
+                else if (clause.Context.propertyClause() is { } pcx)
+                    // §13.18.42 (OO; kb/Work PB1273) — recorded ON THE ITEM, so every later rule asks the entry that
+                    // carries the clause (the OO pass used to find its subject by FIRST NAME MATCH). §13.18.42.3 SR1
+                    // is screened below, where the entry's name is in hand for the message.
+                    property = new PropertyClauseSpec(
+                        NoGet: pcx.NO() is not null && pcx.GET() is not null,
+                        NoSet: pcx.NO() is not null && pcx.SET() is not null,
+                        IsFinal: pcx.FINAL() is not null);
                 else if (clause.Context.typedefClause() is { } td)
                     // §13.18.58; D17. The COBOL-2002 introduction gate is VersionConformancePass ParseArm.VisitTypedefClause
                     // (14g.2, recognition-based — the typedef item is discarded from ConformanceForest when it fails to
@@ -4527,6 +4539,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // and global-name registration.
         DataClauseKind placementRefused = ScreenClausePlacement(written, level, isFiller, section, entryWhere);
         if ((placementRefused & DataClauseKind.External) != 0) { hasExternal = false; externalAs = null; }
+        if ((placementRefused & DataClauseKind.Property) != 0) property = null;   // §13.16.3 SR21 — no accessor from a refused clause
+        // §13.18.42.3 SR1 — "The PROPERTY clause may be specified only in the working-storage section of a factory
+        // definition or an instance definition" (kb/Work PB1273). Not a table row: the rule's axis is the SOURCE
+        // ELEMENT (object or factory, never a program, function or METHOD), which the placement table's section bits
+        // cannot state. Until this arm the clause was silently INERT everywhere but object/factory storage — the OO
+        // pass never looked anywhere else. The clause stays recorded (the compile has failed), so the elementary
+        // rule still names a group subject too.
+        if (property is not null
+            && !(OoIsClassUnit && _bindingMethodScope is null && section is EntrySection.WorkingStorage))
+            Edition.Error(DiagnosticCatalog.PropertyClauseRule, $"{entryWhere}: the PROPERTY clause is written in "
+                + (!OoIsClassUnit ? "a source element that is not a class definition"
+                    : _bindingMethodScope is not null ? "a method definition"
+                    : $"the {SectionWords(section)} of a class definition")
+                + "; the PROPERTY clause may be specified only in the working-storage section of a factory "
+                + "definition or an instance definition (ISO §13.18.42.3 SR1)");
         bool hasGlobal = (written & ~placementRefused & DataClauseKind.Global) != 0;
 
         // Parse the usage keyword ONCE per entry — ParseUsage carries the W2 loud-guard gates (the 2002+
@@ -5075,6 +5102,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // space-filled cell is conformant — the clause simply has no stored field to seed here.
         }
         item.IsBased = isBased;
+        item.Property = property;
 
         // ALIGNED (ISO §13.18.1; kb/Work PB487). Recorded here, ADJUDICATED in CheckAlignedClauses — §13.18.1.3
         // SR1's subject test asks whether this is "a bit group item or an elementary bit data item", and a group
@@ -5781,24 +5809,26 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             var literals = raws.Select(r => r!).ToList();
             int toIdx = ph.TO()?.Symbol.TokenIndex ?? int.MaxValue;
             var from = new List<int>();
+            var fromWritten = new List<string>();
             List<int>? to = ph.TO() is not null ? [] : null;
+            List<string>? toWritten = ph.TO() is not null ? [] : null;
             foreach (var il in ph.signedIntegerLiteral())
             {
-                // SATURATE rather than fall to 0 on an out-of-int literal: the §13.18.63.3 SR20/SR21 range
-                // diagnostics quote the subscript back at the programmer, and quoting "0" for a source that
-                // wrote 99999999999 reports a number the program does not contain. Either way the value is
-                // out of range for any real table, and the screen says so.
+                // SATURATE rather than fall to 0 on an out-of-int literal, through THE ONE integer-literal reader
+                // (kb/Work PB1579): the saturated value is out of range for any real table, so the §13.18.63.3
+                // SR20/SR21 screen still finds it, and the screen quotes the subscript AS WRITTEN (FromWritten /
+                // ToWritten) — never the saturated number, which the program does not contain.
                 // ⛔ THE SATURATION FLOOR IS int.MinValue, NOT 0 (kb/Work PB553). §13.18.63.3 SR19 admits a
                 // SIGNED integer numeric literal here (§5.5 2) a) → §8.3.3.3.2 2)), so a negative subscript is
                 // now a bindable value that §8.4.2.3.4 GR2 ("The value of a subscript shall be a positive
-                // integer") rejects downstream — clamping it to 0 would quote "0" back at a source that wrote
-                // "-1", the exact misquote the paragraph above exists to prevent.
-                int v = long.TryParse(SignedIntegerLiteral.Screen(il, Edition, $"{where}, Format 2 VALUE"),
-                                      out long n)
-                    ? (int)Math.Clamp(n, int.MinValue, int.MaxValue) : int.MaxValue;
-                if (il.Start.TokenIndex < toIdx) from.Add(v); else to!.Add(v);
+                // integer") rejects downstream. A long.TryParse here saturated a 20-to-31-digit NEGATIVE subscript
+                // to int.MaxValue, and the screen then quoted a positive number back.
+                string written = SignedIntegerLiteral.Screen(il, Edition, $"{where}, Format 2 VALUE");
+                int v = CobolNet.Validation.IntegerOperandRules.TryHostValue(written, out int n) ? n : int.MaxValue;
+                if (il.Start.TokenIndex < toIdx) { from.Add(v); fromWritten.Add(written); }
+                else { to!.Add(v); toWritten!.Add(written); }
             }
-            list.Add(new TableValueSpec(literals, from, to, i));
+            list.Add(new TableValueSpec(literals, from, to, i, fromWritten, toWritten));
         }
         return ok ? list : null;
     }
@@ -6371,6 +6401,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         + $"'{missing}' does not name an item of the record (ISO §13.18.45.3 SR4; §8.4.2.1)");
                     continue;
                 }
+                // §13.18.45.3 SR8 — WHAT THE RANGE MAY HOLD (kb/Work PB1284), asked before either form binds: a
+                // refused range never reaches the no-THRU forwarding or the tiler, which would otherwise model the
+                // alias as a fixed window over storage that has no fixed extent.
+                if (RenamesRangeFault(root, info.From, info.Thru) is { } rangeFault)
+                {
+                    using var __s = Edition.At(ren);
+                    Edition.Error(DiagnosticCatalog.RenamesRangeContent,
+                        $"'{ren.CobolName ?? "FILLER"}' RENAMES {info.FromName}{(info.ThruName is { } tn8 ? " THRU " + tn8 : "")}: "
+                        + $"{rangeFault}; none of the items within the range, including data-name-2 and data-name-3, "
+                        + "shall be of class object, message-tag, or pointer, a variable-length data item, or an "
+                        + "occurs-depending table (ISO §13.18.45.3 SR8)");
+                    continue;
+                }
                 // The no-THRU alias inherits the renamed item's description (§13.18.45 GR1) — the resolver
                 // forwards to the FROM item's place; no span, no synthetic alphanumeric picture.
                 if (info.Thru is null) { ren.Pic = info.From.Pic; continue; }
@@ -6404,6 +6447,25 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     Edition.Error(DiagnosticCatalog.RenamesOperandUnresolved,
                         $"'{ren.CobolName ?? "FILLER"}' RENAMES {info.FromName} THRU {info.ThruName}: data-name-3 ends before "
                         + "data-name-2 begins — the THRU item shall follow the FROM item in the record (ISO §13.18.45.4 GR2)");
+                    continue;
+                }
+                // §13.18.45.3 SR10 — "The area described by data-name-2 THROUGH data-name-3 shall define an integral
+                // number of bytes" (kb/Work PB1284). Only a USAGE BIT item can make it fractional: §8.5.1.6.3 packs
+                // same-level bit items into shared bytes, so `A PIC 1(3) USAGE BIT` THRU `B PIC 1(2) USAGE BIT` is a
+                // 5-bit area the character offsets above cannot even see. Measured on THE ONE bit layout
+                // (BitLayout), and only for a record that holds a bit leaf — without one every extent is whole
+                // characters by construction.
+                if (root.HasBitDescendant
+                    && BitLayout.StartBitOf(root, info.From) is var fromBit and >= 0
+                    && BitLayout.StartBitOf(root, info.Thru) is var thruBit and >= 0
+                    && (thruBit + BitLayout.RunBits(info.Thru) - fromBit) is var areaBits
+                    && areaBits % BitLayout.BitsPerCharacter != 0)
+                {
+                    using var __b = Edition.At(ren);
+                    Edition.Error(DiagnosticCatalog.RenamesAreaNotWholeBytes,
+                        $"'{ren.CobolName ?? "FILLER"}' RENAMES {info.FromName} THRU {info.ThruName}: the area is "
+                        + $"{areaBits} bits, which is not a whole number of bytes; the area described by data-name-2 "
+                        + "THROUGH data-name-3 shall define an integral number of bytes (ISO §13.18.45.3 SR10)");
                     continue;
                 }
                 // Every leaf of the record with its storage extent — REDEFINES views INCLUDED: a view reads the
@@ -6471,6 +6533,56 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             }
     }
 
+    /// <summary>The first §13.18.45.3 SR8 violation among the items WITHIN a RENAMES range, as the clause of the
+    /// diagnostic naming the item and its shape, or null (kb/Work PB1284). SR8: "None of the items within the range,
+    /// including data-name-2 and data-name-3, if specified, shall be of class object, message-tag, or pointer, a
+    /// strongly-typed group item, an item subordinate to a strongly-typed group item, a variable-length data item, or
+    /// an occurs-depending table."
+    /// <para>THE RANGE is §13.18.45.4 GR2's: every entry from data-name-2 through the last entry of data-name-3's
+    /// subtree, in declaration order — groups and elementary items alike, a REDEFINES view among them — or, without
+    /// THROUGH, data-name-2 and its subordinates (GR1). It is enumerated over the DECLARATION tree, not over storage
+    /// offsets, because the offending shapes are exactly the ones storage offsets cannot see: a dynamic-length item
+    /// has zero fixed width, and a dynamic-capacity or occurs-depending table's extent is not its declared one.</para>
+    /// <para>The strongly-typed arms are enforced with the rest of the strong-type rules they share a sentence
+    /// with, <c>CheckStrongTypeDeclarations</c> (§13.18.57.3 SR3, COBOLNET1532); this screen owns the other three.
+    /// The class arm reads §13.18.60.3 SR14's phrase reader, whose five phrases are exactly the usages of classes
+    /// object (OBJECT REFERENCE), message-tag (MESSAGE-TAG) and pointer (POINTER, PROGRAM-POINTER,
+    /// FUNCTION-POINTER).</para></summary>
+    private static string? RenamesRangeFault(DataItem record, DataItem from, DataItem? thru)
+    {
+        var ordered = new List<DataItem>();
+        void PreOrder(DataItem n) { ordered.Add(n); foreach (var c in n.Children) PreOrder(c); }
+        PreOrder(record);
+        int first = ordered.IndexOf(from);
+        var last = thru ?? from;
+        int lastAt = ordered.IndexOf(last);
+        if (first < 0 || lastAt < 0) return null;   // not in this record — reported by the operand resolution
+        int end = lastAt;
+        while (end + 1 < ordered.Count && OdoModel.IsWithin(ordered[end + 1], last)) end++;   // last's subtree
+        for (int i = first; i <= end; i++)
+        {
+            var d = ordered[i];
+            string name = $"'{d.CobolName ?? "FILLER"}'";
+            if (VariableLengthCompatibility.IsVariableLengthDataItem(d))
+                return $"{name} is a variable-length data item — "
+                    + (d.IsDynamicTable ? "a dynamic-capacity table" : "a dynamic-length elementary item")
+                    + " (ISO §8.5.1.11.1)";
+            if (d.OccursSpec is { DependingName: not null })
+                return $"{name} is an occurs-depending table";
+            if (!d.IsGroup
+                && (ItemCategory.Sr14PhraseOf(d.Pic?.Usage) ?? ItemCategory.Sr14PhraseOf(d.OwnUsage)) is { } phrase)
+                return $"{name} is described with USAGE {phrase} — of class " + phrase switch
+                {
+                    "OBJECT REFERENCE" => "object",
+                    "MESSAGE-TAG" => "message-tag",
+                    "POINTER" or "PROGRAM-POINTER" or "FUNCTION-POINTER" => "pointer",
+                    _ => throw new System.Diagnostics.UnreachableException(
+                        $"§13.18.60.3 SR14 phrase '{phrase}' has no §8.5.2 class in the RENAMES SR8 screen"),
+                };
+        }
+        return null;
+    }
+
     /// <summary>Group every redefining entry with the non-redefining anchor it ultimately overlays (SR7/SR11) into a
     /// <see cref="RedefinesClass"/>, mark the anchor canonical and every other member a view, then assign the class a
     /// tier (D &gt; C &gt; B &gt; A) and its class-max width, and propagate view-suppression to each view's
@@ -6513,7 +6625,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // no diagnostic. Rejecting the entry makes that path unreachable.
                 foreach (var (side, sideItem) in new[]
                          { ("the subject of the REDEFINES entry", item), ("data-name-2 of a REDEFINES entry", item.RedefinesTarget) })
-                    if (Sr17Shape(sideItem) is { } shape)
+                    if (VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(sideItem) is { } shape)
                         Edition.Error(DiagnosticCatalog.RedefinesVariableLength,
                             $"'{sideItem.CobolName ?? sideItem.CsName}' is {side} but is {shape}: neither "
                             + "data-name-2 nor the subject of the entry shall be a variable-length group or a "
@@ -6658,7 +6770,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // code does not close.
             if (!implicitArea)
                 foreach (var m in cls.Members)
-                    if (Sr17Shape(m) is { } vlShape)
+                    if (VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(m) is { } vlShape)
                     {
                         tier = RedefinesTier.Rejected;
                         reject = $"REDEFINES entry side '{m.CobolName ?? m.CsName}' is {vlShape} "
@@ -6925,20 +7037,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// documents ("An INTERNAL redefine … is legitimate and NOT flagged") — this screen must not silently
     /// overturn that determination; whether the §13.18.57.3 SR4 letter overturns IT is [[PB183]]'s companion
     /// derivation.</para></summary>
-    /// <summary>The §8.5.1.12.1 shapes ISO §13.18.44.3 SR17 bars from EITHER side of a REDEFINES entry: a
-    /// DYNAMIC-LENGTH elementary item, or a VARIABLE-LENGTH GROUP — "a group item whose data description has at
-    /// least one dynamic-length elementary item or dynamic-capacity table as a subordinate item". Returns the
-    /// clause of the message naming which shape was found, or null when the item is fine.
-    /// <para>The dynamic-capacity half overlaps the COBOLNET1525 arm deliberately: 1525 is
-    /// the narrower per-CLASS backstop for an item that IS itself a dynamic-capacity table (which SR17 does not
-    /// literally name — it names variable-length GROUPS and dynamic-length ELEMENTARY items), and it now fires
-    /// only where SR17 does not. Neither code is reallocated.</para></summary>
-    private static string? Sr17Shape(DataItem item) =>
-        item.IsDynamicLength ? "a dynamic-length elementary item (ISO §8.5.1.10)"
-        : item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(item)
-            ? "a variable-length group (ISO §8.5.1.12.1 — a dynamic-length elementary item or a "
-              + "dynamic-capacity table is subordinate to it)"
-        : null;
 
     /// <summary>The outermost strongly-typed item in <paramref name="record"/>'s subtree (the record itself when it
     /// is a TYPE subject naming a STRONG type), or null — the "in whole or in part" population of §13.18.57.3 SR4

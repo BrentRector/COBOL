@@ -158,6 +158,28 @@ public sealed partial class DataBinder
                 continue;
             }
 
+            // ── §13.18.5.3 SR2 ───────────────────────────────────────────────────────────────────────────
+            // "The subject of the entry shall not be a dynamic-length elementary item or a variable-length
+            // group." (kb/Work PB1213.) Asked of the SHAPE, through the one screen of that pair — never of the
+            // BASED cell's carriage gates (ByteWindowResidueOf / VariableLengthCellResidueOf), which answer what
+            // the shared cell can HOLD and are shared with EXTERNAL and ADDRESS OF, where a variable-length group
+            // is legal. Until this arm, a BASED group with a DYNAMIC LENGTH leaf compiled and ran because the
+            // cell had learned to carry one, and the dynamic-capacity-table spelling was refused only as "not yet
+            // implemented". A written BASED clause and one a TYPE / SAME AS copy composed both land on IsBased,
+            // so both are judged here. (The elementary spelling is also §13.16.3 SR18's — DYNAMIC LENGTH admits
+            // no BASED clause beside it — which clears IsDynamicLength, so it is reported once, there.)
+            if (item.IsBased && VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(item) is { } variableShape)
+            {
+                Edition.Error(DiagnosticCatalog.BasedSubjectVariableLength, $"data item '{name}' is described with "
+                    + $"the BASED clause and is {variableShape}; the subject of a BASED entry shall not be a "
+                    + "dynamic-length elementary item or a variable-length group (ISO §13.18.5.3 SR2)");
+                // The BASED placement arms' discipline: the refusal clears the flag, so the entry binds as ordinary
+                // storage under an already-failed compile and the cell classifier never adds its carriage verdict
+                // ("not yet implemented") for a shape the standard forbids outright.
+                item.IsBased = false;
+                continue;
+            }
+
             // ── §13.18.60.3 SR14 ─────────────────────────────────────────────────────────────────────────
             // ARM A — a GROUP entry that WROTE one of the five phrases. §13.18.60.4 GR1: the clause "applies
             // only to each elementary item in the group", and every such item is subordinate to this group, so

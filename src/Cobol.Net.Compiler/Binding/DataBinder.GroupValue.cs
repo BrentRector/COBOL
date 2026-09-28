@@ -147,7 +147,7 @@ public sealed partial class DataBinder
                         {
                             string kept = ValidateValueCategory(subjectPic, lit,
                                 $"data item '{subject}' ({GroupCategoryWord(subjectPic.Category)} group item), "
-                                + $"Format 2 VALUE FROM ({string.Join(" ", spec.From)}) "
+                                + $"Format 2 VALUE FROM ({spec.FromText}) "
                                 + "(ISO §13.18.63.3 SR13 through SR16)", groupSubject);
                             rewritten |= !string.Equals(kept, lit, StringComparison.Ordinal);
                             lits.Add(kept);

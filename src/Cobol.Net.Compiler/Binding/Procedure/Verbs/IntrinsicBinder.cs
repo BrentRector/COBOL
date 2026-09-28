@@ -920,8 +920,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // §15.85.3 r6 — "Argument-4, if specified, shall be a positive nonzero integer." Decidable here only
             // for a LITERAL; a data item's value is a run-time fact, and §15.85.4 r2 owns the outcome of a level
             // the ordering table does not define (EC-ORDER-NOT-SUPPORTED).
+            // Read through THE ONE integer-literal reader (kb/Work PB1579): a long.TryParse refused a 20-to-31-digit
+            // POSITIVE level as "not a positive nonzero integer" — a false sentence; the level beyond the table's
+            // highest is §15.85.4 r2's run-time outcome.
             if (level is BoundNumericLiteral { Text: { } text }
-                && (!long.TryParse(text, out long n) || n <= 0))
+                && (!CobolNet.Validation.IntegerOperandRules.TryHostValue(text, out int n) || n <= 0))
                 return Malformed($"argument-4 is {text}, which is not a positive nonzero integer "
                     + "(ISO §15.85.3 r6) — the ordering level is 1 (primary) through the highest level the "
                     + "ordering table defines");
@@ -1550,16 +1553,19 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             ctx.Edition.Error("COBOLNET1642", "FUNCTION BASECONVERT: argument-1 shall be a usage display or "
                 + $"national data item or literal, not usage {u} (ISO §15.12.3 rule 1)");
 
-        long? b2 = StaticIntLiteral(args, 1), b3 = StaticIntLiteral(args, 2);
-        if (b2 is { } r2v && r2v is < 2 or > 16)
+        var s2 = StaticIntLiteral(args, 1);
+        var s3 = StaticIntLiteral(args, 2);
+        int? b2 = s2?.Value;
+        if (s2 is { } r2 && r2.Value is < 2 or > 16)
             ctx.Edition.Error("COBOLNET1642", "FUNCTION BASECONVERT: argument-2 shall be in the range 2 to 16, "
-                + $"not {r2v} (ISO §15.12.3 rule 1; §4.2.2 — a literal violation is flagged at compile time)");
-        if (b3 is { } r3v && r3v is < 2 or > 16)
+                + $"not {r2.Text} (ISO §15.12.3 rule 1; §4.2.2 — a literal violation is flagged at compile time)");
+        if (s3 is { } r3 && r3.Value is < 2 or > 16)
             ctx.Edition.Error("COBOLNET1642", "FUNCTION BASECONVERT: argument-3 shall be in the range 2 to 16, "
-                + $"not {r3v} (ISO §15.12.3 rule 1; §4.2.2 — a literal violation is flagged at compile time)");
-        if (b2 is { } e2 && b3 is { } e3 && e2 == e3)
+                + $"not {r3.Text} (ISO §15.12.3 rule 1; §4.2.2 — a literal violation is flagged at compile time)");
+        // Equal VALUES, not equal saturated bounds: two different over-range literals both read as HostLimit.
+        if (s2 is { Beyond: false } e2 && s3 is { Beyond: false } e3 && e2.Value == e3.Value)
             ctx.Edition.Error("COBOLNET1642", "FUNCTION BASECONVERT: argument-2 and argument-3 shall have "
-                + $"unequal values — both are {e2} (ISO §15.12.3 rule 1)");
+                + $"unequal values — both are {e2.Value} (ISO §15.12.3 rule 1)");
         for (int i = 1; i <= 2 && i < args.Count; i++)
             if (args[i] is BoundNumericLiteral bl && (bl.Text.Contains('.') || bl.Text.Contains(',')))
                 ctx.Edition.Error("COBOLNET1642", $"FUNCTION BASECONVERT: argument-{i + 1} shall be a positive "
@@ -1585,9 +1591,14 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>The statically known integer value of argument <paramref name="i"/> — a plain numeric literal
-    /// only (a data item or expression is runtime territory); null when absent or not an integer literal.</summary>
-    private static long? StaticIntLiteral(IReadOnlyList<BoundOperand> args, int i) =>
-        i < args.Count && args[i] is BoundNumericLiteral nl && long.TryParse(nl.Text, out long v) ? v : null;
+    /// only (a data item or expression is runtime territory); null when absent or not an integer literal. Read
+    /// through THE ONE integer-literal reader (kb/Work PB1579): a <c>long.TryParse</c> answered "not an integer
+    /// literal" for a 20-to-31-digit base, and the compile-time range screen was skipped. <c>Value</c> is the host
+    /// value (saturated when <c>Beyond</c>); a diagnostic quotes <c>Text</c>, the literal as written.</summary>
+    private static (int Value, bool Beyond, string Text)? StaticIntLiteral(IReadOnlyList<BoundOperand> args, int i) =>
+        i < args.Count && args[i] is BoundNumericLiteral nl
+        && CobolNet.Validation.IntegerOperandRules.TryHostValue(nl.Text, out int v, out bool beyond)
+            ? (v, beyond, nl.Text) : null;
 
     /// <summary>The §15.19.2 CONVERT format words (reserved within the argument list, like TRIM's LEADING/TRAILING).</summary>
     private static bool IsConvertFormatWord(string w) =>
@@ -2027,7 +2038,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // character positions", which under the 1-byte-per-position model IS its byte width. The former
         // Math.Max(1, ImageWidth) answered 1 for every carrier (a POINTER is 8) and undercounted a group holding a
         // national or carrier child (X(3)+N(2) is 7, not 5).
-        BoundFieldOperand f => new BoundNumLiteral(LengthPositions(f.Place.Item).ToString()),
+        BoundFieldOperand f => new BoundNumLiteral(ItemLength.Positions(f.Place.Item).ToString()),
         // A nested string-result intrinsic (alphanumeric OR national — one UTF-16 char per national position,
         // D-N1, so .Length IS the §15.50.4 character-position count for both; and BOOLEAN — r1's boolean
         // positions ARE the '0'/'1' image's length, kb/Work PB68) keeps a runtime .Length.
@@ -2065,36 +2076,6 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             + "boolean literal, a based entry, a type-name, or a DATA ITEM of any class (a numeric ITEM is fine)",
             "§15.50.3 r1"),
     };
-
-    /// <summary>§15.50.4 r1/r2/r3 for a FIXED item (kb/Work PB61): an elementary boolean item's BOOLEAN positions
-    /// (r1), an elementary usage-national item's NATIONAL positions (r2), and for everything else — an
-    /// alphanumeric group, a DISPLAY leaf, a COMP/PACKED leaf, an INDEX/POINTER/PROGRAM-POINTER/COMP-1/COMP-2
-    /// carrier — the length "in alphanumeric character positions" (r3), which is the byte width under WiseOwl COBOL's
-    /// 1-byte-per-alphanumeric-position model (D-N1: national = 2 bytes = 2 positions inside an alphanumeric group).
-    /// A bit group / national group (GROUP-USAGE, §13.18.29) is not modelled — kb/Work PB79 — so a group is
-    /// always r3's alphanumeric group here.</summary>
-    internal static int LengthPositions(DataItem item)
-    {
-        // THE ONE category reader (D20/PB79): an elementary item's own picture, a bit / national GROUP's as-if picture
-        // — a bit group's boolean positions are its exact bit extent (no trailing filler), a national group's national
-        // positions its character image width. Only an alphanumeric group falls to r3.
-        if (item.OperandPic is { } pic)
-        {
-            if (pic.Category is PicCategory.Boolean) return pic.Length;                     // r1 — boolean positions
-            // r2 — NATIONAL character positions, counted by THE ONE national-position authority
-            // (Place.NationalWindow.PositionsOf, the same count the storage geometry and the byte-window gate
-            // read), never re-derived as pic.Length. ⛔ The two differ for exactly the shape §13.18.60.3 SR12's
-            // national-form numeric made reachable (kb/Work PB646): a SIGN IS SEPARATE position is a character
-            // position and not a digit position (§13.18.52 GR6a), so `PIC S9(3) USAGE NATIONAL SIGN IS LEADING
-            // SEPARATE` is FOUR national positions while pic.Length is its three digits — and r3's DISPLAY arm
-            // below already counted the separate sign, so the two arms of ONE rule disagreed.
-            // A national GROUP is not elementary: PositionsOf answers null and §13.18.29.4 GR2b's as-if
-            // PICTURE N(m) length is the count (the `?? pic.Length` arm).
-            if (pic.Usage is Usage.National || pic.Category is PicCategory.National)
-                return Model.NationalWindow.PositionsOf(item) ?? pic.Length;                // r2 — national positions
-        }
-        return item.ByteWidth;                                                              // r3 — alphanumeric positions ≡ bytes
-    }
 
     /// <summary>A bare-word argument that names a TYPE (§15.50.3 r1 / §15.14.3 r1: "… a based entry, a type-name,
     /// or a data item of any class or category") — a level-1 TYPEDEF lives in <c>DataBinder.TypeDecls</c>, off the
@@ -2165,7 +2146,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     + "does not admit as a type-declaration argument");
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name} type argument");
             }
-            return new BoundNumLiteral((isByte ? typeArg.ByteWidth : LengthPositions(typeArg)).ToString());
+            return new BoundNumLiteral((isByte ? typeArg.ByteWidth : ItemLength.Positions(typeArg)).ToString());
         }
         // ⛔ THE §15.3 SCREEN IS CALLED HERE BECAUSE THIS BINDER RETURNS BEFORE THE GENERIC ONE REACHES IT
         // (fix-queue PB12). CheckArgumentClasses sits after arity on the generic path and its comment

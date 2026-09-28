@@ -71,8 +71,7 @@ internal sealed class OoDriver(BindSession session)
         data.BindDeclarations(synthetic);
         foreach (var m in cls.Symbol.Methods.ToList())   // snapshot — property synthesis appends accessors
             data.OoBindMethodData(m);
-        data.OoBindPropertyClauses(cls.Symbol,
-            cls.Symbol.Ctx.objectParagraph()?.dataDivision()?.workingStorageSection(), factory: false);
+        data.OoBindPropertyClauses(cls.Symbol, factory: false);
         data.BindResolve(synthetic);
         OoGateClassGlobal(data, cls.Name, "OBJECT", edition);
         cls.Data = data;
@@ -90,8 +89,7 @@ internal sealed class OoDriver(BindSession session)
         fdata.BindDeclarations(fsynthetic);
         foreach (var m in cls.Symbol.FactoryMethods.ToList())
             fdata.OoBindMethodData(m);
-        fdata.OoBindPropertyClauses(cls.Symbol,
-            cls.Symbol.Ctx.factoryParagraph()?.dataDivision()?.workingStorageSection(), factory: true);
+        fdata.OoBindPropertyClauses(cls.Symbol, factory: true);
         fdata.BindResolve(fsynthetic);
         OoGateClassGlobal(fdata, cls.Name, "FACTORY", edition);
         cls.FactoryData = fdata;

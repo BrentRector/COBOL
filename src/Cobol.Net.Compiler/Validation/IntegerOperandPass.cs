@@ -77,11 +77,7 @@ internal sealed class IntegerOperandPass(IDiagnosticSink sink) : CursorFollowing
             string where = IntegerOperandRules.ConstructName(ctx);
             Sink.Report(new EditionDiagnostic(DiagnosticCatalog.IntegerOperandBeyondLimit.Code, EditionSeverity.Error,
                 DiagnosticCatalog.IntegerOperandBeyondLimit.Id,
-                $"{where}: the integer operand {text} exceeds this implementation's limit of "
-                + $"{IntegerOperandRules.HostLimit:N0} for an integer-n that sizes, counts or positions something the "
-                + "compiler lays out (docs/CONFORMANCE.md §3 'Integer operands and host carriers'). ISO §4.5: "
-                + "\"Translation may be unsuccessful due to factors other than lack of conformance of a compilation "
-                + "group\" — the limits of an implementation", where,
+                IntegerOperandRules.BeyondLimitMessage(where, $"the integer operand {text}"), where,
                 DiagnosticCatalog.IntegerOperandBeyondLimit.IsoSection));
         }
         return base.VisitChildren(ctx);
@@ -224,8 +220,7 @@ internal static class IntegerOperandRules
     /// <see cref="IntegerOperandPass"/> asks before any binder reads the value (kb/Work PB1058).</summary>
     internal static bool BeyondHostLimit(Core.IntegerLiteralContext operand) =>
         !(operand.Parent is ParserRuleContext owner && FullValueSlots.Contains(owner.GetType()))
-        && !int.TryParse(operand.GetText(), System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out _);
+        && TryHostValue(operand.GetText(), out _, out bool saturated) && saturated;
 
     /// <summary>⛔ THE ONE READER of an <c>integer-n</c> the binder keeps in its model (kb/Work PB1058). A value
     /// beyond <see cref="HostLimit"/> has already been reported by <see cref="IntegerOperandPass"/> (it runs
@@ -234,8 +229,58 @@ internal static class IntegerOperandRules
     /// unhandled <see cref="OverflowException"/> on <c>PAGE LIMIT 77777777777</c>, <c>COLUMN 77777777777</c>
     /// and <c>LINAGE 77777777777</c>.</summary>
     internal static int HostValue(Core.IntegerLiteralContext operand) =>
-        int.TryParse(operand.GetText(), System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out int v) ? v : HostLimit;
+        TryHostValue(operand.GetText(), out int v) ? v : HostLimit;
+
+    /// <summary>⛔ THE ONE READER of the TEXT of a COBOL integer literal — an optional sign and decimal digits
+    /// (§8.3.3.3.2: "An integer literal is a fixed-point numeric literal that contains no decimal point"; the
+    /// SIGNED forms a few operands admit) — reached from a token, a constant's integer text or an expression's
+    /// source text rather than an <c>integerLiteral</c> node (kb/Work PB1579). It separates the two questions a
+    /// bare <c>int.TryParse</c> conflated: "is this an integer literal?" (the return value) and "what is its value
+    /// in the host model?" (<paramref name="value"/>, saturated at <see cref="HostLimit"/> — at int.MinValue for a
+    /// negative literal, the Format 2 VALUE subscript floor of kb/Work PB553 — like
+    /// <see cref="HostValue(Core.IntegerLiteralContext)"/>, so a range rule downstream still finds it out of range;
+    /// a diagnostic quotes the literal's own TEXT, never the saturated number). A <c>TryParse</c> answered "not an
+    /// integer" for an 11-digit literal, and each site then took ANOTHER branch: an integer constant-name was
+    /// refused as "not an INTEGER constant-name", a reference-modification literal as "not an integer literal", a
+    /// 31-digit CURRENCY SIGN literal as not numeric. A site whose integer sizes or positions something the compiler
+    /// lays out asks for <c>saturated</c> and raises COBOLNET2427 (<see cref="BeyondLimitMessage"/>) — handing the
+    /// saturated bound on would have the layout allocate it.</summary>
+    internal static bool TryHostValue(string text, out int value) => TryHostValue(text, out value, out _);
+
+    /// <inheritdoc cref="TryHostValue(string, out int)"/>
+    /// <param name="saturated">True when the literal's value lies outside the host range and
+    /// <paramref name="value"/> is the saturated bound — the fact a site that substitutes a CONSTANT for an
+    /// <c>integer-n</c> needs to raise the <see cref="HostLimit"/> diagnostic the literal itself would get.</param>
+    internal static bool TryHostValue(string text, out int value, out bool saturated)
+    {
+        value = 0;
+        saturated = false;
+        int digitsFrom = text.Length > 0 && text[0] is '+' or '-' ? 1 : 0;
+        if (digitsFrom == text.Length) return false;
+        for (int i = digitsFrom; i < text.Length; i++)
+            if (!char.IsAsciiDigit(text[i])) return false;
+        if (int.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign,
+                System.Globalization.CultureInfo.InvariantCulture, out int v))
+            value = v;
+        else
+        {
+            saturated = true;
+            value = text[0] == '-' ? int.MinValue : HostLimit;
+        }
+        return true;
+    }
+
+    /// <summary>⛔ THE ONE SENTENCE of COBOLNET2427 (kb/Work PB1579) — the pre-bind screen of a written
+    /// <c>integer-n</c> and every binder site that meets the same over-limit integer by another road (an integer
+    /// constant-name substituted for integer-n, a reference-modification literal of a data-division clause
+    /// operand) report it in the same words, quoting the integer as the source wrote it.</summary>
+    /// <param name="where">The construct, as the site names it.</param>
+    /// <param name="subject">What the integer is, e.g. <c>the integer operand 77777777777</c>.</param>
+    internal static string BeyondLimitMessage(string where, string subject) =>
+        $"{where}: {subject} exceeds this implementation's limit of {HostLimit:N0} for an integer-n that sizes, "
+        + "counts or positions something the compiler lays out (docs/CONFORMANCE.md §3 'Integer operands and host "
+        + "carriers'). ISO §4.5: \"Translation may be unsuccessful due to factors other than lack of conformance of "
+        + "a compilation group\" — the limits of an implementation";
 
     /// <summary>The slot of <paramref name="operand"/>, from the grammar rule that spells it. A rule the table
     /// does not name takes §5.5 1)'s default — the drift test keeps that from being silent.</summary>

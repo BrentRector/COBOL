@@ -3088,6 +3088,13 @@ public sealed partial class DataBinder
                 + $"length that is not an integer literal. The operand may be reference-modified, but if it is, "
                 + $"leftmost-position and length shall be integer literals ({rule}) — the prior control has the "
                 + "same data description as the slice (§13.18.16.4 GR3), so its extent is fixed at compile time.");
+        else if (sfx.BeyondHostLimit)
+            // kb/Work PB1579: the literals ARE integer literals (the rule above holds), but one lies beyond the host
+            // range, and the slice is laid out as the prior control's own description — the limit a written
+            // integer-n that sizes or positions something meets (COBOLNET2427), never a saturated bound allocated.
+            Edition.Error(DiagnosticCatalog.IntegerOperandBeyondLimit,
+                CobolNet.Validation.IntegerOperandRules.BeyondLimitMessage(where,
+                    $"the reference-modification of '{DataBinder.WrittenText(dref)}', a leftmost-position or length that"));
         return new ReportControlRef(name, quals, sfx.Start, sfx.Length);
     }
 

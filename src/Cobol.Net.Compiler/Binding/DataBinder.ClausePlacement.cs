@@ -106,6 +106,20 @@ internal static class ClausePlacementRules
             + "entries in the working-storage section, and in level 1 type declarations.",
             DiagnosticCatalog.DataClausePlacement, Sections: EntrySections.WorkingStorage,
             TypeDeclarationInAnySection: true),
+        // §13.16.3 SR21 — kb/Work PB1273. It was a private arm of the OO pass, which walks only the object/factory
+        // working storage it synthesizes accessors for, so the refusal hung on SR1's placement being right.
+        new(DataClauseKind.Property, ClausePlacementKind.NotWith, "§13.16.3 SR21",
+            "The PROPERTY clause shall not be specified in the same data description entry as: a) a BASED clause, "
+            + "b) a TYPEDEF clause.",
+            DiagnosticCatalog.PropertyWithBasedOrTypedef, Excluded: DataClauseKind.Based | DataClauseKind.Typedef),
+        // §13.18.42.3 SR3's ELEMENTARY half — kb/Work PB1273. Its qualification half ("whose name does not require
+        // qualification for uniqueness of reference") asks the object's whole name space and is
+        // OoBindPropertyClauses'; SR1 (object / factory working storage only) is BindEntry's, because its axis is
+        // the source element, not the section.
+        new(DataClauseKind.Property, ClausePlacementKind.ElementaryOnly, "§13.18.42.3 SR3",
+            "The PROPERTY clause may be specified only for an elementary item whose name does not require "
+            + "qualification for uniqueness of reference.",
+            DiagnosticCatalog.PropertyClauseRule),
         // §13.16.3 SR7 — kb/Work PB518. The FD-record half is ScreenFileRecordEntryNames.
         new(DataClauseKind.External | DataClauseKind.Global, ClausePlacementKind.DataNameRequired, "§13.16.3 SR7",
             "The data-name format of the entry-name clause shall be specified for any entry containing the GLOBAL "
@@ -129,7 +143,6 @@ internal static class ClausePlacementRules
             [DataClauseKind.Synchronized] = "§13.18.55 — group legal at 2023 (UsageInheritanceGroup's edition gate)",
             [DataClauseKind.Aligned] = "§13.18.1.3 SR1 — CheckAlignedClauses",
             [DataClauseKind.ConstantRecord] = "§13.16.3 SR6 / §13.18.15.3 SR1 — BindEntry's CONSTANT RECORD block and BindEntries",
-            [DataClauseKind.Property] = "§13.18.42.3 — OoBindPropertyClauses",
             [DataClauseKind.Type] = "§13.16.3 SR14 — BindEntry's TYPE composition check",
             [DataClauseKind.Typedef] = "§13.16.3 SR15 — RegisterTypeDecl and BindEntries (level 1, data-name)",
             [DataClauseKind.SameAs] = "§13.16.3 SR12 — BindEntry's SAME AS composition check",
@@ -246,6 +259,7 @@ public sealed partial class DataBinder
             item.Pic = null;              // the entry becomes the group its hierarchy declares
             item.Justified = false;
             item.BlankWhenZero = false;
+            item.Property = null;         // a refused PROPERTY defines no accessor (§13.18.42.3 SR3)
         }
     }
 
@@ -256,7 +270,8 @@ public sealed partial class DataBinder
     internal static DataClauseKind ElementaryOnlyClausesOn(DataItem item) =>
         (item.Pic is not null ? DataClauseKind.Picture : DataClauseKind.None)
         | (item.Justified ? DataClauseKind.Justified : DataClauseKind.None)
-        | (item.BlankWhenZero ? DataClauseKind.BlankWhenZero : DataClauseKind.None);
+        | (item.BlankWhenZero ? DataClauseKind.BlankWhenZero : DataClauseKind.None)
+        | (item.Property is not null ? DataClauseKind.Property : DataClauseKind.None);
 
     /// <summary>The SUBJECT rules of BLANK WHEN ZERO and JUSTIFIED — what the elementary item they are written on
     /// may BE (kb/Work PB507). Runs after <c>UsageInheritancePass</c> and <see cref="CheckPictureRequired"/>, because

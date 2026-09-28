@@ -10,6 +10,8 @@
   "pb1353_replacing_operands_legal",
   "pb1358_replace_anywhere",
   "pb1355_library_text_located",
+  "pb1284_renames_range_fixed",
+  "pb1088_dbg_contained",
   "pb1543_nbsp_is_a_text_word_character",
   "pb1468_relation_defined_pairs",
   "pb1190_varying_advancing_bounds",

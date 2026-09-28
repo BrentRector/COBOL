@@ -2058,7 +2058,7 @@
   {
    "id": "property-clause-2002",
    "status": "active",
-   "description": "The PROPERTY data-description clause (ISO 13.18.42) - introduced 2002 (OO). {is2002()}?-gated in dataDescriptionClause plus the valueItem loop guard (at 2002+ PROPERTY is reserved (8.9) so it terminates a VALUE clause instead of parsing as a constant-name operand); accessors synthesize per GR1/GR2 under the pinned __GET_/__SET_ names (11.7.4 GR1a). Below 2002 the W1.5 parse-layer mapping names the edition (0900).",
+   "description": "The PROPERTY data-description clause (ISO 13.18.42) - introduced 2002 (OO). {is2002()}?-gated in dataDescriptionClause plus the valueItem loop guard (at 2002+ PROPERTY is reserved (8.9) so it terminates a VALUE clause instead of parsing as a constant-name operand); accessors synthesize per GR1/GR2 under the pinned __GET_/__SET_ names (11.7.4 GR1a). Below 2002 the W1.5 parse-layer mapping names the edition (0900). The sample writes the clause where 13.18.42.3 SR1 permits it - the working-storage section of an instance definition (kb/Work PB1273: a PROPERTY clause in a program is COBOLNET2563).",
    "display": "the PROPERTY data-description clause",
    "diagnosticCode": "COBOLNET0900",
    "citation": "ISO §13.18.42; {is2002()}?-gated in dataDescriptionClause + the valueItem loop guard (at 2002+ PROPERTY terminates a VALUE clause — reserved, never a constant-name operand); accessor synthesis per GR1/GR2 under the pinned __GET_/__SET_ names (§11.7.4 GR1a); W1.5 parse-layer 0900 mapping",
@@ -2066,7 +2066,7 @@
    "removedIn": null,
    "expectDiagnostic": "COBOLNET0900",
    "vcr": "M2 OO (roadmap Phase 3); W1.5 parse-layer mapping (DEVLOG 606)",
-   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. PCLQ1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W-B PIC 9(4) PROPERTY.\nPROCEDURE DIVISION.\nMAIN.\n    STOP RUN.\n"
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. PCLQ1.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS PCLQC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OBJ USAGE OBJECT REFERENCE PCLQC.\nPROCEDURE DIVISION.\nMAIN.\n    INVOKE PCLQC \"NEW\" RETURNING OBJ.\n    STOP RUN.\nEND PROGRAM PCLQ1.\n\nIDENTIFICATION DIVISION.\nCLASS-ID. PCLQC INHERITS FROM BASE.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS BASE.\nIDENTIFICATION DIVISION.\nOBJECT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W-B PIC 9(4) PROPERTY.\nPROCEDURE DIVISION.\nEND OBJECT.\nEND CLASS PCLQC.\n"
   },
   {
    "id": "implements-clause-2002",

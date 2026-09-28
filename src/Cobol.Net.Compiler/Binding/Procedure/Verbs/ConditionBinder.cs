@@ -222,7 +222,10 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// value (the §8.8.4.3 SR1 length-1 test and the §14.9.13.3 SR6 test then fail OPEN — no false rejection).</summary>
     private static int? StaticBoolCallWidth(BoundBoolCall c) =>
         c.Call.Sig.Name == "BOOLEAN-OF-INTEGER" && c.Call.Args.Count == 2
-        && c.Call.Args[1] is BoundNumericLiteral { Text: { } t } && int.TryParse(t, out int w) ? w : null;
+        && c.Call.Args[1] is BoundNumericLiteral { Text: { } t }
+        // THE ONE integer-literal reader (kb/Work PB1579): an int.TryParse read an 11-digit length as "runtime" and
+        // the length-1 tests failed open; saturated, it is a static width that is not 1.
+        && CobolNet.Validation.IntegerOperandRules.TryHostValue(t, out int w) ? w : null;
 
     /// <summary>The COMPILE-TIME length of a boolean item operand, or null when it is a run-time quantity. A
     /// reference-modified operand is the §8.4.3.3.4 GR5 unique data item of the SLICE's positions

@@ -55,7 +55,13 @@ internal enum SegmentPosition
 /// omitted, bracketed length, which <see cref="RefMods"/> and <see cref="Start"/> tell apart.</param>
 /// <param name="NonLiteral">Exactly one ref-mod is written and a segment of it is NOT an integer literal — the
 /// shape §13.18.16.3 SR4 / §13.18.54.3 SR8 / §13.18.57.3 SR10 each reject.</param>
-internal readonly record struct RefModSuffixes(int RefMods, int Subscripts, int? Start, int? Length, bool NonLiteral);
+/// <param name="BeyondHostLimit">Exactly one ref-mod is written, both segments ARE integer literals, and one of them
+/// lies beyond the host range (kb/Work PB1579). <see cref="Start"/> and <see cref="Length"/> are then null: a
+/// clause that lays the slice out (the CONTROL prior-value copy, §13.18.16.4 GR3) reports COBOLNET2427 through
+/// <see cref="CobolNet.Validation.IntegerOperandRules.BeyondLimitMessage"/> rather than allocate a saturated
+/// bound.</param>
+internal readonly record struct RefModSuffixes(
+    int RefMods, int Subscripts, int? Start, int? Length, bool NonLiteral, bool BeyondHostLimit = false);
 
 public sealed class ReferenceResolver(DataBinder data)
 {
@@ -789,24 +795,34 @@ public sealed class ReferenceResolver(DataBinder data)
         }
         if (refMods != 1) return new RefModSuffixes(refMods, subscripts, null, null, false);
 
-        var (start, length, ok) = parsed is not null ? ReadParsedLiterals(parsed) : ReadCapturedLiterals(captured!);
-        return new RefModSuffixes(refMods, subscripts, ok ? start : null, ok ? length : null, !ok);
+        var (start, length, ok, beyond) =
+            parsed is not null ? ReadParsedLiterals(parsed) : ReadCapturedLiterals(captured!);
+        return ok && beyond
+            ? new RefModSuffixes(refMods, subscripts, null, null, false, BeyondHostLimit: true)
+            : new RefModSuffixes(refMods, subscripts, ok ? start : null, ok ? length : null, !ok);
     }
 
     /// <summary>The DEFAULT-mode <c>refModPart</c> as integer literals: each arithmetic-expression segment shall be
-    /// ONE integer literal (§13.18.16.3 SR4 and its twins), so its whole text is the value or the read fails.</summary>
-    private static (int Start, int? Length, bool Ok) ReadParsedLiterals(Core.RefModPartContext rmp)
+    /// ONE integer literal (§13.18.16.3 SR4 and its twins), so its whole text is the value or the read fails.
+    /// ⛔ Read through THE ONE integer-literal reader, <see cref="CobolNet.Validation.IntegerOperandRules.TryHostValue(string, out int, out bool)"/>
+    /// (kb/Work PB1579): an int.TryParse sent an 11-digit literal to the "not an integer literal" branch, a false
+    /// sentence; the reader answers "integer literal, beyond the host range" (<c>Beyond</c>) instead.</summary>
+    private static (int Start, int? Length, bool Ok, bool Beyond) ReadParsedLiterals(Core.RefModPartContext rmp)
     {
         var exprs = rmp.refModSpec().arithmeticExpression();
-        if (exprs.Length == 0 || !int.TryParse(exprs[0].GetText(), out int start)) return (0, null, false);
-        if (exprs.Length == 1) return (start, null, true);
-        return int.TryParse(exprs[1].GetText(), out int len) ? (start, len, true) : (0, null, false);
+        if (exprs.Length == 0
+            || !CobolNet.Validation.IntegerOperandRules.TryHostValue(exprs[0].GetText(), out int start, out bool b0))
+            return (0, null, false, false);
+        if (exprs.Length == 1) return (start, null, true, b0);
+        return CobolNet.Validation.IntegerOperandRules.TryHostValue(exprs[1].GetText(), out int len, out bool b1)
+            ? (start, len, true, b0 || b1) : (0, null, false, false);
     }
 
     /// <summary>The SUBSCRIPT-mode captured group as integer literals: split at the depth-0 colon and require each
     /// side (whitespace apart) to be exactly ONE integer-literal token. An omitted length — §8.4.3.3.2's bracketed
     /// form — is the empty right side, and is the only empty side permitted.</summary>
-    private static (int Start, int? Length, bool Ok) ReadCapturedLiterals(Core.SubscriptOrRefModContext group)
+    private static (int Start, int? Length, bool Ok, bool Beyond) ReadCapturedLiterals(
+        Core.SubscriptOrRefModContext group)
     {
         var tokens = new List<IToken>();
         CollectLeafTokens(group, tokens);
@@ -818,18 +834,20 @@ public sealed class ReferenceResolver(DataBinder data)
             else if (tt == Core.SUB_RPAREN) { if (d > 0) d--; }
             else if (tt == Core.SUB_COLON && d == 0) { colon = i; break; }
         }
-        if (colon < 0) return (0, null, false);
-        if (SoleIntegerLiteral(tokens, 0, colon) is not { } start) return (0, null, false);
+        if (colon < 0) return (0, null, false, false);
+        if (SoleIntegerLiteral(tokens, 0, colon) is not var (start, b0)) return (0, null, false, false);
         int after = colon + 1;
         bool empty = true;
         for (int i = after; i < tokens.Count; i++) if (tokens[i].Type != Core.SUB_WS) { empty = false; break; }
-        if (empty) return (start, null, true);
-        return SoleIntegerLiteral(tokens, after, tokens.Count) is { } len ? (start, len, true) : (0, null, false);
+        if (empty) return (start, null, true, b0);
+        return SoleIntegerLiteral(tokens, after, tokens.Count) is var (len, b1)
+            ? (start, len, true, b0 || b1) : (0, null, false, false);
     }
 
-    /// <summary>The one integer-literal token in <c>tokens[from, to)</c>, whitespace ignored; null when the range
-    /// holds anything else (a data-name, an operator, more than one token) — i.e. not an integer literal.</summary>
-    private static int? SoleIntegerLiteral(List<IToken> tokens, int from, int to)
+    /// <summary>The one integer-literal token in <c>tokens[from, to)</c>, whitespace ignored, read through THE ONE
+    /// integer-literal reader (kb/Work PB1579) — its host value and whether that value is saturated; null when the
+    /// range holds anything else (a data-name, an operator, more than one token) — i.e. not an integer literal.</summary>
+    private static (int Value, bool Beyond)? SoleIntegerLiteral(List<IToken> tokens, int from, int to)
     {
         IToken? only = null;
         for (int i = from; i < to; i++)
@@ -840,7 +858,8 @@ public sealed class ReferenceResolver(DataBinder data)
         }
         return only is not null
             && only.Type is Core.SUB_INTEGERLIT or Core.SIGNED_INTEGERLIT or Core.INTEGERLIT
-            && int.TryParse(only.Text, out int v) ? v : null;
+            && CobolNet.Validation.IntegerOperandRules.TryHostValue(only.Text, out int v, out bool beyond)
+            ? (v, beyond) : null;
     }
 
     /// <summary>

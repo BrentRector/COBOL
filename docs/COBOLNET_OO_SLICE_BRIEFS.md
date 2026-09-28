@@ -1094,6 +1094,15 @@ ALSO carry the PROPERTY clause (duplicate accessor → 0838); §13.18.42.3 SR4 (
 must not collide with a superclass property (walk `Base` chain rosters); §8.4.3.9.3 SR7 (:7388) when both
 accessors exist, GET's returning description == SET's using description (`DescriptionMismatch` again → 0838).
 
+**The subject, and where each §13.18.42.3 rule lives (kb/Work PB1273).** `BindEntry` records the written clause
+on the ITEM (`DataItem.Property`, a `PropertyClauseSpec`), and `OoBindPropertyClauses` synthesizes from the object
+/ factory working-storage items that carry it — never from a name lookup, which bound the first same-named item.
+SR1 (only factory / instance working storage) is screened in `BindEntry`, because its axis is the source element;
+SR3's elementary half and §13.16.3 SR21 are rows of the data-clause placement table; SR2 (subject to OCCURS in any
+format, by ancestry — `RecordLayout.OccursSubjectOf`), SR3's qualification half, SR5 (CONSTANT RECORD requires
+WITH NO SET) and SR6 (no ACTIVE-CLASS object reference) are asked in `OoBindPropertyClauses` (COBOLNET2563); SR4
+keeps 0842.
+
 **Naming (§11.7.4 GR1a :13271 — "implementor-defined"): PIN the implementor definition here:** the emitted C#
 names are `__GET_<SANITIZED-PROP>` / `__SET_<SANITIZED-PROP>` (uppercase-sanitized like `CsName`). The `__`
 prefix is the established cannot-collide-with-COBOL-derived-names rule (`DataBinder.Oo.cs:151-161`); the

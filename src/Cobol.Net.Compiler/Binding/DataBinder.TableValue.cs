@@ -133,7 +133,7 @@ public sealed partial class DataBinder
     private void ScreenTableValueGeometry(
         DataItem item, TableValueSpec spec, IReadOnlyList<TableValueDim> dims, string where)
     {
-        string phrase = $"{where}, Format 2 VALUE FROM ({string.Join(" ", spec.From)})";
+        string phrase = $"{where}, Format 2 VALUE FROM ({spec.FromText})";
 
         // ── SR20 sentence 1 / SR21 sentence 1 — the subscript COUNT. "In one FROM phrase, there shall be one
         //    subscript-1 specified for each OCCURS clause for the subject of the entry or superordinate to that
@@ -164,7 +164,7 @@ public sealed partial class DataBinder
         for (int k = 0; k < dims.Count; k++)
         {
             if (spec.From[k] >= 1 && spec.From[k] <= SubscriptCeiling(dims[k])) continue;
-            Edition.Error("COBOLNET1586", $"{phrase}: a Format 2 VALUE FROM subscript ({spec.From[k]}) is out of "
+            Edition.Error("COBOLNET1586", $"{phrase}: a Format 2 VALUE FROM subscript ({spec.FromWritten[k]}) is out of "
                 + $"range 1..{SubscriptCeiling(dims[k])} for {DimensionName(dims, k)} "
                 + $"(ISO §13.18.63.3 SR20{CeilingProvenance(dims[k])})");
         }
@@ -175,7 +175,7 @@ public sealed partial class DataBinder
             for (int k = 0; k < dims.Count; k++)
             {
                 if (to[k] >= 1 && to[k] <= SubscriptCeiling(dims[k])) continue;
-                Edition.Error("COBOLNET1587", $"{phrase}: a Format 2 VALUE TO subscript ({to[k]}) is out of range "
+                Edition.Error("COBOLNET1587", $"{phrase}: a Format 2 VALUE TO subscript ({spec.ToWritten![k]}) is out of range "
                     + $"1..{SubscriptCeiling(dims[k])} for {DimensionName(dims, k)} "
                     + $"(ISO §13.18.63.3 SR21{CeilingProvenance(dims[k])})");
             }
@@ -187,8 +187,8 @@ public sealed partial class DataBinder
             //    "successive" is the LEXICOGRAPHIC order of the whole tuple — a per-dimension comparison would
             //    reject `FROM (1 3) TO (2 1)`, which is two successive elements of a 2×3 table.
             if (Subscripts.Compare(new Subscripts([.. to]), new Subscripts([.. spec.From])) < 0)
-                Edition.Error("COBOLNET1587", $"{phrase}: the TO subscripts ({string.Join(" ", to)}) identify a "
-                    + $"table element PRECEDING the one the FROM subscripts ({string.Join(" ", spec.From)}) "
+                Edition.Error("COBOLNET1587", $"{phrase}: the TO subscripts ({spec.ToText}) identify a "
+                    + $"table element PRECEDING the one the FROM subscripts ({spec.FromText}) "
                     + "identify — subscript-2 shall be the same occurrence or a successive occurrence of the "
                     + "table element associated with the corresponding subscript-1 (ISO §13.18.63.3 SR21)");
 
@@ -205,7 +205,7 @@ public sealed partial class DataBinder
                 {
                     if (spec.From[k] == to[k]) continue;
                     Edition.Error(DiagnosticCatalog.TableValueDynamicSpanLevels, $"{phrase}: subscript-1 "
-                        + $"({spec.From[k]}) and subscript-2 ({to[k]}) differ for {DimensionName(dims, k)}, "
+                        + $"({spec.FromWritten[k]}) and subscript-2 ({spec.ToWritten![k]}) differ for {DimensionName(dims, k)}, "
                         + $"which is more inclusive than {DimensionName(dims, d)} — an OCCURS DYNAMIC clause "
                         + "with no TO phrase; the subscripts corresponding to all levels higher than that "
                         + "OCCURS clause shall be equal (ISO §13.18.63.3 SR23)");

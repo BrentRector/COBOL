@@ -51,6 +51,32 @@ internal static class VariableLengthCompatibility
     public static bool IsVariableLength(DataItem item) =>
         item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(item);
 
+    /// <summary>True for a VARIABLE-LENGTH DATA ITEM (§8.5.1.11.1: "The term variable-length data item refers to
+    /// either a dynamic-capacity table or a dynamic-length elementary item") — the ITEM, not a group containing one
+    /// (that is <see cref="IsVariableLength"/>). §13.18.45.3 SR8 bars it from a RENAMES range.</summary>
+    public static bool IsVariableLengthDataItem(DataItem item) =>
+        item.IsDynamicTable || (item.IsDynamicLength && !item.IsGroup);
+
+    /// <summary>⛔ THE ONE "dynamic-length elementary item or variable-length group" SCREEN (kb/Work PB1213). The
+    /// standard bars that PAIR of shapes, in those words, from a family of operands and subjects — §13.18.5.3 SR2
+    /// ("The subject of the entry shall not be a dynamic-length elementary item or a variable-length group"),
+    /// §13.10.3 SR12 ("Data-name-1 and data-name-2 shall not be dynamic-length elementary items or variable-length
+    /// groups"), §13.18.44.3 SR17 (REDEFINES, either side) and §12.4.5.8.3 SR3 (FILE STATUS). Each consumer used
+    /// to spell its own walk, and the CONSTANT one asked about dynamic-capacity TABLES only, so a group made
+    /// variable-length by a DYNAMIC LENGTH leaf passed. Returns the phrase naming the shape found — the clause of
+    /// the consumer's diagnostic — or null when the item is neither.
+    /// <para>The group half is <see cref="IsVariableLength"/>, §8.5.1.12.1's definition verbatim: "a group item
+    /// whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a
+    /// subordinate item". An item that IS itself a dynamic-capacity table is neither shape (its elements have a
+    /// fixed length), and an occurs-depending group is not a variable-length group — the standard names that
+    /// shape separately wherever it means it.</para></summary>
+    public static string? DynamicLengthOrVariableLengthGroup(DataItem item) =>
+        item.IsDynamicLength && !item.IsGroup ? "a dynamic-length elementary item (ISO §8.5.1.10)"
+        : IsVariableLength(item)
+            ? "a variable-length group (ISO §8.5.1.12.1 — a dynamic-length elementary item or a dynamic-capacity "
+              + "table is subordinate to it)"
+        : null;
+
     /// <summary>The kind of one positional atom of a group's byte layout.</summary>
     private enum AtomKind
     {
