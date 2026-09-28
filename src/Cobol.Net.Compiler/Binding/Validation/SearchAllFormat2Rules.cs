@@ -110,22 +110,24 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
                                      out string? why)
     {
         why = null;
-        // Each tier below indexes [0] after testing the count, so an ERROR NODE (a tier with no children at all,
-        // which only a failed parse produces) leaves the walk rather than throwing out of the binder.
-        if (cond.logicalOrExpression() is not { } or || or.logicalXorExpression().Length == 0) return true;
-        if (or.logicalXorExpression().Length > 1 || or.abbreviatedAndChain().Length > 0)
-        { why = "an OR"; return false; }
-        var xor = or.logicalXorExpression()[0];
-        if (xor.logicalAndExpression().Length == 0) return true;
-        if (xor.logicalAndExpression().Length > 1) { why = "an XOR"; return false; }
-        var and = xor.logicalAndExpression()[0];
-        if (and.abbreviatedRelation().Length > 0)
+        // Each leading tier's first element is tested for null, so an ERROR NODE (a tier with no children at all,
+        // which only a failed parse produces) leaves the walk rather than throwing out of the binder. Every
+        // connective's operand is a SUCCEEDING tier (kb/Work PB1390), so its presence is what names the connective.
+        if (cond.logicalOrExpression() is not { } or || or.logicalXorExpression() is not { } xor) return true;
+        if (or.succeedingXorExpression().Length > 0) { why = "an OR"; return false; }
+        if (xor.logicalAndExpression() is not { } and) return true;
+        if (xor.succeedingAndExpression().Length > 0) { why = "an XOR"; return false; }
+        if (and.succeedingCondition().Any(s => s.abbreviatedRelation() is not null))
         {
             why = "an abbreviated combined relation (Format 2's AND phrase writes data-name-2 out in full)";
             return false;
         }
-        foreach (var u in and.unaryLogicalExpression())
+        // The leading condition, then every AND operand — the succeeding operands are ordinary conditions here.
+        var operands = new[] { and.unaryLogicalExpression() }
+            .Concat(and.succeedingCondition().Select(s => s.unaryLogicalExpression()));
+        foreach (var u in operands)
         {
+            if (u is null) { why = "a condition Format 2 does not print"; return false; }
             if (u.NOT() is not null) { why = "a NOT"; return false; }
             if (u.primaryCondition() is not { } p) { why = "a condition Format 2 does not print"; return false; }
             if (!TryPrimary(p, into, out why)) return false;

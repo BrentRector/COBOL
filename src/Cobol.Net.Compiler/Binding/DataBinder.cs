@@ -1437,18 +1437,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// selection-object screens quote a WHEN phrase and a range-expression, and <c>WHEN1ALSO2</c> /
     /// <c>"A"THRU5</c> are not what anybody wrote (kb/Work PB399), and neither is the qualified reference
     /// <c>WS-CINNOGRP</c> that COBOLNET1639 used to echo for <c>WS-C IN NOGRP</c> (kb/Work PB983).</para>
-    /// <para>A reference continued across source lines keeps ONE space per separator run, and a node with no
-    /// complete source extent (an error-recovered one) falls back to its token text rather than throwing inside a
-    /// diagnostic.</para></summary>
-    internal static string WrittenText(Antlr4.Runtime.ParserRuleContext ctx)
-    {
-        if (ctx.Start is not { StartIndex: >= 0 } start || ctx.Stop is not { } stop || stop.StopIndex < start.StartIndex
-            || start.InputStream is null)
-            return ctx.GetText();
-        string raw = start.InputStream.GetText(new Antlr4.Runtime.Misc.Interval(start.StartIndex, stop.StopIndex));
-        return raw.AsSpan().IndexOfAny('\r', '\n') < 0 ? raw
-            : System.Text.RegularExpressions.Regex.Replace(raw, @"\s*[\r\n]\s*", " ");
-    }
+    /// <para>The body is the frontend's <see cref="CobolNet.Frontend.Parsing.WrittenSource.Of"/>, which a frontend
+    /// formation rule quotes source through as well (kb/Work PB1413) — one definition, two layers.</para></summary>
+    internal static string WrittenText(Antlr4.Runtime.ParserRuleContext ctx) => CobolNet.Frontend.Parsing.WrittenSource.Of(ctx);
 
     /// <summary>⛔ THE SHAPES A <i>data-name-n</i> OPERAND MAY NOT BE WRITTEN IN (kb/Work PB489). Where a general
     /// format prints <c>data-name-n</c>, the reference is a QUALIFIED-DATA-NAME — ISO §8.4.2.2.2 Format 1,

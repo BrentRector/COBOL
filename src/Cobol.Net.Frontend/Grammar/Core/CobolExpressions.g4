@@ -108,39 +108,70 @@ condition
     : logicalOrExpression
     ;
 
+// ── THE CONDITION TIERS (ISO §8.8.4.9 / §8.8.4.11; precedence NOT > AND > XOR > OR, §8.8.4.11.3) ──
+// Each tier is an iterative loop whose leftmost element is the tier below, so `a OR b XOR c` groups as
+// `a OR (b XOR c)` and `a XOR b AND c` as `a XOR (b AND c)`. The tiers come in TWO spellings that differ in the
+// LEADING element only:
+//   * the LEADING tiers (logicalOrExpression / logicalXorExpression / logicalAndExpression) hold the FIRST
+//     simple condition of the sequence — never abbreviated;
+//   * the SUCCEEDING tiers (succeedingXorExpression / succeedingAndExpression / succeedingCondition) are the
+//     operand of every connective, at every tier.
+// ⛔ ONE TAIL, AT EVERY TIER (kb/Work PB1390). §8.8.4.12.1: "any relation condition except the first may be
+// abbreviated", and §8.8.4.12.2's general format repeats ONE group — {AND | OR | EXCLUSIVE-OR | XOR} then
+// {NOT | simple-relational-operator | extended-relational-operator} then object-1 — with any connective in any
+// position. The abbreviated tail used to be spelled THREE different ways (OR admitted only an
+// abbreviated-AND chain with no bare/NOT continuation and no XOR, AND admitted an abbreviated relation only after
+// a leading one, XOR's right operand could not lead with one), so `A = B OR < C AND D`, `A = B XOR < C` and
+// `A = B OR < C XOR = D` were COBOL0001 at every edition. Now every connective's operand is a succeeding tier,
+// whose leftmost element is `succeedingCondition` — an abbreviated relation or an ordinary (NOT-)condition —
+// and the binder's AbbrevCarry threads §8.8.4.12.4 GR1's insertion through the sequence in source order.
+// PartialExpressionSpineDriftTests re-derives the succeeding tiers' tails from the leading tiers' own text.
 logicalOrExpression
-    : logicalXorExpression ( OR ( logicalXorExpression | abbreviatedAndChain ) )*
+    : logicalXorExpression ( OR succeedingXorExpression )*
     ;
 
 // COBOL-2023 logical exclusive-or (ISO §8.8.4.9; precedence NOT > AND > XOR > OR). XOR and EXCLUSIVE-OR are
-// equivalent. Sits between OR and AND so `a OR b XOR c` parses as `a OR (b XOR c)`. The OPERATOR is a 2023
-// addition (Annex E.2 item 25 reserves both words; VCR rows 32/41 — the W3 regating of the former "2002"
-// mislabel): gated {is2023()}?; below 2023 both words are USER-DEFINED words (cobolWord admits the tokens;
-// the §8.9 funnel + table enforce the 2023 reservation as 0901 in provable positions).
+// equivalent (§8.8.4.11.1 NOTE). The OPERATOR is a 2023 addition (Annex E.2 item 25 reserves both words; VCR rows
+// 32/41): it parses at every edition (superset — a user-word XOR is never valid in a connective slot) and is
+// gated on RECOGNITION of the one `xorOperator` rule (VersionConformancePass.VisitXorOperator, and the
+// conditional-compilation stage for a >>IF — the ONE LogicalOperatorGate body); below 2023 both words are
+// USER-DEFINED words (cobolWord admits the tokens; the §8.9 funnel enforces the 2023 reservation as 0901).
 logicalXorExpression
-    : logicalAndExpression ( ( XOR | EXCLUSIVE_OR ) logicalAndExpression )*   // XOR/EXCLUSIVE-OR: COBOL-2023; parses at all editions (superset — a bare user-word XOR is never valid in this connective slot), gated at BIND when the operator is genuinely present (BindCondition XOR arm → Check(LogicalXorOperator2023)) — residue migration #1, DESIGN-version-conformance-pipeline.md
+    : logicalAndExpression ( xorOperator succeedingAndExpression )*
     ;
 
 logicalAndExpression
-    : unaryLogicalExpression ( AND ( abbreviatedRelation | unaryLogicalExpression ) )*
+    : unaryLogicalExpression ( AND succeedingCondition )*
     ;
 
-// Abbreviated AND chain: one or more abbreviated relations connected by AND.
-// Used after OR when the abbreviated form includes AND chaining:
-//   IF A = B OR = C AND = D   → OR (= C AND = D)
-abbreviatedAndChain
-    : abbreviatedRelation ( AND abbreviatedRelation )*
+succeedingXorExpression
+    : succeedingAndExpression ( xorOperator succeedingAndExpression )*
     ;
 
-// Abbreviated combined relation condition (ISO §8.8.4.12):
-// After AND/OR, the left operand (and optionally the operator) can be
-// elided from the previous comparison.
-//   IF A > B OR < C          →  comparisonOperator comparisonOperand
-//   IF A > B AND NOT < C     →  comparisonOperator comparisonOperand
-//     (NOT < is already a comparisonOperator alternative)
-// Bare operands (IF A = B OR C) are already handled by the full
-// logicalAndExpression/unaryLogicalExpression path.
-// NOT + bare operand (IF A = B AND NOT C) is handled by unaryLogicalExpression.
+succeedingAndExpression
+    : succeedingCondition ( AND succeedingCondition )*
+    ;
+
+// A simple condition that is NOT the first of its sequence: §8.8.4.12.1's abbreviated relation (subject, or
+// subject and relational operator, omitted) or an ordinary (NOT-)condition — a bare `object-1` is the latter's
+// comparisonExpression with no operator, which the binder reads against the carried subject and operator.
+succeedingCondition
+    : abbreviatedRelation
+    | unaryLogicalExpression
+    ;
+
+// The ONE spelling of the exclusive-or connective (§8.8.4.9: "'EXCLUSIVE-OR' or 'XOR'"), shared by the condition
+// tiers, the EVALUATE partial-expression spine and the constant-conditional-expression tiers, so the 2023
+// introduction gate has one node to recognize.
+xorOperator
+    : XOR
+    | EXCLUSIVE_OR
+    ;
+
+// Abbreviated combined relation condition (ISO §8.8.4.12): the subject (and optionally the relational operator)
+// elided from a succeeding relation — `IF A > B OR < C`, `IF A > B AND NOT < C` (NOT < is a comparisonOperator
+// alternative). A bare object (`IF A = B OR C`) and NOT + bare object (`IF A = B AND NOT C`) are ordinary
+// unaryLogicalExpressions whose comparisonExpression has no operator.
 abbreviatedRelation
     : comparisonOperator comparisonOperand
     ;
@@ -155,8 +186,8 @@ abbreviatedRelation
 // "Partial-expression-1 shall be a sequence of COBOL words such that, were it preceded by the corresponding
 // selection subject, a conditional expression would result". `WHEN > 5 AND < 10` and `WHEN NUMERIC OR = 0` are
 // therefore conforming source. So the spine below MIRRORS the condition tiers and delegates every TAIL to the very
-// same rules (abbreviatedRelation / unaryLogicalExpression / logicalAndExpression / logicalXorExpression /
-// abbreviatedAndChain): only the LEADING element differs, which is the whole of SR5. Because each tier is an
+// same rules the condition's leading tiers use (succeedingXorExpression / succeedingAndExpression /
+// succeedingCondition): only the LEADING element differs, which is the whole of SR5. Because each tier is an
 // iterative loop whose leftmost element is the tier below, this spine yields the IDENTICAL grouping
 // (OR ( XOR ( AND … ) ) ) that `condition` yields — and PartialExpressionSpineDriftTests re-derives that from the
 // two rules' own text so the mirror cannot rot.
@@ -172,15 +203,15 @@ abbreviatedRelation
 // WS-F = "Y"`) is claimed by evaluateWhenItem's `condition` alternative and is re-read the same way
 // (ConditionBinder.LeadingBareClassWord; kb/Work PB843). The `IS`-led spelling reaches this rule unambiguously.
 partialExpression
-    : partialXorExpression ( OR ( logicalXorExpression | abbreviatedAndChain ) )*
+    : partialXorExpression ( OR succeedingXorExpression )*
     ;
 
 partialXorExpression
-    : partialAndExpression ( ( XOR | EXCLUSIVE_OR ) logicalAndExpression )*
+    : partialAndExpression ( xorOperator succeedingAndExpression )*
     ;
 
 partialAndExpression
-    : partialComparison ( AND ( abbreviatedRelation | unaryLogicalExpression ) )*
+    : partialComparison ( AND succeedingCondition )*
     ;
 
 // SR5's four shapes, in `comparisonExpression`'s own order and spelling with the leading comparisonOperand removed:
@@ -193,14 +224,17 @@ partialComparison
     | abbreviatedRelation                                      // leftmost portion is a relational operator
     ;
 
+// §8.8.4.10's negated condition. NOT is NOT self-recursive: Table 5 (§8.8.4.11.3) admits after NOT only a
+// simple-condition or '(' — "the pair 'NOT NOT' is not permissible". cceNot is spelled the same way
+// (ConditionTierConnectiveDriftTests).
 unaryLogicalExpression
-    : NOT primaryCondition
-    | primaryCondition
+    : NOT? primaryCondition
     ;
 
 primaryCondition
     // COBOL-2002 boolean forms (ISO §8.8.4.2.2 relation / §8.8.4.3 simple condition) — gated by the
-    // boolExprAhead() predicate so it fires ONLY when a B-operator is actually present in this condition;
+    // boolExprAhead() predicate so it fires ONLY when a B-operator (or a parenthesized boolean literal — kb/Work
+    // PB1370) is actually present in this condition;
     // a normal comparison returns false and falls to comparisonExpression UNCHANGED (the shared rule is
     // untouched — the DEVLOG-621 regression lesson). booleanExpression's leaf is valueOperand, so the binder
     // unwraps a B-op-free operand back to a normal operand (BindPrimaryBoolean).
@@ -233,26 +267,32 @@ comparisonOperand
 // ── COBOL-2002 boolean expressions (ISO §8.8.2; precedence B-NOT > B-AND > B-XOR > B-OR, rule 7b).
 // Permissive-superset doctrine: the operand SHAPES (a boolean item / boolean literal / figurative ZERO /
 // ALL B"…") are enforced at BIND (the boolean-expression constraint band); the tiers enforce the formation
-// rules 1–3 and EVERY Table 4 adjacency cell but ONE structurally. ⛔ THE EXCEPTION IS (B-NOT, B-NOT): this
+// rules 1–3 and every Table 4 adjacency cell structurally EXCEPT TWO. ⛔ THE FIRST IS (B-NOT, B-NOT): this
 // comment used to claim Table 4 was enforced structurally in full, and it was not — `booleanFactor : B_NOT
 // booleanFactor` self-recurses, so `B-NOT B-NOT x` parsed with no diagnostic at any --std while the comment
-// asserted otherwise (a green-looking claim holding a gap open, kb/Work PB158). That cell is now screened by
-// ExpressionFormationPass / ArithmeticFormationRules (COBOLNET1719), alongside §8.8.1.2 Table 3's matching
-// (unary, unary) cell — one mechanism for both adjacency tables. The tiers are SUPERSET-parsed (no edition predicate); they are
-// reached ONLY through the boolExprAhead()-gated primaryCondition ENTRY (or COMPUTE F2), so a B-op-free condition
-// never enters them (the shared comparisonExpression rule is untouched — the DEVLOG-621 lesson). The COBOL-2002
-// introduction gate is bind-time: Check(BooleanOperators2002) in BindBoolExpr when HasBoolOp — residue migration #2. ──
+// asserted otherwise (a green-looking claim holding a gap open, kb/Work PB158). ⛔ THE SECOND IS THE SHIFT ROW —
+// only an identifier or literal may follow a shift operator, and booleanShiftSuffix parses a whole
+// arithmeticExpression (kb/Work PB1413: the "but ONE" this comment then claimed was the same kind of false). Both
+// are screened by ExpressionFormationPass / ArithmeticFormationRules (COBOLNET1719), alongside §8.8.1.2 Table 3's
+// (unary, unary) cell — one mechanism for both adjacency tables, run by the compile-time evaluator too. The tiers
+// are SUPERSET-parsed (no edition predicate); they are reached ONLY through the boolExprAhead()-gated
+// primaryCondition ENTRY (or COMPUTE F2), so a condition with no B-operator and no parenthesized boolean literal
+// never enters them (the shared comparisonExpression rule is untouched — the DEVLOG-621 lesson). The introduction
+// gates (B-operators 2002, shifts 2023) are the ONE BooleanOperatorGate, asked per site by VersionConformancePass
+// and per directive fragment by the conditional-compilation stage — residue migration #2, kb/Work PB1370. ──
 booleanExpression : booleanXorTerm ( B_OR booleanXorTerm )* ;
 booleanXorTerm    : booleanAndTerm ( B_XOR booleanAndTerm )* ;
 booleanAndTerm    : booleanShiftTerm ( B_AND booleanShiftTerm )* ;
 // Boolean shift tier (ISO §8.8.2 rule 8, COBOL-2023). The shift's SECOND operand is an INTEGER operand (rule 5 /
-// Table 4 — after a shift operator ONLY an identifier-or-literal integer may appear), never a booleanFactor. This
-// fixed placement gives the shift tighter-than-B-AND binding, which realizes the default (unmixed) rule-7b case
-// exactly; the context-sensitive rule-7b precedence (a shift inheriting the precedence of a preceding B-OR/B-XOR)
-// is a documented refinement (see BoundBoolShift / the wave-C scout).
+// Table 4 — after a shift operator ONLY an identifier-or-literal integer may appear), never a booleanFactor. The
+// tiers fix only the operand/operator SEQUENCE: rule 7b's context-inherited shift precedence (a shift takes the
+// precedence of the preceding operation — a B-NOT included) is re-derived by the ONE BooleanExpressionResolver.
 booleanShiftTerm  : booleanFactor booleanShiftSuffix* ;
-// The shift's second operand is an INTEGER operand (ISO §8.8.2 rule 5). Permissive-superset: parse an
-// arithmeticExpression (an integer literal / data item is a subset) — the count is used as an integer at runtime.
+// The shift's second operand is an INTEGER operand (ISO §8.8.2 rule 5). Superset parse, NARROWED in both lanes
+// (kb/Work PB1413): the arithmeticExpression is screened back to Table 4's single identifier or literal by
+// ArithmeticFormationRules.ShiftCountNotSoleOperand (a grammar tier cannot do it — `-1` is an integer literal and
+// `- 1` a unary operator, one token sequence in the default lexer mode), then held to §5.5 2)'s INTEGER operand by
+// each lane (ConditionBinder via IntrinsicResultType.IsIntegerOperand; the compile-time evaluator by literal form).
 booleanShiftSuffix : (B_SHIFT_L | B_SHIFT_R | B_SHIFT_LC | B_SHIFT_RC) arithmeticExpression ;
 booleanFactor     : B_NOT booleanFactor
                   | LPAREN booleanExpression RPAREN
@@ -571,23 +611,34 @@ subscriptExpressionFragment : arithmeticExpression EOF ;
 
 // One compile-time operand (a >>DEFINE value, a >>EVALUATE selection-subject / >>WHEN object). Operand-kind
 // disambiguation reuses the boolExprAhead() predicate (the primaryCondition mechanism): booleanExpression is
-// entered ONLY when a real B-operator is present; otherwise an arithmetic operand (a single numeric literal too —
-// GR5 reclassification is in the evaluator) or a non-numeric literal. The evaluator dispatches on WHICH sub-node
-// parsed, not a token guess (booleanExpression's leaf would otherwise match every arithmetic/non-numeric operand).
+// entered ONLY when a real B-operator is present, or the operand is a parenthesized boolean literal — §8.8.2's
+// "a boolean expression enclosed in parentheses", which has no operator to find (kb/Work PB1370: `>>DEFINE X AS
+// (B"101")` was malformed); otherwise an arithmetic operand (a single numeric literal too — GR5 reclassification
+// is in the evaluator) or a non-numeric literal. The evaluator dispatches on WHICH sub-node parsed, not a token
+// guess (booleanExpression's leaf would otherwise match every arithmetic/non-numeric operand).
 compileTimeOperandFragment : compileTimeOperand EOF ;
 compileTimeOperand
-    : {boolExprAhead()}? booleanExpression      // a genuine boolean expression (a B-operator is present)
+    : {boolExprAhead()}? booleanExpression      // a genuine boolean expression (a B-operator, or a parenthesized boolean literal)
     | arithmeticExpression                       // numeric operand (a single numeric literal too — GR5 in eval)
     | nonNumericLiteral                          // string / national / boolean / hex literal operand
     ;
 
-// A constant-conditional-expression (§7.3.8) — the >>IF operand and the >>EVALUATE-TRUE >>WHEN operand.
-// Precedence NOT > AND > OR (§8.8.4.9), parentheses grouping (LPAREN is always a group under PrimeDirectiveExpr).
+// A constant-conditional-expression (§7.3.8) — the >>IF operand and the >>EVALUATE-TRUE >>WHEN operand. §7.3.8.2
+// SR1 d): "A complex condition as specified in 8.8.4.9, Complex conditions" — so its logical tiers are THE
+// condition tiers' connectives over a compile-time leaf: precedence NOT > AND > XOR > OR (§8.8.4.11.3), the one
+// `xorOperator` rule (a 2023 introduction, gated per fragment by the conditional-compilation stage), and a
+// non-recursive NOT (Table 5 — 'NOT NOT' is not permissible). The leaf differs, so ANTLR (which has no
+// parameterized rules) needs a second spelling of the tiers; ConditionTierConnectiveDriftTests requires each cce
+// tier's connective shape to be the runtime tier's, so a connective added to one cannot be missing from the other
+// (kb/Work PB1371 — cceOr/cceAnd/cceNot never received XOR and let NOT recurse). No abbreviated relation: "Abbreviated
+// combined relation conditions shall not be specified" (SR1 d)). Parentheses group (LPAREN is always a group under
+// PrimeDirectiveExpr).
 constantConditionalExpressionFragment : constantConditionalExpression EOF ;
 constantConditionalExpression : cceOr ;
-cceOr      : cceAnd ( OR cceAnd )* ;
+cceOr      : cceXor ( OR cceXor )* ;
+cceXor     : cceAnd ( xorOperator cceAnd )* ;
 cceAnd     : cceNot ( AND cceNot )* ;
-cceNot     : NOT cceNot | ccePrimary ;
+cceNot     : NOT? ccePrimary ;
 ccePrimary : LPAREN constantConditionalExpression RPAREN
            | definedCondition
            | cceRelationOrBoolean ;

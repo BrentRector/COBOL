@@ -66,6 +66,18 @@ internal sealed class ExpressionFormationPass(IDiagnosticSink sink) : CursorFoll
         return base.VisitChildren(ctx);
     }
 
+    /// <summary>§8.8.2 Table 4, row "B-SHIFT-L … B-SHIFT-RC": only "Identifier or literal" is permissible next —
+    /// rule 5's integer operand (kb/Work PB1370 / PB1413).</summary>
+    public override object? VisitBooleanShiftSuffix(CobolParserCore.BooleanShiftSuffixContext ctx)
+    {
+        if (ArithmeticFormationRules.ShiftCountNotSoleOperand(ctx) is { } count)
+        {
+            using var _ = Sink.At(count.Line, count.Column + 1);
+            Report(ArithmeticFormationRules.ShiftCountMessage(ctx));
+        }
+        return base.VisitChildren(ctx);
+    }
+
     private void Report(string message) => Sink.Report(new EditionDiagnostic(
         DiagnosticCatalog.ExpressionFormationPair.Code, EditionSeverity.Error,
         "expression-formation-pair", message, "an expression",

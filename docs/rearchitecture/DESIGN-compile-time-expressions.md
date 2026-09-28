@@ -110,9 +110,10 @@ compileTimeOperand
     ;
 constantConditionalExpressionFragment : constantConditionalExpression EOF ;
 constantConditionalExpression : cceOr ;
-cceOr      : cceAnd ( OR cceAnd )* ;
+cceOr      : cceXor ( OR cceXor )* ;
+cceXor     : cceAnd ( xorOperator cceAnd )* ;                     // XOR / EXCLUSIVE-OR — the ONE xorOperator rule
 cceAnd     : cceNot ( AND cceNot )* ;
-cceNot     : NOT cceNot | ccePrimary ;
+cceNot     : NOT? ccePrimary ;                                    // Table 5: 'NOT NOT' is not permissible
 ccePrimary : LPAREN constantConditionalExpression RPAREN
            | definedCondition
            | cceRelationOrBoolean ;
@@ -123,8 +124,16 @@ cceRelationOrBoolean
 ```
 
 * **Operand-kind disambiguation** uses the existing `boolExprAhead()` predicate (the mechanism the source
-  `primaryCondition` rule already uses): `booleanExpression` is entered only when a real B-operator/BOOLLIT is
-  present; otherwise arithmetic (incl. a single numeric literal) or a non-numeric literal. The evaluator
+  `primaryCondition` rule already uses): `booleanExpression` is entered only when a real B-operator is present or
+  a grouping-paren run opens on a boolean literal — `(B"101")`, §8.8.2's "a boolean expression enclosed in
+  parentheses", which carries no operator to find (kb/Work PB1370; the same predicate serves the runtime
+  conditions, so `IF (B"1") = F` is recognized too); otherwise arithmetic (incl. a single numeric literal) or a
+  non-numeric literal. A parenthesized boolean NAME with no operator is not token-decidable (its category is a
+  binding fact).
+* **Edition gate.** A compile-time boolean expression is formed per §8.8.2 OF THE TARGETED EDITION, so each
+  evaluated fragment asks the ONE boolean-operator introduction gate (`BooleanOperatorGate`, shared with
+  `VersionConformancePass`): a `B-SHIFT-*` below 2023 is COBOLNET0900, exactly as its runtime twin (kb/Work
+  PB1370; `BooleanExpressionGateSiteDriftTests` pins both fragment sites). The evaluator
   dispatches on **which operand sub-node parsed**, not a token guess — necessary because `booleanExpression →
   valueOperand` would otherwise match every arithmetic/non-numeric operand.
 * **`DEFINED`** is not reserved in the source language — a token only inside the fragment via a primed lexer flag
@@ -165,8 +174,8 @@ public sealed class CompileTimeExpressionEvaluator(
 {
     // Public operand boundary — applies §7.3.11.4 GR5 reclassification + §7.3.6.3 GR3 truncation ITSELF.
     public CtNumber? EvaluateArithmeticOperand(CobolParserCore.ArithmeticExpressionContext e, string where);
-    // A boolean operand → its bit string (via BooleanExpressionResolver, §6). A shift count goes through
-    // EvaluateArithmeticOperand, so it is GR3-truncated and rule-5 integer-validated.
+    // A boolean operand → its bit string (via BooleanExpressionResolver, §6). A shift count is one integer
+    // literal or numeric-variable name (Table 4 shape screened first), held to the integer-literal FORM (§6).
     public BitString? EvaluateBoolean(CobolParserCore.BooleanExpressionContext e, string where);
 }
 public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Literal, bool IsInteger);   // GR3-truncated unless WasSingleLiteral
@@ -245,9 +254,13 @@ mechanism.** A CFG cannot express context-dependent precedence, so `BooleanExpre
 
 * Binary precedence `B-AND`(3) > `B-XOR`(2) > `B-OR`(1); `B-NOT` is the unary factor level (tightest, rule 7b
   1st); parentheses recurse as a fresh level (rule 7a); equal precedence left-to-right (rule 7c).
-* A **shift** takes the precedence of the operator immediately preceding it in the sequence, or `B-AND` if none
+* A **shift** takes the precedence of the OPERATION immediately preceding it in the sequence, or `B-AND` if none
   (rule 7b tail). So `A B-AND B B-SHIFT-L 2` → `(A B-AND B) B-SHIFT-L 2`; `A B-OR B B-SHIFT-L 2` →
-  `(A B-OR B) B-SHIFT-L 2`; `A B-SHIFT-L 2 B-AND C` → `(A B-SHIFT-L 2) B-AND C`. Verified by shunting-yard trace.
+  `(A B-OR B) B-SHIFT-L 2`; `A B-SHIFT-L 2 B-AND C` → `(A B-SHIFT-L 2) B-AND C`. **Negation is an operation in
+  that ladder (rule 7b 1st)**, so a `B-NOT` operand makes the following shift take negation's precedence:
+  `A B-AND B-NOT B B-SHIFT-R 1` → `A B-AND ((B-NOT B) B-SHIFT-R 1)` (kb/Work PB1370 — the resolver tracked only
+  binary operators and shifted `(A B-AND B-NOT B)`). Pinned by `BooleanExpressionFormationTests` and
+  `conformance/2023/boolean_expression_formation` (both lanes).
 * `Resolve<T>` is **generic over the combine operations** (leaf / not / binary / shift callbacks), so the SAME
   grouping serves the compile-time evaluator (`T = BitString`, folds) and the runtime `COMPUTE` Format-2 boolean
   binder (`T = BoundBoolExpr`, builds). This is the singular fix.
@@ -265,9 +278,14 @@ form is now accepted and evaluated per rule 7b. Existing COBOLNET1569 tests flip
 * **Binary `B-AND`/`B-OR`/`B-XOR`** (rules 9/10) — bit-by-bit from the left; unequal length ⇒ shorter
   right-extended with boolean zeros; result length = the larger operand; zero-length ⇒ zero-length (rule 9
   NOTE 2).
-* **Shift `-L/-R/-LC/-RC`** (rule 8) — the second operand shall be an **integer operand** (rule 5): evaluated via
-  the directive arithmetic boundary (§7.3.3 SR10 + GR3-truncated) and required to be integral (a fractional value
-  rejected, rule 5). Rule 8 specifies a single shift, repeated `count` times when `count` is greater than 1; a
+* **Shift `-L/-R/-LC/-RC`** (rule 8) — the second operand shall be an **integer operand** (rule 5). Its SHAPE is
+  Table 4's: after a shift operator only a single identifier or literal may appear, so a compound (`1 + 1`),
+  parenthesized (`(1)`) or separately-signed (`- 1`) count is refused by the SHARED formation screen
+  (`ArithmeticFormationRules.ShiftCountNotSoleOperand`, which the runtime `ExpressionFormationPass` runs too —
+  COBOLNET1719 there, COBOLNET1619 here). The single operand is then held to §5.5 2) a)'s INTEGER LITERAL by FORM
+  (`NumericLiteral.IsIntegerLiteralForm` — "contains no decimal point", §8.3.3.3.2): a literal as written, or a
+  numeric compilation variable's literal (§7.3.11.4 GR1), so `1.0` and a variable holding `1.5` are refused
+  rather than truncated (kb/Work PB1413). Rule 8 specifies a single shift, repeated `count` times when `count` is greater than 1; a
   `count==0` is identity (the shift repeated zero times leaves the operand unchanged). §8.8.2 assigns no meaning to
   a **negative** repetition count, so — a directive value must be determinate, never a silently wrong value — a
   negative count is rejected loudly (COBOLNET1619). Logical (zero-fill) vs circular (wrap); result length = first
@@ -284,8 +302,16 @@ both in the directive fragment (`compileTimeOperand`) and, as a latent-gap fix, 
 
 `EvaluateCce(constantConditionalExpression)` walks the cce tree:
 
-* **`cceOr`/`cceAnd`/`cceNot`** — logical combination (§8.8.4.9); both sides evaluated **unconditionally** (a
-  formation error in any operand is always reportable per §7.3.8, regardless of branch truth). Test-pinned.
+* **`cceOr`/`cceXor`/`cceAnd`/`cceNot`** — logical combination (§8.8.4.9, precedence NOT > AND > XOR > OR per
+  §8.8.4.11.3); every operand evaluated **unconditionally** (a formation error in any operand is always reportable
+  per §7.3.8, regardless of branch truth). Test-pinned. §7.3.8.2 SR1 d) makes the operand "A complex condition as
+  specified in 8.8.4.9", so these tiers are the runtime condition tiers' connectives over a compile-time leaf:
+  ANTLR has no parameterized rules, so they are a second spelling, and `ConditionTierConnectiveDriftTests` requires
+  each cce tier's connective shape (operand rule names masked) to equal its runtime tier's. The copy had drifted —
+  no XOR tier and a self-recursive NOT, so `>>IF 1 = 2 XOR 1 = 1` was COBOLNET1619 and `>>IF NOT NOT 1 = 1`
+  compiled (kb/Work PB1371). The XOR connective's 2023 introduction gate is `LogicalOperatorGate`, asked per
+  fragment by `EvaluateCceText` (the `BooleanOperatorGate` precedent), so below 2023 it is COBOLNET0900. No
+  abbreviated relation: SR1 d) — "Abbreviated combined relation conditions shall not be specified".
 * **`definedCondition`** — `IS [NOT] DEFINED` per §7.3.8.4.4.
 * **Relation** (§8.8.4.2 / §7.3.8.2 SR1a) — evaluate both operands to `CtValue`s: **SR1a.1** reject a
   category mismatch; **SR1a.2** for non-numeric operands only `=`/`<>` are valid; **comparison** via

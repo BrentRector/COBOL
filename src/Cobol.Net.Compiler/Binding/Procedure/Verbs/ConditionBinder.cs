@@ -54,9 +54,14 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             shift: BindBoolShiftSuffix);
 
     /// <summary>Apply one boolean shift suffix (<c>(B-SHIFT-L|R|LC|RC) integer</c>) to <paramref name="operand"/>
-    /// (ISO §8.8.2 rule 8, COBOL-2023). Rule 5 — the first operand shall not be the figurative ALL literal
-    /// (COBOLNET1511); the second operand is the integer inside the suffix. The 2023 introduction is gated in the
-    /// VersionConformancePass parse arm (HasShiftOp), so there is no binder-side edition gate here.</summary>
+    /// (ISO §8.8.2 rule 8, COBOL-2023). Rule 5 has two halves: the first operand shall not be the figurative ALL
+    /// literal (COBOLNET1511, the boolean-constraint band), and "The second operand shall be an integer operand"
+    /// (COBOLNET2513, kb/Work PB1413) — asked through the ONE integer classifier (<see cref="IntrinsicResultType.IsIntegerOperand(BoundExpr)"/>:
+    /// §5.5 2)'s integer literal, integer data item, or integer-type function; a numeric function is refused even
+    /// when its value is integral, §8.4.3.2.3 SR11). The count's SHAPE — Table 4's single identifier or literal —
+    /// is <see cref="ArithmeticFormationRules.ShiftCountNotSoleOperand"/>'s, reported by ExpressionFormationPass
+    /// (COBOLNET1719); a malformed count is not asked the integer question too, so it draws one diagnostic. The 2023
+    /// introduction is gated in the VersionConformancePass parse arm, so there is no binder-side edition gate here.</summary>
     private BoundBoolExpr BindBoolShiftSuffix(BoundBoolExpr operand, Core.BooleanShiftSuffixContext suf)
     {
         var kind = suf.B_SHIFT_LC() is not null ? BoolShiftKind.LeftCircular
@@ -66,7 +71,15 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         if (operand is BoundBoolAll { IsAllLiteral: true })   // NOT figurative ZERO — a disjoint §8.8.2 operand (kb/Work PB157)
             ctx.Edition.Error("COBOLNET1511", "the first operand of a boolean shift operation shall not be the "
                 + "figurative constant ALL literal (ISO §8.8.2 rule 5)");
-        return new BoundBoolShift(operand, kind, host.Expr.BindExpr(suf.arithmeticExpression()));
+        var count = host.Expr.BindExpr(suf.arithmeticExpression());
+        if (count is not BoundExprError && ArithmeticFormationRules.ShiftCountNotSoleOperand(suf) is null
+            && !IntrinsicResultType.IsIntegerOperand(count))
+            ctx.Edition.Error(DiagnosticCatalog.BooleanShiftCountNotInteger, $"the second operand of a boolean shift operation shall be an integer "
+                + $"operand (ISO §8.8.2 rule 5) — '{DataBinder.WrittenText(suf.arithmeticExpression())}' is not: an integer operand "
+                + "is an integer literal (no decimal point, §8.3.3.3.2), an integer data item, or an integer-type "
+                + "function (ISO §5.5 2); a numeric function is not one even when its value is integral, "
+                + "§8.4.3.2.3 SR11)");
+        return new BoundBoolShift(operand, kind, count);
     }
 
     /// <summary>Rule 4 (§8.8.2 :9364): both operands of a binary boolean op shall not both be ALL "literal".</summary>
@@ -415,10 +428,16 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     private BoundCondition BindCondition(IParseTree node, AbbrevCarry carry) => node switch
     {
         Core.ConditionContext c => BindCondition(c.GetChild(0), carry),
+        // The condition tiers (§8.8.4.9; NOT > AND > XOR > OR, §8.8.4.11.3), in their LEADING spelling (the first
+        // simple condition, never abbreviated) and their SUCCEEDING spelling (every connective's operand, whose
+        // leftmost element may be §8.8.4.12's abbreviated relation — kb/Work PB1390). Both fold with the ONE
+        // sequence binder, which threads the abbreviation carry through the whole sequence in source order.
         Core.LogicalOrExpressionContext orExpr => BindFlatSequence(orExpr, "||", carry),
-        Core.LogicalXorExpressionContext xorExpr => BindXorSequence(xorExpr, carry),
+        Core.LogicalXorExpressionContext xorExpr => BindFlatSequence(xorExpr, "^", carry),
         Core.LogicalAndExpressionContext andExpr => BindFlatSequence(andExpr, "&&", carry),
-        Core.AbbreviatedAndChainContext chain => BindFlatSequence(chain, "&&", carry),
+        Core.SucceedingXorExpressionContext sXor => BindFlatSequence(sXor, "^", carry),
+        Core.SucceedingAndExpressionContext sAnd => BindFlatSequence(sAnd, "&&", carry),
+        Core.SucceedingConditionContext sc => BindCondition(sc.GetChild(0), carry),
         // §14.9.13.3 SR5's spine — the SAME three logical tiers with only the leading element elided, so they
         // fold with the SAME sequence binder and inherit its short-circuit / user-function cardinality rules.
         Core.PartialExpressionContext pOr => BindFlatSequence(pOr, "||", carry),
@@ -463,7 +482,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         return BindAbbreviatedRelation(pc.abbreviatedRelation(), carry);
     }
 
-    /// <summary>Bind a left-to-right logical sequence (an OR / XOR / AND chain, or an abbreviated-AND chain), threading
+    /// <summary>Bind a left-to-right logical sequence (an OR / XOR / AND chain, leading or succeeding), threading
     /// the abbreviation <paramref name="carry"/> through every operand in SOURCE ORDER so a later abbreviated relation
     /// sees the subject / operator an earlier one established. A lone operand returns its own condition (no wrapper).
     /// A user-function reference in a NON-FIRST operand of an AND/OR chain is CONDITIONALLY evaluated
@@ -479,7 +498,8 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         for (int i = 0; i < ctx.ChildCount; i++)
         {
             var ch = ctx.GetChild(i);
-            if (ch is ITerminalNode) continue;   // the AND / OR / XOR / EXCLUSIVE-OR connective tokens
+            // The AND / OR connective tokens, and the one xorOperator node (XOR / EXCLUSIVE-OR — kb/Work PB1390).
+            if (ch is ITerminalNode or Core.XorOperatorContext) continue;
             var udfMark = host.Udf.Mark;
             parts.Add(BindCondition(ch, carry));
             if (parts.Count > 1 && op != "^")
@@ -487,16 +507,6 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         }
         return parts.Count == 1 ? parts[0] : new BoundLogical(op, parts);
     }
-
-    /// <summary>The logical XOR / EXCLUSIVE-OR operator (ISO §8.8.4.9) is a COBOL-2023 introduction. It parses at all
-    /// editions (superset — the <c>{is2023()}?</c> predicate is gone); the introduction gate fires HERE, only when the
-    /// operator is genuinely present (<c>ChildCount &gt; 1</c> ⇒ an <c>XOR</c>/<c>EXCLUSIVE_OR</c> terminal was matched
-    /// between two operands), so a bare below-2023 <c>logicalAndExpression</c> is untouched. Residue migration #1
-    /// (DESIGN-version-conformance-pipeline.md) — the reverse-signature arm is deleted.</summary>
-    private BoundCondition BindXorSequence(Core.LogicalXorExpressionContext xorExpr, AbbrevCarry carry)
-        // The XOR-operator introduction gate (LogicalXorOperator2023) fires on RECOGNITION in the
-        // VersionConformancePass parse-arm (VisitLogicalXorExpression, ChildCount>1); Step 14h.4a.
-        => BindFlatSequence(xorExpr, "^", carry);
 
     private BoundCondition BindPrimary(Core.PrimaryConditionContext p, AbbrevCarry carry)
     {
@@ -516,11 +526,20 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>An abbreviated relation with the subject omitted (<c>comparisonOperator comparisonOperand</c>): the
-    /// carried subject is inserted and the newly-stated operator becomes the carried operator (ISO §8.8.4.12.4 GR1).</summary>
+    /// carried subject is inserted and the newly-stated operator becomes the carried operator (ISO §8.8.4.12.4 GR1).
+    /// With no carried subject — GR1's insertion "terminates once a complete simple condition is encountered", and a
+    /// parenthesized group opens a fresh scope — the relation has nothing to insert: COBOLNET2552 (kb/Work PB1390;
+    /// it used to be refused unreported, which the COBOLNET2319 internal-error net caught).</summary>
     private BoundCondition BindAbbreviatedRelation(Core.AbbreviatedRelationContext ar, AbbrevCarry carry)
     {
         if (carry.Subject is not { } subject)
+        {
+            ctx.Edition.Error(DiagnosticCatalog.AbbreviatedRelationWithoutSubject,
+                $"'{DataBinder.WrittenText(ar)}' omits the subject of its relation, but no subject precedes it to insert: the "
+                + "insertion of an omitted subject terminates at a complete simple condition that is not a relation, and "
+                + "does not cross a parenthesis (ISO §8.8.4.12.1; §8.8.4.12.4 GR1)");
             return Refused("abbreviated relation with no preceding relation subject");
+        }
         string op = MapOperator(ar.comparisonOperator().GetText());
         carry.Op = op;
         return CheckedRelational(subject, op, ComparisonOperand(ar.comparisonOperand()));

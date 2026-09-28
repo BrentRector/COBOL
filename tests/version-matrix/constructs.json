@@ -2158,10 +2158,10 @@
   },
   {
    "id": "logical-xor-operator-2023",
-   "description": "The logical XOR / EXCLUSIVE-OR operator (ISO 8.8.4.9; precedence NOT > AND > XOR > OR) - a 2023 addition (Annex E.2 item 25 reserves both words; VCR rows 32/41 - the chair-adjudicated regating of the former '2002' mislabel). The operator is {is2023()}?-gated; below 2023 the W1.5 parse-layer mapping names the edition (0900) and both words are user-defined words.",
+   "description": "The logical XOR / EXCLUSIVE-OR operator (ISO 8.8.4.9; precedence NOT > AND > XOR > OR) - a 2023 addition (Annex E.2 item 25 reserves both words; VCR rows 32/41 - the chair-adjudicated regating of the former '2002' mislabel). The operator parses at every edition (superset) and is gated on RECOGNITION of the one xorOperator grammar rule every tier spells it through - condition, EVALUATE partial expression and >>IF constant-conditional-expression alike (LogicalOperatorGate, both lanes; kb/Work PB1390/PB1371); below 2023 both words are user-defined words.",
    "display": "the logical XOR/EXCLUSIVE-OR operator",
    "diagnosticCode": "COBOLNET0900",
-   "citation": "ISO §8.8.4.9; a 2023 addition per Annex E.2 item 25 (VCR rows 32/41 — the chair-adjudicated regating of the former '2002' mislabel); {is2023()}?-gated operator + W1.5 parse-layer 0900 mapping",
+   "citation": "ISO §8.8.4.9; a 2023 addition per Annex E.2 item 25 (VCR rows 32/41 — the chair-adjudicated regating of the former '2002' mislabel); introduction gate on the xorOperator rule (LogicalOperatorGate)",
    "introducedIn": 2023,
    "removedIn": null,
    "expectDiagnostic": "COBOLNET0900",

@@ -24,6 +24,9 @@ namespace CobolNet.Tests.Unit;
 /// <para>So the list is DERIVED from the grammar here rather than remembered. A new rule that admits a boolean
 /// expression fails this test until it is either gated or explicitly adjudicated as exempt — the exemption
 /// carries its reason, which is the part a comment in the pass could not enforce.</para>
+/// <para>The gate BODY is the frontend's <c>BooleanOperatorGate</c>, shared by both lanes: the pass calls it per
+/// compilation-unit site, and the conditional-compilation stage per compile-time directive fragment — the two
+/// fragment rules the walk never reaches were once "exempt" on that reachability fact alone (kb/Work PB1370).</para>
 /// </summary>
 public sealed class BooleanExpressionGateSiteDriftTests
 {
@@ -34,14 +37,31 @@ public sealed class BooleanExpressionGateSiteDriftTests
         ["booleanFactor"] =
             "the parenthesized sub-expression — a NESTED occurrence of the same expression, gated once at the "
             + "enclosing site; gating here would fire one diagnostic per level of parentheses",
-        ["compileTimeOperand"] =
-            "a compile-time DIRECTIVE-expression fragment (ISO §7.3.7): reachable only from the frontend's "
-            + "directive re-parse and referenced by nothing in compilationUnit, so the VersionConformancePass "
-            + "walk over the compilation unit never reaches it",
-        ["cceRelationOrBoolean"] =
-            "a constant-conditional-expression fragment (ISO §7.3.8) — the same directive re-parse as "
-            + "compileTimeOperand, outside the compilation-unit walk",
     };
+
+    /// <summary>⛔ THE DIRECTIVE-FRAGMENT SITES ARE GATED, NOT EXEMPT (kb/Work PB1370). These rules are reachable
+    /// only from the conditional-compilation stage's fragment re-parse, which the <c>VersionConformancePass</c>
+    /// walk never reaches — and that reachability fact used to sit in <see cref="Exempt"/> as if it were a reason
+    /// for NO gate, so <c>&gt;&gt;DEFINE G AS B"1100" B-SHIFT-L 1</c> compiled clean at 2002 and 2014. A compile-time
+    /// boolean expression is "formed in accordance with 8.8.2" (ISO §7.3.7.2 SR1) of the targeted edition, so each
+    /// rule is gated by the frontend helper that evaluates its fragment, keyed here by that helper's name.</summary>
+    private static readonly Dictionary<string, string> DirectiveGated = new(StringComparer.Ordinal)
+    {
+        ["compileTimeOperand"] = "EvaluateOperandText",   // compileTimeOperandFragment (§7.3.11 / §7.3.13 operands)
+        ["cceRelationOrBoolean"] = "EvaluateCceText",     // constantConditionalExpressionFragment (§7.3.8)
+    };
+
+    private static string ProcessorSource() => File.ReadAllText(TestRepo.Src(Path.Combine(
+        "Cobol.Net.Frontend", "Preprocessor", "ConditionalCompilationProcessor.cs")));
+
+    /// <summary>The body of the processor's static helper <paramref name="name"/> — from its declaration to the
+    /// next member declaration.</summary>
+    private static string HelperBody(string source, string name)
+    {
+        var m = Regex.Match(source, @"private static \w+\?? " + name + @"\((?<body>.*?)\n    (?:///|private|public|internal)",
+            RegexOptions.Singleline);
+        return m.Success ? m.Groups["body"].Value : "";
+    }
 
     /// <summary>The parser rules of every composite-grammar fragment, as (name, body) — comments stripped so a
     /// rule NAMED in a comment is not mistaken for a rule that references it (this file's own subject appears
@@ -96,7 +116,7 @@ public sealed class BooleanExpressionGateSiteDriftTests
 
         var overrides = GateOverrides();
         var ungated = hosts
-            .Where(h => !Exempt.ContainsKey(h))
+            .Where(h => !Exempt.ContainsKey(h) && !DirectiveGated.ContainsKey(h))
             .Where(h => !overrides.TryGetValue(h, out string? body)
                         || !body.Contains("GateBooleanOperators", StringComparison.Ordinal))
             .ToList();
@@ -116,19 +136,48 @@ public sealed class BooleanExpressionGateSiteDriftTests
         var hosts = ParserRules()
             .Where(r => Regex.IsMatch(r.Body, @"\bbooleanExpression\b"))
             .Select(r => r.Name).ToHashSet(StringComparer.Ordinal);
-        var stale = Exempt.Keys.Where(k => !hosts.Contains(k)).ToList();
+        var stale = Exempt.Keys.Concat(DirectiveGated.Keys).Where(k => !hosts.Contains(k)).ToList();
         Assert.True(stale.Count == 0,
-            $"exempt rule(s) no longer reference a booleanExpression: {string.Join(", ", stale)}");
+            $"exempt or directive-gated rule(s) no longer reference a booleanExpression: {string.Join(", ", stale)}");
     }
 
-    /// <summary>The gate itself is written ONCE. Three call sites are fine; three COPIES of the two Check calls
-    /// are how the third site came to be missing in the first place (feedback_one_rule_one_place).</summary>
+    /// <summary>Each directive-fragment site's evaluating helper asks the gate before it evaluates — the frontend
+    /// twin of a <c>Visit&lt;Rule&gt;</c> override calling <c>GateBooleanOperators</c> (kb/Work PB1370).</summary>
+    [Fact]
+    public void EveryDirectiveFragmentSite_IsGatedByItsEvaluatingHelper()
+    {
+        string source = ProcessorSource();
+        Assert.Contains("BooleanOperatorGate.Check(", source, StringComparison.Ordinal);
+        foreach (var (rule, helper) in DirectiveGated)
+        {
+            string body = HelperBody(source, helper);
+            Assert.True(body.Length > 0, $"the helper {helper} (which evaluates {rule}) is gone — this guard is blind");
+            Assert.True(body.Contains("GateBooleanOperators(", StringComparison.Ordinal),
+                $"{helper} evaluates a {rule} fragment without asking the boolean-operator introduction gate — "
+                + "a B-SHIFT-* in a compiler directive would compile clean below COBOL-2023");
+        }
+    }
+
+    /// <summary>The gate itself is written ONCE, and both lanes call it. Three call sites are fine; three COPIES
+    /// of the two Check calls are how the third site came to be missing in the first place, and a directive-stage
+    /// copy is how the compile-time lane would drift from the runtime one (feedback_one_rule_one_place).</summary>
     [Fact]
     public void TheGateBodyIsWrittenOnce()
     {
+        var shift = new List<string>();
+        var ops = new List<string>();
+        foreach (string f in Directory.EnumerateFiles(TestRepo.Src(), "*.cs", SearchOption.AllDirectories))
+        {
+            if (f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || f.EndsWith("Constructs.g.cs", StringComparison.Ordinal)) continue;
+            string text = File.ReadAllText(f);
+            if (Regex.IsMatch(text, @"\bConstructs\.BooleanShiftOperators2023\b")) shift.Add(Path.GetFileName(f));
+            if (Regex.IsMatch(text, @"\bConstructs\.BooleanOperators2002\b")) ops.Add(Path.GetFileName(f));
+        }
+        Assert.Equal(["BooleanOperatorGate.cs"], shift);
+        Assert.Equal(["BooleanOperatorGate.cs"], ops);
         string pass = File.ReadAllText(TestRepo.Src(Path.Combine(
             "Cobol.Net.Compiler", "Validation", "VersionConformancePass.cs")));
-        Assert.Single(Regex.Matches(pass, @"Constructs\.BooleanShiftOperators2023"));
-        Assert.Single(Regex.Matches(pass, @"Constructs\.BooleanOperators2002"));
+        Assert.Contains("BooleanOperatorGate.Check(", pass, StringComparison.Ordinal);
     }
 }

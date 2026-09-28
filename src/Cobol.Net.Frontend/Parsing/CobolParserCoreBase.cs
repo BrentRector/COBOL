@@ -649,8 +649,12 @@ public abstract class CobolParserCoreBase : Parser
 
     /// <summary>
     /// COBOL-2002 boolean-condition discriminator (ISO §8.8.4.2.2 / §8.8.4.3): true when a boolean OPERATOR
-    /// (B-AND / B-OR / B-XOR / B-NOT) appears in the CURRENT condition ahead of the parse position, before any
-    /// condition boundary. This gates a dedicated <c>primaryCondition</c> alternative WITHOUT touching the
+    /// (B-AND / B-OR / B-XOR / B-NOT / a B-SHIFT-*) appears in the CURRENT condition ahead of the parse position,
+    /// before any condition boundary — or a parenthesized boolean LITERAL, the one operator-free boolean expression
+    /// the token stream can identify (<see cref="ParenRunOpensOnBoolLiteral"/>). It is the ONE boolean-operand
+    /// discriminator of every <c>{boolExprAhead()}?</c> site, the compile-time directive fragments
+    /// (<c>compileTimeOperand</c> / <c>cceRelationOrBoolean</c>) included, so the runtime and compile-time lanes
+    /// recognize the same boolean expressions. This gates a dedicated <c>primaryCondition</c> alternative WITHOUT touching the
     /// shared <c>comparisonExpression</c> rule (whose modification regressed subscript/ref-mod comparisons at
     /// 2002+, DEVLOG 621) — a normal comparison (no B-op ahead) returns false and falls to comparisonExpression
     /// unchanged. The scan stops at the condition's end: a period, the logical connectives (AND/OR/THEN/ELSE),
@@ -689,6 +693,12 @@ public abstract class CobolParserCoreBase : Parser
                 // heads a comparison as a user data-name (IF B-NOT = 5).
                 case CobolLexer.B_NOT:
                     if (IsBoolOperandStart(TokenStream.LA(i + 1))) return true;
+                    break;
+                // An OPERATOR-FREE parenthesized boolean literal — `(B"101")` — is a boolean expression with no
+                // B-operator in it at all (kb/Work PB1370; see ParenRunOpensOnBoolLiteral). GROUPING-PAREN-ONLY: a
+                // function argument list (FNARG_LPAREN) is an operand's own parenthesis, never a boolean group.
+                case CobolLexer.LPAREN:
+                    if (ParenRunOpensOnBoolLiteral(i)) return true;
                     break;
                 // ── Condition boundaries: no B-operator can belong to THIS condition past here ──
                 case CobolLexer.DOT:
@@ -749,6 +759,9 @@ public abstract class CobolParserCoreBase : Parser
                 return false;   // adjacent operand terms — a space-separated argument boundary (PB124)
             switch (t)
             {
+                // The operator-free parenthesized boolean literal, the same recognition boolExprAhead makes.
+                case CobolLexer.LPAREN when ParenRunOpensOnBoolLiteral(i):
+                    return true;
                 case CobolLexer.LPAREN: case CobolLexer.FNARG_LPAREN: depth++; break;
                 case CobolLexer.RPAREN: case CobolLexer.FNARG_RPAREN:
                     if (depth == 0) return false;   // the argument list's ')' — this argument is over
@@ -775,6 +788,24 @@ public abstract class CobolParserCoreBase : Parser
             prev = t;
         }
         return false;
+    }
+
+    /// <summary>Does the grouping-paren run starting at <c>LA(<paramref name="i"/>)</c> open on a boolean literal —
+    /// <c>(B"101")</c>, <c>((B"1") B-OR …)</c>? ISO §8.8.2 lists "a boolean expression enclosed in parentheses" as a
+    /// boolean expression and rule 1 lets one begin with '(' followed (Table 4, row '(') by a literal, so such an
+    /// operand is boolean although it carries NO B-operator — the shape a B-operator scan alone misses, which made
+    /// <c>&gt;&gt;DEFINE X AS (B"101")</c> and <c>IF (B"1") = F</c> malformed (kb/Work PB1370). The token run is
+    /// decisive, not a guess: a boolean literal is never an arithmetic operand (§8.8.1.1), so a grouping '(' whose
+    /// first operand is one can only open a boolean expression. A subscript / reference-modifier '(' carries SUB_*
+    /// operands and a function-argument '(' is FNARG_LPAREN, so neither reaches this test with a BOOLLIT behind it.
+    /// An operator-free parenthesized boolean IDENTIFIER (<c>(F)</c>) is NOT decidable from tokens — its category is
+    /// a binding fact — and stays with the binder.</summary>
+    private bool ParenRunOpensOnBoolLiteral(int i)
+    {
+        int k = i;
+        // GROUPING-PAREN-ONLY: a function argument list's FNARG_LPAREN opens no parenthesized boolean expression.
+        while (TokenStream.LA(k) == CobolLexer.LPAREN) k++;
+        return TokenStream.LA(k) == CobolLexer.BOOLLIT;
     }
 
     /// <summary>An operand-ENDING token — an operand can end with an identifier, a right paren, or a literal. Used by

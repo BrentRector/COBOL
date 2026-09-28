@@ -356,7 +356,7 @@ the pass's parse-tree arm (`VisitCobolWord`).
 
 | # | Construct (id) | Predicate role | Mechanism | Recognition / detect point | Risk |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `LogicalXorOperator2023` (XOR / EXCLUSIVE-OR) | gating-only | bind-time → pass | `LogicalXorExpressionContext` (guard `ChildCount>1`) | low |
+| 1 | `LogicalXorOperator2023` (XOR / EXCLUSIVE-OR) | gating-only | bind-time → pass | `XorOperatorContext` — the ONE `xorOperator` rule every tier (condition, EVALUATE partial expression, `>>IF` cce) spells the connective through; `LogicalOperatorGate`, shared with the directive stage (kb/Work PB1392, PB1371) | low |
 | 2 | `BooleanOperators2002` (B-AND/B-OR/B-XOR/B-NOT + condition ENTRY + COMPUTE F2) | **both** | hybrid: pass for operator tiers + COMPUTE F2; **forward-detect** `boolExprAhead()` for the condition ENTRY | `BindBoolExpr` (guard `HasBoolOp`) | medium |
 | 3 | `FileSharingClause2002` (SELECT + OPEN SHARING) | gating-only | bind-time → pass (both sites) | SELECT clause; OPEN phrase | medium (OPEN name-list collision) |
 | 4 | `RetryPhrase2002` (RETRY on OPEN/READ/WRITE/REWRITE/DELETE) | **both** | **6 predicate sites** (`openClause:232`, `readStatement:291`, `writeStatement:343`, `rewriteStatement:384`, `deleteStatement:407`, `deleteFileStatement:425` in `Core/CobolIO.g4`) — hybrid: bind-time → pass for the 5 statement sites; **forward-detect** `retryPhraseAhead()` (§2.3) for OPEN | `BindRetry` | medium |

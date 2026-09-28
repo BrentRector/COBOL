@@ -168,7 +168,7 @@ public static class ConditionalCompilationProcessor
             _dialectLevel = dialectLevel;
             _edition = EditionInfo.Of(dialectLevel, permissive);
             _bag = diagnostics;
-            _diag = new DirectiveDiag(diagnostics, sourcePath, _flagScan);
+            _diag = new DirectiveDiag(diagnostics, sourcePath, _flagScan, _edition);
             // The ONE shared compile-time expression evaluator (ledger C2). Name resolution reads the CURRENT
             // `_defines` (a directive may reference a variable an earlier directive — or a copybook — set); the
             // frontend routes every formation diagnostic to COBOLNET1619; a directive operand is dot-decimal (§5.3).
@@ -523,6 +523,7 @@ public static class ConditionalCompilationProcessor
         if (DirectiveExpressionFragment.ParseOperand(text) is not { } frag) { diag.Malformed(where, text); return null; }
         var operand = frag.compileTimeOperand();
         diag.FlagArithmetic(operand);   // b COMPILE-TIME-ARITHMETIC-EXPRESSIONS (§7.3.15.4 GR4 b) — evaluated context
+        diag.GateBooleanOperators(operand);
         return evaluator.EvaluateOperand(operand, where);
     }
 
@@ -534,6 +535,8 @@ public static class ConditionalCompilationProcessor
         if (DirectiveExpressionFragment.ParseCce(text) is not { } frag) { diag.Malformed(where, text); return false; }
         var cce = frag.constantConditionalExpression();
         diag.FlagArithmetic(cce);   // b COMPILE-TIME-ARITHMETIC-EXPRESSIONS (§7.3.15.4 GR4 b) — evaluated context
+        diag.GateBooleanOperators(cce);
+        diag.GateLogicalOperators(cce);
         return evaluator.EvaluateCce(cce, where) ?? false;
     }
 
@@ -632,7 +635,8 @@ public static class ConditionalCompilationProcessor
     /// violation); the §7.3.11.3 SR2 redefinition is COBOLNET1618. <see cref="At"/> is set before each directive
     /// (kb/Work PB82: the SOURCE origin of the directive line — the copybook's own file and line when the directive
     /// is inside copied text — never an index into the text being rendered).</summary>
-    private sealed class DirectiveDiag(DiagnosticBag? bag, string? sourcePath, FlagScanState flagScan) : ICtDiagnostics
+    private sealed class DirectiveDiag(DiagnosticBag? bag, string? sourcePath, FlagScanState flagScan, EditionInfo edition)
+        : ICtDiagnostics
     {
         /// <summary>The source file the directives are read from (kb/Work PB82 — the identity origin of unmapped text).</summary>
         public string? SourcePath => sourcePath;
@@ -648,6 +652,25 @@ public static class ConditionalCompilationProcessor
             if (_flagScan.IsOn(FlagOption.Flag14CompileTimeArithmeticExpressions)
                 && (HasDescendant<CobolParserCore.AddOpContext>(tree) || HasDescendant<CobolParserCore.MulOpContext>(tree)))
                 FlagWarn(FlagOption.Flag14CompileTimeArithmeticExpressions, At);
+        }
+
+        /// <summary>The boolean-operator introduction gate over an evaluated directive fragment (kb/Work PB1370): a
+        /// compile-time boolean expression is "formed in accordance with 8.8.2" (ISO §7.3.7.2 SR1) OF THE TARGETED
+        /// EDITION, so a B-SHIFT-* below COBOL-2023 is the same COBOLNET0900 its runtime twin draws — asked through
+        /// the ONE body the compilation-unit walk uses (<see cref="BooleanOperatorGate"/>), once per fragment.</summary>
+        public void GateBooleanOperators(Antlr4.Runtime.Tree.IParseTree fragment)
+        {
+            if (bag is not null) BooleanOperatorGate.Check(edition, new BagSink(bag, At.ToLocation()), fragment);
+        }
+
+        /// <summary>The logical-operator introduction gate over an evaluated constant-conditional-expression
+        /// fragment (kb/Work PB1371): a >>IF operand is "a complex condition as specified in 8.8.4.9" (ISO §7.3.8.2
+        /// SR1 d)) of the targeted edition, so an XOR / EXCLUSIVE-OR connective below COBOL-2023 is the same
+        /// COBOLNET0900 its runtime twin draws — asked through the ONE body the compilation-unit walk uses
+        /// (<see cref="LogicalOperatorGate"/>), once per fragment.</summary>
+        public void GateLogicalOperators(Antlr4.Runtime.Tree.IParseTree fragment)
+        {
+            if (bag is not null) LogicalOperatorGate.Check(edition, new BagSink(bag, At.ToLocation()), fragment);
         }
 
         public void Report(CtDiagCode code, string message) => Emit("COBOLNET1619", message);

@@ -1353,7 +1353,9 @@ public static class DiagnosticCatalog
         + "is not permissible\". The sign-adjacency carve-out is §8.3.3.3.2 rule 2: a numeric literal is a "
         + "character-string and \"If a sign is used, it shall appear as the leftmost character of the literal\", "
         + "so a sign written against the digits belongs to the literal and forms the PERMISSIBLE (unary, literal) "
-        + "pair instead.",
+        + "pair instead. Table 4's boolean-shift row permits only an identifier or literal after B-SHIFT-L / "
+        + "B-SHIFT-R / B-SHIFT-LC / B-SHIFT-RC (§8.8.2 rule 5: \"The second operand shall be an integer operand\"), "
+        + "so a parenthesized, separately-signed or compound shift count is the same kind of invalid pair.",
         "ISO §8.8.1.2 Table 3 / §8.8.2 Table 4");
     // ⛔ THE LEVEL-NUMBER SETS (kb/Work PB485). §13.18.33.3 states FOUR sets, one per DATA DIVISION section, and
     // they are NOT the same set: 77 is legal in working-storage/local-storage/linkage (SR5) and illegal in a
@@ -2197,6 +2199,16 @@ public static class DiagnosticCatalog
         + "(§13.18.60.3 SR10's closed reference list), or a reference-modified slice (§8.4.3.3.4 GR6c makes it "
         + "category alphanumeric) is not a legal resultant.",
         "ISO §14.9.2.3 SR2/SR4 · §14.9.8.3 SR1 · §14.9.12.3 SR1/SR2 · §14.9.26.3 SR1/SR2 · §14.9.44.3");
+    // kb/Work PB1413 — the INTEGER half of §8.8.2 rule 5 for a boolean shift count. Its SHAPE half (Table 4's single
+    // identifier or literal) is COBOLNET1719's, so this code fires only on a well-formed count that is not an integer.
+    public static readonly DiagnosticDescriptor BooleanShiftCountNotInteger = new(
+        "COBOLNET2513", "boolean-shift-count-not-integer", EditionSeverity.Error,
+        "The second operand of a boolean shift operator (B-SHIFT-L / B-SHIFT-R / B-SHIFT-LC / B-SHIFT-RC) is not an "
+        + "integer operand. ISO §8.8.2 rule 5: \"The second operand shall be an integer operand.\" §5.5 2) makes that "
+        + "an integer literal (\"a fixed-point numeric literal that contains no decimal point\", §8.3.3.3.2), an "
+        + "integer intrinsic function, or a fixed-point numeric data item with no digit positions to the right of the "
+        + "radix point; §8.4.3.2.3 SR11 bars a numeric function even when its value is integral. Write an integer count.",
+        "ISO §8.8.2 rule 5");
     public static readonly DiagnosticDescriptor PerformTimesCountNotInteger = new(
         "COBOLNET1646", "perform-times-count-not-integer", EditionSeverity.Error,
         "The PERFORM … TIMES count is not an integer. ISO §14.9.28.3 SR2: \"Each identifier shall reference a numeric "
@@ -5040,6 +5052,18 @@ public static class DiagnosticCatalog
         + "its condition-name, §8.8.4.6.2) are none of them. Within an abbreviated combined relation condition the "
         + "same operand is the object of the carried relation (§8.8.4.12) and is not refused.",
         "ISO §8.8.4.2.1; §8.8.4.1");
+
+    // kb/Work PB1390 — the termination half of §8.8.4.12.4 GR1. An abbreviated relation (subject omitted) whose
+    // sequence has no stated subject to insert used to be refused with no diagnostic (the COBOLNET2319 internal net).
+    public static readonly DiagnosticDescriptor AbbreviatedRelationWithoutSubject = new(
+        "COBOLNET2552", "abbreviated-relation-without-subject", EditionSeverity.Error,
+        "A relation condition is written with its subject omitted where no subject can be inserted. ISO §8.8.4.12.1: "
+        + "\"any relation condition except the first may be abbreviated\" — and only within a consecutive sequence of "
+        + "relation conditions in which no parentheses are used; §8.8.4.12.4 GR1: \"The insertion of an omitted subject "
+        + "and/or relational operator terminates once a complete simple condition is encountered within a complex "
+        + "condition.\" So an abbreviated relation that follows a class, sign, condition-name, switch-status, boolean "
+        + "or parenthesized condition, or that opens a parenthesized group, has no subject. Write the subject.",
+        "ISO §8.8.4.12.1; §8.8.4.12.4 GR1");
 
     /// <summary>The internal-error net under the ONE <c>BoundConditionError</c> construction site (kb/Work PB982):
     /// a condition refused with no failing diagnostic recorded would compile clean and throw at run time.</summary>

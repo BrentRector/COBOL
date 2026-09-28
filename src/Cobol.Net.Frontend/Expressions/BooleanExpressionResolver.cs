@@ -24,17 +24,18 @@ using Core = CobolParserCore;
 /// </list>
 ///
 /// Precedence (rule 7b): B-NOT (handled at the <c>booleanFactor</c> level, tightest) &gt; B-AND &gt; B-XOR &gt;
-/// B-OR; a shift inherits the precedence of the operator lexically before it, or B-AND when it is the first
-/// operation. Equal precedence associates left-to-right (rule 7c). Parentheses evaluate first (rule 7a) — a
+/// B-OR; a shift inherits the precedence of the operation lexically before it — a B-NOT included — or B-AND
+/// when it is the first operation. Equal precedence associates left-to-right (rule 7c). Parentheses evaluate first (rule 7a) — a
 /// parenthesized sub-expression is a fresh <c>booleanExpression</c> resolved recursively through the
 /// <c>booleanFactor</c> leaf.
 /// </summary>
 public static class BooleanExpressionResolver
 {
-    /// <summary>Boolean binary-operator precedence (higher binds tighter): B-AND(3) &gt; B-XOR(2) &gt; B-OR(1).
-    /// A shift is assigned the precedence of the operation preceding it, defaulting to B-AND's when it is first
-    /// (§8.8.2 rule 7b tail).</summary>
-    private const int PrecAnd = 3, PrecXor = 2, PrecOr = 1, PrecShiftDefault = PrecAnd;
+    /// <summary>Boolean operation precedence (higher binds tighter): B-NOT(4) &gt; B-AND(3) &gt; B-XOR(2) &gt;
+    /// B-OR(1) — §8.8.2 rule 7b's 1st…4th. A shift is assigned the precedence of the operation preceding it,
+    /// defaulting to B-AND's when it is first (rule 7b tail). <see cref="PrecNot"/> is never stacked (B-NOT is
+    /// folded at the factor); it exists because a B-NOT IS an operation a following shift inherits from.</summary>
+    private const int PrecNot = 4, PrecAnd = 3, PrecXor = 2, PrecOr = 1, PrecShiftDefault = PrecAnd;
 
     /// <summary>Resolve <paramref name="ctx"/> to a single value of type <typeparamref name="T"/>, combining its
     /// operands per §8.8.2 rule 7.</summary>
@@ -68,7 +69,18 @@ public static class BooleanExpressionResolver
 
         foreach (var item in items)
         {
-            if (item.IsOperand) { operands.Push(item.Operand!); continue; }
+            if (item.IsOperand)
+            {
+                operands.Push(item.Operand!);
+                // ⛔ A NEGATED OPERAND ENDS WITH AN OPERATION TOO (kb/Work PB1370). Rule 7b's ladder names negation
+                // (B-NOT) 1st, and "the preceding operation" of `A B-AND B-NOT B B-SHIFT-R 1`'s shift is that
+                // B-NOT, not the B-AND: the shift takes negation's precedence and applies to (B-NOT B) alone, so
+                // the value is A B-AND ((B-NOT B) B-SHIFT-R 1). Tracking only BINARY operators here gave the shift
+                // B-AND's precedence and shifted (A B-AND B-NOT B) instead — a wrong answer in BOTH lanes, since
+                // the compile-time fold and the runtime binder share this resolver.
+                if (item.Negated) prevPrec = PrecNot;
+                continue;
+            }
 
             if (item.ShiftSuffix is { } suf)
             {
@@ -155,7 +167,8 @@ public static class BooleanExpressionResolver
     {
         // booleanShiftTerm : booleanFactor booleanShiftSuffix* — the factor is one operand; each suffix is a
         // shift operator whose right operand is the integer inside the suffix.
-        outp.Add(Item<T>.Val(ResolveFactor(s.booleanFactor(), leaf, not, binary, shift)));
+        var factor = s.booleanFactor();
+        outp.Add(Item<T>.Val(ResolveFactor(factor, leaf, not, binary, shift), negated: factor.B_NOT() is not null));
         foreach (var suf in s.booleanShiftSuffix())
             outp.Add(Item<T>.Shift(suf));
     }
@@ -177,15 +190,17 @@ public static class BooleanExpressionResolver
     // ── flat-sequence item + pending operator ────────────────────────────────────────────────────────────────
 
     /// <summary>One element of the flattened lexical sequence: a resolved operand, a binary operator, or a shift
-    /// suffix.</summary>
+    /// suffix. <see cref="Negated"/> marks an operand whose factor is a B-NOT — the operation a following shift
+    /// inherits its precedence from (§8.8.2 rule 7b).</summary>
     private readonly struct Item<T>
     {
         public bool IsOperand { get; private init; }
         public T? Operand { get; private init; }
+        public bool Negated { get; private init; }
         public char BinaryOp { get; private init; }
         public Core.BooleanShiftSuffixContext? ShiftSuffix { get; private init; }
 
-        public static Item<T> Val(T v) => new() { IsOperand = true, Operand = v };
+        public static Item<T> Val(T v, bool negated) => new() { IsOperand = true, Operand = v, Negated = negated };
         public static Item<T> Op(char c) => new() { BinaryOp = c };
         public static Item<T> Shift(Core.BooleanShiftSuffixContext s) => new() { ShiftSuffix = s };
     }

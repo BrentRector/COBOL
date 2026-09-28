@@ -8,6 +8,7 @@ using CobolNet.Binding.Passes; // GroupBindContext — this pass is the manifest
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;   // DiagnosticCatalog / EditionDiagnostic / EditionCodes / EditionSeverity(Policy) — the §8.9 funnel
 using CobolNet.Frontend.Common;        // CobolWordRule — the ONE §8.3.2.1 word-length ceiling (shared with the directive stages)
+using CobolNet.Frontend.Expressions;    // BooleanOperatorGate — the ONE boolean-operator introduction gate (both lanes)
 using CobolNet.Frontend.Generated;     // CobolParserCore / CobolLexer / CobolParserCoreBaseVisitor — the parse-tree arm
 using CobolNet.Frontend.Parsing;       // CobolKeywordTokens — the reverse vocab map (>>COBOL-WORDS SR3/SR4 category)
 
@@ -1974,14 +1975,14 @@ internal sealed class VersionConformancePass
 
         // ── Step 14h.4a: the clean expression/phrase gates (one unambiguous detection point each) ─────────────
 
-        /// <summary>The logical XOR / EXCLUSIVE-OR operator (ISO §8.8.4.9) — a COBOL-2023 introduction. A
-        /// <c>ChildCount &gt; 1</c> means an XOR/EXCLUSIVE_OR terminal was matched between two
-        /// <c>logicalAndExpression</c> operands (a bare below-2023 <c>logicalAndExpression</c> is one child,
-        /// untouched — the same guard BindXorSequence used).</summary>
-        public override object? VisitLogicalXorExpression(CobolParserCore.LogicalXorExpressionContext ctx)
+        /// <summary>The logical XOR / EXCLUSIVE-OR operator (ISO §8.8.4.9) — a COBOL-2023 introduction, recognized as
+        /// the ONE <c>xorOperator</c> node every tier spells it through (the condition's leading and succeeding tiers
+        /// and the EVALUATE partial-expression spine alike). The gate used to hang off <c>logicalXorExpression</c>
+        /// alone, so an XOR inside a partial expression (<c>WHEN &gt; 5 XOR &lt; 3</c>) compiled clean below 2023
+        /// (kb/Work PB1390). The body is <see cref="LogicalOperatorGate"/>, shared with the directive stage.</summary>
+        public override object? VisitXorOperator(CobolParserCore.XorOperatorContext ctx)
         {
-            if (ctx.ChildCount > 1)
-                _p.Check(Constructs.LogicalXorOperator2023, "the logical XOR operator");
+            LogicalOperatorGate.Check(_p._edition, _p._sink, ctx);
             return base.VisitChildren(ctx);
         }
 
@@ -2163,7 +2164,7 @@ internal sealed class VersionConformancePass
 
         // ── Step 14h.4b: the boolean-operator + national/boolean LITERAL gates (the delicate cases) ────────────
         // (1) The boolean OPERATORS gate is detected at the primaryCondition / computeStatement ALTITUDE with a
-        //     whole-subtree HasBoolOp scan — never per booleanExpression node: the tiers nest via parentheses /
+        //     whole-subtree operator scan (BooleanOperatorGate) — never per booleanExpression node: the tiers nest via parentheses /
         //     the relation form, so a per-node gate would over-count. (2) The national/boolean LITERAL gates fire
         //     for a PROCEDURE-DIVISION statement operand only (a StatementContext ancestor); a data-division VALUE
         //     literal is left to the data/PIC gate (its item's national/boolean USAGE, Step 14g) — firing here too
@@ -2176,18 +2177,16 @@ internal sealed class VersionConformancePass
         /// tiers nest through parentheses and through the relation form, so a gate hanging off the tier rule
         /// itself would fire once per nesting level and multiply the diagnostic. Passing a site's operand(s)
         /// here fires exactly once for that site, matching the binder's own altitude
-        /// (<c>be.Any(HasBoolOp)</c> in BindPrimaryBoolean).</para>
+        /// (<c>HasBoolOp</c> in ConditionBinder.BindPrimaryBoolean).</para>
         /// <para>⛔ IT WAS COPIED PER SITE UNTIL PB46 ADDED A THIRD ONE. Two identical four-line bodies is the
         /// point at which a new grammar site silently ships UNGATED — a 2023 shift operator accepted under
         /// <c>--std 2002</c>. The hosting sites are enumerated by <c>BooleanExpressionGateSiteDriftTests</c>,
-        /// which reads the .g4 files, so a fourth one fails a test instead of passing silently.</para></summary>
-        private void GateBooleanOperators(params CobolParserCore.BooleanExpressionContext?[] operands)
-        {
-            if (operands.Any(b => b is not null && HasBoolOp(b)))
-                _p.Check(Constructs.BooleanOperators2002, "the boolean operators (B-AND/B-OR/B-XOR/B-NOT)");
-            if (operands.Any(b => b is not null && HasShiftOp(b)))
-                _p.Check(Constructs.BooleanShiftOperators2023, "the boolean shift operators (B-SHIFT-L/R/LC/RC)");
-        }
+        /// which reads the .g4 files, so a fourth one fails a test instead of passing silently.</para>
+        /// <para>⛔ THE BODY IS <see cref="BooleanOperatorGate"/>, SHARED WITH THE DIRECTIVE STAGE (kb/Work PB1370): a
+        /// compile-time boolean expression is a site too, and it is parsed from a directive fragment this walk never
+        /// reaches, so the conditional-compilation stage asks the same body there.</para></summary>
+        private void GateBooleanOperators(params CobolParserCore.BooleanExpressionContext?[] operands) =>
+            BooleanOperatorGate.Check(_p._edition, _p._sink, operands);
 
         /// <summary>Site — a bare boolean-expression CALL argument (§14.9.4.2 Format 2's keyword-less
         /// boolean-expression-1; kb/Work PB130 — the callArgument alternation gained the guarded arm and
@@ -2360,31 +2359,6 @@ internal sealed class VersionConformancePass
             return false;
         }
 
-        /// <summary>Whether a boolean-expression subtree contains any B-operator terminal — the discriminator
-        /// between a genuine boolean expression and a bare operand parsed through the booleanExpression rule.
-        /// Mirrors the binder's <c>HasBoolOp</c> (StatementBinder.Boolean.cs), which stays there for its own
-        /// channel-routing use (a pure predicate, duplicated across the two layers it serves).</summary>
-        private static bool HasBoolOp(Antlr4.Runtime.Tree.IParseTree t)
-        {
-            if (t is Antlr4.Runtime.Tree.ITerminalNode term)
-                return term.Symbol.Type is CobolLexer.B_AND or CobolLexer.B_OR or CobolLexer.B_XOR or CobolLexer.B_NOT;
-            for (int i = 0; i < t.ChildCount; i++)
-                if (HasBoolOp(t.GetChild(i))) return true;
-            return false;
-        }
-
-        /// <summary>Whether a boolean-expression subtree contains any boolean SHIFT operator terminal (ISO §8.8.2,
-        /// 2023). A DISTINCT construct/edition from HasBoolOp (2023 vs 2002) — a program using only shift operators
-        /// at --std 2002 must get the shift's COBOLNET0900, not the boolean-operators-2002 message.</summary>
-        private static bool HasShiftOp(Antlr4.Runtime.Tree.IParseTree t)
-        {
-            if (t is Antlr4.Runtime.Tree.ITerminalNode term)
-                return term.Symbol.Type is CobolLexer.B_SHIFT_L or CobolLexer.B_SHIFT_R
-                    or CobolLexer.B_SHIFT_LC or CobolLexer.B_SHIFT_RC;
-            for (int i = 0; i < t.ChildCount; i++)
-                if (HasShiftOp(t.GetChild(i))) return true;
-            return false;
-        }
 
         // Which cobolWord token TYPES the funnel checks POSITION-BLIND (P2.4, refined — DEVLOG 585): IDENTIFIER
         // occurrences are ALWAYS genuine words (the lexer didn't tokenize them), and they carry the whole

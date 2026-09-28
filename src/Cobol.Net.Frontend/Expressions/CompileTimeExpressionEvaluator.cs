@@ -102,7 +102,7 @@ public sealed class CompileTimeExpressionEvaluator
             bool floating = CobolNet.Common.NumericLiteral.IsFloatingPointForm(text);
             if (!floating && !WithinLiteralCapacity(text, lit, where)) return null;
             if (CtNumeric.TryParseLiteral(text, out var v))
-                return new CtNumber(true, v, lit, IsInteger: !floating && !text.Contains('.'));
+                return new CtNumber(true, v, lit, IsInteger: CobolNet.Common.NumericLiteral.IsIntegerLiteralForm(text));
             _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the numeric literal '{lit}' lies outside the "
                 + "decimal128 range this compiler gives a numeric literal, about 1E-6176 to 9.99E+6144 (ISO "
                 + "§8.3.3.3.3 r3; §8.8.1.5.2 r2; CONFORMANCE.md §7)");
@@ -392,17 +392,27 @@ public sealed class CompileTimeExpressionEvaluator
     }
 
     /// <summary>Apply one boolean shift suffix (<c>(B-SHIFT-L|R|LC|RC) integer</c>, §8.8.2 rule 8). The second
-    /// operand is an INTEGER operand (rule 5) — evaluated through the arithmetic boundary (GR3-truncated) then
-    /// required to be integral; a negative count is rejected (the spec defines only counts ≥ 1). Result length =
-    /// the first operand's length.</summary>
+    /// operand is an INTEGER operand (rule 5). Its SHAPE — a single identifier or literal (Table 4) — was already
+    /// screened by <see cref="FormationViolation"/> through the shared <see cref="ArithmeticFormationRules"/>, so it
+    /// is one literal or one compilation-variable name here (kb/Work PB1370). Either way the operand the rule sees
+    /// is a LITERAL (a name is used "where a literal of the category associated with the name is permitted",
+    /// §7.3.11.4 GR1, and stands for its value), and §5.5 2) a) requires an INTEGER literal —
+    /// a FORM test (<see cref="CobolNet.Common.NumericLiteral.IsIntegerLiteralForm"/>), so <c>1.0</c> is refused
+    /// though its value is integral, and a name holding 1.5 is refused rather than truncated. A negative count is
+    /// rejected (the spec defines only counts ≥ 1). Result length = the first operand's length.</summary>
     private BitString? BooleanShift(BitString? operand, Core.BooleanShiftSuffixContext suf, string where)
     {
         if (operand is null) return null;   // already reported
         bool circular = suf.B_SHIFT_LC() is not null || suf.B_SHIFT_RC() is not null;
         bool left = suf.B_SHIFT_L() is not null || suf.B_SHIFT_LC() is not null;
-        if (EvaluateDirectiveArithmetic(suf.arithmeticExpression(), where) is not { } count) return null;
-        if (!CtNumeric.IsInteger(count.Value))
-        { ReportDirective(where, "the second operand of a boolean shift shall be an integer operand (ISO §8.8.2 rule 5)"); return null; }
+        if (ShiftCount(suf.arithmeticExpression(), where) is not { } count) return null;
+        if (!count.IsInteger)
+        {
+            ReportDirective(where, $"the second operand of a boolean shift shall be an integer operand (ISO §8.8.2 "
+                + $"rule 5) — '{count.Literal}' is not an integer literal: \"An integer literal is a fixed-point numeric "
+                + "literal that contains no decimal point\" (ISO §8.3.3.3.2; §5.5 2) a))");
+            return null;
+        }
         if (count.Value.Sig < 0)
         { ReportDirective(where, "a boolean shift count shall not be negative (ISO §8.8.2 rule 8)"); return null; }
         // Reduce the count to a small equivalent BEFORE the (long) cast so an astronomically large literal count
@@ -418,21 +428,55 @@ public sealed class CompileTimeExpressionEvaluator
         return operand.Shift(k, circular, left);
     }
 
+    /// <summary>The literal a well-formed shift count stands for: a numeric literal as written, or the value of a
+    /// previously-defined NUMERIC compilation variable (§7.3.11.4 GR1 — the name stands for its literal, whose
+    /// text <see cref="CtValue.Text"/> keeps; an expression-valued variable's text is its §7.3.6.3 GR3 integer), its
+    /// <see cref="CtNumber.IsInteger"/> the ONE integer-literal form test over that text. <see langword="null"/>
+    /// (reported) otherwise — a name is never GR3-truncated here, which is what let a variable holding 1.5 shift
+    /// by 1.</summary>
+    private CtNumber? ShiftCount(Core.ArithmeticExpressionContext count, string where)
+    {
+        if (SoleDataRef(count) is not { } dref) return EvaluateDirectiveArithmetic(count, where);
+        if (dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w
+            && _resolveName(w.GetText()) is { Category: CtCategory.Numeric } cv)
+            return new CtNumber(true, cv.Number, cv.Text,
+                IsInteger: CobolNet.Common.NumericLiteral.IsIntegerLiteralForm(cv.Text));
+        ReportDirective(where, $"'{dref.GetText()}' — the second operand of a boolean shift shall be an integer "
+            + "operand (ISO §8.8.2 rule 5): an integer literal or a previously-defined numeric compilation variable "
+            + "holding one (§7.3.11.4 GR1)");
+        return null;
+    }
+
     // ══ Constant-conditional-expression (§7.3.8) over the ANTLR tree ═════════════════════════════════════════════
 
     /// <summary>Evaluate a constant-conditional-expression (ISO §7.3.8) — true/false, or <see langword="null"/>
     /// when a formation rule is violated (already reported). Per §8.8.4.13 the VALUE may short-circuit, but a
-    /// FORMATION error is reportable regardless of branch, so every AND/OR operand is evaluated; the frontend
+    /// FORMATION error is reportable regardless of branch, so every AND/XOR/OR operand is evaluated; the frontend
     /// treats a null result as false for line selection.</summary>
     public bool? EvaluateCce(Core.ConstantConditionalExpressionContext cce, string where) => EvalCceOr(cce.cceOr(), where);
 
     private bool? EvalCceOr(Core.CceOrContext o, string where)
     {
         bool result = false, ok = true;
-        foreach (var a in o.cceAnd())
+        foreach (var x in o.cceXor())
+        {
+            var v = EvalCceXor(x, where);
+            if (v is null) ok = false; else result |= v.Value;
+        }
+        return ok ? result : (bool?)null;
+    }
+
+    /// <summary>The exclusive-or tier (§8.8.4.9 — "true if one but not both of the included conditions is true";
+    /// precedence between AND and OR, §8.8.4.11.3). Both operands are always evaluated, as for AND and OR — and XOR
+    /// has no short circuit to take in any case. Its 2023 introduction gate is the conditional-compilation stage's
+    /// (<see cref="LogicalOperatorGate"/>), asked of the whole fragment before it is evaluated (kb/Work PB1371).</summary>
+    private bool? EvalCceXor(Core.CceXorContext x, string where)
+    {
+        bool result = false, ok = true;
+        foreach (var a in x.cceAnd())
         {
             var v = EvalCceAnd(a, where);
-            if (v is null) ok = false; else result |= v.Value;
+            if (v is null) ok = false; else result ^= v.Value;
         }
         return ok ? result : (bool?)null;
     }
@@ -448,10 +492,10 @@ public sealed class CompileTimeExpressionEvaluator
         return ok ? result : (bool?)null;
     }
 
+    /// <summary>§8.8.4.10's negation — one NOT at most (Table 5: 'NOT NOT' is not permissible; the grammar's
+    /// <c>NOT? ccePrimary</c> makes a second one a malformed fragment).</summary>
     private bool? EvalCceNot(Core.CceNotContext n, string where) =>
-        n.NOT() is not null
-            ? EvalCceNot(n.cceNot(), where) is { } inner ? !inner : (bool?)null
-            : EvalCcePrimary(n.ccePrimary(), where);
+        EvalCcePrimary(n.ccePrimary(), where) is { } v ? (n.NOT() is not null ? !v : v) : (bool?)null;
 
     private bool? EvalCcePrimary(Core.CcePrimaryContext p, string where)
     {

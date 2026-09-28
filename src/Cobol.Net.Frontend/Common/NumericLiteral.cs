@@ -47,6 +47,14 @@ public static class NumericLiteral
         return text.Replace(',', '.');
     }
 
+    /// <summary>⛔ THE ONE integer-literal FORM test — ISO §8.3.3.3.2: "An integer literal is a fixed-point numeric
+    /// literal that contains no decimal point." It is the FORM, not the value: <c>1.0</c> is not an integer literal
+    /// though its value is integral, and no §8.3.3.3.3 floating-point literal is one (its significand includes a
+    /// decimal point). Either separator counts — the text may be as written (a ',' under DECIMAL-POINT IS COMMA) or
+    /// canonical. Read by the compiler's integer classifier (<c>IntrinsicResultType.IsIntegerOperand</c>) and the
+    /// compile-time boolean-shift count (kb/Work PB1413), so the two lanes answer §5.5 2) a) the same way.</summary>
+    public static bool IsIntegerLiteralForm(string text) => !text.Contains('.') && !text.Contains(',');
+
     /// <summary>True when <paramref name="text"/> (canonical dot-decimal) has the FLOATING-POINT numeric literal form
     /// of ISO §8.3.3.3.3: a fixed-point significand (optional sign, digits, at most one decimal point), the letter E,
     /// and an optionally signed integer exponent — <c>1.5E+3</c>, <c>-2.5E-2</c>. Fixed-point text and any

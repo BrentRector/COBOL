@@ -352,7 +352,7 @@ internal static class IntrinsicResultType
         // not an integer literal though its value is integral, and no §8.3.3.3.3 floating-point literal can be
         // one either — r2 requires its significand to "include a decimal point", so the test excludes the whole
         // floating form without naming it (kb/Work PB248 re-derived this arm and left it unchanged).
-        BoundNumericLiteral n => !n.Text.Contains('.') && !n.Text.Contains(','),
+        BoundNumericLiteral n => CobolNet.Common.NumericLiteral.IsIntegerLiteralForm(n.Text),
         // ⛔ THE ONE §5.5 2)b)2. PRIMITIVE (kb/Work PB248). This arm read the SCALE alone —
         // `{ Category: Numeric, Scale: <= 0, Usage: not Index }` — and a floating-point item is PICTURE-less, so
         // PicInfo.FloatItem gives it Scale 0 and it answered TRUE: `PERFORM … F TIMES` over a COMP-2 holding 3.7

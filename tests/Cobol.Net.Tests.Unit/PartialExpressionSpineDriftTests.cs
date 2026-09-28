@@ -66,6 +66,40 @@ public sealed class PartialExpressionSpineDriftTests
         Assert.Equal(conditionTail, partialTail);
     }
 
+    /// <summary>⛔ THE SUCCEEDING TIERS ARE THE SAME MIRROR (kb/Work PB1390). Every connective's operand — at the OR,
+    /// XOR and AND tier alike — is a SUCCEEDING tier whose leftmost element may be §8.8.4.12's abbreviated relation
+    /// ("any relation condition except the first may be abbreviated", §8.8.4.12.1). They differ from the leading
+    /// tiers in the leading element only, so their tails are extracted from the leading tiers and required
+    /// identical: the abbreviated tail used to be spelled three different ways, one per tier, and each spelling
+    /// rejected a different legal mix.</summary>
+    [Theory]
+    // succeeding tier            its first element          the leading tier it mirrors   that tier's first element
+    [InlineData("succeedingXorExpression", "succeedingAndExpression", "logicalXorExpression", "logicalAndExpression")]
+    [InlineData("succeedingAndExpression", "succeedingCondition", "logicalAndExpression", "unaryLogicalExpression")]
+    public void EachSucceedingTier_HasTheSameTailAsTheLeadingTierItMirrors(
+        string succeedingRule, string succeedingHead, string leadingRule, string leadingHead)
+    {
+        string succeedingTail = TailAfter(RuleBody("CobolExpressions.g4", succeedingRule), succeedingHead);
+        string leadingTail = TailAfter(RuleBody("CobolExpressions.g4", leadingRule), leadingHead);
+        Assert.Equal(leadingTail, succeedingTail);
+    }
+
+    /// <summary>Every connective of every leading tier takes a SUCCEEDING operand, and a succeeding condition is an
+    /// abbreviated relation or an ordinary (NOT-)condition — nothing else. A connective that took a leading-tier
+    /// operand again would reject `A = B OR &lt; C` at that tier (the PB1390 shape).</summary>
+    [Fact]
+    public void EveryConnective_TakesASucceedingOperand()
+    {
+        Assert.Equal("logicalXorExpression ( OR succeedingXorExpression )*",
+            RuleBody("CobolExpressions.g4", "logicalOrExpression"));
+        Assert.Equal("logicalAndExpression ( xorOperator succeedingAndExpression )*",
+            RuleBody("CobolExpressions.g4", "logicalXorExpression"));
+        Assert.Equal("unaryLogicalExpression ( AND succeedingCondition )*",
+            RuleBody("CobolExpressions.g4", "logicalAndExpression"));
+        Assert.Equal("abbreviatedRelation | unaryLogicalExpression",
+            RuleBody("CobolExpressions.g4", "succeedingCondition"));
+    }
+
     /// <summary>SR5's three shapes, each named in <c>partialComparison</c>, and each the SAME shape
     /// <c>comparisonExpression</c> writes with a leading <c>comparisonOperand</c>. A shape that appears in one and
     /// not the other means one of the two spellings of a rule can express something the other cannot.</summary>

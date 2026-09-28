@@ -52,82 +52,62 @@ internal sealed class ConditionBinder
         return ExpandAbbreviatedConditions(bound);
     }
 
+    // The condition tiers (ISO §8.8.4.9; NOT > AND > XOR > OR, §8.8.4.11.3). Each LEADING tier holds the first
+    // simple condition; every connective's operand is a SUCCEEDING tier whose leftmost element may be an
+    // abbreviated relation (§8.8.4.12; kb/Work PB1390). The abbreviations are expanded afterwards by
+    // ExpandAbbreviatedConditions, so the tiers only fold.
     internal BoundExpression BindLogicalOr(CobolParserCore.LogicalOrExpressionContext ctx)
     {
-        // First child is always a logicalXorExpression (XOR binds tighter than OR — ISO §8.8.4.11.3).
-        var xorExprs = ctx.logicalXorExpression();
-        var result = BindLogicalXor(xorExprs[0]);
-
-        // Iterate through children after the first operand, matching OR tokens with their alternatives
-        // (logicalXorExpression or an abbreviated AND chain).
-        for (int i = 1; i < ctx.ChildCount; i++)
-        {
-            var child = ctx.GetChild(i);
-            if (child is Antlr4.Runtime.Tree.ITerminalNode)
-                continue; // skip OR tokens
-
-            BoundExpression right;
-            if (child is CobolParserCore.LogicalXorExpressionContext xorCtx)
-            {
-                right = BindLogicalXor(xorCtx);
-            }
-            else if (child is CobolParserCore.AbbreviatedAndChainContext chainCtx)
-            {
-                right = BindAbbreviatedAndChain(chainCtx);
-            }
-            else
-                continue;
-
-            result = new BoundBinaryExpression(result,
-                BoundBinaryOperatorKind.Or,
-                right, CobolCategory.Unknown);
-        }
+        var result = BindLogicalXor(ctx.logicalXorExpression());
+        foreach (var s in ctx.succeedingXorExpression())
+            result = new BoundBinaryExpression(result, BoundBinaryOperatorKind.Or, BindSucceedingXor(s),
+                CobolCategory.Unknown);
         return result;
     }
 
-    // COBOL-2002 logical exclusive-or (ISO §8.8.4.9; precedence between OR and AND). XOR / EXCLUSIVE-OR are
+    // COBOL-2023 logical exclusive-or (ISO §8.8.4.9; precedence between OR and AND). XOR / EXCLUSIVE-OR are
     // equivalent; the truth value is true iff exactly one operand condition is true.
     internal BoundExpression BindLogicalXor(CobolParserCore.LogicalXorExpressionContext ctx)
     {
-        var andExprs = ctx.logicalAndExpression();
-        var result = BindLogicalAnd(andExprs[0]);
-        for (int i = 1; i < andExprs.Length; i++)
-            result = new BoundBinaryExpression(result, BoundBinaryOperatorKind.Xor,
-                BindLogicalAnd(andExprs[i]), CobolCategory.Unknown);
+        var result = BindLogicalAnd(ctx.logicalAndExpression());
+        foreach (var s in ctx.succeedingAndExpression())
+            result = new BoundBinaryExpression(result, BoundBinaryOperatorKind.Xor, BindSucceedingAnd(s),
+                CobolCategory.Unknown);
         return result;
     }
 
     internal BoundExpression BindLogicalAnd(CobolParserCore.LogicalAndExpressionContext ctx)
     {
-        // First child is always a unaryLogicalExpression
-        var notExprs = ctx.unaryLogicalExpression();
-        var result = BindUnaryLogical(notExprs[0]);
-
-        // Iterate through children after the first unaryLogicalExpression
-        for (int i = 1; i < ctx.ChildCount; i++)
-        {
-            var child = ctx.GetChild(i);
-            if (child is Antlr4.Runtime.Tree.ITerminalNode)
-                continue; // skip AND tokens
-
-            BoundExpression right;
-            if (child is CobolParserCore.UnaryLogicalExpressionContext unaryCtx)
-            {
-                right = BindUnaryLogical(unaryCtx);
-            }
-            else if (child is CobolParserCore.AbbreviatedRelationContext abbrevCtx)
-            {
-                right = BindAbbreviatedRelation(abbrevCtx);
-            }
-            else
-                continue;
-
-            result = new BoundBinaryExpression(result,
-                BoundBinaryOperatorKind.And,
-                right, CobolCategory.Unknown);
-        }
+        var result = BindUnaryLogical(ctx.unaryLogicalExpression());
+        foreach (var s in ctx.succeedingCondition())
+            result = new BoundBinaryExpression(result, BoundBinaryOperatorKind.And, BindSucceedingCondition(s),
+                CobolCategory.Unknown);
         return result;
     }
+
+    internal BoundExpression BindSucceedingXor(CobolParserCore.SucceedingXorExpressionContext ctx)
+    {
+        var ands = ctx.succeedingAndExpression();
+        var result = BindSucceedingAnd(ands[0]);
+        for (int i = 1; i < ands.Length; i++)
+            result = new BoundBinaryExpression(result, BoundBinaryOperatorKind.Xor, BindSucceedingAnd(ands[i]),
+                CobolCategory.Unknown);
+        return result;
+    }
+
+    internal BoundExpression BindSucceedingAnd(CobolParserCore.SucceedingAndExpressionContext ctx)
+    {
+        var conds = ctx.succeedingCondition();
+        var result = BindSucceedingCondition(conds[0]);
+        for (int i = 1; i < conds.Length; i++)
+            result = new BoundBinaryExpression(result, BoundBinaryOperatorKind.And, BindSucceedingCondition(conds[i]),
+                CobolCategory.Unknown);
+        return result;
+    }
+
+    /// <summary>A non-first simple condition: an abbreviated relation (§8.8.4.12) or an ordinary (NOT-)condition.</summary>
+    internal BoundExpression BindSucceedingCondition(CobolParserCore.SucceedingConditionContext ctx) =>
+        ctx.abbreviatedRelation() is { } abbrev ? BindAbbreviatedRelation(abbrev) : BindUnaryLogical(ctx.unaryLogicalExpression());
 
     /// <summary>
     /// Bind an abbreviated relational condition (COBOL-85 section 6.3.4.2).
@@ -147,25 +127,6 @@ internal sealed class ConditionBinder
         // The right operand is the value; the operator is parsed.
         // Left operand will be filled from context by RewriteAbbreviatedRelations.
         return new BoundAbbreviatedExpression(op, right);
-    }
-
-    /// <summary>
-    /// Bind an abbreviated AND chain: one or more abbreviated relations connected by AND.
-    /// Used after OR when abbreviated forms include AND chaining:
-    ///   IF A = B OR = C AND = D  ->  OR (= C AND = D)
-    /// </summary>
-    internal BoundExpression BindAbbreviatedAndChain(CobolParserCore.AbbreviatedAndChainContext ctx)
-    {
-        var abbrevs = ctx.abbreviatedRelation();
-        var result = BindAbbreviatedRelation(abbrevs[0]);
-        for (int i = 1; i < abbrevs.Length; i++)
-        {
-            var right = BindAbbreviatedRelation(abbrevs[i]);
-            result = new BoundBinaryExpression(result,
-                BoundBinaryOperatorKind.And,
-                right, CobolCategory.Unknown);
-        }
-        return result;
     }
 
     internal BoundExpression BindUnaryLogical(CobolParserCore.UnaryLogicalExpressionContext ctx)

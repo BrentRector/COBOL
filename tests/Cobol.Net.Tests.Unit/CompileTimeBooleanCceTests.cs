@@ -115,10 +115,12 @@ public sealed class CompileTimeBooleanCceTests
         Assert.Contains(diag.Reports, x => x.Code == CtDiagCode.DirectiveRule && x.Message.Contains("integer operand"));
     }
 
-    [Fact] // §8.8.2 rule 8 — a negative shift count is rejected.
+    [Fact] // §8.8.2 rule 8 — a negative shift count is rejected. The sign is WRITTEN AGAINST the digits, so `-1` is
+           // one integer literal (§8.3.3.3.2); `- 1` is a unary operator, the Table 4 formation error
+           // BooleanExpressionFormationTests covers (kb/Work PB1413).
     public void Boolean_NegativeShiftCount_Rejected()
     {
-        var (v, diag) = EvalOperand("B\"1100\" B-SHIFT-L - 1");
+        var (v, diag) = EvalOperand("B\"1100\" B-SHIFT-L -1");
         Assert.Null(v);
         Assert.Contains(diag.Reports, x => x.Code == CtDiagCode.DirectiveRule && x.Message.Contains("negative"));
     }

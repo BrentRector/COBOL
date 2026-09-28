@@ -179,7 +179,7 @@ public class BoundTreeBuilderDecompositionTests
     [InlineData("BindLogicalOr")]
     [InlineData("BindLogicalAnd")]
     [InlineData("BindAbbreviatedRelation")]
-    [InlineData("BindAbbreviatedAndChain")]
+    [InlineData("BindSucceedingCondition")]
     [InlineData("BindUnaryLogical")]
     [InlineData("BindPrimaryCondition")]
     [InlineData("BindSignConditionFromComparison")]

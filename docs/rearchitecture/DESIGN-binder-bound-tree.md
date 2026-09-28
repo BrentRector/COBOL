@@ -482,7 +482,7 @@ to offer, and `dialect_two_axes` constrains the leniencies this compiler impleme
 
 | Entry | Rule that governs | Where | r7 lane |
 |---|---|---|---|
-| ADD/SUBTRACT/MULTIPLY/DIVIDE senders · COMPUTE RHS · CONTINUE AFTER · RETRY · ALLOCATE · START WITH LENGTH · boolean-shift count · CALL BY CONTENT/REFERENCE arithmetic arg | §8.8.1.1 — genuinely `arithmetic-expression-1` | `BindExpr` | arithmetic: warn+coerce |
+| ADD/SUBTRACT/MULTIPLY/DIVIDE senders · COMPUTE RHS · CONTINUE AFTER · RETRY · ALLOCATE · START WITH LENGTH · boolean-shift count (bound here, then narrowed to §8.8.2 rule 5's ONE integer operand: Table 4 shape by `ExpressionFormationPass`, integer-ness by `IntrinsicResultType.IsIntegerOperand` — kb/Work PB1413) · CALL BY CONTENT/REFERENCE arithmetic arg | §8.8.1.1 — genuinely `arithmetic-expression-1` | `BindExpr` | arithmetic: warn+coerce |
 | SET TO / UP BY / CAPACITY / SIZE · pointer SET UP BY · compound relation / EVALUATE operand | §8.8.1.1 + r7 window + SR10 | `BindIndexWindowExpr` | exempt (r7 lists them) |
 | PERFORM VARYING FROM/BY · D18 **subscript** segment | §8.8.1.1 + r7 window; SR10 does NOT list them, so an index **data item** takes axis A (PB215) | `BindIndexNameWindowOperandExpr` / `BindIndexNameWindowExpr` | exempt (r7 lists them) |
 | RW VARYING FROM/BY | §13.18.64.2 → §8.8.1.1; on neither index list (PB215) | `BindExpr` | arithmetic: warn+coerce |

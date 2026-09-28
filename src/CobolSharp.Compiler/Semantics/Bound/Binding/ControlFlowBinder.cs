@@ -403,8 +403,8 @@ internal sealed class ControlFlowBinder
             {
                 var item = items[0];
                 // Check if WHEN item is TRUE or FALSE via condition → booleanLiteral
-                var boolLit = item.condition()?.logicalOrExpression()?.logicalXorExpression(0)?.logicalAndExpression(0)
-                    ?.unaryLogicalExpression(0)?.primaryCondition()?.booleanLiteral();
+                var boolLit = item.condition()?.logicalOrExpression()?.logicalXorExpression()?.logicalAndExpression()
+                    ?.unaryLogicalExpression()?.primaryCondition()?.booleanLiteral();
                 if (boolLit?.TRUE_() != null)
                     return new BoundEvaluateConditionWhen(classConditionSubject);
                 if (boolLit?.FALSE_() != null)
@@ -417,8 +417,8 @@ internal sealed class ControlFlowBinder
             if (condNameSubject is BoundConditionNameExpression condNameExpr && items.Length > 0)
             {
                 var item = items[0];
-                var boolLit = item.condition()?.logicalOrExpression()?.logicalXorExpression(0)?.logicalAndExpression(0)
-                    ?.unaryLogicalExpression(0)?.primaryCondition()?.booleanLiteral();
+                var boolLit = item.condition()?.logicalOrExpression()?.logicalXorExpression()?.logicalAndExpression()
+                    ?.unaryLogicalExpression()?.primaryCondition()?.booleanLiteral();
                 if (boolLit?.TRUE_() != null)
                     return new BoundEvaluateConditionWhen(condNameExpr);
                 if (boolLit?.FALSE_() != null)
