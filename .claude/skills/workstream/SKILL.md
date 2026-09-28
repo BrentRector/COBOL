@@ -3,7 +3,12 @@ name: workstream
 description: Use BEFORE dispatching any fleet, lander, implementer or adjudication workflow - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
 ---
 
-> **Generic base:** [`agent-fleet`](https://github.com/BrentRector/claude-skills/blob/main/skills/agent-fleet/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
+> ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:agent-fleet` (Skill tool) before reading on. If the plugin is not loaded
+> (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/agent-fleet/SKILL.md` instead
+> (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
+> what is specific to WiseOwl COBOL — commands, paths, kb/Work, push-main, the owner's dated decisions and
+> measurements — and wins on conflict. Pinned: **brent-tools 1.8.1** (`tools/claude-skills`, kb/Work/PB1699). A
+> practice improved here is written into the public base first, then consumed by moving the pin.
 
 # Workstream — token-frugal, restart-safe orchestration
 
@@ -65,7 +70,7 @@ design, every attempt, result, limits and decision. The `.json` holds the raw pe
 `scripts/telemetry/workflow_metrics.py`, because transcripts are pruned. Failures and null results are recorded too.
 ⭐ **The handoff is STAMPED (kb/Work/PB1698, 2026-09-28).** STATUS.md's first line is `STATUS-AT: <sha>`, which names
 the commit it describes and is written after that commit. A resumer or same-file successor runs
-`python scripts/spec/status_delta.py <worktree>`:
+`python tools/claude-skills/skills/agent-fleet/references/status_delta.py <worktree>`:
 - CURRENT: the summary covers the whole branch.
 - STALE: read only the commits it lists.
 - UNSTAMPED or DIVERGED: read them all.
@@ -104,7 +109,7 @@ which case the register's own clustering rule says they were one mechanism to be
 
 **⭐ Group related fixes — owner decision 2026-09-13 ("adopt it").** The FILL UNIT is a GROUP: the harm-ranked note plus every open note that shares its named source files or its rule family (the registrar's root-cause cluster, or a grep of the notes' code sites) — three or four notes, one implementer, one branch, one gate, one report with a section per note; the mechanism rule above still governs the WORK inside the group (each note fixed at its root, checkpoint per mechanism, SPLIT at a note boundary at the turn cap). Evidence: trains 37/38 re-merged PB416/PB391 (MOVE validity), PB419/PB420/PB425 (INITIALIZE and MOVE emitters) and PB443/PB877 (the subscript resolver) pairwise, two composition defects appeared that neither implementer could see, and half the reports folded a sibling note. A group touching a shared seam runs `~CorpusRunner` + `~Nist` at the implementer's gate (the PB425 drop).
 ⭐ **THE GROUPS ARE COMPUTED, NOT EYEBALLED — owner 2026-09-27 ("group fixes so all fixes in one source file, or one
-small set of related code, all get fixed in one pass").** `python scripts/spec/fix_clusters.py [--json out.json]`
+small set of related code, all get fixed in one pass").** `python tools/claude-skills/skills/agent-fleet/references/fix_clusters.py [--json out.json]`
 resolves every open defect's named code sites to real `src/Cobol.Net.*` files, gives each note a PRIMARY file, and
 clusters notes by it (cap 5, split by harm, singletons absorbed into a cluster whose file they also name), ranked by
 summed harm. **Fill each slot with the top-ranked cluster of a subsystem not already in flight**, never a hand-picked
@@ -113,7 +118,7 @@ a six-slot wave carries ~25–30 defects instead of ~10. Wave 65, grouped by han
 defects across two implementers (A and E) and left three of `ReferenceFormatProcessor.cs`'s five behind.
 
 ⭐ **ORIENTATION IS PAID ONCE, NOT ONCE PER WAVE — owner 2026-09-27 ("over many waves, more of the same orientation
-… can we reduce the repeated work?").** Every dispatch spec tells the implementer to run `python scripts/spec/orient.py
+… can we reduce the repeated work?").** Every dispatch spec tells the implementer to run `python tools/claude-skills/skills/agent-fleet/references/orient.py
 <the files its notes name>` BEFORE reading any source (MANDATORY-PRACTICES P6; `check_practices.py` refuses a spec
 without it). It prints each file's outline with line numbers, cited clauses, covering tests, what LANDED notes learned
 about the file (their code sites and mechanisms, newest first), the open notes naming it, and recent commits. It is
@@ -271,11 +276,9 @@ in-flight worktrees.
 
 ## 5. On restart after a cutoff
 
-1. Read the reset time off the 429 message; check `date` against it.
-2. `git status` on main — a dead lander may have applied its patch (finish from the NEXT step; never re-apply).
-3. `git worktree list` + dirt per worktree (`git -C <wt> status --short -- . ':!.claude/settings.local.json'`) +
-   `STATUS.md` per worktree → who is near done.
-4. Dispatch FRESH agents from checkpoints in landing order; resume in place only the near-done ones.
+The base's §12 "On restart after a cutoff" applies as written: its `status_delta.py` is
+`tools/claude-skills/skills/agent-fleet/references/status_delta.py <worktree>`, and `.agent-fleet.json` already
+leaves `.claude/settings.local.json` out of its uncommitted list.
 
 ## 6. Templates (substitute the session's paths for `{SCRATCH}`, `{PIN}`)
 

@@ -3,7 +3,13 @@ name: review
 description: Use when asked for a code review, architecture review, performance review, or duplication/efficiency analysis - the four review dimensions the owner requires, run as parallel agents with project-specific criteria and adversarial verification.
 ---
 
-> **Generic base:** [`review`](https://github.com/BrentRector/claude-skills/blob/main/skills/review/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
+> ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:review` (Skill tool) before reading on — its steps (target, free
+> checks, triage, calibration, parallel dimension agents + specialist agents, adversarial verification, sibling sweep,
+> report format) are the procedure. If the plugin is not loaded (a cloud session receives no project marketplace),
+> Read `tools/claude-skills/skills/review/SKILL.md` instead (`git submodule update --init tools/claude-skills` if the
+> path is missing). THEN apply this overlay: the project's review rules, which the base's "Project hooks" section
+> says to honor as hard criteria. It wins on conflict. Pinned: **brent-tools 1.8.1** (`tools/claude-skills`,
+> kb/Work/PB1699). Project context: scale=long-lived, consequence=high.
 
 # Review
 
@@ -55,25 +61,11 @@ Repeated logic · two mechanisms doing one job · redundant recomputation of som
 anything a single canonical implementation should absorb. This is the dimension most often skipped and the one the
 owner named explicitly.
 
-## Verify before reporting
+## Verify, report, scale
 
-Review output is candidate findings, not conclusions. **Adversarially verify each one** — spawn a skeptic per
-finding prompted to REFUTE it, and default to refuted when uncertain. A plausible-but-wrong finding costs more than
-a missed one, because it sends the next session to rewrite working code.
+The base's Step 6 (adversarial verification), Step 8 (report) and Scale apply as written. Here, additionally:
 
-When a verification pass AGREES, check that it agrees with the REASONING. A right answer held for a wrong reason is
-a latent defect — record corrected rationales, not just corrected verdicts.
-
-## Report
-
-Use `ReportFindings` when the host asks for it; otherwise a ranked list, most severe first. Every finding needs a
-concrete failure scenario (inputs/state → wrong output), not a style opinion. **Findings become tracked work** — a
-real defect goes into `docs/rearchitecture/CONFORMANCE-FIX-QUEUE.md`, not into prose that evaporates.
-
-If nothing survives verification, say so plainly. An empty review is a valid result.
-
-## Scale
-
-"Review this diff" → the four dimensions, single-vote verification. "Audit this subsystem" or "be comprehensive" →
-a larger finder pool per dimension, 3-5 vote adversarial verification, and a completeness critic asking what was
-not examined. The comprehensive whole-source pass is owner-scheduled for the conformance milestone.
+- **Findings become tracked work in `kb/Work/`** — one note per surviving defect (CLAUDE.md rule 8), never prose
+  that evaporates and never a second list. `docs/rearchitecture/CONFORMANCE-FIX-QUEUE.md` is only a pointer now.
+- Use `ReportFindings` when the host asks for it.
+- The comprehensive whole-source pass is owner-scheduled for the conformance milestone.

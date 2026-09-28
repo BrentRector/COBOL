@@ -18,7 +18,7 @@ did you fix?" explicitly), and any drift test that pins the shape. Name files on
 ## For the next implementer (⛔ required — it becomes `orient.py`'s LEARNED section)
 One line per source file you changed: `path#Member` — the entry point that now owns the rule, the helper to REUSE
 (not copy), and the trap that cost you turns. The same lines go into each note's `## Landing` section, because
-`scripts/spec/orient.py` reads landed notes, and this is the only way the next wave starts where you finished.
+`tools/claude-skills/skills/agent-fleet/references/orient.py` reads landed notes, and this is the only way the next wave starts where you finished.
 
 ## Goldens
 One line each: path · PROGRAM-ID · editions it runs at · how the expected value was derived (rule, not measurement).

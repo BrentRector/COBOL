@@ -1,3 +1,6 @@
 [submodule "specs-private"]
 	path = specs-private
 	url = https://github.com/BrentRector/COBOL-private.git
+[submodule "tools/claude-skills"]
+	path = tools/claude-skills
+	url = https://github.com/BrentRector/claude-skills.git

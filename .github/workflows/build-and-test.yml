@@ -209,7 +209,8 @@ jobs:
   # `--self-test`s inside the Unit leg (`CitationAuditSelfTestDriftTests`), proving each check can still fail.
   # ONE STEP PER AUDIT, each `if: !cancelled()`, so one red never hides the others' verdicts.
   # ⛔ This is the SAME list, in the same order, as `scripts/build-local.{ps1,sh}` and battery phase -1; the
-  # work-register check is added because a `kb/` edit is a docs-only push, and nothing else validates it there. ──
+  # work-register and fleet-practices checks are added because a `kb/` or brief edit is a docs-only push, and
+  # nothing else validates it there. ──
   audits:
     name: audits (citations · evidence supersession · witness loss · work register)
     needs: changes
@@ -253,6 +254,16 @@ jobs:
       - name: Work register — every kb/Work note well-formed (work.py check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/work.py check
+      # The fleet briefs, the pinned PUBLIC skills submodule and `.agent-fleet.json` (kb/Work PB1699). Only the
+      # PUBLIC submodule is fetched — never `--recursive`/`submodules: true`, which would pull the private
+      # specs-private this job deliberately does without. A brief edit is a docs-only push, so this is where it is checked.
+      - name: Fleet practices + pinned public skills (check_practices.py)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init tools/claude-skills
+          python3 .claude/skills/workstream/check_practices.py
 
   # ── The authoritative NIST gate: the PARALLEL guard. guard-fast.sh runs exactly the checks scripts/guard.sh
   # does (build + unit + integration + the ~376 NIST CCVS-85 programs) but fans the NIST suite across the

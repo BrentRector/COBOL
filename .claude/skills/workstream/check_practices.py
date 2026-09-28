@@ -8,7 +8,7 @@
 A practice that lives only in a scratchpad or a transcript is forgotten by the next session (owner 2026-09-23);
 this check is what keeps "automatic" true.
 """
-import json, pathlib, re, sys
+import json, pathlib, re, subprocess, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 T = HERE / 'templates'
@@ -93,8 +93,67 @@ def same_file_without_successor(groups_path):
     return found
 
 
+# PB1699: the generic fleet scripts and base skills are CONSUMED from the pinned public submodule, never copied or
+# wrapped. Four ways that silently rots: the pin moves and the overlays still name the old version; `.agent-fleet.json`
+# carries a key no script accepts (it would be ignored); a brief names a submodule script that is not there; or a
+# caller still points at the retired project copies.
+REPO = HERE.parents[2]
+SKILLS = REPO / 'tools' / 'claude-skills'
+OVERLAYS = ['workstream', 'gate', 'review', 'spec-lookup']
+PIN = re.compile(r'brent-tools (\d+\.\d+\.\d+)')
+RETIRED = re.compile(r'scripts/spec/(?:orient|fix_clusters|status_delta)\.py')
+SUBMODULE_SCRIPT = re.compile(r'tools/claude-skills/([\w./-]+\.(?:py|js))')
+FROZEN = ('DEVLOG.md', 'docs/rearchitecture/evidence/')
+
+
+def fleet_tooling():
+    plugin = SKILLS / '.claude-plugin' / 'plugin.json'
+    if not plugin.exists():
+        return ['tools/claude-skills is not checked out — run: git submodule update --init tools/claude-skills']
+    found = []
+    version = json.loads(plugin.read_text(encoding='utf-8'))['version']
+    for name, path in [(o, REPO / '.claude' / 'skills' / o / 'SKILL.md') for o in OVERLAYS] + \
+                      [('PB1699', REPO / 'kb' / 'Work' / 'PB1699.md')]:
+        pins = set(PIN.findall(path.read_text(encoding='utf-8')))
+        if pins != {version}:
+            found.append(f'{name} names brent-tools {sorted(pins) or "no version"}, the submodule is {version}')
+        if name in OVERLAYS and f'brent-tools:' not in path.read_text(encoding='utf-8'):
+            found.append(f'{name} overlay does not invoke its brent-tools base skill first')
+    sys.path.insert(0, str(SKILLS / 'skills' / 'agent-fleet' / 'references'))
+    try:
+        import fleet_config
+        _, cfg = fleet_config.load(REPO / fleet_config.NAME)
+        sources = ''.join((SKILLS / 'skills' / 'agent-fleet' / 'references' / s).read_text(encoding='utf-8')
+                          for s in ('orient.py', 'fix_clusters.py', 'status_delta.py'))
+        found += [f'.agent-fleet.json key {k!r} is no flag of the fleet scripts' for k in cfg
+                  if f'"--{k.replace("_", "-")}"' not in sources]
+    except (OSError, ValueError, ImportError) as e:
+        found.append(f'.agent-fleet.json: {e}')
+    tracked = subprocess.run(['git', 'ls-files', '-z'], cwd=REPO, capture_output=True, text=True,
+                             encoding='utf-8').stdout.split('\0')
+    for rel in tracked:
+        if not rel or rel.startswith(FROZEN) or rel.startswith('tools/claude-skills') or \
+                not rel.endswith(('.md', '.py', '.js', '.ps1', '.sh', '.yml', '.json', '.txt')):
+            continue
+        try:
+            text = (REPO / rel).read_text(encoding='utf-8')
+        except (OSError, UnicodeDecodeError):
+            continue
+        if RETIRED.search(text):
+            found.append(f'{rel} still calls a retired project copy (use the tools/claude-skills path)')
+        found += [f'{rel} names tools/claude-skills/{m}, which the pinned submodule does not have'
+                  for m in sorted(set(SUBMODULE_SCRIPT.findall(text))) if not (SKILLS / m).exists()]
+    return found
+
+
 def main():
     bad = 0
+    tooling = fleet_tooling()
+    if tooling:
+        bad += 1
+        print('FAIL     fleet tooling (kb/Work/PB1699):\n' + '\n'.join(f'           {t}' for t in tooling))
+    else:
+        print('ok       fleet tooling: pin, .agent-fleet.json, submodule script paths, no retired copies')
     over = mechanical_model_overrides()
     if over:
         bad += 1

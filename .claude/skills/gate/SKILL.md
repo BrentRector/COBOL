@@ -3,7 +3,11 @@ name: gate
 description: Use before every commit and before every merge to choose and run the correct test gate - wave-local filtered (~2 min) per commit versus the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
 ---
 
-> **Generic base:** [`test-gate`](https://github.com/BrentRector/claude-skills/blob/main/skills/test-gate/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
+> ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:test-gate` (Skill tool) before reading on. If the plugin is not loaded
+> (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/test-gate/SKILL.md` instead
+> (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
+> what is specific to WiseOwl COBOL — commands, paths, CI and push-main, the owner's dated decisions — and wins on
+> conflict. Pinned: **brent-tools 1.8.1** (`tools/claude-skills`, kb/Work/PB1699).
 
 # Gate
 
@@ -67,19 +71,15 @@ constructs one after another) but still gets ONE comprehensive gate for the whol
 
 ## Reading the verdict — where false greens come from
 
-1. **Redirect the FULL output to a file.** Never `| tail -N` — it drops the failing test NAME, the one thing you
-   need. Then grep the file for the summary line and for `crash|abort|Failed: *[1-9]`.
-2. **Never chain ANYTHING after a verdict command** (build, test, `build-local`, `push-main.sh`, battery) with `&&`,
-   `||` or `;` — MANDATORY-PRACTICES P14, and the guard hook (`scripts/hooks/forbidden_commands.py` rule 5) now BLOCKS
-   it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
-   Independent commands go as parallel tool calls in one turn. The original case:
-   **never `&&`-chain `git commit` or `git push` onto a test run or its tail.** The exit code of `tail` is not the
-   verdict. Read the verdict, THEN commit as a separate call. This has been violated after the rule was written.
-3. **Never edit source files while a gate is running.** The parallel legs compile from the WORKING TREE, so mid-run
-   edits manufacture phantom failures. Staging first does not protect you. Prep only docs and commit messages.
-4. **Never call a failure a "flake" without naming the test.** Get the name, reproduce in isolation with
-   `--filter`, then disposition. A flake verdict requires a clean serial re-run of THAT test — never an inference
-   from other suites being green.
+The base's "Read the verdict line", "Flakes and attribution" and "A filter that matches nothing" sections apply as
+written (full output to a file, no source edits while a gate runs, no flake without the test's name and an isolated
+re-run). Here, additionally:
+
+- **Never chain ANYTHING after a verdict command** (build, test, `build-local`, `push-main.sh`, battery) with `&&`,
+  `||` or `;` — MANDATORY-PRACTICES P14, and the guard hook (`scripts/hooks/forbidden_commands.py` rule 5) BLOCKS
+  it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
+- `scripts/build-local.{ps1,sh}` normalizes a bare filter (`~X|~Y` → `FullyQualifiedName~X|…`) and prints the
+  `=== WAVE-LOCAL GATE: ` verdict line — block on that line, never on the exit code.
 
 ## Read the failure before diagnosing it
 

@@ -20,7 +20,7 @@ You do READ-ONLY, well-specified lookups for the WiseOwl COBOL orchestrator. The
 says exactly what to find and where to write it: always a file in the scratchpad, never inside a git tree (a hook
 refuses that).
 
-- Locate with the tools first, in this order: `python scripts/spec/orient.py <files>`, `python scripts/spec/where.py
+- Locate with the tools first, in this order: `python tools/claude-skills/skills/agent-fleet/references/orient.py <files>`, `python scripts/spec/where.py
   <clause>`, the LSP tool (workspaceSymbol / findReferences) for a named type or member, then grep.
 - Checkpoint one JSON line per item to the output file the moment it is decided; on start, read it and skip done items.
 - Report what you FOUND, with the evidence line that shows it. If a step needs judging COBOL semantics, the ISO spec,

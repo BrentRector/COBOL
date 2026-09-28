@@ -103,5 +103,16 @@
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "brentrector-claude-skills": {
+      "source": {
+        "source": "directory",
+        "path": "./tools/claude-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "brent-tools@brentrector-claude-skills": true
   }
 }

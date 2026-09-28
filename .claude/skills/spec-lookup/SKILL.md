@@ -3,28 +3,28 @@ name: spec-lookup
 description: Use BEFORE implementing, debugging, or adjudicating any COBOL semantics, syntax, output, or "is this a bug" question - derives the expected behavior from the ISO spec and produces a citable section/rule before any code is read or written.
 ---
 
-> **Generic base:** [`spec-oracle`](https://github.com/BrentRector/claude-skills/blob/main/skills/spec-oracle/SKILL.md) in [BrentRector/claude-skills](https://github.com/BrentRector/claude-skills) — the reusable discipline, with the owner's bar in its sibling `engineering-standards`. THIS skill is the WiseOwl COBOL application of it and wins on conflict.
+> ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:spec-oracle` (Skill tool) before reading on — its order of operations
+> (derive and cite BEFORE reading code), the specific-rule rule, the checked citation, "only now read the code", the
+> failure modes and the latitude precedence are the procedure. If the plugin is not loaded (a cloud session receives
+> no project marketplace), Read `tools/claude-skills/skills/spec-oracle/SKILL.md` instead
+> (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: where the
+> COBOL standard, its tools and the owner's decisions live. It wins on conflict. Pinned: **brent-tools 1.8.1**
+> (`tools/claude-skills`, kb/Work/PB1699).
 
 # Spec lookup
 
-**Order of operations is the whole point.** Derive the expected result from the spec and write down the citation
-BEFORE reading the implementation, building a repro, or looking at the diff. A repro VERIFIES a spec-derived
-expectation; it never supplies one.
-
-The recurring drift is jumping into repros to OBSERVE behavior instead of DERIVING correct behavior. If you catch
-yourself starting from a failing diff and reverse-engineering what the code does, stop and restart here.
+The recurring drift here is jumping into repros to OBSERVE behavior instead of DERIVING correct behavior (CLAUDE.md
+rule 1). If you catch yourself starting from a failing diff, stop and restart at the base's step 1.
 
 ## 1. Find the governing rule
 
-`specs/ISO_COBOL.md` (private submodule; `git submodule update --init --recursive` if absent).
+`specs/ISO_COBOL.md` — TRACKED in this repository. (The private `specs-private` submodule holds only the licensed
+PDF, needed only to render a page.)
 
 Rules live as **Syntax Rules (SR)** and **General Rules (GR)** per statement (§14.9.x) and clause (§11/§12/§13.x),
 plus §8 concepts (classes and categories §8.5, conditions §8.8.4, reference and ref-mod §8.4, standard conversions
 §8.5.1, expressions §8.8), §15 intrinsics, Annex A (required documented behavior), Annex E (edition deltas), and
-Annex F (obsolete/archaic).
-
-**Read the SPECIFIC governing rule, not the nearest general sentence.** A "gap" derived from a general sentence
-usually dissolves once the exact argument rule or syntax rule is read.
+Annex F (obsolete/archaic). `python scripts/spec/where.py <clause> [rule]` lists the code that already cites a rule.
 
 ## 2. If a general format (a DIAGRAM) is load-bearing
 
@@ -35,27 +35,23 @@ illegal.
 1. Read the repaired `Figure notes` block under the diagram. A full re-render pass corrected those; they are
    authoritative and usually already answer the question.
 2. Only to settle a genuine doubt, render the page: `python scripts/render-spec-page.py <page>` (anchor `page-N`
-   equals PDF page N) and LOOK at it.
+   equals PDF page N; needs `specs-private`) and LOOK at it.
 
 **Never escalate a figure-reading question to the owner.** The diagram answers it. Never derive a general format
 from prose alone.
 
-## 3. Write down the expected result and the citation
+## 3. The citation, checked by the project's tool
 
-Produce, before touching code: the exact §/GR/SR, the derived expected value or behavior, and the edition
-applicability (does this differ across 85/2002/2014/2023? check Annex E). That triple is what a golden's expected
-value is computed from — never an oracle's output.
+The base's triple (citation · derived expectation · applicability) is what a golden's expected value is computed
+from — never an oracle's output. Applicability here is the edition: does this differ across 85/2002/2014/2023?
+Check Annex E. **Check the citation mechanically:** `python scripts/spec/cite.py --check <clause> "<text>"`
+(CLAUDE.md rule 1 — a citation you did not run `--check` on is not a citation, and an INHERITED one is the usual
+failure).
 
-## 4. Only now read the code
+## 4. Latitude and defects in the standard
 
-Ask "does the code match the cited rule", not "what does the code do". Check the dispatch's arms AND its default
-against the rule. A byte-neutral refactor proves no-regression, never correctness.
-
-## When the standard itself is defective
-
-It happens. Record it in `docs/CONFORMANCE.md` rather than silently coding around it, or a future maintainer will
-"fix" the compiler back to the wrong behavior.
-
-## Never
-
-Claim spec compatibility without a citation. If a construct is accepted as a common extension, say exactly that.
+- **Implementor latitude** follows the owner's precedence (CLAUDE.md rule 1, 2026-08-08 via `kb/Work/R13`): the ISO
+  spec where it controls → otherwise GnuCOBOL → if GnuCOBOL has nothing, IBM Enterprise COBOL or Micro Focus. It
+  settles latitude only, never GnuCOBOL's non-ISO extensions. Record the choice in `docs/CONFORMANCE.md`.
+- **A defect in the standard** is recorded in `docs/CONFORMANCE.md`, never silently coded around.
+- A construct accepted as a common extension is called exactly that.

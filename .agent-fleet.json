@@ -1,0 +1,18 @@
+{
+  "notes": "kb/Work",
+  "notes_glob": "PB*.md",
+  "tests": "tests",
+  "test_ext": ".cs",
+  "cite": "(?P<key>§\\s?\\d+(?:\\.\\d+)+)(?:\\s+(?:SR|GR)\\s?\\d+)?",
+  "open_status": "open",
+  "closed_status": "landed,retired",
+  "min_name": 7,
+  "src": ["src/Cobol.Net.*"],
+  "ext": ".cs,.g4",
+  "exclude_dir": ["Generated"],
+  "harm": "wrong_answer=8,crashes=4,rejects_legal_source=2,under_rejects=1",
+  "kind": "defect",
+  "skip_flag": ["blocked", "process_only"],
+  "base": "origin/main",
+  "exclude": [".claude/settings.local.json"]
+}

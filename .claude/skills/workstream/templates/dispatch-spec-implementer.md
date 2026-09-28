@@ -9,8 +9,10 @@ Scratch:  {S}\{slug}\
 Report your ACTUAL branch (`git branch --show-current`).
 {pred}
 THE GROUP IS ONE ROOT: {root}. Read every note first — {files} — they carry the forensic detail, the citations, the
-probes and the CODE SITES. ⛔ ORIENT IN ONE CALL, BEFORE READING ANY SOURCE FILE: `python scripts/spec/orient.py
-<every source file your notes name>` prints each file's outline with line numbers, the clauses it cites, the tests
+probes and the CODE SITES. ⛔ ORIENT IN ONE CALL, BEFORE READING ANY SOURCE FILE: `python
+tools/claude-skills/skills/agent-fleet/references/orient.py <every source file your notes name>` (a fresh worktree
+has no submodules: if that path is missing, run `git submodule update --init tools/claude-skills` once; the project
+settings come from `.agent-fleet.json`, so pass no flags) prints each file's outline with line numbers, the clauses it cites, the tests
 that exercise it, what EARLIER implementers learned about it (the landed notes' code sites and mechanisms) and its
 recent commits. Then read only the line ranges it points you to, and use `python scripts/spec/where.py <clause>`
 for a rule no note locates. Do not re-survey the codebase: orientation (grep/read) was 46 % of every implementer's
@@ -67,7 +69,7 @@ report, each with its repro path and code site (file:line) so the registrar does
 CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, THEN rewrite `STATUS.md` (DONE /
 NEXT / BLOCKED / GATE / batch paths / codes used) with FIRST LINE `STATUS-AT: <output of git rev-parse HEAD>` — the
 commit it describes (P4; STATUS.md is gitignored, so writing it never moves HEAD). RESUMING or MERGING a predecessor:
-run `python scripts/spec/status_delta.py <that worktree>` FIRST and read the summary plus ONLY the commits it lists.
+run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <that worktree>` FIRST and read the summary plus ONLY the commits it lists.
 Turn cap 220 — at the cap, checkpoint, write NEXT, return SPLIT.
 
 Report ≤ 60 lines, following `templates/implementer-report-template.md`, one section per note.
