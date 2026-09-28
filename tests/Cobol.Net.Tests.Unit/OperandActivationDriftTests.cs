@@ -23,7 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// activation text that emitted no propagation pickup, so the registry discarded every condition it
 /// propagated; and a HOISTED one's pickup resumed by falling through, back INTO the statement GR2 says to leave
 /// (a COMPUTE completed with the function's result). The repair is ONE mechanism: the activation is marked
-/// <c>InExpression</c>, its pickup throws <c>RaiseResumeSignal</c>, and the carrying statement's
+/// <c>OperandEvaluation</c>, its pickup throws <c>RaiseResumeSignal</c>, and the carrying statement's
 /// <c>BoundActivationSite</c> lands it.</para>
 /// </summary>
 public sealed class OperandActivationDriftTests
@@ -38,19 +38,31 @@ public sealed class OperandActivationDriftTests
         return m.Groups["b"].Value;
     }
 
-    /// <summary>The activation-site RESUME landings in <c>CallEmitter</c> all go through the ONE helper that
-    /// parts the two kinds of activation — a direct <c>dispatch.ResumeTransfer</c> in either method would land an
-    /// operand activation's RESUME inside the statement it belongs to (or a <c>goto</c> inside a lambda).</summary>
+    /// <summary>ONE landing decides for every operand-evaluation step (kb/Work PB1432). The fact that a step
+    /// evaluates an OPERAND lives on the bound node (<c>BoundStatement.OperandEvaluation</c>, stamped at the two
+    /// drain sites), the statement emitter opens the scope around such a step, and <c>DispatchState.ResumeTransfer</c>
+    /// unwinds inside it — so no raise site chooses its own landing. Before PB1432 the choice was a per-emitter
+    /// <c>Resume(inExpression, …)</c> helper that only activations reached: a §15.4 subscript temporary store's
+    /// size-error landing wrote <c>goto __xfer</c> inside a short-circuited operand's lambda (CS0159) and, hoisted,
+    /// fell back INTO the statement §14.9.33.4 GR2 a) 1. says to leave.</summary>
     [Fact]
-    public void ActivationSiteResumes_GoThroughTheOperandAwareHelper()
+    public void OperandEvaluationLanding_IsDecidedOnceByTheDispatchState()
     {
         string call = CodeGenFile("Verbs", "CallEmitter.cs");
-        foreach (var method in new[] { "public string? EmitPropagationPickup(", "private void EmitCallEcCatch(" })
-        {
-            string body = MethodBody(call, method);
-            Assert.DoesNotContain("dispatch.ResumeTransfer(", body);
-            Assert.Contains("Resume(", body);
-        }
+        Assert.DoesNotContain("inExpression", call);
+        Assert.DoesNotContain("private string Resume(", call);
+        string state = CodeGenFile("EmitterState.cs");
+        string resume = Regex.Match(state, @"public string ResumeTransfer\([^\n]*\n(?<b>(?:[^\n]*\n){1,3})").Groups["b"].Value;
+        Assert.Contains("InOperandEvaluation", resume);
+        Assert.Contains("OperandEvaluationResume(", resume);
+        string stmt = CodeGenFile("StatementEmitter.cs");
+        Assert.Contains("_dispatchState.EnterOperandEvaluation()", MethodBody(stmt, "internal bool EmitStatement("));
+        string ec = CodeGenFile("EcEmitter.cs");
+        Assert.DoesNotContain("Func<string, string>? landing", ec);
+        foreach (var drain in new[] {
+            File.ReadAllText(TestRepo.Src(["Cobol.Net.Compiler", "Binding", "Procedure", "Verbs", "UdfBinder.cs"])),
+            File.ReadAllText(TestRepo.Src(["Cobol.Net.Compiler", "Binding", "Procedure", "Verbs", "OoBinder.cs"])) })
+            Assert.Contains("with { OperandEvaluation = true }", drain);
     }
 
     /// <summary>A per-evaluation window's activation is the statement emitter's own output — there is no second
@@ -120,6 +132,50 @@ public sealed class OperandActivationDriftTests
         Assert.Equal(2, Regex.Matches(cs, @"catch \(RaiseResumeSignal __as\d+\)").Count);
         Assert.Equal(4, Regex.Matches(cs, @"== ResumeSignal\.NextStatement\) throw new RaiseResumeSignal\(__r\d+\);").Count);
         Assert.Equal(2, Regex.Matches(cs, @"TakeRaisedPropagation\(").Count);
+    }
+
+    /// <summary>kb/Work PB1432 — a §15.4 subscript temporary STORE in a short-circuited operand is an
+    /// operand-evaluation step too: its size-error selection throws to the IF's landing from inside the lambda
+    /// (it was <c>goto __xfer</c> there, CS0159), and hoisted before a first operand it throws as well rather than
+    /// falling back into the IF (§14.9.33.4 GR2 a) 1. and NOTE 1: "transfer would be after the END-IF").</summary>
+    [Fact]
+    public void GeneratedCode_SubscriptTemporaryStoreLandsAtItsStatement()
+    {
+        string cs = Emit("""
+                   >>TURN EC-ALL CHECKING ON
+                   IDENTIFICATION DIVISION.
+                   PROGRAM-ID. OADRIFT4.
+                   DATA DIVISION.
+                   WORKING-STORAGE SECTION.
+                   01 WS-A PIC 9 VALUE 0.
+                   01 Z PIC 9 VALUE 0.
+                   01 ONE PIC 9 VALUE 1.
+                   01 TB.
+                      05 EL PIC 9 OCCURS 3 VALUE 1.
+                   PROCEDURE DIVISION.
+                   DECLARATIVES.
+                   HZ SECTION. USE AFTER EXCEPTION CONDITION EC-SIZE.
+                   HZ-P.
+                       RESUME AT NEXT STATEMENT.
+                   END DECLARATIVES.
+                   MAIN SECTION.
+                   MAIN-P.
+                       IF WS-A = 1 OR EL(FUNCTION INTEGER(ONE / Z)) = 1
+                           DISPLAY "T"
+                       END-IF.
+                       IF EL(FUNCTION INTEGER(ONE / Z)) = 1
+                           DISPLAY "T"
+                       END-IF.
+                       STOP RUN.
+            """);
+        var lambda = Regex.Match(cs, @"new Func<bool>\(\(\) => \{(?<b>.*?)return ", RegexOptions.Singleline);
+        Assert.True(lambda.Success, cs);
+        string body = lambda.Groups["b"].Value;
+        Assert.Contains("throw new RaiseResumeSignal(", body);
+        Assert.DoesNotContain("goto ", body);
+        // Both IFs carry a landing, and both stores' selections throw (the lambda's and the hoisted one's).
+        Assert.Equal(2, Regex.Matches(cs, @"catch \(RaiseResumeSignal __as\d+\)").Count);
+        Assert.Equal(2, Regex.Matches(cs, @"== ResumeSignal\.NextStatement\) throw new RaiseResumeSignal\(__r\d+\);").Count);
     }
 
     /// <summary>The control: a statement with no operand activation binds no landing.</summary>

@@ -25,15 +25,58 @@ public sealed record TokenRetypes(CobolWordsMap CobolWords, IReadOnlySet<string>
     /// <summary>No directive and no freed word — every parse's token stream is the lexer's, unchanged.</summary>
     public static readonly TokenRetypes None = new(CobolWordsMap.Empty, new HashSet<string>(StringComparer.Ordinal));
 
-    /// <summary>Prime <paramref name="lexer"/> BEFORE any tokenization: a de-reserved keyword may be used as a
-    /// SUBSCRIPTED data name, so the lexer must open SUBSCRIPT mode at its following '(' although the retype runs
-    /// only after lexing. (A freed reservation-gated word needs no priming: every gated token is already a
-    /// subscript trigger, generated from the same <c>cobol-words.json</c> rows.)</summary>
-    public void PrimeLexer(CobolLexer lexer)
+    /// <summary>Prime <paramref name="lexer"/> BEFORE any tokenization with this compile's answer to "can a '(' after
+    /// this word open a SUBSCRIPT", which the lexer must decide before any parser predicate runs:
+    /// <list type="bullet">
+    /// <item>a de-reserved keyword (<c>&gt;&gt;COBOL-WORDS</c> UNDEFINE / SUBSTITUTE) may be used as a SUBSCRIPTED data
+    /// name, so it becomes a trigger although the retype runs only after lexing;</item>
+    /// <item>a word <paramref name="edition"/> RESERVES is never a data name (ISO §8.3.2.1 rule 1), so it stops being
+    /// one — the '(' after a boolean operator at 2002+ groups a boolean sub-expression (§8.8.2 Table 4; kb/Work
+    /// PB1465). The decision is <see cref="ReservedWordSet.AdmitsAsUserWord"/>, the SAME one the parser's
+    /// <c>userWordHere</c> gate and the §8.9 funnel make, so <c>--permissive</c> keeps every word it keeps as a
+    /// name a trigger too. A freed reservation-gated word (retyped to IDENTIFIER after lexing) is admitted, so it
+    /// keeps its trigger.</item>
+    /// </list></summary>
+    public void PrimeLexer(CobolLexer lexer, EditionInfo edition)
     {
         if (!CobolWords.IsEmpty)
             lexer.SetCobolWordsDataNames(CobolWordsRewriter.DeReservedTokenTypes(CobolWords));
+        lexer.SetReservedNonDataNames(ReservedNonDataNames(edition));
     }
+
+    /// <summary>The SUBSCRIPT-trigger tokens <paramref name="edition"/> does not admit as user-defined words —
+    /// computed once per edition. An intrinsic-function-name token is never in it: its '(' opens a keyword-omitted
+    /// function call's argument capture (§8.4.3.2.3 SR2) whatever the word's reservation, and the set of such
+    /// tokens is read off the GENERATED parser's <c>functionName</c> rule, never listed here.</summary>
+    private static IReadOnlySet<int> ReservedNonDataNames(EditionInfo edition) =>
+        s_reservedNonDataNames.GetOrAdd(edition, static e =>
+        {
+            var functionNames = FunctionNameTokens.Value;
+            var set = new HashSet<int>();
+            foreach (int t in CobolLexer.SubscriptTriggerTokens)
+            {
+                if (t == CobolLexer.IDENTIFIER || functionNames.Contains(t)) continue;
+                if (WordOf(t) is { } word && !ReservedWordSet.Default.AdmitsAsUserWord(word, e)) set.Add(t);
+            }
+            return set;
+        });
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<EditionInfo, IReadOnlySet<int>>
+        s_reservedNonDataNames = new();
+
+    private static readonly Lazy<Antlr4.Runtime.Misc.IntervalSet> FunctionNameTokens = new(() =>
+    {
+        var atn = CobolParserCore._ATN;
+        return atn.NextTokens(atn.ruleToStartState[CobolParserCore.RULE_functionName]);
+    });
+
+    /// <summary>The COBOL word a keyword token spells: its symbolic name with '_' read as '-' and the generator's
+    /// clash-avoiding trailing '_' dropped (the <c>cobol-words.json</c> token convention, e.g. <c>B_OR</c> → B-OR,
+    /// <c>FULL_</c> → FULL).</summary>
+    private static string? WordOf(int tokenType) =>
+        CobolLexer.DefaultVocabulary.GetSymbolicName(tokenType) is { } name
+            ? name.TrimEnd('_').Replace('_', '-')
+            : null;
 
     /// <summary>Apply both retypes to the filled token stream. Byte-identical when <see cref="None"/>.</summary>
     public void Rewrite(CommonTokenStream tokens)

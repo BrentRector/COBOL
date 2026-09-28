@@ -2408,18 +2408,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     {
         // §8.5.2.12 items 3/4/5 make the LINAGE-/LINE-/PAGE-COUNTER registers category-numeric DATA ITEMS, so
         // §15.43.3/§15.58.3/§15.83.3 r1 ADMITS them (kb/Work R26 — they used to draw the r1 rejection). Their
-        // capacity: LINAGE-COUNTER's "size is equal to the page size specified in the LINAGE clause"
-        // (§8.4.3.14.4 GR1) — a literal operand's value directly, a data-name operand's all-nines (the maximum
-        // page size it can specify); the report counters carry NO size in the standard (§8.4.3.15.4 GR1 —
-        // "temporary unsigned integer data items") and take the documented implementor shape PIC 9(18), the
-        // all-nines of the runtime's long carrier (CONFORMANCE.md §3, "the counter registers' declared
-        // capacity" — NOT an Annex A.1 item, so it lives with the pinned behavior determinations). All three
-        // registers are UNSIGNED:
-        // LOWEST-ALGEBRAIC = 0, SMALLEST-ALGEBRAIC = 1 (scale 0).
-        if (args[0] is BoundComputedOperand { Expr: BoundLinageCounterRef lc })
-            return CounterRegisterFold(sig, LinagePageCapacity(lc.File));
-        if (args[0] is BoundComputedOperand { Expr: BoundReportCounterRef })
-            return CounterRegisterFold(sig, "999999999999999999");
+        // extremes are AlgebraicRanges.OfCounterRegister's — the ONE statement of the registers' capacity, which
+        // the §8.8.4.4.4 class conditions read too (kb/Work PB1401).
+        if (args[0] is BoundComputedOperand { Expr: var register } && AlgebraicRanges.OfCounterRegister(register) is { } counter)
+            return CounterRegisterFold(sig, counter);
         if (args[0] is not BoundFieldOperand f || f.Place is RefModPlace || f.Place.Item.IsGroup
             || f.Place.Item.Pic is not { } pic)
             return AlgebraicArgError(sig);
@@ -2576,29 +2568,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         }
     }
 
-    /// <summary>The HIGHEST/LOWEST/SMALLEST fold for a counter register (kb/Work R26): the registers are
-    /// UNSIGNED integers (§8.4.3.14.4 GR1 / §8.4.3.15.4 GR1), so LOWEST is 0 and SMALLEST is 1 (scale 0);
-    /// HIGHEST is the register's capacity, computed by the caller.</summary>
-    private static BoundExpr CounterRegisterFold(IntrinsicSig sig, string highest) => sig.Name switch
+    /// <summary>The HIGHEST/LOWEST/SMALLEST fold for a counter register (kb/Work R26), read off the register's
+    /// <see cref="AlgebraicRange"/>: the registers are UNSIGNED integers (§8.4.3.14.4 GR1 / §8.4.3.15.4 GR1), so
+    /// LOWEST is its zero (0) and SMALLEST its nearest nonzero value (1, scale 0); HIGHEST is its capacity.</summary>
+    private static BoundExpr CounterRegisterFold(IntrinsicSig sig, AlgebraicRange counter) => sig.Name switch
     {
-        "SMALLEST-ALGEBRAIC" => new BoundNumLiteral("1"),
-        "LOWEST-ALGEBRAIC" => new BoundNumLiteral("0"),
-        _ => new BoundNumLiteral(highest),
+        "SMALLEST-ALGEBRAIC" => new BoundNumLiteral(counter.Nearest!),
+        "LOWEST-ALGEBRAIC" => new BoundNumLiteral(counter.Zero),
+        _ => new BoundNumLiteral(counter.Farthest),
     };
-
-    /// <summary>§8.4.3.14.4 GR1 — LINAGE-COUNTER's size "is equal to the page size specified in the LINAGE
-    /// clause": a literal operand's value directly; for a data-name operand the page size is set at run time,
-    /// so the capacity is the MAXIMUM the operand item can specify — its all-nines (§15.43.4 r2's "may be
-    /// represented in argument-1" read against the register's largest possible size).</summary>
-    private string LinagePageCapacity(Model.FileModel file)
-    {
-        var body = file.Linage?.Body;
-        if (body?.Literal is { } lit) return lit.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (body?.DataName is { } dn && ctx.Symbols.TryResolve(dn, ctx.ActiveScope, out var items)
-            && items[0].Pic is { } p && p.Digits > 0)
-            return new string('9', p.Digits);
-        return "999999999999999999";   // no resolvable operand shape — the long carrier's own bound
-    }
 
     private BoundExpr AlgebraicArgError(IntrinsicSig sig)
     {

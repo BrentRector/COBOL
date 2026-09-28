@@ -103,20 +103,38 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         // never did, so `EVALUATE S9-ITEM WHEN "A" THRU "Z"` compared an OVERPUNCHED image here and a plain one
         // one lowering over — the two-arm shape, and reachable the moment the EC gate stopped demanding a
         // literal pair. A no-op for every non-signed-numeric operand, which is why it is unconditional there too.
-        string read = OperandText.AsString(n.Left, num, deSign: true),
-               lo = loFig ? FigSeed(n.Lo, subjectCat) : OperandText.AsString(n.Lo, num, deSign: true),
-               hi = hiFig ? FigSeed(n.Hi, subjectCat) : OperandText.AsString(n.Hi, num, deSign: true);
-        // Unchecked, the node is the inclusive bound test the relation-pair lowering produced — the ONLY difference
-        // is that the collating sequence is this range's, which a BoundRelational pair has no slot for. ThruMember
-        // adds exactly the EC-set, so emitting it with checking off would set a nonfatal EC no >>TURN asked for.
-        if (n.CheckInvalid)
-            return loFig || hiFig
-                ? RuntimeApi.ThruMemberFig(read, lo, hi, loFig, hiFig, collate)
-                : RuntimeApi.ThruMember(read, lo, hi, collate);
-        string loCmp = loFig ? RuntimeApi.StrCompareFig(read, lo, figIsLeft: false, collate)
-                             : RuntimeApi.StrCompare(read, lo, collate),
-               hiCmp = hiFig ? RuntimeApi.StrCompareFig(read, hi, figIsLeft: false, collate)
-                             : RuntimeApi.StrCompare(read, hi, collate);
+        string read = OperandText.AsString(n.Left, num, deSign: true);
+        var lo = new MembershipOperand(loFig ? FigSeed(n.Lo, subjectCat) : OperandText.AsString(n.Lo, num, deSign: true), loFig);
+        var hi = new MembershipOperand(hiFig ? FigSeed(n.Hi, subjectCat) : OperandText.AsString(n.Hi, num, deSign: true), hiFig);
+        return RenderStringRange(read, lo, hi, n.CheckInvalid, collate);
+    }
+
+    /// <summary>One end of a character-comparison range, or a level-88 VALUE: the C# expression, and whether it
+    /// is a figurative SEED (one fill character, or literal-1 of <c>ALL literal-1</c>) that the runtime sizes to
+    /// the tested operand's own character-position count (ISO §8.3.3.6.4 GR2) rather than a value of its own.</summary>
+    private readonly record struct MembershipOperand(string Text, bool IsFigSeed);
+
+    /// <summary>⛔ THE ONE RENDERING OF AN ALPHANUMERIC / NATIONAL / BOOLEAN THROUGH-RANGE TEST — the EVALUATE
+    /// WHEN range (<see cref="Visit(BoundRangeMembership)"/>) and the level-88 VALUE … THRU range
+    /// (<see cref="RenderMembershipTest"/>) are the same §14.7.8 test, and §8.8.4.5.3 GR2 compares a
+    /// condition-name value by the relation-condition rules, so the two may not size a figurative end, or raise
+    /// rule 2's EC-RANGE-INVALID, by two different spellings (kb/Work PB1477: the 88 folded a figurative end to
+    /// the variable's DECLARED width while the EVALUATE range sized it at run time).
+    /// <para><paramref name="checkInvalid"/> selects <c>ThruMember</c> / <c>ThruMemberFig</c>, which add exactly
+    /// the §14.7.8 rule 2 EC-set; unchecked, the test is the inclusive bound pair the relation lowering produces
+    /// (§14.9.13.4 GR4 a) 5.) — emitting the carrier with checking off would set a nonfatal EC no >>TURN asked
+    /// for. <paramref name="weights"/> is the trailing pad / collation fragment.</para></summary>
+    private static string RenderStringRange(string read, MembershipOperand lo, MembershipOperand hi, bool checkInvalid,
+        string weights)
+    {
+        if (checkInvalid)
+            return lo.IsFigSeed || hi.IsFigSeed
+                ? RuntimeApi.ThruMemberFig(read, lo.Text, hi.Text, lo.IsFigSeed, hi.IsFigSeed, weights)
+                : RuntimeApi.ThruMember(read, lo.Text, hi.Text, weights);
+        string loCmp = lo.IsFigSeed ? RuntimeApi.StrCompareFig(read, lo.Text, figIsLeft: false, weights)
+                                    : RuntimeApi.StrCompare(read, lo.Text, weights),
+               hiCmp = hi.IsFigSeed ? RuntimeApi.StrCompareFig(read, hi.Text, figIsLeft: false, weights)
+                                    : RuntimeApi.StrCompare(read, hi.Text, weights);
         return $"({loCmp} >= 0 && {hiCmp} <= 0)";
     }
 
@@ -144,7 +162,7 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
     /// that a RESUME is a <c>__pc</c>-anchored statement surface a lambda cannot hold; so the registry's boundary
     /// default (since removed) DISCARDED every condition a function propagated from a PERFORM UNTIL, a SEARCH WHEN, an EVALUATE
     /// object or a short-circuited operand, although §14.9.18.4 GR1 b) raises it in the activating element. The
-    /// activation is marked <c>InExpression</c> at bind, so its pickup leaves by throwing to the carrying
+    /// activation is marked <c>OperandEvaluation</c> at bind, so its pickup leaves by throwing to the carrying
     /// statement's <c>BoundActivationSite</c> — never by a <c>goto</c> — and it can run inside the lambda.</para>
     /// <para>The captured text keeps its line breaks: a trailing <c>//</c> comment in it would otherwise swallow
     /// the rest of the lambda.</para></summary>
@@ -616,16 +634,35 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
     /// StoreAsImage base, a sign-admitting n) 1. test — both answers about the item, not the operand.</para></summary>
     private string RenderClass(BoundClassCondition c)
     {
-        var fld = c.Operand as BoundFieldOperand;
         // §8.8.4.4.4 GR3 n) 1. versus n) 2. is a question about the OPERAND's category (kb/Work PB823): a
         // reference-modified slice answers alphanumeric / national here (§8.4.3.3.4 GR6 c), whatever its base
         // item is, and a bit / national group answers its as-if category (§13.18.29.4 GR1 b)/GR2 b), never numeric.
-        bool numericCategory = fld is not null && StringCategoryOf(fld) is PicCategory.Numeric;
+        // ⛔ ASKED OF EVERY OPERAND SHAPE, NOT ONLY A DATA-ITEM REFERENCE (kb/Work PB1401 / PB1466): §8.5.2.12 items
+        // 3–7 make the three counter registers and every numeric / integer function category-numeric data items,
+        // and they bind as COMPUTED operands. This renderer used to ask the category of a BoundFieldOperand only,
+        // so a register was sent down the n) 2. string arm (a run-time NotImplemented) and FARTHEST-FROM-ZERO /
+        // NEAREST-TO-ZERO / IN-ARITHMETIC-RANGE dereferenced a null field (a compiler crash), while
+        // `FUNCTION NUMVAL("1.5") IS NUMERIC` applied n) 2.'s all-digits test to the text "1.5" and answered FALSE.
+        bool numericCategory = StringCategoryOf(c.Operand) is PicCategory.Numeric;
+        if (numericCategory && c.Operand is BoundComputedOperand computed)
+            return RenderComputedNumericClass(computed, c.ClassKind, c.Negated);
+        var fld = c.Operand as BoundFieldOperand;
+        // Total over the operand kinds: a numeric-category operand is a data item or a computed one (above). No
+        // other shape reaches identifier-1 with that category, and one that ever did is loud here, never a null
+        // dereference in the arms below.
+        if (numericCategory && fld is null)
+            return EmitText.LoudValue("bool", $"numeric class condition over a '{c.Operand.GetType().Name}' operand");
         // A numeric OPERAND is a whole numeric data item. Its storage is either the native long/Int128, which can
         // only hold a valid value (the fold to true below), or a CHARACTER WINDOW (a REDEFINES view, a whole-
         // group-aliased StoreAsImage leaf), which is tested at run time by the ONE n) 1. predicate over the raw
         // window — its NumProfile carries the item's sign presentation and the compilation's --sign-encoding, so
         // no sign convention is re-spelled here.
+        // ⛔ THE FOLD IS SOUND ONLY BECAUSE A NATIVE CARRIER IS NEVER WRITTEN BY A CHARACTER CHANNEL (kb/Work
+        // PB1466): StorageFormPass.IsImagePromotable image-stores every DISPLAY, BINARY and PACKED leaf that a group
+        // MOVE, a READ or a BY REFERENCE crossing reaches, so the only content a native leaf can hold is a value a
+        // numeric store put there. It used to promote DISPLAY alone, and this fold answered TRUE over a packed field
+        // READ with nibbles A–F. (A national-form numeric leaf is not yet promoted — the carriage question that
+        // method records.)
         bool windowedNumeric = numericCategory && (fld!.Place is RedefViewPlace || fld.Place.Item.StoreAsImage);
         // §14.6.13.2 dash-1 of rules 1, 2 AND 3: a sending item referenced in a CLASS condition is EXEMPT from
         // every one of them — the class test inspects the content precisely in order to CATEGORIZE it, so raising
@@ -758,6 +795,92 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         return pic.IsFloat ? FloatTest(f, CobolNet.Runtime.FloatClassTest.Finite) : numericTest;
     }
 
+    /// <summary>The numeric class conditions over a COMPUTED category-numeric operand — a LINAGE-COUNTER,
+    /// LINE-COUNTER or PAGE-COUNTER register, or a numeric / integer function-identifier (ISO §8.5.2.12 items 3–7;
+    /// kb/Work PB1401, PB1466). Such an operand has a VALUE and no storage, so every question is asked of the value,
+    /// and of that value ONCE — the runtime helpers take it as one argument, so a function with an effect (RANDOM's
+    /// seed, an EC-ARGUMENT-FUNCTION raise) runs exactly as often as it is written, which a pair of relation
+    /// conditions over the operand would not guarantee.
+    /// <list type="bullet">
+    /// <item>A binary64 value (the float function family, DOC-A.1-92) is asked on its own bits by
+    /// <c>CobolFloatClass</c>, as a float data item is: NUMERIC is §8.8.4.4.4 GR3 n) 1.'s "valid representation" (a
+    /// finite value), FARTHEST-FROM-ZERO / NEAREST-TO-ZERO are binary64's extremes, and IN-ARITHMETIC-RANGE is
+    /// finiteness because binary64's range lies inside every mode's intermediate (the containment
+    /// <see cref="RenderInArithmeticRange"/> states for a float item).</item>
+    /// <item>Every other value is lifted EXACTLY into the decimal form (<c>NumericRenderer.DecOperand</c>) and asked
+    /// there: NUMERIC is GR3 n) 1. c. — true, the content being a value its carrier holds; g) / m) compare it with
+    /// the extremes of the data item the operand references (<see cref="AlgebraicRanges.OfCounterRegister"/> /
+    /// <see cref="AlgebraicRanges.OfFunctionReturnedValue"/>); l) compares its magnitude with the mode's
+    /// intermediate extremes (<see cref="ArithmeticModes.IntermediateExtremes"/>) — the rule's own words, "neither
+    /// farther from zero nor closer to zero than is permitted for the form of an intermediate data item".</item>
+    /// </list>
+    /// The other alternatives cannot reach here: §8.8.4.4.3 SR3–SR5 and SR7 refuse a numeric operand for each of
+    /// them at bind (<see cref="ClassConditionModel"/>), and an arm that is reached anyway is loud.</summary>
+    private string RenderComputedNumericClass(BoundComputedOperand op, char kind, bool negated)
+    {
+        // §14.6.13.2 dash-1 of rules 1–3: a class condition's operand is exempt from the checked sending reads.
+        NumX v = num.AsNum(op, ReceiverContext.None, SendingRef.ClassCondition);
+        string test;
+        if (v.Real)
+        {
+            string carrier = NumericRenderer.Real(v);
+            test = kind switch
+            {
+                ClassConditionModel.Numeric or ClassConditionModel.InArithmeticRange =>
+                    RuntimeApi.FloatClass(carrier, CobolNet.Runtime.FloatClassTest.Finite),
+                ClassConditionModel.FarthestFromZero =>
+                    RuntimeApi.FloatClass(carrier, CobolNet.Runtime.FloatClassTest.FarthestFromZero),
+                ClassConditionModel.NearestToZero =>
+                    RuntimeApi.FloatClass(carrier, CobolNet.Runtime.FloatClassTest.NearestToZero),
+                _ => EmitText.LoudValue("bool", $"class condition '{kind}' over a computed numeric operand"),
+            };
+        }
+        else
+        {
+            string dec = num.DecOperand(v);
+            test = kind switch
+            {
+                ClassConditionModel.Numeric => RuntimeApi.ValueClassIsNumeric(dec),
+                ClassConditionModel.FarthestFromZero or ClassConditionModel.NearestToZero =>
+                    ComputedExtremeTest(op, v, dec, kind is ClassConditionModel.FarthestFromZero),
+                ClassConditionModel.InArithmeticRange => ComputedInArithmeticRangeTest(dec),
+                _ => EmitText.LoudValue("bool", $"class condition '{kind}' over a computed numeric operand"),
+            };
+        }
+        return negated ? $"!({test})" : $"({test})";
+    }
+
+    /// <summary>§8.8.4.4.4 GR3 g) / m) over a computed operand's decimal value — its extremes read from the data item
+    /// the operand references (the either-direction reading <see cref="RenderExtremeClass"/> documents).</summary>
+    private string ComputedExtremeTest(BoundComputedOperand op, NumX v, string dec, bool farthest)
+    {
+        AlgebraicRange? described = AlgebraicRanges.OfCounterRegister(op.Expr)
+            ?? (op.Expr is BoundIntrinsicCall
+                ? AlgebraicRanges.OfFunctionReturnedValue(IntrinsicResultType.IsIntegerOperand(op), v.Dec,
+                    ctx.Data.DecimalPointIsComma)
+                : null);
+        if (described is not { } range || range.Nearest is null)
+            return EmitText.LoudValue("bool", $"{(farthest ? "FARTHEST-FROM-ZERO" : "NEAREST-TO-ZERO")} over a computed operand with no described capacity");
+        string positive = farthest ? range.Farthest : range.Nearest;
+        string? negative = range.FarthestNegative is null ? null : farthest ? range.FarthestNegative : "-" + range.Nearest;
+        return RuntimeApi.ValueClassIsExtreme(dec, DecLiteral(positive), negative is null ? null : DecLiteral(negative));
+    }
+
+    /// <summary>§8.8.4.4.4 GR3 l) over a computed operand's decimal value, against the mode's intermediate.</summary>
+    private string ComputedInArithmeticRangeTest(string dec)
+    {
+        var (farthest, nearest) = ArithmeticModes.IntermediateExtremes(ctx.Data.Options.Arithmetic);
+        return RuntimeApi.ValueClassIsInArithmeticRange(dec, DecLiteral(farthest), DecLiteral(nearest));
+    }
+
+    /// <summary>An exact decimal-literal TEXT (the forms <see cref="AlgebraicRanges"/> and
+    /// <see cref="ArithmeticModes.IntermediateExtremes"/> produce) as a decimal-form constant — every one of them
+    /// has at most 34 significant digits, so the lift is exact.</summary>
+    private string DecLiteral(string text) =>
+        NumericLiteral.TryParseExact(text, out var sig, out int exp10)
+            ? RuntimeApi.DecFromParsedLiteral(sig, exp10, num.IntermediateMode)
+            : EmitText.LoudValue("CobolDec", $"decimal constant '{text}'");
+
     private string RenderCondition88(BoundCondition88 c)
     {
         // ⛔ ONE CLASSIFICATION OF THE CONDITIONAL VARIABLE, computed HERE and shared by its IMAGE and by its
@@ -845,23 +968,36 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
             // its singleton on a sequence no rule puts there.
             string rangeCollate = RangeCollateArg(alphabet, cat, cat);
             string pad = cat is PicCategory.Boolean ? ", pad: '0'" : "";
-            string lo = StringMembershipExpr(low, parent);
-            if (high is null) return $"CobolString.Compare({read}, {lo}{pad}{collate}) == 0";
-            string hi = StringMembershipExpr(high, parent);
+            // ⛔ A FIGURATIVE VALUE IS A SEED, SIZED BY THE RUNTIME AGAINST THE OPERAND AS READ — exactly as the
+            // relation condition sizes it (kb/Work PB1477). §8.8.4.5.3 GR2 makes this comparison the relation
+            // condition's, and §8.3.3.6.4 GR2 repeats a figurative to "the number of character positions in the
+            // associated data item": the conditional variable AS IT IS COMPARED, i.e. at its CURRENT extent
+            // (§13.18.38.4 GR8 a) — an occurs-depending group item referenced as an operand uses "only that part
+            // of the table area that is specified by the value of the data item referenced by data-name-1"). A
+            // compile-time fold to the variable's declared width sized `88 GV-ALLX VALUE ALL "X"` on a group
+            // holding an OCCURS DEPENDING ON table to the MAXIMUM extent while `read` is the current one, so the
+            // 88 answered FALSE where `IF GV = ALL "X"` answered TRUE. The seed and the sizing are now the ones
+            // the relation (RenderFigurativeRelational) and the EVALUATE range (Visit(BoundRangeMembership)) use.
+            var lo = StringMembershipOperand(low, parent, cat);
+            if (high is null)
+                return lo.IsFigSeed
+                    ? $"{RuntimeApi.StrCompareFig(read, lo.Text, figIsLeft: false, pad + collate)} == 0"
+                    : $"{RuntimeApi.StrCompare(read, lo.Text, pad + collate)} == 0";
+            var hi = StringMembershipOperand(high, parent, cat);
             // §14.7.8 rule 2: an alphanumeric/national THRU range under checking routes through ThruMember (sets the
             // nonfatal EC-RANGE-INVALID for an inverted range, then treats it as empty — the empty behaviour is
-            // otherwise emergent from the inclusive test). Boolean/other categories keep the inline byte-identical form.
+            // otherwise emergent from the inclusive test). Boolean/other categories keep the inline form.
             // The class that governs the COMPARISON, not the raw category — the same pair rule the collate
             // argument above asks (§8.8.4.5.3 GR2; the pair is the variable's category twice, as stated there).
             // ForComparison(null, null) is the ALPHANUMERIC branch (an ordinary group item, ISO §8.8.4.2.1), so
             // an alphanumeric GROUP's 88 range now reaches §14.7.8 rule 2's exception exactly as its elementary
-            // twin does. Boolean and numeric ranges keep the inline byte-identical form (§14.7.8 rule 1 sets no
+            // twin does. Boolean and numeric ranges keep the inline form (§14.7.8 rule 1 sets no
             // exception; a boolean subject may not carry THROUGH at all, §13.18.63.3 SR29).
             // ⛔ THE ONE §14.7.8 rule-1/rule-2 predicate, the same call the EVALUATE range's EC gate and
             // TryResolveRangeAlphabet's SR3 screen make (kb/Work PB401) — never a locally spelled-out class test.
-            if (checkRangeInvalid && CollatingSelection.IsCollatedThroughRange(CollatingSelection.ForComparison(cat, cat)))
-                return RuntimeApi.ThruMember(read, lo, hi, rangeCollate);
-            return $"(CobolString.Compare({read}, {lo}{pad}{rangeCollate}) >= 0 && CobolString.Compare({read}, {hi}{pad}{rangeCollate}) <= 0)";
+            bool checkedRange = checkRangeInvalid
+                && CollatingSelection.IsCollatedThroughRange(CollatingSelection.ForComparison(cat, cat));
+            return RenderStringRange(read, lo, hi, checkedRange, pad + rangeCollate);
         }
         // A float (COMP-1/2/FLOAT-*) conditional variable: `read` is the native double `(double)(X)`, so the VALUE
         // literal must render as a native double too — NOT scaled-integer at the float item's Scale 0, which would
@@ -887,42 +1023,29 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         : raw.IndexOf('E') >= 0 || raw.IndexOf('e') >= 0 ? raw.Trim().TrimStart('+')
         : $"{raw.Trim().TrimStart('+')}d";
 
-    /// <summary>A string level-88 VALUE operand's character value: a NUMERIC-EDITED conditional variable's numeric
-    /// literal (or figurative ZERO at >= 2023) is its EDITED image — ISO §13.18.63.3 SR6 converts a numeric-edited
-    /// item's numeric VALUE literals "according to the rules for the MOVE statement" in formats 1, 2 AND 4, and
-    /// §8.8.4.5.3 GR2 then compares by the relation-condition rules (kb/Work PB97: the raw text "10" was compared to the
-    /// image " 10.00" — every such condition-name was silently false); a figurative <c>ALL "literal"</c> repeated to
-    /// the conditional variable's width (ISO §8.3.3.6.4 GR2), a bare figurative WORD (QUOTE / SPACE / HIGH-VALUE /
-    /// LOW-VALUE / ZERO — §8.3.3.6.4 r2, materialized to the variable's width, NC250A IF--TEST-26/27), else the decoded
-    /// literal.</summary>
-    /// <summary>The membership operand as a C# EXPRESSION: a format-2 (LOCALE) conditional variable's numeric
-    /// VALUE composes its edited image AT RUNTIME under the locale then current (§13.18.40.5 r11 — no
-    /// compile-time image exists; the ONE producer, <see cref="RuntimeApi.LocaleEditCompose"/>; falling back to
-    /// comparing raw literal text is precisely the PB97 defect shape); everything else is the compile-time
-    /// <see cref="StringMembershipValue"/> as a string literal.</summary>
-    private string StringMembershipExpr(string raw, DataItem parent)
+    /// <summary>A string level-88 VALUE operand as a C# EXPRESSION, in the order the VALUE recipe reads it:
+    /// <list type="bullet">
+    /// <item>a format-2 (LOCALE) conditional variable's numeric VALUE composes its edited image AT RUNTIME under
+    /// the locale then current (§13.18.40.5 r11 — no compile-time image exists; the ONE producer,
+    /// <see cref="RuntimeApi.LocaleEditCompose"/>; comparing raw literal text is precisely the PB97 defect shape);</item>
+    /// <item>a NUMERIC-EDITED conditional variable's numeric literal (or figurative ZERO at >= 2023) is its EDITED
+    /// image — ISO §13.18.63.3 SR6 converts a numeric-edited item's numeric VALUE literals "according to the rules
+    /// for the MOVE statement", and §8.8.4.5.3 GR2 then compares by the relation-condition rules (kb/Work PB97);</item>
+    /// <item>a figurative <c>ALL "literal"</c> or a bare figurative WORD (QUOTE / SPACE / HIGH-VALUE / LOW-VALUE /
+    /// ZERO) is a SEED (<see cref="MembershipOperand.IsFigSeed"/>) that the runtime sizes to the conditional variable
+    /// AS READ (§8.3.3.6.4 GR2 — kb/Work PB1477; NC250A IF--TEST-26/27);</item>
+    /// <item>else the decoded literal.</item>
+    /// </list></summary>
+    private MembershipOperand StringMembershipOperand(string raw, DataItem parent, PicCategory? cat)
     {
         if (parent.OperandPic is { LocaleEdit: not null } lpic
             && !raw.StartsWith('"') && !raw.StartsWith('\'')
             && ValueInitializer.TryParseNumeric(raw, out var uv, out int sc))
-            return RuntimeApi.LocaleEditCompose(lpic, uv, sc, parent.BlankWhenZero);
-        return EmitText.CsLiteral(StringMembershipValue(raw, parent));
-    }
-
-    private string StringMembershipValue(string raw, DataItem parent)
-    {
-        // ⛔ THE ONE READER for the WIDTH too (kb/Work PB728). ISO 8.3.3.6.4 GR2 repeats a figurative /
-        // ALL literal to the conditional variable's CHARACTER-POSITION count, and 13.18.29.4 GR1b/GR2b says what
-        // that count is for a group operating as an elementary item: the as-if PICTURE's 1(m) boolean positions
-        // or N(m) national positions. Raw `Pic` is null for every group, so the fallback ImageWidth answered in
-        // the group's STORAGE unit - measured: `88 GB-ALL1 VALUE ALL B"1"` on a 3-bit GROUP-USAGE BIT group
-        // repeated to ONE position (its one byte of storage) and answered FALSE where the elementary twin
-        // answered TRUE. ImageWidth remains the fallback for an ORDINARY group, whose positions ARE characters.
-        int width = parent.OperandPic?.Length ?? parent.ImageWidth;
+            return new(RuntimeApi.LocaleEditCompose(lpic, uv, sc, parent.BlankWhenZero), IsFigSeed: false);
         if (parent.OperandPic is { Category: PicCategory.NumericEdited } npic
             && ValueInitializer.EditedImageOfNumericValue(ctx.Data.Edition.DialectLevel,
                     ctx.Data.DecimalPointIsComma, parent, npic, raw) is { } edited)
-            return edited;
+            return new(EmitText.CsLiteral(edited), IsFigSeed: false);
         // ⛔ THE ONE §8.3.3.6.2 OPERAND CLASSIFIER (kb/Work PB461). §14.9.39.4 GR6 stores this same operand
         // "according to the rules for the VALUE clause" and §8.8.4.5.3 GR3 makes the test true exactly when the
         // stored value equals it, so the TEST is required to read the text the way the STORE and the VALUE
@@ -930,12 +1053,15 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         // words — so `88 B-ALLSP VALUE ALL SPACES` arrived as "ALLSPACES", never stripped, and was compared as
         // the ten characters A-L-L-S-P-A-C-E-S against an item this compiler had correctly filled with spaces.
         // The fill is category-aware here as it is at the store (§8.3.3.6.4 GR6/GR7 — a national or boolean
-        // anchor reads its OWN sequence, never the alphanumeric PCS).
+        // anchor reads its OWN sequence, never the alphanumeric PCS); `cat` is RenderCondition88's ONE
+        // classification of the variable, so a bit / national GROUP's as-if category (§13.18.29.4 GR1b/GR2b)
+        // chooses the fill (kb/Work PB728). No width is computed here: the SEED is sized by the runtime against
+        // the variable's own character-position count as read — boolean positions, national positions, or an
+        // ODO group's CURRENT extent — which is the one quantity GR2 names (kb/Work PB1477).
         var op = FigurativeConstants.Classify(raw);
-        return op.AllLiteral is { } lit ? EmitText.RepeatToWidth(CobolLiteral.Decode(lit), width)
-            : op.Kind is { } k ? new string(
-                FigurativeConstants.FillChar(k, ctx.Data.Collating, parent.OperandPic?.Category, ctx.Data.NationalCollating), width)
-            : CobolLiteral.Decode(raw);
+        return op.AllLiteral is { } lit ? new(EmitText.CsLiteral(CobolLiteral.Decode(lit)), IsFigSeed: true)
+            : op.Kind is { } k ? new(FigurativeConstants.FillText(k, ctx.Data.Collating, cat, ctx.Data.NationalCollating), IsFigSeed: true)
+            : new(EmitText.CsLiteral(CobolLiteral.Decode(raw)), IsFigSeed: false);
     }
 
     /// <summary>A numeric level-88 VALUE operand → its unscaled-<c>long</c> text. A figurative ZERO maps to <c>0</c>

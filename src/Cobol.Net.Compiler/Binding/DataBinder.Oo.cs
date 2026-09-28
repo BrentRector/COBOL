@@ -528,13 +528,14 @@ public sealed partial class DataBinder
     /// <c>UdfAttachPerEvaluation</c> with no extra wiring.</para></summary>
     internal List<Bound.BoundStatement> PendingPreOps { get; } = [];
 
-    /// <summary>How many OPERAND activations (a function reference, an inline method invocation, an
-    /// object-property accessor) the statement now binding has drained so far — the test
+    /// <summary>How many OPERAND-EVALUATION steps (<see cref="Bound.BoundStatement.OperandEvaluation"/> — a
+    /// function reference, an inline method invocation, an object-property accessor, a §15.4 function-bearing
+    /// subscript's temporary store; kb/Work PB892, PB1432) the statement now binding has drained so far — the test
     /// <c>StatementBinder.BindStatement</c> uses to wrap that statement in its <c>BoundActivationSite</c>
     /// (kb/Work PB892). BindStatement saves it, zeroes it and restores it around each statement, so a nested
     /// statement's activations count toward the nested statement only (§14.9.33.4 GR2 a) 3.: "the lowest level
     /// statement, not the containing statement").</summary>
-    internal int OperandActivations { get; set; }
+    internal int OperandEvaluations { get; set; }
 
     /// <summary>Synthesize the GR1/GR2/GR3 compiler temp for one property reference: a level-1 elementary
     /// item CLONED from the accessor's crossing description (<paramref name="model"/> = the GET RETURNING

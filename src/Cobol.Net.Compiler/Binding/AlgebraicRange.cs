@@ -150,6 +150,70 @@ internal static class AlgebraicRanges
             Decimalize(BigInteger.Zero, scale, negative: false));
     }
 
+    /// <summary>The extremes of a COUNTER REGISTER — LINAGE-COUNTER, LINE-COUNTER or PAGE-COUNTER, category-numeric
+    /// data items by §8.5.2.12 items 3–5 — or <c>null</c> for any other expression (kb/Work R26, PB1401). Each is
+    /// "a temporary unsigned integer data item" (§8.4.3.14.4 GR1 / §8.4.3.15.4 GR1), so its nearest nonzero value
+    /// is 1, its zero is 0 and it has no negative extreme; its capacity is:
+    /// <list type="bullet">
+    /// <item>LINAGE-COUNTER — "whose size is equal to the page size specified in the LINAGE clause" (§8.4.3.14.4
+    /// GR1): a literal page size directly; a data-name page size is set at run time, so the capacity is the
+    /// largest page size that item can hold, its all-nines. The data-name is read from its RESOLVED item
+    /// (<see cref="LinageOperand.Item"/>, qualified per §8.4.2.2 — kb/Work PB489), never re-looked-up by its bare
+    /// name.</item>
+    /// <item>LINE-COUNTER / PAGE-COUNTER — the standard gives no size, and WiseOwl COBOL's documented shape is
+    /// PIC 9(18), the all-nines of the runtime's long carrier (CONFORMANCE.md §3, "the counter registers'
+    /// declared capacity").</item>
+    /// </list>
+    /// ⛔ THE ONE STATEMENT OF THE REGISTERS' CAPACITY: the §15.43/§15.58/§15.83 algebraic folds and the §8.8.4.4.4
+    /// GR3 g)/l)/m) class conditions both ask it here, so a HIGHEST-ALGEBRAIC of the register and an
+    /// <c>IS FARTHEST-FROM-ZERO</c> test of it cannot name two different values.</summary>
+    internal static AlgebraicRange? OfCounterRegister(Bound.BoundExpr register) => register switch
+    {
+        Bound.BoundLinageCounterRef lc => UnsignedCounter(LinagePageCapacity(lc.File)),
+        Bound.BoundReportCounterRef => UnsignedCounter(ReportCounterCapacity),
+        _ => null,
+    };
+
+    /// <summary>The documented LINE-COUNTER / PAGE-COUNTER capacity, PIC 9(18) (see <see cref="OfCounterRegister"/>).</summary>
+    private const string ReportCounterCapacity = "999999999999999999";
+
+    private static AlgebraicRange UnsignedCounter(string capacity) =>
+        new(capacity, FarthestNegative: null, Nearest: "1", Zero: "0");
+
+    private static string LinagePageCapacity(FileModel file)
+    {
+        var body = file.Linage?.Body;
+        if (body?.Literal is { } lit) return lit.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (body?.Item?.Pic is { Digits: > 0 } p) return new string('9', p.Digits);
+        // An unresolved page-size operand was already reported by its own resolution (DataBinder.ResolveLinage);
+        // the register is still a long-carried counter, so its carrier's bound stands in for the missing size.
+        return ReportCounterCapacity;
+    }
+
+    /// <summary>The extremes of a numeric or integer FUNCTION's returned value (§8.5.2.12 items 6–7) — the
+    /// "temporary elementary data item" §15.4 places it in — for a function whose value is NOT a binary64 (that
+    /// family is asked on its own bits by <c>CobolFloatClass</c>, whose extremes are binary64's). §15.4.1 leaves the
+    /// characteristics and representation of the returned value to the implementor under native arithmetic, and
+    /// WiseOwl COBOL's determination (CONFORMANCE.md DOC-A.1-92) fixes it:
+    /// <list type="bullet">
+    /// <item><paramref name="standardDecimal"/> — a value carried as the SDIDI (NUMVAL / NUMVAL-C in every mode,
+    /// every function under a standard arithmetic mode): the SDIDI's own extremes, the same text
+    /// <see cref="ArithmeticModes.IntermediateExtremes"/> states for that form.</item>
+    /// <item>otherwise the §15.4 temporary's description (<c>SendingValueTemp</c>): S9(30) for an INTEGER function
+    /// (§15.2 item 5 — "no digits to the right of the decimal point", so its nearest nonzero value is 1), and
+    /// S9(21)V9(9) for a NUMERIC function.</item>
+    /// </list></summary>
+    internal static AlgebraicRange OfFunctionReturnedValue(bool integer, bool standardDecimal, bool decimalPointIsComma)
+    {
+        if (standardDecimal)
+        {
+            var (far, near) = ArithmeticModes.IntermediateExtremes(ArithmeticMode.StandardDecimal);
+            return new AlgebraicRange(far, "-" + far, near, Zero: "0");
+        }
+        return Of(integer ? Procedure.SendingValueTemp.IntegerFunctionValuePic : Procedure.SendingValueTemp.FunctionValuePic,
+            decimalPointIsComma)!.Value;
+    }
+
     private static BigInteger Pow10(int n) => BigInteger.Pow(10, Math.Max(0, n));
 
     /// <summary>Render an unscaled <see cref="BigInteger"/> at <paramref name="scale"/> fractional digits as a

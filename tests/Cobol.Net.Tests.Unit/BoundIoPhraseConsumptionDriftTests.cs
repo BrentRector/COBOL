@@ -66,6 +66,9 @@ public sealed class BoundIoPhraseConsumptionDriftTests
             + "stale, or the verb moved to another emitter.");
 
         var missing = node.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            // The BoundStatement base's own members are not phrases of this statement: OperandEvaluation (kb/Work
+            // PB1432) is read for EVERY node by StatementEmitter.EmitStatement, never by a verb's emitter.
+            .Where(p => p.DeclaringType != typeof(BoundStatement))
             .Select(p => p.Name)
             .Where(p => !Exempt.ContainsKey($"{nodeName}.{p}"))
             .Where(p => !receivers.Any(r => Regex.IsMatch(source, $@"\b{Regex.Escape(r)}\s*[.?]\s*{Regex.Escape(p)}\b")))

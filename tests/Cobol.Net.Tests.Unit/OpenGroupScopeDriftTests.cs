@@ -38,6 +38,9 @@ public sealed class OpenGroupScopeDriftTests
     /// §14.9.27.2 forbids.</summary>
     private static string[] StatementScopedMembers(Type statement, string groupListProperty) =>
         [.. statement.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            // The BoundStatement base's own members (OperandEvaluation, kb/Work PB1432) belong to every node, not
+            // to this statement's phrase set.
+            .Where(p => p.DeclaringType != typeof(BoundStatement))
             .Where(p => p.Name != groupListProperty)
             .Select(p => p.Name)
             .Order()];

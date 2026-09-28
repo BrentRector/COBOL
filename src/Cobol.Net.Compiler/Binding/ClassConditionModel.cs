@@ -182,14 +182,21 @@ internal static class ClassConditionModel
     /// an ordinary group's usage) and fails OPEN for the NEGATIVE rules — SR3/SR4/SR5/SR8 exist to reject what
     /// they name, never what this compiler cannot classify. The two POSITIVE rules (SR6, SR7) name what the
     /// operand SHALL be, so a data item whose category is known and is not that fails them: an alphanumeric
-    /// group is category alphanumeric (§8.5.2.1) and has no standard floating-point usage.</para></summary>
-    public static bool Violates(ClassOperandRule rule, PicCategory? category, Usage? usage) => rule switch
+    /// group is category alphanumeric (§8.5.2.1) and has no standard floating-point usage.</para>
+    /// <para><paramref name="function"/> marks an intrinsic FUNCTION-IDENTIFIER operand, for SR3's second sentence —
+    /// "If identifier-1 is a function-identifier, it shall reference an alphanumeric or national function" — which
+    /// states the function's half of the usage rule by its TYPE (§15.2), not by a usage clause it cannot have
+    /// (kb/Work PB1401). A COUNTER REGISTER is not a function-identifier, has no usage clause, and so keeps the
+    /// fail-open usage answer; SR4–SR6 reach it through its category.</para></summary>
+    public static bool Violates(ClassOperandRule rule, PicCategory? category, Usage? usage, bool function) => rule switch
     {
         ClassOperandRule.NotBooleanNumericOrNumericEdited =>
             category is PicCategory.Boolean or PicCategory.Numeric or PicCategory.NumericEdited,
         ClassOperandRule.NotNumericOrNumericEdited =>
             category is PicCategory.Numeric or PicCategory.NumericEdited,
-        ClassOperandRule.UsageDisplayOrNational => usage is { } u && !DisplayOrNational(u),
+        ClassOperandRule.UsageDisplayOrNational => function
+            ? category is not (PicCategory.Alphanumeric or PicCategory.National)
+            : usage is { } u && !DisplayOrNational(u),
         ClassOperandRule.NumericUsageOrCategory =>
             usage is { } u2 && !DisplayOrNational(u2) && category is not PicCategory.Numeric,
         ClassOperandRule.NumericCategory => category is { } c && c is not PicCategory.Numeric,
@@ -218,7 +225,8 @@ internal static class ClassConditionModel
         ClassOperandRule.UsageDisplayOrNational =>
             (DiagnosticCatalog.ClassConditionOperandUsage.Code, "ISO §8.8.4.4.3 SR3",
             "if the alphabet-name-1, ALPHABETIC, ALPHABETIC-LOWER, ALPHABETIC-UPPER, BOOLEAN, or class-name-1 "
-            + "phrase is specified, identifier-1 shall reference a data-item whose usage is display or national"),
+            + "phrase is specified, identifier-1 shall reference a data-item whose usage is display or national. If "
+            + "identifier-1 is a function-identifier, it shall reference an alphanumeric or national function"),
         ClassOperandRule.NumericCategory =>
             (DiagnosticCatalog.ClassConditionNotNumericCategory.Code, "ISO §8.8.4.4.3 SR6",
             "if FARTHEST-FROM-ZERO, IN-ARITHMETIC-RANGE, or NEAREST-TO-ZERO is specified, identifier-1 shall "

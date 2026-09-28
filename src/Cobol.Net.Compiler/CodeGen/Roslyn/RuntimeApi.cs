@@ -174,6 +174,23 @@ internal static class RuntimeApi
     public static string FloatClassImage(string image, string profile, FloatClassTest test) =>
         $"{nameof(CobolFloatClass)}.{nameof(CobolFloatClass.IsImage)}({image}, {profile}, {nameof(FloatClassTest)}.{test})";
 
+    /// <summary>NUMERIC over a COMPUTED numeric operand's value (ISO §8.8.4.4.4 GR3 n) 1. c.; kb/Work PB1401) —
+    /// <c>CobolValueClass.IsNumeric</c>: the operand is evaluated and its content is a valid value by
+    /// construction. <paramref name="dec"/> is the operand lifted to its decimal form.</summary>
+    public static string ValueClassIsNumeric(string dec) =>
+        $"{nameof(CobolValueClass)}.{nameof(CobolValueClass.IsNumeric)}({dec})";
+
+    /// <summary>FARTHEST-FROM-ZERO / NEAREST-TO-ZERO over a COMPUTED numeric operand's value (ISO §8.8.4.4.4 GR3 g)
+    /// / m)) — <c>CobolValueClass.IsExtreme</c>, which takes the value ONCE. <paramref name="negative"/> is
+    /// <c>null</c> for a description that cannot hold a sign.</summary>
+    public static string ValueClassIsExtreme(string dec, string positive, string? negative) =>
+        $"{nameof(CobolValueClass)}.{nameof(CobolValueClass.IsExtreme)}({dec}, {positive}, {negative ?? "null"})";
+
+    /// <summary>IN-ARITHMETIC-RANGE over a COMPUTED numeric operand's value (ISO §8.8.4.4.4 GR3 l)) —
+    /// <c>CobolValueClass.IsInArithmeticRange</c> against the mode's intermediate extremes.</summary>
+    public static string ValueClassIsInArithmeticRange(string dec, string farthest, string nearest) =>
+        $"{nameof(CobolValueClass)}.{nameof(CobolValueClass.IsInArithmeticRange)}({dec}, {farthest}, {nearest})";
+
     /// <summary>The rule-2 checked sending read on the STRING channel — <c>CobolNum.SendingImage</c>: a ZONED
     /// window is handed on VERBATIM (its stored image is its text), having first been tested against the numeric
     /// class condition under checking. <paramref name="sending"/> false is the raw read, for an exempt context

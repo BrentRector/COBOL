@@ -199,4 +199,33 @@ public sealed class CobolLexerModeDriftTests
         Assert.Contains("ZERO_ARITH", names);
         Assert.DoesNotContain("ZERO", names);
     }
+
+    private static string[] PrimedTokenNames(string src, int year)
+    {
+        var lexer = new CobolLexer(new AntlrInputStream(src));
+        TokenRetypes.None.PrimeLexer(lexer, CobolNet.Editions.EditionInfo.Of(year));
+        var stream = new CommonTokenStream(lexer);
+        stream.Fill();
+        return [.. stream.GetTokens()
+            .Where(t => t.Type != TokenConstants.EOF && t.Type != CobolLexer.WS && t.Type != CobolLexer.SUB_WS)
+            .Select(t => CobolLexer.DefaultVocabulary.GetSymbolicName(t.Type) ?? t.Type.ToString())];
+    }
+
+    /// <summary>kb/Work PB1465 — the SUBSCRIPT trigger is narrowed PER COMPILE to the words the compile admits as
+    /// user-defined words (ISO §8.3.2.1 GR1: "Reserved words shall not be used as user-defined words"). A '(' after
+    /// a boolean operator §8.9 reserves (2002+) groups a boolean sub-expression, which §8.8.2 Table 4 permits; at
+    /// COBOL-85, where B-OR is a user word, the same '(' is still a subscript. A data-name and an intrinsic-function
+    /// name (a keyword-omitted call, §8.4.3.2.3 SR2 — SUM is reserved at every edition) keep their capture.</summary>
+    [Theory]
+    [InlineData("IF BZ B-OR (BW B-AND BW)", 2023, false)]
+    [InlineData("IF B-NOT (BW B-XOR BZ)", 2002, false)]
+    [InlineData("COMPUTE BR = BZ B-XOR (BW)", 2014, false)]
+    [InlineData("IF BZ B-OR (BW B-AND BW)", 85, true)]
+    [InlineData("IF BZ B-OR BT (2)", 2023, true)]
+    [InlineData("COMPUTE X = SUM (1 2 3)", 2023, true)]
+    public void ParenAfterAWord_OpensSubscriptOnlyWhereTheWordCanBeAName(string src, int year, bool subscript)
+    {
+        string[] names = PrimedTokenNames(src, year);
+        Assert.Equal(subscript, names.Any(n => n.StartsWith("SUB_", StringComparison.Ordinal)));
+    }
 }

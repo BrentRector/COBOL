@@ -61,7 +61,7 @@ public static class FragmentParse
     {
         var flag = new SyntaxErrorFlag();
         var lexer = new CobolLexer(new AntlrInputStream(text));
-        retypes.PrimeLexer(lexer);
+        retypes.PrimeLexer(lexer, edition);
         prime?.Invoke(lexer);
         lexer.RemoveErrorListeners();
         lexer.AddErrorListener(flag);

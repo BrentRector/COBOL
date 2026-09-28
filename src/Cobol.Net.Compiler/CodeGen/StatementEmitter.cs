@@ -104,7 +104,18 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     /// Dispatch is the generated exhaustive <see cref="IBoundStatementVisitor{T}"/> (PHASE-07 Step 6b): every bound
     /// statement leaf has a <c>Visit</c> below, so a missing arm is a COMPILE error — the former 79-arm switch and
     /// its loud <c>default</c> are gone.</summary>
-    internal bool EmitStatement(BoundStatement s) => s.Accept(this);
+    /// <summary>Emit one bound statement. An operand-evaluation step (<see cref="BoundStatement.OperandEvaluation"/>
+    /// — kb/Work PB892, PB1432) is emitted inside <c>DispatchState</c>'s operand-evaluation scope, so every RESUME
+    /// landing its raise sites write unwinds to the carrying statement's <see cref="BoundActivationSite"/> — one
+    /// decision, here, for the hoisted step, the lambda-captured step (<c>ConditionRenderer.PreOpText</c>) and the
+    /// per-operation step (<c>ControlFlowEmitter.RenderPerEvaluation</c>) alike.</summary>
+    internal bool EmitStatement(BoundStatement s)
+    {
+        if (!s.OperandEvaluation || _dispatchState.InOperandEvaluation) return s.Accept(this);
+        bool saved = _dispatchState.EnterOperandEvaluation();
+        try { return s.Accept(this); }
+        finally { _dispatchState.ExitOperandEvaluation(saved); }
+    }
 
     // ── Control flow / no-op ─────────────────────────────────────────────────────────────────────────────────
     public bool Visit(BoundStop n)

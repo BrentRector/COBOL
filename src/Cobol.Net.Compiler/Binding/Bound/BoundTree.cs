@@ -300,9 +300,9 @@ public sealed record BoundExprError : BoundExpr
 /// must be an immediately-invoked <c>Func&lt;bool&gt;</c> because a condition sits in a C# loop HEADER where no
 /// statement can precede it per iteration; the set/augment windows ARE statement positions, so the consumer
 /// (<c>ControlFlowEmitter.RenderPerEvaluation</c>) emits each activation through the ONE statement emitter
-/// immediately before the operation that reads the value — once per operation. Either way the activation is
-/// <c>InExpression</c>, and a RESUME for a condition it propagates leaves through the carrying statement's
-/// <see cref="BoundActivationSite"/> (kb/Work PB892).</para>
+/// immediately before the operation that reads the value — once per operation. Either way every step is an
+/// <see cref="BoundStatement.OperandEvaluation"/>, and a RESUME for a condition it raises or propagates leaves
+/// through the carrying statement's <see cref="BoundActivationSite"/> (kb/Work PB892, PB1432).</para>
 /// <para>Like its condition twin, <paramref name="Activations"/> is <see cref="BoundStatement"/> so it carries
 /// BOTH pending pre-op kinds: a user-function activation and a §15.4 function-bearing-subscript temporary
 /// store (kb/Work PB17). A rendering site that does NOT own the window fails LOUD rather than dropping the
@@ -788,7 +788,24 @@ public sealed record BoundUdfEvaluated(IReadOnlyList<BoundStatement> Activations
 
 /// <summary>A bound statement.</summary>
 [BoundNode]
-public abstract record BoundStatement;
+public abstract record BoundStatement
+{
+    /// <summary>True when this node is not a statement the programmer wrote but a step of EVALUATING AN OPERAND of
+    /// one — every pre-op drained from <c>DataBinder.PendingPreOps</c> (a user-function activation, an inline method
+    /// invocation, a D18 function-bearing subscript's §15.4 temporary store, a sending-value temp) and every
+    /// object-property accessor lowered around a statement (kb/Work PB892, PB1432). Wherever the step runs —
+    /// hoisted before the statement, or inside a per-evaluation window's lambda — a condition it raises or
+    /// propagates belongs to the statement it was written in: ISO §14.9.33.4 GR2 a) 1. ("the one in which the
+    /// exception condition was raised") and 2. ("for an inline invocation or a function invocation, … the statement
+    /// in which the inline invocation or function invocation was specified"), and NOTE 1 ("If an exception condition
+    /// was raised during the evaluation of 'a', transfer would be after the END-IF"). So its RESUME landing never
+    /// falls back into that statement and never writes a <c>goto</c> (which a lambda cannot hold): the statement
+    /// emitter opens <c>DispatchState.OperandEvaluation</c> around it, and the ONE landing
+    /// (<c>DispatchState.ResumeTransfer</c>) unwinds to the carrying statement's <see cref="BoundActivationSite"/>.
+    /// Set at exactly two places — <c>UdfBinder.DrainPending</c> and <c>OoBinder.OoWrapPropertyOps</c> — never by a
+    /// construction site remembering to.</summary>
+    public bool OperandEvaluation { get; init; }
+}
 
 /// <summary>⛔ A DEFERRAL, AND NOTHING ELSE: a statement whose construct WiseOwl COBOL HAS NOT BUILT. The backend
 /// emits a loud runtime guard (§1.4) and <see cref="StatementBinder.BindStatement"/> reports COBOLNET1756 at
@@ -1848,19 +1865,6 @@ public interface IActivatingStatement
     /// hoisted ones inside a desugar sequence: a new activating node inherits the stamp by implementing the
     /// interface, never by remembering to set a property at its own construction site.</summary>
     BoundStatement WithActivatorChecking(CobolNet.Runtime.Exceptions.EcCheckingProfile profile);
-
-    /// <summary>True when this activation is not a statement of its own but an operand of one — a user-defined
-    /// function reference, an inline method invocation, or an object-property accessor lowered onto an activation
-    /// (kb/Work PB892). ISO §14.9.33.4 GR2 a) 2.: "for an inline invocation or a function invocation, it is the
-    /// statement in which the inline invocation or function invocation was specified" that a RESUME AT NEXT
-    /// STATEMENT resumes after — so its propagation pickup leaves THROUGH that carrying statement's
-    /// <see cref="BoundActivationSite"/> rather than falling back into the statement it is an operand of.</summary>
-    bool InExpression { get; }
-
-    /// <summary>Return this node marked <see cref="InExpression"/>. Set at the ONE place an operand activation
-    /// leaves the binder's pending lists for its carrier (<c>UdfBinder.DrainPending</c>,
-    /// <c>OoBinder.OoWrapPropertyOps</c>).</summary>
-    BoundStatement AsExpressionActivation();
 }
 
 /// <summary>⛔ THE STATEMENT AN OPERAND ACTIVATION BELONGS TO (kb/Work PB892) — the lowest-level statement whose
@@ -1876,8 +1880,12 @@ public interface IActivatingStatement
 /// runs BEFORE the statement, where falling through re-enters it — so it throws
 /// <c>RaiseResumeSignal</c> and this node catches it: RESUME AT procedure-name transfers (GR3); RESUME AT NEXT
 /// STATEMENT continues after <paramref name="Inner"/>.</para>
-/// <para>Created by <c>StatementBinder.BindStatement</c> exactly when the statement drained an operand
-/// activation, so a statement without one binds byte-identically.</para></summary>
+/// <para>The same landing serves every OTHER operand-evaluation step (<see cref="BoundStatement.OperandEvaluation"/>
+/// — kb/Work PB1432): a D18 function-bearing subscript's §15.4 temporary store raises EC-SIZE-ZERO-DIVIDE in the
+/// statement it was written in (§14.9.33.4 GR2 a) 1.), inside a short-circuited operand's lambda as readily as
+/// hoisted before the statement, and NOTE 1 places the RESUME AT NEXT STATEMENT "after the END-IF".</para>
+/// <para>Created by <c>StatementBinder.BindStatement</c> exactly when the statement drained an operand-evaluation
+/// step, so a statement without one binds byte-identically.</para></summary>
 public sealed record BoundActivationSite(BoundStatement Inner) : BoundStatement;
 
 /// <summary><c>RAISE EXCEPTION exception-name-1</c> (ISO §14.9.29; SR1 — level-3 only, validated at bind).

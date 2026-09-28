@@ -119,8 +119,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // falls through to §14.6.13.1, because §14.9.4.4 GR3i says that once the program "was successfully
         // called" the ON EXCEPTION phrase is ignored.
         string? flag = hasPhrase ? $"__callErr{id}" : null;
-        if (ecProg.Count > 0) EmitCallEcCatch(ecProg, byPhrase: hasOn, flag, c.InExpression);
-        if (ecOther.Count > 0) EmitCallEcCatch(ecOther, byPhrase: false, flag, c.InExpression);
+        if (ecProg.Count > 0) EmitCallEcCatch(ecProg, byPhrase: hasOn, flag);
+        if (ecOther.Count > 0) EmitCallEcCatch(ecOther, byPhrase: false, flag);
         if (hasOn)
         {
             int pid = ctx.Names.NextEc();
@@ -315,7 +315,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// statement's business (GR3i) and must fall through to §14.6.13.1. A CobolCallException whose name is not
     /// enabled likewise falls through to the next arm / propagates — the checking-off behavior unchanged.</para>
     /// </summary>
-    private void EmitCallEcCatch(List<string> ecNames, bool byPhrase, string? phraseFlag, bool inExpression = false)
+    private void EmitCallEcCatch(List<string> ecNames, bool byPhrase, string? phraseFlag)
     {
         var w = ctx.Writer;
         int id = ctx.Names.NextEc();
@@ -331,8 +331,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 w.Line("// the statement's ON EXCEPTION phrase handles it (§14.6.13.1.3 #1; §14.9.4.4 GR3h item 1)");
             else
                 ec.EmitSelection($"__ce{id}.EcName",
-                    EcEmitter.FatalTermination($"__ce{id}.EcName", $"__ce{id}.Message"),   // every name here is fatal (Table 13)
-                    r => Resume(inExpression, r));
+                    EcEmitter.FatalTermination($"__ce{id}.EcName", $"__ce{id}.Message"));   // every name here is fatal (Table 13)
         }
     }
 
@@ -364,15 +363,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             if (raised is not null) w.Line($"{raised} = true;");
             w.Line($"ExceptionState.SetObject(__po{id});   // GR1b2 — the current exception object HERE (the activator)");
             w.Line($"int __or{id} = {ec.ObjDispatchExpr($"__po{id}")};   // rule 2 — USE AFTER EXCEPTION OBJECT (GR14)");
-            w.Line(Resume(site.InExpression, $"__or{id}", "   // RESUME AT procedure-name"));
+            w.Line(dispatch.ResumeTransfer($"__or{id}", "   // RESUME AT procedure-name"));
             using (w.Block($"if (__or{id} == -3)   // rule 3 PROPAGATE ON: directive not implemented (residue); rule 4 —"))
             {
                 // As if EXCEPTION EC-OO-EXCEPTION (:24608): the name enters the F3 tiers; Table 13 makes it fatal.
                 ec.EmitConditionSet("EC-OO-EXCEPTION", "as if EXCEPTION EC-OO-EXCEPTION (:24608)");
                 ec.EmitSelection("\"EC-OO-EXCEPTION\"",
                     EcEmitter.FatalTermination("\"EC-OO-EXCEPTION\"",
-                        "\"an exception object was not handled (ISO 14.6.13.1.5; Table 13 - fatal)\""),
-                    r => Resume(site.InExpression, r, ""));
+                        "\"an exception object was not handled (ISO 14.6.13.1.5; Table 13 - fatal)\""));
             }
             w.Line("// -1/-2: declarative completed / RESUME NEXT — normal continuation (:24604)");
         }
@@ -385,20 +383,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 EcEmitter.FatalTermination($"__pn{id}",
                     "\"exception condition propagated by GOBACK/EXIT PROGRAM RAISING and not resumed "
                     + "(ISO 14.9.18; 14.6.13.1.3 #6/#7)\""),
-                r => Resume(site.InExpression, r),
                 fatalWhen: $"__pf{id}");
         }
         return raised;
     }
-
-    /// <summary>The RESUME landing of one activation site's dispatch result — the ONE place the two kinds of
-    /// activation part: a CALL / INVOKE STATEMENT is itself §14.9.33.4 GR2 a) 2.'s applicable statement, so its
-    /// transfer is the ordinary <see cref="DispatchState.ResumeTransfer"/>; an OPERAND activation's applicable
-    /// statement is the one it was written in, which it leaves through
-    /// <see cref="DispatchState.OperandActivationResume"/> (kb/Work PB892).</summary>
-    private string Resume(bool inExpression, string resultVar,
-        string comment = "   // RESUME AT procedure-name (§14.9.33.4 GR3)") =>
-        inExpression ? dispatch.OperandActivationResume(resultVar) : dispatch.ResumeTransfer(resultVar, comment);
 
     /// <summary>The C# <c>CobolArg</c> expression for one bound CALL argument (caller side; design D1/D2).
     /// BY REFERENCE builds an accessor carrier over the caller's storage (§14.2.3 GR8); BY CONTENT/BY VALUE
@@ -1016,6 +1004,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// answer for the CALL callee's carrier window and the INVOKE argument / copy-out windows.</summary>
     internal static int BoundaryImageWidth(DataItem item) =>
         item.IsAsIfElementary ? item.AsIfPic!.Length : item.ImageWidth;
+
+    /// <summary>The character window of an ELEMENTARY string-carried formal — its carrier's width: the PICTURE's
+    /// length for every character category, and for an image-stored NUMERIC formal its storage image
+    /// (<see cref="DataItem.ImageWidth"/>, the one width authority), which for a BINARY / PACKED formal is its BYTES,
+    /// not its digit count (kb/Work PB1466: a promoted <c>USAGE BINARY-DOUBLE</c> formal is 8 positions, not 19). ONE
+    /// answer for the CALL callee's resident carrier and the INVOKE argument / copy-out windows.</summary>
+    internal static int ElementaryFormalWindow(DataItem formal) =>
+        Math.Max(1, formal.StoreAsImage ? formal.ImageWidth : formal.Pic!.Length);
 
     internal static string CallStringWrite(Place p, string value) =>
         // The boundary WRITE half of the §14.2.3 GR8/GR9 full-allocation rule above: a group (including an

@@ -611,7 +611,15 @@ disambiguation genuinely needs lexer-mode context and cannot be cleanly expresse
 COBOL's grammar), but the *duplicated* literal/operator token bodies are factored into a shared lexer
 fragment `fragment` rule set (`NUM_BODY`, `STR_BODY`, `NAT_BODY`, `BOOL_BODY`, `NAME_BODY`) referenced by
 both the DEFAULT tokens and the `SUB_*` tokens, so `"-15.6"` / `N"AB"` tokenization rules exist once. This
-removes the "keep SUB_* in sync with DEFAULT" hazard without touching the mode-switch strategy. The
+removes the "keep SUB_* in sync with DEFAULT" hazard without touching the mode-switch strategy.
+**The trigger is narrowed per compile (kb/Work PB1465).** `_dataNameTokens` is edition-blind — every word that
+is a user-defined word in SOME edition — so `TokenRetypes.PrimeLexer(lexer, edition)` hands the lexer the
+trigger tokens this compile does NOT admit as user-defined words (`ReservedWordSet.AdmitsAsUserWord`, the one
+decision the parser's `userWordHere` gate and the §8.9 funnel make; §8.3.2.1 rule 1), minus the parser's
+`functionName` first-set (a keyword-omitted intrinsic call keeps its capture, §8.4.3.2.3 SR2). A '(' after such
+a word groups: `IF BZ B-OR (BW B-AND BW)` at 2002+ parses by §8.8.2 Table 4. Under `--permissive` a word §8.9
+added keeps its user-word reading and so its trigger (the migration mode cannot tell the operator from the
+legacy name at lex time). The
 binder-side subscript re-parse (`ReferenceResolver.SplitSubscriptTokens`) is addressed by the binder
 rearchitecture (structured `Place` path segments), not here; the frontend's contribution is to preserve the
 captured token run faithfully.

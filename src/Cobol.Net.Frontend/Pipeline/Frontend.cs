@@ -308,7 +308,8 @@ public sealed class Frontend
         // still lexed as its keyword token (the retype below runs post-lex, after the '(' decision is frozen).
         // Set BEFORE any tokenization (ZeroTokenRewriter.Fill). A no-op when no de-reserved word is a keyword token.
         var retypes = TokenRetypes.None with { CobolWords = cobolWordsMap };
-        retypes.PrimeLexer(lexer);
+        var edition = EditionInfo.Of(DialectLevel, Permissive);
+        retypes.PrimeLexer(lexer, edition);
         var tokens = new CommonTokenStream(lexer);
         ZeroTokenRewriter.Rewrite(tokens);
         // >>COBOL-WORDS (ISO §7.3.10.4) — retype tokens per the per-group override: synonyms (EQUATE/SUBSTITUTE)
@@ -335,7 +336,7 @@ public sealed class Frontend
         // exists for. Every other stage of this pipeline is already handed `Permissive`; the parser was the gap.
         var parser = new CobolParserCore(tokens)
         {
-            Edition = EditionInfo.Of(DialectLevel, Permissive),
+            Edition = edition,
             CobolWords = cobolWordsMap,
         };
 

@@ -74,17 +74,15 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// <param name="terminate">The C# statement that terminates the run unit (normally <see cref="FatalTermination"/>),
     /// or <c>null</c> for a NONFATAL condition. Prefer <see cref="EmitConditionRaise"/>, which takes the fatality
     /// from Table 13 instead of from the caller, whenever the name is known at compile time.</param>
-    /// <param name="landing">Renders the RESUME landing of the result variable; <see cref="DispatchState.ResumeTransfer"/>
-    /// when omitted (an operand activation passes <see cref="DispatchState.OperandActivationResume"/>).</param>
     /// <param name="fatalWhen">An extra C# condition ANDed onto the fatal default, for a site whose name — and so its
     /// fatality — is chosen at run time (the GOBACK … RAISING pickup's propagated fatal flag).</param>
-    public void EmitSelection(string ecNameExpr, string? terminate, Func<string, string>? landing = null,
-        string? fatalWhen = null)
+    public void EmitSelection(string ecNameExpr, string? terminate, string? fatalWhen = null)
     {
         var w = ctx.Writer;
         string r = $"__r{ctx.Names.NextEc()}";
         w.Line($"int {r} = {EcDispatchExpr(ecNameExpr, "\"\"")};");
-        w.Line(landing is null ? dispatch.ResumeTransfer(r) : landing(r));
+        // The ONE landing — it unwinds by itself inside an operand-evaluation step (kb/Work PB892, PB1432).
+        w.Line(dispatch.ResumeTransfer(r));
         if (terminate is null)
             return;   // nonfatal: declarative completed / RESUME NEXT / no handler all continue (§14.6.13.1.4 3)/4))
         string when = fatalWhen is null ? "" : $" && {fatalWhen}";
@@ -128,10 +126,11 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             : throw new InvalidOperationException(
                 $"'{ecName}' is not a catalogued level-3 exception-name (§14.6.13.1.6 Table 13) — an emitter bug");
 
-    /// <summary>Emit the statement an OPERAND activation was specified in (kb/Work PB892) — the landing of
-    /// <see cref="DispatchState.OperandActivationResume"/>. ISO §14.9.33.4 GR2 a) 2. makes that statement the
-    /// applicable one for a condition a function reference or an inline invocation propagates, and GR2 a) 3. makes
-    /// it the LOWEST such statement, which is why every statement that drained an activation carries its own
+    /// <summary>Emit the statement an OPERAND-EVALUATION step was specified in (kb/Work PB892, PB1432) — the landing
+    /// <see cref="DispatchState.ResumeTransfer"/> unwinds to from inside such a step. ISO §14.9.33.4 GR2 a) 2. makes
+    /// that statement the applicable one for a condition a function reference or an inline invocation propagates,
+    /// GR2 a) 1. for one a §15.4 subscript temporary store raises, and GR2 a) 3. makes it the LOWEST such
+    /// statement, which is why every statement that drained a step carries its own
     /// landing: the nearest one catches. RESUME AT procedure-name transfers (GR3); RESUME AT NEXT STATEMENT falls
     /// out after the statement (GR2).
     /// <para>Only a unit whose selection machinery can return a RESUME emits the landing — the same

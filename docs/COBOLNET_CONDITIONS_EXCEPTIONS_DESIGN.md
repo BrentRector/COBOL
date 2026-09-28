@@ -312,18 +312,24 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
     `IActivatingStatement` at the one `BindStatement` exit, recursing into a desugar sequence, so a new
     activating node inherits it by implementing the interface. Whether the pickup is EMITTED still gates on the
     group's EC participation (zero scaffolding); whether it RAISES gates on the profile.
-  - **An OPERAND activation — a function reference, an inline method invocation, an object-property accessor —
-    has no statement of its own, and ONE landing gives it one** (kb/Work PB892). §14.9.33.4 GR2 a) 2. makes the
-    applicable statement for a condition it propagates "the statement in which the inline invocation or function
-    invocation was specified", and GR2 a) 3. the LOWEST such statement. `UdfBinder.DrainPending` (the one drain of
-    the pending pre-op list) and `OoBinder.OoWrapPropertyOps` mark every activation they hand to a carrier
-    `IActivatingStatement.InExpression`, and `DrainPending` stamps its profile there — a per-evaluation window's
-    activations live inside a CONDITION or an OPERAND, where `EcWrap`'s statement-shaped stamp never reaches.
-    `StatementBinder.BindStatement` wraps a statement that drained any in `BoundActivationSite` (a save/zero/restore
-    counter, so a nested statement's activations count only toward it). The pickup of an `InExpression` site
-    lands a RESUME through `DispatchState.OperandActivationResume` — it THROWS `RaiseResumeSignal` for RESUME AT
-    procedure-name and for RESUME AT NEXT STATEMENT — and `EcEmitter.EmitActivationSite` catches it around the
-    statement with the ordinary `ResumeTransfer`. One mechanism covers both shapes the old code split: a HOISTED
+  - **An OPERAND-EVALUATION step — a function reference, an inline method invocation, an object-property
+    accessor, a D18 function-bearing subscript's §15.4 temporary store, a sending-value temp — has no statement of
+    its own, and ONE landing gives it one** (kb/Work PB892, PB1432). §14.9.33.4 GR2 a) 2. makes the applicable
+    statement for a condition an activation propagates "the statement in which the inline invocation or function
+    invocation was specified", GR2 a) 1. makes it "the one in which the exception condition was raised" for a
+    condition a store raises (NOTE 1: "If an exception condition was raised during the evaluation of 'a', transfer
+    would be after the END-IF"), and GR2 a) 3. the LOWEST such statement. `UdfBinder.DrainPending` (the one drain
+    of the pending pre-op list) and `OoBinder.OoWrapPropertyOps` mark every step they hand to a carrier
+    `BoundStatement.OperandEvaluation`, and `DrainPending` stamps an activation's profile there — a per-evaluation
+    window's steps live inside a CONDITION or an OPERAND, where `EcWrap`'s statement-shaped stamp never reaches.
+    `StatementBinder.BindStatement` wraps a statement that drained any in `BoundActivationSite` (the
+    `OperandEvaluations` save/zero/restore counter, so a nested statement's steps count only toward it).
+    `StatementEmitter.EmitStatement` emits a marked step inside `DispatchState`'s operand-evaluation scope, and
+    inside it the ONE landing, `DispatchState.ResumeTransfer`, THROWS `RaiseResumeSignal` for RESUME AT
+    procedure-name and for RESUME AT NEXT STATEMENT; `EcEmitter.EmitActivationSite` catches it around the statement
+    with the ordinary landing. No raise site chooses its landing (`EcEmitter.EmitSelection` takes none), and a
+    statement-level `goto` requested inside the scope is an internal error rather than a CS0159 against generated
+    source (PB1432: a subscript temporary store's size-error landing in a short-circuited operand's lambda). One mechanism covers both shapes the old code split: a HOISTED
     activation (whose -2 used to fall back INTO the statement — a COMPUTE completed with the function's result),
     and a PER-EVALUATION one inside an immediately-invoked lambda (where no `goto` can leave, which is why
     `CallEmitter.FunctionActivationText` used to emit no pickup and the registry DISCARDED every

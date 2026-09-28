@@ -63,11 +63,11 @@ internal static class StorageFormPass
                     promoted.Add(temp);
         foreach (var d in ctx.AllBindersAndInterfaces())
             foreach (var group in d.WholeGroupReferenced)
-                AddNumericDisplayLeaves(group, promoted);
+                AddImagePromotableLeaves(group, promoted);
         // (4) THE ELEMENTARY TWIN of (3) (kb/Work PB992): an elementary item a CHARACTER CHANNEL writes — a group
         //     move's receiver, a BY REFERENCE crossing, a CALL RETURNING receiver (UsageCollectionPass). A native
-        //     carrier holds a VALUE, so characters with no numeric reading could not survive in it; the leaf
-        //     stores its character image instead, the one representation that holds every content. A REDEFINES
+        //     carrier holds a VALUE, so content with no numeric reading could not survive in it; the leaf
+        //     stores its storage image instead, the one representation that holds every content. A REDEFINES
         //     class member keeps its tier's classification (the bind-time image facts' same exclusion).
         foreach (var d in ctx.AllBindersAndInterfaces())
             foreach (var item in d.CharacterChannelItems)
@@ -75,30 +75,44 @@ internal static class StorageFormPass
                     promoted.Add(item);
         return promoted;
 
-        static void AddNumericDisplayLeaves(DataItem item, HashSet<DataItem> promoted)
+        static void AddImagePromotableLeaves(DataItem item, HashSet<DataItem> promoted)
         {
             foreach (var child in item.Children)
             {
                 // A fixed-OCCURS subordinate is part of the whole-group image too (ISO §14.9 — every OCCURS
                 // position); same recursion as the legacy MarkStoreAsImage.
-                if (child.IsGroup) AddNumericDisplayLeaves(child, promoted);
-                // ⛔ DISPLAY ONLY — the CARRIAGE question, not PicInfo.IsCharacterFormNumeric's IMAGE-FORM one
-                // (kb/Work PB646): promotion replaces the native carrier with a string of the leaf's
-                // ImageWidth character positions, which is the leaf's whole storage for usage DISPLAY and is
-                // HALF of it for usage NATIONAL (D-N1 — two bytes per position). A national-form numeric leaf
-                // contributes to the group image by the D-N7 composition instead, and promoting one was
-                // measured to corrupt a group-to-group MOVE between two of them.
+                if (child.IsGroup) AddImagePromotableLeaves(child, promoted);
                 else if (IsImagePromotable(child))
                     promoted.Add(child);
             }
         }
     }
 
-    /// <summary>The ONE eligibility test for image promotion: an elementary fixed-point numeric item of usage
-    /// DISPLAY — the CARRIAGE question, not the image-form one (kb/Work PB646; the reasoning is at the whole-group
-    /// arm above). Shared by the whole-group promotion and the character-channel promotion (kb/Work PB992).</summary>
+    /// <summary>⛔ THE ONE eligibility test for image promotion, shared by the whole-group promotion and the
+    /// character-channel promotion (kb/Work PB992): an elementary FIXED-POINT numeric item with a pinned byte form
+    /// (<see cref="PicInfo.HasImageByteForm"/>) — usage DISPLAY, BINARY / COMP-5 / BINARY-CHAR…DOUBLE, or PACKED.
+    /// <para>⛔ BINARY AND PACKED ARE PROMOTED, NOT DISPLAY ALONE (kb/Work PB1466). Content reaches such a leaf
+    /// through a character channel — a group MOVE, a READ into its record, a BY REFERENCE crossing — "without
+    /// consideration for the individual elementary or group items" (§14.9.25.4 GR4), so it can be anything, and
+    /// ISO §8.8.4.4.4 GR3 n) 1. c. exists to ask about exactly that content: "the content … consists entirely of a
+    /// valid representation for the usage and, if a PICTURE clause is specified, the numeric value is within the
+    /// range of values implied by the PICTURE clause". A native carrier holds a DECODED value — a packed nibble
+    /// A–F or a binary value past the PICTURE's range is normalized away on the way in — so the class condition
+    /// was folded to the constant <c>true</c> and the validate-a-packed-field-after-READ idiom answered NUMERIC
+    /// over garbage. The storage image holds every content, and the class test reads it
+    /// (<c>CobolNum.IsNumericImage</c>, keyed on the byte form). The price is DISPLAY's own: arithmetic on such a
+    /// leaf decodes and encodes its image.</para>
+    /// <para>⚠ NATIONAL IS STILL EXCLUDED — the CARRIAGE question (kb/Work PB646): promotion replaces the carrier
+    /// with a string of the leaf's ImageWidth character positions, which is HALF of a national leaf's storage (D-N1
+    /// — two bytes per position), and a character-image group's MOVE is sized by that position count while its
+    /// AsImage serializes national positions as byte pairs, so a group-to-group MOVE across a promoted national
+    /// numeric leaf truncates the group (measured, w65e probe p9 — the same width disagreement already truncates a
+    /// group with a PIC N leaf, reported as a lead). USAGE INDEX is class index, never a numeric operand of a class
+    /// test, and keeps its IndexCell. Floating-point leaves keep their native carrier, which holds every IEEE bit
+    /// pattern its usage can store.</para></summary>
     private static bool IsImagePromotable(DataItem item) =>
-        !item.IsGroup && item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display };
+        !item.IsGroup && item.Pic is { Category: PicCategory.Numeric, IsFloat: false, HasImageByteForm: true } p
+        && p.Usage is not (Usage.National or Usage.Index);
 
     /// <summary>The STORAGE-level twin of <see cref="HarmonizeOverrideCrossings"/> (P5.7): the identical
     /// override-chain + implements-pair fixed point, deciding string-carriage off the just-classified

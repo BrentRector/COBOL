@@ -35,7 +35,31 @@ tokens { FNARG_LPAREN, FNARG_RPAREN }
     // used to instruct. Do NOT hand-add a token here: edit cobol-words.json and re-run the generator.
 
     private bool PreviousTokenCouldBeDataName()
-        => _dataNameTokens.Contains(_lastNonWsTokenType) || IsCobolWordsDataName(_lastNonWsTokenType);
+        => (_dataNameTokens.Contains(_lastNonWsTokenType) && !_reservedNonNames.Contains(_lastNonWsTokenType))
+           || IsCobolWordsDataName(_lastNonWsTokenType);
+
+    // ⛔ A WORD THIS COMPILE RESERVES IS NEVER A DATA-NAME, SO A '(' AFTER IT IS NEVER A SUBSCRIPT (kb/Work PB1465).
+    // _dataNameTokens is edition-blind: it holds every word that is a user-defined word in SOME edition, because
+    // the SUBSCRIPT decision is frozen here, before any parser predicate can ask the edition. That made the '(' after
+    // a boolean OPERATOR — B-AND / B-OR / B-XOR / B-NOT, user words at COBOL-85 and reserved by ISO §8.9 from 2002 —
+    // open SUBSCRIPT mode, so `IF BZ B-OR (BW B-AND BW)` and `COMPUTE BR = B-NOT (BW B-XOR BZ)` were COBOL0001
+    // although §8.8.2's Table 4 admits '(' after every boolean operator. §8.3.2.1 rule 1 ("Reserved words shall not
+    // be used as user-defined words") settles it for EVERY reservation-gated word at once: the compile's own answer
+    // to "is this word a user-defined word here" (ReservedWordSet.AdmitsAsUserWord — the question the parser's
+    // userWordHere gate and the §8.9 funnel ask) is handed in by TokenRetypes.PrimeLexer, and a word it refuses
+    // stops triggering. An intrinsic-function-name word keeps its trigger (a keyword-omitted call, §8.4.3.2.3 SR2),
+    // which is why PrimeLexer excludes the functionName rule's own tokens rather than this lexer listing them.
+    private readonly System.Collections.Generic.HashSet<int> _reservedNonNames =
+        new System.Collections.Generic.HashSet<int>();
+    public void SetReservedNonDataNames(System.Collections.Generic.IReadOnlySet<int> types)
+    {
+        _reservedNonNames.Clear();
+        foreach (int t in types) _reservedNonNames.Add(t);
+    }
+
+    /// <summary>The edition-blind SUBSCRIPT-trigger set (every word that is a data-name in some edition), for
+    /// TokenRetypes.PrimeLexer to narrow per compile.</summary>
+    public static System.Collections.Generic.IReadOnlySet<int> SubscriptTriggerTokens => _dataNameTokens;
 
     // ⛔ THE REPORT-WRITER SUM CLAUSE IS NOT THE SUM FUNCTION (kb/Work PB924). SUM carries subscriptTrigger for
     // §8.4.3.2.3 SR2's keyword-omitted intrinsic call `SUM(1 2 3)`, and a reserved word can never be a data-name,

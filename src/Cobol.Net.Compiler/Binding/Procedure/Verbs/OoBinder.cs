@@ -80,9 +80,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // the statement, so a condition it propagates resumes after THAT statement — the operand-activation mark
         // UdfBinder.DrainPending gives a function reference (kb/Work PB892; §14.9.33.4 GR2 a) 2.). Its checking
         // profile is EcBinder.EcWrap's sequence stamp, which reaches these steps.
-        ctx.Data.OperandActivations += pre.Count + post.Count;
+        ctx.Data.OperandEvaluations += pre.Count + post.Count;
         return new BoundSequence([.. pre.Select(Operand), core, .. post.Select(Operand)]);
-        static BoundStatement Operand(BoundStatement s) => ((IActivatingStatement)s).AsExpressionActivation();
+        static BoundStatement Operand(BoundStatement s) => s with { OperandEvaluation = true };
     }
 
     /// <summary>The §8.4.3.9.4 GR1 GET of one SENDING property reference — "as though" an INVOKE of the GET

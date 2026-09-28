@@ -541,7 +541,7 @@ internal sealed class ProgramEmitter
                     // activated element's stores reach only the copy, never the caller; §14.2.2 SR2 restricts
                     // the carried shape to class numeric, object or pointer, so the text leg has no BY VALUE
                     // arm while the managed one does).
-                    w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, Math.Max(1, f.Item.Pic!.Length))};");
+                    w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, CallEmitter.ElementaryFormalWindow(f.Item))};");
                     continue;
                 }
                 // Boundary round-trip formal (group / redefined): adopt the carrier, copy the caller's image in.

@@ -387,9 +387,9 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // The operand-activation scope (kb/Work PB892): THIS statement's line is the one whose §7.3.25 profile an
         // operand activation carries, and THIS statement counts only the activations it drains itself — both are
         // saved around a nested statement's bind and restored after it.
-        int savedLine = StatementLine, savedActivations = data.OperandActivations;
+        int savedLine = StatementLine, savedActivations = data.OperandEvaluations;
         StatementLine = s.Start.Line;
-        data.OperandActivations = 0;
+        data.OperandEvaluations = 0;
         int errorMark = data.Edition.ErrorsRecorded, refusalMark = data.Edition.RefusalsBound;
         int unbuiltMark = data.Edition.UnbuiltMark;
         int controlStoreMark = _controlStoreReports;
@@ -451,9 +451,9 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // ISO §14.9.33.4 GR2 a) 2./3. — the statement an operand activation was specified in is where a RESUME AT
         // NEXT STATEMENT for the condition it propagates lands. Through Rewrap like the hoist above, so a
         // multi-operand statement's landing is the implicit statement the activation belongs to.
-        if (data.OperandActivations > 0) core = BoundImplicitSeries.Rewrap(core, n => new BoundActivationSite(n));
+        if (data.OperandEvaluations > 0) core = BoundImplicitSeries.Rewrap(core, n => new BoundActivationSite(n));
         StatementLine = savedLine;
-        data.OperandActivations = savedActivations;
+        data.OperandEvaluations = savedActivations;
         return Ec.EcWrap(s, core);
     }
 

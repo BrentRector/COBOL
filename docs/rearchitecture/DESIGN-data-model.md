@@ -748,7 +748,7 @@ elementary / group / `ALL 'x'` / Report-Writer SOURCE VALUEs. This closes the co
 | Action | From | To | Why |
 |---|---|---|---|
 | create | — | `Binding/Model/StorageForm.cs` | The one computed value-representation discriminator (§2.1); replaces the `(Pic, StoreAsImage, Class.Tier, IsDynamicTable)` scatter. |
-| create | — | `Binding/Passes/StorageFormPass.cs` | Computes `DataItem.Storage` ONCE after all facts; owns the numeric-DISPLAY→image promotion (§2.5 step 10). |
+| create | — | `Binding/Passes/StorageFormPass.cs` | Computes `DataItem.Storage` ONCE after all facts; owns the numeric→image promotion of every fixed-point DISPLAY / BINARY / PACKED leaf a whole-group operand or a character channel reaches (§2.5 step 10; kb/Work PB992, PB1466 — `IsImagePromotable`). |
 | create | — | `Binding/Passes/UsageCollectionPass.cs` | New owner of `WholeGroupReferenced`, collected from the BOUND tree — removes the `ReferenceResolver` mid-resolve mutation and the emitter's write-back. |
 | create | — | `Binding/Passes/IBindPass.cs` + `BindPipeline.cs` | Declared, asserted pass order with Requires/Produces (§2.5); kills implicit ordering. |
 | create | — | `Binding/Model/RecordLayout.cs` | Single physical offset/width authority (§2.6). |

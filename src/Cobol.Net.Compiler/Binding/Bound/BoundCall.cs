@@ -114,11 +114,6 @@ public sealed record BoundCallProgram(
     public BoundStatement WithActivatorChecking(CobolNet.Runtime.Exceptions.EcCheckingProfile profile)
         => this with { ActivatorChecking = profile };
 
-    /// <inheritdoc/>
-    public bool InExpression { get; init; }
-
-    /// <inheritdoc/>
-    public BoundStatement AsExpressionActivation() => this with { InExpression = true };
 
     /// <summary>True when this node is the lowering of a user-defined FUNCTION reference (M2-UDF): a locate
     /// miss stamps EC-FUNCTION-NOT-FOUND (Fatal, ISO §8.4.3.2.4 GR6b / Table 13) rather than the CALL's

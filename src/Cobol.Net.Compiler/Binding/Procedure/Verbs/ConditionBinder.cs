@@ -562,17 +562,33 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // twin was rejected, kb/Work PB157's sweep), and a reference-modified slice has its ITEM's usage but the
         // category §8.4.3.3.4 GR6 c) gives it — alphanumeric (national when the usage is national) — so
         // `IF NUM (1:2) IS ALPHABETIC` is not an SR4 violation and `IF NUM (1:2) IS NEAREST-TO-ZERO` IS an SR6
-        // one (kb/Work PB823, whose renderer half reads the same reader). Only a DATA-ITEM reference is
-        // classified; any other operand shape fails open (ClassConditionModel.Violates).
-        PicCategory? category = op is BoundFieldOperand ? IntrinsicResultType.OperandCategory(op) : null;
+        // one (kb/Work PB823, whose renderer half reads the same reader).
+        // ⛔ EVERY OPERAND SHAPE IS CLASSIFIED, NOT ONLY A DATA-ITEM REFERENCE (kb/Work PB1401). §8.5.2.12 items
+        // 3–7 make LINAGE-COUNTER, LINE-COUNTER, PAGE-COUNTER and every numeric / integer function a category-numeric
+        // data item, and they bind as COMPUTED operands; the screen used to hand them a null category, so SR4–SR6
+        // failed open over them and `IF FUNCTION UPPER-CASE(A) IS NEAREST-TO-ZERO` reached a renderer that has no
+        // numeric description to test. The one reader already answers them (numeric for a register, the §15.2
+        // type for a function), and the renderer asks the same reader, so the two halves cannot disagree.
+        PicCategory? category = IntrinsicResultType.OperandCategory(op);
         Usage? usage = op switch
         {
             BoundFieldOperand { Place: RefModPlace rm } => rm.Inner.Item.OperandPic?.Usage,
             BoundFieldOperand f => f.Place.Item.OperandPic?.Usage,
+            // §15.2 items 1–3: an alphanumeric function has "an implicit usage display", a boolean function "an
+            // implicit usage bit", a national function "an implicit usage national"; items 4–5 give a numeric or
+            // integer function none, and SR3's function sentence covers it by type below.
+            BoundComputedOperand { Expr: BoundIntrinsicCall ic } => ic.ResultCategory switch
+            {
+                PicCategory.Alphanumeric => Usage.Display,
+                PicCategory.Boolean => Usage.Bit,
+                PicCategory.National => Usage.National,
+                _ => null,
+            },
             _ => null,
         };
+        bool function = op is BoundComputedOperand { Expr: BoundIntrinsicCall };
         foreach (var rule in alt.Rules)
-            if (ClassConditionModel.Violates(rule, category, usage))
+            if (ClassConditionModel.Violates(rule, category, usage, function))
             {
                 var (code, clause, text) = ClassConditionModel.Wording(rule);
                 ctx.Edition.Error(code, $"the {alt.Spelling} class condition over '{OperandName(op)}': {text} ({clause})");

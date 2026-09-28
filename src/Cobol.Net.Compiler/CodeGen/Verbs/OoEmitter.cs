@@ -1178,7 +1178,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // The image crossing. BY REFERENCE allows a SMALLER formal (§14.8.2.2 rule 1 — a PREFIX of
                 // the argument): pass the leading formal-width characters; the write-back below splices the
                 // prefix back, preserving the argument's tail. CONTENT pads/truncates per MOVE.
-                int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : Math.Max(1, a.Formal.Pic!.Length);
+                int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : CallEmitter.ElementaryFormalWindow(a.Formal);
                 string read = a.Source is { } gsp
                     ? a.ByContent ? CallEmitter.CallContentRead(gsp) : CallEmitter.CallStringRead(gsp)
                     : CsLiteral(a.StringLiteral ?? "");
@@ -1189,7 +1189,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     ? $"string {tmp} = {OoStringReadOf(sp, a, qualProfile)};"
                     : a.StringLiteral is { } slit
                     // An ANY LENGTH formal sees the literal AT ITS OWN length (§13.18.2 GR1) — no width-fit.
-                    ? $"string {tmp} = {(a.Formal.IsAnyLength ? CsLiteral(slit) : RuntimeApi.StrStore(CsLiteral(slit), $"{Math.Max(1, a.Formal.Pic!.Length)}"))};"
+                    ? $"string {tmp} = {(a.Formal.IsAnyLength ? CsLiteral(slit) : RuntimeApi.StrStore(CsLiteral(slit), $"{CallEmitter.ElementaryFormalWindow(a.Formal)}"))};"
                     // A numeric literal into an image-stored numeric formal: compose the formal's STORAGE image
                     // (kb/Work PB970 — of its own byte form, not a zoned digit run) through the OWNER's internal
                     // profile (the review's cross-class rule — qualified, never bare).
@@ -1294,7 +1294,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     "INVOKE copy-out into"));
             else if (a.Formal.IsGroup || src.Item.IsGroup)
             {
-                int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : Math.Max(1, a.Formal.Pic!.Length);
+                int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : CallEmitter.ElementaryFormalWindow(a.Formal);
                 // The §14.8.2.2 rule-1 prefix: splice the formal's characters back over the argument's
                 // LEADING positions, preserving the tail beyond the formal's width.
                 Post(CallEmitter.CallStringWrite(src,

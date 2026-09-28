@@ -129,13 +129,12 @@ public sealed class DisplayUsageUnionDriftTests
             // exclusion and fell to a Tier-C runtime loud.
             ["Binding/ReferenceResolver.cs"] = (0, 1),
 
-            // DISPLAY-ONLY (1), CARRIAGE: the whole-group promotion to CharImage storage — same question, and same
-            //      D-N1 half-storage reason, as MarkImageLeaves above.
-            //  ⛔ WAS 2: UnifyCrossing's OO crossing reconciliation left with kb/Work PB187 — it asks "does the
-            //      native side HAVE a byte image to be promoted to?", which is PicInfo.HasImageByteForm (minus the
-            //      national-form numeric, PB646's carriage exclusion), so a windowed float/binary formal and its
-            //      native prototype twin now agree on ONE crossing form.
-            ["Binding/Passes/StorageFormPass.cs"] = (1, 0),
+            // (Binding/Passes/StorageFormPass.cs LEFT THE INVENTORY — kb/Work PB1466.) Its last display-only site,
+            //      the whole-group / character-channel promotion (IsImagePromotable), now asks
+            //      PicInfo.HasImageByteForm minus the national-form numeric (PB646's carriage exclusion) and USAGE
+            //      INDEX: a BINARY or PACKED leaf a group MOVE, a READ or a BY REFERENCE crossing reaches holds
+            //      content its native carrier cannot, and the numeric class condition (§8.8.4.4.4 GR3 n) 1. c.)
+            //      must read that content. UnifyCrossing had left with kb/Work PB187 on the same predicate.
 
             // DISPLAY-ONLY (2), both CARRIAGE (MarkImageForced):
             //  the figurative pass — a NON-DIGIT figurative fill deposits fill CHARACTERS into the receiver's

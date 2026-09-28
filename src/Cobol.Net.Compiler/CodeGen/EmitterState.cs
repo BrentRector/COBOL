@@ -194,6 +194,15 @@ internal sealed class DispatchState
     /// first (§14.9.14.4 GR7 "preceding any return mechanisms for that section").</summary>
     public string TransferJump()
     {
+        // ⛔ AN OPERAND-EVALUATION STEP NEVER LEAVES BY `goto` (kb/Work PB1432): it may be running inside a
+        // per-evaluation window's lambda, where C# forbids the jump (CS0159 — the backend rejected legal COBOL),
+        // and hoisted before its statement the jump would be right only by accident. Its only transfer is the
+        // RESUME landing, which ResumeTransfer already unwinds; anything else reaching here is an emitter bug,
+        // reported as one rather than as a C# compile error against a generated path.
+        if (InOperandEvaluation)
+            throw new InvalidOperationException(
+                "internal: a statement-level transfer was requested while emitting an operand-evaluation step "
+                + "(BoundStatement.OperandEvaluation) — only the RESUME landing may leave one, and it unwinds");
         TransferUsed = true;
         return $"goto {TransferLabel};";
     }
@@ -207,15 +216,42 @@ internal sealed class DispatchState
     /// qualifying declarative) and falls through. Written ONCE here because every raise site there is — I/O,
     /// CALL, pointer, SEARCH, RAISE, size-error, CONTINUE AFTER — lands the same way, and each site that spelled
     /// it itself spelled the transfer as a capturable <c>break</c> (kb/Work PB405).</summary>
+    /// <para>⛔ INSIDE AN OPERAND-EVALUATION STEP (<see cref="InOperandEvaluation"/>) THE SAME CALL UNWINDS
+    /// (kb/Work PB892, PB1432): see <see cref="OperandEvaluationResume"/>. Every raise site of such a step — a
+    /// function activation's propagation pickup, a §15.4 subscript temporary store's size-error selection, any
+    /// raise a sending-value temp's MOVE makes — lands through this one method, so none of them decides the landing
+    /// itself and a new raise site inherits the right one.</para>
     public string ResumeTransfer(string resultVar, string comment = "   // RESUME AT procedure-name (§14.9.33.4 GR3)")
-        => $"if ({resultVar} >= 0) {{ {TransferOut(resultVar)} }}{comment}";
+        => InOperandEvaluation
+            ? OperandEvaluationResume(resultVar)
+            : $"if ({resultVar} >= 0) {{ {TransferOut(resultVar)} }}{comment}";
 
-    /// <summary>The RESUME landing of a dispatch result selected for a condition an OPERAND activation propagated
-    /// (<see cref="IActivatingStatement.InExpression"/> — a function reference, an inline method
-    /// invocation, an object-property accessor; kb/Work PB892). ISO §14.9.33.4 GR2 a) 2.: "for an inline
-    /// invocation or a function invocation, it [the applicable statement] is the statement in which the inline
-    /// invocation or function invocation was specified" — so RESUME AT NEXT STATEMENT leaves THAT statement, and
-    /// GR3's RESUME AT procedure-name leaves it too. Neither can be written here: the activation may be running
+    /// <summary>True while the statement emitter is emitting an operand-evaluation step
+    /// (<see cref="Binding.Bound.BoundStatement.OperandEvaluation"/>) — opened by
+    /// <c>StatementEmitter.EmitStatement</c>, the one place every step (hoisted, lambda-captured or
+    /// per-operation) is emitted through.</summary>
+    public bool InOperandEvaluation { get; private set; }
+
+    /// <summary>Enter the operand-evaluation scope, returning the previous state for
+    /// <see cref="ExitOperandEvaluation"/> (the save/restore idiom of <see cref="BeginTransferScope"/>).</summary>
+    public bool EnterOperandEvaluation()
+    {
+        bool saved = InOperandEvaluation;
+        InOperandEvaluation = true;
+        return saved;
+    }
+
+    /// <summary>Close a scope opened by <see cref="EnterOperandEvaluation"/>.</summary>
+    public void ExitOperandEvaluation(bool saved) => InOperandEvaluation = saved;
+
+    /// <summary>The RESUME landing of a dispatch result selected for a condition an OPERAND-EVALUATION step raised
+    /// or propagated (<see cref="Binding.Bound.BoundStatement.OperandEvaluation"/> — a function reference, an inline
+    /// method invocation, an object-property accessor, a §15.4 subscript temporary store; kb/Work PB892, PB1432).
+    /// ISO §14.9.33.4 GR2 a) 2.: "for an inline invocation or a function invocation, it [the applicable statement]
+    /// is the statement in which the inline invocation or function invocation was specified", and GR2 a) 1. makes
+    /// the statement a store was evaluated for "the one in which the exception condition was raised" — so RESUME
+    /// AT NEXT STATEMENT leaves THAT statement, and GR3's RESUME AT procedure-name leaves it too. Neither can be
+    /// written here: the step may be running
     /// inside a C# expression (a per-evaluation window's immediately-invoked lambda), where no <c>goto</c> can
     /// leave, and even a hoisted one sits BEFORE the statement, so <see cref="ResumeTransfer"/>'s fall-through
     /// would re-enter the very statement GR2 says to abandon. Both actions therefore unwind as
@@ -223,7 +259,7 @@ internal sealed class DispatchState
     /// <see cref="ResumeTransfer"/>. A declarative that completed normally (-1) or no qualifying declarative (-3)
     /// leaves the activation's result in place and the statement continues (§14.9.18.4 GR1 b) "execution continues
     /// … as specified in the rules for the activating statement after the result … is returned").</summary>
-    public string OperandActivationResume(string resultVar) =>
+    private static string OperandEvaluationResume(string resultVar) =>
         $"if ({resultVar} >= 0 || {resultVar} == ResumeSignal.NextStatement) throw new RaiseResumeSignal({resultVar});"
         + "   // RESUME leaves the statement the activation was specified in (§14.9.33.4 GR2 a) 2.)";
 
