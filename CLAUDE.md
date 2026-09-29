@@ -106,5 +106,7 @@ always runs the WHOLE Conformance, Unit and Characterization assemblies, whateve
 comprehensive battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree.
 The owner decided on 2026-09-28 (kb/Work PB1708): the gate moves to "ORDER, DON'T SKIP". Every gate runs the whole
 population, ordered so likely failures come first, and a stale or missing impact map only changes the order, never
-what runs. Impact maps are recorded on demand, never per commit. Build `CobolSharp.sln` (not a single project)
+what runs. Impact maps are recorded on demand, never per commit. **CI also runs on Linux, so every gate runs CI's Linux legs
+under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every implementer and lander runs all three legs,
+about 5 minutes. Build `CobolSharp.sln` (not a single project)
 before any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.

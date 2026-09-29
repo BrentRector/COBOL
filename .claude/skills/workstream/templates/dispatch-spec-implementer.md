@@ -65,6 +65,7 @@ Print a real verdict line; never leave a placeholder in the report.
 
 GOLDENS: one positive at the introducing edition + one negative below it, a copy per edition only where behaviour differs.
 Every golden/negative you ADD must RUN BY NAME at your gate (`DisplayName~<name>` or the corpus leg) — quote its pass line (MANDATORY-PRACTICES I7).
+LINUX GATE (I8, PB1732): after the Windows gate is green and COMMITTED, run `wsl -d Ubuntu --cd <your worktree> -- bash -lc 'bash scripts/linux-gate.sh --nice'` through the PowerShell tool (all three of CI's Linux legs, ~5 min). Quote its `=== LINUX GATE:` line in your report.
 Parser + emitter + golden + manifest entry in ONE commit.
 
 REGISTER: flip each note's `status` and write its `closes_rows` IN THE COMMIT THAT LANDS IT (with `closes_rows_reason:`

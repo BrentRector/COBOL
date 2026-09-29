@@ -51,6 +51,7 @@ Each rule carries its reason and its measurement; do not drop a rule because its
 | I5 | Flip `status` + write `closes_rows` in the landing commit; `work.py check`; no lists anywhere. | CLAUDE.md rule 8. |
 | I6 | Report ≤ 60 lines per `implementer-report-template.md`. | Owner 2026-09-13 lever 4. |
 | I7 | **Every golden and negative you ADD runs BY NAME at your gate** (`DisplayName~<name>` term, or the corpus leg) and the report quotes its pass line; `Manifest_CoversEveryProgram` alone proves registration, not execution. | Train 60: a w59d negative shipped with no `.err` because its implementer's gate ran only the manifest test; the lander's whole-assembly gate caught it. |
+| I8 | **Run ALL of CI's Linux legs under WSL before reporting (PB1732)**, after the Windows gate is green and committed: `wsl -d Ubuntu --cd <your worktree> -- bash -lc 'bash scripts/linux-gate.sh --nice'`. That is unit and characterization on the Windows-built binaries, plus conformance on a Linux build of HEAD, about 5 min in all. Quote the `=== LINUX GATE:` line in the report. A Linux red is yours to fix, exactly like a Windows red. ⚖ All legs, always: a platform-sensitivity detector was built and then deleted the same night, because measured at ~5 min the whole Linux population is cheaper than any selection is safe. | Train 71b: group F's new test planted the Windows path `E:\COBOL-wt\battery87`, which `Path.GetFullPath` treats as relative on Linux. The test was green on Windows and red in CI's Linux unit job, costing ~30 min of CI and a dropped cluster. The WSL unit leg reproduces it in ~2.5 min. |
 
 ## Lander (train)
 
@@ -65,6 +66,7 @@ Each rule carries its reason and its measurement; do not drop a rule because its
 | L7 | `git add -A -- . ":!.claude/settings.local.json"` then `git reset -q -- STATUS.md`. | A checkpoint reached main (2026-09-02). |
 | L8 | DEVLOG number read after the FINAL fetch+rebase; on a non-fast-forward, rebase and renumber. | Parallel landers. |
 | L9 | **Review the train before push-main** (lander-train-brief step 5b): the `review` skill's full-code pass over `git diff origin/main...HEAD`; a confirmed correctness finding DROPS its cluster. | Owner 2026-09-25 (tooling rec. 8); `/code-review` is interactive-only, so the owner runs `/code-review ultra` on big batches. |
+| L10 | **Linux gate before push-main (PB1732)** (lander-train-brief step 3b): after the Windows gate, run `wsl -d Ubuntu --cd <your worktree> -- bash -lc 'bash scripts/linux-gate.sh'`, which runs ALL THREE of CI's Linux legs (unit, characterization, conformance) on the Windows-built binaries. `=== LINUX GATE: GREEN` is required. A red is attributed by cluster and DROPS that cluster, exactly as a Windows red does. | Train 71b pushed a train whose only red was Linux-only, and the ~30-min CI round trip found what a local WSL run finds in minutes. |
 
 ## Registrar
 

@@ -20,10 +20,13 @@ BRIEFS = {
     # P4: the stamped handoff (kb/Work/PB1698) — STATUS.md names the commit it describes; a resumer reads the delta.
     # PB1683: the implementer's gate filter is DERIVED from the impact map.
     'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'STATUS-AT:',
-                                      r'status_delta\.py', r'impacted_tests\.py --base'],
+                                      r'status_delta\.py', r'impacted_tests\.py --base',
+                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
+                                      r'linux-gate\.sh'],
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'impacted_tests\.py --base'],
-    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'tail -n \+1 -f', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN'],
-    'lander-brief.md': [r'claude-skills', POINTER, r'push-main'],
+    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'tail -n \+1 -f', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
+                              r'linux-gate\.sh'],  # PB1732 (L10): CI's Linux legs under WSL before push-main
+    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh'],  # PB1732 (L10)
     'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main'],
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
@@ -33,7 +36,9 @@ BRIEFS = {
                                      r'Turn cap 220', r'code site', r'RUN BY NAME', r'drift_rules\.py', r'STATUS-AT:',
                                      r'status_delta\.py',
                                      # PB1683: the implementer's gate filter is DERIVED from the impact map
-                                     r'impacted_tests\.py --base'],
+                                     r'impacted_tests\.py --base',
+                                     # PB1732 (I8): CI's Linux legs run under WSL before the report
+                                     r'linux-gate\.sh'],
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
@@ -41,7 +46,7 @@ BRIEFS = {
                            r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
                            r"status: 'NO-RESULT', error"],
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
-    'MANDATORY-PRACTICES.md': [r'stall_watch\.py'],
+    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh'],  # O8; PB1732
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.

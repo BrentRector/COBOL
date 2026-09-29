@@ -1180,7 +1180,7 @@ never a wall-clock assertion — MANDATORY-PRACTICES forbids those), so the next
   so each operating system's arm is proven where it runs. Every helper process it starts exits once its sentinel
   file is deleted, so a red arm leaves nothing running on the host. ⛔ The cap does not span operating systems: a
   Windows lock and a WSL lock on a drvfs mount do not see each other; the repository's gates run on Windows
-  (`build-local.ps1`), and a WSL run is an ad hoc Linux reproduction.
+  (`build-local.ps1`), and the WSL legs of the Linux gate (section 3.15) are not counted against the cap.
 
 **Retirement is measured** (owner, 2026-09-28): the cap goes when, over one full train, the median implementer
 selection is under 25 % of the Conformance assembly, or a whole cold Conformance implementer gate at `BelowNormal` —
@@ -1223,6 +1223,41 @@ still read:** M11 only empties the selection behind `impacted_tests.py`'s filter
 now always handed the whole assembly), and the line, `--plus` and `-Filter` go in M13 together with every caller named
 above. CLAUDE.md "Testing" already states the ORDER, DON'T SKIP direction (owner, 2026-09-28); M13's landing asks the
 owner to update it to the landed gate, since agents do not edit CLAUDE.md.
+
+### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
+
+CI runs most of its test jobs on `ubuntu-latest`, and every local gate runs on the Windows host, so without this a
+change's first Linux run was CI's. Train 71b showed the cost: a Windows path literal in a new drift test was green
+on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and a dropped cluster, for a failure a
+2.5-minute WSL run reproduces.
+
+**`scripts/linux-gate.sh`** runs, from any tree (`wsl -d Ubuntu --cd <tree> -- bash -lc 'bash scripts/linux-gate.sh'`),
+the test projects CI's Linux jobs run. `LinuxGateDriftTests` holds that set equal to the workflow's.
+
+| leg | binaries | why |
+|---|---|---|
+| `unit`, `characterization` | the Windows gate's, `--no-build` | IL is portable, and on F's branch this reproduced CI's Linux unit job exactly: one red, in 143 s |
+| `conformance` | a LINUX build of committed HEAD, in a `git archive` snapshot on the Linux filesystem (`~/linux-gate/<tree>`) | the Conformance tests find their goldens through `[CallerFilePath]`, which a Windows build bakes in as `E:\…` paths; reusing Windows binaries gave 363 false reds |
+
+- **Git from Linux.** A Windows worktree's `.git` file names an `E:/` gitdir that Linux git cannot open, and /mnt
+  trees trip git's ownership check. The script exports a translated `GIT_DIR` and `safe.directory` through git's
+  environment config; nothing on disk changes.
+- **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line. NOT RUN is never green.
+
+**Which legs run (MANDATORY-PRACTICES I8, L10): all three, at every implementer gate and every landing.** Measured
+on main at `9a0ab2dd4`, 2026-09-29:
+- `unit`: about 143 s;
+- `characterization`: about 3 s;
+- `conformance`: 149 s, including the Linux build, for 9,319 of 9,319 passing.
+
+That is about 5 minutes for the whole Linux population. A platform-sensitivity detector, which would have added the
+conformance leg only for flagged diffs, was built and deleted the same night. At that cost no selection is worth its
+misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
+
+**Limits.**
+- WSL is not `ubuntu-latest`, and the gate runs Debug where CI also runs Release. It catches platform assumptions,
+  and CI through `push-main.sh` remains the proof.
+- The gate cap (section 3.14.6) does not span operating systems, so WSL legs are not counted against it.
 
 ---
 

@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-230 drift tests.
+231 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -139,6 +139,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [LevelNumberArmDriftTests](../tests/Cobol.Net.Tests.Unit/LevelNumberArmDriftTests.cs) | ⛔ A SECTION-KEYED SYNTAX RULE IS ONLY AS COMPLETE AS ITS LIST OF GRAMMAR ARMS, AND THAT LIST IS A CLASSIFIER. | — |
 | [LexerDfaCacheDriftTests](../tests/Cobol.Net.Tests.Unit/LexerDfaCacheDriftTests.cs) | ⛔ AFTER WARM-UP THE LEXER PERFORMS NO ATN SIMULATION (kb/Work PB1715; DESIGN-test-build-ci.md §3.14.5 M6): once the suite's sources have been lexed, lexing them again takes a cached DFA edge for every ASCII character of every token, and every mode of CobolLexer.g4 has a cached start state. | `tests/nist`, `tests/conformance` |
 | [LinkageCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/LinkageCarrierDriftTests.cs) | ⛔ A LINKAGE FORMAL CROSSES AS A CHARACTER IMAGE ONLY WHEN ITS OWN STORAGE *IS* A C# STRING (kb/Work PB663). | — |
+| [LinuxGateDriftTests](../tests/Cobol.Net.Tests.Unit/LinuxGateDriftTests.cs) | ⛔ THE LOCAL LINUX GATE RUNS WHAT CI'S LINUX JOBS RUN (kb/Work PB1732): every test project a Linux job of .github/workflows/build-and-test.yml runs with dotnet test is a leg of scripts/linux-gate.sh. | `.github/workflows/build-and-test.yml`, `scripts/linux-gate.sh` |
 | [LiteralScreenDriftTests](../tests/Cobol.Net.Tests.Unit/LiteralScreenDriftTests.cs) | ⛔ A LITERAL'S OWN SYNTAX RULES ARE ASKED ONCE, OF EVERY LITERAL TOKEN, AT ONE SITE (kb/Work PB1393): the §8.3.3 length rule (COBOLNET0814) and hexadecimal grouping rule (COBOLNET1635) live in LiteralScreenPass, which walks every token of the unit's tree, and nowhere else; and the pass's token set is every token the lexer defines over a literal body fragment, so a new literal token — a new lexer mo… | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src` |
 | [LockedRecordStatusProducersDriftTests](../tests/Cobol.Net.Tests.Unit/LockedRecordStatusProducersDriftTests.cs) | ⛔ THE WITNESS FOR ANNEX A.1 ITEM 152'S "Condition absent." DETERMINATION (kb/Work PB1536 Q1, owner decision R43 item 3). | `src` |
 | [MethodAbiPairDriftTests](../tests/Cobol.Net.Tests.Unit/MethodAbiPairDriftTests.cs) | ⛔ THE METHOD ABI IS A PAIR PER FORMAL, AND ONLY TWO PLACES MAY SPELL IT (kb/Work PB757; COBOLNET_OO_DESIGN D6). | `src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs` |
