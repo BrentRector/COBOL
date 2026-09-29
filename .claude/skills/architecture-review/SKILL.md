@@ -7,7 +7,7 @@ description: Use when running (or preparing) the comprehensive, whole-codebase a
 > not loaded (a cloud session receives no project marketplace), Read
 > `tools/claude-skills/skills/architecture-audit/SKILL.md` instead (`git submodule update --init tools/claude-skills`
 > if the path is missing). Its phases, contract and anti-patterns are the procedure. THEN apply this overlay: it
-> carries only what is specific to WiseOwl COBOL, and wins on conflict. Pinned: **brent-tools 1.15.0**
+> carries only what is specific to WiseOwl COBOL, and wins on conflict. Pinned: **brent-tools 1.15.1**
 > (`tools/claude-skills`, kb/Work/PB1699).
 
 # Architecture review (WiseOwl COBOL)

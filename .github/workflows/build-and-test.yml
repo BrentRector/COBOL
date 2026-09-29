@@ -96,8 +96,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
-          # ⛔ THE DOC-ONLY LIST — exactly the set the retired `paths-ignore` block carried, and nothing else.
-          IGNORE='^(DEVLOG\.md|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/)'
+          # ⛔ THE DOC-ONLY LIST — the set the retired `paths-ignore` block carried, plus the agent tooling that no
+          # matrix test reads or runs (2026-09-29): `.claude/` (skills, briefs, agent definitions, the settings that
+          # wire local hooks) and the `tools/claude-skills` submodule pin. The briefs ARE validated on every push, by
+          # the audits job's fleet-practices check, which is not behind `run_matrix`. A skills-and-pin commit used to
+          # run the full matrix (~11 min) for nothing.
+          IGNORE='^(DEVLOG\.md|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/|\.claude/|tools/claude-skills$)'
           ZERO=0000000000000000000000000000000000000000
           code=true; verified=false; reason=""; BASE=""
           if [ "$EVENT" != "push" ]; then
@@ -131,7 +135,7 @@ jobs:
                 reason="$(grep -c . code.txt) path(s) outside the doc-only list, e.g. $(head -1 code.txt)"
               else
                 code=false
-                reason="every changed path is DEVLOG.md / PROMPT.md / CLAUDE.md / README.md / docs/ / kb/ — the matrix is skipped"
+                reason="every changed path is DEVLOG.md / PROMPT.md / CLAUDE.md / README.md / docs/ / kb/ / .claude/ / the tools/claude-skills pin — the matrix is skipped"
               fi
             fi
           fi
