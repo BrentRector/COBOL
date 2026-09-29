@@ -70,6 +70,23 @@ public sealed class DiagnosticPositionTests : IDisposable
         Assert.Contains(lines, d => d.Contains("b.cob(7,12): error COBOLNET1639"));   // column 12 = the M of MOVE
     }
 
+    [Fact] // kb/Work PB1728: a PICTURE string's trimmed clause separator (`PIC X, VALUE …`) must not shift the column
+    // of every later token on the line — the lexer used to seek back over the ',' without restoring its column, so a
+    // diagnostic on the VALUE literal pointed one column right. The two lines differ only in ',' versus ' ', so the
+    // literal is at the same column in both, and a diagnostic anchored on it must say so.
+    public void TokenAfterTrimmedPictureSeparator_KeepsItsColumn()
+    {
+        string At(string name, string pictureTail)
+        {
+            Write(name, Head + $"       01 V PIC X{pictureTail} VALUE \"A\"B.\n       PROCEDURE DIVISION.\n           STOP RUN.\n");
+            var (ok, lines) = Compile(name);
+            Assert.False(ok);
+            string d = Assert.Single(lines, l => l.Contains("COBOLNET2633"));   // §8.3.5 5): anchored on the literal
+            return d[d.IndexOf($"{name}(", StringComparison.Ordinal)..d.IndexOf(')')];
+        }
+        Assert.Equal(At("s.cob", " ").Replace("s.cob", ""), At("c.cob", ",").Replace("c.cob", ""));
+    }
+
     [Fact] // the entry cursor: a data-description diagnostic names its entry's line
     public void DataEntryError_NamesTheEntryLine()
     {

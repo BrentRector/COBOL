@@ -15,6 +15,10 @@ namespace CobolNet.Common;
 /// answers from the prefix. Front-end-side (no PICTURE model here); the binder maps it onto its data category.</summary>
 public enum LiteralClass { Alphanumeric, National, Boolean }
 
+/// <summary>Which of a literal's own §8.3.3 syntax rules <see cref="CobolLiteral.SyntaxViolation"/> found violated: the
+/// prefixed formats' content repertoire, the hexadecimal grouping, or the length.</summary>
+public enum LiteralRule { Repertoire, HexGrouping, Length }
+
 public static class CobolLiteral
 {
     /// <summary>The prefix letters a quoted literal may carry: <c>N</c> national (§8.3.3.5), <c>B</c> boolean
@@ -145,6 +149,7 @@ public static class CobolLiteral
         // boolean item stores those as the '0'/'1' characters of the D-B1 bit-string world.
         if (lit.Prefix == "BX")
         {
+            if (!IsInRepertoire(lit.Body[1..^1])) return "";   // §8.3.3.4.3 SR3 — reported by RepertoireViolation
             var sb = new System.Text.StringBuilder(lit.Body.Length * 4);
             foreach (char c in lit.Body[1..^1])
                 sb.Append(System.Convert.ToString(System.Convert.ToInt32(c.ToString(), 16), 2).PadLeft(4, '0'));
@@ -154,11 +159,6 @@ public static class CobolLiteral
         return lit.Body[1..^1].Replace(new string(q, 2), q.ToString());
     }
 
-    /// <summary>Decode an <c>X"…"</c>/<c>X'…'</c> hexadecimal-format alphanumeric literal (ISO §8.3.3.2 —
-    /// each pair of hexadecimal digits is one character) to its character value; an odd digit count (a lexer
-    /// impossibility for a well-formed token, but tolerated) or a non-hex shape yields the empty string. The
-    /// ONE hex decoder (P10 Step 14) — the former <c>OoBinder.OoDecodeMethodNameLiteral</c> inline copy now
-    /// routes here, as does the §8.8.3 concatenation fold.</summary>
     /// <summary>
     /// ⭐ THE §8.3.3 HEXADECIMAL GROUPING RULE, for all three literal forms — a message naming the offending
     /// clause, or <see langword="null"/> when the literal is well formed or is not a hexadecimal literal at all.
@@ -183,7 +183,7 @@ public static class CobolLiteral
     /// </remarks>
     public static string? HexGroupViolation(string raw)
     {
-        if (SplitLiteral(raw) is not { } lit) return null;
+        if (SplitLiteral(raw) is not { } lit || RepertoireViolation(raw) is not null) return null;
         (int per, string clause) = lit.Prefix switch
         {
             "X" => (2, "§8.3.3.2.3 r6"),
@@ -196,6 +196,76 @@ public static class CobolLiteral
             : $"has {n} hexadecimal digit(s), which is not a whole number of {per}-digit groups — {clause} "
               + $"requires each hexadecimal character sequence to be {per} digits";
     }
+
+    /// <summary>
+    /// ⭐ A LITERAL'S OWN SYNTAX RULES, ASKED IN THEIR ONE ORDER — the first violated of <see cref="RepertoireViolation"/>,
+    /// <see cref="HexGroupViolation"/> and <see cref="LengthViolation"/>, or <see langword="null"/>. Content outside the
+    /// repertoire has no digit count to group, and a malformed hexadecimal literal has no value to measure, so the first
+    /// violation is the one to report. Every consumer that meets a literal TOKEN asks this, never the three predicates:
+    /// <c>LiteralScreenPass</c> for the unit's tree, and the compile-time evaluator for a compiler-directive operand,
+    /// whose fragment is lexed apart from the unit and so is never on that tree (kb/Work PB1441).
+    /// </summary>
+    public static (LiteralRule Rule, string Message)? SyntaxViolation(string raw) =>
+        RepertoireViolation(raw) is { } repertoire ? (LiteralRule.Repertoire, repertoire)
+        : HexGroupViolation(raw) is { } grouping ? (LiteralRule.HexGrouping, grouping)
+        : LengthViolation(raw) is { } length ? (LiteralRule.Length, length)
+        : null;
+
+    /// <summary>A literal as a diagnostic quotes it: whole when short, else its first and last few characters — an
+    /// over-long literal is by definition too long to quote whole.</summary>
+    public static string Abbreviated(string raw) => raw.Length <= 40 ? raw : raw[..24] + "…" + raw[^8..];
+
+    /// <summary>
+    /// ⭐ THE §8.3.3 CONTENT-REPERTOIRE RULE of the four prefixed formats whose content is not free text — a message
+    /// naming the offending character and clause, or <see langword="null"/> when the content is within the format's
+    /// repertoire or <paramref name="raw"/> is not such a literal (kb/Work PB1441, PB1394).
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><c>X"…"</c> — §8.3.3.2.3 SR5: "Hex-character-sequence-1 shall be composed of hexadecimal digits".</item>
+    /// <item><c>NX"…"</c> — §8.3.3.5.3 SR4: the same sentence for hexadecimal-national.</item>
+    /// <item><c>BX"…"</c> — §8.3.3.4.3 SR3: "Hexadecimal-digit-1 shall be a hexadecimal digit".</item>
+    /// <item><c>B"…"</c> — §8.3.3.4.3 SR2: "Boolean-character-1 shall be a boolean character, '0' or '1'".</item>
+    /// </list>
+    /// <para>⛔ THE LEXER NO LONGER DECIDES THIS, AND MUST NOT. Its bodies used to spell each repertoire, so a body
+    /// outside it was not a literal at all and fell back to IDENTIFIER + Format 1 literal — a silent wrong answer
+    /// beside a data item of the prefix's name. Every prefixed body is now any quoted content (CobolLexer.g4
+    /// HEX_BODY), and this rule is asked of every literal token by <c>LiteralScreenPass</c>. It PRECEDES the
+    /// grouping rule: a non-hexadecimal sequence has no digit count to group, so <see cref="HexGroupViolation"/>
+    /// declines such a literal, and every decoder answers "" for it (<see cref="IsInRepertoire"/>).</para>
+    /// </remarks>
+    public static string? RepertoireViolation(string raw)
+    {
+        if (SplitLiteral(raw) is not { } lit) return null;
+        (bool hex, string clause, string repertoire) = lit.Prefix switch
+        {
+            "X" => (true, "§8.3.3.2.3 SR5", "hexadecimal digits"),
+            "NX" => (true, "§8.3.3.5.3 SR4", "hexadecimal digits"),
+            "BX" => (true, "§8.3.3.4.3 SR3", "hexadecimal digits"),
+            "B" => (false, "§8.3.3.4.3 SR2", "the boolean characters '0' and '1'"),
+            _ => (false, "", ""),   // Format 1 alphanumeric and national: any character is content
+        };
+        if (clause.Length == 0) return null;
+        string content = lit.Body[1..^1];
+        int bad = FirstOutsideRepertoire(content, hex);
+        return bad < 0 ? null
+            : $"contains '{content[bad]}' — {clause} admits only {repertoire} between its delimiters";
+    }
+
+    /// <summary>The index of the first character of <paramref name="content"/> outside the hexadecimal digits
+    /// (<paramref name="hex"/>; §3.98: 0–9 and A–F, "where the letters A-F are equivalent to the letters a-f") or the
+    /// boolean characters '0'/'1'; -1 when none.</summary>
+    private static int FirstOutsideRepertoire(string content, bool hex)
+    {
+        for (int i = 0; i < content.Length; i++)
+            if (!(hex ? char.IsAsciiHexDigit(content[i]) : content[i] is '0' or '1')) return i;
+        return -1;
+    }
+
+    /// <summary>True when every character of <paramref name="digits"/> is a hexadecimal digit — the precondition every
+    /// hexadecimal decoder checks before converting, so a literal <see cref="RepertoireViolation"/> reports decodes to
+    /// "" (the malformed-literal posture <see cref="HexGroupViolation"/> established) rather than throwing.</summary>
+    private static bool IsInRepertoire(string digits) => FirstOutsideRepertoire(digits, hex: true) < 0;
 
     /// <summary>The largest number of character positions a literal of ANY of the three classes may hold, and the
     /// largest a concatenation expression may produce: ISO §8.3.3.2.3 SR1 (alphanumeric), §8.3.3.4.3 SR1
@@ -244,31 +314,26 @@ public static class CobolLiteral
     /// <summary>Decode <paramref name="digits"/> as groups of <paramref name="perChar"/> hexadecimal digits, one
     /// character per group — the §8.3.3.5.4 GR4 hexadecimal-national mapping, and the shape §8.3.3.2's
     /// alphanumeric hex form uses with <paramref name="perChar"/> = 2. A trailing partial group violates
-    /// §8.3.3.5.3 SR5 and yields the empty string, matching <see cref="DecodeHex"/>'s odd-digit posture (the
-    /// lexer already rejects the shape, so this is the belt to that braces).</summary>
+    /// §8.3.3.5.3 SR5 (and a non-hexadecimal digit §8.3.3.5.3 SR4 / §8.3.3.2.3 SR5) and yields the empty string:
+    /// the literal screen reports the violation (<see cref="HexGroupViolation"/>, <see cref="RepertoireViolation"/>),
+    /// so a malformed literal has no value to produce.</summary>
     private static string DecodeHexGroups(string digits, int perChar)
     {
         if (digits.Length == 0) return "";                       // §8.3.3.5.4 GR4 — zero-length is legal
-        if (digits.Length % perChar != 0) return "";
+        if (digits.Length % perChar != 0 || !IsInRepertoire(digits)) return "";
         var chars = new char[digits.Length / perChar];
         for (int i = 0; i < chars.Length; i++)
             chars[i] = (char)Convert.ToInt32(digits.Substring(i * perChar, perChar), 16);
         return new string(chars);
     }
 
+    /// <summary>Decode an <c>X"…"</c>/<c>X'…'</c> hexadecimal-format alphanumeric literal (ISO §8.3.3.2 —
+    /// each pair of hexadecimal digits is one character) to its character value; an odd digit count or a non-hexadecimal
+    /// digit (both reported by the literal screen) yields the empty string. The
+    /// ONE hex decoder (P10 Step 14) — the former <c>OoBinder.OoDecodeMethodNameLiteral</c> inline copy now
+    /// routes here, as does the §8.8.3 concatenation fold.</summary>
     public static string DecodeHex(string raw)
-    {
-        if (raw.Length < 3 || raw[0] is not ('X' or 'x')) return "";
-        char q = raw[^1];
-        int open = raw.IndexOf(q);
-        if (open < 0 || open >= raw.Length - 1) return "";
-        string digits = raw[(open + 1)..^1];
-        if (digits.Length % 2 != 0) return "";
-        var chars = new char[digits.Length / 2];
-        for (int i = 0; i < chars.Length; i++)
-            chars[i] = (char)Convert.ToInt32(digits.Substring(i * 2, 2), 16);
-        return new string(chars);
-    }
+        => SplitLiteral(raw) is { Prefix: "X" } lit ? DecodeHexGroups(lit.Body[1..^1], 2) : "";
 
     /// <summary>If <paramref name="raw"/> is the figurative <c>ALL "literal"</c> / <c>ALL 'literal'</c> form (a
     /// VALUE / level-88 operand text), the decoded literal; otherwise <see langword="null"/> (e.g. <c>ALL ZEROS</c>,

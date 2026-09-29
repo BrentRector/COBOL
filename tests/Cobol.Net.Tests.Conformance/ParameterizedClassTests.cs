@@ -36,6 +36,7 @@ public sealed class ParameterizedClassTests
         IDENTIFICATION DIVISION.
         INTERFACE-ID. PCIFC.
         END INTERFACE PCIFC.
+
         """;
 
     private const string Holder = """
@@ -46,9 +47,11 @@ public sealed class ParameterizedClassTests
         REPOSITORY.
             CLASS ELEM.
         END CLASS PCHOLD.
+
         """;
 
     private static string Driver(string repository, string data = "") => $"""
+
         IDENTIFICATION DIVISION.
         PROGRAM-ID. PCDRV.
         ENVIRONMENT DIVISION.

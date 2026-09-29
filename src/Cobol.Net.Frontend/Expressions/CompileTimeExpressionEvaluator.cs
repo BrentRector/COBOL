@@ -335,6 +335,7 @@ public sealed class CompileTimeExpressionEvaluator
         { ReportDirective(where, "a concatenation expression shall not appear in a compiler directive (ISO §7.3.3 SR10)"); return null; }
         if (nn.figurativeConstant() is not null)
         { ReportDirective(where, "a figurative constant shall not appear in a compiler directive (ISO §7.3.3 SR10)"); return null; }
+        if (LiteralRuleViolated(nn, where)) return null;
         if (nn.STRINGLIT() is { } s) return CtValue.Alphanumeric(CobolLiteral.Decode(s.GetText()));
         if (nn.HEXLIT() is { } h) return CtValue.Alphanumeric(CobolLiteral.Decode(h.GetText()));   // X"…" — category alphanumeric
         if (nn.NATLIT() is { } nat) return CtValue.National(CobolLiteral.Decode(nat.GetText()));
@@ -370,7 +371,7 @@ public sealed class CompileTimeExpressionEvaluator
     {
         if (vo.nonNumericLiteral() is { } nn)
         {
-            if (nn.BOOLLIT() is { } bl) return BitString.Of(CobolLiteral.Decode(bl.GetText()));
+            if (nn.BOOLLIT() is { } bl) return LiteralRuleViolated(nn, where) ? null : BitString.Of(CobolLiteral.Decode(bl.GetText()));
             if (nn.concatenationExpression() is not null)
             { ReportDirective(where, "a concatenation expression shall not appear in a compiler directive (ISO §7.3.3 SR10)"); return null; }
             if (nn.figurativeConstant() is not null)
@@ -570,6 +571,18 @@ public sealed class CompileTimeExpressionEvaluator
     /// <summary>Report a compiler-directive expression formation violation through the code-preserving sink (the
     /// frontend routes <see cref="CtDiagCode.DirectiveRule"/> to COBOLNET1619).</summary>
     private void ReportDirective(string where, string message) => _diag.Report(CtDiagCode.DirectiveRule, $"{where}: {message}");
+
+    /// <summary>A directive operand's literal asks the literal's own §8.3.3 rules — content repertoire, hexadecimal
+    /// grouping, length — through <see cref="CobolLiteral.SyntaxViolation"/>, exactly as <c>LiteralScreenPass</c> asks
+    /// them of the unit's tokens (kb/Work PB1441). The directive fragment is lexed apart from the unit, so no other screen
+    /// ever sees this token, and a literal the rules refuse has no value: the decoders answer "" for it, which this
+    /// evaluator must not take as the operand's value. True (reported) when a rule is violated.</summary>
+    private bool LiteralRuleViolated(Core.NonNumericLiteralContext nn, string where)
+    {
+        if (CobolLiteral.SyntaxViolation(nn.GetText()) is not { } v) return false;
+        ReportDirective(where, $"the literal {CobolLiteral.Abbreviated(nn.GetText())} {v.Message}");
+        return true;
+    }
 
     /// <summary>The frontend's invocation of the SHARED expression-formation rule (ISO §8.8.1.2 Table 3 /
     /// §8.8.2 Table 4) — <see cref="ArithmeticFormationRules"/>, the same rule the compiler's

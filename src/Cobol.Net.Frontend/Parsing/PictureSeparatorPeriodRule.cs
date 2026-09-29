@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
 using CobolNet.Frontend.Generated;
 
 namespace CobolNet.Frontend.Parsing;
@@ -26,25 +25,16 @@ namespace CobolNet.Frontend.Parsing;
 /// </summary>
 public static class PictureSeparatorPeriodRule
 {
-    /// <summary>Every <c>PIC_STRING</c> token in <paramref name="tokens"/> that violates SR7.</summary>
-    public static IEnumerable<IToken> Violations(IList<IToken> tokens)
+    /// <summary>Every <c>PIC_STRING</c> token in <paramref name="tokens"/> that violates SR7, judged against
+    /// <paramref name="source"/>, the exact character sequence the tokens were lexed from.</summary>
+    public static IEnumerable<IToken> Violations(string source, IList<IToken> tokens)
     {
         foreach (var t in tokens)
         {
             if (t.Type != CobolLexer.PIC_STRING || t.Text is not { Length: > 0 } text) continue;
             if (text[^1] is not (',' or '.')) continue;
-            if (NextCharacter(t) != '.') yield return t;
+            if (SeparatorRule.CharAt(source, t.StopIndex + 1) != '.') yield return t;
         }
-    }
-
-    /// <summary>The source character immediately after <paramref name="t"/>, or -1 at end of input.</summary>
-    private static int NextCharacter(IToken t)
-    {
-        var input = t.InputStream;
-        int at = t.StopIndex + 1;
-        if (input is null || at >= input.Size) return -1;
-        string c = input.GetText(Interval.Of(at, at));
-        return c.Length == 1 ? c[0] : -1;
     }
 
     /// <summary>The COBOLNET2419 message for one violating character-string.</summary>

@@ -324,9 +324,15 @@ public sealed class Frontend
         // entry kind (kb/Work PB569). Reported through the syntax-error listener so it is located exactly like a
         // parse error; the parse itself still runs, so every other diagnostic of the unit is reported too.
         var sr7 = new CobolErrorListener(diagnostics, sourcePath, LineMap);
-        foreach (var pic in PictureSeparatorPeriodRule.Violations(tokens.GetTokens()))
+        foreach (var pic in PictureSeparatorPeriodRule.Violations(text, tokens.GetTokens()))
             sr7.SyntaxError(TextWriter.Null, null!, pic, pic.Line, pic.Column,
                 $"[{Diagnostics.DiagnosticDescriptors.COBOLNET2419.Code}] {PictureSeparatorPeriodRule.Message(pic)}", null!);
+        // ISO §8.3.5 rules 2, 3 and 5 — the separator context of every comma, semicolon, period and literal, decided from
+        // the same characters and reported the same way (kb/Work PB1394). Hidden-channel tokens included: a ';' with no
+        // space after it reaches the token stream only there.
+        foreach (var v in SeparatorRule.Violations(text, tokens.GetTokens()))
+            sr7.SyntaxError(TextWriter.Null, null!, v.Token, v.Token.Line, v.Token.Column,
+                $"[{v.Descriptor.Code}] {v.Message}", null!);
 
         // The parser needs the map as well as the lexer and the rewriter: its text predicates (LOCALE, ORDER,
         // CLASSIFICATION, ATTRIBUTE, the LC_ categories) recognize §8.9/§8.10 words the lexer deliberately does

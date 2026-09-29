@@ -5624,6 +5624,49 @@ public static class DiagnosticCatalog
         + "object reference described with ACTIVE-CLASS. The site names the rule it caught.",
         "ISO §13.18.42.3 SR1/SR2/SR3/SR5/SR6");
 
+    /// <summary>COBOLNET2630 — a prefixed literal whose CONTENT is outside its format's repertoire (kb/Work PB1441,
+    /// PB1394): §8.3.3.2.3 SR5 / §8.3.3.5.3 SR4 "Hex-character-sequence-1 shall be composed of hexadecimal digits"
+    /// (<c>X"…"</c>, <c>NX"…"</c>), §8.3.3.4.3 SR3 "Hexadecimal-digit-1 shall be a hexadecimal digit" (<c>BX"…"</c>)
+    /// and §8.3.3.4.3 SR2 "Boolean-character-1 shall be a boolean character, '0' or '1'" (<c>B"…"</c>). Asked of every
+    /// literal token by <c>LiteralScreenPass</c>; before the lexer admitted any content, such a literal silently
+    /// re-lexed as a data-name plus a Format 1 literal.</summary>
+    public static readonly DiagnosticDescriptor LiteralContentRepertoire = new(
+        "COBOLNET2630", "literal-content-repertoire", EditionSeverity.Error,
+        "A hexadecimal or boolean literal contains a character its format does not admit: X\"…\", NX\"…\" and BX\"…\" "
+        + "admit only hexadecimal digits (0–9, A–F), and B\"…\" only the boolean characters 0 and 1.",
+        "ISO §8.3.3.2.3 SR5 · §8.3.3.5.3 SR4 · §8.3.3.4.3 SR2/SR3");
+
+    /// <summary>COBOLNET2631 — a comma or semicolon not immediately followed by a space (kb/Work PB1394). §8.3.5 2):
+    /// "The COBOL characters comma and semicolon, immediately followed by a space, are separators" — without the space
+    /// the character is no separator, so <c>N,M</c> is not two operands. The one legal space-less comma is the
+    /// decimal point of a numeric literal under DECIMAL-POINT IS COMMA, which the numeric-literal rules own.
+    /// Decided post-lex by <c>SeparatorRule</c>.</summary>
+    public static readonly DiagnosticDescriptor SeparatorCommaWithoutSpace = new(
+        "COBOLNET2631", "separator-comma-without-space", EditionSeverity.Error,
+        "A comma or semicolon is not immediately followed by a space, so it is not a separator.",
+        "ISO §8.3.5 2)");
+
+    /// <summary>COBOLNET2632 — a period not followed by a space (kb/Work PB1394). §8.3.5 3): "The COBOL character
+    /// period, when followed by a space, is a separator" — so <c>N.DISPLAY</c> ends no sentence. A period inside a
+    /// numeric literal or a PICTURE character-string is part of that character-string, never this token. Decided
+    /// post-lex by <c>SeparatorRule</c>.</summary>
+    public static readonly DiagnosticDescriptor SeparatorPeriodWithoutSpace = new(
+        "COBOLNET2632", "separator-period-without-space", EditionSeverity.Error,
+        "A period is not followed by a space, so it is not a separator period.",
+        "ISO §8.3.5 3)");
+
+    /// <summary>COBOLNET2633 — a literal whose opening or closing delimiter is not separated as §8.3.5 5) requires
+    /// (kb/Work PB1394): "The opening delimiter shall be immediately preceded by a space, left parenthesis, or opening
+    /// pseudo-text delimiter. The closing delimiter shall be immediately followed by one of the separators space,
+    /// comma, semicolon, period, right parenthesis, or closing pseudo-text delimiter." Decided post-lex by
+    /// <c>SeparatorRule</c>, over every literal token of either lexer mode.</summary>
+    public static readonly DiagnosticDescriptor SeparatorLiteralDelimiter = new(
+        "COBOLNET2633", "separator-literal-delimiter", EditionSeverity.Error,
+        "A literal's opening delimiter is not immediately preceded by a space, left parenthesis or opening "
+        + "pseudo-text delimiter, or its closing delimiter is not immediately followed by a space, comma, semicolon, "
+        + "period, right parenthesis or closing pseudo-text delimiter.",
+        "ISO §8.3.5 5)");
+
     /// <summary>COBOLNET2634 — a file-name is specified in a second SELECT clause of the same factory, function, object
     /// or program (ISO §12.4.5.2 SR2; kb/Work PB1077). The second entry used to replace the first in the binder's name
     /// map, so the program ran against whichever ASSIGN target came last. Reported by

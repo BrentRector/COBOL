@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Text.RegularExpressions;
 using CobolNet.Frontend.Generated;
+using CobolNet.Frontend.Parsing;
 using CobolNet.Tests.Shared;
 using CobolNet.Validation;
 using Xunit;
@@ -10,9 +11,11 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ A LITERAL'S OWN SYNTAX RULES ARE ASKED ONCE, OF EVERY LITERAL TOKEN, AT ONE SITE (kb/Work PB1393): the §8.3.3
-/// length rule (COBOLNET0814) and hexadecimal grouping rule (COBOLNET1635) live in <c>LiteralScreenPass</c>, which
-/// walks every token of the unit's tree, and nowhere else; and the pass's token set is every token the lexer defines
-/// over a literal body fragment, so a new literal token — a new lexer mode's twin — joins the screen or fails here.
+/// length rule (COBOLNET0814), hexadecimal grouping rule (COBOLNET1635) and content repertoire rule (COBOLNET2630,
+/// kb/Work PB1441) live in <c>LiteralScreenPass</c>, which walks every token of the unit's tree, and nowhere else; and
+/// the literal token set (<c>LiteralTokens.Types</c>, shared with the §8.3.5 <c>SeparatorRule</c>) is every token the
+/// lexer defines over a literal body fragment, so a new literal token — a new lexer mode's twin — joins both rules or
+/// fails here.
 /// </summary>
 /// <remarks>
 /// Each rule used to be written in the one funnel its author was fixing (the length cap in two procedure-operand
@@ -39,21 +42,27 @@ public sealed class LiteralScreenDriftTests
             .Select(m => m.Groups[1].Value).ToHashSet();
         Assert.True(defined.Count >= 8,
             $"expected the four DEFAULT-mode literal tokens and their SUBSCRIPT twins, found {defined.Count}");
-        var screened = LiteralScreenPass.LiteralTokenTypes
+        var screened = LiteralTokens.Types
             .Select(t => CobolLexer.DefaultVocabulary.GetSymbolicName(t)).ToHashSet();
         Assert.Equal(defined.Order(), screened.Order());
     }
 
-    /// <summary>The rule predicates and their descriptors have ONE production caller, and no emit site spells either
-    /// code as a bare string.</summary>
+    /// <summary>The three rule predicates are asked only through <c>CobolLiteral.SyntaxViolation</c>, their one order;
+    /// that is asked once per lexing of literal tokens — the unit's tree (<c>LiteralScreenPass</c>) and a compiler-directive
+    /// operand, lexed apart from the unit (<c>CompileTimeExpressionEvaluator</c>, kb/Work PB1441); the descriptors have ONE
+    /// emit site, and no emit site spells a code as a bare string.</summary>
     [Theory]
-    [InlineData("CobolLiteral.HexGroupViolation(", true)]
-    [InlineData("CobolLiteral.LengthViolation(", true)]
-    [InlineData("DiagnosticCatalog.HexLiteralDigitGrouping", true)]
-    [InlineData("DiagnosticCatalog.LiteralTooLong", true)]
-    [InlineData("\"COBOLNET0814\"", false)]
-    [InlineData("\"COBOLNET1635\"", false)]
-    public void LiteralRule_HasOneReportingSite(string needle, bool askedByTheScreen)
+    [InlineData("CobolLiteral.SyntaxViolation(", "CompileTimeExpressionEvaluator.cs,LiteralScreenPass.cs")]
+    [InlineData("CobolLiteral.HexGroupViolation(", "")]
+    [InlineData("CobolLiteral.RepertoireViolation(", "")]
+    [InlineData("CobolLiteral.LengthViolation(", "")]
+    [InlineData("DiagnosticCatalog.LiteralContentRepertoire", "LiteralScreenPass.cs")]
+    [InlineData("DiagnosticCatalog.HexLiteralDigitGrouping", "LiteralScreenPass.cs")]
+    [InlineData("DiagnosticCatalog.LiteralTooLong", "LiteralScreenPass.cs")]
+    [InlineData("\"COBOLNET2630\"", "")]
+    [InlineData("\"COBOLNET0814\"", "")]
+    [InlineData("\"COBOLNET1635\"", "")]
+    public void LiteralRule_HasOneReportingSite(string needle, string expectedSites)
     {
         char sep = Path.DirectorySeparatorChar;
         var sites = Directory.EnumerateFiles(TestRepo.Src(), "*.cs", SearchOption.AllDirectories)
@@ -61,8 +70,9 @@ public sealed class LiteralScreenDriftTests
                         && Path.GetFileName(p) is not ("DiagnosticCatalog.cs" or "CobolLiteral.cs"))
             .Where(p => File.ReadAllText(p).Contains(needle, StringComparison.Ordinal))
             .Select(p => Path.GetFileName(p))
+            .Order(StringComparer.Ordinal)
             .ToList();
-        string[] expected = askedByTheScreen ? ["LiteralScreenPass.cs"] : [];
+        string[] expected = expectedSites.Length == 0 ? [] : expectedSites.Split(',');
         Assert.True(sites.SequenceEqual(expected),
             $"'{needle}' is used at [{string.Join(", ", sites)}], expected [{string.Join(", ", expected)}] — a literal's "
             + "own §8.3.3 rules are a property of the TOKEN; a second site is a second funnel the next literal position "

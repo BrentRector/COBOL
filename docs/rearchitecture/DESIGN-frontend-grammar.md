@@ -933,7 +933,7 @@ generated visitor. The façade is for the *binder*.
 
 The frontend already has the good pieces: `Diagnostics/DiagnosticDescriptor` (a typed
 `{Code, Severity, MessageTemplate}` record) and `DiagnosticDescriptors` (a registry:
-`CBL0901`, `COBOL0301`, `COBOLNET0900`, …) — `Diagnostics/DiagnosticDescriptors.cs`. This is exactly the
+`CBL0901`, `COBOL0303`, `COBOLNET0900`, …) — `Diagnostics/DiagnosticDescriptors.cs`. This is exactly the
 model the *compiler* side lacks (its 163 codes are bare strings — the understandability-critique HIGH). The
 target:
 
@@ -1213,6 +1213,32 @@ token once, after the post-lex rewrites in `Frontend.LexAndParse`, and reports C
 syntax-error listener; a separator period necessarily ends the entry, so "last clause" needs no second test. It
 covers every PICTURE parent (data, report group and screen description entries) because it never looks at the
 parent.
+
+**§8.3.5's separator-context rules are decided the same way, by `SeparatorRule` (kb/Work PB1394).** The lexer skips
+the separator space, so no grammar rule can see whether a separator was written — `N,M` and `N, M`, `"AB"N` and
+`"AB" N` are the same token run. `SeparatorRule` runs beside `PictureSeparatorPeriodRule` in `Frontend.LexAndParse`,
+over EVERY token of the unit (all channels), and judges each from the source characters beside it: rule 2 — a
+COMMA / SUB_COMMA / SUB_SEMICOLON, or a lone ';' (the `SEMICOLON` token rides the HIDDEN channel so this rule sees it
+and the parser does not), not immediately followed by a space → COBOLNET2631, except a numeric literal's
+DECIMAL-POINT IS COMMA decimal point (a digit after, a digit / sign / '(' / space before), which the numeric-literal
+rules own; rule 3 — a DOT not followed by a space → COBOLNET2632 (a period inside a numeric literal or PICTURE
+string is part of that token); rule 5 — every literal token of either mode (`LiteralTokens.Types`, the one set
+`LiteralScreenPass` also reads) whose opening delimiter is not preceded by a space, '(' or '==' or whose closing
+delimiter is not followed by a space, ',', ';', '.', ')' or '==' → COBOLNET2633, touching literals reported once.
+"Separator space" is the lexer's own `WS` set plus the start and end of the text. The parse-recovery hints that
+guessed at rule 5 on a parse error (COBOL0301/0302) are gone: the rule has one home. It applies to the main
+compilation-group lex; the D2 keyword-omitted re-parse needs no second screen because every one of its tokens was
+already a SUBSCRIPT-mode token of the main lex.
+
+**A prefixed literal is delimited whatever its content (kb/Work PB1441).** `X"`, `N"`, `B"`, `NX"` and `BX"` are
+opening delimiters (§8.3.5 5)), so every prefixed body fragment is `<prefix> STR_BODY`; the §8.3.3 content
+repertoires (hexadecimal digits for X / NX / BX, '0'/'1' for B) are `LiteralScreenPass`'s COBOLNET2630, never the
+lexer's — a body that spelled its repertoire fell back to IDENTIFIER + Format 1 literal on the first bad character,
+which beside a data item of the prefix's name compiled as two operands. The literal rules have one ordered entry,
+`CobolLiteral.SyntaxViolation` (repertoire, then grouping, then length), asked of the unit's tree by
+`LiteralScreenPass` and of a compiler-directive operand — lexed apart from the unit — by
+`CompileTimeExpressionEvaluator`. A lexer action that ends a token early does
+so through `CutTokenTo(length)`, which restores the column with the input position (kb/Work PB1728).
 
 ---
 

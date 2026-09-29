@@ -205,13 +205,10 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
                 + "is 'MOVE { CORRESPONDING | CORR } identifier-3 TO identifier-4' — so no format admits a "
                 + "CORRESPONDING phrase after a sending operand (ISO §14.9.25.2).", 0));
 
-        // 1. Missing space before string literal
-        if (token.Text?.StartsWith('"') == true && prev != null && IsIdentifier(prev))
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0301, "Missing space before string literal.", 20));
-
-        // 2. Missing space after string literal
-        if (prev?.Text?.EndsWith('"') == true && IsIdentifier(token))
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0302, "Missing space after string literal.", 20));
+        // ⛔ NO "MISSING SPACE BEFORE / AFTER STRING LITERAL" GUESS HERE (kb/Work PB1394). A literal delimiter that is not
+        // separated is §8.3.5 rule 5's violation, and SeparatorRule reports it — for every literal token, whether or
+        // not the parse happens to fail there — as COBOLNET2633. The two recovery hints that stood here (COBOL0301 /
+        // COBOL0302) stated that rule a second time, only on a parse error, and only for a quotation-mark delimiter.
 
         // 3. Missing TO in MOVE statement
         if (IsInRule(ruleStack, "moveStatement") && IsIdentifier(token) && prev != null && IsLiteral(prev))

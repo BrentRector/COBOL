@@ -80,9 +80,9 @@ public sealed class MethodOmittedArgumentTests
             01 C PIC X.
             PROCEDURE DIVISION.
                 INVOKE CMOA1 "NEW" RETURNING O.
-                MOVE O::"CHK"(OMITTED) TO C.
+                MOVE O :: "CHK" (OMITTED) TO C.
                 DISPLAY "O=" C.
-                MOVE O::"CHK"(W) TO C.
+                MOVE O :: "CHK" (W) TO C.
                 DISPLAY "G=" C.
                 STOP RUN.
             END PROGRAM MOA1.

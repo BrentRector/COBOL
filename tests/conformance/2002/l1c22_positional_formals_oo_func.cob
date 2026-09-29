@@ -33,7 +33,7 @@
       *>     returning item: "F=BBBAAA".
       *>  I: INVOKE L1C22M "CAT" USING Y X: method formal X = "BBB",
       *>     Y = "AAA", returns X then Y: "I=BBBAAA".
-      *>  N: inline invocation L1C22M::"CAT"(Y X): same binding:
+      *>  N: inline invocation L1C22M :: "CAT" (Y X): same binding:
       *>     "N=BBBAAA".
       *>  P: MOVE Y TO P OF L1C22M invokes the implicit SET property
       *>     method with the caller's Y ("BBB") as its one argument,
@@ -71,7 +71,7 @@
            INVOKE L1C22M "CAT" USING Y X RETURNING W-R
            DISPLAY "I=" W-R
            MOVE SPACES TO W-R
-           MOVE L1C22M::"CAT"(Y X) TO W-R
+           MOVE L1C22M :: "CAT" (Y X) TO W-R
            DISPLAY "N=" W-R
            MOVE Y TO P OF L1C22M
            DISPLAY "P=" P OF L1C22M

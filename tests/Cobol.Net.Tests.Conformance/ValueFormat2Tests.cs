@@ -50,7 +50,7 @@ public sealed class ValueFormat2Tests
     public void FixedTable_ExplicitRange()
     {
         var (ok, stdout, detail) = EditionHarness.CompileAndRun(
-            Prog("01 T-GRP.\n   03 E PIC X(2) OCCURS 5 VALUES ARE \"AA\",\"BB\" FROM (2) TO (4).",
+            Prog("01 T-GRP.\n   03 E PIC X(2) OCCURS 5 VALUES ARE \"AA\", \"BB\" FROM (2) TO (4).",
                  "    DISPLAY \"[\" E(2) E(3) E(4) \"]\"."), 2023);
         Assert.True(ok, detail);
         Assert.Contains("[AABBAA]", stdout);

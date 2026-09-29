@@ -30,7 +30,8 @@ public sealed class EvaluateOperandClassifierDriftTests
     private static string Prog(string pid, string env, string data, string setup, string expr) => $"""
         IDENTIFICATION DIVISION.
         PROGRAM-ID. {pid}.
-        {env}DATA DIVISION.
+        {env}
+        DATA DIVISION.
         WORKING-STORAGE SECTION.
         01 W-PAD PIC X VALUE SPACE.
         {data}

@@ -4491,13 +4491,13 @@
   "ordinal": 5,
   "subject": "Alphanumeric literals",
   "rule-digest": "aeae82f35659",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STRINGLIT; src/Cobol.Net.Frontend/Parsing/CobolErrorStrategy.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY",
+  "test-ref": "conformance:negative/w73a-hex-literal-non-hex-digit; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule; unit:SeparatorRuleTests.PrefixedLiteral_IsOneTokenWhateverItsContent",
   "derivation": "",
-  "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1394 (registrar 15b). cite.py --check 8.3.3.2.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK; 3.98 hexadecimal digit = 0-9, A-F (a-f equivalent). HEX_BODY only matches [0-9a-f]*, so X\"GG\" does not lex as HEXLIT and falls back to IDENTIFIER `X` + STRINGLIT \"GG\" -- the same silent-split hole R03/PB59 closed for zero length and NX/BX. Probes: p8 `01 X PIC X(3) VALUE \"ZZZ\"` + `DISPLAY X\"GG\"` COMPILES CLEAN and prints ZZZGG (two operands); p2/p9 (no item X, or MOVE) are refused only by the generic parse-recovery hint COBOL0301 'Missing space before string literal' which names neither SR5 nor the literal; p7 VALUE X\"4G\" draws COBOLNET1639 'the VALUE operand X is not a literal' + COBOLNET1585 -- misdescribing the source. Expected: every X\"<non-hex>\" is refused as an SR5 violation of a hexadecimal-alphanumeric literal (the opening delimiter X\" is itself a separator per 8.3.5 rule 5, so the source can only be read as a malformed Format 2 literal). || editions as written by the adjudicator: 2014, 2023 (Annex E itemizes the 2014->2023 delta and lists no change to 8.3.3.2, so the rule stands in both; the 1985/2002 edge is NOT derivable in-repo -- no 2002 or 1985 text is held)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "SR5 (cite.py --check 8.3.3.2.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK 5)); 3.98 hexadecimal digit, A-F equivalent to a-f (cite.py OK). kb/Work PB1394/PB1441 LANDED (wave 73 group A): HEX_BODY is now [x] STR_BODY, so X\"GG\" is one HEXLIT and never IDENTIFIER X + \"GG\"; LiteralScreenPass asks CobolLiteral.RepertoireViolation of every literal token and reports COBOLNET2630 naming the character and SR5 (before the grouping rule, which declines such a literal); every hex decoder answers \"\" for it instead of throwing. Negative: DISPLAY X\"GG\" beside 01 X -> COBOLNET2630 at 2002/2014/2023 (it used to print ZZZGG).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.2.3-6",
@@ -4746,13 +4746,13 @@
   "ordinal": 2,
   "subject": "Boolean literals",
   "rule-digest": "91afd79ef573",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY",
+  "test-ref": "conformance:negative/w73a-boolean-literal-non-boolean-character; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1394 (registrar 15b). 'Boolean-character-1 shall be a boolean character, '0' or '1', from the computer's coded character set' (cite.py --check 8.3.3.4.3 SR2 OK). Enforced lexically: Format 1 admits only [01]*. B\"012\" does not form a BOOLLIT; it lexes as IDENTIFIER B + STRINGLIT and is rejected: probe bl2 MOVE B\"012\" TO B1 -> COBOL0301 unexpected '\"012\"'; bl3b VALUE B\"12\" -> COBOLNET1639/1585. Rejected in both divisions (no silent split), though the diagnostic does not name SR2 (message quality only). No spec-derived negative test pins it -> test-ref empty. || REFUTED: PARTIAL — The rule is enforced only where the parser happens to reject the split. The lexer does not form BOOLLIT for B\"012\" and falls back to IDENTIFIER B + STRINGLIT \"012\". §8.3.5 r5 makes B\" itself an opening delimiter, and an opening quote must be immediately preceded by a space, left parenthesis or pseudo-text delimiter. When a data item named B exists, DISPLAY B\"012\" compiles and runs silently as B followed by \"012\". The adjudicator's 'no silent split' claim is false. B\"\"\"\" (content = an embedded quote, not '0'/'1') is also accepted silently as B\"\" followed by \"\" with no separator. MOVE B\"2\" TO A is rejected (COBOL0301 'Missing space before string literal'), so the separator check exists but is not applied in every statement. || editions as written by the adjudicator: 2002, 2014, 2023 (boolean literals are a COBOL-2002 introduction, gated COBOLNET0900 at --std 85 - probe bl7; the zero-length-literal introduction edge is not derivable from the in-repo 2023 text, whose Annex E lists only the 2014->2023 delta)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "SR2 (cite.py --check 8.3.3.4.3 \"Boolean-character-1 shall be a boolean character, '0' or '1'\" OK 2)). kb/Work PB1394 LANDED (wave 73 group A): BOOL_BODY Format 1 is now 'B' STR_BODY, so B\"012\" is one BOOLLIT and LiteralScreenPass reports COBOLNET2630 naming '2' and SR2 in every position; beside an item B it no longer compiles as B + \"012\" (refuter's silent split). Negative: DISPLAY B\"012\" beside 01 B -> COBOLNET2630 at 2002/2014/2023.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.4.3-3",
@@ -4761,13 +4761,13 @@
   "ordinal": 3,
   "subject": "Boolean literals",
   "rule-digest": "23f400d67b05",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY",
+  "test-ref": "conformance:negative/w73a-hex-boolean-literal-non-hex-digit; conformance:2002/w73a_prefix_literal_beside_named_item; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule; unit:SeparatorRuleTests.InRepertoire_IsNotAViolation",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1394 (registrar 15b). 'Hexadecimal-digit-1 shall be a hexadecimal digit' plus NOTE 'Hexadecimal-boolean literals can be of zero length' (cite.py --check 8.3.3.4.3 SR3 OK). HEXDIGITS=[0-9a-f]* case-insensitive: probe bl3 MOVE BX\"G1\" TO B1 -> COBOL0301 rejected; NOTE half: BX\"\"/BX'' accepted (bl12). No grouping rule is imposed on BX (HexGroupViolation returns null for BX; BX\"5\"/BX\"5AB\" legal, r03 rows 11-12) - correct, SR3 states none. No spec-derived negative test for a non-hex digit -> test-ref empty. || REFUTED: PARTIAL — The rule has two halves. The zero-length NOTE half holds (BX\"\"/BX'' accepted). The 'shall be a hexadecimal digit' half is enforced only by accident of the parse. BX\"G1\" does not form BOOLLIT and falls back to IDENTIFIER BX + STRINGLIT \"G1\". §8.3.5 r5 names BX\" as a three-character opening delimiter. With a data item named BX in scope, DISPLAY BX\"G1\" compiles silently and prints the item followed by G1. The earlier probe bl3 (MOVE BX\"G1\" TO B1, no BX item) was rejected only because the MOVE parse failed. || editions as written by the adjudicator: 2002, 2014, 2023 (boolean literals are a COBOL-2002 introduction, gated COBOLNET0900 at --std 85 - probe bl7; the zero-length-literal introduction edge is not derivable from the in-repo 2023 text, whose Annex E lists only the 2014->2023 delta)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "SR3 (cite.py --check 8.3.3.4.3 \"Hexadecimal-digit-1 shall be a hexadecimal digit\" OK 3)). kb/Work PB1394 LANDED (wave 73 group A): BOOL_BODY Format 2 is 'BX' STR_BODY, BX\"G1\" is one BOOLLIT, and LiteralScreenPass reports COBOLNET2630 naming 'G' and SR3; the NOTE half (zero length) still holds (BX\"\" is in the repertoire) and no grouping rule is imposed on BX. Negative: DISPLAY BX\"G1\" beside 01 BX -> COBOLNET2630 at 2002/2014/2023; positive: BX\"A\" -> 1010 beside the item BX.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.3.3.4.4-1",
@@ -4926,13 +4926,13 @@
   "ordinal": 4,
   "subject": "National literals",
   "rule-digest": "82982ec04a01",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NAT_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#IDENTIFIER",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NAT_BODY",
+  "test-ref": "conformance:negative/w73a-hex-national-literal-non-hex-digit; conformance:2002/w73a_prefix_literal_beside_named_item; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1441 (registrar 15c). cite.py --check 8.3.3.5.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" -> OK (rule 4). The rule is enforced only by the lexer failing to match: NAT_BODY's NX arms take HEXDIGITS ([0-9a-f]*), so NX\"00G1\" does not lex as a national literal at all - it falls back to IDENTIFIER `NX` + STRINGLIT \"00G1\", the exact silent-split shape R03 closed for WELL-FORMED NX literals (and which the R03 lexer comment itself warns against for the grouping rule). Probe n1, with `01 NX PIC X(4) VALUE \"ZZZZ\"` in scope: `MOVE FUNCTION MAX(NX\"00G1\") TO NA` compiles with NO diagnostic and prints [ZZZZ] - MAX(NX, \"00G1\"). Without such an item the failure is an unrelated diagnostic (probe n5: COBOLNET1504 '2 operand arguments'; n6: COBOLNET1639 'NX is not a literal'), never the SR4 rule. Expected: a named error for a non-hexadecimal character in a hexadecimal-national literal. Sibling: HEX_BODY / BOOL_BODY BX arms share HEXDIGITS, so X\"4G\" and BX\"G\" split the same way (§8.3.3.2.3 SR5, §8.3.3.4.3 r3). [editions as adjudicated: COBOL-2002, COBOL-2014, COBOL-2023 (national literals are a COBOL-2002 introduction; absent from COBOL-85, where the construct is rejected COBOLNET0900 via Constructs.NationalData2002)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "SR4 (cite.py --check 8.3.3.5.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK 4)). kb/Work PB1441 LANDED (wave 73 group A): NAT_BODY Format 2 is 'NX' STR_BODY, so NX\"00G1\" is one NATLIT (never IDENTIFIER NX + \"00G1\"), and LiteralScreenPass reports COBOLNET2630 naming 'G' and SR4. Negative: MAX(NX\"00G1\") beside 01 NX -> COBOLNET2630 at 2002/2014/2023 (it used to print [ZZZZ], the item's value).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.5.3-5",
@@ -5256,13 +5256,13 @@
   "ordinal": 2,
   "subject": "Lexical elements",
   "rule-digest": "d1910ad25ebb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#COMMA; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SEMICOLON; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#valueClause; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Parsing/SeparatorRule.cs#Violations; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SEMICOLON; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#LexAndParse",
+  "test-ref": "conformance:negative/w73a-comma-not-followed-by-space; conformance:85/w73a_separator_context_conforming; unit:SeparatorRuleTests.NonconformingSeparator_IsReportedOnce; unit:SeparatorRuleTests.ConformingSeparators_AreNotReported",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1394 (registrar 15b). Rule: 'The COBOL characters comma and semicolon, immediately followed by a space, are separators' (cite.py --check 8.3.5 OK §8.3.5 2)). Legal half CONFORMS (COMMA_SEP/FNARG_SEPARATOR/SEMICOLON; probe lgsep). Illegal half UNDER-REJECTED: a comma NOT followed by a space lexes as COMMA, which the parser admits as an operand separator in ~12 list rules (`(COMMA? x)*` in CobolParserCore.g4:642/670, CobolData.g4:774/833-835/887, CobolExpressions.g4:620, CobolIO.g4:332/338, CobolReportWriter.g4:219-220); and SEMICOLON : ';' -> skip discards a semicolon regardless of what follows. Probes: probe/lexical-elements/commanosp.cob `MOVE 1 TO N,M.` compiles and runs (001001); probe/lexical-elements/semicnosp.cob `MOVE 1 TO N;M.` compiles and runs (001001). Expected: 'N,M' / 'N;M' contain no separator (the comma/semicolon is not followed by a space) so the character-string is not a valid COBOL word — a compile-time error. Inconsistent sibling: FUNCTION MAX(N,M) IS rejected (probe fnmaxcomma). See finding 'bare comma/semicolon'. [code-location note: (dataReference (COMMA? dataReference)* lists, line 670)] || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators)",
-  "state": "GAP"
+  "notes": "Rule 2 (cite.py --check 8.3.5 \"The COBOL characters comma and semicolon, immediately followed by a space, are separators\" OK 2)). kb/Work PB1394 LANDED (wave 73 group A): SeparatorRule, run post-lex over every token of the unit (all channels) from the source characters, reports a comma or semicolon not immediately followed by a space as COBOLNET2631 - DEFAULT-mode COMMA, SUBSCRIPT-mode SUB_COMMA / SUB_SEMICOLON, and the lone ';' that the lexer now keeps on the HIDDEN channel instead of skipping. The one space-less comma it leaves alone is a numeric literal's decimal point under DECIMAL-POINT IS COMMA (a digit after it and a digit, sign, '(' or space before it - 12.3.7.4 GR14 a)), which the numeric-literal rules own. Negative: MOVE 1 TO N,M / N;M -> COBOLNET2631 at all four editions (they used to compile as two receivers and print 001001); positive: MOVE 1 TO N, M and N; M.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.5-3",
@@ -5271,13 +5271,13 @@
   "ordinal": 3,
   "subject": "Lexical elements",
   "rule-digest": "b61df907a093",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#DOT; src/Cobol.Net.Frontend/Parsing/PictureSeparatorPeriodRule.cs#PictureSeparatorPeriodRule",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Parsing/SeparatorRule.cs#Violations; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#DOT; src/Cobol.Net.Frontend/Parsing/PictureSeparatorPeriodRule.cs#PictureSeparatorPeriodRule",
+  "test-ref": "conformance:negative/w73a-period-not-followed-by-space; conformance:85/w73a_separator_context_conforming; unit:SeparatorRuleTests.NonconformingSeparator_IsReportedOnce",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1394 (registrar 15b). Rule: 'The COBOL character period, when followed by a space, is a separator. The separator period shall be used only to indicate the end of a sentence, or as shown in formats.' (cite.py --check 8.3.5 OK §8.3.5 3)). Second half CONFORMS: a period mid-statement is rejected (probe probe/lexical-elements/periodmid.cob `MOVE 1 TO N. M.` -> COBOL0001). First half DIVERGES: DOT : '.' matches a period whatever follows it, so a period NOT followed by a space still acts as the separator period. Probe probe/lexical-elements/periodnosp.cob `DISPLAY N.DISPLAY M.` compiles and prints 005 / 007; expected: 'N.DISPLAY' has no separator after the period, so it is not a sentence end and the character-string is not a valid word — compile-time error. PICTURE-string periods are handled separately in PICMODE (not this defect). See finding 'period not followed by space'. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators)",
-  "state": "GAP"
+  "notes": "Rule 3 (cite.py --check 8.3.5 \"The COBOL character period, when followed by a space, is a separator\" OK 3)). kb/Work PB1394 LANDED (wave 73 group A): SeparatorRule reports a DOT token not followed by a space (or the end of the text) as COBOLNET2632. A period inside a numeric literal or a PICTURE character-string is part of that token (DECIMALLIT / PIC_STRING), never DOT. Negative: DISPLAY N.DISPLAY M -> COBOLNET2632 at all four editions (it used to compile and print 005 and 007).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.5-4",
@@ -5301,13 +5301,13 @@
   "ordinal": 5,
   "subject": "Lexical elements",
   "rule-digest": "11a57475607e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NAT_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STRINGLIT",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Parsing/SeparatorRule.cs#Violations; src/Cobol.Net.Frontend/Parsing/LiteralTokens.cs#Types; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY",
+  "test-ref": "conformance:negative/w73a-literal-delimiter-not-separated; conformance:85/w73a_separator_context_conforming; conformance:2002/w73a_prefix_literal_beside_named_item; unit:SeparatorRuleTests.NonconformingSeparator_IsReportedOnce; unit:SeparatorRuleTests.AdjacentLiterals_ReportTheBoundaryOnce",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1394 (registrar 15b). Rule (cite.py --check 8.3.5 OK §8.3.5 5)): delimiter set + 'The opening delimiter shall be immediately preceded by a space, left parenthesis, or opening pseudo-text delimiter. The closing delimiter shall be immediately followed by one of the separators space, comma, semicolon, period, right parenthesis, or closing pseudo-text delimiter.' Delimiter-set half CONFORMS: STR_BODY takes \" or ' with the matching closer, HEX/NAT/BOOL_BODY take X\"/N\"/NX\"/B\"/BX\" in both quote spellings. Adjacency half DIVERGES: the lexer skips whitespace and no rule or post-lex pass checks the character before an opening delimiter or after a closing one. Probes: probe/lexical-elements/litclose.cob `DISPLAY \"AB\"N.` compiles and prints AB005; litopen.cob `MOVE\"AB\" TO A.` compiles and prints AB; litcloseequal.cob `IF \"AB\"=A` compiles. (litclosecolon `\"AB\":N` and hexlitopen `MOVE\"X\"X\"41\"` are rejected only by accident of the parse.) Expected: each is a compile-time error — the closing delimiter is followed by 'N' / '=' (not a listed separator) and the opening delimiter is preceded by 'E'. See finding 'literal delimiter adjacency'. || editions as written by the adjudicator: 1985, 2002, 2014, 2023 (§8.3.5 is common to all editions; Annex E lists no change to separators); the prefixed opening delimiters B\"/N\"/X\"/BX\"/NX\" exist with their literal kinds (2002+ for boolean/national)",
-  "state": "GAP"
+  "notes": "Rule 5 (cite.py --check 8.3.5 \"The opening delimiter shall be immediately preceded by a space, left parenthesis, or opening pseudo-text delimiter\" OK 5)). kb/Work PB1394 LANDED (wave 73 group A): SeparatorRule asks every literal token of either lexer mode (LiteralTokens.Types, the set LiteralScreenDriftTests derives from the grammar) whether the character before its opening delimiter is a space, '(' or '==' and the character after its closing delimiter is a space, ',', ';', '.', ')' or '==', and reports COBOLNET2633 otherwise; touching literals are one report. The prefixed opening delimiters (X\" N\" B\" NX\" BX\") are now always delimited as one token whatever their content (PB1441), so W\"AB\" beside an item W is IDENTIFIER + literal and reported, and X\"GG\" is a malformed hexadecimal literal (COBOLNET2630) rather than X + \"GG\". The parse-recovery guesses COBOL0301/COBOL0302 that stated the rule a second time are removed. Negative: DISPLAY \"AB\"N, MOVE\"AB\", IF \"AB\"=A -> COBOLNET2633 at all four editions.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.5-6",
@@ -9201,13 +9201,13 @@
   "ordinal": 1,
   "subject": "Expressions",
   "rule-digest": "3a65d05eb856",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#booleanFactor; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#BindBoolOperandValue",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName",
+  "test-ref": "conformance:2002/pb1465_boolean_paren_after_operator",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1162 (registrar 15b). Rule 1 (cite.py --check 8.8.2 \"the unary operator B-NOT\" -> OK §8.8.2 1)). booleanFactor admits only B_NOT / LPAREN / valueOperand as a first symbol; BindBoolOperandValue accepts a category-boolean item/ref-mod/boolean function, a boolean literal (incl. folded concatenation), figurative ZERO and ALL B\"...\", and reports COBOLNET1511 for any other operand. PROBES: leading '(' (T07 (B-NOT A) B-AND B=0001), leading B-NOT (p1b), boolean literal and item accepted; leading B-AND rejected (N12, COBOLNET0901 - rejection correct though the message names the reserved-word rule); non-boolean identifier -> 1511 (BooleanOperatorTests.NonBooleanOperand_InBooleanExpression_Rejected1511 covers only that half). ZERO / ALL literal as a leading operand is accepted (p1b ZERO-OR=1100) - consistent with the clause's own operand list and rule 4/5, which presuppose a figurative first operand. test-ref empty: no spec-derived test covers the leading-symbol set as a whole. || REFUTED: PARTIAL — Rule 1 binds EVERY boolean expression, including the nested ones the recursive definition builds (the operand of B-NOT and each operand of a binary operator is itself a boolean expression). The '(' start is honored only at the outermost position. A nested boolean expression that begins with '(' is rejected with COBOL0001 on legal source: after B-NOT, and after B-AND/B-OR. Only the identifier, literal and B-NOT starts work in nested position. The root cause is shared with the Table 4 finding the adjudicator named, but the rule-1 half that admits '(' is realized only at the top level, so CONFORMS overstates it. The enforcement half is sound: a numeric-literal start gets 1511 and a leading B-AND is rejected. || editions as written by the adjudicator: 2002, 2014, 2023 (boolean expressions and B-AND/B-OR/B-XOR/B-NOT are a COBOL-2002 introduction - the in-repo 2023 text's Annex E carries only the 2014->2023 delta, so the 2002 introduction is taken from the clause's absence in 85 and the probe gate COBOLNET0900 at --std 85)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "Rule 1 (cite.py --check 8.8.2 \"the unary operator B-NOT\" OK 1)). kb/Work PB1162 re-verdicted (wave 73 group A): the refuter's PARTIAL was that a NESTED boolean expression beginning with '(' (after B-NOT or a binary operator) was COBOL0001; PB1465 fixed that and its golden pins it after B-NOT (C2, K2, K4) and after B-AND/B-OR/B-XOR (C1, C3, C4, K1, K3). The enforcement half (a numeric start -> COBOLNET1511, a leading B-AND refused) was already sound.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.2-2",
@@ -9231,13 +9231,13 @@
   "ordinal": 3,
   "subject": "Expressions",
   "rule-digest": "63aa6a72049c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#booleanFactor",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName",
+  "test-ref": "conformance:2002/pb1465_boolean_paren_after_operator",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1162 (registrar 15b). Rule 3 (cite.py --check 8.8.2 \"There shall be a one-to-one correspondence between left and right parentheses\" -> OK §8.8.2 3)). booleanFactor's LPAREN booleanExpression RPAREN makes balance structural. PROBES: `(A B-AND B.` -> COBOL0001 missing token (N09); `A B-AND B)` -> COBOL0307 (N15); `( ) B-AND A` -> COBOL0001 (N26); nested `((A B-OR B)) B-AND C` = 0001 accepted. Balanced parentheses in a NON-leading position are wrongly rejected, but by the lexer's subscript capture (the Table 4 finding), not by this rule's enforcement. No spec-derived negative test -> test-ref empty. || REFUTED: PARTIAL — Unbalanced parentheses are rejected, but every correctly paired pair of parentheses outside the expression's leading position is rejected too. The parenthesization facility that rule 3 constrains (and that rule 7a evaluates) works only at the start of an expression. `A B-AND ( B )` has a perfect one-to-one correspondence and still gets COBOL0001. The adjudicator acknowledged this and attributed it to the Table 4 finding, but a verdict on the parentheses rule cannot be CONFORMS while balanced parentheses are refused in most positions. Only the rejection half is verified. || editions as written by the adjudicator: 2002, 2014, 2023 (boolean expressions and B-AND/B-OR/B-XOR/B-NOT are a COBOL-2002 introduction - the in-repo 2023 text's Annex E carries only the 2014->2023 delta, so the 2002 introduction is taken from the clause's absence in 85 and the probe gate COBOLNET0900 at --std 85)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "Rule 3 (cite.py --check 8.8.2 \"There shall be a one-to-one correspondence between left and right parentheses\" OK 3)). kb/Work PB1162 re-verdicted (wave 73 group A): the refuter's PARTIAL was balanced parentheses refused outside the leading position (A B-AND ( B ) -> COBOL0001) by the lexer's subscript capture; PB1465 fixed it, and its golden writes balanced groups after every operator. The rejection half (unbalanced -> COBOL0001 / COBOL0307) was already sound.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.8.2-4",
@@ -9276,13 +9276,13 @@
   "ordinal": 6,
   "subject": "Expressions",
   "rule-digest": "ea02e8512fab",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#OnDefaultLParen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#booleanFactor; src/Cobol.Net.Compiler/Validation/ExpressionFormationPass.cs; src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#booleanFactor",
+  "test-ref": "conformance:2002/pb1465_boolean_paren_after_operator; conformance:2023/boolean_expression_formation",
   "derivation": "",
-  "editions": "2023, 2002, 2014",
-  "notes": "kb/Work PB1162 (registrar 15b). Rule 6 / Table 4 (cite.py --check 8.8.2 \"The permissible combinations of operands, operators, and parentheses in a boolean expression are specified in Table 4\" -> OK §8.8.2 6)). Every '-' cell probed is rejected: (id,id) N16, (id,B-NOT) N22, (id,'(') T11, (binop,binop) N08, (binop,')') T01, (shift,binop) N19, (shift,B-NOT) T02, (shift,'(') N14, (shift,')') T03, (B-NOT,binop) T04, (B-NOT,B-NOT) N10 (COBOLNET1719, conformance:negative/pb158-stacked-bnot), (B-NOT,')') T05, ('(',binop) T06, ('(',')') N26, (')',id) T08, (')',B-NOT) T09, (')','(') T10. P cells accepted: (id,op), (op,id), (op,B-NOT) T12 = 1000, (B-NOT,id), ('(',id), ('(',B-NOT) T07, ('(','('), (')',op), (')',')'). DIVERGES (rejects legal source): the two P cells (B-AND/B-OR/B-XOR, '(') and (B-NOT, '(') fail to parse at every edition - `A B-AND (B B-OR C)`, `A B-XOR (B)`, `B-NOT (A B-AND B)`, `A B-OR B-NOT (B)`, `A B-SHIFT-L 1 B-AND (B)`, and in a relation `IF A B-AND (B B-OR C) = B\"0100\"` -> COBOL0001 'cannot parse construct near' the token after '(' (probes PA PB PC PD T13 T14 T15 T16; PB2 at --std 2002 and 2014 too). Mechanism: OnDefaultLParen pushes SUBSCRIPT mode for a '(' after any token PreviousTokenCouldBeDataName accepts, and B-AND/B-OR/B-XOR/B-NOT are in the data-name token set (legal user words below 2002); only the directive-expression lexer (PrimeDirectiveExpr) is exempted. The (shift-op, operand) cell's operand is also over-wide (an arithmetic expression) - the rule-5 finding. || editions as written by the adjudicator: 2023 only for the shift half (Annex E.2 item 3: 'The boolean operators B-SHIFT-L, B-SHIFT-R, B-SHIFT-LC and B-SHIFT-RC have been added', cite.py --check E.2 OK); the rest 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "Rule 6 (cite.py --check 8.8.2 \"The permissible combinations of operands, operators, and parentheses in a boolean expression are specified\" OK 6)). kb/Work PB1162 re-verdicted (wave 73 group A): Table 4's (B-AND/B-OR/B-XOR, '(') and (B-NOT, '(') pairs were refused by the lexer's edition-blind subscript trigger; kb/Work PB1465 (56098c443) fixed the trigger and its golden pins every operator. Re-probed on the w73a build at 2002/2014/2023: COMPUTE R = A B-AND (B B-OR C) -> 0100, COMPUTE R = B-NOT (A B-AND B) -> 1011.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.2-7",
@@ -9291,13 +9291,13 @@
   "ordinal": 7,
   "subject": "Expressions",
   "rule-digest": "9eaf2902f629",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Expressions/BooleanExpressionResolver.cs#Resolve; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#booleanExpression; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#BindBoolExpr",
-  "test-ref": "unit:BooleanExpressionResolverTests.Groups_Per_Rule7",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName",
+  "test-ref": "unit:BooleanExpressionResolverTests.Groups_Per_Rule7; conformance:2002/pb1465_boolean_paren_after_operator",
   "derivation": "",
-  "editions": "2023, 2002, 2014",
-  "notes": "kb/Work PB1162 (registrar 15b). Rule 7 (cite.py --check 8.8.2 \"If the boolean shift operation is not preceded by another operation, the precedence of that operation is the same as B-AND\" -> OK §8.8.2 7)): parentheses first (7a), B-NOT > B-AND > B-XOR > B-OR (7b), a shift inherits the preceding operation's precedence (B-AND if none), equal precedence left-to-right (7c). BooleanExpressionResolver flattens the tiers and precedence-climbs with PrecAnd 3 / PrecXor 2 / PrecOr 1, shift applied postfix at the inherited precedence. PROBE out/probe/expressions/p1b.cob (--std 2023, A=1100 B=0101 C=0011): A B-OR B B-AND C=1101, A B-AND B B-OR C=0111, A B-OR B B-XOR C=1110, A B-XOR B B-OR C=1011, A B-XOR B B-AND C=1101, B-NOT A B-AND B=0001, A B-XOR B B-XOR C=1010, ((A B-OR B)) B-AND C=0001, A B-SHIFT-L 1 B-SHIFT-RC 2=0010, B-NOT A B-SHIFT-L 1=0110 (shift after B-NOT groups (B-NOT A) first) - all equal the rule-derived values. Unit test Groups_Per_Rule7 pins the groupings (spec-derived), golden conformance:2023/boolean_shift_mixed pins 7b's shift inheritance with discriminating values. PARTIAL because 7a is reachable only for a LEADING parenthesized group: any '(' after B-AND/B-OR/B-XOR/B-NOT is lexed in SUBSCRIPT mode and the parse fails (`A B-AND (B B-OR C)` -> COBOL0001 at every edition, probes PA/PB/PD/T13-T16) - see the Table-4 lexer finding; the precedence-modifying use NOTE 1 describes cannot be written on a right operand. || editions as written by the adjudicator: 2023 only for the shift half (Annex E.2 item 3: 'The boolean operators B-SHIFT-L, B-SHIFT-R, B-SHIFT-LC and B-SHIFT-RC have been added', cite.py --check E.2 OK); the rest 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "Rule 7 (evaluation order, parentheses first). kb/Work PB1162 re-verdicted (wave 73 group A): the PARTIAL was the parenthesized non-leading operand being unwritable (the lexer's subscript capture), not the evaluation order; PB1465's golden evaluates nested groups after every operator (K3 BW B-XOR (BW B-AND BZ) = 1, K4 B-NOT (BZ B-OR (BZ B-AND BW)) = 1).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.2-8",
@@ -57861,13 +57861,13 @@
   "ordinal": 0,
   "subject": "Complex Combined conditions",
   "rule-digest": "77d59cb63e9d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#logicalOrExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#logicalXorExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#logicalAndExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#partialXorExpression; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#BindFlatSequence; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#OnDefaultLParen; src/Cobol.Net.Frontend/Parsing/CobolLexerWordSet.g.cs#_dataNameTokens; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#xorOperator; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#succeedingXorExpression; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitXorOperator; src/Cobol.Net.Frontend/Expressions/LogicalOperatorGate.cs#Check",
-  "test-ref": "conformance:2023/logical_xor; conformance:negative/pb1392-partial-xor-below-2023; unit:ConditionTierConnectiveDriftTests.TheExclusiveOrTokens_AreSpelledOnlyByXorOperator",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#logicalXorExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName",
+  "test-ref": "conformance:2023/logical_xor; conformance:negative/pb1392-partial-xor-below-2023; unit:ConditionTierConnectiveDriftTests.TheExclusiveOrTokens_AreSpelledOnlyByXorOperator; conformance:2023/w73a_xor_parenthesized_condition; conformance:2023/pb1390_abbreviated_tail_xor",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1392, PB1162 (registrar 15b). Rule: condition-1 { {AND|OR|EXCLUSIVE-OR|XOR} condition-2 } ... (braces both levels, one operator per repetition, at least one repetition). cite.py --check 8.8.4.11.2 'condition-1 ┤ ┤              ├ condition-2 ├ …' OK; --check 8.8.4.11.1 \"A combined condition results from connecting conditions with one of the logical operators 'AND', 'OR', 'EXCLUSIVE-OR', or 'XOR'.\" OK; --check 8.8.4.11.3 (Table 5) '| EXCLUSIVE-OR or XOR, OR or AND | No | No | simple-condition, ) | simple-condition, NOT, ( |' OK; --check E.3.2 \"Logical operators have been enhanced to include 'EXCLUSIVE-OR' and 'XOR'.\" OK. Code: grammar condition -> logicalOrExpression (OR loop) -> logicalXorExpression ((XOR|EXCLUSIVE_OR) loop) -> logicalAndExpression (AND loop) -> unaryLogicalExpression (NOT? primaryCondition); ConditionBinder.BindFlatSequence folds each tier into BoundLogical('||'/'^'/'&&'), XOR emitted through RuntimeApi '^' -> CobolBool.Xor. VERIFIED (pinned cobol.exe, probe/ccc/ccc1.cob, --std 2023): XOR truth table T^T=F, T^F=T, F^T(EXCLUSIVE-OR)=T, F^F=F; repetition T XOR T XOR T = T; mixed XOR/EXCLUSIVE-OR 4-operand chain T^T^F^T = T; A OR B XOR C = A OR (B XOR C) (T); F AND T XOR T = T; OR/OR/AND repetition = T; XOR NOT (Table 5 'XOR NOT' pair) = F correctly; AND x4 chain = T. All match the spec. Edition gate VERIFIED (probe g1.cob): `IF A = 1 XOR B = 9` at --std 85/2002/2014 -> COBOLNET0900, at 2023 compiles and runs; XOR as a user data-name at 85/2014 (`01 XOR PIC 9`, `IF XOR = 4 OR A = 9`, `XOR (1:1)`) compiles and runs (probe g2.cob). DEFECT 1 (rejects legal source, all editions where the operator exists = 2023): condition-2 written as a parenthesized condition after XOR / EXCLUSIVE-OR is a raw parse error. Table 5 says an XOR/EXCLUSIVE-OR element 'may be immediately followed by only: simple-condition, NOT, (' - so '(' is explicitly permitted. Probe p.cob --std 2023: `IF A = 1 XOR (B = 9)` -> error COBOL0001: cannot parse construct near 'B'; same for `A = 1 XOR (B = 9 OR C = 3)`, `(A = 1) XOR (B = 9)`, `A = 1 EXCLUSIVE-OR (B = 9)`, and with the '(' on the next line (g6.cob); `A = 1 OR (B = 9 OR C = 3)` and `A = 1 AND (B = 2 OR C = 3)` compile (T); `A = 1 XOR NOT (B = 9)` compiles (F). Spec-derived expected for A=1,B=2,C=3: `A = 1 XOR (B = 9)` -> T; `A = 1 XOR (B = 9 OR C = 3)` -> F. Mechanism: CobolLexer.g4 OnDefaultLParen pushes SUBSCRIPT mode for a '(' whose previous token is in _dataNameTokens (CobolLexerWordSet.g.cs, generated from cobol-words.json subscriptTrigger=true rows); XOR and EXCLUSIVE_OR are in that set (they are user words below 2023) and the decision is edition-blind, so at 2023 - where both are reserved and can only be the operator - the grouping paren is lexed as a subscript and the condition cannot parse. DEFECT 2 (under-rejects): the XOR operator inside an EVALUATE partial-expression (grammar partialXorExpression) is never edition-gated - VersionConformancePass has VisitLogicalXorExpression only, no VisitPartialXorExpression. Probe g4.cob: `EVALUATE A WHEN > 5 XOR B = 2 ...` at --std 2014 compiles and prints W1 with no COBOLNET0900; expected COBOLNET0900 (XOR is a 2023 addition, §E.3.2 4)). Same shape at 85/2002 by the same missing arm. Sibling leads out of this row: (a) the same lexer mechanism breaks `COMPUTE BR = BA B-AND (BC B-OR BD)` at 2023 (probe g7.cob, COBOL0001 near 'BC'; expected B\"1000\") - §8.8.2 boolean expressions; (b) an abbreviated relation after XOR (`IF A = 1 XOR = 2`, `IF A = 1 XOR 2`, `WHEN > 5 XOR < 3`) is a parse error because logicalXorExpression's right operand is logicalAndExpression with no abbreviatedRelation / abbreviatedAndChain alternative, while §8.8.4.12.2's format lists EXCLUSIVE-OR/XOR (FMT-8.8.4.12.2 row, not this slice). No kb/Work note owns either defect (searched kb/Work for XOR/EXCLUSIVE-OR: PB398/400/445/590/726/787 etc. do not cover it). test-ref conformance:2023/logical_xor covers the plain XOR truth table and precedence only; negative/xor_below_2023 covers the gate on the full-condition arm. || editions as written by the adjudicator: AND / OR forms: 85, 2002, 2014, 2023. EXCLUSIVE-OR / XOR: 2023 only (§E.3.2 4) 'Logical operators have been enhanced to include 'EXCLUSIVE-OR' and 'XOR'.'; both words added as reserved words in the same annex). retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#BindXorSequence (kb/Work PB1392/PB1390 (wave 68 s): BindXorSequence was a one-line wrapper over BindFlatSequence and is deleted; the tier-keyed XOR gate VisitLogicalXorExpression became VisitXorOperator over the one xorOperator rule (LogicalOperatorGate), both witnessed on this row) retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitLogicalXorExpression (kb/Work PB1392/PB1390 (wave 68 s): BindXorSequence was a one-line wrapper over BindFlatSequence and is deleted; the tier-keyed XOR gate VisitLogicalXorExpression became VisitXorOperator over the one xorOperator rule (LogicalOperatorGate), both witnessed on this row)",
-  "state": "GAP"
+  "editions": "2023",
+  "notes": "cite.py --check 8.8.4.11.2 \"AND, OR, EXCLUSIVE-OR, and XOR are underlined in the printed standard (required words). Both\" OK. kb/Work PB1162 re-verdicted (wave 73 group A): the finding was a '(' after XOR / EXCLUSIVE-OR lexed in SUBSCRIPT mode at 2023; PB1465's reservation-aware trigger fixed it (both words are reserved at 2023). Golden: A = 1 XOR (B = 9) -> T, A = 1 EXCLUSIVE-OR (B = 9 OR C = 3) -> F, (A = 9) XOR (B = 2) -> T, each derived from Table 5 and the truth of XOR.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.8.4.12.2",
@@ -59706,13 +59706,13 @@
   "ordinal": 0,
   "subject": "RETRY phrase",
   "rule-digest": "614c868d9983",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#retryPhrase; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#OnDefaultLParen; src/Cobol.Net.Frontend/Parsing/CobolLexerWordSet.g.cs#_dataNameTokens",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#retryPhrase; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousTokenCouldBeDataName",
+  "test-ref": "conformance:2014/w73a_retry_parenthesized_count; conformance:2023/l1m8_rewrite_format_phrases",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1162 (registrar 14c). The parser rule `retryPhrase : RETRY (arithmeticExpression TIMES | FOR? arithmeticExpression SECONDS | FOREVER)` matches the printed format (one of three alternatives, FOR optional) and is wired into OPEN (before the file-name list), READ (bracket 1), WRITE, REWRITE, DELETE and DELETE FILE; probes at --std 2002/2014/2023 accept `RETRY N TIMES`, `RETRY N + 1 TIMES`, `RETRY N ** 2 TIMES`, `RETRY FOR (N) SECONDS`, `RETRY FUNCTION ABS(N) TIMES`, `RETRY FOREVER` on every verb, and --std 85 rejects (conformance:negative/retry_below_2002). DEFECT: an arithmetic-expression that BEGINS with '(' directly after RETRY is rejected at every edition: `READ F RETRY (N) TIMES`, `READ F RETRY (1) TIMES`, `WRITE R RETRY (N + 1) TIMES`, `OPEN INPUT RETRY (N) TIMES F`, `DELETE F RECORD RETRY (N) TIMES`, `DELETE FILE F RETRY (N) TIMES` all give COBOL0001 'cannot parse construct near N'. Cause: RETRY is in the lexer's edition-blind subscript-trigger set `_dataNameTokens` (it is a legal user word below 2002), so OnDefaultLParen pushes SUBSCRIPT mode for the '(' even at 2002+ where §8.9 reserves RETRY and it can never be a data-name. cite.py --check 8.8.1.1 \"or an arithmetic expression enclosed in parentheses\" -> OK. Expected: all six compile. Probes: out/probe/retry-phrase/e1..e7.cob, e101..e104.cob. [editions as adjudicated: 2002, 2014, 2023 (the RETRY phrase is a COBOL-2002 facility; 2023 Annex E lists no change to 14.7.9)]",
-  "state": "GAP"
+  "editions": "2014, 2023",
+  "notes": "cite.py --check 14.7.9.2 OK (General format: RETRY { arithmetic-expression-1 TIMES | FOR arithmetic-expression-2 SECONDS | FOREVER }). kb/Work PB1162 re-verdicted (wave 73 group A): the finding was the '(' right after RETRY opening SUBSCRIPT mode, so RETRY (N) TIMES was COBOL0001. kb/Work PB1465 (56098c443) made the subscript trigger ask the compile's own reservation (a word ReservedWordSet refuses as a user word never triggers), and RETRY is reserved from 2014, so the '(' now groups. Re-probed on the w73a build: READ F RETRY (N) TIMES, WRITE R RETRY (N + 1) TIMES and OPEN INPUT RETRY (N) TIMES F compile at 2014 and 2023. Golden: WRITE R RETRY (N + 1) TIMES then READ F RETRY (N) TIMES on a relative file -> W 00, R 00 REC1 (14.7.9.3 GR4 acts only after a conflict).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-14.9.1.2",

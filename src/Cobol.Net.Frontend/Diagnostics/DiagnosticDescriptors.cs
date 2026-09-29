@@ -476,10 +476,6 @@ public static partial class DiagnosticDescriptors
     // ══════════════════════════════════════
     public static readonly DiagnosticDescriptor COBOL0300 = new("COBOL0300", DiagnosticSeverity.Warning,
         "THROUGH/THRU is not recognized in this context. Check PERFORM or VALUE THROUGH syntax.");
-    public static readonly DiagnosticDescriptor COBOL0301 = new("COBOL0301", DiagnosticSeverity.Warning,
-        "Missing space before string literal.");
-    public static readonly DiagnosticDescriptor COBOL0302 = new("COBOL0302", DiagnosticSeverity.Warning,
-        "Missing space after string literal.");
     public static readonly DiagnosticDescriptor COBOL0303 = new("COBOL0303", DiagnosticSeverity.Warning,
         "In a MOVE statement, did you forget TO before the target?");
     public static readonly DiagnosticDescriptor COBOL0304 = new("COBOL0304", DiagnosticSeverity.Warning,
@@ -549,6 +545,20 @@ public static partial class DiagnosticDescriptors
         DiagnosticSeverity.Error, "{0}");
     public static readonly DiagnosticDescriptor COBOLNET2419 = new(
         CobolNet.Editions.Diagnostics.DiagnosticCatalog.PictureTrailingSymbolNotLast.Code,
+        DiagnosticSeverity.Error, "{0}");
+
+    // ══════════════════════════════════════
+    // COBOLNET2631–2633: the §8.3.5 separator-context rules (kb/Work PB1394), decided post-lex by SeparatorRule over
+    // the source characters around each token and reported through the syntax-error listener beside 2419.
+    // ══════════════════════════════════════
+    public static readonly DiagnosticDescriptor COBOLNET2631 = new(
+        CobolNet.Editions.Diagnostics.DiagnosticCatalog.SeparatorCommaWithoutSpace.Code,
+        DiagnosticSeverity.Error, "{0}");
+    public static readonly DiagnosticDescriptor COBOLNET2632 = new(
+        CobolNet.Editions.Diagnostics.DiagnosticCatalog.SeparatorPeriodWithoutSpace.Code,
+        DiagnosticSeverity.Error, "{0}");
+    public static readonly DiagnosticDescriptor COBOLNET2633 = new(
+        CobolNet.Editions.Diagnostics.DiagnosticCatalog.SeparatorLiteralDelimiter.Code,
         DiagnosticSeverity.Error, "{0}");
 
     // ══════════════════════════════════════

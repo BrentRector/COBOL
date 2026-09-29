@@ -223,10 +223,22 @@ tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
     private void OnSignedLiteral(int signedType)
     {
         if (SignedLiteralCanStart()) { Type = signedType; return; }
-        int start = TokenStartCharIndex;
-        Type = InputStream.LA(start - InputStream.Index) == '+' ? PLUS : MINUS;
-        InputStream.Seek(start + 1);
-        Column = TokenStartColumn + 1;
+        Type = InputStream.LA(TokenStartCharIndex - InputStream.Index) == '+' ? PLUS : MINUS;
+        CutTokenTo(1);
+    }
+
+    // ⛔ THE ONE WAY AN ACTION GIVES BACK PART OF ITS MATCH (kb/Work PB1728). Ending a token early is two facts, not
+    // one: where the input resumes AND the column the next token starts at — the lexer's Column is advanced by the
+    // match and is NOT recomputed by a Seek. PIC_STRING's two trims used to Seek back over the separator alone, so
+    // every token after `PIC 9,` on that line reported a column one too high (`01 Y PIC 9, VALUE 1.`: VALUE at 26,
+    // correct 25) and every diagnostic anchored there pointed one column right. The token's text follows from the
+    // cut (ANTLR reads it from the input interval the token spans), so no caller sets Text. Every caller cuts a
+    // match that holds no line break — a sign and its digits, a PICTURE character-string — which is what makes the
+    // column arithmetic exact; Line is untouched for the same reason.
+    private void CutTokenTo(int length)
+    {
+        InputStream.Seek(TokenStartCharIndex + length);
+        Column = TokenStartColumn + length;
     }
 
     public override Antlr4.Runtime.IToken NextToken()
@@ -942,14 +954,23 @@ fragment STR_BODY  : '"' (~["\r\n] | '""')* '"' | '\'' (~['\r\n] | '\'\'')* '\''
 // a hexadecimal literal "one FORM of an alphanumeric literal, not a separate kind of thing" (CobolLiteral's own
 // words) — and that split is why its decoding had to be added at FOUR separate call sites, the fourth being a
 // silent VALUE-clause miscompile. A second token here would have bought the same bill twice over.
-// ⚠ ZERO LENGTH IS `*`, NOT `+`, and the standard says so in both places: §8.3.3.5.3 NOTE 2 "Hexadecimal-national
-// literals can be of zero length" and §8.3.3.4.3 NOTE "Hexadecimal-boolean literals can be of zero length".
-// Format 1's `[01]+` is left exactly as it was — widening THAT is §8.3.3.4.4 GR4, a different change set.
-fragment HEXDIGITS : [0-9a-f]* ;                                                     // caseInsensitive covers A-F
+// ⛔ A PREFIXED LITERAL'S BODY IS ANY QUOTED CONTENT — THE LEXER DELIMITS, IT DOES NOT JUDGE THE CONTENT (kb/Work
+// PB1441, PB1394). §8.3.5 5) makes `X"`, `N"`, `B"` and the three-character `NX"` / `BX"` OPENING DELIMITERS, so
+// once one is written the character-string can only be a literal of that format, well formed or not. The bodies
+// used to spell each format's REPERTOIRE — `[0-9a-f]*` for X, NX and BX, `[01]*` for B — and a body outside it
+// failed the whole alternative, so maximal munch fell back to IDENTIFIER `X` + a Format 1 STRINGLIT: beside a
+// data item named X, `DISPLAY X"GG"` compiled and printed the item followed by GG, and `MAX(NX"00G1")` answered
+// the item's value. The repertoire rules — §8.3.3.2.3 SR5 and §8.3.3.5.3 SR4 (hexadecimal digits), §8.3.3.4.3
+// SR3 (a hexadecimal digit) and SR2 (a boolean character, '0' or '1') — are now asked of the whole token by
+// LiteralScreenPass (CobolLiteral.RepertoireViolation → COBOLNET2630), beside the §8.3.3 grouping and length
+// rules it already asked: the token must MATCH so something is left to diagnose (the R03 doctrine this block
+// began with). Every prefixed body is therefore STR_BODY, doubled delimiters included, so no content can split one.
+// ⚠ ZERO LENGTH IS LEGAL IN EVERY FORMAT, and STR_BODY admits it: §8.3.3.5.3 NOTE 2 "Hexadecimal-national literals
+// can be of zero length", §8.3.3.4.3 NOTE "Hexadecimal-boolean literals can be of zero length", §8.3.3.4.4 GR4 for
+// Format 1 boolean (kb/Work PB65), §8.3.3.2.3 NOTE 2 for X (PB59).
 // Hexadecimal-alphanumeric X"…" / X'…' (§8.3.3.2.2 Format 2 — the printed page shows BOTH delimiters with
 // the hex sequence OPTIONAL, verified at 300 dpi 2026-08-09): one body, both delimiters, zero length legal —
-// the Group-B discipline. The apostrophe arm used to hard-code `+`, so X'' split into IDENTIFIER + a
-// zero-length Format-1 literal and NATIONAL-OF(X'') drew 1546 on the WRONG argument (PB59 / AR-15.66.3-3).
+// the Group-B discipline.
 // ⛔ SUB_HEXLIT IS ITS SUBSCRIPT-MODE TWIN (kb/Work PB1393). The keyword-omitted intrinsic capture re-lexes its
 // argument text in DEFAULT mode, so the VALUE never needed the twin (PB59 measured that); the literal SYNTAX
 // SCREEN does. LiteralScreenPass asks the §8.3.3 length and grouping rules of every literal TOKEN of the unit's
@@ -957,13 +978,11 @@ fragment HEXDIGITS : [0-9a-f]* ;                                                
 // SUBSCRIPT-mode token or not at all. Without the twin, `LENGTH(X"414")` lexed here as SUB_IDENTIFIER `X` +
 // SUB_STRINGLIT `"414"` and the malformed hexadecimal literal decoded to "" in silence. LiteralScreenDriftTests
 // requires every token defined over one of these literal body fragments to be in the screen's token set.
-fragment HEX_BODY  : [x] '"' HEXDIGITS '"' | [x] '\'' HEXDIGITS '\'' ;
+fragment HEX_BODY  : [x] STR_BODY ;                                                  // §8.3.3.2.2 Format 2
 fragment NAT_BODY  : 'N' STR_BODY                                                    // NATLIT / SUB_NATLIT F1
-                   | 'NX' '"' HEXDIGITS '"'                                          // §8.3.3.5.2 Format 2
-                   | 'NX' '\'' HEXDIGITS '\'' ;
-fragment BOOL_BODY : 'B' '"' [01]* '"' | 'B' '\'' [01]* '\''                         // BOOLLIT / SUB_BOOLLIT F1 — ZERO length is legal (§8.3.3.4.4 GR4; kb/Work PB65)
-                   | 'BX' '"' HEXDIGITS '"'                                          // §8.3.3.4.2 Format 2
-                   | 'BX' '\'' HEXDIGITS '\'' ;
+                   | 'NX' STR_BODY ;                                                 // §8.3.3.5.2 Format 2
+fragment BOOL_BODY : 'B' STR_BODY                                                    // BOOLLIT / SUB_BOOLLIT F1
+                   | 'BX' STR_BODY ;                                                 // §8.3.3.4.2 Format 2
 fragment INT_BODY  : [0-9]+ ;                                                        // INTEGERLIT / SUB_INTEGERLIT
 fragment DEC_BODY  : [0-9]+ '.' [0-9]+ | '.' [0-9]+ ;                                // DECIMALLIT / SUB_DECIMALLIT
 // ⛔ THE UNDERSCORE IS A COBOL WORD CHARACTER AND HAS BEEN SINCE COBOL-2002 (fix-queue R02). §8.3.2.1: "Each
@@ -1030,19 +1049,20 @@ INTEGERLIT  : INT_BODY ;
 STRINGLIT   : STR_BODY ;
 // National literal N"…" / N'…' (ISO §8.3.3.5, COBOL-2002). The leading N is part of the token so
 // ANTLR's maximal-munch prefers it over IDENTIFIER (a bare N) and over a plain STRINGLIT; an
-// identifier such as NAME is unaffected (it has no opening quote). NX"…" (hex national) is deferred.
+// identifier such as NAME is unaffected (it has no opening quote). NX"…" (Format 2, hexadecimal-national) is
+// the same token (fix-queue R03).
 NATLIT      : NAT_BODY ;
 // ⚠ ZERO LENGTH IS LEGAL IN BOTH DELIMITERS — §8.3.3.2.3 NOTE 2, "Hexadecimal-alphanumeric literals can be
 // of zero length", and §8.3.3.2.2 Format 2 brackets the hex sequence under BOTH delimiter spellings (page
 // rendered and verified — PB59). The quotation arm's `+` was fixed by R03's sweep; the APOSTROPHE arm kept
 // its `+` until PB59, so X'' split into IDENTIFIER + a zero-length Format-1 literal — the same silent-split
-// hole, one delimiter over. The GROUPING rule (§8.3.3.2.3 r6, pairs of digits) is enforced at bind by
-// CobolLiteral.HexGroupViolation, not here: a lexer that refused an odd count would put the literal back in
-// the silent-split hole this whole item exists to close.
+// hole, one delimiter over. The GROUPING rule (§8.3.3.2.3 r6, pairs of digits) and the REPERTOIRE rule (SR5,
+// hexadecimal digits) are asked by LiteralScreenPass, not here: a lexer that refused an odd count or a non-hex
+// digit would put the literal back in the silent-split hole this whole item exists to close (see HEX_BODY).
 HEXLIT      : HEX_BODY ;
-// Boolean literal B"0101" / B'0101' (binary digits only; ISO §8.3.3.4, COBOL-2002). The leading B is part
-// of the token so maximal-munch prefers it over IDENTIFIER (a bare B) and over a plain STRINGLIT ("B"…").
-// BX"…" (hex boolean) is deferred.
+// Boolean literal B"0101" / B'0101' (ISO §8.3.3.4, COBOL-2002). The leading B is part of the token so
+// maximal-munch prefers it over IDENTIFIER (a bare B) and over a plain STRINGLIT. BX"…" (Format 2,
+// hexadecimal-boolean) is the same token; neither body is judged here (§8.3.3.4.3 SR2/SR3 — see HEX_BODY).
 BOOLLIT     : BOOL_BODY ;
 
 // ── Operators (multi-char before single-char) ──
@@ -1052,6 +1072,8 @@ LTEQUAL     : '<=' ;
 GTEQUAL     : '>=' ;
 NOTEQUAL    : '<>' ;
 
+// A period is a separator only when a space follows it (§8.3.5 rule 3). The token is every period the literal and
+// PICTURE rules did not take; SeparatorRule reports one with no space after it (COBOLNET2632, kb/Work PB1394).
 DOT         : '.' ;
 // P7 Step 12: inside a FUNCTION-argument region the ','/';'-plus-space separator (§8.3.5 rules 1/2) is a REAL
 // token — the argument boundary must survive to the parser: a '(' right after it opens a PARENTHESIZED
@@ -1063,7 +1085,8 @@ DOT         : '.' ;
 // ⛔ never a predicate choosing between two rules (kb/Work PB1715): the predicate this rule carried kept every
 // `, ` and `; ` of every compile off the cached DFA, and the unpredicated twin it needed is gone with it.
 FNARG_SEPARATOR : [,;] [ \t\r\n]+ { if (!InFunctionArgs()) Skip(); } ;
-// A comma NOT followed by whitespace is preserved for DECIMAL-POINT IS COMMA.
+// A comma NOT followed by whitespace is preserved for DECIMAL-POINT IS COMMA, where it is a numeric literal's
+// decimal point; anywhere else it is no separator (§8.3.5 rule 2) and SeparatorRule reports it (COBOLNET2631).
 COMMA       : ',' ;
 LPAREN      : '(' { OnDefaultLParen(); } ;
 RPAREN      : ')' { OnDefaultRParen(); } ;
@@ -1092,7 +1115,10 @@ COLON       : ':' ;
 // every other separator-adjacent operator (e.g. '::' §8.7.4) already has. '&' has no other lexical role,
 // so the token is unambiguous with or without the spaces.
 AMPERSAND   : '&' ;
-SEMICOLON   : ';' -> skip ;   // a ';' with no space after it (the §8.3.5 separator `; ` is FNARG_SEPARATOR above)
+// A ';' with no space after it (the §8.3.5 separator `; ` is FNARG_SEPARATOR above). It is no separator (§8.3.5 rule
+// 2), and SeparatorRule reports it (COBOLNET2631) — so it rides the HIDDEN channel, where that post-lex rule sees it and
+// the parser does not, rather than being skipped out of existence (kb/Work PB1394).
+SEMICOLON   : ';' -> channel(HIDDEN) ;
 
 // ── Catch-all for unrecognized characters ──
 
@@ -1121,12 +1147,11 @@ PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
     {
         // Handle PIC "999999999999.." — greedy match consumed sentence-ending period.
         // If the PIC string ends with '.' and the char that caused the match was also '.',
-        // trim the trailing period and back up so it becomes a DOT token.
+        // trim the trailing period and back up so it becomes a DOT token (CutTokenTo: the input AND the column).
         var t = Text;
         if (t.Length > 1 && t[t.Length - 1] == '.')
         {
-            Text = t.Substring(0, t.Length - 1);
-            InputStream.Seek(InputStream.Index - 1);
+            CutTokenTo(t.Length - 1);
         }
         // A trailing ',' or ';' IMMEDIATELY FOLLOWED BY A SPACE is the CLAUSE SEPARATOR over-captured by the
         // greedy match (ISO §8.3.5 rule 2) — `77 X PIC 99, VALUE 3.` must lex the picture as "99" (VCR Table 7
@@ -1141,8 +1166,7 @@ PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
             int la = InputStream.LA(1);
             if (la == ' ' || la == '\t' || la == '\r' || la == '\n' || la == Antlr4.Runtime.IntStreamConstants.EOF)
             {
-                Text = t.Substring(0, t.Length - 1);
-                InputStream.Seek(InputStream.Index - 1);
+                CutTokenTo(t.Length - 1);
             }
         }
     } -> popMode ;

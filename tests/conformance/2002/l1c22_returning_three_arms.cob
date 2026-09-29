@@ -25,8 +25,9 @@
       *>  R3: factory METHOD TWICE of class L1C22K, PROCEDURE DIVISION
       *>      USING L-N RETURNING L-R, L-R = L-N * 2; INVOKE ... USING
       *>      W-M (21) RETURNING W-R: R3=000042.
-      *>  R4: the same method through inline invocation L1C22K::"TWICE"
-      *>      with W-K = 50; its value is the returning item: R4=000100.
+      *>  R4: the same method through inline invocation L1C22K ::
+      *>      "TWICE" with W-K = 50; its value is the returning item:
+      *>      R4=000100.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C22P IS PROTOTYPE.
        DATA DIVISION.
@@ -59,7 +60,7 @@
            INVOKE L1C22K "TWICE" USING W-M RETURNING W-R
            DISPLAY "R3=" W-R
            MOVE 0 TO W-R
-           MOVE L1C22K::"TWICE"(W-K) TO W-R
+           MOVE L1C22K :: "TWICE" (W-K) TO W-R
            DISPLAY "R4=" W-R
            STOP RUN.
        END PROGRAM L1C22A.

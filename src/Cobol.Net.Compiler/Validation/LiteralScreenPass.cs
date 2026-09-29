@@ -6,8 +6,8 @@ using CobolNet.Binding;              // EditionContext, DiagnosticCursorAt
 using CobolNet.Common;               // CobolLiteral — the ONE literal codec and its shape rules
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog
 using CobolNet.Frontend.Expressions; // ArithmeticFormationRules — the ONE §8.3.3.3.2 rule-2 contiguity test
-using CobolNet.Frontend.Generated;   // CobolLexer token types
-using CobolNet.Frontend.Parsing;     // WrittenSource — a node's text as written, spacing intact
+using CobolNet.Frontend.Generated;   // CobolParserCore contexts of the signed literal slots
+using CobolNet.Frontend.Parsing;     // LiteralTokens — the ONE literal token set; WrittenSource — a node's text as written
 
 namespace CobolNet.Validation;
 
@@ -20,7 +20,11 @@ namespace CobolNet.Validation;
 /// (<see cref="CobolLiteral.LengthViolation"/> → <c>COBOLNET0814</c>);</item>
 /// <item>the hexadecimal GROUPING rule — §8.3.3.2.3 SR6 (<c>X"…"</c>, pairs) and §8.3.3.5.3 SR5 (<c>NX"…"</c>, groups
 /// of four); a <c>BX"…"</c> literal has none (<see cref="CobolLiteral.HexGroupViolation"/> →
-/// <c>COBOLNET1635</c>).</item>
+/// <c>COBOLNET1635</c>);</item>
+/// <item>the content REPERTOIRE rule of the prefixed formats — §8.3.3.2.3 SR5 (<c>X"…"</c>) and §8.3.3.5.3 SR4
+/// (<c>NX"…"</c>) hexadecimal digits, §8.3.3.4.3 SR3 (<c>BX"…"</c>) a hexadecimal digit, §8.3.3.4.3 SR2
+/// (<c>B"…"</c>) '0' or '1' (<see cref="CobolLiteral.RepertoireViolation"/> → <c>COBOLNET2630</c>). The lexer delimits
+/// a prefixed literal whatever its content (kb/Work PB1441), so this screen is the only place the rule is asked.</item>
 /// <item>the SIGN rule — §8.3.3.3.2 2), a numeric literal's sign is its leftmost character — over the two grammar
 /// rules that parse a sign as a separate token (<c>signedNumericLiteral</c>, <c>signedIntegerLiteral</c>): a sign
 /// separated from its digits is refused (<c>COBOLNET2155</c>; kb/Work PB1445). Not a token rule, but a rule of the
@@ -42,7 +46,7 @@ namespace CobolNet.Validation;
 /// function argument list (<c>FunctionArgFragment</c>) or a subscript expression; those fragment trees are never
 /// walked here, and do not need to be, because each of their literals was already a <c>SUB_*</c> literal token of
 /// this tree. That argument holds only while every literal format has a SUBSCRIPT-mode twin — which is why
-/// <c>SUB_HEXLIT</c> exists — and <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokenTypes"/> from the
+/// <c>SUB_HEXLIT</c> exists — and <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokens.Types"/> from the
 /// lexer grammar (every token whose body is a literal fragment), so a new literal token cannot escape the screen.</para>
 /// <para>Edition-invariant: the rules carry no edition qualifier in the text the repository holds, and the checks
 /// they replace ran at every <c>--std</c>. It is a sibling of <see cref="ExpressionFormationPass"/> on the same
@@ -51,15 +55,6 @@ namespace CobolNet.Validation;
 /// </remarks>
 internal static class LiteralScreenPass
 {
-    /// <summary>The token types that ARE a literal of class alphanumeric, boolean or national: the four DEFAULT-mode
-    /// literal tokens and their SUBSCRIPT-mode twins. Derived-and-pinned: <c>LiteralScreenDriftTests</c> reads the
-    /// lexer grammar and requires this set to equal the tokens defined over a literal body fragment.</summary>
-    internal static readonly IReadOnlySet<int> LiteralTokenTypes = new HashSet<int>
-    {
-        CobolLexer.STRINGLIT, CobolLexer.HEXLIT, CobolLexer.NATLIT, CobolLexer.BOOLLIT,
-        CobolLexer.SUB_STRINGLIT, CobolLexer.SUB_HEXLIT, CobolLexer.SUB_NATLIT, CobolLexer.SUB_BOOLLIT,
-    };
-
     /// <summary>Screen every literal token of <paramref name="tree"/>, reporting to <paramref name="edition"/> at the
     /// token's own position.</summary>
     public static void Run(IParseTree tree, EditionContext edition)
@@ -71,7 +66,7 @@ internal static class LiteralScreenPass
             var node = pending.Pop();
             if (node is ITerminalNode t)
             {
-                if (LiteralTokenTypes.Contains(t.Symbol.Type)) Screen(t, edition);
+                if (LiteralTokens.Types.Contains(t.Symbol.Type)) Screen(t, edition);
                 continue;
             }
             if (SignedSlot(node) is ({ } sign, { } first)) ScreenSign(node, sign, first, edition);
@@ -109,24 +104,18 @@ internal static class LiteralScreenPass
             + $"separator (ISO §8.3.5). Write `{sign.Text}{first.Text}` if the sign belongs to the literal.");
     }
 
-    /// <summary>The two rules, in precedence order: a malformed hexadecimal literal has no value to measure, so the
-    /// grouping violation is the one reported for it.</summary>
+    /// <summary>The first of the three rules the literal violates, in <see cref="CobolLiteral.SyntaxViolation"/>'s one
+    /// order, reported at the token under the rule's own descriptor.</summary>
     private static void Screen(ITerminalNode t, EditionContext edition)
     {
         string raw = t.GetText();
-        if (CobolLiteral.HexGroupViolation(raw) is { } grouping)
+        if (CobolLiteral.SyntaxViolation(raw) is not { } v) return;
+        using var _ = edition.At(t.Symbol);
+        edition.Error(v.Rule switch
         {
-            using var _ = edition.At(t.Symbol);
-            edition.Error(DiagnosticCatalog.HexLiteralDigitGrouping, $"the literal {raw} {grouping}");
-        }
-        else if (CobolLiteral.LengthViolation(raw) is { } length)
-        {
-            using var _ = edition.At(t.Symbol);
-            edition.Error(DiagnosticCatalog.LiteralTooLong, $"the literal {Abbreviated(raw)} {length}");
-        }
+            LiteralRule.Repertoire => DiagnosticCatalog.LiteralContentRepertoire,
+            LiteralRule.HexGrouping => DiagnosticCatalog.HexLiteralDigitGrouping,
+            _ => DiagnosticCatalog.LiteralTooLong,
+        }, $"the literal {CobolLiteral.Abbreviated(raw)} {v.Message}");
     }
-
-    /// <summary>An over-long literal is by definition too long to quote whole in a diagnostic: its first and last few
-    /// characters identify it.</summary>
-    private static string Abbreviated(string raw) => raw.Length <= 40 ? raw : raw[..24] + "…" + raw[^8..];
 }
