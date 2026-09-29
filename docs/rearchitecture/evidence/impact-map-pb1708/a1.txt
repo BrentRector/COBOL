@@ -1,0 +1,262 @@
+== 69 Y 4d9fead76: files 86 total map_selected 9252
+    9236 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs   | a change at line 2619 outside every method — the file level, plus the 38 executed file(s) naming its types
+    9000 src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 500 outside every method — the file level, plus the 192 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs   | a change at line 147 outside every method — the file level, plus the 31 executed file(s) naming its types
+    8977 src/Cobol.Net.Compiler/Binding/DataBinder.cs   | 6 changed method(s) .ctor, BindEntry, BindFileSection, IsLiteralValueOperand, ReportNonLiteralValueOperand, UsageInheritanceElemen
+    8977 src/Cobol.Net.Compiler/Binding/PredefinedNullRule.cs   | status A — the file level, plus the 8 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs   | a change at line 601 outside every method — the file level, plus the 7 executed file(s) naming its types
+    8909 src/Cobol.Net.Compiler/Binding/BinderDriver.cs   | 1 changed method(s) BindUnitData
+    7746 tests/Cobol.Net.Tests.Unit/PredefinedNullContextDriftTests.cs   | status A — the file level, plus the 3 executed file(s) naming its types
+    7196 src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs   | 2 changed method(s) CandidateClasses, ClassOf
+    6045 src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs   | 5 changed method(s) FigurativeOperand, NonNumericInNumericContext, NonNumericLiteralOperand, NullAdmittingOperand, RefusePredefine
+    4040 src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs   | 1 changed method(s) Visit
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2560 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs   | 2 changed method(s) BindBoolOperandValue, ComparisonOperandOf
+    2414 src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs   | 1 changed method(s) Visit
+    2362 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs   | 4 changed method(s) BindClose, BindOpen, BindRewrite, BindWrite
+     982 src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs   | 2 changed method(s) Fill, FillChar
+     977 src/Cobol.Net.Compiler/Binding/Procedure/SendingValueTemp.cs   | 1 changed method(s) Model
+     761 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs   | 1 changed method(s) BindSet
+     478 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs   | 2 changed method(s) BindCall, ByValueLiteralAdmitted
+     413 src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs   | 1 changed method(s) Visit
+     353 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs   | 2 changed method(s) OoBindInvocationArg, OoBindInvoke
+       0 src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4  WHOLE: src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4: a grammar, build or source-generator input — every assembly | 
+       0 src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4  WHOLE: src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4: a grammar, build or source-generator input — every as | 
+       0 src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4  WHOLE: src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4: a grammar, build or source-generator input — every assembly ma | 
+== 69 Z 63213d7f8: files 55 total map_selected 9238
+    9229 src/Cobol.Net.Compiler/Binding/BinderDriver.cs   | a change at line 700 outside every method — the file level, plus the 36 executed file(s) naming its types
+    9229 src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs   | a change at line 82 outside every method — the file level, plus the 183 executed file(s) naming its types
+    9229 src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs   | a change at line 199 outside every method — the file level, plus the 192 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/BindSession.cs   | a change at line 45 outside every method — the file level, plus the 4 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Model/IndexDeclaration.cs   | a change at line 60 outside every method — the file level, plus the 8 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Oo/NamingConvention.cs   | a change at line 82 outside every method — the file level, plus the 15 executed file(s) naming its types
+    8977 src/Cobol.Net.Compiler/Binding/DataBinder.Ptr.cs   | 2 changed method(s) PtrBindBasedAndAddressables, PtrResolveAddressOfTarget
+    8950 src/Cobol.Net.Compiler/Binding/TurnState.cs   | 1 changed method(s) EnabledAtHeader
+    7287 src/Cobol.Net.Compiler/Binding/Model/SymbolTable.cs   | 4 changed method(s) <IndexCandidates>b__0, IndexCandidates, NearestDeclaring, TryResolveUnqualified
+    6915 src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs   | 2 changed method(s) OoTryBindPropertyReference, ResolveUnqualified
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/2014/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/2023/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2289 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs   | 1 changed method(s) FunctionPointerNamed
+    1515 src/Cobol.Net.Compiler/Binding/DataBinder.cs   | 2 changed method(s) <QualifiedCandidates>b__309_0, QualifiedCandidates
+     482 src/Cobol.Net.Compiler/Oo/OoDriver.cs   | 1 changed method(s) BindClassBody
+     378 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs   | 1 changed method(s) ConditionOf
+== 69 X cfb312fbb: files 73 total map_selected 9256
+    9238 src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs   | a change at line 63 outside every method — the file level, plus the 10 executed file(s) naming its types
+    9228 src/Cobol.Net.Editions/Constructs.g.cs   | declarations only (no method of it has sequence points) — the file level, plus the 29 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Pipeline/Frontend.cs   | 1 changed method(s) Preprocess
+    9225 src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs   | a change at line 69 outside every method — the file level, plus the 29 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs   | a change at line 54 outside every method — the file level, plus the 11 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/TextWord.cs   | 4 changed method(s) CommentStartsAt, HoldsComment, IsDebugLineCarrierAt, TryNext
+    8079 tests/Cobol.Net.Tests.Conformance/EditionHarness.cs   | a change at line 26 outside every method — the file level, plus the 97 executed file(s) naming its types
+    5777 src/Cobol.Net.Editions/ConstructRegistry.g.cs   | 1 changed method(s) .cctor
+    3574 tests/Cobol.Net.Tests.Conformance/CorpusRunnerTests.cs   | a change at line 180 outside every method — the file level, plus the 5 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2529 tests/version-matrix/constructs.json   | read by 6 test source file(s) that name 'constructs.json'
+    1473 tests/Cobol.Net.Tests.Conformance/VersionMatrixTests.cs   | 20 changed method(s) .ctor, <LoadCatalogue>b__15_0, <LoadCatalogue>b__15_1, Construct_MatchesEditionExpectation, IntroducedConstru
+== 68 W a9203e66b: files 26 total map_selected 9000
+    8998 src/Cobol.Net.Runtime/Control/ProgramTable.cs   | a change at line 59 outside every method — the file level, plus the 37 executed file(s) naming its types
+    8981 src/Cobol.Net.Runtime/Control/CobolObject.cs  WHOLE: 2 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 82 outside every method — the file level, plus the 22 executed file(s) naming its types
+    8980 src/Cobol.Net.Runtime/Control/ExternalStore.cs   | a change at line 25 outside every method — the file level, plus the 21 executed file(s) naming its types
+    8980 src/Cobol.Net.Runtime/Control/ProgramRegistry.cs   | a change at line 113 outside every method — the file level, plus the 28 executed file(s) naming its types
+    8980 src/Cobol.Net.Runtime/IO/CobolFile.cs  WHOLE: 2 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 21 outside every method — the file level, plus the 23 executed file(s) naming its types
+    8972 src/Cobol.Net.Runtime/Control/RunUnit.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 88 outside every method — the file level, plus the 56 executed file(s) naming its types
+    8972 src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs   | a change at line 46 outside every method — the file level, plus the 24 executed file(s) naming its types
+    6792 src/Cobol.Net.Runtime/Control/CobolModule.cs   | a change at line 26 outside every method — the file level, plus the 3 executed file(s) naming its types
+    4634 src/Cobol.Net.Runtime/Control/ModuleStack.cs   | a change at line 64 outside every method — the file level, plus the 8 executed file(s) naming its types
+    3436 tests/Cobol.Net.Tests.Unit/RunUnitStateDriftTests.cs   | a change at line 73 outside every method — the file level, plus the 1 executed file(s) naming its types
+== 68 T 56098c443: files 65 total map_selected 9253
+    9236 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs   | a change at line 2587 outside every method — the file level, plus the 38 executed file(s) naming its types
+    9229 src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs   | a change at line 538 outside every method — the file level, plus the 183 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Parsing/TokenRetypes.cs   | a change at line 28 outside every method — the file level, plus the 13 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Pipeline/Frontend.cs   | 1 changed method(s) LexAndParse
+    9000 src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 809 outside every method — the file level, plus the 192 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Bound/BoundCall.cs   | a change at line 116 outside every method — the file level, plus the 15 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Bound/BoundOo.cs   | a change at line 64 outside every method — the file level, plus the 12 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Passes/StorageFormPass.cs   | a change at line 78 outside every method — the file level, plus the 28 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs   | a change at line 107 outside every method — the file level, plus the 25 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs   | a change at line 305 outside every method — the file level, plus the 22 executed file(s) naming its types
+    8977 src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs   | a change at line 106 outside every method — the file level, plus the 23 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/Binding/ClassConditionModel.cs   | a change at line 185 outside every method — the file level, plus the 4 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs   | a change at line 79 outside every method — the file level, plus the 30 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/CodeGen/EmitterState.cs   | a change at line 225 outside every method — the file level, plus the 30 executed file(s) naming its types
+    8944 src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs   | 2 changed method(s) <BindStatement>b__133_2, BindStatement
+    8944 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs   | 2 changed method(s) <OoWrapPropertyOps>g__Operand|3_0, OoWrapPropertyOps
+    8944 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs   | 1 changed method(s) DrainPending
+    7278 src/Cobol.Net.Compiler/Binding/AlgebraicRange.cs   | a change at line 152 outside every method — the file level, plus the 4 executed file(s) naming its types
+    4620 src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs   | 1 changed method(s) EmitCallMethod
+    3965 src/Cobol.Net.Runtime/Values/Numeric/CobolValueClass.cs   | status A — the file level, plus the 1 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/2014/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+       0 src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4  WHOLE: src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4: a grammar, build or source-generator input — every assembly | 
+== 68 R 2b85b70e1: files 64 total map_selected 9114
+    8984 src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 1380 outside every method — the file level, plus the 82 executed file(s) naming its types
+    8981 src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs   | a change at line 165 outside every method — the file level, plus the 36 executed file(s) naming its types
+    8981 src/Cobol.Net.Compiler/Oo/OoConformance.cs   | a change at line 345 outside every method — the file level, plus the 27 executed file(s) naming its types
+    8981 src/Cobol.Net.Compiler/Oo/OoMethodSymbol.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 26 outside every method — the file level, plus the 16 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/BinderDriver.cs   | 3 changed method(s) Bind, BindUnitData, ExternalMaskAt
+    8980 src/Cobol.Net.Compiler/Binding/Model/FileModel.cs   | a change at line 378 outside every method — the file level, plus the 51 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Passes/UsageCollectionPass.cs   | 2 changed method(s) Run, Visit
+    8980 src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs   | a change at line 292 outside every method — the file level, plus the 22 executed file(s) naming its types
+    8969 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs   | 2 changed method(s) .cctor, <EcWrap>g__QueryFor|1
+    5083 tests/Cobol.Net.Tests.Unit/ExceptionRaiseHelperDriftTests.cs   | a change at line 169 outside every method — the file level, plus the 4 executed file(s) naming its types
+    4632 src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs   | 1 changed method(s) .cctor
+    4620 src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs   | 2 changed method(s) EmitCallMethod, EmitProgramClass
+    4047 src/Cobol.Net.Compiler/Binding/DataBinder.cs   | 1 changed method(s) BindFileControl
+    3436 src/Cobol.Net.Runtime/Exceptions/CheckingFlags.cs   | declarations only (no method of it has sequence points) — the file level, plus the 2 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/2023/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+     311 src/Cobol.Net.Runtime/Control/ProgramTable.cs   | 3 changed method(s) CallFunctionPointer, CallPointer, CallProgram
+== 68 S 8987ede5c: files 62 total map_selected 9247
+    9229 src/Cobol.Net.Compiler/Binding/DataBinder.cs   | a change at line 1448 outside every method — the file level, plus the 183 executed file(s) naming its types
+    9229 src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs   | a change at line 1978 outside every method — the file level, plus the 83 executed file(s) naming its types
+    9225 src/Cobol.Net.Compiler/Validation/ExpressionFormationPass.cs   | a change at line 68 outside every method — the file level, plus the 5 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Expressions/BooleanExpressionResolver.cs   | a change at line 34 outside every method — the file level, plus the 5 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Expressions/BooleanOperatorGate.cs   | status A — the file level, plus the 4 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Expressions/LogicalOperatorGate.cs   | status A — the file level, plus the 5 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs   | a change at line 637 outside every method — the file level, plus the 29 executed file(s) naming its types
+    8998 tests/Cobol.Net.Tests.Unit/BooleanExpressionGateSiteDriftTests.cs   | a change at line 144 outside every method — the file level, plus the 3 executed file(s) naming its types
+    8995 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs   | a change at line 514 outside every method — the file level, plus the 34 executed file(s) naming its types
+    8995 src/CobolSharp.Compiler/Semantics/Bound/Binding/ConditionBinder.cs   | a change at line 88 outside every method — the file level, plus the 34 executed file(s) naming its types
+    8993 src/Cobol.Net.Frontend/Parsing/WrittenSource.cs   | status A — the file level, plus the 2 executed file(s) naming its types
+    5777 src/Cobol.Net.Editions/ConstructRegistry.g.cs   | 1 changed method(s) .cctor
+    3789 src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs   | 3 changed method(s) ParenRunOpensOnBoolLiteral, boolArgAhead, boolExprAhead
+    3430 tests/conformance/2023/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2529 tests/version-matrix/constructs.json   | read by 6 test source file(s) that name 'constructs.json'
+    1867 src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs   | 1 changed method(s) IsIntegerOperand
+    1707 src/Cobol.Net.Frontend/Common/NumericLiteral.cs   | 1 changed method(s) IsIntegerLiteralForm
+       0 src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4  WHOLE: src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4: a grammar, build or source-generator input — every as | 
+== 68 V2 1bb25a078: files 48 total map_selected 9241
+    9225 src/Cobol.Net.Runtime/IO/FileConnector.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 736 outside every method — the file level, plus the 26 executed file(s) naming its types
+    9000 src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 1826 outside every method — the file level, plus the 192 executed file(s) naming its types
+    8984 src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 1069 outside every method — the file level, plus the 82 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs   | a change at line 396 outside every method — the file level, plus the 29 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs   | a change at line 1415 outside every method — the file level, plus the 58 executed file(s) naming its types
+    8980 src/Cobol.Net.Runtime/IO/ReportWriter.cs   | a change at line 118 outside every method — the file level, plus the 19 executed file(s) naming its types
+    8977 src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs   | a change at line 174 outside every method — the file level, plus the 13 executed file(s) naming its types
+    4632 src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs   | 1 changed method(s) .cctor
+    3436 src/Cobol.Net.Runtime/Exceptions/CheckingFlags.cs   | declarations only (no method of it has sequence points) — the file level, plus the 2 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+== 67 4936716f6: files 29 total map_selected 9249
+    9248 src/Cobol.Net.Frontend/Pipeline/Frontend.cs   | a change at line 158 outside every method — the file level, plus the 351 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs   | a change at line 67 outside every method — the file level, plus the 11 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatMap.cs   | status A — the file level, plus the 4 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs   | 2 changed method(s) <NormalizeToFreeFormMapped>b__13_0, NormalizeToFreeFormMapped
+    9225 src/Cobol.Net.Frontend/Preprocessor/TextWord.cs   | a change at line 60 outside every method — the file level, plus the 4 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+== 67 ce6062464: files 52 total map_selected 9238
+    9225 src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs   | a change at line 2722 outside every method — the file level, plus the 113 executed file(s) naming its types
+    8995 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs   | a change at line 1114 outside every method — the file level, plus the 34 executed file(s) naming its types
+    8981 src/Cobol.Net.Compiler/Binding/MoveTable16.cs   | a change at line 361 outside every method — the file level, plus the 17 executed file(s) naming its types
+    8981 src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs   | a change at line 381 outside every method — the file level, plus the 38 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs   | a change at line 1504 outside every method — the file level, plus the 31 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/Binding/RelationPairShape.cs   | status A — the file level, plus the 4 executed file(s) naming its types
+    8969 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs   | a change at line 372 outside every method — the file level, plus the 9 executed file(s) naming its types
+    8969 src/Cobol.Net.Compiler/Binding/RelationComparability.cs   | status A — the file level, plus the 4 executed file(s) naming its types
+    5253 src/Cobol.Net.Runtime/Values/CobolContiguousLayout.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 31 outside every method — the file level, plus the 14 executed file(s) naming its types
+    4191 src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs   | 1 changed method(s) PairRefusal
+    3681 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StrongGroupComparison.cs   | status A — the file level, plus the 3 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/2014/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2928 src/Cobol.Net.Compiler/Binding/Procedure/PlaceCursor.cs   | status A — the file level, plus the 2 executed file(s) naming its types
+    1262 src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs   | 2 changed method(s) RenderRelational, RenderVariableLengthGroupRelational
+== 67 9a1170d4f: files 30 total map_selected 9114
+    8984 src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs   | a change at line 9 outside every method — the file level, plus the 22 executed file(s) naming its types
+    8984 src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 396 outside every method — the file level, plus the 82 executed file(s) naming its types
+    8981 src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupImageCodec.cs   | a change at line 31 outside every method — the file level, plus the 22 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupValueSlicer.cs   | a change at line 31 outside every method — the file level, plus the 7 executed file(s) naming its types
+    8980 src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs   | a change at line 36 outside every method — the file level, plus the 16 executed file(s) naming its types
+    5933 src/Cobol.Net.Compiler/CodeGen/DataDivision/PhysicalModel.cs   | a change at line 20 outside every method — the file level, plus the 11 executed file(s) naming its types
+    3849 tests/Cobol.Net.Tests.Unit/GroupStoreTargetDriftTests.cs   | status A — the file level, plus the 1 executed file(s) naming its types
+    3430 tests/conformance/2014/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3246 src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs   | 7 changed method(s) BitsWrite, GroupTarget, NatWrite, Write, WriteGroupImage, WriteVarGroupContiguous …
+== 67 df366c09d: files 32 total map_selected 5375
+    3612 src/Cobol.Net.Runtime/IO/SequentialConnector.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 141 outside every method — the file level, plus the 21 executed file(s) naming its types
+    3430 tests/conformance/2023/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+     865 src/Cobol.Net.Runtime/IO/FileConnector.cs   | 1 changed method(s) Open
+     865 src/Cobol.Net.Runtime/IO/FileRegistry.cs   | 2 changed method(s) OpenCore, WriteAnyOrg
+     794 tests/Cobol.Net.Tests.Conformance/LinageConformanceTests.cs   | a change at line 78 outside every method — the file level, plus the 2 executed file(s) naming its types
+== 66 ec1820d65: files 27 total map_selected 9112
+    8987 src/Cobol.Net.Compiler/Binding/Model/DataItem.cs   | a change at line 169 outside every method — the file level, plus the 160 executed file(s) naming its types
+    8977 src/Cobol.Net.Compiler/Binding/DataBinder.ImpliedPicture.cs   | 1 changed method(s) SynthesizeImpliedPictures
+    8977 src/Cobol.Net.Compiler/Binding/Passes/BindPipeline.cs   | 2 changed method(s) <Build>b__0_1, Build
+    8977 src/Cobol.Net.Compiler/Binding/ValueSubject.cs   | a change at line 66 outside every method — the file level, plus the 3 executed file(s) naming its types
+    8311 src/Cobol.Net.Compiler/Binding/DataBinder.cs   | 7 changed method(s) BasedLevelAdmitted, BindEntry, CopyEntryDescription, ExpandSameAs, ExpandType, ScreenComposedBased …
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3370 src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs   | 2 changed method(s) GroupKindsOf, GroupUsageInEffect
+== 66 94478632f: files 20 total map_selected 9105
+    8980 src/Cobol.Net.Runtime/IO/ReportWriter.cs   | a change at line 167 outside every method — the file level, plus the 19 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+== 66 907c9e189: files 33 total map_selected 9112
+    8984 src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.CobolObject: | a change at line 740 outside every method — the file level, plus the 82 executed file(s) naming its types
+    8982 src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs   | a change at line 1095 outside every method — the file level, plus the 46 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/Binding/Bound/BoundInspect.cs   | a change at line 36 outside every method — the file level, plus the 12 executed file(s) naming its types
+    8980 src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs   | a change at line 743 outside every method — the file level, plus the 58 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs   | a change at line 305 outside every method — the file level, plus the 5 executed file(s) naming its types
+    8972 src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs   | a change at line 616 outside every method — the file level, plus the 43 executed file(s) naming its types
+    8969 src/Cobol.Net.Runtime/Verbs/CobolInspect.cs   | a change at line 187 outside every method — the file level, plus the 4 executed file(s) naming its types
+    4632 src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs   | 1 changed method(s) .cctor
+    3436 src/Cobol.Net.Runtime/Exceptions/CheckingFlags.cs   | declarations only (no method of it has sequence points) — the file level, plus the 2 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+     393 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs   | 1 changed method(s) <EcWrap>g__QueryFor|1
+       0 tests/Cobol.Net.Tests.Characterization/Snapshots/char_string_ops.85.g.cs.txt  WHOLE: tests/Cobol.Net.Tests.Characterization/Snapshots/char_string_ops.85.g.cs.txt: test data no test source names a | 
+== 66 06a909393: files 15 total map_selected 9105
+    8980 src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs   | a change at line 402 outside every method — the file level, plus the 85 executed file(s) naming its types
+    3430 tests/conformance/2023/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+== 65 5dc2bb90f: files 32 total map_selected 9245
+    9228 src/Cobol.Net.Editions/Constructs.g.cs   | declarations only (no method of it has sequence points) — the file level, plus the 29 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs   | status A — the file level, plus the 14 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs   | a change at line 16 outside every method — the file level, plus the 14 executed file(s) naming its types
+    5777 src/Cobol.Net.Editions/ConstructRegistry.g.cs   | 1 changed method(s) .cctor
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2529 tests/version-matrix/constructs.json   | read by 6 test source file(s) that name 'constructs.json'
+    1408 src/Cobol.Net.Frontend/Preprocessor/NistPreprocessor.cs   | 1 changed method(s) Process
+       0 src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4  WHOLE: src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4: a grammar, build or source-generator input — every assembly | 
+== 65 24a8d3bbd: files 25 total map_selected 9235
+    9225 src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs   | a change at line 436 outside every method — the file level, plus the 47 executed file(s) naming its types
+    8969 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs   | a change at line 217 outside every method — the file level, plus the 1 executed file(s) naming its types
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    2936 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticOperandRole.cs   | status A — the file level, plus the 3 executed file(s) naming its types
+    2497 src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs   | 1 changed method(s) ComparisonOperandOf
+    2071 tests/Cobol.Net.Tests.Unit/ArithmeticOperandRoleDriftTests.cs   | status A — the file level, plus the 3 executed file(s) naming its types
+== 65 b34b0f1df: files 25 total map_selected 9103
+    8977 src/Cobol.Net.Compiler/Binding/CollatingModel.cs   | a change at line 302 outside every method — the file level, plus the 24 executed file(s) naming its types
+    3896 src/Cobol.Net.Runtime/IO/CodeSetConversion.cs  WHOLE: 1 changed method(s) executed only OUTSIDE every test's context (e.g. System.Void CobolNet.Runtime.IO.FileRegis | a change at line 43 outside every method — the file level, plus the 8 executed file(s) naming its types
+    3430 tests/conformance/2023/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/85/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+     895 src/Cobol.Net.Runtime/IO/LineSequentialCharacterSet.cs   | a change at line 48 outside every method — the file level, plus the 5 executed file(s) naming its types
+     783 src/Cobol.Net.Runtime/IO/FileConnector.cs   | 1 changed method(s) RecordHasCharacterWithoutByteImage
+     707 src/Cobol.Net.Runtime/IO/SequentialConnector.cs   | 1 changed method(s) RecordAreaOutsideLineCharacterSet
+== 65 b77f68124: files 19 total map_selected 9237
+    9229 src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs   | a change at line 245 outside every method — the file level, plus the 183 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs   | a change at line 68 outside every method — the file level, plus the 12 executed file(s) naming its types
+    9225 src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs   | a change at line 285 outside every method — the file level, plus the 11 executed file(s) naming its types
+    5049 src/Cobol.Net.Compiler/Binding/DataBinder.cs   | 1 changed method(s) RawValueOperandText
+    3430 tests/conformance/2002/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    3430 tests/conformance/negative/manifest.json   | read by 7 test source file(s) that name 'manifest.json'
+    1205 src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs   | 1 changed method(s) ResolveSubscriptName

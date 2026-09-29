@@ -1,0 +1,10 @@
+discovered by --list-tests: 96
+default-order              results in trx:  96 (failed 0)  first 8 started: C00.T0 C03.T0 C01.T0 C02.T0 C03.T1 C01.T1 C02.T1 C00.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    96, Skipped:     0, Total:    96, Duration: 7 s - OrderProbe.dll (net10.0)
+planned-order              results in trx:  96 (failed 0)  first 8 started: C22.T0 C00.T0 C05.T3 C17.T2 C17.T0 C05.T0 C00.T1 C22.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    96, Skipped:     0, Total:    96, Duration: 7 s - OrderProbe.dll (net10.0)
+planned-red-no-stop        results in trx:  96 (failed 1)  first 8 started: C22.T0 C02.T0 C05.T3 C17.T2 C05.T0 C02.T1 C22.T1 C17.T0
+                           verdict line: Failed!  - Failed:     1, Passed:    95, Skipped:     0, Total:    96, Duration: 7 s - OrderProbe.dll (net10.0)
+planned-red-stop-on-fail   results in trx:   0 (failed 0)  first 8 started: C05.T3 C02.T0 C22.T0 C17.T2 C05.T0 C02.T1 C22.T1
+                           verdict line: (none)
+                           ABORTED: The active test run was aborted. Reason: Test host process crashed : Unhandled exception. System.OperationCanceledException: The operation was canceled.

@@ -1,0 +1,66 @@
+# b6 — the continuity cells (VersionMatrixTests.Cobol85Program_StillCompilesAtLaterEdition: 1,047 rows in the 12
+# partition collections, each partition ONE edition because the stride i % 12 over name x {2002, 2014, 2023} keeps
+# i mod 3), cold (COBOLNET_COMPILE_CACHE=off), BelowNormal, the shared 32-logical / 24-core host, 2026-09-28
+# ~19:30-20:10 PDT with the host otherwise ~12 % busy. run-leg.ps1 produced each line.
+#
+# E0   one partition alone (87 rows = one collection = serial)                      84.8 s  -> 0.97 s per row
+# E1   all 1,047 rows, ONE process, workstation GC (the gate's shape)              395.0 s
+# E1b  the same again, with testhost CPU sampled (below)                           369.4 s
+# E2   the same, DOTNET_gcServer=1                                                 359.6 s  (-3 % to -9 %: GC is not it)
+# E3   TWO processes at once, six partitions each (P0-P5 | P6-P11)          195.1 / 208.8 s  -> wall 209 s (1.8x)
+# E4   FOUR processes at once, three partitions each                121.6/126.1/129.1/136.3 s -> wall 136 s (2.8x)
+#
+# Twelve collections in one process ran each row at ~4.5 s against 0.97 s alone, while the testhost used only ~3.8
+# cores (the samples below: ~38 CPU-s per 10 s). The same work split across processes scaled: the limit is INSIDE
+# one process. b2-scaling/ names it (the ANTLR lexer's start state, recomputed and re-added under a lock per token).
+
+E0-serial-P2 rc=0 wall=84.8 s env=
+E1-cont-all-wksgc rc=0 wall=395 s env=
+E2-cont-all-srvgc rc=0 wall=359.6 s env=DOTNET_gcServer=1
+E1b-cont-all-wksgc rc=0 wall=369.4 s env=
+E3-shardB rc=0 wall=195.1 s env=
+E3-shardA rc=0 wall=208.8 s env=
+E4-s3 rc=0 wall=121.6 s env=
+E4-s4 rc=0 wall=126.1 s env=
+E4-s1 rc=0 wall=129.1 s env=
+E4-s2 rc=0 wall=136.3 s env=
+
+# E1b: seconds since start, host CPU %, testhost cumulative CPU-seconds, testhost threads
+t_s host_cpu_pct testhost_cpu_s testhost_threads
+1 20.6 3.0 32
+11 25.4 42.0 33
+21 23.7 78.0 33
+31 33.5 115.1 32
+42 32.1 153.6 32
+52 30.9 191.1 32
+62 21.5 229.3 32
+72 30.2 269.7 32
+82 28.7 310.2 32
+92 31.2 345.3 32
+102 23.1 383.5 32
+112 38.1 423.1 31
+122 25.0 461.3 32
+132 27.8 499.8 32
+142 23.0 538.4 30
+152 24.2 576.7 30
+162 27.1 615.6 30
+173 23.8 653.2 30
+183 21.8 693.7 30
+193 30.6 731.6 29
+203 19.5 771.5 30
+213 23.9 810.8 30
+223 26.4 849.1 30
+233 26.9 888.4 29
+243 38.8 928.4 29
+253 26.1 965.4 30
+263 29.2 1004.4 30
+273 42.1 1042.4 30
+283 27.2 1082.6 30
+293 36.0 1117.8 29
+304 29.6 1155.8 32
+314 31.0 1193.7 32
+324 29.6 1230.7 32
+334 28.2 1269.1 32
+344 34.6 1307.6 31
+354 31.8 1346.2 32
+364 22.2 1383.8 32

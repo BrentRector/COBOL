@@ -1,0 +1,27 @@
+69 Y 4d9fead76: floor 9103
+69 Z 63213d7f8: floor 9102
+69 X cfb312fbb: floor 9243
+68 W a9203e66b: floor 348
+68 T 56098c443: floor 9236
+68 R 2b85b70e1: floor 9106
+68 S 8987ede5c: floor 7159
+68 V2 1bb25a078: floor 6374
+67 4936716f6: floor 9236
+67 ce6062464: floor 6374
+67 9a1170d4f: floor 5207
+67 df366c09d: floor 3967
+66 ec1820d65: floor 9102
+66 94478632f: floor 3538
+66 907c9e189: floor 6432
+66 06a909393: floor 3430
+65 5dc2bb90f: floor 6375
+65 24a8d3bbd: floor 5311
+65 b34b0f1df: floor 3955
+65 b77f68124: floor 6734
+FLOOR over 20 clusters: min 348 median 6403.5 max 9243 of 9274; >= 50%: 15
+68b X (5171c6872, dropped): registry files ['src/Cobol.Net.Editions/ConstructRegistry.g.cs', 'src/Cobol.Net.Editions/Constructs.g.cs', 'src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs', 'src/Cobol.Net.Frontend/Diagnostics/DiagnosticDescriptors.cs']; selected today 9169; with every registry contribution removed 9169 of 9190; whole reasons []
+   red DiagnosticPositionTests.Copy_MainLinesStayMain_CopiedLinesNameTheCopybook: today True, registry removed True
+   red DiagnosticPositionTests.ParseErrorInsideCopybook_NamesTheCopybookLine: today True, registry removed True
+68b Y (f5d81cf73, dropped): registry files ['src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs']; selected today 9165; with every registry contribution removed 9165 of 9190; whole reasons ['src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4', 'src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4', 'src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4']
+   tests executing src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs: 8906; selected with registry removed: 8906
+   of them naming CONSTANT and NULL: 0; selected: 0

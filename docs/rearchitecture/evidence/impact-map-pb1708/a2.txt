@@ -1,0 +1,22 @@
+population 9274
+label | total | -REG | -REG-DECL(method+cctor+data) | -REG-DECL-CCTOR | whole reasons (non-REG) | kinds
+69 Y 4d9fead76 | 9252 | 9252 | 9121 | 9103 | ["1 changed method(s) executed only OUTSIDE every test's conte", 'src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4', 'src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4', 'src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4'] | {'DATA': 44, 'METHOD': 31, 'WHOLE': 4, 'DECL': 6, 'REG': 1}
+69 Z 63213d7f8 | 9238 | 9238 | 9102 | 9102 | [] | {'DATA': 39, 'DECL': 6, 'METHOD': 10}
+69 X cfb312fbb | 9256 | 9256 | 9243 | 9243 | [] | {'DATA': 51, 'METHOD': 12, 'REG': 4, 'DECL': 6}
+68 W a9203e66b | 9000 | 9000 | 8982 | 348 | ["1 changed method(s) executed only OUTSIDE every test's conte", "2 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 8, 'METHOD': 6, 'DECL': 9, 'WHOLE': 3}
+68 T 56098c443 | 9253 | 9253 | 9242 | 9236 | ["1 changed method(s) executed only OUTSIDE every test's conte", 'src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4'] | {'DATA': 35, 'DECL': 16, 'WHOLE': 2, 'METHOD': 12}
+68 R 2b85b70e1 | 9114 | 9114 | 9114 | 9106 | ["1 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 40, 'METHOD': 10, 'DECL': 10, 'CCTOR': 2, 'WHOLE': 2}
+68 S 8987ede5c | 9247 | 9247 | 7159 | 7159 | ['src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4'] | {'DATA': 37, 'DECL': 15, 'METHOD': 7, 'REG': 2, 'WHOLE': 1}
+68 V2 1bb25a078 | 9241 | 9241 | 9241 | 3451 | ["1 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 32, 'WHOLE': 3, 'METHOD': 6, 'DECL': 6, 'CCTOR': 1}
+67 4936716f6 | 9249 | 9249 | 9236 | 9236 | [] | {'DATA': 20, 'DECL': 7, 'METHOD': 2}
+67 ce6062464 | 9238 | 9112 | 7960 | 6374 | ["1 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 31, 'METHOD': 7, 'DECL': 12, 'REG': 1, 'WHOLE': 1}
+67 9a1170d4f | 9114 | 9114 | 9110 | 5207 | ["1 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 21, 'DECL': 7, 'METHOD': 1, 'WHOLE': 1}
+67 df366c09d | 5375 | 5375 | 5371 | 3967 | ["1 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 24, 'METHOD': 4, 'WHOLE': 1, 'DECL': 3}
+66 ec1820d65 | 9112 | 9112 | 9102 | 9102 | [] | {'DATA': 18, 'METHOD': 5, 'DECL': 3, 'REG': 1}
+66 94478632f | 9105 | 9105 | 3538 | 3538 | [] | {'DATA': 16, 'METHOD': 2, 'REG': 1, 'DECL': 1}
+66 907c9e189 | 9112 | 9112 | 9109 | 3689 | ["1 changed method(s) executed only OUTSIDE every test's conte", 'tests/Cobol.Net.Tests.Characterization/Snapshots/char_string_ops.85.g.cs.txt'] | {'DATA': 17, 'DECL': 7, 'METHOD': 6, 'CCTOR': 1, 'WHOLE': 2}
+66 06a909393 | 9105 | 9105 | 3430 | 3430 | [] | {'DATA': 13, 'DECL': 2}
+65 5dc2bb90f | 9245 | 9243 | 6375 | 6375 | ['src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4'] | {'DATA': 23, 'REG': 3, 'WHOLE': 1, 'METHOD': 2, 'DECL': 3}
+65 24a8d3bbd | 9235 | 9235 | 5311 | 5311 | [] | {'DATA': 16, 'DECL': 5, 'METHOD': 2, 'REG': 1, 'CCTOR': 1}
+65 b34b0f1df | 9103 | 9103 | 5632 | 3955 | ["1 changed method(s) executed only OUTSIDE every test's conte"] | {'DATA': 16, 'DECL': 4, 'METHOD': 4, 'WHOLE': 1}
+65 b77f68124 | 9237 | 9237 | 6734 | 6734 | [] | {'DATA': 10, 'DECL': 5, 'METHOD': 4}

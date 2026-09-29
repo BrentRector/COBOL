@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- PB1708 pivot evidence (b2): does ONE process scale the continuity-cell compile across threads? Not in
+       CobolSharp.sln and not a test: `dotnet run` (Debug, like the gate; see Program.cs). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Cobol.Net.Compiler\Cobol.Net.Compiler.csproj" />
+  </ItemGroup>
+</Project>

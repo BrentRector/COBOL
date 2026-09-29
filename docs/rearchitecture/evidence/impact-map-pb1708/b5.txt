@@ -1,0 +1,5 @@
+9054 tests, 11553 test-seconds
+budget  1.0% =    116 test-s:  2102 tests (23.2% of the population) in  83 collections; the largest collection's part  25.8 s (CorpusRunnerTests_P1)
+budget  2.0% =    231 test-s:  2879 tests (31.8% of the population) in  98 collections; the largest collection's part  58.6 s (CorpusRunnerTests_P1)
+budget  5.0% =    578 test-s:  4473 tests (49.4% of the population) in 133 collections; the largest collection's part 120.5 s (CorpusRunnerTests_P1)
+budget 10.0% =   1155 test-s:  6144 tests (67.9% of the population) in 164 collections; the largest collection's part 200.1 s (CorpusRunnerTests_P2)
