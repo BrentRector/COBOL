@@ -627,6 +627,29 @@ captured token run faithfully.
 **3.3c Mode inventory** stays: DEFAULT, PICMODE, SUBSCRIPT, COMMENT_MODE (`CobolLexer.g4:497,651,726,782`).
 No change to mode semantics; only the shared-fragment factoring in 3.3b.
 
+**3.3e ⛔ The lexer carries NO semantic predicate — context the lexer needs goes in an ACTION (kb/Work PB1715).**
+ANTLR 4.13.1 caches a mode's start state only when no predicate is in its closure (`LexerATNSimulator.MatchATN`),
+and never caches a DFA edge whose target passed through one (`AddDFAEdge` returns before storing the edge), so a
+token that reaches a predicate re-runs ATN simulation — and re-adds its DFA state under `lock (dfa.states)` — on
+EVERY occurrence. Six left-edge predicates in DEFAULT mode did that to every token of every compile, which made
+the lexer most of a check-only compile's time and serialized parallel compiles on the one lock
+(`DESIGN-test-build-ci.md` §3.14.5 M6). Each context-dependent rule now matches unconditionally and its action
+decides what the match is:
+- `DEFINED` (§7.3.8.4.4) has no rule: it is a VIRTUAL token (the `tokens { }` block, beside `FNARG_LPAREN` /
+  `FNARG_RPAREN`) that `IDENTIFIER`'s action retypes when the lexer is primed for a compiler-directive expression.
+  ⚠ A literal rule `'DEFINED' {retype}` would lex the same tokens but publish the literal name `'DEFINED'`, and the
+  vocabulary's literal names MEAN "the lexer makes this word a keyword token" to `CobolKeywordTokens` (the
+  `>>COBOL-WORDS` word → token map) and `CobolWordsDriftTests` — a token-context keyword must never publish one;
+- `FNARG_SEPARATOR` matches the §8.3.5 2) comma/semicolon-space separator everywhere and `Skip()`s it outside a
+  function-argument region (the unpredicated `COMMA_SEP` twin it needed is deleted);
+- the four `FN_SIGNED_*` twins match `[+-]` + a numeric body, and `OnSignedLiteral` keeps the signed literal where
+  `SignedLiteralCanStart` holds (§8.3.3.3.2 2) / §8.7.1); elsewhere it cuts the token back to its one-character
+  sign (`PLUS`/`MINUS`, the column restored) and the lexer resumes at the digits — exactly the two tokens the
+  predicate-false path lexed.
+`LexerDfaCacheDriftTests` holds the invariant over the suite's sources (a private DFA; after a warm-up pass, no
+ASCII character of a re-lex leaves the cached DFA and every mode has a cached start state). A character above 127
+has no DFA edge in ANTLR (`MAX_DFA_EDGE`) and the EOF transition is never cached; both are reported, never asserted.
+
 **3.3d The ALL figurative's literal-1 (kb/Work PB71, 2026-08-18; PB1627, 2026-09-26).** `figurativeConstant`'s
 Format-6 arm is `ALL allLiteral`, where `allLiteral : concatenationExpression | STRINGLIT | HEXLIT | NATLIT |
 BOOLLIT` — ONE arm for the four literal kinds §8.3.3.6.3 SR2 admits (alphanumeric plain or hexadecimal, national
@@ -1388,7 +1411,8 @@ The mode is not gratuitous; it solves two problems a naïve DEFAULT-mode rule re
   elsewhere is arithmetic grouping. The mode disambiguates by the *preceding* token
   (`PreviousTokenCouldBeDataName` over the generated `_dataNameTokens` set). A grammar-level rule must recover this
   another way (the same ambiguity the `{is2023()}? inlineMethodInvocationStatement` predicate already fights).
-- **⚠ Separator loss (the blocker).** DEFAULT mode `-> skip`s `WS` and `COMMA_SEP`. But ISO/IEC 1989:2023 §8.3.5
+- **⚠ Separator loss (the blocker).** DEFAULT mode `-> skip`s `WS`, and outside a function-argument region
+  `FNARG_SEPARATOR`'s action skips the comma/semicolon-space separator. But ISO/IEC 1989:2023 §8.3.5
   admits a **space** as a subscript / argument separator: `X (I J)` and `MAX (A B)` are legal, alongside the comma
   forms `X (I, J)`. The SUBSCRIPT mode keeps `SUB_WS` a real token so `SplitSubscriptTokens` can split
   space-separated operands. Once WS is skipped, `X(I J)` (two subscripts) and `X(I J)` is indistinguishable from a

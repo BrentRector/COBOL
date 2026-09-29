@@ -9,7 +9,9 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// ⛔ THE SIGNED-LITERAL SHAPE SYMMETRY (kb/Work R17 — ledger F12). The lexer has three numeric literal
 /// BODIES (integer, decimal, float), and a sign-adjacent form must exist for each in BOTH regions that admit
-/// one — the DEFAULT-mode FUNCTION-argument twins (<c>FN_SIGNED_*</c>, predicated) and the SUBSCRIPT mode.
+/// one — the DEFAULT-mode FUNCTION-argument twins (<c>FN_SIGNED_*</c>, whose <c>OnSignedLiteral</c> action keeps
+/// the signed literal only where §8.3.3.3.2 makes the sign part of it, and otherwise splits the sign off as the
+/// operator) and the SUBSCRIPT mode.
 /// The float shape was the one signed-capable body with NO twins, so <c>FUNCTION EXP(-1.5E3)</c> lexed as
 /// TWO arguments (the signed-decimal rule won maximal munch at "-1.5" and orphaned "E3") and drew a false
 /// arity diagnostic — and the same hole in SUBSCRIPT mode broke the keyword-omitted spelling's OUTER capture.
@@ -33,10 +35,10 @@ public sealed class SignedLiteralShapeDriftTests
         Assert.NotEmpty(bodies);
         foreach (string body in bodies)
             Assert.True(
-                Regex.IsMatch(src, @"FN_SIGNED_\w+\s*:\s*\{SignedLiteralCanStart\(\)\}\?\s*\[\+-\]\s*" + body + @"\b"),
+                Regex.IsMatch(src, @"FN_SIGNED_\w+\s*:\s*\[\+-\]\s*" + body + @"\s*\{\s*OnSignedLiteral\("),
                 $"{body} has no FN_SIGNED twin — a sign-adjacent literal of this shape in a FUNCTION argument "
                 + "region will be split by maximal munch into a shorter signed literal plus an orphan (the F12 "
-                + "false-arity failure). Add the predicated twin beside FN_SIGNED_DECIMALLIT.");
+                + "false-arity failure). Add the twin, with its OnSignedLiteral action, beside FN_SIGNED_DECIMALLIT.");
     }
 
     [Fact]

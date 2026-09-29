@@ -11,7 +11,11 @@ options {
 // them: the '(' / ')' rules below RETYPE themselves from the _fnParenStack the lexer already maintains, which is
 // the ONE place that knows which parens open an argument list. A distinct type is what lets every DOWNSTREAM
 // consumer stop guessing — see the SR6 note on OnDefaultLParen.
-tokens { FNARG_LPAREN, FNARG_RPAREN }
+// DEFINED is virtual for the same reason in another region: it is a keyword ONLY inside a primed compiler-directive
+// expression, so IDENTIFIER's action retypes the word there (see IDENTIFIER). A rule spelling 'DEFINED' would publish
+// that literal in the vocabulary, whose literal names are read as "the lexer makes this word a keyword token"
+// (CobolKeywordTokens, CobolWordsDriftTests) — which, everywhere else, it does not.
+tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
 
 @members {
     // Track the types of the last TWO non-WS tokens emitted: one for subscript-mode detection, two for the
@@ -132,6 +136,14 @@ tokens { FNARG_LPAREN, FNARG_RPAREN }
     // operand / cce region — DEFINED is a token and every '(' groups (DESIGN §4.1).
     public void PrimeDirectiveExpr() => _primeDirectiveExpr = true;
 
+    // IDENTIFIER's action in a primed directive expression: the §7.3.8.4.4 keyword DEFINED is the one word the region
+    // makes a token (a virtual token — see the tokens block). Reached only when primed, so the Text it reads is never
+    // built for an ordinary source identifier.
+    private void RetypeDirectiveKeyword()
+    {
+        if (string.Equals(Text, "DEFINED", System.StringComparison.OrdinalIgnoreCase)) Type = DEFINED;
+    }
+
     // ⛔ AN ARGUMENT-LIST PARENTHESIS IS NOT AN ARITHMETIC PARENTHESIS, AND EMITTING BOTH AS LPAREN MADE EVERY
     // DOWNSTREAM PASS GUESS (fix-queue PB48). §8.4.3.2.3 SR6: "If a function's definition permits arguments and a
     // left parenthesis immediately follows function-prototype-name-1 or intrinsic-function-name-1, the left
@@ -177,17 +189,44 @@ tokens { FNARG_LPAREN, FNARG_RPAREN }
         if (wasFnArgs) Type = FNARG_RPAREN;
     }
 
-    // A signed numeric literal's sign is the leftmost CHARACTER of the literal (ISO §8.3.3.3.2 r2) and an
-    // arithmetic operator shall be preceded AND followed by a space (§8.7.1) — so inside a function-argument
-    // region a [+-] that follows a separator and touches its digits starts a NEW argument (a signed literal),
-    // never a binary operator: MAX(A -4) is two arguments, MAX(A - 4) is one subtraction.
+    // ⛔ NO SEMANTIC PREDICATE ON A PATH THE DFA MUST CACHE — CONTEXT GOES IN AN ACTION (kb/Work PB1715). ANTLR
+    // 4.13.1 never caches a mode's start state whose closure passed through a predicate (LexerATNSimulator.MatchATN)
+    // nor a DFA edge whose target did (AddDFAEdge), so every token that REACHES a predicate re-runs ATN simulation
+    // and re-adds its DFA state under lock(dfa.states) — on every occurrence, not once. Six left-edge predicates in
+    // this mode (the four FN_SIGNED_* twins, DEFINED, FNARG_SEPARATOR) did that to EVERY token of every compile:
+    // the CLI paid the simulation serially and parallel compiles serialized on the one lock (3.5x peak at 8
+    // threads, DESIGN-test-build-ci.md §3.14.5 M6). Each match is now unconditional and an ACTION decides what it
+    // is (DEFINED became a virtual token IDENTIFIER's action retypes); actions do not suppress DFA edges.
+    // LexerDfaCacheDriftTests holds it: re-lexing the suite's sources after a warm-up leaves the cached DFA nowhere.
+
+    // A signed numeric literal's sign is the leftmost CHARACTER of the literal (ISO §8.3.3.3.2 2): "If a sign is
+    // used, it shall appear as the leftmost character of the literal") and an arithmetic operator "shall be
+    // preceded by a space and followed by a space" (§8.7.1) — so inside a function-argument region a [+-] that
+    // follows a separator and touches its digits starts a NEW argument (a signed literal), never a binary
+    // operator: MAX(A -4) is two arguments, MAX(A - 4) is one subtraction. Asked by the FN_SIGNED_* action after
+    // the match, so the separator test reads the character before the TOKEN'S START, not before the input index.
     private bool SignedLiteralCanStart()
     {
         if (!InFunctionArgs()) return false;
-        if (InputStream.Index == 0) return true;   // fragment start (the D2 re-parse) — a separator by definition
-        int la = InputStream.LA(-1);
-        return la == ' ' || la == '\t' || la == '\r' || la == '\n' || la == ',' || la == ';' || la == '('
-            || la == Antlr4.Runtime.IntStreamConstants.EOF;
+        int start = TokenStartCharIndex;
+        if (start == 0) return true;   // fragment start (the D2 re-parse) — a separator by definition
+        int before = InputStream.LA(start - 1 - InputStream.Index);   // LA(-k) is the character k before the index
+        return before == ' ' || before == '\t' || before == '\r' || before == '\n' || before == ',' || before == ';'
+            || before == '(';
+    }
+
+    // The FN_SIGNED_* action. A [+-] touching a numeric body always matches as ONE token (maximal munch over the
+    // unconditional rule); where SignedLiteralCanStart holds it is the signed literal. Elsewhere the sign is the
+    // arithmetic operator on its own, exactly what PLUS / MINUS lex, and the digits are a literal of their own: the
+    // token is cut back to its first character and the lexer resumes at the digits, which re-lex as the unsigned
+    // literal the old predicate-false path produced. No body character is a line break, so only the column moves.
+    private void OnSignedLiteral(int signedType)
+    {
+        if (SignedLiteralCanStart()) { Type = signedType; return; }
+        int start = TokenStartCharIndex;
+        Type = InputStream.LA(start - InputStream.Index) == '+' ? PLUS : MINUS;
+        InputStream.Seek(start + 1);
+        Column = TokenStartColumn + 1;
     }
 
     public override Antlr4.Runtime.IToken NextToken()
@@ -955,33 +994,34 @@ fragment NAME_BODY                                                              
 // touches its digits is the leftmost CHARACTER of a numeric literal (ISO §8.3.3.3.2 r2); a binary operator is
 // space-surrounded (§8.7.1). These twins re-type to the SUBSCRIPT-mode SIGNED_* token types so the parser sees
 // one vocabulary: MAX(A -4) lexes A SIGNED_INTEGERLIT(-4) = two arguments; MAX(A - 4) lexes A MINUS 4 = one
-// subtraction. Outside argument regions the predicate is false and [+-] lexes PLUS/MINUS exactly as before.
+// subtraction. Outside argument regions OnSignedLiteral cuts the token back to its sign, so [+-] lexes PLUS/MINUS
+// and the digits their own literal, exactly as a lone sign always has. ⛔ The context test is the ACTION, never a
+// predicate on the rule (kb/Work PB1715 — see the members): a predicate here re-simulated every `+`/`-` token.
 // The decimal twin MUST precede the integer twin (the SUBSCRIPT-mode ordering note: else -15.6 orphans ".6"),
 // and the FLOAT twin precedes them both (kb/Work R17): "-1.5E3" must stay ONE token — without this twin the
 // signed-decimal rule won maximal munch at "-1.5" and orphaned "E3" as an IDENTIFIER, so the parser reported
 // two arguments (§8.3.3.3.3 r2 makes the sign part of the literal; §15.3 type 10 admits the literal). The
 // sign travels in the TOKEN TEXT and the type is plain FLOATLIT — one vocabulary, zero parser changes, and
 // the emitter's E-form arm renders the signed text as a C# double literal directly.
-FN_SIGNED_FLOATLIT   : {SignedLiteralCanStart()}? [+-] FLOAT_BODY -> type(FLOATLIT) ;
-FN_SIGNED_COMMA_FLOATLIT : {SignedLiteralCanStart()}? [+-] FLOAT_COMMA_BODY -> type(COMMA_FLOATLIT) ;   // kb/Work PB98
-FN_SIGNED_DECIMALLIT : {SignedLiteralCanStart()}? [+-] DEC_BODY -> type(SIGNED_DECIMALLIT) ;
-FN_SIGNED_INTEGERLIT : {SignedLiteralCanStart()}? [+-] INT_BODY -> type(SIGNED_INTEGERLIT) ;
+FN_SIGNED_FLOATLIT   : [+-] FLOAT_BODY { OnSignedLiteral(FLOATLIT); } ;
+FN_SIGNED_COMMA_FLOATLIT : [+-] FLOAT_COMMA_BODY { OnSignedLiteral(COMMA_FLOATLIT); } ;   // kb/Work PB98
+FN_SIGNED_DECIMALLIT : [+-] DEC_BODY { OnSignedLiteral(SIGNED_DECIMALLIT); } ;
+FN_SIGNED_INTEGERLIT : [+-] INT_BODY { OnSignedLiteral(SIGNED_INTEGERLIT); } ;
 
 DECIMALLIT  : DEC_BODY ;
-
-// DEFINED — the §7.3.8.4.4 defined-condition keyword (`compilation-variable-name IS [NOT] DEFINED`). It is NOT a
-// reserved word in the source language: it is a token ONLY inside a primed compiler-directive-expression fragment
-// (the PrimeFunctionArgs precedent). Predicated + placed before IDENTIFIER so first-match picks it when primed;
-// when unprimed the predicate fails and 'DEFINED' lexes as an ordinary IDENTIFIER (a legal user data-name).
-DEFINED     : {_primeDirectiveExpr}? 'DEFINED' ;
 
 // ── IDENTIFIER (must come BEFORE INTEGERLIT) ──
 // COBOL-85 user-defined words: 1-30 chars from {A-Z, a-z, 0-9, hyphen},
 // must contain at least one letter, no leading/trailing hyphen.
 // Digit-start forms: 42-DATANAMES (hyphen), 11A/25COUNT/80PARTS (letter).
 // Pure digits remain INTEGERLIT (level numbers, paragraph numbers, etc.).
-
-IDENTIFIER  : NAME_BODY ;
+// The action is the ONE place a word that is a keyword only in a primed region is retyped: DEFINED, the §7.3.8.4.4
+// defined-condition keyword (`compilation-variable-name IS [NOT] DEFINED`), is NOT a reserved word in the source
+// language — it is a token ONLY inside a primed compiler-directive-expression fragment (the PrimeFunctionArgs
+// precedent), and an ordinary IDENTIFIER (a legal user data-name) everywhere else. ⛔ An ACTION, never a predicate
+// (kb/Work PB1715): the predicate the DEFINED rule carried kept every D-initial word of every compile (DATA,
+// DIVISION, DISPLAY …) off the cached DFA.
+IDENTIFIER  : NAME_BODY { if (_primeDirectiveExpr) RetypeDirectiveKeyword(); } ;
 
 INTEGERLIT  : INT_BODY ;
 
@@ -1017,12 +1057,13 @@ DOT         : '.' ;
 // token — the argument boundary must survive to the parser: a '(' right after it opens a PARENTHESIZED
 // ARGUMENT, and the LPAREN whitelist action sees the separator (not the previous argument's data-name) as the
 // previous token, so `MAX(A * B, (C + 1) / 2, …)` (IF119A/IF123A) does not mis-lex the group as a subscript
-// of B. Outside argument regions both separators stay skipped exactly as before. MUST precede COMMA_SEP
-// (equal-length match — first rule wins when the predicate holds).
-FNARG_SEPARATOR : {InFunctionArgs()}? [,;] [ \t\r\n]+ ;
-// §8.3.5: comma followed by whitespace is a separator (equivalent to space).
-// Comma NOT followed by whitespace is preserved for DECIMAL-POINT IS COMMA.
-COMMA_SEP   : ',' [ \t\r\n]+ -> skip ;
+// of B. Outside argument regions the ACTION skips it — ISO §8.3.5 2): "The COBOL characters comma and semicolon,
+// immediately followed by a space, are separators that may be used anywhere the separator space is used" — so it
+// is skipped exactly as the space is. ONE rule matches the separator everywhere and its action says which it is;
+// ⛔ never a predicate choosing between two rules (kb/Work PB1715): the predicate this rule carried kept every
+// `, ` and `; ` of every compile off the cached DFA, and the unpredicated twin it needed is gone with it.
+FNARG_SEPARATOR : [,;] [ \t\r\n]+ { if (!InFunctionArgs()) Skip(); } ;
+// A comma NOT followed by whitespace is preserved for DECIMAL-POINT IS COMMA.
 COMMA       : ',' ;
 LPAREN      : '(' { OnDefaultLParen(); } ;
 RPAREN      : ')' { OnDefaultRParen(); } ;
@@ -1051,7 +1092,7 @@ COLON       : ':' ;
 // every other separator-adjacent operator (e.g. '::' §8.7.4) already has. '&' has no other lexical role,
 // so the token is unambiguous with or without the spaces.
 AMPERSAND   : '&' ;
-SEMICOLON   : ';' -> skip ;   // §8.3.5: semicolon-space is equivalent to space
+SEMICOLON   : ';' -> skip ;   // a ';' with no space after it (the §8.3.5 separator `; ` is FNARG_SEPARATOR above)
 
 // ── Catch-all for unrecognized characters ──
 
@@ -1093,8 +1134,8 @@ PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
         // following-character GUARD is load-bearing: a LEGAL trailing ',' (§13.18.40.3 SR7 — PICTURE as the
         // last clause) is followed by the separator PERIOD, not a space (NC125A's `PIC 9,9,…,9,.` — the token
         // ends at the ',' because '.'+newline cannot extend the match, so LA(1) is '.' and the ',' is a
-        // PICTURE SYMBOL to keep). The seek-back re-lexes a trimmed separator in DEFAULT mode
-        // (COMMA_SEP / SEMICOLON — both skipped).
+        // PICTURE SYMBOL to keep). The seek-back re-lexes a trimmed separator in DEFAULT mode, where
+        // FNARG_SEPARATOR's action skips it (a PICTURE clause is never inside a function-argument region).
         else if (t.Length > 1 && (t[t.Length - 1] == ',' || t[t.Length - 1] == ';'))
         {
             int la = InputStream.LA(1);

@@ -24,7 +24,7 @@ scripts as `<name>.txt`.
 | `a7`, `a8` | where the Conformance assembly's recorded (instrumented) test-seconds go. |
 | `a11` | PB1710: which child processes wrote no hits file. |
 | `b1` | where an UNINSTRUMENTED whole-Conformance run spends its wall clock: the critical path is the twelve continuity partitions. |
-| `b2-scaling/` | whether ONE process scales the continuity work across threads (it does not: 3.5× at best) and why (stack samples: the ANTLR lexer's start state). `b2.txt`, `stacks-*.txt`, `classify.txt`. |
+| `b2-scaling/` | whether ONE process scales the continuity work across threads (it does not: 3.5× at best) and why (stack samples: the ANTLR lexer's start state). `b2.txt`, `stacks-*.txt`, `classify.txt`. After M6 (kb/Work PB1715), `b2-after-m6.txt`: 32× faster serially, no lock contention, and the next limiter is the workstation GC. |
 | `b3-order-probe/` | what xunit 2.9.2's collection and test-case orderers do under parallel collections, and what `StopOnFail` does (it crashes the test host); what a leg-filtering EXECUTOR leaves in the trx (nothing for a dropped case), an empty leg (no verdict line, exit 0), a skipped fact (NotExecuted), and the three ways to refuse a bad environment (a throwing framework constructor falls back SILENTLY to running everything; a throwing executor is a catastrophic failure; `ExecutionErrorTestCase` is a clean red). |
 | `b4` | where the reds of the dropped branch 68b X would run under each candidate ORDER. |
 | `b5` | how big a cheapest-first first leg is, and its serial lower bound. |

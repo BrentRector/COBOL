@@ -1018,27 +1018,49 @@ token of every compilation recomputes the closure over all default-mode rules an
   edge stays uncached and every D-initial default-mode token (DATA, DIVISION, DISPLAY, DEPENDING, D-initial names)
   still takes the lock; `FNARG_SEPARATOR`'s does the same for every `,` and `;` separator, and the `FN_SIGNED_*`
   rules' for every `+` and `-`. So each predicate LEAVES the lexer's hot paths:
-  - `FNARG_SEPARATOR` and `DEFINED` match exactly the text their fallback matches, so each becomes an unconditional
-    rule whose ACTION picks the outcome (`[,;] [ \t\r\n]+` always lexes as one token; the action keeps it as
-    `FNARG_SEPARATOR` in function arguments and skips it otherwise, exactly as `COMMA_SEP` / `SEMICOLON` and the
-    whitespace rule skip today, and `COMMA_SEP`, which it subsumes, is deleted; `'DEFINED'` is retyped
-    `IDENTIFIER` when the directive expression is not primed). Actions do not suppress DFA edges.
+  - `FNARG_SEPARATOR` and `DEFINED` match exactly the text their fallback matches, so an ACTION picks the outcome
+    (`[,;] [ \t\r\n]+` always lexes as one token; the action keeps it as `FNARG_SEPARATOR` in function arguments
+    and skips it otherwise, exactly as `COMMA_SEP` / `SEMICOLON` and the whitespace rule skipped, and `COMMA_SEP`,
+    which it subsumes, is deleted). `DEFINED` lost its rule: it is a virtual token that `IDENTIFIER`'s action
+    retypes when the directive expression is primed. ⚠ The first cut — an unconditional `'DEFINED'` rule retyping
+    itself to `IDENTIFIER` — lexed identical tokens but published the literal name `'DEFINED'`, which
+    `CobolKeywordTokens` reads as "the lexer makes this word a keyword token" (so `>>COBOL-WORDS` would have
+    treated DEFINED as one) and `CobolWordsDriftTests` flagged; a token-stream differential cannot see a
+    vocabulary consumer, so this is recorded here (DESIGN-frontend-grammar.md §3.3e). Actions do not suppress
+    DFA edges.
   - the four `FN_SIGNED_*` rules lex ONE token where the fallback lexes TWO (the sign, then the number), so an action
-    cannot choose between them; they become a mode the preceding token's action enters (the signed-literal context
-    `SignedLiteralCanStart()` computes today), or the lexer's `NextToken` splits the signed token when the context
-    forbids it — the implementer picks; the invariant decides. A predicate at the END of the rule is acceptable only
-    if the invariant stays green, which for `+1` in a `VALUE` clause it would not.
-  `LexerDfaCacheDriftTests` pins the invariant that matters, measured with a counting `LexerATNSimulator` subclass
-  (it counts `MatchATN` and `ComputeTargetState` calls): after one warm-up pass over the suite's ASCII sources,
-  re-lexing them performs ZERO ATN simulation; as a sub-assertion, `decisionToDFA[mode].s0` is non-null for every
-  mode. The next predicate on a common prefix is therefore red, wherever in the rule it sits. ⚠ ANTLR's DFA edges
-  cover only characters 0–127 (`MAX_DFA_EDGE = 127`), so a non-ASCII character is simulated on every occurrence;
-  the same counter REPORTS (never asserts) the simulation count for the suite's non-ASCII sources, so that residual
-  is measured, not guessed. The implementing change proves equivalence once — the token stream of every source the
-  suite compiles (NIST programs and copybooks, the conformance goldens and negatives) is identical before and after
-  — and the whole suite pins it thereafter. Expected gain, as a bound to be measured: with 93 % of a check-only
-  compile's samples in that path, Amdahl bounds the serial speed-up near 15×, and the lock disappears. Acceptance:
-  `b2` at 12 threads ≥ 8× over today's 1-thread wall with CPU utilisation ≥ 70 %; `b1` re-measured on the next
+    cannot choose between them by retyping alone. They stay unconditional DEFAULT-mode rules, and their action
+    (`OnSignedLiteral`) keeps the signed literal where `SignedLiteralCanStart()` holds — now asked of the character
+    before the TOKEN'S START — and otherwise CUTS the token back to its sign: the type becomes `PLUS`/`MINUS`, the
+    input is re-seeked to the character after the sign and the column restored (no numeric body contains a line
+    break), so the lexer resumes at the digits and lexes them exactly as the predicate-false path did. The
+    alternative, a mode entered by the preceding token's action, was rejected: the context is "a separator
+    character immediately before the sign", which a mode would have to re-derive on every token.
+  `LexerDfaCacheDriftTests` pins the invariant that matters: after one warm-up pass over the suite's sources, no
+  ASCII character of a re-lex leaves the cached DFA, and `s0` is non-null for every mode. ⚠ The instrument is NOT
+  a counting `LexerATNSimulator` subclass as first designed: in ANTLR 4.13.1 `MatchATN`, `ComputeTargetState` and
+  `ExecATN` are not virtual, so no subclass can count them. It is a probe on the INPUT side — `Lexer.NextToken`
+  and `LexerATNSimulator.Match` each `Mark()` the `ICharStream` as a match begins, and the test's stream, at that
+  moment, walks the cached DFA of the lexer's current mode over the coming characters exactly as `ExecATN` will and
+  records the first place the walk would leave the cache (no start state; a missing ASCII edge; a character above
+  127; EOF). The lexer runs over a PRIVATE DFA, so the measurement is independent of what other tests lexed first,
+  and the warm-up pass must itself see misses, or the probe is blind. The next predicate on a common prefix is
+  therefore red, wherever in the rule it sits — measured: the pre-M6 grammar is red (5,216,645 start-state misses
+  on the re-lex, 13 min against the fixed grammar's 3 s), and a predicate planted one character into `DEFINED`
+  (`'D' {true}? 'EFINED'`) is red (68,289 mid-token misses — every D-initial token). ⚠ ANTLR's DFA edges cover only
+  characters 0–127 (`MAX_DFA_EDGE = 127`), so a non-ASCII character is simulated on every occurrence, and the EOF
+  transition is never cached (`GetExistingTargetState` rejects `t < MIN_DFA_EDGE`), so the token that reaches the
+  end of an input is simulated once per input; the test REPORTS both, never asserts them. Over the lexer inputs the
+  suite actually produces (17,055 distinct preprocessed texts and fragments): 14,556 ASCII inputs re-lex with zero
+  misses; the 2,499 non-ASCII ones (38,675 non-ASCII characters in 72.8 M) leave the cache 77,196 times — against
+  9,955,488 tokens. The implementing change proved equivalence once: every distinct (lexer input, priming) the
+  Conformance, Unit and Characterization assemblies lexed on the pre-M6 grammar (compile cache off) was captured and
+  replayed through both lexers, and all 17,055 token streams — type, channel, offsets, line, column, text, lexer
+  errors and final mode — are identical (DEVLOG). Measured gain (`b2-scaling/b2-after-m6.txt`): the one-thread
+  wall of `b2` fell from 110.1 s to 3.4 s (32×, beyond the 15× Amdahl bound estimated from the stack samples), at
+  12 threads it is 2.0 s (55× today's one-thread wall: acceptance MET) with ZERO contended `Monitor` acquisitions;
+  CPU utilisation at 12 threads is 21 % (acceptance NOT met) and the reason is no longer the lexer — 1.3 s of the
+  2.0 s is workstation-GC pause, and the same run under server GC reaches 87 %. `b1` is re-measured on the next
   battery.
 - **Sharing one front end across editions is REJECTED** as unsound: edition state is cached in the front end
   (`Frontend.LexAndParse` primes the lexer with the cell's `EditionInfo`; the reference-format and COPY
@@ -1047,7 +1069,10 @@ token of every compilation recomputes the closure over all default-mode rules an
 - **Process sharding is not built.** It bought 1.8× (two processes) and 2.8× (four) only because each process has
   its own lock; building it would route around the product defect (CLAUDE.md rule 4). After M6, `b6` is re-run: if
   two processes still beat one by more than 15 %, the next in-process serialization is found and fixed at its root.
-- **Server GC** bought 3–9 %: not adopted.
+- **Server GC** bought 3–9 % while the lexer lock bound the process: not adopted then. After M6 it is the next
+  in-process serialization — `b2` over the whole green set spends 3.1–4.0 s of each ~5 s round paused in
+  workstation GC at 8–24 threads, and reaches 6.1× at 87 % CPU on 12 threads under server GC
+  (`b2-scaling/b2-after-m6.txt`) — so it is re-decided as its own mechanism, not inside M6.
 - **The compiled-program cache** (§3.12) already stores check-only results, so a TEST-ONLY re-gate hits every
   continuity cell; a gate after a product change misses by design. No change.
 - **§3.11's "the class-split lever is exhausted"** was measured under this lock. After M6, the partition counts
@@ -1151,7 +1176,7 @@ above. The rejected design and both reviews are in the DEVLOG entry that pivoted
 
 | id | mechanism | files | acceptance (measured, never asserted) | depends on | size |
 |---|---|---|---|---|---|
-| M6 | after warm-up the lexer performs no ATN simulation (§3.14.5); defect note: id allocated by the orchestrator | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4` and the predicate and action methods it calls; `tests/Cobol.Net.Tests.Unit/LexerDfaCacheDriftTests.cs`; this section | token streams of every suite source identical before/after (one-time differential, recorded in the DEVLOG); `LexerDfaCacheDriftTests` red on a planted predicate at the left edge AND on one placed after a common prefix's first character; zero ATN simulation on re-lexing the suite's ASCII sources; the non-ASCII residual reported; `b2` at 12 threads ≥ 8× today's 1-thread wall, CPU utilisation ≥ 70 %; whole battery green | — | 140–200 turns |
+| M6 | after warm-up the lexer performs no ATN simulation (§3.14.5); kb/Work PB1715 | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4` and the predicate and action methods it calls; `tests/Cobol.Net.Tests.Unit/LexerDfaCacheDriftTests.cs`; this section | token streams of every suite source identical before/after (one-time differential, recorded in the DEVLOG); `LexerDfaCacheDriftTests` red on a planted predicate at the left edge AND on one placed after a common prefix's first character; zero ATN simulation on re-lexing the suite's ASCII sources (the one EOF transition per input ANTLR never caches is reported, not counted); the non-ASCII residual reported; `b2` at 12 threads ≥ 8× today's 1-thread wall, CPU utilisation ≥ 70 % (measured 55× and 21 %: the utilisation limit is now the workstation GC, §3.14.5); whole battery green | — | 140–200 turns |
 | M7 | SR23 before the table-value fill; the fill bounded by the phrase (§3.14.5); defect note: id allocated by the orchestrator | `src/Cobol.Net.Compiler/Binding/Model/TableValuePlan.cs` (`TableValueOdometer.Resolve`), `DataBinder.ResolveTableValues`; battery summary top-5 report in `scripts/battery.sh` | the pb505 program rejects with `COBOLNET1946` in < 1 s through the CLI (was 29.6 s); both tests keep their assertions; every Format 2 VALUE golden unchanged; the battery summary lists the five slowest tests | — | 60–100 turns |
 | M11 | the order plan: `NameKey`, tiers 0a/0u/1–3, the budgets and the collection cap (§3.13, §3.14.2); the NARROWING deleted | `scripts/spec/impacted_tests.py` (selection code DELETED — its filter line is always the whole-assembly filter until M13 deletes the line; `--plan` added), `scripts/gate_plan.py`, `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, kb/Work PB1712 (closed) | `--self-test` covers every tier arm, `NameKey`, the unknown budget, the collection cap and the no-map / no-timings / stale-map / empty-leg-1 / whole-assembly-in-leg-1 arms; the filter line is the whole-assembly filter for a base WITH a map; `b4` re-run through the new script reproduces cheapest-first on 68b X (first red ≤ 1 % of the work); `b7` re-run through it: a golden appended to the 85 manifest leaves ONE tier-0u case and a leg-1 floor ≤ 16 s | — | 110–160 turns |
 | M14 | ONE population check for every whole-assembly run, and the handshake scrub (§3.14.3–4) | `scripts/test_population.py` + `--self-test`; `scripts/battery.sh` (PHASE 1 population check; scrub); `.github/workflows/build-and-test.yml` (`conformance-population` runs the tool on the shard trx files; the inline `grep -c` block DELETED; scrub); `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `scripts/spec/record_verdicts.py`, `scripts/spec/record_impact_map.py` (scrub); `GateLegDriftTests` (6); `docs/DRIFT_RULES.md`. As landed, the arm-(6) scan also found `build-local.ps1`/`.sh`, `guard.sh`, `guard-fast.sh`, `measure-battery-determinism.sh` and `filter_population.py` (scrubbed), the scrub grew the VSTest channel, the two other `--list-tests` parsers were folded into the tool's, and `FilterPopulationGuardDriftTests` recognises the new shard shape | the self-test's arms (short, over, skipped, definitions vs results); the battery's PHASE 1 prints each assembly's population line and is red on a planted dropped case; CI's guard red on a planted shard overlap that keeps the count; `b8`'s two inputs pass | — | 60–100 turns |
