@@ -58,7 +58,9 @@ continuous criteria on every change, and as a comprehensive pass over the whole 
 3. **Performance** — hot paths, allocations, data-structure fit, compile throughput.
 4. **Duplication and efficiency** — repeated logic, parallel mechanisms, redundant computation.
 
-Findings become tracked work, never prose that evaporates.
+Findings become tracked work, never prose that evaporates. The comprehensive pass is planned in
+`docs/rearchitecture/DESIGN-architecture-review.md` and run by `.claude/skills/architecture-review`; the owner
+decides when it starts (kb/Work PB1754).
 
 ## 5. Working style
 

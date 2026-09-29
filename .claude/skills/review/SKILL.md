@@ -8,7 +8,7 @@ description: Use when asked for a code review, architecture review, performance 
 > report format) are the procedure. If the plugin is not loaded (a cloud session receives no project marketplace),
 > Read `tools/claude-skills/skills/review/SKILL.md` instead (`git submodule update --init tools/claude-skills` if the
 > path is missing). THEN apply this overlay: the project's review rules, which the base's "Project hooks" section
-> says to honor as hard criteria. It wins on conflict. Pinned: **brent-tools 1.14.1** (`tools/claude-skills`,
+> says to honor as hard criteria. It wins on conflict. Pinned: **brent-tools 1.15.0** (`tools/claude-skills`,
 > kb/Work/PB1699). Project context: scale=long-lived, consequence=high.
 
 # Review
