@@ -20,11 +20,13 @@ echo "=== Building ==="
 dotnet build "$GUARD_CLI_PROJECT" -v quiet
 guard_assert_compiler_identity "$GUARD_CLI_DLL" "$GUARD_COMPILER"
 
+# SCRUBBED (kb/Work PB1718): no gate leg handshake or VSTest*/RunSettingsFilePath property reaches a test host.
+. "$(dirname "$0")/python-resolve.sh"
 echo "=== Unit tests ==="
-dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --verbosity quiet
+"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --verbosity quiet
 
 echo "=== Integration tests ==="
-dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --verbosity quiet
+"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --verbosity quiet
 
 echo "=== NIST regression ==="
 

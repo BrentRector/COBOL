@@ -87,7 +87,8 @@ LEG_LOGS="TestResults/build-local"; mkdir -p "$LEG_LOGS"
 leg() {   # leg <name> <dotnet test args…>
     local name="$1"; shift
     local log="$LEG_LOGS/$name.log"
-    dotnet test "$@" > "$log" 2>&1; local rc=$?
+    # SCRUBBED (kb/Work PB1718): no leg handshake or VSTest*/RunSettingsFilePath property reaches the test host.
+    python scripts/test_population.py scrubbed dotnet test "$@" > "$log" 2>&1; local rc=$?
     python scripts/test_leg_report.py --name "$name" --log "$log" --rc "$rc" || RC=1
 }
 leg conformance      tests/Cobol.Net.Tests.Conformance --no-build --filter "$F"

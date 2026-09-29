@@ -94,7 +94,8 @@ $legLogs = Join-Path (Get-Location) 'TestResults/build-local'
 New-Item -ItemType Directory -Force $legLogs | Out-Null
 function Leg([string]$name, [string[]]$testArgs) {
     $log = Join-Path $legLogs "$name.log"
-    & dotnet test @testArgs *> $log
+    # SCRUBBED (kb/Work PB1718): no leg handshake or VSTest*/RunSettingsFilePath property reaches the test host.
+    & python scripts/test_population.py scrubbed dotnet test @testArgs *> $log
     $legRc = $LASTEXITCODE
     python scripts/test_leg_report.py --name $name --log $log --rc $legRc
     if ($LASTEXITCODE -ne 0) { $script:rc = 1 }

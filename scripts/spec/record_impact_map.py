@@ -51,6 +51,11 @@ import zlib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+# The population and the scrub rule are scripts/test_population.py's (kb/Work PB1718): one `--list-tests` reader,
+# one statement of the environment variables that may narrow a `dotnet test` run.
+sys.path.insert(0, str(REPO / "scripts"))
+from test_population import PopulationError, list_population, scrubbed_env  # noqa: E402
+
 SCHEMA = 2
 ASSEMBLIES = {
     "Conformance": "tests/Cobol.Net.Tests.Conformance",
@@ -63,7 +68,6 @@ PROBED = [
     "CobolSharp.Compiler", "CobolSharp.Runtime",
     "Cobol.Net.Tests.Characterization", "Cobol.Net.Tests.Conformance", "Cobol.Net.Tests.Unit",
 ]
-LISTED_MARK = "The following Tests are available:"
 
 
 def git(*args: str, cwd: Path = REPO) -> str:
@@ -99,15 +103,6 @@ def verdict_line(log: Path) -> str:
         if s.startswith(("Passed!", "Failed!")):
             return s
     return "(no verdict line)"
-
-
-def listed_tests(project: Path, cwd: Path) -> list[str]:
-    env = {**os.environ, "DOTNET_CLI_UI_LANGUAGE": "en"}
-    out = subprocess.run(["dotnet", "test", str(project), "--no-build", "--list-tests"], cwd=cwd, env=env,
-                         capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
-    if LISTED_MARK not in out:
-        return []
-    return [ln.strip() for ln in out.split(LISTED_MARK, 1)[1].splitlines() if ln.startswith("    ")]
 
 
 def read_hits(path: Path) -> set[int]:
@@ -300,13 +295,18 @@ def main() -> int:
         table = json.loads(table_path.read_text(encoding="utf-8"))
         timings["instrument"] = round(time.time() - t1, 1)
 
-        env = {**os.environ, "COBOLNET_IMPACT_DIR": str(raw), "COBOLNET_IMPACT_PROBES": str(len(table["entries"])),
-               "COBOLNET_COMPILE_CACHE": "off", "DOTNET_CLI_UI_LANGUAGE": "en"}
+        # SCRUBBED (§3.14.3): a stray gate handshake or `VSTestTestCaseFilter` would record a PART of an assembly.
+        env = {**scrubbed_env(), "COBOLNET_IMPACT_DIR": str(raw),
+               "COBOLNET_IMPACT_PROBES": str(len(table["entries"])), "COBOLNET_COMPILE_CACHE": "off",
+               "DOTNET_CLI_UI_LANGUAGE": "en"}
         verdicts: dict[str, str] = {}
         listed: dict[str, list[str]] = {}
         for asm in asms:
             proj = wt / ASSEMBLIES[asm]
-            listed[asm] = listed_tests(proj, wt)
+            try:
+                listed[asm] = list(list_population(proj, cwd=wt)[0].elements())
+            except PopulationError as e:
+                return fail(f"the {asm} population could not be listed: {e}")
             t2 = time.time()
             cmd = ["dotnet", "test", str(proj), "--no-build"]
             if args.filter:

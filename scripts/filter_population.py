@@ -70,25 +70,26 @@ cannot rot into asserting against a term that stopped existing.
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
+# The listing's shape and the scrub rule are test_population.py's (kb/Work PB1718): ONE parser of a
+# `--list-tests` output, and ONE statement of which environment variables may narrow a `dotnet test` run.
+from test_population import LISTED_MARK as AVAILABLE, PopulationError, parse_listing, scrubbed_env
+
 # ⛔ The markers below are the ENGLISH strings vstest prints, so the probe pins the CLI's language rather than
 # inheriting the machine's. Without this a non-English machine finds no marker, which this script reports as a
-# failed DISCOVERY (exit 2) — fail-closed, but for a reason no one would guess. The CI's own population
-# assertion greps the same listing shape.
-ENV = {**os.environ, "DOTNET_CLI_UI_LANGUAGE": "en"}
+# failed DISCOVERY (exit 2) — fail-closed, but for a reason no one would guess. SCRUBBED, like every `dotnet
+# test` caller: a stray `VSTestTestCaseFilter` or gate handshake in the environment would narrow the probe.
+ENV = {**scrubbed_env(), "DOTNET_CLI_UI_LANGUAGE": "en"}
 
 # A vstest filter term: <property><operator><value>. The operators are ordered so `!=`/`!~` win over `=`/`~`.
 TERM_RE = re.compile(r"^(?P<prop>[A-Za-z_][A-Za-z0-9_.]*)(?P<op>!=|!~|=|~)(?P<val>.*)$", re.DOTALL)
 # The negated operators, keyed to the positive form that asks "does this name exist at all?".
 POSITIVE_OF = {"!~": "~", "!=": "="}
-AVAILABLE = "The following Tests are available:"
 NO_MATCH = "No test matches the given testcase filter"
-LISTED_RE = re.compile(r"^ {4}\S")
 DEAD, INERT = "DEAD FILTER TERM", "INERT FILTER TERM"
 RC_OK, RC_DEAD, RC_ERROR, RC_INERT = 0, 1, 2, 3
 
@@ -158,18 +159,17 @@ def discover(project: str, term: str | None, allow_build: bool = False) -> tuple
     out = (proc.stdout or "") + (proc.stderr or "")
     if AVAILABLE not in out and NO_MATCH not in out:
         return -1, out.strip()[-1500:]
-    body = out.split(AVAILABLE, 1)[1] if AVAILABLE in out else ""
-    return sum(1 for line in body.splitlines() if LISTED_RE.match(line)), ""
+    return (sum(parse_listing(out, project).values()) if AVAILABLE in out else 0), ""
 
 
 def listed_names(project: str, allow_build: bool = False) -> list[str]:
     """Every test `project` discovers, as printed — display names, theory arguments and all."""
     proc = subprocess.run(discovery_cmd(project, allow_build),
                           capture_output=True, text=True, encoding="utf-8", errors="replace", env=ENV)
-    out = (proc.stdout or "") + (proc.stderr or "")
-    if AVAILABLE not in out:
+    try:
+        return list(parse_listing((proc.stdout or "") + (proc.stderr or ""), project).elements())
+    except PopulationError:
         return []
-    return [line.strip() for line in out.split(AVAILABLE, 1)[1].splitlines() if LISTED_RE.match(line)]
 
 
 def check(filter_text: str, filtered: list[str], unfiltered: list[str],

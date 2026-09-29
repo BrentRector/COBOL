@@ -44,9 +44,15 @@ concurrency:
 # is never masked by another.
 #
 # EVERY direct `dotnet test` step also writes a TRX log (--logger trx, --results-directory TestResults/<OS>-<job>/)
-# and its job uploads them with `if: always()` as artifact test-results-<OS>-<job|shard> (14-day retention) — a
+# and its job uploads them with `if: always()` as artifact test-results-<OS>-<job> (14-day retention) — a
 # red is diagnosable from the artifact without a re-run (kb/Work PB108). The two OSes share shard NAMES, so the
-# artifact name carries both. The guard job is the exception: its verdict is guard-fast.sh's own NIST-loop
+# artifact name carries both; a Conformance shard's is test-results-<OS>-conformance-<shard>, the exact pattern
+# the conformance-population job downloads.
+#
+# ⛔ NO JOB SETS A VARIABLE THAT NARROWS A TEST RUN (kb/Work PB1718; DESIGN-test-build-ci §3.14.3): the gate's leg
+# handshake COBOLNET_GATE_*, or VSTest* / RunSettingsFilePath, which MSBuild imports from the environment as the
+# VSTest target's filter and run settings. A hosted job's environment is exactly what this file declares, so that
+# is how CI scrubs; `python scripts/test_population.py audit-callers` (GateLegDriftTests arm 6) is red on one. The guard job is the exception: its verdict is guard-fast.sh's own NIST-loop
 # output, not a `dotnet test` exit.
 jobs:
   # ── ⛔ THE ONE PLACE THE DOC-ONLY PATH LIST LIVES. It used to be `paths-ignore` on the push trigger, where it
@@ -313,8 +319,9 @@ jobs:
   # job's wall time). Three shards, chosen from measured per-class test counts: the version matrix (~2020 light
   # compiles) · the corpus + NIST runners (~820 heavy compile-and-runs) · THE COMPLEMENT — an exclusion filter,
   # so a NEW test class automatically lands in shard "rest" and can never fall between buckets. Each shard
-  # publishes its executed-test Total; the conformance-population job asserts the shards SUM to the discovered
-  # test count on BOTH platforms — a filter typo or a class rename shows up as a loud mismatch, never as
+  # publishes its trx and its build's `--list-tests` population; the conformance-population job asserts, on BOTH
+  # platforms, that the shards' union IS the discovered population, case by case (scripts/test_population.py) —
+  # a filter typo, a class rename or two overlapping filters show up as named NEVER RAN / RAN TWICE cases, never as
   # silently-untested code (feedback_measure_the_selectors_complement).
   greenfield-conformance:
     name: Greenfield conformance (Linux, sharded)
@@ -366,6 +373,14 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
       - name: Build the conformance project
         run: dotnet build tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
+      # The POPULATION this shard's trx is checked against, listed from THIS build (conformance-population job).
+      - name: List the discovered population (scripts/test_population.py, scrubbed)
+        shell: bash
+        run: |
+          . scripts/python-resolve.sh
+          mkdir -p TestResults/${{ runner.os }}-${{ matrix.shard }}
+          "$PY" scripts/test_population.py list --project tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj \
+            --out TestResults/${{ runner.os }}-${{ matrix.shard }}/conformance.list.txt
       - name: Conformance shard ${{ matrix.shard }}
         shell: bash
         run: |
@@ -373,22 +388,13 @@ jobs:
           dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj --no-build \
             --filter "${{ matrix.filter }}" \
             --logger "trx;LogFileName=conformance-${{ matrix.shard }}.trx" --results-directory TestResults/${{ runner.os }}-${{ matrix.shard }} \
-            2>&1 | tee shard.log
-          grep -Eo 'Total:[[:space:]]+[0-9]+' shard.log | tail -1 | grep -Eo '[0-9]+' > count.txt
-          echo "shard ${{ matrix.shard }} executed $(cat count.txt) tests"
-      - name: Publish shard count
-        uses: actions/upload-artifact@v7
-        with:
-          name: shard-count-${{ runner.os }}-${{ matrix.shard }}
-          path: count.txt
-      - name: Upload test results (TRX + shard log)
+            2>&1 | tee TestResults/${{ runner.os }}-${{ matrix.shard }}/shard.log
+      - name: Upload test results (TRX + population listing + shard log)
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-${{ runner.os }}-${{ matrix.shard }}
-          path: |
-            TestResults/${{ runner.os }}-${{ matrix.shard }}/*.trx
-            shard.log
+          name: test-results-${{ runner.os }}-conformance-${{ matrix.shard }}
+          path: TestResults/${{ runner.os }}-${{ matrix.shard }}/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -497,6 +503,14 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
       - name: Build the conformance project (Release)
         run: dotnet build tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj --configuration Release
+      # The POPULATION this shard's trx is checked against, listed from THIS (Release, Windows) build.
+      - name: List the discovered population (scripts/test_population.py, scrubbed)
+        shell: bash
+        run: |
+          . scripts/python-resolve.sh
+          mkdir -p TestResults/${{ runner.os }}-${{ matrix.shard }}
+          "$PY" scripts/test_population.py list --project tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj \
+            --configuration Release --out TestResults/${{ runner.os }}-${{ matrix.shard }}/conformance.list.txt
       - name: Conformance shard ${{ matrix.shard }}
         shell: bash
         run: |
@@ -504,29 +518,24 @@ jobs:
           dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj --no-build --configuration Release \
             --filter "${{ matrix.filter }}" \
             --logger "trx;LogFileName=conformance-${{ matrix.shard }}.trx" --results-directory TestResults/${{ runner.os }}-${{ matrix.shard }} \
-            2>&1 | tee shard.log
-          grep -Eo 'Total:[[:space:]]+[0-9]+' shard.log | tail -1 | grep -Eo '[0-9]+' > count.txt
-          echo "shard ${{ matrix.shard }} executed $(cat count.txt) tests"
-      - name: Publish shard count
-        uses: actions/upload-artifact@v7
-        with:
-          name: shard-count-${{ runner.os }}-${{ matrix.shard }}
-          path: count.txt
-      - name: Upload test results (TRX + shard log)
+            2>&1 | tee TestResults/${{ runner.os }}-${{ matrix.shard }}/shard.log
+      - name: Upload test results (TRX + population listing + shard log)
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-${{ runner.os }}-${{ matrix.shard }}
-          path: |
-            TestResults/${{ runner.os }}-${{ matrix.shard }}/*.trx
-            shard.log
+          name: test-results-${{ runner.os }}-conformance-${{ matrix.shard }}
+          path: TestResults/${{ runner.os }}-${{ matrix.shard }}/
           if-no-files-found: ignore
           retention-days: 14
 
-  # ── The shard POPULATION GUARD: discovery is re-derived (`--list-tests`), and each platform's shard Totals
-  # must SUM to it exactly. Runs only when every shard succeeded — it is the "did the shards cover everything"
-  # check, not a substitute for their pass/fail. A theory whose cases cannot enumerate at discovery time would
-  # trip this loudly; that is the safe direction (a false red, never a silent gap). ──
+  # ── The shard POPULATION GUARD (kb/Work PB1718; DESIGN-test-build-ci §3.14.4): per platform, the UNION of the
+  # shards' trx test definitions must equal the discovered population (`--list-tests`, which every shard listed
+  # from its own build) as a MULTISET — every case exactly once. It used to SUM each shard's `Total:` against a
+  # `grep -c` of the listing, and a count cannot see a dropped case offset by one that ran twice: two shard filters
+  # that overlapped by one test while a third dropped one summed exactly. It is the one tool the battery and the gate
+  # use, so the three whole-assembly runs cannot disagree about what "whole" means. Runs only when every shard
+  # succeeded — the "did the shards cover everything" check, not a substitute for their pass/fail. No .NET here:
+  # the listings come from the shards, so the population is the one the trx files were produced by. ──
   conformance-population:
     name: Conformance shard population guard
     needs: [changes, greenfield-conformance, windows-conformance]
@@ -536,40 +545,22 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: false
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
-      - name: Cache NuGet packages
-        uses: actions/cache@v6
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
-          restore-keys: ${{ runner.os }}-nuget-
-      - name: Build the conformance project
-        run: dotnet build tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
-      - name: Download shard counts
+      - name: Download every shard's trx and population listing
         uses: actions/download-artifact@v8
         with:
-          pattern: shard-count-*
-          path: counts
-      - name: Assert the shards sum to the discovered population, per platform
+          pattern: test-results-*-conformance-*
+          path: shards
+      - name: Assert the shards' union is exactly the discovered population, per platform (test_population.py)
         shell: bash
         run: |
-          disc=$(dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj --no-build \
-                   --list-tests 2>/dev/null | grep -cE '^    CobolNet\.Tests\.Conformance\.')
-          echo "discovered: $disc"
+          . scripts/python-resolve.sh
           fail=0
           for os in Linux Windows; do
-            sum=0
-            for f in counts/shard-count-$os-*/count.txt; do
-              n=$(cat "$f"); echo "$f: $n"; sum=$((sum + n))
-            done
-            echo "$os shard sum: $sum"
-            if [ "$sum" -ne "$disc" ]; then
-              echo "::error::POPULATION MISMATCH ($os): shards executed $sum of $disc discovered tests — a shard filter is dropping or double-counting tests"
-              fail=1
-            fi
+            # An absent platform leaves its globs unexpanded: the tool reads no file and exits 2 — red, never green.
+            "$PY" scripts/test_population.py check --label "Conformance ($os shards)" \
+              --listing shards/test-results-$os-conformance-*/conformance.list.txt \
+              --trx shards/test-results-$os-conformance-*/*.trx \
+              || { echo "::error::POPULATION MISMATCH ($os): the shards' union is not the discovered population — see the names above"; fail=1; }
           done
           exit $fail
 

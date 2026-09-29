@@ -89,7 +89,8 @@ neither guard hard-coding a CLI path); `guard-nist-audit.sh` asserts it dynamica
 ### 1.4 CI (`.github/workflows/build-and-test.yml`) — a gated matrix behind ONE required check
 Ten jobs. `changes` decides whether the matrix runs at all; then, concurrently, `guard` (WiseOwl COBOL parallel NIST +
 legacy unit/integration, ubuntu) · `greenfield-conformance` (ubuntu, 6 shards) · `greenfield-unit` (ubuntu) ·
-`windows-conformance` (windows, the same 6 shards, Release) · `conformance-population` (the shard-sum guard) ·
+`windows-conformance` (windows, the same 6 shards, Release) · `conformance-population` (the shards' union against
+each platform's discovered population, `scripts/test_population.py`, §3.14.4) ·
 `inv1-strong-2023` · `windows-build-test` (Release warnings-as-errors) · `legacy-oracle` (schedule/dispatch only);
 and finally `ci-gate`. NuGet cached; `Generated/` regenerated per checkout (java+pwsh prerequisites).
 
@@ -889,11 +890,25 @@ digest of that file).
   (`GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_LEG is set but COBOLNET_GATE_PLAN_SHA256 is not`). The run is RED, never
   a silent whole or partial run. A developer who exports two of the variables by hand to reproduce a leg therefore
   gets a red battery, not a green one with a third of Conformance missing.
-- ⛔ **Every caller of `dotnet test` other than the driver scrubs the three variables** (`battery.sh`, the CI workflow,
-  `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `record_verdicts.py`, `record_impact_map.py`); `GateLegDriftTests` arm (6)
-  is red on a caller under `scripts/` or `.github/workflows/` that runs `dotnet test` without doing so. A console
-  marker printed from inside the test host was considered and not adopted: what vstest shows of a host's output at
-  `--verbosity quiet` is unmeasured, while the refusal arm and the population check below are measured.
+- ⛔ **Every caller of `dotnet test` scrubs its environment** — the three handshake variables, and with them the two
+  OTHER environment channels that narrow a run while it exits 0 (M14, measured 2026-09-28 on Characterization's 33
+  cases): MSBuild imports every environment variable as a property, so `VSTestTestCaseFilter=FullyQualifiedName~Snapshot`
+  ran 31 cases, and `RunSettingsFilePath` (or `VSTestSetting`) naming a runsettings file with a `TestCaseFilter` did
+  the same — in the run AND in `--list-tests`, so a population listed in the caller's environment is blind to them.
+  The rule is written once, `test_population.py`'s `is_scrubbed`: the prefixes `COBOLNET_GATE_` and `VSTest`, and
+  `RunSettingsFilePath`, case-insensitively. A python caller passes `env=scrubbed_env()` (`record_impact_map.py`,
+  `filter_population.py`; the driver merges its handshake over the scrubbed environment); every other caller runs
+  `python scripts/test_population.py scrubbed dotnet test …` — `battery.sh`, `build-local.ps1`/`.sh`, `gen-vcr.ps1`,
+  `gen-diagnostics-doc.ps1`, `guard.sh`, `guard-fast.sh`, `measure-battery-determinism.sh`, and the gate command
+  `record_verdicts.py` prints. It runs the command rather than printing names to unset, because a PowerShell script
+  run in the operator's session would otherwise delete the operator's own variables. **The CI workflow scrubs by
+  construction**: a GitHub-hosted job's environment is exactly what the workflow declares, so it scrubs by setting
+  none of those variables. `GateLegDriftTests` arm (6) runs `test_population.py audit-callers`, which is red on a
+  `dotnet test` in command position under `scripts/` (the hooks excepted: they receive commands as data), on a
+  python `["dotnet", "test", …]` without `scrubbed_env`, on a printed unscrubbed instruction, and on a workflow that
+  sets a scrubbed variable. A console marker printed from inside the test host was considered and not adopted: what
+  vstest shows of a host's output at `--verbosity quiet` is unmeasured, while the refusal arm and the population
+  check below are measured.
 
 **Each leg host writes its IDENTITY RECORD** into the gate's run directory (`leg-<n>-<assembly>.json`): the plan
 digest it read, its leg, the MVID and SHA-256 of the test assembly, the SHA-256 of every product assembly in its
@@ -925,12 +940,18 @@ functions and of `filter_population.py` (a gate without a vstest filter has no t
 #### 3.14.4 Soundness: the population check — ONE tool for every whole-assembly run
 
 `scripts/test_population.py` (a module and a CLI) answers one question for any run: did the union of its trx files
-execute exactly the discovered population? Its callers are the gate driver (per assembly, over both legs), the
-battery (`battery.sh` PHASE 1, all three assemblies — until now it accepted any `Passed!` line with exit 0), and CI's
-`conformance-population` job (over each platform's shard trx files; the inline `grep -c` count block is deleted in
-the same change, because a count cannot see a dropped test offset by one that ran twice).
+execute exactly the discovered population? Its callers are the gate driver (per assembly, over both legs: the module's
+`list_population` and `check`), the battery (`battery.sh` PHASE 1, all three assemblies — `check --project … --trx …`;
+until M14 it accepted any `Passed!` line with exit 0), and CI's `conformance-population` job (`check --listing … --trx
+…` over each platform's shard trx files; the inline `grep -c` count block and the `shard-count-*` artifacts were
+deleted in the same change, because a count cannot see a dropped test offset by one that ran twice). Each CI shard
+lists its OWN build's population (`test_population.py list`, 2 s) and uploads it beside its trx as
+`test-results-<OS>-conformance-<shard>`, so the checking job needs no .NET and no build of its own, and the listings
+of one platform must be identical — the shards ran one build — or the check is an error. It also owns the ONE parser
+of a `--list-tests` output (`parse_listing`); `filter_population.py` and `record_impact_map.py` import it.
 - **The population** is `dotnet test --list-tests` — vstest discovery, which never calls the executor and so cannot see
-  the leg filter.
+  the leg filter — listed by the tool itself in a SCRUBBED environment (§3.14.3), because the VSTest environment
+  channel narrows discovery exactly as it narrows the run.
 - **The executed set** is the multiset union of the trx files' TEST DEFINITIONS (`<UnitTest name>`, one per
   discovered case that executed). Not the RESULT names: xunit lists a theory whose data it cannot serialize as ONE
   case and then reports one result per row, so Unit's results carry 33 names `--list-tests` never printed and miss 2
@@ -938,7 +959,12 @@ the same change, because a count cannot see a dropped test offset by one that ra
 - a name short → `NEVER RAN` (red, each named) — unless the run stopped early, when the remainder is reported as NOT
   RUN and the verdict is already RED/INCOMPLETE;
 - a name over → `RAN TWICE` (red, named);
+- a definition the listing never printed → `NOT IN THE POPULATION` (red, named: a trx of another build or assembly);
 - a definition with no Passed or Failed result → counted as SKIPPED on the verdict line, never as ran;
+- an input it cannot read (a missing or non-trx file, a listing without vstest's marker, an EMPTY population,
+  listings that disagree) → exit 2, an error, never a finding. Each run prints one line,
+  `=== POPULATION <label>: EXACT — 9,317/9,317 cases ran (skipped 0) across 1 trx ===` or `RED — …` followed by the
+  named cases;
 - (gate only) an IDENTITY MISMATCH → red: two legs read two plans (digest), or a leg ran binaries other than the ones
   the driver built and listed (the identity records' hashes against step 3's), so totality no longer holds.
 
@@ -951,7 +977,10 @@ RED/INCOMPLETE), no plan (one leg, plain order), an assembly whose leg 1 is empt
 whole), a partial handshake on a real leg host (every case an execution error, RED), a second gate in the same
 worktree (refused), and `-Mode lander` (one leg, no fail-fast, no slot); (4) every test project under `tests/` that
 the gate runs links `GateLegs.cs`; (5) no discovered display name in a gated assembly contains the repository root;
-(6) every `dotnet test` caller outside the driver scrubs `COBOLNET_GATE_*`.
+(6) every `dotnet test` caller scrubs `COBOLNET_GATE_*`, `VSTest*` and `RunSettingsFilePath`
+(`test_population.py audit-callers`, §3.14.3) — the driver included, which merges its own handshake over the
+scrubbed environment. Each arm is one test method named for its number, so the mechanisms that land them separately
+merge by union.
 
 #### 3.14.5 Whole-suite speed — measured first
 
@@ -1125,7 +1154,7 @@ above. The rejected design and both reviews are in the DEVLOG entry that pivoted
 | M6 | after warm-up the lexer performs no ATN simulation (§3.14.5); defect note: id allocated by the orchestrator | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4` and the predicate and action methods it calls; `tests/Cobol.Net.Tests.Unit/LexerDfaCacheDriftTests.cs`; this section | token streams of every suite source identical before/after (one-time differential, recorded in the DEVLOG); `LexerDfaCacheDriftTests` red on a planted predicate at the left edge AND on one placed after a common prefix's first character; zero ATN simulation on re-lexing the suite's ASCII sources; the non-ASCII residual reported; `b2` at 12 threads ≥ 8× today's 1-thread wall, CPU utilisation ≥ 70 %; whole battery green | — | 140–200 turns |
 | M7 | SR23 before the table-value fill; the fill bounded by the phrase (§3.14.5); defect note: id allocated by the orchestrator | `src/Cobol.Net.Compiler/Binding/Model/TableValuePlan.cs` (`TableValueOdometer.Resolve`), `DataBinder.ResolveTableValues`; battery summary top-5 report in `scripts/battery.sh` | the pb505 program rejects with `COBOLNET1946` in < 1 s through the CLI (was 29.6 s); both tests keep their assertions; every Format 2 VALUE golden unchanged; the battery summary lists the five slowest tests | — | 60–100 turns |
 | M11 | the order plan: `NameKey`, tiers 0a/0u/1–3, the budgets and the collection cap (§3.13, §3.14.2); the NARROWING deleted | `scripts/spec/impacted_tests.py` (selection code DELETED — its filter line is always the whole-assembly filter until M13 deletes the line; `--plan` added), `scripts/gate_plan.py`, `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, kb/Work PB1712 (closed) | `--self-test` covers every tier arm, `NameKey`, the unknown budget, the collection cap and the no-map / no-timings / stale-map / empty-leg-1 / whole-assembly-in-leg-1 arms; the filter line is the whole-assembly filter for a base WITH a map; `b4` re-run through the new script reproduces cheapest-first on 68b X (first red ≤ 1 % of the work); `b7` re-run through it: a golden appended to the 85 manifest leaves ONE tier-0u case and a leg-1 floor ≤ 16 s | — | 110–160 turns |
-| M14 | ONE population check for every whole-assembly run, and the handshake scrub (§3.14.3–4) | `scripts/test_population.py` + `--self-test`; `scripts/battery.sh` (PHASE 1 population check; scrub); `.github/workflows/build-and-test.yml` (`conformance-population` runs the tool on the shard trx files; the inline `grep -c` block DELETED; scrub); `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `scripts/spec/record_verdicts.py`, `scripts/spec/record_impact_map.py` (scrub); `GateLegDriftTests` (6); `docs/DRIFT_RULES.md` | the self-test's arms (short, over, skipped, definitions vs results); the battery's PHASE 1 prints each assembly's population line and is red on a planted dropped case; CI's guard red on a planted shard overlap that keeps the count; `b8`'s two inputs pass | — | 60–100 turns |
+| M14 | ONE population check for every whole-assembly run, and the handshake scrub (§3.14.3–4) | `scripts/test_population.py` + `--self-test`; `scripts/battery.sh` (PHASE 1 population check; scrub); `.github/workflows/build-and-test.yml` (`conformance-population` runs the tool on the shard trx files; the inline `grep -c` block DELETED; scrub); `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `scripts/spec/record_verdicts.py`, `scripts/spec/record_impact_map.py` (scrub); `GateLegDriftTests` (6); `docs/DRIFT_RULES.md`. As landed, the arm-(6) scan also found `build-local.ps1`/`.sh`, `guard.sh`, `guard-fast.sh`, `measure-battery-determinism.sh` and `filter_population.py` (scrubbed), the scrub grew the VSTest channel, the two other `--list-tests` parsers were folded into the tool's, and `FilterPopulationGuardDriftTests` recognises the new shard shape | the self-test's arms (short, over, skipped, definitions vs results); the battery's PHASE 1 prints each assembly's population line and is red on a planted dropped case; CI's guard red on a planted shard overlap that keeps the count; `b8`'s two inputs pass | — | 60–100 turns |
 | M12 | the in-assembly leg filter, the handshake and the identity records (§3.14.3) | `tests/_shared/GateLegs.cs`, the three test `.csproj` links, `tools/impact/ImpactTestFramework.cs` + `ImpactRecording.targets` (`IMPACT_RECORDING`), `tests/Cobol.Net.Tests.Unit/ParenTokenTwinDriftTests.cs` (repository-relative path argument), `GateLegDriftTests` (1), (2), (4), (5) | with no handshake every assembly's count and verdict are unchanged; with a full one, each leg's trx definitions are exactly its leg's cases and the two legs' union equals `--list-tests`; each partial handshake (one variable, two, missing file, digest mismatch, bad leg) makes every case an execution error and the run RED; each leg writes its identity record; a planted non-permutation throws; no display name carries the repository root; a recording at HEAD still records every test (the recorder's watchdog) | M11 (the plan format) | 130–190 turns |
 | M2 | the cross-worktree gate cap, FIFO (§3.14.6) | `scripts/gate_slot.py` + `--self-test`; `tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs` | the self-test's five arms (FIFO order included), on Windows and on Linux; N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N implementer gates, their builds included | — | 90–130 turns |
 | M13 | the ordered gate: driver, modes, worktree lock, run directory, fail-fast, and the wiring that deletes the selection interface (§3.14.1, §3.14.3–4) | `scripts/run_gate_legs.py` (takes the slot, §3.14.6), `scripts/spec/record_impact_map.py` (the recorder takes a slot too, and spawns every child through `Slot.spawn_kwargs`), `scripts/build-local.ps1` + `.sh` (`-Filter` removed, `-Mode lander\|implementer` required, `Leg` replaced); `scripts/spec/impacted_tests.py` (the filter line and `--plus` DELETED); `GateLegDriftTests` (3); in the SAME change every caller of either interface: `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md` (I1, I2, I7), `implementer-brief.md`, `fix-lane-implementer-brief.md`, `dispatch-spec-implementer.md`, `lander-train-brief.md` and `lander-brief.md` (`-Mode lander`), `.claude/skills/workstream/check_practices.py` (its required `impacted_tests\.py --base` patterns), `.claude/skills/workstream/SKILL.md`, `.claude/agents/cobol-implementer.md`, `.claude/skills/gate/SKILL.md`, `scripts/hooks/test_forbidden_commands.py` (its `-Filter` fixture), `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, `docs/DRIFT_RULES.md`, `docs/DOC_INDEX.md`, plan §9, README, CONTRIBUTING, the PR template | the self-test's arms (§3.14.4 (3)); a real gate on a planted red in a leg-1 test stops after leg 1 with the remainder named; a real green gate's population equals `--list-tests` for all three assemblies; a real `-Mode lander` gate runs one leg with no slot; `check_practices.py` green with no `impacted_tests` pattern left; over the next train, each implementer gate's time to first red, whole wall and green-path barrier cost (leg 1's wall beyond its share of the work, plus the extra host starts) are recorded, against the lander's single leg | M11, M12, M14, M2 | 170–220 turns |

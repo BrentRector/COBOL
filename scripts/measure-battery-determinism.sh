@@ -13,6 +13,7 @@
 # It changes nothing and builds nothing between runs — that is the point. Build once, first, yourself.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
+. scripts/python-resolve.sh   # "$PY" — every test run below is SCRUBBED through test_population.py (kb/Work PB1718)
 LEG="${1:-guard}"; RUNS="${2:-5}"
 OUT="${3:-${TMPDIR:-/tmp}/determinism-$LEG}"
 mkdir -p "$OUT"
@@ -26,10 +27,10 @@ for i in $(seq 1 "$RUNS"); do
         guard)
             bash scripts/guard-fast.sh > "$OUT/run$i.log" 2>&1 ;;
         conformance)
-            dotnet test tests/Cobol.Net.Tests.Conformance --no-build --verbosity quiet \
+            "$PY" scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Conformance --no-build --verbosity quiet \
                 > "$OUT/run$i.log" 2>&1 ;;
         unit)
-            dotnet test tests/Cobol.Net.Tests.Unit --no-build --verbosity quiet \
+            "$PY" scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Unit --no-build --verbosity quiet \
                 > "$OUT/run$i.log" 2>&1 ;;
         *) echo "unknown leg: $LEG" >&2; exit 2 ;;
     esac

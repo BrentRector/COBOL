@@ -41,14 +41,14 @@ namespace CobolNet.Tests.Unit;
 /// <list type="number">
 /// <item><description>a call to <c>scripts/filter_population.py</c>, which asks vstest per TERM whether the term
 /// names a real test — the ONE place that rule lives;</description></item>
-/// <item><description>the SHARDED form: the leg captures vstest's own <c>Total:</c> count into
-/// <c>count.txt</c>, publishes it as a <c>shard-count-*</c> artifact, and the <c>conformance-population</c> job
-/// re-discovers the population with <c>--list-tests</c> and asserts the shards SUM to it. That is a STRONGER
-/// assertion than a per-term floor, which is why the shard legs are not made to call the guard as well — a
-/// second, weaker guard beside a stronger one is duplication, not defence in depth. Its validity depends
-/// entirely on that summing job still existing, which is why
-/// <see cref="TheShardPopulationJob_StillReDiscoversAndSumsTheShardCounts"/> is a separate test rather than a
-/// comment.</description></item>
+/// <item><description>the SHARDED form: the leg lists its build's population with
+/// <c>scripts/test_population.py list</c> and publishes it beside its trx, and the <c>conformance-population</c>
+/// job runs <c>test_population.py check</c> over every shard's trx against that listing — the shards' UNION must be
+/// the discovered population case by case (kb/Work PB1718). That is a STRONGER assertion than a per-term floor,
+/// which is why the shard legs are not made to call the guard as well — a second, weaker guard beside a stronger
+/// one is duplication, not defence in depth. Its validity depends entirely on that checking job still existing,
+/// which is why <see cref="TheShardPopulationJob_StillChecksTheShardUnionAgainstTheListing"/> is a separate test
+/// rather than a comment.</description></item>
 /// </list>
 /// <para>
 /// ⚠ SCOPE — the EXECUTABLE surfaces: everything under <c>scripts/</c> and every workflow under
@@ -83,11 +83,17 @@ public sealed class FilterPopulationGuardDriftTests
     private static bool RunsAFilteredTest(string text)
         => text.Contains("dotnet test", StringComparison.Ordinal) && text.Contains("--filter", StringComparison.Ordinal);
 
-    /// <summary>The sharded population assertion, recognized by its three moving parts rather than by name.</summary>
-    private static bool AssertsPopulationByShardCount(string text)
-        => text.Contains("count.txt", StringComparison.Ordinal)
-        && text.Contains("Total:", StringComparison.Ordinal)
-        && text.Contains("shard-count-", StringComparison.Ordinal);
+    /// <summary>
+    /// The sharded population assertion, recognized by its moving parts rather than by name: the shard lists its
+    /// population through the one tool and writes the trx that the checking job reads.
+    /// </summary>
+    private static bool AssertsPopulationByShardUnion(string text)
+        => text.Contains(PopulationTool + " list", StringComparison.Ordinal)
+        && text.Contains("trx;LogFileName=", StringComparison.Ordinal)
+        && text.Contains("upload-artifact", StringComparison.Ordinal);
+
+    /// <summary>The one population check every whole-assembly run shares (kb/Work PB1718).</summary>
+    private const string PopulationTool = "scripts/test_population.py";
 
     /// <summary>
     /// Every script and every CI job that runs a filtered test asserts that the filter selected something.
@@ -131,7 +137,7 @@ public sealed class FilterPopulationGuardDriftTests
                 string code = CodeOnly(body);
                 if (!RunsAFilteredTest(code)) continue;
                 jobSites.Add($"{name}:{job}");
-                if (!code.Contains(Guard, StringComparison.Ordinal) && !AssertsPopulationByShardCount(code))
+                if (!code.Contains(Guard, StringComparison.Ordinal) && !AssertsPopulationByShardUnion(code))
                     offenders.Add($"{name} job '{job}'");
             }
         }
@@ -150,27 +156,29 @@ public sealed class FilterPopulationGuardDriftTests
     }
 
     /// <summary>
-    /// The shard legs' population assertion IS the summing job; if it goes, their exemption goes with it.
+    /// The shard legs' population assertion IS the checking job; if it goes, their exemption goes with it.
     /// </summary>
     [Fact]
-    public void TheShardPopulationJob_StillReDiscoversAndSumsTheShardCounts()
+    public void TheShardPopulationJob_StillChecksTheShardUnionAgainstTheListing()
     {
         string workflow = TestRepo.At(".github", "workflows", "build-and-test.yml");
-        var summing = SplitJobs(File.ReadAllLines(workflow), "build-and-test.yml")
+        var checking = SplitJobs(File.ReadAllLines(workflow), "build-and-test.yml")
             .Select(j => (j.Name, Code: CodeOnly(j.Body)))
-            .Where(j => j.Code.Contains("shard-count-", StringComparison.Ordinal)
-                     && j.Code.Contains("--list-tests", StringComparison.Ordinal))
+            .Where(j => j.Code.Contains(PopulationTool + " check", StringComparison.Ordinal)
+                     && j.Code.Contains("download-artifact", StringComparison.Ordinal))
             .ToList();
 
-        Assert.True(summing.Count > 0,
-            "No CI job re-discovers the conformance population and sums the shard counts against it. The sharded\n"
+        Assert.True(checking.Count > 0,
+            "No CI job checks the conformance shards' union against the discovered population. The sharded\n"
             + "legs are exempt from calling scripts/filter_population.py ONLY because that job asserts something\n"
-            + "STRONGER on their behalf (kb/Work PB752). With it gone, every shard filter is an unverified claim\n"
-            + "again: either restore the summing job, or make each shard leg call the guard.");
+            + "STRONGER on their behalf (kb/Work PB752, PB1718). With it gone, every shard filter is an unverified\n"
+            + "claim again: either restore the checking job, or make each shard leg call the guard.");
 
-        string code = summing[0].Code;
-        Assert.Contains("POPULATION MISMATCH", code, StringComparison.Ordinal);
-        Assert.Contains("download-artifact", code, StringComparison.Ordinal);
+        // The check reads BOTH halves — the shards' listings and their trx files — never a count of either.
+        string code = checking[0].Code;
+        Assert.Contains("--listing", code, StringComparison.Ordinal);
+        Assert.Contains("--trx", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("grep -c", code, StringComparison.Ordinal);
     }
 
     /// <summary>

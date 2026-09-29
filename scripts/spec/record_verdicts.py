@@ -78,11 +78,12 @@ CONTROL = (RETIRE, RETIRE_REASON)
 # matches nothing with a PASSING run of zero tests, so if `SpecTraceabilityInventoryDriftTests` is renamed or
 # partitioned, the operator who pastes this line sees a green that proves nothing about the rows just recorded.
 # The guard is the same one `build-local.{ps1,sh}`, the two regenerators and the CI legs call — one rule, one
-# place — so the two lines below fail loudly instead.
+# place — so the two lines below fail loudly instead. The run itself is SCRUBBED (kb/Work PB1718): a gate leg
+# handshake or a VSTest*/RunSettingsFilePath variable left in the operator's shell would narrow it further.
 GATE_FILTER = "FullyQualifiedName~SpecTraceabilityInventory"
 GATE_PROJECT = "tests/Cobol.Net.Tests.Unit"
 GATE = (f'python scripts/filter_population.py --filter "{GATE_FILTER}" --filtered {GATE_PROJECT} --allow-build\n'
-        f'    dotnet test {GATE_PROJECT} --filter "{GATE_FILTER}"')
+        f'    python scripts/test_population.py scrubbed dotnet test {GATE_PROJECT} --filter "{GATE_FILTER}"')
 INVENTORY_REL = "tests/version-matrix/traceability-inventory.json"
 
 

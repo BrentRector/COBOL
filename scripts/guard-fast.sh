@@ -68,11 +68,12 @@ guard_assert_compiler_identity "$CLI" "$GUARD_COMPILER" || exit 1
 el "=== Unit + Integration tests (parallel, --no-build) ==="
 # --logger console;verbosity=minimal so a red run NAMES its failing tests in the log — battery #29's one
 # integration red was unnameable from a quiet-verbosity log, breaking the no-flake-without-a-name discipline
-# (kb/Work PB127): quiet prints only the Passed!/Failed! summary line.
-dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --no-build --verbosity quiet \
+# (kb/Work PB127): quiet prints only the Passed!/Failed! summary line. SCRUBBED (kb/Work PB1718): no gate leg
+# handshake or VSTest*/RunSettingsFilePath property reaches a test host.
+"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --no-build --verbosity quiet \
     --logger "console;verbosity=minimal" > "$TMP/gf_unit.log" 2>&1 &
 UNIT=$!
-dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --no-build --verbosity quiet \
+"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --no-build --verbosity quiet \
     --logger "console;verbosity=minimal" > "$TMP/gf_int.log" 2>&1 &
 INT=$!
 

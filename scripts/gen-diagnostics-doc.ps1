@@ -22,7 +22,8 @@ try {
         throw "the regeneration filter selects nothing (filter_population rc $LASTEXITCODE) — NOTHING WAS REGENERATED; see the finding above (kb/Work PB751)"
     }
     $env:COBOLNET_WRITE_DIAGNOSTICS_DOC = '1'
-    dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj -c Debug --filter $filter
+    # SCRUBBED (kb/Work PB1718): a stray leg handshake or VSTest* property would narrow even this one-test run.
+    python scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj -c Debug --filter $filter
     if ($LASTEXITCODE -ne 0) { throw "regeneration test failed (exit $LASTEXITCODE)" }
     Write-Host 'Regenerated docs/DIAGNOSTICS.md from DiagnosticCatalog.'
 }

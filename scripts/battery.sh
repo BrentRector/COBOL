@@ -12,7 +12,8 @@
 #   PHASE 0  build the solution ONCE          — every --no-build leg below depends on it (a stale test-bin
 #                                               compiler DLL hides regressions: plan §0 "Mechanics")
 #   PHASE 1  Conformance ∥ Unit ∥ Characterization — three independent --no-build assemblies, fully concurrent.
-#            Wall-clock becomes the POLE (Conformance), not the SUM.
+#            Wall-clock becomes the POLE (Conformance), not the SUM. Each is population-checked afterwards:
+#            its trx must hold every discovered case exactly once (scripts/test_population.py, kb/Work PB1718).
 #   PHASE 2a guard evidence-rule witnesses    — seconds. Proves the NIST guard's verdicts still MEAN what they
 #                                               say (a lost observation is a NO-VERDICT, a wrong answer is a
 #                                               REGRESSION) before phase 2's output is believed. §3.10
@@ -98,24 +99,40 @@ note "BUILD: ok"
 
 if [ "${SKIP_TESTS:-0}" != "1" ]; then
     el "=== PHASE 1: Conformance ∥ Unit ∥ Characterization (independent --no-build assemblies) ==="
-    dotnet test tests/Cobol.Net.Tests.Conformance --no-build --verbosity quiet \
+    # ⛔ SCRUBBED (kb/Work PB1718; DESIGN-test-build-ci §3.14.3): every run goes through `test_population.py
+    # scrubbed`, which drops the gate's leg handshake (COBOLNET_GATE_*) and the MSBuild properties that filter a run
+    # from the environment (VSTest*, RunSettingsFilePath) — a stray one would make this whole-assembly run a PART.
+    # Every leg writes a TRX (kb/Work PB1573): at --verbosity quiet the console log carries only the verdict line,
+    # so the TRX is the ONLY record of a failing test's message and stack — and the population check below reads it.
+    "$PY" scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Conformance --no-build --verbosity quiet \
         --logger "trx;LogFileName=conformance.trx" --results-directory "$OUT" > "$OUT/conformance.log" 2>&1 &
     P_CONF=$!
-    dotnet test tests/Cobol.Net.Tests.Unit --no-build --verbosity quiet \
+    "$PY" scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Unit --no-build --verbosity quiet \
         --logger "trx;LogFileName=unit.trx" --results-directory "$OUT" > "$OUT/unit.log" 2>&1 &
     P_UNIT=$!
-    # Every leg writes a TRX (kb/Work PB1573): at --verbosity quiet the console log carries only the verdict line,
-    # so the TRX is the ONLY record of a failing test's message and stack — and this leg used to have none.
-    dotnet test tests/Cobol.Net.Tests.Characterization --no-build --verbosity quiet \
+    "$PY" scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Characterization --no-build --verbosity quiet \
         --logger "trx;LogFileName=characterization.trx" --results-directory "$OUT" > "$OUT/characterization.log" 2>&1 &
     P_CHAR=$!
     wait $P_CONF; RC_CONF=$?
     wait $P_UNIT; RC_UNIT=$?
     wait $P_CHAR; RC_CHAR=$?
+    # ⛔ A `Passed!` LINE IS NOT A POPULATION (kb/Work PB1718; DESIGN-test-build-ci §3.14.4). This phase used to accept
+    # any verdict line with exit 0, so a run that executed a THIRD of its assembly — a stray filter, a leg handshake
+    # left in the environment — read GREEN. Each assembly is now listed (`--list-tests`, scrubbed) and its trx's test
+    # definitions must equal that listing as a multiset: every discovered case ran exactly once. It is the ONE tool
+    # CI's shard guard uses too (and the ordered gate's driver, §3.14.9 M13); its `--self-test` fires every arm
+    # (GateLegDriftTests).
     for leg in conformance unit characterization; do
+        case "$leg" in conformance) asm=Conformance ;; unit) asm=Unit ;; characterization) asm=Characterization ;; esac
         v=$(grep -E "^(Passed!|Failed!)" "$OUT/$leg.log" | tail -1)
         note "$(printf '%-16s %s' "$leg:" "${v:-NO VERDICT LINE — the leg produced no result, which is a FAILURE}")"
         [ -n "$v" ] || RC=1
+        "$PY" scripts/test_population.py check --label "$asm" --project "tests/Cobol.Net.Tests.$asm" \
+            --save-listing "$OUT/$leg.list.txt" --trx "$OUT/$leg.trx" > "$OUT/$leg.population.log" 2>&1
+        PRC=$?
+        p=$(grep -E '^=== POPULATION ' "$OUT/$leg.population.log" | tail -1)
+        note "$(printf '%-16s %s' "  population:" "${p:-NO POPULATION LINE — the check did not run, which is a FAILURE (see $OUT/$leg.population.log)}")"
+        [ "$PRC" -eq 0 ] || RC=1
     done
     [ "$RC_CONF" -eq 0 ] && [ "$RC_UNIT" -eq 0 ] && [ "$RC_CHAR" -eq 0 ] || RC=1
     # The five slowest tests of the three legs (DESIGN-test-build-ci §3.14.5, kb/Work PB1716), so the next long

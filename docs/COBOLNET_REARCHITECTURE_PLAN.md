@@ -1261,7 +1261,8 @@ the single origin of every numeric argument. Measure the WHOLE population after 
   tests, so the `dotnet test` exit code alone is never evidence the drift test ran (PB751; this is the same pair
   `record_verdicts.py` now PRINTS at the end of a batch):
   `python scripts/filter_population.py --filter "FullyQualifiedName~SpecTraceabilityInventory" --filtered tests/Cobol.Net.Tests.Unit --allow-build`
-  then `dotnet test tests/Cobol.Net.Tests.Unit --filter "FullyQualifiedName~SpecTraceabilityInventory"`.
+  then `python scripts/test_population.py scrubbed dotnet test tests/Cobol.Net.Tests.Unit --filter "FullyQualifiedName~SpecTraceabilityInventory"`
+  (scrubbed: no gate leg handshake or VSTest*/RunSettingsFilePath variable narrows it — kb/Work PB1718).
 
 
 **⚙ 2026-08-03 — THE INSTRUMENT WAVE (§5b step 1). The harnesses were fixed BEFORE any more of their output was
