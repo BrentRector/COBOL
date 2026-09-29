@@ -271,15 +271,16 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // key-level clause's alphabet-name-3 against the KEY POSITION it names (P = the prime key, A<i> = the i-th
         // alternate), so the rule compares what the clause says about the file's keys; sorted, because the clauses'
         // order in the entry is not part of their specification.
-        string KeyPosition(string keyName)
+        // The operand is matched by the key ITEM the binder resolved it to (kb/Work PB1075 — a qualified operand).
+        string KeyPosition(CollatingKeyOperand k)
         {
-            if (string.Equals(f.RecordKeyName, keyName, StringComparison.OrdinalIgnoreCase)) return "P";
-            int i = f.AlternateKeyNames.FindIndex(a => string.Equals(a.Name, keyName, StringComparison.OrdinalIgnoreCase));
-            return i >= 0 ? $"A{i}" : keyName.ToUpperInvariant();
+            if (k.Key is not null && ReferenceEquals(f.RecordKeyItem, k.Key)) return "P";
+            int i = k.Key is null ? -1 : f.AlternateKeyNames.FindIndex(a => ReferenceEquals(a.Item, k.Key));
+            return i >= 0 ? $"A{i}" : k.Name.ToUpperInvariant();
         }
         string fileColl = f.FileLevelCollating is { } fc ? $"{fc.Alnum?.ToUpperInvariant()}/{fc.Nat?.ToUpperInvariant()}" : "";
         string keyColl = string.Join(",", f.KeyLevelCollating
-            .SelectMany(c => c.KeyNames.Select(k => $"{KeyPosition(k)}={c.Alphabet.ToUpperInvariant()}"))
+            .SelectMany(c => c.Keys.Select(k => $"{KeyPosition(k)}={c.Alphabet.ToUpperInvariant()}"))
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
         // b) "A consistent specification for data-name-1, device-name-1, and literal-1 in the ASSIGN clause" — all
         // THREE operands, so the USING data-name is part of the identity, not just the TO target. Consistency rule

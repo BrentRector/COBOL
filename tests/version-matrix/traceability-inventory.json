@@ -4162,11 +4162,11 @@
   "subject": "COBOL words",
   "rule-digest": "1a927ffa677c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord",
   "test-ref": "conformance:2023/pb65_repository_r5_intrinsic_names; conformance:negative/pb65-repository-intrinsic-name-as-data-name; conformance:negative/pb65-repository-all-intrinsic-name-as-user-word",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB65 (2026-08-18): ONE screen (DataBinder.ScreenRepositoryIntrinsicName) asked by every declaration funnel — data-name, condition-name, index-name, file-name, paragraph/section name — rejects (COBOLNET1649) a user-defined word spelling an intrinsic-function-name the REPOSITORY identifies (FUNCTION name INTRINSIC, or every catalogued name under FUNCTION ALL INTRINSIC); LENGTH/RANDOM/SIGN/SUM are reserved words already. A catalogued name the REPOSITORY does not identify stays a legal user-defined word (SQRT as a table, MOD as an item — the golden's control) and its FUNCTION-less spelling a data reference. Editions: the REPOSITORY function-specifier is 2002+ (85 has no REPOSITORY).",
+  "notes": "kb/Work PB65 (2026-08-18): ONE screen (DataBinder.ScreenRepositoryIntrinsicName) asked by every declaration funnel — data-name, condition-name, index-name, file-name, paragraph/section name — rejects (COBOLNET1649) a user-defined word spelling an intrinsic-function-name the REPOSITORY identifies (FUNCTION name INTRINSIC, or every catalogued name under FUNCTION ALL INTRINSIC); LENGTH/RANDOM/SIGN/SUM are reserved words already. A catalogued name the REPOSITORY does not identify stays a legal user-defined word (SQRT as a table, MOD as an item — the golden's control) and its FUNCTION-less spelling a data reference. Editions: the REPOSITORY function-specifier is 2002+ (85 has no REPOSITORY). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 renamed the screen to the one declaration funnel DataBinder.DeclareUserWord)",
   "state": "OK"
  },
  {
@@ -4611,13 +4611,13 @@
   "ordinal": 2,
   "subject": "Numeric literals",
   "rule-digest": "35ef2124318d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#IsLiteralValueOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#signedNumericLiteral; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#valueClauseOperand; src/Cobol.Net.Compiler/Binding/SignedIntegerLiteral.cs#Screen; src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignIsPartOfLiteral",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignAbuts; src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignedLiteralViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#ScreenSign; src/Cobol.Net.Compiler/Binding/DataBinder.cs#IsLiteralValueOperand; src/Cobol.Net.Frontend/Expressions/SoleOperand.cs#NumericLiteral; src/Cobol.Net.Compiler/Binding/SignedIntegerLiteral.cs#Read",
+  "test-ref": "conformance:negative/pb1445-value-double-sign; conformance:negative/pb1445-condition-value-separated-sign; conformance:negative/pb1445-move-separated-sign; conformance:85/pb1445_signed_literal_forms",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1445 (registrar 15c). \"A literal shall not contain more than one sign character. If a sign is used, it shall appear as the leftmost character of the literal. If the literal is unsigned, the literal is nonnegative.\" (cite.py --check 8.3.3.3.2 -> OK §8.3.3.3.2 2)); a literal is \"a character-string\" (lead paragraph, --check OK) and a space is a separator (§8.3.5 1), --check OK), so a sign separated from its digits is not part of the literal. Three halves: (c) UNSIGNED => NONNEGATIVE holds (v1: IF 5 > -6, +0 = -0, 007 stores 7). (a) ONE sign and (b) LEFTMOST/adjacent are enforced only in two places -- SignedIntegerLiteral.Screen (the VALUE Format 2 FROM/TO subscript slot, COBOLNET2155) and SoleOperand.NumericLiteral/SignIsPartOfLiteral (EVALUATE/DEFINE/CONSTANT sole-operand classification). Everywhere else they are not: DIVERGES, two mechanisms. [M1] DataBinder.IsLiteralValueOperand strips ANY number of unary signs with `while (u?.unaryExpression() is { } signed) u = signed;` and never checks adjacency: `01 B PIC S9 VALUE - 5.` (u2), `VALUE +-5` (u1), `VALUE -+5` (u5), `VALUE ++5` (u6), `VALUE -`<newline>`5` (t4), and `88 C1 VALUE - 5` (u9) are all ACCEPTED silently and store -5/+5; `VALUE --5` (u3) passes bind and CRASHES the backend: 'error CS1059: The operand of an increment or decrement operator must be a variable' in the generated C#. Expected: each is refused -- VALUE Format 1 writes literal-1 (§13.18.63.2, --check OK 'IS literal-1') and none of these is a literal. [M2] every procedure-division `literal` slot parses `numericLiteral : signedNumericLiteral : (PLUS | MINUS)? numericLiteralCore` with the sign as a SEPARATE default-mode token and no adjacency screen (GetText() strips the whitespace): `MOVE - 5 TO A` (s2) stores -5.00, `ADD - 5 TO A` (s8) adds -5, `DISPLAY - 5` (u4) prints -5, `MOVE - .5 TO A` (s10) stores -0.50 -- all accepted at --std 85/2002/2014/2023. Correctly refused: MOVE +-5 / MOVE 5- (parse errors, s3/s9); `IF A = - 5` (s7) is legal (a relation operand is an arithmetic expression, so `- 5` is unary minus) and is accepted. Covering tests that exist pin only the screened slots (conformance:negative/pb553-value-subscript-sign-not-adjacent, conformance:negative/pb400-evaluate-signed-sole-literal-pair) and do not cover the diverging arms -> test-ref empty. No kb/Work note owns M1 or M2 (searched open/half notes for adjacency / IsLiteralValueOperand). [editions as adjudicated: 1985, 2002, 2014, 2023 (the formation/value rules are unchanged across editions; only the digit ceiling moves: 18 at COBOL-85, 1 through 31 from 2002 per the clause's lead paragraph)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1445: ONE contiguity test (ArithmeticFormationRules.SignAbuts, on the tokens' stream indices, never GetText) answers rule 2 everywhere. LiteralScreenPass screens every signed literal slot of the tree (signedNumericLiteral — MOVE/ADD/DISPLAY literal operands — and signedIntegerLiteral), so `MOVE - 5`, `ADD - 5`, `DISPLAY - 5`, `MOVE - .5` draw COBOLNET2155 instead of reading -5; the VALUE clause (every format writes literal-n, §13.18.63.2) accepts a signed operand only when SoleOperand.NumericLiteral calls it ONE literal, so `VALUE --5` (was CS1059 in the backend), `+-5`, `- 5`, a sign split across lines and `88 C1 VALUE - 5` draw COBOLNET2155 naming the broken sentence. `-5`, `+4`, `MOVE -3`, `ADD -2` stay literals and `IF A = - 5` / `COMPUTE A = - 5 * 2` stay unary operators in an expression (85/pb1445_signed_literal_forms).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.3.2-3",
@@ -15276,13 +15276,13 @@
   "ordinal": 12,
   "subject": "REPOSITORY paragraph",
   "rule-digest": "d48e2a77b2fd",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RegisterName; src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RepositoryIntrinsicSpecifier; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUnitName; src/Cobol.Net.Compiler/Binding/UserWordKind.cs#UserWordKind; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#DeclareUserWord; src/Cobol.Net.Compiler/Oo/OoDriver.cs#DeclareMethodWords",
+  "test-ref": "conformance:negative/pb1083-special-names-intrinsic-words; conformance:negative/pb1083-contained-program-intrinsic-name; unit:UserWordDeclarationDriftTests.EveryType_IsDeclared_OrExemptWithItsReason; unit:UserWordDeclarationDriftTests.TheEnum_IsTheStandardsList",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1083: Rule (cite.py --check 12.3.8.3 'Intrinsic-function-name-1 shall not be specified as a user-defined word within the scope of this REPOSITORY paragraph' -> OK §12.3.8.3 12)); same obligation restated as §8.3.2.1 rule 5 second bullet (cite.py --find 'identified in a function-specifier' -> §8.3.2.1 5)). Code: ONE screen, DataBinder.ScreenRepositoryIntrinsicName (COBOLNET1649), but it is CALLED only from the data-name (RegisterName), condition-name, index-name, file-name, paragraph-name and section-name declaration funnels. Every other user-defined word class of §8.3.2.2 is unscreened. Probe out/probe/repo/sr12a.cob (--std 2023): REPOSITORY FUNCTION PI E ABS INTRINSIC with SPECIAL-NAMES ALPHABET PI IS NATIVE, CLASS E IS \"A\" THRU \"Z\", SYMBOLIC CHARACTERS ABS IS 66 -> compiles clean and runs (IF WS-X IS E prints CLASS-E; DISPLAY PI prints the intrinsic) - expected COBOLNET1649 on the alphabet-name, class-name and symbolic-character. sr12b.cob: REPOSITORY FUNCTION MOD INTRINSIC in an outermost program containing PROGRAM-ID. MOD -> accepted (program-name is a §8.3.2.2 user-defined word inside the §12.3.4 GR1 scope). The covered half is witnessed by conformance:negative/pb65-repository-intrinsic-name-as-data-name and conformance:2023/pb65_repository_r5_intrinsic_names, but the rule is not enforced for alphabet-names, class-names, symbolic-characters, mnemonic-names, program-names and the remaining user-word classes -> under-rejects.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1083: every declaration of every §8.3.2.2 user-defined-word type announces its word through ONE funnel, DataBinder.DeclareUserWord(word, UserWordKind) — data-, record-, constant-, type-, condition-, index-, file-, report-, screen-, record-key-names, the SPECIAL-NAMES words (alphabet-, class-, locale-, mnemonic-, ordering-, dynamic-length-structure-names, symbolic-characters, switch condition-names), paragraph/section names, the unit's own program-/user-function-/prototype-name, the REPOSITORY's specifier words and the OO words. It asks the ONE membership (RepositoryIntrinsicSpecifier) and draws COBOLNET1649 naming SR12 for a FUNCTION name INTRINSIC specifier. UserWordDeclarationDriftTests parses §8.3.2.2's list from the spec and fails on a type neither declared nor exempted with its reason. The alphabet-name PI, class-name E and symbolic-character ABS (negative/pb1083-special-names-intrinsic-words) and a contained program named MOD under its container's FUNCTION MOD INTRINSIC (§12.3.4 GR1; negative/pb1083-contained-program-intrinsic-name) are refused; they compiled clean before. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 replaced the six-caller screen with the one declaration funnel DataBinder.DeclareUserWord, which every §8.3.2.2 type reaches)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.8.3-13",
@@ -15291,13 +15291,13 @@
   "ordinal": 13,
   "subject": "REPOSITORY paragraph",
   "rule-digest": "9a4af3f24229",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RepositoryIntrinsicSpecifier; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TryIntrinsicOfThisCompilation; src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs#IsDefinedAt",
+  "test-ref": "conformance:negative/pb1083-all-intrinsic-2023-names; conformance:negative/pb1083-cobol-words-synonym-as-user-word; conformance:2014/pb1083_all_intrinsic_edition_names; unit:UserWordDeclarationDriftTests.EveryType_IsDeclared_OrExemptWithItsReason",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1083: Rule (cite.py --check 12.3.8.3 'none of the names of the intrinsic functions may be specified as a user-defined word' -> OK §12.3.8.3 13)). Code: ScreenRepositoryIntrinsicName with RepositoryAllIntrinsic tests IntrinsicCatalog.TryGet(name) - edition-blind and COBOL-WORDS-blind - and is reached only from the data/condition/index/file/paragraph/section funnels. Data-name half works: out/probe/repo/sr13a.cob (FUNCTION ALL INTRINSIC in the container, 01 SQRT in a contained program) -> COBOLNET1649 (correct, the scope reaches contained units); conformance:negative/pb65-repository-all-intrinsic-name-as-user-word pins a data-name. Defects: (1) same funnel gap as SR12 - alphabet/class/symbolic-character/program-names are unscreened (sr12a.cob shape); (2) edition-blind set - gr14ed.cob at --std 2014 refuses 01 CONCAT / FIND-STRING / BASECONVERT (2023-only intrinsics, legal 2014 user words; Annex E.2 item 13 is the standard's own statement that these became prohibited only at 2023) = rejects legal source; (3) COBOL-WORDS-blind set - gr14b.cob EQUATE \"PI\" WITH \"MYPI\" then 01 MYPI under ALL is accepted (expected refused; GR14 adds literal-2 to the list) and gr14a.cob UNDEFINE \"SQRT\" then 01 SQRT is refused (expected legal). [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (the prohibited set is edition-relative: Annex E.2 item 13 adds BASECONVERT, CONCAT, CONVERT, FIND-STRING, MODULE-NAME, SMALLEST-ALGEBRAIC, SUBSTITUTE at 2023)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1083: under FUNCTION ALL INTRINSIC the prohibited names are the §8.11 names OF THE TARGETED EDITION after >>COBOL-WORDS (DataBinder.TryIntrinsicOfThisCompilation: CobolWordsMap.Resolve, then IntrinsicSig.IsDefinedAt, the D8 window). So CONCAT / FIND-STRING / BASECONVERT are legal data-names at --std 2014 (2014/pb1083_all_intrinsic_edition_names prints 123) and refused at 2023 (Annex E.2 item 13; negative/pb1083-all-intrinsic-2023-names), and an EQUATE/SUBSTITUTE synonym (MYPI, EULER) is refused as a data-name (negative/pb1083-cobol-words-synonym-as-user-word). Every §8.3.2.2 type reaches the screen (see SR-12.3.8.3-12). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 replaced the six-caller screen with the one declaration funnel DataBinder.DeclareUserWord and the one membership RepositoryIntrinsicSpecifier)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.8.3-14",
@@ -15546,13 +15546,13 @@
   "ordinal": 14,
   "subject": "REPOSITORY paragraph",
   "rule-digest": "2f4a38d4bf5b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#IsFunctionBearing",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#IsRepositoryIntrinsic; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TryIntrinsicOfThisCompilation; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CanonicalIntrinsicWord; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#IsFunctionBearing",
+  "test-ref": "conformance:2023/pb1083_repository_all_cobol_words; conformance:negative/pb1083-cobol-words-synonym-as-user-word; conformance:2014/pb1083_all_intrinsic_edition_names",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1083: Rule (cite.py --check 12.3.8.4 'except for those that may have been undefined by the COBOL-WORDS directive' -> OK §12.3.8.4 14)): ALL = as if each §8.11 intrinsic-function-name were specified, EXCEPT names undefined by COBOL-WORDS, with a SUBSTITUTE literal-4 REPLACING the original name and an EQUATE literal-2 ADDED. Code: every ALL-list membership test is IntrinsicCatalog.TryGet(<raw written name>) - DataBinder.ScreenRepositoryIntrinsicName (the §8.3.2.1 rule 5 user-word screen), IntrinsicBinder.KeywordOmittedFunction (catalogued = IntrinsicCatalog.TryGet(name)) and ReferenceResolver.IsFunctionBearing - none consults ctx.CobolWords.Resolve (CobolWordsMap) and none consults the edition window. The plain ALL half works (conformance:2002/udf_keyword_omitted; conformance:negative/pb65-repository-all-intrinsic-name-as-user-word). Probes (pinned cobol.exe, out/probe/repo): gr14a.cob (--std 2023) '>>COBOL-WORDS UNDEFINE \"SQRT\"', 'EQUATE \"PI\" WITH \"MYPI\"', 'SUBSTITUTE \"E\" BY \"EULER\"' + FUNCTION ALL INTRINSIC: 01 SQRT and 01 E are REFUSED COBOLNET1649 (expected legal: SQRT undefined, E substituted away); DISPLAY MYPI and DISPLAY EULER draw COBOLNET1639 'not defined' (expected PI 3.14159... and e 2.71828... - both are in the ALL list); gr14b.cob: 01 MYPI / 01 EULER ACCEPTED and run (expected refused per SR13 because both are in the ALL list). Control gr14c.cob (no REPOSITORY): FUNCTION MYPI -> 3.141592653589793, FUNCTION EULER -> 2.718281828459045, data-names SQRT/E legal - the directive itself works, only the REPOSITORY ALL arm ignores it. Edition: gr14ed.cob at --std 2014 declares 01 CONCAT / FIND-STRING / BASECONVERT under FUNCTION ALL INTRINSIC -> COBOLNET1649 on all three, although those names are 2023 intrinsics (Annex E.2 item 13 lists exactly them as newly prohibited under ALL at 2023) and are not §8.11 intrinsic-function-names of the 2014 edition - rejects legal 2014 source. [registrar 14a — editions as adjudicated: ALL phrase: 2002, 2014, 2023; the COBOL-WORDS sentences: 2023 only (>>COBOL-WORDS is a 2023 directive, Annex E.3.3 item 12); the ALL list is edition-relative (Annex E.2 item 13: seven intrinsic names new at 2023 become prohibited user words under FUNCTION ALL INTRINSIC only at 2023)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1083: the ALL list is ONE membership, DataBinder.IsRepositoryIntrinsic, asked by the declaration screen, IntrinsicBinder.KeywordOmittedFunction (and its reserved-name arm) and ReferenceResolver.IsFunctionBearing — it used to be IntrinsicCatalog.TryGet(written word) three times over. The word goes through CobolWordsMap.Resolve (GR14: an UNDEFINE'd or SUBSTITUTE'd-away name leaves the list, a SUBSTITUTE literal-5 or EQUATE literal-2 joins it) and its function's D8 window. 2023/pb1083_repository_all_cobol_words: with SQRT undefined, PI EQUATE'd to MYPI and E SUBSTITUTE'd by EULER, 01 SQRT and 01 E are legal (7, 8) and FUNCTION-less MYPI / EULER are pi and e; they drew COBOLNET1649 and COBOLNET1639 before. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 moved the ALL-list membership to DataBinder.IsRepositoryIntrinsic, which the three consumers ask)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.8.4-15",
@@ -16282,11 +16282,11 @@
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "deab2c0a1494",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileCollatingSequenceClause",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileCollatingSequenceClause; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CaptureFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ClauseDataName",
   "test-ref": "conformance:negative/l1-file-collating-key-subscripted",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "COLLATING SEQUENCE OF IX-KEY (1) is rejected as a syntax error (COBOL0312); the Format-2 operand is a bare name",
+  "notes": "kb/Work PB1075: the Format-2 operand is a data reference, so a qualified key is legal; `COLLATING SEQUENCE OF IX-KEY (1) IS REV` is refused BY NAME through the one data-name-n capture DataBinder.ClauseDataName (COBOLNET2024: the operand is written with a subscript) instead of the former parse error COBOL0312.",
   "state": "OK"
  },
  {
@@ -17661,13 +17661,13 @@
   "ordinal": 4,
   "subject": "File description entry",
   "rule-digest": "061b6b641733",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#FileDescriptionClauseAdmitted",
+  "test-ref": "conformance:negative/pb1238-line-sequential-record-contains; conformance:2023/pb1238_line_sequential_varying",
   "derivation": "",
   "editions": "2023",
-  "notes": "(kb/Work PB1238, 14d). Rule: 'If the LINE SEQUENTIAL phrase of the ORGANIZATION clause ... is specified neither the BLOCK CONTAINS clause nor the RECORD CONTAINS clause shall be specified.' (cite.py --check 13.4.5.3 -> OK §13.4.5.3 4); §12.4.5.10.3 2) OK). No code tests Organization == LineSequential against BlockContains / RecordContains (grep of src: the only LineSequential tests are READ PREVIOUS, the emitter and the edition gate). Probes at --std 2023: probe/fde/sr4_block (ORGANIZATION LINE SEQUENTIAL + FD F BLOCK CONTAINS 2 RECORDS), probe/fde/sr4_record (RECORD CONTAINS 10 CHARACTERS) and probe/fde/sr4_record_range (RECORD CONTAINS 5 TO 10 CHARACTERS) all compile clean and run. Control: RECORD IS VARYING (not a 'RECORD CONTAINS' clause) correctly compiles. Expected: compile-time error for each. Finding 2. || Editions (adjudicator): 2023 only (LINE SEQUENTIAL organization is new in ISO/IEC 1989:2023 — §12.4.5.10.3 GR2; the compiler gates it as file-organization-line-sequential-2023) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection (clause loop — no LINE SEQUENTIAL screen); src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause",
-  "state": "GAP"
+  "notes": "kb/Work PB1238: a LINE SEQUENTIAL file's FD that writes BLOCK CONTAINS or RECORD CONTAINS (the record clause's Formats 1 and 3, §13.18.43.2) is refused COBOLNET2605 and the clause is not bound; RECORD IS VARYING ... DEPENDING ON stays legal (§14.9.51.4 GR22 describes a line sequential file whose RECORD clause has the DEPENDING phrase) and round-trips [ABC]. LINE SEQUENTIAL itself is 2023-only (edition-gated below).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.4.5.3-5",
@@ -17676,13 +17676,13 @@
   "ordinal": 5,
   "subject": "File description entry",
   "rule-digest": "98e48aad5011",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#fileDescriptionClause; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileDescriptionFormats.cs#Of; src/Cobol.Net.Compiler/Binding/DataBinder.cs#FileDescriptionClauseAdmitted",
+  "test-ref": "conformance:negative/pb1238-fd-linage-relative; conformance:negative/pb1238-report-fd-linage; conformance:negative/pb1238-fd-file-control-clause; conformance:85/pb1238_fd_formats_admitted",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1238, 14d). Rule: 'Format 1 is the file description entry for a sequential file.' (cite.py --check 13.4.5.3 -> OK §13.4.5.3 5)); with SR7 'Format 2 is the file description entry for a relative file or an indexed file' (OK §13.4.5.3 7)) and the rendered §13.4.5.2 formats, Format-1-only clauses (LINAGE, CODE-SET, FORMAT) belong to sequential files alone, and no format admits the file control entry's clauses. The compiler never decides which format an FD is and so never checks admissibility: probe/fde/sr5_linage_rel (RELATIVE file, FD F LINAGE IS 20 LINES) and probe/fde/sr5_codeset_idx (INDEXED file, FD F CODE-SET IS AL1) compile clean and run (FORMAT on a relative file is refused only because A.4.8 is declined, COBOLNET1705). Worse, fileDescriptionClause still carries organizationClause | accessModeClause | recordKeyClause | alternateKeyClause | fileStatusClause (CobolData.g4, despite the 'GENERAL FORMATS ARE CLOSED' comment of PB829) and BindFileSection's clause loop has no arm for them: probe/fde/fmt_fd_org (FD F ORGANIZATION IS RELATIVE ACCESS MODE IS RANDOM.) and probe/fde/fmt_fd_status (FD F FILE STATUS IS FS.) compile clean, and the .g.cs registers F as a plain sequential connector — the clauses are silently discarded. The accept direction (every Format-1 clause on a sequential file) holds: sr2_order, sr2_order_codeset, sr5_cs_for_alnum (CODE-SET FOR ALPHANUMERIC IS AL1) all compile and run. Findings 2 and 3. || Editions (adjudicator): 85, 2002, 2014, 2023 (the file description entry and this rule exist in every edition; no Annex E item touches 13.4.5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1238: the FD's format is decided once (FileDescriptionFormats.Of: relative/indexed -> Format 2; else a REPORT clause anywhere in the entry -> Format 3; else Format 1, SR5/SR7/SR8) and every clause is asked against the rendered §13.4.5.2 list of that format before it binds: LINAGE / CODE-SET / FORMAT on a relative or indexed file, LINAGE on a report FD and a REPORT clause on a relative file are refused COBOLNET2604 and not bound. Every Format 1 and Format 2 clause stays admitted (85/pb1238_fd_formats_admitted). FileDescriptionFormatDriftTests holds the table total over the grammar's alternatives.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.4.5.3-6",
@@ -58326,13 +58326,13 @@
   "ordinal": 0,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "675f8e443d15",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileCollatingSequenceClause; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#collatingForPhrase; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CaptureFileCollating",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileCollatingSequenceClause; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#collatingForPhrase; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CaptureFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CollatingKeyNamed; src/Cobol.Net.Compiler/Binding/ChoiceIndicators.cs#ForPhrasePair; src/Cobol.Net.Compiler/Binding/ChoiceIndicators.cs#AlphabetPair",
+  "test-ref": "conformance:2002/pb1075_collating_qualified_key; conformance:negative/l1-file-collating-key-subscripted; conformance:negative/pb1075-file-collating-for-repeated; unit:ForPhrasePairDriftTests.EveryBinderRead_GoesThroughChoiceIndicators",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1075: cite.py --check 12.4.5.7.2 \"COLLATING\" OK (diagram); --check 5.2.6.4 \"any single alternative shall be specified only once\" OK. The grammar parses Format 1's IS form, the FOR-split form (FOR optional per the PB695 underline census, both alternatives in either order: probe p16 `SEQUENCE FOR NATIONAL IS NREV ALPHANUMERIC REV` runs) and Format 2's `OF name... IS? alphabet`. Two shape defects: (1) Format 2 takes `OF cobolWord+`, so a QUALIFIED data-name-1 is a parse error — probe p14 `COLLATING SEQUENCE OF IX-KEY IN IX-REC IS REV` -> `COBOL0312: unexpected 'IN'`; data-name-1 is a user-defined word 'including qualification ... if needed' (§5.2 table) and §8.4.2.2 requires qualification where the name is not unique (two FDs sharing a key field name is ordinary), while RECORD KEY itself takes dataReference — rejects legal source. (2) the FOR choice-indicator group is `collatingForPhrase+` and CaptureFileCollating overwrites alnum/nat on each phrase, so `FOR ALPHANUMERIC IS REV FOR ALPHANUMERIC IS DREV` is accepted with last-wins (probe p15 only drew an error because its second name was undeclared) — §5.2.6.4 'any single alternative shall be specified only once' under-rejected. Also: when IS is omitted and SR6 subscripting is written the parse error is generic (p11). [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1075: Format 2's operand is a dataReference (`OF dataReference+ IS? alphabet-name-3`), captured through the one data-name-n capture DataBinder.ClauseDataName (SR6's subscript refused by name, COBOLNET2024) and resolved by §8.4.2.2 narrowed to this file's RECORD KEY / ALTERNATE RECORD KEY items (the key clauses' own SR2 narrowing), compared by ITEM for SR4/SR5/SR7/SR8 and GR6 — so `COLLATING SEQUENCE OF IX-KEY IN IX-REC IS REV` compiles and orders the key by REV (2002/pb1075_collating_qualified_key: ZZZ, MMM, AAA) where it was COBOL0312. Format 1's FOR group stays a `collatingForPhrase+` superset and ChoiceIndicators.ForPhrasePair refuses a repeated alternative (§5.2.6.4, COBOLNET2104) instead of letting the last win; the same reader serves the PROGRAM COLLATING SEQUENCE and CHARACTER CLASSIFICATION clauses, SORT/MERGE COLLATING SEQUENCE and CODE-SET (ForPhrasePairDriftTests derives the repeated FOR-phrase rules from the grammar).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-12.4.5.8.2",
@@ -58536,13 +58536,13 @@
   "ordinal": 0,
   "subject": "File description entry",
   "rule-digest": "a6166443f1f2",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#fileDescriptionClause; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#fileGlobalExternalClause; src/Cobol.Net.Compiler/Validation/ClosedFormatPass.cs#VisitUnrecognizedClause",
-  "test-ref": "conformance:negative/pb829-fd-unrecognized-clause; conformance:2023/pb829_closed_formats_legal; conformance:2002/pb511_external_as_name",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#fileDescriptionClause; src/Cobol.Net.Compiler/Binding/FileDescriptionFormats.cs#Rows; src/Cobol.Net.Compiler/Validation/ClosedFormatPass.cs#VisitUnrecognizedClause",
+  "test-ref": "conformance:negative/pb829-fd-unrecognized-clause; conformance:2023/pb829_closed_formats_legal; conformance:2002/pb511_external_as_name; conformance:negative/pb1238-fd-file-control-clause; conformance:85/pb1238_fd_formats_admitted",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1081: re-verdicted from CONFORMS by registrar 14a on the general-slug adjudicator's measurement: fileDescriptionClause admits organizationClause, accessModeClause and recordKeyClause, which no §13.4.5.2 file-description format contains, and the binder never reads them: 'FD SQ ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC.' over a sequential SELECT compiles with no diagnostic at --std 85 and 2023 and runs as a plain sequential file (probes gG.cob / gH.cob). cite.py --check 13.4.5.2 \"FD\" -> OK.",
-  "state": "GAP"
+  "notes": "kb/Work PB1081 via PB1238: the five file control entry clauses the grammar superset-parses in the FD position (ORGANIZATION, ACCESS MODE, RECORD KEY, ALTERNATE RECORD KEY, FILE STATUS) are no longer silently dropped: each is refused BY NAME, COBOLNET2604 'a clause of the file control entry (ISO §12.4.5.1) ... write it in the SELECT entry'. Any other residue stays COBOLNET1970 (ClosedFormatPass). The three printed formats' clause lists (rendered, folios 342-343) are the FileDescriptionFormats table.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.4.6.2",
@@ -61012,11 +61012,11 @@
   "subject": "HIGHEST-ALGEBRAIC function",
   "rule-digest": "187bfcaff6be",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindAlgebraicFold",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindAlgebraicFold; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord",
   "test-ref": "conformance:2002/highest_lowest_algebraic; conformance:2023/pb65_repository_r5_intrinsic_names; conformance:negative/pb65-repository-intrinsic-name-as-data-name",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB65 (2026-08-18): the format's keyword-omitted spelling under a REPOSITORY entry is the FUNCTION reference (+999 for a S999 argument) — the reference no longer yields to a same-named data item, because 8.3.2.1 rule 5 forbids that declaration (COBOLNET1649 at the declaration). The counter-argument legs (LINAGE-COUNTER / LINE-COUNTER / PAGE-COUNTER) were fixed earlier (BindAlgebraicFold admits the counter refs).",
+  "notes": "kb/Work PB65 (2026-08-18): the format's keyword-omitted spelling under a REPOSITORY entry is the FUNCTION reference (+999 for a S999 argument) — the reference no longer yields to a same-named data item, because 8.3.2.1 rule 5 forbids that declaration (COBOLNET1649 at the declaration). The counter-argument legs (LINAGE-COUNTER / LINE-COUNTER / PAGE-COUNTER) were fixed earlier (BindAlgebraicFold admits the counter refs). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 renamed the screen to the one declaration funnel DataBinder.DeclareUserWord)",
   "state": "OK"
  },
  {
@@ -61237,11 +61237,11 @@
   "subject": "LOWEST-ALGEBRAIC function",
   "rule-digest": "26bd3fe6fdfe",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord",
   "test-ref": "conformance:2002/highest_lowest_algebraic; conformance:2023/pb65_repository_r5_intrinsic_names; conformance:negative/pb65-repository-all-intrinsic-name-as-user-word",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB65 (2026-08-18): the same single site as FMT-15.43.2 — a shadowing table named LOWEST-ALGEBRAIC (or `01 LOWEST-ALGEBRAIC` under FUNCTION ALL INTRINSIC) is rejected at the declaration (COBOLNET1649), and LOWEST-ALGEBRAIC(A1) is the function (-999 for a S999 argument). Without a REPOSITORY entry the FUNCTION-less spelling is COBOLNET1543 (the earlier fix).",
+  "notes": "kb/Work PB65 (2026-08-18): the same single site as FMT-15.43.2 — a shadowing table named LOWEST-ALGEBRAIC (or `01 LOWEST-ALGEBRAIC` under FUNCTION ALL INTRINSIC) is rejected at the declaration (COBOLNET1649), and LOWEST-ALGEBRAIC(A1) is the function (-999 for a S999 argument). Without a REPOSITORY entry the FUNCTION-less spelling is COBOLNET1543 (the earlier fix). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 renamed the screen to the one declaration funnel DataBinder.DeclareUserWord)",
   "state": "OK"
  },
  {

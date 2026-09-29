@@ -266,7 +266,9 @@ public sealed class LinageConformanceTests
     [Theory]
     [InlineData("LNGBY9", "lngby9.prt", "", "RECORD CONTAINS 4 CHARACTERS", 85)]
     [InlineData("LNGBYA", "lngbya.prt", "", "LINAGE IS 10 LINES", 85)]
-    [InlineData("LNGBYB", "lngbyb.prt", "\n        ORGANIZATION IS LINE SEQUENTIAL", "RECORD CONTAINS 4 CHARACTERS", 2023)]
+    // A LINE SEQUENTIAL file's FD carries no RECORD CONTAINS (§13.4.5.3 SR4 — "neither the BLOCK CONTAINS clause
+    // nor the RECORD CONTAINS clause shall be specified"; COBOLNET2605), so its record width is the 01's alone.
+    [InlineData("LNGBYB", "lngbyb.prt", "\n        ORGANIZATION IS LINE SEQUENTIAL", "", 2023)]
     [InlineData("LNGBYC", "lngbyc.prt", "\n        ORGANIZATION IS LINE SEQUENTIAL", "LINAGE IS 10 LINES", 2023)]
     public void Bytes_PlainWriteAfterAnAfterWrite_AdvancesFirst_NoWeld(
         string programId, string file, string org, string fd, int edition)
@@ -284,7 +286,7 @@ public sealed class LinageConformanceTests
     [InlineData("LNGBYD", "lngbyd.prt", "", 85)]
     [InlineData("LNGBYE", "lngbye.prt", "\n        ORGANIZATION IS LINE SEQUENTIAL", 2023)]
     public void Bytes_PlainWriteAfterAdvancingPage_AdvancesFirst_NoWeld(string programId, string file, string org, int edition)
-        => AssertBytes(BytesProgram(programId, file, org, "RECORD CONTAINS 4 CHARACTERS", """
+        => AssertBytes(BytesProgram(programId, file, org, org.Length == 0 ? "RECORD CONTAINS 4 CHARACTERS" : "", """
                 MOVE "AAAA" TO P-REC.
                 WRITE P-REC AFTER ADVANCING PAGE.
                 MOVE "BBBB" TO P-REC.
@@ -303,7 +305,7 @@ public sealed class LinageConformanceTests
     [InlineData("LNGBYH", "lngbyh.prt", "BEFORE ADVANCING 1 LINE", "", "AAAA\r\nBBBB\r\nCCCC\r\n")]
     [InlineData("LNGBYI", "lngbyi.prt", "AFTER ADVANCING 1 LINE", "AFTER ADVANCING 0 LINES", "\r\nAAAABBBB\r\nCCCC\r\n")]
     public void Bytes_LineSequential_EveryPlacementMix(string programId, string file, string first, string second, string expected)
-        => AssertBytes(BytesProgram(programId, file, LineSequentialOrg, "RECORD CONTAINS 4 CHARACTERS", $"""
+        => AssertBytes(BytesProgram(programId, file, LineSequentialOrg, "", $"""
                 MOVE "AAAA" TO P-REC.
                 WRITE P-REC {first}.
                 MOVE "BBBB" TO P-REC.

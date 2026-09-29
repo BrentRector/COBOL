@@ -98,9 +98,17 @@ fileControlClauses
 // and SR1-8 (alphabet class, single file-level clause, key existence, no subscript, single clause per key) are
 // enforced by the binder — the grammar is a permissive shape (the sharing/lock precedent). `OF` disambiguates
 // Format 2 from Format 1; list it first so the parser commits on the OF token.
+// ⛔ FORMAT 2's OPERAND IS A dataReference, NOT A cobolWord (kb/Work PB1075). data-name-1 is a user-defined word
+// that takes qualification wherever a name is not unique (§8.4.2.2.1: "uniqueness shall be established through
+// qualification for each user-defined name explicitly referenced"), so `OF IX-KEY IN IX-REC IS REV` is legal
+// source — the bare-word shape was a parse error on it. The binder captures each operand through the ONE
+// data-name-n capture (DataBinder.ClauseDataName), which refuses SR6's subscript by name, and resolves it to the
+// key ITEM, so two files' same-named keys cannot be confused. The Format 1 FOR phrases stay a `+` superset; their
+// "each alternative at most once" half (§5.2.6.4) is ChoiceIndicators.ForPhrasePair's, shared with the other four
+// clauses that print the same pair (ForPhrasePairDriftTests).
 fileCollatingSequenceClause
     : COLLATING? SEQUENCE
-      ( OF cobolWord+ IS? cobolWord                 // Format 2: OF {data-name-1 | record-key-name-1}… IS alphabet-name-3
+      ( OF dataReference+ IS? cobolWord             // Format 2: OF {data-name-1 | record-key-name-1}… IS alphabet-name-3
       | collatingForPhrase+                         // Format 1: {FOR ALPHANUMERIC | FOR NATIONAL} IS alphabet-name …
       | IS? cobolWord cobolWord?                    // Format 1: IS alphabet-name-1 [alphabet-name-2]
       )

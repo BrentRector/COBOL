@@ -246,10 +246,11 @@ public sealed class FileModel
     /// <summary>Where the (first) file-level clause is written — §12.4.5.7.3 SR1/SR2 report there.</summary>
     public CobolNet.Editions.DiagnosticCursor FileLevelCollatingAt { get; set; }
 
-    /// <summary>Format 2 (key-level) COLLATING SEQUENCE clauses as written: each names one or more RECORD KEY /
-    /// ALTERNATE RECORD KEY items and their alphabet-name-3 (§12.4.5.7.2 Format 2), and where the clause is written
-    /// (§12.4.5.7.3 SR4/SR5/SR7/SR8 report there).</summary>
-    public List<(IReadOnlyList<string> KeyNames, string Alphabet, CobolNet.Editions.DiagnosticCursor At)> KeyLevelCollating { get; } = [];
+    /// <summary>Format 2 (key-level) COLLATING SEQUENCE clauses: each names one or more RECORD KEY / ALTERNATE
+    /// RECORD KEY items and their alphabet-name-3 (§12.4.5.7.2 Format 2), and where the clause is written
+    /// (§12.4.5.7.3 SR4/SR5/SR7/SR8 report there). Each operand is captured as a qualified data-name and resolved
+    /// post-build to the key ITEM it names (kb/Work PB1075).</summary>
+    public List<KeyLevelCollatingClause> KeyLevelCollating { get; } = [];
 
     /// <summary>The resolved PRIME key collating sequence (a literal-phrase table or a LOCALE sequence — the
     /// <see cref="AlphabetDef"/> the emitter renders as a runtime <c>CobolCollation</c>); null = native ordinal (no
@@ -723,6 +724,28 @@ public sealed record LinageOperand(int? Literal, string? DataName)
     /// resolution report (both run post-build, once the data forest is indexed).</summary>
     public CobolNet.Editions.DiagnosticCursor At { get; set; }
 }
+
+/// <summary>One operand of a key-level (Format 2) COLLATING SEQUENCE clause — ISO §12.4.5.7.2 <c>OF { data-name-1 |
+/// record-key-name-1 } …</c> — captured as a qualified data-name (kb/Work PB1075: it was a bare word, so a
+/// qualified key was a parse error) and resolved post-build to the RECORD KEY or ALTERNATE RECORD KEY item it names.
+/// </summary>
+public sealed class CollatingKeyOperand
+{
+    /// <summary>The operand's base word as written.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>The operand's IN/OF qualifier words, innermost first (ISO §8.4.2.2).</summary>
+    public required IReadOnlyList<string> Qualifiers { get; init; }
+
+    /// <summary>The key item the operand names — set post-build by <c>DataBinder.ResolveFileCollating</c>; null
+    /// when it names no key of the file (§12.4.5.7.3 SR4/SR5, reported there) or was refused at capture.</summary>
+    public DataItem? Key { get; set; }
+}
+
+/// <summary>One key-level (Format 2) COLLATING SEQUENCE clause: the keys it names, alphabet-name-3, and where it is
+/// written (ISO §12.4.5.7.2 Format 2).</summary>
+public sealed record KeyLevelCollatingClause(
+    IReadOnlyList<CollatingKeyOperand> Keys, string Alphabet, CobolNet.Editions.DiagnosticCursor At);
 
 /// <summary>The LINAGE clause's four operands (ISO §13.18.34): the page-body size (GR2), the footing start
 /// (GR3 — the footing area is [footing, page size] inclusive), and the top/bottom margins (GR4/GR5). A null

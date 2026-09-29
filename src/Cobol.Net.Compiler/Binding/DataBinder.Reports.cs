@@ -688,6 +688,7 @@ public sealed partial class DataBinder
         {
             using var _ = Edition.At(rd);
             if (rd.reportName()?.GetText() is not { } name) continue;
+            DeclareUserWord(name, UserWordKind.ReportName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
             var model = new ReportModel
             {
                 Name = name,

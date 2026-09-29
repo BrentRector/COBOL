@@ -1939,6 +1939,26 @@ public static class DiagnosticCatalog
         + "file.\" (ISO §13.4.5.3 SR8). The report file's lines are composed by the report writer from the report "
         + "description entries of the REPORT SECTION; remove the entries, or describe a separate file for records.",
         "ISO §13.4.5.3 SR8");
+    public static readonly DiagnosticDescriptor FileDescriptionClauseFormat = new(
+        "COBOLNET2604", "file-description-clause-format", EditionSeverity.Error,
+        "A clause is written in a file description entry whose general format does not contain it. ISO §13.4.5.2 "
+        + "prints three closed formats and §13.4.5.3 binds each entry to exactly one of them: \"Format 1 is the file "
+        + "description entry for a sequential file\" (SR5), \"Format 2 is the file description entry for a relative "
+        + "file or an indexed file\" (SR7), \"Format 3 is the file description entry for a report file\" (SR8). "
+        + "Format 1 admits IS EXTERNAL, IS GLOBAL, FORMAT, BLOCK CONTAINS, the RECORD clause, the LINAGE clause and "
+        + "CODE-SET; Format 2 only IS EXTERNAL, IS GLOBAL, BLOCK CONTAINS and the RECORD clause; Format 3 IS EXTERNAL, "
+        + "IS GLOBAL, BLOCK CONTAINS, the RECORD clause, CODE-SET and the REPORT clause. The ORGANIZATION, ACCESS "
+        + "MODE, RECORD KEY, ALTERNATE RECORD KEY and FILE STATUS clauses are clauses of the file control entry "
+        + "(§12.4.5.1) and belong in the SELECT entry, never in the FD.", "ISO §13.4.5.2; §13.4.5.3 SR5/SR7/SR8");
+    public static readonly DiagnosticDescriptor LineSequentialBlockOrRecordContains = new(
+        "COBOLNET2605", "line-sequential-block-record-contains", EditionSeverity.Error,
+        "The file description entry of a LINE SEQUENTIAL file specifies a BLOCK CONTAINS clause or a RECORD CONTAINS "
+        + "clause. ISO §13.4.5.3 SR4: \"If the LINE SEQUENTIAL phrase of the ORGANIZATION clause of the sequential "
+        + "format of the 12.4.5, File control entry is specified neither the BLOCK CONTAINS clause nor the RECORD "
+        + "CONTAINS clause shall be specified.\" A line sequential record's length is set by its line delimiter "
+        + "(§9.1.7.2). The variable-length RECORD IS VARYING clause is not a RECORD CONTAINS clause and remains "
+        + "available (§14.9.51.4 GR22 describes a line sequential file whose RECORD clause has the DEPENDING phrase).",
+        "ISO §13.4.5.3 SR4");
     public static readonly DiagnosticDescriptor AllLiteralClass = new(
         "COBOLNET2491", "all-literal-class", EditionSeverity.Error,
         "The literal-1 of the figurative constant ALL literal-1 is a constant-name that stands for a numeric literal. "
@@ -4511,7 +4531,11 @@ public static class DiagnosticCatalog
     /// slots) and this narrows it by name rather than leaving it to the ANTLR error reporter.</summary>
     public static readonly DiagnosticDescriptor SignedLiteralSignNotAdjacent = new(
         "COBOLNET2155", "signed-literal-sign-not-adjacent", EditionSeverity.Error,
-        "A numeric literal's sign is separated from its digits by a space.",
+        "A numeric literal is written with its sign separated from its digits (by a space or a line break), or with "
+        + "more than one sign character. ISO §8.3.3.3.2 2): \"A literal shall not contain more than one sign "
+        + "character. If a sign is used, it shall appear as the leftmost character of the literal\" — and a space "
+        + "is a separator (§8.3.5), so `- 5` is two things, not the literal -5. Screened in every signed literal slot "
+        + "(LiteralScreenPass) and in the VALUE clause's literal positions, which admit no arithmetic expression.",
         "ISO §8.3.3.3.2 2)");
 
     /// <summary>The literal of the EXTERNAL clause's <c>AS</c> phrase violated §13.18.22.3 SR3: "Literal-1

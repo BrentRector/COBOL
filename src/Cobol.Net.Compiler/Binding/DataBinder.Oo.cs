@@ -689,6 +689,7 @@ public sealed partial class DataBinder
                 Edition.Error(DiagnosticCatalog.PropertyClauseRule, $"{where}: property subject '{subjName}': {fault}");
                 continue;
             }
+            DeclareUserWord(subjName, UserWordKind.PropertyName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
             // Superclass property-name collision (§13.18.42.3 SR4): walk the base chain's accessor rosters.
             for (var b = cls.Base; b is not null; b = b.Base)
                 if ((factory ? b.FactoryMethods : b.Methods).Any(bm =>

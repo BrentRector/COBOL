@@ -81,8 +81,8 @@ public sealed class SignedIntegerSlotDriftTests
     {
         // ⛔ ANTLR's GetText() concatenates a node's tokens with the whitespace stripped, so `+ 1` and `+1`
         // both read back as "+1" and §8.3.3.3.2 2)'s adjacency violation is INVISIBLE to any caller that goes
-        // straight to the text. SignedIntegerLiteral.Screen measures it on the token stream's own indices;
-        // this assertion keeps it the only door (kb/Work PB553).
+        // straight to the text. SignedIntegerLiteral.Read measures it on the token stream's own indices
+        // (LiteralScreenPass reports it, kb/Work PB1445); this assertion keeps it the only door (kb/Work PB553).
         string[] sources = System.IO.Directory.GetFiles(
             TestRepo.Src("Cobol.Net.Compiler"), "*.cs", System.IO.SearchOption.AllDirectories);
         var offenders = new System.Collections.Generic.List<string>();
@@ -91,13 +91,13 @@ public sealed class SignedIntegerSlotDriftTests
         {
             if (System.IO.Path.GetFileName(f) == "SignedIntegerLiteral.cs") continue;
             string src = System.IO.File.ReadAllText(f);
-            callers += Regex.Matches(src, @"\bSignedIntegerLiteral\.Screen\s*\(").Count;
+            callers += Regex.Matches(src, @"\bSignedIntegerLiteral\.Read\s*\(").Count;
             foreach (Match m in Regex.Matches(src, @"signedIntegerLiteral\s*\([^)]*\)[^;\r\n]*?\.GetText\s*\("))
                 offenders.Add($"{System.IO.Path.GetFileName(f)}: {m.Value}");
         }
         // A ZERO-population "clean" result is the failure this suite exists to prevent: assert the screen is
         // actually CALLED before asserting nobody bypasses it (feedback green_test_can_hold_a_gap_open).
-        Assert.True(callers > 0, "no caller of SignedIntegerLiteral.Screen was found — the screen is dead and "
+        Assert.True(callers > 0, "no caller of SignedIntegerLiteral.Read was found — the reader is dead and "
             + "the bypass assertion below would pass vacuously");
         Assert.Empty(offenders);
     }

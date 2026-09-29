@@ -8,9 +8,11 @@
       *> is INDEXED, IX-KEY is its declared RECORD KEY data-name (SR4)
       *> and REV is an alphanumeric alphabet (SR7), so the subscript is
       *> the only ground for rejection. The §12.4.5.7.2 Format-2 operand
-      *> is a bare name, so the rejection is a syntax error; the observed
-      *> diagnostic is the FILE-CONTROL parse error COBOL0312, which is
-      *> what the .err holds.
+      *> is parsed as a data reference (a QUALIFIED data-name is legal,
+      *> kb/Work PB1075), and the one data-name-n capture refuses the
+      *> subscript by name: COBOLNET2024, which is what the .err holds
+      *> (it was the parse error COBOL0312 while the grammar took a bare
+      *> word).
       *> Reject-at names 2002 onward: the file-control COLLATING SEQUENCE
       *> clause is a COBOL-2002 introduction.
        IDENTIFICATION DIVISION.

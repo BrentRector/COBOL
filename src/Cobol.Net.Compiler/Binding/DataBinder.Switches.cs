@@ -836,6 +836,12 @@ public sealed partial class DataBinder
     private void BindImplementorNameEntry(Core.ImplementorSwitchEntryContext sw)
     {
         var e = ImplementorNameEntry.Read(sw);
+        using (Edition.At(sw))   // §8.3.2.2 — the entry's user-defined words, through the one funnel (kb/Work PB1083)
+        {
+            if (e.Mnemonic is { } mnemonic) DeclareUserWord(mnemonic, UserWordKind.MnemonicName);
+            if (e.OnCondition is { } onName) DeclareUserWord(onName, UserWordKind.ConditionName);
+            if (e.OffCondition is { } offName) DeclareUserWord(offName, UserWordKind.ConditionName);
+        }
         if (e.Unavailable is { } why)
         {
             Edition.Error(DiagnosticCatalog.UnavailableImplementorName, why);
@@ -857,27 +863,10 @@ public sealed partial class DataBinder
     /// mismatch; the national slot is a new surface, so it is strict.</summary>
     private void ResolveProgramCollating(Core.ProgramCollatingSequenceClauseContext pcs)
     {
-        string? alnumName = null, natName = null;
-        var fors = pcs.collatingForPhrase();
-        if (fors.Length > 0)
-        {
-            foreach (var f in fors)
-            {
-                bool isNat = f.NATIONAL() is not null;
-                ref string? slot = ref isNat ? ref natName : ref alnumName;
-                if (slot is not null)
-                    Edition.Error("COBOLNET0898", "PROGRAM COLLATING SEQUENCE: the FOR "
-                        + $"{(isNat ? "NATIONAL" : "ALPHANUMERIC")} phrase may be specified only once "
-                        + "(ISO §12.3.6.2 general format)");
-                slot = f.cobolWord().GetText();
-            }
-        }
-        else
-        {
-            var words = pcs.cobolWord();
-            alnumName = words.Length > 0 ? words[0].GetText() : null;
-            natName = words.Length > 1 ? words[1].GetText() : null;
-        }
+        using var _ = Edition.At(pcs);   // every verdict below is about this clause — report it there
+        var (alnumName, natName) = ChoiceIndicators.AlphabetPair(Edition, pcs.collatingForPhrase(),
+            f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), pcs.cobolWord(),
+            "PROGRAM COLLATING SEQUENCE", "12.3.6.2");
 
         if (alnumName is not null)
         {
@@ -915,22 +904,15 @@ public sealed partial class DataBinder
     {
         using var _ = Edition.At(cc);
         LocalePhrase? alphanumeric = null, national = null;
-        var fors = cc.classificationForPhrase();
-        if (fors.Length > 0)
+        // The FOR pair — each class at most once (§5.2.6.4) — through the one reader (kb/Work PB1075).
+        var (alnumFor, natFor) = ChoiceIndicators.ForPhrasePair(Edition, cc.classificationForPhrase(),
+            f => f.NATIONAL() is not null, "CHARACTER CLASSIFICATION", "12.3.6.2");
+        if (alnumFor is not null || natFor is not null)
         {
-            foreach (var f in fors)
-            {
-                bool nat = f.NATIONAL() is not null;
-                var phrase = ClassificationPhrase(f.localePhrase().GetText(), nat);
-                if (phrase is null) return;
-                if ((nat ? national : alphanumeric) is not null)
-                {
-                    Edition.Error("COBOLNET0898", $"CHARACTER CLASSIFICATION FOR {(nat ? "NATIONAL" : "ALPHANUMERIC")} is specified more than once "
-                        + "— each alternative of the clause's brace shall be specified at most once (ISO §12.3.6.2 / §5.2.6.4)");
-                    return;
-                }
-                if (nat) national = phrase; else alphanumeric = phrase;
-            }
+            if (alnumFor is not null
+                && (alphanumeric = ClassificationPhrase(alnumFor.localePhrase().GetText(), national: false)) is null) return;
+            if (natFor is not null
+                && (national = ClassificationPhrase(natFor.localePhrase().GetText(), national: true)) is null) return;
         }
         else
         {
@@ -992,6 +974,7 @@ public sealed partial class DataBinder
     {
         var words = loc.cobolWord();                  // [0] = locale-name-1, [1] = external-locale-name-1 (word branch); LOCALE is the formatWord
         string name = words[0].GetText();
+        DeclareUserWord(name, UserWordKind.LocaleName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         string external;
         bool fromLiteral = loc.literal() is not null;
         if (fromLiteral)
@@ -1090,6 +1073,7 @@ public sealed partial class DataBinder
     {
         if (dls.cobolWord() is not { } nameCtx || dls.dynamicLengthLayout() is not { } layout) return;   // a parse error already
         string name = nameCtx.GetText();
+        using (Edition.At(nameCtx)) DeclareUserWord(name, UserWordKind.DynamicLengthStructureName);   // §8.3.2.2 (kb/Work PB1083)
         string where = $"DYNAMIC LENGTH STRUCTURE {name}";
         DynamicLengthStructure declared;
         if (layout.cobolWord() is { } physical)
@@ -1135,6 +1119,7 @@ public sealed partial class DataBinder
         // mistook for a user-defined word.
         if (ot.cobolWord() is not { } name1 || ot.literal() is not { } lit) return;   // a malformed shape already drew a parse error
         string name = name1.GetText();
+        DeclareUserWord(name, UserWordKind.OrderingName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         string raw = lit.GetText();
         // SR10 / SR11 for literal-9 — the ONE text-literal rule the LOCALE clause's literal-4 shares.
         if (!TryClauseTextLiteral(lit, $"ORDER TABLE {name} IS {raw}", "literal-9", out string text)) return;
@@ -1176,6 +1161,7 @@ public sealed partial class DataBinder
         // (§12.3.7.2); a FOR phrase after the definition is refused by name in ClosedFormatPass (kb/Work PB977)
         // and read here only to recover.
         string name = alpha.cobolWord().GetText();
+        DeclareUserWord(name, UserWordKind.AlphabetName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         var def = alpha.alphabetDefinition();
         bool national = ForPhraseIsNational(alpha.specialNamesForPhrase(), alpha.misplacedSpecialNamesForPhrase());
         // `IS LOCALE [locale-name-2]` — either branch (§12.3.7.2): Annex A.4.9 item 10 ("LOCALE phrases in the
@@ -1780,6 +1766,7 @@ public sealed partial class DataBinder
         // ParseArm.VisitClassDefinitionClause (14g.4, recognition).
         using var _ = Edition.At(cd);
         string name = cd.cobolWord(0).GetText();
+        DeclareUserWord(name, UserWordKind.ClassName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         bool national = ForPhraseIsNational(cd.specialNamesForPhrase(), cd.misplacedSpecialNamesForPhrase());
         // The IN phrase (ISO §12.3.7.4 GR12 a; kb/Work PB110): a NUMERIC literal is the ordinal of a character
         // within the character set referenced by alphabet-name-4 — not the native set. SR17 d (a LOCALE alphabet)
@@ -1904,6 +1891,7 @@ public sealed partial class DataBinder
             for (int i = 0; i < names.Length; i++)
             {
                 string symName = names[i].GetText();
+                DeclareUserWord(symName, UserWordKind.SymbolicCharacter);   // §8.3.2.2 (kb/Work PB1083)
                 // integer-1 is an INTEGERLIT — unsigned digits by the grammar (§5.5 1)) — so only its magnitude can
                 // be wrong. ⛔ It used to be read with `int.TryParse` and a failure `continue`d: an ordinal too long
                 // for an int bound NOTHING and drew NO diagnostic, and the name then surfaced as "not defined" at

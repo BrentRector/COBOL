@@ -384,8 +384,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     internal HashSet<string> RepositoryIntrinsics { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>True when the unit's REPOSITORY specifies <c>FUNCTION ALL INTRINSIC</c> (§12.3.8 GR14): the word
-    /// FUNCTION may be omitted for EVERY §8.11 intrinsic-function-name in this scope (SR2/GR13). The SR13
-    /// user-word prohibition (an intrinsic name shall not be a user-defined word here) is staged residue.</summary>
+    /// FUNCTION may be omitted for EVERY §8.11 intrinsic-function-name in this scope (SR2/GR13). Read only through
+    /// <see cref="IsRepositoryIntrinsic"/> — the membership that applies GR14's >>COBOL-WORDS clauses and the edition
+    /// — which the SR13 user-word prohibition (<see cref="DeclareUserWord"/>) asks too.</summary>
     internal bool RepositoryAllIntrinsic { get; set; }
 
     /// <summary>Bind a program unit's DATA DIVISION + the FILE-CONTROL paragraph: the OPTIONS paragraph, the SELECT
@@ -456,6 +457,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // same-named intrinsic; the `FUNCTION ALL INTRINSIC` alternative carries no functionName and the
         // per-name INTRINSIC form is excluded by its phrase). CLASS/INTERFACE specifiers stay declarative
         // (names resolve through the group-wide pass-1 table).
+        // The REPOSITORY's own user-defined words, declared AFTER the loop: a specifier written before
+        // `FUNCTION ALL INTRINSIC` is inside its scope all the same (§12.3.8.3 SR13; kb/Work PB1083).
+        var specifierWords = new List<(Core.RepositoryEntryContext At, string Word, UserWordKind Kind)>();
         foreach (var re in EnvDivisions(program).SelectMany(env => env.configurationSection()?.configurationParagraph()
                      .Select(p => p.repositoryParagraph()).FirstOrDefault(r => r is not null)
                      ?.repositoryEntry() ?? []))
@@ -468,18 +472,31 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // class) and SR1 (a repeated name shall be specified identically) — by BindSpecifierExternalizedName;
             // what each externalized name RESOLVES to is its consumer's (kb/Work PB974).
             if (re.PROPERTY() is not null && re.propertyName() is { } pn)
+            {
+                specifierWords.Add((re, pn.GetText(), UserWordKind.PropertyName));
                 OoRepositoryProperties[pn.GetText()] =
                     BindSpecifierExternalizedName(re, "PROPERTY", pn.GetText(), "literal-4") ?? pn.GetText();
+            }
             // §12.3.8.2's program-specifier (kb/Work PB237): `PROGRAM program-prototype-name-1 [AS literal-3]`.
             else if (re.PROGRAM() is not null && re.programPrototypeName() is { } ppn)
+            {
+                specifierWords.Add((re, ppn.GetText(), UserWordKind.ProgramPrototypeName));
                 BindProgramSpecifier(re, ppn.GetText());
+            }
             else if (re.CLASS() is not null && re.className() is { } cn)
+            {
+                specifierWords.Add((re, cn.GetText(), UserWordKind.ObjectClassName));
                 BindSpecifierExternalizedName(re, "CLASS", cn.GetText(), "literal-1");
+            }
             else if (re.INTERFACE() is not null && re.interfaceName() is { } inm)
+            {
+                specifierWords.Add((re, inm.GetText(), UserWordKind.InterfaceName));
                 BindSpecifierExternalizedName(re, "INTERFACE", inm.GetText(), "literal-2");
+            }
             // §12.3.8.2 user-defined-function-specifier `FUNCTION function-prototype-name-1 [AS literal-5]`.
             else if (re.FUNCTION() is not null && re.INTRINSIC() is null && re.functionName() is [var fn])
             {
+                specifierWords.Add((re, fn.GetText(), UserWordKind.FunctionPrototypeName));
                 UserFunctionNames.Add(fn.GetText());
                 FunctionSpecifiers[fn.GetText()] =
                     BindSpecifierExternalizedName(re, "FUNCTION", fn.GetText(), "literal-5") ?? fn.GetText();
@@ -496,10 +513,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     using (Edition.At(re))
                         CheckRepositorySpecification(inf.GetText(), new RepositorySpecification(IntrinsicKind, null, null),
                             inf.GetText());
-                    RepositoryIntrinsics.Add(inf.GetText());
+                    // The CANONICAL name (an EQUATE / SUBSTITUTE synonym names its intrinsic), so every spelling of
+                    // the function is a member (RepositoryIntrinsicSpecifier; kb/Work PB1083).
+                    RepositoryIntrinsics.Add(CanonicalIntrinsicWord(inf.GetText()) ?? inf.GetText());
                 }
             }
         }
+        foreach (var (at, word, kind) in specifierWords)
+            using (Edition.At(at)) DeclareUserWord(word, kind);
+        DeclareUnitName(program);
 
         SwitchBindSpecialNames(program);           // SPECIAL-NAMES switch clauses → the external-switch registry (ISO §12.3.7)
         BindFileControl(program);                  // SELECT clauses → FileModels (before the FD records bind)
@@ -516,7 +538,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // ⚠ This was a WARNING until kb/Work PB260: the program compiled, the screen behavior was simply absent,
         // and a DISPLAY of the screen record printed its characters — a declined facility that produced output.
         if (program.dataDivision()?.screenSection() is { } scr)
+        {
             ScreenFacility.ReportSection(Edition, scr, ScreenNames);
+            // The section is refused, but its screen-names are declared all the same (§8.3.2.2; kb/Work PB1083).
+            foreach (var sn in ScreenNames) DeclareUserWord(sn, UserWordKind.ScreenName);
+        }
 
         if (program.dataDivision()?.workingStorageSection() is { } ws)
             _workingStorageRoots.AddRange(BindEntries(ws.dataDescriptionEntry(), _rootNames));
@@ -903,6 +929,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // A TYPEDEF template's items (root + subordinates) are NOT globally referenceable (ISO §13.18.58.4 GR1) —
             // keep them off ByName; the clones ExpandTypes produces ARE registered.
             if (!rootIsTemplate) RegisterName(item);
+            // Every named entry is DECLARED here (§8.3.2.2; kb/Work PB1083) — a template's subordinate data-names
+            // too, although they stay off ByName; the template root's type-name is declared by RegisterTypeDecl, and
+            // the clones ExpandTypes registers are the same words, already declared here.
+            if (item.CobolName is { } declared && !item.IsTypedef)
+                DeclareUserWord(declared, section == EntrySection.File && item.Level == 1
+                    ? UserWordKind.RecordName : UserWordKind.DataName);
         }
         return newRoots;
     }
@@ -938,6 +970,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"TYPEDEF '{item.CobolName}': an ELEMENTARY type definition shall not be "
                 + "specified with the STRONG phrase (ISO §8.5.3.1) — §8.5.3.3 makes group items the only kind of "
                 + "item that may be strongly typed");
+        DeclareUserWord(item.CobolName, UserWordKind.TypeName);   // the template is off ByName, so RegisterName never sees it
         if (!TypeDecls.TryAdd(item.CobolName, item))
             Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"duplicate type-name '{item.CobolName}' — a type-name shall be unique "
                 + "(ISO §13.18.58)");
@@ -1146,7 +1179,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // called from SequentialIoBinder.BindOpen per file-name (kb/Work PB319, feedback_one_rule_one_place;
             // conformance:OpenSharingLockModeTests pins the single-diagnostic count).
             _files.Add(file);
-            ScreenRepositoryIntrinsicName(name, "file-name");   // §8.3.2.1 rule 5 (kb/Work PB65)
+            DeclareUserWord(name, UserWordKind.FileName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB65, PB1083)
             FilesByName[name] = file;
         }
     }
@@ -1170,6 +1203,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     private void DeclineRecordKeySource(Core.RecordKeySourcePhraseContext src, string clause, string fileName)
     {
         using var _ = Edition.At(src);
+        // The phrase is declined, but record-key-name-1 is declared by it all the same (§8.3.2.2; kb/Work PB1083).
+        DeclareUserWord(src.recordKeyName().GetText(), UserWordKind.RecordKeyName);
         Edition.Declined(DiagnosticCatalog.RecordKeySourcePhraseUnsupported,
             $"the {clause} clause on file '{fileName}' ({Spelled(src)})");
     }
@@ -1182,26 +1217,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         using var _ = Edition.At(ctx);
         if (ctx.OF() is not null)   // Format 2 (key-level): OF {key}… IS alphabet-name-3
         {
-            var words = ctx.cobolWord();
-            var keyNames = words.Take(words.Length - 1).Select(w => w.GetText()).ToList();
-            file.KeyLevelCollating.Add((keyNames, words[^1].GetText(), Edition.Cursor));
+            // Each key through the ONE data-name-n capture (kb/Work PB1075): qualified names are legal (§8.4.2.2.1),
+            // and SR6's "shall not be subscripted" is refused by name there.
+            var keys = ctx.dataReference()
+                .Select(d => ClauseDataName(d, "COLLATING SEQUENCE OF"))
+                .Select(k => new CollatingKeyOperand { Name = k.Base, Qualifiers = k.Quals })
+                .ToList();
+            file.KeyLevelCollating.Add(new KeyLevelCollatingClause(keys, ctx.cobolWord(0).GetText(), Edition.Cursor));
             return;
         }
         if (file.FileLevelCollatingCount++ == 0) file.FileLevelCollatingAt = Edition.Cursor;   // §12.4.5.7.3 SR3 — at most one file-level clause
-        string? alnum = null, nat = null;
-        if (ctx.collatingForPhrase() is { Length: > 0 } fors)
-            foreach (var f in fors)
-            {
-                if (f.NATIONAL() is not null) nat = f.cobolWord().GetText();
-                else alnum = f.cobolWord().GetText();
-            }
-        else
-        {
-            var words = ctx.cobolWord();
-            alnum = words.Length > 0 ? words[0].GetText() : null;
-            nat = words.Length > 1 ? words[1].GetText() : null;
-        }
-        file.FileLevelCollating = (alnum, nat);
+        file.FileLevelCollating = ChoiceIndicators.AlphabetPair(Edition, ctx.collatingForPhrase(),
+            f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), ctx.cobolWord(),
+            $"file '{file.CobolName}' COLLATING SEQUENCE", "12.4.5.7.2 Format 1");
     }
 
     /// <summary>Resolve each INDEXED key's collating-weight table from the file's §12.4.5.7 COLLATING SEQUENCE
@@ -1239,10 +1267,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             return;
         }
 
-        // SR4/SR5: every Format-2 name shall be a declared RECORD KEY or ALTERNATE RECORD KEY of this file.
-        var keyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (file.RecordKeyName is { } pk) keyNames.Add(pk);
-        foreach (var alt in file.AlternateKeyNames) keyNames.Add(alt.Name);
+        // SR4/SR5: every Format-2 operand shall name a declared RECORD KEY or ALTERNATE RECORD KEY of this file. The
+        // operand is a qualified data-name (kb/Work PB1075), so it is RESOLVED — §8.4.2.2 over the file's key items —
+        // and compared by ITEM: two files' keys may share a name, and only qualification tells them apart.
+        var keyItems = new List<DataItem>();
+        if (file.RecordKeyItem is { } pkItem) keyItems.Add(pkItem);
+        keyItems.AddRange(file.AlternateKeys.Select(a => a.Item));
         // SR8: "Neither data-name-1 nor record-key-name-1 shall be specified in more than one COLLATING SEQUENCE
         // clause." The boundary is the CLAUSE, and the screen is per OPERAND *within* it: §12.4.5.7.2's Format-2
         // figure is `OF { data-name-1 | record-key-name-1 } … IS alphabet-name-3`, and by §5.2.7 the ellipsis
@@ -1253,19 +1283,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // (kb/Work PB703; PB364 is the same shape on §14.9.49.3's USE rules, the register's first consumer).
         // GR6 is unaffected by the repeat: ResolveKeyCollating takes the FIRST clause naming the key, and a key
         // listed twice in one clause is named by that one clause, so it resolves to that clause's alphabet-name-3.
-        var namedIn = new ConstructOperandRegister<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (names, alphabet3, at) in file.KeyLevelCollating)
+        var namedIn = new ConstructOperandRegister<DataItem>(ReferenceEqualityComparer.Instance);
+        foreach (var (keys, alphabet3, at) in file.KeyLevelCollating)
         {
             using var _ = Edition.At(at);
-            foreach (var n in names)
+            foreach (var k in keys)
             {
-                if (!keyNames.Contains(n))
-                    Edition.Error(DiagnosticCatalog.FileCollatingKey, $"file '{file.CobolName}': COLLATING SEQUENCE "
-                        + $"OF '{n}' — '{n}' is not a RECORD KEY or ALTERNATE RECORD KEY of this file "
-                        + "(ISO §12.4.5.7.3 SR4/SR5)");
-                else if (namedIn.Register(n) is ConstructOperand.Duplicate)   // an EARLIER clause named it
-                    Edition.Error(DiagnosticCatalog.FileCollatingKey, $"file '{file.CobolName}': key '{n}' is named "
-                        + "in more than one COLLATING SEQUENCE clause (ISO §12.4.5.7.3 SR8)");
+                string written = WrittenQualified(k.Name, k.Qualifiers);
+                if (_refusedClauseOperands.Contains(k.Name)) continue;   // SR6 / shape — refused at capture
+                k.Key = CollatingKeyNamed(file, k, keyItems, written);
+                if (k.Key is null) continue;
+                if (namedIn.Register(k.Key) is ConstructOperand.Duplicate)   // an EARLIER clause named it
+                    Edition.Error(DiagnosticCatalog.FileCollatingKey, $"file '{file.CobolName}': key '{written}' is "
+                        + "named in more than one COLLATING SEQUENCE clause (ISO §12.4.5.7.3 SR8)");
             }
             namedIn.EndConstruct();   // the clause is complete — a repeat from here on is across clauses
             // SR7 — alphabet-name-3 against the class of EACH key the clause names: "When the class of data-name-1
@@ -1279,11 +1309,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     + "(ISO §12.4.5.7.3 SR7)");
                 continue;
             }
-            foreach (var n in names.Distinct(StringComparer.OrdinalIgnoreCase))
-                if (KeyItemNamed(file, n) is { } key && ItemCategory.IsAlphanumericOrNational(key)
+            foreach (var k in keys.Where(k => k.Key is not null).DistinctBy(k => k.Key!, ReferenceEqualityComparer.Instance))
+                if (k.Key is { } key && ItemCategory.IsAlphanumericOrNational(key)
                     && CollatingAlphabetFault(alphabet3, IsNationalKey(key)) is { } fault)
                     Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING "
-                        + $"SEQUENCE OF '{n}' IS '{alphabet3}' — '{n}' is of class "
+                        + $"SEQUENCE OF '{WrittenQualified(k.Name, k.Qualifiers)}' IS '{alphabet3}' — "
+                        + $"'{WrittenQualified(k.Name, k.Qualifiers)}' is of class "
                         + $"{(IsNationalKey(key) ? "national" : "alphanumeric")}, so alphabet-name-3 shall reference an "
                         + $"alphabet that defines {(IsNationalKey(key) ? "a national" : "an alphanumeric")} collating "
                         + $"sequence; {fault} (ISO §12.4.5.7.3 SR7)");
@@ -1303,9 +1334,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     + $"sequence; {f2} (ISO §12.4.5.7.3 SR2)");
         }
 
-        file.PrimeKeyCollation = ResolveKeyCollating(file, file.RecordKeyName, file.RecordKeyItem);
-        for (int i = 0; i < file.AlternateKeys.Count; i++)
-            file.AlternateKeyCollations.Add(ResolveKeyCollating(file, AltName(file, i), file.AlternateKeys[i].Item));
+        file.PrimeKeyCollation = ResolveKeyCollating(file, file.RecordKeyItem);
+        foreach (var alt in file.AlternateKeys)
+            file.AlternateKeyCollations.Add(ResolveKeyCollating(file, alt.Item));
     }
 
     /// <summary>Why <paramref name="alphabet"/> does NOT define a collating sequence of the class asked for, as the
@@ -1332,16 +1363,30 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// (alphanumeric or national) reach a caller.</summary>
     private static bool IsNationalKey(DataItem key) => !ItemCategory.IsAlphanumeric(key);
 
-    /// <summary>The resolved item of the RECORD KEY or ALTERNATE RECORD KEY clause whose data-name is
-    /// <paramref name="name"/>, or null (not a key of this file, or unresolved — both already reported).</summary>
-    private static DataItem? KeyItemNamed(FileModel file, string name) =>
-        string.Equals(file.RecordKeyName, name, StringComparison.OrdinalIgnoreCase) ? file.RecordKeyItem
-        : file.AlternateKeyNames.FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Item;
-
-    /// <summary>The declared name of the i-th resolved alternate key (index-aligned when all names resolve — the
-    /// normal case; a name that failed to resolve has already errored).</summary>
-    private static string? AltName(FileModel file, int i) =>
-        i < file.AlternateKeyNames.Count ? file.AlternateKeyNames[i].Name : null;
+    /// <summary>The RECORD KEY or ALTERNATE RECORD KEY item one key-level COLLATING SEQUENCE operand names — ISO
+    /// §12.4.5.7.3 SR4/SR5: "shall be a name specified as the data-name in an ALTERNATE RECORD KEY clause or in a
+    /// RECORD KEY clause in the file control entry" — or null, REPORTED, when it names none (kb/Work PB1075).
+    /// <para>The operand is a qualified data-name, resolved by §8.4.2.2 like every other clause operand and narrowed
+    /// to this file's key items: qualification is what separates two files' same-named keys (the case that used to
+    /// be a parse error), and a reference that still leaves two key items is ambiguous (§8.4.2.2.3 SR1). A key clause
+    /// whose own operand failed to resolve has already been reported, so an operand spelled like it is not reported
+    /// a second time as "not a key" (one fault, one verdict).</para></summary>
+    private DataItem? CollatingKeyNamed(FileModel file, CollatingKeyOperand k, IReadOnlyList<DataItem> keyItems,
+                                        string written)
+    {
+        var named = QualifiedCandidates(k.Name, k.Qualifiers, Model.Scope.Program)
+            .Where(i => keyItems.Contains(i, ReferenceEqualityComparer.Instance));
+        if (named.Count > 0)
+            return UniqueOrReportAmbiguous(named, $"file '{file.CobolName}': COLLATING SEQUENCE OF", written, out _);
+        bool unresolvedKeyOfThatName =
+            file.RecordKeyItem is null && string.Equals(file.RecordKeyName, k.Name, StringComparison.OrdinalIgnoreCase)
+            || file.AlternateKeyNames.Any(a => a.Item is null && a.Name.Equals(k.Name, StringComparison.OrdinalIgnoreCase));
+        if (!unresolvedKeyOfThatName)
+            Edition.Error(DiagnosticCatalog.FileCollatingKey, $"file '{file.CobolName}': COLLATING SEQUENCE OF "
+                + $"'{written}' — '{written}' is not a RECORD KEY or ALTERNATE RECORD KEY of this file "
+                + "(ISO §12.4.5.7.3 SR4/SR5)");
+        return null;
+    }
 
     /// <summary>Resolve one key's collating sequence BY THE KEY'S CLASS (§12.4.5.7.4): a Format-2 alphabet naming
     /// the key wins (GR6); else the Format-1 alphabet of the key's class — alphabet-name-1 for a key of class
@@ -1358,15 +1403,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// implementation does not provide: it is DECLINED by name (COBOLNET1584), and refused rather than accepted
     /// inert because an inert compile would order the key — and judge its uniqueness — by a different sequence
     /// than the one written (docs/CONFORMANCE.md §2 rows 41–42).</para></summary>
-    private AlphabetDef? ResolveKeyCollating(FileModel file, string? keyName, DataItem? key)
+    private AlphabetDef? ResolveKeyCollating(FileModel file, DataItem? key)
     {
         if (key is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;   // SR2 has refused it
         bool national = IsNationalKey(key);
         string? alphabet = null;
         var where = file.FileLevelCollatingAt;
-        if (keyName is not null)
-            foreach (var (names, a, at) in file.KeyLevelCollating)
-                if (names.Any(n => n.Equals(keyName, StringComparison.OrdinalIgnoreCase))) { alphabet = a; where = at; break; }
+        // GR6 — the FIRST key-level clause naming this key ITEM (operands resolved in ResolveFileCollating, kb/Work
+        // PB1075; they were compared by spelling, so a qualified operand could not name its key).
+        foreach (var clause in file.KeyLevelCollating)
+            if (clause.Keys.Any(k => ReferenceEquals(k.Key, key))) { alphabet = clause.Alphabet; where = clause.At; break; }
         alphabet ??= national ? file.FileLevelCollating?.Nat : file.FileLevelCollating?.Alnum;   // GR3 / GR2
         if (alphabet is null) return null;                                                       // GR5 / GR4
 
@@ -1579,8 +1625,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // §13.18.33.4 GR3: "Multiple level 1 entries subordinate to a FD or SD entry represent implicit
             // redefinitions of the same area" — an IMPLICIT redefinition, not a REDEFINES clause (kb/Work PB836).
             LinkImplicitRecordArea(file);
-            foreach (var clause in fd.fileDescriptionClauses()?.fileDescriptionClause() ?? [])
-                if (clause.recordClause() is { } rc)
+            // §13.4.5.3 SR5/SR7/SR8: the entry's format is decided ONCE, before any clause binds — from the SELECT's
+            // organization and whether a REPORT clause is written ANYWHERE in the entry (SR2: any order). A clause
+            // its format does not contain is refused and NOT bound (kb/Work PB1238).
+            var clauses = fd.fileDescriptionClauses()?.fileDescriptionClause() ?? [];
+            var format = FileDescriptionFormats.Of(file.Organization, clauses.Any(c => c.reportClause() is not null));
+            foreach (var clause in clauses)
+                if (!FileDescriptionClauseAdmitted(clause, format, file, name))
+                    continue;
+                else if (clause.recordClause() is { } rc)
                     BindRecordClause(rc, file);   // RECORD VARYING / m TO n → FileModel.Varying (ISO §13.18.43)
                 else if (clause.codeSetClause() is { } cs)
                     BindCodeSetClause(cs, file, records);   // ISO §13.18.13 (kb/Work PB110)
@@ -1680,6 +1733,52 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // enforcement site covering FD AND SD via the shared grammar rule; P2.6 / Table-7 row 7.1.)
             }
         }
+    }
+
+    /// <summary>Whether one written FD clause belongs in this entry, reporting it when it does not (kb/Work PB1238).
+    /// Two rules, both keyed on facts decided before the clause loop: the §13.4.5.2 format's clause list
+    /// (<see cref="FileDescriptionFormats"/>, COBOLNET2604 — including the file control entry's clauses, which no
+    /// FD format contains) and §13.4.5.3 SR4's LINE SEQUENTIAL ban on BLOCK CONTAINS and RECORD CONTAINS
+    /// (COBOLNET2605). The <c>unrecognizedClause</c> error production has no row and is admitted here: its own pass
+    /// refuses it by name (COBOLNET1970).</summary>
+    private bool FileDescriptionClauseAdmitted(
+        Core.FileDescriptionClauseContext clause, FileDescriptionFormat format, FileModel file, string fdName)
+    {
+        if (FileDescriptionFormats.RowOf(clause) is not { } row) return true;
+        using var _ = Edition.At(clause);
+        if (row.HomeEntry is { } home)
+        {
+            Edition.Error(DiagnosticCatalog.FileDescriptionClauseFormat, $"the {row.Name} ({WrittenText(clause)}) is "
+                + $"written in the file description entry for '{fdName}', but it is a clause of {home}, and no ISO "
+                + "§13.4.5.2 file description format contains it — write it in the SELECT entry for "
+                + $"'{fdName}'. It is not bound here, so it has no effect on the file.");
+            return false;
+        }
+        if ((row.Formats & format) == 0)
+        {
+            Edition.Error(DiagnosticCatalog.FileDescriptionClauseFormat, $"the {row.Name} ({WrittenText(clause)}) is not "
+                + $"a clause of {FileDescriptionFormats.Caption(format)} of the file description entry: file "
+                + $"'{fdName}' is {file.OrganizationFace}"
+                + (format == FileDescriptionFormat.Report ? ", and its entry specifies a REPORT clause" : "")
+                + $", and {FileDescriptionFormats.BindingRule(format)}. §13.4.5.2 prints that format with only "
+                + $"the {FileDescriptionFormats.Admitted(format)}.");
+            return false;
+        }
+        // §13.4.5.3 SR4 (FORMATS 1 AND 3 — the formats a LINE SEQUENTIAL file can be written in): "neither the
+        // BLOCK CONTAINS clause nor the RECORD CONTAINS clause shall be specified". RECORD CONTAINS is the record
+        // clause's Format 1 and Format 3 (§13.18.43.2, the arms spelled RECORD CONTAINS); the VARYING arm stays
+        // legal, as §14.9.51.4 GR22 describes a line sequential file whose RECORD clause has the DEPENDING phrase.
+        if (file.Organization == FileOrganization.LineSequential
+            && (clause.blockContainsClause() is not null || clause.recordClause() is { } rc && rc.VARYING() is null))
+        {
+            Edition.Error(DiagnosticCatalog.LineSequentialBlockOrRecordContains, $"file '{fdName}' is LINE SEQUENTIAL "
+                + $"and its file description entry specifies {WrittenText(clause)} — ISO §13.4.5.3 SR4: \"If the LINE "
+                + "SEQUENTIAL phrase of the ORGANIZATION clause … is specified neither the BLOCK CONTAINS clause nor "
+                + "the RECORD CONTAINS clause shall be specified.\" A line sequential record ends at its line "
+                + "delimiter; remove the clause (RECORD IS VARYING remains available).");
+            return false;
+        }
+        return true;
     }
 
     /// <summary>ISO §14.9.30.4 GR6's IMPLIED record description, made a REAL record at bind time (kb/Work PB345).
@@ -2912,34 +3011,107 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         RegisterIndexes(item);   // before the name test: a FILLER table's index-names are referenceable (PB919)
         if (item.CobolName is not { } name) return;
-        ScreenRepositoryIntrinsicName(name, "data-name");
         if (!ByName.TryGetValue(name, out var list)) ByName[name] = list = [];
         list.Add(item);
     }
 
     private readonly HashSet<string> _repositoryNameReported = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>ISO §8.3.2.1 rule 5 — THE ONE screen for a user-defined word that spells an intrinsic-function-name
-    /// "identified in a function-specifier in the REPOSITORY paragraph" (<c>FUNCTION name INTRINSIC</c>, or every
-    /// catalogued name under <c>FUNCTION ALL INTRINSIC</c>): asked by every declaration funnel — a data-name
-    /// (<see cref="RegisterName"/>), a condition-name, an index-name, a file-name, a paragraph or section name
-    /// (<c>ProcedureTableBuilder</c>). Reported once per name (a TYPE expansion re-registers a clone). Returns true
-    /// when the name is reserved. kb/Work PB65 (FMT-15.43.2 / FMT-15.58.2): the REPOSITORY sets were filled and
-    /// consulted by NOTHING at declaration time, so a table named HIGHEST-ALGEBRAIC compiled and the keyword-omitted
-    /// reference `HIGHEST-ALGEBRAIC(A1)` silently read the table — the standard's prohibition is exactly what makes
-    /// §8.4.3.2.3 SR2's FUNCTION-less reference unambiguous, and the binder no longer substitutes a hand-written
-    /// "the data item wins" precedence for it.</summary>
-    internal bool ScreenRepositoryIntrinsicName(string name, string what)
+    /// <summary>⛔ THE ONE DECLARATION FUNNEL OF A USER-DEFINED WORD (ISO §8.3.2.2; kb/Work PB1083): every
+    /// declaration of every §8.3.2.2 type announces its word here, and the rules about a user-defined word AS
+    /// DECLARED are asked here once. Today that is §8.3.2.1 rule 5 — intrinsic-function-names may be user-defined
+    /// words "except for … intrinsic function names identified in a function-specifier in the REPOSITORY paragraph"
+    /// — which §12.3.8.3 restates for the specifier's scope (SR12 for <c>FUNCTION name INTRINSIC</c>, SR13 for
+    /// <c>FUNCTION ALL INTRINSIC</c>); the membership is <see cref="IsRepositoryIntrinsic"/>. Reported once per
+    /// word (a TYPE expansion re-registers a clone). Returns true when the word is reserved.
+    /// <para>kb/Work PB65 (FMT-15.43.2 / FMT-15.58.2) made the prohibition bite at all — the REPOSITORY sets were
+    /// consulted by nothing at declaration time, so a table named HIGHEST-ALGEBRAIC compiled and the keyword-omitted
+    /// reference `HIGHEST-ALGEBRAIC(A1)` silently read the table. kb/Work PB1083 made it reach every type: it was
+    /// called from six funnels (data-, condition-, index-, file-, paragraph- and section-names), so an alphabet-name,
+    /// a class-name, a symbolic-character, a program-name or a function-prototype-name spelling a REPOSITORY
+    /// intrinsic compiled clean. <c>UserWordDeclarationDriftTests</c> keeps every §8.3.2.2 type declared here.</para>
+    /// </summary>
+    internal bool DeclareUserWord(string word, UserWordKind kind)
     {
-        bool reserved = RepositoryAllIntrinsic ? IntrinsicCatalog.TryGet(name, out _) : RepositoryIntrinsics.Contains(name);
-        if (!reserved) return false;
-        if (_repositoryNameReported.Add(name))
+        if (RepositoryIntrinsicSpecifier(word) is not { } specifier) return false;
+        bool named = specifier != AllIntrinsics;   // SR12 (a named specifier) or SR13 (ALL)
+        if (_repositoryNameReported.Add(word))
             Edition.Error(DiagnosticCatalog.RepositoryIntrinsicNameAsUserWord,
-                $"{what} '{name}': the intrinsic-function-name is identified in a function-specifier of the REPOSITORY "
-                + $"paragraph (FUNCTION {(RepositoryAllIntrinsic ? "ALL" : name)} INTRINSIC), so it shall not be used "
-                + "as a user-defined word in this source unit (ISO §8.3.2.1 rule 5)");
+                $"{kind.Spelling()} '{word}': the intrinsic-function-name is identified in a function-specifier of the "
+                + $"REPOSITORY paragraph (FUNCTION {specifier} INTRINSIC), so it shall not be used as a user-defined "
+                + $"word within the scope of that paragraph (ISO §8.3.2.1 rule 5; §12.3.8.3 SR{(named ? "12" : "13")})");
         return true;
     }
+
+    /// <summary>Declare the unit's OWN name — the program-name of a PROGRAM-ID paragraph or the user-function-name of
+    /// a FUNCTION-ID paragraph (§8.3.2.2) — once the REPOSITORY in scope is known: the unit's own paragraph and, for a
+    /// contained program, its container's (inherited by <c>InheritConfiguration</c>; §12.3.4 GR1 — "the entries
+    /// explicitly or implicitly specified in the configuration section of a source unit that contains other source
+    /// units apply to each directly or indirectly contained source unit"). A class, interface or method
+    /// is declared by the OO driver, whose units reach this binder as synthetic contexts with no identification
+    /// division.</summary>
+    private void DeclareUnitName(Core.ProgramUnitContext program)
+    {
+        // The IS PROTOTYPE format declares a prototype-name instead (§11.10.2 Format 2, §11.5.2 Format 2).
+        var id = program.identificationDivision()?.identificationBody();
+        if (id?.programIdParagraph() is { } pid && pid.programName() is { } pgm)
+            using (Edition.At(pgm))
+                DeclareUserWord(pgm.GetText(), pid.prototypePhrase() is null
+                    ? UserWordKind.ProgramName : UserWordKind.ProgramPrototypeName);
+        else if (id?.functionIdParagraph() is { } fid && fid.programName() is { } fn)
+            using (Edition.At(fn))
+                DeclareUserWord(fn.GetText(), fid.prototypePhrase() is null
+                    ? UserWordKind.UserFunctionName : UserWordKind.FunctionPrototypeName);
+    }
+
+    /// <summary>⛔ THE ONE ANSWER to "does the REPOSITORY paragraph in scope identify this word as an
+    /// intrinsic-function-name?" (kb/Work PB1083) — asked by the declaration screen (<see cref="DeclareUserWord"/>),
+    /// the keyword-omitted function reference (<c>IntrinsicBinder.KeywordOmittedFunction</c>) and the subscript
+    /// renderer's function detection (<c>ReferenceResolver.IsFunctionBearing</c>), which used to ask
+    /// <c>IntrinsicCatalog.TryGet(written word)</c> three times over and so ignored both halves below.
+    /// <list type="bullet">
+    /// <item>&gt;&gt;COBOL-WORDS, through the ONE resolution (<c>CobolWordsMap.Resolve</c>, kb/Work PB250): §12.3.8.4
+    /// GR14 — ALL is "as if each of the intrinsic-function-names defined in 8.11 … except for those that may have
+    /// been undefined by the COBOL-WORDS directive, were specified"; a SUBSTITUTE literal-4 is replaced in the list by
+    /// its literal-5 and an EQUATE literal-2 is added to it. So an UNDEFINE'd or SUBSTITUTE'd-away name is no longer
+    /// a member, and a synonym is one exactly when its canonical intrinsic is.</item>
+    /// <item>The edition: the §8.11 list is the targeted edition's — a name outside its function's D8 window is no
+    /// intrinsic-function-name there (Annex E.2 item 13: BASECONVERT, CONCAT, … are prohibited under ALL only from
+    /// 2023).</item>
+    /// </list></summary>
+    internal bool IsRepositoryIntrinsic(string word) => RepositoryIntrinsicSpecifier(word) is not null;
+
+    private const string AllIntrinsics = "ALL";
+
+    /// <summary>The membership behind <see cref="IsRepositoryIntrinsic"/>, naming the specifier that makes
+    /// <paramref name="word"/> a member: its canonical intrinsic-function-name when a <c>FUNCTION name INTRINSIC</c>
+    /// specifier identifies it (§12.3.8.3 SR12), <see cref="AllIntrinsics"/> when only <c>FUNCTION ALL INTRINSIC</c>
+    /// does (SR13), null when neither. <see cref="RepositoryIntrinsics"/> holds each named specifier's CANONICAL
+    /// name, so every spelling of one function answers alike.</summary>
+    private string? RepositoryIntrinsicSpecifier(string word)
+    {
+        if (!RepositoryAllIntrinsic && RepositoryIntrinsics.Count == 0) return null;   // no intrinsic specifier in scope
+        if (!TryIntrinsicOfThisCompilation(word, out var sig)) return null;
+        if (RepositoryIntrinsics.Contains(sig.Name)) return sig.Name;
+        return RepositoryAllIntrinsic ? AllIntrinsics : null;
+    }
+
+    /// <summary>Is <paramref name="word"/> an intrinsic-function-name OF THIS COMPILATION — through &gt;&gt;COBOL-WORDS
+    /// (an EQUATE / SUBSTITUTE synonym names its canonical intrinsic; an UNDEFINE'd or SUBSTITUTE'd-away name names
+    /// none: §7.3.10.4 GR2-GR4) and inside its function's D8 edition window (the §8.11 list is the targeted
+    /// edition's)? The one answer the REPOSITORY membership and <c>IntrinsicBinder.KeywordOmittedFunction</c> both
+    /// ask (kb/Work PB1083).</summary>
+    internal bool TryIntrinsicOfThisCompilation(string word, out IntrinsicSig sig)
+    {
+        sig = default;
+        return CanonicalIntrinsicWord(word) is { } canonical
+            && IntrinsicCatalog.TryGet(canonical, out sig) && sig.IsDefinedAt(Edition.DialectLevel);
+    }
+
+    /// <summary>The word through &gt;&gt;COBOL-WORDS (§7.3.10.4 GR2-GR4, <c>CobolWordsMap.Resolve</c>): its canonical
+    /// word, or null when the directive removed it. Allocation-free when no directive is present.</summary>
+    private string? CanonicalIntrinsicWord(string word) =>
+        CobolWords.IsEmpty ? word : CobolWords.Resolve(word.ToUpperInvariant());
 
     // ── TYPEDEF / the TYPE clause (ISO §13.18.58 / §13.18.57; data-model D17) ──────────────────────────────────
 
@@ -3720,6 +3892,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         item.Uid = _uidCounter++;
         item.Parent = _lastRoot;        // owning record — an alias sibling, NOT a storage child
         _lastRoot.Renames66.Add(item);
+        DeclareUserWord(name, UserWordKind.DataName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         RegisterName(item);
         return item;
     }
@@ -3881,7 +4054,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         parent.Own88s.Add(cond);   // the item owns its 88s (source of truth; lets CloneItem carry a TYPEDEF's 88s)
         if (registerGlobal)
         {
-            ScreenRepositoryIntrinsicName(name, "condition-name");   // §8.3.2.1 rule 5 (kb/Work PB65)
+            DeclareUserWord(name, UserWordKind.ConditionName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB65, PB1083)
             if (!Conditions.TryGetValue(name, out var list)) Conditions[name] = list = [];
             list.Add(cond);
         }
@@ -5235,7 +5408,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // entries are never registered, and each of its clones declares its own.
         foreach (var idxName in indexNames)
         {
-            ScreenRepositoryIntrinsicName(idxName, "index-name");   // §8.3.2.1 rule 5 (kb/Work PB65)
+            DeclareUserWord(idxName, UserWordKind.IndexName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB65, PB1083)
             item.IndexNames.Add(idxName);
         }
         return item;
@@ -5416,25 +5589,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     private void BindCodeSetClause(Core.CodeSetClauseContext cs, FileModel file, IReadOnlyList<DataItem> records)
     {
         using var _ = Edition.At(cs);
-        string? alnumName = null, natName = null;
-        if (cs.codeSetForPhrase() is { Length: > 0 } fors)
-        {
-            foreach (var f in fors)
-            {
-                bool nat = f.NATIONAL() is not null;
-                ref string? slot = ref nat ? ref natName : ref alnumName;
-                if (slot is not null)
-                    Edition.Error(DiagnosticCatalog.CodeSetClauseViolation, $"CODE-SET FOR {(nat ? "NATIONAL" : "ALPHANUMERIC")} "
-                        + "is specified more than once — each alternative of the clause's brace shall be specified at most "
-                        + "once (ISO §13.18.13.2 / §5.2.6.4)");
-                slot = f.cobolWord().GetText();
-            }
-        }
-        else
-        {
-            alnumName = cs.cobolWord(0).GetText();
-            natName = cs.cobolWord().Length > 1 ? cs.cobolWord(1).GetText() : null;
-        }
+        var (alnumName, natName) = ChoiceIndicators.AlphabetPair(Edition, cs.codeSetForPhrase(),
+            f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), cs.cobolWord(),
+            $"file '{file.CobolName}' CODE-SET", "13.18.13.2");
         var alnumSet = alnumName is null ? null : CodedCharacterSetOf(alnumName, $"CODE-SET … {alnumName}",
             "ISO §13.18.13.3 SR1 — alphabet-name-1 shall reference an alphabet that defines an alphanumeric coded character set");
         var natSet = natName is null ? null : CodedCharacterSetOf(natName, $"CODE-SET … {natName}",
@@ -5569,12 +5726,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             return nn.predefinedNull() is null
                 && (nn.figurativeConstant()?.cobolWord()?.GetText() is not { } symWord
                 || SymbolicOf(symWord) is not null || FindConstant(symWord) is not null);
-        // §8.3.3.3.2 rule 2 makes a written sign part of the numeric literal, so strip the unary arms before
-        // asking what the primary is (`VALUE -9999` is literal-1, not an arithmetic expression).
+        // §8.3.3.3.2 rule 2 makes a written sign part of the numeric literal — ONE sign, as its leftmost
+        // character — so `VALUE -9999` is literal-1, while `--5`, `+-5` and `- 5` are no literal at all (kb/Work
+        // PB1445: this arm used to strip ANY number of signs, and `VALUE --5` reached the C# backend as a
+        // decrement operator, CS1059). THE ONE §8.3.3.3.2 reading, SoleOperand.NumericLiteral, decides it. The
+        // figurative ZERO is a literal only UNSIGNED: a sign belongs to a numeric literal, never to a figurative.
         var u = op.unaryExpression();
-        while (u?.unaryExpression() is { } signed) u = signed;
-        var p = u?.primaryExpression();
-        if (p?.numericLiteral() is not null || p?.ZERO_ARITH() is not null) return true;
+        if (CobolNet.Frontend.Expressions.SoleOperand.NumericLiteral(u) is not null
+            || u?.addOp() is null && u?.primaryExpression()?.ZERO_ARITH() is not null) return true;
         // A word: the only names a literal position admits are a constant-name (§13.10.3 SR2) and a
         // symbolic-character (§8.3.3.6.2 Format 7). ⛔ The lookup takes the operand through
         // BareValueOperandWord — the SAME accessor the two substituting readers use — so the predicate and the
@@ -5658,6 +5817,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 + "shall be specified in the SYMBOLIC CHARACTERS clause of the SPECIAL-NAMES paragraph (ISO §8.3.3.6.3 "
                 + "SR4), and the only other word ALL may precede is a constant-name standing for literal-1 (§13.10.3 "
                 + "SR2), so the operand identifies no resource (ISO §8.4.2.1).");
+            return;
+        }
+        // Signs in front of a numeric literal that do not make ONE literal (`--5`, `+-5`, `- 5`, a sign at the end
+        // of a line and its digits on the next): §8.3.3.3.2 rule 2 is the rule broken, so it is the rule named
+        // (kb/Work PB1445) — the same code LiteralScreenPass reports for a separated sign in every other literal slot.
+        if (op.unaryExpression() is { } signedShape
+            && CobolNet.Frontend.Expressions.ArithmeticFormationRules.SignedLiteralViolation(signedShape) is { } why)
+        {
+            Edition.Error(DiagnosticCatalog.SignedLiteralSignNotAdjacent, $"{where}: {position.Operand} "
+                + $"'{AsWritten(op)}' is not a literal — {why}: "
+                + CobolNet.Frontend.Expressions.ArithmeticFormationRules.SignRuleQuote
+                + $"; and {position.Format}, which admits no arithmetic expression.");
             return;
         }
         // The BARE-word arm only (the SAME accessor the predicate used): a SIGNED or suffixed operand is not a
@@ -5823,7 +5994,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // now a bindable value that §8.4.2.3.4 GR2 ("The value of a subscript shall be a positive
                 // integer") rejects downstream. A long.TryParse here saturated a 20-to-31-digit NEGATIVE subscript
                 // to int.MaxValue, and the screen then quoted a positive number back.
-                string written = SignedIntegerLiteral.Screen(il, Edition, $"{where}, Format 2 VALUE");
+                string written = SignedIntegerLiteral.Read(il);
                 int v = CobolNet.Validation.IntegerOperandRules.TryHostValue(written, out int n) ? n : int.MaxValue;
                 if (il.Start.TokenIndex < toIdx) { from.Add(v); fromWritten.Add(written); }
                 else { to!.Add(v); toWritten!.Add(written); }

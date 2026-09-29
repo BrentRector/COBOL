@@ -541,27 +541,9 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         var pcs = new SortCollation(ctx.Data.Collating, ctx.Data.NationalCollating);
         if (c is null) return (pcs, null);
 
-        string? alnumName = null, natName = null;
-        var fors = c.collatingForPhrase();
-        if (fors.Length > 0)
-        {
-            foreach (var f in fors)
-            {
-                bool isNat = f.NATIONAL() is not null;
-                ref string? slot = ref isNat ? ref natName : ref alnumName;
-                if (slot is not null)
-                    ctx.Edition.Error("COBOLNET0898", "SORT/MERGE COLLATING SEQUENCE: the FOR "
-                        + $"{(isNat ? "NATIONAL" : "ALPHANUMERIC")} phrase may be specified only once "
-                        + "(ISO §14.9.40.2 general format)");
-                slot = f.cobolWord().GetText();
-            }
-        }
-        else
-        {
-            var words = c.cobolWord();
-            alnumName = words.Length > 0 ? words[0].GetText() : null;
-            natName = words.Length > 1 ? words[1].GetText() : null;
-        }
+        var (alnumName, natName) = ChoiceIndicators.AlphabetPair(ctx.Edition, c.collatingForPhrase(),
+            f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), c.cobolWord(),
+            "SORT/MERGE COLLATING SEQUENCE", "14.9.40.2");
 
         // Alphabet-name-2 (national keys, GR5a): resolve + class-validate, and CARRY the sequence (PB678). A name
         // that fails either check leaves the national half on the program collating sequence — the diagnostic is

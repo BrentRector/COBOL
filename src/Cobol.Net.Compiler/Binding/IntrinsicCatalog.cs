@@ -65,6 +65,13 @@ public readonly record struct IntrinsicSig(
     IntrinsicCodomain Codomain = IntrinsicCodomain.None,
     IntrinsicDomain Domain = IntrinsicDomain.None, string? DomainRule = null)
 {
+    /// <summary>Is the function an intrinsic-function-name of the edition <paramref name="dialectLevel"/> — inside
+    /// its D8 window [<see cref="IntroducedIn"/>, <see cref="RemovedIn"/>)? The REPOSITORY's <c>FUNCTION ALL
+    /// INTRINSIC</c> list is the §8.11 names OF THAT EDITION: Annex E.2 item 13 names seven functions whose names
+    /// it prohibits as user-defined words only from 2023 on (kb/Work PB1083).</summary>
+    public bool IsDefinedAt(int dialectLevel) =>
+        IntroducedIn <= dialectLevel && (RemovedIn is not { } gone || dialectLevel < gone);
+
     /// <summary>The §15.3 kind code of argument position <paramref name="i"/> (0-based; the last code repeats).</summary>
     public char ArgKind(int i) =>
         ArgKinds.Length == 0 ? 'n' : ArgKinds[Math.Min(i, ArgKinds.Length - 1)];

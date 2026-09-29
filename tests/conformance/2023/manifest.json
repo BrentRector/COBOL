@@ -3,6 +3,8 @@
  "enabled": [
   "w70c_pb1268_dynamic_table_bound_subscript",
   "w70c_pb1174_table_sort_dynamic_capacity",
+  "pb1083_repository_all_cobol_words",
+  "pb1238_line_sequential_varying",
   "w69z_pb1047_shadowed_dynamic_table",
   "w68r_pb1138_method_external_check",
   "w68r_pb1079_external_entry_identity",

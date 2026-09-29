@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet.Editions;
-using CobolNet.Editions.Diagnostics;
+using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Generated;
 
 namespace CobolNet.Binding;
@@ -17,8 +16,9 @@ using Core = CobolParserCore;
 /// <c>( + 1 )</c>, which the standard does not. ISO §8.3.3.3.2 2) is the rule — <i>"A literal shall not contain
 /// more than one sign character. If a sign is used, it shall appear as the leftmost character of the
 /// literal."</i> — and a literal is ONE character-string, so a space between the sign and its digits makes the
-/// two things two things. Narrowing happens HERE, by name, instead of being left to the ANTLR error
-/// reporter.</para>
+/// two things two things. The violation is REPORTED once, for this rule and <c>signedNumericLiteral</c> alike, by
+/// <c>LiteralScreenPass</c> (COBOLNET2155; kb/Work PB1445); this reader only declines to read the separated sign
+/// as part of the value.</para>
 ///
 /// <para>⛔ THE VALUE IS NOT WHAT <c>GetText()</c> RETURNS, and the difference is not cosmetic: ANTLR's
 /// <c>GetText()</c> concatenates the node's tokens with the whitespace stripped, so <c>+ 1</c> and <c>+1</c>
@@ -27,28 +27,17 @@ using Core = CobolParserCore;
 /// </summary>
 internal static class SignedIntegerLiteral
 {
-    /// <summary>The literal's text with its sign (e.g. <c>"+1"</c>, <c>"-3"</c>, <c>"12"</c>), after screening
-    /// §8.3.3.3.2 2)'s adjacency. On violation the diagnostic is reported and the UNSIGNED digits are returned,
-    /// so the caller's own range screens still run on a recovered value rather than cascading.</summary>
+    /// <summary>The literal's text with its sign (e.g. <c>"+1"</c>, <c>"-3"</c>, <c>"12"</c>). When the sign does
+    /// not abut the digits (<see cref="ArithmeticFormationRules.SignAbuts"/>) the source is already refused by
+    /// <c>LiteralScreenPass</c>, and the UNSIGNED digits are returned so the caller's own range screens still run on
+    /// a recovered value rather than cascading.</summary>
     /// <param name="ctx">The <c>signedIntegerLiteral</c> node.</param>
-    /// <param name="edition">The diagnostic sink; the caller has already positioned it.</param>
-    /// <param name="where">The source-shaped prefix of the message, e.g. <c>data item 'T', Format 2 VALUE</c>.</param>
-    public static string Screen(Core.SignedIntegerLiteralContext ctx, EditionContext edition, string where)
+    public static string Read(Core.SignedIntegerLiteralContext ctx)
     {
         var digits = ctx.INTEGERLIT();
         var sign = (Antlr4.Runtime.Tree.ITerminalNode?)ctx.PLUS() ?? ctx.MINUS();
-        if (sign is null) return digits.GetText();
-        // Adjacency, measured on the INPUT STREAM and not on GetText(): the sign's last character index and
-        // the digits' first must be consecutive. Same-line is implied — a newline is a character too.
-        if (sign.Symbol.StopIndex + 1 != digits.Symbol.StartIndex)
-        {
-            edition.Error(DiagnosticCatalog.SignedLiteralSignNotAdjacent,
-                $"{where}: `{sign.GetText()} {digits.GetText()}` — a sign is part of the numeric literal and "
-                + "shall be its leftmost character, with no space between the sign and its digits: \"A literal "
-                + "shall not contain more than one sign character. If a sign is used, it shall appear as the "
-                + $"leftmost character of the literal\" (ISO §8.3.3.3.2 2)). Write `{sign.GetText()}{digits.GetText()}`.");
-            return digits.GetText();
-        }
-        return sign.GetText() + digits.GetText();
+        return sign is not null && ArithmeticFormationRules.SignAbuts(sign.Symbol, digits.Symbol)
+            ? sign.GetText() + digits.GetText()
+            : digits.GetText();
     }
 }

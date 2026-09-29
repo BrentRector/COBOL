@@ -2,6 +2,8 @@
  "enabled": [
   "pb617_integer_arg_literal_constant",
   "pb1362_fixed_form_default",
+  "pb1445_signed_literal_forms",
+  "pb1238_fd_formats_admitted",
   "w69z_pb1047_shadowed_redefines_root",
   "pb1390_abbreviated_tail_and_or",
   "pb1171_report_file_legal_references",

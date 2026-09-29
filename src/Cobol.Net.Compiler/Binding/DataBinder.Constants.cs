@@ -183,6 +183,7 @@ public sealed partial class DataBinder
                 "a constant entry shall be named — constant-name-1 is required (ISO §13.10.2)");
             return;
         }
+        DeclareUserWord(name, UserWordKind.ConstantName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         bool isGlobal = body.GLOBAL() is not null;
 
         // FROM compilation-variable-name-1 (§13.10.4 GR1's >>DEFINE leg) — STAGED LOUD: the compilation-

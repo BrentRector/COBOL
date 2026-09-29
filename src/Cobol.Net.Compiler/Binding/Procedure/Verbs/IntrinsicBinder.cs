@@ -56,7 +56,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         string? reservedName = fc.reservedIntrinsicArgFn()?.GetText() ?? fc.RANDOM()?.GetText();
         if (reservedName is { } fn)
         {
-            if (!ctx.Data.RepositoryAllIntrinsic && !ctx.Data.RepositoryIntrinsics.Contains(fn))
+            if (!ctx.Data.IsRepositoryIntrinsic(fn))   // the ONE REPOSITORY membership (kb/Work PB1083)
             {
                 ctx.Edition.Error("COBOLNET1543",
                     $"'{fn}' is written without the word FUNCTION, but the REPOSITORY paragraph does not declare "
@@ -323,19 +323,22 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 : BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} arguments");
             return tailRefMod is null ? viaPointer : ResultRefMod(viaPointer, ctx.Refs.ReadRefMod(tailRefMod), name);
         }
-        bool catalogued = IntrinsicCatalog.TryGet(name, out var sig);
+        // The word as an intrinsic-function-name OF THIS COMPILATION (>>COBOL-WORDS and the edition window —
+        // DataBinder.TryIntrinsicOfThisCompilation), and the REPOSITORY half through DataBinder.IsRepositoryIntrinsic,
+        // the one membership the declaration screen asks too (kb/Work PB1083).
+        bool catalogued = ctx.Data.TryIntrinsicOfThisCompilation(name, out var sig);
+        bool repositoryIntrinsic = ctx.Data.IsRepositoryIntrinsic(name);
         bool declaredFn = ctx.Data.UserFunctionNames.Contains(name)
             || name.Equals(host.UdfSelfName, StringComparison.OrdinalIgnoreCase)
-            || (catalogued && (ctx.Data.RepositoryAllIntrinsic || ctx.Data.RepositoryIntrinsics.Contains(name)));
+            || repositoryIntrinsic;
         if (!declaredFn && !catalogued) return null;
         // A catalogued name the REPOSITORY does NOT identify may be a user-defined word (§8.3.2.1 rule 5 — a
         // table named MOD or SQRT is legal): the declared item wins, never a mis-routed subscript. A name the
         // REPOSITORY DOES identify cannot be a user-defined word in this unit (rule 5's second exception — screened
-        // at every declaration, DataBinder.ScreenRepositoryIntrinsicName), so the reference IS the function
+        // at every declaration, DataBinder.DeclareUserWord), so the reference IS the function
         // (§8.4.3.2.3 SR2; kb/Work PB65 FMT-15.43.2 / FMT-15.58.2 — the former unconditional "data item wins"
         // let a shadowing table answer where §15.43.4 requires +999). A user-function-prototype name keeps the
         // data-item precedence (its declaration is not screened by rule 5).
-        bool repositoryIntrinsic = catalogued && (ctx.Data.RepositoryAllIntrinsic || ctx.Data.RepositoryIntrinsics.Contains(name));
         if (!repositoryIntrinsic && ctx.Symbols.TryResolve(name, ctx.ActiveScope, out _)) return null;
         if (!declaredFn)
         {

@@ -235,7 +235,7 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
   CONFORMS, GAP 4040.
   **✅ PB65 CLOSED (DEVLOG 1306, 2026-08-18)** — the last five members: a MIXED selection list (MAX/MIN/ORD-MAX/
   ORD-MIN/MEDIAN with a float beside a fixed item) delivers the CONTENT via the SDIDI (`MAX(F1 N1)` was 13);
-  §8.3.2.1 rule 5 written once (`DataBinder.ScreenRepositoryIntrinsicName`, COBOLNET1649 — a REPOSITORY-named
+  §8.3.2.1 rule 5 written once (now `DataBinder.DeclareUserWord`, every §8.3.2.2 type — PB1083; COBOLNET1649 — a REPOSITORY-named
   intrinsic can no longer be shadowed by a data item); a boolean EXPRESSION is an intrinsic argument (the
   argument-scoped `boolArgAhead()`; B"" lexes); `>>LEAP-SECOND ON` reaches the date/time family (a directive
   processor, ONE `DirectiveResults` record into Bind, ONE leave-set in the CC processor; COBOLNET1650; construct

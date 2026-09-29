@@ -628,11 +628,27 @@ FUNCTION-less reference unambiguous. The REPOSITORY sets (`RepositoryIntrinsics`
 filled and consulted by NOTHING at declaration time; `KeywordOmittedFunction` substituted a hand-written "a declared
 data item wins" precedence, so under `FUNCTION HIGHEST-ALGEBRAIC INTRINSIC` a table named HIGHEST-ALGEBRAIC compiled
 clean and `HIGHEST-ALGEBRAIC(A1)` silently read the table element where §15.43.4 requires +999. **The rule now:**
-`DataBinder.ScreenRepositoryIntrinsicName` is THE screen — asked by every declaration funnel (a data-name, a
-condition-name, an index-name, a file-name, a paragraph or section name) — **COBOLNET1649** at the declaration; a
-catalogued name the REPOSITORY does NOT identify stays a legal user-defined word (SQRT as a table, MOD as an item),
-and only for those does the data item win the FUNCTION-less spelling. Golden `pb65_repository_r5_intrinsic_names`,
-negatives `pb65-repository-*`.
+`DataBinder.DeclareUserWord(word, UserWordKind)` is THE declaration funnel of a user-defined word, and the screen
+lives there — **COBOLNET1649** at the declaration; a catalogued name the REPOSITORY does NOT identify stays a legal
+user-defined word (SQRT as a table, MOD as an item), and only for those does the data item win the FUNCTION-less
+spelling. Golden `pb65_repository_r5_intrinsic_names`, negatives `pb65-repository-*`.
+
+**Every type, one membership (kb/Work PB1083, §12.3.8.3 SR12/SR13, §12.3.8.4 GR14).** The funnel is called for
+every §8.3.2.2 type — data-, record-, constant-, type-, condition-, index-, file-, report-, screen- and record-key-
+names, the SPECIAL-NAMES words (alphabet-, class-, locale-, mnemonic-, ordering-, dynamic-length-structure-names,
+symbolic-characters, switch condition-names), paragraph- and section-names, the unit's own program-name /
+user-function-name / prototype-name (a contained program under its container's REPOSITORY), the REPOSITORY's own
+specifier words (declared after the paragraph, so a specifier written before `FUNCTION ALL INTRINSIC` is caught),
+and the OO words (object-class-, interface-, method- and property-names); `UserWordDeclarationDriftTests` parses
+§8.3.2.2's list and fails on a type neither declared nor exempted with its reason. The membership is ONE function,
+`DataBinder.IsRepositoryIntrinsic`, asked by the screen, `IntrinsicBinder.KeywordOmittedFunction` (and its
+reserved-name arm) and `ReferenceResolver.IsFunctionBearing`; its intrinsic half,
+`DataBinder.TryIntrinsicOfThisCompilation`, is also what `KeywordOmittedFunction` asks for "is this word an intrinsic
+at all", and a named specifier is stored by its CANONICAL name, so every spelling of one function answers alike. The
+word goes through `CobolWordsMap.Resolve` (GR14 —
+an UNDEFINE'd or SUBSTITUTE'd-away name leaves the ALL list, a SUBSTITUTE literal-5 or EQUATE literal-2 joins it)
+and its function's D8 window (`IntrinsicSig.IsDefinedAt` — Annex E.2 item 13's seven names are prohibited under ALL
+only from 2023). Golden `2023/pb1083_repository_all_cobol_words`; negatives `pb1083-*`.
 
 ### A boolean EXPRESSION is an intrinsic argument (PB65, FMT-15.45.2 / §8.4.3.2.3 SR8).
 

@@ -80,7 +80,17 @@ public static class SoleOperand
             if (n.ChildCount != 1) return null;
             n = n.GetChild(0);
         }
-        var u = (Core.UnaryExpressionContext)n;
+        return NumericLiteral((Core.UnaryExpressionContext)n);
+    }
+
+    /// <summary>The same question asked of a unary-tier operand directly — the VALUE clause's
+    /// <c>valueClauseOperand : unaryExpression</c> slot, whose every format writes <i>literal-n</i> (§13.18.63.2), so
+    /// its operand is a literal only when it IS one: unsigned, or ONE sign abutting a bare numeric literal
+    /// (<c>-5</c>). <c>--5</c>, <c>+-5</c> and <c>- 5</c> answer null (kb/Work PB1445: the VALUE reader used to strip
+    /// any number of signs, and <c>VALUE --5</c> reached the C# backend as a decrement operator).</summary>
+    public static string? NumericLiteral(Core.UnaryExpressionContext? u)
+    {
+        if (u is null) return null;
         if (u.addOp() is not { } sign)
             return u.primaryExpression()?.numericLiteral()?.GetText();     // unsigned, or a lexer-fused SIGNED_*LIT
         var operand = u.unaryExpression();

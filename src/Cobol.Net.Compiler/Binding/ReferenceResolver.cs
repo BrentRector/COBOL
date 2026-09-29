@@ -2379,9 +2379,9 @@ public sealed class ReferenceResolver(DataBinder data)
             // the `w == "FUNCTION"` test above and never reaches here.
             if (k >= tokens.Count || tokens[k].Type is not (Core.SUB_LPAREN or Core.LPAREN)) continue;
             if (data.Symbols.TryResolve(w, data.ActiveScope, out _)) continue;   // a declared item wins
-            if (data.UserFunctionNames.Contains(w)
-                || ((data.RepositoryAllIntrinsic || data.RepositoryIntrinsics.Contains(w))
-                    && IntrinsicCatalog.TryGet(w, out _)))
+            // The REPOSITORY half is the ONE membership the declaration screen and KeywordOmittedFunction ask
+            // (DataBinder.IsRepositoryIntrinsic — >>COBOL-WORDS and the edition window included; kb/Work PB1083).
+            if (data.UserFunctionNames.Contains(w) || data.IsRepositoryIntrinsic(w))
                 return true;
         }
         return false;

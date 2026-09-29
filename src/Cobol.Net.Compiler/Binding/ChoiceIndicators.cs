@@ -49,4 +49,48 @@ internal static class ChoiceIndicators
                 + "once (in any order, but once)");
         return occurrences.Length > 0 ? occurrences[0] : null;
     }
+
+    /// <summary>⛔ THE ONE READER of the FOR ALPHANUMERIC / FOR NATIONAL choice pair (kb/Work PB1075). Five general
+    /// formats print <c>{ | FOR ALPHANUMERIC IS x-1 | FOR NATIONAL IS x-2 | }</c> — a brace with choice indicators —
+    /// as the alternative to a positional <c>IS x-1 [x-2]</c> form: the PROGRAM COLLATING SEQUENCE and CHARACTER
+    /// CLASSIFICATION clauses (§12.3.6.2), the file control entry's file-level COLLATING SEQUENCE clause
+    /// (§12.4.5.7.2 Format 1), the SORT/MERGE COLLATING SEQUENCE phrase (§14.9.40.2 / §14.9.24.2) and the CODE-SET
+    /// clause (§13.18.13.2). Each used to walk its FOR phrases itself: four reported a repeat under their own
+    /// messages (two of them the bare string COBOLNET0898) and the file clause let the LAST repeat win in silence.
+    /// A repeat is §5.2.6.4's violation, read by <see cref="AtMostOnce{T}"/>; the FIRST phrase of each class is
+    /// returned, so binding continues on the first as written.</summary>
+    /// <param name="edition">The one diagnostic sink.</param>
+    /// <param name="forPhrases">The FOR phrases as parsed (the grammar's <c>+</c> superset), in written order.</param>
+    /// <param name="isNational">Whether a FOR phrase is the FOR NATIONAL alternative.</param>
+    /// <param name="statement">The clause as the user wrote it, for the message.</param>
+    /// <param name="clause">The subclause whose general format prints the pair.</param>
+    public static (T? Alphanumeric, T? National) ForPhrasePair<T>(EditionContext edition, T[] forPhrases,
+        Func<T, bool> isNational, string statement, string clause) where T : ParserRuleContext
+    {
+        var alnum = AtMostOnce(edition, forPhrases.Where(f => !isNational(f)).ToArray(), statement,
+            "the FOR ALPHANUMERIC phrase", clause);
+        var nat = AtMostOnce(edition, forPhrases.Where(isNational).ToArray(), statement, "the FOR NATIONAL phrase", clause);
+        return (alnum, nat);
+    }
+
+    /// <summary>The alphabet-name pair of the four formats among <see cref="ForPhrasePair{T}"/>'s five whose operands
+    /// are alphabet-names (every one but CHARACTER CLASSIFICATION): the FOR phrases when any is written, else the IS
+    /// form's alphabet-name-1 [alphabet-name-2].</summary>
+    /// <param name="edition">The one diagnostic sink.</param>
+    /// <param name="forPhrases">The FOR phrases as parsed, in written order.</param>
+    /// <param name="isNational">Whether a FOR phrase is the FOR NATIONAL alternative.</param>
+    /// <param name="alphabetOf">The alphabet-name a FOR phrase names.</param>
+    /// <param name="isForm">The IS form's alphabet-name words (alphabet-name-1, then alphabet-name-2), read when no FOR
+    /// phrase is written.</param>
+    /// <param name="statement">The clause as the user wrote it, for the message.</param>
+    /// <param name="clause">The subclause whose general format prints the pair.</param>
+    public static (string? Alphanumeric, string? National) AlphabetPair<T>(EditionContext edition, T[] forPhrases,
+        Func<T, bool> isNational, Func<T, string> alphabetOf, IReadOnlyList<ParserRuleContext> isForm,
+        string statement, string clause) where T : ParserRuleContext
+    {
+        if (forPhrases.Length == 0)
+            return (isForm.Count > 0 ? isForm[0].GetText() : null, isForm.Count > 1 ? isForm[1].GetText() : null);
+        var (alnum, nat) = ForPhrasePair(edition, forPhrases, isNational, statement, clause);
+        return (alnum is null ? null : alphabetOf(alnum), nat is null ? null : alphabetOf(nat));
+    }
 }

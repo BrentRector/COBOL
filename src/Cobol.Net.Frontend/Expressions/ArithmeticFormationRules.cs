@@ -169,12 +169,56 @@ public static class ArithmeticFormationRules
     public static bool SignIsPartOfLiteral(IToken sign, Core.UnaryExpressionContext? operand)
     {
         if (operand?.primaryExpression() is not { } primary) return false;
-        IToken first = primary.Start;
-        if (first.Line != sign.Line || first.StartIndex != sign.StopIndex + 1) return false;   // separated ⇒ unary
-        // The operand must be the bare literal: walk the sole-child spine and require a numeric literal at the
-        // end. `- -2 * 3` reaches here with primary = 2 only, so the spine test is over `primary` itself.
+        if (!SignAbuts(sign, primary.Start)) return false;   // separated ⇒ unary
+        // The operand must be the bare literal. `- -2 * 3` reaches here with primary = 2 only, so the spine test is
+        // over `primary` itself.
+        return IsBareNumericLiteral(primary);
+    }
+
+    /// <summary>Whether a primary is a bare numeric literal: its sole-child spine ends at the numeric literal
+    /// core (no parenthesis, identifier or function on the way down).</summary>
+    private static bool IsBareNumericLiteral(Core.PrimaryExpressionContext primary)
+    {
         IParseTree n = primary;
         while (n.ChildCount == 1) n = n.GetChild(0);
         return n is Core.NumericLiteralCoreContext or ITerminalNode { Parent: Core.NumericLiteralCoreContext };
+    }
+
+    /// <summary>⛔ THE ONE CONTIGUITY TEST of §8.3.3.3.2 rule 2 — the sign and the literal's first character are
+    /// ONE character-string exactly when the sign's last character index immediately precedes the literal's first
+    /// on the input stream (a space, and equally a line break, is a separator — §8.3.5). Measured on the TOKENS'
+    /// stream indices, never on <c>GetText()</c>, which concatenates a node's tokens with the whitespace stripped
+    /// so <c>- 5</c> and <c>-5</c> read back alike. <see cref="SignIsPartOfLiteral"/> asks it of an arithmetic
+    /// operand; <c>LiteralScreenPass</c> asks it of every signed literal slot (<c>signedNumericLiteral</c>,
+    /// <c>signedIntegerLiteral</c>) and <c>SignedIntegerLiteral.Read</c> of the one it reads (kb/Work PB1445).</summary>
+    public static bool SignAbuts(IToken sign, IToken first) =>
+        first.Line == sign.Line && first.StartIndex == sign.StopIndex + 1;
+
+    /// <summary>§8.3.3.3.2 rule 2 as written, for every diagnostic that cites it.</summary>
+    public const string SignRuleQuote = "\"A literal shall not contain more than one sign character. If a sign is "
+        + "used, it shall appear as the leftmost character of the literal\" (ISO §8.3.3.3.2 2))";
+
+    /// <summary>What is wrong with a unary-tier operand written as SIGNS in front of a bare numeric literal, where
+    /// the position admits only a literal (no arithmetic expression) — "it contains more than one sign character"
+    /// for <c>--5</c> / <c>+-5</c>, "its sign is separated from its digits" for <c>- 5</c> — or null when the
+    /// operand is not that shape or is a well-formed signed literal (kb/Work PB1445). The shape test is
+    /// <see cref="SignIsPartOfLiteral"/>'s own: the innermost operand must be a bare numeric literal.</summary>
+    public static string? SignedLiteralViolation(Core.UnaryExpressionContext u)
+    {
+        if (u.addOp() is null) return null;
+        int signs = 0;
+        IToken lastSign = u.Start;
+        var cur = u;
+        while (cur.addOp() is { } s)
+        {
+            signs++;
+            lastSign = s.Stop;
+            if (cur.unaryExpression() is not { } inner) return null;
+            cur = inner;
+        }
+        if (cur.primaryExpression() is not { } primary || !IsBareNumericLiteral(primary)) return null;
+        return signs > 1 ? "it contains more than one sign character"
+            : !SignAbuts(lastSign, primary.Start) ? "its sign is separated from its digits"
+            : null;
     }
 }

@@ -28,6 +28,11 @@ public sealed class ExternalFileEntryIdentityTests
         return f;
     }
 
+    /// <summary>A key-level clause naming one key by its bare data-name, unresolved (no record items in this model),
+    /// so the fingerprint keys the operand by its spelling.</summary>
+    private static KeyLevelCollatingClause KeyClause(string key, string alphabet) =>
+        new([new CollatingKeyOperand { Name = key, Qualifiers = [] }], alphabet, default);
+
     public static TheoryData<string, Action<FileModel>> Items => new()
     {
         { "a) OPTIONAL", f => f.Optional = true },
@@ -39,7 +44,7 @@ public sealed class ExternalFileEntryIdentityTests
         { "e) organization", f => f.Organization = FileOrganization.Relative },
         { "f) access mode", f => f.AccessMode = FileAccessMode.Random },
         { "g) file-level COLLATING SEQUENCE", f => f.FileLevelCollating = ("REV", null) },
-        { "g) key-level COLLATING SEQUENCE", f => f.KeyLevelCollating.Add((["XA"], "REV", default)) },
+        { "g) key-level COLLATING SEQUENCE", f => f.KeyLevelCollating.Add(KeyClause("XA", "REV")) },
         { "k) DUPLICATES phrase", f => f.AlternateKeyNames[0] = new AlternateKeyClause { Name = "XA", Qualifiers = [], Duplicates = false } },
         { "k) number of alternate record keys", f => f.AlternateKeyNames.Clear() },
         { "k) SUPPRESS WHEN phrase", f => f.AlternateKeyNames[0].SuppressWhen =
@@ -67,8 +72,8 @@ public sealed class ExternalFileEntryIdentityTests
     {
         // GR1 g) "The same specification of COLLATING SEQUENCE clauses": the same key-to-alphabet assignments written
         // as two clauses in either order specify the same thing.
-        var a = Entry(); a.KeyLevelCollating.Add((["XK"], "ALPHA1", default)); a.KeyLevelCollating.Add((["XA"], "ALPHA2", default));
-        var b = Entry(); b.KeyLevelCollating.Add((["XA"], "alpha2", default)); b.KeyLevelCollating.Add((["XK"], "alpha1", default));
+        var a = Entry(); a.KeyLevelCollating.Add(KeyClause("XK", "ALPHA1")); a.KeyLevelCollating.Add(KeyClause("XA", "ALPHA2"));
+        var b = Entry(); b.KeyLevelCollating.Add(KeyClause("XA", "alpha2")); b.KeyLevelCollating.Add(KeyClause("XK", "alpha1"));
         Assert.Equal(OoEmitter.SelectFingerprint(a), OoEmitter.SelectFingerprint(b));
     }
 }

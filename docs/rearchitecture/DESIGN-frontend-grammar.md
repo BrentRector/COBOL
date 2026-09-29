@@ -1056,6 +1056,18 @@ joined the table the same way, which is the table doing its job: a tenth format 
   visitor for the three clauses. It replaced two opposite answers to one spelling: the ALPHABET postfix was an
   accepted "historical superset", the CLASS postfix a bare `COBOL0001: unexpected 'FOR'`. The binders read it only
   to recover the intended class (`DataBinder.ForPhraseIsNational`).
+- **A closed UNION of formats — the file description entry (kb/Work PB1238).** `fileDescriptionClause` is the
+  union of §13.4.5.2's three formats, and §13.4.5.3 SR5/SR7/SR8 bind each entry to exactly ONE of them. Which one
+  is decided once, in `Compiler/Binding/FileDescriptionFormats.cs` (`Of`: a relative or indexed file is Format 2;
+  otherwise a REPORT clause anywhere in the entry makes it Format 3; else Format 1), and the same file's table
+  keys each alternative's context type to the formats that print it. `DataBinder.FileDescriptionClauseAdmitted`
+  refuses a clause its entry's format does not contain (COBOLNET2604) and does not bind it; the same table
+  carries the five FILE CONTROL ENTRY clauses the grammar superset-parses in the FD position (ORGANIZATION,
+  ACCESS MODE, RECORD KEY, ALTERNATE RECORD KEY, FILE STATUS) with no admitting format and a home entry, so they
+  are refused BY NAME with "write it in the SELECT entry" instead of a token error — they used to parse and be
+  silently dropped. §13.4.5.3 SR4 (LINE SEQUENTIAL: no BLOCK CONTAINS, no RECORD CONTAINS; the VARYING arm stays
+  legal) is asked in the same method (COBOLNET2605). `FileDescriptionFormatDriftTests` reflects over the generated
+  parser so a new alternative cannot land without a row.
 
 **The ordering a fixer owes, and why.** Audit the format from the RENDERED printed page first, model what the
 grammar is missing, and only THEN close the list. Doing (3) before (1) and (2) rejects legal source that is
@@ -1104,6 +1116,16 @@ newly-closed format as the standing witness that the rendering was right.
   recognized by text through the parser base's `wordAhead` (the one `Word` funnel), each as the left-edge predicate
   of its own one-word rule. Gated below 2014 (`dynamic-length-structure-2014`); its semantics are
   `DESIGN-data-model.md` §2.1.
+- **The FOR ALPHANUMERIC / FOR NATIONAL pair is read in ONE place** (kb/Work PB1075). Five formats print the same
+  `{ IS x-1 [x-2] | { | FOR ALPHANUMERIC IS x-1 | FOR NATIONAL IS x-2 | } }` shape — the PROGRAM COLLATING SEQUENCE
+  and CHARACTER CLASSIFICATION clauses (§12.3.6.2), the file-level COLLATING SEQUENCE clause (§12.4.5.7.2 Format 1),
+  the SORT/MERGE COLLATING SEQUENCE phrase (§14.9.40.2 / §14.9.24.2) and the CODE-SET clause (§13.18.13.2). The
+  grammar writes the FOR phrases as a `+` superset; `ChoiceIndicators.ForPhrasePair` reads the pair and refuses a
+  repeated alternative (§5.2.6.4, COBOLNET2104) for all five, and `ChoiceIndicators.AlphabetPair` adds the IS form
+  for the four whose operands are alphabet-names. `ForPhrasePairDriftTests` derives the repeated FOR-phrase rules
+  from the grammar and fails on a binder that walks one itself. The file clause's Format 2 operand is a
+  `dataReference` (a qualified data-name, SR6's subscript refused by name through `DataBinder.ClauseDataName`)
+  resolved to the key ITEM among the file's RECORD KEY / ALTERNATE RECORD KEY items.
 
 ### 3.11 The required imperative-statement operand — the quantifier IS the rule (kb/Work PB396)
 

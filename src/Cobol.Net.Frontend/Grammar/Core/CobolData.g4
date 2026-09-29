@@ -66,6 +66,11 @@ fileDescriptionClauses
 // linage-clause · CODE-SET · REPORT(S), plus the COBOL-85 clauses removed at COBOL-2002 (LABEL RECORDS, DATA
 // RECORDS, VALUE OF) which are superset-parsed and removal-gated post-bind. The last alternative is the error
 // production, NOT a vendor hook — see CobolExpressions.g4#unrecognizedClause.
+// ⚠ The first five alternatives are the FILE CONTROL ENTRY's clauses (§12.4.5.1), which no FD format contains.
+// They are SUPERSET-PARSED here so the binder can refuse them BY NAME ("a clause of the file control entry —
+// write it in the SELECT entry", COBOLNET2604) instead of a token error; and which of the three formats an entry
+// is — and so which of the other clauses it admits — is decided in ONE place, Binding/FileDescriptionFormats.cs
+// (kb/Work PB1238), whose table FileDescriptionFormatDriftTests holds total over this rule's alternatives.
 fileDescriptionClause
     : organizationClause
     | accessModeClause
