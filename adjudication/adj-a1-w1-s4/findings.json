@@ -1,0 +1,116 @@
+[
+ {
+  "mechanism": "A fixed implementor determination exists in code (or in \u00a73 prose) but has no '| DOC-A.1-N |' register row, so the traceability inventory cannot see it (missing/misfiled A.1 documentation)",
+  "rule_ids": [
+   "DOC-A.1-94",
+   "DOC-A.1-95",
+   "DOC-A.1-97",
+   "DOC-A.1-101",
+   "DOC-A.1-111"
+  ],
+  "harm": "silent",
+  "repro": "python scripts/spec/audit_annex_a1.py -> no row for 94/95/97/101/111; probes: GOBACK WITH NORMAL STATUS 300 -> exit 44; X\"80\" -> ORD 129; LENGTH(NX\"D800\")=1; INVOKE of REPOSITORY CLASS SB AS \"System.Text.StringBuilder\" -> COBOLNET0813/0823",
+  "expected_from_spec": "\u00a74.2.5 + each A.1 item: 'This item shall be documented in the implementor's user documentation' \u2014 a determination row for exactly this item",
+  "observed_or_reasoning": "94: substance in \u00a73 STOP/GOBACK bullet labelled items 192/193; 111: substance in \u00a73 directives bullet labelled item 112 (wrong item); 95/97/101: stated nowhere",
+  "code_site": "docs/CONFORMANCE.md \u00a77; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#DecodeHex/#DecodeHexGroups; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs",
+  "clause": "A.1 items 94/95/97/101/111; \u00a714.9.18.4 GR10; \u00a78.3.3.2.4 GR5; \u00a78.3.3.5.4 GR5; \u00a714.9.23.4 GR2b; \u00a77.3.17.4 GR2",
+  "owning_note": "95: PB1397; 97: PB160; 111: PB1369; 94 and 101: NONE (new)"
+ },
+ {
+  "mechanism": "Vacuous conditional A.1 items (condition cannot arise in this implementation) carry no \u00a77 row recording the vacuity, although the register counts them as in-scope obligations and the project's convention (DOC-A.1-185) is an explicit VACUOUS row",
+  "rule_ids": [
+   "DOC-A.1-88",
+   "DOC-A.1-96",
+   "DOC-A.1-98"
+  ],
+  "harm": "silent",
+  "repro": "audit_annex_a1.py CANNOT-ARISE set is {84,85,86,173} only; probe p88: prototype FUNCTION-ID EXTF AS \"strlen\" -> EC-FUNCTION-NOT-FOUND, exit 1; X\"8\" -> COBOLNET1635",
+  "expected_from_spec": "A.1 88/96/98 are conditionally required; when the condition does not hold the item is not required, but the register needs a stated disposition to close the row",
+  "observed_or_reasoning": "characters are 16-bit UTF-16 code units (never a non-multiple of 4 bits); non-COBOL functions are never located. Behaviour is correct; only the recorded disposition is missing",
+  "code_site": "docs/CONFORMANCE.md \u00a77",
+  "clause": "\u00a78.3.3.2.4 GR5 / \u00a78.3.3.5.4 GR5 second sentence; \u00a78.4.3.2.4 GR6d",
+  "owning_note": "NONE (new); PB1397 / PB160 are the neighbouring character-set register notes"
+ },
+ {
+  "mechanism": "The fatal-I-O-status action (item 103) is made in code (continue with checking off; abnormal termination exit 1 with EC-I-O checking on) but documented only as a parenthetical in the SORT/MERGE bullet, and FileStatus.cs's '71' summary states the opposite of the default behaviour",
+  "rule_ids": [
+   "DOC-A.1-103"
+  ],
+  "harm": "silent",
+  "repro": "f2.cob: SELECT F ASSIGN \"nonexist-zz.dat\" (no FILE STATUS, no USE); OPEN INPUT F; READ F -> continues, exit 0. f6.cob: LINE SEQUENTIAL WRITE of X\"41014243\" with no FILE STATUS -> status 71 (f7 shows 71), continues, exit 0. With >>TURN EC-I-O CHECKING ON: 'abnormal run-unit termination: EC-I-O-PERMANENT-ERROR (fatal): I-O status 35', exit 1",
+  "expected_from_spec": "\u00a79.1.13.1: 'the implementor determines what action is taken ... may either continue or terminate' + A.1 103 required + documented",
+  "observed_or_reasoning": "No DOC-A.1-103 row; FileStatus.LineRecordInvalidChar doc comment says 'a program without a FILE STATUS item or a USE declarative terminates here rather than writing a corrupt line' \u2014 false in a default build",
+  "code_site": "src/Cobol.Net.Runtime/IO/FileStatus.cs#LineRecordInvalidChar; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs#IsFatalIoStatus; docs/CONFORMANCE.md \u00a77",
+  "clause": "\u00a79.1.13.1; A.1 item 103",
+  "owning_note": "NONE for the documentation half (new); PB1512 owns the related host-IOException crash"
+ },
+ {
+  "mechanism": "'Runtime resources that are checked' before an activation: EC-PROGRAM-RESOURCES / the EC-OO-METHOD resource arm have no raise site, and the empty checked set is not documented (function-identifier and INVOKE siblings)",
+  "rule_ids": [
+   "DOC-A.1-89",
+   "DOC-A.1-102"
+  ],
+  "harm": "under-rejects",
+  "repro": "grep -rn EC-PROGRAM-RESOURCES src -> catalog row only; CobolObject.__CobolInvoke raises EC-OO-METHOD only for method-not-found",
+  "expected_from_spec": "\u00a78.4.3.2.4 GR6c / \u00a714.9.23.4 GR7b: resources checked are implementor-defined; A.1 89/102 required + documented",
+  "observed_or_reasoning": "No check, no row. NOTE A.1 102 cites 'General rule 7e' but the resource sentence is GR7b",
+  "code_site": "src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs; src/Cobol.Net.Runtime/Control/CobolObject.cs#__CobolInvoke",
+  "clause": "\u00a78.4.3.2.4 GR6c; \u00a714.9.23.4 GR7b",
+  "owning_note": "PB1422 (open; owns item 89 and names item 102 as the INVOKE sibling to sweep)"
+ },
+ {
+  "mechanism": "Implementor-defined exception names (EC-IMP-suffix, EC-level-2-IMP): the catalog accepts ANY EC-IMP-suffix as a valid fatal level-3 name and raises EC-PROGRAM-IMP at one internal site, with the Imp->fatal determination stated only in code comments",
+  "rule_ids": [
+   "DOC-A.1-99",
+   "DOC-A.1-100"
+  ],
+  "harm": "under-rejects",
+  "repro": ">>TURN EC-ALL CHECKING ON / RAISE EXCEPTION EC-IMP-WIBBLE -> compiles; 'abnormal run-unit termination: EC-IMP-WIBBLE (fatal)', exit 1. RAISE EXCEPTION EC-PROGRAM-IMP -> fatal, exit 1",
+  "expected_from_spec": "Table 13: 'EC-IMP-suffix (implementor specifies suffix)'; A.1 99/100 optional, documented if provided",
+  "observed_or_reasoning": "either the open suffix family is a provided facility (then undocumented) or none is provided (then arbitrary suffixes name no condition and should be rejected); EC-PROGRAM-IMP is provided at ProgramTable.cs ~518 and undocumented",
+  "code_site": "src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs#TryGet; src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#CobolCallException; src/Cobol.Net.Runtime/Control/ProgramTable.cs",
+  "clause": "\u00a714.6.13.1.6 Table 13",
+  "owning_note": "NONE (new)"
+ },
+ {
+  "mechanism": "I-O status boundary rows 24/34: no externally-defined boundary model and no DOC rows",
+  "rule_ids": [
+   "DOC-A.1-107",
+   "DOC-A.1-108"
+  ],
+  "harm": "wrong-answer",
+  "repro": "see PB1192",
+  "expected_from_spec": "\u00a79.1.13.5 4) / \u00a79.1.13.6 3): the implementor specifies the manner in which these boundaries are defined",
+  "observed_or_reasoning": "already owned",
+  "code_site": "src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Write; IndexedConnector.cs#Write; SequentialConnector.cs#Write",
+  "clause": "\u00a79.1.13.5 4); \u00a79.1.13.6 3)",
+  "owning_note": "PB1192 (open) \u2014 reference only"
+ },
+ {
+  "mechanism": "Optional A.1 elements not provided but with no \u00a77 'Not provided.' row (so the a1-optional-not-provided selector cannot close them)",
+  "rule_ids": [
+   "DOC-A.1-105",
+   "DOC-A.1-106"
+  ],
+  "harm": "silent",
+  "repro": "grep of FileStatusCode: no 0x value; no permanent-error correction technique or sticky permanent-error state",
+  "expected_from_spec": "\u00a79.1.13.3 1) / \u00a79.1.13.1 \u2014 optional; documented if provided",
+  "observed_or_reasoning": "non-provision is conformant for optional items, but the register needs the \u00a77 'Not provided.' row (PB280 Q1 selector) \u2014 owner/documentation action",
+  "code_site": "src/Cobol.Net.Runtime/IO/FileStatus.cs",
+  "clause": "\u00a79.1.13.1; \u00a79.1.13.3",
+  "owning_note": "NONE (new)"
+ },
+ {
+  "mechanism": "Per-object instance-file close on GC never reaches the real run unit: ~CobolObject enqueues the close via RunUnit.Current, which is AsyncLocal-backed, so on the finalizer thread it creates an orphan RunUnit and the owning registry never drains the close; an unreachable object's file stays open (and registered) until run-unit end",
+  "rule_ids": [
+   "DOC-A.1-113"
+  ],
+  "harm": "wrong-answer",
+  "repro": "/tmp/adj/refute/gc2.cob (copied to adjudication/adj-a1-w1-s4/probes/): loop creates an object that opens its own file OUTPUT and writes without CLOSE, drops the reference, forces allocation; next object's OPEN OUTPUT -> 'K=00000002 OPEN-OUTPUT=61' (re-confirmed by the adjudicator at pin). gc1.cob: record never flushed after ~4M allocations (READ=10).",
+  "expected_from_spec": "\u00a79.3.14.3: an instance object is destroyed when it is determined it cannot take part in continued execution; \u00a79.1.4: implicit CLOSE of the object's file connectors when the object is deleted",
+  "observed_or_reasoning": "the GC does determine unreachability and runs the finalizer, but the close lands on an orphan RunUnit (RunUnit.Current => _current.Value ??= new RunUnit()); only CobolFile.CloseAll at run-unit termination closes the file",
+  "code_site": "src/Cobol.Net.Runtime/Control/CobolObject.cs (finalizer, line ~88); src/Cobol.Net.Runtime/IO/CobolFile.cs#EnqueueInstanceClose; src/Cobol.Net.Runtime/Control/RunUnit.cs#Current",
+  "clause": "\u00a79.3.14.3; \u00a79.1.4",
+  "owning_note": "NONE (new) \u2014 sweep other finalizer/thread-pool callers of RunUnit.Current"
+ }
+]

@@ -1,0 +1,65 @@
+[
+ {
+  "mechanism": "Annex A.3 4) asynchronous-messaging facility is declined (CONFORMANCE §2 row 4, §4 item 1; COBOLNET1578 warn + BoundNop) but has NO derived-verdicts selector, so its RECEIVE/SEND rows cannot close as DOCUMENTED-NON-SUPPORT without an owner decision; COBOLNET1578 is asserted at no RECEIVE site",
+  "rule_ids": [
+   "FMT-14.9.31.2",
+   "GR-14.9.31.4-1",
+   "GR-14.9.31.4-2",
+   "GR-14.9.31.4-3",
+   "GR-14.9.31.4-4",
+   "GR-14.9.31.4-5",
+   "SR-14.9.31.3-1",
+   "SR-14.9.31.3-2",
+   "SR-14.9.31.3-3",
+   "FMT-14.9.38.2",
+   "SR-14.9.38.3-1",
+   "SR-14.9.38.3-2",
+   "SR-14.9.38.3-3",
+   "SR-14.9.38.3-4",
+   "GR-14.9.38.4-1",
+   "GR-14.9.38.4-2",
+   "GR-14.9.38.4-3",
+   "GR-14.9.38.4-4",
+   "GR-14.9.38.4-5",
+   "GR-14.9.38.4-6",
+   "GR-14.9.38.4-7",
+   "GR-14.9.38.4-8"
+  ],
+  "harm": "silent",
+  "repro": "python scripts/spec/derive_verdict_batch.py --list (8 selectors, none MCS); probe/rcv.cob and probe/snd.cob at --std 2023: COBOLNET1578 per statement, neither ON nor NOT ON EXCEPTION runs, operands untouched",
+  "expected_from_spec": "§4.2.6: declined processor-dependent elements 'need not be implemented', absence documented, ¶3 compile-time warning mandatory -> DOCUMENTED-NON-SUPPORT once an owner-approved selector and a 1578 witness exist",
+  "observed_or_reasoning": "Code matches the documented decline on pinned 0caa7d5; the gap is register/witness debt, not runtime. Already filed - not a new defect.",
+  "code_site": "tests/version-matrix/inventory-schema.json#derived-verdicts; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindUnsupportedFacility",
+  "clause": "4.2.6; A.3 4); 14.9.31; 14.9.38",
+  "owning_note": "PB1198 (owner, Question 1); PB374 (open, 1578 witness)"
+ },
+ {
+  "mechanism": "facilityWord gates the 2023-only MCS RECEIVE/SEND arms on reservation, not introduction: at --std 85 both are recognized and warned as the 2023 Annex A.3 4) facility (2002/2014 give COBOL0001)",
+  "rule_ids": [
+   "FMT-14.9.31.2",
+   "FMT-14.9.38.2"
+  ],
+  "harm": "under-rejects",
+  "repro": "cobol probe/rcv.cob --run --std 85 -> two COBOLNET1578 warnings, runs; same for probe/snd.cob; --std 2002/2014 -> COBOL0001",
+  "expected_from_spec": "Asynchronous messaging is a COBOL-2023 addition (E.3.2 item 1); the 2023 general formats have no meaning at 85",
+  "observed_or_reasoning": "re-confirmed on pinned tree; already filed",
+  "code_site": "src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs#facilityWord",
+  "clause": "14.9.31.2; 14.9.38.2",
+  "owning_note": "PB374 (open, REGISTRAR 14c extension)"
+ },
+ {
+  "mechanism": "mcsSendStatement merges §14.9.38.2's two general formats with RETURNING/RAISING/END-SEND optional; SRs unchecked - over-acceptance licensed by §4.2.6 ¶3 only while A.3 4) is declined",
+  "rule_ids": [
+   "FMT-14.9.38.2",
+   "SR-14.9.38.3-1",
+   "SR-14.9.38.3-4"
+  ],
+  "harm": "under-rejects",
+  "repro": "SEND TO 42 FROM MSG RETURNING MT RAISING LAST END-SEND. at --std 2023 -> only COBOLNET1578 (per PB937); probe/snd.cob shapes all warn-only",
+  "expected_from_spec": "§4.2.6 ¶3 'it is not required to diagnose syntax errors within this unsupported syntax' -> owed only on a claim of A.3 4)",
+  "observed_or_reasoning": "already filed",
+  "code_site": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#mcsSendStatement",
+  "clause": "14.9.38.2; 4.2.6",
+  "owning_note": "PB937 (open, arm 1); PB1198"
+ }
+]

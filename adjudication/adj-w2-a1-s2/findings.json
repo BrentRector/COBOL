@@ -1,0 +1,152 @@
+[
+ {
+  "mechanism": "RECORD clause A.1 determinations the code makes are not written in docs/CONFORMANCE.md §7 (item 146 storage-size calculation: fixed = record size unframed, variable = 4-byte LE prefix + record; item 148 Format 3 -> variable)",
+  "rule_ids": [
+   "DOC-A.1-146",
+   "DOC-A.1-148"
+  ],
+  "harm": "silent",
+  "repro": "probe/rec/p1.cob (--std 85 and 2023): FD F1 fixed X(5) -> 10-byte unframed file; FD F3 RECORD CONTAINS 5 TO 10 -> frames 05000000'ABCDE' 0A000000'ABCDEFGHIJ'; grep docs/CONFORMANCE.md for DOC-A.1-146/148: none",
+  "expected_from_spec": "§13.18.43.4 GR2 'The implementor shall specify the calculations necessary for the user to derive the size for records on the storage medium'; GR17 'It is implementor defined whether format 3 of the RECORD clause produces fixed-length records or variable-length records'; A.1 items 146/148 required + documented",
+  "observed_or_reasoning": "Behaviour fixed in code, no §7 row",
+  "code_site": "docs/CONFORMANCE.md §7; src/Cobol.Net.Runtime/IO/RecordFraming.cs; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindRecordClause",
+  "clause": "13.18.43.4 GR2, GR17; A.1 146, 148",
+  "owning_note": "PB1278 (open) — cited, not new"
+ },
+ {
+  "mechanism": "A.1 determination written OUTSIDE the §7 register (so the computed anchor docs/CONFORMANCE.md#DOC-A.1-N resolves to nothing and audit_annex_a1.py does not count it): item 147 lives in §3 D-FRA (iv); item 181 lives in the §4 A.4.9 locale prose",
+  "rule_ids": [
+   "DOC-A.1-147",
+   "DOC-A.1-181"
+  ],
+  "harm": "silent",
+  "repro": "grep -n 'DOC-A.1-147\\|DOC-A.1-181' docs/CONFORMANCE.md -> none; D-FRA (iv) at ~line 232 and the locale-TAG determination at ~line 1088 carry the answers",
+  "expected_from_spec": "§13.18.43.4 GR5 'This implicit RECORD clause is defined by the implementor'; §12.3.7.4 GR5 'The implementor specifies the allowable external-locale-names and the allowable content of literal-4'; A.1 147 required + documented, A.1 181 optional, documented if provided (it is provided)",
+  "observed_or_reasoning": "Answers exist and the code matches them (probe/rec/p1.cob F4; probe/loc/l1.cob, l2.cob) but not under their register key; 147 also inherits PB1276's GR8 minimum defect and PB322's SD arm",
+  "code_site": "docs/CONFORMANCE.md §7 (missing DOC-A.1-147, DOC-A.1-181 rows); src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ImpliesVariableFormat; src/Cobol.Net.Runtime/Collation/Locale/LocaleConfig.cs",
+  "clause": "13.18.43.4 GR5; 12.3.7.4 GR5; A.1 147, 181",
+  "owning_note": "NEW (147 clusters with PB1278 / PB1276; 181 with the PB64 locale determinations)"
+ },
+ {
+  "mechanism": "§12.4.5.9.4 GR7 record-lock ceilings are implemented and unit-pinned (connector 15 -> status 54, run unit 255 -> status 53) but the required maxima are documented nowhere",
+  "rule_ids": [
+   "DOC-A.1-154",
+   "DOC-A.1-155"
+  ],
+  "harm": "silent",
+  "repro": "grep docs/CONFORMANCE.md for 'DOC-A.1-154', 'DOC-A.1-155', '255', lock maximum -> nothing; PhysicalFileTable.ConnectorLockMax=15, RunUnitLockMax=255; unit:CobolFileLockTests.ConnectorLockLimit_16thRecord_Is54 / RunUnitLockLimit_256thRunUnitLock_Is53",
+  "expected_from_spec": "§12.4.5.9.4 GR7 'The implementor shall specify the maximum number of record locks that may be held by a file connector; that maximum shall be at least 15. The implementor shall specify the maximum number of record locks that may be held by a run unit; that maximum shall be at least 255.'",
+  "observed_or_reasoning": "Values meet the floors; only the §7 rows are missing (the pinning unit tests already exist and can be named in 'Pinned by')",
+  "code_site": "docs/CONFORMANCE.md §7; src/Cobol.Net.Runtime/IO/Sharing/PhysicalFileTable.cs#ConnectorLockMax; src/Cobol.Net.Runtime/IO/Sharing/PhysicalFileTable.cs#RunUnitLockMax",
+  "clause": "12.4.5.9.4 GR7; A.1 154, 155",
+  "owning_note": "NEW (no kb/Work note claims items 154/155; PB707 is the RETRY path only)"
+ },
+ {
+  "mechanism": "Reference-format determinations (free-form line terminators; meaning of lines and character positions) not written",
+  "rule_ids": [
+   "DOC-A.1-156",
+   "DOC-A.1-157"
+  ],
+  "harm": "silent",
+  "repro": "ReferenceFormatProcessor.NormalizeToFreeFormMapped splits on LF and trims CR; fixed-form area not padded to margin R; no DOC-A.1-156/157 rows",
+  "expected_from_spec": "§6.1 b) 'The implementor shall specify any control characters that terminate a free-form line'; §6.1 c) 'The implementor shall specify the meaning of lines and character positions'",
+  "observed_or_reasoning": "Behaviour fixed, undocumented; 157's padding edge is a live wrong answer",
+  "code_site": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped",
+  "clause": "6.1 b), c); A.1 156, 157",
+  "owning_note": "PB1496 (open) + PB1491 (open) — cited, not new"
+ },
+ {
+  "mechanism": "Report file record structure (CRLF print lines) and report column/national-character correspondence (one column per UTF-16 code unit) not written",
+  "rule_ids": [
+   "DOC-A.1-159",
+   "DOC-A.1-160"
+  ],
+  "harm": "silent",
+  "repro": "probe/rw/r1.cob -> 'ABCD\\r\\nABCD\\r\\n' with COLUMN 1 PIC N(2) + COLUMN PLUS 1 PIC X(2)",
+  "expected_from_spec": "§13.4.5.4 GR4; §13.18.14.4 GR2",
+  "observed_or_reasoning": "Behaviour fixed, undocumented",
+  "code_site": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements",
+  "clause": "13.4.5.4 GR4; 13.18.14.4 GR2; A.1 159, 160",
+  "owning_note": "PB1253 (open) — cited, not new"
+ },
+ {
+  "mechanism": "Run-unit relationship with a non-COBOL component (the .NET host activator CONFORMANCE.md itself names) has no A.1-167 determination; only neighbouring single questions (items 19, 134, §14.9.18.4 GR1 a) are answered",
+  "rule_ids": [
+   "DOC-A.1-167"
+  ],
+  "harm": "silent",
+  "repro": "grep docs/CONFORMANCE.md 'DOC-A.1-167' -> none; §3 bullet ~line 450 names 'a .NET host that invokes a generated program class directly' as a supported non-COBOL activator",
+  "expected_from_spec": "§14.6.1 'the requirements for the relationship and interaction between the COBOL and the non-COBOL modules are defined by the implementor'; A.1 167 conditionally required (condition met) + documented",
+  "observed_or_reasoning": "Condition met, no determination of RunUnit sharing/lifetime for a host",
+  "code_site": "docs/CONFORMANCE.md §7; src/Cobol.Net.Runtime/Control/RunUnit.cs; src/Cobol.Net.Runtime/Control/CallAbi.cs",
+  "clause": "14.6.1; A.1 167",
+  "owning_note": "NEW (clusters with PB1149, PB1253 item 116, PB1069)"
+ },
+ {
+  "mechanism": "Run-unit termination does not reset the locale (RunUnit.ResetCurrent leaves RunUnit.Locale) and the A.1-168 answer is undocumented",
+  "rule_ids": [
+   "DOC-A.1-168"
+  ],
+  "harm": "silent",
+  "repro": "RunUnit.ResetCurrent resets Programs + Random only",
+  "expected_from_spec": "§14.6.11 GR5 'the implementor specifies whether the locale is reset to the locale in effect when the run unit was activated'",
+  "observed_or_reasoning": "Not a chosen answer; owed with the scoping fix",
+  "code_site": "src/Cobol.Net.Runtime/Control/RunUnit.cs#ResetCurrent",
+  "clause": "14.6.11 GR5; A.1 168",
+  "owning_note": "PB1069 (open) — cited, not new"
+ },
+ {
+  "mechanism": "No derived selector (and no §7 convention) for a CONDITIONALLY-required A.1 item whose condition is absent in this implementation — a1-optional-not-provided covers requirement=optional only",
+  "rule_ids": [
+   "DOC-A.1-149",
+   "DOC-A.1-152"
+  ],
+  "harm": "silent",
+  "repro": "inventory_schema.DerivedSelector over DOC-A.1-149/152 selects nothing; 149's condition (a feature-name in RECORD DELIMITER) is absent per DOC-A.1-150 'Not provided.'; 152's condition (other circumstances returning status 51) is absent — 51 comes only from PhysicalFileTable.LockRecord / FileRegistry.ConflictOnLockedRecord on a logical record held by another connector",
+  "expected_from_spec": "A.1 preamble 'Conditionally required: If the associated feature or language element is implemented then this element is also required.'",
+  "observed_or_reasoning": "Rows cannot close without an owner decision (a §7 'Not provided — condition absent' row + selector extension, analogous to PB280 Q1)",
+  "code_site": "tests/version-matrix/inventory-schema.json#derived-verdicts; docs/CONFORMANCE.md §7",
+  "clause": "A.1 preamble; 12.4.5.3 GR1 c); 9.1.16",
+  "owning_note": "NEW — owner question; register kb/Work A11"
+ },
+ {
+  "mechanism": "screen-handling-only derived selector has no xref-sections arm, so Annex A.1 items that cite a declined A.4.2 screen clause (item 172 -> 13.18.50; also items 3/4 -> 14.9.1 screen format) are not withdrawn the way format-select-when-only withdraws items 84/85/173",
+  "rule_ids": [
+   "DOC-A.1-172"
+  ],
+  "harm": "silent",
+  "repro": "python: DerivedSelector('screen-handling-only',...).select([DOC-A.1-172, DOC-A.1-3 rules]) -> []; format-select-when-only carries xref-sections ['13.18.24','13.18.51']",
+  "expected_from_spec": "A.1 preamble 'When the element is part of a feature that is optional or processor-dependent, the item is not required if the optional or processor-dependent feature is not implemented'; §13.18.50 SECURE is screen-only; A.4.2 Not claimed",
+  "observed_or_reasoning": "Row stays GAP with no route to close",
+  "code_site": "tests/version-matrix/inventory-schema.json#derived-verdicts",
+  "clause": "13.18.50.3 GR4; A.1 172; A.4.2",
+  "owning_note": "NEW (register kb/Work A11; witness debt PB260)"
+ },
+ {
+  "mechanism": "No §8.13 external repository and no determination for how class/interface specifiers select a class/interface",
+  "rule_ids": [
+   "DOC-A.1-161",
+   "DOC-A.1-162"
+  ],
+  "harm": "silent",
+  "repro": "see kb/Work PB1086 sr10.cob",
+  "expected_from_spec": "§12.3.8.4 GR6 / GR9 implementor-defined, A.1 161/162 required + documented",
+  "observed_or_reasoning": "Blocked on owner question",
+  "code_site": "src/Cobol.Net.Compiler/Oo/OoNameResolution.cs#Resolve",
+  "clause": "12.3.8.4 GR6, GR9; A.1 161, 162",
+  "owning_note": "PB1086 (open, blocked_by PB1099 Q3 status owner) — cited, not new"
+ },
+ {
+  "mechanism": "Process: inventory-schema anchor_obliged() makes every CONFORMS/PARTIAL/DIVERGES DOC row owe its own §7 row, yet 23 A.1 items (e.g. 169) say the element need NOT be documented — a correct CONFORMS on such an item can only close by writing a voluntary §7 row",
+  "rule_ids": [
+   "DOC-A.1-169"
+  ],
+  "harm": "silent",
+  "repro": "scripts/spec/inventory_schema.py Schema.anchor_obliged docstring: 'CONFORMS, PARTIAL and DIVERGES each ... owes its own §7 row unconditionally'",
+  "expected_from_spec": "A.1 169 'The internal procedure employed by the implementor does not have to be documented in the implementor's user documentation.'",
+  "observed_or_reasoning": "Either the owner accepts voluntary rows for these items (as for 90/92/123/144) or the anchor rule gains a not-documented exemption",
+  "code_site": "scripts/spec/inventory_schema.py#anchor_obliged",
+  "clause": "A.1 169",
+  "owning_note": "NEW — process, register kb/Work A11"
+ }
+]

@@ -1,0 +1,106 @@
+[
+ {
+  "mechanism": "A located COBOL.NET module that cannot be loaded or initialized is reported as EC-PROGRAM-NOT-FOUND, and the CALL statement has no EC-PROGRAM-RESOURCES raise site; the implementor-defined set of checked resources (empty) is written nowhere",
+  "rule_ids": [
+   "DOC-A.1-14"
+  ],
+  "harm": "silent",
+  "repro": "By reading: ProgramTable.ProbeSiblingModule finds <name>.dll in AppContext.BaseDirectory, and when that dll carries __CobolModule.Register() but LoadFromAssemblyPath or register.Invoke throws (missing dependency, BadImageFormat, type-initializer failure), the bare catch returns false, so CALL \"<name>\" raises EC-PROGRAM-NOT-FOUND. CallEmitter.EnabledCallNames' summary says EC-PROGRAM-RESOURCES has no raise site. grep docs/CONFORMANCE.md for 'EC-PROGRAM-RESOURCES' / 'runtime resources' returns nothing.",
+  "expected_from_spec": "§14.9.4.4 GR3c: 'If the program is located but the resources necessary to execute the program are not available, the EC-PROGRAM-RESOURCES exception condition is set to exist ... The runtime resources that are checked in order to determine the availability of the called program for execution are defined by the implementor' (cite.py --check OK). A.1 item 14 requires the checked set to be documented.",
+  "observed_or_reasoning": "No DOC-A.1-14 row. A located-but-unloadable module surfaces under the wrong exception name: FUNCTION EXCEPTION-STATUS reports EC-PROGRAM-NOT-FOUND, and a USE AFTER EXCEPTION CONDITION EC-PROGRAM-RESOURCES declarative never runs. This is reasoned from the code; no failing-registrar dll was built in this session.",
+  "code_site": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#ProgramTable.ProbeSiblingModule (catch -> false); src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EnabledCallNames",
+  "clause": "14.9.4.4 GR3c; A.1 item 14",
+  "owning_note": "none. Sibling of kb/Work PB1422 (open; the FUNCTION-activation twin, A.1 item 89), whose body says 'The CALL twin (A.1 item 14 ...) and INVOKE (A.1 item 102) should be swept the same way' but claims no CALL row"
+ },
+ {
+  "mechanism": "A.1 items that cannot arise because the feature is declined or not provided have no disposition path in the register. The derived-verdicts selectors key on CLAUSE sections and rule text, but DOC rows carry section 'A.1'. The 'a1-optional-not-provided' selector covers only requirement 'optional' items that have their own 'Not provided' §7 row. So audit_annex_a1.py counts these items among the 195 open obligations.",
+  "rule_ids": [
+   "DOC-A.1-3",
+   "DOC-A.1-4",
+   "DOC-A.1-11",
+   "DOC-A.1-27",
+   "DOC-A.1-28",
+   "DOC-A.1-7",
+   "DOC-A.1-13",
+   "DOC-A.1-15"
+  ],
+  "harm": "silent",
+  "repro": "python scripts/spec/audit_annex_a1.py lists CANNOT-ARISE = 84, 85, 86, 173 only. The screen items (3, 4, 11, 27; A.4.2 Not claimed, probe: COBOLNET1560/1707) and commit/rollback (28; A.4.3 Not claimed, probe: COBOLNET1709/1579) are absent from that list. Item 7's 'Not provided' fact is filed inside the DOC-A.1-195 row. Items 13 and 15 are conditionally required on non-COBOL CALL support, which does not exist (probe: CALL \"Antlr4.Runtime.Standard\" -> EC-PROGRAM-NOT-FOUND).",
+  "expected_from_spec": "Annex A.1 preamble: 'When the element is part of a feature that is optional or processor-dependent, the item is not required if the optional or processor-dependent feature is not implemented' (cite.py --check A.1 OK). 'Conditionally required: If the associated feature or language element is implemented then this element is also required.'",
+  "observed_or_reasoning": "Every one of these items is un-incurred, and the posture is verified by probe, but none can reach a closed verdict. Owner questions: (1) Should the screen-handling-only and commit-and-rollback-only selectors get an A.1-item arm (the item's cited clause is in the module's section list)? (2) Should a1-optional-not-provided be widened to 'conditionally required' items whose condition this register declares false? Mechanical part: file 'Not provided.' rows for DOC-A.1-7, -13 and -15.",
+  "code_site": "tests/version-matrix/inventory-schema.json#derived-verdicts (screen-handling-only, commit-and-rollback-only, a1-optional-not-provided); scripts/spec/audit_annex_a1.py; docs/CONFORMANCE.md §7",
+  "clause": "Annex A.1 preamble; A.4.1",
+  "owning_note": "kb/Work A11 (open umbrella: 'or explicitly dispositioned (N/A where the element belongs to an unclaimed optional/processor-dependent facility)'); witness debt for screen: PB260. No note carries the selector question."
+ },
+ {
+  "mechanism": "Annex A.1 determinations that the code already fixes are written nowhere under their DOC-A.1-<n> key (or only incidentally, off-key)",
+  "rule_ids": [
+   "DOC-A.1-6",
+   "DOC-A.1-8",
+   "DOC-A.1-9",
+   "DOC-A.1-16",
+   "DOC-A.1-17",
+   "DOC-A.1-21",
+   "DOC-A.1-23",
+   "DOC-A.1-25",
+   "DOC-A.1-26"
+  ],
+  "harm": "silent",
+  "repro": "grep -n 'DOC-A.1-<n>' docs/CONFORMANCE.md returns nothing for each item. Probes: ord.cob (group BYTE-LENGTH 3 = no filler, so the group is coincident with its first item; ORD(\"A\")=66 = code point + 1); hx2.cob (X\"414\" -> COBOLNET1635, so 2 digits per character); call17.cob (a failed CALL has no other effect: RETURNING and USING items unchanged); chr.cob (CHAR on a locale tie returns the lowest-coded member); rep.cob ('§' accepted in a REPLACE text-word); enc.cob (per-file BOM, UTF-8 default, U+FFFD substitution, UTF-16 copybook in a UTF-8 group).",
+  "expected_from_spec": "Each item: 'This item is required [or provided]. This item shall be documented in the implementor's user documentation.'",
+  "observed_or_reasoning": "The behavior is deterministic and the code fixes it, but no determination row exists. Item 9's only statement cites §8.3.3.2.3 SR5 instead of SR6. Item 16's substance sits in §3 prose and in DOC-A.1-19 and does not name the EC-PROGRAM-NOT-FOUND outcome. The DOC-A.1-22 row documents the CHAR-NATIONAL twin of item 21 but not CHAR.",
+  "code_site": "docs/CONFORMANCE.md §7",
+  "clause": "A.1 items 6, 8, 9, 16, 17, 21, 23, 25, 26",
+  "owning_note": "Per row: 8 -> PB1092 (open); 23 -> PB1369 (open); 25/26 -> PB1397 (open); 6, 9 (row half), 16, 17, 21 -> kb/Work A11 umbrella only (no specific note)"
+ },
+ {
+  "mechanism": "The documented compile-time arithmetic rounding method is not the implemented one: the determination says division truncates, but System.Decimal division rounds",
+  "rule_ids": [
+   "DOC-A.1-29"
+  ],
+  "harm": "silent",
+  "repro": "01 C7 CONSTANT AS 2 / 3 * 3.  01 C11 CONSTANT AS 100 / 7 * 7.  DISPLAY C7 \" \" C11 -> '2 100'",
+  "expected_from_spec": "§7.3.6.3 GR2 and §7.3.6.2 SR2: the implementor shall document the mode and the intermediate rounding method (cite.py --check OK for both). The documentation must match the implementation.",
+  "observed_or_reasoning": "Under the documented truncating division the answer would be '1 99'. The bullet also calls System.Decimal a 'standard' mode.",
+  "code_site": "docs/CONFORMANCE.md §3 'Compile-time arithmetic mode' bullet; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs",
+  "clause": "7.3.6.2 SR2; 7.3.6.3 GR2",
+  "owning_note": "kb/Work PB1369 (open), referenced and not re-reported"
+ },
+ {
+  "mechanism": "The SR6 hexadecimal digit-group check runs only where HEXLIT is a direct literal. As a concatenation operand, X\"4\" silently decodes to the empty string.",
+  "rule_ids": [
+   "DOC-A.1-9"
+  ],
+  "harm": "under-rejects",
+  "repro": "MOVE \"Z\" & X\"4\" TO B -> B='Z   ', FUNCTION LENGTH(\"Z\" & X\"4\") = 1",
+  "expected_from_spec": "§8.3.3.2.3 SR6: each hex-character-sequence shall consist of the implementor's number of digits (2).",
+  "observed_or_reasoning": "No diagnostic; the digit is dropped.",
+  "code_site": "src/Cobol.Net.Compiler (ConcatFolder.FoldAll / nonNumericLiteral HEXLIT arm)",
+  "clause": "8.3.3.2.3 SR6",
+  "owning_note": "kb/Work PB1393 (open), referenced and not re-reported"
+ },
+ {
+  "mechanism": "Undecodable source bytes are silently replaced by U+FFFD, which changes literal content without a diagnostic",
+  "rule_ids": [
+   "DOC-A.1-25"
+  ],
+  "harm": "silent",
+  "repro": "A UTF-8 (no BOM) source whose literal \"A<0xE9>B\" DISPLAYs A EF BF BD B, with no warning",
+  "expected_from_spec": "§8.1.3.2 GR1: the implementor defines and documents the mapping; the substitution must at least be documented.",
+  "observed_or_reasoning": "File.ReadAllText's default decoder replaces the byte; nothing is documented.",
+  "code_site": "src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#ReadAllText",
+  "clause": "8.1.3.2 GR1",
+  "owning_note": "kb/Work PB1397 (open), referenced and not re-reported"
+ },
+ {
+  "mechanism": "An indexed OPEN OUTPUT on a full device crashes the run unit with an unhandled IOException, thrown from AbandonOpen->ReleaseFileLock outside OPEN's '30' exception mapping (the refuter found it while probing DOC-A.1-24; it is outside this row and was NOT re-verified by the adjudicator)",
+  "rule_ids": [],
+  "harm": "crashes",
+  "repro": "/tmp/adj/refute/d24 (probe programs p1-p5.cob): an indexed file on a nearly full tmpfs, then OPEN OUTPUT",
+  "expected_from_spec": "§9.1.13.6 item 1: an OS-level failure is the permanent error '30', and the statement completes with that status",
+  "observed_or_reasoning": "Per the refuter, an unhandled IOException escapes OPEN",
+  "code_site": "src/Cobol.Net.Runtime/IO/KeyedConnector.cs (AbandonOpen / ReleaseFileLock)",
+  "clause": "9.1.13.6",
+  "owning_note": "none. It needs a new kb/Work note after re-verification"
+ }
+]

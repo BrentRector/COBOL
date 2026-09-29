@@ -1,0 +1,93 @@
+[
+ {
+  "mechanism": "continue-after-interval-wraps-before-clamp",
+  "rule_ids": [
+   "DOC-A.1-39"
+  ],
+  "harm": "wrong-answer",
+  "repro": "PROCEDURE DIVISION. CONTINUE AFTER 18446744073709551619 SECONDS. DISPLAY 'D'. (--std 2023) -> suspends ~3 s; with ...616 (2^64) suspends 0 s; also 01 BIG PIC 9(20) VALUE 18446744073709551616 / CONTINUE AFTER BIG SECONDS -> returns at once",
+  "expected_from_spec": "§14.9.9.4 GR1: 'If the value arithmetic-expression-1 is greater than this maximum meaningful value, the maximum meaningful value is placed into the temporary data item' -> suspend CobolTiming.MaxSeconds (86,400 s) (cite.py --check 14.9.9.4 OK 1))",
+  "observed_or_reasoning": "StatementEmitter.Visit(BoundContinueAfter) narrows the interval with an unchecked '(long)' cast (Scale-0 lane: '(long)(x.Expr)'; Dec lane: '(long)(...).ToUnscaled(0, Truncation)') BEFORE SleepTruncated applies Math.Min(secs, MaxSeconds), so any interval >= 2^63 wraps to its low 64 bits (0..2^63-1 or negative -> no suspension). The float lane saturates and is safe. Clamp must precede narrowing (compare against MaxSeconds in the value's own domain). Sibling pattern: PB463 (SET SIZE OF unchecked narrowing).",
+  "code_site": "src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs#Visit(BoundContinueAfter); src/Cobol.Net.Runtime/Control/CobolTiming.cs#ContinueAfterExact/SleepTruncated",
+  "clause": "§14.9.9.4 GR1",
+  "owning_note": "none - NEW (the documentation half of item 39 is PB160)"
+ },
+ {
+  "mechanism": "charset-determination-unwritten-and-split",
+  "rule_ids": [
+   "DOC-A.1-31",
+   "DOC-A.1-36",
+   "DOC-A.1-38"
+  ],
+  "harm": "silent",
+  "repro": "01 A PIC X(3) VALUE '€é'. DISPLAY FUNCTION ORD(A(1:1)) -> 8365 (U+20AC held in memory); FUNCTION BYTE-LENGTH(A) -> 3; FUNCTION CONVERT(A ANY ANUM HEX) -> 3FE920 (€ -> 0x3F); a sequential WRITE of the same record puts '?' on the medium (PB690)",
+  "expected_from_spec": "§8.1.2 'The implementor shall specify the set of characters in and the encoding of each of the computer's alphanumeric character set and the computer's national character set. When these are implemented as one character set, the implementor shall specify the characters that map into the computer's alphanumeric coded character set ...' (OK §8.1.2 3)); §8.3.3.2.3 SR2 / §8.3.3.2.4 GR3 c) for UTF-8/mixed in class alphanumeric (OK)",
+  "observed_or_reasoning": "No DOC-A.1-31/-36/-38 rows. Rows 33/188 say both repertoires are UTF-16 (total identity), row 209 says one byte per DISPLAY position; the code holds any UTF-16 unit in an alphanumeric item but serializes it as Latin-1 ('?' + EC-DATA-CONVERSION only when checked) at the storage image and silently on files. Which characters are alphanumeric, the DISPLAY encoding, and whether '€' in an alphanumeric literal is 'mixed national' (always-on, not the optional capability SR2 requires) are all unanswered.",
+  "code_site": "docs/CONFORMANCE.md §7 (missing rows); src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Text.cs#ByteSub; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#AsStorageImage; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore",
+  "clause": "§8.1.2; §8.3.3.2.3 SR2; §8.3.3.2.4 GR3 c)",
+  "owning_note": "PB690 (open, blocked on owner; names DOC-A.1-31/-34 and the file half); items 36 and 38 named by no note - NEW"
+ },
+ {
+  "mechanism": "conditional-facility-absent-posture",
+  "rule_ids": [
+   "DOC-A.1-30",
+   "DOC-A.1-34",
+   "DOC-A.1-37"
+  ],
+  "harm": "silent",
+  "repro": ">>IMP SOMETHING before IDENTIFICATION DIVISION -> 'error COBOL0001: unexpected '>'' (anonymous); no runtime encoding selector exists (RuntimeConfig); compile-time and runtime coded character sets are both .NET UTF-16 so no literal conversion exists",
+  "expected_from_spec": "A.1 items 30/34/37 are 'conditionally required' and 'if provided ... shall be documented'; the facility each is conditioned on (§7.3.3 SR9 IMP directive; §8.1.2 differing compile/runtime sets; §8.1.2 multiple encodings) is not provided, so the obligation is not incurred - but nothing records that",
+  "observed_or_reasoning": "PB280 Q1's 'Not provided.' -> DOCUMENTED-NON-SUPPORT selector (a1-optional-not-provided) is scoped to OPTIONAL items; conditionally-required items whose condition the implementation does not meet have no posture, so they sit as GAP/NOT-IMPLEMENTED forever. Owner question: extend Q1 to conditional items (a 'Not provided.' / 'Condition does not arise.' cell) with a witness. Also: >>IMP is refused anonymously (COBOL0001) rather than as an undefined implementor directive.",
+  "code_site": "scripts/spec (inventory-schema.json derived-verdicts.a1-optional-not-provided); src/Cobol.Net.Frontend (directive recognition)",
+  "clause": "Annex A.1 preamble ('Conditionally required'); §7.3.3 SR9; §8.1.2",
+  "owning_note": "none - NEW (register umbrella A11/PB160; PB690 names a DOC-A.1-34 row)"
+ },
+ {
+  "mechanism": "define-parameter-mechanism-undocumented-and-spelling-sensitive",
+  "rule_ids": [
+   "DOC-A.1-49"
+  ],
+  "harm": "silent",
+  "repro": ">>DEFINE MyVar AS PARAMETER / >>IF MyVar IS DEFINED ... : MYVAR=x -> NOT-DEFINED; MyVar=x -> DEFINED (Linux)",
+  "expected_from_spec": "§7.3.11.4 GR4 'the value ... is obtained from the operating environment by an implementor-defined method' (OK §7.3.11.4 4)); A.1 item 49 required + documented",
+  "observed_or_reasoning": "ApplyDefine reads Environment.GetEnvironmentVariable(name) with the name as spelled, so two spellings of one case-insensitive compilation-variable-name read different environment variables; numeric-vs-alphanumeric typing by invariant decimal parse. None documented; no DOC-A.1-49 row.",
+  "code_site": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs (DefineKind.Parameter arm); src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#GetEnvironmentVariable",
+  "clause": "§7.3.11.4 GR4",
+  "owning_note": "none - NEW (PB1367 owns a different DEFINE PARAMETER defect: the SR2 bypass)"
+ },
+ {
+  "mechanism": "a1-register-rows-missing-for-determinations-the-code-makes",
+  "rule_ids": [
+   "DOC-A.1-32",
+   "DOC-A.1-40",
+   "DOC-A.1-42",
+   "DOC-A.1-43",
+   "DOC-A.1-44",
+   "DOC-A.1-46",
+   "DOC-A.1-51",
+   "DOC-A.1-52"
+  ],
+  "harm": "silent",
+  "repro": "grep '^| DOC-A.1-(32|40|42|43|44|46|51|52) |' docs/CONFORMANCE.md -> none; python scripts/spec/audit_annex_a1.py lists them undischarged",
+  "expected_from_spec": "Each item: 'This item is required/conditionally required ... shall be documented in the implementor's user documentation' (§A.1, cite.py OK per row)",
+  "observed_or_reasoning": "The code fixes each answer (FillChar values; FindCopybook search order; ORDER TABLE literal-9 set - documented but under §2 row 25, not the §7 key; ToUpperInvariant currency equivalence; empty extra-prohibition set; per-usage representations with 47/74/81/213/217 unregistered; DELETE FILE = one host unlink; every host path treated as concurrently accessible).",
+  "code_site": "docs/CONFORMANCE.md §7",
+  "clause": "Annex A.1 items 32/40/42/43/44/46/51/52",
+  "owning_note": "PB1397 (32, 44), PB1355 + PB1369 (40), PB1092 (43), PB322 (52), PB160/A11 umbrella; items 42 (misfiled), 46 (and its 213/217 gaps) and 51 named by no note - NEW"
+ },
+ {
+  "mechanism": "optional-declined-module-items-without-not-provided-row",
+  "rule_ids": [
+   "DOC-A.1-41",
+   "DOC-A.1-45",
+   "DOC-A.1-47"
+  ],
+  "harm": "silent",
+  "repro": "SPECIAL-NAMES. CURSOR IS CPOS CRT STATUS IS CST. -> COBOLNET1560 (A.4.2 refused by name); 01 D16 USAGE FLOAT-DECIMAL-16 -> COBOLNET1564 (A.3 item 19)",
+  "expected_from_spec": "A.1 preamble: an item that is part of an optional/processor-dependent feature not implemented is not required; PB280 Q1 records an optional non-provided item as 'Not provided.' -> DOCUMENTED-NON-SUPPORT",
+  "observed_or_reasoning": "screen-handling-only deliberately excludes A.1 rows ('This item is (?:required|optional)\\.'), and no 'Not provided.' §7 cell exists for 41/45; item 47 (required, but its feature is the declined A.3 item 13/19) is PB579's pending owner question.",
+  "code_site": "docs/CONFORMANCE.md §7; tests/version-matrix/inventory-schema.json derived-verdicts",
+  "clause": "Annex A.1 preamble; §9.2.3 4) a); §9.2.4; §11.9.9.3 SR3",
+  "owning_note": "PB579 (owner) for 47; PB260 (A.4.2 witness debt) for 41/45"
+ }
+]

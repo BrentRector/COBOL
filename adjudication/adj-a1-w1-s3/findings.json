@@ -1,0 +1,168 @@
+[
+ {
+  "mechanism": "Required Annex A.1 determination missing from docs/CONFORMANCE.md while the code fixes a concrete behavior (no '| DOC-A.1-N |' row, no statement)",
+  "rule_ids": [
+   "DOC-A.1-53",
+   "DOC-A.1-54",
+   "DOC-A.1-55",
+   "DOC-A.1-68",
+   "DOC-A.1-76",
+   "DOC-A.1-77"
+  ],
+  "harm": "silent",
+  "repro": ">>DISPLAY \"X\" 42 / >>DISPLAY \"X\" UPON LISTING / >>DISPLAY PARAMETER XYZ compile clean at --std 2023 and transfer nothing; PROGRAM-ID. sub-p. registers externalized name 'sub-p', CALL \"SUB-P\" resolves case-insensitively; three clause-less SELECTs on one path: OPEN INPUT/INPUT/I-O all '00' (ALL-OTHER-like default); every host file arbitrated as shareable",
+  "expected_from_spec": "\u00a77.3.12.4 GR1/GR3/GR5 b), \u00a78.3.2.2 2) a)/\u00a77.3.9.3 GR2 b), \u00a79.1.15 (default sharing mode; devices allowing concurrent access) each make the answer implementor-defined and Annex A.1 items 53/54/55/68/76/77 require it documented",
+  "observed_or_reasoning": "No DOC-A.1-53/54/55/68/76/77 rows; FileRegistry.ImplementorDefaultSharing is null ('UNDETERMINED') yet the arbitration quantifier yields a fixed permissive answer",
+  "code_site": "src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs; src/Cobol.Net.Runtime/Control/ProgramTable.cs#_byPath; src/Cobol.Net.Runtime/IO/FileRegistry.cs#ImplementorDefaultSharing",
+  "clause": "7.3.12.4; 8.3.2.2; 7.3.9.3; 9.1.15; A.1",
+  "owning_note": "PB1369 (53/54/55), PB1383 (68), PB322 (76/77; PB670 for the 1985 posture)"
+ },
+ {
+  "mechanism": "Determination written in docs/CONFORMANCE.md prose or inside ANOTHER item's row instead of under its own DOC-A.1-N register key, so the inventory's computed anchor (docs/CONFORMANCE.md#DOC-A.1-N) resolves to nothing",
+  "rule_ids": [
+   "DOC-A.1-65",
+   "DOC-A.1-78",
+   "DOC-A.1-60"
+  ],
+  "harm": "silent",
+  "repro": "grep '| DOC-A.1-65 |' / '| DOC-A.1-78 |' docs/CONFORMANCE.md -> none; item 65's answer is \u00a73 prose (line 450 'Return to a NON-COBOL activating runtime element'); item 78's answer ('NO') sits inside the DOC-A.1-129 row; the DOC-A.1-62 cell cites 'the same ... determination item 60 records for a dynamic-capacity table' but no item-60 row exists",
+  "expected_from_spec": "Annex A.1 items 65 and 78 are required + documented (\u00a714.9.18.4 GR1 a); \u00a79.1.6 last sentence). The register contract (CONFORMANCE.md \u00a77 header, audit_annex_a1.py) files each determination under its own DOC-A.1-<n> key",
+  "observed_or_reasoning": "Substance is correct and probe-verified (a C# host calling ProgramRegistry.CallProgram resumes after GOBACK; a file created under SHARING NO OTHER reopens under ALL OTHER concurrently) but the rows cannot close; item 65 prose also says the host invokes 'a generated program class directly' while that class is emitted internal sealed",
+  "code_site": "docs/CONFORMANCE.md \u00a73 line ~450; docs/CONFORMANCE.md DOC-A.1-129 and DOC-A.1-62 rows",
+  "clause": "14.9.18.4 GR1 a); 9.1.6; A.1",
+  "owning_note": "PB160 (A.1 register campaign, umbrella) \u2014 no row-specific note"
+ },
+ {
+  "mechanism": "docs/CONFORMANCE.md states the FLAG-02/FLAG-14 warnings 'are not yet emitted' while FlagConformancePass emits COBOLNET1620/1621 \u2014 a wrongly documented determination, and no DOC-A.1-79/80 row",
+  "rule_ids": [
+   "DOC-A.1-79",
+   "DOC-A.1-80"
+  ],
+  "harm": "silent",
+  "repro": ">>FLAG-02 I-O-STATUS-07 + CLOSE F WITH NO REWIND -> warning COBOLNET1620; CONFORMANCE.md:527-529 says the flags are not yet emitted",
+  "expected_from_spec": "\u00a77.3.14.4 GR1 / \u00a77.3.15.4 GR1: 'The implementor shall provide a warning mechanism ...'; A.1 items 79/80 require it documented",
+  "observed_or_reasoning": "Mechanism exists and is listed in docs/DIAGNOSTICS.md:108-109; the conformance statement contradicts it",
+  "code_site": "docs/CONFORMANCE.md lines 527-529; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs",
+  "clause": "7.3.14.4; 7.3.15.4",
+  "owning_note": "PB1369 (stale sentence, its line 114); PB1376, PB1375 (detector defects)"
+ },
+ {
+  "mechanism": "FLAG-14 COMPILE-TIME-ARITHMETIC-EXPRESSIONS scans only directive fragments, never a constant entry's arithmetic-expression-1",
+  "rule_ids": [
+   "DOC-A.1-80"
+  ],
+  "harm": "silent",
+  "repro": ">>FLAG-14 COMPILE-TIME-ARITHMETIC-EXPRESSIONS ON / 01 K CONSTANT AS 2 / 3 * 3. -> no COBOLNET1621",
+  "expected_from_spec": "\u00a77.3.15.4 GR4 b with \u00a77.3.6.1: a constant entry's arithmetic expression is a compile-time arithmetic expression and shall be flagged",
+  "observed_or_reasoning": "compiles with no warning",
+  "code_site": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs",
+  "clause": "7.3.15.4 GR4 b",
+  "owning_note": "PB1375"
+ },
+ {
+  "mechanism": "Dynamic-capacity table accessors never set EC-BOUND-SUBSCRIPT (RefSending returns a scratch slot for an occurrence outside 1..capacity; RefReceiving for occ<1)",
+  "rule_ids": [
+   "DOC-A.1-60"
+  ],
+  "harm": "wrong-answer",
+  "repro": ">>TURN EC-ALL CHECKING ON; 05 T OCCURS DYNAMIC CAPACITY C FROM 0 TO 5 INITIALIZED. 10 E PIC 99 VALUE 7.; MOVE 11 TO E(2); MOVE E(3) TO X and MOVE E(0) TO X -> X=07, EXCEPTION-STATUS blank (a fixed OCCURS 5 E(0) raises EC-BOUND-SUBSCRIPT)",
+  "expected_from_spec": "\u00a78.4.2.3.4 GR2: subscript less than one or greater than the highest permissible occurrence number sets EC-BOUND-SUBSCRIPT; \u00a78.5.1.9.2 sending reference behaves as a fixed table of current capacity",
+  "observed_or_reasoning": "no condition, seed value returned",
+  "code_site": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefSending/RefReceiving",
+  "clause": "8.4.2.3.4 GR2; 8.5.1.9.2",
+  "owning_note": "PB1268"
+ },
+ {
+  "mechanism": "Dynamic-capacity table growth has no runtime-resource maximum: Array.Resize's OutOfMemoryException escapes GrowTo",
+  "rule_ids": [
+   "DOC-A.1-60",
+   "DOC-A.1-61"
+  ],
+  "harm": "crashes",
+  "repro": "DOTNET_GCHeapHardLimit=0x80000000; 05 T OCCURS DYNAMIC CAPACITY C. 10 E PIC X(40). 10 F PIC 9(9).; MOVE 'A' TO E(1000000000) -> process dies 'Out of memory.'",
+  "expected_from_spec": "\u00a78.5.1.9.6 GR2: EC-BOUND-TABLE-LIMIT when capacity would exceed 'the maximum capacity of the table based on the resources available at runtime'; \u00a78.4.2.3.4 GR2 highest permissible occurrence number 'may be affected by the availability of runtime resources'",
+  "observed_or_reasoning": "uncaught .NET OOM, no EC",
+  "code_site": "src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#GrowTo",
+  "clause": "8.5.1.9.6 GR2",
+  "owning_note": "PB1410"
+ },
+ {
+  "mechanism": "A dynamic-length elementary item is inlined into a record image as bare content with no length or delimiter, so its structure is unrecoverable at READ \u2014 the UNSTRUCTURED (no dynamic-length-structure-name) arm of PB1094's DELIMITED defect",
+  "rule_ids": [
+   "DOC-A.1-63"
+  ],
+  "harm": "wrong-answer",
+  "repro": "FD F. 01 R. 05 D1 PIC X DYNAMIC LENGTH. 05 D2 PIC X DYNAMIC LENGTH.; MOVE 'ABC' TO D1; MOVE 'DE' TO D2; WRITE R; CLOSE; OPEN INPUT; READ -> D1=[ABCDE] D2=[] (file bytes 05 00 00 00 'ABCDE'); same at --std 2014",
+  "expected_from_spec": "\u00a713.18.19.3 SR3: with no structure-name the structure is implementor-defined \u2014 but it must be A structure (the item's boundary), and a WRITE/READ round trip must return the values written (\u00a714.9.29 READ / \u00a714.9.51 WRITE record transfer)",
+  "observed_or_reasoning": "D2's content is absorbed into D1",
+  "code_site": "record-image codec for dynamic-length items (WRITE/READ path); src/Cobol.Net.Compiler/Binding/Model/DynamicLengthStructure.cs",
+  "clause": "13.18.19.3 SR3; 8.5.1.10",
+  "owning_note": "PB1094 (mechanism, DELIMITED arm \u2014 extend to the unstructured arm); PB991 (row SR-13.18.19.3-3 / item 63)"
+ },
+ {
+  "mechanism": "File sharing's interaction with other processes/languages is PROVIDED (connector sharing postures are expressed as host FileShare modes \u2014 flock(LOCK_NB) on Unix, share modes on Windows) but undocumented in the user documentation",
+  "rule_ids": [
+   "DOC-A.1-75"
+  ],
+  "harm": "silent",
+  "repro": "grep docs/CONFORMANCE.md for DOC-A.1-75 / other process / host share mode -> nothing; src/Cobol.Net.Runtime/IO/FileSupport.cs:268-298 and COBOLNET_FILES_DESIGN.md:704-705 describe the mechanism",
+  "expected_from_spec": "\u00a79.1.15: 'Other facilities may specify some degree of file sharing, however, their interaction with COBOL file sharing is defined by the implementor.'; A.1 item 75: optional, if provided shall be documented",
+  "observed_or_reasoning": "provided (host share mode is 'the only thing a process can say to another run unit') and undocumented",
+  "code_site": "src/Cobol.Net.Runtime/IO/FileSupport.cs; src/Cobol.Net.Runtime/IO/Sharing/FileLockPosture.cs",
+  "clause": "9.1.15",
+  "owning_note": "none \u2014 new; nearest family PB322"
+ },
+ {
+  "mechanism": "No \u00a78.13 external repository and no documented determination standing in for one",
+  "rule_ids": [
+   "DOC-A.1-66",
+   "DOC-A.1-67"
+  ],
+  "harm": "under-rejects",
+  "repro": "REPOSITORY. FUNCTION NOSUCHFN PROGRAM NOSUCHPG CLASS NOSUCHCL ... compiles clean (PB1086); cobol --help offers no update/flag option",
+  "expected_from_spec": "\u00a78.13: 'The implementor shall provide a mechanism that allows the user to specify whether to update the external repository ...' and '... whether to flag differences ...'",
+  "observed_or_reasoning": "facility absent",
+  "code_site": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; BinderDriver.ProgramPrototypesOf",
+  "clause": "8.13",
+  "owning_note": "PB1086 (blocked on PB1099 Q3)"
+ },
+ {
+  "mechanism": "A required A.1 item hanging off a DECLINED optional module (A.4.2 screen handling) is covered by no derived-verdict selector, so it can never close",
+  "rule_ids": [
+   "DOC-A.1-83"
+  ],
+  "harm": "silent",
+  "repro": "inventory rows DOC-A.1-3/4/11/27/83 have no verdict; screen-handling-only selector matches \u00a713.18.x/\u00a712.3.7/\u00a714.9 rule sections, not the A.1-section DOC rows; FORMAT's DOC rows 84/85/173 did close as DOCUMENTED-NON-SUPPORT",
+  "expected_from_spec": "\u00a713.18.23.4 GR4 + A.1 item 83 (required, documented) vs A.4.1/\u00a74.2.7 optional-module licence",
+  "observed_or_reasoning": "owner decision needed: extend the selector to DOC rows of declined modules, or add 'Not provided.' rows",
+  "code_site": "tests/version-matrix/inventory-schema.json#derived-verdicts.screen-handling-only",
+  "clause": "13.18.23.4 GR4; A.4.2 item 13",
+  "owning_note": "PB260 (screen witness debt) / PB280 Q1 policy \u2014 needs owner"
+ },
+ {
+  "mechanism": "The EC-EXTERNAL-FILE-MISMATCH ASSIGN consistency check compares the RESOLVED target, not the written clause that DOC-A.1-72 documents ('TEXTUAL SAMENESS OF THE CLAUSE'): a device-name prefix and device-name-vs-literal differences are invisible",
+  "rule_ids": [
+   "DOC-A.1-72"
+  ],
+  "harm": "silent",
+  "repro": "two programs, one EXTERNAL FD, EC-EXTERNAL-FILE-MISMATCH checking on in both: ASSIGN DISK \"xa.dat\" vs ASSIGN \"xa.dat\"; ASSIGN PRINTER \"xa.dat\" vs DISK \"xa.dat\"; ASSIGN XADAT vs ASSIGN \"XADAT\" -> NO-CONDITION in all three (refuter probes /tmp/adj/refute-probe/c1,c2,c7)",
+  "expected_from_spec": "\u00a712.4.5.3 GR1 b) leaves the consistency rules to the implementor; the documented rule (textual sameness of device-name/literal target) makes each of these a mismatch",
+  "observed_or_reasoning": "determination and code disagree \u2014 either the row or SelectFingerprint must change; also no spec-derived test drives the ASSIGN arm with checking on (pb673_external_assign_executor has no >>TURN)",
+  "code_site": "SelectFingerprint / ExternalStore.Describe (ASSIGN target field); docs/CONFORMANCE.md DOC-A.1-72",
+  "clause": "12.4.5.3 GR1 b)",
+  "owning_note": "none \u2014 new (PB673 landed; PB685 owns item 71)"
+ },
+ {
+  "mechanism": "binary32 receivers (FLOAT-SHORT / FLOAT-BINARY-32 / COMP-1) are rounded twice (decimal -> double -> float)",
+  "rule_ids": [
+   "DOC-A.1-81"
+  ],
+  "harm": "wrong-answer",
+  "repro": "MOVE 1.000000059604644775390625000001 TO FS (FLOAT-SHORT) -> stores 1.0, nearest binary32 is 1.00000011920928955 (refuter fp81.cob; also PIC 9V9(30) sender, negative, COMPUTE; --std 2002 and 2023)",
+  "expected_from_spec": "\u00a714.6.8.3 rule 1: content set to the algebraic value (the documented 60559 conversion); rule 2 for FLOAT-BINARY-32 requires ISO/IEC 60559 conversion",
+  "observed_or_reasoning": "CobolFloat.StoreChecked/StoreSingleChecked narrow via double",
+  "code_site": "src/Cobol.Net.Runtime/Values/Numeric/CobolFloat.cs#StoreSingleChecked",
+  "clause": "14.6.8.3",
+  "owning_note": "PB1110"
+ }
+]

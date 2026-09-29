@@ -1,0 +1,17 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. F6.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT F ASSIGN TO "f6out.txt" ORGANIZATION LINE SEQUENTIAL.
+       DATA DIVISION.
+       FILE SECTION.
+       FD F.
+       01 FR PIC X(4).
+       PROCEDURE DIVISION.
+           OPEN OUTPUT F.
+           MOVE X"41014243" TO FR.
+           WRITE FR.
+           DISPLAY "AFTER WRITE".
+           CLOSE F.
+           STOP RUN.

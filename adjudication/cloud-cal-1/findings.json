@@ -1,0 +1,31 @@
+[
+ {
+  "mechanism": "a1-determination-made-in-code-but-unfiled: the compiler/runtime makes a fixed, observable implementor determination but docs/CONFORMANCE.md §7 carries no DOC-A.1-<n> row for it (or states it only in prose / under a neighbouring item key)",
+  "rule_ids": [
+   "DOC-A.1-12",
+   "DOC-A.1-20",
+   "DOC-A.1-74",
+   "DOC-A.1-213",
+   "DOC-A.1-153",
+   "DOC-A.1-197"
+  ],
+  "harm": "silent",
+  "repro": "grep -n '^| DOC-A.1-\\(12\\|20\\|74\\|213\\|153\\|197\\) |' docs/CONFORMANCE.md  -> no output; python scripts/spec/audit_annex_a1.py lists them unwritten",
+  "expected_from_spec": "Annex A.1 items 12/20/74/213/153/197: 'This item shall be documented in the implementor's user documentation' - §8.1.2 3), §8.1.3.2 1), §8.3.3.6.4 1), §13.18.60.4 8), §12.4.5.9.4 1) b) 2., §13.18.55.4 3)",
+  "observed_or_reasoning": "Code answers: 8-bit byte; ASCII-only word case folding (intrinsics use .NET invariant); SPACE/ZERO/QUOTE = U+0020/U+0030/U+0022 in both sets; national = one UTF-16 code unit (2 bytes); default lock = no record locking (FileRegistry.ImplementorDefaultShare); SYNC = no positioning (DOC-A.1-195). None filed under its own item key.",
+  "code_site": "docs/CONFORMANCE.md §7; owners kb/Work A11, PB1397 (12,74), PB1092 (153), PB538/PB372 (197)",
+  "clause": "Annex A.1; §8.1.2; §8.1.3.2; §8.3.3.6.4; §13.18.60.4; §12.4.5.9.4; §13.18.55.4"
+ },
+ {
+  "mechanism": "reserve-clause-unmodeled: RESERVE integer-1 is parsed and discarded and no default number of I-O areas exists, so neither GR1 half is implemented or documented",
+  "rule_ids": [
+   "DOC-A.1-164"
+  ],
+  "harm": "silent",
+  "repro": "SELECT F ASSIGN TO 'f' RESERVE 3 AREAS. compiles; no FileModel field, emitter or runtime reads it (OoEmitter.cs:192 'RESERVE ... not modeled by FileModel')",
+  "expected_from_spec": "§12.4.5.14.3 1): with RESERVE the number of areas equals integer-1; without it the number is specified by the implementor (A.1 item 164, documented)",
+  "observed_or_reasoning": "No carrier, no determination; already owned by kb/Work PB643 (open).",
+  "code_site": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileReserveClause; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs",
+  "clause": "§12.4.5.14.3 1)"
+ }
+]

@@ -1,0 +1,82 @@
+[
+ {
+  "mechanism": "no-4.2.10-extension-warning-or-register",
+  "rule_ids": [
+   "GR-4.2.10-1",
+   "GR-4.2.10-3"
+  ],
+  "harm": "silent",
+  "repro": "probe/ext1.cob: 01 A PIC S9(5) COMP-3 VALUE 12. 01 B PIC S9(5) COMP-5 VALUE 3. 01 C COMP-2 VALUE 1.5. ADD B TO A. DISPLAY A ' ' B ' ' C. -> `cobol ext1.cob --run --std 85` and `--std 2023` both print '00015 00003 1.5' with ZERO diagnostics; `cobol --help` lists no extension-flagging option.",
+  "expected_from_spec": "§4.2.10: 'Documentation associated with an implementation shall identify nonstandard extensions for which support is claimed' and 'An implementation shall provide a warning mechanism that optionally may be invoked by the user at compile time to indicate use of a nonstandard extension in a compilation group. This warning mechanism shall flag only extensions that are syntactically distinguishable.' (cite.py OK §4.2.10 3)). COMP-1/-2/-3/-5 are defined at no ISO edition and are syntactically distinguishable, so a user-invocable option (e.g. a --flag-extensions / strict switch or a >>directive) must be able to warn on them, and docs/CONFORMANCE.md must list the claimed extensions.",
+  "observed_or_reasoning": "No mechanism exists: the compiler's only warning axes are edition gating (--std/--permissive, for ISO constructs removed/introduced), the >>FLAG-02/-14 migration flags (FlagConformancePass, §7.3.14/15), and the named declined-element seam. Vendor usages bind silently in PictureAnalyzer.ParseUsage (COMP-3 -> Usage.Packed at l.995). CONFORMANCE.md documents the vendor words only as reserved words (D-RW1) - the reserved-word half of §4.2.10 is met and pinned by CobolWordsDriftTests - but has no 'claimed nonstandard extensions' register. Each per-construct note (PB1139 COLLATING-less SORT/MERGE, PB1455 subscript-between-qualifiers, PB1508 order-free OPTIONS, PB755/PB756 optional underlined words, PB758 END-INVOKE, PB396) cites §4.2.10 for ITS construct, i.e. the missing mechanism is the common root: with one extension register + one warning seam (the EditionContext.Declined pattern), each of those becomes a row rather than a bespoke decision. Fix shape: a data-driven extension register (like cobol-words.json extensionReserved) read by one binder seam emitting a suppressible Warning under a user option, a CONFORMANCE.md section generated/drift-tested from it.",
+  "code_site": "src/Cobol.Net.Compiler/Binding/PictureAnalyzer.cs#ParseUsage; src/Cobol.Net.Cli/Program.cs; tests/version-matrix/cobol-words.json",
+  "clause": "4.2.10",
+  "owning_note": ""
+ },
+ {
+  "mechanism": "ec-oo-resource-never-raised",
+  "rule_ids": [
+   "GR-16.2.1.2-2"
+  ],
+  "harm": "crashes",
+  "repro": "Code reading (resource exhaustion is not reproducible in a golden): INVOKE C \"NEW\" RETURNING R renders `R = new C()` (BoundOo InvokeForm.New) and factory SELF \"NEW\" renders `__New() => new C()` (OoEmitter ~l.314); grep -rn 'OO-RESOURCE' src -> only ExceptionCatalog.cs:171 (the catalog entry). An OutOfMemoryException during construction escapes as an unhandled .NET exception.",
+  "expected_from_spec": "§16.2.1.2 GR2: 'If resources needed to create a new object are not available, the returned object reference is set to NULL, and the EC-OO-RESOURCE exception condition is set to exist and is propagated back to the runtime element that invoked the New method.' (cite.py OK §16.2.1.2 2)).",
+  "observed_or_reasoning": "No raise site. The planned slice (docs/COBOLNET_OO_SLICE_BRIEFS.md l.248 'EC-OO (EC-OO-RESOURCE on New per §16.2.1 GR2 ...)') never landed. The runtime already has the pattern for ALLOCATE (CobolPtr.cs:211 catches OutOfMemoryException -> NULL + condition); NEW should route through one runtime helper doing the same, so every NEW form (InvokeForm.New, NewSelf, inline class::\"NEW\") inherits it.",
+  "code_site": "src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Compiler/Binding/Bound/BoundOo.cs#InvokeForm; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs",
+  "clause": "16.2.1.2",
+  "owning_note": ""
+ },
+ {
+  "mechanism": "runtime-integer-argument-fraction-truncated",
+  "rule_ids": [
+   "GR-5.5-3"
+  ],
+  "harm": "wrong-answer",
+  "repro": "PROGRAM-ID. CHQ. 01 X PIC 9 VALUE 5. PROCEDURE DIVISION. >>TURN EC-ARGUMENT-FUNCTION CHECKING ON / DISPLAY FUNCTION FACTORIAL(X / 2 + 1). DISPLAY 'ES=' FUNCTION EXCEPTION-STATUS. -> prints '6' and 'ES=' blank at --std 2023 (probe/ch2.cob). Same for FACTORIAL(X * 0.5) -> 2, FACTORIAL(1 + X / 2) -> 6, CHAR(X / 2 + 64) -> ordinal 66. Control: FACTORIAL(X / 2) and CHAR(X / 2) are rejected at compile time COBOLNET1627.",
+  "expected_from_spec": "§15.3 6) 'Integer. An arithmetic expression that will always result in an integer value or an integer data item shall be specified.' and §15.3 14): 'If the evaluation of an argument results in an incorrect value for that argument ... the EC-ARGUMENT-FUNCTION exception condition is set to exist.' (both cite.py OK). X/2+1, X*0.5 are not always-integral, so either the bind-time screen rejects them or, with checking enabled, 3.5 must raise EC-ARGUMENT-FUNCTION (fatal) - never silently answer FACTORIAL(3).",
+  "observed_or_reasoning": "Two holes, one path. (1) Static: IntrinsicArgumentRules.NotAlwaysIntegral checks a quotient only at the ROOT of the argument expression and CollectAdditive treats a non-additive subtree (X/2, X*0.5) as opaque, so any division/fractional-literal product nested in an additive spine fails open - the sibling of kb/Work PB617 (literal-only spines), same walk. (2) Runtime: the integer landing never tests integrality - CobolIntrinsics.IntegerArgReal is `(long)Math.Truncate(v)` and the Int128 path narrows the scaled value, so the fraction is discarded and EC-ARGUMENT-FUNCTION is never set even under checking. The fail-open design of (1) is only sound if (2) exists. Suggest folding into PB617 as its runtime half, or a new note.",
+  "code_site": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs; src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs#IntegerArgReal; src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs#IntegerArg",
+  "clause": "15.3",
+  "owning_note": "PB617 (sibling - static literal half; not the same mechanism)"
+ },
+ {
+  "mechanism": "catalog-fmt-row-for-notation-clause",
+  "rule_ids": [
+   "FMT-5.2"
+  ],
+  "harm": "silent",
+  "repro": "python: json.load(docs/rearchitecture/spec-rule-catalog.json)['rules'] entry id FMT-5.2 -> text '<a id=\"section-5-2-1\"></a>', has_diagram false; it is the only FMT row at section depth <= 1 in tests/version-matrix/traceability-inventory.json.",
+  "expected_from_spec": "§5.2 'General formats' is the description-techniques clause (notation), not a construct; it prints no general format. FMT rows exist to verify a construct's printed diagram against its grammar rule.",
+  "observed_or_reasoning": "scripts/spec/extract_rule_catalog.py l.558-588 emits an FMT row for EVERY heading whose title matches 'general formats?', so §5.2's own heading manufactured a row whose body is the next anchor. Process-only: it inflates the denominator by one unverifiable row. Fix: require the FMT heading's parent to be a numbered construct clause (or exclude §5), plus a drift assertion that every FMT row has_diagram or a Format label.",
+  "code_site": "scripts/spec/extract_rule_catalog.py",
+  "clause": "5.2",
+  "owning_note": "PB284 (cluster - catalog denominator; PB284 is rows lost, this is a row manufactured)"
+ },
+ {
+  "mechanism": "base-class-and-factoryobject-absent",
+  "rule_ids": [
+   "GR-16.2.2.2-1",
+   "GR-16.2.1.2-1"
+  ],
+  "harm": "rejects-legal-source",
+  "repro": "probe/base1.cob: CLASS-ID. BSX INHERITS FROM BASE. REPOSITORY. CLASS BASE. -> COBOLNET0821 at --std 2023; probe/new1.cob: INVOKE B1 \"FactoryObject\" RETURNING F1 -> COBOLNET0825.",
+  "expected_from_spec": "§16.1 'A standard class BASE shall be provided by the implementation'; §16.2.2.2 GR1 FactoryObject returns the factory of the object's class.",
+  "observed_or_reasoning": "ALREADY OWNED - kb/Work PB1506 (open). Re-measured on 0caa7d5, unchanged. Listed only so the registrar can attach the two rows; do not file again.",
+  "code_site": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoNameResolution.cs#Lookup",
+  "clause": "16.2.2.2",
+  "owning_note": "PB1506"
+ },
+ {
+  "mechanism": "float-decimal-clause-silent-no-4.2.6-warning",
+  "rule_ids": [
+   "GR-4.2.10-2"
+  ],
+  "harm": "silent",
+  "repro": "probe/fd.cob: OPTIONS. FLOAT-DECIMAL IS BINARY-ENCODING. -> compiles and runs clean at --std 2014/2023.",
+  "expected_from_spec": "§4.2.6: 'An implementation shall provide a warning mechanism at compile time to indicate use of syntactically-detectable processor-dependent language elements not supported by that implementation.' (cite.py OK); A.3 item 13 is Not claimed.",
+  "observed_or_reasoning": "ALREADY OWNED - kb/Work PB298 (Registrar-15d extension). Re-measured unchanged. Not re-reported.",
+  "code_site": "src/Cobol.Net.Compiler/Binding/OptionsBinder.cs#ApplyFloatDecimal",
+  "clause": "4.2.6",
+  "owning_note": "PB298"
+ }
+]

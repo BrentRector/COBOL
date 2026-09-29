@@ -1,0 +1,53 @@
+[
+ {
+  "mechanism": "Annex A.1 determinations that the code already fixes are written nowhere under their DOC-A.1-<n> key (no §7 row; at most design-doc or code-comment prose), so the required user documentation is absent and audit_annex_a1.py counts the item open",
+  "rule_ids": [
+   "DOC-A.1-114",
+   "DOC-A.1-116",
+   "DOC-A.1-120",
+   "DOC-A.1-121",
+   "DOC-A.1-122",
+   "DOC-A.1-124",
+   "DOC-A.1-130",
+   "DOC-A.1-131",
+   "DOC-A.1-141"
+  ],
+  "harm": "silent",
+  "repro": "grep '^| DOC-A.1-<n> ' docs/CONFORMANCE.md for each id -> nothing. Behaviour probes (--std 2023): ls1.cob writes 'AB\\r\\n' (114: CRLF written; ls2.cob shows LF, lone CR, CRLF and EOF all delimit on READ); nx2.cob NX\"414\" -> COBOLNET1635 '4-digit groups' (122); int2.cob subscript I/2 with I=5 under >>TURN EC-BOUND -> 'EC-BOUND-SUBSCRIPT ... 2.500000000 is not an integer', unchecked it silently selects element 2, COMP-2 2.0 accepted (124); pg.cob OPEN OUTPUT -> empty file, LINAGE-COUNTER 1, TOP margin at first WRITE, first ADVANCING PAGE emits \\f (130); sh.cob three clause-less SELECTs on one path all open 00 in INPUT/INPUT/I-O and I-O/I-O (131). 116/141: ProgramRegistry.CallProgram(CobolArg[]) is the non-COBOL host ABI, undocumented beyond the RETURN half; 120: LocaleState reads CurrentCulture once (DESIGN-locale-facility L3), not in CONFORMANCE.md; 121: __GET_<P>/__SET_<P> only in NamingConvention.",
+  "expected_from_spec": "Each item's A.1 sentence: 'This item shall be documented in the implementor's user documentation' (cite.py --check A.1 OK for each), with the operative rules §12.4.5.10.3 GR2, §13.7.4 GR3, §8.2.1, §11.7.4 GR1 a), §8.3.3.5.3 SR5, §5.5 3) a), §14.9.27.4 GR18 and GR23, §14.2.3 GR13 (all --check OK). §4.2.5 requires every such element to be documented.",
+  "observed_or_reasoning": "The behaviour is settled in code (and for 120 in the locale design doc) but the user documentation - docs/CONFORMANCE.md §7 - carries no row under the item's key, so a user cannot learn the implementor's choice and the traceability anchor docs/CONFORMANCE.md#DOC-A.1-<n> does not resolve.",
+  "code_site": "docs/CONFORMANCE.md §7; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenWriter (114, 130); src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#CallProgram (116, 141); src/Cobol.Net.Runtime/Control/LocaleState.cs#LocaleState (120); src/Cobol.Net.Compiler/Oo/NamingConvention.cs#GetAccessorName (121); src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation (122); src/Cobol.Net.Runtime/Values/Numeric/CobolNum.cs#HasFraction (124); src/Cobol.Net.Runtime/IO/FileRegistry.cs#ImplementorDefaultSharing (131)",
+  "clause": "Annex A.1 items 114, 116, 120, 121, 122, 124, 130, 131, 141; §4.2.5",
+  "owning_note": "116 -> kb/Work PB1253 (open); 121 -> PB1520 (open); 122 -> PB160 (open, registrar 15c paragraph); 130 + 131 -> PB322 (open, determinations D and A; 131's 85 twin PB670); 141 -> PB1149 (open). NO item-specific note for 114, 120, 124 - umbrella kb/Work A11 / register campaign PB160 only (registrar should file or extend)."
+ },
+ {
+  "mechanism": "The determination IS written (and in two cases pinned by a golden) but filed under a NEIGHBOURING item's key or in off-register prose, so the item's own computed anchor does not resolve - the §7 misfiling hazard",
+  "rule_ids": [
+   "DOC-A.1-126",
+   "DOC-A.1-139",
+   "DOC-A.1-132",
+   "DOC-A.1-117"
+  ],
+  "harm": "silent",
+  "repro": "126: the '| DOC-A.1-127 |' row states 'ONE object computer ... whether the name is present, absent (§12.3.6.4 GR3), or the paragraph is omitted (GR4)', pinned by conformance:2023/pb373_object_computer_name_inert. 139: the '| DOC-A.1-204 |' row states the implicit PERFORM TURN (§14.9.28.4 GR14) saves no location, pinned by conformance:2023/l1_exception_no_location_arms LEG B; probe pl.cob: PERFORM WHEN -> EXCEPTION-LOCATION ' ', PERFORM WITH LOCATION -> 'PL; ; 10'. 132: '| DOC-A.1-133 |' says 'A dynamic-length alphanumeric item' but not which of the supported dynamic-length types (native / PREFIXED / DELIMITED structure). 117: §3's recognized-and-inert directive prose says '>>LISTING / >>PAGE - no source listing is produced' but no DOC-A.1-117 row and nothing on the §6.5 logical-conversion effect.",
+  "expected_from_spec": "CONFORMANCE.md §7's own key discipline: the item key IS the inventory rule-id DOC-A.1-<n>, and a determination filed under a neighbouring item cannot resolve. A.1 items 117 (§7.3.18.3 GR1, §6.5), 126 (§12.3.6.4 GR3/GR4), 132 (§15.65.4 r1), 139 (§14.9.28.4 GR14 -> §7.3.25.4 GR7) - all --check OK.",
+  "observed_or_reasoning": "126 and 139 are complete in substance and correct by probe/golden: split or cross-key the rows (PARTIAL). 132 and 117 are incomplete in substance as well as off-key (DIVERGES).",
+  "code_site": "docs/CONFORMANCE.md#DOC-A.1-127; docs/CONFORMANCE.md#DOC-A.1-204; docs/CONFORMANCE.md#DOC-A.1-133; docs/CONFORMANCE.md §3 (recognized-and-inert directives)",
+  "clause": "Annex A.1 items 117, 126, 132, 139",
+  "owning_note": "117 -> kb/Work PB1496 (open; also PB1369, PB1067). 126, 132, 139: none item-specific - umbrella kb/Work A11."
+ },
+ {
+  "mechanism": "Un-incurred A.1 items (optional and not provided, or conditionally required on non-COBOL program support that does not exist) have no disposition row, so no derived-verdicts selector can stamp them and they stay open",
+  "rule_ids": [
+   "DOC-A.1-142",
+   "DOC-A.1-143"
+  ],
+  "harm": "silent",
+  "repro": "probe pa.cob (--std 2023, foreign Antlr4.Runtime.Standard.dll beside the program): SET PP TO ADDRESS OF PROGRAM \"Antlr4.Runtime.Standard\" -> NULL; ADDRESS OF PROGRAM \"PA\" -> set. CONFORMANCE.md has no DOC-A.1-142 / DOC-A.1-143 row; DOC-A.1-19 says 'no non-COBOL program can be declared'.",
+  "expected_from_spec": "Annex A.1 preamble (Conditionally required: 'If the associated feature or language element is implemented then this element is also required'; optional: 'If the element is provided by the implementor, the implementor's user documentation shall document the element'). §8.4.3.13.4 GR2, §8.3.2.2.21 (--check OK).",
+  "observed_or_reasoning": "143 is OPTIONAL: owner decision PB280 Q1 already prescribes a 'Not provided.' row, which a1-optional-not-provided would then turn into DOCUMENTED-NON-SUPPORT - a mechanical fix. 142 is CONDITIONALLY REQUIRED: a 'Not provided.' row would not be selected (the selector keys on requirement 'optional') - the same owner question wave 1 raised for DOC-A.1-13/15 (widen the selector to conditionally-required items whose condition the register declares false).",
+  "code_site": "tests/version-matrix/inventory-schema.json#derived-verdicts (a1-optional-not-provided); scripts/spec/audit_annex_a1.py; docs/CONFORMANCE.md §7",
+  "clause": "Annex A.1 preamble; items 142, 143",
+  "owning_note": "kb/Work A11 (umbrella, 'or explicitly dispositioned'); PB280 (Q1 rule for optional items); the selector question is the wave-1 adj-a1-w1-s1 finding, not yet a note."
+ }
+]

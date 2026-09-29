@@ -1,0 +1,33 @@
+[
+ {
+  "mechanism": "GLOBAL bridge set is built per global ROOT with no de-duplication and no redefines-tier awareness: BinderDriver.BindUnitData adds DataBinder.GlobalBridgesOf(g) for every CallGlobalRoot, so two global roots sharing one StringCanonical redefines class (every GLOBAL FD with >=2 record descriptions; `01 G GLOBAL` + `01 H REDEFINES G GLOBAL`) emit the shared `_redef_` backing bridge twice (CS0102/CS0229), and a GLOBAL redefiner of a non-StringCanonical (alias) class gets a Field bridge to a member the container never declares while its anchor is not bridged (CS1061/CS0120)",
+  "rule_ids": [
+   "GR-13.18.27.4-1",
+   "GR-13.18.27.4-3 (inventory CONFORMS contradicted, not in this batch)"
+  ],
+  "harm": "crashes",
+  "repro": "FD F GLOBAL. 01 R1 PIC X(5). 01 R2. 05 R2A PIC X(2). 05 R2B PIC X(3). + any contained program (even `DISPLAY \"IN\"`) -> 'backend compilation failed ... CS0102: The type _PRG_OUTF._PRG_INF already contains a definition for _redef_R1' at --std 2023 (probe/gl/fr3.cob). Also probe/gl/fr2.cob (01 G GLOBAL + 01 H REDEFINES G GLOBAL -> CS0102 _redef_G) and probe/gl/rr.cob (01 G PIC X(5) VALUE 'HELLO'. 01 G-RED REDEFINES G GLOBAL PIC X(5). containee DISPLAY G-RED -> CS1061 'G_RED' + CS0120 '_PRG_OUTR.G').",
+  "expected_from_spec": "§13.18.27.4 GR1 (cite OK §13.18.27.4 1)): a data-name described with GLOBAL, and every data-name subordinate to a global name (the records of a GLOBAL FD, §8.4.6.2), is a global name a contained program may reference (GR2); GR3 (cite OK §13.18.27.4 3)) expressly contemplates GLOBAL on a REDEFINES entry. All three programs are legal and must compile and run.",
+  "observed_or_reasoning": "Backend C# fails to compile; the generated nested class declares `private ref string _redef_R1 => ref __outer._redef_R1;` twice (one per record root) and `private ref string G_RED => ref __outer.G_RED;` for a field the container never emits. The ordinary one-record GLOBAL FD and a plain GLOBAL group work (probe g1b).",
+  "code_site": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData (unit.Bridges.AddRange per root); src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#GlobalBridgesOf; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs (bridge emission)",
+  "clause": "13.18.27.4",
+  "owning_note": "NEW — no kb/Work note owns it (PB1009 landed the per-residence bridge list; PB1243 is the ambiguity defect of GR2; PB1193 the record-level GLOBAL). Registrar to file."
+ },
+ {
+  "mechanism": "Unpositioned screen ACCEPT/DISPLAY with an exception phrase (`ACCEPT SG ON EXCEPTION ... END-ACCEPT`, legal Format 3 shape: AT and the exception brackets are independent) draws a generic COBOL0307 parse error (plus a spurious COBOLNET0901 on END-ACCEPT) instead of the named A.4.2 refusal COBOLNET1707, contradicting docs/CONFORMANCE.md A.4.2's claim that every screen source shape draws a named Error. Deliberate grammar cost recorded at CobolScreen.g4 screenTail (exception phrases bound to the positioning phrase to stop DISPLAY stealing an enclosing statement's arm).",
+  "rule_ids": [
+   "GR-14.9.1.4-24",
+   "GR-14.9.1.4-L2.1",
+   "GR-14.9.1.4-L2.2",
+   "GR-14.9.1.4-L3.1",
+   "GR-14.9.1.4-L3.2"
+  ],
+  "harm": "silent",
+  "repro": "SCREEN SECTION. 01 SG. 05 SI1 PIC X TO WS-X. ... ACCEPT SG ON EXCEPTION DISPLAY \"E\" NOT ON EXCEPTION DISPLAY \"N\" END-ACCEPT. at --std 2002/2023 -> COBOL0307 unexpected 'ON' / 'NOT' + COBOLNET0901 'END-ACCEPT is a reserved word' (probe/acc2.cob); DISPLAY twin probe/dsp2.cob the same.",
+  "expected_from_spec": "Annex A.4.2 item 1/9 (cite OK §A.4.2 1)): Format 3 is an optional element; A.4.1 refuses the syntax when unclaimed. The project's own A.4.2 determination promises the named COBOLNET1707 for every screen statement shape.",
+  "observed_or_reasoning": "The program is refused either way (no wrong answer), but by an anonymous parse error pointing at a 'missing period', and the documentation's 'all seven source shapes draw a named Error' is false for this shape. Diagnostic-quality / doc-accuracy only.",
+  "code_site": "src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4#screenTail; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#ScreenFormatOf",
+  "clause": "14.9.1.2",
+  "owning_note": "None found (grep 'unpositioned' / 'ON EXCEPTION' in kb/Work); closest PB260 (landed A.4.2 witnesses) — registrar to decide file vs fold into PB260/PB284."
+ }
+]

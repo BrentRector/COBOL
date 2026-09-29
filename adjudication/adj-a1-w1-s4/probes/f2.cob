@@ -1,0 +1,18 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. F2.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT F ASSIGN TO "nonexist-zz.dat" ORGANIZATION SEQUENTIAL.
+       DATA DIVISION.
+       FILE SECTION.
+       FD F.
+       01 FR PIC X(4).
+       WORKING-STORAGE SECTION.
+       01 ST PIC XX.
+       PROCEDURE DIVISION.
+           OPEN INPUT F.
+           DISPLAY "AFTER OPEN".
+           READ F AT END DISPLAY "EOF" END-READ.
+           DISPLAY "AFTER READ".
+           STOP RUN.
