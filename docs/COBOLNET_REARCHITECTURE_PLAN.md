@@ -24,6 +24,23 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
 
 ### Where we are
 
+- **▶ LIVE STATE (2026-09-29 15:11 PDT) — IDLE; the owner restarts the CLI now.** Main is `b2a5045d8`; the inventory is at **GAP 818** (866 this morning).
+  - **Landed today:**
+    - train 72 (M12 PB1719, M13 PB1721, the gate cap PB1720 N=1): the ordered whole-population gate, about 3 min per run;
+    - trains 73 and 74 (wave 73: C, E, F, then finishers A2, B2 and D2 for A, B and D, which died near the end with no error);
+    - PB1732's root fix (the Linux gate tests a `--shared` clone and exports nothing);
+    - PB1743 (blocking waits use `until grep`, not `tail -f | grep -m1`);
+    - CI skips the matrix for `.claude/` and pin-only commits;
+    - PB1754's plan for the comprehensive architecture review (not started; owner decisions pending);
+    - the claude-skills pin at v1.15.1.
+  - **Open from wave 73's splits:**
+    - PB480 and PB1113/PB1116 plus the PB1112 remnant (OO conformance);
+    - PB1042 (StorageCell dyn slots for dynamic-capacity tables);
+    - PB322 (three mechanisms) and PB833 (fcntl locks; design first);
+    - PB1422;
+    - PB758 (re-scoped to a §4.2.10 nonstandard-extension warning mechanism, which needs a note);
+    - the new leads PB1744–PB1747 and PB1755–PB1756.
+  - **NEXT:** the next fix wave from `fix_clusters.py` (`work.py next` leads with PB1044, PB1066, PB1076), with the owner's okay.
 - **▶ LIVE STATE (2026-09-29 00:55 PDT) — THE PB1708 PIVOT'S FIRST MECHANISMS ARE ON MAIN.** Wave 71 (workflow wf_db98f9ed-c65) landed in two trains.
   - **Train 71** (DEVLOG 1772): M14 one population check (PB1718), M2 the FIFO gate cap (PB1720; `half`, N still to measure) and M7 the table-VALUE fill bounded by its phrase (PB1716: pb505 rejects in 0.49 s, was 25 s).
   - **Train 71b** (DEVLOG 1773): M6 lexer predicates made actions, so the DFA start state is cached (PB1715), and M11 the order plan, `gate_plan.py`, with the narrowing deleted (PB1717, which closed PB1712).
