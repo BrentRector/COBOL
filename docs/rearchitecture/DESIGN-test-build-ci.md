@@ -600,7 +600,10 @@ that is too. The proof is in the after-profile itself — the SAME work reports 
 new collections found contention, not silicon; at 17.4× + 6.5× ≈ 24 threads on 24 physical cores the box is
 saturated. **The class-split lever is therefore EXHAUSTED**, and the remaining lever is to reduce the WORK — the
 persistent compile/run host of §3.10's `guard-fast` row and A13(c), not more parallelism. Kept for the balance
-and for the drift gate, exactly as the `guard-fast` regrouping was kept for correctness rather than speed.
+and for the drift gate, exactly as the `guard-fast` regrouping was kept for correctness rather than speed. ⚠ The
+contention was since NAMED (§3.14.5): for check-only compiles it is one lock in the ANTLR lexer's start-state path,
+so the continuity partitions ran at ~3.8 busy cores, not a saturated host; the partition counts are re-measured
+once M6 removes it.
 
 #### 3.11.2 ⛔ Filters must key on the METHOD, never on `Class.Method`
 
@@ -701,13 +704,19 @@ pins it on the built bits. Re-measured on the real flow — populate at one comm
 a TEST-ONLY commit (that very test), rebuild, whole assembly: **build 5 s + 1 m 18 s, 13,133 hits / 27 misses,
 7,952 green.**
 
-### 3.13 THE PER-TEST IMPACT MAP — deriving the implementer's gate filter (kb/Work PB1683)
+### 3.13 THE PER-TEST IMPACT MAP — ORDERING the implementer's gate (kb/Work PB1683, PB1708)
 
 **The defect it answers.** An implementer's gate ran the tests its author NAMED (its goldens, `~Drift|~EditionGate`,
 `~CorpusRunner|~Nist` on a "shared seam"). Train 68b dropped two groups on whole-assembly reds those names never
 reached — `DiagnosticPositionTests` after a COPY library-search change, and a `CONSTANT AS NULL` crash in
 `DataBinder.Constants.cs` — and wave 69 (four agents, 1.17 M tokens) existed only to finish them. The map records
 the fact the names were guessing: which tests execute which code.
+
+⛔ **The map ORDERS the gate; it never SELECTS it** (owner, 2026-09-28, kb/Work PB1708). Every implementer gate runs
+the whole discovered population (§3.14); the map only decides which tests run FIRST, so a red surfaces in minutes.
+A dependency the map cannot see therefore costs a later red, never a missed one — and the single-process,
+memoizing compiler hides dependencies in more ways than one recorder can close (values memoized into static
+collections, edition state cached in the front end, static FIELD reads — PB1712).
 
 **Collection — a per-test hit recorder, chosen by measurement.** Per-test coverage from a coverage tool cannot
 attribute hits under xunit's parallel collections, and per-shard coverage bisected to tests multiplies the run.
@@ -718,48 +727,254 @@ The recorder instead rides the test run itself, in its own RECORDING build, and 
 | `tools/impact/ImpactRecording.targets` | imported ONLY through `-p:CustomAfterMicrosoftCommonTargets=…` (nothing in the tree imports it, so no gated, battery or shipped build carries a probe); compiles `ImpactProbe.cs` into the greenfield compiler, front end, editions, runtime and CLI, the legacy oracle the differential harness loads, and the three test assemblies; compiles `ImpactTestFramework.cs` into the test assemblies and names it in `[assembly: Xunit.TestFramework]` |
 | `tools/impact/ImpactInstrumenter` (Mono.Cecil) | rewrites each covered assembly once: every method with sequence points calls `ImpactProbe.Hit(id)` on entry, `id` being its entry in the probe table — its file and the LINE RANGES it owns (its sequence points, merged across the lines between two of them unless another method's point lies between, so braces, `else` lines and comments belong to it and a lambda's body to the lambda); members with no sequence points are charged to a TYPE-LEVEL entry; `implies` names each entry's type-chain static constructors; every `Process.Start` is redirected to the probe's twin |
 | `ImpactProbe` | one byte store per hit into the array of the running CONTEXT, an `AsyncLocal` every assembly's copy shares through `AppContext` data; a hit with no context lands in an AMBIENT array. In a child process (a compiled COBOL program loading the instrumented runtime) it records for the process and writes a hits file at exit, which the redirected `Process.Start` queued on the starting test |
-| `ImpactTestFramework` | xunit's own framework with the message bus wrapped: `ITestCollectionStarting` / `ITestClassStarting` / `ITestStarting` install a fresh context synchronously on the flow about to run it (the same `TestRunner.RunAsync` then awaits the test, so the context flows into constructor, body and every task it starts, while parallel tests keep their own); `…Finished` saves it with the children folded in. A `BeforeAfterTestAttribute` cannot do this — it is handed only the `MethodInfo`, which cannot tell a theory's rows apart, and the corpus theories are ~3,400 of the ~9,300 Conformance tests |
+| `ImpactTestFramework` | xunit's own framework with the message bus wrapped: `ITestCollectionStarting` / `ITestClassStarting` / `ITestStarting` install a fresh context synchronously on the flow about to run it (the same `TestRunner.RunAsync` then awaits the test, so the context flows into constructor, body and every task it starts, while parallel tests keep their own); `…Finished` saves it with the children folded in. A `BeforeAfterTestAttribute` cannot do this — it is handed only the `MethodInfo`, which cannot tell a theory's rows apart, and the corpus theories are ~3,400 of the ~9,300 Conformance tests. It DERIVES from the gate's `GateTestFramework` (§3.14.3), so a recording build still names one framework |
 | `scripts/spec/record_impact_map.py` | a DETACHED worktree at the commit, the recording build, the instrumenter, each test assembly once with `COBOLNET_COMPILE_CACHE=off` (a cache hit skips the compiler and would record nothing for it), and the merge into `<git common dir>/cobol-impact/<sha>.json.gz` — shared by every worktree of the repository. Its watchdog fails the recording when a listed test was never recorded or no test reached the compiler, front end or runtime |
-| `scripts/spec/impacted_tests.py` | the lookup: `--base <cut point>` (or explicit files, taken at the file level) → the filter, its last stdout line |
+| `scripts/spec/impacted_tests.py` | the lookup: `--base <cut point>` → the order plan's TIERS (below), written into the plan file `scripts/gate_plan.py` assembles (§3.14.2) |
 
 **Measured cost.** At `dbea12428`, `BelowNormal` on the shared 32-core host: 35,578 probe entries; Conformance
 9,274 green in 15 m 19 s (cold, instrumented), Unit 29,693 green in 2 m 38 s, Characterization 33 in 2 s; build
-23 s, instrumentation 4 s; **18.7 min in all** — inside one cold Conformance leg of the battery, which is where it
-runs. The map is ~5 MB compressed.
+23 s, instrumentation 4 s; **18.7 min in all**. The map is ~5 MB compressed.
 
-**How a change selects.** A hunk inside a method's owned lines selects the tests that executed that method (a
-static constructor's change, every test that touched its type). A comment-or-blank hunk selects nothing. ADDED
-code between members: an ordinary new method runs only when changed code calls it, except through overload
-resolution, so it selects the tests that reached any same-named method of the file's types; an override, virtual,
-operator, conversion, extension method, field, property, constant, a type with a base list or an attribute is a
-DECLARATION change. A declaration change — or any removed or changed line no method owns (a signature, a
-constant, an enum value) — selects every test that executed the file, plus every test that executed a file NAMING
-one of its outermost types (constants and enum values are compiled INTO their consumers). A theory row is
-selected by a `DisplayName~<its name argument>` term, a whole method or class when the term budget (150) requires.
+**What the lookup computes: a TIER per test.** A change is analysed exactly as PB1683 built it: a hunk inside a
+method's owned lines reaches the tests that executed that method; a comment-or-blank hunk reaches nothing; an ADDED
+ordinary method reaches the tests that reached any same-named method of the file's types (overload capture); a
+DECLARATION change (an override, virtual, operator, conversion, extension method, field, property, constant, a type
+with a base list or an attribute, or any removed or changed line no method owns) reaches every test that executed
+the file plus every test that executed a file naming one of its outermost types; a static constructor's change
+reaches every test that touched its type. From that:
 
-**⛔ Conservative by construction — the WHOLE assembly, and the reason, when it cannot bound the change:** no map
-for the base, or one older than it by anything but documentation (the line numbers are the map commit's); a
-`.g4`, project, build or source-generator input; a NEW src file; a declarations-only file no executed file names;
-non-C# data under `src/`; a changed method reached only outside every test's context in product code (a
-finalizer; in a test file that is xunit discovery running a theory's data source, and the file's classes are
-selected instead); corpus data no golden names. `ImpactedTestsDriftTests` (Unit) drives every arm through the
-script's `--self-test`, proves through the real command line that an unmapped file prints `FullyQualifiedName~.`,
-and requires every product project under `src/` to be in both the targets file and the recorder's `PROBED` list.
+| tier | the tests | runs |
+|---|---|---|
+| 1 | executed a changed method body (the direct hits) | first, cheapest first |
+| 2 | reached only through a widening — a static constructor, a declaration change, the file level | next, cheapest first |
+| 3 | reached by nothing the change touched | last |
 
-**Holes it does not close (the lander's whole-assembly gate is their net):** a static cache built by one test
-from a method a later test never re-executes; a default-parameter or attribute change consumed by code that does
-not name the declaring type; a new type discovered by reflection with no base list.
+What used to force the WHOLE-assembly filter — no map for the base, a map older than the base, a `.g4`, project,
+build or source-generator input, a NEW src file, non-C# data under `src/`, a method reached only outside every
+test's context — now puts EVERY test in tier 1, and the gate still runs all of them. A stale map is harmless for
+the same reason: its line numbers can misplace a test by a tier, never drop it. `ImpactedTestsDriftTests` (Unit)
+drives every arm through the script's `--self-test`, and requires every product project under `src/` to be in both
+the targets file and the recorder's `PROBED` list.
 
-**What the replay measured — the map is a CORRECTNESS gate, not a narrowing one, for this compiler.** Every
-golden runs the whole pipeline, so a change to the preprocessor, binder or emitter reaches almost every test.
-FILE granularity selected the whole Conformance assembly for 20 of 22 branches of trains 65–69 and the two
-dropped 68b branches; METHOD granularity (the design above) still reaches 5,504–9,268 of 9,274 tests per train
-cluster (each cluster bundles three to five notes and 15–86 files), so every replayed cluster's filter is the whole
-assembly. For the two dropped 68b branches the map, recorded at their own base `4b0f3e22a`, selects the tests that
-went red. The derived filter is therefore NARROWER than the whole assembly only for a small, local change; its
-value is that the implementer's gate now runs every test the change can reach, which the name-guessed filter did
-not. The implementer gate cost that follows (a whole cold Conformance leg per implementer, which MANDATORY-PRACTICES
-I2 forbade for lander contention) is an owner decision recorded in kb/Work PB1683.
+**What the replays measured — for this compiler the map mostly says "everything", so COST orders inside a tier.**
+Every golden runs the whole pipeline. Over the 20 replayed clusters of trains 65–69, method granularity reaches
+5,504–9,268 of 9,274 tests, and even a perfectly precise registry and declaration analysis leaves a median of 6,404
+(evidence `impact-map-pb1708/a5`, `a6`). On the one dropped branch with named reds, 68b X, 9,144 of 9,190 tests are
+tier 1 (`b4`). Ranking tier 1 by SPECIFICITY (the sum of `ln(N / df)` over the changed entries a test executed) put
+X's first red after **62 %** of the assembly's recorded test-seconds — worse than the plain class-and-name order
+(14 %) — because the change that broke them (the COPY library search) is executed by every test. Ranking by
+recorded COST, cheapest first, put it after **0.32 %** (40 of 12,408 test-seconds). So inside a tier the order is
+cheapest first, and the map's contribution is the tier boundary. One replayed branch is a small sample; M13's
+acceptance (§3.14.9) records the time to the first red of every implementer gate of the next train.
+
+### 3.14 THE ORDERED WHOLE-POPULATION GATE, WHOLE-SUITE SPEED AND THE GATE CAP (kb/Work PB1708)
+
+#### 3.14.1 The contract
+
+- **Every implementer gate runs the WHOLE discovered population** of Conformance, Unit and Characterization, every
+  time, in two LEGS: the likely-red tests first, everything else second. Ordering changes WHEN a test runs, never
+  WHETHER.
+- ⛔ **Sound by construction: every discovered test runs exactly once across the legs.** A test's leg is a TOTAL
+  function of its name and one plan file (§3.14.2), so the legs cannot overlap and cannot leave a test out; the gate
+  CHECKS it on every run (§3.14.4) and a drift test proves the check fires.
+- **Fail fast:** the gate stops at the first leg with a red and reports RED and INCOMPLETE. It never reports GREEN
+  unless every leg ran. An implementer is done only on GREEN.
+- **The verdict line counts the whole population:** `=== BUILD-LOCAL GATE: GREEN — Conformance 9,317/9,317 ·
+  Unit 29,693/29,693 · Characterization 33/33 in 2 legs (plan 3f1c…: map dbea124, timings build-local) ===`.
+- **No plan input, a stale one, or a broken one → ONE leg in the plain order.** Never a skip.
+- The LANDER, the battery and CI are unchanged: one unfiltered run each, no plan.
+
+#### 3.14.2 The plan: `scripts/gate_plan.py`
+
+Inputs, each optional: the diff against the worktree's cut point; the impact map for the base (§3.13, any age);
+TIMINGS — the per-test durations in this worktree's previous gate trx (`TestResults/build-local/`), else the map's
+recorded durations; and this worktree's previous-gate REDS (trx outcome `Failed`).
+
+- **Tier 0** — a test no timing source or map knows (new or renamed); a test declared in a test file the diff
+  changes; a test red at this worktree's previous gate. The implementer's own goldens are here by construction.
+- **Tiers 1–3** — `impacted_tests.py` (§3.13); with no map, every test is tier 1.
+- **Leg 1** = tier 0 + the cheapest tests of tier 1 while their recorded time stays within `LEG_ONE_BUDGET` = 2 % of
+  the assembly's recorded test-seconds. **Leg 2** = everything else. Measured on battery #87 (`b5`): a 2 % budget
+  holds 2,879 of 9,054 Conformance tests (32 %) in 98 collections; one collection's share (59 s of
+  `CorpusRunnerTests_P1`) bounds the leg from below, because xunit runs a collection serially.
+- **Order inside a leg.** Collections by their best-ranked test (tier, then cost), and inside a collection its
+  tests by the same key — the assembly-level `TestCollectionOrderer` / `TestCaseOrderer` of §3.14.3. In leg 2 the
+  collections go LONGEST FIRST (largest recorded sum first), so a surviving long pole starts at once instead of
+  capping the wall; with no timings, xunit's own order.
+- **The plan file** (`TestResults/build-local/plan.json`) holds, per assembly, the multiset of leg-1 display names
+  and the set of KNOWN names (every name any input knows), the per-test rank, and its SHA-256 digest. **The leg
+  function:** `leg(test) = 1` if its display name is in leg 1 or is unknown, else `2` — total over every name, so a
+  test the plan never heard of runs in leg 1, never nowhere. Display names are the key because xunit truncates long
+  theory arguments with `···` and a name may repeat; the function assigns all tests of one name to one leg, which
+  keeps it total and disjoint.
+
+#### 3.14.3 How the legs run on this runner (xunit 2.9.2 · xunit.runner.visualstudio 2.8.2 · Test.Sdk 17.11.1)
+
+Each primitive the runner offers was measured (evidence `b3-order-probe/`, 24 collections × 4 facts on this
+repository's package versions, and on the Conformance assembly itself):
+
+| primitive | verdict |
+|---|---|
+| `dotnet test --filter` naming the leg's rows | ⛔ rejected. A leg of ~3,000 theory rows needs one `DisplayName=` term each: about 400 KB at ~130 characters a term, beyond Windows' 32,767-character command line. The complement leg needs the De Morgan complement of the whole union. A value containing a space silently matched NOTHING and exited 0 (`DisplayName~edition: 2023`, measured). Truncated `···` names are not unique keys. |
+| a runsettings `TestCaseFilter` | ⛔ rejected: the same expression language and the same defects, minus the length limit. |
+| vstest.console `/Tests:` | ⛔ rejected: a SUBSTRING match on names (ambiguous by construction) and not reachable through `dotnet test`. |
+| xunit `StopOnFail` (runsettings `xUnit.StopOnFail`) | ⛔ rejected: at the first red the test host CRASHED (`OperationCanceledException` in `XunitTestAssemblyRunner.RunTestCollectionAsync`), vstest reported "Test Run Aborted", and the trx held NO result — the red's own message was lost. |
+| assembly `[TestCollectionOrderer]` + `[TestCaseOrderer]` | ✅ used. Under 4 parallel threads the three planned collections started in the first wave and each ran its planned case first; unplanned ones kept xunit's order behind them. |
+| `dotnet test --list-tests` | ✅ used for the population: 9,317 Conformance tests discovered in 2.0 s. |
+
+So the leg filter lives INSIDE the test assemblies, where the test cases are objects rather than strings:
+`tests/_shared/GateLegs.cs` (linked into every project under `tests/`, as `TestPartitioning.cs` is) holds
+`GateTestFramework : XunitTestFramework`, whose executor runs `testCases.Where(c => plan.LegOf(c) == leg)` and the two
+orderers. It reads `COBOLNET_GATE_PLAN` (the plan file) and `COBOLNET_GATE_LEG`; with neither set — the battery, CI,
+the lander, an IDE — it runs every case in xunit's order, exactly as today. Each leg's host writes the digest of
+the plan it read beside its trx. The recording build's `ImpactTestFramework` derives from `GateTestFramework` and
+the shared `[assembly: Xunit.TestFramework]` line is compiled out under the recording targets' `IMPACT_RECORDING`
+constant, so an assembly always names exactly one framework.
+
+The driver is `scripts/run_gate_legs.py`, called by `build-local.ps1` and `build-local.sh` after their audits and
+build, in place of their `Leg` functions and of `filter_population.py` (a gate without a filter has no term to
+prove live; `filter_population.py` stays for CI, the generators and `record_verdicts.py`). Per leg it runs the three
+assemblies CONCURRENTLY (the battery's `Conformance ∥ Unit ∥ Characterization` shape), each
+`dotnet test --no-build --logger trx` with the plan environment, prints each through `test_leg_report.py`, and runs
+the population check. `-Filter` is removed from both scripts and from every caller (briefs, skills, practices,
+`check_practices.py`, README, CONTRIBUTING, the PR template) in the same change.
+
+#### 3.14.4 Soundness: the population check
+
+After the last leg run (or at a fail-fast stop), per assembly: the POPULATION is `dotnet test --list-tests` — vstest
+discovery, which never calls the executor and so cannot see the leg filter. The union of every leg's trx results
+must equal it as a MULTISET of display names; every leg's plan digest must equal the driver's.
+- a name short → `NEVER RAN` (red, each named) — unless the run stopped early, when the remainder is reported as
+  NOT RUN and the verdict is already RED/INCOMPLETE;
+- a name over → `RAN TWICE` (red, named);
+- a digest mismatch → red: two legs read two plans, and totality no longer holds.
+
+`GateLegDriftTests` (Unit) proves it fails: (1) `LegOf` is total and deterministic over synthetic cases with
+repeated, unknown and truncated names and an empty plan; (2) each orderer's output is a permutation of its input,
+and a planted non-permutation throws; (3) `run_gate_legs.py --self-test` fires every arm on planted trx files — a
+dropped test, a duplicated test, a digest mismatch, a red in leg 1 (stop, remainder named, RED/INCOMPLETE), and no
+plan (one leg, plain order); (4) every test project under `tests/` that the gate runs links `GateLegs.cs`.
+
+#### 3.14.5 Whole-suite speed — measured first
+
+An uninstrumented whole-Conformance run (battery #87, `b1`): 9,054 tests, **571 s wall**, 11,553 test-seconds.
+
+| share of test-seconds | method |
+|---|---|
+| 54.4 % | `VersionMatrixTests.Cobol85Program_StillCompilesAtLaterEdition` — the continuity cells, 1,047 rows |
+| 18.1 % | `NistDifferentialTests.NistProgram_MatchesGolden`, 349 rows |
+| 10.8 % | `CorpusRunnerTests` (negative 6.3 %, positive 4.5 %) |
+| 3.3 % | two single tests: the corpus row `pb505-table-value-dynamic-span-levels` (266 s, inside the corpus share above) and `ValueFormat2Tests.DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946` (116 s) |
+
+**The critical path is the twelve continuity partitions:** eleven of them ran 525–557 s each and all twelve ended
+in the run's last 26 s, against a 361 s floor for the whole assembly's work on 32 threads. A continuity cell is two check-only compiles of
+one NIST program (permissive, strict) at a later edition.
+
+**Why a partition is slow — one lock in the lexer (`b6`, `b2`).** One partition alone: 0.97 s per row. All twelve
+in one process: 369–395 s, ~4.5 s per row, with the test host using only ~3.8 of 24 cores. Server GC: 360 s. The
+same work as two concurrent processes: 209 s; four: 136 s — the limit is INSIDE one process. An in-process probe of
+exactly that work (`b2-scaling`) peaks at 3.5× by 8 threads, with ~1,400 contended `Monitor` acquisitions per
+compile. Stack samples name it: **28 of 30 single-thread samples, and all 24 twelve-thread stacks, are in ANTLR's
+`LexerATNSimulator.ComputeStartState` / `AddDFAState`** — half of the latter blocked in `Monitor.Enter`. ANTLR 4.13.1
+`LexerATNSimulator.MatchATN` caches a mode's start state only when its closure carries no semantic context, and
+`CobolLexer.g4`'s default mode has six predicates on the LEFT EDGE of a rule (`FN_SIGNED_FLOATLIT`,
+`FN_SIGNED_COMMA_FLOATLIT`, `FN_SIGNED_DECIMALLIT`, `FN_SIGNED_INTEGERLIT`, `DEFINED`, `FNARG_SEPARATOR`). So every
+token of every compilation recomputes the closure over all default-mode rules and re-adds it under
+`lock (dfa.states)`. That is a PRODUCT defect: the `cobol` CLI pays it serially, and any host compiling in parallel
+(the test host, an IDE) pays the lock too.
+
+- **M6 — the lexer caches every mode's start state.** No predicate is reachable from any mode's start state: each of
+  the six moves off the left edge (after the rule's first character, reading the token-start context
+  `_tokenStartCharIndex` instead of the current position) or becomes a mode the preceding token's action pushes —
+  per predicate the implementer picks; the invariant decides. `LexerStartStateDriftTests` pins the invariant, so
+  the next left-edge predicate is red: after lexing each mode's representative input, `decisionToDFA[mode].s0` is
+  non-null for every mode. The implementing change proves equivalence once — the token stream of every source the
+  suite compiles (NIST programs and copybooks, the conformance goldens and negatives) is identical before and after
+  — and the whole suite pins it thereafter. Expected gain, as a bound to be measured: with 93 % of a check-only
+  compile's samples in that path, Amdahl bounds the serial speed-up near 15×, and the lock disappears. Acceptance:
+  `b2` at 12 threads ≥ 8× over today's 1-thread wall with CPU utilisation ≥ 70 %; `b1` re-measured on the next
+  battery.
+- **Sharing one front end across editions is REJECTED** as unsound: edition state is cached in the front end
+  (`Frontend.LexAndParse` primes the lexer with the cell's `EditionInfo`; the reference-format and COPY
+  preprocessors and `CobolParserCoreBase` hold per-edition state), so a shared front end would answer the 2014 cell
+  from another edition's parse. M6 changes no test's inputs.
+- **Process sharding is not built.** It bought 1.8× (two processes) and 2.8× (four) only because each process has
+  its own lock; building it would route around the product defect (CLAUDE.md rule 4). After M6, `b6` is re-run: if
+  two processes still beat one by more than 15 %, the next in-process serialization is found and fixed at its root.
+- **Server GC** bought 3–9 %: not adopted.
+- **The compiled-program cache** (§3.12) already stores check-only results, so a TEST-ONLY re-gate hits every
+  continuity cell; a gate after a product change misses by design. No change.
+- **§3.11's "the class-split lever is exhausted"** was measured under this lock. After M6, the partition counts
+  (one `Partitions` constant per family, audited by `TestPartitionAudit`) are re-measured, starting with
+  `CorpusRunnerTests` (3), whose `_P1` bounds leg 1.
+
+**M7 — the long poles.** `pb505-table-value-dynamic-span-levels` (266 s in the battery; **29.6 s alone through the
+`cobol` CLI** for a 26-line program) and `DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946` (116 s) are one
+product defect: all three stack samples of the CLI compile sit in `TableValueOdometer.Resolve`, whose fill loop is
+bounded only by its `MaxFillElements` ceiling (64,000,000) — and when the odometer can never carry out of a DYNAMIC
+dimension with no TO, the phrase's TO is never reached, which is exactly the §13.18.63.3 SR23 violation ("the values
+of subscript-1 and subscript-2 corresponding to all levels higher than that of the OCCURS clause, if applicable,
+shall be equal") that `COBOLNET1946` then reports. The fix checks SR23 before any fill and bounds the
+fill by the elements the phrase names; the test keeps asserting the diagnostic. The other poles over 30 s in `b1`
+(`CompiledProgramCacheDriftTests.TheOutputDirectory_DoesNotReachTheOutput` 55 s, `OptionalWordSubsetDriftTests`
+`special-names-85` 41 s, `St101A` 30 s, continuity rows of IX113A/NC177A/NC253A/RL101A at 40–49 s) are compile-bound
+and are re-measured after M6 before any is touched. The battery summary prints the five slowest tests (a REPORT,
+never a wall-clock assertion — MANDATORY-PRACTICES forbids those), so the next pole is seen when it appears.
+
+#### 3.14.6 The gate cap (M2)
+
+`scripts/gate_slot.py` is ONE counting semaphore for the whole repository: N lock files
+`<git common dir>/cobol-gate-slots/<k>.lock`, each held by an exclusive OS file lock, so a crashed holder releases
+its slot when it dies and no stale-pid cleanup exists. `run_gate_legs.py` takes a slot before its first leg and
+holds it through the population check, and the slot is held by the legs' whole PROCESS TREE: on Windows the legs run
+inside a Job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so if the driver dies the OS kills every `dotnet test`
+and test host with it; on Linux the lock's descriptor is inherited by the legs (an `flock` lives until the last
+descriptor closes). It takes a slot for every `-Priority BelowNormal` run — every implementer gate is now a
+whole-population gate — and prints the wait (`gate-slot: waiting, k ahead`) and the slot on the verdict line. The
+LANDER (Normal priority) and the BATTERY never take a slot and never wait; the impact recorder takes one. N comes
+from `COBOLNET_GATE_SLOTS`; its default is the largest N at which the lander's whole-Conformance leg stays within
+1.25× of its quiet time with N implementer gates running (M2's acceptance). `gate_slot.py --self-test` proves the
+wait, the release on a killed holder, the kill of an orphaned tree and the sharing across worktrees. ⛔ The cap does
+not span operating systems: a Windows lock and a WSL lock on a drvfs mount do not see each other; the repository's
+gates run on Windows (`build-local.ps1`), and a WSL run is an ad hoc Linux reproduction.
+
+**Retirement is measured** (owner, 2026-09-28): the cap goes when, over one full train, the median implementer
+selection is under 25 % of the Conformance assembly, or a whole cold Conformance leg at `BelowNormal` costs under 6
+minutes on the shared host. Under ordering nothing is selected, so the second criterion is the live one — and M6
+and M7 are what can meet it.
+
+#### 3.14.7 PB1712 under ordering
+
+PB1712 found that the recorder cannot see static FIELD reads, so a change to one `DiagnosticCatalog` descriptor
+reaches 80 tests in the map where the methods reporting it are reached by up to 9,225. Under selection that was a
+silent SKIP of every test the map missed. Under ordering it cannot skip anything: a test the map under-reaches lands
+in a later tier and still runs in the same gate, so the harm is a later red, never a missed one. The finding stays
+documented in the note as an ORDERING-quality limit, and the gate needs no field probes for soundness.
+
+#### 3.14.8 What the rejected SELECTION design's mechanisms become
+
+`M1` (field probes, map schema 3) and `M9` (a map recorded per main commit) are not needed for soundness. Whether a
+map is still recorded per main commit (~19 min each) or on demand is an OPEN owner question (kb/Work PB1709): the
+gate works with any map or none, and on the one replay with named reds recorded cost carried the order (§3.13).
+`M3`, `M4`, `M5`, `M8` and `M10` (the registry restructuring) are shelved as a speed measure (owner, 2026-09-28) and
+revisited on engineering merit only. `M2` (the cap), `M6` and `M7` are redesigned above. The rejected design and
+both reviews are in the DEVLOG entry that pivoted it and in kb/Work PB1708.
+
+#### 3.14.9 Implementation plan — gateable mechanisms, each ≤ ~220 implementer turns
+
+| id | mechanism | files | acceptance (measured, never asserted) | depends on | size |
+|---|---|---|---|---|---|
+| M6 | the lexer caches every mode's start state (§3.14.5) | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4` and the predicate methods it calls; `tests/Cobol.Net.Tests.Unit/LexerStartStateDriftTests.cs`; this section | token streams of every suite source identical before/after (one-time differential, recorded in the DEVLOG); `LexerStartStateDriftTests` red on a planted left-edge predicate; `b2` at 12 threads ≥ 8× today's 1-thread wall, CPU utilisation ≥ 70 %; whole battery green | — | 120–180 turns |
+| M7 | SR23 before the table-value fill; the fill bounded by the phrase (§3.14.5) | `src/Cobol.Net.Compiler/Binding/Model/TableValuePlan.cs` (`TableValueOdometer.Resolve`), `DataBinder.ResolveTableValues`; battery summary top-5 report in `scripts/battery.sh` | the pb505 program rejects with `COBOLNET1946` in < 1 s through the CLI (was 29.6 s); both tests keep their assertions; every Format 2 VALUE golden unchanged; the battery summary lists the five slowest tests | — | 60–100 turns |
+| M11 | the order plan: tiers and legs (§3.13, §3.14.2) | `scripts/spec/impacted_tests.py` (the filter output and `--plus` DELETED, `--plan` added), `scripts/gate_plan.py`, `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs` | `--self-test` covers every tier arm and the no-map / no-timings / stale-map arms (one leg, plain order); `b4` re-run through the new script reproduces cheapest-first on 68b X (first red ≤ 1 % of the work) | — | 100–150 turns |
+| M12 | the in-assembly leg filter and orderers (§3.14.3) | `tests/_shared/GateLegs.cs`, the three test `.csproj` links, `tools/impact/ImpactTestFramework.cs` + `ImpactRecording.targets` (`IMPACT_RECORDING`), `GateLegDriftTests` (1), (2), (4) | with no plan env every assembly's count and verdict are unchanged; a planted non-permutation throws; a recording at HEAD still records every test (the recorder's watchdog) | M11 (the plan format) | 120–180 turns |
+| M2 | the cross-worktree gate cap (§3.14.6) | `scripts/gate_slot.py` + `--self-test` | the self-test's four arms; N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N BelowNormal gates | — | 80–120 turns |
+| M13 | the ordered gate: driver, population check, fail-fast, wiring (§3.14.1, §3.14.3–4) | `scripts/run_gate_legs.py`, `scripts/build-local.ps1` + `.sh` (`-Filter` removed, `Leg` replaced), `GateLegDriftTests` (3), `.claude/skills/workstream/templates/*` (I1/I2, briefs, dispatch spec), `check_practices.py`, `.claude/skills/gate/SKILL.md`, plan §9, README, CONTRIBUTING, PR template | the self-test's five arms; a real gate on a planted red in a leg-1 test stops after leg 1 with the remainder named; a real green gate's population equals `--list-tests` for all three assemblies; over the next train, each implementer gate's time to first red and whole wall are recorded (vs the lander's unordered leg) | M11, M12, M2 | 150–200 turns |
+
+M6, M7, M11 and M2 are independent and may run in parallel groups; M12 follows M11; M13 lands last, with M2 in the
+same train so no implementer runs a whole-population gate uncapped. The owner's CLAUDE.md "Testing" paragraph
+("Per commit, run only the WAVE-LOCAL filtered gate") describes today's gate; M13's landing asks the owner to
+update it, since agents do not edit CLAUDE.md.
 
 ---
 

@@ -1,7 +1,7 @@
 # b6 — the continuity cells (VersionMatrixTests.Cobol85Program_StillCompilesAtLaterEdition: 1,047 rows in the 12
 # partition collections, each partition ONE edition because the stride i % 12 over name x {2002, 2014, 2023} keeps
 # i mod 3), cold (COBOLNET_COMPILE_CACHE=off), BelowNormal, the shared 32-logical / 24-core host, 2026-09-28
-# ~19:30-20:10 PDT with the host otherwise ~12 % busy. run-leg.ps1 produced each line.
+# ~19:00-19:30 PDT with the host otherwise ~12 % busy. run-leg.ps1 produced each line.
 #
 # E0   one partition alone (87 rows = one collection = serial)                      84.8 s  -> 0.97 s per row
 # E1   all 1,047 rows, ONE process, workstation GC (the gate's shape)              395.0 s

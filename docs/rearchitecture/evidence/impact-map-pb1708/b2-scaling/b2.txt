@@ -1,4 +1,4 @@
-# b2 — Program.cs on the shared 32-logical / 24-core host, 2026-09-28 ~20:15-20:40 PDT, Debug build, Normal
+# b2 — Program.cs on the shared 32-logical / 24-core host, 2026-09-28 ~19:32-19:49 PDT, Debug build, Normal
 # priority, host otherwise ~12 % busy. Three runs:
 #   (1) `-- 96 1,2,4,8,12,16,24`  the scaling curve: throughput stops at ~3.5x by 8 threads, CPU utilisation falls
 #       to 15 %, and contended Monitor acquisitions climb to ~270,000 per round (~1,400 per compile);
