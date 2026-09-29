@@ -4,16 +4,71 @@
 // <collection>.<test>" to $ORDER_PROBE_LOG. PlanCollectionOrderer / PlanCaseOrderer read $ORDER_PROBE_PLAN (one test
 // name per line, highest priority first): a collection ranks by its best-ranked test, cases by their own rank, and
 // everything unplanned keeps xunit's default order AFTER the planned ones. Both orderers THROW if their output is not
-// a permutation of their input. With $ORDER_PROBE_FAIL set, C17.T2 fails. run.ps1 drives the three measurements.
+// a permutation of their input. With $ORDER_PROBE_FAIL set, C17.T2 fails.
+//
+// The GATE LEG half (the review's request, 2026-09-28): GateFramework is a GateTestFramework-shaped framework whose
+// executor DROPS every discovered case not in the requested leg. $ORDER_PROBE_LEG names the leg (1 or 2) and
+// $ORDER_PROBE_LEGPLAN a file of leg-1 display names; a case whose display name is listed is leg 1, every other case
+// leg 2. With $ORDER_PROBE_THROW set the framework's constructor throws, and with $ORDER_PROBE_BAD = throw | errorcases
+// the executor throws or turns every case into an ExecutionErrorTestCase (the "partial gate environment" arms). Dup.Long
+// is one theory whose two rows share a truncated display name; Skipped.S is a [Fact(Skip)]. run.ps1 drives it all.
 using System.Diagnostics;
+using System.Reflection;
 using Xunit;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
 [assembly: TestCollectionOrderer("OrderProbe.PlanCollectionOrderer", "OrderProbe")]
 [assembly: TestCaseOrderer("OrderProbe.PlanCaseOrderer", "OrderProbe")]
+[assembly: TestFramework("OrderProbe.GateFramework", "OrderProbe")]
 
 namespace OrderProbe;
+
+public sealed class GateFramework : XunitTestFramework
+{
+    public GateFramework(IMessageSink messageSink) : base(messageSink)
+    {
+        if (Environment.GetEnvironmentVariable("ORDER_PROBE_THROW") is not null)
+            throw new InvalidOperationException("GATE ENVIRONMENT INCOMPLETE: the probe's planted partial environment");
+    }
+
+    protected override ITestFrameworkExecutor CreateExecutor(AssemblyName assemblyName) =>
+        new GateExecutor(assemblyName, SourceInformationProvider, DiagnosticMessageSink);
+}
+
+public sealed class GateExecutor(AssemblyName assemblyName, ISourceInformationProvider sip, IMessageSink diag)
+    : XunitTestFrameworkExecutor(assemblyName, sip, diag)
+{
+    protected override void RunTestCases(IEnumerable<IXunitTestCase> testCases, IMessageSink executionMessageSink,
+        ITestFrameworkExecutionOptions executionOptions)
+    {
+        // The two ways an executor can refuse a bad environment: throw, or turn every case into xunit's own
+        // ExecutionErrorTestCase (a case that reports one failure carrying the message).
+        switch (Environment.GetEnvironmentVariable("ORDER_PROBE_BAD"))
+        {
+            case "throw":
+                throw new InvalidOperationException("GATE ENVIRONMENT INCOMPLETE: thrown by the executor");
+            case "errorcases":
+                base.RunTestCases(testCases.Select(c => (IXunitTestCase)new ExecutionErrorTestCase(DiagnosticMessageSink,
+                        TestMethodDisplay.ClassAndMethod, TestMethodDisplayOptions.None, c.TestMethod,
+                        "GATE ENVIRONMENT INCOMPLETE: " + c.DisplayName)).ToList(),
+                    executionMessageSink, executionOptions);
+                return;
+        }
+
+        string? leg = Environment.GetEnvironmentVariable("ORDER_PROBE_LEG");
+        if (leg is null)
+        {
+            base.RunTestCases(testCases, executionMessageSink, executionOptions);
+            return;
+        }
+
+        var legOne = File.ReadAllLines(Environment.GetEnvironmentVariable("ORDER_PROBE_LEGPLAN")!)
+            .Where(l => l.Length > 0).ToHashSet(StringComparer.Ordinal);
+        base.RunTestCases(testCases.Where(c => (legOne.Contains(c.DisplayName) ? "1" : "2") == leg).ToList(),
+            executionMessageSink, executionOptions);
+    }
+}
 
 public static class Plan
 {
@@ -85,6 +140,21 @@ public abstract class Facts
     [Fact] public void T1() => Run(nameof(T1));
     [Fact] public void T2() => Run(nameof(T2));
     [Fact] public void T3() => Run(nameof(T3));
+}
+
+public sealed class Dup
+{
+    // Two rows whose argument differs only after xunit's 50-character argument truncation: one display name, twice.
+    [Theory]
+    [InlineData("0123456789012345678901234567890123456789012345678901234567890-A")]
+    [InlineData("0123456789012345678901234567890123456789012345678901234567890-B")]
+    public void Long(string s) => Plan.Record("start Dup.Long " + s[^1]);
+}
+
+public sealed class Skipped
+{
+    [Fact(Skip = "the probe's skipped fact")]
+    public void S() { }
 }
 
 public sealed class C00 : Facts; public sealed class C01 : Facts; public sealed class C02 : Facts; public sealed class C03 : Facts;
