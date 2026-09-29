@@ -1,0 +1,56 @@
+55 types whose static initializer calls methods charged only to the initializing test(s)
+ 9225 readers     1 init  CobolNet.Frontend.Preprocessor.DirectiveStateRegistry: get_Entries (1)
+ 9225 readers     1 init  CobolNet.Frontend.Parsing.TokenRetypes: .ctor (1)
+ 9225 readers     1 init  CobolNet.Frontend.Expressions.CompileTimeArithmetic: .ctor (1)
+ 9029 readers     1 init  CobolNet.Editions.ReservedWordSet: .ctor (1)
+ 7946 readers     1 init  CobolNet.Binding.PictureComposition: PackTable (1)
+ 7139 readers     1 init  CobolNet.Binding.IntrinsicArgumentRules: ByClass (1), Uniform (1), Schema (1)
+ 4729 readers     1 init  CobolNet.Binding.IntrinsicCatalog: Build (1), <Build>g__Add|2_0 (1)
+ 4026 readers     1 init  CobolNet.CodeGen.Emit.OperandText: BuildVisitors (1)
+ 3436 readers  3436 init  CobolNet.Runtime.RunUnit: get_External (45), get_Switches (20), get_Files (3434), get_Random (27), get_ReportFlow (99), get_Clock (35), +9 more
+ 3436 readers  3436 init  CobolNet.Runtime.Collation.Cache.CollationKeyCache: .ctor (2), get_DefaultConfig (2), For (2), get_Collator (2), get_Config (2), GetKey (2), +1 more
+ 3436 readers  3436 init  CobolNet.Runtime.Collation.Cache.CacheConfig: get_Enabled (2)
+ 3436 readers   853 init  CobolNet.Runtime.IO.FileRegistry: MintInstanceKey (6), SelectNameOf (4), OpenTape (5), NoRewindPhraseEffect (4), ReversedPhraseEffect (1), CloseIfOpen (4), +20 more
+ 3277 readers     1 init  CobolNet.Binding.OptionsModel: .ctor (1)
+ 2738 readers     1 init  CobolNet.Validation.IntegerOperandRules: All (1)
+ 2130 readers  2097 init  CobolNet.Runtime.Pow10: FiveAsWide (122), BuildLong (2097), BuildWide (2097), BuildFive (2097)
+  889 readers     1 init  CobolNet.Binding.Procedure.SetFormatSelection: Bits (1)
+  838 readers   838 init  CobolNet.Runtime.IO.FileCharacterSet: HasCharacterWithoutByteImage (781)
+  790 readers    74 init  CobolNet.Runtime.IO.SequentialConnector: EmitLineSequentialRecord (33), EmitRecordLine (30), ReadPhysicalLine (58), RewriteLine (6)
+  516 readers    58 init  CobolNet.Runtime.Exceptions.ExceptionCatalog: IsEndOfPage (2), Build (58), <Build>g__L3|7_0 (58)
+  300 readers     1 init  CobolNet.Binding.EvaluateOperandCombinations: BuildFrom (1)
+  285 readers   118 init  CobolNet.Runtime.CobolDec: Pow (22), PowMagnitude (21), Magnitude (21), Order (3), PowCore (5), Ln10 (4), +11 more
+  163 readers    20 init  CobolNet.Runtime.Exceptions.EcCheckingProfile: Of (19), Enabled (19)
+  151 readers     1 init  CobolNet.Binding.Procedure.FromPhraseRules: .ctor (1)
+  138 readers    79 init  CobolNet.Runtime.CobolFloat: ExactScaled (6), LowOrderDigits (2), AddChecked (1), SubChecked (1)
+  133 readers   133 init  CobolNet.Runtime.ZonedSign: Punch (131), TryUnpunch (48), IsSignCharacter (4), get_OptionSpellings (1)
+  126 readers     1 init  CobolNet.Binding.Bound.IntoPhraseRules: .ctor (1)
+  109 readers    36 init  CobolNet.Runtime.CobolIntrinsics: FromDoubleBounded (21), AnnuityDec (1), SignOf (1), DomainDecAdmitted (27), AdmitsDec (27), Acos (1), +13 more
+  106 readers   106 init  CobolNet.Runtime.IO.CobolSort: RaisedByTheStatement (1), EnterProcedure (88), ReleaseStatement (83), Released (5), AnyProcedureRunning (1), ReturnStatement (79), +15 more
+  103 readers     1 init  CobolNet.Frontend.Parsing.CobolKeywordTokens: Build (1)
+   80 readers     1 init  CobolNet.Binding.ImplementorNames: Build (1)
+   74 readers     1 init  CobolNet.Binding.Bound.BoundPredefinedNull: .ctor (1)
+   69 readers    98 init  CobolNet.Runtime.ManagedPointer: SameTarget (39), At (55)
+   65 readers     1 init  CobolNet.Validation.IntegerSlot: Not (1)
+   55 readers     6 init  CobolNet.Runtime.CobolPtr: UpBy (6), Unrepresentable (1), UpByAmount (6)
+   40 readers    35 init  CobolSharp.Runtime.PicEnvironment: get_CurrencyOutputChar (35)
+   40 readers     1 init  CobolSharp.Compiler.Semantics.DialectConfig: .ctor (1)
+   39 readers    39 init  CobolNet.Runtime.CobolDate: DateOfInteger (5), DayOfInteger (5), IntegerOfDate (7), IntegerOfDay (6), LongIsoYear (1), FormattedDate (6), +3 more
+   38 readers     1 init  CobolSharp.Compiler.Semantics.ExpressionType: MakeAlphanumeric (1), MakeBoolean (1), MakeGroup (1), MakeUnknown (1)
+   30 readers    30 init  CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader: ParentOf (7), ResolveCollation (10)
+   29 readers    34 init  CobolNet.Runtime.ProgramPointer: get_IsNull (13), SameTarget (25)
+   27 readers    11 init  CobolNet.Runtime.Collation.CollationEngine: get_Standard (1), StandardAtLevel (1), For (10), ForLocale (10), ResolveLocale (10), Resolve (10), +1 more
+   26 readers     2 init  CobolNet.Runtime.FloatResultant: TryFromScaled (1), TryFromDec (1), LandBinary32 (2), CompareToMidpoint (1), UpBinary32 (1), DownBinary32 (1), +1 more
+   23 readers    23 init  CobolSharp.Runtime.Numeric.CobolDecimal: CountDigits (2)
+   23 readers    20 init  CobolSharp.Runtime.PicRuntime: CompareNumeric (15), CompareNumericToLiteral (2), EncodeOverpunch (20), DecodeOverpunch (20)
+   21 readers    21 init  CobolNet.Runtime.Globalization.LocaleFacts: get_InvariantMode (19), get_Collate (3), get_HasCultureData (18), get_IsAvailable (19), Require (19), get_DateTimeFormat (3), +8 more
+   19 readers    13 init  CobolNet.Runtime.Collation.CollationTable: .ctor (13), get_Description (6), get_UcaVersion (7), get_SourceTag (6), get_PrimaryShift (10), get_ContractionCount (6), +27 more
+   15 readers     1 init  CobolNet.Binding.DataBinder/LiteralPosition: .ctor (1)
+   11 readers    11 init  CobolNet.Runtime.FunctionPointer: SameTarget (5)
+   11 readers    10 init  CobolNet.Runtime.Collation.Collator: get_Root (10), SafeBoundary (7), CodePointBefore (2), CodePointAt (2), GetKey (5), NeedsNormalization (5)
+   11 readers    10 init  CobolNet.Runtime.Collation.CollationOptions: get_Default (10), get_IsPlain (10), .ctor (10)
+   11 readers     9 init  CobolNet.Runtime.LocaleCollation: get_Current (9), Snapshot (2), get_SupportsKeys (2), KeyOf (2), Weight (2), CharAt (3), +1 more
+   10 readers    10 init  CobolNet.Runtime.Globalization.MonetaryFacts: get_CurrencySymbol (9), get_IntCurrencySymbol (3), get_DecimalPoint (9), GroupingAdmits (3), GroupingIsExact (4), GroupingFits (6), +4 more
+    8 readers     7 init  CobolNet.Runtime.Globalization.CharacterClassification: get_National (1)
+    8 readers     1 init  CobolNet.Binding.ImplementorCodeNames: get_Ascii (1), get_Ebcdic (1), SingleByteCodePage (1)
+    2 readers     1 init  CobolNet.Runtime.PointerImage: Of (1), AreaBase (1), NameBase (1), Render (1)

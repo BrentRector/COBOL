@@ -1,0 +1,86 @@
+9054 tests, wall 571 s, 11553 test-seconds, average concurrency 20.2x
+
+-- test-seconds by METHOD (theory rows summed), top 12
+    6287 s  54.4%   1047 rows    6.00 s/row  VersionMatrixTests.Cobol85Program_StillCompilesAtLaterEdition
+    2086 s  18.1%    349 rows    5.98 s/row  NistDifferentialTests.NistProgram_MatchesGolden
+     727 s   6.3%   1679 rows    0.43 s/row  CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic
+     525 s   4.5%   1621 rows    0.32 s/row  CorpusRunnerTests.EnabledProgram_CompilesStrict_AndMatchesOutIfPresent
+     117 s   1.0%     23 rows    5.07 s/row  OptionalWordSubsetDriftTests.EveryOptionalWordSubset_CompilesAndRunsIdentically
+     116 s   1.0%      1 rows  115.78 s/row  ValueFormat2Tests.DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946
+      83 s   0.7%    948 rows    0.09 s/row  VersionMatrixTests.Construct_MatchesEditionExpectation
+      55 s   0.5%      1 rows   55.44 s/row  CompiledProgramCacheDriftTests.TheOutputDirectory_DoesNotReachTheOutput
+      53 s   0.5%     23 rows    2.32 s/row  UsageInheritanceDriftTests.InheritedUsagePhrase_IsTheSameItemAsAWrittenOne
+      43 s   0.4%     26 rows    1.67 s/row  UsageInheritanceDriftTests.InheritedUsage_IsTheSameItemAsAWrittenOne
+      30 s   0.3%      1 rows   30.48 s/row  VersionMatrixTests.St101A_DocumentedRemovals_RejectStrictAt2002Plus
+      29 s   0.2%      1 rows   28.61 s/row  SpecPinnedNistTests.NC201A_VaryingAfterFromOuterInductionVariable_RunsEightBodies
+
+-- COLLECTIONS (class = collection): test-seconds, and when each started/ended relative to the run
+     557 s    199 tests  start +    6 s  end +  563 s  VersionMatrixTests_P5
+     548 s    198 tests  start +    7 s  end +  555 s  VersionMatrixTests_P9
+     545 s    198 tests  start +    0 s  end +  545 s  VersionMatrixTests_P8
+     543 s    198 tests  start +   12 s  end +  555 s  VersionMatrixTests_P11
+     539 s    200 tests  start +   23 s  end +  562 s  VersionMatrixTests_P3
+     536 s   1100 tests  start +   35 s  end +  571 s  CorpusRunnerTests_P1
+     535 s    198 tests  start +   12 s  end +  546 s  VersionMatrixTests_P7
+     534 s    202 tests  start +   23 s  end +  557 s  VersionMatrixTests_P2
+     534 s    198 tests  start +   21 s  end +  555 s  VersionMatrixTests_P10
+     532 s    202 tests  start +   25 s  end +  558 s  VersionMatrixTests_P0
+     530 s    199 tests  start +   33 s  end +  562 s  VersionMatrixTests_P4
+     525 s    199 tests  start +   22 s  end +  548 s  VersionMatrixTests_P6
+     470 s    202 tests  start +   92 s  end +  562 s  VersionMatrixTests_P1
+     377 s     58 tests  start +    0 s  end +  377 s  NistDifferentialTests_P3
+     368 s     58 tests  start +    8 s  end +  376 s  NistDifferentialTests_P2
+     366 s   1099 tests  start +   34 s  end +  399 s  CorpusRunnerTests_P2
+     351 s   1101 tests  start +   52 s  end +  404 s  CorpusRunnerTests_P0
+     347 s     58 tests  start +   43 s  end +  389 s  NistDifferentialTests_P5
+     336 s     59 tests  start +    8 s  end +  344 s  NistDifferentialTests_P0
+     334 s     58 tests  start +   51 s  end +  384 s  NistDifferentialTests_P4
+     325 s     58 tests  start +   46 s  end +  371 s  NistDifferentialTests_P1
+     140 s     51 tests  start +   12 s  end +  151 s  ValueFormat2Tests
+     117 s     23 tests  start +   38 s  end +  155 s  OptionalWordSubsetDriftTests
+     105 s     77 tests  start +    5 s  end +  110 s  UsageInheritanceDriftTests
+   ... 192 collections in all
+
+-- the concurrency profile (tests running, sampled every second)
+   fewer than 32 tests running:   315 s of 572 s (55.1%)
+   fewer than 24 tests running:   143 s of 572 s (25.0%)
+   fewer than 16 tests running:    27 s of 572 s ( 4.7%)
+   fewer than  8 tests running:     1 s of 572 s ( 0.2%)
+   fewer than  4 tests running:     1 s of 572 s ( 0.2%)
+   fewer than  2 tests running:     0 s of 572 s ( 0.0%)
+   the last second with >= 16 tests running: +563 s; the tail after it: 9 s
+     +    0 s   62 running
+     +   28 s   85 running
+     +   56 s   64 running
+     +   84 s   59 running
+     +  112 s   37 running
+     +  140 s   33 running
+     +  168 s   36 running
+     +  196 s   34 running
+     +  224 s   27 running
+     +  252 s   30 running
+     +  280 s   32 running
+     +  308 s   30 running
+     +  336 s   32 running
+     +  364 s   32 running
+     +  392 s   29 running
+     +  420 s   19 running
+     +  448 s   13 running
+     +  476 s   21 running
+     +  504 s   25 running
+     +  532 s   22 running
+     +  560 s   67 running
+
+-- long poles: the slowest single tests
+   266.0 s  start +  203 s  CobolNet.Tests.Conformance.CorpusRunnerTests_P1.EnabledNegativeCase_RejectsWithItsDiagnostic(name: "pb505-table-value-dynamic-span-levels")
+   115.8 s  start +   34 s  CobolNet.Tests.Conformance.ValueFormat2Tests.DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946
+    55.4 s  start +   36 s  CobolNet.Tests.Conformance.CompiledProgramCacheDriftTests.TheOutputDirectory_DoesNotReachTheOutput
+    48.8 s  start +  200 s  CobolNet.Tests.Conformance.VersionMatrixTests_P3.Cobol85Program_StillCompilesAtLaterEdition(testName: "IX113A", edition: 2002)
+    47.7 s  start +   32 s  CobolNet.Tests.Conformance.VersionMatrixTests_P7.Cobol85Program_StillCompilesAtLaterEdition(testName: "NC177A", edition: 2014)
+    46.8 s  start +  289 s  CobolNet.Tests.Conformance.VersionMatrixTests_P4.Cobol85Program_StillCompilesAtLaterEdition(testName: "IX113A", edition: 2014)
+    44.9 s  start +   62 s  CobolNet.Tests.Conformance.VersionMatrixTests_P6.Cobol85Program_StillCompilesAtLaterEdition(testName: "NC253A", edition: 2002)
+    42.2 s  start +  340 s  CobolNet.Tests.Conformance.VersionMatrixTests_P5.Cobol85Program_StillCompilesAtLaterEdition(testName: "IX113A", edition: 2023)
+    41.1 s  start +   72 s  CobolNet.Tests.Conformance.OptionalWordSubsetDriftTests.EveryOptionalWordSubset_CompilesAndRunsIdentically(name: "special-names-85")
+    40.0 s  start +   65 s  CobolNet.Tests.Conformance.VersionMatrixTests_P0.Cobol85Program_StillCompilesAtLaterEdition(testName: "RL101A", edition: 2002)
+
+lower bound on the wall for THIS work at 32 threads (max(test-s / 32, the longest collection)): 557 s

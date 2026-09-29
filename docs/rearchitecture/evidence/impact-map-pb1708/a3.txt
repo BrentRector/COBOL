@@ -1,0 +1,155 @@
+69 Y 4d9fead76 | src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs:499 | public sealed record BoundPredefinedNull : BoundOperand
+69 Y 4d9fead76 | src/Cobol.Net.Compiler/Binding/PredefinedNullRule.cs | status A
+69 Y 4d9fead76 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs:2612 | internal BoundOperand BindArgOperand(Core.FunctionArgumentContext a)
+69 Y 4d9fead76 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs:610 | private string? SortMapIoFiles(Core.DataReferenceListContext? list, List<FileModel> files)
+69 Y 4d9fead76 | src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs:147 | public bool ResolveFile(string name, string verb, [NotNullWhen(true)] out FileModel? file)
+69 Y 4d9fead76 | tests/Cobol.Net.Tests.Conformance/StopGobackExitCodeTests.cs:276 | [InlineData("STOP RUN WITH ERROR STATUS NULL.", "COBOLNET1704", "§8.4.3.10.3 SR1")]
+69 Y 4d9fead76 | tests/Cobol.Net.Tests.Unit/PredefinedNullContextDriftTests.cs | status A
+69 Z 63213d7f8 | src/Cobol.Net.Compiler/Binding/BindSession.cs:45 | public GroupRepository Repository
+69 Z 63213d7f8 | src/Cobol.Net.Compiler/Binding/BinderDriver.cs:672 | private static void BindUnitProcedure(BoundUnit unit,
+69 Z 63213d7f8 | src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs:82 | private readonly HashSet<string> _inheritedConstants = new(StringComparer.OrdinalIgnoreCase);
+69 Z 63213d7f8 | src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs:199 | private readonly Dictionary<DataItem, int> _inheritedGlobalDepth = new(ReferenceEqualityComparer.Instance);
+69 Z 63213d7f8 | src/Cobol.Net.Compiler/Binding/Model/IndexDeclaration.cs:60 | public NameCandidates<IndexDeclaration> Candidates(string name, Func<IndexDeclaration, bool> qualifies)
+69 Z 63213d7f8 | src/Cobol.Net.Compiler/Oo/NamingConvention.cs:82 | public static string AddressCarrierName(string cobolWord) =>
+69 X cfb312fbb | src/Cobol.Net.Editions/Constructs.g.cs:186 | public const string ReplaceAlsoLast2002 = "replace-also-last-2002";
+69 X cfb312fbb | src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs:63 | public string? WorkingDirectory { get; private set; }
+69 X cfb312fbb | src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs:69 | public static string ProcessWithCopy(string text, string sourceDir, CopyProcessor copyProcessor,
+69 X cfb312fbb | src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs:55 | private static readonly string[] CopybookExtensions = ["", ".cpy", ".cob", ".cbl", ".CPY", ".COB", ".CBL"];
+69 X cfb312fbb | tests/Cobol.Net.Tests.Conformance/CorpusRunnerTests.cs:177 | new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition))));
+69 X cfb312fbb | tests/Cobol.Net.Tests.Conformance/EditionHarness.cs:24 | string source, int edition, bool permissive = false)
+69 X cfb312fbb | tests/Cobol.Net.Tests.Unit/TextManipulationStatementTests.cs | status A
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/CobolModule.cs:27 | public static void Reset() => RunUnit.Current.Modules.Reset();
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/CobolObject.cs:80 | private FileRegistry? __instFilesOwner;
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/ExternalStore.cs:25 | public static void Reset() => RunUnit.Current.External.Reset();
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/ModuleStack.cs:65 | public void Reset() => _stack.Clear();
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/ProgramRegistry.cs:114 | public static void Reset() => RunUnit.ResetCurrent();
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/ProgramTable.cs:60 | public void Reset()
+68 W a9203e66b | src/Cobol.Net.Runtime/Control/RunUnit.cs:84 | public static IReadOnlyList<string> HostConfiguration { get; } = [nameof(Clock), nameof(DebugMode)];
+68 W a9203e66b | src/Cobol.Net.Runtime/IO/CobolFile.cs:22 | internal static void EnqueueInstanceClose(string key) => _reg.EnqueueInstanceClose(key);
+68 W a9203e66b | src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs:41 | public static T Slot = default!;
+68 W a9203e66b | tests/Cobol.Net.Tests.Conformance/RunUnitScopeHostTests.cs | status A
+68 W a9203e66b | tests/Cobol.Net.Tests.Unit/InstanceFileFinalizerTests.cs | status A
+68 W a9203e66b | tests/Cobol.Net.Tests.Unit/RunUnitStateDriftTests.cs:67 | [Fact]
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/AlgebraicRange.cs:152 | internal static AlgebraicRange? OfCounterRegister(Bound.BoundExpr register) => register switch
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/Bound/BoundCall.cs:117 | public bool InExpression { get; init; }
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/Bound/BoundOo.cs:65 | public bool InExpression { get; init; }
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs:791 | public abstract record BoundStatement;
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/ClassConditionModel.cs:185 | public static bool Violates(ClassOperandRule rule, PicCategory? category, Usage? usage) => rule switch
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs:537 | internal int OperandActivations { get; set; }
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/Passes/StorageFormPass.cs:78 | static void AddNumericDisplayLeaves(DataItem item, HashSet<DataItem> promoted)
+68 T 56098c443 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs:2589 | private string LinagePageCapacity(Model.FileModel file)
+68 T 56098c443 | src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs:81 | public void EmitSelection(string ecNameExpr, string? terminate, Func<string, string>? landing = null,
+68 T 56098c443 | src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs:106 | string read = OperandText.AsString(n.Left, num, deSign: true),
+68 T 56098c443 | src/Cobol.Net.Compiler/CodeGen/EmitterState.cs:211 | => $"if ({resultVar} >= 0) {{ {TransferOut(resultVar)} }}{comment}";
+68 T 56098c443 | src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs:107 | internal bool EmitStatement(BoundStatement s) => s.Accept(this);
+68 T 56098c443 | src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs:318 | private void EmitCallEcCatch(List<string> ecNames, bool byPhrase, string? phraseFlag, bool inExpression = fals
+68 T 56098c443 | src/Cobol.Net.Frontend/Parsing/TokenRetypes.cs:28 | public void PrimeLexer(CobolLexer lexer)
+68 T 56098c443 | src/Cobol.Net.Runtime/Values/Numeric/CobolValueClass.cs | status A
+68 T 56098c443 | tests/Cobol.Net.Tests.Unit/CobolLexerModeDriftTests.cs:201 | private static string[] PrimedTokenNames(string src, int year)
+68 T 56098c443 | tests/Cobol.Net.Tests.Unit/OperandActivationDriftTests.cs:45 | public void ActivationSiteResumes_GoThroughTheOperandAwareHelper()
+68 R 2b85b70e1 | src/Cobol.Net.Compiler/Binding/Model/FileModel.cs:378 | public int? ReserveAreas { get; set; }
+68 R 2b85b70e1 | src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs:296 | private static int ExternalBit(string ec) => ec switch
+68 R 2b85b70e1 | src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs:162 | private IEnumerable<(string Member, string Type, string Fresh)> PtrActivationSeed(DataBinder data, OoMethodSym
+68 R 2b85b70e1 | src/Cobol.Net.Compiler/Oo/OoConformance.cs:345 | public static readonly IReadOnlyList<string> ReturningReferenceClasses = ["O:", "P:D:", "P:P:"];
+68 R 2b85b70e1 | src/Cobol.Net.Compiler/Oo/OoMethodSymbol.cs:26 | public string DispatchKey => CobolNet.Runtime.CobolObject.NormalizeMethodName(ExternalizedName);
+68 R 2b85b70e1 | src/Cobol.Net.Runtime/Exceptions/CheckingFlags.cs:125 | public bool ExternalFormatConflict;
+68 R 2b85b70e1 | src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs:1295 | public int ExternalCheckMask { get; set; }
+68 R 2b85b70e1 | tests/Cobol.Net.Tests.Conformance/OoSpineTests.cs:2377 | public void Universal_WrongShapedArg_EcOoUniversal()
+68 R 2b85b70e1 | tests/Cobol.Net.Tests.Unit/ActivationStorageReseedDriftTests.cs | status A
+68 R 2b85b70e1 | tests/Cobol.Net.Tests.Unit/ExceptionRaiseHelperDriftTests.cs:168 | [Fact]
+68 R 2b85b70e1 | tests/Cobol.Net.Tests.Unit/ExternalFileEntryIdentityTests.cs | status A
+68 R 2b85b70e1 | tests/Cobol.Net.Tests.Unit/ProgramActivationMaskTests.cs:27 | public void FailedActivation_ConsumesThePendingExternalMask()
+68 S 8987ede5c | src/Cobol.Net.Compiler/Binding/DataBinder.cs:1440 | internal static string WrittenText(Antlr4.Runtime.ParserRuleContext ctx)
+68 S 8987ede5c | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs:491 | private BoundCondition BindXorSequence(Core.LogicalXorExpressionContext xorExpr, AbbrevCarry carry)
+68 S 8987ede5c | src/Cobol.Net.Compiler/Validation/ExpressionFormationPass.cs:68 | public override object? VisitBooleanShiftSuffix(CobolParserCore.BooleanShiftSuffixContext ctx)
+68 S 8987ede5c | src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs:1977 | public override object? VisitLogicalXorExpression(CobolParserCore.LogicalXorExpressionContext ctx)
+68 S 8987ede5c | src/Cobol.Net.Frontend/Expressions/BooleanExpressionResolver.cs:34 | private const int PrecAnd = 3, PrecXor = 2, PrecOr = 1, PrecShiftDefault = PrecAnd;
+68 S 8987ede5c | src/Cobol.Net.Frontend/Expressions/BooleanOperatorGate.cs | status A
+68 S 8987ede5c | src/Cobol.Net.Frontend/Expressions/LogicalOperatorGate.cs | status A
+68 S 8987ede5c | src/Cobol.Net.Frontend/Parsing/WrittenSource.cs | status A
+68 S 8987ede5c | src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs:635 | private sealed class DirectiveDiag(DiagnosticBag? bag, string? sourcePath, FlagScanState flagScan) : ICtDiagno
+68 S 8987ede5c | src/CobolSharp.Compiler/Semantics/Bound/Binding/ConditionBinder.cs:106 | for (int i = 1; i < ctx.ChildCount; i++)
+68 S 8987ede5c | tests/Cobol.Net.Tests.Unit/BooleanExpressionFormationTests.cs | status A
+68 S 8987ede5c | tests/Cobol.Net.Tests.Unit/BooleanExpressionGateSiteDriftTests.cs:124 | [Fact]
+68 S 8987ede5c | tests/Cobol.Net.Tests.Unit/CompileTimeBooleanCceTests.cs:118 | [Fact] // §8.8.2 rule 8 — a negative shift count is rejected.
+68 S 8987ede5c | tests/Cobol.Net.Tests.Unit/ConditionTierConnectiveDriftTests.cs | status A
+68 S 8987ede5c | tests/Cobol.Net.Tests.Unit/PartialExpressionSpineDriftTests.cs:68 | [Theory]
+68 V2 1bb25a078 | src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs:1808 | public sealed record BoundSuppress(ReportModel Report) : BoundStatement;
+68 V2 1bb25a078 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs:384 | private static readonly string[] GenerateNames = ["EC-REPORT-INACTIVE", "EC-FLOW-REPORT"];
+68 V2 1bb25a078 | src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs:1415 | public static string ReportNewLine(int width) =>
+68 V2 1bb25a078 | src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs:108 | private void EmitFieldPlacements(ReportModel r, ReportFieldModel f, bool needsHc, CodeWriter w)
+68 V2 1bb25a078 | src/Cobol.Net.Runtime/Exceptions/CheckingFlags.cs:205 | public bool ReportSumSize;
+68 V2 1bb25a078 | src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs:1069 | public bool ReportSumSizeChecking
+68 V2 1bb25a078 | src/Cobol.Net.Runtime/IO/FileConnector.cs:736 | internal Action? HeldLineDrain { get; set; }
+68 V2 1bb25a078 | src/Cobol.Net.Runtime/IO/ReportWriter.cs:118 | public Func<bool>? Present { get; } = present;
+68 V2 1bb25a078 | tests/Cobol.Net.Tests.Unit/ReportHeldLineTests.cs | status A
+67 4936716f6 | src/Cobol.Net.Frontend/Pipeline/Frontend.cs:158 | private MappedText Normalize(string sourcePath, DiagnosticBag diagnostics)
+67 4936716f6 | src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs:69 | private readonly Dictionary<string, ReferenceFormatMap> _referenceFormats = new(StringComparer.Ordinal);
+67 4936716f6 | src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatMap.cs | status A
+67 4936716f6 | src/Cobol.Net.Frontend/Preprocessor/TextWord.cs:51 | public bool IsSpaceForMatching => Kind is TextWordKind.SeparatorCommaOrSemicolon or TextWordKind.DirectiveLine
+67 4936716f6 | tests/Cobol.Net.Tests.Unit/LibraryTextReferenceFormatTests.cs | status A
+67 4936716f6 | tests/Cobol.Net.Tests.Unit/TextManipulationDirectiveLineTests.cs | status A
+67 4936716f6 | tests/Cobol.Net.Tests.Unit/TextManipulationTextWordTests.cs:107 | [Theory] // §8.3.5 1) (kb/Work PB1543): only the COBOL space (with tab and line end) separates — a character t
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/MoveTable16.cs:361 | private static string? VariableLengthRefusal(DataItem? sender, DataItem? receiver)
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/Procedure/PlaceCursor.cs | status A
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs:1075 | public BoundRelational CheckedRelational(BoundOperand left, string op, BoundOperand right)
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs:375 | private void ExpandInitialize(InitializeCursor cur, in InitializeSpec spec, List<InitializeAction> actions,
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StrongGroupComparison.cs | status A
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/RelationComparability.cs | status A
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/RelationPairShape.cs | status A
+67 ce6062464 | src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs:1453 | static bool BoolCompatible(BoundOperand o) => o is BoundFigurative { Kind: 'Z' }
+67 ce6062464 | src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs:380 | private static string? VarCarrierRead(Place g, DataItem other) =>
+67 ce6062464 | src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs:2606 | public static readonly DiagnosticDescriptor StrongGroupOrderingSignedLeaf = new(
+67 ce6062464 | src/Cobol.Net.Runtime/Values/CobolContiguousLayout.cs:31 | public IReadOnlyList<int> ComponentOffsets => FixedAt;
+67 ce6062464 | tests/Cobol.Net.Tests.Conformance/RelationComparabilityTests.cs | status A
+67 ce6062464 | tests/Cobol.Net.Tests.Conformance/RelationPairShapeTests.cs | status A
+67 ce6062464 | tests/Cobol.Net.Tests.Conformance/TypedefResidueTests.cs:122 | public void StrongSignedGroupOrderingCompare_Staged0899()
+67 9a1170d4f | src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupImageCodec.cs:31 | public string ImageInitOf(DataItem item, bool useValues = true, Subscripts subs = default)
+67 9a1170d4f | src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupValueSlicer.cs:31 | public string ComposedInit(DataItem group, Subscripts subs = default)
+67 9a1170d4f | src/Cobol.Net.Compiler/CodeGen/DataDivision/PhysicalModel.cs:20 | private readonly Dictionary<(DataItem Owner, Subscripts Subs), IReadOnlyList<Physical>> _physCache = [];
+67 9a1170d4f | src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs:9 | internal enum SeedRecipe
+67 9a1170d4f | src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs:396 | private void NonfatalIfEnabled(bool enabled, string ec)
+67 9a1170d4f | src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs:33 | public CobolDynTable(Func<T> seed, int min, int? expected, bool initialized)
+67 9a1170d4f | tests/Cobol.Net.Tests.Unit/CobolDynTableTests.cs | status A
+67 9a1170d4f | tests/Cobol.Net.Tests.Unit/GroupStoreTargetDriftTests.cs | status A
+67 df366c09d | src/Cobol.Net.Runtime/IO/SequentialConnector.cs:146 | internal bool ReversedRequested { private get; set; }
+67 df366c09d | tests/Cobol.Net.Tests.Conformance/LinageConformanceTests.cs:78 | private static void AssertBytes(string source, string fileName, string expected, int edition = 85)
+67 df366c09d | tests/Cobol.Net.Tests.Conformance/SequentialFileIoSpecTests.cs:118 | public void LineSequential_Rewrite_Gr17_Equal00_Longer44_Shorter00()
+67 df366c09d | tests/Cobol.Net.Tests.Unit/FileBoundaryTests.cs:82 | [Fact]
+66 ec1820d65 | src/Cobol.Net.Compiler/Binding/Model/DataItem.cs:169 | [DescriptionCopy(DescriptionCopyKind.Clause,
+66 ec1820d65 | src/Cobol.Net.Compiler/Binding/ValueSubject.cs:66 | public static ValueSubject ForElementary(PicInfo pic, bool isDynamicLength, bool isAnyLength) =>
+66 ec1820d65 | tests/Cobol.Net.Tests.Unit/TypeSameAsCompositionTests.cs | status A
+66 94478632f | src/Cobol.Net.Runtime/IO/ReportWriter.cs:166 | public List<(int Column, int Width)> IndicateFields { get; } = [];
+66 907c9e189 | src/Cobol.Net.Compiler/Binding/Bound/BoundInspect.cs:33 | public sealed record BoundInspectConvert(BoundOperand From, BoundOperand To, BoundOperand? Before, BoundOperan
+66 907c9e189 | src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs:1082 | [CobolClass.Alphanumeric, CobolClass.NumericEditedDeEditing, CobolClass.National];
+66 907c9e189 | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs:305 | private (BoundOperand Op, bool Figurative) InspectCharOperand(Core.InspectCharContext c)
+66 907c9e189 | src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs:565 | public static string WriteBits(Place group, string bits) =>
+66 907c9e189 | src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs:720 | public static string InspectReplace(string image, string kinds, string pats, string reps, string befs, string 
+66 907c9e189 | src/Cobol.Net.Runtime/Exceptions/CheckingFlags.cs:116 | public bool RangeInspectSize;
+66 907c9e189 | src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs:728 | public bool RangeInspectSizeChecking
+66 907c9e189 | src/Cobol.Net.Runtime/Verbs/CobolInspect.cs:177 | string?[] befores, string?[] afters, bool backward = false)
+66 06a909393 | src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs:402 | private RefResolution ItemFailure(Core.DataReferenceContext dref, DataItem item, DeferredShape? deferred)
+66 06a909393 | tests/Cobol.Net.Tests.Unit/RenamesPlaceBuilderDriftTests.cs | status A
+65 5dc2bb90f | src/Cobol.Net.Editions/Constructs.g.cs:43 | public const string FloatingCommentIndicator2002 = "floating-comment-indicator-2002";
+65 5dc2bb90f | src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs | status A
+65 5dc2bb90f | src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs:16 | public static class ReferenceFormatProcessor
+65 5dc2bb90f | tests/Cobol.Net.Tests.Unit/ReferenceFormatLogicalConversionTests.cs | status A
+65 24a8d3bbd | src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs:407 | host.Intrinsic.KeywordOmittedFunction(dref) is { } kof ? kof   // §8.4.3.2 SR2 — a repository intrinsic/functi
+65 24a8d3bbd | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs:226 | private bool Format1Receivers(string verb, string cite, int receiverCount, bool nonReceiverOperand)
+65 24a8d3bbd | src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticOperandRole.cs | status A
+65 24a8d3bbd | tests/Cobol.Net.Tests.Conformance/ArithmeticIdentifierOperandTests.cs | status A
+65 24a8d3bbd | tests/Cobol.Net.Tests.Unit/ArithmeticOperandRoleDriftTests.cs | status A
+65 b34b0f1df | src/Cobol.Net.Compiler/Binding/CollatingModel.cs:301 | public CodeSetMedium Medium => CodeName is { } cn
+65 b34b0f1df | src/Cobol.Net.Runtime/IO/CodeSetConversion.cs:31 | public const int ChannelUnits = 256;
+65 b34b0f1df | src/Cobol.Net.Runtime/IO/LineSequentialCharacterSet.cs:44 | public static bool Contains(int codePoint, bool national) =>
+65 b34b0f1df | tests/Cobol.Net.Tests.Unit/CodeSetConversionTests.cs | status A
+65 b34b0f1df | tests/Cobol.Net.Tests.Unit/CodedCharacterSetTests.cs:15 | [Fact]
+65 b77f68124 | src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs:207 | string name, bool isGlobal, Core.NonNumericLiteralContext nn, string where)
+65 b77f68124 | src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs:68 | public readonly record struct CtNumber(bool WasSingleLiteral, CobolDec Value, string Text);
+65 b77f68124 | src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs:194 | private static List<TextWord> MatchWords(string text)
+65 b77f68124 | tests/Cobol.Net.Tests.Unit/CompileTimeExpressionEvaluatorTests.cs:74 | [InlineData("+5", "+5", true)]
+65 b77f68124 | tests/Cobol.Net.Tests.Unit/TextWordSequenceTests.cs | status A
+Counter({'member signature / new member': 54, 'other': 35, 'new file (status A)': 34, 'attribute': 12, 'type declaration': 8, 'const': 4, 'static readonly field': 4})
+ambient-only product entries: 2
+    System.Void CobolNet.Runtime.CobolObject::Finalize()
+    System.Void CobolNet.Runtime.IO.FileRegistry::EnqueueInstanceClose(System.String)

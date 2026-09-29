@@ -1,0 +1,21 @@
+Conformance.trx
+  --list-tests: 9317 names (9314 distinct; 3 names listed more than once, 6 rows)
+  trx:          9317 results (9314 distinct); outcomes {'Passed': 9317}
+  multiset: listed-not-in-trx 0, trx-not-listed 0 -> EQUAL
+  the trx's TEST DEFINITIONS (one per discovered case, <UnitTest name>): 9317 -> EQUAL to --list-tests as a multiset
+  names embedding an absolute path: 0
+  names with non-ASCII characters: 303 distinct (all matched: True)
+Unit.trx
+  --list-tests: 29703 names (29700 distinct; 1 names listed more than once, 4 rows)
+  trx:          29734 results (29731 distinct); outcomes {'Passed': 29732, 'Failed': 2}
+  multiset: listed-not-in-trx 2, trx-not-listed 33 -> DIFFERENT
+  the trx's TEST DEFINITIONS (one per discovered case, <UnitTest name>): 29703 -> EQUAL to --list-tests as a multiset
+    only listed x1: CobolNet.Tests.Unit.ExternalFileEntryIdentityTests.Each_GR1_item_is_part_of_the_identity
+    only listed x1: CobolNet.Tests.Unit.IntegerArgumentConstantWitnessTests.TheIntegerScreen_JudgesTheLiteralConstantByValue
+    only in trx x1: CobolNet.Tests.Unit.IntegerArgumentConstantWitnessTests.TheIntegerScreen_JudgesTheLiteralConstantByValue(shape: "3 - 1", expr: BoundBinary { Left = BoundNumLite
+    only in trx x1: CobolNet.Tests.Unit.IntegerArgumentConstantWitnessTests.TheIntegerScreen_JudgesTheLiteralConstantByValue(shape: "- 0.25 + 2", expr: BoundBinary { Left = BoundNe
+    only in trx x1: CobolNet.Tests.Unit.ExternalFileEntryIdentityTests.Each_GR1_item_is_part_of_the_identity(item: "a) OPTIONAL", change: Action`1 { Method = Void <get_Items>b__2_0
+    only in trx x1: CobolNet.Tests.Unit.IntegerArgumentConstantWitnessTests.TheIntegerScreen_JudgesTheLiteralConstantByValue(shape: "1.5 + 1", expr: BoundBinary { Left = BoundNumLi
+    only in trx x1: CobolNet.Tests.Unit.IntegerArgumentConstantWitnessTests.TheIntegerScreen_JudgesTheLiteralConstantByValue(shape: "(1.5) parenthesized", expr: BoundNumLiteral { T
+  names embedding an absolute path: 404, e.g. CobolNet.Tests.Unit.ParenTokenTwinDriftTests.EveryPlainParenSite_NamesTheFnargTwin_OrDeclaresGroupingOnly(proj: "Cobol.Net.Frontend", rel: "Common/CobolLiteral.cs", path:
+  names with non-ASCII characters: 619 distinct (all matched: True)

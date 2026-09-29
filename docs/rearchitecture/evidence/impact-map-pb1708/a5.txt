@@ -1,0 +1,28 @@
+index: 1155 files at dbea12428953, 31408 identifiers
+label | files | T0 | T1 (registry entries) | T2 (+symbol rule) | T3 whole-forcing reasons left
+69 Y 4d9fead76 | 86 | 9252 | 9252 | 9246 | ['src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4', 'src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4', 'src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4']
+69 Z 63213d7f8 | 55 | 9238 | 9238 | 9239 | []
+69 X cfb312fbb | 73 | 9256 | 9256 | 9267 | []
+68 W a9203e66b | 26 | 9000 | 9000 | 9227 | []
+68 T 56098c443 | 65 | 9253 | 9253 | 9252 | ['src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4']
+68 R 2b85b70e1 | 64 | 9114 | 9114 | 9242 | []
+68 S 8987ede5c | 62 | 9247 | 9247 | 9242 | ['src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4']
+68 V2 1bb25a078 | 48 | 9241 | 9241 | 9262 | []
+67 4936716f6 | 29 | 9249 | 9249 | 9250 | []
+67 ce6062464 | 52 | 9238 | 9124 | 9274 | []
+67 9a1170d4f | 30 | 9114 | 9114 | 9241 | []
+67 df366c09d | 32 | 5375 | 5375 | 8149 | []
+66 ec1820d65 | 27 | 9112 | 9112 | 9105 | []
+66 94478632f | 20 | 9105 | 9105 | 9248 | []
+66 907c9e189 | 33 | 9112 | 9112 | 9257 | ['tests/Cobol.Net.Tests.Characterization/Snapshots/char_string_ops.85.g.cs.txt']
+66 06a909393 | 15 | 9105 | 9105 | 9236 | []
+65 5dc2bb90f | 32 | 9245 | 9243 | 9244 | ['src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4']
+65 24a8d3bbd | 25 | 9235 | 9235 | 9075 | []
+65 b34b0f1df | 25 | 9103 | 9103 | 9253 | []
+65 b77f68124 | 19 | 9237 | 9237 | 9246 | []
+T0: min 5375 median 9236.0 max 9256 of 9274
+T1: min 5375 median 9179.5 max 9256 of 9274
+T2: min 8149 median 9245.0 max 9274 of 9274
+T2 clusters with no structural whole reason: 15 of 20
+DiagnosticCatalog: 422 fields; a change to any field initializer selects 80 tests today; 264 fields are named by methods that more tests reach (max (9225, 'TextManipulationStatementSyntax'), median 279.0)
+DiagnosticDescriptors: 222 fields; a change to any field initializer selects 1 tests today; 97 fields are named by methods that more tests reach (max (9225, 'COBOLNET2419'), median 1.0)

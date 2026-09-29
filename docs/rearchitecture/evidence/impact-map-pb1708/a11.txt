@@ -1,0 +1,37 @@
+== rec-dbea12428953-1790618548: children started 4242, without a hits file 172, by assembly {'Conformance': 0, 'Unit': 172}, tests 35
+   48 of  48 children  (6 of 6 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.OpenInput_PresentButRefused_Is37
+   32 of  32 children  (4 of 4 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.OpenIoOrExtend_PresentButRefused_Is37
+    9 of   9 children  (3 of 3 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.OpenIo_PresentAndWritableButNotReadable_Is37
+    9 of   9 children  (3 of 3 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.OpenInput_PresentAndObservableButNotReadable_Is37
+    8 of   8 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.DeleteFile_PresentButRefused_Is37
+    8 of   8 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.TheDenyHelperWorksOnThisHost
+    8 of   8 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.Probe_PresentButRefused_IsUnauthorized_WhereFileExistsSaysAbsent
+    8 of   8 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.OpenOutput_OverAPresentRefusedFile_Is37
+    8 of   8 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.OpenOutput_NewFileUnderARefusedDirectory_StillSucceeds
+    3 of   3 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.FileAuthorityPresenceTests.TheCapabilityHelpersWorkOnThisHost
+    2 of   2 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.CitationAuditSelfTestDriftTests.DocCitationAudit_ProvesEveryArmCanFail
+    2 of   2 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ProcessObservationDriftTests.AProcessThatNeverFinishes_RaisesInsteadOfReturningEmptyOutput
+    2 of   2 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ProcessObservationDriftTests.AProcessThatCannotStart_RaisesAsALaunchFailure
+    2 of   2 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ExternalCorpusFetchTests.TheFetchScript_SelfTest_ProvesTheExtractionNeverDestroysWhatItCannotReplace
+    2 of   2 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.TheCensus_NamesEveryPopulationAndItsProgramCount
+    2 of   2 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.TheDriftCheck_ActuallyFails_WhenTheExtractionIsEmptied
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ProcessObservationDriftTests.ACompletedProcess_IsObservedNormally
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.DerivedVerdictDriftTests.TheSelectorEngine_ProvesEveryAxisCanFail
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.CitationAuditSelfTestDriftTests.CodeCitationAudit_ProvesEveryCheckCanFail
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ProcessObservationDriftTests.Observe_ReportsATimeoutWithoutThrowing
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ProcessObservationDriftTests.ACompletedProcess_YieldsItsStdout
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.SpecTraceabilityInventoryDriftTests.TheDerivationRule_AgreesWithTheFixtureAndWithPython
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.TestLegReportDriftTests.TheReporter_ProvesAPlantedFailuresTextReachesTheLog
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ConflictMarkerDriftTests.TheSweepActuallyReadsTheTrackedTree
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ClosesRowsBackLinkDriftTests.TheFrontmatterReader_AgreesWithTheFixtureAndWithPython
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.AnnexA1RegisterDriftTests.EveryDocRow_IsFiledUnderTheItemAnnexA1Names
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.AnnexA2UndefinedListDriftTests.TheUndefinedElementList_StillMatchesTheStandard
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.DerivationRegisterDriftTests.TheDerivationAudit_ProvesEveryCheckCanFail
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.AnnexA2UndefinedListDriftTests.TheExtractor_ProvesEveryCheckCanFail
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.DerivationRegisterDriftTests.EveryLiveDerivation_StandsUnderThePythonEngine
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.SweepExternalPopulation_EqualsTheDifferentialsCommittedCaseCount
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.AnnexA1RegisterDriftTests.EveryVerdictedDocRow_HasItsRegisterDetermination
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.AnnexA1RegisterDriftTests.TheRegisterAudit_ProvesEveryCheckCanFail
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.VaultReferenceGeneratorDriftTests.Generator_RunsClean
+    1 of   1 children  (1 of 1 rows)  Unit  CobolNet.Tests.Unit.GrammarDiagramGeneratorDriftTests.Generator_RunsClean
+== rec-4b0f3e22ae27-1790619684: children started 3961, without a hits file 0, by assembly {'Conformance': 0}, tests 0

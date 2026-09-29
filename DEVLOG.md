@@ -13,6 +13,156 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1771 — 2026-09-28 21:10 PDT — PB1708 pivot design landed; PB1715–PB1721 filed (two product speed defects, five gate mechanisms)
+
+The design workflow wf_08642598-d3c finished in three steps: the architect wrote Entry 1769, the adversarial review
+returned APPROVE_WITH_CHANGES with 2 BLOCKING and 9 NON_BLOCKING findings, and the reviser resolved all eleven
+(Entry 1770).
+
+**The merge.** The reviser's branch is merged into main, bringing `DESIGN-test-build-ci.md` sections 3.13 and 3.14
+and the evidence in `docs/rearchitecture/evidence/impact-map-pb1708/`. The DEVLOG conflict was resolved by
+renumbering the branch's entries above main's 1768 (to 1769 and 1770), byte-safe with CRLF preserved.
+
+**The orchestrator filed the notes the design could not** (agents do not allocate ids):
+- **PB1715:** the lexer never caches its default mode's start state, because of six left-edge predicates. Every token
+  in every `cobol` compile pays ATN simulation, and parallel compiles serialize on `lock(dfa.states)`.
+- **PB1716:** `TableValueOdometer.Resolve` fills up to 64M elements before SR23 rejects the entry, so a 26-line
+  erroneous program takes 29.6 s to be rejected; it is the suite's 219 s long pole. SR23's clause was re-derived
+  mechanically: `cite.py --check 13.18.63.3` passes.
+- **PB1717–PB1721:** the gate mechanisms.
+  - M11, the order plan; closing it also closes PB1712.
+  - M14, one population tool.
+  - M12, the in-assembly leg filter.
+  - M2, the FIFO gate cap.
+  - M13, the ordered gate, which deletes the selection interface together with every caller.
+  - Their `blocked_by` fields carry the dependencies.
+
+**Two frictions:**
+1. The first draft of the notes cited design-doc sections with `§`, which is the same phantom Entry 1766 fixed.
+   The citation audit caught all nine before commit.
+2. The register has no harm flag for compile-time PERFORMANCE, so PB1715 and PB1716 are `process_only: true` with
+   the reason stated in each note, even though both are product defects shipped in the CLI.
+
+## Entry 1770 — 2026-09-28 20:57 PDT — PB1708 pivot design revised: only the driver can make a host filter, and nothing deletes an interface its callers still read
+
+The adversarial review of the "order, don't skip" design (Entry 1769) returned 2 BLOCKING and 9 NON_BLOCKING
+findings. This revision resolves all eleven in `DESIGN-test-build-ci.md` sections 3.13 and 3.14, and three of them
+were settled by new measurements rather than argument.
+
+**Blocking 1: the environment alone made a test host filter.** `GateTestFramework` filtered whenever two variables
+were set, and only the gate driver checked the population. A developer who exported them by hand to reproduce a leg
+would later get a battery that ran a third of Conformance and printed `Passed!`. The review proposed throwing at
+framework construction on any partial environment. The extended `b3` probe measured that this does NOT work: xunit
+catches a constructor's exception and silently falls back to its default framework, so every case ran, `Passed!`,
+exit 0. An executor that throws is a "Catastrophic failure" with no verdict line and no trx result. What does work is
+reporting every case as xunit's own `ExecutionErrorTestCase` carrying the cause: every case Failed, a `Failed!`
+line, exit 1. The design is now:
+- a three-variable handshake (`COBOLNET_GATE_PLAN`, `_LEG` and `_PLAN_SHA256`, the last matching the file);
+- every other combination turns the whole run red;
+- every other `dotnet test` caller scrubs the variables, with a drift test to keep it so;
+- one population check, `scripts/test_population.py`, which the battery and CI now run as well as the gate.
+
+**Blocking 2: M11 deleted an output its callers still read.** M11 removed `impacted_tests.py`'s filter line and
+`--plus`, but the practices, the three briefs, the gate skill and `check_practices.py` were rewired only in M13.
+M11 now deletes only the NARROWING, so its filter line is always the whole assembly. That closes PB1712 at M11,
+while M13 deletes the line, `--plus` and `-Filter` together with every caller, named file by file. Until M11 lands,
+no map may be recorded into the shared store. Main had meanwhile retired per-commit maps (PB1709; merged here).
+
+**What the new measurements showed.**
+- `b8` (one build, Conformance and Unit, full unfiltered runs): `--list-tests` equals the trx's TEST DEFINITIONS as
+  a multiset (9,317 and 29,703), but not its RESULT names. xunit lists a theory whose data it cannot serialize as one
+  case and reports a result per row, so Unit's results carry 33 names the listing never printed. The population
+  check therefore keys on definitions. 404 Unit names embed the worktree's absolute path, and a placeholder cannot
+  normalize them, because xunit truncates the argument at a fixed length.
+- `b7` (battery #87's durations, today's manifests): appending one golden to the 85 manifest renames 1,398
+  partitioned corpus rows (450 test-seconds), which pushes leg 1's serial floor from 46 s to 208 s under raw-name
+  keys. The plan now keys on `NameKey` (partition suffix removed) and caps each collection's budgeted leg-1 time at
+  15 s, which gives 2,740 cases and a 15.2 s floor. It also budgets genuinely unknown cases separately.
+- `b3` (extended): a dropped case leaves no trace in the trx. Two legs' definitions reunite into the listing, both
+  rows of a truncated-name theory included. An empty leg prints no verdict line and exits 0, so the driver skips an
+  assembly for a leg its plan leaves empty. A skipped fact is NotExecuted, and the verdict now counts it separately.
+
+**The rest.**
+- M6 no longer moves predicates one character in. The decompiled ANTLR 4.13.1 simulator never stores a DFA edge
+  through a predicate, so that would leave a lock on every D-, comma- and sign-initial token. The invariant is now
+  zero ATN simulation after warm-up, counted by a simulator subclass.
+- The gate gets a required `-Mode lander|implementer`.
+- Each gate holds a per-worktree lock from before the build, writes into a fresh run directory, and has every leg
+  record its binaries' hashes.
+- The cap serves waiters FIFO by ticket and is taken before the build.
+- M14 is new: the population tool and its battery and CI callers. CI's inline `grep -c` count block goes.
+
+Two product defects found by the design still need kb/Work notes: M6's lexer lock and M7's 64 M-element table-value
+fill. Their ids are allocated by the orchestrator (agents never allocate ids), which is an open item in the report.
+The design branch's own entry, numbered 1765 there, is renumbered 1768 here, above main's 1765–1767. The branch's
+`__pycache__` litter is removed.
+
+## Entry 1769 — 2026-09-28 20:07 PDT — PB1708 pivot designed: the gate runs everything, in order; the continuity wall is one lexer lock
+
+**Why a pivot.** PB1708's first design made the recorded impact map SELECT an implementer's tests, precisely
+enough to be worth it: restructured registries, entry-level dependencies (map schema 3, static-field probes),
+per-commit maps, a source-generated construct registry. Two adversarial reviews rejected it — seven BLOCKING
+findings, then two still open plus three new — and each cycle found another way this single-process, memoizing
+compiler hides a dependency from any recorder (values memoized into static collections; edition state cached in the
+front end). Under selection every such hole silently skips a failing test. The owner chose "Pivot: order, don't
+skip" (kb/Work PB1708, fourth decision). The rejected branches are `worktree-wf_2a880f25-d10-1` and `-d10-3`.
+
+**The design** (`DESIGN-test-build-ci.md` §3.13 rewritten, §3.14 new). Every implementer gate runs the whole
+Conformance, Unit and Characterization population in two legs: leg 1 = tier 0 (new tests, tests in changed test
+files, last gate's reds) plus the cheapest tier-1 tests within 2 % of the recorded test-seconds; leg 2 = the rest,
+longest collection first. A test's leg is a total function of its display name and one plan file, so the legs can
+neither overlap nor drop a test, and every gate checks it: the union of the legs' trx results must equal
+`dotnet test --list-tests` as a multiset, and every leg must have read the same plan digest. The gate stops at the
+first red leg and reports RED/INCOMPLETE; GREEN exists only when every leg ran. No plan input means one leg in the
+plain order — never a skip. The lander, the battery and CI are unchanged.
+
+**How the runner decided the mechanism** (evidence `docs/rearchitecture/evidence/impact-map-pb1708/b3-order-probe`).
+vstest filters were rejected: a leg of ~3,000 theory rows is ~400 KB of `DisplayName=` terms, beyond the Windows
+command line; the complement leg is the De Morgan complement of the union; xunit truncates long arguments with
+`···`; and while measuring, `DisplayName~edition: 2023` (a value with a space) matched NOTHING and exited 0 — the
+silent green the filter guard exists for. xunit's `StopOnFail` was rejected after it CRASHED the test host
+(`OperationCanceledException`) and the trx lost the red. Assembly-level collection and case orderers ARE honoured
+under parallel collections, so the leg filter lives inside the test assemblies (`tests/_shared/GateLegs.cs`, a
+`GateTestFramework` the recording framework derives from), keyed on objects, not strings.
+
+**What orders a leg: cost, more than the map** (`b4`). On 68b X — the one dropped branch with named reds — 9,144 of
+9,190 tests share tier 1. Ordering by map SPECIFICITY put the first red after 62 % of the assembly's work, worse
+than the plain order (14 %); cheapest-first put it after 0.32 %. The map keeps the tier boundary; PB1709
+(per-commit maps, ~19 min each) becomes an open owner question, and PB1712 (the map's blindness to static field
+reads) can no longer skip a test — it now costs ordering only, and the note says so.
+
+**Where the whole suite's time goes** (`b1`, battery #87, uninstrumented): 571 s wall, and the twelve continuity
+partitions ARE the critical path (525–557 s each). Measured as the gate runs them (`b6`): one partition alone 0.97 s
+per row; all twelve in one process 369–395 s at ~3.8 busy cores; server GC 360 s; two concurrent processes 209 s,
+four 136 s — the limit is inside one process. An in-process probe of the exact check-only work (`b2-scaling`)
+peaks at 3.5× by 8 threads with ~1,400 contended Monitor acquisitions per compile, and stack samples put 28 of 30
+single-thread samples and all 24 twelve-thread stacks in ANTLR's `LexerATNSimulator.ComputeStartState` /
+`AddDFAState`: six LEFT-EDGE predicates in `CobolLexer.g4`'s default mode keep ANTLR from ever caching that mode's
+start state, so every token of every compilation recomputes the closure over all default-mode rules and re-adds it
+under `lock (dfa.states)`. That is a product defect (the CLI pays it serially); M6 fixes it at the grammar with a
+drift test that every mode's start state is cached. Sharing one front end across editions stays rejected (edition
+state is cached in the front end), and process sharding is not built — it only routes around the lock. §3.11's
+"class-split lever exhausted" was measured under this lock and is re-opened after M6.
+
+**A new defect (note-ready; the id is central).** The long poles `pb505-table-value-dynamic-span-levels` (266 s in the
+battery) and `ValueFormat2Tests.DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946` (116 s) are one: the 26-line
+program takes 29.6 s through the `cobol` CLI, and every stack sample sits in `TableValueOdometer.Resolve`
+(`src/Cobol.Net.Compiler/Binding/Model/TableValuePlan.cs`), whose fill loop is bounded only by `MaxFillElements`
+(64,000,000) and runs to it when the odometer cannot carry out of a DYNAMIC dimension with no TO — the §13.18.63.3
+SR23 violation COBOLNET1946 reports afterwards. Harm: compile time (a legal-looking but rejected program hangs the
+compiler for half a minute), no wrong answer. Design M7.
+
+**Evidence reproducibility.** The evidence directory from `-d10-3` is in the tree with a README naming every input
+that is not in the repository (the two recorded maps, `a1.pkl`, raw recording contexts, a battery trx, the host,
+`dotnet-stack`); `a1.txt` and `a5.txt` were re-generated from the repository and match (a5 minus the two scratchpad
+warning lines it used to carry, from a positional `maxsplit` now fixed).
+
+**Implementation plan** (§3.14.9): M6 lexer start state · M7 odometer · M11 order plan (tiers; the filter output
+deleted) · M12 in-assembly leg filter + orderers · M2 cross-worktree gate cap (retires when a cold whole-Conformance
+leg at BelowNormal is under 6 min over a train) · M13 the ordered gate (driver, population check, fail-fast,
+`-Filter` removed from `build-local` and every caller). M6, M7, M11, M2 are independent; M13 lands last with M2.
+No production code changed.
+
 ## Entry 1768 — 2026-09-28 20:50 PDT — PB1714: the stall watchdog no longer trusts the scheduler (claude-skills v1.13.1)
 
 A LinkedIn commenter observed that silence-based detection cannot see the 16-hour wave-68 outage (PB1703), because

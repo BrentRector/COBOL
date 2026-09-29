@@ -1,0 +1,28 @@
+# b2 — Program.cs on the shared 32-logical / 24-core host, 2026-09-28 ~19:32-19:49 PDT, Debug build, Normal
+# priority, host otherwise ~12 % busy. Three runs:
+#   (1) `-- 96 1,2,4,8,12,16,24`  the scaling curve: throughput stops at ~3.5x by 8 threads, CPU utilisation falls
+#       to 15 %, and contended Monitor acquisitions climb to ~270,000 per round (~1,400 per compile);
+#   (2) `-- 60 1,1,1`             single-thread rounds while 30 stack samples were taken (stacks-1thread-1.txt is the first);
+#   (3) `-- 200 12,12,12`         12-thread rounds while stacks-12threads-1/2.txt were taken.
+# classify.txt: 28 of 30 single-thread samples, and 24 of 24 twelve-thread stacks, are in the ANTLR lexer's
+# LexerATNSimulator.ComputeStartState / AddDFAState; at 12 threads 12 of the 24 are blocked in Monitor.Enter.
+
+96 green NIST programs x 2 CheckOnly compiles (permissive + strict) at COBOL-2023; 32 logical processors; server GC False
+threads  wall_s  speedup  cpu_s  cpu_util  lock_contentions  gc_pause_s  gc_count
+      1   110.1     1.00    108       99%                 0         4.5      7665
+      2    71.3     1.54    116       81%             44586         7.4      8041
+      4    45.1     2.44    122       67%             87301         9.6      8236
+      8    31.4     3.50    123       49%            192222        11.6      8282
+     12    34.3     3.21    128       31%            277226        13.6      8270
+     16    31.5     3.49    116       23%            254149        12.9      8270
+     24    35.7     3.08    126       15%            272151        18.8      8306
+60 green NIST programs x 2 CheckOnly compiles (permissive + strict) at COBOL-2023; 32 logical processors; server GC False
+threads  wall_s  speedup  cpu_s  cpu_util  lock_contentions  gc_pause_s  gc_count
+      1    35.6     1.00     35       99%                 0         1.6      3955
+      1    36.1     1.00     36       98%                 0         1.6      3954
+      1    32.8     1.00     32       97%                 0         1.6      3954
+200 green NIST programs x 2 CheckOnly compiles (permissive + strict) at COBOL-2023; 32 logical processors; server GC False
+threads  wall_s  speedup  cpu_s  cpu_util  lock_contentions  gc_pause_s  gc_count
+     12    55.4     1.00    226       34%            502963        22.6     21219
+     12    73.5     1.00    291       33%            635055        28.6     21218
+     12    74.3     1.00    298       33%            650833        29.5     21218

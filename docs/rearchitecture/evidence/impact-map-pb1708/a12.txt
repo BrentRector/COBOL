@@ -1,0 +1,7 @@
+  891  static readonly field (initializer or static constructor): Cobol.Net.Editions 434, Cobol.Net.Frontend 264, Cobol.Net.Compiler 120, Cobol.Net.Runtime 73
+   15  MUTABLE static field (non-readonly, non-const): Cobol.Net.Runtime 7, Cobol.Net.Frontend 4, Cobol.Net.Editions 3, Cobol.Net.Compiler 1
+   14  static Lazy<T>: Cobol.Net.Runtime 10, Cobol.Net.Editions 2, Cobol.Net.Compiler 1, Cobol.Net.Frontend 1
+   11  ConcurrentDictionary GetOrAdd/AddOrUpdate call: Cobol.Net.Runtime 10, Cobol.Net.Frontend 1
+    0  LazyInitializer: 
+    0  static property 'field ??=' (the accessor shape): 
+    3  [ThreadStatic]: Cobol.Net.Runtime 3

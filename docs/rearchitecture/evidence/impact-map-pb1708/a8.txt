@@ -1,0 +1,12 @@
+    9626 s  53.2%   1047 rows    9.19 s/row  VersionMatrixTests.Cobol85Program_StillCompilesAtLaterEdition
+    3261 s  18.0%    349 rows    9.34 s/row  NistDifferentialTests.NistProgram_MatchesGolden
+    1306 s   7.2%   1732 rows    0.75 s/row  CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic
+     778 s   4.3%   1689 rows    0.46 s/row  CorpusRunnerTests.EnabledProgram_CompilesStrict_AndMatchesOutIfPresent
+     219 s   1.2%      1 rows  219.11 s/row  ValueFormat2Tests.DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946
+     175 s   1.0%     23 rows    7.62 s/row  OptionalWordSubsetDriftTests.EveryOptionalWordSubset_CompilesAndRunsIdentically
+     130 s   0.7%    956 rows    0.14 s/row  VersionMatrixTests.Construct_MatchesEditionExpectation
+      75 s   0.4%     23 rows    3.28 s/row  UsageInheritanceDriftTests.InheritedUsagePhrase_IsTheSameItemAsAWrittenOne
+      71 s   0.4%      1 rows   71.36 s/row  CompiledProgramCacheDriftTests.TheOutputDirectory_DoesNotReachTheOutput
+      50 s   0.3%     26 rows    1.91 s/row  UsageInheritanceDriftTests.InheritedUsage_IsTheSameItemAsAWrittenOne
+      46 s   0.3%     22 rows    2.08 s/row  RelationComparabilityTests.EveryPair_MatchesTheComparisonsDefinedList
+      44 s   0.2%      1 rows   43.60 s/row  VersionMatrixTests.St101A_DocumentedRemovals_RejectStrictAt2002Plus

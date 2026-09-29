@@ -1,0 +1,19 @@
+9274 tests, 18104 test-seconds, 196 classes
+     899 s   5.0%  (cum   5.0%)   1140 tests  CorpusRunnerTests_P1
+     865 s   4.8%  (cum   9.7%)    203 tests  VersionMatrixTests_P0
+     864 s   4.8%  (cum  14.5%)    203 tests  VersionMatrixTests_P1
+     850 s   4.7%  (cum  19.2%)    200 tests  VersionMatrixTests_P5
+     843 s   4.7%  (cum  23.9%)    198 tests  VersionMatrixTests_P10
+     839 s   4.6%  (cum  28.5%)    200 tests  VersionMatrixTests_P4
+     832 s   4.6%  (cum  33.1%)    200 tests  VersionMatrixTests_P7
+     807 s   4.5%  (cum  37.6%)    198 tests  VersionMatrixTests_P9
+     802 s   4.4%  (cum  42.0%)    198 tests  VersionMatrixTests_P11
+     795 s   4.4%  (cum  46.4%)    199 tests  VersionMatrixTests_P8
+     782 s   4.3%  (cum  50.7%)    200 tests  VersionMatrixTests_P6
+     759 s   4.2%  (cum  54.9%)    201 tests  VersionMatrixTests_P3
+     742 s   4.1%  (cum  59.0%)    203 tests  VersionMatrixTests_P2
+     644 s   3.6%  (cum  62.5%)   1140 tests  CorpusRunnerTests_P2
+     609 s   3.4%  (cum  65.9%)     58 tests  NistDifferentialTests_P2
+slowest 1% of tests (92) carry 22.8% of the time
+slowest 10% of tests (927) carry 69.1% of the time
+slowest 50% of tests (4637) carry 95.2% of the time

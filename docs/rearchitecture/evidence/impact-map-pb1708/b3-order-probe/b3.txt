@@ -1,0 +1,29 @@
+discovered by --list-tests: 99 (98 distinct names)
+default-order              exit 0; results in trx:  99 (NotExecuted 1, Passed 98)  first 8 started: Dup.Long C01.T0 C02.T0 C00.T0 Dup.Long C13.T0 C00.T1 C02.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    98, Skipped:     1, Total:    99, Duration: 7 s - OrderProbe.dll (net10.0)
+planned-order              exit 0; results in trx:  99 (NotExecuted 1, Passed 98)  first 8 started: C22.T0 C00.T0 C05.T3 C17.T2 C17.T0 C05.T0 C22.T1 C00.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    98, Skipped:     1, Total:    99, Duration: 7 s - OrderProbe.dll (net10.0)
+planned-red-no-stop        exit 1; results in trx:  99 (Failed 1, NotExecuted 1, Passed 97)  first 8 started: Dup.Long C22.T0 C17.T2 C05.T3 Dup.Long C08.T0 C05.T0 C22.T1
+                           verdict line: Failed!  - Failed:     1, Passed:    97, Skipped:     1, Total:    99, Duration: 7 s - OrderProbe.dll (net10.0)
+planned-red-stop-on-fail   exit 1; results in trx:   6 (NotExecuted 1, Passed 5)  first 8 started: Dup.Long C22.T0 C17.T2 C05.T3 Dup.Long C06.T0 C05.T0 C06.T1
+                           verdict line: Passed!  - Failed:     0, Passed:     5, Skipped:     1, Total:     6, Duration: 315 ms - OrderProbe.dll (net10.0)
+                           ABORTED: The active test run was aborted. Reason: Test host process crashed : Unhandled exception. System.OperationCanceledException: The operation was canceled.
+leg-1                      exit 0; results in trx:  42 (Passed 42)  first 8 started: Dup.Long C00.T0 C06.T0 C05.T3 Dup.Long C02.T0 C05.T0 C06.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    42, Skipped:     0, Total:    42, Duration: 3 s - OrderProbe.dll (net10.0)
+leg-2                      exit 0; results in trx:  57 (NotExecuted 1, Passed 56)  first 8 started: C10.T0 C22.T0 C14.T0 C17.T2 C17.T0 C14.T1 C22.T1 C10.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    56, Skipped:     1, Total:    57, Duration: 4 s - OrderProbe.dll (net10.0)
+union of the two legs' trx names vs --list-tests, as a MULTISET: EQUAL (99 vs 99); outcome Passed/Failed (ran): 98
+union of the two legs' trx TEST DEFINITIONS vs --list-tests, as a MULTISET: EQUAL (99 vs 99); leg 1 holds 42 definitions for its 42 results
+duplicate-named theory in leg 1's trx: 2 results
+empty-leg-2                exit 0; results in trx:   0 ()  first 8 started: (none)
+                           verdict line: (none)
+                           console: No test is available in E:\COBOL\.claude\worktrees\wf_08642598-d3c-3\docs\rearchitecture\evidence\impact-map-pb1708\b3-order-probe\bin\Debug\net10.0\OrderProbe.dll. Make sure that test discoverer & executors are registered and platform & framework version settings are appropriate and try again.
+throwing-framework         exit 0; results in trx:  99 (NotExecuted 1, Passed 98)  first 8 started: Dup.Long C05.T0 C01.T0 C00.T0 Dup.Long C09.T0 C05.T1 C00.T1
+                           verdict line: Passed!  - Failed:     0, Passed:    98, Skipped:     1, Total:    99, Duration: 7 s - OrderProbe.dll (net10.0)
+throwing-executor          exit 1; results in trx:   0 ()  first 8 started: (none)
+                           verdict line: (none)
+                           console: No test is available in E:\COBOL\.claude\worktrees\wf_08642598-d3c-3\docs\rearchitecture\evidence\impact-map-pb1708\b3-order-probe\bin\Debug\net10.0\OrderProbe.dll. Make sure that test discoverer & executors are registered and platform & framework version settings are appropriate and try again.
+                           console: [xUnit.net 00:00:00.07] OrderProbe: Catastrophic failure: System.InvalidOperationException: GATE ENVIRONMENT INCOMPLETE: thrown by the executor
+error-cases                exit 1; results in trx:  97 (Failed 97)  first 8 started: (none)
+                           verdict line: Failed!  - Failed:    97, Passed:     0, Skipped:     0, Total:    97, Duration: 25 ms - OrderProbe.dll (net10.0)
+                           console: System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: OrderProbe.C00.T0

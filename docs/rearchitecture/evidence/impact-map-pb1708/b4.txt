@@ -1,0 +1,26 @@
+68b X: 65 changed files; map 4b0f3e22ae27; 9190 Conformance tests, 12408 recorded test-seconds
+  tier 1:  9144 tests,   12407 test-s (100.0%)
+  tier 2:    28 tests,       1 test-s ( 0.0%)
+  tier 3:    18 tests,       0 test-s ( 0.0%)
+  changed entries executed by some test: 27; median df 1
+  tests executing a RARE changed entry (df <= 460): 527
+A  specificity (sum of idf), then cheapest
+     Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo position  6568 of 9190;    7789 test-s ahead = 62.78%
+     ParseErrorInsideCopybook_NamesTheCopybookLine    position  6093 of 9190;    7738 test-s ahead = 62.36%
+     FIRST RED after 7738 test-s = 62.36% of the assembly's work
+B  cheapest first inside the tiers
+     Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo position  2693 of 9190;     183 test-s ahead =  1.47%
+     ParseErrorInsideCopybook_NamesTheCopybookLine    position  1362 of 9190;      40 test-s ahead =  0.32%
+     FIRST RED after 40 test-s = 0.32% of the assembly's work
+C  specificity per second (score / time)
+     Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo position  6550 of 9190;    6747 test-s ahead = 54.37%
+     ParseErrorInsideCopybook_NamesTheCopybookLine    position  6003 of 9190;    5415 test-s ahead = 43.64%
+     FIRST RED after 5415 test-s = 43.64% of the assembly's work
+D  tests of RARE changed entries first, then cheapest
+     Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo position  2827 of 9190;     308 test-s ahead =  2.48%
+     ParseErrorInsideCopybook_NamesTheCopybookLine    position  1531 of 9190;     169 test-s ahead =  1.36%
+     FIRST RED after 169 test-s = 1.36% of the assembly's work
+-  no map: the default order (by class and name)
+     Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo position  3881 of 9190;    1741 test-s ahead = 14.03%
+     ParseErrorInsideCopybook_NamesTheCopybookLine    position  3886 of 9190;    1741 test-s ahead = 14.03%
+     FIRST RED after 1741 test-s = 14.03% of the assembly's work
