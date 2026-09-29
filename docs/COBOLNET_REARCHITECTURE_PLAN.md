@@ -3140,7 +3140,8 @@ already-derivable coverage; none change the pipeline.
   cache off; the map lands in `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree).
   `impacted_tests.py --self-test` proves each conservative arm fires. The LANDER is unchanged (whole assemblies).
   ⚠ TARGET (owner 2026-09-28, kb/Work PB1708; DESIGN-test-build-ci §3.14): the map will ORDER a whole-population
-  implementer gate in two legs instead of filtering it; this entry changes when M13 lands.
+  implementer gate in two legs instead of filtering it; this entry changes when M13 lands (`build-local.ps1
+  -Mode lander|implementer`, no `-Filter`). Maps are recorded on demand, and none into the shared store before M11.
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` · legacy suite:
   `dotnet test tests/CobolSharp.Tests.Integration --filter FullyQualifiedName~ConformanceTests` ·

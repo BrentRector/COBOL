@@ -10,7 +10,8 @@ The gate's population check (DESIGN-test-build-ci.md §3.14.4) compares exactly 
 spelling difference between them (escaping, truncation, encoding) would make every gate read NEVER RAN / RAN TWICE.
 Reported per assembly: both counts, distinct names, names listed more than once (xunit's `···` truncation), the
 multiset difference in each direction, the trx's test DEFINITIONS against the listing, trx outcomes, and names
-embedding an absolute path.
+embedding an absolute path. (The committed run's two Unit failures are ExternalCorpusPopulationDriftTests: the
+git-ignored GnuCOBOL corpus was not fetched into that worktree. They bear on nothing here.)
 """
 import re
 import sys
