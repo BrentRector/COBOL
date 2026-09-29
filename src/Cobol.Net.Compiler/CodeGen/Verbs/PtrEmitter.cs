@@ -61,7 +61,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
     {
         string nameExpr = pa.NameLiteral is { } lit
             ? CsLiteral(lit)
-            : $"({PlaceRenderer.Read(pa.NamePlace!)}).Trim()";   // §8.4.3.13.4 GR1a — the identifier's content
+            : PlaceRenderer.Read(pa.NamePlace!);   // §8.4.3.13.4 GR1a — the identifier's content
         bool checkNotFound = ecState.Info?.Enabled.Any(e => e.Ec == "EC-PROGRAM-NOT-FOUND") == true;
         return $"ProgramRegistry.{(callArgument ? "EntryOfArgument" : "EntryOfOperand")}({nameExpr}, "
             + $"{(checkNotFound ? "true" : "false")})";
@@ -216,7 +216,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         var w = ctx.Writer;
         string nameExpr = s.NameLiteral is { } lit
             ? EmitText.CsLiteral(lit)
-            : $"({PlaceRenderer.Read(s.NamePlace!)}).Trim()";   // §8.4.3.13 GR1a — the identifier's value names the program
+            : PlaceRenderer.Read(s.NamePlace!);   // §8.4.3.13 GR1a — the identifier's value names the program
         int id = ctx.Names.NextPtr();
         string nf = $"__ppNf{id}";
         w.Line($"bool {nf};");
@@ -260,7 +260,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         // whose externalized function-name the binder already resolved to a compile-time constant.
         string nameExpr = s.PrototypeName is { } proto
             ? CsLiteral(proto)
-            : $"({PlaceRenderer.Read(s.NamePlace!)}).Trim()";
+            : PlaceRenderer.Read(s.NamePlace!);
         int id = ctx.Names.NextPtr();
         string nf = $"__fpNf{id}";
         w.Line($"bool {nf};");

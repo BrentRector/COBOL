@@ -35,6 +35,7 @@ public sealed class DirectiveStateStackTests
     {
         [Constructs.TurnDirective2002] = TurnIsRestored,
         [Constructs.RefModZeroLength2023] = RefModZeroLengthIsRestored,
+        [Constructs.PropagateDirective2002] = PropagateIsRestored,
         [Constructs.Flag02Directive2014] = () => FlagIsRestored("FLAG-02", FlagOption.Flag02EcProgramExceptions),
         [Constructs.Flag14Directive2023] = () => FlagIsRestored("FLAG-14", FlagOption.Flag14ReadPrevious),
         [Constructs.CobolWordsDirective2023] = CobolWordsAreRestored,
@@ -83,6 +84,23 @@ public sealed class DirectiveStateStackTests
         Assert.True(s.IsOnAt(Line(d, "IN")));
         Assert.False(s.IsOnAt(Line(d, "OUT")));
         Assert.True(s.IsUnspecifiedAt(Line(d, "OUT")));   // back to "not specified", the FLAG-14 i tri-state
+    }
+
+    /// <summary>kb/Work PB1119 — the PROPAGATE state a PUSH saves is the ON/OFF fold the binder asks at each
+    /// source element's first line (§7.3.22.4 GR1, §7.3.20.4 GR1).</summary>
+    private static void PropagateIsRestored()
+    {
+        var d = Directives("""
+                   >>PROPAGATE ON
+                   >>PUSH PROPAGATE
+                   >>PROPAGATE OFF
+                       DISPLAY "IN"
+                   >>POP PROPAGATE
+                       DISPLAY "OUT"
+            """);
+        var s = PropagateState.Build(d.PropagateEvents);
+        Assert.False(s.IsOnAt(Line(d, "IN")));
+        Assert.True(s.IsOnAt(Line(d, "OUT")));
     }
 
     private static void FlagIsRestored(string directive, FlagOption option)

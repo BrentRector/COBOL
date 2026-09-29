@@ -73,12 +73,15 @@ internal sealed class BinderDriver
         // The group's compile-time REF-MOD-ZERO-LENGTH resolution (ISO §7.3.23) — the per-line zero-length
         // allowance fold every ReferenceResolver queries when building a ref-mod Place (§8.4.3.3.4 item 5c).
         var refModZl = RefModZeroLengthState.Build(refModZlEvents);
+        // The group's compile-time >>PROPAGATE resolution (ISO §7.3.21; kb/Work PB1119) — folded once per source
+        // element below (program units in BindUnitData, methods in the roster loop).
+        var propagate = PropagateState.Build(directives.PropagateEvents);
 
         var (units, classes, table) = CollectUnits(tree, edition,
             cobolWordsMap ?? CobolNet.Editions.CobolWordsMap.Empty);
         var session = new BindSession
         {
-            Turn = turn, OoClasses = table, Edition = edition, RefModZeroLength = refModZl,
+            Turn = turn, OoClasses = table, Edition = edition, RefModZeroLength = refModZl, Propagate = propagate,
             DirectiveSites = directives.DirectiveSites,
             CobolWords = cobolWordsMap ?? CobolNet.Editions.CobolWordsMap.Empty,
             Retypes = tree.TokenRetypes,
@@ -109,6 +112,9 @@ internal sealed class BinderDriver
                     ? (mc.environmentDivision()?.Start ?? mc.dataDivision()?.Start ?? mc.procedureDivision()?.Start ?? mc.Stop).Line
                     : cls.Ctx.Start.Line;
                 m.ExternalCheckMaskHere = ExternalMaskAt(turn, divLine);
+                // §7.3.21.4 GR1/GR3 — automatic propagation for the METHOD (kb/Work PB1119), folded at its METHOD-ID
+                // line; §7.3.21.3 SR1 keeps the directive out of the class, so that is also the CLASS-ID's state.
+                m.AutomaticPropagationHere = propagate.IsOnAt((m.Ctx?.Start ?? cls.Ctx.Start).Line);
             }
         // The group-level Describe gate reaches the class halves too (kb/Work PB1138): a method activation registers
         // its factory's or object's external descriptions (§14.9.23.4 GR7 d)), so the same zero-scaffolding switch the
@@ -598,6 +604,11 @@ internal sealed class BinderDriver
             "EC-PROGRAM-ARG-MISMATCH", unit.Ctx.procedureDivision(), int.MaxValue);
         data.ExternalDescribe = Procedure.EcBinder.ExternalNames.Any(session.Turn.AnyEnabledFor);
         data.OdoReferenceChecking = session.Turn.AnyEnabledFor("EC-BOUND-ODO");   // §13.18.38.4 GR7 (kb/Work PB1268)
+        // §7.3.21.4 GR1/GR3 — automatic propagation for this program or function (kb/Work PB1119), folded at the
+        // unit's first line (§7.3.21.3 SR1: never inside a compilation unit, so a contained program folds to its
+        // container's state). Its IDENTIFICATION DIVISION is the first line: a CONTAINED unit's Ctx is the synthetic
+        // context Reparent builds, whose own Start is null (see NameCtx below).
+        data.AutomaticPropagation = session.Propagate.IsOnAt(unit.Ctx.identificationDivision().Start.Line);
 
         // GLOBAL FD inheritance (ISO §13.18.30: the file-name of a GLOBAL FD is a GLOBAL name, visible in every
         // directly/indirectly contained program; §13.18.27 GR1–2 — nearest container first, a local declaration
@@ -752,7 +763,9 @@ internal sealed class BinderDriver
 
     /// <summary>The AS NESTED callee table for one caller (kb/Work PB131; §14.9.4.3 SR15 + §10.7.2):
     /// name → the callee's bound PD-header SIGNATURE. Directly-contained children first; a COMMON program
-    /// contained in an ancestor is visible too (nearest wins on a name clash, matching §10.7.2's scope).
+    /// contained in an ancestor is visible too (nearest wins on a name clash, matching §10.7.2's scope) — EXCEPT from
+    /// within that common program's own subtree unless it is RECURSIVE (§8.4.6.3 2); kb/Work PB1460), the exception
+    /// the run-time resolver applies through the same <see cref="CobolNet.Runtime.ProgramNameScope"/>.
     /// <para>The signature carries the RETURNING item as well as the formals (kb/Work PB204): §14.9.4.3 SR25
     /// makes §14.8.3, Returning items apply to a Format-2 CALL exactly as §14.8.2 applies to its arguments, and
     /// with AS NESTED both halves of that pair are statically known. Carrying only the formals is what left the
@@ -760,12 +773,12 @@ internal sealed class BinderDriver
     /// it was written.</para></summary>
     private static Dictionary<string, CalleeSignature> NestedCallablesOf(BoundUnit unit)
     {
-        var map = new Dictionary<string, CalleeSignature>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, CalleeSignature>(CobolNet.Runtime.ExternalizedNames.Comparer);
         foreach (var c in unit.Children)
             map.TryAdd(c.Name, new CalleeSignature(c.Data.LinkageFormals, c.Data.LinkageReturning));
         for (var anc = unit.Parent; anc is not null; anc = anc.Parent)
             foreach (var c in anc.Children)
-                if (c.Common)
+                if (c.Common && CobolNet.Runtime.ProgramNameScope.CommonProgramReferable(c, c.Recursive, unit, u => u.Parent))
                     map.TryAdd(c.Name, new CalleeSignature(c.Data.LinkageFormals, c.Data.LinkageReturning));
         return map;
     }
@@ -774,31 +787,6 @@ internal sealed class BinderDriver
     // The PROGRAM twin of BuildUserFunctionTable below: GR10 a)/b)/c) has the identical shape to GR11 a)/b)/c),
     // and the two tables are built at the same point for the same reason — every unit's DATA has bound, so a
     // callee's PD-header signature is a fact no matter where in the group its definition sits.
-
-    /// <summary>The compilation group's program definitions by EXTERNALIZED name — the search space of ISO
-    /// §12.3.8.4 general rule 10 a): "if the externalized name of the program prototype is the externalized name
-    /// of a program definition specified previously in the same compilation group, the details are taken from that
-    /// program definition, which is the program that will be called".
-    /// <para>OUTERMOST program definitions only: a contained program is part of its container's program
-    /// definition, is not a compilation-group source unit (§10.6.1), and is reachable only through §14.9.4.3 SR15's
-    /// AS NESTED — which has its own table. FUNCTION-ID units are excluded because §9.4 puts them in the function
-    /// namespace, and prototype units because they have no body. The key is <c>BoundUnit.ExternalizedName</c>
-    /// — GR10 a) says "externalized name" twice and §11.10.4 GR1 makes that the AS literal when one is written
-    /// (kb/Work PB303; before the phrase parsed, MakeUnit collapsed it onto <c>Name</c>).</para>
-    /// <para>DETERMINATION on GR10 a)'s word "previously": the ORDER is not enforced. GR10 a) and c) are the two
-    /// arms this implementation can reach, and for a later in-group definition both name the SAME program — c)
-    /// takes "the details … from the external repository for the program with the same name", and this
-    /// implementation's external repository is the run unit's program registry, which the later definition is in.
-    /// Enforcing the order would therefore reject nothing illegal and would only DOWNGRADE a later definition's
-    /// signature from a compile-time §14.8.2 check to a run-time EC-PROGRAM-ARG-MISMATCH.</para></summary>
-    /// <summary>The comparison EVERY definition-name question in this file asks — the same one
-    /// <c>ProgramTable.NameEquals</c> and both group tables here use (<c>OrdinalIgnoreCase</c>). §8.3.2.2
-    /// leaves the mapping of an externalized name to the implementor ("The implementor defines the formation
-    /// and mapping rules of these names"); what is NOT optional is that the bind-time check and the run-unit
-    /// resolver ask it the same way, or a group this check passes still resolves to the wrong definition.
-    /// <para>⚠ DETERMINATION, recorded because kb/Work PB660 carried the opposite as an INHERITED claim
-    /// ("externalized: ordinal, per PB303's determination" — PB303 records no such determination).</para></summary>
-    private static bool NameEq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>⛔ THE ONE UNIQUENESS CHECK OVER A COMPILATION GROUP'S DEFINITION NAMES (kb/Work PB660), in
     /// the two scopes the standard gives them.
@@ -836,7 +824,7 @@ internal sealed class BinderDriver
         //     arrives from the OO table (and is why a CLASS-ID sharing a PROGRAM-ID's externalized name used to
         //     compile clean — each namespace policed only ITSELF).
         var externalized =
-            new Dictionary<string, (string Kind, string Spelling, string Word)>(StringComparer.OrdinalIgnoreCase);
+            new Dictionary<string, (string Kind, string Spelling, string Word)>(CobolNet.Runtime.ExternalizedNames.Comparer);
         foreach (var (kind, spelling, word, name, at) in ExternalizedDefinitions(units, oo))
         {
             if (externalized.TryGetValue(name, out var first))
@@ -846,7 +834,7 @@ internal sealed class BinderDriver
                 // COBOLNET0840). A pair already reported THERE is skipped here rather than doubled — but only
                 // that pair: two class definitions whose words DIFFER and whose AS literals coincide are
                 // §8.3.2.2's business alone, and nothing else in the compiler looks at them.
-                if (IsOo(kind) && IsOo(first.Kind) && NameEq(word, first.Word)) continue;
+                if (IsOo(kind) && IsOo(first.Kind) && string.Equals(word, first.Word, StringComparison.OrdinalIgnoreCase)) continue;
                 using var _ = edition.At(at);
                 string why = first.Kind == kind
                     ? $"two {kind} definitions cannot be one instance (§8.3.2.2: \"when two or more source "
@@ -868,7 +856,7 @@ internal sealed class BinderDriver
         foreach (var root in units)
         {
             if (root.Parent is not null || root.IsFunction) continue;
-            var contained = new Dictionary<string, BoundUnit>(StringComparer.OrdinalIgnoreCase);
+            var contained = new Dictionary<string, BoundUnit>(CobolNet.Runtime.ExternalizedNames.Comparer);
             foreach (var c in Containees(root))
                 if (!contained.TryAdd(c.Name, c))
                 {
@@ -953,7 +941,7 @@ internal sealed class BinderDriver
         {
             if (!proto.IsPrototype) continue;
             var definition = units.FirstOrDefault(d => d is { IsPrototype: false, Parent: null }
-                && d.IsFunction == proto.IsFunction && NameEq(d.ExternalizedName, proto.ExternalizedName));
+                && d.IsFunction == proto.IsFunction && CobolNet.Runtime.ExternalizedNames.Same(d.ExternalizedName, proto.ExternalizedName));
             if (definition is null
                 || PrototypeSignatures.Same(Signature(proto), Signature(definition)))
                 continue;
@@ -977,10 +965,26 @@ internal sealed class BinderDriver
     /// PROTOTYPE definition, §11.10.2 Format 2 — kb/Work PB894) have the SAME consequence, "the details are taken
     /// from" that unit, so they are ONE table: definitions are registered first and a prototype only fills a
     /// name no definition holds, which is exactly a)'s "otherwise" precedence. A name in neither is GR10 c), the
-    /// external repository — this implementation's run-unit program registry.</summary>
+    /// external repository — this implementation's run-unit program registry.
+    /// <para>The compilation group's program definitions by EXTERNALIZED name — the search space of ISO
+    /// §12.3.8.4 general rule 10 a): "if the externalized name of the program prototype is the externalized name
+    /// of a program definition specified previously in the same compilation group, the details are taken from that
+    /// program definition, which is the program that will be called".</para>
+    /// <para>OUTERMOST program definitions only: a contained program is part of its container's program
+    /// definition, is not a compilation-group source unit (§10.6.1), and is reachable only through §14.9.4.3 SR15's
+    /// AS NESTED — which has its own table. FUNCTION-ID units are excluded because §9.4 puts them in the function
+    /// namespace, and prototype units because they have no body. The key is <c>BoundUnit.ExternalizedName</c>
+    /// — GR10 a) says "externalized name" twice and §11.10.4 GR1 makes that the AS literal when one is written
+    /// (kb/Work PB303; before the phrase parsed, MakeUnit collapsed it onto <c>Name</c>).</para>
+    /// <para>DETERMINATION on GR10 a)'s word "previously": the ORDER is not enforced. GR10 a) and c) are the two
+    /// arms this implementation can reach, and for a later in-group definition both name the SAME program — c)
+    /// takes "the details … from the external repository for the program with the same name", and this
+    /// implementation's external repository is the run unit's program registry, which the later definition is in.
+    /// Enforcing the order would therefore reject nothing illegal and would only DOWNGRADE a later definition's
+    /// signature from a compile-time §14.8.2 check to a run-time EC-PROGRAM-ARG-MISMATCH.</para></summary>
     private static Dictionary<string, CalleeSignature> BuildProgramDetailsTable(IReadOnlyList<BoundUnit> units)
     {
-        var map = new Dictionary<string, CalleeSignature>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, CalleeSignature>(CobolNet.Runtime.ExternalizedNames.Comparer);
         foreach (bool prototypes in (bool[])[false, true])
             foreach (var u in units)
                 if (u is { IsFunction: false, Parent: null } && u.IsPrototype == prototypes)
@@ -1074,7 +1078,7 @@ internal sealed class BinderDriver
         {
             if (string.Equals(name, externalized, StringComparison.Ordinal)) continue;
             own ??= new Dictionary<string, UserFunctionSignature>(group, StringComparer.OrdinalIgnoreCase);
-            var target = group.Values.FirstOrDefault(f => NameEq(f.Externalized, externalized));
+            var target = group.Values.FirstOrDefault(f => CobolNet.Runtime.ExternalizedNames.Same(f.Externalized, externalized));
             if (target is null) own.Remove(name);
             else own[name] = target;
         }
@@ -1121,7 +1125,7 @@ internal sealed class BinderDriver
             var bucket = u.IsPrototype ? protos : defs;
             if (bucket.TryGetValue(u.Name, out var firstSameWord))
             {
-                if (u.IsPrototype || !NameEq(u.ExternalizedName, firstSameWord.ExternalizedName))
+                if (u.IsPrototype || !CobolNet.Runtime.ExternalizedNames.Same(u.ExternalizedName, firstSameWord.ExternalizedName))
                     edition.Error("COBOLNET1508",
                         $"duplicate FUNCTION-ID '{u.Name}' in the compilation group — two function "
                         + $"{(u.IsPrototype ? "prototypes" : "definitions")} share one user-function-name, which "

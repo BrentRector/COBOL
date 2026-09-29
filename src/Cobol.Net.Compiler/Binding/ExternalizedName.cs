@@ -39,8 +39,8 @@ using Core = CobolParserCore;
 /// </summary>
 internal static class ExternalizedName
 {
-    /// <summary>Screen one AS-phrase literal against its clause's syntax rule and return its value, or null
-    /// (having reported) on violation.</summary>
+    /// <summary>Screen one AS-phrase literal against its clause's syntax rule and return the externalized name it
+    /// FORMS (see <see cref="Form"/>), or null (having reported) on violation.</summary>
     /// <param name="lit">The phrase's <c>literal</c> child.</param>
     /// <param name="edition">The diagnostic sink; the caller has already positioned it.</param>
     /// <param name="code">The reporting descriptor — the OWNING clause's, never a shared one, so a message
@@ -112,6 +112,36 @@ internal static class ExternalizedName
             Reject($"{tag} shall not be a zero-length literal ({rule})");
             return null;
         }
-        return value;
+        return Form(value, edition, where, tag, rejectZeroLength);
+    }
+
+    /// <summary>§8.3.2.2 2)'s FORMATION half — "the content of the literal specified in that AS phrase is a name
+    /// that is externalized to the operating environment. The implementor defines the formation and mapping rules
+    /// of these names." — applied through the ONE rule every externalized name takes
+    /// (<see cref="CobolNet.Runtime.ExternalizedNames.Form"/>, DOC-A.1-68): leading and trailing spaces are not
+    /// part of the name. The run-time CALL / CANCEL / program-address / INVOKE side forms its target through the
+    /// same function, which is why <c>PROGRAM-ID. S AS "trail  "</c> is now reached by <c>CALL "trail"</c> and by
+    /// <c>CALL "trail  "</c> alike (kb/Work PB1539). Removing the spaces is reported as a WARNING (COBOLNET2642),
+    /// because the name the program is known by is not the literal as written. A literal of spaces ONLY forms the
+    /// zero-length name, which nothing can name; where the clause itself refuses a zero-length literal
+    /// (<paramref name="zeroLengthRefused"/> — every clause but §11.3.3's CLASS-ID) the formation rule refuses it
+    /// too (COBOLNET2643) rather than create a program no CALL can reach.</summary>
+    private static string? Form(string written, EditionContext edition, string where, string tag,
+        bool zeroLengthRefused)
+    {
+        if (!CobolNet.Runtime.ExternalizedNames.HasFormationSpaces(written)) return written;
+        string formed = CobolNet.Runtime.ExternalizedNames.Form(written);
+        if (formed.Length == 0 && zeroLengthRefused)
+        {
+            edition.Error(DiagnosticCatalog.ExternalizedNameAllSpaces,
+                $"{where}: {tag} is all spaces, and an externalized name is formed without its leading and trailing "
+                + "spaces, so it forms the zero-length name, which no CALL, CANCEL or INVOKE can name (ISO §8.3.2.2; "
+                + "the formation rule is documented as DOC-A.1-68)");
+            return null;
+        }
+        edition.Warning(DiagnosticCatalog.ExternalizedNameSpaces,
+            $"{where}: {tag} has leading or trailing spaces, which are not part of an externalized name — the name "
+            + $"externalized is \"{formed}\" (ISO §8.3.2.2; the formation rule is documented as DOC-A.1-68)");
+        return formed;
     }
 }

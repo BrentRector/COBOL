@@ -59,6 +59,13 @@ public sealed record OoMethodSymbol(
     /// file is picked up for free, since the fold walks every event with a lower line.</para></summary>
     public bool OoUniversalCheckingHere { get; set; }
 
+    /// <summary>Is automatic propagation of exception conditions enabled for this METHOD (ISO §7.3.21.4 GR1/GR3 —
+    /// "functions, methods, and programs that follow in the compilation group"; kb/Work PB1119)? Folded by
+    /// <c>BinderDriver</c> from the group's <c>PropagateState</c> at the METHOD-ID line (a synthesized PROPERTY
+    /// accessor: its CLASS-ID line), and read by <c>OoEmitter</c> into the emitter's per-element propagation
+    /// state.</summary>
+    public bool AutomaticPropagationHere { get; set; }
+
     /// <summary>The METHOD's half of §14.8.4.1's "enabled in both the activating and activated runtime elements":
     /// the <c>ExternalChecks</c> bits of the EC-EXTERNAL conditions enabled "before the Environment division" of this
     /// method (<c>BinderDriver.ExternalMaskAt</c>, the one fold the program units' mask takes too), baked by

@@ -216,6 +216,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     private BoundStatement OoBindByReceiver(InvocationSite site, Core.ObjectReferenceContext target,
                                             string methodName)
     {
+        // The written method name is FORMED once, here, where both invocation spellings meet: leading and trailing
+        // spaces are not part of an externalized name (DOC-A.1-68; the one rule, CobolNet.Runtime.ExternalizedNames),
+        // so `INVOKE O " GET "` names the method `METHOD-ID. GET` names, by the typed and the universal path alike.
+        methodName = CobolNet.Runtime.ExternalizedNames.Form(methodName);
         if (target.SELF() is not null || target.SUPER() is not null)
         {
             // Slice 3b — §8.4.3.8: SELF/SUPER are the predefined object references of the CURRENT method's

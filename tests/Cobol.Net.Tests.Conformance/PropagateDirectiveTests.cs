@@ -7,9 +7,10 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// The <c>&gt;&gt;PROPAGATE</c> directive (ISO §7.3.21; PHASE-12 wave 4/5): the COBOL-2002+ compiler directive that
 /// controls automatic exception-condition propagation to the activating runtime element (GR1/GR2; default OFF,
-/// GR4). This wave RECOGNIZES the directive and EDITION-GATES it (introduction gate, provisional COBOL-2002 per the
-/// roadmap decision-1 policy — §7.3.21 is live in the 2023 spec, so the 2002-vs-2014 edge cannot be pinned in-repo;
-/// the runtime propagation SEMANTICS are the deferred PHASE-13 EC work). Below 2002 it is the registry's
+/// GR4). These cases pin the directive's RECOGNITION and EDITION GATE (introduction gate, provisional COBOL-2002 per
+/// the roadmap decision-1 policy — §7.3.21 is live in the 2023 spec, so the 2002-vs-2014 edge cannot be pinned
+/// in-repo); the propagation itself is <c>AutomaticPropagationTests</c> and the golden
+/// <c>2002/w73d2_pb1119_propagate_on</c> (kb/Work PB1119). Below 2002 it is the registry's
 /// COBOLNET0900 — the ONE introduction band every compiler directive now shares (kb/Work PB725 reconciled this
 /// stage's bespoke COBOLNET0883 introduction gate onto it, and kb/Work PB794 RETIRED the rest of 0883 by making
 /// §7.3.21.2's { ON | OFF } the row's directiveOperand column, checked by the one COBOLNET1911 producer) —

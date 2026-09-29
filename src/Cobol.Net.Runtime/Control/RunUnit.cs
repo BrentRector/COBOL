@@ -19,7 +19,7 @@ namespace CobolNet.Runtime;
 /// <c>ProgramRegistry.Reset()</c> is <see cref="Begin"/>, and a host's <see cref="Run"/> constructs one too — so no
 /// member can be forgotten by a hand-written reset list (the switch, locale and report-flow state all were, and
 /// survived into the next run unit a host began in the same process). The §14.6.11 implicit CloseAll and the
-/// §14.6.12 abnormal-termination surface are runtime-side — <see cref="ProgramTable.RunMain"/>.
+/// §14.6.12 abnormal-termination surface are runtime-side — <see cref="ProgramTable.RunMain"/> and <see cref="Terminate"/>.
 /// </summary>
 public sealed class RunUnit
 {
@@ -111,7 +111,45 @@ public sealed class RunUnit
         if (_factoryObjects.TryGetValue(typeof(T), out var existing)) return (T)existing;
         var created = new T();
         _factoryObjects.Add(typeof(T), created);
+        // The class's (and every superclass's) METHOD working-storage is static data: its first method activation
+        // in this run unit is always preceded by this creation, because a method runs on a factory object or on an
+        // instance its factory's New made — so the class adopts its static storage into this run unit HERE.
+        created.__AdoptRunUnitStorage(this);
         return created;
+    }
+
+    /// <summary>The static-storage resets this run unit has ADOPTED, in adoption order (kb/Work PB1069). Static data
+    /// — a RECURSIVE program's or a function's WORKING-STORAGE (§13.5.4 GR1) and a class's METHOD WORKING-STORAGE (OO
+    /// deep-dive D3) — is a C# static on its generated type, so it is the ONE kind of run-unit state that a new
+    /// <see cref="RunUnit"/> object cannot make fresh by construction. The set is keyed by the reset delegate (two
+    /// delegates of one static method are equal), so a class reached through several subclass factories adopts once.</summary>
+    private readonly List<Action> _staticStorage = [];
+    private readonly HashSet<Action> _adoptedStaticStorage = [];
+
+    /// <summary>Adopt one unit's static storage into this run unit: its <paramref name="reset"/> runs NOW — ISO
+    /// §14.6.2.3.2 case 1, "The first time the function, method, or program in which it is described is activated in
+    /// a run unit", holds even when the same loaded module served an earlier run unit in this process — and again at
+    /// <see cref="Terminate"/>. Adopting the same reset twice is a no-op.</summary>
+    public void AdoptStaticStorage(Action reset)
+    {
+        if (!_adoptedStaticStorage.Add(reset)) return;
+        _staticStorage.Add(reset);
+        reset();
+    }
+
+    /// <summary>Normal and abnormal run-unit termination's runtime epilogue — ONE method for both boundaries
+    /// (<see cref="ProgramTable.RunMain"/>'s and <see cref="Run"/>'s), idempotent so a host that nests them runs it
+    /// harmlessly twice. ISO §14.6.11 2): "An implicit CLOSE statement without any phrases is executed for each file
+    /// that is in the open mode" (also after an abnormal termination, §14.6.12). Then every adopted static storage
+    /// returns to its initial state, which RELEASES what it held — §14.6.11 3) "Any storage obtained with an ALLOCATE
+    /// statement and not yet released by a FREE statement is released", 4) "All instance objects are destroyed" and
+    /// 6) "Any resources occupied by dynamic-capacity tables or dynamic-length elementary items are freed": a static
+    /// POINTER, OBJECT REFERENCE or dynamic item is managed memory that stays reachable exactly as long as the
+    /// static field refers to it, and everything else the run unit owned is released with this object.</summary>
+    public void Terminate()
+    {
+        Files.CloseAll();
+        foreach (var reset in _staticStorage) reset();
     }
 
     private long _exitStatus;
@@ -156,7 +194,7 @@ public sealed class RunUnit
         var ru = StartAfter(prior);
         _current.Value = ru;
         try { body(ru); }
-        finally { ru.Files.CloseAll(); _current.Value = prior; }
+        finally { ru.Terminate(); _current.Value = prior; }
     }
 
     /// <summary>Begin a NEW run unit and make it the ambient one — the emitted run-unit driver's first statement

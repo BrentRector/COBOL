@@ -30,7 +30,12 @@ public sealed record BoundProgram(
     // gate: a non-F3 unit adds zero synthetic pcs and needs no fall-through wall); F3HandlerOwners[pc - base] is the
     // owning PERFORM's PerformId (the EXIT-PERFORM / handler-region context). Set by the pc-range synthesis wave.
     int? F3HandlerBasePc = null,
-    IReadOnlyList<int>? F3HandlerOwners = null);
+    IReadOnlyList<int>? F3HandlerOwners = null,
+    // The object-class and interface targets of the unit's PROCEDURE DIVISION header RAISING phrase (§14.2.1) — the
+    // "applicable class or interface … specified in the RAISING phrase of the procedure division header in the
+    // activating element" §14.6.13.1.5's EXIT/GOBACK item 3 tests when automatic propagation re-propagates an
+    // exception OBJECT (kb/Work PB1119). Empty for a class unit: each METHOD carries its own (OoMethodSymbol.Raising).
+    IReadOnlyList<RaisingTarget>? RaisingObjects = null);
 
 /// <summary>One <c>USE FOR DEBUGGING ON procedure-name / ALL PROCEDURES</c> subject procedure (X3.23-1985 debug
 /// module; deleted 2002, absent ISO 2023 — modeled only at <c>--std 85</c>, VCR Table 7 row 7.17). The emitter

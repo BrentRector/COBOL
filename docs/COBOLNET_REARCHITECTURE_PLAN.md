@@ -3100,8 +3100,8 @@ already-derivable coverage; none change the pipeline.
   report-OCCURS family) · narrowed-1509 shapes · signed-leaf strong ordering (0899 `strong-group-ordering-
   signed-leaf`) · 1535 `typedef-renames-staged` · MAX/MIN-under-explicit-collating.
 - **P12 residues:** external-float `E` PICTURE (staged 0899) · FUNCTION-POINTER runtime + restricted
-  PROGRAM-POINTER + `ADDRESS OF` spellings (staged 0899) · >>PROPAGATE runtime semantics + §7.3.21.3 SR1
-  placement (→ P13 Wave D adjunct) · DYNAMIC LENGTH national FUNCTION LENGTH/BYTE-LENGTH runtime paths (staged
+  PROGRAM-POINTER + `ADDRESS OF` spellings (staged 0899) · >>PROPAGATE §7.3.21.3 SR1
+  placement (kb/Work PB1378; the runtime semantics landed with kb/Work PB1119) · DYNAMIC LENGTH national FUNCTION LENGTH/BYTE-LENGTH runtime paths (staged
   loud; also inventory row A.4.5-Partial).
 - **P13-session residues:** UDF/INVOKE activation boundaries carry EC-EXTERNAL site-mask 0 (no raise there; the
   INVOKE GR7d leg needs the OO activation seam) · Tier-C confined-`byte[]` codec (DESIGN-data-model §2.3;

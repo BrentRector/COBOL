@@ -62,11 +62,11 @@ public sealed record ExternalDescriptor(
 /// </summary>
 public sealed class ExternalTable
 {
-    private readonly Dictionary<string, StorageCell> _cells = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, StorageCell> _cells = new(ExternalizedNames.Comparer);
     // Per external name: each describing element's descriptor, keyed by the describer's unit path. A
     // re-activation re-describes identically (compile-time constants), so same-key replacement is a no-op;
     // CANCEL does not remove entries (the external storage — and hence its description — persists, §14.9.5 GR8).
-    private readonly Dictionary<string, Dictionary<string, ExternalDescriptor>> _describers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, ExternalDescriptor>> _describers = new(ExternalizedNames.Comparer);
 
     /// <summary>The run-unit cell for <paramref name="name"/>, created with <paramref name="initialImage"/> on
     /// first reference (ISO §14.6.2.3.2 — external data takes its initial state once per run unit). The cell

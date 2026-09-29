@@ -35,5 +35,5 @@ public readonly record struct FunctionPointer(string? Name)
     /// <summary>Pointer equality (ISO §8.8.4.2.16 — two function-pointers are equal when they identify the same
     /// function, or are both NULL). Function-name identity is case-insensitive (§8.3.2.2).</summary>
     public static bool SameTarget(FunctionPointer a, FunctionPointer b) =>
-        string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+        ExternalizedNames.Same(a.Name, b.Name);
 }

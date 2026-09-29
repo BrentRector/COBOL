@@ -55,9 +55,14 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
         if (ctx.Data.EmitsStaticReset) EmitStaticReset(w);
     }
 
-    /// <summary>Emit a RECURSIVE unit's <c>__ResetStatics</c> — the §14.6.2.3.2 initial-state action for the
-    /// unit's STATIC working-storage AND its unit-scoped file-registration guard (registered with the
-    /// run-unit ProgramTable): reassigns every static WS root field / Tier-B backing to the SAME composed
+    /// <summary>Emit the <c>__ResetStatics</c> of a unit with STATIC data — a RECURSIVE program or a function
+    /// (static working-storage, §13.5.4 GR1), or a class half (its methods' working-storage, OO deep-dive D3) — the
+    /// §14.6.2.3.2 initial-state action for that static data AND a unit's file-registration guard. A program
+    /// registers it with the run-unit ProgramTable; a class's factory adopts it when the run unit first creates the
+    /// factory object (<c>OoEmitter.EmitClassUnit</c>); either way the run unit runs it at its start AND at its
+    /// termination (<c>RunUnit.AdoptStaticStorage</c> / <c>RunUnit.Terminate</c>; §14.6.11 items 3, 4 and 6 — a
+    /// static POINTER, OBJECT REFERENCE or dynamic item no longer keeps storage alive past the run unit; kb/Work
+    /// PB1069). It reassigns every static WS root field / Tier-B backing to the SAME composed
     /// initializer its declaration carries (the ONE ValueInitializer channel — §13.18.63 VALUE semantics
     /// identical to first-load), every static WS index cell to 1, and <c>__filesRegistered</c> to false so
     /// the next activation re-registers fresh connectors in no open mode (action 3; kb/Work PB168). Invoked
@@ -70,7 +75,7 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
     private void EmitStaticReset(CodeWriter w)
     {
         var stmts = new List<string>();
-        foreach (var root in ctx.Data.WorkingStorageRoots)
+        foreach (var root in ctx.Data.StaticStorageRoots)
         {
             // §14.6.2.3.2 action 5: "The address of each based item is set to null" — the static bridge
             // field (kb/Work PB154; the DATA lives in the allocated cell, so there is no value to re-seed).

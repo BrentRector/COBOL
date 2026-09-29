@@ -97,7 +97,10 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         // discarded it, and let ProgramTable resolve ANY outermost program at run time).
         if (asNested && call.callTarget()?.literal() is { } asLit)
         {
-            string nestedName = CobolLiteral.Decode(asLit.GetText());
+            // The name is read and FORMED by the ONE program-name-literal reader, exactly as the target below is,
+            // so the bind-time scope table and the run-time resolver match the same string (kb/Work PB1539).
+            if (ProgramNameLiteral(asLit, "CALL … AS NESTED", "§14.9.4.3 SR2") is not { } nestedName)
+                return BoundRejected.Reported(ctx.Edition);
             if (host.NestedCallables is { } nc && nc.TryGetValue(nestedName, out var sig))
                 callee = sig;
             else
@@ -721,7 +724,12 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         if (host.Expr.NonNumericLiteralOperand(lit.nonNumericLiteral()) is BoundStringLiteral
             { Category: PicCategory.Alphanumeric or PicCategory.National } sl)
         {
-            if (sl.Value.Length != 0) return sl.Value;
+            // The literal's content FORMS the program-name (§14.9.4.4 GR3 b) sends it "as described in 8.3.2.2";
+            // DOC-A.1-68): leading and trailing spaces removed by the ONE rule the run-time resolver applies too, so
+            // `CALL "trail  "` and a `PROGRAM-ID. S AS "trail  "` are the same name (kb/Work PB1539). A literal of
+            // spaces only is NOT zero-length (SR2 admits it) and stays legal: it forms the empty name, which the
+            // run-time locate reports as EC-PROGRAM-NOT-FOUND (§14.9.4.4 GR3 b).
+            if (sl.Value.Length != 0) return CobolNet.Runtime.ExternalizedNames.Form(sl.Value);
             ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass,
                 $"{verb} with a zero-length literal program name (ISO {clause})");
             return null;

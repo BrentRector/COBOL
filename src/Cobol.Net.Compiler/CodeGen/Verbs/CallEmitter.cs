@@ -257,7 +257,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 : $"ProgramRegistry.CallPointer({PlaceRenderer.Read(pf.Place)}, {head});";
         string nameExpr = c.LiteralName is { } literal
             ? CsLiteral(literal)
-            : $"({OperandText.AsString(c.DynamicName!, num)}).Trim()";   // GR3b — the identifier's value at CALL time (GR3a: read once)
+            : OperandText.AsString(c.DynamicName!, num);   // GR3b — the identifier's value at CALL time (GR3a: read once); ProgramTable forms the name
         return $"ProgramRegistry.CallProgram({nameExpr}, {head}"
             + $"{(c.IsFunction ? ", notFoundEc: \"EC-FUNCTION-NOT-FOUND\"" : "")}"   // §8.4.3.2.4 GR6b
             + $"{(argMismatchChecking ? ", siteArgMismatchChecking: true" : "")});";
@@ -351,8 +351,12 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             w.Line($"ExceptionState.SetObject(__po{id});   // GR1b2 — the current exception object HERE (the activator)");
             w.Line($"int __or{id} = {ec.ObjDispatchExpr($"__po{id}")};   // rule 2 — USE AFTER EXCEPTION OBJECT (GR14)");
             w.Line(dispatch.ResumeTransfer($"__or{id}", "   // RESUME AT procedure-name"));
-            using (w.Block($"if (__or{id} == -3)   // rule 3 PROPAGATE ON: directive not implemented (residue); rule 4 —"))
+            using (w.Block($"if (__or{id} == -3)   // no declarative took it: item 3 (PROPAGATE ON), else item 4"))
             {
+                // Item 3 — under >>PROPAGATE ON the activator re-propagates it (kb/Work PB1119); it returns, so what
+                // follows is item 4 for an element without the directive (or a main program, which has no activator).
+                if (ec.ObjectPropagationReturn($"__po{id}") is { } propagate)
+                    w.Line(propagate + "   // §14.6.13.1.5 item 3");
                 // As if EXCEPTION EC-OO-EXCEPTION (:24608): the name enters the F3 tiers; Table 13 makes it fatal.
                 ec.EmitConditionSet("EC-OO-EXCEPTION", "as if EXCEPTION EC-OO-EXCEPTION (:24608)");
                 ec.EmitSelection("\"EC-OO-EXCEPTION\"",
@@ -1045,7 +1049,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         var ecProg = EnabledProgramNames();
         foreach (var (literal, dynamic) in c.Targets)
         {
-            string nameExpr = literal is { } l ? CsLiteral(l) : $"({OperandText.AsString(dynamic!, num)}).Trim()";
+            string nameExpr = literal is { } l ? CsLiteral(l) : OperandText.AsString(dynamic!, num);
             string call = $"ProgramRegistry.Cancel({nameExpr}, {CsLiteral(callState.SelfPath)});";
             if (ecProg.Count == 0)
             {

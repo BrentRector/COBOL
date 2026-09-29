@@ -97,11 +97,23 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// §14.6.2.3.2 initial-state cases so a run-unit re-run and a post-CANCEL activation re-register their
     /// connectors. The two emitter sites previously mirrored this predicate BY HAND with a comment warning
     /// that divergence is a CS0103 in generated code; reading it here retires the mirroring (kb/Work PB168;
-    /// the one-rule-one-place discipline).</summary>
+    /// the one-rule-one-place discipline).
+    /// <para>The static channel is populated for exactly two kinds of storage — a <see cref="UnitStaticWs"/> unit's
+    /// WORKING-STORAGE (<see cref="RouteStaticUnitStorage"/>) and a class's METHOD WORKING-STORAGE (OO deep-dive D3,
+    /// <see cref="MethodWorkingStorageRoots"/>) — so a non-empty channel IS the condition, with no unit-kind conjunct.
+    /// A class half therefore emits <c>__ResetStatics</c> too, and its factory adopts it into each run unit
+    /// (kb/Work PB1069: a pre-2023 method's WORKING-STORAGE was a C# static nothing ever reset, so a second run unit
+    /// in one process saw the first one's values).</para></summary>
     public bool EmitsStaticReset =>
-        (UnitStaticWs && (StaticRootFields.Count > 0 || StaticBasedBridgeAddrs.Count > 0
-                          || StaticAddressableCells.Count > 0 || StaticIndexCells.Count > 0))
+        StaticRootFields.Count > 0 || StaticBasedBridgeAddrs.Count > 0
+        || StaticAddressableCells.Count > 0 || StaticIndexCells.Count > 0
         || (UnitStaticFiles && Files.Count > 0);
+
+    /// <summary>Every WORKING-STORAGE root whose storage is STATIC data — this unit's own when it is a
+    /// <see cref="UnitStaticWs"/> unit, then each METHOD's (a class half; OO deep-dive D3), in source order. The ONE
+    /// walk <c>__ResetStatics</c> emits from; each arm there is gated on the static-channel membership, so an
+    /// automatic-storage root in this list contributes nothing.</summary>
+    public IEnumerable<DataItem> StaticStorageRoots => _workingStorageRoots.Concat(_methodWorkingStorageRoots);
 
     /// <summary>The unit's WORKING-STORAGE SECTION roots, in source order — the subset of <see cref="Roots"/>
     /// whose storage class is decided by §13.5.4 (static/initial data), captured at bind so the static-WS
@@ -109,6 +121,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// the mixed forest (FILE records and compiler temps share <see cref="Roots"/>).</summary>
     public IReadOnlyList<DataItem> WorkingStorageRoots => _workingStorageRoots;
     private readonly List<DataItem> _workingStorageRoots = [];
+
+    /// <summary>A class half's METHOD WORKING-STORAGE roots, every method's in source order — the static data of
+    /// OO deep-dive D3 (one copy per class, persistent across activations; §13.5.4 GR1 via §11.7).</summary>
+    public IReadOnlyList<DataItem> MethodWorkingStorageRoots => _methodWorkingStorageRoots;
+    private readonly List<DataItem> _methodWorkingStorageRoots = [];
 
     /// <summary>The unit's LOCAL-STORAGE SECTION roots, in source order (ISO §13.6 — automatic data,
     /// §13.6.4 GR1). Emitted as ordinary INSTANCE fields: for an INITIAL or RECURSIVE unit the fresh instance
@@ -1708,10 +1725,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     {
                         file.IsExternal = true;
                         // GR5's two sentences, in order: literal-1 when the AS phrase is written, the FD's own
-                        // file-name otherwise (kb/Work PB511). The literal is taken verbatim — it is a
-                        // character-string, not a COBOL word — while the file-name is uppercased because
-                        // §8.3.2 makes a user-defined word case-insensitive. §13.18.22.3 SR3 screens it
-                        // through the ONE shared externalized-name screen (COBOLNET2156).
+                        // file-name otherwise (kb/Work PB511). The literal is a character-string, not a COBOL
+                        // word, so its case is kept, while the file-name is uppercased because §8.3.2 makes a
+                        // user-defined word case-insensitive. §13.18.22.3 SR3 screens it through the ONE shared
+                        // externalized-name screen (COBOLNET2156), which also FORMS it — leading and trailing
+                        // spaces removed (DOC-A.1-68, kb/Work PB1539).
                         file.ExternalName =
                             (ge.externalizedNamePhrase() is { } asPhrase
                                 ? ExternalizedName.Screen(asPhrase.literal(), Edition,

@@ -39,10 +39,19 @@ public abstract class CobolObject
             + "the invocation (ISO §9.3.6 6); §14.9.23.4 GR7b)");
 
     /// <summary>Normalize an identifier-2 method-name value (§14.9.23.4 GR2a): the content IS a
-    /// user-defined word — case-insensitive (§8.3.2.2), and the PIC X trailing-space padding is not part
-    /// of the name. The ONE word mapping: the INVOKE literal is normalized through it at bind time, and every
+    /// user-defined word — formed by the one externalized-name rule (<see cref="ExternalizedNames.Form"/>: leading
+    /// and trailing spaces, which include the PIC X padding, are not part of the name) and case-insensitive
+    /// (§8.3.2.2). The ONE word mapping: the INVOKE literal is normalized through it at bind time, and every
     /// generated case label is the method's EXTERNALIZED name through it (<c>OoMethodSymbol.DispatchKey</c>).</summary>
-    public static string NormalizeMethodName(string raw) => raw.TrimEnd().ToUpperInvariant();
+    public static string NormalizeMethodName(string raw) => ExternalizedNames.Form(raw).ToUpperInvariant();
+
+    /// <summary>Adopt this object's CLASS static storage — every method's WORKING-STORAGE, OO deep-dive D3 — into
+    /// <paramref name="runUnit"/> (<see cref="RunUnit.AdoptStaticStorage"/>, kb/Work PB1069). Called once, on the
+    /// FACTORY object, when the run unit creates it (<see cref="RunUnit.FactoryObject{T}"/>). A generated factory
+    /// whose class or factory half has method working-storage overrides it, adopting its own two resets and then
+    /// calling the base, so every class on the inheritance chain adopts its static storage; a class with none
+    /// inherits this empty root.</summary>
+    protected internal virtual void __AdoptRunUnitStorage(RunUnit runUnit) { }
 
     /// <summary>The INVOKE null-receiver guard (§14.9.23.4 GR5): emitted before every instance dispatch —
     /// <c>CobolObject.RequireNonNull(recv).M(args)</c> — so a null object reference raises EC-OO-NULL (fatal,

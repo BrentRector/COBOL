@@ -53,7 +53,7 @@ public sealed class ProgramTable
     private readonly RunUnit _owner;
     private readonly Dictionary<string, Node> _byPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Node> _order = [];
-    private readonly HashSet<string> _probedModules = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _probedModules = new(ExternalizedNames.Comparer);
 
     public ProgramTable(RunUnit owner) => _owner = owner;
 
@@ -78,7 +78,7 @@ public sealed class ProgramTable
     {
         var node = new Node
         {
-            Path = path, Name = name, CallName = externalizedName ?? name, ParentPath = parentPath,
+            Path = path, Name = name, CallName = ExternalizedNames.Form(externalizedName ?? name), ParentPath = parentPath,
             Initial = initial, Common = common, Recursive = recursive, Factory = factory,
             FormalCount = formalCount, RequiredCount = requiredCount, ArgMismatchChecking = argMismatchChecking,
             StaticReset = staticReset, IsFunction = isFunction,
@@ -95,7 +95,9 @@ public sealed class ProgramTable
                     $"program {name} registered before its container {parentPath} — the registrar emits containers first (kb/Work PB154)");
             parent.Children.Add(node);
         }
-        staticReset?.Invoke();   // run-unit start = initial state for the unit's static data (§14.6.2.3.2 case 1)
+        // Run-unit start = initial state for the unit's static data (§14.6.2.3.2 case 1), and run-unit termination
+        // releases it (§14.6.11 3/4/6) — both through the run unit's ONE static-storage adoption (kb/Work PB1069).
+        if (staticReset is not null) _owner.AdoptStaticStorage(staticReset);
     }
 
     /// <summary>Run the run unit's MAIN program (the first program of the compilation group), owning the run-unit
@@ -147,11 +149,12 @@ public sealed class ProgramTable
         catch (CobolImplementorFatalException ix) { AbnormalTermination(ix.Message); }
         finally
         {
-            // §14.6.11(2): an implicit CLOSE without phrases for EVERY open file in the RUN UNIT, executed even when
-            // termination is abnormal (§14.6.12). Idempotent (FileRegistry.CloseAll), so the RunUnit.Run embedding
-            // path's own finally-CloseAll is a harmless double. StopRun unwinding from Activate passes THROUGH here
-            // (CloseAll runs) on its way to the entry wrapper's catch.
-            _owner.Files.CloseAll();
+            // §14.6.11's runtime epilogue — item 2's implicit CLOSE of EVERY open file in the RUN UNIT (executed even
+            // when termination is abnormal, §14.6.12) and items 3/4/6's release of what static storage still holds —
+            // is RunUnit.Terminate, the ONE epilogue the RunUnit.Run embedding boundary runs too (idempotent, so
+            // nesting them is harmless). StopRun unwinding from Activate passes THROUGH here on its way to the entry
+            // wrapper's catch.
+            _owner.Terminate();
         }
     }
 
@@ -183,9 +186,9 @@ public sealed class ProgramTable
         var n = ResolveVisible(name, callerPath, wantFunction: notFoundEc == "EC-FUNCTION-NOT-FOUND")
             ?? throw new CobolCallException(
                 notFoundEc == "EC-FUNCTION-NOT-FOUND"
-                    ? $"FUNCTION '{name?.Trim()}': the user-defined function could not be located in the run unit "
+                    ? $"FUNCTION '{ExternalizedNames.Form(name)}': the user-defined function could not be located in the run unit "
                       + "(ISO §8.4.3.2.4 GR6b — EC-FUNCTION-NOT-FOUND)"
-                    : $"CALL '{name?.Trim()}': program not found in the run unit (ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
+                    : $"CALL '{ExternalizedNames.Form(name)}': program not found in the run unit (ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
                 notFoundEc);
         if (n.Active > 0 && !n.Recursive)
             throw new CobolCallException(
@@ -320,12 +323,12 @@ public sealed class ProgramTable
     {
         // GR1/GR2 name the EXTERNALIZED program-name explicitly, so this matches — and the pointer carries —
         // Node.CallName (kb/Work PB303; identical to Name for a program with no AS phrase).
-        string target = name?.Trim() ?? "";
+        string target = ExternalizedNames.Form(name);
         foreach (var n in _order)
-            if (n.ParentPath is null && !n.IsFunction && NameEquals(n.CallName, target)) { notFound = false; return new ProgramPointer(n.CallName); }
+            if (n.ParentPath is null && !n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new ProgramPointer(n.CallName); }
         if (ProbeSiblingModule(target))
             foreach (var n in _order)
-                if (n.ParentPath is null && !n.IsFunction && NameEquals(n.CallName, target)) { notFound = false; return new ProgramPointer(n.CallName); }
+                if (n.ParentPath is null && !n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new ProgramPointer(n.CallName); }
         notFound = true;
         return ProgramPointer.Null;   // §8.4.3.13 GR4 — the value is the predefined address NULL
     }
@@ -347,12 +350,12 @@ public sealed class ProgramTable
     /// </summary>
     public FunctionPointer FunctionAddressOf(string name, out bool notFound)
     {
-        string target = name?.Trim() ?? "";
+        string target = ExternalizedNames.Form(name);
         foreach (var n in _order)
-            if (n.IsFunction && NameEquals(n.CallName, target)) { notFound = false; return new FunctionPointer(n.CallName); }
+            if (n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new FunctionPointer(n.CallName); }
         if (ProbeSiblingModule(target))
             foreach (var n in _order)
-                if (n.IsFunction && NameEquals(n.CallName, target)) { notFound = false; return new FunctionPointer(n.CallName); }
+                if (n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new FunctionPointer(n.CallName); }
         notFound = true;
         return FunctionPointer.Null;   // §8.4.3.12.4 GR4 — the value is the predefined address NULL
     }
@@ -376,7 +379,7 @@ public sealed class ProgramTable
     {
         if (p.IsNull) return true;   // §13.18.60.4 GR26 — NULL is always an admissible content
         foreach (var n in _order)
-            if (n.IsFunction && NameEquals(n.CallName, p.Name!))
+            if (n.IsFunction && ExternalizedNames.Same(n.CallName, p.Name!))
                 return Math.Max(n.FormalCount, 0) == expectedFormals;
         return false;   // an address no registration backs is not "the address of a function … with the same signature"
     }
@@ -437,7 +440,7 @@ public sealed class ProgramTable
     /// </summary>
     public void Cancel(string name, string callerPath)
     {
-        string n = name?.Trim() ?? "";
+        string n = ExternalizedNames.Form(name);
         if (n.Length == 0) return;   // §14.9.5 GR12
         // GR7: a name not located in the run unit is NO ACTION — so the sibling-module probe must not run
         // (it loads assemblies, fires registrars/static resets, and caches the MISS, suppressing a later
@@ -516,27 +519,26 @@ public sealed class ProgramTable
         // FUNCTION-ID's name is a function-name, never a program-name — so a program lookup must not see a
         // registered function (CANCEL of a UDF name re-initialized its statics before — kb/Work PB154) and a
         // function lookup (the EC-FUNCTION-NOT-FOUND callers) must not see a program. One discriminator per arm.
-        string target = name?.Trim() ?? "";
+        string target = ExternalizedNames.Form(name);
         if (target.Length == 0) return null;
         Node? caller = callerPath is not null && _byPath.TryGetValue(callerPath, out var c) ? c : null;
 
         if (caller is not null)
         {
             foreach (var child in caller.Children)                                   // rule 1
-                if (child.IsFunction == wantFunction && NameEquals(child.CallName, target)) return child;
-            if (caller.IsFunction == wantFunction && NameEquals(caller.CallName, target) && caller.Recursive)
+                if (child.IsFunction == wantFunction && ExternalizedNames.Same(child.CallName, target)) return child;
+            if (caller.IsFunction == wantFunction && ExternalizedNames.Same(caller.CallName, target) && caller.Recursive)
                 return caller;                                                       // rule 2
             for (var anc = ParentOf(caller); anc is not null; anc = ParentOf(anc))   // rule 3 — nearest container first
                 foreach (var sib in anc.Children)
                 {
-                    if (sib.IsFunction != wantFunction || !sib.Common || !NameEquals(sib.CallName, target)) continue;
-                    bool onOwnChain = caller.Path.Equals(sib.Path, StringComparison.OrdinalIgnoreCase)
-                        || caller.Path.StartsWith(sib.Path + "/", StringComparison.OrdinalIgnoreCase);
-                    if (!onOwnChain || sib.Recursive) return sib;
+                    if (sib.IsFunction != wantFunction || !sib.Common || !ExternalizedNames.Same(sib.CallName, target)) continue;
+                    // §8.4.6.3 2)'s exception — written ONCE, shared with the bind-time AS NESTED table (kb/Work PB1460).
+                    if (ProgramNameScope.CommonProgramReferable(sib, sib.Recursive, caller, ParentOf)) return sib;
                 }
         }
         foreach (var n in _order)                                                    // rule 4 — outermost programs
-            if (n.ParentPath is null && n.IsFunction == wantFunction && NameEquals(n.CallName, target)) return n;
+            if (n.ParentPath is null && n.IsFunction == wantFunction && ExternalizedNames.Same(n.CallName, target)) return n;
 
         // Rule-4 fallthrough: the run unit may be composed of SEPARATELY COMPILED modules ("a run unit contains
         // one or more runtime modules", ISO §14.6.1; §14.9.4.4 GR3b — the runtime system "attempts to locate"
@@ -547,7 +549,7 @@ public sealed class ProgramTable
         // name per run unit.
         if (probe && ProbeSiblingModule(target))
             foreach (var n in _order)
-                if (n.ParentPath is null && n.IsFunction == wantFunction && NameEquals(n.CallName, target)) return n;
+                if (n.ParentPath is null && n.IsFunction == wantFunction && ExternalizedNames.Same(n.CallName, target)) return n;
         return null;
     }
 
@@ -591,6 +593,4 @@ public sealed class ProgramTable
         for (var p = ParentOf(top); p is not null; p = ParentOf(top)) top = p;
         return top.Name;
     }
-
-    private static bool NameEquals(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 }

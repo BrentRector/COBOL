@@ -319,6 +319,7 @@ public sealed partial class DataBinder
                             + "recognized but not yet implemented (Phase 3, OO port)");
                 var roots = BindEntries(ws.dataDescriptionEntry(), _rootNames);
                 m.Binding!.StaticRoots.AddRange(roots);
+                _methodWorkingStorageRoots.AddRange(roots);
                 foreach (var r in roots) _staticRootFields.Add(r.CsName);
             }
             if (dd.localStorageSection() is { } ls)

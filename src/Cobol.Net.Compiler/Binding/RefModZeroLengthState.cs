@@ -29,31 +29,14 @@ public sealed class RefModZeroLengthState
         => events is null || events.Count == 0 ? Empty : new RefModZeroLengthState(DirectiveTimeline<RefModZeroLengthEvent>.Of(events));
 
     /// <summary>Is <c>REF-MOD-ZERO-LENGTH</c> ON at a reference modification on <paramref name="siteLine"/>? The
-    /// most recent toggle strictly BEFORE the site wins; OFF when no toggle precedes it.</summary>
-    public bool IsOnAt(int siteLine)
-    {
-        bool on = false;   // §7.3.23.3 GR1 — the default is OFF
-        for (int k = 0; k < _events.Count; k++)
-        {
-            var e = _events[k];
-            if (e.Line >= siteLine) break;   // events are in line order; a directive applies to succeeding text only
-            if (_events.InEffectAt(k, siteLine)) on = e.On;   // a POP-revoked toggle is gone (kb/Work PB941)
-        }
-        return on;
-    }
+    /// most recent toggle strictly BEFORE the site wins; OFF when no toggle precedes it (§7.3.23.3 GR1 — the default
+    /// is OFF). The fold is the timeline's one <see cref="DirectiveTimeline{T}.TryLastInEffectBefore"/>.</summary>
+    public bool IsOnAt(int siteLine) => _events.TryLastInEffectBefore(siteLine, ev => ev.Line, out var last) && last.On;
 
     /// <summary>Whether the <c>&gt;&gt;REF-MOD-ZERO-LENGTH</c> directive is NOT explicitly specified (neither ON nor
-    /// OFF) at <paramref name="siteLine"/> — no toggle precedes the site. This is the tri-state distinction
-    /// <see cref="IsOnAt"/> cannot make (it folds absence to OFF): the FLAG-14 REF-MOD-ZERO-LENGTH option
-    /// (ISO §7.3.15.4 GR4 i) flags a reference modification ONLY when the directive is in this unspecified state
-    /// (and EC-BOUND-REF-MOD checking is on).</summary>
-    public bool IsUnspecifiedAt(int siteLine)
-    {
-        for (int k = 0; k < _events.Count; k++)
-        {
-            if (_events[k].Line >= siteLine) break;           // no toggle reaches the site
-            if (_events.InEffectAt(k, siteLine)) return false; // a live toggle (ON or OFF) precedes it — explicitly specified
-        }
-        return true;   // none, or every one was revoked by a POP back to the unspecified state (kb/Work PB941)
-    }
+    /// OFF) at <paramref name="siteLine"/> — no live toggle precedes the site (none, or every one was revoked by a POP
+    /// back to the unspecified state, kb/Work PB941). This is the tri-state distinction <see cref="IsOnAt"/> cannot
+    /// make (it folds absence to OFF): the FLAG-14 REF-MOD-ZERO-LENGTH option (ISO §7.3.15.4 GR4 i) flags a reference
+    /// modification ONLY when the directive is in this unspecified state (and EC-BOUND-REF-MOD checking is on).</summary>
+    public bool IsUnspecifiedAt(int siteLine) => !_events.TryLastInEffectBefore(siteLine, ev => ev.Line, out _);
 }

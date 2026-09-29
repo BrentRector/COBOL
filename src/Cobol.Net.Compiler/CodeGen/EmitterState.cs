@@ -328,6 +328,16 @@ internal sealed class EcState
     /// <summary>… has F4 (EXCEPTION OBJECT) declaratives (→ <c>__EcObjDispatch</c> exists). Set per unit.</summary>
     public bool UnitHasF4 { get; set; }
 
+    /// <summary>The group's class table — restored once per run unit with <see cref="Active"/>; the emitter resolves
+    /// an element's PROCEDURE DIVISION header RAISING classes and interfaces through it (kb/Work PB1119).</summary>
+    public Compiler.Oo.OoClassTable? OoClasses { get; set; }
+
+    /// <summary>The source element being emitted runs with AUTOMATIC PROPAGATION enabled (ISO §7.3.21.4 GR1 — a
+    /// <c>&gt;&gt;PROPAGATE ON</c> precedes it; kb/Work PB1119), or null when it does not (GR4's OFF default). Set per
+    /// program unit and per METHOD, restored after each; read only by <c>EcEmitter</c>, where the fatal default is
+    /// decided (§14.6.13.1.3 6)) and where an activator disposes of an exception object (§14.6.13.1.5).</summary>
+    public AutomaticPropagation? Propagation { get; set; }
+
     /// <summary>The wrapper context of the statement being emitted (else null) — statement-scoped, saved/restored
     /// around each <c>BoundEcChecked</c> body.</summary>
     public EcStatementInfo? Info { get; set; }
@@ -419,4 +429,29 @@ internal sealed class CallUnitState
     /// store must write the OWNER's storage although the NAME is not visible to it. Rebuilt per emitted unit
     /// (nearest container first); consumed by the after-verb FILE STATUS store.</summary>
     public Dictionary<FileModel, Place> InheritedStatusPlace { get; } = [];
+}
+
+/// <summary>How an element compiled under <c>&gt;&gt;PROPAGATE ON</c> performs the "as if a GOBACK statement with the
+/// RAISING LAST EXCEPTION phrase were executed" of ISO §14.6.13.1.3 6) / §14.6.13.1.5 (kb/Work PB1119).</summary>
+/// <param name="InMethod">The element is a METHOD: GOBACK returns through <c>MethodReturn</c> and there is always an
+/// activator. Otherwise a program or function: <c>ProgramReturn</c>, and only while <c>__asCalled</c> — §7.3.21.1
+/// propagates "to the activating runtime element", and a run unit's main program has none (§14.9.18.4 GR3 makes
+/// its GOBACK a STOP that ignores RAISING), so there the §14.6.13.1.3 7) termination stands.</param>
+/// <param name="RaisingObjectCsTypes">The C# types an exception object must be an instance of to be "an applicable
+/// class or interface … specified in the RAISING phrase of the procedure division header" of this element
+/// (§14.6.13.1.5 item 3) — the classes' own types (FACTORY OF: the factory type) and each interface's implementing
+/// types.</param>
+internal sealed record AutomaticPropagation(bool InMethod, IReadOnlyList<string> RaisingObjectCsTypes)
+{
+    /// <summary>The element's automatic propagation, or null when it is OFF; <paramref name="raising"/> is its
+    /// PROCEDURE DIVISION header RAISING phrase, resolved through <paramref name="table"/>.</summary>
+    public static AutomaticPropagation? Of(bool on, bool inMethod, IEnumerable<Binding.Model.RaisingTarget> raising,
+        Compiler.Oo.OoClassTable? table) =>
+        !on ? null : new(inMethod, [.. raising.SelectMany(t => t.Kind switch
+        {
+            Binding.Model.RaisingTargetKind.ObjectClass when table?.Find(t.Name) is { } c =>
+                (IEnumerable<string>)[t.Factory ? c.FactoryCsName : c.CsName],
+            Binding.Model.RaisingTargetKind.Interface when table?.FindInterface(t.Name) is { } i => i.ImplementedCsTypes,
+            _ => [],
+        }).Distinct(StringComparer.Ordinal)]);
 }

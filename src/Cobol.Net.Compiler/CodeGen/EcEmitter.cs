@@ -86,8 +86,43 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         if (terminate is null)
             return;   // nonfatal: declarative completed / RESUME NEXT / no handler all continue (§14.6.13.1.4 3)/4))
         string when = fatalWhen is null ? "" : $" && {fatalWhen}";
+        // §14.6.13.1.3 6) sits between 5) (a declarative ran: -1 terminates below) and 7): with NO handler (-3) and
+        // the element under >>PROPAGATE ON, the condition propagates as if GOBACK RAISING LAST EXCEPTION.
+        if (PropagationReturn(ecNameExpr) is { } propagate)
+            w.Line($"if ({r} == -3{when}) {propagate}   // no handler: automatic propagation (§14.6.13.1.3 6); §7.3.21.4 GR2)");
         w.Line($"if ({r} != ResumeSignal.NextStatement{when}) {terminate}"
             + "   // fatal, not resumed → abnormal run-unit termination (§14.6.13.1.3 5)/7))");
+    }
+
+    /// <summary>⛔ THE ONE RENDERING OF AUTOMATIC PROPAGATION of an unhandled fatal condition (ISO §14.6.13.1.3 6); the
+    /// §7.3.21.4 GR2 effect of <c>&gt;&gt;PROPAGATE ON</c>; kb/Work PB1119): stage the condition as the LAST exception for
+    /// the activator (<c>ExceptionState.StageAutomaticPropagation</c>, which excludes EC-FLOW-GLOBAL-EXIT and
+    /// EC-FLOW-GLOBAL-GOBACK) and return as a GOBACK does — <c>ProgramReturn</c> from a called program or function,
+    /// <c>MethodReturn</c> from a method. Null when the element being emitted is not under PROPAGATE ON (GR4's
+    /// default), so an element without the directive emits byte-identical text. Its two callers are the fatal
+    /// defaults: <see cref="EmitSelection"/> and the generated <c>__IoCheckEc</c> (the EC-I-O arm, which §14.6.13.1.3
+    /// 3) sends on to the same rules).</summary>
+    private string? PropagationReturn(string ecNameExpr) => ecState.Propagation switch
+    {
+        null => null,
+        { InMethod: true } => $"if (ExceptionState.StageAutomaticPropagation({ecNameExpr})) throw new MethodReturn();",
+        _ => $"if (__asCalled && ExceptionState.StageAutomaticPropagation({ecNameExpr})) throw new ProgramReturn();",
+    };
+
+    /// <summary>§14.6.13.1.5's EXIT/GOBACK item 3 — the ACTIVATOR's automatic propagation of an exception OBJECT that
+    /// no declarative took (kb/Work PB1119): "if a PROPAGATE ON directive is in effect for the activating runtime
+    /// element, the exception is propagated as if a GOBACK statement with the RAISING LAST EXCEPTION phrase were
+    /// specified in this activating runtime element", or with EXCEPTION EC-OO-EXCEPTION when the object is of no
+    /// class or interface this element's PROCEDURE DIVISION header RAISING phrase specifies. Null when the element is
+    /// not under PROPAGATE ON; then item 4 (the caller's EC-OO-EXCEPTION conversion) applies.</summary>
+    public string? ObjectPropagationReturn(string objExpr)
+    {
+        if (ecState.Propagation is not { } p) return null;
+        string applicable = p.RaisingObjectCsTypes.Count == 0
+            ? "false" : $"{objExpr} is {string.Join(" or ", p.RaisingObjectCsTypes)}";
+        return p.InMethod
+            ? $"{{ ExceptionState.StageAutomaticObjectPropagation({applicable}); throw new MethodReturn(); }}"
+            : $"if (__asCalled) {{ ExceptionState.StageAutomaticObjectPropagation({applicable}); throw new ProgramReturn(); }}";
     }
 
     /// <summary>The standard terminate statement of <see cref="EmitSelection"/>: a <c>CobolFatalException</c>
@@ -873,6 +908,11 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             }
             else EmitUseTiers();
             w.Line("if (__sel >= 0 || __sel == -2) return __sel;   // RESUME redirected/suppressed (§14.9.33)");
+            // §14.6.13.1.3 3) sends a fatal EC-I-O condition on to "the following rules", so 6)'s automatic propagation
+            // applies here exactly as at EmitSelection: no procedure qualified (-3) under >>PROPAGATE ON (kb/Work PB1119).
+            if (PropagationReturn("__ec!") is { } propagate)
+                w.Line($"if (__sel == -3 && __en && !__verbRule && {IoStatusClass.Fatal("__st")}) {propagate}"
+                    + "   // automatic propagation (§14.6.13.1.3 6))");
             // ⛔ §14.6.13.1.3 2) PRECEDES 5) and 7): "If the executed statement is a MERGE or SORT statement, then
             // the rules for those statements apply." A SORT/MERGE implicit transfer passes __verbRule, and the fatal
             // disposition is then the verb's own (SortEmitter.EmitTransferDisposition — terminate the statement,

@@ -388,6 +388,18 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // resource-failure leg. A class that does not inherit BASE has no New at all (kb/Work PB1548).
         if (lifeCycle)
             extras.Add($"protected override {cls.CsName} __Create() => new {cls.CsName}();   // New (ISO §16.2.1.2 GR1)");
+        // The class's METHOD working-storage is static data (OO deep-dive D3), so a new run unit cannot make it fresh
+        // by construction: each half that has any emits __ResetStatics (the ONE predicate, DataBinder.EmitsStaticReset,
+        // shared with RecordStructEmitter), and the factory ADOPTS both into the run unit that creates it — reset at
+        // its start (§14.6.2.3.2 case 1) and released at its termination (§14.6.11 3/4/6; kb/Work PB1069). The base
+        // call keeps a superclass's own adoption on the chain.
+        var adopt = new[] { (cls.Data, cls.CsName), (cls.FactoryData, cls.Symbol.FactoryCsName) }
+            .Where(h => h.Item1.EmitsStaticReset)
+            .Select(h => $"runUnit.AdoptStaticStorage({h.Item2}.__ResetStatics);")
+            .ToList();
+        if (adopt.Count > 0)
+            extras.Add("protected override void __AdoptRunUnitStorage(RunUnit runUnit) { base.__AdoptRunUnitStorage(runUnit); "
+                + string.Join(" ", adopt) + " }   // method WORKING-STORAGE → this run unit (ISO §14.6.2.3.2 / §14.6.11)");
         EmitTypeHalf(cls.Name, cls.Symbol.FactoryCsName, facBase,
             cls.FactoryData, cls.FactoryRefs, cls.FactoryBound, cls.Symbol.FactoryMethods, w, extras,
             sealedType: cls.Symbol.IsFinal);
@@ -446,9 +458,17 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             bool classHasF3Perform = bound.Ec is { HasF3Perform: true };
             bool savedUnitF3P = ecState.UnitHasF3Perform;
             ecState.UnitHasF3Perform = classHasF3Perform;
+            // The class-member __IoCheckEc serves every method's I-O statements, so its fatal default takes the METHODS'
+            // automatic propagation (kb/Work PB1119). §7.3.21.3 SR1 keeps the directive out of a class, so every method
+            // of one class folds the same state; the raising types are not read here (they serve the INVOKE pickup,
+            // which is emitted inside each method with that method's own header).
+            var savedPropagation = ecState.Propagation;
+            ecState.Propagation = AutomaticPropagation.Of(roster.Any(m => m.AutomaticPropagationHere), inMethod: true,
+                [], ecState.OoClasses);
             if (bound.Ec is { HasIoChecked: true }) U.Ec.EmitIoCheckEc([], w, asLocal: false);
             if (classHasF3Perform) U.Ec.EmitEcPerformMember(w);   // the raise-site funnel, once per class (§9.10.1-C1)
             ecState.UnitHasF3Perform = savedUnitF3P;
+            ecState.Propagation = savedPropagation;
             if (bound.Paragraphs.Count > 0)
                 w.Line($"private const int __N = {bound.Paragraphs.Count};   // paragraph count (all methods — one pc space)");
             w.Line();
@@ -968,6 +988,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // method must not inherit the last PROGRAM's slots from this run-unit-lifetime state object (kb/Work PB409).
             var savedGlobalDecls = dispatch.GlobalDeclIds;
             dispatch.GlobalDeclIds = [];
+            // A method is a source element of its own for §7.3.21.4 GR1 too (kb/Work PB1119): ITS automatic
+            // propagation and ITS header's RAISING classes drive the fatal default and the INVOKE pickup in its body.
+            var savedPropagation = ecState.Propagation;
+            ecState.Propagation = AutomaticPropagation.Of(m.AutomaticPropagationHere, inMethod: true, m.Raising,
+                ecState.OoClasses);
             if (methodSelects)
             {
                 ecState.UnitHasF3Perform = methodF3;                            // raise sites emit __EcPerform
@@ -1028,6 +1053,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             (ecState.UnitHasF3Perform, ecState.UnitHasF3, ecState.UnitHasF4, dispatch.UseDecls,
                 dispatch.DeclCount, dispatch.F3HandlerBasePc) = savedSel;
             dispatch.GlobalDeclIds = savedGlobalDecls;
+            ecState.Propagation = savedPropagation;
             // BY REFERENCE copy-out (§14.2.3 GR8) / RETURNING (§14.9.23.4 GR8). A Tier-B REDEFINES canonical's
             // storage IS its string backing (a width-correct image), not the suppressed root struct — write that
             // back / return that, else the generated C# names an undeclared local (review A/emission).

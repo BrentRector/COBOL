@@ -122,6 +122,30 @@ public sealed class RunUnitStateDriftTests
         Assert.Same(second.FactoryObject<ProbeFactory>(), second.FactoryObject<ProbeFactory>());
     }
 
+    /// <summary>kb/Work PB1069's remainder — STATIC storage is the one kind of run-unit state a new
+    /// <see cref="RunUnit"/> object cannot make fresh by construction, so the run unit ADOPTS each unit's static reset:
+    /// it runs at adoption (§14.6.2.3.2 1) — initial state at the first activation in a run unit), once per reset
+    /// however many factories on a subclass chain adopt it, and again at <see cref="RunUnit.Terminate"/> (§14.6.11 3/4/6 —
+    /// what the static held is released). Both run-unit boundaries end in that one epilogue.</summary>
+    [Fact]
+    public void StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination()
+    {
+        StaticProbe.Resets = 0;
+        RunUnit.Run(ru =>
+        {
+            ru.AdoptStaticStorage(StaticProbe.Reset);
+            ru.AdoptStaticStorage(StaticProbe.Reset);      // a second factory on the chain — no second reset
+            Assert.Equal(1, StaticProbe.Resets);
+        });
+        Assert.Equal(2, StaticProbe.Resets);                // RunUnit.Run's termination ran the adopted reset
+    }
+
+    private static class StaticProbe
+    {
+        public static int Resets;
+        public static void Reset() => Resets++;
+    }
+
     private sealed class ProbeFactory : CobolObject;
 
     private sealed class FixedClockForTest : IClock

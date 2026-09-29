@@ -165,6 +165,7 @@ public sealed class ExceptionPerformDirectiveScopeTests
                    >>TURN EC-SIZE CHECKING ON
                    >>REF-MOD-ZERO-LENGTH ON
                    >>FLAG-14 READ-PREVIOUS ON
+                   >>PROPAGATE ON
                        DISPLAY "X"
             """);
         int pop = Line("X");

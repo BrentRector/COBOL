@@ -852,7 +852,7 @@ code:
   §7.3.10.3 SR1 / §7.3.17.3 SR1 close the region — and take the state in effect there.
 * **`DirectiveStateRegistry`** accounts for every pushable row: carried (naming the stage types and the
   `DirectiveResults` members) or, with its rule, why this compiler holds no state (LISTING — no listing is produced,
-  §7.3.18.3 GR1; DISPLAY — stateless; CALL-CONVENTION and PROPAGATE — no state implemented; FLAG-85 /
+  §7.3.18.3 GR1; DISPLAY — stateless; CALL-CONVENTION — no state implemented; FLAG-85 /
   FLAG-NATIVE-ARITHMETIC — removed at 2023, the only edition with PUSH). `DirectiveStateStackTests` is the drift
   gate: the registry equals the pushable set, every carrier is a real stage, every `DirectiveResults` member is
   claimed, and every carried row has a PUSH/change/POP behavioural case.

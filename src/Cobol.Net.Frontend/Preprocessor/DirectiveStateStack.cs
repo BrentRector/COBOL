@@ -277,6 +277,24 @@ public sealed class DirectiveTimeline<T> : IReadOnlyList<T>
     /// <summary>The line of the POP that revoked event <paramref name="index"/>, or <see cref="int.MaxValue"/>.</summary>
     public int RevokedAt(int index) => _revokedAt?[index] ?? int.MaxValue;
 
+    /// <summary>THE fold of a single-valued ON/OFF directive at a construct on <paramref name="siteLine"/>: the most
+    /// recent event written strictly BEFORE the site (a directive occupies its own line and applies to the text that
+    /// follows it — the <c>&gt;&gt;TURN</c> GR5 discipline) and still in effect there (<see cref="InEffectAt"/>, a
+    /// POP-revoked event is gone). False when no such event exists — the directive is UNSPECIFIED at the site, and
+    /// each caller applies its own default. The REF-MOD-ZERO-LENGTH and PROPAGATE states are this fold (kb/Work
+    /// PB1119), so neither re-spells the line test or the revocation test.</summary>
+    public bool TryLastInEffectBefore(int siteLine, Func<T, int> lineOf, out T ev)
+    {
+        ev = default!;
+        bool found = false;
+        for (int k = 0; k < _events.Count; k++)
+        {
+            if (lineOf(_events[k]) >= siteLine) break;   // events are in line order
+            if (InEffectAt(k, siteLine)) { ev = _events[k]; found = true; }
+        }
+        return found;
+    }
+
     /// <inheritdoc/>
     public T this[int index] => _events[index];
 

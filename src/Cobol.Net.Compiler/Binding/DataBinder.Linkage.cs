@@ -276,6 +276,12 @@ public sealed partial class DataBinder
     /// gate.</summary>
     public bool ArgMismatchChecking { get; set; }
 
+    /// <summary>Is automatic propagation of exception conditions enabled for this program or function unit (ISO
+    /// §7.3.21.4 GR1/GR3; kb/Work PB1119)? Folded by <c>BinderDriver.BindUnitData</c> from the group's
+    /// <see cref="PropagateState"/> at the unit's first line; read by <c>ProgramEmitter</c> into the emitter's
+    /// per-element propagation state, which <c>EcEmitter.EmitSelection</c> applies (§14.6.13.1.3 6)).</summary>
+    public bool AutomaticPropagation { get; set; }
+
     /// <summary>This unit's before-Environment-division EC-EXTERNAL enablement mask (ISO §14.8.4.1 — the
     /// ACTIVATED-element half of the both-elements rule; <c>ExternalChecks</c> bits). Computed by
     /// <c>BinderDriver.BindUnitData</c> from the group TurnState folded at the unit's first

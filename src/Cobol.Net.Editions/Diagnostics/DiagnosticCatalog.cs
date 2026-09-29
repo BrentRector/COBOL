@@ -376,6 +376,29 @@ public static class DiagnosticCatalog
         + "literal and shall not be a figurative constant\" — and that asymmetry is honoured exactly.",
         "ISO §11.10.3 SR1 / §11.5.3 SR1 / §11.3.3 SR1 / §11.6.3 SR1 / §11.7.3 SR1");
 
+    /// <summary>COBOLNET2642 — an AS literal's leading or trailing spaces are removed when the externalized name is
+    /// formed (§8.3.2.2 2) leaves formation to the implementor; DOC-A.1-68 fixes it; kb/Work PB1539).</summary>
+    public static readonly DiagnosticDescriptor ExternalizedNameSpaces = new(
+        "COBOLNET2642", "externalized-name-spaces", EditionSeverity.Warning,
+        "An AS phrase's literal has leading or trailing spaces. ISO §8.3.2.2 rule 2 makes the literal's content a "
+        + "name externalized to the operating environment and leaves its formation rules to the implementor; "
+        + "WiseOwl COBOL forms every externalized name — an AS literal, a CALL, CANCEL or program-address target, an "
+        + "INVOKE method name — by removing leading and trailing spaces (docs/CONFORMANCE.md DOC-A.1-68), so the "
+        + "name the entity is known by differs from the literal as written.",
+        "ISO §8.3.2.2 rule 2 / DOC-A.1-68");
+
+    /// <summary>COBOLNET2643 — an AS literal of spaces only forms the zero-length externalized name (kb/Work
+    /// PB1539). Refused wherever the clause itself refuses a zero-length literal — every AS clause but CLASS-ID.</summary>
+    public static readonly DiagnosticDescriptor ExternalizedNameAllSpaces = new(
+        "COBOLNET2643", "externalized-name-all-spaces", EditionSeverity.Error,
+        "An AS phrase's literal consists of spaces only. Externalized names are formed without leading and trailing "
+        + "spaces (ISO §8.3.2.2 rule 2 leaves formation to the implementor; docs/CONFORMANCE.md DOC-A.1-68), so the "
+        + "literal forms the zero-length name, which no CALL, CANCEL, program-address or INVOKE target can name. The "
+        + "clauses that refuse a zero-length literal (§11.10.3 SR1, §11.5.3 SR1, §11.6.3 SR1, §11.7.3 SR1, §12.3.8.3 "
+        + "SR2, §13.18.22.3 SR3) therefore refuse this literal too; CLASS-ID, whose §11.3.3 SR1 admits a zero-length "
+        + "literal, forms the zero-length name without a diagnostic.",
+        "ISO §8.3.2.2 rule 2 / DOC-A.1-68");
+
     /// <summary>COBOLNET1795 — §11.10.3 syntax rule 2, the PROGRAM-ID Format-1 placement rule. A contained
     /// program is not externalized at all (§8.3.2.2 2) externalizes <q>program-names of outermost programs</q>), so
     /// the phrase that names its externalized form is illegal there.</summary>

@@ -232,9 +232,10 @@ public sealed class Frontend
             throw new InvalidOperationException(
                 "TurnDirectiveProcessor changed the line count — TURN scoping would silently misanchor (hazard H3)");
 
-        // >>PROPAGATE (ISO §7.3.21): recognize + edition-gate (introduction gate; runtime semantics are PHASE-13).
+        // >>PROPAGATE (ISO §7.3.21): collect the ON/OFF toggles the binder folds per source element (§7.3.21.4
+        // GR1/GR3 — automatic propagation for the functions, methods and programs that follow; kb/Work PB1119).
         // Line-count preserving like the >>TURN stage.
-        text = PropagateDirectiveProcessor.Process(text);
+        (text, var propagateEvents) = PropagateDirectiveProcessor.Process(text, stackOps);
         if (CountLines(text) != linesBefore)
             throw new InvalidOperationException(
                 "PropagateDirectiveProcessor changed the line count (hazard H3)");
@@ -271,7 +272,7 @@ public sealed class Frontend
                 "LeapSecondDirectiveProcessor changed the line count (hazard H3)");
 
         return (new MappedText(text, mapped.Lines),   // the constructor re-asserts the line-count invariant
-            new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, cobolWordsMap, leapSecondOn, directiveSites),
+            new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, propagateEvents, cobolWordsMap, leapSecondOn, directiveSites),
             manipulated);
     }
 

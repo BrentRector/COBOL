@@ -80,8 +80,9 @@ OO mechanism (feedback_one_mechanism_per_job):
   or a superclass with the SAME FACTORY presence; b) an interface that CONFORMS (§9.3.8.2.3,
   `OoConformance.InterfaceConformsTo`, which shares `MethodConformanceMismatches` with the IMPLEMENTS pass)
   to a listed interface; d) never universal.
-- **PROPAGATE ON** (:24606) is an un-implemented directive — the pickup's rule-3 hole is documented in the
-  generated comment (residue). Object VIEWS (EC-OO-CONFORMANCE) stay 0899-named; method declaratives are
+- **PROPAGATE ON** (§14.6.13.1.5 EXIT/GOBACK item 3) — the activator's re-propagation of an object no declarative
+  took is `EcEmitter.ObjectPropagationReturn`, emitted in the pickup's `-3` arm ahead of item 4 (kb/Work PB1119; see
+  "Automatic propagation" below). Object VIEWS (EC-OO-CONFORMANCE) stay 0899-named; method declaratives are
   implemented (kb/Work PB1010 — the METHOD-SCOPED SELECTION paragraph below); the
   interface / FACTORY-OF / ACTIVE-CLASS legs of the RAISING phrase are implemented (above — kb/Work PB389 on the
   operand end, PB815/PB814 on the header end). Every exception-object raise site renders its operand through
@@ -477,6 +478,20 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   CLOSE or READ on a never-opened connector (42/47) is an access. Argument-1 shall be "specified in an FD statement"
   (§15.28.3 r1 / §15.29.3 r1): `BindExceptionFileArg` requires `HasFd && !IsSortMerge` and cites the function's own
   clause (COBOLNET1574). Pinned by `pb63_exception_file_select_names` and the `pb63-exception-file-*` negatives.
+
+**Automatic propagation — `>>PROPAGATE` (ISO §7.3.21; kb/Work PB1119).** The directive stage
+(`PropagateDirectiveProcessor`) collects ON/OFF toggles into a `DirectiveTimeline` like every line-scoped directive
+(PUSH/POP replayed; `DirectiveStateRegistry` carries it), and the binder folds them ONCE per source element at its
+first line (`PropagateState` → `DataBinder.AutomaticPropagation` for a program or function,
+`OoMethodSymbol.AutomaticPropagationHere` for a method — §7.3.21.4 GR1/GR3, default OFF by GR4). The emitter holds
+the element's `AutomaticPropagation` (its GOBACK signal and its header RAISING classes) in `EcState.Propagation`, and
+the rule is applied where the fatal default is decided: `EcEmitter.EmitSelection` emits, between §14.6.13.1.3 5)
+(a declarative ran → terminate) and 7), `if (r == -3) <stage LAST; GOBACK>` — `ExceptionState.StageAutomaticPropagation`
+excludes EC-FLOW-GLOBAL-EXIT/-GOBACK and stages the LAST exception for the activator, whose ordinary pickup then
+raises it (§14.9.18.4 GR1 b)), so a chain of PROPAGATE ON elements propagates hop by hop. The EC-I-O arm of
+`__IoCheckEc` applies the same return (§14.6.13.1.3 3)). A program propagates only while `__asCalled`; the
+nonfatal and main-program readings are CONFORMANCE.md D-PROP. An element without the directive emits byte-identical
+text.
 
 **Still later waves:** the exception-checking PERFORM WHEN + `>>PROPAGATE` (2023 — VCR row 79/§4808),
 RAISE/RAISING identifier (exception OBJECTS — the OO wave; the `ExceptionState.ExceptionObject` slot exists),

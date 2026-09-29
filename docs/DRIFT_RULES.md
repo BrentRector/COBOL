@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-236 drift tests.
+238 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -96,6 +96,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ExceptionCheckingPerformDirectiveBanDriftTests](../tests/Cobol.Net.Tests.Unit/ExceptionCheckingPerformDirectiveBanDriftTests.cs) | kb/Work PB595 — ONE lexical-containment predicate for the three directive bans, and the warning owner decision D20 (2026-07-19) specified: ISO §7.3.25.3 SR5 — "A TURN directive shall not be specified within an exception processing PERFORM statement." ISO §7.3.22.3 SR4 — "The PUSH directive shall not be specified within an exception checking PERFORM statement." ISO §7.3.20.3 SR4 — "The POP directiv… | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs` |
 | [ExceptionRaiseHelperDriftTests](../tests/Cobol.Net.Tests.Unit/ExceptionRaiseHelperDriftTests.cs) | kb/Work PB676 — the invariant that keeps ISO §14.6.13.1.1's raise rule TRUE PER CONDITION as conditions are added: the ambient flag a runtime raise helper READS is the flag the emitter SETS for the exception-name that helper raises. | — |
 | [ExternalCorpusPopulationDriftTests](../tests/Cobol.Net.Tests.Unit/ExternalCorpusPopulationDriftTests.cs) | ⛔ THE GATE THAT KEEPS "THE CORPUS" ONE POPULATION — PB209. | `scripts/corpus_sweep.py`, `tests/external` |
+| [ExternalizedNameFormationDriftTests](../tests/Cobol.Net.Tests.Unit/ExternalizedNameFormationDriftTests.cs) | ⛔ AN EXTERNALIZED NAME IS FORMED AND MAPPED BY ONE FUNCTION, ExternalizedNames (kb/Work PB1539, DOC-A.1-68). | `src/Cobol.Net.Runtime/Control/ProgramTable.cs`, `src/Cobol.Net.Compiler/Binding/BinderDriver.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs` |
 | [FigurativeOperandClassifierDriftTests](../tests/Cobol.Net.Tests.Unit/FigurativeOperandClassifierDriftTests.cs) | ⛔ ONE RULE, ONE PLACE — the §8.3.3.6.2 figurative-operand form (kb/Work PB461). | `src` |
 | [FileControlKeyRuleDriftTests](../tests/Cobol.Net.Tests.Unit/FileControlKeyRuleDriftTests.cs) | ⛔ THE DRIFT GUARD ON FileControlKeyRules'S TABLE (kb/Work PB699). | `tests/version-matrix/traceability-inventory.json` |
 | [FileDescriptionFormatDriftTests](../tests/Cobol.Net.Tests.Unit/FileDescriptionFormatDriftTests.cs) | ⛔ EVERY FILE DESCRIPTION CLAUSE THE GRAMMAR PARSES HAS DECIDED WHICH §13.4.5.2 FORMATS CONTAIN IT (kb/Work PB1238). | — |
@@ -183,6 +184,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ProcedureRangeDeclarativesDriftTests](../tests/Cobol.Net.Tests.Unit/ProcedureRangeDeclarativesDriftTests.cs) | kb/Work PB433 — the SECTION travels with a resolved procedure-name, and §14.9.28.3 SR11 is asked of it. | `src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/ProcedureResolution.cs`, `src/Cobol.Net.Compiler/Binding` |
 | [ProcedureRangeEmptinessDriftTests](../tests/Cobol.Net.Tests.Unit/ProcedureRangeEmptinessDriftTests.cs) | ⛔ "IS THIS PROCEDURE RANGE EMPTY?" IS NOT A QUESTION THE NUMBERS CAN ANSWER, AND FOR YEARS EVERY CONSUMER ANSWERED IT WITH THE NUMBERS (kb/Work PB440). | `src/Cobol.Net.Compiler` |
 | [ProcessObservationDriftTests](../tests/Cobol.Net.Tests.Unit/ProcessObservationDriftTests.cs) | Keeps the child-process observer collapsed to ONE implementation, and proves it can actually tell a non-observation from a wrong answer. | `tests` |
+| [ProgramNameScopeDriftTests](../tests/Cobol.Net.Tests.Unit/ProgramNameScopeDriftTests.cs) | ⛔ ISO §8.4.6.3 2)'s COMMON-program exception is written ONCE, in ProgramNameScope, and BOTH scope implementations ask it (kb/Work PB1460): the bind-time AS NESTED table (BinderDriver.NestedCallablesOf) and the run-time resolver (ProgramTable.ResolveVisible). | — |
 | [QualifiedNameClassDriftTests](../tests/Cobol.Net.Tests.Unit/QualifiedNameClassDriftTests.cs) | kb/Work PB919 — ISO §8.4.2.2.3 SR1's uniqueness obligation covers EVERY user-defined name, and it was enforced per name class with one class (index-names) never done. | `specs/ISO_COBOL.md` |
 | [ReadPreconditionOrderDriftTests](../tests/Cobol.Net.Tests.Unit/ReadPreconditionOrderDriftTests.cs) | ⛔ THE READ PRECONDITIONS ARE WRITTEN DOWN ONCE, AND IN THE STANDARD'S OWN ORDER (kb/Work PB336). | `src/Cobol.Net.Runtime/IO` |
 | [ReceiverContextRestoreDriftTests](../tests/Cobol.Net.Tests.Unit/ReceiverContextRestoreDriftTests.cs) | ⛔ EVERY PUBLIC ENTRY OF NumericRenderer THAT SETS THE AMBIENT RECEIVER MUST RESTORE IT. | `src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs` |

@@ -69,9 +69,10 @@ public static class DirectiveStateRegistry
         new(Constructs.DisplayDirective2023, [], [],
             "NONE HELD: the DISPLAY directive has no state — §7.3.12.4 GR1 transfers its operands when it is "
             + "processed, and nothing persists past its own line."),
-        new(Constructs.PropagateDirective2002, [], [],
-            "NONE HELD: the directive is recognized and consumed and its propagation effect (§7.3.21.4) is not "
-            + "implemented, so no PROPAGATE state exists yet. When it is, its stage registers a carrier here."),
+        new(Constructs.PropagateDirective2002, [nameof(PropagateDirectiveProcessor)],
+            [nameof(DirectiveResults.PropagateEvents)],
+            "The automatic-propagation toggles (§7.3.21.4 GR1/GR3), folded per source element by the binder's "
+            + "PropagateState (kb/Work PB1119)."),
         new(Constructs.Flag85DirectiveWindow, [], [],
             "NONE HELD: removed at 2023 (Annex E.2 item 21) while PUSH/POP exist only at 2023, so no source may "
             + "contain both."),

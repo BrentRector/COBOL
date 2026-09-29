@@ -53,6 +53,10 @@ public sealed class OoNameResolutionDriftTests
                 + "lookup)"),
         [Path.Combine("Binding", "ReferenceResolver.cs")] =
             (1, "the property-reference INSTANCE form's re-lookup of the receiving item's declared class"),
+        [Path.Combine("CodeGen", "EmitterState.cs")] =
+            (2, "AutomaticPropagation.Of (kb/Work PB1119, §14.6.13.1.5 EXIT/GOBACK item 3): the re-lookup of each "
+                + "class / interface an element's PROCEDURE DIVISION header RAISING phrase names, to render its C# "
+                + "type test — scope-checked where the header WROTE it (RaisingPhrase.Partition's funnel lookup)"),
     };
 
     /// <summary>The lookup shape that WAS the bug: <c>Find</c> / <c>FindInterface</c> on the group-wide table

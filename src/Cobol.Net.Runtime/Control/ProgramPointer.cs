@@ -22,5 +22,5 @@ public readonly record struct ProgramPointer(string? Name)
     /// <summary>Pointer equality (ISO §8.8.4.2.16 — two program-pointers are equal when they identify the same
     /// program, or are both NULL). Program-name identity is case-insensitive (§8.3.2.2).</summary>
     public static bool SameTarget(ProgramPointer a, ProgramPointer b) =>
-        string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+        ExternalizedNames.Same(a.Name, b.Name);
 }

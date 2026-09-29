@@ -107,7 +107,7 @@ restate (a class/class or class/interface pair sharing a WORD is skipped there, 
 diagnostic; a pair whose words differ and whose `AS` literals coincide is §8.3.2.2's alone and row 1 has
 it).
 
-⚠ **DETERMINATION — the comparison is CASE-INSENSITIVE**, the same one `ProgramTable.NameEquals` resolves a CALL
+⚠ **DETERMINATION — the comparison is CASE-INSENSITIVE**, the ONE mapping `ExternalizedNames.Same` (DOC-A.1-68) that `ProgramTable` resolves a CALL
 with. §8.3.2.2 leaves the mapping to the implementor (*“The implementor defines the formation and mapping rules
 of these names”*); what is not optional is that the bind-time check and the run-unit resolver agree, or source
 this check passes still resolves to the wrong definition. PROTOTYPE units contribute nothing here: §10.6.2
@@ -116,6 +116,14 @@ definition with the same externalized name, the signatures of these two compilat
 and SR3 is its function twin. The complement is pinned as hard as the
 refusals (`DefinitionNameUniquenessTests`): two different containers may EACH contain a program of one name,
 and two outermost programs may share the declared word under different `AS` literals.
+
+**FORMATION is the mapping's other half, and it lives in the same place** (`CobolNet.Runtime.ExternalizedNames`,
+DOC-A.1-68; kb/Work PB1539): `Form` removes a name's leading and trailing SPACES, `Same` / `Comparer` ignore case.
+Both sides of every lookup ask it — the bind-time AS screen (`ExternalizedName.Screen`, which warns COBOLNET2642
+when it removes spaces and refuses an all-space literal with COBOLNET2643 where the clause refuses a zero-length
+one), the CALL / CANCEL literal reader, the INVOKE method name, and at run time every CALL / CANCEL /
+program-address target, the registered `CallName`, the EXTERNAL store's keys and pointer equality. No emitter
+trims a name expression: the runtime forms it (`ExternalizedNameFormationDriftTests`).
 
 **Where the pair lives.** `BoundUnit.Name` / `BoundUnit.ExternalizedName` for programs and functions; `OoClassSymbol` / `OoInterfaceSymbol` / `OoMethodSymbol.ExternalizedName` for the OO trio; `DataItem.ExternalizedAs` and `FileModel.ExternalName` for §8.3.2.2's site 2), the EXTERNAL clause — whose default is §13.18.22.4 GR5's second sentence (the subject's own data-name or file-name) and is applied at the ONE cell-keying site, `DataBinder.CallMakeExternal` (kb/Work PB511). Each defaults to the declared word, so a source unit with no AS phrase is bit-for-bit what it was. The run-unit registry carries both (`ProgramTable.Node.Name` for MODULE-NAME, `Node.CallName` for resolution) and `ProgramRegistry.Register` takes its `externalizedName` argument only when they differ, keeping every AS-less unit emitted registration line byte-identical.
 

@@ -113,7 +113,7 @@ public sealed class RunUnit
         var ru = StartAfter(prior);   // a NEW object; only HostConfiguration carries over
         _current.Value = ru;
         try { body(ru); }
-        finally { ru.Files.CloseAll(); _current.Value = prior; }
+        finally { ru.Terminate(); _current.Value = prior; }   // the ONE §14.6.11 epilogue (RunMain calls it too)
     }
 }
 ```
@@ -126,6 +126,16 @@ the clock seam and the object-time debug switch) is carried from the ambient run
 shape reset a HAND LIST of members on the one ambient object, and the switch, locale and report-flow state (and the
 process-static factory singletons) survived into the next run unit (kb/Work PB1069);
 `RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit` now reflects over every field instead of a list.
+
+**Static storage is ADOPTED by the run unit (kb/Work PB1069).** The one run-unit state a new object cannot make fresh
+is STATIC data on a generated type: a RECURSIVE program's or a FUNCTION-ID's WORKING-STORAGE (§13.5.4 GR1) and a
+class's METHOD WORKING-STORAGE (OO deep-dive D3). Each such unit emits `__ResetStatics`, and the run unit adopts it
+(`RunUnit.AdoptStaticStorage`, once per reset): a program at `ProgramTable.Register`, a class when the run unit
+creates its factory object (`RunUnit.FactoryObject` → the generated override of `CobolObject.__AdoptRunUnitStorage`,
+which adopts both halves' resets and calls base, so every superclass adopts its own). Adoption runs the reset —
+§14.6.2.3.2 1), the initial state at the first activation in a run unit — and `RunUnit.Terminate`, the ONE
+termination epilogue `ProgramTable.RunMain` and `RunUnit.Run` both call, closes every file (§14.6.11 2) and runs every
+adopted reset again, so a static POINTER, OBJECT REFERENCE or dynamic item releases what it held (§14.6.11 3, 4, 6).
 
 **No run-unit state in a static — enforced.** `RunUnitStateDriftTests.NoWritableStatic_OutsideTheDocumentedProcessStores`
 enumerates every writable static field in `Cobol.Net.Runtime` and fails on one not documented there as

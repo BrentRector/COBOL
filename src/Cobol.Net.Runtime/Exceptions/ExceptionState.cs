@@ -257,6 +257,42 @@ public sealed class ExceptionEngine
 
     private const string RaisingNotSpecified = "EC-RAISING-NOT-SPECIFIED";
 
+    /// <summary>AUTOMATIC PROPAGATION of an unhandled FATAL exception condition — ISO §14.6.13.1.3 6): "If checking
+    /// for the exception condition is enabled, and the exception condition is neither EC-FLOW-GLOBAL-EXIT nor
+    /// EC-FLOW-GLOBAL-GOBACK, and there is an applicable PROPAGATE ON directive, the exception condition is propagated
+    /// as if a GOBACK statement with the RAISING LAST EXCEPTION phrase were executed" (the §7.3.21.4 GR2 effect of
+    /// <c>&gt;&gt;PROPAGATE ON</c>; kb/Work PB1119). The emitted fatal default calls this only where the other three
+    /// conditions already hold — checking is enabled (the raise happened), no declarative or WHEN phrase qualified,
+    /// and the element was compiled under PROPAGATE ON — so what is decided here is the name exclusion, and the
+    /// staging IS <see cref="SetPropagatingLast"/>: the condition just raised is the last exception status. Returns
+    /// false (stage nothing) for the two excluded names, whose #7 termination then stands. The caller performs the
+    /// GOBACK's return.</summary>
+    public bool StageAutomaticPropagation(string name)
+    {
+        if (string.Equals(name, "EC-FLOW-GLOBAL-EXIT", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "EC-FLOW-GLOBAL-GOBACK", StringComparison.OrdinalIgnoreCase))
+            return false;
+        SetPropagatingLast();   // "as if … RAISING LAST EXCEPTION" — no PD-header operand: a fatal name is never EC-USER
+        return true;
+    }
+
+    /// <summary>AUTOMATIC PROPAGATION of an exception OBJECT no declarative of the activating element took — ISO
+    /// §14.6.13.1.5, EXIT/GOBACK item 3: "if a PROPAGATE ON directive is in effect for the activating runtime
+    /// element, the exception is propagated as if a GOBACK statement with the RAISING LAST EXCEPTION phrase were
+    /// specified in this activating runtime element. However, if no applicable class or interface is specified in the
+    /// RAISING phrase of the procedure division header in the activating element, the RAISING phrase is EXCEPTION
+    /// EC-OO-EXCEPTION, instead of LAST EXCEPTION" (kb/Work PB1119). <paramref name="applicable"/> is the emitted type
+    /// test against that header's classes and interfaces; the object is the current exception status here (the pickup
+    /// made it so), so the LAST arm re-stages the object itself.</summary>
+    public void StageAutomaticObjectPropagation(bool applicable)
+    {
+        if (applicable) { SetPropagatingLast(); return; }
+        bool fatal = !ExceptionCatalog.TryGet(OoException, out var info) || info.IsFatal;   // Table 13, never a literal
+        SetPropagating(OoException, fatal);
+    }
+
+    private const string OoException = "EC-OO-EXCEPTION";
+
     private static string[] Names(string[]? names) => names ?? [];
 
     /// <summary>THE ACTIVATOR-SIDE RAISE of a staged <c>GOBACK / EXIT … RAISING</c> condition — ISO §14.9.18.4
@@ -1606,6 +1642,12 @@ public static class ExceptionState
     /// <inheritdoc cref="ExceptionEngine.SetPropagatingLast"/>
     public static void SetPropagatingLast(string[]? pdRaising = null, string? statement = null, string? location = null)
         => E.SetPropagatingLast(pdRaising, statement, location);
+
+    /// <inheritdoc cref="ExceptionEngine.StageAutomaticPropagation"/>
+    public static bool StageAutomaticPropagation(string name) => E.StageAutomaticPropagation(name);
+
+    /// <inheritdoc cref="ExceptionEngine.StageAutomaticObjectPropagation"/>
+    public static void StageAutomaticObjectPropagation(bool applicable) => E.StageAutomaticObjectPropagation(applicable);
 
     /// <inheritdoc cref="ExceptionEngine.TakeRaisedPropagation"/>
     public static bool TakeRaisedPropagation(string activatorChecking, out string name, out bool fatal)

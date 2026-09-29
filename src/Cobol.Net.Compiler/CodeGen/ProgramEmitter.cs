@@ -74,6 +74,7 @@ internal sealed class ProgramEmitter
     internal string Emit(BoundCompilation comp)
     {
         _ecState.Active = comp.EcActive;
+        _ecState.OoClasses = comp.OoClasses;
         _oo = new OoEmitter(_dispatchState, _ecState, _callState, this, comp.InterfaceData, comp.OoAdapters);
         var units = comp.Units;
         var classes = comp.ClassUnits;
@@ -250,6 +251,9 @@ internal sealed class ProgramEmitter
         _ecState.UnitHasF3 = unit.Bound.Declaratives?.Any(d => d.EcEntries is not null) ?? false;   // → __EcDispatch exists
         _ecState.UnitHasF3Perform = unit.Bound.Ec?.HasF3Perform ?? false;   // → __EcPerform + the F3-frame interceptor (§14.9.28)
         _ecState.UnitHasF4 = unit.Bound.Declaratives?.Any(d => d.Eo is not null) ?? false;   // → __EcObjDispatch exists (EC-OO F4)
+        // §7.3.21.4 GR1 — this program or function's automatic propagation (kb/Work PB1119), read at its fatal default.
+        _ecState.Propagation = AutomaticPropagation.Of(data.AutomaticPropagation, inMethod: false,
+            unit.Bound.RaisingObjects ?? [], _ecState.OoClasses);
         // A containing program with USE … GLOBAL declaratives makes this unit's I-O hooks walk outward on a
         // no-local-match (ISO §14.9.49.4 GR4b) — consumed by EmitDispatcher/EmitUseMachinery.
         _dispatchState.OuterGlobalUse = ChainHasGlobalUse(unit.Parent);
