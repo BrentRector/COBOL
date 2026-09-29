@@ -3,19 +3,22 @@
 //
 // ⛔ RECORDING BUILDS ONLY (kb/Work PB1683) — compiled into the three test assemblies by
 // tools/impact/ImpactRecording.targets, which also names ImpactTestFramework in the assembly's
-// [assembly: Xunit.TestFramework]. The design is docs/rearchitecture/DESIGN-test-build-ci.md §3.13.
+// [assembly: Xunit.TestFramework] and defines IMPACT_RECORDING, which drops the gate's own framework attribute
+// (tests/Directory.Build.props). The design is docs/rearchitecture/DESIGN-test-build-ci.md §3.13 and §3.14.3.
 #nullable enable
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using CobolNet.Gate;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
 namespace CobolNet.Impact;
 
 /// <summary>
-/// xunit's own framework with ONE change: the message bus is wrapped so that, when xunit reports a test collection,
+/// The gate's framework (<see cref="GateTestFramework"/>: a recording runs the same executor, handshake and leg
+/// filter as every other build) with ONE change: the message bus is wrapped so that, when xunit reports a test collection,
 /// class or test STARTING, a fresh hit context is installed on the logical flow that is about to run it
 /// (<see cref="ImpactProbe.Enter"/>), and when it reports it FINISHED the context's hits are saved against its name.
 ///
@@ -27,32 +30,9 @@ namespace CobolNet.Impact;
 /// 3,400 of the Conformance assembly's 9,300 tests. Collection and class contexts exist because xunit creates
 /// fixtures there, outside any test, and a fixture's work is a dependency of every test in its scope.</para>
 /// </summary>
-public sealed class ImpactTestFramework(IMessageSink messageSink) : XunitTestFramework(messageSink)
+public sealed class ImpactTestFramework(IMessageSink messageSink) : GateTestFramework(messageSink)
 {
-    protected override ITestFrameworkExecutor CreateExecutor(AssemblyName assemblyName) =>
-        new Executor(assemblyName, SourceInformationProvider, DiagnosticMessageSink);
-
-    private sealed class Executor(AssemblyName assemblyName, ISourceInformationProvider sourceInformationProvider,
-        IMessageSink diagnosticMessageSink)
-        : XunitTestFrameworkExecutor(assemblyName, sourceInformationProvider, diagnosticMessageSink)
-    {
-        protected override async void RunTestCases(IEnumerable<IXunitTestCase> testCases,
-            IMessageSink executionMessageSink, ITestFrameworkExecutionOptions executionOptions)
-        {
-            using var runner = new Runner(TestAssembly, testCases, DiagnosticMessageSink, executionMessageSink,
-                executionOptions);
-            await runner.RunAsync();
-        }
-    }
-
-    private sealed class Runner(ITestAssembly testAssembly, IEnumerable<IXunitTestCase> testCases,
-        IMessageSink diagnosticMessageSink, IMessageSink executionMessageSink,
-        ITestFrameworkExecutionOptions executionOptions)
-        : XunitTestAssemblyRunner(testAssembly, testCases, diagnosticMessageSink, executionMessageSink,
-            executionOptions)
-    {
-        protected override IMessageBus CreateMessageBus() => new ContextBus(base.CreateMessageBus());
-    }
+    protected override IMessageBus WrapMessageBus(IMessageBus bus) => new ContextBus(bus);
 
     /// <summary>The interception: starts and finishes contexts, then forwards every message unchanged.</summary>
     private sealed class ContextBus(IMessageBus inner) : IMessageBus

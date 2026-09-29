@@ -4,6 +4,13 @@
 .claude/workflows/*.js text eol=lf
 .claude/skills/workstream/templates/*.js text eol=lf
 
+# Shell scripts must stay LF-only for the same reason bash needs it: a CRLF'd script dies at its first `set -u\r`
+# ("set: -: invalid option", then "$'\r': command not found"). Under core.autocrlf=true every FRESH Windows
+# checkout — each agent worktree — got CRLF scripts, so `wsl … bash scripts/linux-gate.sh` (MANDATORY-PRACTICES
+# I8, kb/Work PB1732) could not start in any worktree but the one the script was written in (measured 2026-09-29,
+# wave 72 group G). Git Bash on Windows runs LF scripts unchanged.
+*.sh text eol=lf
+
 # DEVLOG.md is the ONE tracked file stored with CRLF in the object database (every other text file normalizes to
 # LF under core.autocrlf). That was implicit — no attribute governed it — and the log's append discipline depends
 # on it: entries are inserted by writing BYTES, and a silent renormalization would rewrite all 36k lines in a

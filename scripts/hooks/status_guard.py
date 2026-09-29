@@ -104,6 +104,12 @@ def main():
 
 
 def self_test():
+    # HERMETIC, like gate_slot.py's: the self-test builds its own repository, so a caller's repository selection
+    # (GIT_DIR/GIT_INDEX_FILE from a git hook, or any exported GIT_DIR/GIT_WORK_TREE) would send its init, config and commit to the
+    # caller's REAL repository. Git names the variables itself (kb/Work PB1719, 2026-09-29).
+    for name in subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True,
+                               text=True).stdout.split():
+        os.environ.pop(name, None)
     ok = True
 
     def check(name, got, want_kind):

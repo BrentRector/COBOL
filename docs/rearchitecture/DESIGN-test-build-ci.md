@@ -911,18 +911,43 @@ Unit assemblies themselves, `b8`):
 | `dotnet test --list-tests` | ✅ used for the population: 9,317 Conformance cases discovered in 2.0 s; the trx's test definitions of a full unfiltered run equal it as a multiset (`b8`). |
 
 So the leg filter lives INSIDE the test assemblies, where the test cases are objects rather than strings:
-`tests/_shared/GateLegs.cs` (linked into every project under `tests/`, as `TestPartitioning.cs` is) holds `NameKey`,
-`GateTestFramework : XunitTestFramework`, whose executor runs `testCases.Where(c => plan.LegOf(c) == leg)`, and the
-two orderers. **The environment handshake** — three variables, all written by the driver:
+`tests/_shared/GateLegs.cs` (linked into every project under `tests/` by `tests/Directory.Build.props`'s `_shared`
+glob, as `TestPartitioning.cs` is) holds `GateNameKey` (the name key, mirroring `gate_plan.py#name_key`), the plan
+reader, `GateTestFramework : XunitTestFramework`, whose executor runs `testCases.Where(c => plan.LegOf(c) == leg)`,
+and the two orderers (landed, kb/Work PB1719):
+- **The framework attribute is written by `tests/Directory.Build.props`**, for every project with `IsTestProject`,
+  as an MSBuild `AssemblyAttribute` (`Xunit.TestFrameworkAttribute("CobolNet.Gate.GateTestFramework",
+  "$(AssemblyName)")`): xunit resolves the framework by ASSEMBLY name, which a linked source file cannot spell, and
+  on any miss it silently runs its default framework — every case, no filter. `GateLegDriftTests` arm (4) checks it
+  in each gated assembly.
+- **The plan names an assembly by its key**: the test assembly's name without `Cobol.Net.Tests.` (`Conformance`,
+  `Unit`, `Characterization`), as the impact map and `gate_plan.py --list` do.
+- **The orderers are installed by the executor's assembly runner**, after xunit reads the assembly's own orderer
+  attributes and only under a plan, so a run with no handshake keeps xunit's order exactly (an orderer attribute
+  would also need the assembly name, and would act on every run). The collection orderer ranks a collection by its
+  best-ranked case; the case orderer ranks a class's cases by their own rank; unplanned ones keep xunit's order after
+  them. The executor also hands the runner the leg's cases in rank order, because xunit runs a collection's classes
+  in the order their first case arrives. ⛔ Each orderer's output is CHECKED to be a permutation of its input
+  (`GateOrder.Permutation`) and throws otherwise: xunit trusts an orderer's result, so a dropped case would silently
+  never run, while a thrown orderer is logged and xunit keeps its own complete order.
+- **Any failure while choosing the leg's cases** — reading the handshake, the plan, writing the identity record, or a
+  defect in that code — refuses the run the same way as a bad handshake below; the executor never throws.
+
+**The environment handshake** — three variables, all written by the driver:
 `COBOLNET_GATE_PLAN` (the plan file), `COBOLNET_GATE_LEG` (`1` or `2`) and `COBOLNET_GATE_PLAN_SHA256` (the driver's
 digest of that file).
-- **None set** (the battery, CI, the lander's single leg, an IDE): every case, xunit's order, exactly as today.
-- **All three set and consistent** (the file reads, parses, and hashes to the digest; the leg is `1` or `2`): the
-  leg's cases, in plan order.
+- **None set** (the battery, CI, the lander's single leg, an IDE): every case, xunit's order, exactly as today. An
+  EMPTY value counts as unset (Windows cannot hold an empty environment variable at all).
+- **All three set and consistent** (the file reads, hashes to the digest — compared case-insensitively — and parses
+  as a schema-1 plan naming this assembly; the leg is `1` or `2`): the leg's cases, in plan order.
 - **Anything else** — one or two of them set, the file missing, unreadable or unparsable, a digest mismatch, a leg
-  other than `1` or `2`: the executor reports EVERY case as an `ExecutionErrorTestCase` naming the cause
+  other than `1` or `2`, a plan of another schema, one that names no entry for this assembly or puts one key in both
+  legs: the executor
+  reports EVERY case as an `ExecutionErrorTestCase` naming the cause
   (`GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_LEG is set but COBOLNET_GATE_PLAN_SHA256 is not`). The run is RED, never
-  a silent whole or partial run. A developer who exports two of the variables by hand to reproduce a leg therefore
+  a silent whole or partial run (measured on the real hosts, evidence `m12`: each of eight partial or stale
+  environments gave `Failed!` and exit 1; vstest keeps one failed result per test METHOD, because the error cases of
+  one method share its id, so Characterization's 35 cases show 4 failed results). A developer who exports two of the variables by hand to reproduce a leg therefore
   gets a red battery, not a green one with a third of Conformance missing.
 - ⛔ **Every caller of `dotnet test` scrubs its environment** — the three handshake variables, and with them the two
   OTHER environment channels that narrow a run while it exits 0 (M14, measured 2026-09-28 on Characterization's 33
@@ -944,12 +969,16 @@ digest of that file).
   vstest shows of a host's output at `--verbosity quiet` is unmeasured, while the refusal arm and the population
   check below are measured.
 
-**Each leg host writes its IDENTITY RECORD** into the gate's run directory (`leg-<n>-<assembly>.json`): the plan
-digest it read, its leg, the MVID and SHA-256 of the test assembly, the SHA-256 of every product assembly in its
-`bin` directory (the compiler under test), and the keys of the cases it received and ran. The recording build's
-`ImpactTestFramework` derives from `GateTestFramework` and the shared `[assembly: Xunit.TestFramework]` line is
-compiled out under the recording targets' `IMPACT_RECORDING` constant, so an assembly always names exactly one
-framework.
+**Each leg host writes its IDENTITY RECORD** into the gate's run directory — the plan's directory — as
+`leg-<n>-<assembly key>.json`, before it runs a case (written to a temporary name and moved into place): `schema`
+1, `assembly`, `leg`, `plan_sha256` (the digest it verified), `plan_content_sha256` (the plan's own `sha256`),
+`test_assembly` (file, MVID and SHA-256), `product_assemblies` (the SHA-256 of every `Cobol.Net.*`, `CobolSharp.*` and
+`cobol.dll` beside the test assembly: the compiler under test), `received` (how many discovered cases the host was
+handed) and `runs` (the name key of every case it runs, in run order). The recording build's `ImpactTestFramework`
+derives from `GateTestFramework` — overriding only its one extension point, `WrapMessageBus` — and the recording
+targets define `IMPACT_RECORDING`, whose presence in `DefineConstants` drops the `tests/Directory.Build.props`
+attribute, so an assembly always names exactly one framework (MSBuild evaluates item conditions after every property,
+so the props file sees the targets' constant).
 
 **The driver** is `scripts/run_gate_legs.py`, called by `build-local.ps1` and `build-local.sh` in place of their `Leg`
 functions and of `filter_population.py` (a gate without a vstest filter has no term to prove live;
@@ -1010,8 +1039,14 @@ case, a skipped case, a digest mismatch, a binary changed between legs, a red in
 RED/INCOMPLETE), no plan (one leg, plain order), an assembly whose leg 1 is empty (not invoked; its population still
 whole), a partial handshake on a real leg host (every case an execution error, RED), a second gate in the same
 worktree (refused), and `-Mode lander` (one leg, no fail-fast, no slot); (4) every test project under `tests/` that
-the gate runs links `GateLegs.cs`; (5) no discovered display name in a gated assembly contains the repository root;
-(6) every `dotnet test` caller scrubs `COBOLNET_GATE_*`, `VSTest*` and `RunSettingsFilePath`
+the gate runs links `GateLegs.cs` and names `GateTestFramework`; (5) no discovered display name in a gated assembly
+contains the repository root. Arms (4) and (5) audit the assembly they run in (`tests/_shared/GateLegAudit.cs`: the
+attribute, and xunit's own discovery with theories pre-enumerated, checking each name and each string argument,
+since a truncated argument can cut the root off; the root is matched as TEXT in its written, `/` and xunit-escaped
+forms, never through the host's path rules, and Unit's witness plants a Windows, a POSIX and the host's own root, so
+the arm is proven on each OS CI runs), so every gated assembly carries a `GateLegDriftTests` with those
+two arms; Unit's also holds (1), (2), (3)'s population half, (6), the handshake arms and (4)'s structural half over
+every test `.csproj`; (6) every `dotnet test` caller scrubs `COBOLNET_GATE_*`, `VSTest*` and `RunSettingsFilePath`
 (`test_population.py audit-callers`, §3.14.3) — the driver included, which merges its own handshake over the
 scrubbed environment. Each arm is one test method named for its number, so the mechanisms that land them separately
 merge by union.
@@ -1213,7 +1248,7 @@ above. The rejected design and both reviews are in the DEVLOG entry that pivoted
 | M7 | SR23 before the table-value fill; the fill bounded by the phrase (§3.14.5); defect note: id allocated by the orchestrator | `src/Cobol.Net.Compiler/Binding/Model/TableValuePlan.cs` (`TableValueOdometer.Resolve`), `DataBinder.ResolveTableValues`; battery summary top-5 report in `scripts/battery.sh` | the pb505 program rejects with `COBOLNET1946` in < 1 s through the CLI (was 29.6 s); both tests keep their assertions; every Format 2 VALUE golden unchanged; the battery summary lists the five slowest tests | — | 60–100 turns |
 | M11 | the order plan: `NameKey`, tiers 0a/0u/1–3, the budgets and the collection cap (§3.13, §3.14.2); the NARROWING deleted — LANDED (kb/Work PB1717: b4 first red 0.32 %, b7 one tier-0u case and a 15.3 s floor; tier 0a corrected to ADDED test methods) | `scripts/spec/impacted_tests.py` (selection code DELETED — its filter line is always the whole-assembly filter until M13 deletes the line; `--plan` added), `scripts/gate_plan.py`, `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, kb/Work PB1712 (closed) | `--self-test` covers every tier arm, `NameKey`, the unknown budget, the collection cap and the no-map / no-timings / stale-map / empty-leg-1 / whole-assembly-in-leg-1 arms; the filter line is the whole-assembly filter for a base WITH a map; `b4` re-run through the new script reproduces cheapest-first on 68b X (first red ≤ 1 % of the work); `b7` re-run through it: a golden appended to the 85 manifest leaves ONE tier-0u case and a leg-1 floor ≤ 16 s | — | 110–160 turns |
 | M14 | ONE population check for every whole-assembly run, and the handshake scrub (§3.14.3–4) | `scripts/test_population.py` + `--self-test`; `scripts/battery.sh` (PHASE 1 population check; scrub); `.github/workflows/build-and-test.yml` (`conformance-population` runs the tool on the shard trx files; the inline `grep -c` block DELETED; scrub); `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `scripts/spec/record_verdicts.py`, `scripts/spec/record_impact_map.py` (scrub); `GateLegDriftTests` (6); `docs/DRIFT_RULES.md`. As landed, the arm-(6) scan also found `build-local.ps1`/`.sh`, `guard.sh`, `guard-fast.sh`, `measure-battery-determinism.sh` and `filter_population.py` (scrubbed), the scrub grew the VSTest channel, the two other `--list-tests` parsers were folded into the tool's, and `FilterPopulationGuardDriftTests` recognises the new shard shape | the self-test's arms (short, over, skipped, definitions vs results); the battery's PHASE 1 prints each assembly's population line and is red on a planted dropped case; CI's guard red on a planted shard overlap that keeps the count; `b8`'s two inputs pass | — | 60–100 turns |
-| M12 | the in-assembly leg filter, the handshake and the identity records (§3.14.3) | `tests/_shared/GateLegs.cs`, the three test `.csproj` links, `tools/impact/ImpactTestFramework.cs` + `ImpactRecording.targets` (`IMPACT_RECORDING`), `tests/Cobol.Net.Tests.Unit/ParenTokenTwinDriftTests.cs` (repository-relative path argument), `GateLegDriftTests` (1), (2), (4), (5) | with no handshake every assembly's count and verdict are unchanged; with a full one, each leg's trx definitions are exactly its leg's cases and the two legs' union equals `--list-tests`; each partial handshake (one variable, two, missing file, digest mismatch, bad leg) makes every case an execution error and the run RED; each leg writes its identity record; a planted non-permutation throws; no display name carries the repository root; a recording at HEAD still records every test (the recorder's watchdog) | M11 (the plan format) | 130–190 turns |
+| M12 | the in-assembly leg filter, the handshake and the identity records (§3.14.3) — LANDED (kb/Work PB1719, evidence `m12`: no handshake, 35 / 29,715 / 9,319 definitions = `--list-tests`; a plan from `gate_plan.py` ran Characterization in one leg and Unit 28,754 + 961 and Conformance 5,069 + 4,250, each leg exactly its plan's cases, union = `--list-tests`, five identity records; eight partial or stale handshakes each `Failed!`, exit 1; a recording at its head recorded 39,100 tests, the gate's 9,319 + 29,746 + 35, with the watchdog clean) | `tests/_shared/GateLegs.cs` + `GateLegAudit.cs` (linked by the existing `_shared` glob, so no `.csproj` changes), `tests/Directory.Build.props` (the framework attribute, by assembly name), `tools/impact/ImpactTestFramework.cs` + `ImpactRecording.targets` (`IMPACT_RECORDING`), `tests/Cobol.Net.Tests.Unit/ParenTokenTwinDriftTests.cs` (repository-relative path argument), `GateLegDriftTests` (1), (2), (4), (5) in Unit and (4), (5) in Conformance and Characterization | with no handshake every assembly's count and verdict are unchanged; with a full one, each leg's trx definitions are exactly its leg's cases and the two legs' union equals `--list-tests`; each partial handshake (one variable, two, missing file, digest mismatch, bad leg) makes every case an execution error and the run RED; each leg writes its identity record; a planted non-permutation throws; no display name carries the repository root; a recording at HEAD still records every test (the recorder's watchdog) | M11 (the plan format) | 130–190 turns |
 | M2 | the cross-worktree gate cap, FIFO (§3.14.6) | `scripts/gate_slot.py` + `--self-test`; `tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs` | the self-test's five arms (FIFO order included), on Windows and on Linux; N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N implementer gates, their builds included | — | 90–130 turns |
 | M13 | the ordered gate: driver, modes, worktree lock, run directory, fail-fast, and the wiring that deletes the selection interface (§3.14.1, §3.14.3–4) | `scripts/run_gate_legs.py` (takes the slot, §3.14.6), `scripts/spec/record_impact_map.py` (the recorder takes a slot too, and spawns every child through `Slot.spawn_kwargs`), `scripts/build-local.ps1` + `.sh` (`-Filter` removed, `-Mode lander\|implementer` required, `Leg` replaced); `scripts/spec/impacted_tests.py` (the filter line and `--plus` DELETED); `GateLegDriftTests` (3); in the SAME change every caller of either interface: `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md` (I1, I2, I7), `implementer-brief.md`, `fix-lane-implementer-brief.md`, `dispatch-spec-implementer.md`, `lander-train-brief.md` and `lander-brief.md` (`-Mode lander`), `.claude/skills/workstream/check_practices.py` (its required `impacted_tests\.py --base` patterns), `.claude/skills/workstream/SKILL.md`, `.claude/agents/cobol-implementer.md`, `.claude/skills/gate/SKILL.md`, `scripts/hooks/test_forbidden_commands.py` (its `-Filter` fixture), `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, `docs/DRIFT_RULES.md`, `docs/DOC_INDEX.md`, plan §9, README, CONTRIBUTING, the PR template | the self-test's arms (§3.14.4 (3)); a real gate on a planted red in a leg-1 test stops after leg 1 with the remainder named; a real green gate's population equals `--list-tests` for all three assemblies; a real `-Mode lander` gate runs one leg with no slot; `check_practices.py` green with no `impacted_tests` pattern left; over the next train, each implementer gate's time to first red, whole wall and green-path barrier cost (leg 1's wall beyond its share of the work, plus the extra host starts) are recorded, against the lander's single leg | M11, M12, M14, M2 | 170–220 turns |
 
@@ -1250,6 +1285,15 @@ Two earlier designs failed, and each failure was measured:
 
 So the script exports nothing. Its only git calls on the Windows repository are two READS (HEAD, and the count of
 uncommitted changes), with `safe.directory` and `core.autocrlf` passed inline.
+
+Two guards stay beside the clone (group G, kb/Work PB1719). A self-test that builds its own repositories first drops
+every variable `git rev-parse --local-env-vars` names (`gate_slot.py`, `status_guard.py`), so an inherited `GIT_DIR`
+can never redirect it into the real repository. And the script snapshots the real repository's `HEAD` and
+`core.worktree` before the legs and is RED (`repository-written`) when either changed. (Not the worktree list:
+other agents add and remove worktrees of the shared repository while it runs.)
+
+**Line endings.** `.gitattributes` keeps `*.sh` LF. Under `core.autocrlf=true` a fresh Windows worktree otherwise
+checks the script out CRLF, and bash dies at its first line (`set: -: invalid option`).
 
 **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line naming the HEAD it tested. NOT RUN is never green.
 

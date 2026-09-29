@@ -1,0 +1,58 @@
+M12 acceptance on ef645ba057e5 (base bf2e5b43f84b)
+Characterization: --list-tests discovered 35 cases
+Unit: --list-tests discovered 29715 cases
+Conformance: --list-tests discovered 9319 cases
+A. no handshake
+  PASS  Characterization: exit 0; Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - Cobol.Net.Tests.Characterization.dll (net10.0)
+  PASS  Characterization: definitions == --list-tests as a multiset (35 vs 35)
+      outcomes {'Passed': 35}
+  PASS  Unit: exit 0; Passed!  - Failed:     0, Passed: 29746, Skipped:     0, Total: 29746, Duration: 1 m 37 s - Cobol.Net.Tests.Unit.dll (net10.0)
+  PASS  Unit: definitions == --list-tests as a multiset (29715 vs 29715)
+      outcomes {'Passed': 29746}
+  PASS  Conformance: exit 0; Passed!  - Failed:     0, Passed:  9319, Skipped:     0, Total:  9319, Duration: 1 m 10 s - Cobol.Net.Tests.Conformance.dll (net10.0)
+  PASS  Conformance: definitions == --list-tests as a multiset (9319 vs 9319)
+      outcomes {'Passed': 9319}
+B. a full handshake
+  every case tier 1: no impact map recorded for the base bf2e5b43f84b or any ancestor in E:\COBOL\.git\cobol-impact — record one (record_impact_map.py --commit bf2e5b43f84b)
+    every case tier 1: tests/Directory.Build.props: a grammar, build or source-generator input — every assembly may change
+  gate_plan: Characterization: 35 cases, tiers {'0a': 2, '0u': 0, '1': 33, '2': 0, '3': 0}; leg 1 35 cases (3.071 of 3.071 recorded s; floor 1.925 s in EmittedCSharpSnapshotTests); legs [1] — its whole recorded time 3.1 s fits the collection cap
+  gate_plan: Unit: 29715 cases, tiers {'0a': 14, '0u': 0, '1': 29701, '2': 0, '3': 0}; leg 1 28754 cases (31.132 of 1250.078 recorded s; floor 3.108 s in ImpactedTestsDriftTests); legs [1, 2]
+  gate_plan: Conformance: 9319 cases, tiers {'0a': 2, '0u': 0, '1': 9317, '2': 0, '3': 0}; leg 1 5069 cases (20.219 of 976.692 recorded s; floor 2.213 s in CorpusRunnerTests_P0); legs [1, 2]
+  gate_plan: map none, timings previous run E:\Temp\claude\E--COBOL\73cac64c-391d-42c0-bcdf-c880e3e10305\scratchpad\w71f\m12-work\A-whole; plan a92029a30316 → E:\Temp\claude\E--COBOL\73cac64c-391d-42c0-bcdf-c880e3e10305\scratchpad\w71f\m12-work\B-legs\plan.json
+  PASS  the handshake digest is the SHA-256 of the plan's bytes
+  PASS  Characterization leg 1: exit 0; Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - Cobol.Net.Tests.Characterization.dll (net10.0)
+  PASS  Characterization leg 1: definitions == the plan's leg-1 cases (35 vs 35)
+  PASS  Characterization leg 1: identity record leg-1-Characterization.json — received 35, runs 35, products ['Cobol.Net.Compiler.dll', 'Cobol.Net.Editions.dll', 'Cobol.Net.Frontend.dll', 'Cobol.Net.Runtime.dll']
+  PASS  Characterization: legs [1] — the union of the legs' definitions == --list-tests
+  PASS  Unit leg 1: exit 0; Passed!  - Failed:     0, Passed: 28785, Skipped:     0, Total: 28785, Duration: 4 s - Cobol.Net.Tests.Unit.dll (net10.0)
+  PASS  Unit leg 1: definitions == the plan's leg-1 cases (28754 vs 28754)
+  PASS  Unit leg 1: identity record leg-1-Unit.json — received 29715, runs 28754, products ['Cobol.Net.Compiler.dll', 'Cobol.Net.Editions.dll', 'Cobol.Net.Frontend.dll', 'Cobol.Net.Runtime.dll', 'cobol.dll']
+  PASS  Unit leg 2: exit 0; Passed!  - Failed:     0, Passed:   961, Skipped:     0, Total:   961, Duration: 1 m 34 s - Cobol.Net.Tests.Unit.dll (net10.0)
+  PASS  Unit leg 2: definitions == the plan's leg-2 cases (961 vs 961)
+  PASS  Unit leg 2: identity record leg-2-Unit.json — received 29715, runs 961, products ['Cobol.Net.Compiler.dll', 'Cobol.Net.Editions.dll', 'Cobol.Net.Frontend.dll', 'Cobol.Net.Runtime.dll', 'cobol.dll']
+  PASS  Unit: legs [1, 2] — the union of the legs' definitions == --list-tests
+  PASS  Conformance leg 1: exit 0; Passed!  - Failed:     0, Passed:  5069, Skipped:     0, Total:  5069, Duration: 5 s - Cobol.Net.Tests.Conformance.dll (net10.0)
+  PASS  Conformance leg 1: definitions == the plan's leg-1 cases (5069 vs 5069)
+  PASS  Conformance leg 1: identity record leg-1-Conformance.json — received 9319, runs 5069, products ['Cobol.Net.Compiler.dll', 'Cobol.Net.Editions.dll', 'Cobol.Net.Frontend.dll', 'Cobol.Net.Runtime.dll', 'CobolSharp.Compiler.dll', 'CobolSharp.Runtime.dll']
+  PASS  Conformance leg 2: exit 0; Passed!  - Failed:     0, Passed:  4250, Skipped:     0, Total:  4250, Duration: 1 m 8 s - Cobol.Net.Tests.Conformance.dll (net10.0)
+  PASS  Conformance leg 2: definitions == the plan's leg-2 cases (4250 vs 4250)
+  PASS  Conformance leg 2: identity record leg-2-Conformance.json — received 9319, runs 4250, products ['Cobol.Net.Compiler.dll', 'Cobol.Net.Editions.dll', 'Cobol.Net.Frontend.dll', 'Cobol.Net.Runtime.dll', 'CobolSharp.Compiler.dll', 'CobolSharp.Runtime.dll']
+  PASS  Conformance: legs [1, 2] — the union of the legs' definitions == --list-tests
+C. every partial or stale handshake refuses (Characterization's real host)
+  PASS  plan only: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 7 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_PLAN is set but COBOLNET_GATE_LEG and COBOLNET_GATE_PLAN_SHA256 are not (case CobolNet.Tests.Characterization.GateLegDriftTests.Arm5_NoDiscove
+  PASS  leg only: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 7 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_LEG is set but COBOLNET_GATE_PLAN and COBOLNET_GATE_PLAN_SHA256 are not (case CobolNet.Tests.Characterization.GateLegDriftTests.Arm4_ThisAssem
+  PASS  digest only: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 6 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_PLAN_SHA256 is set but COBOLNET_GATE_PLAN and COBOLNET_GATE_LEG are not (case CobolNet.Tests.Characterization.SmokeTests.Harness_IsWired)
+  PASS  plan + leg: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 6 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_PLAN and COBOLNET_GATE_LEG are set but COBOLNET_GATE_PLAN_SHA256 is not (case CobolNet.Tests.Characterization.GateLegDriftTests.Arm4_ThisAssem
+  PASS  leg + digest: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 7 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_LEG and COBOLNET_GATE_PLAN_SHA256 are set but COBOLNET_GATE_PLAN is not (case CobolNet.Tests.Characterization.RuntimeApiGuardTests.Bare_runtim
+  PASS  missing file: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 7 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_PLAN 'E:\Temp\claude\E--COBOL\73cac64c-391d-42c0-bcdf-c880e3e10305\scratchpad\w71f\m12-work\absent.json' cannot be read (FileNotFoundException
+  PASS  digest mismatch (a stale plan): exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 6 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_PLAN_SHA256 is c49c6a270d474e1d2b662e9827f2b460010d469cb26870fd3edec188dc87cf58 but the plan 'E:\Temp\claude\E--COBOL\73cac64c-391d-42c0-bcdf-
+  PASS  bad leg: exit 1; Failed!  - Failed:     4, Passed:     0, Skipped:     0, Total:     4, Duration: 7 ms - Cobol.Net.Tests.Characterization.dll (net10.0); outcomes {'Failed': 4}; 4 refusal messages
+      System.InvalidOperationException : GATE ENVIRONMENT INCOMPLETE: COBOLNET_GATE_LEG is '3', not 1 or 2 (case CobolNet.Tests.Characterization.SmokeTests.Harness_IsWired)
+=== M12 ACCEPTANCE: GREEN ===

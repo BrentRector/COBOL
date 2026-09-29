@@ -10,7 +10,9 @@
       * ImpactProbe.cs to every assembly the impact map covers (the greenfield compiler, runtime and front end, the
         legacy oracle the differential harness still loads, and
         the three test assemblies, whose harness code is as much a dependency of a test as the compiler is);
-      * ImpactTestFramework.cs plus [assembly: Xunit.TestFramework] naming it, to the three test assemblies.
+      * ImpactTestFramework.cs plus [assembly: Xunit.TestFramework] naming it, to the three test assemblies, and
+        the IMPACT_RECORDING constant, which drops the gate's own framework attribute (tests/Directory.Build.props):
+        ImpactTestFramework derives from GateTestFramework, and an assembly names exactly one framework.
     tools/impact/ImpactInstrumenter then rewrites the built assemblies to call the probe.
   -->
   <PropertyGroup>
@@ -27,6 +29,10 @@
   <ItemGroup Condition="'$(_CobolImpactProbed)' == 'true' or '$(_CobolImpactTests)' == 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)ImpactProbe.cs" Link="_impact\ImpactProbe.cs" />
   </ItemGroup>
+
+  <PropertyGroup Condition="'$(_CobolImpactTests)' == 'true'">
+    <DefineConstants>$(DefineConstants);IMPACT_RECORDING</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup Condition="'$(_CobolImpactTests)' == 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)ImpactTestFramework.cs" Link="_impact\ImpactTestFramework.cs" />

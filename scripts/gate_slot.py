@@ -506,6 +506,15 @@ def _wait_until(predicate: Callable[[], bool], what: str) -> None:
 
 
 def self_test() -> int:
+    # ⛔ HERMETIC. The self-test builds its OWN repositories, so it must not inherit a caller's repository selection.
+    # A git hook exports GIT_DIR and GIT_INDEX_FILE (and linux-gate.sh exported GIT_DIR and GIT_WORK_TREE until PB1732
+    # moved it to a clone). Under either, every git call below ignored its cwd and acted on the caller's REAL repository:
+    # `init` wrote core.worktree into the shared config, `commit --allow-empty -m self-test` landed on the agent's
+    # branch, and `worktree add` registered a /tmp worktree (measured 2026-09-29, wave 72 group G, kb/Work PB1719).
+    # Git names the variables itself; dropping them here also covers the gate children the arms start.
+    for name in subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True,
+                               text=True, encoding="utf-8").stdout.split():
+        os.environ.pop(name, None)
     me = str(Path(__file__).resolve())
     py = sys.executable
     root = Path(tempfile.mkdtemp(prefix="gate-slot-selftest-"))

@@ -16,4 +16,21 @@
     <Compile Include="$(MSBuildThisFileDirectory)_shared\*.cs" Link="_shared\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!--
+    THE GATE'S FRAMEWORK (kb/Work PB1719; docs/rearchitecture/DESIGN-test-build-ci.md section 3.14.3): every test
+    project runs under CobolNet.Gate.GateTestFramework (_shared/GateLegs.cs), which runs exactly one leg of the
+    gate's plan when the gate driver hands it a complete handshake, and is xunit's own framework otherwise. The
+    attribute names the assembly, which a linked source file cannot, so it is written here. xunit resolves it by that
+    name and silently runs its default framework on a miss; GateLegDriftTests pins it in every gated assembly.
+    ⛔ The impact-recording build (tools/impact/ImpactRecording.targets) defines IMPACT_RECORDING and names its own
+    ImpactTestFramework (derived from GateTestFramework) instead: an assembly names exactly one framework. Item
+    conditions are evaluated after every property, so this sees the recording targets' DefineConstants.
+  -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' and '$([System.String]::Copy(`;$(DefineConstants);`).Contains(`;IMPACT_RECORDING;`))' != 'true'">
+    <AssemblyAttribute Include="Xunit.TestFrameworkAttribute">
+      <_Parameter1>CobolNet.Gate.GateTestFramework</_Parameter1>
+      <_Parameter2>$(AssemblyName)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

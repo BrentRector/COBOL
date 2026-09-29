@@ -3143,8 +3143,10 @@ already-derivable coverage; none change the pipeline.
   is ALWAYS the whole-assembly `FullyQualifiedName~.` for `build-local.ps1 -Filter` (M11 deleted the narrowing: the
   map ORDERS a gate and never selects it; stderr reports the change's tiers). `python scripts/gate_plan.py --out
   plan.json --list <Assembly>=<--list-tests output> … [--base <sha>] [--previous-run <dir>]` builds the ORDER PLAN
-  (`NameKey`, tiers 0a/0u/1–3, the leg-1 budgets and collection cap); M12 and M13 wire it into the test hosts and
-  `build-local`. Maps are recorded ON DEMAND: `python scripts/spec/record_impact_map.py [--commit <sha>]` (a
+  (`NameKey`, tiers 0a/0u/1–3, the leg-1 budgets and collection cap). The test hosts already run one leg of it when
+  handed `COBOLNET_GATE_PLAN`, `COBOLNET_GATE_LEG` and `COBOLNET_GATE_PLAN_SHA256` together (M12,
+  `tests/_shared/GateLegs.cs`; one or two of them set, or a stale plan, makes every case an execution error — never
+  export them by hand); M13 wires it into `build-local`. Maps are recorded ON DEMAND: `python scripts/spec/record_impact_map.py [--commit <sha>]` (a
   detached worktree, a probe-instrumented build, every test assembly once with the compile cache off; the map lands
   in `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree). Both scripts' `--self-test` prove
   every arm. The LANDER is unchanged (whole assemblies). ⚠ TARGET (owner 2026-09-28, kb/Work PB1708; §3.14): this

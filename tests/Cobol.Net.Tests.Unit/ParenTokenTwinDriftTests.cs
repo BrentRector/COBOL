@@ -49,6 +49,9 @@ public sealed class ParenTokenTwinDriftTests
     /// member, small enough that an unrelated mention elsewhere in the file cannot excuse the site.</summary>
     private const int Window = 12;
 
+    /// <summary>One row per source file, as (project, path relative to the project). ⛔ The row carries no absolute
+    /// path: a theory's arguments are part of its display name, and a worktree path there makes the name differ
+    /// between worktrees, so the gate's plan could never key on it (kb/Work PB1719; GateLegDriftTests).</summary>
     public static IEnumerable<object[]> SourceFiles()
     {
         foreach (string proj in new[] { "Cobol.Net.Frontend", "Cobol.Net.Compiler", "CobolSharp.Compiler" })
@@ -63,16 +66,18 @@ public sealed class ParenTokenTwinDriftTests
                     || rel.StartsWith("obj/", StringComparison.Ordinal)
                     || rel.StartsWith("bin/", StringComparison.Ordinal)
                     || rel.EndsWith(".g.cs", StringComparison.Ordinal)) continue;
-                yield return [proj, rel, f];
+                yield return [proj, rel];
             }
         }
     }
 
+    private static string PathOf(string proj, string rel) => TestRepo.Src([proj, .. rel.Split('/')]);
+
     [Theory]
     [MemberData(nameof(SourceFiles))]
-    public void EveryPlainParenSite_NamesTheFnargTwin_OrDeclaresGroupingOnly(string proj, string rel, string path)
+    public void EveryPlainParenSite_NamesTheFnargTwin_OrDeclaresGroupingOnly(string proj, string rel)
     {
-        string[] lines = File.ReadAllLines(path);
+        string[] lines = File.ReadAllLines(PathOf(proj, rel));
         var unconsidered = new List<int>();
         for (int i = 0; i < lines.Length; i++)
         {
@@ -103,8 +108,8 @@ public sealed class ParenTokenTwinDriftTests
         var seen = new List<string>();
         foreach (object[] row in SourceFiles())
         {
-            string rel = (string)row[1], path = (string)row[2];
-            if (File.ReadAllLines(path).Any(l => PlainParen.IsMatch(l))) seen.Add(rel);
+            string proj = (string)row[0], rel = (string)row[1];
+            if (File.ReadAllLines(PathOf(proj, rel)).Any(l => PlainParen.IsMatch(l))) seen.Add(rel);
         }
         // The sites the PB48 sweep enumerated. Each must still be REACHED by the theory above; if one is
         // renamed the list is wrong and this says so, rather than the theory silently covering less.
