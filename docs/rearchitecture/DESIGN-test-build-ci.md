@@ -1234,23 +1234,33 @@ on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and 
 **`scripts/linux-gate.sh`** runs, from any tree (`wsl -d Ubuntu --cd <tree> -- bash -lc 'bash scripts/linux-gate.sh'`),
 the test projects CI's Linux jobs run. `LinuxGateDriftTests` holds that set equal to the workflow's.
 
-| leg | binaries | why |
-|---|---|---|
-| `unit`, `characterization` | the Windows gate's, `--no-build` | IL is portable, and on F's branch this reproduced CI's Linux unit job exactly: one red, in 143 s |
-| `conformance` | a LINUX build of committed HEAD, in a `git archive` snapshot on the Linux filesystem (`~/linux-gate/<tree>`) | the Conformance tests find their goldens through `[CallerFilePath]`, which a Windows build bakes in as `E:\…` paths; reusing Windows binaries gave 363 false reds |
+**How: a Linux clone of the commit, never the Windows tree.** The tree's COMMITTED HEAD is cloned into
+`~/linux-gate/<tree>` on the Linux filesystem. The clone is `--shared`: it borrows the Windows repository's object
+store read-only, so nothing is copied. Each leg's project is built there with the Linux SDK and tested there, the
+shape of CI's ubuntu jobs. The git-ignored GnuCOBOL corpus is copied in from the tree, or fetched as CI fetches it.
+Commit before running: uncommitted changes are counted, reported, and not tested.
 
-- **Git from Linux.** A Windows worktree's `.git` file names an `E:/` gitdir that Linux git cannot open, and /mnt
-  trees trip git's ownership check. The script exports a translated `GIT_DIR` and `safe.directory` through git's
-  environment config; nothing on disk changes.
-- **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line. NOT RUN is never green.
+Two earlier designs failed, and each failure was measured:
+1. **Windows-built binaries run `--no-build`.** The Conformance tests find their goldens through `[CallerFilePath]`,
+   which a Windows build bakes in as `E:\…` paths that are relative on Linux: 363 false reds.
+2. **The Windows tree, with `GIT_DIR`/`GIT_WORK_TREE` exported** so Linux git could read a worktree whose `.git` file
+   names an `E:/` gitdir. The variables reached every test process. `gate_slot.py`'s self-test (git init, commit,
+   worktree add in its own temp repositories) then wrote into the REAL repository: `core.worktree` landed in the
+   shared `.git/config` and broke git in every checkout until the owner removed it (2026-09-29).
 
-**Which legs run (MANDATORY-PRACTICES I8, L10): all three, at every implementer gate and every landing.** Measured
-on main at `9a0ab2dd4`, 2026-09-29:
-- `unit`: about 143 s;
-- `characterization`: about 3 s;
-- `conformance`: 149 s, including the Linux build, for 9,319 of 9,319 passing.
+So the script exports nothing. Its only git calls on the Windows repository are two READS (HEAD, and the count of
+uncommitted changes), with `safe.directory` and `core.autocrlf` passed inline.
 
-That is about 5 minutes for the whole Linux population. A platform-sensitivity detector, which would have added the
+**Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line naming the HEAD it tested. NOT RUN is never green.
+
+**Which legs run (MANDATORY-PRACTICES I8, L10): all three, at every implementer gate and every landing.**
+- **Measured at `4fdc6897c`** (train 71b with F), 2026-09-29: 195 s in all.
+  - `unit`: 75 s including the build; exactly CI's one red, `Arm5`.
+  - `characterization`: 8 s.
+  - `conformance`: 102 s, for 9,321/9,321.
+- **The shared `.git/config` and the worktree list were unchanged afterwards.**
+
+That is about 3–4 minutes for the whole Linux population. A platform-sensitivity detector, which would have added the
 conformance leg only for flagged diffs, was built and deleted the same night. At that cost no selection is worth its
 misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
 
