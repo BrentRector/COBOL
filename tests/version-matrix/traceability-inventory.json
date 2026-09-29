@@ -13566,13 +13566,13 @@
   "ordinal": 2,
   "subject": "Configuration section",
   "rule-digest": "c0d748690e33",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoEnvironmentRules.cs#Screen; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
+  "test-ref": "conformance-test:OoEnvironmentPlacementTests.EnvironmentPlacement_FollowsTheOneTable",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1076: Rule: 'The configuration section shall not be specified in a method definition.' (cite.py --check 12.3.3 -> OK §12.3.3 2)). Code: OoBindMethodData raises COBOLNET1519 whenever m.Ctx.environmentDivision() is not null, i.e. it keys on the DIVISION, not on the configuration SECTION. The forbidding half is enforced: probes meth_config_empty (METHOD-ID with ENVIRONMENT DIVISION. CONFIGURATION SECTION.) and meth_special (+ SPECIAL-NAMES DECIMAL-POINT IS COMMA) -> COBOLNET1519, rc 70, --std 2023. But the method-definition skeleton prints '[ environment-division ]' (cite.py --check 10.6.1 \"[ environment-division ]\" -> OK §10.6.1 General format) and §12.2.1 makes both sections optional (cite.py --check 12.2.1 \"[ configuration-section ]\" -> OK), so a bare 'ENVIRONMENT DIVISION.' header with neither section is legal in a method; probe meth_empty_env rejects it with the same COBOLNET1519 (rc 70) -> rejects legal source. Baseline (no ENV in method) compiles and runs 'BUMPED'. Probes: E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/configuration-section/{baseline,meth_empty_env,meth_config_empty,meth_special}. Existing test OoSpineTests.MethodMayNotOwnEnvOrFileSection_1519 covers only the ENV+INPUT-OUTPUT arm (§12.4.3), never a configuration section, and pins the over-broad division-level check, so it does not close this row. Unresolved tension recorded, not adjudicated as a defect: the §10.6.1 NOTE says a method-definition in an interface-definition defines a method prototype, and §10.6.2 SR4 b)/c) restrict (rather than forbid) a method prototype's OBJECT-COMPUTER/SPECIAL-NAMES, implying a prototype may carry a configuration section; the interface arm routes through PrototypeUnitRules.ScreenBody and admits it. The literal SR2 would forbid it; the SR4 reading admits it. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (method definitions exist only from ISO 2002's OO facility; no 1985 form) | code-location as adjudicated: src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (interface prototype arm -> PrototypeUnitRules.ScreenBody)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1076: a method's CONFIGURATION SECTION is COBOLNET2644; a bare ENVIRONMENT DIVISION header is legal (§10.6.1, §12.2.1).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.3-3",
@@ -13581,13 +13581,13 @@
   "ordinal": 3,
   "subject": "Configuration section",
   "rule-digest": "70150cfa6e5a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoDriver.cs; src/Cobol.Net.Compiler/Binding/Procedure/MnemonicRegistry.cs; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoEnvironmentRules.cs#Screen; src/Cobol.Net.Compiler/Oo/OoDriver.cs",
+  "test-ref": "conformance-test:OoEnvironmentPlacementTests.EnvironmentPlacement_FollowsTheOneTable",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB813: Rule: 'The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be specified in a factory definition or an instance definition.' (cite.py --check 12.3.3 -> OK §12.3.3 3)). No screen exists anywhere in src (grep of sourceComputerParagraph/objectComputerParagraph/'12.3.3 SR3' finds only comments asserting SR3 as a premise). All three paragraphs are accepted silently, --std 2023: fac_source_comp (FACTORY. ENVIRONMENT DIVISION. CONFIGURATION SECTION. SOURCE-COMPUTER. MYBOX.) rc 0 'BUMPED'; obj_object_comp (OBJECT. ... OBJECT-COMPUTER. MYBOX.) rc 0; obj_repository (OBJECT. ... REPOSITORY.) rc 0. Control: fac_special_ok (SPECIAL-NAMES in FACTORY, which SR3 permits) rc 0 as expected. Probes: E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/configuration-section/. Owned by kb/Work PB813 (open; claims SR-12.3.3-3; measured the REPOSITORY half and owes the SOURCE-/OBJECT-COMPUTER sibling sweep) - this adjudication supplies that sibling measurement; no new note. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (factory/instance definitions are ISO 2002 OO facility) | code-location as adjudicated: src/Cobol.Net.Compiler/Oo/OoDriver.cs#(object/factory unit assembly adds the paragraph's environmentDivision); src/Cobol.Net.Compiler/Binding/Procedure/MnemonicRegistry.cs; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build]",
-  "state": "GAP"
+  "notes": "kb/Work PB813: SOURCE-COMPUTER / OBJECT-COMPUTER / REPOSITORY in a factory or instance definition is COBOLNET2644 (both arms).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.4-1",
@@ -13941,13 +13941,13 @@
   "ordinal": 2,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "50450035009c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#factoryParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#objectParagraph; src/Cobol.Net.Compiler/Oo/OoDriver.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoEnvironmentRules.cs#Screen",
+  "test-ref": "conformance-test:OoEnvironmentPlacementTests.EnvironmentPlacement_FollowsTheOneTable",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1076: Rule: 'In a factory definition or instance definition, the only clauses that may be specified are the CURSOR and CRT STATUS clauses.' cite.py --check 12.3.7.3 -> OK §12.3.7.3 2). CURSOR and CRT STATUS are the declined screen module (A.4.2, COBOLNET1560), so in practice NO SPECIAL-NAMES clause is usable in a FACTORY or OBJECT paragraph. The grammar admits environmentDivision? in both, and no binder or pass screens its SPECIAL-NAMES entries (grep for the rule text / '12.3.7.3 SR2' over src finds only the prototype sibling PrototypeUnitRules.ScreenBody, §10.6.2 SR4 c). Probes (--std 2023, compile rc=0, dll produced): sr2_factory_decimal (FACTORY ... SPECIAL-NAMES. DECIMAL-POINT IS COMMA.), sr2_factory_class (CLASS DIG IS \"0\" THRU \"9\"), sr2_object_currency (OBJECT ... CURRENCY SIGN IS \"#\"). Expected from the spec: a diagnostic on each clause. §12.3.3 SR3 (cite OK §12.3.3 3)) is the paragraph-level twin (SOURCE-COMPUTER/OBJECT-COMPUTER/REPOSITORY not in a factory/instance) - OoClassTable.cs:502 enforces the REPOSITORY leg, the clause-level SR2 has no home. See finding 'OO SPECIAL-NAMES clause restrictions unscreened'. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (factory and instance definitions are the OO module, introduced at 2002) | code-location as adjudicated: src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#factoryParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#objectParagraph; src/Cobol.Net.Compiler/Oo/OoDriver.cs (splices the factory/object environmentDivision into the bound unit); no screen exists]",
-  "state": "GAP"
+  "notes": "kb/Work PB1076: a factory or instance SPECIAL-NAMES admits CURSOR and CRT STATUS only.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-3",
@@ -13956,13 +13956,13 @@
   "ordinal": 3,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "a449db5e2817",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#interfaceDefinition; src/Cobol.Net.Compiler/Oo/OoDriver.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoEnvironmentRules.cs#Screen; src/Cobol.Net.Compiler/Oo/OoDriver.cs",
+  "test-ref": "conformance-test:OoEnvironmentPlacementTests.EnvironmentPlacement_FollowsTheOneTable",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1076: Rule: 'In an interface definition, the ALPHABET clause, the CURRENCY clause, the DECIMAL-POINT clause, and the LOCALE clause are the only permitted clauses.' cite.py --check 12.3.7.3 -> OK §12.3.7.3 3). No screen: probes (--std 2023, rc=0, dll produced) sr3_itf_class (INTERFACE-ID ... SPECIAL-NAMES. CLASS DIG IS \"0\" THRU \"9\"), sr3_itf_symbolic (SYMBOLIC CHARACTERS BEL IS 8), sr3_itf_switch (SYSOUT IS MYOUT) all compile clean; the permitted controls sr3_itf_currency_ok and sr3_itf_alphabet_ok (ALPHABET + DECIMAL-POINT) compile as they should. Expected from the spec: a diagnostic on CLASS, SYMBOLIC CHARACTERS and the device entry. The shape of the fix already exists one file over: PrototypeUnitRules.AdmittedInPrototype screens exactly this kind of permitted-clause list for §10.6.2 SR4 c) (cite OK §10.6.2 4) c)). See finding 'OO SPECIAL-NAMES clause restrictions unscreened'. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (interface definitions are the OO module, introduced at 2002) | code-location as adjudicated: src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#interfaceDefinition; src/Cobol.Net.Compiler/Oo/OoDriver.cs:43 (splices the interface environmentDivision); no screen exists]",
-  "state": "GAP"
+  "notes": "kb/Work PB1076: an interface SPECIAL-NAMES admits ALPHABET, CURRENCY, DECIMAL-POINT and LOCALE only.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-4",
@@ -15576,13 +15576,13 @@
   "ordinal": 1,
   "subject": "Input-output section",
   "rule-digest": "d6d423e9b878",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoDriver.cs#OoReparentClassData; src/Cobol.Net.Compiler/Oo/OoDriver.cs#OoReparentFactoryData; src/Cobol.Net.Compiler/Oo/OoDriver.cs#BindInterfaceData; src/Cobol.Net.Compiler/Binding/DataBinder.cs#EnvDivisions; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#classDefinition; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#interfaceDefinition",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoEnvironmentRules.cs#Screen; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoDriver.cs",
+  "test-ref": "conformance-test:OoEnvironmentPlacementTests.EnvironmentPlacement_FollowsTheOneTable",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1076: Rule (cite.py --check 12.4.3 \"Within a class definition, the input-output section may be specified only in a factory definition or instance definition, but not in a method definition\" -> OK §12.4.3 1); --check 12.4.3 \"The input-output section shall not be specified within an interface definition\" -> OK). Five arms. (1) program definition: legal, probe p1 runs. (2) function definition: legal, probe p8 (FUNCTION-ID with FILE-CONTROL + FD, WRITE, RETURNING) runs 'DONE!'. (3) factory/instance definition: legal, probe p5 (OBJECT. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION ...) compiles exit 0; conformance:2002/oo_factory_file covers the factory arm. (4) method definition: forbidden, enforced by DataBinder.Oo.cs OoBindMethodData `if (m.Ctx.environmentDivision() is not null) Edition.Error(\"COBOLNET1519\" ...)`; probe p7 -> COBOLNET1519; covered by conformance-test:OoSpineTests.MethodMayNotOwnEnvOrFileSection_1519 (first InlineData). Interface method prototypes also route through OoBindMethodData (OoDriver.BindInterfaceData) and draw 1519. (5a) CLASS-LEVEL environment division (between CLASS-ID and FACTORY/OBJECT, which §10.6's class-definition skeleton admits as [environment-division]): the input-output section is NOT refused -- OoReparentClassData/OoReparentFactoryData add the class env to BOTH halves' synthetic units and DataBinder.EnvDivisions binds its FILE-CONTROL into both; probe p4 (CLASS-ID. IOSC4. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT F1 ...; FD F1 in OBJECT) compiles exit 0 at --std 2002 and 2023, zero diagnostics. (5b) INTERFACE-level environment division: probe p6 (INTERFACE-ID. IOSI6. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT F1 ...) compiles exit 0 at 2002 and 2023; OoDriver.BindInterfaceData binds the env through DataBinder.BindDeclarations with no screen. Grep of src for inputOutputSection() finds only DataBinder.cs:959/1758 (binding) and PrototypeUnitRules.cs:69 (§10.6.2 SR4 d, program/function prototypes only) -- no class-level or interface-level screen exists. Two arms under-rejected -> DIVERGES. Expected per spec: both p4 and p6 are nonconforming source and draw a compile-time error. No kb/Work note owns this (searched for §12.4.3 / input-output section). test-ref empty: no test covers the class-level or interface-level arms. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 for the class/factory/instance/method/interface/function arms (OO and user-defined functions are 2002 introductions); program-definition arm at every edition]",
-  "state": "GAP"
+  "notes": "kb/Work PB1076: the INPUT-OUTPUT SECTION is refused (COBOLNET2644) in a method, the class's own environment division and an interface; admitted in a factory or instance.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.2-1",

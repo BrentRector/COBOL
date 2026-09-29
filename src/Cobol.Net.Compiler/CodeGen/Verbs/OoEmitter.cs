@@ -1009,6 +1009,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // declarative sections (DeclStartPc), entered only through the method's own __RunUse.
                 string saved = dispatch.DispatchName;
                 dispatch.DispatchName = "__MDispatch";
+                // The method's GR4 a) USE BEFORE REPORTING selectors (kb/Work PB1044) — declared BEFORE the dispatch
+                // local function whose GENERATE/TERMINATE statements capture the cached-delegate slot.
+                U.ReportWriter.EmitMethodBeforeReportingSelectors(mDecls, w);
                 if (methodF3)
                     U.Dispatch.EmitDispatchMethod(bound, w, "int __MDispatch(int __startPc, int __exitPc)",
                         m.Binding!.DeclStartPc, m.Binding!.EndPc,
@@ -1025,6 +1028,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         hasIoChecked: mDecls.Count > 0 && bound.Ec is { HasIoChecked: true },
                         hasF3Perform: methodF3, w, asLocal: true);
                 dispatch.DispatchName = saved;
+                dispatch.BeforeReportingSelectors.Clear();   // the selectors are this method's locals — no other unit's statement may name them
                 // The ACTIVATION boundary's checking scope (kb/Work PB841 — the INVOKE twin of ProgramTable.CallProgram):
                 // the method's statements are its own source text (§7.3.25.4 GR6), so they start from all-off whatever
                 // guard the INVOKE ran under, and the activator's flags come back on return. Taken HERE, after

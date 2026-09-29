@@ -260,15 +260,10 @@ public sealed partial class DataBinder
         string where = $"method '{m.Name}'";
         m.Binding ??= new OoMethodBinding();   // the after-data-bind half attaches HERE (P9 R7 — phase-explicit)
         _ooBoundMethods.Add(m);
-        // A method definition shall NOT contain an ENVIRONMENT DIVISION: the configuration section (§12.3.3 SR2)
-        // and the input-output section / FILE-CONTROL (§12.4.3 SR1) may appear only in a factory or instance
-        // definition — never a method. (Object/factory FILE-CONTROL is the M2-OO-1i object/factory ENV+FILE leg;
-        // a method references those files via §11.7.4 GR5, it does not declare its own.) Hard error, not the old
-        // "not yet implemented" 0899 — the construct is spec-forbidden, not unimplemented.
-        if (m.Ctx.environmentDivision() is not null)
-            Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain an ENVIRONMENT DIVISION "
-                + "— the configuration and input-output sections may appear only in a factory or instance "
-                + "definition (ISO §12.3.3 SR2 / §12.4.3 SR1)");
+        // A method's environment division may not carry the configuration section (§12.3.3 SR2) or the
+        // input-output section (§12.4.3 SR1) — a bare header is legal (§10.6.1, §12.2.1). One placement table
+        // for every OO definition kind (kb/Work PB1076). A method references the class's files via §11.7.4 GR5.
+        OoEnvironmentRules.Screen(OoDefinition.Method, where, m.Ctx.environmentDivision(), Edition);
 
         // §10.6.1's method skeleton prints [options-paragraph] (kb/Work PB135): fold it over the class
         // channel's model per §11.9.4 GR1; the roster swaps it in around this method's body bind.

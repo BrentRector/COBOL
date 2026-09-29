@@ -3,7 +3,7 @@
       *> paragraph carries its OWN environment division, the former singular env read SHADOWED the class-level
       *> one - here the class-level SPECIAL-NAMES CURRENCY SIGN "U" must still reach the OBJECT half's PICTURE
       *> binder (pre-fix this program failed to compile: 'E' was an unknown PICTURE symbol in the object half; the U symbol here is SR22-legal),
-      *> while the object's own env (SOURCE-COMPUTER) binds too.
+      *> while the object's own bare ENVIRONMENT DIVISION header (legal: 12.3.3 SR3 forbids only the SOURCE-COMPUTER, OBJECT-COMPUTER and REPOSITORY paragraphs there) must not shadow it.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. OOENVP9.
        ENVIRONMENT DIVISION.
@@ -31,8 +31,6 @@
        IDENTIFICATION DIVISION.
        OBJECT.
        ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       SOURCE-COMPUTER. GF-BOX.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 N PIC 9(3)V99 VALUE 12.34.

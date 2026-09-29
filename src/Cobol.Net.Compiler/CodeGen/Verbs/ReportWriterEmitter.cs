@@ -623,14 +623,42 @@ internal sealed class ReportWriterEmitter(
     public void EmitBeforeReportingSelectors(BoundUnit unit, CodeWriter w)
     {
         dispatch.BeforeReportingSelectors.Clear();
-        var decls = unit.Bound.Declaratives ?? [];
-        foreach (var r in unit.Data.VisibleReports)
+        EmitSelectors(unit.Bound.Declaratives ?? [], unit.Data.VisibleReports,
+            r => ChainSelects(unit, r, globalOnly: false),
+            r => unit.Data.ReportDepth(r) > 0 && ChainSelects(unit.Parent, r, globalOnly: true)
+                ? $"return __outer.{SelectorName(r)}(__gi, true);   // GR4 b) — the next directly containing source element"
+                : "return false;   // no qualifying declarative — the group is produced with none (GR4 b) exhausted)",
+            asLocal: false, w);
+    }
+
+    /// <summary>The METHOD's half of §14.9.49.4 GR4 (kb/Work PB1044): a method is a source element of its own
+    /// (§14.2.2 SR10 admits USE declaratives in a method definition; design SSOT §9.10), so its GENERATE and
+    /// TERMINATE statements select over ITS declaratives — GR4 a) — and, being contained in no source element with a
+    /// procedure division (§14.2.2 SR12/SR13), GR4 b)'s outward walk has nowhere to go. The selectors are LOCAL
+    /// FUNCTIONS of the method (they call its local <c>__RunUse</c> and capture its data), over the reports its
+    /// class half owns. The caller restores <see cref="DispatchState.BeforeReportingSelectors"/> after the body.</summary>
+    public void EmitMethodBeforeReportingSelectors(IReadOnlyList<BoundDeclarative> decls, CodeWriter w)
+    {
+        dispatch.BeforeReportingSelectors.Clear();
+        EmitSelectors(decls, ctx.Data.VisibleReports,
+            r => decls.Any(d => d.ReportGroup is { } g && r.Groups.Contains(g)),
+            _ => "return false;   // a method has no containing source element (GR4 b) exhausted)",
+            asLocal: true, w);
+    }
+
+    /// <summary>The ONE selector emitter (programs: members; methods: local functions). Emits, for every report of
+    /// <paramref name="reports"/> that <paramref name="selects"/>, the cached-delegate slot and the
+    /// <c>__BeforeReporting_*</c> switch over <paramref name="decls"/>, ending in <paramref name="tail"/>.</summary>
+    private void EmitSelectors(IReadOnlyList<BoundDeclarative> decls, IEnumerable<ReportModel> reports,
+        Func<ReportModel, bool> selects, Func<ReportModel, string> tail, bool asLocal, CodeWriter w)
+    {
+        foreach (var r in reports)
         {
-            if (!ChainSelects(unit, r, globalOnly: false)) continue;
+            if (!selects(r)) continue;
             dispatch.BeforeReportingSelectors.Add(r);
             w.Line();
-            w.Line($"private System.Func<int, bool>? {SelectorField(r)};   // RD {r.Name}: the cached selector (ISO §14.9.49.4 GR4)");
-            using (w.Block($"public bool {SelectorName(r)}(int __gi, bool __globalOnly)   // RD {r.Name} — ISO §14.9.49.4 GR4 / GR8"))
+            w.Line($"{(asLocal ? "" : "private ")}System.Func<int, bool>? {SelectorField(r)}{(asLocal ? " = null" : "")};   // RD {r.Name}: the cached selector (ISO §14.9.49.4 GR4)");
+            using (w.Block($"{(asLocal ? "" : "public ")}bool {SelectorName(r)}(int __gi, bool __globalOnly)   // RD {r.Name} — ISO §14.9.49.4 GR4 / GR8"))
             {
                 var cases = new List<string>();
                 var seen = new HashSet<int>();
@@ -642,9 +670,7 @@ internal sealed class ReportWriterEmitter(
                 if (cases.Count > 0)
                     using (w.Block("switch (__gi)"))
                         foreach (string c in cases) w.Line(c);
-                w.Line(unit.Data.ReportDepth(r) > 0 && ChainSelects(unit.Parent, r, globalOnly: true)
-                    ? $"return __outer.{SelectorName(r)}(__gi, true);   // GR4 b) — the next directly containing source element"
-                    : "return false;   // no qualifying declarative — the group is produced with none (GR4 b) exhausted)");
+                w.Line(tail(r));
             }
         }
     }

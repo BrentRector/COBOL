@@ -40,6 +40,8 @@ internal sealed class OoDriver(BindSession session)
         // rather than only the METHOD one the finding named).
         data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(iface.Ctx.optionsParagraph(), session.Edition, null));
         var synthetic = new Core.ProgramUnitContext(null!, -1);
+        OoEnvironmentRules.Screen(OoDefinition.Interface, $"interface '{iface.Name}'",
+            iface.Ctx.environmentDivision(), session.Edition);
         if (iface.Ctx.environmentDivision() is { } env) synthetic.AddChild(env);
         data.BindDeclarations(synthetic);
         using (session.Edition.At(iface.Ctx)) data.DeclareUserWord(iface.Name, UserWordKind.InterfaceName);
@@ -75,6 +77,13 @@ internal sealed class OoDriver(BindSession session)
     public void BindClassData(OoClassUnit cls)
     {
         var edition = session.Edition;
+        // The environment-division placement of each definition of the class, judged once (kb/Work PB1076 + PB813).
+        var classCtx = cls.Symbol.Ctx;
+        OoEnvironmentRules.Screen(OoDefinition.Class, $"class '{cls.Name}'", classCtx.environmentDivision(), edition);
+        OoEnvironmentRules.Screen(OoDefinition.Factory, $"class '{cls.Name}' FACTORY paragraph",
+            classCtx.factoryParagraph()?.environmentDivision(), edition);
+        OoEnvironmentRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
+            classCtx.objectParagraph()?.environmentDivision(), edition);
         // OoOwnerClassName is what USAGE OBJECT REFERENCE [FACTORY OF] ACTIVE-CLASS binds to — §13.18.60.4
         // GR22 e), the class of the object that invoked the containing method (kb/Work PB389).
         var data = new DataBinder(edition) { OoClasses = session.OoClasses, OoIsClassUnit = true, OoOwnerClassName = cls.Name, RefModZeroLength = session.RefModZeroLength, CobolWords = session.CobolWords, Retypes = session.Retypes };

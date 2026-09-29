@@ -13,6 +13,15 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1788 — 2026-09-29 16:00 PDT — PB1044 + PB1076 + PB813: method USE BEFORE REPORTING, and the one OO environment-placement table
+
+Three notes, one batch, one gate (owner: fix several bugs, then one test for them all).
+
+- **PB1044** — a METHOD's own USE BEFORE REPORTING declarative never ran (`OoEmitter` cleared the GR4 selector set for class units and only `ProgramEmitter` emitted selectors). `ReportWriterEmitter.EmitBeforeReportingSelectors` is now a thin caller of ONE `EmitSelectors` (members for a program, LOCAL FUNCTIONS for a method via `EmitMethodBeforeReportingSelectors`), called per method from `OoEmitter.EmitMethod` before the dispatch local function. §14.9.49.4 GR4 a) / GR8; golden `conformance:2023/pb1044_method_use_before_reporting`. Sweep: `UseDecls` was already per-method, `OuterGlobalUse` is correctly false for a method (§14.2.2 SR12/SR13); a method USE FOR DEBUGGING is a separate, unmeasured question. The note's probe needed `INHERITS FROM BASE` (COBOLNET2448) to reach NEW.
+- **PB1076 + PB813** — the OO environment-division placement rules had ONE arm (the method arm, which tested the whole division). New `OoEnvironmentRules.Screen` is the one table keyed by (definition kind x element), COBOLNET2644: §12.3.3 SR2 (method: no CONFIGURATION SECTION; a bare header is legal), SR3 (factory/instance: no SOURCE-COMPUTER, OBJECT-COMPUTER, REPOSITORY), §12.4.3 SR1 (INPUT-OUTPUT SECTION only in a factory or instance), §12.3.7.3 SR2/SR3 (SPECIAL-NAMES clause lists). The old method-arm COBOLNET1519 environment check is deleted, not aliased. Witness: `OoEnvironmentPlacementTests.EnvironmentPlacement_FollowsTheOneTable` (17 rows incl. legal controls). Closes SR-12.3.3-2, SR-12.3.3-3, SR-12.4.3-1, SR-12.3.7.3-2, SR-12.3.7.3-3: GAP 818 to 813.
+
+Gate: PB1044 alone passed the implementer gate (Conformance 9381, Unit 29858, Characterization 35); the combined change is gated once before the commit.
+
 ## Entry 1787 — 2026-09-29 15:44 PDT — Conformance ledger republished (GAP 818); adjudication branches deleted; token-frugal pacing
 
 - **The archive of PB1522's cloud-adjudication lanes landed (DEVLOG 1786).** The 11 `claude/adj-*` branches are

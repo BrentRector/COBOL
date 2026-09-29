@@ -387,6 +387,21 @@ public static class DiagnosticCatalog
         + "name the entity is known by differs from the literal as written.",
         "ISO §8.3.2.2 rule 2 / DOC-A.1-68");
 
+    /// <summary>COBOLNET2644 — an OO definition's environment division carries a part its kind may not (kb/Work
+    /// PB1076 + PB813). ONE code for the one placement table, <c>OoEnvironmentRules.Screen</c>, its only reporter.</summary>
+    public static readonly DiagnosticDescriptor OoEnvironmentPlacement = new(
+        "COBOLNET2644", "oo-environment-placement", EditionSeverity.Error,
+        "The environment division of a method, factory, instance, interface or class definition carries a part that "
+        + "kind of definition may not. ISO §12.3.3 SR2: \"The configuration section shall not be specified in a "
+        + "method definition.\" SR3: \"The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be "
+        + "specified in a factory definition or an instance definition.\" §12.4.3 SR1: the input-output section "
+        + "may be specified within a class definition \"only in a factory definition or instance definition, but "
+        + "not in a method definition\" and \"shall not be specified within an interface definition.\" §12.3.7.3 "
+        + "SR2: in a factory or instance definition \"the only clauses that may be specified are the CURSOR and "
+        + "CRT STATUS clauses\"; SR3: in an interface definition \"the ALPHABET clause, the CURRENCY clause, the "
+        + "DECIMAL-POINT clause, and the LOCALE clause are the only permitted clauses.\"",
+        "ISO §12.3.3 SR2/SR3, §12.4.3 SR1, §12.3.7.3 SR2/SR3");
+
     /// <summary>COBOLNET2643 — an AS literal of spaces only forms the zero-length externalized name (kb/Work
     /// PB1539). Refused wherever the clause itself refuses a zero-length literal — every AS clause but CLASS-ID.</summary>
     public static readonly DiagnosticDescriptor ExternalizedNameAllSpaces = new(

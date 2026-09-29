@@ -369,12 +369,6 @@ public sealed class OoSpineTests
     /// §11.7.4 GR5, it never declares its own.</summary>
     [Theory]
     [InlineData("""
-        ENVIRONMENT DIVISION.
-        INPUT-OUTPUT SECTION.
-        FILE-CONTROL.
-            SELECT F ASSIGN "m.dat".
-        """)]
-    [InlineData("""
         DATA DIVISION.
         FILE SECTION.
         FD F.
