@@ -127,18 +127,21 @@ public enum FileRetryKind
 {
     /// <summary>No RETRY phrase — a single lock attempt (GR4a).</summary>
     None,
-    /// <summary>RETRY n TIMES — the lock check is attempted n+1 times (GR1); a zero or negative n makes no
-    /// further attempt (GR4a).</summary>
+    /// <summary>RETRY n TIMES — the lock check is attempted n+1 times (GR1), each re-attempt against a holder outside
+    /// the run unit after <c>FileRegistry.RetryInterval</c> (A.1 item 165); a zero or negative n makes no further
+    /// attempt (GR4a).</summary>
     Times,
     /// <summary>RETRY FOR n SECONDS — a timeout period clamped by GR2 to the implementor's MAXIMUM MEANINGFUL
-    /// VALUE, which WiseOwl COBOL defines as ZERO (Annex A.1 item 166, recorded in docs/CONFORMANCE.md §7): a lock
-    /// here is held only by a file connector of the executing run unit, which cannot release it while this
-    /// statement runs, so no positive timeout could change the outcome. The period is therefore zero-length,
-    /// no further attempt is made, and the conflict's OWN §9.1.13 status stands — never a sleep.</summary>
+    /// VALUE, which WiseOwl COBOL defines as ZERO (Annex A.1 item 166, recorded in docs/CONFORMANCE.md §7). The
+    /// period is therefore zero-length, no further attempt is made, and the conflict's OWN §9.1.13 status stands.
+    /// (The determination's original ground — that no holder could release during a wait — holds only for this run
+    /// unit's own connectors; kb/Work PB1163 records that the value is the owner's to keep or revise.)</summary>
     Seconds,
-    /// <summary>RETRY FOREVER — GR3's unbounded wait. The conflict's own §9.1.13 status stands, except that a
-    /// wait on a record locked by another file connector is the deadlock §9.1.13.8 item 2 defines and this
-    /// implementation detects ('52'; A.1 item 109). See <c>FileRegistry.ExhaustionStatus</c>.</summary>
+    /// <summary>RETRY FOREVER — GR3: attempts until the operation completes, waiting between attempts while the
+    /// holder is outside the run unit. A holder inside it — another file connector of this run unit — can never
+    /// release while the statement runs, so there the conflict's own §9.1.13 status stands, except that a wait on
+    /// a record locked by another file connector is the deadlock §9.1.13.8 item 2 defines and this implementation
+    /// detects ('52'; A.1 item 109). See <c>FileRegistry.RetryLoop</c> and <c>ExhaustionStatus</c>.</summary>
     Forever,
 }
 

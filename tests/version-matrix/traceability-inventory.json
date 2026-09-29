@@ -15606,13 +15606,13 @@
   "ordinal": 2,
   "subject": "File control entry",
   "rule-digest": "0acd4d779c28",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
-  "test-ref": "",
+  "test-ref": "conformance:negative/w73b-pb1077-select-twice; conformance:85/w73b_pb1077_select_scope_per_program",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1077: Rule: 'A given file-name may be specified in only one SELECT clause within a factory, function, object, or program.' (cite.py --check 12.4.5.2 -> OK §12.4.5.2 2)). Code: DataBinder.BindFileControl builds a new FileModel per fileControlClauseGroup, does `_files.Add(file)` and `FilesByName[name] = file` with NO test for a prior entry of the same name; the grammar's `declareName` does not refuse a redeclaration either. Probe probe/fce/sr2dup: two `SELECT F1` entries (\"a.dat\" then \"b.dat\") + one FD F1 compile clean and run 'OK' exit 0 at --std 2023 and --std 85. probe/fce/sr2open (same shape, OPEN OUTPUT F1 / WRITE / CLOSE) writes b1.dat only - the LAST SELECT silently wins the FilesByName slot while _files carries both models. probe/fce/sr2dup_diff (first SELECT ORGANIZATION SEQUENTIAL, second ORGANIZATION RELATIVE) also compiles clean. Spec-derived expected: a compile-time error on the second SELECT F1 (a syntax rule violation). Harm: under-rejects (silent choice of one entry). Finding: file-control-entry-sr2-sr3-unenforced. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (ALL FORMATS syntax rule; no Annex E row)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1077 landed (w73b). cite.py --check 12.4.5.2 \"A given file-name may be specified in only one SELECT clause within a factory, function, object, or program\" -> OK 2). BindFileControl keeps the unit's own SELECTs in DataBinder._selectedFiles and reports a second SELECT of a file-name with COBOLNET2634 at every edition; the first entry stands (it used to be silently replaced in FilesByName, so the program wrote the last ASSIGN target). A class-level input-output section (bound into both OO halves) is not screened: §12.4.3 SR1 forbids it outright (kb/Work PB1076). Probe: SELECT F1 twice -> compiled clean, wrote b1.dat only; now COBOLNET2634 at --std 2023 and 85. The per-program scope is witnessed by the 85 golden (containing and contained program each SELECT F).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.2-3",
@@ -15621,13 +15621,13 @@
   "ordinal": 3,
   "subject": "File control entry",
   "rule-digest": "7620a6797dae",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl; src/Cobol.Net.Runtime/IO/FileRegistry.cs#Require",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenSelectsHaveDescriptions",
+  "test-ref": "conformance:negative/w73b-pb1077-select-without-fd; conformance:85/w73b_pb1077_select_scope_per_program",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1077: Rule: 'For each file-name specified in a SELECT clause, there shall be a file description entry or a sort-merge file description entry in the file section of the factory, function, object, or program in which the SELECT clause is specified.' (cite.py --check 12.4.5.2 -> OK §12.4.5.2 3)). Code: BindFileControl registers a FileModel per SELECT; nothing screens a FileModel that no FD/SD attached to (BindFileSection only attaches records to existing models). Probe probe/fce/sr3nofd (SELECT F1 + SELECT F2, FD F1 only) compiles clean and runs 'OK' exit 0 at --std 2023 and 85. probe/fce/sr3open (same, `OPEN OUTPUT F2`) compiles clean and then ABORTS the run unit: `System.InvalidOperationException: file connector 'SR3OPN::F2' was never registered - a compiler defect, not a program error (kb/Work PB140)` from FileRegistry.Require (exit 3762504530) at both editions. Spec-derived expected: compile-time error naming F2 for want of an FD/SD. Harm: crashes (and under-rejects when the file is never referenced). Distinct from landed PB345 (an FD with no record descriptions - that one HAS an FD). Finding: file-control-entry-sr2-sr3-unenforced. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (ALL FORMATS syntax rule; no Annex E row)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1077 landed (w73b). cite.py --check 12.4.5.2 \"For each file-name specified in a SELECT clause, there shall be a file description entry or a sort-merge file description entry\" -> OK 3). DataBinder.ScreenSelectsHaveDescriptions runs once every FD and SD has attached (both set FileModel.HasFd), also for a unit with no FILE SECTION, and reports COBOLNET2635 at the file control entry. Probe: SELECT F2 with no FD, OPEN OUTPUT F2 -> compiled clean and aborted the run unit in FileRegistry.Require ('never registered - a compiler defect'); now COBOLNET2635 at --std 2023 and 85.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.2-4",
@@ -17616,13 +17616,13 @@
   "ordinal": 1,
   "subject": "File description entry",
   "rule-digest": "0cda1e9f25c3",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection",
-  "test-ref": "",
+  "test-ref": "conformance:negative/w73b-pb1237-fd-sd-without-select",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1237, 14d). Rule: 'File-name-1 shall be specified in a file control entry.' (cite.py --check 13.4.5.3 -> OK §13.4.5.3 1)). BindFileSection, on !FilesByName.TryGetValue(name), synthesizes 'new FileModel { CobolName = name, SelectName = name }' with the comment 'it is never opened' and issues NO diagnostic. Probe probe/fde/sr1_noselect (FD F with only SELECT G) compiles clean and runs; probe/fde/sr1_noselect_use goes further: OPEN OUTPUT F / WRITE R / CLOSE F compile and RUN ('OK'), the .g.cs registering 'CobolFile.Register(\"SR1U::F\", \"\", 10, ...)' with an EMPTY assignment — the comment's premise is false. Expected: a compile-time error at every edition. Sibling: the SD arm below it carries the same fallback and §13.4.6.3 SR1 states the same rule for the SD (cite.py OK §13.4.6.3 1)). Finding 1. || Editions (adjudicator): 85, 2002, 2014, 2023 (the file description entry and this rule exist in every edition; no Annex E item touches 13.4.5) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection (the 'FD with no matching SELECT — keep a model' arm)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1237 landed with PB1077 (w73b, the other arm of the SELECT/FD pairing). cite.py --check 13.4.5.3 \"File-name-1 shall be specified in a file control entry\" -> OK 1). BindFileSection's no-SELECT branch now reports COBOLNET2636 (the model is still built so the entry's records resolve without a cascade). Probe: FD F9 with no SELECT compiled clean and ran; now COBOLNET2636 at --std 2023 and 85.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.4.5.3-2",
@@ -17811,13 +17811,13 @@
   "ordinal": 1,
   "subject": "Sort-merge file description entry",
   "rule-digest": "0cda1e9f25c3",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection",
+  "test-ref": "conformance:negative/w73b-pb1237-fd-sd-without-select",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1290. Rule: \"File-name-1 shall be specified in a file control entry.\" (cite.py --check 13.4.6.3 -> OK §13.4.6.3 1)). Code: the SD arm of DataBinder does `if (!FilesByName.TryGetValue(sdName, out var sdFile)) { sdFile = new FileModel { CobolName = sdName, SelectName = sdName }; ... }` -- it SYNTHESIZES a file for an SD that no SELECT names, and no later pass diagnoses it (searched src/Cobol.Net.Compiler for a SELECT-presence check; none). Probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out13\\probe\\sd\\sr1.cob (FILE-CONTROL selects only IN1; `SD SRT.` with no SELECT SRT; SORT SRT ... USING IN1 GIVING IN1) compiles clean at --std 2023 and RUNS (sorted in1.dat, printed DONE). Expected from spec: a compile-time error for the SD. Sibling (FD, §13.4.5.3 SR1, same text, --check OK): E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out13\\probe\\sd\\fd1.cob, `FD SRT` with no SELECT, OPEN/CLOSE compiles and runs clean -- same mechanism, not this subject's row but the same fix. || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles (SD arm, ~L1539-1549)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1290 landed with PB1077 (w73b). cite.py --check 13.4.6.3 \"File-name-1 shall be specified in a file control entry\" -> OK 1). The SD arm of BindFileSection reports COBOLNET2636 like the FD arm. Probe: SD S9 with no SELECT compiled clean; now COBOLNET2636 at --std 2023 and 85.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.4.6.3-2",
@@ -33471,13 +33471,13 @@
   "ordinal": 2,
   "subject": "RETRY phrase",
   "rule-digest": "8ca5eaeaca77",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#RetrySeconds; src/Cobol.Net.Runtime/IO/FileRegistry.cs#RetryLoop",
-  "test-ref": "unit:CobolFileLockTests.RetryLoop_AttemptCount_FollowsGR1AndGR4; conformance:2002/pb1033_integer_operand_full_value",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#RetryLoop",
+  "test-ref": "unit:CobolFileLockTests.RetryLoop_AttemptCount_FollowsGR1AndGR4; conformance:2002/pb1033_integer_operand_full_value; unit:CobolFileLockTests.RetryLoop_LandsTheConflictsOwnStatus_ByClass",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1163 (the PB1033 half landed w59b). cite.py --check 14.7.9.3 \"The implementor shall specify the maximum meaningful value of arithmetic-expression-2\" -> OK 2). FIXED by PB1033: `RETRY FOR 4294967297 SECONDS` (literal) compiled to CS0221; the amount now narrows through the saturating RuntimeApi.HostInt64 and compiles (the golden compiles it), and GR2's clamp to the DOC-A.1-166 maximum meaningful value of 0 applies to the value. STILL PARTIAL for kb/Work PB1163 alone: DOC-A.1-166's stated GROUND ('every lock is held by a connector of the executing run unit') is falsified since PB860 (DeleteFile/Open consult other run units), measured on the same holder: RETRY 100000000 TIMES -> '00', RETRY FOR 30 SECONDS -> '62'. The determination is the owner's to keep or revise.",
-  "state": "GAP"
+  "notes": "kb/Work PB1163 landed (w73b). cite.py --check 14.7.9.3 \"The implementor shall specify the maximum meaningful value of arithmetic-expression-2\" -> OK 2). GR2 obliges the implementor to SPECIFY n, m and the maximum meaningful value and the retry frequency; DOC-A.1-166 specifies n = 1, m = 0, maximum 0, no retries in the zero-length period, and RetryLoop's Seconds arm implements exactly that. The row was PARTIAL only because DOC-A.1-166 stated a false GROUND (no holder can release during a wait), falsified by PB860's cross-run-unit detection; DOC-A.1-166 and D8 now state the value as a letter-legal determination whose ground holds only for in-run-unit holders, flagged for the owner to keep or revise, and document that FOR n SECONDS is the one form that does not wait for an outside holder.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.7.9.3-3",
@@ -33486,13 +33486,13 @@
   "ordinal": 3,
   "subject": "RETRY phrase",
   "rule-digest": "d2defae36429",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#RetryLoop; src/Cobol.Net.Runtime/IO/FileRegistry.cs#ExhaustionStatus; src/Cobol.Net.Runtime/IO/FileRegistry.cs#DeleteFile; src/Cobol.Net.Runtime/IO/FileRegistry.cs#OpenCore",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#RetryLoop; src/Cobol.Net.Runtime/IO/RetryAttempt.cs#RetryAttempt; src/Cobol.Net.Runtime/IO/FileRegistry.cs#SharedOpenAttempt; src/Cobol.Net.Runtime/IO/FileRegistry.cs#DeleteFile",
+  "test-ref": "unit:CobolFileLockTests.RetryForever_AgainstAHolderOutsideTheRunUnit_WaitsUntilTheOperationCompletes; unit:CobolFileLockTests.RetryAgainstAnOutsideHolder_PausesBeforeEachReattempt_AndOnlyThen; unit:SharingRefusalStatusTests.RetryForever_WaitsForAnotherRunUnitToRelease_DeleteFileAndOpen; unit:CobolFileLockTests.RetryLoop_LandsTheConflictsOwnStatus_ByClass",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1163 (registrar 14c). cite.py --check 14.7.9.3 \"If the FOREVER phrase is specified, the mass storage control system shall attempt to gain access to a locked resource until the input-output operation has been completed\" -> OK 3). RetryLoop's Forever arm makes exactly ONE re-attempt and then lands the conflict's own status (or '52' for a record lock). That is defended only for a holder inside the executing run unit (DOC-A.1-109; D8). But since PB860 the file-sharing conflict on OPEN (FileConnector.Open IsSharingRefusal -> '61') and DELETE FILE (HostFile.IsHeldByAnother -> '62') is also raised by a holder in ANOTHER run unit — which CAN release, as FileRegistry.DeleteFile's own comment says ('another run unit CAN close mid-loop'). Probe (out/probe/retry-phrase/forever.cob, openforever.cob; pwsh holds held.dat FileShare.None and releases after 4 s): `DELETE FILE F RETRY FOREVER` -> '62' after 72 ms, file NOT deleted; `OPEN INPUT RETRY FOREVER F` (SHARING WITH NO OTHER) -> '61' after 72 ms. Spec-derived expected: the statement keeps attempting until the holder releases, then completes successfully — '00' (file deleted / opened) after ~4 s. The in-run-unit record case ('52' deadlock) is a documented A.1-109 determination and not contested here. [editions as adjudicated: 2002, 2014, 2023 (the RETRY phrase is a COBOL-2002 facility; 2023 Annex E lists no change to 14.7.9)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1163 landed (w73b). cite.py --check 14.7.9.3 \"If the FOREVER phrase is specified, the mass storage control system shall attempt to gain access to a locked resource until the input-output operation has been completed\" -> OK 3). Every attempt now names its holder (RetryAttempt.HolderOutsideRunUnit): Table 19's '61', OpenByAnotherConnector's '62' and every record lock are held INSIDE the run unit; FileConnector.Open's host-refusal '61' and HostFile.IsHeldByAnother's '62' are held OUTSIDE it. RetryLoop's FOREVER arm re-attempts every FileRegistry.RetryInterval (100 ms) while the holder is outside, until the operation completes; against an inside holder, which cannot release while the statement executes, it re-checks once and stops (the A.1 item 109 deadlock for a record, the conflict's own status for a file). Probe on the w73b build: DELETE FILE F RETRY FOREVER and OPEN INPUT RETRY FOREVER G, each held FileShare.None by another process for ~3 s: before DELFOREVER=62 / OPENFOREVER=61 after 68 ms with the file present; after 00 / 00, file deleted. D8 and DOC-A.1-109/165/166 corrected.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.7.9.3-4",
@@ -33501,13 +33501,13 @@
   "ordinal": 4,
   "subject": "RETRY phrase",
   "rule-digest": "f45c799e764c",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#RetryLoop; src/Cobol.Net.Runtime/IO/FileRegistry.cs#IsConflict; src/Cobol.Net.Runtime/IO/FileRegistry.cs#ExhaustionStatus",
-  "test-ref": "unit:CobolFileLockTests.RetryLoop_AttemptCount_FollowsGR1AndGR4",
+  "test-ref": "unit:CobolFileLockTests.RetryLoop_AttemptCount_FollowsGR1AndGR4; unit:CobolFileLockTests.RetryForever_AgainstAHolderOutsideTheRunUnit_WaitsUntilTheOperationCompletes",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1163 (the PB1033 half landed w59b). cite.py --check 14.7.9.3 \"If the RETRY phrase is not specified or the result of the evaluation of arithmetic-expression-1 or arithmetic-expression-2 is negative or zero\" -> OK 4) a). FIXED by PB1033: GR4 a) now screens the evaluated value - the amount is a long saturated from the Int128 landing, so a positive amount >= 2^31 (WN = 2147483648) is no longer cast negative and screened as 'negative'; RetryLoop's counter is a long. STILL PARTIAL: b)'s 'as specified in General rules 1, 2, or 3' inherits the GR3 FOREVER divergence (row GR-14.7.9.3-3, kb/Work PB1163); WRITE's '53'/'54' bypass is kb/Work PB707 (behaviour-identical).",
-  "state": "GAP"
+  "notes": "kb/Work PB1163 landed (w73b). cite.py --check 14.7.9.3 \"If the RETRY phrase is not specified or the result of the evaluation of arithmetic-expression-1 or arithmetic-expression-2 is negative or zero\" -> OK 4) a). a) was fixed by PB1033; b)'s 'attempts to complete the input-output operation as specified in General rules 1, 2, or 3' now holds because GR3's FOREVER waits for an outside holder (row GR-14.7.9.3-3). WRITE's '53'/'54' bypass remains behaviour-identical (kb/Work PB707).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.8.2.2-1",
@@ -36143,7 +36143,7 @@
   "rule-digest": "c9245598c740",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Delete",
-  "test-ref": "conformance:2002/pb144_indexed_delete_record",
+  "test-ref": "conformance:2002/pb144_indexed_delete_record; conformance:2002/w73b_pb1194_mutation_open_mode_first",
   "derivation": "",
   "editions": "85,2002,2014,2023",
   "notes": "PARTIAL -> CONFORMS (kb/Work PB144). 'The open mode of the file connector referenced by file-name-1 shall be I-O.' IndexedConnector.Delete gates on !IsOpen || Mode != IO -> '49', but that arm had never executed against an INDEXED connector: MEASURED, 37 fixtures mention INDEXED and NOT ONE issued a DELETE against one, and both DELETE unit tests build RELATIVE connectors. The new fixture's IX49 leg is the first execution of it.",
@@ -43416,13 +43416,13 @@
   "ordinal": 3,
   "subject": "REWRITE statement",
   "rule-digest": "fec731aa697c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/RelativeConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/IndexedConnector.cs#Rewrite; src/Cobol.Net.Runtime/IO/FileStatus.cs#DeleteRewriteNotOpenForIO",
-  "test-ref": "conformance:85/l1_open_not_open_statements; conformance:2023/l1_table20_indexed; conformance:2023/l1_table20_seq_relative",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#MutationOpenModeGuard; src/Cobol.Net.Runtime/IO/FileConnector.cs#MutationTargetRecordId; src/Cobol.Net.Runtime/IO/FileRegistry.cs#RewriteShared",
+  "test-ref": "conformance:85/l1_open_not_open_statements; conformance:2023/l1_table20_indexed; conformance:2023/l1_table20_seq_relative; conformance:2002/w73b_pb1194_mutation_open_mode_first",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1194 (registrar 14c). Rule: 'If the open mode is some other value or the file is not open, the I-O status in the rewrite file connector is set to '49''. cite.py --check 14.9.35.4 -> OK 3). All three connector Rewrite bodies test `!IsOpen || Mode != FileOpenMode.IO` FIRST and return '49' before any other check, with no record touched; every REWRITE (sequential and keyed) routes through FileRegistry.RewriteShared -> RewriteAnyOrg, so no arm bypasses it. Both halves are pinned by spec-derived goldens: not-open (85/l1_open_not_open_statements, REWRITE=49) and open-in-another-mode for every organization and access mode (the Table 20 walks, *-O-RW / *-I-RW / *-E-RW = 49). || REFUTED: PARTIAL — The adjudicator's 'all three connector bodies test IsOpen FIRST' is true of the connector bodies but not of the statement: FileRegistry.RewriteShared runs ReleasePriorRecordLocks and the GR11 ConflictOnLockedRecord check BEFORE RewriteAnyOrg reaches the '49' test. For a connector that is NOT OPEN no sharing mode is in effect (9.1.15: 'Record locks are in effect' is a property of the opened sharing mode), so GR11's premise 'record locking is enabled for the rewrite file connector' does not hold and '49' is the only applicable status; the code returns '51' instead. (The INPUT-mode arm returning 51 is acceptable: there both GR3 and GR11 apply and 9.1.13.1 lets the implementor choose.) The goldens cited pin only the no-other-connector case. [editions as adjudicated: 1985, 2002, 2014, 2023 (base REWRITE rule; 2023 Annex E lists no change to it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1194 landed (w73b). cite.py --check 14.9.35.4 \"If the open mode is some other value or the file is not open, the I-O status in the rewrite file connector is set to '49'\" -> OK 3). The governed REWRITE asked FileConnector.MutationTargetRecordId for the record to check against other connectors' locks, and the keyed arms named the key-area record whatever the open state, so a REWRITE (or DELETE RECORD) through a CLOSED connector of a record another connector held locked answered '51'. MutationTargetRecordId now identifies no record unless the connector is open in the I-O mode (the contract the READ peeks keep), through the one shared FileConnector.MutationOpenModeGuard that all five REWRITE/DELETE bodies also call; LocksEffective sets no lock for a connector not registered open (9.1.15: the sharing mode holds 'throughout the duration of this OPEN'). Probe on the w73b build, indexed FB holding K001 under AUTOMATIC locking, FA never opened: before REWRITE-NOTOPEN=51 DELETE-NOTOPEN=51; after 49 / 49. For a connector open INPUT, '49' and '51' both apply (9.1.13.1) and DOC-A.1-104 (2) places GR3's '49'. Golden 2002/w73b_pb1194_mutation_open_mode_first (indexed + relative, closed and INPUT, and the I-O '51' control).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-4",

@@ -197,18 +197,37 @@ two classes breaks conformance in one direction (a `52` for a file conflict) or 
 *wrong* condition, so a USE declarative or exception-checking PERFORM keyed on `EC-I-O-FILE-SHARING` silently does
 not fire. That is why this is a wrong-answer defect and not two cosmetic digits (kb/Work PB142).
 
+**The holder of the locked resource decides whether waiting can help (kb/Work PB1163).** Two kinds of holder
+exist. A file connector *of the executing run unit* cannot close a file or release a record while another statement
+of the same run unit executes, so no wait can change the answer against it. A holder *outside* the run unit —
+another run unit, or any process holding the host file, which the runtime sees only as the host refusing its handle
+(`HostFile.IsSharingRefusal`, kb/Work PB860) — can let go at any moment. Only the attempt knows which holder refused
+it: the Table 19 arbiter and the record-lock table see this run unit's connectors, and the host refusal is the only
+sign of another run unit. So every attempt returns a `RetryAttempt` (its status plus `HolderOutsideRunUnit`), and
+`RetryLoop` reads the holder from it and never infers it from the status digits. The record-lock table belongs to
+the run unit, so a record conflict is always held inside it. A file-sharing conflict is inside when another connector
+of this run unit has the file open (Table 19's '61', `OpenByAnotherConnector`'s '62') and outside when the host
+refused (`FileConnector.Open`'s '61', `HostFile.IsHeldByAnother`'s '62'). The rules that follow:
+- **GR3, FOREVER**, re-attempts while the holder is outside, waiting `FileRegistry.RetryInterval` (100 ms) before
+  each re-attempt, until the operation completes. Against an inside holder it makes one re-check and stops, because
+  that wait could never end. This is the deadlock item 109 names for a record, and the conflict's own status for a
+  file. This premise used to be the only arm. The loop assumed "no releaser exists", so `DELETE FILE … RETRY
+  FOREVER` answered '62' in 72 ms while another program held the file for 4 more seconds.
+- **GR1, n TIMES**, waits the same interval before a re-attempt against an outside holder and none against an
+  inside one (Annex A.1 item 165).
+- **GR2, FOR n SECONDS**, is the determination below.
+
 **The GR2 determination (Annex A.1 item 166).** §14.7.9.3 GR2 requires the implementor to specify the timeout
 temporary's picture `9(n)V9(m)` and the **maximum meaningful value** of arithmetic-expression-2. WiseOwl COBOL defines
-**n = 1, m = 0, maximum meaningful value = 0**. The ground is structural, not a convenience: every file and record
-lock here is held by a file connector *of the executing run unit*, and a connector cannot release one while another
-statement of the same run unit is executing, so no positive timeout period can change the outcome — a sleep would
-only delay an identical answer. GR2 therefore clamps every SECONDS amount into a zero-length timeout period, GR4b's
-"attempts as specified in General rule 2" performs none, and the closing paragraph lands the conflict's own status
-— the same answer GR4a gives for a zero or negative expression. `RETRY FOR 0 SECONDS` and `RETRY FOR 30 SECONDS`
-are thus correct **by one rule** rather than by a special case, which is the observable form of the determination
-and is pinned as such in `2023/delete_file_sharing` (`DELSC0` / `DELSC30`). ⚠ Do not "fix" this into a
-`Thread.Sleep`: that would hang a program for a guaranteed failure. The determination and its ground are recorded
-in `docs/CONFORMANCE.md` §7 under A.1 items 165/166; the deadlock detection conditions are item 109.
+**n = 1, m = 0, maximum meaningful value = 0**. GR2 therefore clamps every SECONDS amount into a zero-length timeout
+period, GR4b's "attempts as specified in General rule 2" performs none, and the closing paragraph lands the
+conflict's own status — the same answer GR4a gives for a zero or negative expression. `RETRY FOR 0 SECONDS` and
+`RETRY FOR 30 SECONDS` are thus correct **by one rule** rather than by a special case, which is the observable form
+of the determination and is pinned as such in `2023/delete_file_sharing` (`DELSC0` / `DELSC30`). ⚠ The value's
+original ground was that no holder can release during a wait. That holds for the run unit's own connectors only, as
+the paragraph above shows. The value itself is letter-legal and is kept, and revising it is the owner's decision
+(kb/Work PB1163). Until then SECONDS is the one form that does not wait for an outside holder. The determinations are
+recorded in `docs/CONFORMANCE.md` §7 under A.1 items 165/166; the deadlock detection conditions are item 109.
 
 **The two roundings are different rules and must stay separate in code.** GR1 rounds the TIMES count **up to the
 next whole number** (`RETRY 1.5 TIMES` is two re-attempts), which is one of only two clauses in the standard that
@@ -248,7 +267,12 @@ rules cannot leave a description behind it (kb/Work PB346).
 `RetryLoop_AttemptCount_FollowsGR1AndGR4` asserts the same rules on the axis a status cannot witness, the ATTEMPT
 COUNT; and `ReadUnderEveryRetryForm_BindsGR9ToTheRetryRules_OnBothFormats` covers §14.9.30.4 GR9's own
 delegation to §14.7.9 through BOTH read formats — until it existed, no test passed a RETRY phrase to a READ
-at all. The corpus witness is `conformance:2023/pb346_read_retry_record_conflict` with its 2014 twin.
+at all. The corpus witness is `conformance:2023/pb346_read_retry_record_conflict` with its 2014 twin. The
+outside-holder arm is `CobolFileLockTests.RetryForever_AgainstAHolderOutsideTheRunUnit_WaitsUntilTheOperationCompletes`
+and `RetryAgainstAnOutsideHolder_PausesBeforeEachReattempt_AndOnlyThen` (the pause is observed through
+`FileRegistry.PauseObserver`, never timed), and end to end `SharingRefusalStatusTests.RetryForever_WaitsForAnotherRunUnitToRelease_DeleteFileAndOpen`,
+which holds a real exclusive handle and releases it only once the statement has been refused. A corpus golden
+cannot witness this arm, because a golden program has no second run unit to hold its file.
 
 ### D9. The L1–L3 phrase-placement leniency family is gated at ONE seam: an error under strict, a warning with an unchanged bind under `--permissive`.
 
@@ -999,7 +1023,9 @@ alphanumeric group item of the maximum size established by the RECORD clause"*.
 **The decision:** `DataBinder.MaterializeImpliedRecord` builds that entry — an unnamed level-01 GROUP over one
 FILLER `PIC X(n)` — as the last act of binding each FD, and everything downstream sees an ordinary record.
 `FileModel.AreaRecord` is consequently non-null for every FD that can be opened with data, and is null only for a
-REPORT file (§13.4.5.3 SR8 forbids it record descriptions) and for a SELECT with no FD at all.
+REPORT file (§13.4.5.3 SR8 forbids it record descriptions). A SELECT with no FD or SD at all never reaches code
+generation: §12.4.5.2 SR3 rejects it (COBOLNET2635, `DataBinder.ScreenSelectsHaveDescriptions`), and an FD or SD
+that no SELECT names is rejected by §13.4.5.3 SR1 / §13.4.6.3 SR1 (COBOLNET2636) (kb/Work PB1077, PB1237, PB1290).
 
 - **A GROUP, not an elementary `PIC X(n)`,** because the distinction is observable: §14.9.25.4 makes a MOVE whose
   sender is a group item a group (alphanumeric) move, so `READ … INTO` a numeric receiver copies bytes where an

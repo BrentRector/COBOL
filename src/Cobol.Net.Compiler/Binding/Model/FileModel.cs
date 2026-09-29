@@ -296,8 +296,8 @@ public sealed class FileModel
     /// <summary>The resolved RELATIVE KEY item (an unsigned integer item, ISO §12.4.5.13.3 SR2).</summary>
     public DataItem? RelativeKeyItem { get; set; }
 
-    /// <summary>True once an FD was matched to this SELECT (a SELECT with no FD is an error the front-end already
-    /// diagnoses; here it simply has no records and is never opened with data).</summary>
+    /// <summary>True once an FD or SD was matched to this SELECT. A SELECT that never gets one is ISO §12.4.5.2 SR3's
+    /// error, reported by <c>DataBinder.ScreenSelectsHaveDescriptions</c> (kb/Work PB1077).</summary>
     public bool HasFd { get; set; }
 
     /// <summary>True for an <c>FD … IS EXTERNAL</c> file (ISO §13.18.22.4 GR4a/GR4b): the file connector is an

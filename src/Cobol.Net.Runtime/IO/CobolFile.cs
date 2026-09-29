@@ -309,10 +309,6 @@ public static class CobolFile
     /// <summary>Release a single record lock (the LOCK MODE single-lock discipline, §12.4.5.9 GR6).</summary>
     public static void ReleaseSingle(string name, string recId) => _reg.ReleaseSingle(name, recId);
 
-    /// <summary>Evaluate an attempt under the RETRY discipline (§14.7.9).</summary>
-    public static string RetryLoop(Func<string> attempt, FileRetryKind kind, long amount)
-        => FileRegistry.RetryLoop(attempt, kind, amount);
-
     /// <summary>ISO §14.9.27.4 Table 19 — is an OPEN request unsuccessful against ONE connector already open on
     /// the same physical file? A null sharing mode is the undetermined implementor default (kb/Work PB322), and
     /// is arbitrated as a conflict only where every candidate mode agrees.</summary>

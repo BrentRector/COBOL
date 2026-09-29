@@ -254,6 +254,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// targets and to map a WRITE/REWRITE record-name back to its owning file.</summary>
     public Dictionary<string, FileModel> FilesByName { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The files this unit's OWN file control entries select, by file-name — the subjects of ISO §12.4.5.2
+    /// SR2 ("A given file-name may be specified in only one SELECT clause within a factory, function, object, or
+    /// program") and SR3 (each needs an FD or SD in the same file section). It is not <see cref="FilesByName"/>,
+    /// which also holds the models an FD or SD synthesizes, and it leaves out a class-level FILE-CONTROL, which
+    /// §12.4.3 SR1 forbids outright (kb/Work PB1076) and which belongs to no factory or object (kb/Work PB1077).</summary>
+    private readonly Dictionary<string, FileModel> _selectedFiles = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Every file of every CONTAINING program that is NOT a global name here — its FD has no GLOBAL clause
     /// (ISO §13.18.27.3 SR1 d)), so its file-name is not in <see cref="FilesByName"/>. It is still reachable through a
     /// record: a file-section level-1 entry may carry its own GLOBAL clause (SR1 b)), and the record-name is then
@@ -526,6 +533,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         SwitchBindSpecialNames(program);           // SPECIAL-NAMES switch clauses → the external-switch registry (ISO §12.3.7)
         BindFileControl(program);                  // SELECT clauses → FileModels (before the FD records bind)
         BindFileSection(program, _rootNames);      // FD records → Roots + FileModel.Records + the shared-area REDEFINES
+        ScreenSelectsHaveDescriptions();           // §12.4.5.2 SR3 — after every FD and SD has attached
         BindReportSection(program);                // RD entries → ReportModels (ISO §13.14; DataBinder.Reports.cs)
         BindIoControl(program);                    // I-O-CONTROL: SAME RECORD AREA → cross-file shared record area (§12.4.6.4 GR2)
 
@@ -999,10 +1007,23 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         var fc = env.inputOutputSection()?.fileControlParagraph();
         if (fc is null) return;
+        // A class-level input-output section (the OO binder hands it to both the factory and the object half) is
+        // outside §12.4.5.2's "factory, function, object, or program" and is forbidden by §12.4.3 SR1 (kb/Work
+        // PB1076), so SR2 and SR3 do not screen its entries.
+        bool screened = env.Parent is not Core.ClassDefinitionContext;
         foreach (var grp in fc.fileControlClauseGroup())
         {
             using var _ = Edition.At(grp);
             if (grp.fileName()?.GetText() is not { } name) continue;
+            // ISO §12.4.5.2 SR2 — one SELECT per file-name. The first entry stands: binding the second used to
+            // REPLACE it in FilesByName, so the program silently ran against the last ASSIGN target (kb/Work PB1077).
+            if (screened && _selectedFiles.ContainsKey(name))
+            {
+                Edition.Error(DiagnosticCatalog.FileNameSelectedTwice, $"file-name '{name}' is specified in a second "
+                    + "SELECT clause; ISO §12.4.5.2 SR2: \"A given file-name may be specified in only one SELECT clause "
+                    + "within a factory, function, object, or program.\"");
+                continue;
+            }
             var file = new FileModel { CobolName = name, SelectName = name, AssignTarget = name, Optional = grp.OPTIONAL() is not null };
             // The entry's OWN position: §12.4.5.1's required members and §12.4.5.2 SR10 are violated by the
             // ABSENCE of a clause, so there is nothing else to point at (kb/Work PB699).
@@ -1181,6 +1202,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             _files.Add(file);
             DeclareUserWord(name, UserWordKind.FileName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB65, PB1083)
             FilesByName[name] = file;
+            if (screened) _selectedFiles[name] = file;
         }
     }
 
@@ -1600,6 +1622,25 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 record.SetRedefinition(anchor, RedefinitionKind.ImplicitFileRecord);
     }
 
+    /// <summary>ISO §12.4.5.2 SR3 — <i>"For each file-name specified in a SELECT clause, there shall be a file
+    /// description entry or a sort-merge file description entry in the file section of the factory, function,
+    /// object, or program in which the SELECT clause is specified."</i> Asked once every FD and SD has attached
+    /// (both set <see cref="FileModel.HasFd"/>), and separately from <see cref="BindFileSection"/> because a unit
+    /// with no FILE SECTION at all has the same obligation. A SELECT with no description used to compile clean,
+    /// and its first OPEN aborted the run unit as "a compiler defect" (kb/Work PB1077). The opposite direction, an
+    /// FD or SD that no SELECT names, is reported where the entry binds.</summary>
+    private void ScreenSelectsHaveDescriptions()
+    {
+        foreach (var (name, file) in _selectedFiles)
+        {
+            if (file.HasFd) continue;
+            using var _ = Edition.At(file.EntryAt);
+            Edition.Error(DiagnosticCatalog.SelectWithoutFileDescription, $"file '{name}' is specified in a SELECT "
+                + "clause but has no file description entry (FD) or sort-merge file description entry (SD); ISO "
+                + "§12.4.5.2 SR3");
+        }
+    }
+
     /// <summary>Bind the FILE SECTION's FD records into the storage forest (they emit as Program fields, like
     /// WORKING-STORAGE), attach them to their <see cref="FileModel"/>, and model the shared record area: multiple
     /// <c>01</c>s under one FD occupy ONE area (ISO §9.1.2), so each secondary record is synthesized as a REDEFINES of
@@ -1615,7 +1656,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             var records = BindEntries(fd.dataDescriptionEntry(), rootNames, EntrySection.File);
             if (!FilesByName.TryGetValue(name, out var file))
             {
-                // An FD with no matching SELECT — keep a model so its records still resolve (it is never opened).
+                // ISO §13.4.5.3 SR1 — "File-name-1 shall be specified in a file control entry." The model is still
+                // built, so the entry's records resolve and the compile reports this one error rather than a
+                // cascade of undefined names (kb/Work PB1237; it used to compile clean and run I-O against an
+                // empty assignment).
+                Edition.Error(DiagnosticCatalog.FileDescriptionWithoutSelect, $"file description entry '{name}' names "
+                    + "a file that no file control entry specifies; ISO §13.4.5.3 SR1: \"File-name-1 shall be "
+                    + "specified in a file control entry.\"");
                 file = new FileModel { CobolName = name, SelectName = name };
                 _files.Add(file);
                 FilesByName[name] = file;
@@ -1706,6 +1753,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             var sdRecords = BindEntries(sd.dataDescriptionEntry(), rootNames, EntrySection.File);
             if (!FilesByName.TryGetValue(sdName, out var sdFile))
             {
+                // ISO §13.4.6.3 SR1 — the SD twin of the FD arm above (kb/Work PB1290).
+                Edition.Error(DiagnosticCatalog.FileDescriptionWithoutSelect, $"sort-merge file description entry "
+                    + $"'{sdName}' names a file that no file control entry specifies; ISO §13.4.6.3 SR1: \"File-name-1 "
+                    + "shall be specified in a file control entry.\"");
                 sdFile = new FileModel { CobolName = sdName, SelectName = sdName };
                 _files.Add(sdFile);
                 FilesByName[sdName] = sdFile;

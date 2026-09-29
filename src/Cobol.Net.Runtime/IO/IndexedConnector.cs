@@ -73,7 +73,7 @@ public sealed class IndexedConnector : KeyedConnector
     /// <inheritdoc/>  (sequential access targets the last-read record, §14.9.35.4 GR22 / §14.9.10.4 GR2;
     /// random/dynamic the record whose prime key is the record area's key slice, §14.9.35.4 GR23 /
     /// §14.9.10.4 GR3 — the ACCESS MODE alone selects the target, see <see cref="KeyedConnector"/>)
-    public override string MutationTargetRecordId(string recordImage, RecordExtents? recordExtents) =>
+    protected override string MutationTargetRecordIdCore(string recordImage, RecordExtents? recordExtents) =>
         Access == KeyedAccess.Sequential
         ? LastReadRecordId
         : AreaKey(recordImage, recordExtents, PrimeKey);
@@ -577,7 +577,7 @@ public sealed class IndexedConnector : KeyedConnector
     public string Rewrite(string image, int length = -1, RecordExtents? extents = null)
     {
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
-        if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
+        if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         // §14.9.35 GR18 — an indexed record's size MAY differ from the replaced record's; GR20 still bounds it.
         if (Stored(image, length) is not { } stored)
             return Status = FileStatusCode.RecordSizeViolation;                                 // '44' GR20
@@ -650,7 +650,7 @@ public sealed class IndexedConnector : KeyedConnector
     public string Delete(string keyedRecordImage, RecordExtents? areaExtents = null)
     {
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
-        if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
+        if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         string prime;
         if (Access == KeyedAccess.Sequential)   // §14.9.10.4 GR2 vs. GR3 — the ACCESS MODE alone
         {

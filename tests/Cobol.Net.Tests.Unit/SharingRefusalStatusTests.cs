@@ -187,4 +187,61 @@ public sealed class SharingRefusalStatusTests
         }
         finally { try { File.Delete(host); } catch (IOException) { } }
     }
+
+    /// <summary>kb/Work PB1163 — §14.7.9.3 GR3, <i>"If the FOREVER phrase is specified, the mass storage control
+    /// system shall attempt to gain access to a locked resource until the input-output operation has been
+    /// completed"</i>, end to end against a real handle of ANOTHER run unit that is released while the statement
+    /// waits. DELETE FILE and OPEN both complete: '00', and the file deleted (or opened). Before the fix both gave up
+    /// after one re-attempt — '62' with the file still present, '61' — although the holder let go moments later.
+    /// The holder releases only once the statement has been refused at least once, so the test observes a real
+    /// wait and times nothing.</summary>
+    [Theory]
+    [InlineData(Org.Sequential)]
+    [InlineData(Org.Relative)]
+    [InlineData(Org.Indexed)]
+    public void RetryForever_WaitsForAnotherRunUnitToRelease_DeleteFileAndOpen(Org org)
+    {
+        Assert.True(HostCapability.Sharing.EnforcesExclusiveAccess, HostCapability.Sharing.Because);
+        string host = Seed(org);
+        try
+        {
+            var reg = new FileRegistry();
+            RegisterOrg(reg, "F", host, org);
+
+            using (var holder = HoldUntilRefused(host))
+                reg.OpenShared("F", FileOpenMode.Input, hasSharingOverride: false, FileSharing.AllOther,
+                    FileRetryKind.Forever, 0, OpenTapePhrase.None, host, assignDynamic: false, page: null);
+            Assert.Equal(FileStatusCode.Success, reg.Status("F"));
+            reg.Close("F");
+
+            using (var holder = HoldUntilRefused(host))
+                Assert.Equal(FileStatusCode.Success, reg.DeleteFile("F", FileRetryKind.Forever, 0));
+            Assert.False(File.Exists(host), "DELETE FILE RETRY FOREVER completes once the other run unit lets go");
+        }
+        finally { try { File.Delete(host); } catch (IOException) { } }
+    }
+
+    /// <summary>An exclusive handle on <paramref name="host"/> — another run unit's, as far as the runtime can tell —
+    /// released on a background thread once the retry discipline has been refused and has paused at least once.
+    /// Disposing the returned object releases the handle if that never happened, so a regression in which the
+    /// statement gives up without waiting FAILS its assertion instead of hanging the test run.</summary>
+    private static IDisposable HoldUntilRefused(string host)
+    {
+        var handle = new FileStream(host, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var refused = new ManualResetEventSlim();
+        FileRegistry.PauseObserver.Value = interval => { refused.Set(); Thread.Sleep(interval); };
+        var release = Task.Run(() => { refused.Wait(); handle.Dispose(); });
+        return new Released(() =>
+        {
+            FileRegistry.PauseObserver.Value = null;
+            refused.Set();
+            release.Wait();
+            refused.Dispose();
+        });
+    }
+
+    private sealed class Released(Action onDispose) : IDisposable
+    {
+        public void Dispose() => onDispose();
+    }
 }

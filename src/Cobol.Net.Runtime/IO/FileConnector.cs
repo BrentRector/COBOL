@@ -542,8 +542,30 @@ public abstract class FileConnector
     /// <summary>The lock identity of the record a REWRITE/DELETE executed NOW would target (§14.9.35 GR11 /
     /// §14.9.10 GR6 — the pre-operation conflict check; <paramref name="recordImage"/> supplies the key slice
     /// for an indexed random/dynamic target, §14.9.35 GR23 / §14.9.10 GR3, and <paramref name="recordExtents"/> the
-    /// record area's EXTENT TABLE — D-FRA (v), kb/Work PB1053).</summary>
-    public virtual string MutationTargetRecordId(string recordImage, RecordExtents? recordExtents) => "";
+    /// record area's EXTENT TABLE — D-FRA (v), kb/Work PB1053). "" when no record is identified.
+    /// <para>⛔ A CONNECTOR NOT OPEN IN THE I-O MODE IDENTIFIES NO RECORD (kb/Work PB1194), the same contract the two
+    /// READ peeks keep. §14.9.35.4 GR3 (<i>"If the open mode is some other value or the file is not open, the I-O
+    /// status in the rewrite file connector is set to '49'"</i>) and §14.9.10.4 GR1 settle the statement before any
+    /// record is reached, so the registry's §9.1.16 conflict check has nothing to ask. The keyed arms used to name
+    /// the record in the key area whatever the open state, so a REWRITE through a CLOSED connector of a record
+    /// another connector held locked answered '51' where '49' is the only applicable status: with no open mode no
+    /// sharing mode is in effect, and the lock rule presupposes one (§9.1.15).</para></summary>
+    public string MutationTargetRecordId(string recordImage, RecordExtents? recordExtents) =>
+        MutationOpenModeGuard() is null ? MutationTargetRecordIdCore(recordImage, recordExtents) : "";
+
+    /// <summary>The organization's answer to <see cref="MutationTargetRecordId"/> for a connector open in the I-O
+    /// mode.</summary>
+    protected virtual string MutationTargetRecordIdCore(string recordImage, RecordExtents? recordExtents) => "";
+
+    /// <summary>The open-mode precondition REWRITE and DELETE RECORD share — ISO §14.9.35.4 GR3, <i>"The rewrite file
+    /// connector shall have an open mode of I-O. If the open mode is some other value or the file is not open, the
+    /// I-O status in the rewrite file connector is set to '49'"</i>, and §14.9.10.4 GR1, <i>"The open mode of the
+    /// file connector referenced by file-name-1 shall be I-O"</i>, whose status is §9.1.13.7 9)'s '49'. Returns
+    /// the failing status, or <see langword="null"/> when the statement may proceed. Assigns nothing, like
+    /// <see cref="ReadOpenModeGuard"/>: the caller owns the single status assignment. Written once here for
+    /// every organization's REWRITE and DELETE body and for <see cref="MutationTargetRecordId"/>.</summary>
+    protected string? MutationOpenModeGuard() =>
+        IsOpen && Mode == FileOpenMode.IO ? null : FileStatusCode.DeleteRewriteNotOpenForIO;
 
     /// <summary>The lock identity of the record released by the most recent successful WRITE (§14.9.51 GR11 —
     /// the WITH LOCK acquisition target).</summary>

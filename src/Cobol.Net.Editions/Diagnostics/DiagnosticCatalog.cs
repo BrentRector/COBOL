@@ -5624,6 +5624,39 @@ public static class DiagnosticCatalog
         + "object reference described with ACTIVE-CLASS. The site names the rule it caught.",
         "ISO §13.18.42.3 SR1/SR2/SR3/SR5/SR6");
 
+    /// <summary>COBOLNET2634 — a file-name is specified in a second SELECT clause of the same factory, function, object
+    /// or program (ISO §12.4.5.2 SR2; kb/Work PB1077). The second entry used to replace the first in the binder's name
+    /// map, so the program ran against whichever ASSIGN target came last. Reported by
+    /// <c>DataBinder.BindFileControl</c> at the second SELECT.</summary>
+    public static readonly DiagnosticDescriptor FileNameSelectedTwice = new(
+        "COBOLNET2634", "file-name-selected-twice", EditionSeverity.Error,
+        "A file-name is specified in more than one SELECT clause. ISO §12.4.5.2 SR2: \"A given file-name may be "
+        + "specified in only one SELECT clause within a factory, function, object, or program.\" Give each file "
+        + "control entry its own file-name, or remove the duplicate entry.", "ISO §12.4.5.2 SR2");
+
+    /// <summary>COBOLNET2635 — a SELECT clause names a file-name that has no file description entry and no sort-merge
+    /// file description entry in the file section (ISO §12.4.5.2 SR3; kb/Work PB1077). Such a file compiled clean and
+    /// its first OPEN aborted the run unit as a "compiler defect". Reported by <c>DataBinder.BindFileSection</c> at
+    /// the file control entry.</summary>
+    public static readonly DiagnosticDescriptor SelectWithoutFileDescription = new(
+        "COBOLNET2635", "select-without-file-description", EditionSeverity.Error,
+        "A file control entry names a file that has no file description entry (FD) and no sort-merge file description "
+        + "entry (SD). ISO §12.4.5.2 SR3: \"For each file-name specified in a SELECT clause, there shall be a file "
+        + "description entry or a sort-merge file description entry in the file section of the factory, function, "
+        + "object, or program in which the SELECT clause is specified.\" Add the FD or SD, or remove the SELECT.",
+        "ISO §12.4.5.2 SR3");
+
+    /// <summary>COBOLNET2636 — a file description entry or a sort-merge file description entry names a file-name that
+    /// no file control entry specifies (ISO §13.4.5.3 SR1 for an FD, §13.4.6.3 SR1 for an SD; kb/Work PB1237,
+    /// PB1290 — the other arm of kb/Work PB1077's pairing). The binder used to synthesize a file with an empty
+    /// assignment, so the program compiled and even ran I-O against it. Reported by <c>DataBinder.BindFileSection</c>
+    /// at the entry.</summary>
+    public static readonly DiagnosticDescriptor FileDescriptionWithoutSelect = new(
+        "COBOLNET2636", "file-description-without-select", EditionSeverity.Error,
+        "A file description entry (FD) or sort-merge file description entry (SD) names a file that no file control "
+        + "entry specifies. ISO §13.4.5.3 SR1 and §13.4.6.3 SR1: \"File-name-1 shall be specified in a file control "
+        + "entry.\" Add a SELECT clause for the file in the FILE-CONTROL paragraph.", "ISO §13.4.5.3 SR1 / §13.4.6.3 SR1");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

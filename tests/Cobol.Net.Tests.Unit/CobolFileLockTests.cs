@@ -110,13 +110,13 @@ public sealed class CobolFileLockTests
     {
         // A conflict that never clears: n TIMES exhausts to the conflict status (51), FOREVER bails to 52.
         Assert.Equal(FileStatusCode.RecordLocked,
-            CobolFile.RetryLoop(() => FileStatusCode.RecordLocked, FileRetryKind.Times, 3));
+            FileRegistry.RetryLoop(() => RetryAttempt.InRunUnit(FileStatusCode.RecordLocked), FileRetryKind.Times, 3));
         Assert.Equal(FileStatusCode.Deadlock,
-            CobolFile.RetryLoop(() => FileStatusCode.RecordLocked, FileRetryKind.Forever, 0));
+            FileRegistry.RetryLoop(() => RetryAttempt.InRunUnit(FileStatusCode.RecordLocked), FileRetryKind.Forever, 0));
         // A conflict that clears on the 2nd attempt: TIMES stops as soon as it succeeds.
         int calls = 0;
-        Assert.Equal(FileStatusCode.Success, CobolFile.RetryLoop(
-            () => { calls++; return calls >= 2 ? FileStatusCode.Success : FileStatusCode.RecordLocked; },
+        Assert.Equal(FileStatusCode.Success, FileRegistry.RetryLoop(
+            () => { calls++; return RetryAttempt.InRunUnit(calls >= 2 ? FileStatusCode.Success : FileStatusCode.RecordLocked); },
             FileRetryKind.Times, 5));
         Assert.Equal(2, calls);
     }
@@ -162,7 +162,7 @@ public sealed class CobolFileLockTests
     [InlineData(FileRetryKind.Forever, 0, FileStatusCode.FileNotFound, FileStatusCode.FileNotFound)]
     public void RetryLoop_LandsTheConflictsOwnStatus_ByClass(
         FileRetryKind kind, int amount, string conflict, string expected) =>
-        Assert.Equal(expected, CobolFile.RetryLoop(() => conflict, kind, amount));
+        Assert.Equal(expected, FileRegistry.RetryLoop(() => RetryAttempt.InRunUnit(conflict), kind, amount));
 
     /// <summary>§14.7.9.3 GR4 again, on the axis the status cannot witness: a NON-conflict status must not be
     /// RE-ATTEMPTED either, and GR4a's zero/negative screen must make no attempt beyond the first.</summary>
@@ -181,8 +181,65 @@ public sealed class CobolFileLockTests
         FileRetryKind kind, int amount, string conflict, int expectedCalls)
     {
         int calls = 0;
-        CobolFile.RetryLoop(() => { calls++; return conflict; }, kind, amount);
+        FileRegistry.RetryLoop(() => { calls++; return RetryAttempt.InRunUnit(conflict); }, kind, amount);
         Assert.Equal(expectedCalls, calls);
+    }
+
+    /// <summary>§14.7.9.3 GR3 against a holder OUTSIDE the run unit (kb/Work PB1163): <i>"If the FOREVER phrase is
+    /// specified, the mass storage control system shall attempt to gain access to a locked resource until the
+    /// input-output operation has been completed"</i>. Such a holder can release while the statement waits, so
+    /// FOREVER keeps attempting — pausing <see cref="FileRegistry.RetryInterval"/> before each re-attempt (A.1 item
+    /// 165) — and lands the attempt that completed. The loop used to stop after one re-attempt on the premise that no
+    /// releaser existed. The pause is observed, never slept, so the test times nothing.</summary>
+    [Theory]
+    [InlineData(FileStatusCode.FileSharingConflict)]   // OPEN, §9.1.13.9 item 1
+    [InlineData(FileStatusCode.DeleteFileSharing)]     // DELETE FILE, §9.1.13.9 item 2
+    public void RetryForever_AgainstAHolderOutsideTheRunUnit_WaitsUntilTheOperationCompletes(string conflict)
+    {
+        int calls = 0, pauses = 0;
+        FileRegistry.PauseObserver.Value = interval => { Assert.Equal(FileRegistry.RetryInterval, interval); pauses++; };
+        try
+        {
+            string status = FileRegistry.RetryLoop(
+                () => ++calls <= 25 ? RetryAttempt.OutsideRunUnit(conflict) : RetryAttempt.InRunUnit(FileStatusCode.Success),
+                FileRetryKind.Forever, 0);
+            Assert.Equal(FileStatusCode.Success, status);
+        }
+        finally { FileRegistry.PauseObserver.Value = null; }
+        Assert.Equal(26, calls);    // the 25 refused attempts and the one that completed
+        Assert.Equal(25, pauses);   // one interval before each re-attempt
+    }
+
+    /// <summary>The same discipline's other arms against an outside holder (kb/Work PB1163): n TIMES pauses before
+    /// each of its n re-attempts (GR1, A.1 item 165) and then lands the conflict's own status; FOREVER stops waiting
+    /// the moment the holder is one of this run unit's own connectors, which cannot release while the statement
+    /// executes (the A.1 item 109 deadlock); and a re-attempt against an in-run-unit holder never pauses.</summary>
+    [Fact]
+    public void RetryAgainstAnOutsideHolder_PausesBeforeEachReattempt_AndOnlyThen()
+    {
+        int pauses = 0;
+        FileRegistry.PauseObserver.Value = _ => pauses++;
+        try
+        {
+            Assert.Equal(FileStatusCode.FileSharingConflict, FileRegistry.RetryLoop(
+                () => RetryAttempt.OutsideRunUnit(FileStatusCode.FileSharingConflict), FileRetryKind.Times, 3));
+            Assert.Equal(3, pauses);
+
+            pauses = 0;
+            int calls = 0;
+            Assert.Equal(FileStatusCode.DeleteFileSharing, FileRegistry.RetryLoop(
+                () => ++calls == 1 ? RetryAttempt.OutsideRunUnit(FileStatusCode.DeleteFileSharing)
+                                   : RetryAttempt.InRunUnit(FileStatusCode.DeleteFileSharing),
+                FileRetryKind.Forever, 0));
+            Assert.Equal(2, calls);    // the outside refusal, then an in-run-unit one that no wait can clear
+            Assert.Equal(1, pauses);
+
+            pauses = 0;
+            FileRegistry.RetryLoop(() => RetryAttempt.InRunUnit(FileStatusCode.RecordLocked), FileRetryKind.Times, 3);
+            FileRegistry.RetryLoop(() => RetryAttempt.InRunUnit(FileStatusCode.RecordLocked), FileRetryKind.Forever, 0);
+            Assert.Equal(0, pauses);
+        }
+        finally { FileRegistry.PauseObserver.Value = null; }
     }
 
     /// <summary>⛔ THE §14.9.30.4 GR9 DRIFT TEST — the READ's OWN binding to §14.7.9, on BOTH read formats

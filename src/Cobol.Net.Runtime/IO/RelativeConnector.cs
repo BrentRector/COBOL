@@ -58,7 +58,7 @@ public sealed class RelativeConnector : KeyedConnector
     /// <inheritdoc/>  (sequential access targets the last-read slot, §14.9.35.4 GR5 / §14.9.10.4 GR2;
     /// random/dynamic the slot named by the RELATIVE KEY item, §14.9.35.4 GR21 / §14.9.10.4 GR4 — the
     /// ACCESS MODE alone selects the target, see <see cref="KeyedConnector"/>)
-    public override string MutationTargetRecordId(string recordImage, RecordExtents? recordExtents) => Access == KeyedAccess.Sequential
+    protected override string MutationTargetRecordIdCore(string recordImage, RecordExtents? recordExtents) => Access == KeyedAccess.Sequential
         ? LastReadRecordId
         : _pendingKey > 0 ? _pendingKey.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
 
@@ -449,7 +449,7 @@ public sealed class RelativeConnector : KeyedConnector
     public string Rewrite(string image, int length = -1, RecordExtents? extents = null)
     {
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
-        if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
+        if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         // §14.9.35 GR18 — a relative record's size MAY differ from the replaced record's; GR20 still bounds it.
         if (Access == KeyedAccess.Sequential)   // §14.9.35.4 GR5 vs. GR21 — the ACCESS MODE alone
         {
@@ -481,7 +481,7 @@ public sealed class RelativeConnector : KeyedConnector
     public string Delete()
     {
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
-        if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
+        if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         if (Access == KeyedAccess.Sequential)   // §14.9.10.4 GR2 vs. GR4 — the ACCESS MODE alone
         {
             if (!wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;

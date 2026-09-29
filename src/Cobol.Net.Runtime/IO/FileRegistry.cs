@@ -698,9 +698,10 @@ public sealed class FileRegistry
 
     /// <summary>DELETE FILE (§14.9.10 Format 2, COBOL-2023): an OPEN connector → '41' (GR13); the physical file
     /// currently open by ANOTHER file connector → the file sharing conflict, '62' (GR15 / §9.1.13.9 item 2),
-    /// re-attempted under a RETRY phrase (GR15 → §14.7.9; in one run unit the other connector cannot close
-    /// mid-loop, so EVERY retry form exhausts to '62' — §9.1.13.9 defines no deadlock value for a file-sharing
-    /// conflict, see <see cref="ExhaustionStatus"/>); an ABSENT physical file is
+    /// re-attempted under a RETRY phrase (GR15 → §14.7.9: another connector of this run unit cannot close
+    /// mid-loop, so every retry form exhausts to '62' against it — §9.1.13.9 defines no deadlock value for a
+    /// file-sharing conflict, see <see cref="ExhaustionStatus"/> — while another run unit's handle can be released,
+    /// and RETRY FOREVER waits for it, kb/Work PB1163); an ABSENT physical file is
     /// a SUCCESSFUL completion, status '05' (GR14); insufficient authority → '37' (GR16) — ONE polymorphic body
     /// over <see cref="FileConnector"/> for all three organizations.</summary>
     public string DeleteFile(string name, bool overridden = false) =>
@@ -723,16 +724,22 @@ public sealed class FileRegistry
         // ordering: an unassociated connector cannot be open, because Open associates before it opens.
         if (c.HostPath.Length == 0) { c.SetStatus(FileStatusCode.OptionalFileNotFound); return FileStatusCode.OptionalFileNotFound; }
         string status;
-        // §9.1.13.9 2) asks about EVERY other file connector: this run unit's are the registry's to see, and
-        // another run unit's only the host's (kb/Work PB860 — asked before the delete, because a Unix unlink
-        // succeeds over an open file). Inside the retry loop, because another run unit CAN close mid-loop.
-        string sharing = RetryLoop(() => OpenByAnotherConnector(name, c.HostPath) || HostFile.IsHeldByAnother(c.HostPath)
-            ? FileStatusCode.DeleteFileSharing : FileStatusCode.Success, retryKind, retryAmount);
         if (c.IsOpen) status = FileStatusCode.FileAlreadyOpen;             // '41' GR13
         else if (ValidateFixedFileAttributes(c, overridden) is { } conflict)
             status = conflict;                                             // '39' GR18 — see the method
-        else if (sharing != FileStatusCode.Success)
-            status = sharing;   // '62' GR15/§9.1.13.9 item 2 — the file is not deleted, under every retry form
+        // §9.1.13.9 2) asks about EVERY other file connector: this run unit's are the registry's to see, and
+        // another run unit's only the host's (kb/Work PB860 — asked before the delete, because a Unix unlink
+        // succeeds over an open file). Inside the retry loop, because another run unit CAN close mid-loop — and
+        // each attempt says which holder refused it, since only one outside the run unit can (kb/Work PB1163).
+        // ⛔ ASKED ONLY AFTER GR13: the host probe cannot tell THIS connector's own handle from a foreign one, so
+        // for an open connector it would report an outside holder that never lets go, and RETRY FOREVER would
+        // wait for ever on a statement GR13 has already answered '41'.
+        else if (RetryLoop(() =>
+                     OpenByAnotherConnector(name, c.HostPath) ? RetryAttempt.InRunUnit(FileStatusCode.DeleteFileSharing)
+                     : HostFile.IsHeldByAnother(c.HostPath) ? RetryAttempt.OutsideRunUnit(FileStatusCode.DeleteFileSharing)
+                     : RetryAttempt.InRunUnit(FileStatusCode.Success), retryKind, retryAmount) is var sharing
+                 && sharing != FileStatusCode.Success)
+            status = sharing;   // '62' GR15/§9.1.13.9 item 2 — the file is not deleted
         // GR14's '05' is only for a file that is ABSENT, and GR16's '37' is for one that is there but refused —
         // so the presence question has THREE answers, and it is asked through the ONE shared probe
         // (HostFile.Probe): File.Exists swallows every access error and answers false, classifying a
@@ -810,9 +817,10 @@ public sealed class FileRegistry
     // ── COBOL-2002 file sharing / record locking (ISO §9.1.15/§9.1.16/§14.9.27/§14.9.47/§14.7.9) ─────────────
     // Design D1: the 51/52/61 statuses are defined over "another file connector" (§9.1.13.9) — two SELECTs bound
     // to one resolved host path are two distinct connectors over one physical file within one run unit, so the
-    // machinery is REAL. Single-run-unit residue (loud, documented): no RETRY form can block productively (no
-    // external releaser exists), so an unsatisfiable conflict lands on the conflict's OWN §9.1.13 status —
-    // never a sleep, and never a manufactured one. See D8 in docs/COBOLNET_FILES_DESIGN.md and ExhaustionStatus.
+    // machinery is REAL. A conflict held by a connector of THIS run unit cannot clear while the statement runs, so
+    // an exhausted retry lands on the conflict's OWN §9.1.13 status, never a manufactured one; a conflict held
+    // OUTSIDE the run unit (the host's refusal, kb/Work PB860) can clear, and RetryLoop waits for it (kb/Work
+    // PB1163). See D8 in docs/COBOLNET_FILES_DESIGN.md, RetryAttempt and ExhaustionStatus.
 
     /// <summary>⛔ THE ONE PLACE WiseOwl COBOL'S IMPLEMENTOR-DEFAULT SHARING MODE IS NAMED (ISO §9.1.15:
     /// <i>"If no specification is made in either location, the implementor defines the sharing mode in which the
@@ -962,12 +970,13 @@ public sealed class FileRegistry
         }
     }
 
-    /// <summary>The arbitrated OPEN body. Returns the resulting I-O status; on a Table-19 conflict returns 61
-    /// without opening the connector, leaving the file <i>"not affected"</i> (§14.9.27.4 GR25).</summary>
-    private string SharedOpenAttempt(string name, FileOpenMode mode, FileSharing? sharingOverride, LinagePage? page)
+    /// <summary>The arbitrated OPEN body — one attempt under the RETRY discipline. Returns the resulting I-O status
+    /// and who holds a conflict; on a Table-19 conflict returns 61 without opening the connector, leaving the file
+    /// <i>"not affected"</i> (§14.9.27.4 GR25).</summary>
+    private RetryAttempt SharedOpenAttempt(string name, FileOpenMode mode, FileSharing? sharingOverride, LinagePage? page)
     {
         var c = Require(name);   // an unregistered name is a COMPILER defect and LOUD (kb/Work PB140)
-        if (_locked.Contains(name)) { c.SetStatus(FileStatusCode.FileLocked); return FileStatusCode.FileLocked; }  // ≤2014 CLOSE WITH LOCK
+        if (_locked.Contains(name)) { c.SetStatus(FileStatusCode.FileLocked); return RetryAttempt.InRunUnit(FileStatusCode.FileLocked); }  // ≤2014 CLOSE WITH LOCK
         // §9.1.15: the OPEN's SHARING phrase overrides the file control entry's SHARING clause; with neither, the
         // implementor default — which for this compiler is UNDETERMINED (see ImplementorDefaultSharing).
         FileSharing? sharing = sharingOverride
@@ -979,7 +988,7 @@ public sealed class FileRegistry
             if (Conflicts(existing, (sharing, mode)))
             {
                 c.SetStatus(FileStatusCode.FileSharingConflict);   // 61 — §9.1.13.9 item 1
-                return FileStatusCode.FileSharingConflict;
+                return RetryAttempt.InRunUnit(FileStatusCode.FileSharingConflict);   // held by this run unit
             }
         }
         // ⛔ The registration is gated on the STATUS, not on `IsOpen`. A re-OPEN of a connector that is already
@@ -1034,7 +1043,10 @@ public sealed class FileRegistry
                 && sq.BeginLinagePage(pg) is { } linageStatus)
                 status = linageStatus;
         }
-        return status;
+        // A '61' from the connector's own OPEN is the host refusing the handle (FileConnector.Open's
+        // HostFile.IsSharingRefusal arm): the Table 19 arbiter above has already admitted this open against every
+        // connector of this run unit, so the holder is outside it and can release (kb/Work PB1163).
+        return new RetryAttempt(status, HolderOutsideRunUnit: status == FileStatusCode.FileSharingConflict);
     }
 
     /// <summary>ISO §14.9.27.4 <b>Table 19</b> — is an OPEN request unsuccessful against ONE connector already
@@ -1215,8 +1227,11 @@ public sealed class FileRegistry
     {
         if (ignoringLock) return null;                                       // §14.9.30.4 GR12
         if (!PhysicalFileTable.IsLockedByOther(st, name, recId)) return null;
+        // The record-lock table is this run unit's own — every lock in it is held by one of its file connectors —
+        // so the holder is always inside the run unit (kb/Work PB1163).
         string conflict = RetryLoop(
-            () => PhysicalFileTable.IsLockedByOther(st, name, recId) ? FileStatusCode.RecordLocked : FileStatusCode.Success,
+            () => RetryAttempt.InRunUnit(PhysicalFileTable.IsLockedByOther(st, name, recId)
+                ? FileStatusCode.RecordLocked : FileStatusCode.Success),
             retryKind, retryAmount);
         if (conflict == FileStatusCode.Success) return null;
         SetStatusOf(name, conflict);   // the status assignment drops the '43' gate (PB140); every
@@ -1302,8 +1317,12 @@ public sealed class FileRegistry
     private static bool LocksEffective(ConnectorShare meta, PhysicalFileTable.State st, string name)
     {
         if (meta.LockMode == FileLockMode.None) return false;                                   // GR1a/b1
-        if (st.Open.TryGetValue(name, out var open) && open.Sharing == FileSharing.NoOther)
-            return false;                                                                        // GR3
+        // A connector that is not open has no sharing mode in effect — §9.1.15, "The sharing mode specifies the
+        // types of operations that may be performed on the shared physical file through other file connectors
+        // throughout the duration of this OPEN" — so it sets no record lock: its statement fails on its own
+        // open-mode rule ('47'/'48'/'49') before any lock is reached (kb/Work PB1194).
+        if (!st.Open.TryGetValue(name, out var open)) return false;
+        if (open.Sharing == FileSharing.NoOther) return false;                                  // GR3
         return true;
     }
 
@@ -1612,31 +1631,62 @@ public sealed class FileRegistry
     /// <para>GR4a: no RETRY phrase, or an arithmetic-expression evaluating negative or zero, makes NO further
     /// attempt. GR1: n TIMES makes n further attempts after the initial failure. GR2: FOR n SECONDS clamps the
     /// timeout period to the implementor's maximum meaningful value, which WiseOwl COBOL defines as ZERO (A.1 item
-    /// 166, docs/CONFORMANCE.md §7), so its period is zero-length and it likewise makes none. GR3: FOREVER waits
-    /// until the operation completes. Never sleeps — the ground for the GR2 determination is that a lock here is
-    /// held only by a file connector of the EXECUTING run unit, which cannot release it while this statement
-    /// runs, so no positive timeout could change the outcome.</para>
+    /// 166, docs/CONFORMANCE.md §7), so its period is zero-length and it likewise makes none. GR3: FOREVER attempts
+    /// "until the input-output operation has been completed".</para>
+    /// <para>⛔ WHO HOLDS THE LOCKED RESOURCE DECIDES WHETHER A LATER ATTEMPT CAN SUCCEED (kb/Work PB1163), and every
+    /// attempt says (<see cref="RetryAttempt.HolderOutsideRunUnit"/>). A holder OUTSIDE the executing run unit —
+    /// another run unit, or another process holding the host file — can let go while this statement waits, so a
+    /// re-attempt against it waits <see cref="RetryInterval"/> first (A.1 item 165) and FOREVER keeps attempting
+    /// until the operation completes. A holder INSIDE the run unit is one of its own file connectors, which cannot
+    /// close a file or release a record while this statement executes: re-attempts against it are made back to back
+    /// (waiting could only delay the same answer), and FOREVER makes one re-check and then stops, because that wait
+    /// could never end — the deadlock <see cref="ExhaustionStatus"/> names (A.1 item 109). This used to be the ONLY
+    /// arm: the loop assumed no releaser existed, so FOREVER gave up after one re-attempt on a file another run
+    /// unit held and released moments later.</para>
     /// <para>Every landing goes through <see cref="ExhaustionStatus"/> — the status is a function of the
     /// conflict's own class, NEVER a literal at a call site.</para></summary>
-    public static string RetryLoop(Func<string> attempt, FileRetryKind kind, long amount)
+    public static string RetryLoop(Func<RetryAttempt> attempt, FileRetryKind kind, long amount)
     {
-        string s = attempt();
-        if (!IsConflict(s)) return s;   // GR4 — success, or an unsuccessful status that is not a conflict
+        var a = attempt();
+        if (!IsConflict(a.Status)) return a.Status;   // GR4 — success, or an unsuccessful status that is not a conflict
         if (kind == FileRetryKind.Times)
             // GR1 — n further attempts after the initial failure; a zero or negative n makes none (GR4a).
-            for (long i = 0; i < amount && IsConflict(s); i++) s = attempt();
+            for (long i = 0; i < amount && IsConflict(a.Status); i++) a = Reattempt(attempt, a);
         else if (kind == FileRetryKind.Forever)
-            // GR3 — "until the input-output operation has been completed". A conflict here is held by a
-            // connector of this run unit, which cannot release while this statement executes, so one attempt
-            // settles it; the wait that can never complete is the deadlock ExhaustionStatus names.
-            s = attempt();
+            // GR3 — until the operation completes, for as long as the holder is one that can release.
+            do a = Reattempt(attempt, a);
+            while (IsConflict(a.Status) && a.HolderOutsideRunUnit);
         // The two arms with no `else` are deliberate, not forgotten: FileRetryKind.None makes no further
         // attempt by GR4a, and FileRetryKind.Seconds makes none because GR2 clamps its period to this
         // implementation's maximum meaningful value of ZERO (A.1 item 166) — a zero-length timeout period
         // during which no retry can be attempted. Seconds still RECEIVES its amount because that value is
         // GR4a's screen input, even though the clamp then makes it inert.
-        return IsConflict(s) ? ExhaustionStatus(s, kind) : s;
+        return IsConflict(a.Status) ? ExhaustionStatus(a.Status, kind) : a.Status;
     }
+
+    /// <summary>§14.7.9.3 GR1's <i>"The implementor determines the interval between these attempts"</i> — WiseOwl
+    /// COBOL's interval (Annex A.1 item 165, docs/CONFORMANCE.md §7): 100 milliseconds before a re-attempt against a
+    /// holder outside the executing run unit, and none against a holder inside it. The same interval paces a
+    /// FOREVER wait (GR3).</summary>
+    public static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>The next attempt after <paramref name="previous"/> failed: it waits <see cref="RetryInterval"/> first
+    /// only when the previous conflict's holder is outside the run unit, the one case a wait can change the
+    /// answer.</summary>
+    private static RetryAttempt Reattempt(Func<RetryAttempt> attempt, RetryAttempt previous)
+    {
+        if (previous.HolderOutsideRunUnit)
+        {
+            if (PauseObserver.Value is { } observe) observe(RetryInterval);
+            else Thread.Sleep(RetryInterval);
+        }
+        return attempt();
+    }
+
+    /// <summary>Test seam: when set, a retry pause is REPORTED instead of performed, so a test asserts WHETHER the
+    /// discipline waits without timing a real sleep (the pattern of <c>CobolTiming.SuspensionObserver</c>, kb/Work
+    /// PB1590). An <see cref="AsyncLocal{T}"/>, so only the calling test's own flow observes.</summary>
+    internal static readonly AsyncLocal<Action<TimeSpan>?> PauseObserver = new();
 
     /// <summary>True when <paramref name="status"/> is one of the two conditions §14.7.9.3 GR4 names as the
     /// RETRY phrase's subject: a RECORD OPERATION conflict (§9.1.13.8, first digit '5') or a FILE SHARING

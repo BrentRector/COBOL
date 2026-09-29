@@ -168,7 +168,7 @@ public sealed class SequentialConnector : FileConnector
         _readOrdinal > 0 ? _readOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
 
     /// <inheritdoc/>  (a sequential REWRITE replaces the record obtained by the last successful READ, §14.9.35)
-    public override string MutationTargetRecordId(string recordImage, RecordExtents? recordExtents) => LastReadRecordId;
+    protected override string MutationTargetRecordIdCore(string recordImage, RecordExtents? recordExtents) => LastReadRecordId;
 
     /// <inheritdoc/>
     public override string LastWrittenRecordId => _writeOrdinal > 0
@@ -1616,7 +1616,7 @@ public sealed class SequentialConnector : FileConnector
     /// where GR17 c) pads it and succeeds.</para></summary>
     private string RewriteRecord(string image, int length, RecordExtents? extents)
     {
-        if (!IsOpen || Mode != FileOpenMode.IO) return Status = FileStatusCode.DeleteRewriteNotOpenForIO;
+        if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         if (!PrevOpWasSuccessfulRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;
         // §13.18.43.4 GR13 — the number of bytes in the record: data-name-1's content (a), else the bytes in the
         // record (b/c), which the compiler passes for a fixed-length file. −1 is the image's own length.
