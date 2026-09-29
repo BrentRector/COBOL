@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb1090_empty_special_names_two_periods",
   "pb1153_counter_register_character_image",
   "pb1655_all_literal_refmod_receiver",
   "w73b_pb1077_select_scope_per_program",

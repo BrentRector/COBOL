@@ -50,9 +50,13 @@ assignClause
     | ASSIGN USING dataReference
     ;
 
+// literal-1 is written as ANY literal token or concatenation expression here — the alphanumeric-only,
+// non-figurative, non-zero-length rule is §12.4.5.2 SR4, screened BY NAME at bind (AssignTargetRule, kb/Work PB1078).
+// A grammar that admitted only STRINGLIT refused the hexadecimal-alphanumeric X"..." literal and a concatenation
+// expression (§8.8.3.3 GR3 "may be used anywhere a literal of that class may be used") anonymously, and admitted ""
 assignTarget
     : cobolWord
-    | STRINGLIT
+    | nonNumericLiteral
     ;
 
 fileControlClauses

@@ -9441,13 +9441,13 @@
   "ordinal": 3,
   "subject": "Concatenation expressions",
   "rule-digest": "1d7a56d02f06",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ConcatFolder.cs#Fold; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#nonNumericLiteral; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs",
-  "test-ref": "conformance:2002/literal_concat",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#assignTarget; src/Cobol.Net.Compiler/Binding/AssignTargetRule.cs#Text; src/Cobol.Net.Compiler/Binding/ConcatFolder.cs",
+  "test-ref": "conformance:2002/literal_concat; conformance:2023/pb1078_assign_hex_and_concat_literal",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1078 (registrar 15b). --check 8.8.3.3 \"A concatenation expression shall be equivalent to a literal of the same class and value, and may be used anywhere a literal of that class may be used\" -> OK. The concat is an alternative of nonNumericLiteral and folds ONCE to the equivalent literal (ConcatFolder), so every literal slot inherits it. PROBED positions (all correct): VALUE (01, 88, 88 THRU, CONSTANT AS, table VALUES ARE .. FROM), MOVE, DISPLAY, IF relation (incl. figurative-only SPACE & SPACE), EVALUATE WHEN and WHEN .. THRU, INSPECT TALLYING FOR ALL, UNSTRING DELIMITED BY, STRING DELIMITED BY SIZE, CALL literal (ON EXCEPTION reached), SPECIAL-NAMES CLASS .. THRU and CURRENCY SIGN (\"\" & \"#\"), FUNCTION LENGTH argument; and equivalence carries into the literal's OWN rules: CURRENCY SIGN \"E\" & \"U\" & \"R\" -> COBOLNET0890 single-character rule, CLASS \"A\" & \"B\" THRU -> COBOLNET1671 one-character rule, i.e. the folded value is judged as the literal. Editions 2002/2014/2023 identical output; 85 -> COBOLNET0900. Golden conformance:2002/literal_concat exercises VALUE, 88, MOVE, DISPLAY, IF, EVALUATE, FUNCTION LENGTH with spec-derived expected values. || REFUTED: DIVERGES — GR3 says a concatenation expression may be used ANYWHERE a literal of its class may be used. It is admitted only where the grammar reaches nonNumericLiteral. The ASSIGN clause's assignTarget is `cobolWord | STRINGLIT` (src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4, assignTarget), so the legal source `SELECT F ASSIGN TO \"ra1\" & \".dat\"` is a PARSE ERROR. §12.4.5.2 SR4 requires only that literal-1 be an alphanumeric literal that is neither figurative nor zero-length; a concat is equivalent to one (GR3). SR5 leaves only the VALUE and the device-name meaning to the implementor, not whether the literal form is allowed. This rejects legal source. The adjudicator's probed list of positions did not include any clause whose grammar names a literal token directly. The dossier's own FMT/SR1 finding (concat-operand-word-substitution) is a separate defect. || editions as written by the adjudicator: 2002, 2014, 2023 — §8.8.3 is not in the 2023 Annex E (2014->2023) delta, so it predates 2023; the 2002 introduction edge is not quotable from the 2023 text (repo holds no 2002/2014 text) and rides the derived edge concat-operator-2002 (VERSION_CHANGE_REFERENCE decision 1); absent from 1985 (probe: --std 85 -> COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2023",
+  "notes": "kb/Work PB1078: the ASSIGN clause's literal-1 slot was the one position that refused a concatenation expression; it now folds through the one ConcatFolder like every other literal slot.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.8.4.2.1-1",
@@ -14706,13 +14706,13 @@
   "ordinal": 31,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "aa39b566bbbb",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolSpecialNames.g4#specialNamesParagraph",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb1090_empty_special_names_two_periods",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1090: Rule: 'One of the separator periods may be omitted if none of the clauses in the SPECIAL-NAMES paragraph is specified.' cite.py --check 12.3.7.3 -> OK §12.3.7.3 31). The general format is `SPECIAL-NAMES. [clauses] .`, so with no clause the FULL form is `SPECIAL-NAMES. .` and SR31 PERMITS dropping one period - both spellings are legal. The grammar `SPECIAL_NAMES DOT specialNameEntry*` (each entry `DOT?`) admits only the one-period form. Probes (--std 85 and --std 2023): sr31_one `SPECIAL-NAMES.` compiles and runs OK; sr31_two `SPECIAL-NAMES. .`, sr31_twoadj `SPECIAL-NAMES..` and sr31_twolines (period on the next line) are all COBOL0001 \"unexpected '.'\" at both editions. Sibling sweep: SOURCE-COMPUTER. . and OBJECT-COMPUTER. . (their own §12.3.5.3 SR1 / §12.3.6.3 SR4 period-omission rules) are ACCEPTED - the SPECIAL-NAMES paragraph is the one arm without the optional second period. Also observed (a FORMAT question, not SR31): a clause with no terminating period before DATA DIVISION (sr31_clause_noperiod) is accepted. See finding 'SPECIAL-NAMES. . rejected'.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1090: the empty paragraph is written SPECIAL-NAMES. or SPECIAL-NAMES. . ; a non-empty paragraph's closing period stays its last entry's own.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-32",
@@ -15636,13 +15636,13 @@
   "ordinal": 4,
   "subject": "File control entry",
   "rule-digest": "6ca222e2d0a1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#assignTarget; src/Cobol.Net.Compiler/Binding/AssignTargetRule.cs#Resolve",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#assignTarget; src/Cobol.Net.Compiler/Binding/AssignTargetRule.cs#Text",
+  "test-ref": "conformance:2023/pb1078_assign_hex_and_concat_literal; conformance:negative/pb1078-assign-literal-shape",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1078: Rule: 'Literal-1 shall be an alphanumeric literal and shall be neither a figurative constant nor a zero-length literal.' (cite.py --check 12.4.5.2 -> OK §12.4.5.2 4)). Code: `assignTarget : cobolWord | STRINGLIT`; STRINGLIT = STR_BODY, which admits \"\" (zero length); AssignTargetRule.Resolve only decodes it. THREE arms checked: (a) figurative constant - SPACE and ALL \"A\" are refused at parse (probe/fce/sr4fig, sr4figall: COBOL0312 unexpected 'SPACE'/'ALL'), correct but anonymous; national N\"..\" refused (sr4nat, COBOL0312) - correct, not alphanumeric. (b) ZERO-LENGTH literal: probe/fce/sr4zero `SELECT F1 ASSIGN TO \"\".` compiles clean exit 0 at --std 2023 AND --std 85; probe/fce/sr4zero_open with FILE STATUS shows OPEN OUTPUT answering FS=30 at run time - UNDER-REJECTS: the syntax rule is a compile-time error. (c) hexadecimal-alphanumeric literal: §8.3.3.2.1 'Alphanumeric literals are of the class and category alphanumeric' (cite OK) and §8.3.3.2.2 prints 'Format 2 (hexadecimal-alphanumeric)' (cite OK), so X\"612E646174\" is an alphanumeric literal whose VALUE equals \"a.dat\"; probe/fce/sr4hex is refused COBOL0312 unexpected 'X\"612E646174\"' - REJECTS LEGAL SOURCE (SR5's implementor latitude governs the literal's VALUE, which here is identical to an accepted literal, not its spelling). Two defective halves -> DIVERGES. Finding: assign-literal-1-shape. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (the figurative-constant half at every edition; the zero-length-literal half bites where zero-length literals exist, 2014+; the hexadecimal-alphanumeric form of an alphanumeric literal exists 2002+ - §8.3.3.2.2 Format 2)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1078: literal-1 is screened BY NAME (COBOLNET2645) - zero-length, figurative, national and boolean refused; the hexadecimal-alphanumeric literal and an alphanumeric concatenation expression admitted.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.2-5",

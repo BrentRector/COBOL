@@ -12,7 +12,11 @@ options {
 
 // SPECIAL-NAMES.
 specialNamesParagraph
-    : SPECIAL_NAMES DOT specialNameEntry*
+    // §12.3.7.2 prints `SPECIAL-NAMES. [clauses] .` and §12.3.7.3 SR31 lets ONE of the two separator periods go
+    // when no clause is written (kb/Work PB1090) — the full empty spelling `SPECIAL-NAMES. .` is the second alternative,
+    // as the SOURCE-COMPUTER / OBJECT-COMPUTER siblings write theirs. A non-empty paragraph's closing period is its
+    // last entry's own DOT?.
+    : SPECIAL_NAMES DOT (specialNameEntry+ | DOT)?
     ;
 
 specialNameEntry

@@ -1060,7 +1060,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // The TO phrase is a LIST (§12.4.5.1's ellipsis); which lists are allowable and what one names
                     // is the §12.4.5.2 SR5 determination, read in ONE place (AssignTargetRule, DOC-A.1-71).
                     file.AssignTarget = asg.assignTarget() is { Length: > 0 } tgts
-                        ? AssignTargetRule.Resolve(Edition, tgts, name)
+                        ? AssignTargetRule.Resolve(Edition, LiteralEnv, tgts, name)
                         : "";   // bare `ASSIGN USING …`: no device-name-1/literal-1 exists — UNASSOCIATED until an OPEN
                     if (asg.dataReference() is { } dyn)
                     {

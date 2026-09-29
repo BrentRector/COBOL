@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Binding.Model;
 using CobolNet.Common;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
@@ -42,12 +43,13 @@ internal static class AssignTargetRule
     /// <summary>The target the TO phrase identifies — the text <c>FileModel.AssignTarget</c> carries to the
     /// runtime — reporting COBOLNET2256 for a list the determination does not allow. On a refused list the LAST
     /// operand is returned so binding continues on a plausible shape under an already-failed compile.</summary>
-    public static string Resolve(EditionContext edition, Core.AssignTargetContext[] targets, string fileName)
+    public static string Resolve(EditionContext edition, LiteralEnvironment env, Core.AssignTargetContext[] targets,
+        string fileName)
     {
-        if (targets.Length == 1) return Text(targets[0]);
+        if (targets.Length == 1) return Text(edition, env, targets[0]);
         var first = targets[0];
-        bool deviceLed = first.STRINGLIT() is null && DeviceClasses.Contains(first.GetText());
-        if (targets.Length == 2 && deviceLed) return Text(targets[1]);
+        bool deviceLed = first.cobolWord() is not null && DeviceClasses.Contains(first.GetText());
+        if (targets.Length == 2 && deviceLed) return Text(edition, env, targets[1]);
         using (edition.At(targets[1]))
             edition.Error(DiagnosticCatalog.AssignTargetListNotAllowed,
                 $"SELECT {fileName}: the ASSIGN clause's TO phrase lists {targets.Length} operands ("
@@ -56,12 +58,58 @@ internal static class AssignTargetRule
                 + "implementation allows ONE operand naming the file, or a device class ("
                 + string.Join(" or ", DeviceClasses.Order(StringComparer.Ordinal)) + ") followed by ONE operand "
                 + "naming the file (docs/CONFORMANCE.md §7 DOC-A.1-71)"
-                + (targets.Length == 2 ? (first.STRINGLIT() is not null
+                + (targets.Length == 2 ? (first.cobolWord() is null
                     ? " — here the first operand is a literal, not a device class"
                     : $" — here '{first.GetText()}' is not a device class this implementation provides") : ""));
-        return Text(targets[^1]);
+        return Text(edition, env, targets[^1]);
     }
 
-    private static string Text(Core.AssignTargetContext t) =>
-        t.STRINGLIT() is { } s ? CobolLiteral.Decode(s.GetText()) : t.GetText();
+    /// <summary>The physical name one operand gives: a device-name-1 word is its own spelling; literal-1 is
+    /// screened against §12.4.5.2 SR4 — "an alphanumeric literal ... neither a figurative constant nor a
+    /// zero-length literal" — and decoded (a §8.8.3 concatenation expression folds to its equivalent literal,
+    /// §8.8.3.3 GR3; the hexadecimal-alphanumeric X"..." is an alphanumeric literal, §8.3.3.2.2). A refused literal
+    /// yields "" under an already-failed compile.</summary>
+    private static string Text(EditionContext edition, LiteralEnvironment env, Core.AssignTargetContext t)
+    {
+        if (t.nonNumericLiteral() is not { } nn) return t.GetText();
+        void Refuse(string why)
+        {
+            using var _ = edition.At(nn);
+            edition.Error(DiagnosticCatalog.AssignLiteralShape,
+                $"ASSIGN TO {nn.GetText()}: literal-1 {why} (ISO §12.4.5.2 SR4)");
+        }
+        string value;
+        if (nn.concatenationExpression() is { } ce)
+        {
+            var folded = ConcatFolder.Fold(ce, edition, env);
+            if (folded.Category != PicCategory.Alphanumeric) { Refuse("shall be an alphanumeric literal, and this concatenation expression is not one"); return ""; }
+            value = folded.Value;
+        }
+        else if (nn.predefinedNull() is not null)
+        {
+            // NULL is an identifier, not a literal (§8.4.3.10.3 SR1) — the ONE refusal, not the literal-shape verdict.
+            using var _ = edition.At(nn);
+            PredefinedNullRule.Report(edition, "literal-1 of the ASSIGN clause, which shall be an alphanumeric "
+                + "literal (ISO §12.4.5.2 SR4),");
+            return "";
+        }
+        else if (nn.figurativeConstant() is not null)
+        {
+            Refuse("shall not be a figurative constant");
+            return "";
+        }
+        else
+        {
+            string token = nn.GetText();
+            if (nn.STRINGLIT() is null && nn.HEXLIT() is null
+                || CobolLiteral.ClassOf(token) != LiteralClass.Alphanumeric)
+            {
+                Refuse("shall be an alphanumeric literal");
+                return "";
+            }
+            value = CobolLiteral.Decode(token);
+        }
+        if (value.Length == 0) { Refuse("shall not be a zero-length literal"); return ""; }
+        return value;
+    }
 }

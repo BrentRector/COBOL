@@ -387,19 +387,32 @@ public static class DiagnosticCatalog
         + "name the entity is known by differs from the literal as written.",
         "ISO §8.3.2.2 rule 2 / DOC-A.1-68");
 
+    /// <summary>COBOLNET2645 — the ASSIGN clause's literal-1 is not an alphanumeric literal, or is a figurative constant
+    /// or a zero-length literal (kb/Work PB1078). <c>AssignTargetRule.Text</c> is its only reporter.</summary>
+    public static readonly DiagnosticDescriptor AssignLiteralShape = new(
+        "COBOLNET2645", "assign-literal-shape", EditionSeverity.Error,
+        "The literal-1 of an ASSIGN clause is not admissible. ISO §12.4.5.2 SR4: \"Literal-1 shall be an alphanumeric "
+        + "literal and shall be neither a figurative constant nor a zero-length literal.\" The hexadecimal-"
+        + "alphanumeric literal and a concatenation expression of alphanumeric operands are alphanumeric literals "
+        + "(§8.3.3.2.2; §8.8.3.3 GR3), so they are admitted; a national or boolean literal, a figurative constant and "
+        + "the zero-length literal are not.",
+        "ISO §12.4.5.2 SR4");
+
     /// <summary>COBOLNET2644 — an OO definition's environment division carries a part its kind may not (kb/Work
     /// PB1076 + PB813). ONE code for the one placement table, <c>OoEnvironmentRules.Screen</c>, its only reporter.</summary>
     public static readonly DiagnosticDescriptor OoEnvironmentPlacement = new(
         "COBOLNET2644", "oo-environment-placement", EditionSeverity.Error,
         "The environment division of a method, factory, instance, interface or class definition carries a part that "
-        + "kind of definition may not. ISO §12.3.3 SR2: \"The configuration section shall not be specified in a "
-        + "method definition.\" SR3: \"The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be "
-        + "specified in a factory definition or an instance definition.\" §12.4.3 SR1: the input-output section "
-        + "may be specified within a class definition \"only in a factory definition or instance definition, but "
-        + "not in a method definition\" and \"shall not be specified within an interface definition.\" §12.3.7.3 "
-        + "SR2: in a factory or instance definition \"the only clauses that may be specified are the CURSOR and "
-        + "CRT STATUS clauses\"; SR3: in an interface definition \"the ALPHABET clause, the CURRENCY clause, the "
-        + "DECIMAL-POINT clause, and the LOCALE clause are the only permitted clauses.\"",
+        + "kind of definition may not: \"The configuration section shall not be specified in a method definition.\" "
+        + "(ISO §12.3.3 SR2); \"The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be specified "
+        + "in a factory definition or an instance definition.\" (ISO §12.3.3 SR3); \"The input-output section "
+        + "shall not be specified within an interface definition.\" (ISO §12.4.3 SR1); \"In a factory "
+        + "definition or instance definition, the only clauses that may be specified are the CURSOR and CRT STATUS "
+        + "clauses.\" (ISO §12.3.7.3 SR2); \"In an interface definition, the ALPHABET clause, the CURRENCY clause, the "
+        + "DECIMAL-POINT clause, and the LOCALE clause are the only permitted clauses.\" (ISO §12.3.7.3 SR3). Within a "
+        + "class definition the input-output section is admitted only in a factory definition or an instance "
+        + "definition, so it is refused in a method definition and in the class definition's own environment "
+        + "division too (ISO §12.4.3 SR1).",
         "ISO §12.3.3 SR2/SR3, §12.4.3 SR1, §12.3.7.3 SR2/SR3");
 
     /// <summary>COBOLNET2643 — an AS literal of spaces only forms the zero-length externalized name (kb/Work
