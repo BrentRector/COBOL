@@ -163,9 +163,9 @@ public sealed partial class DataBinder
         //    identifies no table element at all, so the same code answers for it.)
         for (int k = 0; k < dims.Count; k++)
         {
-            if (spec.From[k] >= 1 && spec.From[k] <= SubscriptCeiling(dims[k])) continue;
+            if (spec.From[k] >= 1 && spec.From[k] <= dims[k].Ceiling) continue;
             Edition.Error("COBOLNET1586", $"{phrase}: a Format 2 VALUE FROM subscript ({spec.FromWritten[k]}) is out of "
-                + $"range 1..{SubscriptCeiling(dims[k])} for {DimensionName(dims, k)} "
+                + $"range 1..{dims[k].Ceiling} for {DimensionName(dims, k)} "
                 + $"(ISO §13.18.63.3 SR20{CeilingProvenance(dims[k])})");
         }
 
@@ -174,9 +174,9 @@ public sealed partial class DataBinder
             // ── SR21 sentence 2 — the same ceiling test for subscript-2.
             for (int k = 0; k < dims.Count; k++)
             {
-                if (to[k] >= 1 && to[k] <= SubscriptCeiling(dims[k])) continue;
+                if (to[k] >= 1 && to[k] <= dims[k].Ceiling) continue;
                 Edition.Error("COBOLNET1587", $"{phrase}: a Format 2 VALUE TO subscript ({spec.ToWritten![k]}) is out of range "
-                    + $"1..{SubscriptCeiling(dims[k])} for {DimensionName(dims, k)} "
+                    + $"1..{dims[k].Ceiling} for {DimensionName(dims, k)} "
                     + $"(ISO §13.18.63.3 SR21{CeilingProvenance(dims[k])})");
             }
 
@@ -197,20 +197,19 @@ public sealed partial class DataBinder
             //    and subscript-2 corresponding to all levels higher than that of the OCCURS clause, if
             //    applicable, shall be equal". "Higher" is the COBOL level sense — the MORE inclusive dimensions,
             //    the ones to the LEFT of the unbounded one: the odometer may not carry out of a dimension with
-            //    no ceiling.
-            for (int d = 0; d < dims.Count; d++)
+            //    no ceiling. The rule binds EVERY such OCCURS clause, so a level is constrained when ANY less
+            //    inclusive dimension is unbounded — TableValueOdometer.UnboundedBelow, the one statement of the
+            //    rule's shape, which the fill's ElementCount reads too (kb/Work PB1716: the screen used to test
+            //    only the OUTERMOST unbounded dimension, so two nested ones let `FROM (1 1) TO (2 1)` through
+            //    to a fill that could never carry out of the inner one).
+            for (int k = 0; k < dims.Count; k++)
             {
-                if (!dims[d].DynamicWithoutTo) continue;
-                for (int k = 0; k < d; k++)
-                {
-                    if (spec.From[k] == to[k]) continue;
-                    Edition.Error(DiagnosticCatalog.TableValueDynamicSpanLevels, $"{phrase}: subscript-1 "
-                        + $"({spec.FromWritten[k]}) and subscript-2 ({spec.ToWritten![k]}) differ for {DimensionName(dims, k)}, "
-                        + $"which is more inclusive than {DimensionName(dims, d)} — an OCCURS DYNAMIC clause "
-                        + "with no TO phrase; the subscripts corresponding to all levels higher than that "
-                        + "OCCURS clause shall be equal (ISO §13.18.63.3 SR23)");
-                }
-                break;   // one unbounded dimension is enough; a second is inside the first's span
+                if (spec.From[k] == to[k] || TableValueOdometer.UnboundedBelow(dims, k) is not { } d) continue;
+                Edition.Error(DiagnosticCatalog.TableValueDynamicSpanLevels, $"{phrase}: subscript-1 "
+                    + $"({spec.FromWritten[k]}) and subscript-2 ({spec.ToWritten![k]}) differ for {DimensionName(dims, k)}, "
+                    + $"which is more inclusive than {DimensionName(dims, d)} — an OCCURS DYNAMIC clause "
+                    + "with no TO phrase; the subscripts corresponding to all levels higher than that "
+                    + "OCCURS clause shall be equal (ISO §13.18.63.3 SR23)");
             }
         }
         // ── SR22 — "A VALUE clause without the TO phrase shall not be specified in the same entry as an OCCURS
@@ -223,12 +222,6 @@ public sealed partial class DataBinder
                 + $" the OCCURS DYNAMIC clause on '{unbounded.Owner.CobolName ?? "FILLER"}', which specifies no TO "
                 + "(expected) capacity (ISO §13.18.63.3 SR22)");
     }
-
-    /// <summary>The ceiling §13.18.63.3 SR20/SR21 measure a subscript against — the dimension's declared maximum,
-    /// or, for a DYNAMIC table the OCCURS clause gives no expected capacity, this implementation's §8.5.1.9.1
-    /// maximum capacity (the standard supplies no number there, and without one the §13.18.63.4 GR12 fill is
-    /// unbounded).</summary>
-    private static int SubscriptCeiling(TableValueDim dim) => dim.Max ?? TableValueOdometer.MaxDynamicCapacity;
 
     /// <summary>Says so IN THE MESSAGE when the ceiling a subscript was measured against is this implementation's
     /// rather than the program's: a number the source never wrote must never look like one it did.</summary>

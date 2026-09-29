@@ -73,6 +73,11 @@ public sealed record TableValueDim(DataItem Owner, int? Max, bool Dynamic)
 {
     /// <summary>The §13.18.63.3 SR22/SR23 subject: "an OCCURS clause with a DYNAMIC phrase but no TO phrase".</summary>
     public bool DynamicWithoutTo => Dynamic && Max is null;
+
+    /// <summary>The ceiling §13.18.63.3 SR20/SR21 measure a subscript against — <see cref="Max"/>, or, for a
+    /// DYNAMIC table the OCCURS clause gives no expected capacity, this implementation's §8.5.1.9.1 maximum
+    /// capacity (<see cref="TableValueOdometer.MaxDynamicCapacity"/>: the standard supplies no number there).</summary>
+    public int Ceiling => Max ?? TableValueOdometer.MaxDynamicCapacity;
 }
 
 /// <summary>⛔ THE RESOLVED Format-2 (table) VALUE of one entry (ISO §13.18.63.4 GR12–GR15) — the SUBSCRIPT TUPLE →
@@ -117,11 +122,6 @@ public static class TableValueOdometer
     /// single-dimension loop ran from subscript-1 to subscript-2 with no bound at all.)</summary>
     public const int MaxDynamicCapacity = 1_000_000;
 
-    /// <summary>The defensive ceiling on ONE phrase's fill — see <see cref="Resolve"/>. Never reached by source
-    /// the binder pass has screened; every declared dimension bounds its own subscript-2, and an undeclared
-    /// (dynamic, no OCCURS TO) one is bounded by <see cref="MaxDynamicCapacity"/>.</summary>
-    private const int MaxFillElements = 64_000_000;
-
     /// <summary>§13.18.63.4 GR14 — "If the TO phrase is not specified, it is as if the TO phrase were specified
     /// with each subscript-2 as the maximum number of occurrences, or, in the case of a dynamic-capacity table,
     /// the expected number of occurrences, of the table associated with each corresponding subscript-1." Returns
@@ -145,7 +145,7 @@ public static class TableValueOdometer
     /// by 1." Mutates <paramref name="cur"/>; false when the whole odometer has run past its last element.
     /// <para>A dimension with no ceiling (a DYNAMIC table with no OCCURS TO) simply increments and never carries —
     /// SR23 requires every MORE inclusive subscript to be equal across FROM and TO, so no carry out of it is ever
-    /// needed to reach subscript-2.</para></summary>
+    /// needed to reach subscript-2 (and <see cref="ElementCount"/> refuses a phrase that would need one).</para></summary>
     public static bool Step(int[] cur, IReadOnlyList<TableValueDim> dims)
     {
         for (int k = cur.Length - 1; k >= 0; k--)
@@ -162,38 +162,92 @@ public static class TableValueOdometer
     /// (GR13; GR14 supplies the missing subscript-2), and a LATER phrase overwrites an element an earlier one
     /// already keyed (GR15 — "the value defined by the last specified FROM phrase in the VALUE clause is assigned
     /// to the table element").
-    /// <para>Only phrases whose tuples are well-formed for <paramref name="dims"/> contribute; the caller has
-    /// already diagnosed the rest (SR20/SR21), and a mis-shaped phrase must not silently seed the wrong element.</para></summary>
+    /// <para>Each phrase fills exactly the <see cref="ElementCount"/> elements it names, counted BEFORE the fill
+    /// starts. A phrase that names no well-formed run contributes nothing: the caller has already diagnosed it
+    /// (SR20/SR21/SR23), and a mis-shaped phrase must not silently seed the wrong element.</para></summary>
     public static Dictionary<Subscripts, string> Resolve(
         IReadOnlyList<TableValueDim> dims, IReadOnlyList<TableValueSpec> specs)
     {
         var map = new Dictionary<Subscripts, string>();
         foreach (var spec in specs.OrderBy(s => s.Ordinal))
         {
-            if (spec.Literals.Count == 0 || spec.From.Count != dims.Count) continue;
-            if (spec.To is { } t && t.Count != dims.Count) continue;
+            if (spec.Literals.Count == 0) continue;
             var from = new Subscripts([.. spec.From]);
             var to = spec.To is { } tl ? new Subscripts([.. tl]) : DefaultTo(dims);
-            if (to is not { } stop || Subscripts.Compare(stop, from) < 0) continue;
+            if (to is not { } stop || ElementCount(dims, from, stop) is not { } count) continue;
 
             var cur = new int[dims.Count];
             for (int i = 0; i < dims.Count; i++) cur[i] = spec.From[i];
-            // The odometer visits tuples in strictly increasing lexicographic order (a carry LOWERS an inner
-            // subscript but RAISES a more inclusive one), so `>= stop` is both the GR13 stop condition and the
-            // anti-runaway invariant. The extra element cap is unreachable for conforming source — the pass
-            // screens subscript-2 against every dimension's ceiling, including the §8.5.1.9.1 implementor
-            // maximum capacity for a dimension the OCCURS clause gives none — and is kept as the defensive
-            // statement that this loop is finite whatever a future caller hands it.
-            for (int k = 0; k < MaxFillElements; k++)
+            for (long k = 0; k < count; k++)
             {
-                var here = new Subscripts([.. cur]);
-                map[here] = spec.Literals[k % spec.Literals.Count];
-                if (Subscripts.Compare(here, stop) >= 0) break;
-                if (!Step(cur, dims)) break;
+                map[new Subscripts([.. cur])] = spec.Literals[(int)(k % spec.Literals.Count)];
+                if (k + 1 < count && !Step(cur, dims))
+                    throw new InvalidOperationException($"the §13.18.63.4 GR12 odometer ran out of elements "
+                        + $"before the {count} that {from}..{stop} names — ElementCount and Step disagree");
             }
         }
         return map;
     }
+
+    /// <summary>§13.18.63.3 SR23's antecedent at one LEVEL: the index of the first dimension LESS inclusive than
+    /// <paramref name="level"/> whose OCCURS clause has "a DYNAMIC phrase but no TO phrase", or null when there is
+    /// none. When it is not null, <paramref name="level"/> is one of "all levels higher than that of the OCCURS
+    /// clause", where "the values of subscript-1 and subscript-2 … shall be equal". The rule's shape is written
+    /// here once, and read by both the binder's SR23 diagnostic and <see cref="ElementCount"/>.</summary>
+    public static int? UnboundedBelow(IReadOnlyList<TableValueDim> dims, int level)
+    {
+        for (int j = level + 1; j < dims.Count; j++)
+            if (dims[j].DynamicWithoutTo) return j;
+        return null;
+    }
+
+    /// <summary>⛔ HOW MANY table elements one phrase names: the length of the §13.18.63.4 GR12 fill from the
+    /// <paramref name="from"/> tuple through the <paramref name="to"/> tuple in odometer order, known BEFORE any
+    /// element is filled, so the fill is bounded by the phrase and never by a cap (kb/Work PB1716: a 64,000,000-
+    /// element defensive cap was the only bound, and a phrase violating SR23 ran all the way to it — about 30 s
+    /// to reject a 26-line program).
+    /// <para>The count is the MIXED-RADIX distance between the tuples: one occurrence at dimension k spans the
+    /// product of every less inclusive dimension's maximum. That product does not exist above a dimension with no
+    /// ceiling, which is exactly why §13.18.63.3 SR23 requires "the values of subscript-1 and subscript-2
+    /// corresponding to all levels higher than that of the OCCURS clause" to be equal.</para>
+    /// <para>Null when the phrase names no well-formed run: a subscript outside
+    /// 1..<see cref="TableValueDim.Ceiling"/> (SR20/SR21), a TO tuple preceding the FROM tuple (SR21), or unequal
+    /// subscripts at a level SR23 constrains. The binder diagnoses each of those; the null keeps a diagnosed phrase
+    /// (which still reaches the fill when <c>--permissive</c> demotes its diagnostic) from seeding any element.
+    /// A count beyond <see cref="long.MaxValue"/> saturates there.</para></summary>
+    public static long? ElementCount(IReadOnlyList<TableValueDim> dims, Subscripts from, Subscripts to)
+    {
+        if (from.Count != dims.Count || to.Count != dims.Count) return null;                  // SR20 / SR21 count
+        for (int k = 0; k < dims.Count; k++)
+        {
+            int ceiling = dims[k].Ceiling;
+            if (from[k] < 1 || from[k] > ceiling || to[k] < 1 || to[k] > ceiling) return null;   // SR20 / SR21 range
+            if (from[k] != to[k] && UnboundedBelow(dims, k) is not null) return null;             // SR23
+        }
+        if (Subscripts.Compare(to, from) < 0) return null;                                          // SR21 order
+
+        // TO minus FROM, digit by digit from the least inclusive dimension, borrowing from the next more inclusive
+        // one. Every resulting digit is non-negative, so the weighted sum only grows and saturates honestly. No
+        // borrow reaches a dimension without a ceiling: SR23 (above) made every level more inclusive than it equal,
+        // and TO >= FROM then leaves nothing to borrow at that dimension itself — the loop stops there.
+        long distance = 0, weight = 1;
+        int borrow = 0;
+        for (int k = dims.Count - 1; k >= 0; k--)
+        {
+            int digit = to[k] - from[k] - borrow;
+            borrow = 0;
+            if (digit < 0) { digit += dims[k].Ceiling; borrow = 1; }
+            distance = SaturatingAdd(distance, SaturatingMultiply(digit, weight));
+            if (dims[k].Max is not { } max) break;   // every more inclusive digit is zero (SR23)
+            weight = SaturatingMultiply(weight, max);
+        }
+        return SaturatingAdd(distance, 1);
+    }
+
+    private static long SaturatingMultiply(long a, long b) =>
+        a == 0 || b == 0 ? 0 : a > long.MaxValue / b ? long.MaxValue : a * b;
+
+    private static long SaturatingAdd(long a, long b) => a > long.MaxValue - b ? long.MaxValue : a + b;
 
     /// <summary>§13.18.63.4 GR16 — the INITIAL CAPACITY a Format-2 VALUE gives the dynamic-capacity table at
     /// dimension <paramref name="dim"/>: (a) with a TO phrase, "the initial capacity is increased, if necessary,

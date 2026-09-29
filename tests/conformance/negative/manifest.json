@@ -1754,7 +1754,8 @@
   "w66g-pb1475-strong-type-dpc-differs",
   "pb1509-sum-wide-addend-85",
   "pb1305-report-varying-85",
-  "pb1234-report-control-float-85"
+  "pb1234-report-control-float-85",
+  "pb1716-table-value-nested-dynamic-span"
  ],
  "pending": []
 }

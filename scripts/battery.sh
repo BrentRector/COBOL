@@ -118,6 +118,11 @@ if [ "${SKIP_TESTS:-0}" != "1" ]; then
         [ -n "$v" ] || RC=1
     done
     [ "$RC_CONF" -eq 0 ] && [ "$RC_UNIT" -eq 0 ] && [ "$RC_CHAR" -eq 0 ] || RC=1
+    # The five slowest tests of the three legs (DESIGN-test-build-ci §3.14.5, kb/Work PB1716), so the next long
+    # pole is seen when it appears. A REPORT, never a wall-clock assertion: it never touches RC.
+    note "slowest tests:"
+    "$PY" scripts/profile-test-parallelism.py --slowest 5 \
+        "$OUT/conformance.trx" "$OUT/unit.trx" "$OUT/characterization.trx" 2>&1 | tee -a "$SUMMARY"
 fi
 
 if [ "${SKIP_GUARD:-0}" != "1" ]; then

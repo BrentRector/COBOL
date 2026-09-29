@@ -2,6 +2,13 @@
 """Per-CLASS wall-clock profile of a test assembly, from a `--logger trx` run — plan §11 A13(b).
 
     python scripts/profile-test-parallelism.py <run.trx> [top-N]
+    python scripts/profile-test-parallelism.py --slowest <N> <run.trx>...
+
+The second form lists the N slowest individual TESTS across every trx it is given — `scripts/battery.sh` prints
+the five slowest of its three legs in the battery summary (DESIGN-test-build-ci.md §3.14.5, kb/Work PB1716), so
+the next long pole is seen when it appears. It is a REPORT, never a wall-clock assertion (a timing ceiling flakes
+under load, and `NoWallClockAssertionDriftTests` forbids one), and it exits 0 whatever it finds; an unreadable trx
+is named in its output rather than failing the battery, whose leg verdicts already report a missing leg.
 
 ⛔ WHY. xUnit 2.9.2 parallelizes at TEST-COLLECTION granularity, and by default **each test CLASS is one
 collection** — so every test in a class, including every row of a `[Theory]`, runs SERIALLY ON ONE THREAD. A
@@ -24,6 +31,7 @@ from __future__ import annotations
 
 import collections
 import datetime
+import pathlib
 import sys
 import xml.etree.ElementTree as ET
 
@@ -39,6 +47,25 @@ def _seconds(duration: str | None) -> float:
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
+def slowest_tests(paths: list[str], top: int) -> int:
+    """The `top` slowest individual tests across `paths`, slowest first, each with the trx (leg) it came from."""
+    rows: list[tuple[float, str, str]] = []
+    for path in paths:
+        try:
+            root = ET.parse(path).getroot()
+        except (OSError, ET.ParseError) as e:
+            print(f'  !! {path}: no readable trx ({e.__class__.__name__}: {e})')
+            continue
+        leg = pathlib.Path(path).stem
+        for r in root.iter(f'{{{NS["t"]}}}UnitTestResult'):
+            rows.append((_seconds(r.get('duration')), leg, r.get('testName', '?')))
+    if not rows:
+        print(f'  !! no test results in {" ".join(paths)}')
+    for secs, leg, name in sorted(rows, key=lambda row: -row[0])[:top]:
+        print(f'  {secs:8.1f}s  {leg:<17} {name}')
+    return 0
+
+
 def main(argv: list[str]) -> int:
     # The Windows console defaults to cp1252, which cannot encode the ⚠/⛔ this report uses — and the failure is
     # an UnhandledException AFTER the first lines have printed, i.e. a tool that looks like it half-worked.
@@ -49,6 +76,10 @@ def main(argv: list[str]) -> int:
             pass
     if not argv:
         sys.exit(__doc__)
+    if argv[0] == '--slowest':
+        if len(argv) < 3:
+            sys.exit(__doc__)
+        return slowest_tests(argv[2:], int(argv[1]))
     path, top = argv[0], int(argv[1]) if len(argv) > 1 else 15
     root = ET.parse(path).getroot()
 

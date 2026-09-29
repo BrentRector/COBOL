@@ -1032,7 +1032,13 @@ bounded only by its `MaxFillElements` ceiling (64,000,000) — and when the odom
 dimension with no TO, the phrase's TO is never reached, which is exactly the §13.18.63.3 SR23 violation ("the values
 of subscript-1 and subscript-2 corresponding to all levels higher than that of the OCCURS clause, if applicable,
 shall be equal") that `COBOLNET1946` then reports. The fix checks SR23 before any fill and bounds the
-fill by the elements the phrase names; the test keeps asserting the diagnostic. The other poles over 30 s in `b1`
+fill by the elements the phrase names; the test keeps asserting the diagnostic. **Landed (kb/Work PB1716):**
+`TableValueOdometer.ElementCount` computes a phrase's element count as the mixed-radix distance from subscript-1 to
+subscript-2 BEFORE the fill and returns none for a phrase SR20/SR21/SR23 reject, and `Resolve` fills exactly that
+many elements, so the `MaxFillElements` cap is gone; the SR23 rule's shape ("a level above ANY unbounded
+dimension") lives once in `TableValueOdometer.UnboundedBelow`, read by both the fill and the `COBOLNET1946` screen,
+which had tested only the OUTERMOST unbounded dimension and so accepted two nested ones spanned at the outer level.
+pb505 now rejects in 0.49 s through the CLI (was 25.3 s on the same build). The other poles over 30 s in `b1`
 (`CompiledProgramCacheDriftTests.TheOutputDirectory_DoesNotReachTheOutput` 55 s, `OptionalWordSubsetDriftTests`
 `special-names-85` 41 s, `St101A` 30 s, continuity rows of IX113A/NC177A/NC253A/RL101A at 40–49 s) are compile-bound
 and are re-measured after M6 before any is touched. The battery summary prints the five slowest tests (a REPORT,
