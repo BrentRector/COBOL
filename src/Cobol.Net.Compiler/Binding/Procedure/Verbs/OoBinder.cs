@@ -259,15 +259,17 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "(ISO §14.9.23.3 SR4f–SR4i — the SELF/SUPER method-name placement rules)");
             }
             var selfForm = isSuper ? InvokeForm.Super : InvokeForm.Self;
+            // §14.8.3.3 rule 2 b) 2.: a method invoked with SELF or SUPER is invoked through ACTIVE-CLASS — the
+            // description every invocation-dependent conformance rule reads (OoConformance.InvokedThroughActiveClass).
+            var selfView = ObjectRefDescriptor.ActiveClass(cur.Name, factory: false);
             // A method of the standard class BASE through SELF/SUPER: the object it runs on is the current object,
             // whose class is the containing class or a subclass of it — exactly the §13.18.60.2 ACTIVE-CLASS
             // description, and exactly what §16.2's `active-class` returning items mean. So New in a factory method
             // creates the ACTIVE class (§16.2.1.2 GR1 through the polymorphic factory, SR4 f); SUPER restricts the
             // SEARCH (§8.4.3.8.4 GR3), and the method found is still BASE's, running on the same object.
             if (sm.Standard is not StandardMethod.None)
-                return OoBindStandardInvoke(site, sm, selfForm, receiver: null, receiverClass: null,
-                    ObjectRefDescriptor.ActiveClass(cur.Name, factory: false));
-            return OoBindResolvedInvoke(site, sm, selfForm, null);
+                return OoBindStandardInvoke(site, sm, selfForm, receiver: null, receiverClass: null, selfView);
+            return OoBindResolvedInvoke(site, sm, selfForm, null, selfView);
         }
         if (target.dataReference() is not { } dref)
         {
@@ -303,12 +305,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     {
         if (cls.FindFactoryMethod(method) is { } fm)
         {
-            // §16.2.1.2 GR1: New invoked on the factory object NAMED here creates an instance object of EXACTLY cls
-            // (the factory object is not polymorphic through a class-name), so the result is described ONLY.
+            // §14.8.3.3 rule 2 b) 1.: a method invoked with an object-class-name is invoked through "that same
+            // object-class-name and an ONLY phrase" — and §16.2.1.2 GR1 agrees for New: invoked on the factory object
+            // NAMED here it creates an instance object of EXACTLY cls, so the result is described ONLY.
+            var classView = ObjectRefDescriptor.ObjectClass(cls.Name, factory: false, only: true);
             if (fm.Standard is not StandardMethod.None)
-                return OoBindStandardInvoke(site, fm, InvokeForm.New, receiver: null, cls,
-                    ObjectRefDescriptor.ObjectClass(cls.Name, factory: false, only: true));
-            var bound = OoBindResolvedInvoke(site, fm, InvokeForm.Factory, null);
+                return OoBindStandardInvoke(site, fm, InvokeForm.New, receiver: null, cls, classView);
+            var bound = OoBindResolvedInvoke(site, fm, InvokeForm.Factory, null, classView);
             return bound is BoundInvoke bi ? bi with { ClassCsName = cls.CsName } : bound;
         }
         if (IsStandardNew(method))
@@ -419,7 +422,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "its INHERITS closure) does not declare a method named '" + method + "' "
                     + "(ISO §14.9.23.3 SR4e)");
             }
-            var ibound = OoBindResolvedInvoke(site, proto, InvokeForm.Instance, receiver);
+            var ibound = OoBindResolvedInvoke(site, proto, InvokeForm.Instance, receiver, rdesc);
             return ibound is BoundInvoke ibi ? ibi with { OwnerCsName = recvIface.CsName } : ibound;
         }
         if (host.OoClasses?.Find(className) is not { } cls)
@@ -459,16 +462,18 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // it — New through a FACTORY OF reference creates an object of the class that factory belongs to.
         if (m.Standard is not StandardMethod.None)
             return OoBindStandardInvoke(site, m, InvokeForm.Instance, receiver, cls, rdesc with { Factory = false });
-        var bound = OoBindResolvedInvoke(site, m, InvokeForm.Instance, receiver);
+        var bound = OoBindResolvedInvoke(site, m, InvokeForm.Instance, receiver, rdesc);
         // A factory-object receiver's argument PROFILES live in the FACTORY singleton type, not the instance
         // class — the same qualification InvokeForm.Factory gets by appending the suffix at emit time.
         return rdesc.Factory && bound is BoundInvoke fbi ? fbi with { OwnerCsName = cls.FactoryCsName } : bound;
     }
 
     /// <summary>The shared USING + RETURNING binding tail for a RESOLVED method — the Instance / SELF / SUPER
-    /// forms differ only in receiver resolution and dispatch rendering (§8.4.3.8), never in marshaling.</summary>
+    /// forms differ only in receiver resolution and dispatch rendering (§8.4.3.8), never in marshaling.
+    /// <paramref name="invokedWith"/> is how the object the method runs on is described (§14.8.3.3 rule 2 b)'s four
+    /// cases), which an ACTIVE-CLASS formal or returning item conforms against (kb/Work PB1112).</summary>
     private BoundStatement OoBindResolvedInvoke(
-        InvocationSite site, OoMethodSymbol m, InvokeForm form, Place? receiver)
+        InvocationSite site, OoMethodSymbol m, InvokeForm form, Place? receiver, ObjectRefDescriptor invokedWith)
     {
         // ── USING marshaling (slice 2 — D6; §14.9.23.4 GR3: positional correspondence) ──
         var argCtxs = site.Args;
@@ -491,7 +496,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         var args = new List<BoundInvokeArg>(formals.Count);
         for (int i = 0; i < argCtxs.Count; i++)
         {
-            if (OoBindInvocationArg(argCtxs[i], formals[i], m.Name, site.Verb) is not { } a)
+            if (OoBindInvocationArg(argCtxs[i], formals[i], m.Name, site.Verb, invokedWith) is not { } a)
                 return BoundRejected.Reported(ctx.Edition);
             args.Add(a);
         }
@@ -565,10 +570,15 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // §14.8.3.3 rule 1: the RETURNING delivery conforms "as if a SET statement were performed" —
             // for object references that is the WIDENING direction (universal receiver accepts anything; a
             // typed receiver accepts the same class or a subclass — SET SR12a2), NOT the §14.8.2.3.2
-            // identity rule. Everything else keeps the strict description check.
+            // identity rule. Everything else keeps the strict description check. Rule 2: an ACTIVE-CLASS
+            // returning item sends the description the INVOCATION gives it (OoConformance.ReturningSender).
             string? rerr = m.Binding!.Returning!.Pic is { Category: PicCategory.ObjectReference } sendPic
                     && rp.Item.Pic is { Category: PicCategory.ObjectReference } recvPic
-                ? OoConformance.ObjectRefAssignmentMismatch(host.OoClasses, sendPic, recvPic)
+                ? host.OoClasses is { } oo
+                    ? OoConformance.ObjectRefAssignmentMismatch(oo,
+                        OoConformance.ReturningSender(sendPic.ObjectRef ?? ObjectRefDescriptor.Universal, invokedWith),
+                        recvPic.ObjectRef ?? ObjectRefDescriptor.Universal)
+                    : null
                 : OoConformanceError(m.Binding!.Returning!, rp.Item);
             if (rerr is not null)
             {
@@ -614,7 +624,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// reference-modified argument conforms by its EFFECTIVE description (a unique elementary alphanumeric
     /// item of the window length, §8.4.3.3.4 GR6). Null on a diagnostic.</summary>
     private BoundInvokeArg? OoBindInvocationArg(InvocationArg arg, OoFormal oof, string methodName,
-                                                string verb)
+                                                string verb, ObjectRefDescriptor invokedWith)
     {
         var formal = oof.Item;
         void Err(string msg) => ctx.Edition.Error("COBOLNET0828", $"{verb} \"{methodName}\": {msg}");
@@ -692,6 +702,18 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return null;
             }
             bool selfConforms = true;
+            // An ACTIVE-CLASS formal takes SELF only by §14.8.2.3.3 alternative 1) — invoked through ACTIVE-CLASS
+            // (SELF, SUPER or an ACTIVE-CLASS reference); alternative 2)'s receiver is described ONLY, and §14.9.39.3
+            // SR12 c)1. admits no SELF sender into one (kb/Work PB1112).
+            if (formal.Pic.ObjectRef is { Kind: ObjectRefKind.ActiveClass }
+                && !OoConformance.InvokedThroughActiveClass(invokedWith))
+            {
+                Err($"SELF for ACTIVE-CLASS formal '{formal.CobolName}': the method is invoked with "
+                    + $"{invokedWith.Spelled}, not with SELF, SUPER or an ACTIVE-CLASS reference, and the other "
+                    + "alternative's receiver is described ONLY, which admits no SELF sender (ISO §14.8.2.3.3; "
+                    + "§14.9.39.3 SR12 c)1.)");
+                selfConforms = false;
+            }
             foreach (string why in SelfSenderRefusals(formal.Pic.ObjectRef ?? ObjectRefDescriptor.Universal, selfClass))
             {
                 Err($"SELF for formal '{formal.CobolName}': {why} (the SET rules, ISO §14.8.2.3.3)");
@@ -914,7 +936,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             if (byReference)
             {
                 if (OoConformance.DescriptionMismatch(formal, place.Item, byRefGroupPrefix: true,
-                        anyLengthActivationRelax: true) is { } err1)   // §14.8.2.3.2 rules d/e (ANY LENGTH)
+                        anyLengthActivationRelax: true, invokedWith) is { } err1)   // §14.8.2.3.2 rules d/e (ANY LENGTH); rule 4
                 {
                     Err($"USING argument '{argText}' does not conform to formal parameter "
                         + $"'{formal.CobolName}': {err1} (ISO §14.8.2.3.2 — BY REFERENCE requires the "
@@ -925,7 +947,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
 
             // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category.
-            if (OoConformance.ContentMismatch(host.OoClasses, formal, place) is { } cerr)
+            if (OoConformance.ContentMismatch(host.OoClasses, formal, place, invokedWith) is { } cerr)
             {
                 Err($"BY CONTENT argument '{argText}' does not conform to formal "
                     + $"'{formal.CobolName}': {cerr} (ISO §14.8.2.3.3)");
@@ -1071,6 +1093,17 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 if (host.Params.ContentConformanceReason(formal, LiteralArg(literal2)) is { } nullErr)
                 {
                     Err($"argument NULL for formal '{formal.CobolName}': {nullErr}");
+                    return null;
+                }
+                // An ACTIVE-CLASS formal: a SET of NULL is valid into either alternative's receiver (§14.9.39.3 SR14
+                // c) and SR12 d)), so what remains of §14.8.2.3.3 is the invocation condition (kb/Work PB1112).
+                if (formal.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass }
+                    && !OoConformance.InvokedThroughActiveClass(invokedWith)
+                    && !OoConformance.InvokedThroughOnlyClass(invokedWith))
+                {
+                    Err($"argument NULL for ACTIVE-CLASS formal '{formal.CobolName}': the method is invoked with "
+                        + $"{invokedWith.Spelled} — §14.8.2.3.3 requires it to be invoked with SELF, SUPER or an "
+                        + "ACTIVE-CLASS reference, or with an object-class-name or a reference described with one and ONLY");
                     return null;
                 }
                 return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)

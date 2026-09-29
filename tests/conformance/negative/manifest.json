@@ -1767,7 +1767,11 @@
   "pb1509-sum-wide-addend-85",
   "pb1305-report-varying-85",
   "pb1234-report-control-float-85",
-  "pb1716-table-value-nested-dynamic-span"
+  "pb1716-table-value-nested-dynamic-span",
+  "pb1115-prototype-group-subordinates",
+  "pb1112-active-class-ref-invocation",
+  "pb1112-active-class-content-invocation",
+  "pb1112-active-class-returning-invocation"
  ],
  "pending": []
 }

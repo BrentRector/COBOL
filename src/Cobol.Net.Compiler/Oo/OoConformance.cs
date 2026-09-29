@@ -464,8 +464,12 @@ public static class OoConformance
     /// REFERENCE prefix case — <paramref name="byRefGroupPrefix"/> allows a SMALLER formal). Null when
     /// conformant. This strictness keeps BY REFERENCE marshaling TYPE-PRESERVING (the slice-2 design fact);
     /// CONTENT conversions qualify the owner class internal profiles instead.</summary>
+    /// <param name="invokedWith">ACTIVATION through INVOKE only: how the object the method is activated ON is
+    /// described (<see cref="InvokedWith"/>). An ACTIVE-CLASS formal's rule — §14.8.2.3.2 rule 4 — is a statement
+    /// about the invocation as much as about the argument, so it is decided only when this is supplied; without it
+    /// (the override / implements / prototype PAIR, §9.3.8.2.3 rule 2 d)) the two descriptions are compared.</param>
     public static string? DescriptionMismatch(DataItem formal, DataItem arg, bool byRefGroupPrefix = false,
-        bool anyLengthActivationRelax = false)
+        bool anyLengthActivationRelax = false, ObjectRefDescriptor? invokedWith = null)
     {
         // ⛔ THE STRONGLY-TYPED SENTENCE FIRST, and it governs every crossing this comparator answers for.
         // ONE sentence written three times: §14.8.2.2 "If either the formal parameter or the corresponding
@@ -623,7 +627,7 @@ public static class OoConformance
         // nothing — and a DPC class returning Z9,99 into a non-DPC Z9,99 receiver ran, the receiver reading 1234
         // for 12.34. An ANY LENGTH formal's one-symbol picture has no length of its own (§14.8.2.3.2
         // "Additionally" d)), so for it only the SYMBOL must agree.
-        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal) is { } armWhy) return armWhy;
+        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal, invokedWith) is { } armWhy) return armWhy;
         return f.Clause is { } fc && a.Clause is { } ac
             ? anyLengthFormal ? PictureClauseIdentity.MismatchAtAnyLength(fc, ac) : PictureClauseIdentity.Mismatch(fc, ac)
             : null;
@@ -633,7 +637,8 @@ public static class OoConformance
     /// already share a category): object-reference descriptions, the numeric USAGE / SIGN / BLANK WHEN ZERO /
     /// digit profile, JUSTIFIED, the LOCALE phrase, lengths and the pointer restrictions. The PICTURE clause's
     /// identity is compared by the caller after this, for every category alike.</summary>
-    private static string? CategoryArmMismatch(DataItem formal, DataItem arg, PicInfo f, PicInfo a, bool anyLengthFormal)
+    private static string? CategoryArmMismatch(DataItem formal, DataItem arg, PicInfo f, PicInfo a, bool anyLengthFormal,
+        ObjectRefDescriptor? invokedWith)
     {
         switch (f.Category)
         {
@@ -645,6 +650,11 @@ public static class OoConformance
                 // FACTORY OF or ONLY difference passed as identical.
                 var fd = f.ObjectRef ?? ObjectRefDescriptor.Universal;
                 var ad = a.ObjectRef ?? ObjectRefDescriptor.Universal;
+                // ⛔ An ACTIVE-CLASS formal of an ACTIVATION is §14.8.2.3.2 rule 4's, not rule 2 d)'s (kb/Work PB1112):
+                // it admits an ONLY-described argument the pair rule refuses, and constrains the invocation the pair
+                // rule cannot see.
+                if (fd.Kind is ObjectRefKind.ActiveClass && invokedWith is { } iw)
+                    return ActiveClassFormalMismatch(null, fd, ad, iw, byReference: true);
                 return fd.SameDescriptionAs(ad) ? null
                     : $"object-reference description mismatch (formal {fd.Spelled}, argument {ad.Spelled} — "
                       + "§9.3.8.2.3 rule 2 requires the same kind, name, FACTORY presence and ONLY presence)";
@@ -754,6 +764,93 @@ public static class OoConformance
     private static string PointerRestrictionText(string? restriction, string kind) =>
         restriction is null ? "unrestricted" : $"restricted to {kind} '{restriction}'";
 
+    // ══ ACTIVE-CLASS — CONFORMANCE THAT DEPENDS ON HOW THE METHOD IS INVOKED (kb/Work PB1112) ═══════════════════════
+    // An ACTIVE-CLASS formal or returning item means "the class of the object the method runs on", so the standard
+    // states its conformance in terms of the INVOCATION: §14.8.2.3.2 rule 4 and §14.8.2.3.3's ACTIVE-CLASS paragraph
+    // for a formal, §14.8.3.3 rule 2 for a returning item. The INVOKE binder describes that invocation ONCE as an
+    // ObjectRefDescriptor — "invoked with" — the four cases §14.8.3.3 rule 2 b) enumerates: a class-name is that
+    // object-class-name with ONLY (1.), SELF and SUPER are ACTIVE-CLASS (2.), an object reference is its own description
+    // (3./4.). Before kb/Work PB1112 the formal was screened as a plain description (BY REFERENCE: identity; BY CONTENT:
+    // SET SR14 into the formal) with the invocation never consulted, so rule 4 b)'s ONLY argument was refused and rule
+    // 4 a)'s invocation condition never checked; the returning item was sent as ACTIVE-CLASS whatever the invocation.
+
+    /// <summary>§14.8.2.3.2 rule 4 a) / §14.8.2.3.3 1): the method "shall be invoked with the predefined object
+    /// references SELF or SUPER, or with an object reference described with the ACTIVE-CLASS phrase".</summary>
+    public static bool InvokedThroughActiveClass(ObjectRefDescriptor invokedWith) =>
+        invokedWith.Kind is ObjectRefKind.ActiveClass;
+
+    /// <summary>§14.8.2.3.2 rule 4 b) / §14.8.2.3.3 2): the method "shall be invoked with an object-class-name or with
+    /// an object reference described with an object-class-name and the ONLY phrase" — which class is
+    /// <paramref name="invokedWith"/>'s name.</summary>
+    public static bool InvokedThroughOnlyClass(ObjectRefDescriptor invokedWith) =>
+        invokedWith is { Kind: ObjectRefKind.ObjectClass, Only: true };
+
+    /// <summary>ISO §14.8.2.3.2 rule 4 (BY REFERENCE) and §14.8.2.3.3's ACTIVE-CLASS paragraph (BY CONTENT / BY
+    /// VALUE) for an argument DESCRIPTION <paramref name="arg"/> meeting an ACTIVE-CLASS <paramref name="formal"/> of a
+    /// method invoked with <paramref name="invokedWith"/>. Null when one of the two alternatives holds.
+    /// <list type="bullet">
+    ///   <item>BY REFERENCE a) — "an object reference described with the ACTIVE-CLASS phrase, where the presence or
+    ///     absence of the FACTORY phrase is the same as in the formal parameter", invoked with SELF, SUPER or an
+    ///     ACTIVE-CLASS reference; b) — "an object reference described with an object-class-name and the ONLY phrase"
+    ///     with the formal's FACTORY presence, "and the method to be activated shall be invoked with that
+    ///     object-class-name or with an object reference described with that object-class-name and the ONLY
+    ///     phrase".</item>
+    ///   <item>BY CONTENT 1) — invoked through ACTIVE-CLASS, and a SET of the argument into an ACTIVE-CLASS receiver
+    ///     with the formal's FACTORY presence is valid (§14.9.39.3 SR14); 2) — invoked through an object-class-name
+    ///     (ONLY), and a SET of the argument into "an object reference described with that object-class-name and the
+    ///     ONLY phrase" with the formal's FACTORY presence is valid (SR12 a)1.).</item>
+    /// </list>
+    /// <paramref name="table"/> null means no class table in the group, where no SET rule is checked (the
+    /// <see cref="ObjectRefAssignmentMismatch(OoClassTable?, PicInfo, PicInfo, bool)"/> convention).</summary>
+    public static string? ActiveClassFormalMismatch(OoClassTable? table, ObjectRefDescriptor formal,
+        ObjectRefDescriptor arg, ObjectRefDescriptor invokedWith, bool byReference)
+    {
+        string factory = formal.Factory ? "with" : "without";
+        if (byReference)
+        {
+            if (arg.Kind is ObjectRefKind.ActiveClass && arg.Factory == formal.Factory
+                && InvokedThroughActiveClass(invokedWith))
+                return null;
+            if (arg is { Kind: ObjectRefKind.ObjectClass, Only: true } && arg.Factory == formal.Factory
+                && InvokedThroughOnlyClass(invokedWith)
+                && string.Equals(arg.Name, invokedWith.Name, StringComparison.OrdinalIgnoreCase))
+                return null;
+            return $"the formal parameter is described ACTIVE-CLASS ({factory} FACTORY) and the argument is "
+                + $"{arg.Spelled}, invoked with {invokedWith.Spelled} — BY REFERENCE the argument shall be a) an "
+                + $"ACTIVE-CLASS reference {factory} FACTORY, with the method invoked with SELF, SUPER or an "
+                + $"ACTIVE-CLASS reference, or b) described with an object-class-name and ONLY, {factory} FACTORY, with "
+                + "the method invoked with that object-class-name or a reference described with it and ONLY "
+                + "(ISO §14.8.2.3.2 rule 4)";
+        }
+        string? why1 = !InvokedThroughActiveClass(invokedWith)
+            ? "the method is not invoked with SELF, SUPER or an ACTIVE-CLASS reference"
+            : table is null ? null
+            : ObjectRefAssignmentMismatch(table, arg, ObjectRefDescriptor.ActiveClass(formal.Name!, formal.Factory));
+        if (why1 is null) return null;
+        string? why2 = !InvokedThroughOnlyClass(invokedWith)
+            ? "the method is not invoked with an object-class-name or a reference described with one and ONLY"
+            : table is null ? null
+            : ObjectRefAssignmentMismatch(table, arg,
+                ObjectRefDescriptor.ObjectClass(invokedWith.Name!, formal.Factory, only: true));
+        if (why2 is null) return null;
+        return $"the formal parameter is described ACTIVE-CLASS ({factory} FACTORY) and the argument is "
+            + $"{arg.Spelled}, invoked with {invokedWith.Spelled} — neither alternative holds: 1) {why1}; "
+            + $"2) {why2} (ISO §14.8.2.3.3)";
+    }
+
+    /// <summary>ISO §14.8.3.3 rule 2 — the SENDING operand of a returning item's delivery. A returning item not
+    /// described ACTIVE-CLASS sends itself (rule 1). One described ACTIVE-CLASS sends "an object reference described
+    /// as follows" (rule 2 b)): 1. invoked with an object-class-name — "that same object-class-name and an ONLY
+    /// phrase"; 2. with SELF or SUPER — "an ACTIVE-CLASS phrase"; 3. with a reference described with an
+    /// interface-name — "a universal object reference"; 4. with any other object reference — "the same description as
+    /// that object reference"; and "the presence or absence of the FACTORY phrase is the same as in the returning item
+    /// of the activated element". <paramref name="invokedWith"/> already maps 1. and 2. (<see cref="InvokedThroughActiveClass"/>).</summary>
+    public static ObjectRefDescriptor ReturningSender(ObjectRefDescriptor returning, ObjectRefDescriptor invokedWith) =>
+        returning.Kind is not ObjectRefKind.ActiveClass ? returning
+        : invokedWith.Kind is ObjectRefKind.ObjectClass or ObjectRefKind.ActiveClass
+            ? invokedWith with { Factory = returning.Factory }
+            : ObjectRefDescriptor.Universal;
+
     // ══ ISO §14.8.2.3.3 — ELEMENTARY ITEMS PASSED BY CONTENT OR BY VALUE ═════════════════════════════════
     // ⛔ THE ONE HOME FOR THE RULE, for EVERY activation form that imports §14.8.2 (kb/Work PB165). It used
     // to live as `OoBinder.OoContentMismatch`, private to INVOKE — so the Format-2 CALL lane, which
@@ -780,7 +877,10 @@ public static class OoConformance
     /// identical float usage — the cross-float CONTENT conversion is a documented later refinement), SET for
     /// object references (widening — the argument's class shall be the receiver's class or a subclass), MOVE
     /// otherwise (§14.9.25.3 Table 16). Null when conformant.</summary>
-    public static string? ContentMismatch(OoClassTable? classes, DataItem formal, Place argPlace)
+    /// <param name="invokedWith">INVOKE only — see <see cref="DescriptionMismatch"/>: an ACTIVE-CLASS formal takes
+    /// §14.8.2.3.3's two ACTIVE-CLASS alternatives, each a condition on the invocation AND a SET.</param>
+    public static string? ContentMismatch(OoClassTable? classes, DataItem formal, Place argPlace,
+        ObjectRefDescriptor? invokedWith = null)
     {
         DataItem arg = argPlace.Item;
         // §14.8.2.2's strongly-typed sentence carries NO passing-mode qualification — it follows rules 1 (BY
@@ -848,9 +948,12 @@ public static class OoConformance
                 argCat == f.Category ? null
                 : $"a {f.Category} formal takes an argument of the same pointer category (SET rules, §14.8.2.3.3)",
             PicCategory.ObjectReference =>
-                argCat is PicCategory.ObjectReference && arg.Pic is { } ap
-                    ? ObjectRefAssignmentMismatch(classes, ap, f)
-                    : "an object-reference formal takes an object-reference argument (SET rules, §14.8.2.3.3)",
+                argCat is not PicCategory.ObjectReference || arg.Pic is not { } ap
+                    ? "an object-reference formal takes an object-reference argument (SET rules, §14.8.2.3.3)"
+                : f.ObjectRef is { Kind: ObjectRefKind.ActiveClass } afd && invokedWith is { } iw
+                    ? ActiveClassFormalMismatch(classes, afd, ap.ObjectRef ?? ObjectRefDescriptor.Universal, iw,
+                        byReference: false)
+                : ObjectRefAssignmentMismatch(classes, ap, f),
             // ⭐ BOOLEAN / NATIONAL / NUMERIC-EDITED FORMALS ASK TABLE 16, NOT STRICT IDENTITY (fix-queue PB53).
             // This arm used to call DescriptionMismatch — which is §14.8.2.3.2, the BY **REFERENCE** rule —
             // described in its own comment as a "conservative strict gate". It was not conservative, it was the

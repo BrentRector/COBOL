@@ -413,7 +413,7 @@ public sealed record PicInfo(
     /// signature"). kb/Work PB817 filed exactly that: "SR20 and SR22 are ONE rule (a same-signature test over the
     /// associated prototypes) over TWO carriers; write it once." The CATEGORY says which namespace the name is
     /// resolved in (a function-prototype-name per §8.4.6.6, a program-prototype-name per §8.4.6.8); the RULE over
-    /// it is the same compare either way (<c>PrototypeSignatures.SameSignature</c>).
+    /// it is the same compare either way (<c>PrototypeSignatures.Same</c>).
     /// <para>Distinct from <see cref="RestrictedTypeName"/> on purpose: that one names a TYPE (§13.18.60.4 GR23,
     /// whose declaration-shape rule is SR18's TYPEDEF requirement), not a prototype, and its restriction is a
     /// type-identity test rather than a signature test. Null for an unrestricted program-pointer and for every

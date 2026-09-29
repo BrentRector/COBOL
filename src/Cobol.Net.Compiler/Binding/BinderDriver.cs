@@ -964,8 +964,9 @@ internal sealed class BinderDriver
             edition.Error("COBOLNET1513",
                 $"{kind} prototype '{proto.Name}' and the {kind} definition '{definition.Name}' share the "
                 + $"externalized name \"{proto.ExternalizedName}\" but not a signature — the USING formals (count, "
-                + "BY REFERENCE / BY VALUE, OPTIONAL, description) or the RETURNING item differ; the signatures "
-                + $"of these two compilation units shall be the same (ISO §10.6.2 {(proto.IsFunction ? "SR3" : "SR2")})");
+                + "BY REFERENCE / BY VALUE, OPTIONAL, description — a group's subordinate entries included) or the "
+                + "RETURNING item differ; the signatures of these two compilation units shall be the same (ISO "
+                + $"§10.6.2 {(proto.IsFunction ? "SR3" : "SR2")}; §13.7.3 SR2)");
         }
 
         static CalleeSignature Signature(BoundUnit u) => new(u.Data.LinkageFormals, u.Data.LinkageReturning);

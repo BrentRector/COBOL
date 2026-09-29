@@ -121,16 +121,26 @@ public static class StrongTypeModel
             || DeclaredTypeName(a) is null)
             return false;
         if (DeclaredStrong(a) != DeclaredStrong(b) || DeclaredExternal(a) != DeclaredExternal(b)) return false;
+        return SameElementaryLayout(a, b);
+    }
 
-        // "…for each elementary item in one type declaration there is a corresponding elementary item in the
-        // other type declaration, starting at the same relative byte or bit position and having the same length
-        // in bytes or bits." The correspondence IS position-and-length, and §13.18.44.3 SR12/SR14 keep REDEFINES
-        // out of a strongly-typed declaration, so the elementary items of an equivalent pair tile their
-        // declaration identically and declaration order IS position order — the two sequences are walked
-        // pairwise. GROUPING is deliberately NOT compared: §8.5.3.1's first paragraph makes the essential
-        // characteristics "the relative positions and lengths of the ELEMENTARY items … and the ALIGNED, BLANK
-        // WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, SYNCHRONIZED, and USAGE clauses specified for
-        // each of these elementary items", and an intermediate group level is none of those.
+    /// <summary>ISO §8.5.3.1's STRUCTURAL half — "for each elementary item in one type declaration there is a
+    /// corresponding elementary item in the other type declaration, starting at the same relative byte or bit
+    /// position and having the same length in bytes or bits", each pair with the same ALIGNED, BLANK WHEN ZERO,
+    /// DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, SYNCHRONIZED and USAGE clauses — asked of two data description
+    /// entries whatever their type identity. <see cref="EquivalentTypeDeclarations"/> is this plus the type-name,
+    /// STRONG and EXTERNAL conjuncts; the prototype-versus-definition signature compare
+    /// (<see cref="PrototypeSignatures.Same"/>, ISO §13.7.3 SR2 / §10.6.2 SR2–SR3, kb/Work PB1115) asks it of two
+    /// untyped group formals, because a group's description IS its subordinate entries' descriptions.
+    /// <para>The correspondence IS position-and-length, and §13.18.44.3 SR12/SR14 keep REDEFINES out of a
+    /// strongly-typed declaration, so the elementary items of an equivalent pair tile their declaration
+    /// identically and declaration order IS position order — the two sequences are walked pairwise. GROUPING is
+    /// deliberately NOT compared: §8.5.3.1's first paragraph makes the essential characteristics "the relative
+    /// positions and lengths of the ELEMENTARY items … and the ALIGNED, BLANK WHEN ZERO, DYNAMIC LENGTH,
+    /// JUSTIFIED, PICTURE, SIGN, SYNCHRONIZED, and USAGE clauses specified for each of these elementary items",
+    /// and an intermediate group level is none of those.</para></summary>
+    public static bool SameElementaryLayout(DataItem a, DataItem b)
+    {
         List<(DataItem Item, int Start)> la = [], lb = [];
         if (!CollectElementary(a, 0, la) || !CollectElementary(b, 0, lb) || la.Count != lb.Count) return false;
         for (int i = 0; i < la.Count; i++)
