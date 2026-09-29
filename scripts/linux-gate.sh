@@ -73,6 +73,11 @@ if [ -z "$head" ] || [ -z "$common" ]; then
   echo "=== LINUX GATE: NOT RUN (cannot read this tree's HEAD from Linux: gitdir $gd) ==="; exit 2
 fi
 dirty="$(wgit status --porcelain --untracked-files=no 2>/dev/null | grep -v ' STATUS.md$' | wc -l)"
+# TRIPWIRE (group G's, kb/Work PB1719): nothing below may write to the REAL repository. The clone makes that true by
+# construction; this snapshot makes any future breach LOUD instead of silent. (Not the worktree list: other agents add
+# and remove worktrees of the shared repository while this runs.)
+repo_state() { printf '%s|%s' "$(wgit rev-parse HEAD 2>/dev/null)" "$(wgit config --get core.worktree 2>/dev/null)"; }
+state_before="$(repo_state)"
 
 out="$tree/TestResults/linux-gate"
 rm -rf "$out"; mkdir -p "$out"
@@ -125,6 +130,13 @@ for leg in "${wanted[@]}"; do
     bad="$bad $leg"
   fi
 done
+
+state_after="$(repo_state)"
+if [ "$state_after" != "$state_before" ]; then
+  echo "repository: RED — something wrote to the REAL repository (HEAD|core.worktree before: $state_before," \
+       "after: $state_after). Undo it, then find what escaped the clone."
+  bad="$bad repository-written"
+fi
 
 if [ -z "$bad" ]; then
   echo "=== LINUX GATE: GREEN (legs$ran; HEAD ${head:0:9}) ==="; exit 0
