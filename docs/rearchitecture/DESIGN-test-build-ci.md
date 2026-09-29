@@ -1047,29 +1047,52 @@ never a wall-clock assertion — MANDATORY-PRACTICES forbids those), so the next
 #### 3.14.6 The gate cap (M2)
 
 `scripts/gate_slot.py` is ONE counting semaphore for the whole repository, served FIFO:
-- **Slots.** N lock files `<git common dir>/cobol-gate-slots/<k>.lock`, each held by an exclusive OS file lock, so a
-  crashed holder releases its slot when it dies and no stale-pid cleanup exists.
+- **Slots.** N lock files `<git common dir>/cobol-gate-slots/<k>.lock`, each held by an exclusive OS file lock
+  (`LockFile` on Windows, `flock` on Linux), so a crashed holder releases its slot when it dies and no stale-pid
+  cleanup exists. The holder writes its label (who, pid, since when) at the start of the file; on Windows the lock
+  covers one byte far past the end of the file, so the label stays readable. The label is informational only: a slot
+  is free exactly when its lock can be taken.
 - **Tickets.** A waiter first takes a TICKET: under an exclusive lock on `cobol-gate-slots/tickets.lock` it reads and
-  increments the monotonic counter in `tickets.seq`, creates `ticket-<seq>.lock` and holds it with an exclusive OS
-  lock for as long as it waits. A ticket is LIVE while its file is locked, so a waiter that dies drops out of the
-  queue by itself. A waiter may take a free slot only when no live ticket has a lower sequence number; so a gate that
-  finishes and re-gates at once queues BEHIND everyone already waiting, instead of winning every race by polling
-  first. `gate-slot: waiting, k ahead` counts the live tickets below one's own.
-- **What holds it.** `run_gate_legs.py` takes the slot after the worktree's gate lock and BEFORE the build (§3.14.3),
-  and holds it through the population check, so the cap bounds the concurrent solution builds as well as the test
-  legs. The slot is held by the gate's whole PROCESS TREE: on Windows the build and the legs run inside a Job object
-  with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so if the driver dies the OS kills every `dotnet` process with it; on
-  Linux the lock's descriptor is inherited by the children (an `flock` lives until the last descriptor closes).
-  Acquisition is never nested beyond the one fixed order (worktree lock, then ticket, then slot), so no two gates
-  can wait on each other in a cycle.
+  increments the monotonic counter in `tickets.seq` (rewritten atomically; a counter that is not a number is an error,
+  never a silent reset, since a reset could hand a new waiter a number below a live one), creates
+  `ticket-<seq>.lock` and holds it with an exclusive OS lock for as long as it waits. A ticket is LIVE while its file
+  is locked, so a waiter that dies drops out of the queue by itself; the next scan deletes its file. Scans run under
+  `tickets.lock`, so a ticket is never probed between its creation and its lock. A waiter may take a free slot only
+  when no live ticket has a lower sequence number, and it drops its ticket only AFTER it holds the slot; so a gate
+  that finishes and re-gates at once queues BEHIND everyone already waiting, instead of winning every race by polling
+  first. `gate-slot: waiting, k ahead` counts the live tickets below one's own and is printed each time `k` changes;
+  `gate-slot: took slot k of N (ticket t, waited s)` is printed on acquisition.
+- **What holds it.** A Python caller holds a slot with `GateSlots.for_repo().acquire(label)` (a `Slot`, released by
+  its `with` block or by the holder's death); a shell caller wraps a command with `gate_slot.py run [--label TEXT] --
+  <command>`, which exits with the command's code. `run_gate_legs.py` takes the slot after the worktree's gate lock
+  and BEFORE the build (§3.14.3), and holds it through the population check, so the cap bounds the concurrent solution
+  builds as well as the test legs. The slot is held by the gate's whole PROCESS TREE. On Windows, acquisition puts the
+  holder ITSELF into a Job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` before it spawns anything, so every
+  descendant is in the job from birth, with no window in which a grandchild can escape, and if the driver dies the OS
+  kills every `dotnet` process with it. On Linux the slot's descriptor is inherited by the children: Python's
+  `subprocess` closes descriptors by default, so every spawn passes `**slot.spawn_kwargs()`. `dotnet` hands inherited
+  descriptors on to its own children, and an `flock` lives until the last descriptor closes, so an ORPHANED Linux
+  tree keeps its slot until it exits. The cap still bounds it; nothing kills it. Acquisition is never nested beyond
+  the one fixed order (worktree lock, then ticket, then slot), so no two gates can wait on each other in a cycle.
 - **Who takes one.** Every `-Mode implementer` gate, and the impact recorder. The LANDER (`-Mode lander`) and the
-  BATTERY never take a slot and never wait. N comes from `COBOLNET_GATE_SLOTS`; its default is the largest N at which
-  the lander's whole-Conformance leg stays within 1.25× of its quiet time with N implementer gates running — builds
-  included, since the slot now covers them (M2's acceptance). The verdict line prints the wait and the slot.
-- `gate_slot.py --self-test` proves the FIFO order (a later waiter never overtakes a live earlier ticket), the
-  release on a killed holder, a dead waiter leaving the queue, the kill of an orphaned tree and the sharing across
-  worktrees. ⛔ The cap does not span operating systems: a Windows lock and a WSL lock on a drvfs mount do not see each
-  other; the repository's gates run on Windows (`build-local.ps1`), and a WSL run is an ad hoc Linux reproduction.
+  BATTERY never take a slot and never wait. N comes from `COBOLNET_GATE_SLOTS` (a positive integer; anything else
+  stops the gate with the reason). Its default is the largest N at which the lander's whole-Conformance leg stays
+  within 1.25× of its quiet time with N implementer gates running, builds included, since the slot now covers them
+  (M2's acceptance). The default is `DEFAULT_SLOTS = 2` in the script, PROVISIONAL until that measurement is made on
+  a quiet host (kb/Work PB1720). The verdict line prints the wait and the slot (`Slot.describe()`).
+  `gate_slot.py status` prints each slot's holder and the live tickets in queue order.
+- `gate_slot.py --self-test` proves five arms against a throwaway repository with one linked worktree: the FIFO
+  order (three waiters queued behind a holder are served in ticket order, and the holder re-gating the moment it
+  releases is served LAST), the release on a killed holder, a dead waiter leaving the queue, the orphaned tree (on
+  Windows the job kills the orphaned child and grandchild and the slot frees; on Linux the tree keeps the slot until it
+  exits) and the sharing across worktrees (both checkouts resolve one slot directory, and a holder in one makes a
+  waiter in the other wait). Each arm was seen RED on a planted defect: no ticket check, a ticket file counted live
+  unlocked, no Job object, the descriptor withheld from Linux children, and the per-worktree git dir. It passes on
+  Windows and under WSL, and `GateSlotDriftTests` (Unit) runs it in every Unit run, including CI's Linux unit jobs,
+  so each operating system's arm is proven where it runs. Every helper process it starts exits once its sentinel
+  file is deleted, so a red arm leaves nothing running on the host. ⛔ The cap does not span operating systems: a
+  Windows lock and a WSL lock on a drvfs mount do not see each other; the repository's gates run on Windows
+  (`build-local.ps1`), and a WSL run is an ad hoc Linux reproduction.
 
 **Retirement is measured** (owner, 2026-09-28): the cap goes when, over one full train, the median implementer
 selection is under 25 % of the Conformance assembly, or a whole cold Conformance implementer gate at `BelowNormal` —
@@ -1104,8 +1127,8 @@ above. The rejected design and both reviews are in the DEVLOG entry that pivoted
 | M11 | the order plan: `NameKey`, tiers 0a/0u/1–3, the budgets and the collection cap (§3.13, §3.14.2); the NARROWING deleted | `scripts/spec/impacted_tests.py` (selection code DELETED — its filter line is always the whole-assembly filter until M13 deletes the line; `--plan` added), `scripts/gate_plan.py`, `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, kb/Work PB1712 (closed) | `--self-test` covers every tier arm, `NameKey`, the unknown budget, the collection cap and the no-map / no-timings / stale-map / empty-leg-1 / whole-assembly-in-leg-1 arms; the filter line is the whole-assembly filter for a base WITH a map; `b4` re-run through the new script reproduces cheapest-first on 68b X (first red ≤ 1 % of the work); `b7` re-run through it: a golden appended to the 85 manifest leaves ONE tier-0u case and a leg-1 floor ≤ 16 s | — | 110–160 turns |
 | M14 | ONE population check for every whole-assembly run, and the handshake scrub (§3.14.3–4) | `scripts/test_population.py` + `--self-test`; `scripts/battery.sh` (PHASE 1 population check; scrub); `.github/workflows/build-and-test.yml` (`conformance-population` runs the tool on the shard trx files; the inline `grep -c` block DELETED; scrub); `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `scripts/spec/record_verdicts.py`, `scripts/spec/record_impact_map.py` (scrub); `GateLegDriftTests` (6); `docs/DRIFT_RULES.md` | the self-test's arms (short, over, skipped, definitions vs results); the battery's PHASE 1 prints each assembly's population line and is red on a planted dropped case; CI's guard red on a planted shard overlap that keeps the count; `b8`'s two inputs pass | — | 60–100 turns |
 | M12 | the in-assembly leg filter, the handshake and the identity records (§3.14.3) | `tests/_shared/GateLegs.cs`, the three test `.csproj` links, `tools/impact/ImpactTestFramework.cs` + `ImpactRecording.targets` (`IMPACT_RECORDING`), `tests/Cobol.Net.Tests.Unit/ParenTokenTwinDriftTests.cs` (repository-relative path argument), `GateLegDriftTests` (1), (2), (4), (5) | with no handshake every assembly's count and verdict are unchanged; with a full one, each leg's trx definitions are exactly its leg's cases and the two legs' union equals `--list-tests`; each partial handshake (one variable, two, missing file, digest mismatch, bad leg) makes every case an execution error and the run RED; each leg writes its identity record; a planted non-permutation throws; no display name carries the repository root; a recording at HEAD still records every test (the recorder's watchdog) | M11 (the plan format) | 130–190 turns |
-| M2 | the cross-worktree gate cap, FIFO (§3.14.6) | `scripts/gate_slot.py` + `--self-test` | the self-test's five arms (FIFO order included); N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N implementer gates, their builds included | — | 90–130 turns |
-| M13 | the ordered gate: driver, modes, worktree lock, run directory, fail-fast, and the wiring that deletes the selection interface (§3.14.1, §3.14.3–4) | `scripts/run_gate_legs.py`, `scripts/build-local.ps1` + `.sh` (`-Filter` removed, `-Mode lander\|implementer` required, `Leg` replaced); `scripts/spec/impacted_tests.py` (the filter line and `--plus` DELETED); `GateLegDriftTests` (3); in the SAME change every caller of either interface: `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md` (I1, I2, I7), `implementer-brief.md`, `fix-lane-implementer-brief.md`, `dispatch-spec-implementer.md`, `lander-train-brief.md` and `lander-brief.md` (`-Mode lander`), `.claude/skills/workstream/check_practices.py` (its required `impacted_tests\.py --base` patterns), `.claude/skills/workstream/SKILL.md`, `.claude/agents/cobol-implementer.md`, `.claude/skills/gate/SKILL.md`, `scripts/hooks/test_forbidden_commands.py` (its `-Filter` fixture), `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, `docs/DRIFT_RULES.md`, `docs/DOC_INDEX.md`, plan §9, README, CONTRIBUTING, the PR template | the self-test's arms (§3.14.4 (3)); a real gate on a planted red in a leg-1 test stops after leg 1 with the remainder named; a real green gate's population equals `--list-tests` for all three assemblies; a real `-Mode lander` gate runs one leg with no slot; `check_practices.py` green with no `impacted_tests` pattern left; over the next train, each implementer gate's time to first red, whole wall and green-path barrier cost (leg 1's wall beyond its share of the work, plus the extra host starts) are recorded, against the lander's single leg | M11, M12, M14, M2 | 170–220 turns |
+| M2 | the cross-worktree gate cap, FIFO (§3.14.6) | `scripts/gate_slot.py` + `--self-test`; `tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs` | the self-test's five arms (FIFO order included), on Windows and on Linux; N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N implementer gates, their builds included | — | 90–130 turns |
+| M13 | the ordered gate: driver, modes, worktree lock, run directory, fail-fast, and the wiring that deletes the selection interface (§3.14.1, §3.14.3–4) | `scripts/run_gate_legs.py` (takes the slot, §3.14.6), `scripts/spec/record_impact_map.py` (the recorder takes a slot too, and spawns every child through `Slot.spawn_kwargs`), `scripts/build-local.ps1` + `.sh` (`-Filter` removed, `-Mode lander\|implementer` required, `Leg` replaced); `scripts/spec/impacted_tests.py` (the filter line and `--plus` DELETED); `GateLegDriftTests` (3); in the SAME change every caller of either interface: `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md` (I1, I2, I7), `implementer-brief.md`, `fix-lane-implementer-brief.md`, `dispatch-spec-implementer.md`, `lander-train-brief.md` and `lander-brief.md` (`-Mode lander`), `.claude/skills/workstream/check_practices.py` (its required `impacted_tests\.py --base` patterns), `.claude/skills/workstream/SKILL.md`, `.claude/agents/cobol-implementer.md`, `.claude/skills/gate/SKILL.md`, `scripts/hooks/test_forbidden_commands.py` (its `-Filter` fixture), `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, `docs/DRIFT_RULES.md`, `docs/DOC_INDEX.md`, plan §9, README, CONTRIBUTING, the PR template | the self-test's arms (§3.14.4 (3)); a real gate on a planted red in a leg-1 test stops after leg 1 with the remainder named; a real green gate's population equals `--list-tests` for all three assemblies; a real `-Mode lander` gate runs one leg with no slot; `check_practices.py` green with no `impacted_tests` pattern left; over the next train, each implementer gate's time to first red, whole wall and green-path barrier cost (leg 1's wall beyond its share of the work, plus the extra host starts) are recorded, against the lander's single leg | M11, M12, M14, M2 | 170–220 turns |
 
 M6, M7, M11, M14 and M2 are independent and may run in parallel groups; M12 follows M11; M13 lands last, with M2 in
 the same train so no implementer runs a whole-population gate uncapped. ⛔ **Nothing deletes an interface its callers

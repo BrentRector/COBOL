@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-227 drift tests.
+228 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -102,6 +102,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [FloatQuantizeHeadroomDriftTests](../tests/Cobol.Net.Tests.Unit/FloatQuantizeHeadroomDriftTests.cs) | ⛔ THE FLOAT→FIXED QUANTIZER MUST NEVER SATURATE SILENTLY (fix-queue PB13). | `src` |
 | [Format4UseObjectSelectorDriftTests](../tests/Cobol.Net.Tests.Unit/Format4UseObjectSelectorDriftTests.cs) | kb/Work PB366 + PB365 — the invariants that keep ISO/IEC 1989:2023 §14.9.49.4 GR14 true as the OO emitter grows: each of the Format-4 USE selector's two passes covers EVERY C# type the backend emits for the name that pass's operand alternative wrote, and the class pass precedes the interface pass. | — |
 | [FormatWordDriftTests](../tests/Cobol.Net.Tests.Unit/FormatWordDriftTests.cs) | ⛔ THE DRIFT GUARD FOR formatWord (kb/Work PB764) — "a keyword slot may not borrow cobolWord", measured instead of remembered. | `tests/conformance/manifest.json`, `tests/conformance/.cob` |
+| [GateSlotDriftTests](../tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs) | ⛔ THE GATE CAP IS FIFO AND NEVER LEAKS A SLOT (kb/Work PB1720; DESIGN-test-build-ci.md §3.14.6): scripts/gate_slot.py --self-test drives all five arms — FIFO order (a later waiter never overtakes a live earlier ticket, and a re-gate queues last), a killed holder releases its slot, a dead waiter leaves the queue, an orphaned tree is killed on Windows or keeps its slot until it exits on Linux, and t… | `scripts/gate_slot.py` |
 | [GlobalBridgeResidenceDriftTests](../tests/Cobol.Net.Tests.Unit/GlobalBridgeResidenceDriftTests.cs) | ⛔ EVERY RESIDENCE A GLOBAL NAME CAN HAVE IS REACHABLE FROM A CONTAINED PROGRAM (kb/Work PB1009). | — |
 | [GobackPhraseDecodeDriftTests](../tests/Cobol.Net.Tests.Unit/GobackPhraseDecodeDriftTests.cs) | ⛔ A STATEMENT WHOSE PARSE NODE IS DECODED TWICE, ONCE PER DISPATCH ARM, LOSES A PHRASE ON ONE OF THEM. | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs` |
 | [Gr4GroupDecisionDriftTests](../tests/Cobol.Net.Tests.Unit/Gr4GroupDecisionDriftTests.cs) | ⛔ ISO §14.9.25.4 GR4 IS ONE RULE OVER BOTH OPERANDS, AND ONE CODEC IN BOTH DIRECTIONS (kb/Work PB430). | `src/Cobol.Net.Compiler/Binding/Bound/MoveClassifier.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs` |
