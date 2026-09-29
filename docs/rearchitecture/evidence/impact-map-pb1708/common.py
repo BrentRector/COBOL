@@ -40,8 +40,9 @@ def load(sha="dbea1242895386b1ce3ae9ef75c621f470e6aec6"):
 
 
 def per_file(ix, M, base, head):
-    """[(status, path, mask, whole_reasons, notes, extra_terms)] — each changed file selected alone, hunks
-    translated to M's line numbers (replay_tr.translate: over-approximates, never under)."""
+    """[(status, path, mask, every_tier1_reasons, notes, direct_names)] — each changed file reached alone (mask =
+    its tier-1 and tier-2 entries), hunks translated to M's line numbers (replay_tr.translate: over-approximates,
+    never under)."""
     it.HEAD = head
     changes = it.changed_files(base)
     orig = it.hunks
@@ -49,17 +50,19 @@ def per_file(ix, M, base, head):
     out = []
     try:
         for s, p in changes:
-            sel = it.Selection()
-            it.select(ix, [(s, p)], base, sel)
-            out.append((s, p, sel.mask, list(sel.whole), list(sel.notes), set(sel.extra_terms)))
+            reach = it.Reach()
+            it.reach_of(ix, [(s, p)], base, reach)
+            out.append((s, p, reach.direct | reach.widened, list(reach.every_tier1), list(reach.notes),
+                        set(reach.direct_names)))
     finally:
         it.hunks = orig
     return out
 
 
 def testset(ix, mask):
-    tests, classes = ix.selection(mask)
-    return tests | {i for i in ix.conf if ix.tests[i][3] in classes}
+    """The Conformance tests the rejected SELECTION design would have selected for `mask`: every test whose
+    execution (its own, its class's or its collection's context) reached an entry of it."""
+    return {i for i in ix.by_assembly["Conformance"] if ix.executed(i) & mask}
 
 
 def count(ix, mask):

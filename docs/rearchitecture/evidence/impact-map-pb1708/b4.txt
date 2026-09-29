@@ -24,3 +24,7 @@ D  tests of RARE changed entries first, then cheapest
      Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo position  3881 of 9190;    1741 test-s ahead = 14.03%
      ParseErrorInsideCopybook_NamesTheCopybookLine    position  3886 of 9190;    1741 test-s ahead = 14.03%
      FIRST RED after 1741 test-s = 14.03% of the assembly's work
+P  the order plan (scripts/gate_plan.py): tiers {'0a': 0, '0u': 0, '1': 9159, '2': 13, '3': 18}; legs [1, 2]; leg 1 2829 cases, 248 test-s, floor 15.0 s (CorpusRunnerTests_P1)
+     Copy_MainLinesStayMain_CopiedLinesNameTheCopyboo leg 1, position  2155 of 9190;     123 test-s ahead =  0.99%
+     ParseErrorInsideCopybook_NamesTheCopybookLine    leg 1, position  1374 of 9190;      40 test-s ahead =  0.32%
+     FIRST RED after 40 test-s = 0.32% of the assembly's work

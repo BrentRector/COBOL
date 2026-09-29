@@ -5,7 +5,8 @@ An implementer's gate used to run the tests its author NAMED. Train 68b dropped 
 their filtered gates never ran (`DiagnosticPositionTests` for a COPY library-search change; a `CONSTANT AS NULL`
 crash in `DataBinder.Constants.cs` no filter term named), and wave 69 existed only to finish them. The map this
 script records answers the question the names were guessing: WHICH TESTS EXECUTE WHICH SOURCE FILES.
-`scripts/spec/impacted_tests.py` turns it into a gate filter for a change.
+`scripts/spec/impacted_tests.py` turns it into the TIERS of a change, which `scripts/gate_plan.py` uses to ORDER the
+implementer's whole-population gate — the map never selects a gate (kb/Work PB1708, PB1717).
 
 How (the design is docs/rearchitecture/DESIGN-test-build-ci.md §3.13):
 
@@ -20,10 +21,11 @@ How (the design is docs/rearchitecture/DESIGN-test-build-ci.md §3.13):
   5. the contexts are merged into `<store>/<sha>.json.gz`: per source file, the tests whose execution reached it.
 
 The store defaults to `<git common dir>/cobol-impact/`, which every worktree of the repository shares, so an
-implementer's worktree finds the map the battery recorded without copying anything.
+implementer's worktree finds a map recorded in any worktree without copying anything.
 
 ⛔ It is RECORDED, never hand-maintained, and a map is valid for exactly the tree it was recorded at —
-`impacted_tests.py` refuses (prints the whole-assembly filter) a map older than the change's base.
+for a map older than the change's base by more than documentation, `impacted_tests.py` puts every test in tier 1 and
+uses the map only for its recorded durations and test names.
 
 Usage:
     python scripts/spec/record_impact_map.py                      # HEAD, all three assemblies

@@ -3131,18 +3131,17 @@ already-derivable coverage; none change the pipeline.
   zero tests, so its exit code is never evidence that the filtered tests ran); add `--allow-build` when the run
   itself is what builds the project.
   Comprehensive: `bash scripts/battery.sh [outdir]` (§0 Gates).
-- Implementer gate filter, DERIVED (kb/Work PB1683; `docs/rearchitecture/DESIGN-test-build-ci.md` §3.13):
+- Implementer gate filter (kb/Work PB1683, PB1717; `docs/rearchitecture/DESIGN-test-build-ci.md` sections 3.13 and 3.14.2):
   `python scripts/spec/impacted_tests.py --base <cut point> --plus "<the tests you added>"` — its last stdout line
-  is every Conformance test whose RECORDED execution reaches a changed method (a declaration change widens to the
-  file and the files naming its types), plus `~Drift|~EditionGate`, for
-  `build-local.ps1 -Filter`; it prints the whole-assembly `FullyQualifiedName~.` (and says why) whenever it cannot
-  bound the change. The map it reads is recorded once per main commit: `python scripts/spec/record_impact_map.py
-  [--commit <sha>]` (a detached worktree, a probe-instrumented build, every test assembly once with the compile
-  cache off; the map lands in `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree).
-  `impacted_tests.py --self-test` proves each conservative arm fires. The LANDER is unchanged (whole assemblies).
-  ⚠ TARGET (owner 2026-09-28, kb/Work PB1708; DESIGN-test-build-ci §3.14): the map will ORDER a whole-population
-  implementer gate in two legs instead of filtering it; this entry changes when M13 lands (`build-local.ps1
-  -Mode lander|implementer`, no `-Filter`). Maps are recorded on demand, and none into the shared store before M11.
+  is ALWAYS the whole-assembly `FullyQualifiedName~.` for `build-local.ps1 -Filter` (M11 deleted the narrowing: the
+  map ORDERS a gate and never selects it; stderr reports the change's tiers). `python scripts/gate_plan.py --out
+  plan.json --list <Assembly>=<--list-tests output> … [--base <sha>] [--previous-run <dir>]` builds the ORDER PLAN
+  (`NameKey`, tiers 0a/0u/1–3, the leg-1 budgets and collection cap); M12 and M13 wire it into the test hosts and
+  `build-local`. Maps are recorded ON DEMAND: `python scripts/spec/record_impact_map.py [--commit <sha>]` (a
+  detached worktree, a probe-instrumented build, every test assembly once with the compile cache off; the map lands
+  in `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree). Both scripts' `--self-test` prove
+  every arm. The LANDER is unchanged (whole assemblies). ⚠ TARGET (owner 2026-09-28, kb/Work PB1708; §3.14): this
+  entry changes when M13 lands (`build-local.ps1 -Mode lander|implementer`, no `-Filter`, no filter line).
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` · legacy suite:
   `dotnet test tests/CobolSharp.Tests.Integration --filter FullyQualifiedName~ConformanceTests` ·

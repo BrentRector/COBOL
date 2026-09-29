@@ -4,7 +4,7 @@ from common import *
 
 m, ix = load()
 by = defaultdict(lambda: [0, 0.0])
-for i in ix.conf:
+for i in ix.by_assembly["Conformance"]:
     t = ix.tests[i]
     meth = t[1].split(".")[-1]
     cls = t[3].split(".")[-1].split("_P")[0]

@@ -31,8 +31,8 @@ for label, d in res.items():
     c = count(ix, floor_mask(d["rows"]))
     fl.append(c)
     print(f"{label}: floor {c}")
-print(f"FLOOR over 20 clusters: min {min(fl)} median {statistics.median(fl)} max {max(fl)} of {len(ix.conf)}; "
-      f">= 50%: {sum(1 for c in fl if c >= len(ix.conf) / 2)}")
+print(f"FLOOR over 20 clusters: min {min(fl)} median {statistics.median(fl)} max {max(fl)} of {len(ix.by_assembly['Conformance'])}; "
+      f">= 50%: {sum(1 for c in fl if c >= len(ix.by_assembly['Conformance']) / 2)}")
 
 m2, ix2 = load("4b0f3e22ae272ae6f5163b42b45b0bbd3ad1d707")
 M2 = m2["commit"]
@@ -53,7 +53,7 @@ for label, b, h in json.loads((HERE / "cases-68b.json").read_text()):
     sel_full = {ix2.tests[i][2] for i in testset(ix2, full)}
     sel_noreg = {ix2.tests[i][2] for i in testset(ix2, noreg)}
     print(f"{label}: registry files {regfiles}; selected today {len(sel_full)}; with every registry contribution "
-          f"removed {len(sel_noreg)} of {len(ix2.conf)}; whole reasons {sorted({x.split(':')[0] for x in whole})[:4]}")
+          f"removed {len(sel_noreg)} of {len(ix2.by_assembly['Conformance'])}; whole reasons {sorted({x.split(':')[0] for x in whole})[:4]}")
     if "X" in label:
         for r in RED_X:
             print(f"   red {r}: today {any(r in t for t in sel_full)}, registry removed {any(r in t for t in sel_noreg)}")

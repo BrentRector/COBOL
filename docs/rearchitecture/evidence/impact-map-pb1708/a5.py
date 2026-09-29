@@ -193,7 +193,7 @@ for label, d in res.items():
     c0, c1, c2 = count(ix, t0), count(ix, t1), count(ix, t2)
     summary.append((label, c0, c1, c2, sorted({w.split(":")[0] for w in whole3})))
     print(f"{label} | {len(d['rows'])} | {c0} | {c1} | {c2} | {sorted({w.split(':')[0] for w in whole3})}", flush=True)
-pop = len(ix.conf)
+pop = len(ix.by_assembly["Conformance"])
 for k, name in ((1, "T0"), (2, "T1"), (3, "T2")):
     vals = [r[k] for r in summary]
     print(f"{name}: min {min(vals)} median {statistics.median(vals)} max {max(vals)} of {pop}")

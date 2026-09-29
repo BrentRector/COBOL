@@ -79,7 +79,8 @@ tests/external/*.zip
 # citable identification (the same nominative use an article describing the suite would make), so the
 # differential report and the expectations ledger MAY carry them. Case IDs ("syn_move:38") are coordinates
 # we compute. Net effect: our reports are committable; their corpus is not.
-scripts/__pycache__/
+# Python bytecode caches, wherever a script imports a module (the evidence scripts import from their own directory)
+__pycache__/
 # Regenerable output of scripts/gnucobol_differential.py (re-run to recreate). NOT a licensing
 # exclusion — per the owner's 2026-07-19 ruling its case titles/keywords are citable; it is simply
 # generated, and it is BULKY (it carries every case's title, keywords and our full first diagnostic).

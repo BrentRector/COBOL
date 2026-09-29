@@ -18,11 +18,15 @@ in tier 0 and so in leg 1, outside the 2 % budget. This script measures, per man
   - leg 1 with a per-collection cap C on the budgeted part (tier 0 is exempt): the barrier idles the other cores
     only while leg 1's longest collection is still running, so a cap bounds the green-path cost of the barrier.
 And, per assembly, how many display names embed an absolute path (such a name never matches across worktrees).
+The last table re-runs each append through the ORDER PLAN itself, `scripts/gate_plan.py` (kb/Work PB1717's acceptance:
+an append to the 85 manifest leaves ONE tier-0u case and a leg-1 floor of at most 16 s).
 """
 import json
 import re
 import statistics
+import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
@@ -155,3 +159,40 @@ for target in EDS + ["negative"]:
             first = False
             print(f"{lead}| {keyname:10s} {('-' if cap is None else f'{cap:.0f}s'):>5s} {t0:6d} ({t0s:6.0f})  "
                   f"{n1:6d} ({s1:6.0f})   {big[1]:6.1f} s ({big[0]})")
+
+# ── the ORDER PLAN itself (PB1717, M11): scripts/gate_plan.py as the gate runs it — the renamed population as the
+# discovered listing, the population BEFORE the append (with the times above: a row the battery did not run carries
+# its theory's median) as the previous gate's trx, no map and no diff (so the new golden is tier 0u, not 0a) ──
+sys.path.insert(0, str(REPO / "scripts"))
+from gate_plan import LISTING_HEADER  # noqa: E402
+
+
+def trx_duration(d):
+    return f"{int(d // 3600)}:{int(d % 3600 // 60):02d}:{d % 60:010.7f}"
+
+
+print()
+print("appended to  | the order plan: tier 0u   leg 1 cases (test-s)   floor: largest collection part")
+with tempfile.TemporaryDirectory() as tmp:
+    run_dir = Path(tmp) / "previous-run"
+    run_dir.mkdir()
+    root = ET.Element("TestRun", xmlns=NS.strip("{}"))
+    results = ET.SubElement(root, "Results")
+    for n, d, _ in before + others:
+        ET.SubElement(results, "UnitTestResult", testName=n, duration=trx_duration(d), outcome="Passed")
+    ET.ElementTree(root).write(run_dir / "conformance.trx", encoding="utf-8", xml_declaration=True)
+    for target in EDS + ["negative"]:
+        after = corpus_names(positive_rows(target if target != "negative" else None), negative_rows(target == "negative"))
+        listing = Path(tmp) / "Conformance.list.txt"
+        listing.write_text("".join(line + chr(10) for line in [LISTING_HEADER] + [f"    {n}" for n, _, _ in after + others]),
+                           encoding="utf-8")
+        plan_file = Path(tmp) / "plan.json"
+        run = subprocess.run([sys.executable, str(REPO / "scripts" / "gate_plan.py"), "--out", str(plan_file),
+                              "--list", f"Conformance={listing}", "--previous-run", str(run_dir),
+                              "--store", str(Path(tmp) / "no-map")], cwd=REPO, capture_output=True, text=True,
+                             encoding="utf-8")
+        if run.returncode:
+            raise SystemExit(run.stderr)
+        s = json.loads(plan_file.read_text(encoding="utf-8"))["assemblies"]["Conformance"]["stats"]
+        print(f"{target:12s} | {s['tiers']['0u']:22d}   {s['leg1_cases']:6d} ({s['leg1_seconds']:6.0f})       "
+              f"{s['leg1_floor_seconds']:6.1f} s ({s['leg1_floor_collection']})")

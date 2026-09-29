@@ -33,3 +33,10 @@ negative         1 (     0)   | raw            -      2 (     0)    2883 (   232
                                      | normalized     -      1 (     0)    2883 (   232)     46.4 s (CorpusRunnerTests_P0)
                                      | normalized   15s      1 (     0)    2741 (   232)     15.1 s (CorpusRunnerTests_P2)
                                      | normalized    8s      1 (     0)    2615 (   232)      8.1 s (CorpusRunnerTests_P2)
+
+appended to  | the order plan: tier 0u   leg 1 cases (test-s)   floor: largest collection part
+85           |                      1     2740 (   232)         15.3 s (CorpusRunnerTests_P1)
+2002         |                      1     2739 (   232)         15.2 s (CorpusRunnerTests_P0)
+2014         |                      1     2739 (   232)         15.2 s (CorpusRunnerTests_P2)
+2023         |                      1     2740 (   232)         15.3 s (CorpusRunnerTests_P0)
+negative     |                      1     2740 (   232)         15.2 s (CorpusRunnerTests_P2)

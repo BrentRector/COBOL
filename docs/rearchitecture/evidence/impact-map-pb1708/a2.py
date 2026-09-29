@@ -24,7 +24,7 @@ def kind(p, notes, whole):
     return "DATA"
 
 
-pop = len(ix.conf)
+pop = len(ix.by_assembly["Conformance"])
 agg = Counter()
 print(f"population {pop}")
 print("label | total | -REG | -REG-DECL(method+cctor+data) | -REG-DECL-CCTOR | whole reasons (non-REG) | kinds")
