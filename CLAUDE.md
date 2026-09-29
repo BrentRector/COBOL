@@ -100,6 +100,11 @@ comprehensive pass once the design settles (`PROMPT.md` §4).
   (`git submodule update --init --recursive`) — needed only to render a page (`scripts/render-spec-page.py`).
 
 ## Testing
-Per commit, run only the WAVE-LOCAL filtered gate (~2 min). Run the FULL Conformance suite plus the GnuCOBOL
-differential once per accumulated batch, pre-merge. Build `CobolSharp.sln` — not a single project — before any
-`--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.
+Per commit, an implementer runs the gate filter its brief DERIVES with `impacted_tests.py`
+(MANDATORY-PRACTICES I1/I2). It is never guessed, and today it is usually the whole Conformance assembly. A lander
+always runs the WHOLE Conformance, Unit and Characterization assemblies, whatever any filter says. Run the
+comprehensive battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree.
+The owner decided on 2026-09-28 (kb/Work PB1708): the gate moves to "ORDER, DON'T SKIP". Every gate runs the whole
+population, ordered so likely failures come first, and a stale or missing impact map only changes the order, never
+what runs. Impact maps are recorded on demand, never per commit. Build `CobolSharp.sln` (not a single project)
+before any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.
