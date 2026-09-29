@@ -13,6 +13,18 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1776 — 2026-09-29 09:50 PDT — The project consumes claude-skills v1.13.2 (run CI's other-OS legs locally)
+
+The owner pushed the public claude-skills v1.13.2 (`64d153a`). Its agent-fleet skill now carries PB1732's general
+practice:
+- run CI's other-OS test legs locally before pushing, all of them when they are cheap (measured here at ~4 min);
+- build on the target OS for tests that embed build paths;
+- make git readable across the OS boundary;
+- keep a drift test holding the local legs equal to CI's.
+
+The `tools/claude-skills` pin moves 1.13.1 → 1.13.2. The four project skills (review, spec-lookup, workstream, gate)
+and PB1699 name the new pin, and `check_practices.py` is GREEN.
+
 ## Entry 1775 — 2026-09-29 01:04 PDT — Session close: plan §0 live state after wave 71 and PB1732
 
 The owner ended the session for the night after wave 71 and PB1732 landed (main `2a36d33bd`, CI green on both runs).
