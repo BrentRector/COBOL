@@ -77,7 +77,7 @@ CONTROL = (RETIRE, RETIRE_REASON)
 # it is an instruction handed to a HUMAN — but the hazard travels with the text: vstest answers a filter that
 # matches nothing with a PASSING run of zero tests, so if `SpecTraceabilityInventoryDriftTests` is renamed or
 # partitioned, the operator who pastes this line sees a green that proves nothing about the rows just recorded.
-# The guard is the same one `build-local.{ps1,sh}`, the two regenerators and the CI legs call — one rule, one
+# The guard is the same one the two regenerators and the CI legs call — one rule, one
 # place — so the two lines below fail loudly instead. The run itself is SCRUBBED (kb/Work PB1718): a gate leg
 # handshake or a VSTest*/RunSettingsFilePath variable left in the operator's shell would narrow it further.
 GATE_FILTER = "FullyQualifiedName~SpecTraceabilityInventory"

@@ -40,7 +40,7 @@ const IMPL_SCHEMA = {
   properties: {
     status: { type: 'string', enum: ['DONE', 'SPLIT', 'DISCHARGED', 'BLOCKED'] },
     branch: { type: 'string' }, worktree: { type: 'string' }, base: { type: 'string' }, head: { type: 'string' },
-    report: { type: 'string' }, gate_filter: { type: 'string' }, gate_verdict: { type: 'string' },
+    report: { type: 'string' }, gate_run: { type: 'string' }, gate_verdict: { type: 'string' },
     notes_landed: { type: 'array', items: { type: 'string' } },
     codes_used: { type: 'array', items: { type: 'string' } },
     leads: { type: 'array', items: { type: 'string' } },
@@ -87,7 +87,7 @@ function runGroup(g) {
     `it names your brief, codes, report path, scratch dir, gate and checkpoint protocol. ` +
     `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT. ` +
     `⛔ YOUR LAST ACTION MUST BE THE StructuredOutput CALL — never end on a report file or a summary message (three agents in waves 65-67 did, and their finished branches were stranded): ` +
-    `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, the gate filter and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids).`,
+    `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, your last gate's run directory (TestResults/build-local/<run>, whose verdict.json records its timings) and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids).`,
     { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: 'opus' }
   ).then(r => r ? { ...r, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes } : { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT' }),
   CEILING_MIN, () => {
@@ -106,7 +106,7 @@ function land(batch) {
   const leadIds = (args.lead_id_blocks || [])[n] || 'none (ask the orchestrator)'
   const manifest = JSON.stringify(batch.map(r => ({
     cluster: r.letter, lead: r.lead, notes: r.notes, status: r.status, report: r.report, worktree: r.worktree, branch: r.branch,
-    base: r.base, head: r.head, gate_filter: r.gate_filter, codes: r.codes, codes_used: r.codes_used || [], leads: r.leads || [],
+    base: r.base, head: r.head, gate_run: r.gate_run, codes: r.codes, codes_used: r.codes_used || [], leads: r.leads || [],
   })), null, 1)
   const clusters = batch.map(r => `${r.letter} (${r.notes}${r.status === 'SPLIT' ? ', SPLIT: land only what its report says is complete' : ''})`).join(', ')
   const prev = n === 0 ? args.previous_train : `train ${W}${n === 1 ? '' : String.fromCharCode(96 + n)} of this same wave`

@@ -63,7 +63,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "spec"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import impacted_tests  # noqa: E402
+from test_population import LISTED_MARK, PopulationError, parse_listing  # noqa: E402
 
 PLAN_SCHEMA = 1
 LEG_ONE_BUDGET = 0.02            # of the assembly's recorded test-seconds, for tier 1
@@ -71,7 +73,6 @@ LEG_ONE_UNKNOWN_BUDGET = 0.02    # of the assembly's recorded test-seconds, for 
 LEG_ONE_COLLECTION_CAP = 15.0    # seconds of one collection's BUDGETED leg-1 time (xunit runs a collection serially)
 TIER_ORDER = ("0a", "0u", "1", "2", "3")
 TRX_NS = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
-LISTING_HEADER = "The following Tests are available:"
 PARTITION_CLASS_RE = re.compile(r"(?P<family>.+)_P\d+")
 
 
@@ -105,13 +106,12 @@ def leg_of(plan: dict, assembly: str, display: str) -> int:
 
 
 def read_listing(path: Path) -> list[str]:
-    """The discovered display names, in discovery order, from a `--list-tests` run's output."""
-    lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    """The discovered display names, in discovery order, from a `--list-tests` run's output — read by THE one listing
+    parser, `test_population.parse_listing` (DESIGN §3.14.4)."""
     try:
-        start = next(i for i, line in enumerate(lines) if line.strip() == LISTING_HEADER) + 1
-    except StopIteration:
-        raise SystemExit(f"{path}: no '{LISTING_HEADER}' line — not a --list-tests output") from None
-    return [line.strip() for line in lines[start:] if line.startswith("    ") and line.strip()]
+        return list(parse_listing(path.read_text(encoding="utf-8-sig", errors="replace"), str(path)).elements())
+    except PopulationError as e:
+        raise SystemExit(str(e)) from None
 
 
 class Timings:
@@ -332,6 +332,20 @@ def build_plan(listings: dict[str, list[str]], analysis: impacted_tests.Analysis
     return plan
 
 
+def summary_lines(plan: dict, out: Path) -> list[str]:
+    """What a plan says, for people: the every-tier-1 reasons, each assembly's tiers, leg 1 and legs, and the plan's
+    identity. The CLI and the gate driver (scripts/run_gate_legs.py) both print it."""
+    lines = [f"  every case tier 1: {why}" for why in plan["every_tier1"]]
+    for asm, a in plan["assemblies"].items():
+        s = a["stats"]
+        lines.append(f"gate_plan: {asm}: {s['cases']} cases, tiers {s['tiers']}; leg 1 {s['leg1_cases']} cases "
+                     f"({s['leg1_seconds']} of {s['recorded_seconds']} recorded s; floor {s['leg1_floor_seconds']} s "
+                     f"in {s['leg1_floor_collection'] or '-'}); legs {a['legs']}"
+                     + (f" — {s['one_leg_reason']}" if s["one_leg_reason"] else ""))
+    lines.append(f"gate_plan: map {plan['map_state']}, timings {plan['timings']}; plan {plan['sha256'][:12]} → {out}")
+    return lines
+
+
 def write_plan(plan: dict, out: Path) -> str:
     """Write the plan canonically; return the SHA-256 of the file's bytes (the handshake digest)."""
     data = canonical(plan)
@@ -454,7 +468,7 @@ def self_test() -> int:
           (leg_of(plan, "Conformance", f"{ns}A.M"), leg_of(plan, "Conformance", f"{ns}B.M"),
            leg_of(plan, "Conformance", f"{ns}Z.M"), leg_of(plan, "Unit", f"{ns}B.M")) == (1, 2, 1, 1))
     # the file: canonical, digested, readable back.
-    listing = f"Test run for x.dll\n{LISTING_HEADER}\n" + "\n".join("    " + d for d in cheap[:3]) + "\n"
+    listing = f"Test run for x.dll\n{LISTED_MARK}\n" + "\n".join("    " + d for d in cheap[:3]) + "\n"
     with tempfile.TemporaryDirectory() as tmp:
         lf = Path(tmp) / "list.txt"
         lf.write_text(listing, encoding="utf-8")
@@ -504,17 +518,8 @@ def main() -> int:
     previous, reds = read_previous_run(args.previous_run) if args.previous_run else (Timings("none"), set())
     plan = build_plan(listings, analysis, previous, reds, args.base)
     digest = write_plan(plan, args.out)
-    err = sys.stderr
-    for why in analysis.reach.every_tier1:
-        print(f"  every case tier 1: {why}", file=err)
-    for asm, a in plan["assemblies"].items():
-        s = a["stats"]
-        print(f"gate_plan: {asm}: {s['cases']} cases, tiers {s['tiers']}; leg 1 {s['leg1_cases']} cases "
-              f"({s['leg1_seconds']} of {s['recorded_seconds']} recorded s; floor {s['leg1_floor_seconds']} s in "
-              f"{s['leg1_floor_collection'] or '-'}); legs {a['legs']}"
-              + (f" — {s['one_leg_reason']}" if s["one_leg_reason"] else ""), file=err)
-    print(f"gate_plan: map {plan['map_state']}, timings {plan['timings']}; plan {plan['sha256'][:12]} → {args.out}",
-          file=err)
+    for line in summary_lines(plan, args.out):
+        print(line, file=sys.stderr)
     print(digest)
     return 0
 

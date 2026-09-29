@@ -97,11 +97,12 @@ if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
         bare = [t for t in terms if t.strip().startswith(("~", "!~", "="))]
         if bare:
             block(f"filter term(s) {bare} have no property, so they match NOTHING and the run exits 0 — a silent "
-                  "green. Write `FullyQualifiedName~X` for every term (or use scripts/build-local.{ps1,sh}).")
+                  "green. Write `FullyQualifiedName~X` for every term. (A GATE never filters: it is "
+                  "`scripts/build-local.ps1 -Mode implementer`, the ordered whole population.)")
     if not re.search(r"(>|\|\s*(tail|grep|Select-String|Tee-Object|tee|findstr|Out-File))", commands):
         block("a filtered `dotnet test` must redirect its output to a log (or pipe it through tail/grep) and read the "
-              "verdict line — unredirected output floods the context and hides the verdict. Prefer "
-              "scripts/build-local.{ps1,sh}.")
+              "verdict line — unredirected output floods the context and hides the verdict. A GATE is "
+              "`scripts/build-local.ps1 -Mode implementer`, never a filtered run.")
 
 # 5. chaining after a verdict command
 VERDICT = re.compile(r"\bdotnet\s+(?:test|build)\b|build-local\.(?:ps1|sh)\b|push-main\.sh\b|battery\.sh\b|"

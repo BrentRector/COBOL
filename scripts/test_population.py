@@ -78,6 +78,15 @@ TRX_NS = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
 RAN_OUTCOMES = frozenset({"Passed", "Failed"})
 RC_EXACT, RC_RED, RC_ERROR = 0, 1, 2
 
+#: THE GATED ASSEMBLIES — every whole-population run's three test projects, by the key the plan, the impact map and
+#: the identity records name them with (the test assembly's name without `Cobol.Net.Tests.`). Their one statement:
+#: the gate driver, the impact recorder and `impacted_tests.py` read it from here.
+GATED_ASSEMBLIES = {
+    "Conformance": "tests/Cobol.Net.Tests.Conformance",
+    "Unit": "tests/Cobol.Net.Tests.Unit",
+    "Characterization": "tests/Cobol.Net.Tests.Characterization",
+}
+
 #: The gate's leg handshake (§3.14.3): written by the gate driver alone.
 HANDSHAKE = ("COBOLNET_GATE_PLAN", "COBOLNET_GATE_LEG", "COBOLNET_GATE_PLAN_SHA256")
 _SCRUBBED_PREFIXES = ("COBOLNET_GATE_", "VSTEST")
@@ -113,13 +122,16 @@ def parse_listing(text: str, source: str) -> Counter:
 
 
 def list_population(project: str | Path, configuration: str | None = None,
-                    cwd: str | Path = REPO) -> tuple[Counter, str]:
-    """Discover `project`'s population with `--list-tests`, scrubbed, in English. Returns (names, raw output)."""
+                    cwd: str | Path = REPO, **spawn) -> tuple[Counter, str]:
+    """Discover `project`'s population with `--list-tests`, scrubbed, in English. Returns (names, raw output).
+    `spawn` is extra `subprocess` keyword arguments: a gate-slot holder passes `**slot.spawn_kwargs()`, so the
+    listing runs inside the cap like every other child of the holder (DESIGN §3.14.6)."""
     cmd = ["dotnet", "test", str(project), "--no-build", "--list-tests"]
     if configuration:
         cmd += ["--configuration", configuration]
-    proc = subprocess.run(cmd, cwd=cwd, capture_output=True,
-                          env={**scrubbed_env(), "DOTNET_CLI_UI_LANGUAGE": "en"})
+    # The caller's `env` (a slot holder's, say) is scrubbed like any other: nothing may narrow the population.
+    env = {**scrubbed_env(spawn.pop("env", None)), "DOTNET_CLI_UI_LANGUAGE": "en"}
+    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, env=env, **spawn)
     try:
         # STRICT: a mis-decoded name would read as NEVER RAN beside a NOT IN THE POPULATION twin.
         text = proc.stdout.decode("utf-8")
@@ -339,7 +351,7 @@ def audit_callers(root: Path = REPO) -> tuple[list[str], list[str]]:
 # ── the self-test ─────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def _trx(path: Path, cases: list[tuple[str, list[str]]], stray_results: list[tuple[str, str, str]] = ()) -> str:
+def synthetic_trx(path: Path, cases: list[tuple[str, list[str]]], stray_results: list[tuple[str, str, str]] = ()) -> str:
     """A minimal trx: each case is (definition name, [result outcomes]); a stray result is (definition name it
     belongs to, the RESULT's own name, outcome) — the shape of a theory xunit could not serialize."""
     from xml.sax.saxutils import quoteattr
@@ -360,7 +372,7 @@ def _trx(path: Path, cases: list[tuple[str, list[str]]], stray_results: list[tup
     return str(path)
 
 
-def _listing(path: Path, names: list[str]) -> str:
+def synthetic_listing(path: Path, names: list[str]) -> str:
     path.write_text("Test run for X.dll (.NETCoreApp,Version=v10.0)\n" + LISTED_MARK + "\n"
                     + "".join(f"    {n}\n" for n in names), encoding="utf-8")
     return str(path)
@@ -382,53 +394,53 @@ def self_test() -> int:
         d = Path(tmp)
         trunc = "N.T.Theory(text: \"aaaa\"···"
         population = ["N.A.One", "N.A.Two", "N.B.Three", trunc, trunc, "N.C.Skipped"]
-        listing = _listing(d / "all.list.txt", population)
+        listing = synthetic_listing(d / "all.list.txt", population)
         listed = read_listings([listing])
         ok = lambda outs=("Passed",): list(outs)  # noqa: E731
         full = [(n, ok()) for n in population[:-1]] + [("N.C.Skipped", ["NotExecuted"])]
 
-        p = check("exact", listed, [_trx(d / "exact.trx", full)])
+        p = check("exact", listed, [synthetic_trx(d / "exact.trx", full)])
         arm("exact population, a truncated name listed twice, one skip", p.exact and p.discovered == 6
             and p.ran == 5 and p.skipped == 1 and "EXACT — 5/6 cases ran (skipped 1)" in p.verdict_line(),
             p.verdict_line())
 
-        p = check("short", listed, [_trx(d / "short.trx", [c for c in full if c[0] != "N.A.Two"])])
+        p = check("short", listed, [synthetic_trx(d / "short.trx", [c for c in full if c[0] != "N.A.Two"])])
         arm("short: a dropped case is NEVER RAN, named", not p.exact and p.never_ran == Counter({"N.A.Two": 1})
             and any("NEVER RAN" in ln and "N.A.Two" in ln for ln in p.report()[1:]), p.verdict_line())
 
-        p = check("truncated", listed, [_trx(d / "trunc.trx", [c for c in full if c[0] != trunc] + [(trunc, ok())])])
+        p = check("truncated", listed, [synthetic_trx(d / "trunc.trx", [c for c in full if c[0] != trunc] + [(trunc, ok())])])
         arm("short by multiplicity: one of two rows sharing a truncated name dropped",
             p.never_ran == Counter({trunc: 1}), p.verdict_line())
 
-        p = check("over", listed, [_trx(d / "over.trx", full + [("N.B.Three", ok())])])
+        p = check("over", listed, [synthetic_trx(d / "over.trx", full + [("N.B.Three", ok())])])
         arm("over: a case twice is RAN TWICE, named", p.ran_twice == Counter({"N.B.Three": 1}) and not p.never_ran
             and "1 RAN TWICE" in p.verdict_line(), p.verdict_line())
 
-        shard1 = _trx(d / "shard1.trx", [c for c in full if c[0] in ("N.A.One", "N.A.Two", trunc)])
-        shard2 = _trx(d / "shard2.trx", [c for c in full if c[0] in ("N.A.Two", "N.C.Skipped")])
+        shard1 = synthetic_trx(d / "shard1.trx", [c for c in full if c[0] in ("N.A.One", "N.A.Two", trunc)])
+        shard2 = synthetic_trx(d / "shard2.trx", [c for c in full if c[0] in ("N.A.Two", "N.C.Skipped")])
         executed = sum(read_trx(shard1).definitions.values()) + sum(read_trx(shard2).definitions.values())
         p = check("overlap", listed, [shard1, shard2])
         arm("shard overlap that KEEPS THE COUNT (a count guard passes it; this is red)",
             executed == sum(listed.values()) and p.ran_twice == Counter({"N.A.Two": 1})
             and p.never_ran == Counter({"N.B.Three": 1}), f"counted {executed}; {p.verdict_line()}")
 
-        p = check("skip", listed, [_trx(d / "skip.trx", full)])
+        p = check("skip", listed, [synthetic_trx(d / "skip.trx", full)])
         arm("skipped: a NotExecuted-only definition is counted skipped, never ran", p.skipped == 1 and p.ran == 5)
 
         stray = [("N.A.One", "N.A.One(row: 1)", "Passed"), ("N.A.One", "N.A.One(row: 2)", "Passed")]
-        p = check("defs", listed, [_trx(d / "defs.trx", full, stray)])
+        p = check("defs", listed, [synthetic_trx(d / "defs.trx", full, stray)])
         arm("definitions, not result names: an unserializable theory's per-row results are not cases",
             p.exact, p.verdict_line())
 
-        p = check("foreign", listed, [_trx(d / "foreign.trx", full + [("Other.Assembly.Test", ok())])])
+        p = check("foreign", listed, [synthetic_trx(d / "foreign.trx", full + [("Other.Assembly.Test", ok())])])
         arm("a definition the listing never printed is NOT IN THE POPULATION", not p.exact
             and p.not_listed == Counter({"Other.Assembly.Test": 1}), p.verdict_line())
 
-        p = check("early", listed, [_trx(d / "early.trx", full[:2])], stopped_early=True)
+        p = check("early", listed, [synthetic_trx(d / "early.trx", full[:2])], stopped_early=True)
         arm("stopped early: the remainder is NOT RUN and the verdict RED/INCOMPLETE", not p.exact
             and "RED/INCOMPLETE" in p.verdict_line() and "NOT RUN" in p.verdict_line(), p.verdict_line())
 
-        other = _listing(d / "other.list.txt", population[:-1])
+        other = synthetic_listing(d / "other.list.txt", population[:-1])
         rc, why = rc_of(lambda: read_listings([listing, other]))
         arm("two listings that disagree are an ERROR", rc == RC_ERROR and "LISTINGS DISAGREE" in why, why)
         rc, why = rc_of(lambda: check("gone", listed, [str(d / "absent.trx")]).exact)
@@ -439,8 +451,8 @@ def self_test() -> int:
         (d / "nomark.txt").write_text("No test is available in X.dll\n", encoding="utf-8")
         rc, why = rc_of(lambda: read_listings([str(d / "nomark.txt")]))
         arm("a listing without the vstest marker is an ERROR", rc == RC_ERROR, why)
-        rc, why = rc_of(lambda: check("empty", read_listings([_listing(d / "e.txt", [])]),
-                                      [_trx(d / "e.trx", [])]).exact)
+        rc, why = rc_of(lambda: check("empty", read_listings([synthetic_listing(d / "e.txt", [])]),
+                                      [synthetic_trx(d / "e.trx", [])]).exact)
         arm("an EMPTY population is an ERROR, never clean", rc == RC_ERROR and "EMPTY" in why, why)
         body = parse_listing(LISTED_MARK + "\n    A.B\n     \n  not a case\n    C.D  \n", "inline")
         arm("the listing parser keeps 4-space-indented names verbatim", body == Counter({"A.B": 1, "C.D  ": 1}),

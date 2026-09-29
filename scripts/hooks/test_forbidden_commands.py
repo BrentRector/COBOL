@@ -43,7 +43,7 @@ CASES = [
     ("dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
     ("dotnet build CobolSharp.sln -c Debug && dotnet test x.csproj > t.log", True),
     ("bash scripts/push-main.sh > p.log 2>&1; git log -1", True),
-    ("pwsh -File scripts/build-local.ps1 -Filter X *> b.log || true", True),
+    ("pwsh -File scripts/build-local.ps1 -Mode implementer *> b.log || true", True),
     ("bash scripts/push-main.sh > p.log 2>&1; echo \"rc=$?\"; grep -E landed p.log | tail -2", False),
     ("dotnet build CobolSharp.sln -c Debug -v q 2>&1 | grep -E 'error|Build succeeded'", False),
     ("cd /e/COBOL && dotnet build CobolSharp.sln -c Debug > b.log 2>&1", False),

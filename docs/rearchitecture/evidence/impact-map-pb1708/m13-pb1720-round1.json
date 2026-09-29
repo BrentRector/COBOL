@@ -1,0 +1,164 @@
+{
+ "quiet_mean_s": 139.45,
+ "runs": [
+  {
+   "label": "quiet-a",
+   "n": 0,
+   "load_before": [
+    "43",
+    "11"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 143.1,
+   "lander_timings": {
+    "build_s": 3.5,
+    "legs_s": 143.2,
+    "wall_s": 221.1
+   },
+   "lander_process_wall_s": 221.2,
+   "implementers": [],
+   "ratio_to_quiet": 1.026
+  },
+  {
+   "label": "n1",
+   "n": 1,
+   "load_before": [
+    "43",
+    "15"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 172.8,
+   "lander_timings": {
+    "build_s": 2.6,
+    "legs_s": 173.0,
+    "wall_s": 252.1
+   },
+   "lander_process_wall_s": 252.2,
+   "implementers": [
+    {
+     "worktree": "m1",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 54.5,
+      "legs_s": 168.7,
+      "wall_s": 340.3
+     }
+    }
+   ],
+   "ratio_to_quiet": 1.239
+  },
+  {
+   "label": "n2",
+   "n": 2,
+   "load_before": [
+    "43",
+    "12"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 220.6,
+   "lander_timings": {
+    "build_s": 2.4,
+    "legs_s": 221.0,
+    "wall_s": 300.6
+   },
+   "lander_process_wall_s": 300.8,
+   "implementers": [
+    {
+     "worktree": "m1",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 10.5,
+      "legs_s": 235.8,
+      "wall_s": 353.5
+     }
+    },
+    {
+     "worktree": "m2",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 59.7,
+      "legs_s": 224.2,
+      "wall_s": 403.4
+     }
+    }
+   ],
+   "ratio_to_quiet": 1.582
+  },
+  {
+   "label": "n3",
+   "n": 3,
+   "load_before": [
+    "14",
+    "0"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 192.2,
+   "lander_timings": {
+    "build_s": 2.5,
+    "legs_s": 192.6,
+    "wall_s": 272.7
+   },
+   "lander_process_wall_s": 272.8,
+   "implementers": [
+    {
+     "worktree": "m1",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 13.9,
+      "legs_s": 238.1,
+      "wall_s": 369.0
+     }
+    },
+    {
+     "worktree": "m2",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 13.8,
+      "legs_s": 237.8,
+      "wall_s": 369.3
+     }
+    },
+    {
+     "worktree": "m3",
+     "rc": 1,
+     "verdict": "RED/INCOMPLETE",
+     "timings": {
+      "build_s": 75.7,
+      "first_red_s": 0.9,
+      "legs_s": 5.6,
+      "wall_s": 166.3
+     }
+    }
+   ],
+   "ratio_to_quiet": 1.378
+  },
+  {
+   "label": "quiet-b",
+   "n": 0,
+   "load_before": [
+    "14",
+    "6"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 135.8,
+   "lander_timings": {
+    "build_s": 1.9,
+    "legs_s": 136.0,
+    "wall_s": 212.1
+   },
+   "lander_process_wall_s": 212.2,
+   "implementers": [],
+   "ratio_to_quiet": 0.974
+  }
+ ]
+}

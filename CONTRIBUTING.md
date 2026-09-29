@@ -58,15 +58,16 @@ dotnet build CobolSharp.sln
 Always build the **solution**, not a single project, before running tests with `--no-build`; otherwise you test a
 stale compiler.
 
-The per-change gate builds the solution and runs the conformance tests for the area you touched, plus the Unit and
-Characterization suites:
+The per-change gate builds the solution and runs EVERY Conformance, Unit and Characterization test, ordered so the
+tests your change is most likely to break run first:
 
 ```bash
-pwsh scripts/build-local.ps1 -Filter "~Inspect|~Unstring"     # choose terms that match what you changed
+pwsh scripts/build-local.ps1 -Mode implementer     # or: bash scripts/build-local.sh --mode implementer
 ```
 
-The filter is required. Read the verdict line it prints; a leg with no verdict line is a failure, not a pass. CI runs
-the full matrix on Windows and Linux for every pull request.
+It runs in two legs and stops after the first if anything there fails. Read the `=== BUILD-LOCAL GATE: ` line it
+prints: only `GREEN` is a pass, and it prints `GREEN` only when every test ran. CI runs the full matrix on Windows and
+Linux for every pull request.
 
 ## What a pull request needs
 

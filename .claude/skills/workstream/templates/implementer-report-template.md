@@ -30,8 +30,8 @@ default; a copy per edition only where the rule's behaviour differs by edition.)
 Notes flipped (id → status). Rows deliberately NOT closed, each with the residual and its owner.
 
 ## Gate
-The filter, the three `Passed!/Failed!` lines and the `=== … GATE: … ===` line verbatim; each red on the way named and
-attributed in one line; inert terms named.
+The gate's run directory, its three `=== POPULATION` lines and the `=== BUILD-LOCAL GATE: … ===` line verbatim; each
+red on the way named and attributed in one line.
 
 ## Self-review
 One line per lens — architecture · full code · performance · duplication — naming what was found and fixed, or "nothing".

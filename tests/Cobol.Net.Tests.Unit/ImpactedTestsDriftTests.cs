@@ -10,8 +10,8 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ THE IMPACT MAP ORDERS THE GATE AND NEVER SELECTS IT (kb/Work PB1708, PB1717, PB1712):
-/// <c>scripts/spec/impacted_tests.py</c> only TIERS a change — its filter line is the whole-assembly filter even for
-/// a base WITH a map — <c>scripts/gate_plan.py</c> gives every discovered case exactly one leg by its name key, the
+/// <c>scripts/spec/impacted_tests.py</c> only TIERS a change and prints no vstest filter, even for a base WITH a map —
+/// <c>scripts/gate_plan.py</c> gives every discovered case exactly one leg by its name key, the
 /// partition suffix that key strips appears only on partition classes, and the recorder covers every product
 /// assembly.
 /// </summary>
@@ -25,8 +25,8 @@ namespace CobolNet.Tests.Unit;
 /// <para>
 /// Five facts are pinned. (1) Each script's own <c>--self-test</c> drives every arm by name — an arm deleted from it
 /// is red here. (2) Through the REAL command line, against a map this test writes, a mapped change is TIERED (the
-/// <c>--plan</c> file shows it) while the last stdout line — the one <c>build-local.ps1 -Filter</c> consumes until M13
-/// deletes it — stays <c>FullyQualifiedName~.</c>. (3) An unmapped file puts every test in tier 1 and says why.
+/// <c>--plan</c> file shows it) and nothing it prints is a vstest filter: the gate runs the whole population in
+/// ordered legs, and M13 deleted the filter line and <c>--plus</c> with every caller (kb/Work PB1721). (3) An unmapped file puts every test in tier 1 and says why.
 /// (4) <c>NameKey</c> strips <c>_P&lt;k&gt;</c> from a class segment, so that suffix must mean exactly "partition k
 /// of a <c>TestPartitioning</c> family": every class so named in <c>tests/</c> is one. (5) Every product project
 /// under <c>src/</c> is compiled with the probe and instrumented.
@@ -34,7 +34,8 @@ namespace CobolNet.Tests.Unit;
 /// </remarks>
 public sealed class ImpactedTestsDriftTests
 {
-    private const string Whole = "FullyQualifiedName~.";
+    /// <summary>A vstest filter term — which the impact analysis must never print (kb/Work PB1721).</summary>
+    private const string FilterTerm = "FullyQualifiedName";
 
     [Fact]
     public void ImpactedTestsSelfTest_DrivesEveryTierArm()
@@ -64,7 +65,7 @@ public sealed class ImpactedTestsDriftTests
     }
 
     [Fact]
-    public void AMappedChange_IsTiered_AndTheFilterLineStaysTheWholeAssembly()
+    public void AMappedChange_IsTiered_AndNoFilterIsPrinted()
     {
         string dir = Path.Combine(Path.GetTempPath(), "impact-drift-" + Guid.NewGuid().ToString("N")[..12]);
         Directory.CreateDirectory(dir);
@@ -96,7 +97,8 @@ public sealed class ImpactedTestsDriftTests
             string plan = Path.Combine(dir, "tiers.json");
             var mapped = PythonInstrument.Run(script, "--map", map, "--plan", plan, "src/Cobol.Net.Compiler/Mapped.cs");
             Assert.Equal(0, mapped.ExitCode);
-            Assert.Equal(Whole, LastLine(mapped.Stdout));
+            Assert.DoesNotContain(FilterTerm, mapped.Stdout, StringComparison.Ordinal);
+            Assert.Contains("impacted_tests: map exact", mapped.Stdout, StringComparison.Ordinal);
             using (var tiers = JsonDocument.Parse(File.ReadAllText(plan)))
             {
                 // Named without a diff, the file is taken at the file level: its one test is tier 2 — the map WAS used.
@@ -106,7 +108,7 @@ public sealed class ImpactedTestsDriftTests
 
             var unmapped = PythonInstrument.Run(script, "--map", map, "src/Cobol.Net.Compiler/NeverRecorded.cs");
             Assert.Equal(0, unmapped.ExitCode);
-            Assert.Equal(Whole, LastLine(unmapped.Stdout));
+            Assert.DoesNotContain(FilterTerm, unmapped.Stdout, StringComparison.Ordinal);
             Assert.Contains("never seen", unmapped.Stderr, StringComparison.Ordinal);
         }
         finally
@@ -247,7 +249,4 @@ public sealed class ImpactedTestsDriftTests
 
         return Convert.ToBase64String(ms.ToArray());
     }
-
-    private static string LastLine(string text) =>
-        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
 }

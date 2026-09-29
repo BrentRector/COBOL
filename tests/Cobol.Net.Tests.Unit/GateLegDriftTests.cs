@@ -6,7 +6,7 @@
 // (DESIGN §3.14.9) merge by union:
 //   (1) LegOf is total and deterministic; NameKey strips exactly the partition suffix ........... M12
 //   (2) each orderer's output is a permutation of its input ...................................... M12
-//   (3) run_gate_legs.py --self-test (M13) and test_population.py --self-test (M14) fire every arm
+//   (3) run_gate_legs.py --self-test (M13) and test_population.py --self-test (M14) fire every arm ..... M13, M14
 //   (4) every test project under tests/ that the gate runs links GateLegs.cs .................... M12
 //   (5) no discovered display name in a gated assembly contains the repository root ............. M12
 //   (6) every `dotnet test` caller outside the driver scrubs COBOLNET_GATE_* ..................... M14
@@ -55,6 +55,7 @@ namespace CobolNet.Tests.Unit;
 public sealed class GateLegDriftTests
 {
     private const string PopulationTool = "test_population.py";
+    private const string DriverTool = "run_gate_legs.py";
 
     /// <summary>
     /// Arm (3), the population half: <c>test_population.py --self-test</c> passes and still drives every arm by
@@ -92,6 +93,49 @@ public sealed class GateLegDriftTests
     }
 
     /// <summary>
+    /// Arm (3), the driver half: <c>run_gate_legs.py --self-test</c> passes and still drives every arm by name — the
+    /// fail-fast stop and its named remainder, the population's dropped, duplicated and skipped cases, the identity
+    /// mismatches, the empty leg, the no-plan fallback, the scrubbed all-or-none handshake, the lander's single leg
+    /// and the refused second gate (kb/Work PB1721; DESIGN-test-build-ci.md section 3.14.4).
+    /// </summary>
+    [Fact]
+    public void Arm3_TheGateDriver_FiresEveryArmOnPlantedInputs()
+    {
+        string path = TestRepo.Scripts(DriverTool);
+        Assert.True(File.Exists(path), $"the gate driver is missing: {path}");
+
+        ProcessObservation r = PythonInstrument.Run(path, "--self-test");
+
+        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("run_gate_legs SELF-TEST: PASS", StringComparison.Ordinal),
+            $"`{DriverTool} --self-test` failed (exit {r.ExitCode}):\n{r.Stdout}{r.Stderr}");
+        foreach (string arm in new[]
+                 {
+                     "a whole planted population in two legs is GREEN",
+                     "an assembly whose leg 1 is empty is not invoked for leg 1",
+                     "every leg host is handed all three handshake variables",
+                     "a dropped case is NEVER RAN",
+                     "a case run in both legs is RAN TWICE",
+                     "a skipped case is counted skipped, never as ran",
+                     "a leg host that read another plan digest is an IDENTITY MISMATCH",
+                     "a binary changed between the legs is an IDENTITY MISMATCH",
+                     "a red in leg 1 STOPS the gate",
+                     "the stopped gate NAMES its remainder",
+                     "a red leg's whole output, its failure message included",
+                     "no plan (the planner failed): ONE leg in the plain order",
+                     "a leg host's environment is scrubbed",
+                     "-Mode lander: ONE leg, every assembly, no plan, no handshake, no slot, and no fail-fast",
+                     "a second gate in the same worktree is REFUSED",
+                     "a defect in the driver still ends in ONE verdict line",
+                     "the gate lock is per worktree",
+                 })
+        {
+            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
+                $"`{DriverTool} --self-test` no longer drives '{arm}' — a check that has never been seen to fail "
+                + $"is not evidence.\n{r.Stdout}");
+        }
+    }
+
+    /// <summary>
     /// Arm (6): every <c>dotnet test</c> caller under <c>scripts/</c> runs scrubbed, and no CI workflow sets a
     /// variable that narrows a test run.
     /// </summary>
@@ -111,7 +155,7 @@ public sealed class GateLegDriftTests
         // stopped seeing them would report a clean tree over nothing.
         foreach (string site in new[]
                  {
-                     "scripts/battery.sh", "scripts/build-local.ps1", "scripts/build-local.sh", "scripts/gen-vcr.ps1",
+                     "scripts/battery.sh", "scripts/run_gate_legs.py", "scripts/gen-vcr.ps1",
                      "scripts/gen-diagnostics-doc.ps1", "scripts/spec/record_verdicts.py",
                      "scripts/spec/record_impact_map.py", ".github/workflows/build-and-test.yml",
                  })

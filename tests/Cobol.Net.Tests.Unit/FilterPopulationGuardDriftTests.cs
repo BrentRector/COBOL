@@ -122,10 +122,12 @@ public sealed class FilterPopulationGuardDriftTests
         }
 
         // ⛔ THE SCAN MUST ASSERT ITS OWN POPULATION — the failure this whole test exists to prevent is a check
-        // that looked at nothing and reported clean. The wave-local gate twins are the canonical filtered
-        // invocations (plan §9); if the scan stops seeing them, the scan is broken, not the repo clean.
-        Assert.Contains("scripts/build-local.ps1", sites);
-        Assert.Contains("scripts/build-local.sh", sites);
+        // that looked at nothing and reported clean. The gate no longer filters (kb/Work PB1721: it runs the whole
+        // population in ordered legs); the two regenerators and the verdict recorder are the filtered invocations
+        // left, and if the scan stops seeing them, the scan is broken, not the repo clean.
+        Assert.Contains("scripts/gen-vcr.ps1", sites);
+        Assert.Contains("scripts/gen-diagnostics-doc.ps1", sites);
+        Assert.Contains("scripts/spec/record_verdicts.py", sites);
 
         var jobSites = new List<string>();
         foreach (string workflow in Directory.EnumerateFiles(

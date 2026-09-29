@@ -8,8 +8,8 @@
 ⛔ WHY. Concurrent whole-population implementer gates starve the lander's gate: train 48's lander leg took 30.6 min
 against 9.6 quiet. Every `-Mode implementer` gate (and the impact recorder) therefore takes a SLOT before it builds and
 holds it through its last leg, so at most N of them build or test at once, repository-wide. The lander, the battery
-and CI never take a slot and never wait (DESIGN-test-build-ci.md §3.14.6; the gate driver and the recorder are wired
-to it by mechanism M13, §3.14.9).
+and CI never take a slot and never wait (DESIGN-test-build-ci.md §3.14.6). Its callers are the gate driver
+`scripts/run_gate_legs.py` (implementer mode) and `scripts/spec/record_impact_map.py` (kb/Work PB1721).
 
 THE MECHANISM — every piece is an OS file lock, so nothing is ever cleaned up by guessing whether a pid is alive:
   slots    N lock files `<git common dir>/cobol-gate-slots/<k>.lock`, each held by an exclusive OS lock (LockFile on
@@ -52,12 +52,15 @@ REPO = Path(__file__).resolve().parents[1]
 SLOT_DIR_NAME = "cobol-gate-slots"
 SLOTS_ENV = "COBOLNET_GATE_SLOTS"
 
-# ⛔ PROVISIONAL (DESIGN §3.14.6, kb/Work PB1720): the default is to be the largest N at which the lander's whole-
-# Conformance leg stays within 1.25x of its quiet time with N implementer gates running, builds included. That needs a
-# quiet host and was not measured when the tool landed (the host was running wave 71); 2 is the provisional value
-# until the measurement recorded in PB1720 replaces it.
-DEFAULT_SLOTS = 2
+# ⛔ MEASURED (DESIGN §3.14.6, kb/Work PB1720; evidence impact-map-pb1708/m13): the default is the largest N at which the
+# lander's whole-Conformance leg stays within 1.25x of its quiet time with N implementer gates running, builds included.
+# On the shared 32-core host, every gate cold (COBOLNET_COMPILE_CACHE=off), the lander at Normal and the implementers at
+# BelowNormal, 2026-09-29: quiet 143.1 / 135.8 / 133.6 s; N=1 1.24x and 1.30x; N=2 1.58x and 1.52x; N=3 1.56x. N=2 is
+# far over, and N=1 is at the line — the only value that meets it — so the cap is ONE implementer gate at a time.
+DEFAULT_SLOTS = 1
 DEFAULT_POLL_S = 1.0
+#: What a slot holder's children run without (Slot.spawn_kwargs): the persistent build servers that would outlive them.
+BUILD_SERVERS_OFF = {"MSBUILDDISABLENODEREUSE": "1", "UseSharedCompilation": "false"}
 
 # Windows LockFile locks a byte RANGE. The range sits far past the end of the file, so the holder's label written at
 # the start of the file stays readable to `status` while the lock is held (locking beyond EOF is legal on Windows).
@@ -115,6 +118,56 @@ def _read_label(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace").strip()
     except OSError:
         return ""
+
+
+class ExclusiveLock:
+    """An exclusive OS lock on ONE file, taken WITHOUT waiting — the gate driver's per-worktree gate lock
+    (DESIGN-test-build-ci.md §3.14.3 step 1). The same primitive as a slot: the OS drops it when its holder dies, so
+    no stale-pid cleanup exists, and the holder's label at the start of the file names it to the gate it refuses."""
+
+    def __init__(self, path: Path, fd: int):
+        self.path, self._fd = path, fd
+
+    @classmethod
+    def try_take(cls, path: Path, label: str) -> "ExclusiveLock | None":
+        """The lock, or None when another process holds it (its label: `holder(path)`)."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = _open(path)
+        try:
+            if not _try_lock(fd):
+                os.close(fd)
+                return None
+            _write_label(fd, label)
+        except BaseException:
+            os.close(fd)
+            raise
+        return cls(path, fd)
+
+    @staticmethod
+    def holder(path: Path) -> str:
+        return _read_label(path)
+
+    def release(self) -> None:
+        if self._fd >= 0:
+            _unlock(self._fd)
+            os.close(self._fd)
+            self._fd = -1
+
+    def __enter__(self) -> "ExclusiveLock":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.release()
+
+
+def drop_git_local_env() -> None:
+    """Make this process's git calls act on the repository their cwd names. A self-test that builds its OWN
+    repositories must call it first: a git hook exports GIT_DIR and GIT_INDEX_FILE (and linux-gate.sh exported GIT_DIR
+    and GIT_WORK_TREE until PB1732 moved it to a clone), and under either every `git init`/`commit`/`worktree add` acted on
+    the caller's REAL repository (measured 2026-09-29, wave 72 group G, kb/Work PB1719). Git names the variables."""
+    for name in subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True,
+                               text=True, encoding="utf-8").stdout.split():
+        os.environ.pop(name, None)
 
 
 def slot_dir(repo: Path = REPO) -> Path:
@@ -178,11 +231,20 @@ class Slot:
     _fd: int = field(repr=False)
 
     def spawn_kwargs(self, **kwargs) -> dict:
-        """`subprocess` keyword arguments that keep the slot held by a child for as long as it lives. On Linux that is
-        the slot's descriptor in `pass_fds`; on Windows nothing is needed, since the job holds the whole tree."""
+        """`subprocess` keyword arguments that keep a child inside the slot for as long as it lives, and no longer.
+
+        * Linux: the slot's descriptor in `pass_fds` (on Windows the job already holds the whole tree).
+        * Both: the child's environment (`env` if given, else this process's) with PERSISTENT BUILD SERVERS off —
+          `MSBUILDDISABLENODEREUSE=1` and `UseSharedCompilation=false` (MSBuild imports every environment variable as
+          a property). A reused MSBuild node or a VBCSCompiler server started inside the slot is a descendant of the
+          holder that OTHER worktrees' builds connect to: on Windows the job kills it when this gate ends, in the
+          middle of another gate's build; on Linux it inherits the slot's descriptor and holds the slot for its whole
+          idle lifetime (DESIGN-test-build-ci.md §3.14.6)."""
+        base_env = kwargs["env"] if kwargs.get("env") is not None else os.environ
+        out = {**kwargs, "env": {**base_env, **BUILD_SERVERS_OFF}}
         if IS_WINDOWS or self._fd < 0:
-            return kwargs
-        return {**kwargs, "pass_fds": tuple(kwargs.get("pass_fds", ())) + (self._fd,)}
+            return out
+        return {**out, "pass_fds": tuple(kwargs.get("pass_fds", ())) + (self._fd,)}
 
     def describe(self) -> str:
         return f"slot {self.index + 1} of {self.count} (ticket {self.ticket}, waited {self.waited_s:.1f} s)"
@@ -306,7 +368,7 @@ class GateSlots:
         slot = Slot(k, self.count, seq, time.monotonic() - start, fd)
         try:
             self._drop_ticket(seq, ticket_fd)
-            _bind_process_tree()
+            bind_process_tree()
             if not IS_WINDOWS:
                 os.set_inheritable(fd, True)
         except BaseException:
@@ -338,7 +400,7 @@ class GateSlots:
 _JOB_HANDLE = None  # kept for the life of the process: closing it would kill the tree it holds
 
 
-def _bind_process_tree() -> None:
+def bind_process_tree() -> None:
     """Windows: put this process in a kill-on-close Job object, so every process it starts from now on is in the job
     and dies with it. Idempotent. Linux: nothing here — the slot descriptor's inheritance does the job."""
     global _JOB_HANDLE
@@ -506,15 +568,9 @@ def _wait_until(predicate: Callable[[], bool], what: str) -> None:
 
 
 def self_test() -> int:
-    # ⛔ HERMETIC. The self-test builds its OWN repositories, so it must not inherit a caller's repository selection.
-    # A git hook exports GIT_DIR and GIT_INDEX_FILE (and linux-gate.sh exported GIT_DIR and GIT_WORK_TREE until PB1732
-    # moved it to a clone). Under either, every git call below ignored its cwd and acted on the caller's REAL repository:
-    # `init` wrote core.worktree into the shared config, `commit --allow-empty -m self-test` landed on the agent's
-    # branch, and `worktree add` registered a /tmp worktree (measured 2026-09-29, wave 72 group G, kb/Work PB1719).
-    # Git names the variables itself; dropping them here also covers the gate children the arms start.
-    for name in subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True,
-                               text=True, encoding="utf-8").stdout.split():
-        os.environ.pop(name, None)
+    # ⛔ HERMETIC: the self-test builds its OWN repositories (see drop_git_local_env); dropping the variables here also
+    # covers the gate children the arms start.
+    drop_git_local_env()
     me = str(Path(__file__).resolve())
     py = sys.executable
     root = Path(tempfile.mkdtemp(prefix="gate-slot-selftest-"))

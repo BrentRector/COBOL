@@ -1,6 +1,6 @@
 ---
 name: gate
-description: Use before every commit and before every merge to choose and run the correct test gate - wave-local filtered (~2 min) per commit versus the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
+description: Use before every commit and before every merge to choose and run the correct test gate - the ordered whole-population gate per commit (build-local -Mode implementer - two legs, fail-fast, a gate slot), the lander's one-leg whole population per train, and the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
 ---
 
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:test-gate` (Skill tool) before reading on. If the plugin is not loaded
@@ -11,8 +11,11 @@ description: Use before every commit and before every merge to choose and run th
 
 # Gate
 
-**Self-check first: is this a single wave/commit, or the batch's pre-merge?** Single wave means FILTERED. The owner
-has corrected over-gating repeatedly; the full suite per fix is the bottleneck this model exists to remove.
+**Self-check first: which gate is this — an implementer's commit, a lander's train, or the batch's pre-merge?** Each
+has one command below. No gate FILTERS any more: every gate runs the whole population, ORDERED so a likely red comes
+first (owner, 2026-09-28, kb/Work PB1708: "order, don't skip"). What the owner corrected repeatedly was over-gating per
+fix with the SERIAL suites (the battery, `guard.sh`); the ordered gate is not that — its fail-fast leg 1 returns a red
+in minutes, and a gate slot caps how many run at once.
 
 ## Always first
 
@@ -24,17 +27,39 @@ Build the **solution**, not one project. Building only the compiler project and 
 --no-build` tests whatever compiler was copied into the test bin at its LAST full build — a stale compiler. Local
 goes green while CI fails.
 
-## Per commit — wave-local (~2 min)
+## Per commit — the ordered gate (an implementer)
 
-⭐ **Implementer variant — the filter is DERIVED from the recorded impact map (kb/Work PB1683; DESIGN-test-build-ci.md §3.13):** an implementer in its own worktree runs `python scripts/spec/impacted_tests.py --base <its cut point> --plus "<every golden and test class it ADDED>"` and passes the LAST stdout line unchanged to `pwsh scripts/build-local.ps1 -Filter "<line>" -Priority BelowNormal`. That line is every Conformance test whose recorded execution reaches a changed file (corpus, NIST and VersionMatrix rows included when the change reaches them) plus `~Drift|~EditionGate`; Unit and Characterization run whole. When it prints `FullyQualifiedName~.` it could not bound the change (no map for the base, a `.g4`/build file, a new or never-executed src file) and says why on stderr — the one case an implementer runs the whole Conformance assembly. Name-guessed filters are retired: train 68b dropped two groups on whole-assembly reds their name-guessed gates never ran. The map is recorded per main commit by `python scripts/spec/record_impact_map.py` (a detached worktree, ~25 min at BelowNormal); the lander still runs the whole Conformance assembly unfiltered.
+```
+pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
+```
 
-1. `dotnet test tests/Cobol.Net.Tests.Characterization` (full — it is seconds)
-2. `dotnet test tests/Cobol.Net.Tests.Conformance --filter "<impacted_tests.py's filter>"` (build-local runs this leg)
-   - an edition gate adds `FullyQualifiedName~VersionMatrix` through `--plus`
-3. `dotnet test tests/Cobol.Net.Tests.Unit --filter "<the wave's tests>"`
-4. A `cobol` CLI compile-and-run probe
+The driver, `scripts/run_gate_legs.py` (DESIGN-test-build-ci.md §3.14; kb/Work PB1721), holds the worktree's GATE
+LOCK (a second gate in the same worktree is refused), takes a GATE SLOT (`scripts/gate_slot.py`: at most N implementer
+gates build or test at once, repository-wide — `gate-slot: waiting, k ahead` is the cap working), runs the audits,
+fetches the per-worktree GnuCOBOL corpus when absent, builds the solution and lists every discovered case of
+Conformance, Unit and Characterization. The ORDER PLAN (`scripts/gate_plan.py`) puts in leg 1 the tests the change
+ADDS, the previous gate's reds and the cheapest cases the change can reach — the tiers `impacted_tests.py` derives from
+an impact map, when one exists — and everything else in leg 2. Both legs run the three assemblies concurrently. It is
+FAIL-FAST: a red in leg 1 stops the gate `RED/INCOMPLETE` and names the remainder
+(`TestResults/build-local/<run>/not-run-*.txt`). It is GREEN only when every leg ran, every assembly's population
+equals its `--list-tests` (`scripts/test_population.py`) and every leg host ran this plan on these binaries.
 
-**Do NOT run per commit:** the full Conformance suite, the full Unit suite, or the serial `scripts/guard.sh`.
+- **The impact map only ORDERS.** It is recorded ON DEMAND (`python scripts/spec/record_impact_map.py`, a detached
+  worktree, ~25 min at BelowNormal, inside a gate slot), never per commit (kb/Work PB1709). With no map, or a stale
+  one, the gate still runs everything — the order is plainer, never the population smaller.
+- **An implementer is done only on GREEN**, and then runs CI's Linux legs under WSL (MANDATORY-PRACTICES I8,
+  `bash scripts/linux-gate.sh --nice`).
+
+## Per train — the lander
+
+```
+pwsh scripts/build-local.ps1 -Mode lander *> <log>
+```
+
+No plan, ONE leg — every red of every cluster in one run — no fail-fast and no slot, at Normal priority: the lander
+never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10) and `push-main.sh`.
+
+**Do NOT run per commit:** the battery or the serial `scripts/guard.sh`.
 
 ## Per accumulated batch / pre-merge — comprehensive
 
@@ -78,8 +103,10 @@ re-run). Here, additionally:
 - **Never chain ANYTHING after a verdict command** (build, test, `build-local`, `push-main.sh`, battery) with `&&`,
   `||` or `;` — MANDATORY-PRACTICES P14, and the guard hook (`scripts/hooks/forbidden_commands.py` rule 5) BLOCKS
   it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
-- `scripts/build-local.{ps1,sh}` normalizes a bare filter (`~X|~Y` → `FullyQualifiedName~X|…`) and prints the
-  `=== WAVE-LOCAL GATE: ` verdict line — block on that line, never on the exit code.
+- `scripts/build-local.{ps1,sh}` prints ONE `=== BUILD-LOCAL GATE: ` verdict line — `GREEN`, `RED`,
+  `RED/INCOMPLETE` (stopped after leg 1), `BUILD FAILED` or `NOT RUN` (the lock was held, the cap is malformed, the
+  population could not be listed) — block on that line, never on the exit code. The run directory it names holds
+  every leg's full log, trx and identity record, the plan and `verdict.json` (timings, first red, slot).
 
 ## Read the failure before diagnosing it
 

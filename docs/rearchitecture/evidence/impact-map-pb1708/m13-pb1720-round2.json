@@ -1,0 +1,146 @@
+{
+ "quiet_mean_s": 133.6,
+ "runs": [
+  {
+   "label": "quiet-c",
+   "n": 0,
+   "load_before": [
+    "14",
+    "4"
+   ],
+   "lander_rc": 1,
+   "lander_verdict": "RED",
+   "lander_conformance_s": 133.6,
+   "lander_timings": {
+    "build_s": 1.7,
+    "first_red_s": 71.5,
+    "legs_s": 133.8,
+    "wall_s": 210.1
+   },
+   "lander_process_wall_s": 210.3,
+   "implementers": [],
+   "ratio_to_quiet": 1.0
+  },
+  {
+   "label": "n1-r2",
+   "n": 1,
+   "load_before": [
+    "14",
+    "6"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 173.5,
+   "lander_timings": {
+    "build_s": 2.2,
+    "legs_s": 173.7,
+    "wall_s": 250.5
+   },
+   "lander_process_wall_s": 250.6,
+   "implementers": [
+    {
+     "worktree": "m1",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 6.8,
+      "legs_s": 181.2,
+      "wall_s": 281.1
+     }
+    }
+   ],
+   "ratio_to_quiet": 1.299
+  },
+  {
+   "label": "n2-r2",
+   "n": 2,
+   "load_before": [
+    "14",
+    "5"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 202.7,
+   "lander_timings": {
+    "build_s": 2.5,
+    "legs_s": 203.0,
+    "wall_s": 281.8
+   },
+   "lander_process_wall_s": 282.0,
+   "implementers": [
+    {
+     "worktree": "m1",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 9.8,
+      "legs_s": 239.4,
+      "wall_s": 349.6
+     }
+    },
+    {
+     "worktree": "m2",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 10.5,
+      "legs_s": 239.8,
+      "wall_s": 349.7
+     }
+    }
+   ],
+   "ratio_to_quiet": 1.517
+  },
+  {
+   "label": "n3-r2",
+   "n": 3,
+   "load_before": [
+    "14",
+    "0"
+   ],
+   "lander_rc": 0,
+   "lander_verdict": "GREEN",
+   "lander_conformance_s": 207.7,
+   "lander_timings": {
+    "build_s": 2.8,
+    "legs_s": 208.8,
+    "wall_s": 289.0
+   },
+   "lander_process_wall_s": 289.1,
+   "implementers": [
+    {
+     "worktree": "m1",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 16.4,
+      "legs_s": 327.1,
+      "wall_s": 449.0
+     }
+    },
+    {
+     "worktree": "m2",
+     "rc": 0,
+     "verdict": "GREEN",
+     "timings": {
+      "build_s": 15.5,
+      "legs_s": 322.4,
+      "wall_s": 444.0
+     }
+    },
+    {
+     "worktree": "m3",
+     "rc": 1,
+     "verdict": "RED",
+     "timings": {
+      "build_s": 18.7,
+      "first_red_s": 325.8,
+      "legs_s": 326.0,
+      "wall_s": 479.5
+     }
+    }
+   ],
+   "ratio_to_quiet": 1.555
+  }
+ ]
+}

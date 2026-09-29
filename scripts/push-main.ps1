@@ -1,8 +1,7 @@
 # push-main.ps1 — the pwsh-callable entry point for `scripts/push-main.sh` (kb/Work/PB796, owner question 23).
 #
-# ⛔ THIS IS A SHIM, NOT A TWIN — deliberately unlike the `build-local.{sh,ps1}` pair. That pair has two full
-# implementations because each shell's gate has to work with no other shell installed, and the cost of the
-# duplication is a known, accepted one. Here the duplication would be pure loss: the whole body is `git` and `gh`
+# ⛔ ONE IMPLEMENTATION, TWO ENTRY POINTS — as the `build-local.{sh,ps1}` pair now is too: both run one gate driver,
+# `scripts/run_gate_legs.py` (kb/Work PB1721). A second copy here would be pure loss: the whole body is `git` and `gh`
 # invocations that read identically in both shells, and a second copy of the landing protocol is a second place
 # for it to drift (feedback_one_mechanism_per_job) — the exact defect shape kb/Work/PB796 is about, where ONE
 # rule written in four places meant none of them carried the step that mattered. `bash` is present wherever this

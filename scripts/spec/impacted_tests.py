@@ -32,10 +32,10 @@ source-generator input, a NEW src file, non-C# data under `src/`, a method reach
 context. Nothing here can drop a test: a test the map under-reaches (static FIELD reads are invisible to the
 recorder — PB1712) lands in a later tier of the SAME gate and still runs.
 
-⛔ The FILTER LINE. The LAST stdout line is always the whole-assembly filter `FullyQualifiedName~.`: M11 deleted the
-narrowing that used to print a selection (a map for a base re-armed a silent under-selection, PB1712). The line and
-`--plus` stay only until M13 replaces `build-local.ps1 -Filter` with the ordered gate and changes every caller in
-the same change (DESIGN-test-build-ci.md §3.14.9).
+⛔ NO FILTER. This script prints no vstest filter and takes no `--plus`: M11 deleted the narrowing (a map for a base
+re-armed a silent under-selection, PB1712), and M13 deleted the whole-assembly filter line and `--plus` together with
+`build-local.ps1 -Filter` and every caller (kb/Work PB1721). Its one consumer is `scripts/gate_plan.py`, which the
+gate driver `scripts/run_gate_legs.py` runs in-process; stdout is the tier summary, for people.
 
 Usage:
     python scripts/spec/impacted_tests.py --base <sha>                 # the worktree's change against its base
@@ -61,12 +61,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts"))
+from test_population import GATED_ASSEMBLIES  # noqa: E402
 SCHEMA = 2
-WHOLE = "FullyQualifiedName~."
 CONFORMANCE_DIR = "tests/Cobol.Net.Tests.Conformance/"
 # The gated test projects, by the assembly name the map and the gate use ("Conformance", "Unit", ...).
-TEST_ASSEMBLIES = {"tests/Cobol.Net.Tests.Conformance/": "Conformance", "tests/Cobol.Net.Tests.Unit/": "Unit",
-                   "tests/Cobol.Net.Tests.Characterization/": "Characterization"}
+TEST_ASSEMBLIES = {f"{d}/": k for k, d in GATED_ASSEMBLIES.items()}
 SHARED_TEST_DIR = "tests/_shared/"   # linked into every test project
 TEST_PROJECTS = (*TEST_ASSEMBLIES, SHARED_TEST_DIR)
 # Paths no test EXECUTES: they can only be READ by a test, which the reader search below finds.
@@ -773,8 +773,6 @@ def main() -> int:
     ap.add_argument("--map", type=Path, help="an explicit map file (otherwise the store is searched)")
     ap.add_argument("--store", type=Path, help="the map store (default <git common dir>/cobol-impact)")
     ap.add_argument("--plan", type=Path, help="write the tiers (JSON) that gate_plan.py reads to this file")
-    ap.add_argument("--plus", help="accepted and ignored: the filter line is always the whole assembly "
-                                   "(M13 deletes this option with every caller)")
     ap.add_argument("--explain", action="store_true", help="print every reach decision")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
@@ -799,8 +797,7 @@ def main() -> int:
     counts = {asm: dict(sorted(Counter(t.values()).items())) for asm, t in sorted(a.tiers.items())}
     print(f"impacted_tests: map {a.map_state}; tiers per assembly {counts or '(no map: every test tier 1)'}; "
           f"tier 0a: {len(set().union(*a.reach.added_tests.values()))} added test method(s), {len(a.reach.goldens)} "
-          f"golden(s). The gate runs the WHOLE population — the line below is the whole-assembly filter", file=err)
-    print(WHOLE)
+          f"golden(s). The gate runs the WHOLE population in this order (scripts/run_gate_legs.py)")
     return 0
 
 

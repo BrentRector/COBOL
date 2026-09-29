@@ -56,14 +56,13 @@ REPO = Path(__file__).resolve().parents[2]
 # The population and the scrub rule are scripts/test_population.py's (kb/Work PB1718): one `--list-tests` reader,
 # one statement of the environment variables that may narrow a `dotnet test` run.
 sys.path.insert(0, str(REPO / "scripts"))
-from test_population import PopulationError, list_population, scrubbed_env  # noqa: E402
+from test_population import GATED_ASSEMBLIES as ASSEMBLIES, PopulationError, list_population, scrubbed_env  # noqa: E402
+# ⛔ The recorder builds and runs every test assembly, so it takes a GATE SLOT like an implementer gate
+# (DESIGN-test-build-ci.md §3.14.6): held from before the worktree is made to the map's write, and every child is
+# spawned with `**slot.spawn_kwargs()`, or a Linux child runs outside the cap and a build server outlives the slot.
+from gate_slot import GateSlots, Slot  # noqa: E402
 
 SCHEMA = 2
-ASSEMBLIES = {
-    "Conformance": "tests/Cobol.Net.Tests.Conformance",
-    "Unit": "tests/Cobol.Net.Tests.Unit",
-    "Characterization": "tests/Cobol.Net.Tests.Characterization",
-}
 # The assemblies whose execution the map records — keep in step with tools/impact/ImpactRecording.targets.
 PROBED = [
     "cobol", "Cobol.Net.Compiler", "Cobol.Net.Editions", "Cobol.Net.Frontend", "Cobol.Net.Runtime",
@@ -92,10 +91,11 @@ def priority_flags(priority: str) -> dict:
     return {}
 
 
-def run(cmd: list[str], log: Path, cwd: Path, env: dict | None = None, priority: str = "BelowNormal") -> int:
+def run(cmd: list[str], log: Path, cwd: Path, slot: Slot, env: dict | None = None,
+        priority: str = "BelowNormal") -> int:
     with open(log, "w", encoding="utf-8", errors="replace") as fh:
-        proc = subprocess.run(cmd, cwd=cwd, stdout=fh, stderr=subprocess.STDOUT, env=env,
-                              **priority_flags(priority))
+        proc = subprocess.run(cmd, cwd=cwd, stdout=fh, stderr=subprocess.STDOUT, **priority_flags(priority),
+                              **slot.spawn_kwargs(env=env))
     return proc.returncode
 
 
@@ -247,13 +247,26 @@ def main() -> int:
     for d in (raw, logs):
         d.mkdir(parents=True, exist_ok=True)
     asms = [a.strip() for a in args.assemblies.split(",") if a.strip()]
-    timings: dict[str, float] = {}
     print(f"impact map: recording {sha} in {wt}")
 
     def fail(msg: str) -> int:
         print(f"=== IMPACT MAP: FAILED — {msg} (logs {logs}) ===")
         return 1
 
+    try:
+        slots = GateSlots.for_repo()
+    except ValueError as e:  # a malformed COBOLNET_GATE_SLOTS: never a silent default
+        print(f"=== IMPACT MAP: FAILED — {e} ===")
+        return 2
+    with slots.acquire(f"record_impact_map {sha[:12]} (pid {os.getpid()}, {time.strftime('%Y-%m-%d %H:%M:%S')})",
+                       say=lambda line: print(line, flush=True)) as slot:
+        return record(args, sha, store, wt, raw, logs, asms, slot, fail)
+
+
+def record(args: argparse.Namespace, sha: str, store: Path, wt: Path, raw: Path, logs: Path, asms: list[str],
+           slot: Slot, fail) -> int:
+    """Everything the slot covers: the detached worktree, the recording build, instrumentation, the runs, the map."""
+    timings: dict[str, float] = {}
     t0 = time.time()
     git("worktree", "add", "--detach", str(wt), sha)
     try:
@@ -268,17 +281,17 @@ def main() -> int:
         # tests are red for a reason that is not the tree's, and the recording would say so for the wrong cause.
         if not (wt / "tests/external/gnucobol/tests/testsuite.src").exists():
             if run(["pwsh", "-NoProfile", "-File", "scripts/fetch-gnucobol-tests.ps1"], logs / "fetch-corpus.log",
-                   wt, priority=args.priority) != 0:
+                   wt, slot, priority=args.priority) != 0:
                 print("  ⚠ the GnuCOBOL corpus fetch failed — ExternalCorpusPopulationDriftTests will be red in the "
                       "Unit leg for that reason (their hits are still recorded)")
         rc = run(["dotnet", "build", "CobolSharp.sln", "-c", "Debug", "-v", "quiet",
-                  f"-p:CustomAfterMicrosoftCommonTargets={targets}"], logs / "build.log", wt,
+                  f"-p:CustomAfterMicrosoftCommonTargets={targets}"], logs / "build.log", wt, slot,
                  priority=args.priority)
         if rc != 0:
             return fail("the recording build failed")
-        instr = work / "instrumenter"
+        instr = raw.parent / "instrumenter"  # beside raw/ and logs/ in the recording's work directory
         rc = run(["dotnet", "build", str(wt / "tools/impact/ImpactInstrumenter"), "-c", "Release", "-o",
-                  str(instr), "-v", "quiet"], logs / "instrumenter-build.log", wt, priority=args.priority)
+                  str(instr), "-v", "quiet"], logs / "instrumenter-build.log", wt, slot, priority=args.priority)
         if rc != 0:
             return fail("the instrumenter did not build")
         timings["build"] = round(time.time() - t0, 1)
@@ -290,7 +303,7 @@ def main() -> int:
         cmd = ["dotnet", str(instr / "ImpactInstrumenter.dll"), "--repo", str(wt), "--table", str(table_path)]
         for name in PROBED:
             cmd += ["--assembly", name]
-        rc = run(cmd + bins, logs / "instrument.log", wt, priority=args.priority)
+        rc = run(cmd + bins, logs / "instrument.log", wt, slot, priority=args.priority)
         print((logs / "instrument.log").read_text(encoding="utf-8", errors="replace").rstrip())
         if rc != 0:
             return fail("instrumentation failed")
@@ -306,7 +319,7 @@ def main() -> int:
         for asm in asms:
             proj = wt / ASSEMBLIES[asm]
             try:
-                listed[asm] = list(list_population(proj, cwd=wt)[0].elements())
+                listed[asm] = list(list_population(proj, cwd=wt, **slot.spawn_kwargs())[0].elements())
             except PopulationError as e:
                 return fail(f"the {asm} population could not be listed: {e}")
             t2 = time.time()
@@ -314,12 +327,12 @@ def main() -> int:
             if args.filter:
                 # ⛔ A trial filter is a claim about which tests ran (kb/Work PB708): every term must name one.
                 guard = subprocess.run([sys.executable, str(REPO / "scripts" / "filter_population.py"), "--filter",
-                                        args.filter, "--filtered", str(proj)], cwd=wt)
+                                        args.filter, "--filtered", str(proj)], cwd=wt, **slot.spawn_kwargs())
                 if guard.returncode not in (0, 3):
                     return fail(f"the trial filter does not name what it claims (filter_population.py rc="
                                 f"{guard.returncode})")
                 cmd += ["--filter", args.filter]
-            run(cmd, logs / f"test-{asm}.log", wt, env=env, priority=args.priority)
+            run(cmd, logs / f"test-{asm}.log", wt, slot, env=env, priority=args.priority)
             timings[f"test-{asm}"] = round(time.time() - t2, 1)
             verdicts[asm] = verdict_line(logs / f"test-{asm}.log")
             print(f"  {asm}: {verdicts[asm]}  ({timings[f'test-{asm}']} s)")

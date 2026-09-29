@@ -204,8 +204,8 @@ jobs:
 
   # ── ⛔ THE STATIC AUDITS — ON EVERY PUSH, DOCS-ONLY PUSHES INCLUDED (kb/Work/PB1574). A wrong clause number is
   # the one defect class no test can fail on (`// MOVE (§14.9.24)` compiles; §14.9.24 is MERGE), so CLAUDE.md
-  # rule 1 is enforced by these scripts and nothing else — and until PB1574 they ran only in `scripts/build-local.*`
-  # and battery phase -1. Every commit that never ran build-local (a cloud registrar's, a golden lane's, any
+  # rule 1 is enforced by these scripts and nothing else — and until PB1574 they ran only in the local gate
+  # and battery phase -1. Every commit that never ran the local gate (a cloud registrar's, a golden lane's, any
   # docs-only landing) therefore reached main unaudited: FOURTEEN wrong or unqualified clause numbers did, and every
   # later wave-local verdict went RED on findings nobody in that wave had written. They run HERE, where `ci-gate`
   # can refuse them, and NOT behind `run_matrix`: `kb/`, `docs/` and `CLAUDE.md` are exactly the doc-only paths,
@@ -214,7 +214,8 @@ jobs:
   # submodule holds only the PDF) — and only the standard library of the runner's python3, which also runs their
   # `--self-test`s inside the Unit leg (`CitationAuditSelfTestDriftTests`), proving each check can still fail.
   # ONE STEP PER AUDIT, each `if: !cancelled()`, so one red never hides the others' verdicts.
-  # ⛔ This is the SAME list, in the same order, as `scripts/build-local.{ps1,sh}` and battery phase -1; the
+  # ⛔ This is the SAME list, in the same order, as the gate driver's (`scripts/run_gate_legs.py` AUDITS) and battery
+  # phase -1; the
   # work-register and fleet-practices checks are added because a `kb/` or brief edit is a docs-only push, and
   # nothing else validates it there. ──
   audits:

@@ -104,7 +104,7 @@ part of the curve; the killed one's continuation is on the steep part.
 
 **One mechanism per implementer.** ⓜ A mechanism costs ~150 turns and an implementer's fixed cost is only ~70, so
 the quadratic eats the amortization immediately: the **second mechanism in one transcript costs 44.6 M, more than
-a whole fresh implementer at 40.3 M**. Two only when the notes share one code site *and* one gate filter — in
+a whole fresh implementer at 40.3 M**. Two only when the notes share one code site *and* one root cause — in
 which case the register's own clustering rule says they were one mechanism to begin with.
 
 **⭐ Group related fixes — owner decision 2026-09-13 ("adopt it").** The FILL UNIT is a GROUP: the harm-ranked note plus every open note that shares its named source files or its rule family (the registrar's root-cause cluster, or a grep of the notes' code sites) — three or four notes, one implementer, one branch, one gate, one report with a section per note; the mechanism rule above still governs the WORK inside the group (each note fixed at its root, checkpoint per mechanism, SPLIT at a note boundary at the turn cap). Evidence: trains 37/38 re-merged PB416/PB391 (MOVE validity), PB419/PB420/PB425 (INITIALIZE and MOVE emitters) and PB443/PB877 (the subscript resolver) pairwise, two composition defects appeared that neither implementer could see, and half the reports folded a sibling note. A group touching a shared seam runs `~CorpusRunner` + `~Nist` at the implementer's gate (the PB425 drop).
@@ -161,9 +161,11 @@ considered and rejected in that form: split chains become extra turns, and turns
 **⭐ Lander throughput — owner decision 2026-09-22 ("do all that we can").** The lander is the serial bottleneck: train
 47's lander took 84 min, and its whole-Conformance leg measured 9.6 min on a quiet host, 18.5 min at battery #84 and
 30.6 min in train 48, because up to seventeen implementers were running the SAME whole assembly on the same 32 cores.
-(1) An implementer NEVER runs the whole Conformance assembly — a shared seam adds `~CorpusRunner` + `~Nist`, nothing
-more. (2) Every implementer gate runs `build-local.ps1 … -Priority BelowNormal`, which Windows passes down to the
-build, the test hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
+(1) Every implementer gate is `build-local.ps1 -Mode implementer`, the ORDERED whole population (owner, 2026-09-28,
+kb/Work PB1708: "order, don't skip"), and it holds a GATE SLOT (`scripts/gate_slot.py`, kb/Work PB1720): at most N
+implementer gates build or test at once, repository-wide, while the lander (`-Mode lander`) never takes one and never
+waits. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
+hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
 LANDING: the next train's lander is dispatched while the previous one is still in CI; it merges and gates on the
 current origin/main, and before `push-main.sh` it BLOCKS until the previous train's head is an ancestor of
 origin/main, rebases, and re-gates only when the rebase touched code outside docs/kb/DEVLOG. CI remains the proof.
@@ -194,7 +196,7 @@ the work, not to wait. Stage the earliest-stage, largest jobs behind the near-do
   build, gate, DEVLOG, commit, push — so ⓜ **10.4 M per cluster at k = 1 against 5.1 M at k = 5**, and 4.0 minutes
   of lander per cluster against 9.8. The corpus proves it directly: the golden lander landed 151 rows for 52.9 M =
   0.35 M/row; the PB383 lander landed 2 rows for 7.2 M = 3.6 M/row — **10×**. Mechanics: bring in each implementer's
-  diff in turn, **one build**, the **WHOLE Conformance assembly, unfiltered** (never a union of the implementers' filter terms — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), plus Unit and Characterization, **one commit per cluster inside the landing** so
+  diff in turn, **one build**, the **WHOLE population of Conformance, Unit and Characterization in one leg** (`build-local.ps1 -Mode lander`; a union of the implementers' filter terms was never a landing gate — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), **one commit per cluster inside the landing** so
   a red bisects by cluster, one DEVLOG entry naming every cluster, one push. Past six clusters the token curve is
   flat and the gate-attribution risk is not. Template: `templates/lander-train-brief.md`.
 - ⛔ **Never spend a lander on a 1–2 cluster landing** unless nothing else is ready — that is the k = 1 corner of the
@@ -245,7 +247,7 @@ the work, not to wait. Stage the earliest-stage, largest jobs behind the near-do
   agents are writing files … Lost all 7 completed agents' work"). Commit WIP on your own worktree branch — that is
   what the checkpoint protocol is for — and to compare against a clean tree add a detached worktree
   (`git worktree add --detach <path> <sha>`), never stash/build/probe/pop.
-- The GPL GnuCOBOL corpus (`tests/external/gnucobol`) is git-ignored and **per worktree**. `build-local.{ps1,sh}` fetches it
+- The GPL GnuCOBOL corpus (`tests/external/gnucobol`) is git-ignored and **per worktree**. The gate (`scripts/run_gate_legs.py`) fetches it
   when absent (train 23), so a fresh implementer or lander worktree measures the population from its first gate;
   `ExternalCorpusPopulationDriftTests` is RED BY DESIGN without it (`kb/Work/PB209`). ⛔ **The two population reds are NOT
   "the known worktree shape" any more** (`kb/Work/PB897`): the fetch was broken on every host whose PATH `tar` is GNU tar —

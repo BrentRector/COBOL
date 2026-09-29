@@ -18,25 +18,26 @@ POINTER = 'MANDATORY-PRACTICES.md'
 # that are cheapest to lose silently.
 BRIEFS = {
     # P4: the stamped handoff (kb/Work/PB1698) — STATUS.md names the commit it describes; a resumer reads the delta.
-    # PB1683: the implementer's gate filter is DERIVED from the impact map.
-    'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'STATUS-AT:',
-                                      r'status_delta\.py', r'impacted_tests\.py --base',
+    # PB1721: the implementer's gate is the ORDERED whole population — `build-local.ps1 -Mode implementer`.
+    'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'STATUS-AT:',
+                                      r'status_delta\.py', r'BUILD-LOCAL GATE: GREEN',
                                       # PB1732 (I8): CI's Linux legs run under WSL before the report
                                       r'linux-gate\.sh'],
-    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'whole Conformance', r'impacted_tests\.py --base'],
+    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN'],
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'tail -n \+1 -f', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
+                              r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
                               r'linux-gate\.sh'],  # PB1732 (L10): CI's Linux legs under WSL before push-main
-    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh'],  # PB1732 (L10)
-    'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main'],
+    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander'],  # PB1732 (L10); PB1721 (L2)
+    'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'-Mode lander'],  # PB1721 (L2)
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
-    'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'NEVER run the whole Conformance', r'\\STOP',
+    'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\\STOP',
                                      r'tail -n \+1 -f', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
-                                     r'Turn cap 220', r'code site', r'RUN BY NAME', r'drift_rules\.py', r'STATUS-AT:',
+                                     r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',
                                      r'status_delta\.py',
-                                     # PB1683: the implementer's gate filter is DERIVED from the impact map
-                                     r'impacted_tests\.py --base',
+                                     # PB1721: the ordered gate, blocked on its own verdict line
+                                     r'BUILD-LOCAL GATE: ',
                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
                                      r'linux-gate\.sh'],
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit

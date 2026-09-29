@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """filter_population.py — EVERY TERM of a vstest `--filter` must name a real test (kb/Work PB708).
 
-`build-local.{ps1,sh}` already refuse a leg that prints no `Passed!`/`Failed!` verdict line — the guard added
+`test_leg_report.py` already refuses a leg that prints no `Passed!`/`Failed!` verdict line — the guard added
 after the `--filter "~X|~Y"` lesson (a term without a property matches NOTHING and exits 0). That guard is
 WHOLE-FILTER: it fires only when EVERY term is dead. One dead term OR'd among live ones still selects the
 others, still prints a verdict line, and is never named. PB691's gate ran
@@ -9,7 +9,7 @@ others, still prints a verdict line, and is never named. PB691's gate ran
     FullyQualifiedName~CorpusManifest|FullyQualifiedName~SpecTraceabilityInventory
 
 against the Conformance assembly on every run and reported `Passed! … 1640` every time; the test with that name
-is `SpecTraceabilityInventoryDriftTests`, which lives in Unit — the assembly build-local runs UNFILTERED. Its
+is `SpecTraceabilityInventoryDriftTests`, which lives in Unit — the assembly that gate ran UNFILTERED. Its
 implementer, its finisher and everyone who copied that filter forward believed the inventory drift test had gone
 through the gate's filter. Nothing had.
 

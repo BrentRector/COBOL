@@ -1,0 +1,87 @@
+M13 (kb/Work PB1721) acceptance and M2's N (kb/Work PB1720), wave 72 group H, 2026-09-29, on the shared 32-core host.
+Every excerpt is the gate's own console lines (scripts/run_gate_legs.py); the full logs were in the agent's scratchpad.
+
+A. A real implementer gate, GREEN: its population equals --list-tests for all three assemblies
+   (branch head 0e3262237+M13 WIP; no impact map for the base, so every case tier 1; no timings: leg 1 = tier 0a).
+   verdict.json timings: build 13.8 s, legs 150.4 s, wall 280.2 s (the corpus fetch included).
+    gate-slot: took slot 1 of 2 (ticket 14, waited 0.0 s)
+    === WITNESS LOSS vs 0e3262237662: 0 unexcused, 0 retired, 0 re-sited — GREEN ===
+    === EXTERNAL CORPUS: absent in this worktree — fetching (GPL, git-ignored, never committed) ===
+      every case tier 1: no impact map recorded for the base 0e3262237662 or any ancestor in E:\COBOL\.git\cobol-impact — record one (record_impact_map.py --commit 0e3262237662)
+      every case tier 1: tests/Directory.Build.props: a grammar, build or source-generator input — every assembly may change
+    gate_plan: Conformance: 9321 cases, tiers {'0a': 2, '0u': 0, '1': 9319, '2': 0, '3': 0}; leg 1 2 cases (0.0 of 0 recorded s; floor 0.0 s in GateLegDriftTests); legs [1, 2]
+    gate_plan: Unit: 29728 cases, tiers {'0a': 14, '0u': 0, '1': 29714, '2': 0, '3': 0}; leg 1 14 cases (0.0 of 0 recorded s; floor 0.0 s in GateLegDriftTests); legs [1, 2]
+    gate_plan: Characterization: 35 cases, tiers {'0a': 2, '0u': 0, '1': 33, '2': 0, '3': 0}; leg 1 2 cases (0.0 of 0 recorded s; floor 0.0 s in GateLegDriftTests); legs [1, 2]
+    gate_plan: map none, timings none; plan c88fe37fff5f → E:\COBOL\.claude\worktrees\wf_10d5c11f-c83-2\TestResults\build-local\20260929T173928Z-d73939\plan.json
+    build-local: leg 1 — Conformance, Unit, Characterization concurrently
+    Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 193 ms - Cobol.Net.Tests.Conformance.dll (net10.0)
+    Passed!  - Failed:     0, Passed:    14, Skipped:     0, Total:    14, Duration: 3 s - Cobol.Net.Tests.Unit.dll (net10.0)
+    Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 9 ms - Cobol.Net.Tests.Characterization.dll (net10.0)
+    build-local: leg 2 — Conformance, Unit, Characterization concurrently
+    Passed!  - Failed:     0, Passed:  9319, Skipped:     0, Total:  9319, Duration: 2 m 21 s - Cobol.Net.Tests.Conformance.dll (net10.0)
+    Passed!  - Failed:     0, Passed: 29745, Skipped:     0, Total: 29745, Duration: 1 m 19 s - Cobol.Net.Tests.Unit.dll (net10.0)
+    Passed!  - Failed:     0, Passed:    33, Skipped:     0, Total:    33, Duration: 1 s - Cobol.Net.Tests.Characterization.dll (net10.0)
+    === POPULATION Conformance: EXACT — 9,321/9,321 cases ran (skipped 0) across 2 trx ===
+    === POPULATION Unit: EXACT — 29,728/29,728 cases ran (skipped 0) across 2 trx ===
+    === POPULATION Characterization: EXACT — 35/35 cases ran (skipped 0) across 2 trx ===
+    === IDENTITY: every leg host ran plan c88fe37fff5f on the binaries this gate built ===
+    === BUILD-LOCAL GATE: GREEN — Conformance 9,321/9,321 · Unit 29,728/29,728 · Characterization 35/35 cases ran (skipped 0) in 2 of 2 leg(s) · implementer mode, slot 1 of 2 (ticket 14, waited 0.0 s) (plan c88fe37fff5f: map none (none), timings none; run 20260929T173928Z-d73939) ===
+
+B. A real implementer gate with a PLANTED red in a leg-1 test (an added Unit test method, tier 0a):
+   it stops after leg 1 and names the remainder. timings: first red 11.7 s into the legs, legs 11.9 s, wall 94.2 s.
+    gate-slot: took slot 1 of 2 (ticket 15, waited 0.0 s)
+    === WITNESS LOSS vs 0e3262237662: 0 unexcused, 0 retired, 0 re-sited — GREEN ===
+      every case tier 1: no impact map recorded for the base 0e3262237662 or any ancestor in E:\COBOL\.git\cobol-impact — record one (record_impact_map.py --commit 0e3262237662)
+      every case tier 1: tests/Directory.Build.props: a grammar, build or source-generator input — every assembly may change
+    gate_plan: Conformance: 9321 cases, tiers {'0a': 2, '0u': 0, '1': 9319, '2': 0, '3': 0}; leg 1 3919 cases (59.077 of 2947.543 recorded s; floor 6.423 s in CorpusRunnerTests_P1); legs [1, 2]
+    gate_plan: Unit: 29729 cases, tiers {'0a': 15, '0u': 0, '1': 29714, '2': 0, '3': 0}; leg 1 28912 cases (22.027 of 926.284 recorded s; floor 3.32 s in GateLegDriftTests); legs [1, 2]
+    gate_plan: Characterization: 35 cases, tiers {'0a': 2, '0u': 0, '1': 33, '2': 0, '3': 0}; leg 1 35 cases (2.91 of 2.91 recorded s; floor 1.931 s in EmittedCSharpSnapshotTests); legs [1] — its whole recorded time 2.9 s fits the collection cap
+    gate_plan: map none, timings previous run E:\COBOL\.claude\worktrees\wf_10d5c11f-c83-2\TestResults\build-local\20260929T173928Z-d73939; plan 0a0b8c71b26d → E:\COBOL\.claude\worktrees\wf_10d5c11f-c83-2\TestResults\build-local\20260929T174827Z-db35a8\plan.json
+    build-local: leg 1 — Conformance, Unit, Characterization concurrently
+    Passed!  - Failed:     0, Passed:  3919, Skipped:     0, Total:  3919, Duration: 8 s - Cobol.Net.Tests.Conformance.dll (net10.0)
+    ----- Unit leg 1: RED (exit 1) — the leg's COMPLETE output, untrimmed (13 lines; also kept at E:\COBOL\.claude\worktrees\wf_10d5c11f-c83-2\TestResults\build-local\20260929T174827Z-db35a8\leg-1-Unit.log) -----
+    Failed!  - Failed:     1, Passed: 28928, Skipped:     0, Total: 28929, Duration: 5 s - Cobol.Net.Tests.Unit.dll (net10.0)
+    Failed!  - Failed:     1, Passed: 28928, Skipped:     0, Total: 28929, Duration: 5 s - Cobol.Net.Tests.Unit.dll (net10.0)
+    Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 2 s - Cobol.Net.Tests.Characterization.dll (net10.0)
+    === POPULATION Conformance: RED/INCOMPLETE — 5,402 NOT RUN (the run stopped early) — 3,919/9,321 cases ran (skipped 0) across 1 trx ===
+    === POPULATION Unit: RED/INCOMPLETE — 817 NOT RUN (the run stopped early) — 28,912/29,729 cases ran (skipped 0) across 1 trx ===
+    === POPULATION Characterization: EXACT — 35/35 cases ran (skipped 0) across 1 trx ===
+    === IDENTITY: every leg host ran plan 0a0b8c71b26d on the binaries this gate built ===
+    === BUILD-LOCAL GATE: RED/INCOMPLETE — Unit leg 1 RED; STOPPED AFTER LEG 1 — leg 2 NOT RUN: Conformance 5,402 · Unit 817 (named in E:\COBOL\.claude\worktrees\wf_10d5c11f-c83-2\TestResults\build-local\20260929T174827Z-db35a8/not-run-*.txt) — Conformance 3,919/9,321 · Unit 28,912/29,729 · Characterization 35/35 cases ran (skipped 0) in 1 of 2 leg(s) · implementer mode, slot 1 of 2 (ticket 15, waited 0.0 s) (plan 0a0b8c71b26d: map none (none), timings previous run E:\COBOL\.claude\worktrees\wf_10d5c11f-c83-2\TestResults\build-local\20260929T173928Z-d73939; run 20260929T174827Z-db35a8) ===
+
+C. A real -Mode lander gate: ONE leg, no slot (no gate-slot line), every population exact (N measurement run quiet-a,
+   COBOLNET_COMPILE_CACHE=off).
+    === WITNESS LOSS vs 0e3262237662: 0 unexcused, 0 retired, 0 re-sited — GREEN ===
+    build-local: leg 1 — Conformance, Unit, Characterization concurrently
+    Passed!  - Failed:     0, Passed:  9321, Skipped:     0, Total:  9321, Duration: 2 m 20 s - Cobol.Net.Tests.Conformance.dll (net10.0)
+    Passed!  - Failed:     0, Passed: 29759, Skipped:     0, Total: 29759, Duration: 1 m 16 s - Cobol.Net.Tests.Unit.dll (net10.0)
+    Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - Cobol.Net.Tests.Characterization.dll (net10.0)
+    === POPULATION Conformance: EXACT — 9,321/9,321 cases ran (skipped 0) across 1 trx ===
+    === POPULATION Unit: EXACT — 29,728/29,728 cases ran (skipped 0) across 1 trx ===
+    === POPULATION Characterization: EXACT — 35/35 cases ran (skipped 0) across 1 trx ===
+    === BUILD-LOCAL GATE: GREEN — Conformance 9,321/9,321 · Unit 29,728/29,728 · Characterization 35/35 cases ran (skipped 0) in 1 of 1 leg(s) · lander mode (no plan (lander); run 20260929T180028Z-434f31) ===
+
+D. M2's N (PB1720): the lander's whole-Conformance leg (verdict.json runs[Conformance].wall_s) with N concurrent
+   implementer gates in their own worktrees (m13-measure-n.py; each implementer's compiler source touched so it
+   rebuilds; implementers BelowNormal with COBOLNET_GATE_SLOTS=3 so none queued; lander Normal; every gate cold).
+   Raw rows: m13-pb1720-round1.json, m13-pb1720-round2.json.
+   pooled quiet time: 137.5 s (the 3 quiet runs [143.1, 135.8, 133.6])
+   label      N  Conformance s  ratio   lander   implementers
+   quiet-a    0          143.1   1.04   GREEN    -
+   n1         1          172.8   1.26   GREEN    m1 GREEN (build 54.5 s, wall 340.3 s)
+   n2         2          220.6   1.60   GREEN    m1 GREEN (build 10.5 s, wall 353.5 s), m2 GREEN (build 59.7 s, wall 403.4 s)
+   n3         3          192.2   1.40   GREEN    m1 GREEN (build 13.9 s, wall 369.0 s), m2 GREEN (build 13.8 s, wall 369.3 s), m3 RED/INCOMPLETE (build 75.7 s, wall 166.3 s)
+   quiet-b    0          135.8   0.99   GREEN    -
+   quiet-c    0          133.6   0.97   RED      -
+   n1-r2      1          173.5   1.26   GREEN    m1 GREEN (build 6.8 s, wall 281.1 s)
+   n2-r2      2          202.7   1.47   GREEN    m1 GREEN (build 9.8 s, wall 349.6 s), m2 GREEN (build 10.5 s, wall 349.7 s)
+   n3-r2      3          207.7   1.51   GREEN    m1 GREEN (build 16.4 s, wall 449.0 s), m2 GREEN (build 15.5 s, wall 444.0 s), m3 RED (build 18.7 s, wall 479.5 s)
+
+   Result: N=2 is far over the 1.25x line (1.60x and 1.47x on the pooled quiet time; 1.58x and 1.52x against each round's own); N=1 is at it (1.26x and 1.26x
+   pooled; 1.24x and 1.30x against each round's own quiet run). N cannot be 0, so DEFAULT_SLOTS = 1.
+   Two runs are not the configuration they are labelled: n3's m3 stopped after 0.9 s of leg 1 on an MSB4024
+   'Access to the path ...xunit.core.targets is denied' (a host-level transient read denial, kb/Work PB1729's
+   mechanism), so n3 held two implementer gates for most of the lander's leg; and n3-r2's m3 went RED late in leg 2
+   on CorpusRunnerTests pb969_empty_argument_list 'must run:' with an empty message under the four-gate load.
+   quiet-c's lander was RED in Unit on two more transient 'Access ... is denied' reads (SetBinder.cs,
+   kb/Work/PB1316.md); its Conformance leg, the measured quantity, ran whole and green.

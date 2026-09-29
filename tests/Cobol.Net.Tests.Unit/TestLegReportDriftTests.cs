@@ -85,10 +85,10 @@ public sealed class TestLegReportDriftTests
             }
         }
 
-        // ⛔ THE POPULATION: the three scripts that run and print `dotnet test` legs must each route through the
-        // reporter. A scan that stopped seeing them would otherwise report a clean tree over nothing.
-        Assert.Contains("scripts/build-local.ps1", callers);
-        Assert.Contains("scripts/build-local.sh", callers);
+        // ⛔ THE POPULATION: the two scripts that run and print `dotnet test` legs — the gate driver (both
+        // build-local twins call it, kb/Work PB1721) and guard-fast.sh — must each route through the reporter. A scan
+        // that stopped seeing them would otherwise report a clean tree over nothing.
+        Assert.Contains("scripts/run_gate_legs.py", callers);
         Assert.Contains("scripts/guard-fast.sh", callers);
 
         Assert.True(offenders.Count == 0,
