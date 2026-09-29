@@ -32286,13 +32286,13 @@
   "ordinal": 2,
   "subject": "Alignment and transfer of data into data items",
   "rule-digest": "29c3c2a0dac4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs; src/Cobol.Net.Runtime/Values/Numeric/CobolFloat.cs#StoreSingleChecked; src/Cobol.Net.Runtime/Values/Numeric/CobolFloat.cs#StoreChecked; src/Cobol.Net.Runtime/Values/Numeric/CobolFloat.cs#ScaledToDouble; src/Cobol.Net.Compiler/CodeGen/Verbs/ArithmeticEmitter.cs#float",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Values/Numeric/CobolFloat.cs#ScaledToSingle; src/Cobol.Net.Runtime/Values/Numeric/CobolDec.cs#ToSingle; src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs#ConvertSource",
+  "test-ref": "conformance:2023/pb1110_binary32_receiver_single_rounding",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "OWNED BY kb/Work PB1110 (open). Rule: 'If the receiving data item is described with a standard floating-point usage, the algebraic value is converted and transferred to the receiving data item in a manner consistent with the specifications of ISO/IEC 60559:2020, Clauses 3 and 5.' cite.py --check 14.6.8.3 -> OK §14.6.8.3 2). ISO/IEC 60559 Clause 5 conversions are correctly rounded per the rounding-direction attribute (default roundTiesToEven) - ONE rounding of the exact value. FLOAT-BINARY-64: correct - probe out/probe/alignment/p3.cob MOVE 9007199254740993 -> 9007199254740992 (tie to even), MOVE PIC 9(16)V9(10) 9007199254740993.0000000001 and the same literal -> 9007199254740994 (ScaledToDouble is correctly rounded). FLOAT-BINARY-32: WRONG - MoveEmitter's float arm renders a fixed/Dec sender through NumericRenderer.Real (ScaledToDouble / CobolDec.ToDouble, a correctly-rounded binary64) and then CobolFloat.StoreSingleChecked / StoreChecked(CobolDec, single:true) casts that double to float: two roundings. Probe p3.cob/p4.cob (pinned cobol.exe, --std 2023 and 2014): MOVE 1.0000000596046448 TO FLOAT-BINARY-32 (fixed literal), MOVE 1.0000000596046448E0 (float literal, Dec lane), MOVE of a PIC 9V9(16) item holding it, MOVE 1.00000005960464478, and COMPUTE B32 = SRC ALL store 1.0 (displayed via MOVE to PIC 9V9(23) as 100000000000000000000000); expected, derived from 60559 roundTiesToEven: the value exceeds the midpoint 1.000000059604644775390625 between binary32 neighbours 1 and 1+2^-23, so the result is 1.00000011920928955078125 -> 100000011920928955078125. Contrast in the same program: VALUE 1.0000000596046448E0 on a FLOAT-BINARY-32 seeds the CORRECT 1.00000011920928955078125, so the VALUE landing and the MOVE/COMPUTE landings of one literal disagree. Single-rounding cases pass (0.1 -> 0.100000001490116119384765625; 16777217 -> 16777216; 16777219 -> 16777220), which is why nothing caught it. FLOAT-BINARY-128 / FLOAT-DECIMAL-16/-34 are refused COBOLNET1564 (CONFORMANCE.md §2 rows 17/19 Not claimed, Annex A.3) - not adjudicated here. No existing kb/Work note owns this (searched kb/Work for double rounding / binary32; PB961 is the NaN-payload widening, PB271 the overflow EC). [code-location note: arm (pic.IsFloat, ~lines 660-695: fval = FloatStoreDecChecked | FloatStoreSingleChecked(NumericRenderer.Real(...)) | (double)(Real(...))); code-location note: RECEIVER landing (~line 476)] || editions as adjudicated: 2014, 2023 (standard floating-point usages FLOAT-BINARY-*/FLOAT-DECIMAL-* are ISO/IEC 1989:2014 additions)",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1110: a MOVE of a fixed-point, decimal-literal or standard-decimal sender into a binary32 receiver is ONE correctly rounded conversion (ScaledToSingle / CobolDec.ToSingle); the arithmetic landing already rounds exactly under its mode (a COMPUTE with no ROUNDED truncates by default).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.8.4-1",
@@ -33351,13 +33351,13 @@
   "ordinal": 6,
   "subject": "Common phrases and features for statements",
   "rule-digest": "e0387b57bc28",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CorrespondingBinder.cs#CorrMatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CorrespondingBinder.cs#CorrMembers; src/Cobol.Net.Compiler/CodeGen/Verbs/CorrespondingEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/CorrespondingEmitter.cs#Deferred",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CorrespondingBinder.cs#CorrMatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CorrespondingBinder.cs#NamesakeCounts",
+  "test-ref": "conformance:2023/pb1111_corresponding_unique_name_counts_ineligible_namesakes",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1111 (open). Rule 6 plus the four trailing paragraphs. VERIFIED CORRECT: item identification at statement start (out/probe/corr/c3.cob MOVE CORRESPONDING TE (K OF W) TO W - the first pair rewrites the subscript K OF W, the second pair still uses the hoisted TE(1): W=31); execution order = D1 declaration order (CorrMatch iterates srcMembers); SIZE ERROR phrase runs once after all implied statements with NOT ignored (out/probe/corr/c1.cob S1: E1 G2=81075 - P and R overflow, Q=107 stored before the phrase); no phrase + EC-SIZE checking: the level-3 EC-SIZE-TRUNCATION is dispatched after all pairs (S2/S3: H2 Q already 107, G2 Q already 114 when the declarative runs); EC-DATA-INCOMPATIBLE deferred to after all pairs (Deferred region; golden 2023/pb230_incompatible_corresponding). DEFECT: the uniqueness half. 'The name of each data item that satisfies the above conditions is unique after application of the implied qualifiers' (--check 14.7.6 -> OK §14.7.6 6)) is uniqueness OF REFERENCE (§8.4.2.2.1 'Qualification is used to allow unique reference of user names' --check -> OK), but CorrMatch counts duplicates only among CorrMembers - the ELIGIBLE children - so a namesake excluded by rule 4 or reached through an ineligible FILLER level does not make the name ambiguous. PROBE c3.cob: G1 = { DU PIC 9 VALUE 1, DU PIC 9 OCCURS 2, FF PIC 9 VALUE 3, FILLER REDEFINES FF (10 FF), CC 4, BB 5 }, G2 = { BB, DU, FF, CC } all 0; MOVE CORRESPONDING G1 TO G2 prints G2=5134. Spec-derived: 'DU OF G1' and 'FF OF G1' each identify two data items, so neither name is unique after the implied qualifier G1 and neither pair corresponds -> G2=5004. See findings. || editions as adjudicated: 1985, 2002, 2014, 2023 (the EC-SIZE / EC-DATA-INCOMPATIBLE sentences 2002+)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1111: rule 6's uniqueness is counted over every namesake at the qualification level (ineligible twins and FILLER-nested items included), on both operands, for MOVE, ADD and SUBTRACT.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.7.7-1",
@@ -38886,13 +38886,13 @@
   "ordinal": 2,
   "subject": "INSPECT statement",
   "rule-digest": "850330088c57",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Tally; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Tally; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#OpenLeadingAnchors",
+  "test-ref": "conformance:2023/pb1124_inspect_leading_anchor_at_first_eligible_cycle",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1124 (open). cite.py --check 14.9.22.4 \"If the LEADING adjective applies to literal-1 and literal-1 is a leading occurrence as defined in General rules 12 and 17\" -> OK GR8 a) 2.; GR12 b) \"provided that the first such occurrence encountered is at the point where comparison began in the first comparison cycle in which literal-1 was eligible to participate\" -> OK; GR17 c) same proviso -> OK; GR9 a) \"is first eligible to participate in matching at the leftmost character position\" -> OK. The runtime anchors a LEADING run at expectedPos, set lazily at the first cycle in which the loop REACHES the operand in its region — not the first cycle in which it is ELIGIBLE. When an earlier operand matches at the eligible start, the LEADING operand is never tried in that cycle, expectedPos stays -1, and the run anchors at a later position. Probe l22.cob: X='ABBC'; INSPECT X TALLYING C1 FOR ALL \"A\" C2 FOR LEADING \"B\" -> C1=01 C2=02; spec: first eligible cycle begins at position 1 where 'A' stands, so no leading occurrence -> C2=00. REPLACING twin: Z='ABBC' REPLACING ALL \"A\" BY \"a\" LEADING \"B\" BY \"b\" -> abbC; spec aBBC. Wrong answer, silent. The existing shared-cycle test only covers the case where LEADING is reached at the eligible start and fails there. || editions as adjudicated: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1124: the ABBC probe - C1=01 C2=00 and aBBC.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-L2.3",
@@ -38991,13 +38991,13 @@
   "ordinal": 12,
   "subject": "INSPECT statement",
   "rule-digest": "8660317bf3be",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Tally",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Tally; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#OpenLeadingAnchors",
+  "test-ref": "conformance:2023/pb1124_inspect_leading_anchor_at_first_eligible_cycle",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1124 (open). Rule 12 b): LEADING counts 'provided that the first such occurrence encountered is at the point where comparison began in the first comparison cycle in which literal-1 was eligible to participate' (cite.py --check 14.9.22.4 -> OK 12)). Eligibility is GR9's region notion, so the leading occurrence must sit at the operand's region start. CobolInspect.Tally instead sets expectedPos = pos at the first cycle in which the loop VISITS the LEADING operand - but the shared cycle breaks on the first earlier operand that matches, so when an earlier operand consumes the region start, the LEADING anchor slides to wherever the scan next reaches it. Probes (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/inspect-p2/): p1.cob T1 'XAAB' TALLYING NX FOR ALL \"X\" NA FOR LEADING \"A\" -> NA=02 (spec 0); T3 'ABAB' FOR LEADING \"A\" \"B\" -> 02 (spec 1: B's first eligible cycle began at position 1, which holds A); T9 'QXAA' ALL \"X\" + LEADING \"A\" AFTER \"Q\" -> NA=02 (spec 0). Annex D.25 EXAMPLE 3 row 1 (BBEABDABABBCABEE; cite.py --check D.25 'COUNT-1 FOR LEADING \"B\" AFTER \"D\"' OK) prints COUNT-1=0, COUNT-2=2; the pinned compiler (p4.cob) gives 1 and 1 - the standard's own worked example diverges. a) ALL and c) CHARACTERS conform (T4, T6 'ABCD' CHARACTERS BEFORE \"D\" -> 3, T7 AFTER \"A\" -> 3; Annex D EXAMPLE 1/2/4 rows all match). Separately (GR8/NOTE 2, sibling part): under BACKWARD, Annex D EXAMPLE 5 row 1 prints COUNT-1=1, compiler gives 0 - see the BACKWARD finding. || editions as adjudicated: 1985, 2002, 2014, 2023 (BACKWARD half 2023 only - Annex E.3.3 item 34)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1124: a LEADING run anchors at the first cycle inside its region, whichever operand that cycle matches.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-13",
@@ -39066,13 +39066,13 @@
   "ordinal": 17,
   "subject": "INSPECT statement",
   "rule-digest": "1d16bf4ae9ca",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#OpenLeadingAnchors",
+  "test-ref": "conformance:2023/pb1124_inspect_leading_anchor_at_first_eligible_cycle",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1124 (open). Rule 17 c) LEADING replaces 'provided that the first such occurrence encountered is at the point where comparison began in the first comparison cycle in which literal-1, was eligible to participate' - the same anchoring as GR12b, and CobolInspect.Replace reuses the same visit-time expectedPos anchor. Probe p1.cob T2: 'XAAB' REPLACING ALL \"X\" BY \"Y\" LEADING \"A\" BY \"Z\" -> 'YZZB' (spec 'YAAB'). Annex D.25 EXAMPLE 3 row 1 prints 'BBEXYZXYXYZCABVE'; the pinned compiler gives 'BBEXYZXYXYWCABVE' (LEADING \"B\" BY \"W\" AFTER \"D\" fires at position 11 where the spec's CHARACTERS BY \"Z\" should). a) CHARACTERS, b) ALL, d) FIRST conform: T11 'ABCD' CHARACTERS BY \"*\" BEFORE \"C\" -> '**CD'; T12 'AABA' ALL \"AA\" BY \"XY\" -> 'XYBA'; T10 FIRST -> 'XYAB'; BACKWARD FIRST (d) second half): p5.cob 'AAAAAA' FIRST \"AA\" BY \"XY\" -> 'AAAAXY' (rightmost) and conformance:2023/inspect_backward R=ABAB* pins it. cite.py --check 14.9.22.4 'if BACKWARD is specified, the rightmost occurrence of literal-1 matched' -> OK 17). || editions as adjudicated: 1985, 2002, 2014, 2023 (BACKWARD half 2023 only - Annex E.3.3 item 34)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1124: REPLACING LEADING shares the one anchor rule with TALLYING LEADING.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-18",

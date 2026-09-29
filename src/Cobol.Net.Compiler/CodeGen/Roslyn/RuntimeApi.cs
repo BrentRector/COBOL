@@ -375,6 +375,16 @@ internal static class RuntimeApi
     public static string ScaledToDouble(string unscaled, int scale) =>
         $"{nameof(CobolFloat)}.{nameof(CobolFloat.ScaledToDouble)}({unscaled}, {scale})";
 
+    /// <summary>The CORRECTLY-ROUNDED scaled-value→binary32 conversion, ONE rounding — <c>CobolFloat.ScaledToSingle</c>
+    /// (kb/Work PB1110), the twin of <see cref="ScaledToDouble"/> for a binary32 receiver.</summary>
+    public static string ScaledToSingle(string unscaled, int scale) =>
+        $"{nameof(CobolFloat)}.{nameof(CobolFloat.ScaledToSingle)}({unscaled}, {scale})";
+
+    /// <summary>The checked store of an already single-converted fixed-point MOVE sender —
+    /// <c>CobolFloat.StoreScaledSingleChecked</c> (ISO §14.9.25.4 GR6 d)4.a; kb/Work PB1110).</summary>
+    public static string FloatStoreScaledSingleChecked(string converted) =>
+        $"{nameof(CobolFloat)}.{nameof(CobolFloat.StoreScaledSingleChecked)}({converted})";
+
     /// <summary>The floating-point form's ARITHMETIC store (§14.7.5 cases 3/4 — false = the size error condition,
     /// receiver unchanged): <c>CobolEdit.TryFormatFloat</c> over the result's exact form.</summary>
     public static string EditTryFormatFloat(PicInfo pic, Emit.NumX value, string imgVar, string cfgArgs)

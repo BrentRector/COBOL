@@ -13,6 +13,16 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1790 — 2026-09-29 16:43 PDT — PB1111 + PB1110 + PB1124: CORRESPONDING rule 6, binary32 single rounding, INSPECT LEADING anchor
+
+Third batch (owner: keep fixing bugs while CI runs; one gate per batch). PB1091 was re-probed first and its main defects were already fixed by the PB1557/PB1579 lineage (the ordinal range errors name SR16 e2 / SR14 b1 / SR17 b2 correctly); its remaining rows are adjudication, not code, and stay open. PB1093 (HIGH-VALUE over 65,536 code units) changes byte-level behaviour and is left for an owner decision.
+
+- **PB1111** — CORRESPONDING §14.7.6 rule 6 counted uniqueness over the rule-1/4/5 ELIGIBLE namesakes, so a name defeated only by an OCCURS/REDEFINES twin or a FILLER-nested item still corresponded. `CorrespondingBinder.NamesakeCounts` is the one reader of rule 6's universe (every namesake at the qualification level, FILLER levels flattened) for BOTH operands, shared by MOVE, ADD and SUBTRACT. Closes GR-14.7.6-6.
+- **PB1110** — a binary32 receiver was rounded twice on the MOVE landing (decimal to binary64, then a float cast), so a value just above a binary32 midpoint stored the lower neighbour. `CobolFloat.ScaledToSingle` / `CobolDec.ToSingle` convert once (an exact single divide while both operands are exact binary32 values, else a correctly rounded parse); `MoveEmitter` and `CobolFloat.StoreChecked(CobolDec, single)` use them. The COMPUTE leg of the finding is NOT a defect: a resultant with no ROUNDED phrase truncates (the default, `FloatResultant`), so 1.0 is the truncation; with ROUNDED the sticky-bit landing is already exact. Closes GR-14.6.8.3-2; GR-14.6.8.3-1 (PARTIAL) and DOC-A.1-81 (owner decision PB1535) stay open.
+- **PB1124** — INSPECT LEADING anchored its run at the first cycle that REACHED the operand, not the first cycle in which it was ELIGIBLE, so an earlier operand matching at the region start let the anchor slide downstream. `CobolInspect.OpenLeadingAnchors` opens the anchor at the top of every cycle, for Tally and Replace alike. Closes GR-14.9.22.4-12, -17 and -L2.2.
+
+GAP 810 to 805.
+
 ## Entry 1789 — 2026-09-29 16:16 PDT — PB1078 + PB1090: the ASSIGN literal-1 shape, and the empty SPECIAL-NAMES paragraph
 
 A second batch, fixed while the first (DEVLOG 1788) waited on CI.

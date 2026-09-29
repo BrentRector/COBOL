@@ -1077,6 +1077,13 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     // exact only through 1e22 — so at scale ≥ 23 a LEGAL ASIN(|x| ≤ 1) argument (§15.10.3 r2) arrived one ulp
     // above 1.0 and evaluated NaN; and even a correct literal divisor rounds twice (the Int128 cast, then the
     // divide), which a boundary-sitting argument cannot afford.
+    /// <summary>A NON-float sender's algebraic value converted to binary32 in ONE rounding (kb/Work PB1110):
+    /// <c>CobolFloat.ScaledToSingle</c>, never <see cref="Real"/>'s binary64 narrowed by a cast. A scaled or
+    /// standard-decimal operand only — a float intermediate is already a binary64 the caller narrows once.</summary>
+    internal static string ScaledSingle(NumX x) =>
+        x.Dec ? $"({x.Expr}).ToSingle()"
+        : RuntimeApi.ScaledToSingle(x.Expr, x.Scale);
+
     internal static string Real(NumX x) =>
         x.Real ? x.Expr                                   // already a double-typed float intermediate (D16)
         : x.Dec ? $"({x.Expr}).ToDouble()"

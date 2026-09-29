@@ -108,6 +108,7 @@ public static class CobolInspect
         while (pos < len)
         {
             bool matched = false;
+            OpenLeadingAnchors(pos, kinds, TallyLeading, regionStart, regionEnd, expectedPos);
             for (int k = 0; k < n; k++)
             {
                 bool inRegion = pos >= regionStart[k] && pos < regionEnd[k];
@@ -131,12 +132,7 @@ public static class CobolInspect
                     // GR12b: count the first and each subsequent CONTIGUOUS occurrence, provided the first is at
                     // the point where comparison began in the FIRST cycle in which the operand was ELIGIBLE — an
                     // earlier operand consuming that point (the shared-cycle case) kills the run at zero.
-                    if (!live[k]) continue;
-                    if (expectedPos[k] < 0)
-                    {
-                        if (!inRegion) continue;   // not yet at the region — still waiting, run not killed
-                        expectedPos[k] = pos;      // the first eligible participating cycle
-                    }
+                    if (!live[k] || expectedPos[k] < 0) continue;   // dead, or the region not reached yet — run not killed
                     if (pos == expectedPos[k] && isMatch)
                     {
                         counts[k]++;
@@ -161,6 +157,21 @@ public static class CobolInspect
             if (!matched) pos += 1;   // GR8b — no operand matched: advance one position, restart the cycle
         }
         return counts;
+    }
+
+    /// <summary>⛔ THE ONE PLACE A LEADING RUN'S ANCHOR OPENS (kb/Work PB1124). §14.9.22.4 GR12 b) / GR17 c): the first
+    /// LEADING occurrence must be "at the point where comparison began in the first comparison cycle in which
+    /// literal-1 was eligible to participate" — so the anchor is the position of the first CYCLE that falls inside
+    /// the operand's region, whichever operand that cycle then matches. Opened lazily inside the operand loop it
+    /// slid downstream whenever an EARLIER operand matched at the region start (the shared cycle breaks on the first
+    /// match, so the LEADING operand was never visited there): <c>TALLYING ... ALL 'A' ... LEADING 'B'</c> over
+    /// "ABBC" counted the run at position 2. Tally and Replace both call this at the top of every cycle.</summary>
+    private static void OpenLeadingAnchors(int pos, int[] kinds, int leadingKind, int[] regionStart, int[] regionEnd,
+        int[] expectedPos)
+    {
+        for (int k = 0; k < kinds.Length; k++)
+            if (kinds[k] == leadingKind && expectedPos[k] < 0 && pos >= regionStart[k] && pos < regionEnd[k])
+                expectedPos[k] = pos;
     }
 
     /// <summary>
@@ -214,6 +225,7 @@ public static class CobolInspect
         while (pos < len)
         {
             bool matched = false;
+            OpenLeadingAnchors(pos, kinds, ReplaceLeading, regionStart, regionEnd, expectedPos);
             for (int k = 0; k < n; k++)
             {
                 bool inRegion = pos >= regionStart[k] && pos < regionEnd[k];
@@ -251,12 +263,7 @@ public static class CobolInspect
 
                 if (kinds[k] == ReplaceLeading)
                 {
-                    if (!live[k]) continue;       // GR17c — same contiguity machinery as tallying GR12b
-                    if (expectedPos[k] < 0)
-                    {
-                        if (!inRegion) continue;
-                        expectedPos[k] = pos;
-                    }
+                    if (!live[k] || expectedPos[k] < 0) continue;   // GR17c — same contiguity machinery as tallying GR12b
                     if (pos == expectedPos[k] && isMatch)
                     {
                         Put(chars, pos, pat.Length, repl, fill);

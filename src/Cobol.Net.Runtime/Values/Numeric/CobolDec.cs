@@ -656,6 +656,10 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     /// independently of the emit lane's sibling defect).</summary>
     public double ToDouble() => CobolFloat.ScaledToDouble(Sig, -Exp);
 
+    /// <summary>The CORRECTLY-ROUNDED binary32 of this value in one rounding — <see cref="CobolFloat.ScaledToSingle"/>
+    /// (kb/Work PB1110), never <see cref="ToDouble"/> narrowed.</summary>
+    public float ToSingle() => CobolFloat.ScaledToSingle(Sig, -Exp);
+
     /// <summary>The text image of an SDIDI intermediate used as an intrinsic function's returned value in a
     /// string context (DA2). An SDIDI carries its own exponent, so the fixed-point scale is <c>-Exp</c>; routing
     /// through <see cref="CobolNum.FormatFunctionText"/> rather than formatting here keeps ONE rendering rule for

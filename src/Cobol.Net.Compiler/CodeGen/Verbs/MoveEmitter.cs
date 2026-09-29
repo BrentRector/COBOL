@@ -665,7 +665,11 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                     string fval = fsrcNum.Dec
                         ? $"({pic.ClrType})({RuntimeApi.FloatStoreDecChecked(fsrcNum.Expr, pic.IsSingle)})"
                         : pic.IsSingle
-                            ? RuntimeApi.FloatStoreSingleChecked(NumericRenderer.Real(fsrcNum))
+                            ? fsrcNum.Real
+                                ? RuntimeApi.FloatStoreSingleChecked(NumericRenderer.Real(fsrcNum))
+                                // A fixed-point sender converts to binary32 in ONE rounding (kb/Work PB1110): narrowing its
+                                // binary64 is a second one, and a value just above a binary32 midpoint lands on the midpoint.
+                                : RuntimeApi.FloatStoreScaledSingleChecked(NumericRenderer.ScaledSingle(fsrcNum))
                             : $"({pic.ClrType})({NumericRenderer.Real(fsrcNum)})";
                     // A WINDOWED float receiver (Tier-B / image-stored — the Step D arm-1 dissolution) re-encodes
                     // as its IEEE window bytes.

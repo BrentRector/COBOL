@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// <item>the per-organization dispatch cannot silently lose an arm.</item>
 /// </list>
 /// </summary>
+[Collection("process-globals")]   // kb/Work PB126: `Console.Error` is process-wide and `RecordLayoutNotice` writes to it on OPEN — a class that swaps the error stream and a class that opens a mismatched fixed file must not run in parallel (LineSequential_IsNeverReported captured another class's notice)
 public sealed class FixedFileAttributeFormatTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "CobolNet_FFA_" + Guid.NewGuid().ToString("N")[..8]);

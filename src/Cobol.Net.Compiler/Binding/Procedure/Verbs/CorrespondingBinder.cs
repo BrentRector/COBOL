@@ -140,18 +140,19 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             list.Add(d);
         }
         // Rule 6 is SYMMETRIC ("the name … is unique after application of the implied qualifiers"): a duplicated
-        // eligible name on EITHER side makes the implied qualified reference ambiguous — excluded, not an error.
-        // (The legacy matcher checked only the target side; the spec governs.)
+        // name on EITHER side makes the implied qualified reference ambiguous — excluded, not an error. The count is
+        // over EVERY namesake the qualified reference could identify (kb/Work PB1111), not over the rule-1/4/5
+        // eligible set: an OCCURS / REDEFINES / class-excluded twin still defeats uniqueness, because the rule's
+        // subject is the eligible item and its predicate is the uniqueness of that item's NAME.
         List<DataItem> srcMembers = CorrMembers(src);
-        var srcCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var s in srcMembers)
-            srcCount[s.CobolName!] = srcCount.GetValueOrDefault(s.CobolName!) + 1;
+        var srcCount = NamesakeCounts(src);
+        var dstCount = NamesakeCounts(dst);
 
         foreach (var s in srcMembers)
         {
             if (srcCount[s.CobolName!] > 1) continue;                          // rule 6, source side
             if (!dstByName.TryGetValue(s.CobolName!, out var cands)) continue; // rule 1: no same-named target
-            if (cands.Count > 1) continue;                                     // rule 6, target side
+            if (dstCount[s.CobolName!] > 1) continue;                          // rule 6, target side
             DataItem d = cands[0];
 
             // A group × group namesake pair DESCENDS, and that is true of a bit group and a national group too:
@@ -255,6 +256,29 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             if (!excluded) members.Add(e);
         }
         return members;
+    }
+
+    /// <summary>⛔ THE RULE-6 UNIVERSE (§14.7.6 rule 6, kb/Work PB1111): how many data items answer to each name
+    /// AT THIS QUALIFICATION LEVEL of one CORRESPONDING operand — every subordinate item named so, ELIGIBLE OR NOT
+    /// (an OCCURS or REDEFINES entry, a level-66 alias), because "DU OF G1" identifies each of them. A nameless
+    /// group (FILLER) contributes no qualifier, so its subordinates stand at THIS level too and are counted; a
+    /// named group is a qualifier of its own subordinates, which therefore stand one level down. A THROUGH alias
+    /// counts its included elementary items, the same universe <see cref="CorrMembers"/> filters. ONE reader for both
+    /// operands, so the two sides of the rule answer alike.</summary>
+    private static Dictionary<string, int> NamesakeCounts(DataItem group)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        void Count(IEnumerable<DataItem> items)
+        {
+            foreach (var item in items)
+            {
+                if (!(item.IsGroup || item.IsElementary || item.Renames is not null)) continue;   // not a data item
+                if (item.CobolName is { } name) counts[name] = counts.GetValueOrDefault(name) + 1;
+                else Count(item.Children);   // FILLER: no qualifier — its subordinates stand at this level
+            }
+        }
+        Count(group.Renames is { IsAlias: false } ren ? ren.IncludedElementaryItems : group.Children);
+        return counts;
     }
 
     /// <summary>The lowest group containing both of a THROUGH alias's endpoints — the groups strictly below it

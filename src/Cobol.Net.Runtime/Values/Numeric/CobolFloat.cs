@@ -49,6 +49,32 @@ public static class CobolFloat
             NumberStyles.Float, CultureInfo.InvariantCulture);
     }
 
+    /// <summary>⛔ THE ONE scaled-value→binary32 conversion (kb/Work PB1110): the CORRECTLY-ROUNDED binary32 of the
+    /// algebraic value <c>unscaled × 10^(−scale)</c> in ONE rounding (ISO §14.6.8.3 rule 2: "in a manner consistent
+    /// with the specifications of ISO/IEC 60559:2020", one conversion under roundTiesToEven). Narrowing
+    /// <see cref="ScaledToDouble"/> is a SECOND rounding: a value a hair above a binary32 midpoint rounds onto the
+    /// midpoint in binary64 and the cast then ties to even, storing the lower neighbour. When the unscaled magnitude
+    /// fits 2^24 and |scale| ≤ 10 both operands are exact binary32 values (10^10 = 2^10·5^10, 5^10 &lt; 2^24), so one
+    /// IEEE single divide/multiply rounds once; past either bound, the decimal-string parse
+    /// (<see cref="float.Parse(string)"/> is IEEE correctly rounded in this runtime). ±Infinity is the overflow
+    /// result — the caller's checked store decides whether that raises.</summary>
+    public static float ScaledToSingle(Int128 unscaled, int scale)
+    {
+        if (unscaled == 0) return 0f;
+        Int128 mag = unscaled < 0 ? -unscaled : unscaled;
+        if (mag <= (Int128)(1 << 24) && scale is >= -10 and <= 10)
+        {
+            float v = (float)(int)unscaled;                    // exact: |value| ≤ 2^24
+            return scale > 0 ? v / ExactPow10Single[scale] : v * ExactPow10Single[-scale];
+        }
+        return float.Parse(
+            unscaled.ToString(CultureInfo.InvariantCulture) + "E" + (-scale).ToString(CultureInfo.InvariantCulture),
+            NumberStyles.Float, CultureInfo.InvariantCulture);
+    }
+
+    private static readonly float[] ExactPow10Single =
+        [1f, 1e1f, 1e2f, 1e3f, 1e4f, 1e5f, 1e6f, 1e7f, 1e8f, 1e9f, 1e10f];
+
     /// <summary>⛔ THE ONE WAY GENERATED CODE MATERIALIZES A FLOAT FROM ITS INTERCHANGE BITS (ISO §14.9.39.4 rules
     /// 33–35 — the SET Format-15 canonical values; kb/Work PB961). An OPAQUE call, deliberately: a
     /// <c>BitConverter.Int32BitsToSingle(&lt;constant&gt;)</c> written inline in the generated C# is a JIT
@@ -96,6 +122,16 @@ public static class CobolFloat
         return v;
     }
 
+    /// <summary>The checked store of a MOVE algebraic value that is a FIXED-POINT scaled sender into a SINGLE-precision
+    /// receiver, converted ONCE by <see cref="ScaledToSingle"/> (kb/Work PB1110). A scaled value is never
+    /// ±Infinity, so an infinite result IS the overflow past the single-precision range (§14.9.25.4 GR6 d)4.a).</summary>
+    public static float StoreScaledSingleChecked(float converted)
+    {
+        if (float.IsInfinity(converted))
+            ExceptionState.FloatOverflowError("a MOVE algebraic value overflows the single-precision float receiver (ISO §14.9.25.4 GR6 d)4.a)");
+        return converted;
+    }
+
     /// <summary>The checked store of a MOVE algebraic value into a SINGLE-precision float receiver (ISO
     /// §14.9.25.4 GR6 d)4.a): cast to <see cref="float"/> and, when a FINITE source overflows the single-precision
     /// exponent range to ±Infinity and EC-DATA-OVERFLOW checking is enabled, raise the fatal EC-DATA-OVERFLOW (via
@@ -137,8 +173,9 @@ public static class CobolFloat
     /// COMP-1 since D21, so this makes the family consistent rather than adding a second regime.</para></summary>
     public static double StoreChecked(CobolDec src, bool single)
     {
-        double r = src.ToDouble();
-        if (double.IsInfinity(r) || (single && float.IsInfinity((float)r)))
+        // ONE rounding into the receiver's own format (kb/Work PB1110) — a binary32 receiver never sees a binary64 detour.
+        double r = single ? src.ToSingle() : src.ToDouble();
+        if (double.IsInfinity(r))
             ExceptionState.FloatOverflowError("a MOVE algebraic value is farther from zero than the "
                 + (single ? "single" : "double") + "-precision float receiver's usage permits "
                 + "(ISO §14.9.25.4 GR6 d)4.a)");

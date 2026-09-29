@@ -18,6 +18,7 @@ namespace CobolNet.Tests.Unit;
 /// OPEN still succeeds, '04' still arrives at the short read, and nothing about the conforming behaviour moves.
 /// </para>
 /// </summary>
+[Collection("process-globals")]   // kb/Work PB126: `Console.Error` is process-wide and `RecordLayoutNotice` writes to it on OPEN — a class that swaps the error stream and a class that opens a mismatched fixed file must not run in parallel (LineSequential_IsNeverReported captured another class's notice)
 public sealed class RecordLayoutNoticeTests : IDisposable
 {
     private readonly List<string> _paths = [];
