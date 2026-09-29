@@ -26,7 +26,15 @@ public sealed record BoundStringSending(BoundOperand Value, BoundOperand? Delimi
 /// are PRESERVED (GR7, never space-filled) — under the GR8 per-character range check.</summary>
 public sealed record BoundStringStmt(
     IReadOnlyList<BoundStringSending> Sendings, Place Into, Place? Pointer,
-    IReadOnlyList<BoundStatement>? OnOverflow, IReadOnlyList<BoundStatement>? NotOnOverflow) : BoundStatement;
+    IReadOnlyList<BoundStatement>? OnOverflow, IReadOnlyList<BoundStatement>? NotOnOverflow) : BoundStatement
+{
+    /// <summary>The category of the statement's characters — National when identifier-3 is of class national,
+    /// otherwise Alphanumeric. ISO §14.9.43.4 GR2: "When a figurative constant is specified as literal-1 or
+    /// literal-2, it refers to an implicit one character data item whose usage shall be the same as the usage of
+    /// identifier-3, either display or national", so this is the context §8.3.3.6.4 GR6 reads to choose the
+    /// program collating sequence a HIGH-VALUE / LOW-VALUE is taken from (kb/Work PB1185).</summary>
+    public required PicCategory CharacterCategory { get; init; }
+}
 
 /// <summary>One UNSTRING delimiter (ISO §14.9.48.2): its value (a literal, a figurative — a single character per
 /// GR7 — or a field read at execution) and whether the ALL phrase collapses contiguous occurrences (GR7).</summary>
@@ -59,6 +67,14 @@ public sealed record BoundUnstringStmt(
     Place? Pointer, Place? Tallying,
     IReadOnlyList<BoundStatement>? OnOverflow, IReadOnlyList<BoundStatement>? NotOnOverflow) : BoundStatement
 {
+    /// <summary>The category of the statement's characters — National when identifier-1 is a national data item,
+    /// otherwise Alphanumeric. ONE fact, two rules read it: GR7 ("When a figurative constant is used as the
+    /// delimiter, it stands for a single-character national literal if identifier-1 is a national data item;
+    /// otherwise, it stands for a single-character alphanumeric literal" — the context §8.3.3.6.4 GR6 reads to
+    /// choose the program collating sequence of a HIGH-VALUE / LOW-VALUE delimiter, kb/Work PB1185) and GR11 c)/d)
+    /// (the category of <see cref="Examined"/> and <see cref="Delimiting"/>, minted from it).</summary>
+    public required PicCategory CharacterCategory { get; init; }
+
     /// <summary>GR11 c)'s conceptual item — "the characters examined, excluding any delimiting characters",
     /// "treated as an elementary national data item if identifier-1 is of category national, and otherwise as an
     /// elementary alphanumeric data item" (<c>SendingValueTemp.ConceptualCharacterItem</c>). The emitter writes each

@@ -262,7 +262,7 @@ internal sealed class PlaceRenderer(EmitContext ctx, RuntimeApi rt)
 {
     public string Read(Place p);                 // rvalue C# expression
     public string Write(Place p, string rhs);    // C# store statement
-    public string WriteFill(RefModPlace p, string fillChar);
+    public string WriteFill(RefModPlace p, string seed);   // figurative seed repeated over the slice (§8.3.3.6.4 GR2)
 }
 ```
 

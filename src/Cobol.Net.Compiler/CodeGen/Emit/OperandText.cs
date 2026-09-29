@@ -53,7 +53,15 @@ internal static class OperandText
     private static AsStringVisitor Visitor(bool deSign, SendingRef sending) =>
         _asString[((int)sending * 2) + (deSign ? 1 : 0)];
 
-    public static string AsString(BoundOperand op, NumericRenderer num, bool deSign = false, SendingRef sending = SendingRef.Normal) =>
+    /// <param name="characterCategory">The category of the characters the operand's CONTEXT requires, as the
+    /// statement's own rule states it (STRING §14.9.43.4 GR2 — identifier-3's usage; UNSTRING §14.9.48.4 GR7 —
+    /// identifier-1's category). It is read by the figurative arm alone: ISO §8.3.3.6.4 GR6 — "If the context of the
+    /// figurative constant requires national characters, the national program collating sequence is used;
+    /// otherwise, the alphanumeric program collating sequence is used" — so National takes a HIGH-VALUE /
+    /// LOW-VALUE from the national sequence (kb/Work PB1185), and null (every length-unspecified alphanumeric
+    /// context: DISPLAY, STOP, an intrinsic argument) from the alphanumeric one.</param>
+    public static string AsString(BoundOperand op, NumericRenderer num, bool deSign = false, SendingRef sending = SendingRef.Normal,
+        PicCategory? characterCategory = null) =>
         op is BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean } ic }
             ? num.Intrinsics.RenderString(ic)
         // A NUMERIC-result intrinsic in a string context — DISPLAY FUNCTION ORD(C), MOVE FUNCTION MAX(…) TO a
@@ -65,6 +73,16 @@ internal static class OperandText
         // into a numeric literal, which is why FUNCTION LENGTH printed and FUNCTION ORD threw.
         : op is BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Numeric } nic }
             ? NumericIntrinsicText(num, nic, deSign)
+        // A COUNTER REGISTER — LINAGE-COUNTER, LINE-COUNTER, PAGE-COUNTER — in a string context (DISPLAY, MOVE to
+        // an alphanumeric item, STRING, a relation with an alphanumeric operand). The binder carries it as a computed
+        // operand because it is runtime state, but §8.4.3.14.4 GR1 / §8.4.3.15.4 GR1 make it "a temporary unsigned
+        // integer data item of class and category numeric", and §8.4.3.15.3 SR1 admits it "in any context where an
+        // integer data item may appear". So its image is an unsigned integer ITEM's: its digits, zero-filled to the
+        // register's implicit PIC 9(d) (AlgebraicRanges.CounterRegisterDigits — the documented capacity), exactly the
+        // image FieldAsString gives an unsigned PIC 9(d) item. Unsigned, so deSign has nothing to drop. These used to
+        // reach the visitor's loud computed arm and abort at run time (kb/Work PB1153, PB1199, PB1318).
+        : op is BoundComputedOperand { Expr: var reg } && AlgebraicRanges.CounterRegisterDigits(reg) is { } regDigits
+            ? RuntimeApi.NumFormatUnsignedDisplay(num.Render(reg, ReceiverContext.None).Expr, regDigits)
         // A function-identifier the binder FOLDED into an arithmetic sum — FUNCTION LENGTH / BYTE-LENGTH of a
         // variable-length group is §15.50.4 r7's fixed-plus-dynamic-leaves sum (kb/Work PB61): still a numeric
         // function's returned value in a string position, rendered in the same item-92 literal form. No general
@@ -75,9 +93,12 @@ internal static class OperandText
         // alphanumeric value (§8.3.3.6.4 GR1) of one character (GR3b). Materialize it through the declared collating
         // tables so HIGH-/LOW-VALUE is the runtime-collating extreme (§8.3.3.6.4 GR6/GR7), matching the MOVE and
         // relation paths — not the native pin. Intercepted at the ENTRY (like the intrinsic channel) because the
-        // AsStringVisitor has no access to the renderer's collating context; cat=null ⇒ the alphanumeric PCS applies.
+        // AsStringVisitor has no access to the renderer's collating context. WHICH sequence is §8.3.3.6.4 GR6's
+        // question, answered by the caller's characterCategory: a national context takes the national sequence,
+        // any other the alphanumeric one (kb/Work PB1185 — this arm passed null for every caller, so an UNSTRING
+        // delimiter against a national sender took the ALPHANUMERIC sequence's HIGH-/LOW-VALUE and never matched).
         : op is BoundFigurative fig
-            ? $"new string({FigurativeConstants.Fill(fig.Kind, num.Collating, null, num.NationalCollating)}, 1)"
+            ? $"new string({FigurativeConstants.Fill(fig.Kind, num.Collating, characterCategory, num.NationalCollating)}, 1)"
         // A boolean EXPRESSION operand's string is its '0'/'1' image through the ONE boolean renderer (kb/Work PB65
         // — a legal intrinsic argument, §8.4.3.2.3 SR8, and any other string position a boolean expression reaches);
         // intercepted at the ENTRY because the renderer needs the per-unit NumericRenderer (shift counts).
@@ -567,8 +588,10 @@ internal static class OperandText
         public string Visit(BoundAllLiteral n) => EmitText.CsLiteral(n.Literal);                          // length-unspecified: the literal once (GR3c)
         // EVERY intrinsic-result operand is intercepted at AsString's ENTRY (it needs the per-unit INSTANCE
         // renderer — P7 Step 12): alphanumeric/national/boolean through the string channel, numeric through
-        // NumericIntrinsicText (DA2). What reaches this arm is a computed operand that is NOT an intrinsic — an
-        // arithmetic expression in a string position, which no general format admits — so it stays loud.
+        // NumericIntrinsicText (DA2), and so is every COUNTER REGISTER (an integer data item by §8.4.3.14.4 GR1 /
+        // §8.4.3.15.4 GR1 — kb/Work PB1153/PB1199/PB1318). What reaches this arm is a computed operand that is
+        // neither — an arithmetic expression in a string position, which no general format admits, or an
+        // index-name, which the §13.18.38.3 r7 screen refuses in every character slot (R16) — so it stays loud.
         public string Visit(BoundComputedOperand n) =>
             EmitText.LoudValue("string", "computed expression in a string context");
         public string Visit(BoundOperandError n) => EmitText.LoudValue("string", n.Feature);

@@ -72,6 +72,22 @@ public sealed class CobolStringPadTests
     public void SpliceInto_DefaultPad_ByteIdentical(string dst, int leftmost, int length, string slice, string expected)
         => Assert.Equal(expected, CobolString.SpliceInto(dst, leftmost, length, slice));
 
+    /// <summary>A FIGURATIVE seed (<c>repeat: true</c>) is repeated character by character over every position of
+    /// the slice — ISO §8.3.3.6.4 GR2 against the reference-modified data item (§8.4.3.3.4 GR5), and the same
+    /// answer <see cref="CobolString.FigToWidth"/> gives for a fixed receiver of the slice's length (kb/Work PB1655:
+    /// `MOVE ALL "*" TO T(7:3)` over "---------" used to leave "------*  ").</summary>
+    [Theory]
+    [InlineData("---------", 7, 3, "*", "------***")]
+    [InlineData("---------", 2, 5, "AB", "-ABABA---")]                             // truncated from the right
+    [InlineData("---------", 4, CobolString.OmittedRefModLength, "xy", "---xyxyxy")]  // (leftmost:) — to the end
+    [InlineData("---------", 1, 2, "LONGER", "LO-------")]                        // seed longer than the slice
+    public void SpliceInto_Repeat_FillsTheSliceWithTheFigurativeSeed(string dst, int leftmost, int length, string seed, string expected)
+    {
+        Assert.Equal(expected, CobolString.SpliceInto(dst, leftmost, length, seed, repeat: true));
+        int start = leftmost - 1, len = length == CobolString.OmittedRefModLength ? dst.Length - start : length;
+        Assert.Equal(CobolString.FigToWidth(seed, len), expected.Substring(start, len));
+    }
+
     // ── Compare(left, right, pad) — the boolean zero-extension (§8.8.4.2.8) ─────────────────────────────────
 
     /// <summary>Boolean comparison right-extends the SHORTER operand with boolean zeros — unequal lengths

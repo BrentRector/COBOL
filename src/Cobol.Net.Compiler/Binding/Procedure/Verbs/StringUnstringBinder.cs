@@ -138,7 +138,12 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         List<BoundStatement>? onOvf = null, notOvf = null;
         if (st.stringOnOverflow() is { } ov)
             (onOvf, notOvf) = PhraseBlocks.Split(ov.statementBlock(), PhraseBlocks.StartsWithNot(ov), b => host.BindBlocks([b]));
-        return new BoundStringStmt(sendings, into, pointer, onOvf, notOvf);
+        return new BoundStringStmt(sendings, into, pointer, onOvf, notOvf)
+        {
+            // §14.9.43.4 GR2 — a figurative literal-1 / literal-2 takes identifier-3's usage (kb/Work PB1185).
+            CharacterCategory = IntrinsicArgumentRules.ClassOf(intoOperand) is CobolClass.National
+                ? PicCategory.National : PicCategory.Alphanumeric,
+        };
     }
 
     /// <summary>Bind UNSTRING (ISO §14.9.48). The sender must be category alphanumeric or national (SR2 — a
@@ -291,8 +296,9 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // statement" — so the statement's conceptual item is minted once, and every receiver's store is a MOVE
         // from it bound through the ONE move binder. The emitter used to carry a private copy of the MOVE rules
         // per receiver category, and a copy is where ANY LENGTH, reference-modified and dynamic-length receivers
-        // went missing. Bound AFTER every syntax screen above, so a refused statement mints nothing.
-        var itemCategory = IntrinsicArgumentRules.ClassOf(source) is CobolClass.National
+        // went missing. Bound AFTER every syntax screen above, so a refused statement mints nothing. The same
+        // category is GR7's figurative-delimiter context (BoundUnstringStmt.CharacterCategory — kb/Work PB1185).
+        var itemCategory =IntrinsicArgumentRules.ClassOf(source) is CobolClass.National
             ? PicCategory.National : PicCategory.Alphanumeric;
         var examined = ConceptualItem(itemCategory, "unstring");
         Place? delimiting = areas.Any(a => a.DelimiterIn is not null) ? ConceptualItem(itemCategory, "unsdelim") : null;
@@ -310,7 +316,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
                     : null));
         return new BoundUnstringStmt(source, delims, receivers, pointer, tallying, onOvf, notOvf)
         {
-            Examined = examined, Delimiting = delimiting,
+            CharacterCategory = itemCategory, Examined = examined, Delimiting = delimiting,
         };
 
         Place ConceptualItem(PicCategory category, string tag) =>

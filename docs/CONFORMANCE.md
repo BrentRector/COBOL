@@ -738,6 +738,21 @@ of an unsupported facility.
   statement of the capacity (`AlgebraicRanges.OfCounterRegister`) serves both surfaces, so they cannot disagree. A
   register `IS NUMERIC` is always true (GR3 n) 1. c.: its content is a value the register holds), and
   `IS IN-ARITHMETIC-RANGE` is always true (every capacity lies inside every mode's intermediate).
+  **The registers' implicit DESCRIPTION follows from the same capacity** (kb/Work PB1153, PB1199, PB1318): each is
+  the unsigned integer item **`PIC 9(d) USAGE DISPLAY`**, where d is the capacity's digit count — the digits of the
+  LINAGE page size (`LINAGE IS 20 LINES` → `9(2)`; a data-name page size → its PICTURE's digits) and **18** for
+  PAGE-COUNTER / LINE-COUNTER. The standard names no usage; DISPLAY is chosen because §8.4.3.15.3 SR1 admits the
+  report counters "in any context where an integer data item may appear", and only a usage-display (or national)
+  integer item may appear in all of them — a STRING sender (§14.9.43.3 SR1: "described implicitly or explicitly as
+  usage display or national") and the numeric operand of a relation with an alphanumeric operand (§8.8.4.2.5:
+  "an integer numeric data item of usage display or national"); LINAGE-COUNTER takes the same shape so the three
+  registers are one mechanism. Consequences: the register's character image is its d digits, zero-filled —
+  `DISPLAY LINAGE-COUNTER` after `LINAGE IS 20 LINES`, OPEN OUTPUT and one WRITE shows `02`, `DISPLAY PAGE-COUNTER`
+  after INITIATE shows `000000000000000001`, and `MOVE LINE-COUNTER TO` a `PIC X(4)` item stores the leftmost four
+  of the 18 digits (§14.9.25.4 GR6 a)); `FUNCTION LENGTH` / `BYTE-LENGTH` of a register is d (§15.50.4 r3); the
+  register is an integer for `PERFORM … TIMES`. `AlgebraicRanges.CounterRegisterDigits` / `IsCounterRegister` are
+  the one reader every consumer asks (`OperandText.AsString`, `IntrinsicResultType.IsIntegerOperand`,
+  `RelationComparability`, the LENGTH / BYTE-LENGTH folds). Witness: `conformance:85/pb1153_counter_register_character_image`.
 - **Floating-point value → fixed-point receiver: the conversion manner (§14.6.8.2 r1/r2/r4; kb/Work PB77,
   2026-08-18).** §14.6.8.2 r2 leaves "the manner in which the value is converted to a fixed-point value" to the
   implementor for a FLOAT-SHORT/-LONG/-EXTENDED sending item, and r1 treats an intermediate or standard-float

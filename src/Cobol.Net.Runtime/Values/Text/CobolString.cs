@@ -170,9 +170,14 @@ public static class CobolString
     /// re-applied). A boolean receiver splices with boolean-zero fill (§14.6.8.6; §8.4.3.3 GR5a — a bit position
     /// IS a char index under D-B1). When EC-BOUND-REF-MOD checking is enabled an out-of-range/zero-length ref-mod
     /// raises the fatal EC-BOUND-REF-MOD (§8.4.3.3.4); checking off keeps the lenient no-op default.
+    /// <para><paramref name="repeat"/> makes <paramref name="slice"/> a FIGURATIVE SEED — one fill character, or
+    /// the literal of <c>ALL literal-1</c> — repeated character by character over every position of the slice, the
+    /// §8.3.3.6.4 GR2 sizing against the reference-modified item (§8.4.3.3.4 GR5 makes it a data item whose length
+    /// is known only here, at run time — kb/Work PB1655). It is <see cref="FigToWidth"/>'s rule applied in place,
+    /// so a figurative stored into a slice and one sized against a fixed receiver cannot answer differently.</para>
     /// </summary>
     public static string SpliceInto(string? dst, int leftmost, int length, string? slice, char pad = ' ',
-        bool allowZeroLength = false)
+        bool allowZeroLength = false, bool repeat = false)
     {
         dst ??= ""; slice ??= "";
         int size = dst.Length;
@@ -190,7 +195,10 @@ public static class CobolString
         int len = omitted || length < 0 ? dst.Length - start : Math.Min(length, dst.Length - start);
         if (len <= 0) return dst;
         var arr = dst.ToCharArray();
-        for (int i = 0; i < len; i++) arr[start + i] = i < slice.Length ? slice[i] : pad;
+        if (repeat && slice.Length > 0)
+            for (int i = 0; i < len; i++) arr[start + i] = slice[i % slice.Length];
+        else
+            for (int i = 0; i < len; i++) arr[start + i] = i < slice.Length ? slice[i] : pad;
         return new string(arr);
     }
 

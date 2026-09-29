@@ -167,10 +167,31 @@ internal static class AlgebraicRanges
     /// ⛔ THE ONE STATEMENT OF THE REGISTERS' CAPACITY: the §15.43/§15.58/§15.83 algebraic folds and the §8.8.4.4.4
     /// GR3 g)/l)/m) class conditions both ask it here, so a HIGHEST-ALGEBRAIC of the register and an
     /// <c>IS FARTHEST-FROM-ZERO</c> test of it cannot name two different values.</summary>
-    internal static AlgebraicRange? OfCounterRegister(Bound.BoundExpr register) => register switch
+    internal static AlgebraicRange? OfCounterRegister(Bound.BoundExpr register) =>
+        CounterCapacity(register) is { } capacity ? UnsignedCounter(capacity) : null;
+
+    /// <summary>True for a COUNTER REGISTER read — LINAGE-COUNTER, LINE-COUNTER or PAGE-COUNTER — which the binder
+    /// carries as a computed operand (the register is runtime state, never storage) although the standard makes it a
+    /// DATA ITEM: "a temporary unsigned integer data item of class and category numeric" (§8.4.3.14.4 GR1 /
+    /// §8.4.3.15.4 GR1), referable "in any context where an integer data item may appear" (§8.4.3.15.3 SR1). Every
+    /// consumer that asks "is this an integer data item" or "what is its character image" asks HERE (kb/Work PB1153,
+    /// PB1199, PB1318), so a new register is one arm of <see cref="CounterCapacity"/>, not one per consumer.</summary>
+    internal static bool IsCounterRegister(Bound.BoundExpr e) => CounterCapacity(e) is not null;
+
+    /// <summary>The number of digit positions of a counter register's implicit description — the unsigned integer
+    /// item <c>PIC 9(d)</c> whose all-nines is the declared capacity (docs/CONFORMANCE.md, "the counter registers'
+    /// declared capacity"): the digits of the LINAGE page size, and 18 for LINE-/PAGE-COUNTER. It sizes the register's
+    /// character image, exactly as an integer data item's PICTURE sizes its own (§14.9.25.4 GR6's numeric-integer
+    /// sender; §8.8.4.2.5's "number of digits in the integer"). <c>null</c> for any other expression.</summary>
+    internal static int? CounterRegisterDigits(Bound.BoundExpr e) => CounterCapacity(e)?.Length;
+
+    /// <summary>⛔ THE ONE STATEMENT of a register's capacity, as its all-nines-or-literal text — both
+    /// <see cref="OfCounterRegister"/> and <see cref="CounterRegisterDigits"/> read it, so the class conditions,
+    /// the algebraic folds and the character image cannot disagree about one register.</summary>
+    private static string? CounterCapacity(Bound.BoundExpr register) => register switch
     {
-        Bound.BoundLinageCounterRef lc => UnsignedCounter(LinagePageCapacity(lc.File)),
-        Bound.BoundReportCounterRef => UnsignedCounter(ReportCounterCapacity),
+        Bound.BoundLinageCounterRef lc => LinagePageCapacity(lc.File),
+        Bound.BoundReportCounterRef => ReportCounterCapacity,
         _ => null,
     };
 

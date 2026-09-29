@@ -61,8 +61,11 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         {
             // GR3a: the sender's CONTENT transfers per the alphanumeric-to-alphanumeric move mechanics — its raw
             // character image (a numeric sender contributes its sign-carrying zoned image), not a converted value.
-            string src = OperandText.AsString(snd.Value, num);
-            string delim = snd.BySize || snd.Delimiter is null ? "null" : OperandText.AsString(snd.Delimiter, num);
+            // GR2: a figurative literal-1 / literal-2 is a one-character item of identifier-3's usage, so its
+            // HIGH-/LOW-VALUE comes from THAT usage's program collating sequence (§8.3.3.6.4 GR6; kb/Work PB1185).
+            string src = OperandText.AsString(snd.Value, num, characterCategory: s.CharacterCategory);
+            string delim = snd.BySize || snd.Delimiter is null ? "null"
+                : OperandText.AsString(snd.Delimiter, num, characterCategory: s.CharacterCategory);
             w.Line($"{acc} = {RuntimeApi.StrTransfer(acc, src, delim, ptr, ovf)};");
         }
         if (dynInto)
@@ -102,9 +105,11 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         if (s.Delimiters.Count > 0)
         {
             // GR10: applied in statement order (the kernel's earliest-match-then-first-listed scan); a figurative
-            // is its single character (GR7); a field delimiter is its FULL content — trailing spaces included
-            // (GR9: the delimiter is the content of the item; the legacy's TrimEnd was a deviation).
-            w.Line($"string[] {dels} = {{ {string.Join(", ", s.Delimiters.Select(d => OperandText.AsString(d.Value, num)))} }};");
+            // is its single character (GR7) — a NATIONAL literal when identifier-1 is national, so its HIGH-/LOW-VALUE
+            // is the national sequence's (§8.3.3.6.4 GR6; kb/Work PB1185); a field delimiter is its FULL content —
+            // trailing spaces included (GR9: the delimiter is the content of the item; the legacy's TrimEnd was a
+            // deviation).
+            w.Line($"string[] {dels} = {{ {string.Join(", ", s.Delimiters.Select(d => OperandText.AsString(d.Value, num, characterCategory: s.CharacterCategory)))} }};");
             w.Line($"bool[] {alls} = {{ {string.Join(", ", s.Delimiters.Select(d => d.All ? "true" : "false"))} }};");
         }
         else

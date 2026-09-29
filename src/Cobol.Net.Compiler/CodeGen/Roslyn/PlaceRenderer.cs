@@ -334,15 +334,18 @@ internal static class PlaceRenderer
         return sb.Append(" }").ToString();
     }
 
-    /// <summary>A figurative-constant store into a reference-modified slice: an EMPTY slice with the fill char as the
-    /// SpliceInto pad, so every targeted position takes the fill (ISO §8.3.3.6.4 GR2 / §8.4.3.3 GR5/GR6). Threads
-    /// <c>AllowZeroLength</c> exactly like the <see cref="Write"/> RefModPlace arm (review V31: omitting it made a
-    /// figurative MOVE into a zero-length slice spuriously raise fatal EC-BOUND-REF-MOD under
+    /// <summary>A figurative-constant store into a reference-modified slice: <paramref name="seed"/> — a C# string
+    /// expression holding one fill character, or the literal of <c>ALL literal-1</c> — is repeated character by
+    /// character over EVERY position of the slice (ISO §8.3.3.6.4 GR2, sized against the §8.4.3.3.4 GR5 data item the
+    /// reference modification denotes; kb/Work PB1655 — an ALL literal used to be spliced ONCE and space-padded).
+    /// The slice's length is a run-time value, so the repetition is the runtime's (<c>SpliceInto(repeat: true)</c>).
+    /// Threads <c>AllowZeroLength</c> exactly like the <see cref="Write"/> RefModPlace arm (review V31: omitting it
+    /// made a figurative MOVE into a zero-length slice spuriously raise fatal EC-BOUND-REF-MOD under
     /// <c>&gt;&gt;REF-MOD-ZERO-LENGTH ON</c> — §8.4.3.3.4 GR5c allows the zero-length result, and §14.9.25.4 GR1
     /// makes the zero-length MOVE receiver a no-op, never a raise).</summary>
-    public static string WriteFill(RefModPlace p, string fillChar) =>
-        Write(p.Inner, RuntimeApi.StrSpliceInto(SpliceBase(p.Inner), RmStart(p), RmLen(p), "\"\"", pad: fillChar,
-            allowZeroLength: p.AllowZeroLength));
+    public static string WriteFill(RefModPlace p, string seed) =>
+        Write(p.Inner, RuntimeApi.StrSpliceInto(SpliceBase(p.Inner), RmStart(p), RmLen(p), seed,
+            allowZeroLength: p.AllowZeroLength, repeat: true));
 
     /// <summary>The BASE a reference-modified RECEIVER splices into — the inner place read in the RECEIVING
     /// direction (kb/Work PB202). A ref-mod receiver's group is a §13.18.38.4 GR8 RECEIVING operand, so a

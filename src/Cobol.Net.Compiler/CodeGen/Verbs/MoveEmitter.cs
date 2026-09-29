@@ -78,18 +78,26 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             case MoveKind.RefModSlice:
                 // The slice takes the source's characters (SpliceInto left-justifies, space-fills, and
                 // truncates to the slice length), so pass the raw image, not a full-width store. EXCEPT a
-                // figurative source, which fills EVERY position of the slice (ISO §8.3.3.6.4 GR2 — repeated
-                // to the associated fixed-length item; §8.4.3.3 GR5/GR6 make the slice a unique fixed-length
-                // item); the fill char is category-aware (national/boolean = the D-N3 pin, not the PCS extreme).
+                // figurative source — a figurative word AND `ALL literal-1`, both Format-6/7 figurative constants
+                // — which fills EVERY position of the slice (ISO §8.3.3.6.4 GR2 — "the string of characters is
+                // repeated character by character until the size of the resultant string is greater than or equal
+                // to the number of character positions in the associated data item"; §8.4.3.3.4 GR5 makes the
+                // slice that data item). The ALL literal used to fall to the plain splice and land ONCE,
+                // space-padded (kb/Work PB1655). The figurative word's fill char is category-aware
+                // (national/boolean = the D-N3 pin, not the PCS extreme).
                 var rmp = (RefModPlace)target;
                 // ⛔ OperandPic, NOT raw `Pic` — THE SECOND ARM of kb/Work PB173's pad defect (its twin is
                 // PlaceRenderer.Write's RefModPlace boolean pad). `Pic` is null for any GROUP, so a
                 // figurative fill into a BIT-GROUP slice chose the alphanumeric SPACE instead of the boolean
                 // zero §14.6.8.6 requires. `OperandPic` answers the as-if PICTURE 1(m) of §13.18.29.4 GR1b —
                 // the ONE category reader, the same one RefModPlace.Category uses.
-                ctx.Writer.Line(source is BoundFigurative fig
-                    ? PlaceRenderer.WriteFill(rmp, FigurativeConstants.Fill(fig.Kind, ctx.Data.Collating, rmp.Inner.Item.OperandPic?.Category, ctx.Data.NationalCollating))
-                    : PlaceRenderer.Write(rmp, OperandText.AsString(source, num)));
+                ctx.Writer.Line(source switch
+                {
+                    BoundFigurative fig => PlaceRenderer.WriteFill(rmp,
+                        FigurativeConstants.FillText(fig.Kind, ctx.Data.Collating, rmp.Inner.Item.OperandPic?.Category, ctx.Data.NationalCollating)),
+                    BoundAllLiteral all => PlaceRenderer.WriteFill(rmp, CsLiteral(all.Literal)),
+                    _ => PlaceRenderer.Write(rmp, OperandText.AsString(source, num)),
+                });
                 break;
             case MoveKind.Group:
                 EmitGroupMove(target, source);

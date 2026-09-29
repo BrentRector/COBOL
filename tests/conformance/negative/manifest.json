@@ -5,6 +5,7 @@
   "pb1083-cobol-words-synonym-as-user-word",
   "pb1083-special-names-intrinsic-words",
   "pb1083-contained-program-intrinsic-name",
+  "pb1185-national-unstring-delimiter-at-85",
   "pb617-integer-expr-literal-sum",
   "pb1494-indicator-not-fixed",
   "pb1361-directive-after-program-text",
