@@ -35,8 +35,8 @@ was right in substance.
 - a finished workflow: IDLE, the benign case (stop the watcher on the completion notice);
 - live mode with `--idle 4`: exits after 5 s.
 
-**In the project:** the submodule is pinned at v1.13.1, the two project skills cite the new pin, and PB1714 has
-landed.
+**In the project:** the submodule is pinned at v1.13.1, all four project skills (review, spec-lookup, workstream,
+gate) and PB1699 cite the new pin, and PB1714 has landed.
 
 ## Entry 1767 — 2026-09-28 20:43 PDT — PB1713 filed: a refuter experiment for the handoff note's "next step"
 
