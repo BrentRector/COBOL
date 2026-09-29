@@ -7,7 +7,7 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 > (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/agent-fleet/SKILL.md` instead
 > (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
 > what is specific to WiseOwl COBOL — commands, paths, kb/Work, push-main, the owner's dated decisions and
-> measurements — and wins on conflict. Pinned: **brent-tools 1.13.2** (`tools/claude-skills`, kb/Work/PB1699). A
+> measurements — and wins on conflict. Pinned: **brent-tools 1.14.1** (`tools/claude-skills`, kb/Work/PB1699). A
 > practice improved here is written into the public base first, then consumed by moving the pin.
 
 # Workstream — token-frugal, restart-safe orchestration
@@ -59,7 +59,7 @@ quota kill never lands mid-step. Delete `STOP` before resuming.
 "run the gate in the background and wait for the notification" ENDS its turn, is RETURNED by the harness, and its
 background gate is KILLED — five implementers and the train-46 lander all came back "gate PENDING" with logs that stop
 mid-leg. Every dispatch prompt says: start the job in the background to a log, then BLOCK in the foreground on
-`timeout 580 bash -c 'tail -n +1 -f <log> | grep -m1 "<verdict pattern>"'`, re-issued until the verdict prints (for
+`timeout 580 bash -c 'until grep -qE "<verdict pattern>" <log>; do sleep 5; done'`, re-issued until the verdict prints (for
 push-main, append `echo "PUSH-MAIN-EXIT=$?"` to its log and block on that).
 
 **A killed agent is replaced by a FRESH agent that reads the checkpoint** (`STATUS.md` + `git log`, or the `.jsonl`).

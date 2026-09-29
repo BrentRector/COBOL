@@ -24,7 +24,7 @@ BRIEFS = {
                                       # PB1732 (I8): CI's Linux legs run under WSL before the report
                                       r'linux-gate\.sh'],
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN'],
-    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'tail -n \+1 -f', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
+    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
                               r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
                               r'linux-gate\.sh'],  # PB1732 (L10): CI's Linux legs under WSL before push-main
     'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander'],  # PB1732 (L10); PB1721 (L2)
@@ -33,7 +33,7 @@ BRIEFS = {
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\\STOP',
-                                     r'tail -n \+1 -f', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
+                                     r'until grep -q', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',
                                      r'status_delta\.py',
                                      # PB1721: the ordered gate, blocked on its own verdict line
@@ -54,9 +54,19 @@ BRIEFS = {
 SPEC = BRIEFS['dispatch-spec-implementer.md'] + [r'reports\\w\d+[a-z]\d*-PB\d+-report\.md']
 
 
+# P2: the blocking wait must RETURN when the verdict appears. `tail -f <log> | grep -m1 <verdict>` does not: grep exits
+# on the match, but tail only notices at its next write, and the verdict is the log's LAST line, so the wait idles until
+# its timeout (kb/Work PB1743, measured 2026-09-29: w72h's gate went green at 11:56 and its wait returned at 12:03:48,
+# exit 124). The form is `until grep -q <verdict> <log>; do sleep 5; done`.
+HANGING_WAIT = re.compile(r"tail -n \+1 -f[^\n]*grep -m1|tail -f[^\n]*grep -m1")
+
+
 def check(path, pats):
     text = path.read_text(encoding='utf-8')
-    return [p for p in pats if not re.search(p if p != POINTER else re.escape(POINTER), text)]
+    missing = [p for p in pats if not re.search(p if p != POINTER else re.escape(POINTER), text)]
+    if HANGING_WAIT.search(text):
+        missing.append('P2: a `tail -f … | grep -m1` wait (it idles to its timeout); use `until grep -q …; do sleep 5; done`')
+    return missing
 
 
 # P1: a mechanical role takes its model from its own frontmatter (Sonnet). A per-call `model` on its agent() call

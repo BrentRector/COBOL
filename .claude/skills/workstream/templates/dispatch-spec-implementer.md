@@ -32,7 +32,7 @@ build/gate is running is RETURNED BY THE HARNESS AND ITS BACKGROUND PROCESS IS K
 1. Start the gate in the background, logging to a file:
      PowerShell (run_in_background): pwsh -NoProfile -File scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
 2. Then BLOCK in the foreground until the verdict line appears, in chunks under the 10-minute tool limit:
-     Bash (timeout 590000): timeout 580 bash -c 'tail -n +1 -f "<log>" | grep -m1 -E "=== BUILD-LOCAL GATE: "' ; tail -3 "<log>"
+     Bash (timeout 590000): timeout 580 bash -c 'until grep -qE "=== BUILD-LOCAL GATE: " "<log>"; do sleep 5; done' ; tail -3 "<log>"
    If it times out with no verdict, issue the SAME command again. Do not use `sleep`; do not end your turn.
 3. Only after the verdict line is in hand: record it, checkpoint, write the report, return the structured result.
 
