@@ -13,7 +13,7 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
-## Entry 1765 — 2026-09-28 20:07 PDT — PB1708 pivot designed: the gate runs everything, in order; the continuity wall is one lexer lock
+## Entry 1768 — 2026-09-28 20:07 PDT — PB1708 pivot designed: the gate runs everything, in order; the continuity wall is one lexer lock
 
 **Why a pivot.** PB1708's first design made the recorded impact map SELECT an implementer's tests, precisely
 enough to be worth it: restructured registries, entry-level dependencies (map schema 3, static-field probes),
@@ -78,6 +78,61 @@ deleted) · M12 in-assembly leg filter + orderers · M2 cross-worktree gate cap 
 leg at BelowNormal is under 6 min over a train) · M13 the ordered gate (driver, population check, fail-fast,
 `-Filter` removed from `build-local` and every caller). M6, M7, M11, M2 are independent; M13 lands last with M2.
 No production code changed.
+
+## Entry 1767 — 2026-09-28 20:43 PDT — PB1713 filed: a refuter experiment for the handoff note's "next step"
+
+A LinkedIn commenter pointed out that the handoff note's "next step" line is the one claim that no reviewer checks.
+- Verdicts get refuters, designs get adversarial review (PB1708 was rejected twice today), and the work list is
+  computed.
+- The STATUS.md stamp (PB1698) catches a STALE note, but not a WRONG next step.
+- The owner replied publicly that we will test a refuter on that line.
+
+PB1713 records the A/B design. Arm B runs a read-only refuter on each next step before hand-off. The metric is how
+often a successor's first hour goes to a next step that proves wrong, net of the refuter's token cost. Evidence
+goes under `fleet-optimization/`.
+
+## Entry 1766 — 2026-09-28 20:39 PDT — CI audits: PB1708 cited a design-doc section as an ISO clause
+
+The landing of Entry 1765 failed CI: `audit_code_citations.py --check` reported a PHANTOM at `kb/Work/PB1708.md:56`,
+"the standard has no clause §3.14.3". The `§` referred to a section of `DESIGN-test-build-ci.md`, not to the
+standard. It now reads "DESIGN-test-build-ci.md section 3.14.3", and the audit reports 0 findings. The lesson: `§`
+in kb/Work notes is reserved for ISO clauses, and design-doc sections are named by file plus "section".
+
+## Entry 1765 — 2026-09-28 20:35 PDT — PB1708 pivot recorded ("order, don't skip"); no per-commit impact maps; CLAUDE.md Testing corrected; PB1712 filed
+
+**The first PB1708 design was rejected twice.**
+- The first review REJECTED the design (7 BLOCKING findings). A reviser closed 5.
+- An independent re-review REJECTED it again: 2 still open and 3 new BLOCKING.
+- Each cycle found another way the single-process, memoizing compiler hides dependencies from the impact map:
+  values memoized into static collections (`CobolKeywordTokens.Probed`, `CollationKeyCache`); edition state cached
+  in the preprocessor, lexer and parser.
+- Any such hole lets precise selection SILENTLY skip a failing test. Even perfect method-level precision has a
+  median of about 69 % of the suite.
+- The re-review also found that the source-generator reversal (the owner's third decision, given on the
+  orchestrator's framing) rested on a false premise and would create two mechanisms for one job. That approval is
+  WITHDRAWN.
+
+**The owner's decisions (all in PB1708):**
+- "Pivot: order, don't skip". Every gate runs the whole population ORDERED by impact likelihood; the map only orders
+  and never skips.
+- Invest in whole-suite speed; keep the gate cap until it is measured out; shelve the registry restructuring as a
+  speed measure.
+- "Don't record an impact map on every main commit". PB1709 is retired, since a stale map only mis-orders tests.
+- "Edit the CLAUDE.MD". Its Testing section had said "run only the WAVE-LOCAL filtered gate (~2 min)", stale since
+  train 70b. It now states the derived gate, the lander's whole-suite gate, the battery in its own worktree and the
+  ORDER, DON'T SKIP direction. It gets updated again when the ordered gate lands.
+
+**PB1712 is filed.** The impact map is blind to static-field reads and can silently under-select; for example, a
+change to one DiagnosticCatalog entry selects 80 tests while up to 9,225 reach its readers. It is harmless under
+ordering-only, and it stays documented.
+
+**The pivot design** (workflow wf_08642598-d3c) is written and under adversarial review. It measured the Conformance
+run at about 571 s on the critical path. The continuity partitions are 525–557 s each, and each testhost uses about
+3.8 of 24 cores. It found two PRODUCT speed defects:
+- M6: the ANTLR lexer re-computes its start state per token, which the `cobol` CLI pays on every compile;
+- M7: a table VALUE fill that checks §13.18.63.3 SR23 late and over-fills; this is the 219 s long pole.
+The plan's mechanisms are M6, M7, M11 (the order plan), M12 (in-assembly leg filters and orderers), M2 (the gate
+cap) and M13 (the ordered whole-population gate).
 
 ## Entry 1764 — 2026-09-28 17:11 PDT — PB1708 decided: fix the registry coupling at its root; the design fleet is dispatched
 
