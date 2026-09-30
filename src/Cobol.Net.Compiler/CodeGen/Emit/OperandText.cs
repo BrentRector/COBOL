@@ -365,7 +365,7 @@ internal static class OperandText
         if (pic.IsFloat)
         {
             string dec = RuntimeApi.NumParseImageFloat(PlaceRenderer.Read(p), p.Item.ProfileName, binary32Carrier: pic.IsSingle);
-            return RuntimeApi.FloatDisplay(sending.FloatChecked() ? RuntimeApi.FloatSending(dec) : dec);
+            return RuntimeApi.FloatDisplay(sending.FloatChecked(pic) ? RuntimeApi.FloatSending(dec) : dec);
         }
         // A 16-byte UNSIGNED BinaryCapacity window (UInt128 carrier, kb/Work R10): the unsigned parse twin
         // reinterprets the signed lane's Int128 bit-identically, and the U-named format lane keeps the full
@@ -505,7 +505,7 @@ internal static class OperandText
             // (invariant-culture shortest round-trip, §14.9.11 GR1 implementor-defined) — never a bare .ToString().
             // The sending read is wrapped in CobolFloat.Sending (raises EC-DATA-NOT-FINITE for NaN/±Inf under checking,
             // §14.6.13.2 item 3) UNLESS this is an exempt context — SendingRef.FloatChecked() false.
-            { Category: PicCategory.Numeric } => sending.FloatChecked()
+            { Category: PicCategory.Numeric } => sending.FloatChecked(p.Item.Pic!)
                 ? RuntimeApi.FloatDisplay(RuntimeApi.FloatSending(PlaceRenderer.Read(p)))
                 : RuntimeApi.FloatDisplay(PlaceRenderer.Read(p)),
             // ⛔ THE BOOLEAN ARM IS SPLIT OUT, and the reason is the defect this whole change is about: it used to

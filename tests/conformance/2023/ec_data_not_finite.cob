@@ -11,7 +11,7 @@
       *> ("a noninteger numeric sending operand does not move to an ... alphanumeric receiver"). The leg was
       *> green only while SR1 was unenforced at the sending position; it is REMOVED rather than re-spelled,
       *> because the DISPLAY leg below reaches the same string-image read from source the standard admits.
-      *> same-usage MOVE (COMP-2 -> COMP-2), and VALIDATE (not yet emitted). Under >>TURN … CHECKING ON the USE
+      *> same-usage MOVE (FLOAT-BINARY-64 -> FLOAT-BINARY-64), and VALIDATE (not yet emitted). Under >>TURN … CHECKING ON the USE
       *> declarative reports the condition via FUNCTION EXCEPTION-STATUS (§15.33) and RESUME AT NEXT STATEMENT
       *> (§14.9.33) continues, so every leg is observable in one run. With checking OFF nothing raises.
       >>TURN EC-DATA-NOT-FINITE CHECKING ON
@@ -19,9 +19,9 @@
        PROGRAM-ID. EC-DNF.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 WS-INF USAGE COMP-2.
-       01 WS-B   USAGE COMP-2.
-       01 WS-S   USAGE COMP-1.
+       01 WS-INF USAGE FLOAT-BINARY-64.
+       01 WS-B   USAGE FLOAT-BINARY-64.
+       01 WS-S   USAGE FLOAT-BINARY-32.
        PROCEDURE DIVISION.
        DECLARATIVES.
        H SECTION.

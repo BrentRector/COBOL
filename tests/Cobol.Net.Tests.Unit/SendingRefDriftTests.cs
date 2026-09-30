@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Binding.Model;
 using CobolNet.CodeGen.Emit;
 using Xunit;
 
@@ -54,7 +55,22 @@ public sealed class SendingRefDriftTests
 
     [Fact]
     public void FloatChecked_ExemptsExactlyRule3sList_AndChecksEveryOtherContext()
-        => AssertPartition(Rule3Exempt, r => r.FloatChecked(), "§14.6.13.2 rule 3 (EC-DATA-NOT-FINITE)");
+        => AssertPartition(Rule3Exempt, r => r.FloatChecked(StandardFloat), "§14.6.13.2 rule 3 (EC-DATA-NOT-FINITE)");
+
+    private static readonly PicInfo StandardFloat = new(PicCategory.Numeric, Usage.FloatBinary64, Length: 8, Digits: 0, Scale: 0, Signed: true);
+
+    /// <summary>kb/Work PB1684: §14.6.13.2 3) scopes EC-DATA-NOT-FINITE to a STANDARD floating-point usage — an
+    /// implementor float (COMP-2, FLOAT-LONG) is never checked, in any context.</summary>
+    [Fact]
+    public void FloatChecked_IsFalseForAnImplementorFloatUsage()
+    {
+        foreach (var u in new[] { Usage.Double, Usage.FloatShort, Usage.FloatLong, Usage.FloatExtended })
+        {
+            var pic = new PicInfo(PicCategory.Numeric, u, Length: 8, Digits: 0, Scale: 0, Signed: true);
+            foreach (var r in All)
+                Assert.False(r.FloatChecked(pic), $"{u} is not a standard floating-point usage; SendingRef.{r} checked it");
+        }
+    }
 
     [Fact]
     public void AlphanumericChecked_IsTrueForExactlyTheMoveToNumericContext()
@@ -75,7 +91,7 @@ public sealed class SendingRefDriftTests
         foreach (var (name, f) in new (string, Func<SendingRef, bool>)[]
                  {
                      ("FixedPointChecked", r => r.FixedPointChecked()),
-                     ("FloatChecked", r => r.FloatChecked()),
+                     ("FloatChecked", r => r.FloatChecked(StandardFloat)),
                      ("AlphanumericChecked", r => r.AlphanumericChecked()),
                  })
         {

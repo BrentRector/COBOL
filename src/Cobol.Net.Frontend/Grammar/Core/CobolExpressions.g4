@@ -781,14 +781,17 @@ signedNumericLiteral
 // DOT-based decimals use DECIMALLIT from the lexer (maximal munch resolves
 // DOT-as-decimal vs DOT-as-sentence-terminator unambiguously).
 // COMMA-based decimals for DECIMAL-POINT IS COMMA are assembled here in the parser.
+// ⛔ A COMMA LITERAL IS ONE CHARACTER-STRING (§8.3.3.3.2 / §8.3.5), so its tokens are CONTIGUOUS — a space before the
+// comma ends the previous literal (kb/Work PB1446: `1 ,5` fused into the interior-point literal 1,5 = 1.5, the value
+// of characters OUTSIDE the literal, where `,5` is 0.5). The left-edge predicate sees the hidden-channel gap.
 numericLiteralCore
     : FLOATLIT                             // 1.5E3, 2.5E-2 (floating-point literal, ISO §8.3.3.3.3 — D16)
     | COMMA_FLOATLIT                       // 1,5E3 (the DECIMAL-POINT IS COMMA floating-point literal — kb/Work PB98)
     | DECIMALLIT                           // 123.45 or .45 (dot decimal from lexer)
     | SIGNED_DECIMALLIT                    // -15.6 (sign-adjacent literal — FUNCTION-argument regions only, P7 Step 12)
     | SIGNED_INTEGERLIT                    // -4 (sign-adjacent literal — FUNCTION-argument regions only)
-    | INTEGERLIT COMMA INTEGERLIT          // 123,45 (comma decimal — DECIMAL-POINT IS COMMA)
-    | COMMA INTEGERLIT                     // ,45 (leading comma decimal)
+    | {tokensAreContiguous(3)}? INTEGERLIT COMMA INTEGERLIT  // 123,45 (comma decimal — DECIMAL-POINT IS COMMA)
+    | {tokensAreContiguous(2)}? COMMA INTEGERLIT             // ,45 (leading comma decimal)
     | INTEGERLIT                           // 123 (integer)
     ;
 

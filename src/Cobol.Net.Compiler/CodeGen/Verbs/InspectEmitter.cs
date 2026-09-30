@@ -48,14 +48,15 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     {
         var w = ctx.Writer;
         string back = ins.Backward ? "true" : "false";
+        var cat = CharacterCategoryOf(ins.Target);
 
         if (ins.Tallying.Count > 0)
         {
             var t = ins.Tallying;
             string kinds = string.Join(", ", t.Select(x => RuntimeApi.InspectTallyKindText(x.Kind)));
-            string pats = string.Join(", ", t.Select(x => OperandTextOf(x.Pattern)));
-            string befs = string.Join(", ", t.Select(x => OperandTextOf(x.Before)));
-            string afts = string.Join(", ", t.Select(x => OperandTextOf(x.After)));
+            string pats = string.Join(", ", t.Select(x => OperandTextOf(x.Pattern, cat)));
+            string befs = string.Join(", ", t.Select(x => OperandTextOf(x.Before, cat)));
+            string afts = string.Join(", ", t.Select(x => OperandTextOf(x.After, cat)));
             w.Line($"long[] __cnt{id} = {RuntimeApi.InspectTally(img, kinds, pats, befs, afts, back)};");
             // One add per operand, in source order — the same counter may appear under several operands and
             // accumulates each count (GR11 — INSPECT adds, it never initializes).
@@ -70,10 +71,10 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         {
             var r = ins.Replacing;
             string kinds = string.Join(", ", r.Select(x => RuntimeApi.InspectReplaceKindText(x.Kind)));
-            string pats = string.Join(", ", r.Select(x => OperandTextOf(x.Pattern)));
-            string reps = string.Join(", ", r.Select(x => OperandTextOf(x.Replacement)));
-            string befs = string.Join(", ", r.Select(x => OperandTextOf(x.Before)));
-            string afts = string.Join(", ", r.Select(x => OperandTextOf(x.After)));
+            string pats = string.Join(", ", r.Select(x => OperandTextOf(x.Pattern, cat)));
+            string reps = string.Join(", ", r.Select(x => OperandTextOf(x.Replacement, cat)));
+            string befs = string.Join(", ", r.Select(x => OperandTextOf(x.Before, cat)));
+            string afts = string.Join(", ", r.Select(x => OperandTextOf(x.After, cat)));
             // GR14: a figurative literal-3 takes the size of ITS pattern, which the runtime knows and the binder may
             // not (kb/Work PB1126) — so the flags travel, and the runtime fills.
             string? figs = r.Any(x => x.ReplacementIsFigurative)
@@ -85,7 +86,7 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
 
         if (ins.Converting is { } cv)
         {
-            w.Line($"{img} = {RuntimeApi.InspectConvert(img, OperandTextOf(cv.From), OperandTextOf(cv.To), OperandTextOf(cv.Before), OperandTextOf(cv.After), back, cv.ToIsFigurative)};");
+            w.Line($"{img} = {RuntimeApi.InspectConvert(img, OperandTextOf(cv.From, cat), OperandTextOf(cv.To, cat), OperandTextOf(cv.Before, cat), OperandTextOf(cv.After, cat), back, cv.ToIsFigurative)};");
             mutated = true;
         }
 
@@ -171,7 +172,15 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     /// <summary>An INSPECT operand as the runtime's C# string argument, or <c>null</c> when absent (a CHARACTERS
     /// pattern / an omitted delimiter). An identifier operand reads its FULL raw image at run time — current
     /// content, no trimming (GR5; a PIC X(2) holding "A " is the two-character pattern "A "); a signed numeric
-    /// operand reads de-signed (GR4d).</summary>
-    private string OperandTextOf(BoundOperand? op) =>
-        op is null ? "null" : OperandText.AsString(op, num, deSign: true);
+    /// operand reads de-signed (GR4d).
+    /// <para>⛔ <paramref name="cat"/> IS THE INSPECTED ITEM'S CATEGORY (kb/Work PB1414): an INSPECT operand's
+    /// context is identifier-1's characters, so a figurative HIGH-/LOW-VALUE operand is read from the NATIONAL
+    /// program collating sequence when identifier-1 is national and from the alphanumeric one otherwise
+    /// (§8.3.3.6.4 GR6/GR7 — the same rule <c>OperandText.AsString</c>'s characterCategory answers for STRING and
+    /// UNSTRING, kb/Work PB1185).</para></summary>
+    private string OperandTextOf(BoundOperand? op, PicCategory? cat) =>
+        op is null ? "null" : OperandText.AsString(op, num, deSign: true, characterCategory: cat);
+
+    private static PicCategory? CharacterCategoryOf(BoundOperand target) =>
+        target is BoundFieldOperand { Place.Item.Pic: { } pic } ? pic.Category : null;
 }

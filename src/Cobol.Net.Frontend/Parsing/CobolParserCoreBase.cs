@@ -766,6 +766,21 @@ public abstract class CobolParserCoreBase : Parser
         return false;
     }
 
+    /// <summary>Are the next <paramref name="count"/> tokens ONE character-string — each starting at the character
+    /// after the previous one's last (no space, no hidden-channel token between them)? The comma-decimal literals
+    /// <c>123,45</c> and <c>,45</c> are assembled from tokens (§8.3.3.3.2), and a space before the comma begins a
+    /// NEW character-string (§8.3.5). A left-edge predicate, so it steers prediction (kb/Work PB1446).</summary>
+    protected bool tokensAreContiguous(int count)
+    {
+        for (int i = 1; i < count; i++)
+        {
+            var a = TokenStream.LT(i);
+            var b = TokenStream.LT(i + 1);
+            if (a is null || b is null || a.StopIndex + 1 != b.StartIndex) return false;
+        }
+        return true;
+    }
+
     /// <summary>The ARGUMENT-scoped twin of <see cref="boolExprAhead"/> (kb/Work PB65, FMT-15.45.2): does a boolean
     /// operator belong to THIS intrinsic-function argument? §8.4.3.2.3 SR8 admits "a boolean expression" as
     /// argument-1 and §15.3 item 3 names it for a Boolean argument (INTEGER-OF-BOOLEAN(BIT-A B-AND BIT-B)). The

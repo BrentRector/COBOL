@@ -1,6 +1,5 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet.Common;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
@@ -353,7 +352,9 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 var allFig = host.Expr.FigurativeOperand(fig);
                 if (allFig is BoundAllLiteral or BoundOperandError) return (allFig, allFig is BoundAllLiteral);
             }
-            return (new BoundStringLiteral(InspectFigurativeChar(fig).ToString()), true);
+            // A one-character figurative stays a BoundFigurative, so the emitter reads HIGH-/LOW-VALUE from the
+            // collating sequence of identifier-1's category (§8.3.3.6.4 GR6/GR7; kb/Work PB1414) — not the native pin.
+            return (host.Expr.FigurativeOperand(fig), true);
         }
         // ⛔ A FUNCTION-IDENTIFIER OPERAND (ISO §8.4.3.1.2 Format 1; fix-queue PB45). §14.9.22.2 writes these as
         // `identifier-n | literal-n` and every inspectChar use is SENDING, so `INSPECT S TALLYING N FOR ALL
@@ -390,15 +391,4 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             + "boolean, or national literal (ISO §14.9.22.3 SR3)",
             $"INSPECT operand '{c.GetText()}' (ISO §14.9.22.3 SR3)"), false);
     }
-
-    /// <summary>The single character a figurative INSPECT operand denotes (ISO §14.9.22.3 SR3 — an implicit
-    /// one-character item; HIGH/LOW-VALUE are U+00FF/U+0000 per COBOLNET_DESIGN §14.9, matching the emitter's
-    /// figurative fills).</summary>
-    private static char InspectFigurativeChar(Core.FigurativeConstantContext fig) =>
-        fig.zeroWord() is not null ? '0'
-        : fig.spaceWord() is not null ? ' '
-        : fig.highValueWord() is not null ? '\u00ff'
-        : fig.lowValueWord() is not null ? '\u0000'
-        : fig.quoteWord() is not null ? '"'
-        : ' ';
 }

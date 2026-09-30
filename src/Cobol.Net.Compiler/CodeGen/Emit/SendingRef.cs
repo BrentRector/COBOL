@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Binding.Model;
+
 namespace CobolNet.CodeGen.Emit;
 
 /// <summary>
@@ -83,10 +85,16 @@ internal static class SendingRefRules
     /// <para>⛔ WRITTEN AS THE EXCLUSION LIST THE STANDARD WRITES, not as <c>r is Normal</c>. The two are equal
     /// only while those four are the whole enum: the equality reading silently EXEMPTS every context added
     /// later, so <see cref="SendingRef.MoveToNumeric"/> would have turned off the float check for
-    /// <c>MOVE &lt;COMP-2&gt; TO &lt;PIC 9(5)&gt;</c> — a raise the standard requires, lost to a new enum member
-    /// that never mentioned floats. <c>SendingRefDriftTests</c> holds both lists to their clause text.</para></summary>
-    public static bool FloatChecked(this SendingRef r) =>
-        r is not (SendingRef.ClassCondition or SendingRef.SignCondition or SendingRef.SameUsageMove or SendingRef.Validate);
+    /// <c>MOVE &lt;FLOAT-BINARY-64&gt; TO &lt;PIC 9(5)&gt;</c> — a raise the standard requires, lost to a new enum member
+    /// that never mentioned floats. <c>SendingRefDriftTests</c> holds both lists to their clause text.</para>
+    /// <para>⛔ AND ONLY A STANDARD floating-point usage (kb/Work PB1684): the clause scopes the condition to "a
+    /// sending operand … described with a standard floating-point usage" (FLOAT-BINARY-n / FLOAT-DECIMAL-n —
+    /// <see cref="UsageFamilies.IsStandardFloat"/>), so an implementor float (COMP-1/COMP-2, FLOAT-SHORT / -LONG /
+    /// -EXTENDED) holding +Inf is not a sending-operand error. <c>PicInfo.IsFloat</c> is the STORAGE question and
+    /// answers true for both.</para></summary>
+    public static bool FloatChecked(this SendingRef r, PicInfo pic) =>
+        UsageFamilies.IsStandardFloat(pic.Usage)
+        && r is not (SendingRef.ClassCondition or SendingRef.SignCondition or SendingRef.SameUsageMove or SendingRef.Validate);
 
     /// <summary>§14.9.25.4 <b>GR6 d) 1</b>: emit the EC-DATA-INCOMPATIBLE checked read of an ALPHANUMERIC or
     /// NATIONAL sending operand? The rule lives inside GR6 d), whose scope IS "when a numeric or numeric-edited

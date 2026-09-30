@@ -407,7 +407,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     internal static NumX WindowedNum(string image, DataItem item, PicInfo pic, SendingRef sending) => pic switch
     {
         { IsFloat: true } => new NumX(
-            sending.FloatChecked()
+            sending.FloatChecked(pic)
                 ? RuntimeApi.FloatSending(RuntimeApi.NumParseImageFloat(image, item.ProfileName, binary32Carrier: false))
                 : RuntimeApi.NumParseImageFloat(image, item.ProfileName, binary32Carrier: false),
             0, Real: true),
@@ -477,7 +477,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // item 3) UNLESS this is an exempt context (sign condition / same-usage MOVE — SendingRef.FloatChecked()
         // false = raw read; note rule 2's arm in WindowedNum reads its OWN, shorter exemption list off the same value).
         { IsFloat: true } => new NumX(
-            sending.FloatChecked() ? RuntimeApi.FloatSending($"(double)({PlaceRenderer.Read(p)})") : $"(double)({PlaceRenderer.Read(p)})",
+            sending.FloatChecked(p.Item.Pic!) ? RuntimeApi.FloatSending($"(double)({PlaceRenderer.Read(p)})") : $"(double)({PlaceRenderer.Read(p)})",
             0, Real: true),
         // (A COPY of a float item's content — not an arithmetic read — is FloatCarrierRead below: this arm and
         // WindowedNum's float lane widen to binary64 because arithmetic evaluates there (D16), and a widening
@@ -747,7 +747,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         string raw = p.Item.StoreAsImage
             ? RuntimeApi.NumParseImageFloat(PlaceRenderer.Read(p), p.Item.ProfileName, binary32Carrier: p.Item.Pic!.IsSingle)
             : PlaceRenderer.Read(p);
-        return sending.FloatChecked() ? RuntimeApi.FloatSending(raw) : raw;
+        return sending.FloatChecked(p.Item.Pic!) ? RuntimeApi.FloatSending(raw) : raw;
     }
 
     /// <summary>Rescale a value's unscaled long up to <paramref name="toScale"/> (widening only here → exact).
