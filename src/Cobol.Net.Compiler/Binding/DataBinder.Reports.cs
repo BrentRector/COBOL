@@ -2697,13 +2697,20 @@ public sealed partial class DataBinder
                         Edition.Error(shape.Code, $"RD '{model.Name}': CONTROL operand '{op}' {shape.Clause}");
                     // §8.4.3.3.3 SR1 governs a ref-modded operand here exactly as in the procedure division, and
                     // it is read through the ONE exclusion test so the two paths cannot drift (kb/Work PB205).
-                    // The BOUNDS are deliberately NOT screened here: §8.4.3.3.4 item 5c defines an out-of-range
-                    // slice as the EC-BOUND-REF-MOD condition, and the emitted RefModPlace raises it — a general
-                    // rule, not a syntax rule, so a compile-time rejection would be this compiler's invention.
                     else if (op.RefModStart is not null && ctl.Item is not null
                              && ReferenceResolver.RefModExclusion(ctl.Item) is { } why)
                         Edition.Error(DiagnosticCatalog.RefModIdentifierNotPermitted, $"RD '{model.Name}': CONTROL operand '{op}': reference "
                             + $"modification of {why} is not permitted (ISO §8.4.3.3.3 SR1)");
+                    // The literal BOUNDS are screened by the same one screen the procedure division uses (kb/Work
+                    // PB1707 part 1): a CONTROL operand's positions are integer literals by SR4 and no statement
+                    // exists here for an EC-BOUND-REF-MOD checking directive to govern, so a violation is the
+                    // error. A zero length is not judged (REF-MOD-ZERO-LENGTH is a per-line directive this data
+                    // clause cannot be folded against); the run-time test still owns it.
+                    else if (op.RefModStart is { } ctlStart && ctl.Item is { } ctlRmItem
+                             && ReferenceResolver.LiteralRefModRangeViolation(ctlRmItem, ctlStart, op.RefModLength,
+                                 omittedLength: op.RefModLength is null, allowZeroLength: true) is { } outOfRange)
+                        Edition.Error(DiagnosticCatalog.RefModLiteralOutOfRange,
+                            $"RD '{model.Name}': CONTROL operand '{op}': {outOfRange}");
                 }
 
             var seenOccurs = new HashSet<ReportOccursSpec>(ReferenceEqualityComparer.Instance);

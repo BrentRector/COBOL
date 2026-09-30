@@ -1,5 +1,8 @@
-      *> reject-at: 2002 2014 2023
+      *> reject-at: 2023
       *> PB58 - the argument-screen predicate the class column could not carry. ISO 15.78.3 r1: "at least one character position in length" - a zero-length reference-modified view.
+      *> A zero-length reference modification is itself legal only under REF-MOD-ZERO-LENGTH (7.3.23) - without
+      *> it the statement is refused at its literal length (COBOLNET2670) before the argument screen is reached.
+       >>REF-MOD-ZERO-LENGTH ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. NEGREVERSEZERO.
        DATA DIVISION.

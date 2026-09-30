@@ -575,6 +575,10 @@ public sealed class ReferenceResolver(DataBinder data)
         }
         if ((cleanRef is not null ? ReadRefMod(cleanRef) : ReadRefMod(refCtx!)) is not { } spec)
             return SegmentFailure(DataBinder.WrittenText(dref));   // a bound the materializer refused or deferred (§8.4.3.3.3 SR4)
+        // ⛔ A LITERAL OUT-OF-RANGE REFERENCE MODIFICATION IS SCREENED HERE, once, where the item and the positions
+        // are both known (kb/Work PB1707 part 1, R60): refused while checking is off, compiled with a warning while
+        // it is on (the run-time raise is then what the program asked for).
+        if (!ScreenRefModLiterals(dref, described, spec, dref.Start.Line)) return Refused();
         return RefModView(described, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
     }
 
@@ -718,6 +722,71 @@ public sealed class ReferenceResolver(DataBinder data)
             { Category: PicCategory.Pointer or PicCategory.ProgramPointer or PicCategory.FunctionPointer } => "a pointer",
             { } p => $"an item of category {p.Category}",
         };
+    }
+
+    /// <summary>⛔ THE ONE COMPILE-TIME RANGE SCREEN of a reference modification (kb/Work PB1707 part 1; owner decision
+    /// R60) — the bind-time half of <c>CobolString.RefModOutOfRange</c>, written for LITERAL positions. ISO §8.4.3.3.4
+    /// 5) b): leftmost-position is a position of the item, 1 through its size; 5) c): a specified length is a positive
+    /// nonzero integer (zero only under REF-MOD-ZERO-LENGTH, §7.3.23) and "The sum of leftmost-position and length
+    /// minus the value one shall be less than or equal to the number of positions in the data item referenced by
+    /// identifier-1". A violation is the fatal EC-BOUND-REF-MOD; §14.6.13.1.3 8)'s last paragraph licenses the
+    /// compiler to produce no code for one it detects while checking is not enabled, and GnuCOBOL (cobc/typeck.c,
+    /// "offset of '%s' out of bounds" / "length of '%s' out of bounds") refuses it, so the caller reports
+    /// <see cref="DiagnosticCatalog.RefModLiteralOutOfRange"/> there and the warning twin where checking is on.
+    /// <para>Only an item of FIXED size is screened — the size is then a compile-time fact: a DYNAMIC LENGTH item
+    /// (§8.5.1.10), an ANY LENGTH item (§13.18.2) and an item with an OCCURS DEPENDING beneath it (or a dynamic
+    /// table) have a run-time size, which is the run-time range test's. <paramref name="start"/> /
+    /// <paramref name="length"/> are null for a position that is not an integer literal; a bound is judged only when
+    /// it is known, so <c>X(1:N)</c> is never screened and <c>X(7:N)</c> is refused on its start alone. A length
+    /// literal that exceeds the whole item is refused whatever the start, because no start in 1..size can make it fit.
+    /// Returns the violated clause's words, or null.</para></summary>
+    internal static string? LiteralRefModRangeViolation(DataItem item, System.Numerics.BigInteger? start,
+        System.Numerics.BigInteger? length, bool omittedLength, bool allowZeroLength)
+    {
+        if (item.IsDynamicLength || item.IsAnyLength || HasOdoOnOrBeneathOrDynamicTable(item)) return null;
+        int size = RefModPlace.PositionCount(item);
+        if (start is { } s && (s < 1 || s > size))
+            return $"leftmost-position {s} is not a position of the {size}-position item (ISO §8.4.3.3.4 5) b))";
+        if (omittedLength || length is not { } len) return null;
+        if (len == 0 && !allowZeroLength)
+            return "a zero length is not a positive nonzero integer (ISO §8.4.3.3.4 5) c); REF-MOD-ZERO-LENGTH is not on)";
+        if (len > 0 && (start is { } s2 ? s2 + len - 1 > size : len > size))
+            return $"the reference modification ({(start is { } s3 ? s3.ToString() : "…")}:{len}) extends past the "
+                + $"{size}-position item (ISO §8.4.3.3.4 5) c))";
+        return null;
+    }
+
+    private static bool HasOdoOnOrBeneathOrDynamicTable(DataItem item) =>
+        DataItem.HasOdoOnOrBeneath(item) || item.IsDynamicTable || HasVariableLengthSubordinate(item);
+
+    /// <summary>The decimal-integer LITERAL a rendered position is, or null when it is anything else (a data-name
+    /// read, an expression, a narrowing call) — the screen's "is this position known at compile time".</summary>
+    private static System.Numerics.BigInteger? LiteralPosition(string? rendered) =>
+        rendered is { Length: > 0 } r && r.All(char.IsAsciiDigit) ? System.Numerics.BigInteger.Parse(r) : null;
+
+    /// <summary>The hook that answers "is checking for EC-BOUND-REF-MOD enabled at this source line?" — installed by
+    /// <c>StatementBinder</c> (which owns the statement-level TURN fold, overlays included) exactly as
+    /// <see cref="MaterializeSegment"/> is, and null on the DATA-division resolution paths, where no statement
+    /// exists for a checking directive to govern (so the screen reads null as "not enabled").</summary>
+    internal Func<int, bool>? RefModCheckingAt { get; set; }
+
+    /// <summary>Screen the literal positions of a reference modification of <paramref name="described"/> written at
+    /// <paramref name="line"/> and report a violation once per written reference: the error
+    /// (<see cref="DiagnosticCatalog.RefModLiteralOutOfRange"/>, the reference is refused — the caller returns
+    /// false) where EC-BOUND-REF-MOD checking is not enabled, the warning twin where it is (the reference binds).</summary>
+    private bool ScreenRefModLiterals(Core.DataReferenceContext dref, DataItem described, RefModSpec spec, int line)
+    {
+        if (_probing) return true;   // R30 purity: a probe never diagnoses (kb/Work PB157)
+        if (LiteralRefModRangeViolation(described, LiteralPosition(spec.Start), LiteralPosition(spec.Length),
+                spec.Length is null, spec.AllowZeroLength) is not { } why) return true;
+        bool checking = RefModCheckingAt?.Invoke(line) ?? false;
+        if (_diagnosed.Add(dref))
+        {
+            string at = $"'{DataBinder.WrittenText(dref)}': {why}";
+            if (checking) data.Edition.Warning(DiagnosticCatalog.RefModLiteralOutOfRangeChecked, at);
+            else data.Edition.Error(DiagnosticCatalog.RefModLiteralOutOfRange, at);
+        }
+        return checking;
     }
 
     /// <summary>§8.5.1.12 — a variable-length group has a dynamic-length elementary item or a dynamic-capacity table

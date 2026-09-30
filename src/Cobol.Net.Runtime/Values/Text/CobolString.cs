@@ -101,8 +101,9 @@ public static class CobolString
     /// names as checked even inside a class condition (kb/Work PB1117 — the tolerant digit scan it replaced made
     /// EC-DATA-INCOMPATIBLE unreachable here and dropped a signed image's sign). Returns <c>long</c> because the
     /// rendered ref-mod positions are long-valued COBOL expressions that <c>RuntimeApi.RefModStart</c>/
-    /// <c>RefModLength</c> cast at the call site. Checking OFF truncates toward zero and continues, the same
-    /// lenient posture <see cref="RefMod(string,int,int,bool)"/> takes for an out-of-range position.</para>
+    /// <c>RefModLength</c> cast at the call site. A fractional position is the same violation as an out-of-range
+    /// one and takes the same outcome (<see cref="ExceptionState.RefModViolation"/>: raised when checking is on, the
+    /// run unit's termination when it is off — kb/Work R60).</para>
     /// <para>The carrier overloads mirror the subscript side's, and for the same reason: the item's storage form
     /// is decided after the bind-time expression text is produced.</para></summary>
     public static long RefModPosition(long unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
@@ -125,7 +126,7 @@ public static class CobolString
     private static long RefModScaled(Int128 unscaled, int scale)
     {
         if (CobolNum.HasFraction(unscaled, scale))
-            ExceptionState.RefModError(
+            ExceptionState.RefModViolation(
                 $"reference-modification position {CobolNum.PlainValue(unscaled, scale)} is not an integer "
                 + "(ISO §8.4.3.3.4 item 5c)");
         return CobolNum.PositionOf(unscaled, scale);
@@ -134,10 +135,12 @@ public static class CobolString
     /// <summary>
     /// Reference modification read (ISO §8.4.3.3): the substring of <paramref name="s"/> beginning at 1-based
     /// <paramref name="leftmost"/> for <paramref name="length"/> characters (<see cref="OmittedRefModLength"/> = the
-    /// omitted "to the end" form). When EC-BOUND-REF-MOD checking is enabled (§14.6.13.1.1) an out-of-range
-    /// leftmost/length or a zero-length result raises the fatal EC-BOUND-REF-MOD (§8.4.3.3.4, spec :7089); with
-    /// checking OFF (the default) out-of-range positions are clamped and the result space-padded to the requested
-    /// length (the lenient default).
+    /// omitted "to the end" form). ⛔ A VIOLATION NEVER RETURNS A SLICE: an out-of-range leftmost/length or a
+    /// zero-length result raises the fatal EC-BOUND-REF-MOD when checking is enabled (§14.6.13.1.1; §8.4.3.3.4,
+    /// spec :7089) and TERMINATES the run unit when it is not — the owner's loud-abort rule for an outcome the
+    /// standard names no answer for (kb/Work PB1707 part 2, R60), one rule for the read and the write
+    /// (<see cref="SpliceInto"/>) through <see cref="RefModOutOfRange"/>. So past the range test the slice always
+    /// lies wholly inside <paramref name="s"/>: there is nothing to clamp and nothing to pad.
     /// </summary>
     public static string RefMod(string? s, int leftmost, int length, bool allowZeroLength = false)
     {
@@ -147,19 +150,14 @@ public static class CobolString
         // §8.4.3.3.4 (spec :7089), item 5c: leftmost shall be 1..size; a SPECIFIED length shall be a positive nonzero
         // integer (a negative specified length is a violation regardless of the directive — REF-MOD-ZERO-LENGTH,
         // §7.3.23, <paramref name="allowZeroLength"/>, relaxes ONLY the zero case, C14), with leftmost+length-1 <= size.
-        // For the OMITTED (to-the-end) form only the leftmost is range-checked. A violation raises EC-BOUND-REF-MOD
-        // (fatal) ONLY when checking is on; checking off falls through to the lenient clamp below (byte-identical).
+        // For the OMITTED (to-the-end) form only the leftmost is range-checked.
         if (RefModOutOfRange(leftmost, length, size, omitted, allowZeroLength))
-            ExceptionState.RefModError(
+            ExceptionState.RefModViolation(
                 $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
                 + $"{size}-position item (ISO §8.4.3.3.4 item 5c)");
         int start = leftmost - 1;
-        if (start < 0) start = 0;
-        int avail = Math.Max(0, s.Length - start);
-        int len = omitted || length < 0 ? avail : length;   // to-end for omitted; a checking-off negative clamps to-end
-        if (len <= 0) return "";
-        string slice = start < s.Length ? s.Substring(start, Math.Min(len, avail)) : "";
-        return slice.Length < len ? slice.PadRight(len) : slice;
+        int len = omitted ? size - start : length;   // in range: 0 <= len <= size - start
+        return len == 0 ? "" : s.Substring(start, len);
     }
 
     /// <summary>
@@ -168,8 +166,9 @@ public static class CobolString
     /// <paramref name="slice"/> (left-justified, <paramref name="pad"/>-filled, truncated to the slice length).
     /// <paramref name="dst"/>'s overall length is preserved; only the targeted positions change (editing is not
     /// re-applied). A boolean receiver splices with boolean-zero fill (§14.6.8.6; §8.4.3.3 GR5a — a bit position
-    /// IS a char index under D-B1). When EC-BOUND-REF-MOD checking is enabled an out-of-range/zero-length ref-mod
-    /// raises the fatal EC-BOUND-REF-MOD (§8.4.3.3.4); checking off keeps the lenient no-op default.
+    /// IS a char index under D-B1). An out-of-range/zero-length ref-mod raises the fatal EC-BOUND-REF-MOD
+    /// (§8.4.3.3.4) when checking is enabled and TERMINATES the run unit when it is not — the same
+    /// <see cref="RefModOutOfRange"/> and the same outcome as the read (<see cref="RefMod"/>; kb/Work R60).
     /// <para><paramref name="repeat"/> makes <paramref name="slice"/> a FIGURATIVE SEED — one fill character, or
     /// the literal of <c>ALL literal-1</c> — repeated character by character over every position of the slice, the
     /// §8.3.3.6.4 GR2 sizing against the reference-modified item (§8.4.3.3.4 GR5 makes it a data item whose length
@@ -187,18 +186,55 @@ public static class CobolString
         // out-of-range leftmost/length still raises regardless of the directive. The OMITTED form range-checks only
         // the leftmost.
         if (RefModOutOfRange(leftmost, length, size, omitted, allowZeroLength))
-            ExceptionState.RefModError(
+            ExceptionState.RefModViolation(
                 $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
                 + $"{size}-position receiver (ISO §8.4.3.3.4 item 5c)");
         int start = leftmost - 1;
-        if (start < 0 || start >= dst.Length) return dst;
-        int len = omitted || length < 0 ? dst.Length - start : Math.Min(length, dst.Length - start);
-        if (len <= 0) return dst;
+        int len = omitted ? size - start : length;   // in range (RefModViolation never returns): 0 <= len <= size - start
+        if (len == 0) return dst;
         var arr = dst.ToCharArray();
         if (repeat && slice.Length > 0)
             for (int i = 0; i < len; i++) arr[start + i] = slice[i % slice.Length];
         else
             for (int i = 0; i < len; i++) arr[start + i] = i < slice.Length ? slice[i] : pad;
+        return new string(arr);
+    }
+
+    /// <summary>⛔ A WINDOW THE COMPILER CHOSE, NOT A REFERENCE MODIFICATION THE PROGRAM WROTE (kb/Work PB1707,
+    /// R60). <see cref="RefMod"/> and <see cref="SpliceInto"/> are ISO §8.4.3.3's reference modification: a range
+    /// violation there is EC-BOUND-REF-MOD and, with checking off, the end of the run unit. The runtime also slices
+    /// character images at positions the COMPILER computes — a REDEFINES view over its class backing, an
+    /// occurs-depending group's current extent, the prefix an INVOKE/CALL boundary splices back, the current record
+    /// of a READ … INTO — and there a position past the end of the image is not a program error but the image being
+    /// SHORTER than the extent asked for (a record area holds only what was read into it). This reads
+    /// <paramref name="length"/> characters from 1-based <paramref name="leftmost"/>
+    /// (<see cref="OmittedRefModLength"/> = to the end): it clamps to the image and space-extends the result to the
+    /// requested length, raises nothing, and is never the lowering of source text. Two names for two jobs: a
+    /// reference modification that cannot silently pad, and an image window that must.</summary>
+    public static string Window(string? s, int leftmost, int length)
+    {
+        s ??= "";
+        int start = Math.Max(leftmost - 1, 0);
+        int avail = Math.Max(0, s.Length - start);
+        int len = length == OmittedRefModLength || length < 0 ? avail : length;
+        if (len <= 0) return "";
+        string slice = start < s.Length ? s.Substring(start, Math.Min(len, avail)) : "";
+        return slice.Length < len ? slice.PadRight(len) : slice;
+    }
+
+    /// <summary>The receiving twin of <see cref="Window"/>: <paramref name="dst"/> with the window's positions
+    /// replaced by <paramref name="slice"/> (left-justified, <paramref name="pad"/>-filled, truncated to the window),
+    /// its overall length preserved; a window beyond the image changes nothing. Raises nothing — see
+    /// <see cref="Window"/> for why this is not <see cref="SpliceInto"/>.</summary>
+    public static string WindowInto(string? dst, int leftmost, int length, string? slice, char pad = ' ')
+    {
+        dst ??= ""; slice ??= "";
+        int start = leftmost - 1;
+        if (start < 0 || start >= dst.Length) return dst;
+        int len = length == OmittedRefModLength || length < 0 ? dst.Length - start : Math.Min(length, dst.Length - start);
+        if (len <= 0) return dst;
+        var arr = dst.ToCharArray();
+        for (int i = 0; i < len; i++) arr[start + i] = i < slice.Length ? slice[i] : pad;
         return new string(arr);
     }
 

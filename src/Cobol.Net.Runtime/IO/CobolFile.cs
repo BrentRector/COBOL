@@ -130,6 +130,11 @@ public static class CobolFile
     /// a different holder still holds first (<see cref="FileConnector.HeldLineDrain"/>).</summary>
     internal static void HoldLine(string name, Action drain) => _reg.HoldLine(name, drain);
 
+    /// <summary>Does the print device of the connector of <paramref name="name"/> stand on a line that was
+    /// presented and not yet travelled past? The report writer's page-empty state is only "the device is at page
+    /// line 1" while this is false (kb/Work PB1667).</summary>
+    internal static bool DeviceOnOpenLine(string name) => _reg.DeviceOnOpenLine(name);
+
     // ⛔ No ungoverned READ / REWRITE / BEFORE-AND-AFTER-WRITE entry exists on this facade any more, and none may
     // come back (kb/Work PB683): the emitted code reaches those verbs ONLY through ReadShared / RewriteShared /
     // WriteShared, which decide record-lock governance where the OPEN statement's own SHARING phrase is visible

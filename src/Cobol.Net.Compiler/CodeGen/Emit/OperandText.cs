@@ -201,9 +201,11 @@ internal static class OperandText
     /// are padding, and sending them is what kb/Work PB339 fixes.
     /// <para>ZERO IS A LEGAL LENGTH here and must not raise EC-BOUND-REF-MOD: GR16's closing sentence is "If the
     /// number of bytes determined as above is zero, the record is a zero-length item", and §14.9.25.4 GR1/GR2
-    /// then space-fill the receiver — which is exactly what a zero-length ref-mod result moves.</para></summary>
+    /// then space-fill the receiver — which is exactly what a zero-length window moves. It is an image WINDOW
+    /// (<see cref="RuntimeApi.StrWindow"/>), not a reference modification the program wrote, so no range
+    /// violation exists to raise (kb/Work PB1707).</para></summary>
     public static string CurrentRecordImage(BoundCurrentRecord n) =>
-        RuntimeApi.StrRefMod(RecordAreaImage(n.Area), "1", CurrentRecordLength(n), allowZeroLength: true);
+        RuntimeApi.StrWindow(RecordAreaImage(n.Area), "1", CurrentRecordLength(n));
 
     /// <summary>§13.18.43.4 GR16's two arms, rendered — "the number of bytes in the current record that
     /// participate as the sending operands in the implicit MOVE statement": GR16 a) "If data-name-1 is specified,

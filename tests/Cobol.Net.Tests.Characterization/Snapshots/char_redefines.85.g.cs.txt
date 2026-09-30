@@ -44,8 +44,8 @@ internal sealed class _PRG_CHAR_REDEFINES : ICobolProgram
                 {
                     WS_A = (long)(CobolNum.Store(1234L, 0, _P_0, CobolRounding.Truncation));
                     System.Console.WriteLine(CobolNum.FormatDisplay(WS_A, _P_1));
-                    _redef_WS_G = CobolString.SpliceInto(_redef_WS_G, (int)(0 + 1), 4, CobolString.Store("WXYZ", 4));
-                    System.Console.WriteLine(CobolString.RefMod(_redef_WS_G, (int)(0 + 1), 2) + CobolString.RefMod(_redef_WS_G, (int)(2 + 1), 2));
+                    _redef_WS_G = CobolString.WindowInto(_redef_WS_G, (int)(0 + 1), 4, CobolString.Store("WXYZ", 4));
+                    System.Console.WriteLine(CobolString.Window(_redef_WS_G, (int)(0 + 1), 2) + CobolString.Window(_redef_WS_G, (int)(2 + 1), 2));
                     throw new StopRun();
                 }
                 default:

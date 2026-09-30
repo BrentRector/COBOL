@@ -5,22 +5,25 @@
       *> required to produce executable code. It is implementor-defined
       *> which fatal exception conditions, if any, are detected at compile
       *> time, and the circumstances under which they are detected."
-      *> DETERMINATION PINNED (docs/CONFORMANCE.md DOC-A.1-69): the only
-      *> compile-time detection is the COBOLNET1662 warning for an
-      *> unprovided ORDER TABLE; the compiler ALWAYS produces executable
-      *> code; a constant subscript outside the OCCURS bounds, a constant
-      *> reference modification outside the item, a literal zero divisor
-      *> and a constant intrinsic argument outside its domain compile
-      *> without a diagnostic and, with checking enabled, raise the fatal
-      *> condition at RUN time. (DOC-A.1-69 also says "with checking off
-      *> it continues"; that is item 70's question, and DOC-A.1-70
-      *> answers it differently for a zero divisor. See the unchecked
-      *> half below.)
-      *> WHY EACH LEG CAN FAIL: a compile-time rejection of any of the
-      *> four constant cases fails the strict compile; omitting their code
-      *> loses a CAUGHT line or leaves V=0050000; a run-time crash with
-      *> checking OFF loses the last lines (the corpus also requires exit
-      *> code 0).
+      *> DETERMINATION PINNED (docs/CONFORMANCE.md DOC-A.1-69): the
+      *> compile-time detections are the COBOLNET1662 warning for an
+      *> unprovided ORDER TABLE and a LITERAL reference modification
+      *> outside a fixed-size item (kb/Work PB1707: COBOLNET2670 error
+      *> where EC-BOUND-REF-MOD checking is off, COBOLNET2671 warning
+      *> where it is on). With checking ON the compiler still produces
+      *> executable code: a constant subscript outside the OCCURS bounds,
+      *> a constant reference modification outside the item (the warning
+      *> above), a literal zero divisor and a constant intrinsic argument
+      *> outside its domain compile and raise the fatal condition at RUN
+      *> time. (DOC-A.1-69 also says "with checking off it continues";
+      *> that is item 70's question, and DOC-A.1-70 answers it
+      *> differently for a zero divisor and, since PB1707, for a
+      *> reference modification. See the unchecked half below.)
+      *> WHY EACH LEG CAN FAIL: a compile-time REJECTION of any of the
+      *> four constant cases at checking ON fails the strict compile;
+      *> omitting their code loses a CAUGHT line or leaves V=0050000; a
+      *> run-time crash with checking OFF loses the last lines (the
+      *> corpus also requires exit code 0).
       *> DERIVATION (checked half, >>TURN ... CHECKING ON):
       *>   E (6) on OCCURS 5: §8.4.2.3.4 2) "greater than the highest
       *>     permissible occurrence number, the EC-BOUND-SUBSCRIPT
@@ -49,9 +52,15 @@
       *>   divisor (§14.7.5 case 2) has no result to store and, with
       *>   checking not enabled, the run unit terminates abnormally
       *>   (exit 1), which a golden cannot carry. It is left out here.
-      *>   The unchecked subscript and ref-mod legs have no observable
-      *>   receiving value; they show only that the code runs and
-      *>   execution continues.
+      *>   NO UNCHECKED REFERENCE MODIFICATION: a literal one outside the
+      *>   item is refused at compile time while checking is off
+      *>   (COBOLNET2670, negative:pb1707-refmod-literal-out-of-range),
+      *>   and a computed one ends the run unit (owner decision R60),
+      *>   which a golden cannot carry (tests in
+      *>   RefModUncheckedTerminationTests). It is left out here.
+      *>   The unchecked subscript leg has no observable receiving
+      *>   value; it shows only that the code runs and execution
+      *>   continues.
       *>   OBSERVABLE LEG: V is set to 5, then SQRT (-1) with checking
       *>   off. §15.3 14) "the implementor defines the result of the
       *>   function reference" (cite.py OK); DOC-A.1-90 determines the
@@ -92,7 +101,6 @@
        >>TURN EC-ALL CHECKING OFF
        UNCHECKED-P.
            MOVE E (6) TO R.
-           MOVE S (7:2) TO R.
            MOVE 5 TO V.
            COMPUTE V = FUNCTION SQRT (-1).
            DISPLAY "V=" V.

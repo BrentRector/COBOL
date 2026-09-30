@@ -9,14 +9,9 @@
       *> representation license), so a REDEFINES window over it can deposit a character that is no boolean value
       *> at all - and both channels that READ such an item must report it: the value channel (a boolean
       *> expression operand, L2) and the character channel (DISPLAY, L1).
-      *> L4 pins the observable that a ZERO-LENGTH reference raises nothing, which is what 14.6.13.2's closing
-      *> paragraph requires ("If the content of a sending operand is not referenced by a given execution of a
-      *> statement, any incompatible data in that operand is not detected") even though 8.8.4.4.4 GR1 makes the
-      *> CLASS CONDITION on a zero-length item false - the two questions differ exactly there, and zero-length
-      *> boolean operands are ordinary (8.8.2 NOTE 2 combines two of them into a zero-length result), so raising
-      *> on one would reject working programs.  It does NOT claim which reader served it: a reference-modified
-      *> result is an elementary alphanumeric item whatever the underlying category (8.4.3.3.4 GR6).  The
-      *> corresponding carve-out inside the boolean checked read is stated at CobolBool.Sending.
+      *> (The zero-length leg, L4 - a reference that does not touch the incompatible content raises nothing - needs
+      *> a zero-length reference modification, which is legal only under the COBOL-2023 directive
+      *> REF-MOD-ZERO-LENGTH, so it lives in conformance:2023/pb230_zero_length_boolean_operand.)
       *> EC-DATA-INCOMPATIBLE is fatal (Table 13), so RESUME AT NEXT STATEMENT abandons the raising statement:
       *> L1 prints nothing after its marker and L2 leaves RB holding what L0 stored.
        >>TURN EC-DATA-INCOMPATIBLE CHECKING ON
@@ -51,8 +46,5 @@
            DISPLAY "   RB=[" RB "]".
            DISPLAY "L3 B-NOT of the same operand".
            COMPUTE RB = B-NOT BB.
-           DISPLAY "   RB=[" RB "]".
-           DISPLAY "L4 zero-length operand is not incompatible".
-           COMPUTE RB = BB (1:0).
            DISPLAY "   RB=[" RB "]".
            STOP RUN.

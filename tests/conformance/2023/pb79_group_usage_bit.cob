@@ -126,12 +126,11 @@
            MOVE 2 TO NN.
            DISPLAY "ODO1=[" XO "]".
            DISPLAY "ODO2=[" XO(1:8) "]".
-      *> a position past the current extent is outside the operand (8.4.3.3.4 item 5 - EC-BOUND-REF-MOD when
-      *> checking is on; with it off, the clamped read the CHARACTER twin gives for the same shape).
-           DISPLAY "ODO3=[" XO(9:3) "]".
-      *> GR8 a) receiving: positions past the current extent are NOT modified.
-           MOVE B"000" TO XO(9:3).
-           DISPLAY "ODO4=[" XO "]".
+      *> a position past the current extent is outside the operand (8.4.3.3.4 item 5 b/c - EC-BOUND-REF-MOD). The
+      *> ODO3/ODO4 legs that used to be here read and wrote XO(9:3) with checking off and pinned the space-padded
+      *> read and the clamped write; an UNCHECKED violation now ends the run unit (kb/Work PB1707, owner decision
+      *> R60 - the loud abort), so a golden cannot carry it and RefModUncheckedTerminationTests owns the witness
+      *> over an occurs-depending group's current extent. The numbering is kept.
       *> the boolean-expression channel reads the SAME alphabet at the SAME extent (the comparison used to put
       *> the packed byte image against a boolean literal).
            IF XO = B"11101010" DISPLAY "ODO5=OK"

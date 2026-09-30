@@ -114,7 +114,7 @@ internal static class PlaceRenderer
         // A VARIABLE-LENGTH GROUP of a cell-backed class (kb/Work PB1026): read as its contiguous image at its
         // current extent — §8.5.1.11.2, the same composition a declared group's CurrentImage() performs.
         RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g),
-        RedefViewPlace v => RuntimeApi.StrRefMod(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString()),
+        RedefViewPlace v => RuntimeApi.StrWindow(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString()),
         // The OCCURS DYNAMIC CAPACITY register (§13.18.38 GR15): a read-only view over the table's current capacity.
         CapacityRegisterPlace c => $"{RenderPath(c.Table, AccessDir.Sending)}.Capacity",
         // A REPORT SECTION sum counter (§13.18.54.4 GR1/GR4/GR12): RWCS engine state, read at the counter's own
@@ -241,7 +241,7 @@ internal static class PlaceRenderer
             $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, rhs)};",
         // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
         RedefViewPlace v => $"{RenderPath(v.Backing, AccessDir.Sending)} = " +
-            $"{RuntimeApi.StrSpliceInto(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString(), rhs)};",
+            $"{RuntimeApi.StrWindowInto(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString(), rhs)};",
         // Unreachable: SET Format 14 routes to BoundSetCapacity, and any other store into the CAPACITY register is
         // rejected COBOLNET1523 at bind time (§13.18.38 SR30–32). The backstop for a receiver path that forgot the gate.
         CapacityRegisterPlace => throw new System.InvalidOperationException(
@@ -637,7 +637,7 @@ internal static class PlaceRenderer
     /// <summary>The bit writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
     private static string BitsWrite(Place group, string bits, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{GroupTarget(o.Inner)}.FromBits({RuntimeApi.StrSpliceInto($"{GroupTarget(o.Inner)}.AsBits()", "1", LengthExpr(o), bits, "'0'", allowZeroLength: true)});"
+            ? $"{GroupTarget(o.Inner)}.FromBits({RuntimeApi.StrWindowInto($"{GroupTarget(o.Inner)}.AsBits()", "1", LengthExpr(o), bits, "'0'")});"
             : $"{GroupTarget(group)}.FromBits({bits});";
 
     /// <summary>⛔ <b>THE ONE WRITER OF A GROUP OPERAND'S VALUE</b> — the receiving twin of
@@ -692,7 +692,7 @@ internal static class PlaceRenderer
     /// <summary>The national writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
     private static string NatWrite(Place group, string value, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{GroupTarget(o.Inner)}.FromNat({RuntimeApi.StrSpliceInto($"{GroupTarget(o.Inner)}.AsNat()", "1", NatLengthExpr(o), value, null, allowZeroLength: true)});"
+            ? $"{GroupTarget(o.Inner)}.FromNat({RuntimeApi.StrWindowInto($"{GroupTarget(o.Inner)}.AsNat()", "1", NatLengthExpr(o), value)});"
             : $"{GroupTarget(group)}.FromNat({value});";
 
     /// <summary>An occurs-depending NATIONAL group's current extent in NATIONAL POSITIONS: the byte extent the
@@ -701,12 +701,12 @@ internal static class PlaceRenderer
         $"({CharLengthExpr(p)}) / {RuntimeApi.BytesPerNational}";
 
     /// <summary>A receiving store over an occurs-depending GROUP operand's CURRENT extent (GR8a — depending-outside):
-    /// splice the stored prefix over the live image, leaving positions past the count unmodified. <c>allowZeroLength</c>
-    /// because a zero current extent (OCCURS 0 TO n DEPENDING at count 0, §13.18.38 GR8a) is a no-op store, NOT a
-    /// reference-modification violation — this internal splice is not a user ref-mod, so it must not raise
-    /// EC-BOUND-REF-MOD under checking (review V48).</summary>
+    /// splice the stored prefix over the live image, leaving positions past the count unmodified. A zero current
+    /// extent (OCCURS 0 TO n DEPENDING at count 0, §13.18.38 GR8a) is a no-op store, NOT a reference-modification
+    /// violation — this is an image WINDOW the compiler chose (<see cref="RuntimeApi.StrWindowInto"/>), not a user
+    /// ref-mod, so it never raises EC-BOUND-REF-MOD (review V48; kb/Work PB1707).</summary>
     public static string ReceiveInto(OdoGroupPlace p, string imageExpr) =>
-        WriteGroupImage(p.Inner, RuntimeApi.StrSpliceInto(GroupImage(p.Inner), "1", CharLengthExpr(p), imageExpr, allowZeroLength: true),
+        WriteGroupImage(p.Inner, RuntimeApi.StrWindowInto(GroupImage(p.Inner), "1", CharLengthExpr(p), imageExpr),
             "occurs-depending group receive");
 
     /// <summary>The C# <c>int</c> expression for an occurs-depending group operand's current POSITION extent (GR8):

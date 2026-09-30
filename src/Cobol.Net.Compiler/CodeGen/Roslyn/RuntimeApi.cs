@@ -934,6 +934,21 @@ internal static class RuntimeApi
         + $"{(pad is null ? "" : $", pad: {pad}")}{(allowZeroLength ? ", allowZeroLength: true" : "")}"
         + $"{(repeat ? ", repeat: true" : "")})";
 
+    /// <summary>⛔ A COMPILER-CHOSEN WINDOW over a character image — <c>CobolString.Window</c>; the emit for every
+    /// slice the compiler computes (a REDEFINES view, an occurs-depending group's current extent, an INVOKE/CALL
+    /// boundary prefix, a READ … INTO current record) as opposed to a reference modification the PROGRAM wrote,
+    /// which is <see cref="StrRefMod(string, string, string, bool)"/>. The first is lenient by design (a short
+    /// image pads); the second ends the run unit on a range violation (kb/Work PB1707, R60).
+    /// <c>RuntimeApiWindowDriftTests</c> holds the two lists apart.</summary>
+    public static string StrWindow(string s, string start, string len) =>
+        $"{nameof(CobolString)}.{nameof(CobolString.Window)}({s}, {start}, {len})";
+
+    /// <summary>The receiving twin of <see cref="StrWindow"/> — <c>CobolString.WindowInto</c>;
+    /// <paramref name="pad"/> is an optional C# <c>char</c> literal (boolean-zero <c>'0'</c>), null = space.</summary>
+    public static string StrWindowInto(string s, string start, string len, string rhs, string? pad = null) =>
+        $"{nameof(CobolString)}.{nameof(CobolString.WindowInto)}({s}, {start}, {len}, {rhs}"
+        + $"{(pad is null ? "" : $", pad: {pad}")})";
+
     /// <summary>The three-way alphanumeric comparison — <c>CobolString.Compare</c>. <paramref name="weightsArg"/>
     /// is the trailing collation argument (", __COLLATE" — the program's CobolCollation carrier), possibly empty.</summary>
     public static string StrCompare(string a, string b, string weightsArg) =>

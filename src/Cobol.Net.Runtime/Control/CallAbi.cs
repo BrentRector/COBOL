@@ -557,7 +557,7 @@ public static class CobolArgAdapt
             case ManagedPointer<string> sp:
                 return ManagedPointer<string>.OverField(
                     () => CobolString.Store(sp.Value, width),
-                    v => sp.Value = CobolString.SpliceInto(sp.Value, 1, Math.Min(width, sp.Value?.Length ?? width), v));
+                    v => sp.Value = CobolString.WindowInto(sp.Value, 1, Math.Min(width, sp.Value?.Length ?? width), v));
             case { } np when args[i].Num is { } d && CellImage(np, d) is { } image:
             {
                 // ⛔ THE STORAGE'S OWN IMAGE (kb/Work PB873; §14.2.3 GR8 — "operates as if the formal parameter
@@ -576,7 +576,7 @@ public static class CobolArgAdapt
                     v =>
                     {
                         string current = CellImage(np, d)!;
-                        WriteCellImage(np, CobolString.SpliceInto(current, 1, Math.Min(viewWidth, current.Length), v), d);
+                        WriteCellImage(np, CobolString.WindowInto(current, 1, Math.Min(viewWidth, current.Length), v), d);
                     });
             }
             case { } np when args[i].Num is null && ReadNumericCell(np) is not null:
