@@ -357,6 +357,7 @@ public sealed partial class DataBinder
         // the one presence fact the program arm's null carrier realizes (kb/Work PB133 wave C).
         var pd = m.Ctx.procedureDivision();
         int pos = 0;
+        var header = new ProcedureHeaderScreen(Edition, where);   // §14.2.2 SR1/SR5/SR6 — the ONE header screen (kb/Work PB1145)
         foreach (var prm in pd?.usingClause()?.usingParameter() ?? [])
         {
             using var _ = Edition.At(prm);
@@ -378,7 +379,7 @@ public sealed partial class DataBinder
             if (item is null)
                 Edition.Error("COBOLNET0888", $"{where}: PROCEDURE DIVISION USING parameter '{pname}' is not "
                     + "a level-01/77 LINKAGE SECTION item of the method (ISO §14.2.2 SR1)");
-            else
+            else if (header.AdmitFormal(pname, item))
                 m.Binding!.Formals.Add(new OoFormal(item, pos, OoParamName(m, item, pos), optional));
             pos++;
         }
@@ -389,9 +390,8 @@ public sealed partial class DataBinder
             if (m.Binding!.Returning is null)
                 Edition.Error("COBOLNET0888", $"{where}: PROCEDURE DIVISION RETURNING item '{rref.GetText()}' "
                     + "is not a level-01/77 LINKAGE SECTION item of the method (ISO §14.2.2 SR1)");
-            else if (m.Binding!.Formals.Any(f => ReferenceEquals(f.Item, m.Binding!.Returning)))
-                Edition.Error("COBOLNET0888", $"{where}: '{rref.GetText()}' may not be both a USING parameter "
-                    + "and the RETURNING item (ISO §14.2.2 SR4)");
+            else
+                header.CheckReturning(rref.GetText(), m.Binding!.Returning);   // SR5 / SR6 — SR6 was mis-cited "SR4" here
         }
         // The method's PD-header RAISING phrase (§14.2.1): the ONE partition every header arm calls
         // (RaisingPhrase — kb/Work PB815/PB814; D-EO8), so the method arm and the program arm cannot disagree.

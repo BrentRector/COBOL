@@ -234,10 +234,13 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         if (IsInRule(ruleStack, "specialNamesParagraph") && !IsIdentifier(token) && !IsLiteral(token))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0305, "Unexpected token in SPECIAL-NAMES. Check implementor-name or mnemonic-name syntax.", 15));
 
-        // 8. ASCENDING/DESCENDING KEY not parsed in OCCURS
+        // 8. ASCENDING/DESCENDING KEY where the entry can only end (kb/Work PB1266). KEY is supported; what this
+        // catches is its POSITION: §13.18.38.2 writes the OCCURS clause's KEY phrases BEFORE INDEXED BY, so a KEY phrase
+        // after it finds the entry ready to end. The hint used to claim the clause was "not yet supported" and that a
+        // table had been created without a key — false on both counts.
         if ((tokenUpper == "ASCENDING" || tokenUpper == "DESCENDING") &&
             expectedTokens?.Contains("'.'") == true)
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0100, "ASCENDING/DESCENDING KEY clause in OCCURS is not yet supported. Table created without sort key.", 5));
+            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0100, "ASCENDING/DESCENDING KEY is out of place: in an OCCURS clause the KEY phrases are written before INDEXED BY (ISO §13.18.38.2).", 5));
 
         // 9. BLANK WHEN ZERO as separate tokens
         if (tokenUpper == "BLANK" && expectedTokens?.Contains("'.'") == true)

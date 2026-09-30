@@ -17601,13 +17601,13 @@
   "ordinal": 1,
   "subject": "File section",
   "rule-digest": "b8690ffc5909",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#InitializerFrom; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileSection",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#InFileSection",
+  "test-ref": "conformance:2023/pb1241_file_section_dynamic_length_value_ignored",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1241, 14d). Rule text (cite.py --check 13.4.4 'The initial length of a dynamic-length elementary item is zero.' -> OK §13.4.4 1)): three sentences. (1) VALUE in the file section is ignored except in INITIALIZE: pinned-worktree FD records bind through BindFileSection -> BindEntries(EntrySection.File) and emit as Program fields exactly like WORKING-STORAGE, so ValueInitializer applies the VALUE at initial state; for a FIXED-length item that is an admissible realization of sentence (2) 'the initial value ... is undefined' (cite.py --check 13.18.63.4 'In the file section, VALUE clauses take effect only during the execution of an INITIALIZE statement.' -> OK), and INITIALIZE ... ALL TO VALUE applies it (conformance:2002/pb576_file_section_value_initialize pins the operative half + the plain-INITIALIZE boundary). (3) DIVERGES: ValueInitializer.InitializerFrom's IsDynamicLength arm reads the VALUE regardless of section, citing only the general §8.6.4 sentence (cite.py --check 8.6.4 'When the data description entry of a dynamic-length elementary item contains a VALUE clause, the rules of the VALUE clause define the length of that item in its initial state.' -> OK), which §13.4.4 1) overrides for the file section. PROBE (pinned cobol.exe --std 2023, probe/file-section/p4.cob): FD OUTF. 01 R. 05 D PIC X DYNAMIC LENGTH VALUE \"HELLO\". 05 E PIC X DYNAMIC LENGTH. DISPLAY FUNCTION LENGTH(D) before any INITIALIZE -> observed LEN-D=5 (expected 0 per §13.4.4 1) third sentence); E (no VALUE) -> 0 correct; after INITIALIZE R ALL TO VALUE -> LEN-D=5 D=[HELLO] correct. One of three sentences wrong-answer -> DIVERGES. No existing register note found (grep kb/Work for 13.4.4 / 'initial length'): new finding. pb576 covers only sentence 1, so test-ref left empty. Same result at --std 2014 (LEN-D=5). || Editions (adjudicator): 2002, 2014, 2023 (VALUE-in-file-section / INITIALIZE sentences; COBOL-85 barred VALUE outside level 88 in the file section, not re-derived here); dynamic-length sentence 2014 and 2023 (dynamic-length elementary items exist at 2014 per VERSION_CHANGE_REFERENCE row 60 / E.3.3 item 17; A.4.5 at 2023)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1241: a file-section VALUE clause takes no effect at initial state, so a dynamic-length item there starts at length zero; INITIALIZE ... TO VALUE still applies it.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.4.5.3-1",
@@ -21591,13 +21591,13 @@
   "ordinal": 2,
   "subject": "EXTERNAL clause",
   "rule-digest": "9d4ee557d192",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CheckExternalizedNameUniqueness; src/Cobol.Net.Runtime/Control/ExternalTable.cs#Cell",
-  "test-ref": "conformance:negative/pb511-externalized-name-not-unique",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CheckExternalizedNameUniqueness",
+  "test-ref": "conformance:negative/pb511-externalized-name-not-unique; conformance:negative/pb1236-externalized-name-differs-only-in-case",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1236, 14d). §13.18.22.3 SR2: \"In the same source element, the externalized name of the subject of the entry that includes the EXTERNAL clause shall not be the same as the externalized name of any other entry that includes the EXTERNAL clause.\" (cite.py OK §13.18.22.3 2)). The screen exists (COBOLNET2159) and fires for SR2DUP (two AS \"Q\"), SR2DEF (default name A vs AS \"A\") and SR2FD (two FDs AS \"ZZ\"). DEFECT: the screen compares with StringComparer.Ordinal while the run-unit store it protects (ExternalTable._cells) keys with StringComparer.OrdinalIgnoreCase, so two entries whose externalized names differ only in case pass SR2 and are then silently ALIASED onto one cell. Probe SR2ALIAS: `01 A PIC X(3) EXTERNAL.` + `01 B PIC X(5) EXTERNAL AS \"a\".`; MOVE \"ABC\" TO A; MOVE \"12345\" TO B; DISPLAY -> observed `A=[123] B=[123  ]`. Spec-derived expected: the implementation must apply ONE formation/mapping of externalized names (§8.3.2.2 2), so either the names are distinct (expected `A=[ABC] B=[12345]`) or they are the same externalized name and SR2 rejects the source; the observed truncated shared storage satisfies neither. The negative fixture covers only the exact-duplicate edge. || Editions (adjudicator): 2002, 2014, 2023 (violable only once the AS phrase exists; at 1985 every externalized name is the entry's own unique name)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1236: the SR2 uniqueness screen asks the run-unit store's own (case-insensitive) question, so EXTERNAL and EXTERNAL AS \"a\" are one externalized name (COBOLNET2159).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.22.3-3",
@@ -21726,13 +21726,13 @@
   "ordinal": 6,
   "subject": "EXTERNAL clause",
   "rule-digest": "603599f7b6af",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitExternalDescribes; src/Cobol.Net.Runtime/Control/ExternalTable.cs#Describe",
-  "test-ref": "conformance:2023/ec_external_format_conflict",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#ValueSpecificationKey",
+  "test-ref": "conformance:2023/ec_external_format_conflict; conformance:2023/pb1236_external_value_literal_case_is_significant",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1236, 14d). §13.18.22.4 GR6: \"...each name that is externalized to the operating environment for the record description entries shall be the same; the VALUE clause specification, if any, for each record name of the associated record description entries shall be identical; and the records shall define the same number of bytes. A source element that describes an external record that is not strongly typed may contain a data description entry including the REDEFINES clause that redefines the complete external record, and this complete redefinition need not occur identically...\" (cite.py OK §13.18.22.4 6)); §14.8.4.3 routes it to EC-EXTERNAL-FORMAT-CONFLICT. Verified with >>TURN EC-EXTERNAL-FORMAT-CONFLICT CHECKING ON in both elements: byte count 4 vs 8 -> EXC=[EC-EXTERNAL-FORMAT-CONFLICT] (G6BYTE); record-name VALUE \"ABCD\" vs \"WXYZ\" -> EC (G6VAL1); VALUE vs none -> EC (G6NOV1); complete-record REDEFINES in one describer only -> no EC (G6REDE, the exemption honoured). DEFECT: the VALUE identity is `RawValue.ToUpperInvariant()` (OoEmitter.EmitExternalDescribes), which case-folds the LITERAL CONTENT: probe G6CASE, `01 XV PIC X(4) IS EXTERNAL VALUE \"ABCD\".` vs `... VALUE \"abcd\".` -> NOEXC. Expected: \"ABCD\" and \"abcd\" are different VALUE clause specifications, so the condition is raised (EXC=[EC-EXTERNAL-FORMAT-CONFLICT]). Reading recorded: GR6 compares the RECORD NAME's VALUE clause only ('for each record name'), which is what the emitter does - subordinate-item VALUE differences (G6VALE) raise nothing and that is consistent with the text. Doc drift: the ExternalDescriptor summary in ExternalTable.cs still describes ValueImage as 'the VALUE-composed initial image when ANY VALUE clause appears in the record description', which the emitter does not build. || Editions (adjudicator): 1985, 2002, 2014, 2023 for the rule; the EC-EXTERNAL-FORMAT-CONFLICT check that detects a violation per §14.8.4.3 is enabled by >>TURN (the negative ec-external-turn-below-2023 gates it at 2023)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1236: the record-name VALUE identity keeps a literal's characters exactly; only keywords and hexadecimal digits fold - \"ABCD\" against \"abcd\" is EC-EXTERNAL-FORMAT-CONFLICT.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.23.3-1",
@@ -23811,13 +23811,13 @@
   "ordinal": 7,
   "subject": "OCCURS clause",
   "rule-digest": "fec60590b72b",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/OperandClassScreen.cs; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs",
-  "test-ref": "conformance:negative/display-index-name",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReportUnidentified",
+  "test-ref": "conformance:negative/display-index-name; conformance:negative/pb1266-index-name-in-add-and-call",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1266. cite.py --check 13.18.38.3 \"Index-name-1 may be specified only in the following contexts\" -> OK. The five contexts work: subscript T(IX) and T(IX - 1), PERFORM VARYING IX, SEARCH VARYING IX, SET, IF IX = 2 -> probe/occurs-p1/sr7_ok ('QQ', 'F'). Outside them the index-name is rejected: DISPLAY, MOVE, COMPUTE and a ref-mod bound -> COBOLNET1637 (sr7_display, sr7_move, sr7_compute, sr7_refmod). ADD 1 TO IX and CALL ... USING IX are also rejected, but by COBOLNET1639 \"'IX' is not defined — no declaration in this source element gives the name 'IX'\" (sr7_add, sr7_call). The verdict is right, the message is false: that is the defect SetBinder.cs:391's comment names ('false about a name INDEXED BY declared, and it sends the reader hunting a typo'), fixed there but not at these sites. EVALUATE IX WHEN 2 is accepted (sr7_evaluate) because a selection subject/object pair is evaluated as a relation. Many landed notes cover this rule (PB170/172/215/219/221/223/224, R29). || REFUTED: PARTIAL — EVALUATE IX WHEN 1 THRU 3 compiles and runs (r7_evaluate_subject rc=0 'E'; the adjudicator's sr7_evaluate showed the same). A selection-subject is identifier-1 / literal-1 / arithmetic-expression-1 / boolean-expression-1 / condition-1 / TRUE / FALSE (§14.9.13.2) - an index-name is none of these (the compiler itself refuses IX as an identifier, §8.4.3.1.2, and as an arithmetic operand, 1637). SR7 restricts where index-name-1 may be SPECIFIED; the EVALUATE general rule that evaluates the subject/object pair 'as a relation' is semantics, not a relation condition written in the source, so the adjudicator's rationale is a real clause answering a different question. Everything else holds: DISPLAY (also --std 85), MOVE, COMPUTE, FUNCTION ABS(IX), DIVIDE, STRING, refmod bound -> 1637; PERFORM IX TIMES -> 1646; GO TO DEPENDING ON IX -> 2324; INITIALIZE IX / INSPECT TALLYING IX / ADD / CALL -> 1639 with the false 'not defined' message. Legal contexts (subscript, PERFORM VARYING/AFTER, SEARCH VARYING, SET, relation incl. EVALUATE TRUE WHEN IX = 2) accepted. The cited test-ref conformance:negative/display-index-name pins only the DISPLAY branch.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1266: an index-name written where an identifier is required (ADD receiver, CALL USING) is COBOLNET1637 for the category, never COBOLNET1639 \"not defined\".",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-8",
@@ -23856,13 +23856,13 @@
   "ordinal": 10,
   "subject": "OCCURS clause",
   "rule-digest": "b8d43362dc39",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoResolve; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoResolve",
+  "test-ref": "conformance:negative/pb1260-table-needs-eight-subscripts; conformance:2023/pb1260_seven_nested_tables_are_legal",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1260. cite.py --check 13.18.38.3 \"as long as the number of subscripts required does not exceed seven\" -> OK; §8.4.2.3.3 SR3 agrees ('This allows a maximum of seven subscripts', --check OK). Two halves. The DEPENDING half (nesting only where DEPENDING is absent) is enforced by COBOLNET0854 for Formats 1/2 (but see SR1(b)'s Format 4 hole). The SEVEN-subscript limit is not enforced anywhere: an eight-dimension table compiles and runs at --std 2023 (A8(1 2 1 2 1 2 1 2) moved and displayed 'Z') and at --std 85 -> probe/occurs-p1/sr10_eight, sr10_eight_85. docs/CONFORMANCE.md documents no dimension extension. Report-side (Format 3) depth not separately probed.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1260: an OCCURS entry that would need eight subscripts is COBOLNET2646; seven nested tables compile and run.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-11",
@@ -24141,13 +24141,13 @@
   "ordinal": 29,
   "subject": "OCCURS clause",
   "rule-digest": "0f74af4706f9",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoBindOccursSpec; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#MaxOccurrences",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DynamicBoundWithinMaximum",
+  "test-ref": "conformance:negative/pb1264-occurs-dynamic-from-above-maximum; conformance:2023/pb1264_occurs_dynamic_maximum_is_legal",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "Owned by kb/Work PB1264. cite.py --check 13.18.38.3 \"The implementor shall specify a maximum permissible value for integer-4 and integer-5\" -> OK. Both halves fail. (1) The maximum is not SPECIFIED: docs/CONFORMANCE.md names no integer-4/integer-5 maximum (grep for integer-4, 3FFF_FFFF and 1073741823 finds nothing). The only limit is the runtime constant CobolDynTable.MaxOccurrences = 0x3FFF_FFFF. (2) Values above it are not rejected, and the result is wrong: probe/occurs-p1/sr29_max_plus1 `FROM 1073741824` compiles clean and the CAPACITY register reads 0 (expected: a compile-time rejection); sr29_huge_from `FROM 99999999999 TO 99999999999999` compiles clean with capacity 0, because OdoBindOccursSpec's `int.TryParse(...)` fails and the phrase is silently DROPPED; sr29_to_huge `FROM 1 TO 99999999999` drops TO in silence. Sanity: FROM 3 -> 3 (sr29_sanity).",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1264: the implementor maximum of integer-4/integer-5 (1,073,741,823, docs/CONFORMANCE.md DOC-A.1-60) is enforced at compile time (COBOLNET2647); the maximum itself is legal.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-30",
@@ -31281,13 +31281,13 @@
   "ordinal": 1,
   "subject": "Procedure division structure",
   "rule-digest": "b34aa7171862",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ProcedureHeaderScreen.cs#AdmitFormal",
+  "test-ref": "conformance:negative/pb1145-procedure-header-formal-repeated; conformance:negative/pb1145-method-header-redefines-formal",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1145 (open). §14.2.2 SR1 (cite.py --check 14.2.2 \"A particular user-defined word shall not appear more than once as data-name-1\" -> OK §14.2.2 1)): three halves - (a) level 01/77 in LINKAGE, (b) no user-defined word more than once as data-name-1, (c) no BASED / REDEFINES on data-name-1 (NOTE 2: a LATER item may REDEFINE it). PROGRAM/FUNCTION arm (CallBindLinkage): (a) COBOLNET0888 verified by probe for a WS item and a level-05 subordinate; (c) COBOLNET0889 verified for REDEFINES and BASED; NOTE 2 verified legal (a later 01 B REDEFINES A with USING A compiles). (b) has NO check: `PROCEDURE DIVISION USING A A.` passes the binder and dies in Roslyn - CS0102 'The type _PRG_DUPF already contains a definition for __lnk0' (backend crash, no COBOL diagnostic). METHOD arm (OoBindMethodData): only (a) is checked; (b) `USING A A` in a method compiles CLEAN (silent under-reject); (c) a method formal that REDEFINES or is BASED is not refused - `01 B REDEFINES A` + `USING B C` (C BASED) dies in Roslyn CS0103 'The name B does not exist'. Two-arm dispatch: the PD-header screen is written twice and each arm has a different subset. Expected per SR1: a COBOL diagnostic in every case. Probes: out/probe/pds/dupformal.cob, sr1*.cob, b2/m_dup.cob, b2/m_sr1redef.cob. Existing tests: none found for the SR1 negatives (grep COBOLNET0888/0889 in tests found none) - test-needed. || editions as adjudicated: 85, 2002, 2014, 2023 (the level-01/77-in-linkage and single-appearance halves are base USING; the BASED ban is 2002+ since BASED is a 2002 clause)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1145: one header screen for the program / function and the method arm - a repeated formal, or a REDEFINES / BASED formal, is COBOLNET2648.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.2.2-2",
@@ -31341,13 +31341,13 @@
   "ordinal": 5,
   "subject": "Procedure division structure",
   "rule-digest": "1b958c54801e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ProcedureHeaderScreen.cs#CheckReturning",
+  "test-ref": "conformance:negative/pb1145-method-header-redefines-formal",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1145 (open). §14.2.2 SR5 (cite.py --check 14.2.2 \"The data description entry for data-name-2 shall not contain a BASED clause or a REDEFINES clause\" -> OK §14.2.2 5)). Half 1 (level 01/77 in LINKAGE): checked on both arms by FindLinkageRoot -> COBOLNET0888 (probed: WS item and level-05 item refused; the message cites SR1 though the rule is SR5). Half 2 (no BASED/REDEFINES) has NO check on EITHER arm: program `01 B REDEFINES A` + `PROCEDURE DIVISION RETURNING B.` compiles and runs clean; program `01 B PIC X(3) BASED.` + `RETURNING B` compiles clean; method RETURNING of a REDEFINES item dies in Roslyn CS0103 'The name B does not exist'; method RETURNING of a BASED item compiles clean. Expected: a COBOL diagnostic for all four. Probes: out/probe/pds/sr5*.cob, b2/m_sr5*.cob. || editions as adjudicated: 2002, 2014, 2023 (the PROCEDURE DIVISION RETURNING phrase is a COBOL-2002 introduction)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1145: a RETURNING item with a REDEFINES or BASED clause is COBOLNET2648 on every arm.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.2.2-6",
@@ -31356,13 +31356,13 @@
   "ordinal": 6,
   "subject": "Procedure division structure",
   "rule-digest": "80838502a74a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ProcedureHeaderScreen.cs#CheckReturning",
+  "test-ref": "conformance:negative/pb1145-function-returning-is-a-formal; conformance:negative/pb1145-method-header-redefines-formal",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1145 (open). §14.2.2 SR6 (cite.py --check 14.2.2 \"Data-name-2 shall not be the same as data-name-1\" -> OK §14.2.2 6)). METHOD arm checks it (COBOLNET0888 \"may not be both a USING parameter and the RETURNING item\" - but the message cites '§14.2.2 SR4', which is the RETURNING-placement rule; the rule is SR6). PROGRAM and FUNCTION arm (CallBindLinkage) has no check: `PROCEDURE DIVISION USING A RETURNING A.` compiles clean in a program (probe sr6prog.cob) and in a function (sr6func.cob). Expected: refused. Silent under-reject; two-arm dispatch with the SR1/SR5 rows.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1145: a RETURNING item that is also a formal is COBOLNET2648 on the program, function and method arms alike (the method arm mis-cited SR4).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.2.2-7",
@@ -59676,13 +59676,13 @@
   "ordinal": 0,
   "subject": "Procedure division structure",
   "rule-digest": "604c99f50235",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#procedureDivision; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#usingParameter; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#usingByValue; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#raisingTarget; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4; src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ProcedureHeaderScreen.cs#OptionalNeedsByReference",
+  "test-ref": "conformance:negative/pb1145-optional-after-by-value",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1145 (open). §14.2.1 general formats (text quoted in the input; §14.4.1 'If one paragraph is in a section, all paragraphs shall be in sections' - cite.py --check 14.4.1 OK). ACCEPTED LEGAL shapes verified by probe: Format 2 header sentences then paragraphs (fmt2_ok), Format 1 section-leading sentences then paragraphs (fmt1_ok), DECLARATIVES ... END DECLARATIVES then sections (gr1), BY is optional before REFERENCE/VALUE (grammar), RAISING's three alternatives incl. FACTORY [OF] (raisingTarget, pb815), OPTIONAL under BY REFERENCE (gr3_omit_opt), Format 3 in object/interface (gr2_oo). A declarative section lacking USE is refused (COBOLNET0897). ILLEGAL shapes ACCEPTED (under-reject, no diagnostic at --std 2023, no dialect gate): (1) `PROCEDURE DIVISION. DISPLAY 'A'. S1 SECTION. P1. ...` - Format 1 admits no sentence before the first section header (fmt_sent_before_section.cob runs A B); (2) `PROCEDURE DIVISION. P0. ... S1 SECTION. P1. ...` - a paragraph outside any section when sections are used (fmt_para_before_section.cob runs); (3) `DECLARATIVES. ... END DECLARATIVES. P1. DISPLAY 'B'.` - declaratives exist only in Format 1, whose non-declarative portion is sections (decl_fmt2.cob runs B); (4) `PROCEDURE DIVISION USING BY VALUE LX OPTIONAL LY.` - OPTIONAL is printed only inside the BY REFERENCE alternative, yet the plain usingParameter arm `OPTIONAL? dataReference` inherits the threaded BY VALUE mode (b3/byvalue_optional.cob compiles clean). Grammar comment (procedureDivision: `sentence* procedureUnit*` with procedureUnit = section | paragraph) shows the mixed-format admission is structural. || editions as adjudicated: 85, 2002, 2014, 2023 (Formats 1/2 and USING [BY REFERENCE] base; BY VALUE, OPTIONAL, RETURNING, RAISING and Format 3 are COBOL-2002 introductions)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1145: OPTIONAL after a BY VALUE phrase is refused (COBOLNET2648) - it belongs to the BY REFERENCE alternative only.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-14.7.4.2",

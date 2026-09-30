@@ -309,6 +309,21 @@ public sealed class ReferenceResolver(DataBinder data)
                 + "that uniquely identifies that resource\").");
             return;
         }
+        // ⛔ A DECLARED INDEX-NAME IS NOT UNDEFINED (kb/Work PB1266 — the resolver-level twin of SetBinder's
+        // PB388 screen). The data symbol table holds no index-name, so `ADD 1 TO IX` and `CALL "P" USING IX` — an
+        // identifier position an index-name cannot fill — landed in the "not defined" arm below and told the user that
+        // no declaration gives 'IX', while INDEXED BY had declared it: false, and it sends the reader hunting a typo.
+        // §13.18.38.3 SR7 closes the list of contexts an index-name may appear in, and this position is not one, so
+        // the reference is refused for the CATEGORY — the same COBOLNET1637 DISPLAY / MOVE / COMPUTE already draw.
+        if (data.Symbols.IndexCandidates(name, qualifiers, data.ActiveScope) is not null)
+        {
+            data.Edition.Error(DiagnosticCatalog.IndexNameContext,
+                $"'{text}' is an index-name, which is not an identifier (ISO §8.4.3.1.2): §13.18.38.3 SR7 admits an "
+                + "index-name only as a subscript, in PERFORM/SEARCH VARYING, in SET, or in a relation condition, and "
+                + $"this position needs an identifier. SET a data item to the index first (SET data-item TO {text}) "
+                + "and reference the data item");
+            return;
+        }
         string msg;
         // ⛔ A DECLARED CONDITION-NAME IS NOT UNDEFINED (kb/Work PB567). The data symbol table holds no level-88,
         // so a condition-name qualified by a data-name it is NOT subordinate to (`IS-A OF H1`, H1 an unrelated

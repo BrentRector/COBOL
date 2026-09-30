@@ -62,8 +62,10 @@ public sealed partial class DataBinder
                 if (ph.CAPACITY() is not null && ph.dataReference() is { } capRef)
                     capName = CapacityRegisterName(capRef, where);
                 else if (ph.INITIALIZED() is not null) initialized = true;
-                else if (ph.FROM() is not null && ph.integerLiteral() is { } fl) fromCap = CobolNet.Validation.IntegerOperandRules.HostValue(fl);
-                else if (ph.TO() is not null && ph.integerLiteral() is { } tl) toCap = CobolNet.Validation.IntegerOperandRules.HostValue(tl);
+                else if (ph.FROM() is not null && ph.integerLiteral() is { } fl)
+                    fromCap = DynamicBoundWithinMaximum(ph, "FROM", CobolNet.Validation.IntegerOperandRules.HostValue(fl));
+                else if (ph.TO() is not null && ph.integerLiteral() is { } tl)
+                    toCap = DynamicBoundWithinMaximum(ph, "TO", CobolNet.Validation.IntegerOperandRules.HostValue(tl));
             }
             var dyn = new OccursSpec
             {
@@ -102,6 +104,24 @@ public sealed partial class DataBinder
         };
         spec.Keys.AddRange(keys);
         return spec;
+    }
+
+    /// <summary>⛔ §13.18.38.3 SR29 (kb/Work PB1264): "The implementor shall specify a maximum permissible value for
+    /// integer-4 and integer-5. Their values shall not exceed this maximum value." The maximum is the highest
+    /// permissible occurrence number of a dynamic-capacity table, <c>CobolDynTable.MaxOccurrences</c>
+    /// (docs/CONFORMANCE.md DOC-A.1-60), and a FROM / TO value above it is refused HERE — it used to compile and
+    /// give capacity 0, a table smaller than its written minimum. Returns null for a refused value, under an
+    /// already-failed compile.</summary>
+    private int? DynamicBoundWithinMaximum(Core.OccursDynamicPhraseContext phrase, string which, int? value)
+    {
+        if (value is not { } v || v <= CobolNet.Runtime.CobolDynTable<byte>.MaxOccurrences) return value;
+        using var _ = Edition.At(phrase);
+        Edition.Error(DiagnosticCatalog.OccursDynamicBoundAboveMaximum,
+            $"OCCURS DYNAMIC {which} {v}: the value exceeds this implementation's maximum of "
+            + $"{CobolNet.Runtime.CobolDynTable<byte>.MaxOccurrences:N0} for integer-4 and integer-5 "
+            + "(docs/CONFORMANCE.md DOC-A.1-60); ISO §13.18.38.3 SR29: \"Their values shall not exceed this maximum "
+            + "value.\"");
+        return null;
     }
 
     /// <summary>The name a <c>CAPACITY IN data-name-3</c> phrase DEFINES (ISO §13.18.38.3 SR30 — "Data-name-3 shall
@@ -186,6 +206,20 @@ public sealed partial class DataBinder
             return d;
         }
 
+        // §13.18.38.3 SR10 / §8.4.2.3.3 SR3 (kb/Work PB1260): "as long as the number of subscripts required does not
+        // exceed seven" — a table nested under seven others needs eight. Reported ONCE, at the first entry that
+        // exceeds it (an eighth dimension), not again for everything beneath it.
+        foreach (var table in ConformanceForest())
+        {
+            // The ONE arity walk (DataItem.SubscriptArity — SubscriptAdmissionDriftTests pins that it is written nowhere else).
+            if (!table.IsTable || table.SubscriptArity != 8) continue;
+            using var _ = Edition.At(table);
+            Edition.Error(DiagnosticCatalog.TableNestingTooDeep,
+                $"table '{table.CobolName ?? table.CsName}' is nested under seven other OCCURS entries: a reference to "
+                + "it needs eight subscripts, and \"as long as the number of subscripts required does not exceed "
+                + "seven\" (ISO §13.18.38.3 SR10) — at most seven subscripts may be specified (§8.4.2.3.3 SR3)");
+        }
+
         foreach (var item in AllItems())
         {
             if (item.OccursSpec is not { DependingName: { } depName } spec) continue;
@@ -232,25 +266,22 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET0852", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': data-name-1 "
                     + "shall describe an integer (ISO §13.18.38.3 SR17)");
 
-            // SR2: data-name-1 shall not be subscripted (it cannot lie within any table).
-            for (DataItem? a = dep.Parent; a is not null; a = a.Parent)
-                if (a.Occurs is not null)
-                {
-                    Edition.Error("COBOLNET0853", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': "
-                        + "data-name-1 shall not be subscripted (ISO §13.18.38.3 SR2)");
-                    break;
-                }
+            // SR2: data-name-1 shall not be subscripted (it cannot lie within any table). A TABLE is any OCCURS — a
+            // Format-4 DYNAMIC one leaves Occurs null (kb/Work PB1260) — and "lies within a table" is the ONE arity
+            // answer, DataItem.SubscriptArity (a walk written nowhere else: SubscriptAdmissionDriftTests).
+            if (dep.Parent is { SubscriptArity: > 0 })
+                Edition.Error("COBOLNET0853", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': "
+                    + "data-name-1 shall not be subscripted (ISO §13.18.38.3 SR2)");
 
             // SR1(b)/SR10: "complex ODO" is illegal at every edition — tables may be nested only when the
-            // DEPENDING phrase is absent, and no OCCURS subject may have an occurs-depending table beneath it.
-            for (DataItem? a = item.Parent; a is not null; a = a.Parent)
-                if (a.Occurs is not null)
-                {
-                    Edition.Error("COBOLNET0854", $"occurs-depending table '{subject}' is subordinate to the "
-                        + $"OCCURS item '{a.CobolName}': tables may be nested only when the DEPENDING phrase is "
-                        + "absent (ISO §13.18.38.3 SR1(b)/SR10)");
-                    break;
-                }
+            // DEPENDING phrase is absent, and no OCCURS subject may have an occurs-depending table beneath it. The
+            // nearest enclosing table (DYNAMIC included — `Occurs is not null` let an ODO table nest under OCCURS
+            // DYNAMIC, kb/Work PB1260) is the last of the parent's subscript levels.
+            if (item.Parent is { SubscriptArity: > 0 } enclosing)
+                Edition.Error("COBOLNET0854", $"occurs-depending table '{subject}' is subordinate to the "
+                    + $"OCCURS item '{enclosing.SubscriptLevels()[^1].CobolName}': tables may be nested only when the "
+                    + "DEPENDING phrase is "
+                    + "absent (ISO §13.18.38.3 SR1(b)/SR10)");
 
             // §13.18.44 SR: neither the redefined item nor a redefinition may include an occurs-depending table.
             // (The FD multi-record shared AREA is §9.1.2 record sharing — synthesized with no written REDEFINES
@@ -418,11 +449,16 @@ public sealed partial class DataBinder
 
             // SR30 — data-name-3 is implicitly defined at the OCCURS entry, so it must not also be an explicit
             // data-name (a duplicate definition) nor the CAPACITY register of another dynamic table.
-            if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName))
+            // "Defined elsewhere" is any user-defined word of ANOTHER type too (§8.3.2.2: a given user-defined word "may be
+            // used as only one type of user-defined word"), so a FILE-NAME counts (kb/Work PB1264) — the check used to
+            // consult the data-name index and the other registers only. A paragraph-name is declared later, by the
+            // procedure-division binder, and is not asked here.
+            if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName)
+                || Files.Any(f => string.Equals(f.CobolName, capName, StringComparison.OrdinalIgnoreCase)))
             {
                 Edition.Error("COBOLNET1523", $"CAPACITY IN '{capName}' on '{subject}': data-name-3 is implicitly "
-                    + "defined by the OCCURS DYNAMIC entry and shall not duplicate another data-name or CAPACITY "
-                    + "register (ISO §13.18.38.3 SR30)");
+                    + "defined by the OCCURS DYNAMIC entry and shall not duplicate another data-name, a file-name or "
+                    + "CAPACITY register (ISO §13.18.38.3 SR30)");
                 continue;
             }
             _capacityRegisters[capName] = item;

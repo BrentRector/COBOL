@@ -327,6 +327,7 @@ public sealed partial class DataBinder
         // grammar's one-parameter-per-node shape (the CALL callArgument precedent).
         int pos = 0;
         bool byValue = false;
+        var header = new ProcedureHeaderScreen(Edition, "PROCEDURE DIVISION");   // §14.2.2 SR1/SR5/SR6 — the ONE screen (kb/Work PB1145)
         // The names any ADDRESS OF in this unit or a contained one takes (the SAME scan the pointer pass forces
         // cells from — a GLOBAL formal can be addressed from a contained program, kb/Work PB1009/PB1019).
         var addressed = DataBinder.PtrScanAddressOfSenders(pd)
@@ -360,20 +361,12 @@ public sealed partial class DataBinder
                 pos++;
                 continue;
             }
-            if (item.RedefinesTargetName is not null)
-                // §14.2.2 SR1: a formal parameter shall not include a REDEFINES clause.
-                Edition.Error("COBOLNET0889",
-                    $"formal parameter '{pname}' shall not contain a REDEFINES clause (ISO §14.2.2 SR1)");
-            if (item.IsBased)
-            {
-                // The SAME SR1 sentence (:23658) bans the BASED clause on a formal — without this, a
-                // carrier-resident formal's CsName rewrite would poison the based class's BackingCsName
-                // into invalid C# (the review finding); the flag clears so the entry binds as an
-                // ordinary (already-diagnosed) formal.
-                Edition.Error("COBOLNET0889",
-                    $"formal parameter '{pname}' shall not contain a BASED clause (ISO §14.2.2 SR1)");
-                item.IsBased = false;
-            }
+            // SR1: uniqueness, and no REDEFINES / BASED clause — the ONE header screen. A BASED formal's flag clears
+            // there: a carrier-resident formal's CsName rewrite would poison the based class's BackingCsName into
+            // invalid C#, so the entry binds as an ordinary (already-diagnosed) formal. A REPEATED formal is not
+            // admitted a second time (`USING A A` reached the backend as a duplicate carrier member).
+            if (!header.AdmitFormal(pname, item)) { pos++; continue; }
+            if (optional && byValue) header.OptionalNeedsByReference(pname);   // §14.2.1: OPTIONAL is a BY REFERENCE word
 
             if (byValue)
             {
@@ -461,6 +454,8 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET0888",
                     $"PROCEDURE DIVISION RETURNING item '{rref.GetText()}' is not a level-01/77 LINKAGE SECTION "
                     + "item (ISO §14.2.2 SR1)");
+            else
+                header.CheckReturning(rref.GetText(), LinkageReturning);
         }
 
         AnyLengthValidateUnit();
@@ -629,15 +624,21 @@ public sealed partial class DataBinder
     /// A level-1 TYPE DECLARATION may also carry the EXTERNAL clause (SR1), but GR5 names only "the file
     /// connector or record", and GR3 externalizes the records that REFERENCE such a type under their own
     /// names, so a type declaration's literal-1 has no externalized name to collide with.</para>
-    /// <para>ORDINAL comparison: an externalized name is an operating-environment name, not a COBOL word, so
-    /// §8.3.2's case-insensitivity does not reach it — the same reading §12.3.8.3 SR1 is enforced under.</para>
+    /// <para>⛔ ONE COMPARISON, THE RUN-UNIT STORE'S (kb/Work PB1236): case-INSENSITIVE. The default externalized name
+    /// is the subject's data-name (§13.18.22.4 GR5), and a data-name's case never matters (§8.3.2), so
+    /// <c>ExternalTable</c> keys its cells and describers with <see cref="StringComparer.OrdinalIgnoreCase"/> — that
+    /// is what makes <c>01 XV EXTERNAL</c> in one program and <c>01 Xv EXTERNAL</c> in another ONE record. The
+    /// uniqueness screen this method is protects exactly that store, so it must ask the same question: the
+    /// ordinal comparison it used to make let <c>EXTERNAL</c> and <c>EXTERNAL AS "a"</c> pass the screen and then
+    /// silently alias one cell of the first-created width. §8.3.2.2 2) leaves the formation of an externalized name
+    /// to the implementor, which makes one comparison a choice — and the store's is the one already load-bearing.</para>
     /// </summary>
     private void CheckExternalizedNameUniqueness()
     {
         // Almost every source element declares no EXTERNAL subject at all; this pass runs once per unit,
         // so it costs nothing when there is nothing to compare.
         if (_callExternalBackings.Count == 0 && !Files.Any(f => f.IsExternal)) return;
-        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        var seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);   // the ExternalTable's own comparer
         void Claim(string externalized, string where, DiagnosticCursor? at)
         {
             if (seen.TryGetValue(externalized, out var prior))

@@ -387,6 +387,39 @@ public static class DiagnosticCatalog
         + "name the entity is known by differs from the literal as written.",
         "ISO §8.3.2.2 rule 2 / DOC-A.1-68");
 
+    /// <summary>COBOLNET2648 — a procedure division header's formal parameter or RETURNING item breaks §14.2.2 SR1 /
+    /// SR5 / SR6 or the §14.2.1 using-phrase format (kb/Work PB1145). <c>ProcedureHeaderScreen</c> is its only reporter,
+    /// called by the program / function arm and the method arm alike.</summary>
+    public static readonly DiagnosticDescriptor ProcedureHeaderParameter = new(
+        "COBOLNET2648", "procedure-header-parameter", EditionSeverity.Error,
+        "A procedure division header's USING parameter or RETURNING item is not admissible. ISO §14.2.2 SR1: "
+        + "\"A particular user-defined word shall not appear more than once as data-name-1.\" ISO §14.2.2 SR1: "
+        + "\"The data description entry for data-name-1 shall not contain a BASED clause or a REDEFINES clause.\" "
+        + "ISO §14.2.2 SR5: \"The data description entry for data-name-2 shall not contain a BASED clause or a "
+        + "REDEFINES clause.\" ISO §14.2.2 SR6: \"Data-name-2 shall not be the same as data-name-1.\" ISO §14.2.1 "
+        + "prints OPTIONAL only in the BY REFERENCE alternative of the using-phrase.",
+        "ISO §14.2.2 SR1/SR5/SR6, §14.2.1");
+
+    /// <summary>COBOLNET2647 — an OCCURS DYNAMIC FROM / TO value exceeds the implementor's maximum (kb/Work PB1264).
+    /// <c>DataBinder.DynamicBoundWithinMaximum</c> is its only reporter.</summary>
+    public static readonly DiagnosticDescriptor OccursDynamicBoundAboveMaximum = new(
+        "COBOLNET2647", "occurs-dynamic-bound-above-maximum", EditionSeverity.Error,
+        "The FROM or TO value of an OCCURS DYNAMIC clause is above this implementation's maximum. ISO §13.18.38.3 SR29: "
+        + "\"The implementor shall specify a maximum permissible value for integer-4 and integer-5. Their values "
+        + "shall not exceed this maximum value.\" The maximum is 1,073,741,823, the highest permissible occurrence "
+        + "number of a dynamic-capacity table (docs/CONFORMANCE.md DOC-A.1-60).",
+        "ISO §13.18.38.3 SR29");
+
+    /// <summary>COBOLNET2646 — a table is nested under seven others, so a reference to it would need eight
+    /// subscripts (kb/Work PB1260). <c>DataBinder.OdoResolve</c> is its only reporter.</summary>
+    public static readonly DiagnosticDescriptor TableNestingTooDeep = new(
+        "COBOLNET2646", "table-nesting-too-deep", EditionSeverity.Error,
+        "An OCCURS entry is subordinate to seven other OCCURS entries, so a reference to it requires eight subscripts. "
+        + "ISO §13.18.38.3 SR10: an OCCURS clause may be subordinate to an entry containing another OCCURS clause "
+        + "\"as long as the number of subscripts required does not exceed seven\", and §8.4.2.3.3 SR3 states the same "
+        + "limit: \"This allows a maximum of seven subscripts to be specified.\"",
+        "ISO §13.18.38.3 SR10 / §8.4.2.3.3 SR3");
+
     /// <summary>COBOLNET2645 — the ASSIGN clause's literal-1 is not an alphanumeric literal, or is a figurative constant
     /// or a zero-length literal (kb/Work PB1078). <c>AssignTargetRule.Text</c> is its only reporter.</summary>
     public static readonly DiagnosticDescriptor AssignLiteralShape = new(

@@ -27,9 +27,9 @@ public enum ExternalChecks
 /// the facts §14.8.4 compares across the run unit's describers. Every field is a compile-time constant emitted
 /// at the describing element's activation entry.
 /// RECORD kind (§14.8.4.3 / §13.18.22 GR6): <see cref="ByteCount"/> = the record's byte count;
-/// <see cref="ValueImage"/> = the VALUE-composed initial image when ANY VALUE clause appears in the record
-/// description, else null (the GR6 "identical VALUE clause specification" identity, canonicalized to the
-/// composed image — clause spellings that compose the same image are treated as identical); a complete-record
+/// <see cref="ValueImage"/> = the record name's OWN VALUE clause specification as a canonical KEY, else null (the
+/// GR6 "identical VALUE clause specification" identity: the clause's words are case-folded, a literal's characters
+/// are kept exactly — <c>OoEmitter.ValueSpecificationKey</c>; it is NOT a composed image); a complete-record
 /// REDEFINES contributes nothing (GR6 explicitly exempts it for non-strong records — the descriptor is built
 /// from the base record only); <see cref="StrongTypeKey"/> = the external strong TYPE name (null when not
 /// strongly typed) and <see cref="ConstantRecord"/> = the CONSTANT RECORD presence (§14.8.4.3 ¶3).

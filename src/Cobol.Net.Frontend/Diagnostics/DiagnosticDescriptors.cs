@@ -420,7 +420,7 @@ public static partial class DiagnosticDescriptors
     // COBOL0100–0109: Parser — unsupported feature warnings
     // ══════════════════════════════════════
     public static readonly DiagnosticDescriptor COBOL0100 = new("COBOL0100", DiagnosticSeverity.Warning,
-        "ASCENDING/DESCENDING KEY clause in OCCURS is not yet supported. Table created without sort key.");
+        "ASCENDING/DESCENDING KEY is out of place: in an OCCURS clause the KEY phrases are written before INDEXED BY (ISO §13.18.38.2).");
     public static readonly DiagnosticDescriptor COBOL0101 = new("COBOL0101", DiagnosticSeverity.Warning,
         "BLANK WHEN ZERO may not be recognized. Check that it appears as a single clause on the data item.");
     public static readonly DiagnosticDescriptor COBOL0102 = new("COBOL0102", DiagnosticSeverity.Warning,

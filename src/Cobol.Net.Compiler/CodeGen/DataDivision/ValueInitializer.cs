@@ -203,7 +203,11 @@ internal sealed class ValueInitializer(EmitContext ctx)
         // pic.Length = 1 for the single-symbol X/N picture), so it initializes to a single fill character, NOT "".
         if (item.IsDynamicLength)
         {
-            if (effRaw is not { } dv) return "\"\"";
+            // ⛔ §13.4.4 GR1 (kb/Work PB1241): "A data-item format or table format VALUE clause specified in the file
+            // section is ignored except in the execution of the INITIALIZE statement", and "the initial length of a
+            // dynamic-length elementary item is zero". §8.6.4 is the general rule, and the file section overrides it —
+            // an INITIALIZE ... TO VALUE reaches its own recipe, not this initial-state reader.
+            if (effRaw is not { } dv || InFileSection(item)) return "\"\"";
             if (FigurativeInitializer(dv, pic) is { } figFill) return figFill;
             return RuntimeApi.DynStore(EmitText.CsLiteral(CobolLiteral.Decode(dv)), item.DynMaxSize.ToString());
         }
@@ -450,4 +454,14 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// the ONE literal recipe — the group-image codec's float backing seed reuses it (Step D).</summary>
     internal static string RawValueAsFloat(string raw, PicInfo pic) =>
         pic.IsSingle ? $"{raw.Trim().TrimStart('+')}f" : $"{raw.Trim().TrimStart('+')}d";   // COMP-1/FLOAT-SHORT → float literal, else double
+
+    /// <summary>Whether <paramref name="item"/> belongs to a FILE SECTION record (its root is some FD / SD record) —
+    /// the section fact §13.4.4 GR1 keys on. File-section records emit as unit fields through the same initial-state
+    /// path as WORKING-STORAGE, so the section has to be asked of the ROOT (kb/Work PB1241).</summary>
+    private bool InFileSection(DataItem item)
+    {
+        var root = item;
+        while (root.Parent is { } p) root = p;
+        return ctx.Data.Files.Any(f => f.Records.Contains(root));
+    }
 }
