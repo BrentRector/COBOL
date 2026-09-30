@@ -30,7 +30,7 @@ public sealed class FloatImageLaneTests
     private static string Chars(params int[] bytes)
     {
         var chars = new char[bytes.Length];
-        for (int i = 0; i < bytes.Length; i++) chars[i] = (char)bytes[i];
+        for (int i = 0; i < bytes.Length; i++) chars[i] = StorageByte.ToChar((byte)bytes[i]);   // the storage-byte law
         return new string(chars);
     }
 

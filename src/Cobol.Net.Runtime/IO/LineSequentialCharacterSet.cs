@@ -5,14 +5,14 @@ namespace CobolNet.Runtime.IO;
 /// <summary>⛔ THE IMPLEMENTOR-DEFINED LINE SEQUENTIAL CHARACTER SET — ISO/IEC 1989:2023 Annex A.1 item 115
 /// ("Line sequential character set", required + documented). The determination itself is published at
 /// <c>docs/CONFORMANCE.md</c> <c>DOC-A.1-115</c>; this type is its ONE executable copy.
-/// <para><b>THE SET:</b> in an ALPHANUMERIC record area, every character from U+0020 (space) through U+00FF; in a
-/// NATIONAL one, every character from U+0020 up. The characters BELOW U+0020 — the C0 controls U+0000–U+001F,
-/// which include the two line delimiters CR U+000D and LF U+000A and the tab U+0009 — are outside it. DEL
-/// (U+007F) through U+00FF are inside, so an ordinary 8-bit text file reads without '09'. An alphanumeric
-/// character above U+00FF is outside because it has no byte image in the file's coded character set (owner
-/// decision kb/Work R47, <see cref="FileCharacterSet"/>; kb/Work PB690) — so a WRITE or REWRITE of one is the
-/// standard's '71' on this organization, where every other organization answers '91'. ⛔ The ceiling IS the
-/// file's coded character set, so a file with a CODE-SET clause takes the CODE-SET alphabet's set instead
+/// <para><b>THE SET:</b> with no CODE-SET clause the file is UTF-8 text (<see cref="LineSequentialEncoding"/>; owner
+/// decision kb/Work R51, superseding R47's U+00FF ceiling for this organization; kb/Work PB1760), and the set is
+/// every Unicode SCALAR VALUE from U+0020 (space) up, in an alphanumeric and a national record area alike — a
+/// surrogate pair is one character, HIGH-VALUE (U+FFFF) is a member. The characters BELOW U+0020 — the C0 controls
+/// U+0000–U+001F, which include the two line delimiters CR U+000D and LF U+000A and the tab U+0009 — are outside
+/// it, and so is an UNPAIRED surrogate (it is not a character and has no UTF-8 form; a byte that was not UTF-8 reads
+/// as one, U+DC80–U+DCFF, which is how such a line reports '09'). ⛔ The encoding IS part of the set, so a file
+/// with a CODE-SET clause takes the CODE-SET alphabet's set instead
 /// (§13.18.13.4 GR6; kb/Work PB1542): under STANDARD-1, STANDARD-2 or ASCII an alphanumeric character above
 /// U+007F is outside, under EBCDIC every U+0020–U+00FF character is inside — the same membership
 /// <see cref="CodeSetConversion.Represents"/> answers for every other organization's '91'. A national record
@@ -45,18 +45,20 @@ public static class LineSequentialCharacterSet
     public const int Lowest = ' ';
 
     /// <summary>True when <paramref name="codePoint"/> is a member of the line sequential character set of a
-    /// record area of the given class — alphanumeric (<paramref name="national"/> false) is bounded by the file's
-    /// coded character set: the characters with a byte image (<see cref="StorageByte.HasByte"/>) with no CODE-SET, the CODE-SET alphabet's own
-    /// membership (<paramref name="codeSet"/>, <see cref="CodeSetConversion.Represents"/>) with one; national has
-    /// no ceiling (see the type remarks).</summary>
+    /// record area of the given class. With no CODE-SET the file is UTF-8 text (<see cref="LineSequentialEncoding"/>;
+    /// kb/Work PB1760), so the members are the Unicode SCALAR VALUES from U+0020 up — every character UTF-8 can carry
+    /// — and a surrogate CODE POINT (a lone surrogate, including the U+DC80–U+DCFF escape of a byte that was not
+    /// UTF-8) is not a character at all. With a CODE-SET clause an alphanumeric area is bounded by the CODE-SET
+    /// alphabet's own membership (<paramref name="codeSet"/>, <see cref="CodeSetConversion.Represents"/>) and a
+    /// national one has no ceiling (see the type remarks).</summary>
     public static bool Contains(int codePoint, bool national, CodeSetConversion? codeSet) =>
-        codePoint >= Lowest && (national || (codeSet is null
-            ? codePoint <= char.MaxValue && StorageByte.HasByte((char)codePoint)
-            : codePoint <= char.MaxValue && codeSet.Represents((char)codePoint)));
+        codePoint >= Lowest && (codeSet is null
+            ? codePoint <= 0x10FFFF && codePoint is < 0xD800 or > 0xDFFF
+            : national || (codePoint <= char.MaxValue && codeSet.Represents((char)codePoint)));
 
     /// <summary>True when the record area holds at least one character OUTSIDE the set — the single predicate
     /// behind '09' (READ), '71' (WRITE) and '71' (REWRITE).
-    /// <para>⛔ CHARACTERS, NOT BYTES. The connector's record channel carries one char per BYTE (Latin1), and
+    /// <para>⛔ CHARACTERS, NOT BYTES. The connector's record channel carries one char per BYTE, and
     /// §14.9.30.4 GR15 is explicit that a record area is "specified implicitly or explicitly" as alphanumeric
     /// OR as national. A national character occupies two bytes, UTF-16BE (§13.18.60.4 GR8 / determination D-N1),
     /// so <c>N"CD"</c> occupies the bytes <c>00 43 00 44</c> — a byte-level test would read the 0x00 halves as
@@ -65,21 +67,34 @@ public static class LineSequentialCharacterSet
     /// <c>NationalRecordArea</c>, the same flag <c>FitRecord</c>/<c>TrimRecordEnd</c> read, so the three
     /// record-area rules agree on what a character is. A trailing ODD byte is half a national position, whose
     /// content §14.9.30.4 GR14/GR15 leave undefined; it forms no character and is not tested.</para>
+    /// <para>⛔ A SURROGATE PAIR IS ONE CHARACTER. With no CODE-SET the area is walked as UTF-16, so a supplementary
+    /// character (two positions, §8.5.1.4) is tested as its scalar value and only an UNPAIRED surrogate is outside.</para>
     /// <para><paramref name="codeSet"/> is the connector's CODE-SET conversion, or null — REQUIRED so no caller
     /// can ask the question without saying which coded character set the file is in (kb/Work PB1542).</para></summary>
     public static bool HasCharacterOutside(ReadOnlySpan<char> recordArea, bool national, CodeSetConversion? codeSet)
     {
-        if (!national)
+        if (national)
         {
-            foreach (char c in recordArea)
-                if (!Contains(c, national: false, codeSet)) return true;
-            return false;
+            // Every unit of a national area on this channel is one BYTE of a UTF-16BE pair; a unit that is not a
+            // byte image cannot form a national character (the storage-byte law, StorageByte).
+            if (FileCharacterSet.HasCharacterWithoutByteImage(recordArea)) return true;
+            var chars = new char[recordArea.Length / CobolBits.BytesPerNational];
+            for (int i = 0; i < chars.Length; i++)
+                chars[i] = (char)((StorageByte.ToByte(recordArea[2 * i]) << 8) | StorageByte.ToByte(recordArea[2 * i + 1]));
+            return HasCharacterOutsideOfClass(chars, national: true, codeSet);
         }
-        // Every unit of a national area on this channel is one BYTE of a UTF-16BE pair; a unit above U+00FF is
-        // not a byte at all, so it cannot form a national character (FileCharacterSet's one-char-per-byte rule).
-        if (FileCharacterSet.HasCharacterWithoutByteImage(recordArea)) return true;
-        for (int i = 0; i + 1 < recordArea.Length; i += 2)
-            if (!Contains((StorageByte.ToByte(recordArea[i]) << 8) | StorageByte.ToByte(recordArea[i + 1]), national: true, codeSet)) return true;
+        return HasCharacterOutsideOfClass(recordArea, national: false, codeSet);
+    }
+
+    private static bool HasCharacterOutsideOfClass(ReadOnlySpan<char> text, bool national, CodeSetConversion? codeSet)
+    {
+        for (int i = 0; i < text.Length; i++)
+        {
+            int cp = text[i];
+            if (codeSet is null && char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+                cp = char.ConvertToUtf32(text[i], text[++i]);
+            if (!Contains(cp, national, codeSet)) return true;
+        }
         return false;
     }
 }

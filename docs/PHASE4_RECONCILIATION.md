@@ -714,8 +714,8 @@ both ways); negative corpus +1 (based-level-05).
   GR8/GR9); UCS-4 collates identically to NATIVE (ISO 10646 order over one-code-unit-per-position characters
   IS code-unit order — §8.5.1.4 recognizes no surrogate pairs), and UTF-8/UTF-16 name coded character sets
   only (GR7 Table 6 — referencing them as a collating sequence is the 0898 reject). The NATIVE-default
-  HIGH/LOW-VALUE pin in national contexts stays U+00FF/U+0000 (the flagged §8.3.3.6 GR6/GR7 divergence vs
-  the native sequence's U+FFFF extreme — byte-stable; `FigurativeConstants` carries the flag).
+  HIGH/LOW-VALUE in national (and alphanumeric) contexts is U+FFFF/U+0000, the native sequence's extremes
+  (owner decision kb/Work R52 retired the former U+00FF pin — kb/Work PB1093).
   **D-N4 Repertoire**: the FULL national repertoire — one UTF-16 code unit per position (the Latin-1-only
   0814 guard was LIFTED with the P10 Step-5 DISPLAY-OF/NATIONAL-OF wave). The alphanumeric↔national
   correspondence is the TOTAL UTF-16 IDENTITY in both directions (Annex A.1 item 33, CONFORMANCE.md §7 —
@@ -837,7 +837,7 @@ both ways); negative corpus +1 (based-level-05).
   Boolean` and National likewise; `InitializeSender` :189–200 default-fill arm: Boolean joins the
   `BoundFigurative('Z')` leg, National the `'S'` leg (GR6c :27995–28009 — the golden's INIT=0000/INIT=R);
   `InitializeValueOperand` :233–246 gains N"/B" prefix decode arms (TO VALUE fidelity). **Figuratives**: no
-  FigFill changes (EmitCore.cs:89–97 — Z '0', S ' ', H U+00FF, L U+0000, Q '"' all conform under D-N3/D-N4).
+  FigFill changes (EmitCore.cs:89–97 — Z '0', S ' ', H (now U+FFFF, kb/Work R52), L U+0000, Q '"' all conform under D-N3/D-N4).
   **Ref-mod**: zero structural change — `CobolString.RefMod`/`SpliceInto` are position-based (§8.4.3.3 GR1;
   under D-B1 a bit position IS a char index, so GR5a's bit-position rule is satisfied); the boolean splice pad
   is the one addition (above). **Group images**: `DataItem.IsCharacterImage` :142–145 category test gains
@@ -1106,7 +1106,7 @@ self-adjudicated-real fixed SAME change set; the rest refuted or staged:**
    `"ZERO"`; `EmitSet` now fills via `FigurativeWordFill` (category-aware) for figurative-word 88 VALUEs
    (§14.9.39 F5 + §8.3.3.6.4 GR2). New surface for boolean/national; the pre-existing alphanumeric leg is
    cured by the same code.
-- Also fixed while here: **the HIGH/LOW-VALUE fill for national/boolean now uses the D-N3 pins** (U+00FF/U+0000),
+- Also fixed while here: **the HIGH/LOW-VALUE fill for national/boolean now uses the native extremes** (U+FFFF/U+0000 since kb/Work R52),
   never the alphanumeric program collating sequence's extreme — new `EmissionContext.FigFill(kind, cat)`,
   threaded through ConvertSource / ref-mod / comparison / VALUE / SET (a declared alphanumeric PCS + national
   HIGH/LOW was the one-vote finding). **The USAGE syntax-rule citations were corrected `§13.18.60.4 → .3`** (SRs

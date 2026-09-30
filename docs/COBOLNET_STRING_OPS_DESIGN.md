@@ -47,11 +47,11 @@ THREE THINGS A NAIVE "it's all strings" DESIGN GETS WRONG, all handled here: (1)
 
 **Rejected alternatives.** StringInfo/text-element (grapheme) iteration or Rune enumeration — would over-merge surrogate pairs / combining sequences, violating the spec's explicit per-code-unit rule; rejected.
 
-### D6. HIGH-VALUE → U+00FF and LOW-VALUE → U+0000 for alphanumeric; QUOTE → U+0022; SPACE → U+0020; ZERO → '0'.
+### D6. HIGH-VALUE → U+FFFF and LOW-VALUE → U+0000 in both classes; QUOTE → U+0022; SPACE → U+0020; ZERO → '0'.
 
-**Rationale.** Matches the Latin-1 boundary codec the runtime already established (Text/CobolString uses Encoding.Latin1, byte k ↔ U+00kk, ADR R10) and the legacy lowerers' \xFF/\x00. Keeps figurative constants consistent across the file-I/O byte boundary.
+**Rationale.** §8.3.3.6.4 GR6/GR7: the highest/lowest characters of the native sequence, which is the 65,536 UTF-16 code units in both classes (owner decision kb/Work R52; SSOT §14.9 / §18 #14; `NativeCollatingSequence`). The file-I/O byte boundary keeps HIGH-VALUE as the byte 0xFF through the storage-byte law (`StorageByte`; design COBOLNET_FILES D29), so figurative constants stay consistent across it.
 
-**Rejected alternatives.** (none for alphanumeric — U+00FF/U+0000 matches the Latin-1 codec.) **National refinement (SSOT §14.9 / §18 #14):** national `HIGH-VALUE` = **U+FFFF** (the 2-octet extreme), national `LOW-VALUE` = **U+0000**; alphanumeric stays U+00FF/U+0000 (the single-octet extreme, preserving ASCII/Latin-1 ordering through the ordinal `CobolString.Compare`).
+**Rejected alternatives.** U+00FF for alphanumeric HIGH-VALUE (the former Latin-1 pin) — left every character above U+00FF ordered above "the highest character" (kb/Work PB1093).
 
 ### D7. String-op targets use the universal `Place` lvalue (`Read()`/`Write(rhs)`) — NOT a separate StringLvalue abstraction. [canonical: SSOT §14.1]
 
@@ -237,7 +237,7 @@ String ops span editions. Every edition-varying construct carries TWO co-equal o
 
 ## Open questions (#1 resolved in `COBOLNET_DESIGN.md` §18; #2–#4 still open — record resolutions in the SSOT §18)
 
-- National HIGH-VALUE/LOW-VALUE code points — **RESOLVED (SSOT §18 #14):** national `HIGH-VALUE` = **U+FFFF**, national `LOW-VALUE` = **U+0000**; alphanumeric stays U+00FF/U+0000 (Latin-1 codec). Full custom-`ALPHABET` collating is deferred behind the fixed `CobolString.Compare(a, b, weights?)` seam.
+- HIGH-VALUE/LOW-VALUE code points — **RESOLVED (SSOT §18 #14; owner decision kb/Work R52):** `HIGH-VALUE` = **U+FFFF**, `LOW-VALUE` = **U+0000**, in both classes. Full custom-`ALPHABET` collating is deferred behind the fixed `CobolString.Compare(a, b, weights?)` seam.
 - Out-of-range / zero / non-integer reference modification: throw (raise EC-BOUND-REF-MOD → CobolRuntimeException) vs clamp. Recommend THROW as default (conformant; results otherwise undefined). Should a lenient dialect that clamps be offered (the legacy compiler had dialect-gated leniencies)? Owner-gated.
 - Exception-condition surfacing in v1: the spec ties STRING/UNSTRING/INSPECT/ref-mod to EC-OVERFLOW-*, EC-RANGE-INSPECT-SIZE, EC-BOUND-REF-MOD as checkable conditions. v1 wires ON OVERFLOW directly and throws for fatal ref-mod; full EC handling (>>TURN, USE AFTER EXCEPTION CONDITION, EC- status registers) is the broader exception subsystem (M2 EC/exceptions). Confirm string-ops only needs ON OVERFLOW + ref-mod-throw now, deferring EC-register integration.
 - REF-MOD-ZERO-LENGTH directive plumbing: it is a compile-time directive affecting whether zero-length ref-mod is legal. Is it threaded into the binder now (so RefMod emits the zero-allowed branch) or deferred? Recommend recognizing the directive in G7 as part of the version framework: REF-MOD-ZERO-LENGTH is a COBOL-2023 directive (`VERSION_CHANGE_REFERENCE.md` #11/#30/#109) — at `--std 2023` it gates zero-length ref-mod (OFF ⇒ EC-BOUND-REF-MOD, plus FLAG-14 flagging per §7.3.15.4 GR4 i)); at `--std` 85/2002/2014 the directive itself is diagnosed as not-yet-introduced and zero-length ref-mod keeps the conformant throw (undefined in those editions). Default OFF (throw on zero) until then.

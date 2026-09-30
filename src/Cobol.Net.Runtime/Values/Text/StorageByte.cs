@@ -31,7 +31,8 @@ public static class NativeCollatingSequence
 /// (U+00FF, U+FFFF) and one BYTE (0xFF) — not between text and binary. If a byte-form leaf imaged 0xFF as U+00FF,
 /// <c>MOVE HIGH-VALUES TO REC</c> followed by <c>IF REC = HIGH-VALUES</c> would turn FALSE for any record with a
 /// binary field: storing the group through the leaf would CHANGE its content (measured, kb/Work PB1759 step 0),
-/// where §14.9.25 moves the characters in and nothing alters them afterwards. With one law the image of every byte
+/// where §14.9.25.4 GR4 moves a group "without conversion of data from one form of internal representation to
+/// another" and nothing alters the characters afterwards. With one law the image of every byte
 /// is the character a byte medium reads back, so the medium needs no knowledge of the record layout — a record
 /// struct, a Tier-B REDEFINES backing, a multi-01 FD area and an elementary record cross it identically, and a
 /// numeric view decodes 0xFF from U+FFFF through <see cref="ToByte"/>.</para>

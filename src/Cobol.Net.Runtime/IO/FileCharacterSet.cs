@@ -61,3 +61,20 @@ public static class FileCharacterSet
     public static Encoding Medium { get; } = Encoding.GetEncoding(
         "iso-8859-1", EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
 }
+
+/// <summary>⛔ THE ENCODING OF A FILE'S RECORD DATA ON ITS MEDIUM — the three cases a connector's
+/// <c>FileConnector.MediumEncoding</c> answers (owner decision kb/Work R51 item 3; design D29). Each maps the native record
+/// image to the byte CHANNEL (one char per medium byte) and back, so the framing above it never depends on it.</summary>
+public enum MediumEncoding
+{
+    /// <summary>One byte per character position, ISO/IEC 8859-1 under the storage-byte law (<see cref="FileCharacterSet"/>):
+    /// the fixed-record organizations with no CODE-SET clause (DOC-A.1-31; owner decision kb/Work R47).</summary>
+    SingleByte,
+
+    /// <summary>The CODE-SET alphabet's coded character set (§13.18.13.4 GR6, <see cref="CodeSetConversion"/>).</summary>
+    CodeSet,
+
+    /// <summary>UTF-8 text (<see cref="LineSequentialEncoding"/>): a LINE SEQUENTIAL file with no CODE-SET clause
+    /// (DOC-A.1-115; kb/Work PB1760).</summary>
+    Utf8,
+}

@@ -1,0 +1,7 @@
+RAW=00
+R1=00 [AB    ]
+R2=09 [caf]
+R2-4=NOT
+X2=71
+R3=00 [OK    ]
+R4=AT-END

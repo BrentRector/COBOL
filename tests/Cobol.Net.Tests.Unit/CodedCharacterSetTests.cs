@@ -101,6 +101,34 @@ public sealed class CodedCharacterSetTests
         Assert.Equal("B", natSet.CharAt(3 + 66 - 1));        // code 66: 65 specified codes below it... position = 2 + (66 - 1)
     }
 
+    /// <summary>§12.3.7.4 GR8 over the whole native repertoire (owner decision kb/Work R52; kb/Work PB1093): the
+    /// highest position of a literal-phrase sequence belongs to the largest UNSPECIFIED code unit (GR7 k3 puts the
+    /// tail above the specified block) — U+FFFF in either class — and only a definition that specifies every code
+    /// unit falls through to GR8's own tie rule, where "the last character specified" wins an ALSO group at the
+    /// top.</summary>
+    [Fact]
+    public void Extremes_HighValueIsTheHighestTailCharacter_AndTheTieRuleAtAFullTop()
+    {
+        var pos = new Dictionary<char, int> { ['B'] = 0, ['A'] = 1 };
+        var some = CollatingTable.Build(pos, ['B', 'A'], ['B', 'A'], 2);
+        Assert.Equal('\uFFFF', some.HighValue);
+        Assert.Equal('B', some.LowValue);
+
+        var hv = new Dictionary<char, int> { ['\uFFFF'] = 0, ['B'] = 1, ['A'] = 2 };
+        Assert.Equal('\uFFFE', CollatingTable.Build(hv, ['\uFFFF', 'B', 'A'], ['\uFFFF', 'B', 'A'], 3).HighValue);
+
+        // Every code unit specified; U+FFFF and U+FFFE share the TOP position (ALSO), U+FFFF specified first.
+        var full = new Dictionary<char, int>(CollatingTable.Repertoire);
+        var order = new List<char>(CollatingTable.Repertoire);
+        var rep = new List<char>(CollatingTable.Repertoire);
+        for (int c = 0; c <= 0xFFFD; c++) { full[(char)c] = c; order.Add((char)c); rep.Add((char)c); }
+        full['\uFFFF'] = 0xFFFE; order.Add('\uFFFF'); rep.Add('\uFFFF');
+        full['\uFFFE'] = 0xFFFE; order.Add('\uFFFE');
+        var tie = CollatingTable.Build(full, order, rep, 0xFFFF);
+        Assert.Equal('\uFFFE', tie.HighValue);   // GR8: the LAST character specified at the highest position
+        Assert.Equal('\0', tie.LowValue);
+    }
+
     /// <summary>kb/Work PB1557 — an alphabet that specifies EVERY native character (legal: §12.3.7.3 SR14 b4/c4
     /// bound the count by the native set's size with "shall not exceed") has 65,536 positions, one more than a
     /// 16-bit counter holds. The builders counted it in one and handed <see cref="CollatingTable.Build"/> a

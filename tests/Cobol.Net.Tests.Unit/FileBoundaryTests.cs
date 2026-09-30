@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Text;
+using CobolNet.Runtime;
 using CobolNet.Runtime.IO;
 using Xunit;
 
@@ -222,6 +223,7 @@ public sealed class FileBoundaryTests : IDisposable
         Assert.False(FileCharacterSet.HasCharacterWithoutByteImage("A" + EAcute + (char)0xFF));
         Assert.True(FileCharacterSet.HasCharacterWithoutByteImage("A" + Euro));
         Assert.True(FileCharacterSet.HasCharacterWithoutByteImage(((char)0x100).ToString()));
+        Assert.True(FileCharacterSet.HasCharacterWithoutByteImage(((char)0xFFFE).ToString()));
         var all = new string(Enumerable.Range(0, 256).Select(i => (char)i).ToArray());
         byte[] bytes = FileCharacterSet.Medium.GetBytes(all);
         Assert.Equal(Enumerable.Range(0, 256).Select(i => (byte)i), bytes);
@@ -270,16 +272,72 @@ public sealed class FileBoundaryTests : IDisposable
         Assert.Equal(FileStatusCode.Success, c.Close());
     }
 
-    /// <summary>The line sequential character set carries the same ceiling for an alphanumeric record area and
-    /// none for a national one, whose characters reach it as UTF-16BE byte pairs.</summary>
+    /// <summary>§12.4.5.7.4 GR1 — "Each collating sequence is a fixed file attribute" — over the WHOLE native
+    /// repertoire (kb/Work PB1093): two sequences that order every Latin-1 character identically but U+0100 / U+0101
+    /// differently are different attributes, and the fingerprint says so (it hashed only U+0000–U+00FF before).</summary>
     [Fact]
-    public void LineSequentialCharacterSet_AlphanumericStopsAtU00FF_NationalDoesNot()
+    public void CollatingFingerprint_SeesADifferenceAboveLatin1()
     {
-        Assert.False(LineSequentialCharacterSet.HasCharacterOutside("A" + EAcute, national: false, codeSet: null));
-        Assert.True(LineSequentialCharacterSet.HasCharacterOutside("A" + Euro, national: false, codeSet: null));
+        var ab = new AlphanumericCollation([0x100, 0x101], [0, 1], [0x100, 0x101], 2);
+        var ba = new AlphanumericCollation([0x100, 0x101], [1, 0], [0x101, 0x100], 2);
+        for (int c = 0; c <= 0xFF; c++) Assert.Equal(ab.Weight((char)c), ba.Weight((char)c));
+        Assert.NotEqual(FixedFileAttributes.Fingerprint(ab), FixedFileAttributes.Fingerprint(ba));
+        Assert.Equal(FixedFileAttributes.Fingerprint(ab),
+            FixedFileAttributes.Fingerprint(new AlphanumericCollation([0x100, 0x101], [0, 1], [0x100, 0x101], 2)));
+    }
+
+    /// <summary>With no CODE-SET a line sequential file is UTF-8 text (kb/Work PB1760), so its character set is every
+    /// Unicode scalar value from U+0020 in BOTH record-area classes: U+20AC, a surrogate PAIR and HIGH-VALUE (U+FFFF)
+    /// are members; a C0 control and an unpaired surrogate (including a non-UTF-8 byte's U+DC80–U+DCFF escape) are
+    /// not. A national area's characters reach it as UTF-16BE byte pairs.</summary>
+    [Fact]
+    public void LineSequentialCharacterSet_IsTheUtf8ScalarValues_FromSpace()
+    {
+        Assert.False(LineSequentialCharacterSet.HasCharacterOutside("A" + EAcute + Euro + "\uFFFF", national: false, codeSet: null));
+        Assert.False(LineSequentialCharacterSet.HasCharacterOutside("A\uD83D\uDE00", national: false, codeSet: null));   // one pair
+        Assert.True(LineSequentialCharacterSet.HasCharacterOutside("A\uD83D", national: false, codeSet: null));          // unpaired
+        Assert.True(LineSequentialCharacterSet.HasCharacterOutside("A\uDCE9", national: false, codeSet: null));          // byte escape
+        Assert.True(LineSequentialCharacterSet.HasCharacterOutside("A\t", national: false, codeSet: null));
         // N"€" as its UTF-16BE bytes: 0x20 0xAC.
         Assert.False(LineSequentialCharacterSet.HasCharacterOutside(new string([(char)0x20, (char)0xAC]), national: true, codeSet: null));
         Assert.True(LineSequentialCharacterSet.HasCharacterOutside(new string([(char)0x00, (char)0x0A]), national: true, codeSet: null));
+    }
+
+    /// <summary>The UTF-8 line codec (kb/Work PB1760): every member round-trips through the byte channel as its UTF-8
+    /// bytes; a byte that is not UTF-8 decodes to its U+DC80–U+DCFF escape (so the record keeps the byte and the READ
+    /// reports '09'); a national area travels as its characters, not its pair bytes.</summary>
+    [Fact]
+    public void LineSequentialEncoding_IsUtf8_WithAByteEscape()
+    {
+        string text = "h" + EAcute + Euro + "\uFFFF\uD83D\uDE00";
+        string channel = LineSequentialEncoding.ToChannel(text, nationalArea: false);
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(text), channel.Select(c => (byte)c).ToArray());
+        Assert.Equal(text, LineSequentialEncoding.FromChannel(channel, nationalArea: false));
+        Assert.Equal("caf\uDCE9", LineSequentialEncoding.FromChannel("caf\u00E9", nationalArea: false));   // Latin-1 é
+        Assert.Equal("\uDCE2\uDC82", LineSequentialEncoding.FromChannel("\u00E2\u0082", nationalArea: false));   // torn €
+        string pairs = CobolBits.NatBytes(Euro + "A");
+        Assert.Equal("\u00E2\u0082\u00ACA", LineSequentialEncoding.ToChannel(pairs, nationalArea: true));
+        Assert.Equal(pairs, LineSequentialEncoding.FromChannel("\u00E2\u0082\u00ACA", nationalArea: true));
+        Assert.Throws<InvalidOperationException>(() => LineSequentialEncoding.ToChannel("A\uD83D", nationalArea: false));
+    }
+
+    /// <summary>⛔ THE STORAGE-BYTE LAW (kb/Work PB1759, design D29): byte 0xFF is HIGH-VALUE (U+FFFF), every other byte
+    /// b is U+00bb, and a character's byte is its low byte — so U+00FF and U+FFFF share 0xFF, and the fixed-record
+    /// channel writes HIGH-VALUE as 0xFF and reads 0xFF back as HIGH-VALUE.</summary>
+    [Fact]
+    public void StorageByteLaw_HighValueIsTheByteFF_OnTheChannelToo()
+    {
+        Assert.Equal('\uFFFF', NativeCollatingSequence.HighValue);
+        Assert.Equal('\uFFFF', StorageByte.ToChar(0xFF));
+        Assert.Equal('\u00FE', StorageByte.ToChar(0xFE));
+        Assert.Equal((byte)0xFF, StorageByte.ToByte('\uFFFF'));
+        Assert.Equal((byte)0xFF, StorageByte.ToByte('\u00FF'));
+        Assert.True(StorageByte.HasByte('\uFFFF'));
+        Assert.False(StorageByte.HasByte('\u0100'));
+        Assert.False(StorageByte.HasByte('\uFFFE'));
+        Assert.Equal("A\u00FF", FileCharacterSet.ToChannel("A\uFFFF", codeSet: null));
+        Assert.Equal("A\uFFFF", FileCharacterSet.FromChannel("A\u00FF", codeSet: null));
+        Assert.False(FileCharacterSet.HasCharacterWithoutByteImage("A\uFFFF"));
     }
 
     private static long Composed(FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames)

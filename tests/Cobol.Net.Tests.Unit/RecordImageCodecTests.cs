@@ -44,11 +44,14 @@ public sealed class RecordImageCodecTests
     private static string Bytes(params int[] bytes)
     {
         var chars = new char[bytes.Length];
-        for (int i = 0; i < bytes.Length; i++) chars[i] = (char)bytes[i];
+        for (int i = 0; i < bytes.Length; i++) chars[i] = StorageByte.ToChar((byte)bytes[i]);   // the storage-byte law
         return new string(chars);
     }
 
-    private static string Hex(string image) => string.Join(" ", image.Select(c => ((int)c).ToString("X2")));
+    /// <summary>The image's BYTES in hex — each character read back through the storage-byte law, so the assertion is
+    /// about the bytes a medium would carry, and a character that is not a byte image fails it visibly.</summary>
+    private static string Hex(string image) => string.Join(" ", image.Select(c =>
+        StorageByte.HasByte(c) ? StorageByte.ToByte(c).ToString("X2") : $"U+{(int)c:X4}"));
 
     private static void AssertImage(string expected, string actual) =>
         Assert.Equal(Hex(expected), Hex(actual));   // hex on failure — a raw Latin-1 diff is unreadable
@@ -188,14 +191,15 @@ public sealed class RecordImageCodecTests
         Assert.Equal(expected, CobolNum.FormatImage(signed ? -1 : 1, p).Length);
     }
 
-    /// <summary>Every byte the codec emits fits the Latin-1 carrier the record image is (chars 0–255 map 1:1 to
-    /// bytes) — a char above 0xFF would be a byte the framing cannot write.</summary>
+    /// <summary>Every character the codec emits is a byte image under the storage-byte law (U+0000–U+00FE and U+FFFF
+    /// for 0xFF, kb/Work PB1759) — any other character would be a byte the framing cannot write.</summary>
     [Theory]
     [MemberData(nameof(Grid))]
     public void EveryEmittedCharIsAByte(Usage usage, int digits, bool signed)
     {
         var p = P(usage, digits, signed);
-        foreach (char c in CobolNum.FormatImage(signed ? -1 : 1, p)) Assert.InRange(c, (char)0, (char)0xFF);
+        foreach (char c in CobolNum.FormatImage(signed ? -1 : 1, p))
+            Assert.True(StorageByte.HasByte(c) && c != '\u00FF', $"U+{(int)c:X4} is not a storage-byte image");
     }
 
     [Theory]

@@ -5166,13 +5166,13 @@
   "ordinal": 6,
   "subject": "Figurative constant values",
   "rule-digest": "61feedf29584",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs#FillChar; src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs#Fill; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#HighValue; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#CollatingTable; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetFigurative",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Values/Text/StorageByte.cs#NativeCollatingSequence; src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs#FillChar",
+  "test-ref": "conformance:2023/pb1759_high_value_is_the_highest_native_character; conformance:85/pb1759_high_value_record_round_trip_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1093 (registrar 15b). Rule: 'At runtime, when referenced outside the SPECIAL-NAMES paragraph, the high-value format represents the character, or multiple-character combination, that has the highest ordinal position in the runtime collating sequence.' + 'If the context of the figurative constant requires national characters, the national program collating sequence is used' (cite.py --check 8.3.3.6.4 -> OK 6) both). The native alphanumeric and national sequences are 65,536 positions (D-N1/D-N3; DOC-A.1-188; CollatingTable.Repertoire = 0x10000; FUNCTION CHAR(20000) yields ordinal 20000), so the highest-ordinal character is U+FFFF. The code pins HIGH-VALUE to U+00FF: AlphabetDef.HighValue '?? (char)0xFF' for the native alphanumeric sequence; FillChar/Fill 'H' -> '\\u00ff' for a national anchor with no national PCS; the literal-phrase CollatingTable computes the alphanumeric HighValue 'over the Latin-1 block' although §12.3.7.4 GR7 k3 puts every unspecified native character above the specified ones in native order; AlphabetFigurative (SPECIAL-NAMES, §12.3.7.4 GR10 native extreme) returns U+00FF for alphanumeric while returning U+FFFF for national. The design docs call it 'the flagged §8.3.3.6 GR6/GR7 divergence ... kept byte-stable' (COBOLNET_DESIGN §14 item 14; PHASE4_RECONCILIATION) — no owner decision or kb/Work note owns it. PROBES (probe/figurative-constant-values): p1.cob native: ORD(HIGH-VALUE in PIC X) = 256, ORD(HIGH-VALUE in PIC N) = 256, 'IF NX\"4E00\" > HIGH-VALUE' TRUE (expected FALSE), 'NA = NX\"FFFF\"' after MOVE HIGH-VALUE TO NA FALSE (expected TRUE); p2.cob: CHAR(20000) > HIGH-VALUE TRUE (expected FALSE); p3.cob PCS 'ALPHABET AL IS \"B\" \"A\" \"C\"': ORD(HIGH-VALUE)=256, CHAR(20000) > HIGH-VALUE TRUE (expected: HIGH-VALUE = U+FFFF, ordinal 65536, comparison FALSE); p7.cob 'CLASS HVC IS HIGH-VALUE': CHAR(65536) IS HVC FALSE, CHAR(256) IS HVC TRUE (expected the reverse, §12.3.7.4 GR10). CONFORMING ARMS: an explicit national PCS (p5.cob: HIGH-VALUE = NX\"FFFF\" under a literal-phrase national alphabet, NX\"4E00\" > HIGH-VALUE FALSE) and a LOCALE PCS (p4.cob: ORD(HIGH-VALUE)=63894, CHAR(20000) > HIGH-VALUE FALSE; determination L7). See finding 'HIGH-VALUE native U+00FF pin'. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (the LC_COLLATE sentence and the national-sequence sentence from 2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1093 -> PB1759 LANDED (owner decision R52): HIGH-VALUE is U+FFFF, the highest of the 65,536 native characters, in both classes and at every site (NativeCollatingSequence.HighValue, read by FigurativeConstants.FillChar/Fill, AlphabetDef/NationalAlphabetDef.HighValue, LiteralEnvironment, AlphabetFigurative, the runtime collation defaults). cite.py --check 8.3.3.6.4 \"that has the highest ordinal position in the runtime collating sequence\" -> OK 6). Golden pins: ORD(HIGH-VALUE)=65536, CHAR(20001) < HIGH-VALUE, national HIGH-VALUE = NX\"FFFF\", X\"FF\" is not HIGH-VALUE; a record file round trip keeps HIGH-VALUE through the one-byte medium (the storage-byte law, byte 0xFF <-> U+FFFF, design COBOLNET_FILES D29).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.3.3.6.4-7",
@@ -14931,13 +14931,13 @@
   "ordinal": 8,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "51f4dd9f3e04",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/CollatingModel.cs#Extremes; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#Build; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#HighValue",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/CollatingModel.cs#Extremes",
+  "test-ref": "conformance:2023/pb1093_alphabet_high_value_tail; unit:CodedCharacterSetTests.Extremes_HighValueIsTheHighestTailCharacter_AndTheTieRuleAtAFullTop",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1093: Rule (cite.py --check 12.3.7.4 \"If more than one character has the highest position in the program collating sequence, the last character specified is associated with the figurative constant HIGH-VALUE\" -> OK §12.3.7.4 8)): \"The character that has the highest ordinal position in the program collating sequence is associated with the figurative constant HIGH-VALUE, except when this figurative constant is specified as a literal in the SPECIAL-NAMES paragraph\"; tie -> last character specified. CODE: CollatingTable.Extremes starts the HIGH walk at (char)0xFFFF for the national arm - correct, since GR7 k3 puts every unspecified character above the specified block, so the highest position is the largest UNSPECIFIED code unit, with GR8's tie rule when the whole repertoire is specified - but at (char)0xFF for the ALPHANUMERIC arm ('the documented byte-stability pin'), although the same table places the alphanumeric tail over the full 65,536-unit native set (CollatingTable.Repertoire; runtime LiteralPhraseCollation). MEASURED (probe/snp3/g10a.cob, --std 2023): PROGRAM COLLATING SEQUENCE AL, ALPHABET AL IS HIGH-VALUE \"B\" \"A\" -> MOVE HIGH-VALUE TO Y; Y = X\"FF\" is FALSE (the walk skipped the specified U+00FF and landed on U+00FE), and MOVE FUNCTION CHAR(257) (U+0100) TO X; X > Y is TRUE - a character collates ABOVE HIGH-VALUE, which GR8 makes impossible. Expected from the spec: HIGH-VALUE = U+FFFF (the last native code unit, k3's highest tail position); no character compares greater. Same shape for every alphanumeric literal-phrase alphabet and for the EBCDIC code-name (whose 256 specified positions make Extremes fall through to the tie rule over the Latin-1 block, while U+0100..U+FFFF sit above them per the implementor's own GR7 i adoption of k3). National half verified correct by reading (alphabet_national golden pins U+FFFF); the tie rule verified by reading only. No open kb/Work note owns this; the pin is described as 'flagged' in docs/COBOLNET_DESIGN.md §14.9/§18 #14 and PHASE4_RECONCILIATION but has no owner decision and no register note. Finding: 'alphanumeric HIGH-VALUE pinned to U+00FF over a 65,536-character native set'. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (the national program collating sequence half from 2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1093 LANDED via PB1759 (owner decision R52): CollatingTable.Extremes walks the WHOLE 65,536-unit repertoire for both classes from NativeCollatingSequence.HighValue, so the runtime HIGH-VALUE is the largest UNSPECIFIED code unit (GR7 k3 tail) and GR8's tie rule applies only when every code unit is specified. cite.py --check 12.3.7.4 \"If more than one character has the highest position in the program collating sequence, the last character specified is associated with the figurative constant HIGH-VALUE\" -> OK 8). Golden: ALPHABET AL IS HIGH-VALUE \"B\" \"A\" -> ORD(HIGH-VALUE) = 65536 (U+FFFE, U+FFFF being specified), U+0100 <= HIGH-VALUE. Unit: the tail case, the specified-U+FFFF case and the full-repertoire ALSO tie (last specified wins).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.7.4-9",
@@ -14961,13 +14961,13 @@
   "ordinal": 10,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "9a61ee8291f2",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetFigurative; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetFigurative",
+  "test-ref": "conformance:2023/pb1093_alphabet_high_value_tail; conformance:2023/pb1759_high_value_is_the_highest_native_character",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1093: Rule (cite.py --check 12.3.7.4 \"the figurative constants HIGH-VALUE and LOW-VALUE are associated with those characters having the highest and lowest positions\" -> OK §12.3.7.4 10)): inside SPECIAL-NAMES, HIGH-VALUE / LOW-VALUE are the highest / lowest characters of the NATIVE national collating sequence under NATIONAL, else of the NATIVE alphanumeric collating sequence. CODE: AlphabetFigurative is the ONE mapping for ALPHABET literal-phrase and CLASS operands (both classes, figurative token or >>COBOL-WORDS synonym): LOW-VALUE -> U+0000 (both classes, correct), national HIGH-VALUE -> U+FFFF (correct: the native national set is the 65,536 UTF-16 code units in code-unit order), alphanumeric HIGH-VALUE -> U+00FF. The native alphanumeric set is ALSO 65,536 code units in code-unit order (measured probe/snp3/g6n.cob: ORD(CHAR(65536)) = 65536, and natively CHAR(257) = U+0100 > HIGH-VALUE), so U+00FF is NOT the highest character of the native alphanumeric collating sequence. MEASURED (probe/snp3/g10a.cob): ALPHABET AL IS HIGH-VALUE \"B\" \"A\" as PCS -> X\"FF\" < \"A\" is TRUE and ORD(X\"FF\") = 1: the alphabet placed U+00FF first. Expected from the spec (under the implementor's own GR6 definition): the character at position 1 is U+FFFF; U+00FF stays at its GR7 k3 tail position (above 'A'), so X\"FF\" < \"A\" is FALSE. LOW-VALUE and the national HIGH-VALUE halves CONFORM; the alphanumeric HIGH-VALUE half DIVERGES -> row DIVERGES. Same mechanism as GR8 (one finding). Not owned by any open note (PB940, open, concerns only the duplicated WORD-recognition half of AlphabetFigurative, not its value). [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (the NATIONAL-phrase half from 2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1093 LANDED via PB1759 (owner decision R52): AlphabetFigurative answers the native extremes U+FFFF / U+0000 for both the alphanumeric and the national sequence (both are the 65,536 UTF-16 code units in code-unit order). cite.py --check 12.3.7.4 \"When specified as literals in the SPECIAL-NAMES paragraph, the figurative constants HIGH-VALUE and LOW-VALUE are associated with those characters having the highest and lowest positions\" -> OK 10). Goldens: ALPHABET AL IS HIGH-VALUE \"B\" \"A\" puts U+FFFF at ordinal 1 (LOW-VALUE ORD 1) and X\"FF\" in the tail (ORD 257, above \"A\"); CLASS HVC IS HIGH-VALUE holds CHAR(65536) and not CHAR(256).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.7.4-11",
@@ -16326,13 +16326,13 @@
   "ordinal": 1,
   "subject": "COLLATING SEQUENCE clause",
   "rule-digest": "73cf3f78291e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/FixedFileAttributes.cs#Fingerprint; src/Cobol.Net.Runtime/IO/IndexedConnector.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FixedFileAttributes.cs#Fingerprint",
+  "test-ref": "unit:FileBoundaryTests.CollatingFingerprint_SeesADifferenceAboveLatin1",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1093: cite.py --check 12.4.5.7.4 \"Each collating sequence is a fixed file attribute\" OK. Each key's collating sequence is persisted as a KeyDescriptor.Collation fingerprint at creation and compared at OPEN: probe p13 opened the REV-collated p8.dat with a no-clause program -> FS=39 (correct fixed-attribute conflict). Unverified edge: Fingerprint hashes only the weights of U+0000..U+00FF, so two sequences that differ only above Latin-1 (national keys now exist per PB327; ALPHABET literals above Latin-1 per pb770; LOCALE collations) fingerprint equal and a conflicting OPEN would not be detected; also an un-probeable sequence answers UNKNOWN which never conflicts. Half verified -> PARTIAL. No spec-derived test pins the 39. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1093 LANDED via PB1759: the fixed-attribute fingerprint of a key's collating sequence hashes the weight of every one of the 65,536 native characters (it hashed U+0000-U+00FF only), so two sequences that differ only above Latin-1 are different fixed file attributes and a conflicting OPEN is '39' (the conflict arm itself unchanged; the earlier probe p13 measured it). cite.py --check 12.4.5.7.4 \"Each collating sequence is a fixed file attribute\" -> OK 1). Unit: two AlphanumericCollation tables identical over U+0000-U+00FF and differing at U+0100/U+0101 fingerprint differently, and an equal table fingerprints equal.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.7.4-2",

@@ -10,9 +10,12 @@
       *>  - WRITE: unsuccessful, '71' (§14.9.51.4 GR23; §9.1.13.10
       *>    item 1), the organization's own value for what every other
       *>    organization answers '91';
-      *>  - READ of a medium byte outside the set (X'E9', written with
-      *>    no CODE-SET): successful, '09' (§14.9.30.4 GR16), the byte
-      *>    carried as the native character of the same value (ORD 234).
+      *>  - READ of a medium byte outside the set: successful, '09'
+      *>    (§14.9.30.4 GR16), the byte carried as the native character
+      *>    of the same value. The line was written with NO CODE-SET,
+      *>    i.e. as UTF-8 text (DOC-A.1-115, kb/Work PB1760), so the
+      *>    "é" is the two bytes X'C3A9' and position 2 holds X'C3'
+      *>    (ORD 196) - outside ISO/IEC 646's 128 characters.
       *> Why each leg can fail:
       *>  S1-E    - the defect wrote X'E9' with '00' (STANDARD-1 is
       *>            ISO/IEC 646 IRV, 128 characters, §12.3.7.4 GR7 c).

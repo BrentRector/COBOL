@@ -1905,50 +1905,63 @@ and it leaves zero-padding a crashed run unit would read back as records. *Flush
 detect a full medium on its own WRITE: a syscall per record for every program, where the buffer-filling WRITE
 already reports the boundary.
 
-### D29. TEXT, BYTES AND ENCODING are three layers: the record codec knows each LEAF's kind and encodes/decodes it at the medium; the in-memory group image stays lossless; the file encoding is an attribute of the file. (kb/Work R51, R52; PB1759, PB1760.)
+### D29. TEXT, BYTES AND ENCODING are three layers: characters in memory, ONE storage-byte law wherever a byte becomes a character, and the file encoding as an attribute of the file. (kb/Work R51, R52; PB1759, PB1760.)
 
-**Decision (owner, 2026-09-29).** A file record is BYTES, and the bytes of a leaf are chosen by that leaf's KIND:
+**Decision (owner, 2026-09-29; the mechanism corrected by the implementer's measurement, kb/Work PB1759 step 0, under
+the owner's addendum of the same day).** Text in memory is characters (UTF-16 code units). A record on a byte medium is
+BYTES. The two meet at exactly one law and one per-file encoding:
 
-| leaf kind | in memory | on the medium |
+| layer | rule | where it lives |
 |---|---|---|
-| alphanumeric / alphanumeric-edited (and groups of them) | characters (UTF-16 code units) | the file's encoding: one byte per position (ISO 8859-1) for the fixed-record organizations, UTF-8 for LINE SEQUENTIAL; the alphanumeric HIGH-VALUE character U+FFFF is byte `0xFF` |
-| national | characters | UTF-16BE pairs (D-N1), any encoding |
-| numeric byte forms (binary, packed, IEEE, zoned) | native value | their pinned byte form (D7 / V59) |
-| hexadecimal-alphanumeric literal, `X"FF"` | the characters U+0000-U+00FF | the same bytes |
+| in memory | alphanumeric / national items hold characters; a byte-form leaf (binary, packed, IEEE, pointer, bit, a national item's UTF-16BE pairs in a record image) holds BYTES, imaged one character per byte | the record structs and REDEFINES backings |
+| the storage-byte law | **byte 0xFF is the character U+FFFF (the native HIGH-VALUE, R52); every other byte b is U+00bb; a character's byte is its low-order byte**, so U+00FF and U+FFFF share 0xFF | `CobolNet.Runtime.StorageByte` — every byte-form encoder (`CobolNum.Image`, `PointerImage`, `CobolBits`) and decoder, the item-209 byte reduction (`CobolIntrinsics.RawBytes`) and the fixed-record medium |
+| the file encoding | fixed-record organizations (sequential, relative, indexed, report): one byte per position through the law, a character with no byte (above U+00FF, not U+FFFF) refused `'91'` (R47); LINE SEQUENTIAL: UTF-8 (PB1760); a CODE-SET clause converts the native one-byte channel (§13.18.13.4 GR6) | `FileCharacterSet.ToChannel` / `FromChannel` (the two medium sites: `FileConnector.ToMedium`/`FromMedium`, `RecordFraming.WriteStore`/`ReadStore`) |
 
-**Why per leaf and never per connector.** Today the record image is a string whose characters U+0000-U+00FF stand for
-bytes, and the connector encodes it with one strict Latin-1 (`FileCharacterSet.Medium`, R47). That conflates a TEXT
-0xFF with a BINARY 0xFF: once HIGH-VALUE became U+FFFF (R52) a connector-wide table could not decide whether a byte
-0xFF read from the medium is the HIGH-VALUE character or a byte of a packed/binary field — and one FD's 01 records
-REDEFINE the same area, so even the record layout is unknown at READ. Only the generated record struct (which owns the
-leaf types) can decide, and it decides per VIEW: an alphanumeric view reads 0xFF as HIGH-VALUE, a numeric view of the
-same bytes reads it as a number.
+**Why one law and no per-leaf medium codec (the correction).** The first version of this decision gave every record
+struct a second generated image (`AsMedium`/`FromMedium`) whose alphanumeric leaves mapped U+FFFF <-> 0xFF, on the
+reasoning that a connector-wide map cannot tell a text 0xFF from a binary 0xFF. Measurement showed three things
+(kb/Work PB1759, step 0): (1) every in-memory byte-form DECODER already truncates a character to its low byte, so
+the direction "0xFF -> U+FFFF" costs a numeric view nothing; (2) the record areas that matter most have no leaves to
+dispatch on — a multi-01 FD's shared area and every Tier-B REDEFINES backing are string backings, and an elementary
+record has no struct; (3) the real collision is between two CHARACTERS and one BYTE, and it bites IN MEMORY first:
+with HIGH-VALUE = U+FFFF and binary bytes imaged as U+00bb, `MOVE HIGH-VALUES TO REC` then `IF REC = HIGH-VALUES`
+turns FALSE for any record with a COMP field, because storing the group through the binary leaf re-images FF FF as
+U+00FF U+00FF — content changed by a mere store, where §14.9.25.4 GR4 moves a group "without conversion of data from
+one form of internal representation to another". Making byte 0xFF the character U+FFFF
+everywhere fixes that and makes the medium a pure channel: a byte-form leaf's image already holds U+FFFF for 0xFF,
+a text leaf holds U+FFFF for HIGH-VALUE, and both leave as 0xFF and come back as U+FFFF — no layout knowledge, one
+place. The per-leaf design would also have needed a second image composer arm for every leaf kind (fixed, variable,
+bit runs, OCCURS, national), which is two mechanisms for one job.
 
-**Two images, not one.** `GroupImageCodec` now serves two jobs with one image: the IN-MEMORY group image (group MOVE,
-group comparison, DISPLAY of a group, CALL and INVOKE windows) and the FILE image. They must differ: a lossless
-memory image keeps U+00FF and U+FFFF distinct (a group MOVE must never turn a `ÿ` into HIGH-VALUE), the medium image
-folds U+FFFF to 0xFF. `AsImage()` / `FromImage()` stay the memory image; `AsMedium()` / `FromMedium()` are the file
-image, used by the file emitters (WRITE, REWRITE, READ, RELEASE / RETURN, the keyed START / DELETE key images) and
-nowhere else. **Accepted cost (DOC-A.1-31):** a real `ÿ` (U+00FF) in an alphanumeric field of a record file reads back
-as HIGH-VALUE.
+**Accepted cost (owner R52, generalized; DOC-A.1-31).** U+00FF and U+FFFF share the byte 0xFF, so a real `ÿ` that
+passes through a byte — the record medium of a fixed-record file, or a byte-form storage position (a group MOVE of
+`ÿ` over a COMP field) — returns as HIGH-VALUE. In an alphanumeric leaf in memory it stays U+00FF, the literal
+`X"FF"` stays U+00FF, and a LINE SEQUENTIAL file (UTF-8, PB1760) carries it exactly.
+
+**A CODE-SET file.** No alphabet's correspondence names U+FFFF, so HIGH-VALUE crosses a CODE-SET medium as that coded
+character set's HIGHEST code unit — 0xFF under `EBCDIC`, 0x7F under STANDARD-1 / STANDARD-2 / `ASCII` — and that unit
+reads back as HIGH-VALUE (owner decision R51 item 4: "cross a byte medium as that medium's extreme byte";
+`CodeSetConversion.HighUnit`). The cost mirrors the native medium's: the character the alphabet itself assigns to that
+unit (U+009F, DEL) reads back as HIGH-VALUE (DOC-A.1-187).
 
 **The encoding is an attribute of the FILE.** Fixed-record organizations default to one byte per alphanumeric
 position, because a variable-width encoding makes a record's byte length vary and breaks record-number positioning
 and the fixed-attribute check (§9.1.6); LINE SEQUENTIAL defaults to UTF-8, because a text line has no fixed width and
 full Unicode is required (owner). The FD CODE-SET clause selects any other encoding (`CodeSetConversion`), and Unicode
 inside a fixed-record file is NATIONAL. R47's "refuse a character above U+00FF" survives for fixed-record files with no
-CODE-SET; it is superseded for LINE SEQUENTIAL (PB1760).
+CODE-SET (HIGH-VALUE excepted); it is superseded for LINE SEQUENTIAL (PB1760).
+
+**The collating fingerprint** (§12.4.5.7.4 GR1, a fixed file attribute) hashes the weight of every one of the 65,536
+native characters (`FixedFileAttributes.Fingerprint`), so two sequences that differ only above U+00FF — where
+HIGH-VALUE now sits — are different attributes.
 
 **Rejected alternatives.** *UTF-8 as the default for every file*: binary record content (packed, binary, float) is
-raw bytes, and a multi-byte encoding would corrupt any byte above 0x7F. *A connector-wide HIGH-VALUE byte map*: cannot
-tell text from binary (above). *Keeping HIGH-VALUE at U+00FF*: leaves U+0100..U+FFFF ordered above "the highest
-character" in a UTF-16 repertoire (§8.3.3.6.4 GR6; PB1093). *Byte-position alphanumeric items* (GnuCOBOL, IBM DISPLAY):
-safe and interoperable, but `PIC X(10) VALUE "héllo"` would hold four characters' worth of positions and truncation
-would split code points.
-
-**Work.** PB1759 (typed medium codec + HIGH-VALUE U+FFFF, absorbs PB1093), PB1760 (per-file encoding, LINE SEQUENTIAL
-UTF-8). Neither is landed; this section describes the target, and the register notes carry the sequence and the
-facts still to be measured before code.
+raw bytes, and a multi-byte encoding would corrupt any byte above 0x7F. *A per-leaf medium codec* (`AsMedium` /
+`FromMedium`): unreachable for leafless record areas and wrong in memory (above). *Imaging a binary 0xFF as U+00FF*:
+breaks `IF REC = HIGH-VALUES` after `MOVE HIGH-VALUES TO REC` (above). *Keeping HIGH-VALUE at U+00FF*: leaves
+U+0100..U+FFFF ordered above "the highest character" in a UTF-16 repertoire (§8.3.3.6.4 GR6; PB1093).
+*Byte-position alphanumeric items* (GnuCOBOL, IBM DISPLAY): safe and interoperable, but `PIC X(10) VALUE "héllo"`
+would hold four characters' worth of positions and truncation would split code points.
 
 ## C# mapping
 

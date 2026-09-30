@@ -1579,7 +1579,7 @@ clause" was written in THREE places and exactly one had ever been fixed: kb/Work
 (§14.9.3.4 GR8/GR9) with its fill decoder **private to `PtrEmitter`**, so `PicInfo.DefaultInitializer` (the
 native-field arm) and `GroupImageCodec`'s fall-through (the Tier-B image arm) went on hardcoding `' '` / `'0'` /
 `0L` and *could not* have reused it. The private copy also carried its own §11.9.10.4 GR5 map, which spelled
-HIGH-VALUES as U+FFFF while every other HIGH-VALUE in the compiler is U+00FF — one rule, three places, two
+HIGH-VALUES as U+FFFF while every other HIGH-VALUE in the compiler was then U+00FF — one rule, three places, two
 different answers, and the arm with the private copy was the one that disagreed. `InitialStateBackground` is now
 the sole producer of a background seed; a unit drift test pins that it has exactly three public producers, and
 `pb152_options_initialize_arm_agreement` asks all three arms the same question inside one COBOL program.

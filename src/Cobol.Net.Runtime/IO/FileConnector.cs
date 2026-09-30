@@ -828,14 +828,29 @@ public abstract class FileConnector
     /// the connector, so it is declared once rather than re-derived per record.</summary>
     public CodeSetConversion? CodeSet { get; internal set; }
 
-    /// <summary>⛔ GR6 a — the NATIVE form of a record image just taken off the storage medium. Every physical
-    /// read of record data passes through here; see <see cref="CodeSetConversion"/> for why the framing around
-    /// the record does not.</summary>
-    protected string FromMedium(string mediumImage) => FileCharacterSet.FromChannel(mediumImage, CodeSet);
+    /// <summary>True for a LINE SEQUENTIAL file — a TEXT file, whose default encoding is UTF-8 (<see cref="MediumEncoding"/>).</summary>
+    protected virtual bool LineSequential => false;
 
-    /// <summary>⛔ GR6 b — the STORAGE-MEDIUM form of a record image about to be written. Every physical write of
-    /// record data passes through here.</summary>
-    protected string ToMedium(string nativeImage) => FileCharacterSet.ToChannel(nativeImage, CodeSet);
+    /// <summary>⛔ THE FILE'S ENCODING — an attribute of the FILE, carried by its connector (owner decision kb/Work R51
+    /// item 3; design <c>COBOLNET_FILES_DESIGN.md</c> D29; kb/Work PB1760): a CODE-SET clause selects its alphabet's
+    /// coded character set (§13.18.13.4 GR6); otherwise a LINE SEQUENTIAL file is UTF-8 text and every other file is
+    /// one byte per character position under the storage-byte law (ISO/IEC 8859-1, HIGH-VALUE the byte 0xFF —
+    /// DOC-A.1-31). Derived, never stored, so it cannot disagree with the two facts it is made of.</summary>
+    public MediumEncoding MediumEncoding =>
+        CodeSet is not null ? MediumEncoding.CodeSet : LineSequential ? MediumEncoding.Utf8 : MediumEncoding.SingleByte;
+
+    /// <summary>⛔ GR6 a — the NATIVE form of a record image just taken off the storage medium, decoded by the file's
+    /// <see cref="MediumEncoding"/>. Every physical read of record data passes through here; see
+    /// <see cref="CodeSetConversion"/> for why the framing around the record does not.</summary>
+    protected string FromMedium(string mediumImage) => MediumEncoding is MediumEncoding.Utf8
+        ? LineSequentialEncoding.FromChannel(mediumImage, NationalRecordArea)
+        : FileCharacterSet.FromChannel(mediumImage, CodeSet);
+
+    /// <summary>⛔ GR6 b — the STORAGE-MEDIUM form of a record image about to be written, encoded by the file's
+    /// <see cref="MediumEncoding"/>. Every physical write of record data passes through here.</summary>
+    protected string ToMedium(string nativeImage) => MediumEncoding is MediumEncoding.Utf8
+        ? LineSequentialEncoding.ToChannel(nativeImage, NationalRecordArea)
+        : FileCharacterSet.ToChannel(nativeImage, CodeSet);
 
     /// <summary>⛔ THE ONE ANSWER TO "can this record be written in the file's coded character set?" for every
     /// organization's WRITE and REWRITE (owner decision kb/Work R47; Annex A.1 item 31; kb/Work PB690, PB1150,

@@ -111,6 +111,21 @@ public sealed class CodeSetConversionTests : IDisposable
         Assert.Equal(FileStatusCode.Success, ix.Close());
     }
 
+    /// <summary>HIGH-VALUE crosses a CODE-SET medium as that coded character set's HIGHEST code unit (owner decision
+    /// kb/Work R51 item 4): 0xFF for a complete single-byte code, 0x7F for ISO/IEC 646 — a member of every alphabet,
+    /// written as that unit and read back as U+FFFF (kb/Work PB1759).</summary>
+    [Fact]
+    public void HighValue_IsTheCodeSetsHighestUnit()
+    {
+        const char hv = '\uFFFF';
+        Assert.True(Iso646().Represents(hv));
+        Assert.True(Ebcdic().Represents(hv));
+        Assert.Equal("A\u007F", Iso646().ToMedium("A" + hv));
+        Assert.Equal('\u00FF', Ebcdic().ToMedium(hv.ToString())[0]);
+        Assert.Equal(hv, Iso646().ToNative("\u007F")[0]);
+        Assert.Equal(hv, Ebcdic().ToNative("\u00FF")[0]);
+    }
+
     /// <summary>The line sequential character set's alphanumeric ceiling is the file's coded character set: with
     /// a STANDARD-1 CODE-SET, U+00E9 is outside ('71' / '09'); under EBCDIC it is inside.</summary>
     [Fact]

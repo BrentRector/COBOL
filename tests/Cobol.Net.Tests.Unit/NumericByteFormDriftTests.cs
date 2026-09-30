@@ -200,9 +200,10 @@ public sealed class NumericByteFormDriftTests
         // TWO'S COMPLEMENT, not magnitude (the R40 review fleet — an unsigned profile over the signed long
         // carrier encoded |value| and decoded zero-extended, so the codec was not an involution and a group
         // MOVE of HIGH-VALUES rewrote the index window where §14.9.25.4 GR4 requires a representation copy):
-        // −1 is eight 0xFF bytes, and those bytes parse back to −1.
+        // −1 is eight 0xFF bytes (each imaged U+FFFF by the storage-byte law, kb/Work PB1759), and those bytes
+        // parse back to −1.
         string neg = CobolNum.FormatImage(-1L, profile);
-        for (int i = 0; i < 8; i++) Assert.Equal((char)0xFF, neg[i]);
+        for (int i = 0; i < 8; i++) Assert.Equal(StorageByte.ToChar(0xFF), neg[i]);
         Assert.Equal(-1, (long)CobolNum.ParseImage(neg, profile));
     }
 

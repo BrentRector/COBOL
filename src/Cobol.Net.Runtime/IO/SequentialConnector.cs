@@ -772,6 +772,9 @@ public sealed class SequentialConnector : FileConnector
     /// forms on every host — see <see cref="ReadPhysicalLine"/>.</summary>
     internal static readonly string LineSequentialDelimiter = Environment.NewLine;
 
+    /// <inheritdoc/>
+    protected override bool LineSequential => _lineSequential;
+
     /// <summary>The PRINT STREAM's line control — the line end of a record sequential file written with an
     /// ADVANCING phrase or a LINAGE clause (the one on-disk shape a record sequential print file has; the
     /// report writer's lines are the same stream). CR LF on every host. It is not a line sequential file, so
@@ -1497,13 +1500,20 @@ public sealed class SequentialConnector : FileConnector
         if (_lineSequential)
         {
             frameStart = _lineByteOffset;
-            _lastLineStart = _lineByteOffset;                     // byte anchor of the physical line (§14.9.35 GR17 REWRITE)
             string? line = ReadPhysicalLine(out int delimBytes);
             if (line is null) return null;
-            _lineByteOffset += line.Length + delimBytes;          // Latin1: chars == bytes (past data + delimiter)
-            _lastLineBytes = Math.Min(line.Length, RecordWidth);  // data length of the record being replaced
-            _lastReadLinePartial = line.Length > RecordWidth;     // an over-length read transfers only part (GR17a)
-            return FromMedium(line);
+            // A UTF-8 byte-order mark opening the file is not record data (LineSequentialEncoding; DOC-A.1-115).
+            int bom = frameStart == 0 && MediumEncoding is MediumEncoding.Utf8
+                      && line.StartsWith(LineSequentialEncoding.Bom, StringComparison.Ordinal)
+                ? LineSequentialEncoding.Bom.Length : 0;
+            _lastLineStart = frameStart + bom;                    // byte anchor of the record (§14.9.35 GR17 REWRITE)
+            _lineByteOffset += line.Length + delimBytes;          // the channel is one char per BYTE (past data + delimiter)
+            _lastLineBytes = line.Length - bom;                   // the BYTES the record being replaced occupies
+            string record = FromMedium(bom == 0 ? line : line[bom..]);
+            // An over-length read transfers only part (GR17a) — measured in the record area's units, as the READ's
+            // own truncation is (§14.9.30.4 GR15; a UTF-8 line's characters, not its bytes).
+            _lastReadLinePartial = record.Length > RecordWidth;
+            return record;
         }
         // The block start is the LOGICAL offset (characters consumed so far — 1:1 with bytes under Latin1),
         // never BaseStream.Position: the StreamReader buffers ahead, so the base position is the buffer-fill
@@ -1668,8 +1678,15 @@ public sealed class SequentialConnector : FileConnector
         // GR17 d) routes through the SHARED set (kb/Work PB329): a REWRITE and a WRITE of the identical record
         // area reach the identical verdict (Annex A.1 item 115).
         if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;   // '71' GR17 d)
-        if (len > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 b)
-        return OverwriteInPlace(stream, _lastLineStart, FitRecord(FitRecord(image, len), _lastLineBytes));   // '00' GR17 c)
+        // b) and c) compare BYTES — the record's bytes ON THE MEDIUM against the bytes of the record it replaces in
+        // place (DOC-A.1-115): under a one-byte encoding that is its length; a UTF-8 character may take two to four.
+        string record = FitRecord(image, len);
+        int bytes = ToMedium(record).Length;
+        if (bytes > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 b)
+        // c) space-fills to the replaced record's byte length: one space per missing byte — the space is one byte in
+        // every encoding, and a NATIONAL area's space is a two-char pair in the image but one UTF-8 byte on the medium.
+        int perByte = MediumEncoding is MediumEncoding.Utf8 && NationalRecordArea ? CobolBits.BytesPerNational : 1;
+        return OverwriteInPlace(stream, _lastLineStart, FitRecord(record, len + ((_lastLineBytes - bytes) * perByte)));   // '00' GR17 c)
     }
 
     /// <summary>A REWRITE whose record cannot be overwritten in place — a stream that cannot seek or write, or no

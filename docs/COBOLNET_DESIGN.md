@@ -763,7 +763,7 @@ banned substrate.)* See §14.8 for the `CobolString` vs `CobolStrings` roster sp
   corpus-safe (a scan found ZERO guard-then-same-subscript idioms). *(Local escape hatch if a future program needs
   eager eval: hoist the right operand before `&&`.)*
 - **Figurative constants** map: SPACE→`' '`, ZERO→`'0'`/`0L` (by receiver category), QUOTE→`'"'`, **HIGH-VALUE →
-  U+00FF (alphanumeric) / U+FFFF (national), LOW-VALUE → U+0000** (the cross-subsystem settlement — §14.9), ALL "x"
+  U+FFFF, LOW-VALUE → U+0000, in both classes** (the cross-subsystem settlement — §14.9; owner decision kb/Work R52), ALL "x"
   repeat-to-width.
 - **The predefined NULL is an IDENTIFIER, never a figurative constant** (kb/Work PB1427). §8.4.3.1.2 lists it as
   identifier Format 8 (predefined-address) and the NULL arm of Format 6 (predefined-object); §8.3.3.6.2's seven
@@ -1436,11 +1436,14 @@ UNSTRING. **Named loser:** the data-model design's `CobolString.RefMod/SpliceInt
 
 ### 14.9 Figurative HIGH-VALUE/LOW-VALUE + the byte↔char codepage (settled)
 
-- **HIGH-VALUE → U+00FF (alphanumeric) / U+FFFF (national); LOW-VALUE → U+0000.** This is the single settlement of
-  string-ops' open question and intrinsics' decision — alphanumeric uses the single-octet ordinal extreme (preserves
-  ASCII/Latin-1 ordering through the ordinal `CobolString.Compare`), national uses the 2-octet extreme.
-- **Latin-1 (`Encoding.Latin1`, byte k ↔ U+00kk) is the ONE lossless 8-bit byte↔char carrier** for files (§8),
-  REDEFINES Tier-C (§4), and the whole-group image (§14.4). Full custom-ALPHABET/CODE-SET collating fidelity sits on
+- **HIGH-VALUE → U+FFFF, LOW-VALUE → U+0000, in both classes** (owner decision kb/Work R52; kb/Work PB1093): the extremes of the native
+  sequence, which is the 65,536 UTF-16 code units for alphanumeric and national alike (§8.3.3.6.4 GR6/GR7), read from
+  ONE member, `CobolNet.Runtime.NativeCollatingSequence`.
+- **The storage-byte law is the ONE byte↔char mapping** (`CobolNet.Runtime.StorageByte`; COBOLNET_FILES_DESIGN D29):
+  byte 0xFF is U+FFFF (HIGH-VALUE), every other byte k is U+00kk, a character's byte is its low byte. Every byte-form
+  image (binary, IEEE, pointer, bit, national pairs), the whole-group image (§14.4) and the one-byte record medium
+  (§8) use it, so U+00FF and U+FFFF share the byte 0xFF (the accepted cost, DOC-A.1-31). A LINE SEQUENTIAL file is
+  UTF-8 text instead (kb/Work PB1760). Full custom-ALPHABET/CODE-SET collating fidelity sits on
   the char↔byte boundary deferred to G6; the API seam `CobolString.Compare(a, b, weights?)` is fixed now so call sites
   never change.
 
@@ -1948,12 +1951,14 @@ identical stdout). The remaining items below stand as the mechanical defaults (o
 12. **Pointer carrier.** A typed `ManagedRef<T>` (managed reference; NOT the abandoned `byte[]`+offset+length form);
     keep the public name **`ManagedPointer`** (owner preference). The `feedback_one_mechanism_per_job` memory note
     describes the abandoned byte form (pre-rewrite) and is updated.
-13. **Boundary codec.** `System.Text.Encoding.Latin1` (lossless 8-bit) is the ONE shared boundary codepage constant
-    — used by file serialization, REDEFINES Tier C, and the whole-group image. Settled once in `CobolNet.Runtime`.
-14. **Figurative HIGH/LOW-VALUE + collating.** No PCS ⇒ alphanumeric `HIGH-VALUE`=U+00FF /
-    `LOW-VALUE`=U+0000 (the native NATIONAL pin is U+00FF/U+0000 — a flagged §8.3.3.6 GR6/GR7 divergence from the
-    65,536-position native national sequence's U+FFFF extreme, kept byte-stable; `FigurativeConstants`'s doc carries
-    the flag). With a PROGRAM COLLATING SEQUENCE they are the sequence's EXTREME characters (ISO §8.3.3.6 GR6/7 +
+13. **Boundary codec.** The storage-byte law (`CobolNet.Runtime.StorageByte`: byte 0xFF ↔ U+FFFF, every other byte
+    k ↔ U+00kk) is the ONE byte↔char mapping — used by every byte-form image, REDEFINES Tier C, the whole-group
+    image and the one-byte record medium (`FileCharacterSet`, which encodes the channel as strict ISO/IEC 8859-1). A
+    LINE SEQUENTIAL file is UTF-8 text (`LineSequentialEncoding`). Design COBOLNET_FILES D29; kb/Work PB1759, PB1760.
+14. **Figurative HIGH/LOW-VALUE + collating.** No PCS ⇒ `HIGH-VALUE`=U+FFFF / `LOW-VALUE`=U+0000 in BOTH classes —
+    the extremes of the 65,536-position native sequence (§8.3.3.6.4 GR6/GR7; owner decision kb/Work R52, which
+    retired the former alphanumeric U+00FF pin — kb/Work PB1093; `CobolNet.Runtime.NativeCollatingSequence`). With a
+    PROGRAM COLLATING SEQUENCE they are the sequence's EXTREME characters (ISO §8.3.3.6 GR6/7 +
     §12.3.7 GR8/9 — character identity, ties: highest→last-specified, lowest→first-specified). The custom-`ALPHABET`
     subsystem is LIVE in BOTH classes (§12.3.7.2 two-branch format, the FOR phrase in its ISO position between the
     name and IS; a FOR phrase written after the definition — once an accepted "historical superset" on ALPHABET and a

@@ -101,9 +101,18 @@ public sealed class CodeSetConversion
 
     /// <summary>§13.18.13.4 GR6 b's MEMBERSHIP question — true when <paramref name="native"/> has an "<i>associated
     /// coded character as defined in the alphabet being used</i>", i.e. is a character of this coded character
-    /// set. A native character above the one-byte channel never is.</summary>
+    /// set. A native character above the one-byte channel never is — except the HIGH-VALUE character, which every
+    /// coded character set represents by its HIGHEST code unit (<see cref="HighUnit"/>).</summary>
     public bool Represents(char native) =>
-        StorageByte.HasByte(native) && _toMedium[StorageByte.ToByte(native)] < _toNative.Length;
+        native == NativeCollatingSequence.HighValue || (native < ChannelUnits && _toMedium[native] < _toNative.Length);
+
+    /// <summary>⛔ THE MEDIUM'S HIGH-VALUE: the highest code unit of the coded character set — 0xFF for a complete
+    /// single-byte code (EBCDIC), 0x7F for ISO/IEC 646. Owner decision kb/Work R51 item 4: HIGH-VALUE "crosses a byte
+    /// medium as that medium's extreme byte"; the native HIGH-VALUE is U+FFFF (R52), which no alphabet's
+    /// correspondence names, so GR6 b's replacement of it is this unit and GR6 a reads this unit back as it. The
+    /// cost is the one the native medium pays for U+00FF (DOC-A.1-31): the native character the alphabet itself
+    /// assigns to this unit (U+009F under CCSID 37, DEL under ISO/IEC 646) reads back as HIGH-VALUE.</summary>
+    public char HighUnit => (char)(_toNative.Length - 1);
 
     /// <summary>True when <paramref name="record"/> holds at least one character this coded character set does
     /// not represent (<see cref="Represents"/>) — GR6 b cannot replace it, so the output statement is
@@ -134,7 +143,7 @@ public sealed class CodeSetConversion
                 // It is not a member (Represents), so a WRITE or REWRITE of it is refused like any other
                 // non-member, and ToMedium carries it back to the same unit when a store re-persists the record.
                 // Unreachable for a complete single-byte page.
-                dst[i] = StorageByte.ToChar((byte)(u < map.Length ? map[u] : u));
+                dst[i] = u == map.Length - 1 ? NativeCollatingSequence.HighValue : u < map.Length ? map[u] : u;
             }
         });
     }
@@ -148,17 +157,18 @@ public sealed class CodeSetConversion
     public string ToMedium(string nativeImage)
     {
         if (nativeImage.Length == 0) return nativeImage;
-        return string.Create(nativeImage.Length, (nativeImage, _toMedium), static (dst, s) =>
+        return string.Create(nativeImage.Length, (nativeImage, _toMedium, HighUnit), static (dst, s) =>
         {
-            var (src, map) = s;
+            var (src, map, high) = s;
             for (int i = 0; i < src.Length; i++)
             {
                 char c = src[i];
-                if (!StorageByte.HasByte(c))
+                if (c == NativeCollatingSequence.HighValue) { dst[i] = high; continue; }
+                if (c >= ChannelUnits)
                     throw new InvalidOperationException($"the record contains U+{(int)c:X4}, which the file's "
                         + "CODE-SET coded character set does not represent, and no WRITE or REWRITE screen refused it "
                         + "(ISO §13.18.13.4 GR6 b)");
-                dst[i] = map[StorageByte.ToByte(c)];
+                dst[i] = map[c];
             }
         });
     }

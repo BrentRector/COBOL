@@ -72,11 +72,11 @@ The row now carries `IntrinsicResultRule` — seven spec-derived shapes covering
 
 **Rejected alternatives.** Pre-expanding a figurative to a fixed-width string at parse time — wrong, since width is only known at the receiver, and numeric vs alphanumeric meaning diverges.
 
-### D5. HIGH-VALUE/LOW-VALUE on the UTF-16 string substrate = U+00FF/U+0000 (alphanumeric) and U+FFFF/U+0000 (national).
+### D5. HIGH-VALUE/LOW-VALUE on the UTF-16 string substrate = U+FFFF/U+0000 for BOTH classes (owner decision kb/Work R52; kb/Work PB1093, PB1759).
 
-**Rationale.** §8.3.3.6 defines them as the highest/lowest ordinal in the collating sequence; U+00FF/U+0000 are the single-octet ordinal extremes and preserve ASCII/Latin-1 ordering through the ordinal CobolString.Compare, which is what the NIST corpus exercises.
+**Rationale.** §8.3.3.6.4 GR6/GR7 define them as the characters with the highest/lowest ordinal position in the collating sequence, and the native alphanumeric and national sequences are both the 65,536 UTF-16 code units in code-unit order (DOC-A.1-31/-188), so `FUNCTION ORD(HIGH-VALUE)` is 65536 and no character compares above HIGH-VALUE. One member answers it everywhere: `CobolNet.Runtime.NativeCollatingSequence`. On a one-byte medium, and in a byte-form leaf's image, HIGH-VALUE is the byte 0xFF by the storage-byte law (`StorageByte`, design COBOLNET_FILES D29).
 
-**Rejected alternatives.** U+FFFF for alphanumeric HIGH-VALUE — would over-shoot single-byte ordering and mis-collate against Latin-1 data. Storing a byte sentinel — reintroduces the byte substrate. Full custom-ALPHABET fidelity now — sits on the char↔byte boundary the architecture defers to G6.
+**Rejected alternatives.** U+00FF for alphanumeric HIGH-VALUE (the former pin) — left U+0100..U+FFFF ordered above "the highest character" (PB1093). Storing a byte sentinel — reintroduces the byte substrate.
 
 ### D6. Date/time/WHEN-COMPILED nondeterminism handled by an injectable clock (CobolSystem.Clock) in the runtime.
 
@@ -206,7 +206,7 @@ Three-way split by §15.2 type: exact-numeric intrinsics return NumX (unscaled l
 
 ### HIGH-VALUE/LOW-VALUE/custom ALPHABET on a UTF-16 string substrate — the spec defines them by collating-sequence ordinal, but there is no byte image.
 
-Map HIGH/LOW-VALUE to U+00FF/U+0000 (alphanumeric) and U+FFFF/U+0000 (national) so ordinal CobolString.Compare reproduces ASCII/Latin-1 ordering for the corpus. Custom ALPHABET/collating, CODE-SET round-trip, and REDEFINES-over-bytes are explicitly the char↔byte boundary deferred to G6; SPECIAL-NAMES ALPHABET config is threaded into a collating table that feeds Compare/CHAR/ORD/figuratives when G6 lands.
+Map HIGH/LOW-VALUE to U+FFFF/U+0000 in both classes (D5; owner decision kb/Work R52), the extremes of the 65,536-character native sequence. Custom ALPHABET/collating, CODE-SET round-trip, and REDEFINES-over-bytes are explicitly the char↔byte boundary deferred to G6; SPECIAL-NAMES ALPHABET config is threaded into a collating table that feeds Compare/CHAR/ORD/figuratives when G6 lands.
 
 ### LENGTH OF / BYTE-LENGTH want a byte count that the byteless model never stores.
 
@@ -691,7 +691,7 @@ directive is the introduction gate (construct `leap-second-directive-2002`). Gol
 - FUNCTION WHEN-COMPILED (§15.99.3 r1) and CURRENT-DATE (§15.21.3) share the SAME 21-character structure: `YYYYMMDDHHMMSShh` in positions 1-16 followed by the UTC-offset subfield in positions 17-21 (position 17 = `+`/`−`/`0`, positions 18-19 = offset hours, positions 20-21 = offset minutes). WHEN-COMPILED carries the compilation timestamp, CURRENT-DATE the run-time clock; both are nondeterministic and both route through the injectable clock (the ONE `CobolDate.Format21` formatter), so conformance tests must inject a fixed clock.
 - ADDRESS OF and SET … TO ADDRESS OF produce a ManagedPointer (managed ref), never a numeric address — and SET … TO NULL (the predefined address, an identifier — not a figurative constant; kb/Work PB1427) sets it to the null ManagedPointer, semantically distinct from LOW-VALUE. NULL is no intrinsic-function argument (§8.4.3.10.3 SR1 lists only the function-PROTOTYPE activation), so `FUNCTION LENGTH(NULL)` is COBOLNET2576.
 - DAY-OF-WEEK ordinal: COBOL is 1=Monday..7=Sunday, .NET DayOfWeek is 0=Sunday — the (+6)%7+1 remap is easy to get wrong.
-- HIGH-VALUE used in a comparison vs in a MOVE: as a MOVE source it fills the receiver width with U+00FF; in a comparison it must compare as the highest ordinal — both fall out of the U+00FF mapping + ordinal Compare, but a national receiver needs U+FFFF.
+- HIGH-VALUE used in a comparison vs in a MOVE: as a MOVE source it fills the receiver width with U+FFFF; in a comparison it compares as the highest ordinal — both fall out of the U+FFFF mapping + ordinal Compare, in both classes (D5).
 - INITIALIZE skips FILLER by default but INITIALIZE … REPLACING / WITH FILLER changes that; REDEFINES subordinates and items with the wrong category for the REPLACING clause are skipped (§14.9.20.4 GR5).
 - Nested intrinsic calls as arguments (e.g. ACOS(FUNCTION ACOS(D/D))) — natural grammar recursion since P7 Step 12 (`functionCall` is a `primaryExpression` alternative inside the argument's `arithmeticExpression`).
 
@@ -715,6 +715,6 @@ directive is the introduction gate (construct `leap-second-directive-2002`). Gol
 
 - Confirm the return-type discipline: should ANY intrinsic internal use decimal, or is long (exact)/double (float)/Int128 (wide) strictly sufficient? Recommendation: never decimal — exact-numeric via unscaled long+scale, float via double, wide via Int128. Owner already banned default decimal/BigInteger; confirming this extends to intrinsic INTERNALS.
 - Confirm LENGTH OF / FUNCTION BYTE-LENGTH semantics under the byteless model: fold to a compile-time PIC+USAGE byte size kept in PicInfo, kept distinct from FUNCTION LENGTH (character positions). Is a synthesized compile-time byte-size table acceptable (vs declaring LENGTH OF unsupported until G6's byte boundary)?
-- Confirm the HIGH-VALUE/LOW-VALUE character mapping: U+00FF/U+0000 (alphanumeric) and U+FFFF/U+0000 (national) for the corpus now, with full custom-ALPHABET collating deferred to G6. Acceptable, or does any near-term target require true byte 0xFF semantics sooner?
+- HIGH-VALUE/LOW-VALUE character mapping: RESOLVED by owner decision kb/Work R52 — U+FFFF/U+0000 in both classes; the byte 0xFF on a byte medium (D5).
 - Scope confirmation: SCREEN SECTION, REPORT WRITER, and JSON/XML GENERATE/PARSE are designed only to the seam (registers reserved, deferred to their own subsystems). Confirm they are NOT part of this subsystem's graded deliverable.
 - RETURN-CODE ownership: this design models it as a synthesized static long; the control-flow/CALL subsystem must write it on CALL RETURNING/GOBACK and the process exit code must read it. Confirm that cross-subsystem contract so two designs do not each create a RETURN-CODE field.
