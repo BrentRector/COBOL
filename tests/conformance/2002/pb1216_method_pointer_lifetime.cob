@@ -1,10 +1,11 @@
       *> kb/Work PB1216 - pointer lifetime for a METHOD: a method is a
       *> runtime element, so its LOCAL-STORAGE ends with the activation
       *> (§8.6.4, §8.6.5, §13.18.5.4 4) as in pb1216_ls_and_cancel_
-      *> pointer_lifetime) while its WORKING-STORAGE is one copy per
-      *> class that persists (§8.6.4 static item; §11.7).
+      *> pointer_lifetime) while the OBJECT's WORKING-STORAGE (instance
+      *> data; a method has none, §13.5.3 SR1) persists with the object
+      *> (§8.6.4 static item; §11.7).
       *> DERIVATION. METHOD-LS: HANDLED, [....] (W4 unchanged after the
-      *> resumed MOVE). METHOD-WS [MWWW]: the static item is alive.
+      *> resumed MOVE). METHOD-WS [MWWW]: the instance item is alive.
        >>TURN EC-BOUND-PTR CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1216C.
@@ -49,6 +50,9 @@
            CLASS BASE.
        IDENTIFICATION DIVISION.
        OBJECT.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WW PIC X(4) VALUE "MWWW".
        PROCEDURE DIVISION.
        METHOD-ID. LSADDR.
        DATA DIVISION.
@@ -62,8 +66,6 @@
        END METHOD LSADDR.
        METHOD-ID. WSADDR.
        DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WW PIC X(4) VALUE "MWWW".
        LINKAGE SECTION.
        01 LR USAGE POINTER.
        PROCEDURE DIVISION RETURNING LR.
