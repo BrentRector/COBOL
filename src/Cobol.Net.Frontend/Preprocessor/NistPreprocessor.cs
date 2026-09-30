@@ -130,14 +130,14 @@ public static class NistPreprocessor
         //       per-program and stop sharing a file (SM204A read an empty file). So the alternation consumes
         //       whole "*> …" comment lines (periods and all), terminating only at the entry's REAL period.
         //   (2) But (1) makes the body skip comment periods, so it MUST be anchored to a real-code SELECT —
-        //       `(?m)^[ \t]*SELECT` — never a "SELECT" sitting INSIDE a "*> …" comment. The file-I/O suites
+        //       `(?m)^ *SELECT` — never a "SELECT" sitting INSIDE a "*> …" comment. The file-I/O suites
         //       comment out an optional scratch-file SELECT (indicator 'P', e.g. SQ130A/141A/142A's INDEXED
         //       RAW-DATA on X-card 62). Matching that commented "SELECT" would let the comment-skipping body
         //       run past the whole comment block into real code (no real period until then), and because the
         //       comment says INDEXED it would wrongly map the following SEQUENTIAL XXXXX001/014 — destroying
         //       the per-program isolation those absent-file status tests depend on.
         source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?m)^[ \t]*SELECT\b(?:\*>[^\n]*\n|[^.])*\.",
+            source, @"(?m)^ *SELECT\b(?:\*>[^\n]*\n|[^.])*\.",
             m =>
             {
                 string sel = System.Text.RegularExpressions.Regex.Replace(

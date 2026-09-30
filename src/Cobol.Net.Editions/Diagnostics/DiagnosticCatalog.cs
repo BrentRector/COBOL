@@ -2470,6 +2470,17 @@ public static class DiagnosticCatalog
         + "§6.2.2 lists * and / (comment line), - (continuation line) and space (source line); write one of them, or "
         + "compile a NIST CCVS program with --nist.", "ISO §6.2.2 / §6.3.3");
 
+    /// <summary>COBOLNET2653 — a free-form line longer than 255 character positions (kb/Work PB1496). §6.1 3) a) bounds
+    /// the number of positions on a free-form line at 255; only a fixed-form line logically converted to free form may
+    /// be longer (§6.1 2) b)). Asked on the EXPANDED line — a tab counts the positions it advances over
+    /// (DOC-A.1-157) — once per offending line; the line is still read in full after the diagnostic.</summary>
+    public static readonly DiagnosticDescriptor FreeFormLineTooLong = new(
+        "COBOLNET2653", "free-form-line-too-long", EditionSeverity.Error,
+        "A free-form line has more than 255 character positions. ISO §6.1 3) a): \"The number of character positions "
+        + "on a line may vary from line to line, ranging from a minimum of 0 to a maximum of 255.\" Break the line "
+        + "(the floating literal continuation indicator continues a literal) or split the statement.",
+        "ISO §6.1 3) a)");
+
     /// <summary>COBOLNET2450 — COPY literal-1 / literal-2 that is not a plain alphanumeric literal (kb/Work PB1354):
     /// a concatenation expression or figurative constant (§7.2.3.3 SR4), or a national or boolean literal (SR5
     /// "Literal-1 and literal-2 shall be alphanumeric literals").</summary>

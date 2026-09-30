@@ -127,9 +127,9 @@ public class Program
         if (Directory.Exists(siblingCopyLib))
             copyPaths.Add(siblingCopyLib);
 
-        // Phase 0a: Reference format normalization (drop NIST archive markers first)
-        rawText = ReferenceFormatProcessor.StripNistArchiveMarkers(rawText);
-        string normalized = ReferenceFormatProcessor.NormalizeToFreeForm(rawText);
+        // Phase 0a: Reference format normalization (the line-entry stage drops NIST archive markers: CCVS dialect on)
+        string normalized = ReferenceFormatProcessor.NormalizeToFreeFormMapped(rawText, dialectLevel: 85,
+            permissive: false, diagnostics: null, sourcePath, initialFixed: true, out _, ccvsIndicators: true).Text;
 
         // Phase 0b: COPY/REPLACE expansion
         var copyProcessor = new CopyProcessor(copyPaths);

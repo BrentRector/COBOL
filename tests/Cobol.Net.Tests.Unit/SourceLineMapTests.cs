@@ -81,15 +81,6 @@ public sealed class SourceLineMapTests : IDisposable
         Assert.Contains("\"abc" + new string(' ', 40) + "def\"", lines[aIndex]);
     }
 
-    [Fact]
-    public void NistArchiveMarkers_AreBlankedNotDropped()
-    {
-        string src = "*HEADER,COBOL,SM101A\n       IDENTIFICATION DIVISION.\n*END-OF,SM101A\n";
-        string stripped = ReferenceFormatProcessor.StripNistArchiveMarkers(src);
-        Assert.Equal(src.Count(c => c == '\n'), stripped.Count(c => c == '\n'));
-        Assert.StartsWith("\n       IDENTIFICATION", stripped);
-    }
-
     // ── COPY: the main text keeps its lines, the copied text names the copybook, the text after resumes ──
 
     [Fact]

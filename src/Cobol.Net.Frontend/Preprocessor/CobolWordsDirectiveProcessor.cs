@@ -48,7 +48,7 @@ public static class CobolWordsDirectiveProcessor
 
         for (int i = 0; i < lines.Length; i++)
         {
-            string trimmed = lines[i].TrimEnd('\r').TrimStart();
+            string trimmed = lines[i].TrimStart();
             // SR1 boundary: the FIRST IDENTIFICATION DIVISION ends the region where COBOL-WORDS is legal — and its
             // header is optional (§11.2.1), so the boundary is the ONE unit-start test (kb/Work PB829).
             if (!trimmed.StartsWith(">>", StringComparison.Ordinal))

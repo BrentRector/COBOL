@@ -230,7 +230,7 @@ public static class ConditionalCompilationProcessor
             {
                 string line = lines[i];
                 SourceOrigin origin = input.Lines[i];
-                string trimmed = line.TrimEnd('\r').TrimStart();
+                string trimmed = line.TrimStart();
                 _diag.At = origin;
 
                 if (!trimmed.StartsWith(">>", StringComparison.Ordinal))

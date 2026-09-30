@@ -211,7 +211,7 @@ tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
         int start = TokenStartCharIndex;
         if (start == 0) return true;   // fragment start (the D2 re-parse) — a separator by definition
         int before = InputStream.LA(start - 1 - InputStream.Index);   // LA(-k) is the character k before the index
-        return before == ' ' || before == '\t' || before == '\r' || before == '\n' || before == ',' || before == ';'
+        return before == ' ' || before == '\n' || before == ',' || before == ';'
             || before == '(';
     }
 
@@ -259,7 +259,9 @@ tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
 // ==========================================
 // Assumes preprocessed input: fixed→free normalized, COPY/REPLACE expanded.
 
-WS           : [ \t\r\n]+ -> skip ;
+// The separator space is the space and the line end ONLY: the line-entry stage (PhysicalLines, kb/Work PB1800) has
+// already expanded every TAB and taken every CR LF to its LF, so neither has a rule here.
+WS           : [ \n]+ -> skip ;
 COMMENT_START: '*>' -> skip, pushMode(COMMENT_MODE) ;
 
 // ── END-xxx paired terminators (must precede END and IDENTIFIER) ──
@@ -943,7 +945,7 @@ COMMA_FLOATLIT : FLOAT_COMMA_BODY ;
 // SUBSCRIPT-mode SUB_* twins (fragments are mode-independent). The two modes previously re-declared each body
 // char-for-char; now a future string-escape / national-literal / data-name fix is applied ONCE and cannot diverge
 // between modes (DESIGN-frontend-grammar §3.3b). Bodies are byte-identical to the retired inline forms.
-fragment STR_BODY  : '"' (~["\r\n] | '""')* '"' | '\'' (~['\r\n] | '\'\'')* '\'' ;   // STRINGLIT / SUB_STRINGLIT
+fragment STR_BODY  : '"' (~["\n] | '""')* '"' | '\'' (~['\n] | '\'\'')* '\'' ;   // STRINGLIT / SUB_STRINGLIT
 // ⛔ FORMAT 2 IS THE SAME LITERAL KIND, SO IT IS THE SAME TOKEN (fix-queue R03). §8.3.3.5.2 and §8.3.3.4.2 each
 // print TWO general formats — `N"…"` / `NX"…"` and `B"…"` / `BX"…"` — and their ALL-FORMATS general rules put
 // both formats in ONE class and category (§8.3.3.5.4 GR2 national, §8.3.3.4.4 GR2 boolean). Folding Format 2
@@ -1083,7 +1085,7 @@ DOT         : '.' ;
 // is skipped exactly as the space is. ONE rule matches the separator everywhere and its action says which it is;
 // ⛔ never a predicate choosing between two rules (kb/Work PB1715): the predicate this rule carried kept every
 // `, ` and `; ` of every compile off the cached DFA, and the unpredicated twin it needed is gone with it.
-FNARG_SEPARATOR : [,;] [ \t\r\n]+ { if (!InFunctionArgs()) Skip(); } ;
+FNARG_SEPARATOR : [,;] [ \n]+ { if (!InFunctionArgs()) Skip(); } ;
 // A comma NOT followed by whitespace is preserved for DECIMAL-POINT IS COMMA, where it is a numeric literal's
 // decimal point; anywhere else it is no separator (§8.3.5 rule 2) and SeparatorRule reports it (COBOLNET2631).
 COMMA       : ',' ;
@@ -1136,13 +1138,13 @@ ANY_CHAR    : . ;
 mode PICMODE;
 
 PIC_IS      : 'IS' -> skip ;              // optional IS keyword
-PIC_WS      : [ \t\r\n]+ -> skip ;        // skip whitespace
+PIC_WS      : [ \n]+ -> skip ;       // skip whitespace
 // A comment line between PIC and its character-string (kb/Work PB1493). Source comments are removed by the
 // reference-format stage (ISO §6.5 2) / 3)) before the lexer runs, but the fixed-form DEBUGGING-line carrier
 // (ReferenceFormatProcessor.DebugLineCarrier) still reaches it as a *> line — and *> never begins a picture
 // character-string (> is no PICTURE symbol). Longest match: it always reaches at least as far as PIC_STRING would.
-PIC_COMMENT : '*>' ~[\r\n]* -> skip ;
-PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
+PIC_COMMENT : '*>' ~[\n]* -> skip ;
+PIC_STRING  : ( ~[ \n.] | '.' ~[ \n] )+
     {
         // Handle PIC "999999999999.." — greedy match consumed sentence-ending period.
         // If the PIC string ends with '.' and the char that caused the match was also '.',
@@ -1163,7 +1165,7 @@ PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
         else if (t.Length > 1 && (t[t.Length - 1] == ',' || t[t.Length - 1] == ';'))
         {
             int la = InputStream.LA(1);
-            if (la == ' ' || la == '\t' || la == '\r' || la == '\n' || la == Antlr4.Runtime.IntStreamConstants.EOF)
+            if (la == ' ' || la == '\n' || la == Antlr4.Runtime.IntStreamConstants.EOF)
             {
                 CutTokenTo(t.Length - 1);
             }
@@ -1187,9 +1189,9 @@ PIC_STRING  : ( ~[ \t\r\n.] | '.' ~[ \t\r\n] )+
 
 mode SUBSCRIPT;
 
-SUB_WS              : [ \t\r\n]+ ;
+SUB_WS              : [ \n]+ ;
 // The same comment carrier inside a subscript or reference-modifier (see PIC_COMMENT): *> is no operator there.
-SUB_COMMENT         : '*>' ~[\r\n]* -> skip ;
+SUB_COMMENT         : '*>' ~[\n]* -> skip ;
 
 // Keywords must precede SUB_IDENTIFIER (same length → first rule wins)
 SUB_OF              : 'OF' ;
@@ -1256,5 +1258,5 @@ SUB_ANY             : . ;
 
 mode COMMENT_MODE;
 
-COMMENT_TEXT : ~[\r\n]+ -> skip ;
-COMMENT_END  : [\r\n]   -> popMode, skip ;
+COMMENT_TEXT : ~[\n]+ -> skip ;
+COMMENT_END  : [\n]   -> popMode, skip ;

@@ -1862,7 +1862,9 @@
   "pb1364-when-operand-split-after-match",
   "pb758-invoke-end-invoke-after-returning",
   "pb758-invoke-end-invoke-after-using-returning",
-  "pb1308-method-working-storage-every-edition"
+  "pb1308-method-working-storage-every-edition",
+  "pb1496-free-form-line-256",
+  "pb1803-nist-marker-outside-nist"
  ],
  "pending": []
 }

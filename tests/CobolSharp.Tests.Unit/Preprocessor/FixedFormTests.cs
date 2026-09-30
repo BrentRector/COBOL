@@ -13,24 +13,24 @@ public class FixedFormTests
                        + "000200 PROGRAM-ID.                                                      IF1014.2\n"
                        + "000300     IF101A.                                                      IF1014.2\n";
 
-        Assert.True(ReferenceFormatProcessor.IsFixedForm(source));
+        Assert.True(ReferenceFormatProcessor.IsFixedForm(PhysicalLines.Read(source).Lines));
     }
 
     [Fact]
-    public void ConvertFixedToFree_StripsColumns()
+    public void NormalizeFixed_StripsColumns()
     {
         string source = "000100 IDENTIFICATION DIVISION.                                         IF1014.2\n"
                        + "000200 PROGRAM-ID.                                                      IF1014.2\n"
                        + "000300     IF101A.                                                      IF1014.2\n";
 
-        string free = ReferenceFormatProcessor.ConvertFixedToFree(source);
+        string free = ReferenceFormatProcessor.NormalizeToFreeForm(source, InitialReferenceFormat.Fixed);
         Assert.Contains("IDENTIFICATION DIVISION.", free);
         Assert.DoesNotContain("IF1014.2", free);
         Assert.DoesNotContain("000100", free);
     }
 
     [Fact]
-    public void ConvertFixedToFree_LargeFile_Completes()
+    public void NormalizeFixed_LargeFile_Completes()
     {
         // Generate a large fixed-form file (1000 lines)
         var sb = new System.Text.StringBuilder();
@@ -43,7 +43,7 @@ public class FixedFormTests
         }
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        string result = ReferenceFormatProcessor.ConvertFixedToFree(sb.ToString());
+        string result = ReferenceFormatProcessor.NormalizeToFreeForm(sb.ToString(), InitialReferenceFormat.Fixed);
         sw.Stop();
 
         // No wall-clock ceiling (kb/Work PB1590) — completion is the property; a loaded runner breaches any fixed limit.

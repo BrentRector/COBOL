@@ -88,8 +88,8 @@ public sealed class TextManipulationTextWordTests : IDisposable
     [Fact] // The fixed-form debugging line keeps its COBOL-85 matching rule through the noncharacter carrier.
     public void FixedFormDebuggingLine_TextWordsTakePartInMatching()
     {
-        var free = ReferenceFormatProcessor.ConvertFixedToFreeMapped(
-            "000100     DISPLAY\n000200D    KK.\n", "t.cob").Text;
+        var free = ReferenceFormatProcessor.NormalizeToFreeFormMapped(
+            "000100     DISPLAY\n000200D    KK.\n", 2023, false, null, "t.cob", InitialReferenceFormat.Fixed).Text;
         Assert.Contains(ReferenceFormatProcessor.DebugLineCarrier + "    KK.", free);
         var (text, bag) = Run("REPLACE ==DISPLAY KK== BY ==DISPLAY W1==.\n" + free);
         Clean(bag);

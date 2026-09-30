@@ -6,30 +6,6 @@ namespace CobolNet.Frontend.Preprocessor;
 
 public static partial class ReferenceFormatProcessor
 {
-    /// <summary>Convert fixed-form source to free-form by the ISO §6.5 logical conversion (see
-    /// <see cref="FixedFormConverter"/>): one resultant line per physical line, each ending in <c>\n</c>, except a
-    /// continuation line, which is appended to the latest logical line.</summary>
-    public static string ConvertFixedToFree(string sourceText)
-        => string.Concat(new FixedFormConverter(gates: null, lineOffset: 0, ccvsIndicators: false).Convert(sourceText)
-            .Lines.Select(l => l + "\n"));
-
-    /// <summary>The MAPPED fixed→free conversion of a whole text originating in <paramref name="file"/> (kb/Work PB82).</summary>
-    public static MappedText ConvertFixedToFreeMapped(string sourceText, string file)
-    {
-        var (l, o) = ConvertFixedToFreeMapped(sourceText, gates: null, 0, ccvsIndicators: false);
-        return Mapped(l, o, file);
-    }
-
-    /// <summary>The MAPPED fixed→free conversion (kb/Work PB82): the resultant lines and, per resultant line, the
-    /// 1-based physical source line it came from — a continuation line joins its latest logical line, which keeps
-    /// the number of the line that began it.</summary>
-    /// <param name="lineOffset">The file-relative index (0-based) of this text's first line — nonzero when
-    /// converting one SOURCE-FORMAT SEGMENT of a larger file, so the <see cref="ReferenceFormatDiagnostics"/> continuation
-    /// diagnostics and the origins report the file line, not the segment-relative one.</param>
-    private static (List<string> Lines, List<int> Origins) ConvertFixedToFreeMapped(string sourceText,
-        ReferenceFormatDiagnostics? gates, int lineOffset, bool ccvsIndicators)
-        => new FixedFormConverter(gates, lineOffset, ccvsIndicators).Convert(sourceText);
-
     /// <summary>
     /// THE ISO §6.5 LOGICAL CONVERSION of one fixed-form text — a whole file, one SOURCE FORMAT segment, or a
     /// copybook (kb/Work PB1491). The resultant compilation group is built as a list of lines, one per physical
@@ -58,7 +34,7 @@ public static partial class ReferenceFormatProcessor
     /// part of the literal".</item>
     /// </list>
     /// </summary>
-    private sealed class FixedFormConverter(ReferenceFormatDiagnostics? gates, int lineOffset, bool ccvsIndicators)
+    private sealed class FixedFormConverter(ReferenceFormatDiagnostics? gates, bool ccvsIndicators)
     {
         private readonly List<string> _lines = [];
         private readonly List<int> _origins = [];
@@ -80,11 +56,15 @@ public static partial class ReferenceFormatProcessor
         /// ID DIVISION header or a <c>*-ID</c> paragraph re-enters it, and any other division header leaves it.</summary>
         private bool _inIdentificationDivision = true;
 
-        public (List<string> Lines, List<int> Origins) Convert(string sourceText)
+        /// <summary>Convert the lines of one text — a whole file, one SOURCE FORMAT segment of it, or a copybook —
+        /// returning the resultant lines and, per resultant line, the 1-based physical source line it came from (kb/Work
+        /// PB82): a continuation line joins its latest logical line, which keeps the number of the line that began it.
+        /// Each <see cref="PhysicalLine.Number"/> is the file's own, so a segment reports file lines, never
+        /// segment-relative ones.</summary>
+        public (List<string> Lines, List<int> Origins) Convert(ReadOnlySpan<PhysicalLine> physicalLines)
         {
-            int lineNo = lineOffset;
-            foreach (var rawLine in sourceText.Split('\n'))
-                ConvertLine(rawLine.TrimEnd('\r'), ++lineNo);
+            foreach (var line in physicalLines)
+                ConvertLine(line.Text, line.Number);
             return (_lines, _origins);
         }
 
@@ -304,28 +284,35 @@ public static partial class ReferenceFormatProcessor
         }
     }
 
-    /// <summary>The §6.5 logical conversion of a whole free-form text: line for line (a free-form line is "copied to the
-    /// resultant compilation group", §6.5 7)), after its comment is removed by <see cref="ConvertFreeLine"/>. The
-    /// line count never changes, so the identity line map still holds.</summary>
-    private static MappedText ConvertFreeFormMapped(string sourceText, ReferenceFormatDiagnostics? diagnostics, string sourcePath)
+    /// <summary>The §6.5 logical conversion of free-form lines — a whole text or one SOURCE FORMAT segment of it: line
+    /// for line (a free-form line is "copied to the resultant compilation group", §6.5 7)), after its comment is
+    /// removed by <see cref="ConvertFreeLine"/>. The line count never changes, and each resultant line's origin is the
+    /// physical line it was read from.</summary>
+    private static (List<string> Lines, List<int> Origins) ConvertFreeLines(ReadOnlySpan<PhysicalLine> physicalLines,
+        ReferenceFormatDiagnostics? diagnostics)
     {
-        var lines = sourceText.Split('\n');
-        bool changed = false;
-        for (int i = 0; i < lines.Length; i++)
+        var lines = new List<string>(physicalLines.Length);
+        var origins = new List<int>(physicalLines.Length);
+        foreach (var line in physicalLines)
         {
-            string converted = ConvertFreeLine(lines[i], i + 1, diagnostics);
-            if (ReferenceEquals(converted, lines[i])) continue;
-            lines[i] = converted;
-            changed = true;
+            lines.Add(ConvertFreeLine(line.Text, line.Number, diagnostics));
+            origins.Add(line.Number);
         }
-        return MappedText.Identity(changed ? string.Join('\n', lines) : sourceText, sourcePath);
+        return (lines, origins);
     }
 
-    /// <summary>One free-form line through §6.5 2) and 3): a comment line (the floating comment indicator as its first
-    /// character-string, §6.4.4.2) becomes an empty line, and an inline comment (§6.4.4.3) is removed — so, as in
-    /// fixed form, no later stage sees comment-text. Returns <paramref name="line"/> itself when it has no comment.</summary>
+    /// <summary>The most character positions a free-form line may have (§6.1 3) a): "ranging from a minimum of 0 to a
+    /// maximum of 255") — positions as DOC-A.1-157 counts them, so on the expanded line.</summary>
+    private const int FreeFormMaxPositions = 255;
+
+    /// <summary>One free-form line through §6.1 3) a) (at most <see cref="FreeFormMaxPositions"/> positions — asked here,
+    /// in the free-form arm, because a fixed-form line may run past margin R and only its program-text area counts)
+    /// and §6.5 2) and 3): a comment line (the floating comment indicator as its first character-string, §6.4.4.2)
+    /// becomes an empty line, and an inline comment (§6.4.4.3) is removed — so, as in fixed form, no later stage sees
+    /// comment-text. Returns <paramref name="line"/> itself when it has no comment.</summary>
     private static string ConvertFreeLine(string line, int lineNo, ReferenceFormatDiagnostics? diagnostics)
     {
+        if (line.Length > FreeFormMaxPositions) diagnostics?.OnFreeFormLineTooLong(lineNo, line.Length);
         var state = LiteralState.Outside;
         int comment = ScanProgramText(line, ref state);
         if (comment < 0) return line;
@@ -354,7 +341,7 @@ public static partial class ReferenceFormatProcessor
     {
         if (diagnostics is null) return;
         if (fixedForm) diagnostics.OnFloatingComment(lineNo, column + at);
-        if (at > 0 && text[at - 1] is not (' ' or '\t'))
+        if (at > 0 && text[at - 1] != ' ')
             diagnostics.OnUnseparatedFloatingComment(lineNo, column + at);
     }
 
