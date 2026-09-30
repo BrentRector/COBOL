@@ -24,23 +24,18 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
 
 ### Where we are
 
-- **▶ LIVE STATE (2026-09-29 15:11 PDT) — IDLE; the owner restarts the CLI now.** Main is `b2a5045d8`; the inventory is at **GAP 818** (866 this morning).
-  - **Landed today:**
-    - train 72 (M12 PB1719, M13 PB1721, the gate cap PB1720 N=1): the ordered whole-population gate, about 3 min per run;
-    - trains 73 and 74 (wave 73: C, E, F, then finishers A2, B2 and D2 for A, B and D, which died near the end with no error);
-    - PB1732's root fix (the Linux gate tests a `--shared` clone and exports nothing);
-    - PB1743 (blocking waits use `until grep`, not `tail -f | grep -m1`);
-    - CI skips the matrix for `.claude/` and pin-only commits;
-    - PB1754's plan for the comprehensive architecture review (not started; owner decisions pending);
-    - the claude-skills pin at v1.15.1.
+- **▶ LIVE STATE (2026-09-30 01:00 PDT) — main is `0abc3930d`; the inventory is at GAP 776 (818 at 2026-09-29 15:11).** The bug-fix cadence is now BATCHES (owner, 2026-09-29): 10-20 bugs, each tested individually, one commit, the WSL Linux gate on the committed HEAD while the next batch starts, then `push-main.sh`.
+  - **Design state — the text model is decided and built (kb/Work R51, R52, R53; design doc COBOLNET_FILES_DESIGN D29):** Unicode characters in memory; ONE storage-byte law (`StorageByte`: byte 0xFF is the character U+FFFF, every other byte k is U+00kk, a character's byte is its low byte) wherever a byte becomes a character; HIGH-VALUE = U+FFFF / LOW-VALUE = U+0000 in the native alphanumeric sequence from ONE member (`NativeCollatingSequence`); the fixed-record file medium is ISO 8859-1 through that law (`FileCharacterSet.ToChannel/FromChannel`), a CODE-SET medium writes HIGH-VALUE as the set's highest code unit, a LINE SEQUENTIAL file is UTF-8 (BOM skipped on read, invalid bytes -> status 09); OPTIONS INITIALIZE fills numeric storage too (D23 overturned). Accepted cost, documented in DOC-A.1-31: a real U+00FF passing through a byte returns as HIGH-VALUE. REMARKS, CHANNEL, GENERIC, PACKED, END-INVOKE, END-MERGE, END-METHOD and END-SORT are user words (D-RW1 now lists the 15 GnuCOBOL-reserved extension words only).
+  - **Open owner decisions (each on its kb/Work note):** PB758 (keep `INVOKE ... END-INVOKE` as a documented vendor extension with a §4.2.10 warning, or remove it); PB1516 (the digit rule conforms as written; a capacity reading needs a determination); PB1667 (representation of an ADVANCING 0 overprint in a text file); PB1586 (tab expansion, including a tab inside a literal); PB1705 (carrying 1985 debugging lines to the binder).
+  - **Open work that is NOT a decision (each note carries its "Revisit before implementing" section):** PB1134 (residual: USAGE INDEX cells, NATIONAL numeric items — blocked on PB646 — and OO method LOCAL-STORAGE numeric items), PB1665 (group image width, four copies), PB1152, PB1143, PB1175, PB1114, PB1674, PB1378, PB1641, PB1374; the analyses PB1757 (58 goldens rely on harness source-format auto-detection) and PB1758 (ID-division `REMARKS.` accepted silently at every edition); the `half` notes PB1260, PB1264, PB1266, PB1110, PB1365, PB1446, PB1414, PB1529.
   - **Open from wave 73's splits:**
     - PB480 and PB1113/PB1116 plus the PB1112 remnant (OO conformance);
     - PB1042 (StorageCell dyn slots for dynamic-capacity tables);
     - PB322 (three mechanisms) and PB833 (fcntl locks; design first);
     - PB1422;
-    - PB758 (re-scoped to a §4.2.10 nonstandard-extension warning mechanism, which needs a note);
-    - the new leads PB1744–PB1747 and PB1755–PB1756.
-  - **NEXT:** the next fix wave from `fix_clusters.py` (`work.py next` leads with PB1044, PB1066, PB1076), with the owner's okay.
+    - the leads PB1744–PB1747 and PB1755–PB1756.
+  - **Unexplained, not dismissed:** one gate run went red on `NistDifferentialTests_P3.NistProgram_MatchesGolden(NC134A)` and `GateLegDriftTests.Arm3` (each passed alone and on the next run; DEVLOG 1804). A repeat on either is a real defect.
+  - **NEXT:** the next batch from `work.py next` / `fix_clusters.py` (leads: PB1066, PB1091, PB1094), or an owner decision above.
 - **▶ LIVE STATE (2026-09-29 00:55 PDT) — THE PB1708 PIVOT'S FIRST MECHANISMS ARE ON MAIN.** Wave 71 (workflow wf_db98f9ed-c65) landed in two trains.
   - **Train 71** (DEVLOG 1772): M14 one population check (PB1718), M2 the FIFO gate cap (PB1720; `half`, N still to measure) and M7 the table-VALUE fill bounded by its phrase (PB1716: pb505 rejects in 0.49 s, was 25 s).
   - **Train 71b** (DEVLOG 1773): M6 lexer predicates made actions, so the DFA start state is cached (PB1715), and M11 the order plan, `gate_plan.py`, with the narrowing deleted (PB1717, which closed PB1712).

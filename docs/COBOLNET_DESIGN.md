@@ -527,8 +527,8 @@ REDEFINES class + to all subordinates; monotone; terminating), re-verdicted to t
 
 REDEFINES inside an OCCURS element (overlay is per element); nested REDEFINES chains (follow `RedefinesTarget`
 transitively to the true anchor); signed-DISPLAY overpunch in a numeric view (needs §6's `FormatDisplaySigned`/
-`ParseDisplay`); lossless 8-bit carrier = **Latin-1** (`Encoding.Latin1`, byte k ↔ U+00kk) — a CROSS-SUBSYSTEM
-constant shared with whole-group-image and files (§14.4). RENAMES must immediately follow the record's last entry
+`ParseDisplay`); lossless 8-bit carrier = the **storage-byte law** (`StorageByte`: byte 0xFF ↔ U+FFFF, the native HIGH-VALUE; every other byte k ↔ U+00kk;
+kb/Work R51/R52, COBOLNET_FILES_DESIGN D29) — a CROSS-SUBSYSTEM constant shared with whole-group-image and files (§14.4). RENAMES must immediately follow the record's last entry
 (SR2) and is attached to the owning record as a sibling, not into the storage tree.
 
 ---
@@ -1264,8 +1264,9 @@ The generated C# calls a small set of runtime classes (the roster is settled in 
 | `StopRun` / `ProgramReturn` / `CobolException` / `CobolFatalException` / `ExceptionCatalog` / `ExceptionState` / `ExceptionDispatch` | control-flow + EC signals (§5/§11) |
 | `NotImplementedCobolFeature` | the loud-failure runtime guard (§1.4) |
 
-Cross-subsystem runtime constants: **Latin-1** (`Encoding.Latin1`) is the ONE lossless 8-bit byte↔char carrier (files,
-REDEFINES Tier-C, whole-group image — §14.4/§14.9).
+Cross-subsystem runtime constants: the **storage-byte law** (`StorageByte` — byte 0xFF ↔ U+FFFF, every other byte k ↔ U+00kk) is the ONE
+lossless 8-bit byte↔char carrier (files, REDEFINES Tier-C, whole-group image — §14.4/§14.9); the fixed-record file medium is its
+ISO/IEC 8859-1 channel (`FileCharacterSet`), and a LINE SEQUENTIAL file is UTF-8 (D29).
 
 ---
 
@@ -1326,7 +1327,7 @@ There is ONE facility that turns a typed group/numeric into its alphanumeric ima
 `string AsImage()` (and `FromImage`) per `record struct`, used by (a) whole-group MOVE/compare, (b) INSPECT/STRING/
 UNSTRING of a group/numeric operand (§7.4), (c) ref-mod of a numeric receiver, and (d) RENAMES THRU composition over a
 heterogeneous span (§4.3). **Named loser:** the three names (`AsImage` / `GroupImage` / "materialize") are ONE thing
-— canonical name `AsImage()`/`FromImage()`. It uses the Latin-1 carrier (§14.9). This is **transient** (built on
+— canonical name `AsImage()`/`FromImage()`. It uses the storage-byte-law carrier (§14.9; D29). This is **transient** (built on
 demand, never persisted) and is DISTINCT from REDEFINES Tier-C's PERSISTENT class-scoped `byte[]` (which would be the
 only storage for a float/COMP-5/INDEX pun class). `AsImage` IS the permanent mechanism for
 mixed-usage (DISPLAY+BINARY+PACKED) groups — the byte path remains only for the genuinely non-character-imageable
