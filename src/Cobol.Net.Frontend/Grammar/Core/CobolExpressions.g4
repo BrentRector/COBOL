@@ -681,7 +681,9 @@ argumentList
 // separate alternative here — it is recovered IN THE BINDER from a sole-dataReference expression
 // (ConditionBinder.SoleDataReference, the shape OoBindInvokeArg already uses), because the grammar cannot
 // express "a reference, unless it is part of an expression" without the ambiguity that caused PB46. `literal`
-// precedes it so a non-numeric literal-2 keeps the literal arm, and `booleanExpression` takes the proven
+// precedes it so a non-numeric literal-2 keeps the literal arm — and a numeric literal that is the LEFT OPERAND of an
+// operator does not (`{!numericLiteralIsLeftOperand()}?`, kb/Work PB1135 / decision R59: `O :: "M" (5 + 1)` is ONE
+// argument, like the INVOKE statement's `USING 5 + 1`) — and `booleanExpression` takes the proven
 // {boolExprAhead()}? gate because its leaf `valueOperand` matches everything the other two arms match.
 // ⚠ OMITTED IS FIRST AND IS A RESERVED WORD (§8.9), so it can never be a data-name and shadows nothing.
 // ⛔ THE ADDRESS-IDENTIFIER JOINS AS identifier-2 (kb/Work PB1021): §8.4.3.4.4 GR1 makes these the arguments of
@@ -691,7 +693,7 @@ argument
     : OMITTED
     | addressIdentifier   // §14.9.23.3 SR9 / SR19 via §8.4.3.4.4 GR1 (kb/Work PB1021)
     | {boolExprAhead()}? booleanExpression
-    | literal
+    | {!numericLiteralIsLeftOperand()}? literal
     | arithmeticExpression
     ;
 

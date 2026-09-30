@@ -25,7 +25,6 @@ cobolWord
     | {!keywordContinuesHere()}? CHANNEL
     | {!keywordContinuesHere()}? CYCLE
     | {!keywordContinuesHere()}? DECIMAL_ENCODING
-    | {!keywordContinuesHere()}? END_INVOKE
     | {!keywordContinuesHere()}? END_MERGE
     | {!keywordContinuesHere()}? END_METHOD
     | {!keywordContinuesHere()}? END_SORT

@@ -17886,13 +17886,13 @@
   "ordinal": 1,
   "subject": "Working-storage section",
   "rule-digest": "beb8e06dd183",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#classDefinition; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#interfaceDefinition; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitMethodDefinition; src/Cobol.Net.Editions/ConstructRegistry.g.cs#method-working-storage-window",
-  "test-ref": "conformance-test:OoSpineTests.MethodWorkingStorage_StaticSemantics_EditionWindow",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
+  "test-ref": "conformance:negative/pb1308-method-working-storage-every-edition; conformance:2002/pb1308_method_storage_is_local_or_object; conformance-test:OoSpineTests.MethodWorkingStorage_IsRefusedAtEveryEdition",
   "derivation": "",
-  "editions": "2023",
-  "notes": "Owned by kb/Work PB1308. Rule (cite.py --check 13.5.3 OK, both halves): WS \"may be specified in a function definition or a program definition. Within a class definition ... only in a factory definition or an instance definition, but not in a method definition. The working-storage section shall not be specified within an interface definition.\" VERIFIED at 2023: WS is accepted in a program (p1fmt), a function (recursive_ws), a factory (oo_factory) and an object (p3oo). classDefinition has no dataDivision of its own. A method's WS is refused COBOLNET0902 at 2023 (p4meth; OoSpineTests line 818 asserts !ok23). An interface's method prototype with WS is refused COBOLNET2272 at 2014 and 2023 (p4intf, via §10.6.2 SR4 e) \"The data division may contain only a linkage section\", OK), and interfaceDefinition has no data division of its own. UNVERIFIED / likely divergent edge: the code ACCEPTS method WS silently at --std 2002/2014 (p4meth at 2014 prints MW=01/MW=02). That rests on VCR row 130e, which says itself that it is \"provisional\" and that \"Annex E.2 does NOT itemize the removal\". §E.2 lists removals such as \"EXIT METHOD statement\" (cite.py --check E.2 OK) and NOT this one, and Annex E is the only in-repo edition evidence. So the in-repo spec evidence says 2014 already carried this SR and --std 2014 under-rejects. The test-ref pins the 2023 rejection half; its 2002 acceptance half is the questionable edge (it asserts CTR=01/02/03 at 2002). See the finding. || Editions (adjudicator's statement, normalized to 2023 by registrar 14e): 2023 text. The method-definition ban is pinned 2002/2014-legal by the code (VCR 130e, marked provisional), but Annex E.2 does not list it as a 2023 change",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1308 / decision R62: a method's WORKING-STORAGE SECTION is refused at every edition (COBOLNET1519), never an edition window. retired-witness: conformance-test:OoSpineTests.MethodWorkingStorage_StaticSemantics_EditionWindow (the test pinned the 2002 acceptance that decision R62 (kb/Work PB1308) reversed, and was re-derived as MethodWorkingStorage_IsRefusedAtEveryEdition; the second ref was a mis-spelled witness kind) retired-witness: conformance:OoSpineTests.MethodWorkingStorage_IsRefusedAtEveryEdition (the test pinned the 2002 acceptance that decision R62 (kb/Work PB1308) reversed, and was re-derived as MethodWorkingStorage_IsRefusedAtEveryEdition; the second ref was a mis-spelled witness kind)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.5.4-1",
@@ -32423,10 +32423,10 @@
   "rule-digest": "f8661eb21261",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Control/RunUnit.cs#Terminate; src/Cobol.Net.Runtime/Control/RunUnit.cs#AdoptStaticStorage; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject; src/Cobol.Net.Runtime/Control/ProgramTable.cs#Register; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitClassUnit; src/Cobol.Net.Compiler/CodeGen/DataDivision/RecordStructEmitter.cs#EmitStaticReset",
-  "test-ref": "unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit; conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState; unit:RunUnitStateDriftTests.StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination",
+  "test-ref": "unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit; unit:RunUnitStateDriftTests.StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1069 LANDED (wave 73 D). cite.py --check 14.6.11 'Any storage obtained with an ALLOCATE statement and not yet released by a FREE statement is released' -> OK §14.6.11 3). Everything the run unit owns except STATIC storage hangs off the RunUnit object (w68w). The static residue is closed by ONE adoption mechanism: every unit's static reset (a RECURSIVE program's / FUNCTION-ID's WS through ProgramTable.Register, a class's METHOD WS through its factory's __AdoptRunUnitStorage, called by RunUnit.FactoryObject when the run unit creates the factory) is adopted by the run unit, run at adoption (§14.6.2.3.2 1) and run again by RunUnit.Terminate - the ONE termination epilogue ProgramTable.RunMain's and RunUnit.Run's finally both call - so a POINTER in static WS no longer keeps its ALLOCATEd storage reachable past termination. Witness: a host runs a class with method WS twice in one process; after each run unit the host reads the static MC back at 0 (was 2 then 4; mutant without the adoption measured AFTER MC=2 / COUNT 3).",
+  "editions": "",
+  "notes": "retired-witness: conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState (a method's WORKING-STORAGE is illegal at every edition (kb/Work PB1308), so the test's program no longer compiles; the run-unit scope facts stay witnessed by the row's other references)",
   "state": "OK"
  },
  {
@@ -32438,10 +32438,10 @@
   "rule-digest": "b2653e7e8f8d",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Control/RunUnit.cs#Terminate; src/Cobol.Net.Runtime/Control/RunUnit.cs#AdoptStaticStorage; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject; src/Cobol.Net.Runtime/Control/CobolObject.cs#__AdoptRunUnitStorage; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitClassUnit",
-  "test-ref": "conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData; conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState; unit:RunUnitStateDriftTests.StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination",
+  "test-ref": "conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData; unit:RunUnitStateDriftTests.StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1069 LANDED (wave 73 D). cite.py --check 14.6.11 'All instance objects are destroyed' -> OK §14.6.11 4). Factory objects are the run unit's (w68w); the remaining carrier of an object past termination was an OBJECT REFERENCE in STATIC working-storage (RECURSIVE/FUNCTION-ID WS, pre-2023 METHOD WS). Every static storage is now adopted by the run unit (RunUnit.AdoptStaticStorage) and reset by RunUnit.Terminate at termination, so no static reference keeps an instance object reachable. Witness conformance-test RunUnitScopeHostTests (method WS reads back at its initial state after each run unit; a second run unit starts from VALUE 0).",
+  "editions": "",
+  "notes": "retired-witness: conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState (a method's WORKING-STORAGE is illegal at every edition (kb/Work PB1308), so the test's program no longer compiles; the run-unit scope facts stay witnessed by the row's other references)",
   "state": "OK"
  },
  {
@@ -39576,13 +39576,13 @@
   "ordinal": 6,
   "subject": "INVOKE statement",
   "rule-digest": "4b5badad3d15",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "",
+  "test-ref": "conformance:2023/pb1135_invoke_keywordless_expression_argument; conformance:2023/pb130_call_format2_bare",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1135 (open). Rule (cite.py --check 14.9.23.3 'If an argument is specified without any BY phrase, BY REFERENCE is implied for that argument when' OK; GR6 header): for a non-universal receiver a keyword-less argument's mode is decided by the corresponding formal. The PDF general format (rendered PDF p681 / folio 651) prints `[ BY CONTENT ] {arithmetic-expression-1 | boolean-expression-1 | identifier-5 | literal-2}` and `[ BY VALUE ] {...}` — BY CONTENT/BY VALUE are optional, so a keyword-less expression is legal and GR6 a)2 assumes BY CONTENT. DEFECTS: (1) invokeArgument's keyword-less arms are only addressIdentifier | dataReference | literal: probe p3.cob `INVOKE OBJ \"TAKE\" USING N + 1` against formals LK LK2 ran and printed LK=004A LK2=000A (N and literal +1 as TWO arguments — silent wrong answer; spec: one argument 42, and then an arity violation); p1 (one formal) -> false COBOLNET0828 '2 USING argument(s)'; e1 `USING N * 2` -> COBOL0307; e2 `USING (N + 1)` -> COBOL0001; b1 `USING B1 B-AND B2` -> COBOLNET0901. (2) GR6 b) is unreachable: a BY VALUE method formal is COBOLNET0899 by-value-formal-carrier (probe p2.cob). Findings F1, F6. || editions as adjudicated: 2002, 2014, 2023 (INVOKE / OO is a COBOL-2002 introduction)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1135 / decision R59: a keyword-less N + 1 is ONE expression argument (BY CONTENT); a sole identifier stays BY REFERENCE (SR9).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.23.4-L2.1",
@@ -47123,10 +47123,10 @@
   "rule-digest": "744f674efc7a",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#RunMain; src/Cobol.Net.Runtime/Control/RunUnit.cs#Terminate; src/Cobol.Net.Runtime/Control/RunUnit.cs#Run; src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs#Visit; src/Cobol.Net.Runtime/Control/RunUnit.cs#Begin; src/Cobol.Net.Runtime/IO/FileConnector.cs#Close; src/Cobol.Net.Runtime/IO/FileRegistry.cs#CloseAll",
-  "test-ref": "conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData; unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit; conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState; unit:RunUnitStateDriftTests.StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination",
+  "test-ref": "conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_InheritsNoSwitchAndNoFactoryData; unit:RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUnit; unit:RunUnitStateDriftTests.StaticStorage_IsResetAtAdoption_OnceEach_AndAgainAtTermination",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1069 LANDED (wave 73 D). cite.py --check 14.9.42.4 'The operations described in 14.6.11, Normal run unit termination, are performed' -> OK §14.9.42.4 1). STOP RUN unwinds through ProgramTable.RunMain's finally, which runs RunUnit.Terminate: item 2's implicit CLOSE of every open file (FileRegistry.CloseAll; an OS close failure maps to status 30 and never stops the loop) and items 3/4/6 for the one kind of storage the RunUnit object does not own - static working-storage, every unit's adopted __ResetStatics. Items 4/5 across run units hold by the new-RunUnit-object design (w68w). Items 1 and 7 belong to declined facilities (commit/rollback, MCS; PB260/PB261/PB281-PB283).",
+  "editions": "",
+  "notes": "retired-witness: conformance-test:RunUnitScopeHostTests.ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState (a method's WORKING-STORAGE is illegal at every edition (kb/Work PB1308), so the test's program no longer compiles; the run-unit scope facts stay witnessed by the row's other references)",
   "state": "OK"
  },
  {

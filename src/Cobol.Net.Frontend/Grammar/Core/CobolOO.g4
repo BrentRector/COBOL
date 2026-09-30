@@ -144,7 +144,7 @@ endClassHeader
 // SUPER) is the SET-pointer rule in CobolParserCore.g4; a class-name and an object reference are both data-references
 // syntactically (the binder distinguishes them by resolved symbol kind).
 invokeStatement
-    : INVOKE invokeTarget invokeMethodName invokeUsing? invokeReturning? END_INVOKE?
+    : INVOKE invokeTarget invokeMethodName invokeUsing? invokeReturning?
     ;
 
 invokeTarget
@@ -227,19 +227,20 @@ invokeArgument
     | BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
     // SELF is identifier-5 (§8.4.3.8 — an identifier format whose only role bar is "shall not be a receiving
     // operand"), so the BY CONTENT brace and the keyword-less form admit it (kb/Work PB1137); NULL rides `literal`.
-    | BY? CONTENT (addressIdentifier | SELF | {boolExprAhead()}? booleanExpression | literal | arithmeticExpression)
+    | BY? CONTENT (addressIdentifier | SELF | {boolExprAhead()}? booleanExpression | {!numericLiteralIsLeftOperand()}? literal | arithmeticExpression)
     | OMITTED
     | addressIdentifier   // §14.9.23.3 SR9 / SR19 — a sending operand whatever the mode
     | SELF
     // The keyword-less EXPRESSION arms (kb/Work PB1135) — the twin of `callArgument`'s. §14.9.23.2 prints BY CONTENT
     // and BY VALUE as OPTIONAL over {arithmetic-expression-1 | boolean-expression-1 | identifier-5 | literal-2}, so
-    // an expression written with no BY is a legal argument (§14.9.23.4 GR6 a) 2 makes it BY CONTENT). They come AFTER
-    // dataReference and literal, so a bare `N + 1` keeps the LIST reading CALL's determination gives it (the
-    // arguments N and +1 — parenthesize, `USING (N + 1)`, to select the expression); what these arms add is every
-    // expression that no list reading covers: `N * 2`, `(N + 1)` and `B1 B-AND B2`, which were parse errors.
+    // an expression written with no BY is a legal argument (§14.9.23.4 GR6 a) 2 makes it BY CONTENT).
+    // ⛔ A KEYWORD-LESS `N + 1` IS ONE ARGUMENT (decision R59, reversing PB130's list reading — see `callArgument`).
+    // There is no bare `dataReference` arm: `arithmeticExpression` subsumes the identifier, which the binder recovers
+    // from a sole-dataReference expression (OoBindInvocationArg's `arg.Ref ?? SoleDataReference`, the path BY CONTENT
+    // already takes), so nothing wins the ambiguity over the greedy expression. The `literal` arm is guarded by
+    // `numericLiteralIsLeftOperand()` for the numeric literal the spine also subsumes (`5 + 1`).
     | {boolExprAhead()}? booleanExpression
-    | dataReference
-    | literal
+    | {!numericLiteralIsLeftOperand()}? literal
     | arithmeticExpression
     ;
 

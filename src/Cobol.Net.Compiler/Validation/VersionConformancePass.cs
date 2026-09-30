@@ -857,18 +857,6 @@ internal sealed class VersionConformancePass
             return base.VisitChildren(ctx);
         }
 
-        /// <summary>A WORKING-STORAGE SECTION in a METHOD definition — legal 2002/2014 (D3: static-field
-        /// semantics, shared across instances and persistent across activations, §11.7), BANNED by 2023
-        /// (§13.5.3 SR 1). The dual window: 0900 below 2002, 0902 at 2023, silent between; under
-        /// <c>--permissive</c> the pre-removal static semantics stand (the §10 #1 migration contract).</summary>
-        public override object? VisitMethodDefinition(CobolParserCore.MethodDefinitionContext ctx)
-        {
-            if (ctx.dataDivision()?.workingStorageSection() is not null)
-                _p.Check(Constructs.MethodWorkingStorageWindow,
-                    "a WORKING-STORAGE SECTION in a method definition");
-            return base.VisitChildren(ctx);
-        }
-
         // ── The W3 notInGrammar 85-acceptance gates (VCR Table 7 rows 7.15–7.18; DEVLOG 599): four obsolete '85
         //    elements DELETED by ISO 2002 that formerly had no grammar at all. Each now parses unconditionally,
         //    binds inert at 85, and gates here. ──────────────────────────────────────────────────────────────
@@ -944,7 +932,7 @@ internal sealed class VersionConformancePass
         // the moment the clone is materialized; the PROPERTY identity is consumed entirely by the OO property binder;
         // and — the 14g.2-review correction (DEVLOG 734) — although DataItem.IsTypedef is init-only, the typedef
         // ITEM is discarded from ConformanceForest whenever RegisterTypeDecl rejects it (an unnamed/FILLER typedef, a
-        // duplicate type-name) or it binds into a method's LocalRoots/StaticRoots (off the forest), so a bound-arm
+        // duplicate type-name) or it binds into a method's LocalRoots/LinkageRoots (off the forest), so a bound-arm
         // TYPEDEF gate silently dropped the 0900 on exactly those paths. Recognition fixes all four uniformly: the
         // parse node is always present, so each fires once per written clause with the former BindEntry site's exact
         // constructId + where-string (byte-identical). The InGatedDataEntry guard reproduces the binder's reach — it
@@ -1125,7 +1113,7 @@ internal sealed class VersionConformancePass
         /// <summary>The TYPEDEF [STRONG] clause (ISO §13.18.58; D17) — a COBOL-2002 introduction (a type DECLARATION).
         /// Recognition-based (the 14g.2-review correction, DEVLOG 734), NOT bound-arm: the typedef ITEM is dropped
         /// from ConformanceForest whenever RegisterTypeDecl rejects it (unnamed/FILLER, duplicate type-name) or it
-        /// binds into method LocalRoots/StaticRoots, so a bound-arm gate lost the 0900 on those declaration-error
+        /// binds into method LocalRoots/LinkageRoots, so a bound-arm gate lost the 0900 on those declaration-error
         /// paths. The parse node is always present — one Check per written TYPEDEF, matching the former binder site.</summary>
         public override object? VisitTypedefClause(CobolParserCore.TypedefClauseContext ctx)
         {

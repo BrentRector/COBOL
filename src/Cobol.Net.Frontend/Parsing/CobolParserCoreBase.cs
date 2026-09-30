@@ -770,15 +770,58 @@ public abstract class CobolParserCoreBase : Parser
     /// after the previous one's last (no space, no hidden-channel token between them)? The comma-decimal literals
     /// <c>123,45</c> and <c>,45</c> are assembled from tokens (§8.3.3.3.2), and a space before the comma begins a
     /// NEW character-string (§8.3.5). A left-edge predicate, so it steers prediction (kb/Work PB1446).</summary>
-    protected bool tokensAreContiguous(int count)
+    protected bool tokensAreContiguous(int count) => TokensAreContiguousFrom(1, count);
+
+    /// <summary><see cref="tokensAreContiguous"/> for the <paramref name="count"/> tokens starting at
+    /// <c>LT(<paramref name="first"/>)</c>.</summary>
+    private bool TokensAreContiguousFrom(int first, int count)
     {
-        for (int i = 1; i < count; i++)
+        for (int i = first; i < first + count - 1; i++)
         {
             var a = TokenStream.LT(i);
             var b = TokenStream.LT(i + 1);
             if (a is null || b is null || a.StopIndex + 1 != b.StartIndex) return false;
         }
         return true;
+    }
+
+    /// <summary>⛔ A NUMERIC LITERAL THAT IS THE LEFT OPERAND OF AN ARITHMETIC OPERATOR IS NOT A STANDALONE ARGUMENT
+    /// (kb/Work PB1135, decision R59). Every USING-argument list (CALL §14.9.4.2, INVOKE §14.9.23.2, the inline
+    /// method invocation §8.4.3.4.2) prints the keyword-less operand brace
+    /// <c>{ arithmetic-expression-1 | boolean-expression-1 | identifier | literal | OMITTED }</c>, and an
+    /// argument list is juxtaposition, so <c>5 + 1</c> is either the ONE expression <c>5 + 1</c> or the two
+    /// arguments <c>5</c> and <c>+ 1</c>. The operator tokens of the default lexer mode carry no spacing, but a
+    /// sign separated from its digits is not a literal at all (§8.3.3.3.2 SR2 — it "shall appear as the leftmost
+    /// character of the literal") and an arithmetic operator is "preceded by a space and followed by a space"
+    /// (§8.7.1), so a <c>+ 1</c> after an operand is the binary operator, never a new argument: the expression
+    /// wins. The test is on the LITERAL arm because a literal is one token (two or three for the
+    /// comma-decimal forms) and the scan over it is exact; an identifier is not scanned at all — the
+    /// <c>arithmeticExpression</c> arm simply precedes the <c>dataReference</c> arm's territory, which the
+    /// grammar no longer names in these lists (the binder recovers the sole identifier, GR8 of §14.9.4.4).
+    /// A left-edge predicate, so it steers prediction. Read-only over the token stream.</summary>
+    protected bool numericLiteralIsLeftOperand()
+    {
+        int i = 1;
+        // The literal's OWN sign is contiguous with its digits; a separated sign is the operator of an expression
+        // that starts here, which no literal alternative can carry.
+        if (TokenStream.LA(i) is CobolLexer.PLUS or CobolLexer.MINUS)
+        {
+            if (!TokensAreContiguousFrom(i, 2)) return false;
+            i++;
+        }
+        int width = TokenStream.LA(i) switch
+        {
+            CobolLexer.FLOATLIT or CobolLexer.COMMA_FLOATLIT or CobolLexer.DECIMALLIT => 1,
+            CobolLexer.INTEGERLIT =>
+                TokenStream.LA(i + 1) == CobolLexer.COMMA && TokenStream.LA(i + 2) == CobolLexer.INTEGERLIT
+                    && TokensAreContiguousFrom(i, 3) ? 3 : 1,
+            CobolLexer.COMMA =>
+                TokenStream.LA(i + 1) == CobolLexer.INTEGERLIT && TokensAreContiguousFrom(i, 2) ? 2 : 0,
+            _ => 0,
+        };
+        return width != 0
+            && TokenStream.LA(i + width) is CobolLexer.PLUS or CobolLexer.MINUS or CobolLexer.STAR
+                or CobolLexer.SLASH or CobolLexer.POWER;
     }
 
     /// <summary>The ARGUMENT-scoped twin of <see cref="boolExprAhead"/> (kb/Work PB65, FMT-15.45.2): does a boolean

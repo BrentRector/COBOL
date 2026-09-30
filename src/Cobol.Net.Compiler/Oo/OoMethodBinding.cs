@@ -30,10 +30,6 @@ public sealed class OoMethodBinding
     /// <summary>LOCAL-STORAGE roots → C# locals, re-initialized on every activation (§8.6.4).</summary>
     public List<DataItem> LocalRoots { get; } = [];
 
-    /// <summary>Method WORKING-STORAGE roots → STATIC fields (D3 — shared across instances, persistent across
-    /// activations, §11.7; ILLEGAL at 2023, §13.5.3 SR 1 — the version-conformance pass window row).</summary>
-    public List<DataItem> StaticRoots { get; } = [];
-
     /// <summary>The method's contiguous pc range in its class's one dispatch space — assigned by
     /// <c>StatementBinder.BindClassBody</c> (the exit-bounded range IS the fall-through guard: running past
     /// the last paragraph returns from the method, never into a sibling's paragraphs — the legacy trap #4).

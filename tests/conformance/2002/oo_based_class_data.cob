@@ -1,7 +1,9 @@
       *> kb/Work PB956 -- BASED data and ADDRESS OF targets in every data division a class definition has.
       *> ISO 13.16.3 SR16: the BASED clause "may be specified only in data description entries in the linkage
-      *> section, in the working-storage section, and in the local-storage section" -- all three of which a
-      *> factory, an instance and a method definition have; 13.18.5.3 bars only a class-object subject and a
+      *> section, in the working-storage section, and in the local-storage section" -- a factory and an instance
+      *> definition have a working-storage section, a method definition only a local-storage and a linkage section
+      *> (13.5.3 SR1: working-storage "only in a factory definition or an instance definition, but not in a method
+      *> definition", kb/Work PB1308); 13.18.5.3 bars only a class-object subject and a
       *> dynamic-length / variable-length subject. 8.6.4: local-storage items are "allocated and set to initial
       *> state each time the runtime element containing them is activated", so each recursive REC activation
       *> owns its own LV and its own LB address; 13.18.5.4 GR2: every implicit data-address pointer starts NULL.
@@ -9,8 +11,8 @@
       *>   FACTORY  ALLOCATE FB INITIALIZED (14.9.3.4 GR7 -- as INITIALIZE ... TO DEFAULT: FB2 = zero) + 7  -> F:HI007
       *>   REC(0) -> REC(1) -> REC(2): each LB addresses ITS OWN activation's LV ("L0 ", "L1 ", "L2 "),
       *>     printed innermost first, then re-based onto the object's OW ("OBJ").
-      *>   WSM twice: method WORKING-STORAGE is static data (8.6.4), so WP keeps the address of WC and the
-      *>     second activation adds to the same WC -> W:1, W:2.
+      *>   WSM twice: WC, WB and WP are OBJECT data (working-storage of the instance definition), so WP keeps the
+      *>     address of WC and the second activation adds to the same WC -> W:1, W:2.
       *>   GET property PV reads the object item whose address M1 took (the record now lives on a cell).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB956BAS.
@@ -68,6 +70,9 @@
        01  OW PIC X(3) VALUE "OBJ".
        01  PV PIC X(4) VALUE "PROP" PROPERTY.
        01  PB PIC X(4) BASED.
+       01  WC PIC 9 VALUE 0.
+       01  WB PIC 9 BASED.
+       01  WP USAGE POINTER.
        PROCEDURE DIVISION.
        METHOD-ID. REC.
        DATA DIVISION.
@@ -91,11 +96,6 @@
            DISPLAY "R" D ":" LB.
        END METHOD REC.
        METHOD-ID. WSM.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01  WC PIC 9 VALUE 0.
-       01  WB PIC 9 BASED.
-       01  WP USAGE POINTER.
        PROCEDURE DIVISION.
            IF WP = NULL
                SET WP TO ADDRESS OF WC

@@ -68,7 +68,6 @@ public partial class CobolLexer
         EDITING,
         END_ACCEPT,
         END_DISPLAY,
-        END_INVOKE,
         END_MERGE,
         END_METHOD,
         END_RECEIVE,

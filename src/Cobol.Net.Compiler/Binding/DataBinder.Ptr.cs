@@ -110,20 +110,6 @@ public sealed partial class DataBinder
             _ptrAddressableCellOf[cls] = cell;
             _ptrAddressableBackings.Add((cls.BackingCsName, cell, cls.Canonical, cls.Width));
         }
-
-        // ⛔ A METHOD's cell-backed data takes its STORAGE DURATION from its section (kb/Work PB956): a method
-        // WORKING-STORAGE record is ONE per-class copy persisting across activations (§8.6.4 static items / OO deep-dive D3 —
-        // the static channel every other method-WS root rides), so its implicit pointer or its cell is a STATIC
-        // member. A LOCAL-STORAGE or LINKAGE record is per ACTIVATION (§8.6.4; §8.6.5 — a based entry's implicit
-        // pointer lives as long as the entry's storage) — OoEmitter.EmitMethod re-seeds its member on entry and
-        // restores the activator's on exit, so a recursive activation never sees its caller's address.
-        foreach (var root in OoMethodScopedRoots)
-            if (OoRootOwner.TryGetValue(root, out var owner) && owner.Binding!.StaticRoots.Contains(root)
-                && root.Class is { IsCellBacked: true } c && ReferenceEquals(c.Canonical, root))
-            {
-                if (c.BasedPointerField is { } bp) _staticBasedBridgeAddrs.Add(bp);
-                else if (PtrAddressableCellOf.ContainsKey(c)) _staticAddressableCells.Add(c.BackingCellCsName);
-            }
     }
 
     /// <summary>Resolve one scanned <c>ADDRESS OF</c> head in the scope its statement will bind in: the owning

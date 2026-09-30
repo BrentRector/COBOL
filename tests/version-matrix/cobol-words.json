@@ -944,12 +944,6 @@
    "note": "The SPECIAL-NAMES CHANNEL n IS mnemonic vendor clause (IBM extension). ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no CHANNEL entry in cobc/reserved.c, so outside that clause it is a legal user-defined word. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
   },
   {
-   "token": "END_INVOKE",
-   "nameSlot": true,
-   "subscriptTrigger": true,
-   "note": "The vendor INVOKE scope terminator. ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no entry, so it is a legal user-defined word wherever the INVOKE statement cannot end. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
-  },
-  {
    "token": "END_MERGE",
    "nameSlot": true,
    "subscriptTrigger": true,
