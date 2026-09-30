@@ -36,6 +36,9 @@ import re
 import sys
 from collections import Counter
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from cite import CORRECTION_NOTE  # noqa: E402  — ONE definition of what an editorial correction note looks like
+
 REPO = pathlib.Path(__file__).resolve().parents[2]
 SPEC = REPO / "specs" / "ISO_COBOL.md"
 OUT = REPO / "docs" / "rearchitecture" / "spec-rule-catalog.json"
@@ -396,6 +399,7 @@ def main() -> int:
     # last rule of every block that ends near a page boundary (verified against the rendered PDF: GR-7.3.12.4-6
     # is printed on page 95 and was recorded as 96).
     rule_page = 0
+    in_correction_note = False                   # inside a `> ⚠ **CORRECTED …` blockquote paragraph (R66)
 
     def flattened_tail(n: int, form: str) -> bool:
         """Is this column-0 ordinal the flattened TAIL of the nested list currently open in the rule's body?
@@ -536,6 +540,14 @@ def main() -> int:
             continue
         if cur is None:
             continue
+        # ⛔ AN EDITORIAL CORRECTION NOTE IS NOT RULE TEXT (R66). `> ⚠ **CORRECTED — see the Addendum (Cn).**` flags a
+        # line the transcription corrects and QUOTES THE PRINTED FORM so cite.py finds either; buffered into the rule it
+        # would put the defective printed text inside the catalog's rule text, beside the corrected one. The note is a
+        # blockquote paragraph: every `>` line after its first belongs to it.
+        if CORRECTION_NOTE.match(line) or (in_correction_note and line.startswith(">")):
+            in_correction_note = True
+            continue
+        in_correction_note = False
         if m := ORDINAL.match(line):
             n = int(m.group("n"))
             # ⛔ A FLATTENED NESTED-LIST TAIL IS PART OF ITS PARENT RULE, NOT A ROW (PB698). Decided BEFORE the

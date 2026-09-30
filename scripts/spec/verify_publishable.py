@@ -30,6 +30,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from cite import CORRECTION_NOTE  # noqa: E402  — ONE definition of what an editorial correction note looks like
+
 REPO = pathlib.Path(__file__).resolve().parents[2]
 SPEC_MD = REPO / "specs" / "ISO_COBOL.md"
 
@@ -56,6 +59,104 @@ REQUIRED = [
     (r"NOT part of ISO/IEC 1989:2023",
      "the Preface must state that it is not part of the standard"),
 ]
+
+
+#: An Addendum correction entry: `### C6 · page 607 · 14.9.10.4 … · printed → corrected`.
+ENTRY_HEADING = re.compile(r"^###\s+(C\d+)\s+·\s+(.*)$")
+FLAG_REFERENCE = re.compile(r"see the Addendum \((C\d+)\)")
+PAGES_IN_HEADING = re.compile(r"\bpages?\s+((?:\d+(?:,\s*|\s+and\s+)?)+)")
+PAGE_IN_NOTE = re.compile(r"\bpage\s+(\d+)\b")
+#: A correction that changes a CLASS of characters across the whole text is flagged once, in the Preface, and is
+#: listed under this heading in place of a page (C14: the look-alike hyphens and minus signs).
+WHOLE_TEXT = "the whole text"
+
+
+def check_corrections(text: str) -> list[str]:
+    """Every correction is FLAGGED where it was made, LISTED in the Addendum, and names its PRINTED FORM and PAGE.
+
+    The Addendum exists so a correction can be reversed if it later proves mistaken (specs/README.md "Corrections",
+    kb/Work R66). That only works while three things hold, and each is checked here because each can be edited away
+    independently of the others:
+
+      1. the two sets agree — every `see the Addendum (Cn)` flag has a `### Cn` entry and every entry is pointed at;
+      2. every in-place flag is a `> ⚠ **CORRECTED — see the Addendum (Cn).**` note that QUOTES THE PRINTED FORM in a code
+         span and names the PRINTED PAGE, and that page is one the entry's heading lists — `cite.py --check` finds a
+         quotation of the printed form in the note (and reports the corrected line's rule path, cite.rule_path), which
+         is what keeps every citation written against the printed form passing;
+      3. every entry's heading names the printed page(s) (or `the whole text` for a class of characters), and an entry
+         other than such a class states its printed form.
+    """
+    failures: list[str] = []
+    lines = text.split("\n")
+    addendum_at = next((i for i, l in enumerate(lines) if l.startswith("# Addendum")), len(lines))
+    print("\ncorrections — every flag must match an Addendum entry that names the printed form and page:")
+
+    # the Addendum's entries, each with its body up to the next heading
+    entries: dict[str, dict] = {}
+    current = None
+    for l in lines[addendum_at:]:
+        if m := ENTRY_HEADING.match(l):
+            current = entries.setdefault(m.group(1), {"heading": m.group(2), "body": []})
+        elif l.startswith("## ") or l.startswith("# "):
+            current = None
+        elif current is not None:
+            current["body"].append(l)
+
+    # the flags in the body: each is a blockquote paragraph opening with the CORRECTED marker
+    flags: dict[str, list[tuple[int, str]]] = {}
+    i = 0
+    while i < addendum_at:
+        if CORRECTION_NOTE.match(lines[i]):
+            j = i
+            while j + 1 < addendum_at and lines[j + 1].startswith(">"):
+                j += 1
+            paragraph = " ".join(l.lstrip("> ").strip() for l in lines[i:j + 1])
+            ids = FLAG_REFERENCE.findall(paragraph)
+            for cid in ids[:1]:
+                flags.setdefault(cid, []).append((i + 1, paragraph))
+            i = j
+        i += 1
+    referenced = set(FLAG_REFERENCE.findall("\n".join(lines[:addendum_at])))
+
+    if not entries:
+        failures.append("the Addendum lists no corrections (### Cn entries)")
+        print("  ✗ no correction entries found in the Addendum")
+    for cid in sorted(referenced | set(entries), key=lambda c: int(c[1:])):
+        problems: list[str] = []
+        entry = entries.get(cid)
+        if cid not in entries:
+            problems.append("referenced from the text, but MISSING from the Addendum")
+        elif cid not in referenced:
+            problems.append("in the Addendum, but never referenced from the text")
+        else:
+            heading, body = entry["heading"], "\n".join(entry["body"])
+            is_class = WHOLE_TEXT in heading
+            listed = {int(n) for n in re.findall(r"\d+", m.group(1))} if (m := PAGES_IN_HEADING.search(heading)) else set()
+            if not listed and not is_class:
+                problems.append("its heading names no printed page (`page N`) and is not a whole-text class")
+            if not is_class and not re.search(r"\*\*Printed|printed form", body, re.I):
+                problems.append("it does not state the printed form")
+            if is_class and cid in flags:
+                problems.append("a whole-text class is flagged once in the Preface, not per occurrence")
+            if not is_class and cid not in flags:
+                problems.append("its heading is not a whole-text class but no in-place flag carries it")
+            for at, paragraph in flags.get(cid, []):
+                pages = {int(n) for n in PAGE_IN_NOTE.findall(paragraph)}
+                if not re.search(r"`[^`]+`", paragraph):
+                    problems.append(f"the flag at line {at} quotes no printed form in a code span")
+                if not pages:
+                    problems.append(f"the flag at line {at} names no printed page")
+                elif listed and not pages & listed:
+                    # (a note may also cite the pages that CONFIRM the correction — C1 names three — but one must be
+                    # a page the entry's heading lists, so the flag and the entry point at the same printed page)
+                    problems.append(f"the flag at line {at} names page {sorted(pages)} but the entry lists {sorted(listed)}")
+        if problems:
+            for p in problems:
+                failures.append(f"{cid}: {p}")
+            print(f"  ✗ {cid}: " + "; ".join(problems))
+        else:
+            print(f"  ✓ {cid}: flagged in place, listed in the Addendum, printed form and page named")
+    return failures
 
 
 def main() -> int:
@@ -86,24 +187,7 @@ def main() -> int:
             failures.append(f"missing: {what}")
             print(f"  ✗ MISSING — {what}")
 
-    # Every correction must be both FLAGGED where it was made and LISTED in the Addendum, and the two sets must
-    # agree. The Addendum exists so a correction can be reversed if it later proves mistaken; that only works
-    # while the cross-references hold, and a note or an entry can be edited away independently of the other.
-    print("\ncorrections — every ⚠ flag must match an Addendum entry:")
-    referenced = set(re.findall(r"see the Addendum \((C\d+)\)", text))
-    defined = set(re.findall(r"^###\s+(C\d+)\s+·", text, re.M))
-    if not defined:
-        failures.append("the Addendum lists no corrections (### Cn entries)")
-        print("  ✗ no correction entries found in the Addendum")
-    for cid in sorted(referenced | defined):
-        if cid in referenced and cid in defined:
-            print(f"  ✓ {cid}: flagged in place and listed in the Addendum")
-        elif cid in defined:
-            failures.append(f"{cid} is listed in the Addendum but nothing in the text points at it")
-            print(f"  ✗ {cid}: in the Addendum, but never referenced from the text")
-        else:
-            failures.append(f"{cid} is referenced from the text but missing from the Addendum")
-            print(f"  ✗ {cid}: referenced from the text, but MISSING from the Addendum")
+    failures.extend(check_corrections(text))
 
     # The acknowledgment has to be in the preface, i.e. before the body starts, not only in position at 0.2.
     # The body is delimited by the FIRST CLAUSE, not by a page anchor: pages were removed from the document

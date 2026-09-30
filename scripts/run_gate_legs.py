@@ -88,6 +88,9 @@ AUDITS = (
     ("GUARD HOOK SELF-TEST", ["scripts/hooks/test_forbidden_commands.py"]),
     ("READ-ONLY HOOK SELF-TEST", ["scripts/hooks/test_readonly_repo.py"]),
     ("WITNESS LOSS", ["scripts/spec/audit_witness_loss.py", "--check"]),
+    ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
+    ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
+    ("CITE SELF-TEST", ["scripts/spec/cite.py", "--self-test"]),
 )
 #: The git-ignored GPL corpus ExternalCorpusPopulationDriftTests measure (kb/Work PB209, PB897): absent in a fresh
 #: worktree, so the gate fetches it; a failed fetch makes the gate RED, attributed to the fetch.

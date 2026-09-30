@@ -20,6 +20,16 @@ prints as 6)d)2.b) and the catalog calls it 2). Both produce confident wrong ans
 cannot pass quietly. That is the load-bearing guarantee. Both modes also print a best-effort RULE PATH
 (`6) d)`) to help you write the ordinal — ⚠ it is APPROXIMATE below two levels of nesting, because the standard
 mixes `a)` and `b.` styles at the same depth; read the printed rule when the ordinal itself is load-bearing.
+
+⛔ A CHECK THAT CANNOT BE VALID FAILS, IT NEVER ANSWERS OK (kb/Work PB308). The comparison is on WORDS ONLY
+(`norm`: punctuation is typography), so a quotation made entirely of punctuation — a table row such as
+`| + | + | - |` — normalizes to the EMPTY string, which is a substring of every line of every clause. Both modes
+refuse such a quotation outright; it is the gate failing open, which is worse than the gate failing.
+
+THE CORRECTED TEXT AND THE PRINTED TEXT BOTH PASS (R66, specs/README.md "Corrections"). Where the transcription
+corrects a defect of the printed standard, the corrected line is followed by a `> ⚠ **CORRECTED — see the
+Addendum (Cn).**` note that quotes the PRINTED line verbatim, so a quotation of either form is found inside the
+same clause, and the rule path reported for a quotation of the printed form is the corrected line's.
 """
 from __future__ import annotations
 
@@ -42,8 +52,13 @@ HEADING = re.compile(r"^#{2,6}\s+([0-9]+(?:\.[0-9]+)*|[A-Z](?:\.[0-9]+)+)(?:\s+(
 # The transcription escapes a rule label's delimiter (`1\)`) so Markdown does not eat it as a list — see
 # repairs/rule_numbering.py. Match both forms so this works on any revision.
 TOP = re.compile(r"^(\d+)\\?\)\s")
-SUB = re.compile(r"^\s{2,}([a-z])\\?\)\s")
-SUBSUB = re.compile(r"^\s{2,}(\d+)\\?\.\s")
+SUB = re.compile(r"^(\s{2,})([a-z])\\?\)\s")
+SUBSUB = re.compile(r"^(\s{2,})(\d+)\\?\.\s")
+#: An editorial note on a correction (R66): the paragraph belongs to the line ABOVE it, so a quotation found in
+#: the note reports that line's rule path.
+CORRECTION_NOTE = re.compile(r"^>\s*⚠\s*\*\*CORRECTED")
+
+EMPTY_NEEDLE = "quotation carries no word characters (letters, digits, underscore); nothing to match"
 
 
 def norm(s: str) -> str:
@@ -58,18 +73,100 @@ def clauses(lines):
             for k, (n, t, s) in enumerate(heads)]
 
 
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
 def rule_path(lines, at, start):
-    """The PRINTED rule path of the line at `at` — e.g. ['6)', 'd)', '2.'] — by walking back to each level."""
+    """The PRINTED rule path of the line at `at` — e.g. ['6)', 'd)', '2.'] — by walking back to each level.
+
+    Two lines are not what their position suggests, and each used to report a sub-item it is not in (PB308):
+      · an editorial note on a correction belongs to the line above it, so it takes that line's path;
+      · an UNLETTERED paragraph at the sub-items' own indentation (or shallower) is a trailing paragraph of the
+        PARENT rule — §14.7.7 rule 2's "The composite of operands is a hypothetical data item…" follows its
+        sub-items a) and b) at their indent and is neither — so it reports the bare rule, not the last letter.
+    A paragraph INSIDE a sub-item sits deeper than its label, which is how the two are told apart."""
+    while at > start and CORRECTION_NOTE.match(lines[at]):
+        at -= 1
+        while at > start and not lines[at].strip():
+            at -= 1
+    own = lines[at]
+    is_label = bool(TOP.match(own) or SUB.match(own) or SUBSUB.match(own))
+    own_indent = _indent(own)
     path, seen_sub, seen_subsub = [], False, False
     for k in range(at, start - 1, -1):
-        if not seen_subsub and (m := SUBSUB.match(lines[k])):
-            path.append(f"{m.group(1)}."); seen_subsub = True
-        elif not seen_sub and (m := SUB.match(lines[k])):
-            path.append(f"{m.group(1)})"); seen_sub = True
-        elif (m := TOP.match(lines[k])):
+        line = lines[k]
+        if not seen_subsub and (m := SUBSUB.match(line)):
+            if is_label or own_indent > len(m.group(1)):
+                path.append(f"{m.group(2)}.")
+            seen_subsub = True
+        elif not seen_sub and (m := SUB.match(line)):
+            if is_label or own_indent > len(m.group(1)):
+                path.append(f"{m.group(2)})")
+            seen_sub = True
+        elif (m := TOP.match(line)):
             path.append(f"{m.group(1)})")
             break
     return " ".join(reversed(path))
+
+
+def find(lines, cls, text):
+    """(exit code, output lines) for `--find`: every clause line that contains TEXT (words only)."""
+    needle = norm(text)
+    if not needle:
+        return 1, [f"REFUSED: {EMPTY_NEEDLE}"]
+    hits = [(n, t, s, e, i) for (n, t, s, e) in cls
+            for i in range(s, e) if needle in norm(lines[i])]
+    if not hits:
+        return 1, [f"NO CLAUSE contains {text!r} — the citation names text the standard does not have"]
+    out = []
+    for n, t, s, _e, i in hits[:12]:
+        out.append(f"§{n} {rule_path(lines, i, s)}  ({t})\n    {lines[i].strip()[:190]}\n")
+    out.append(f"{len(hits)} occurrence(s)")
+    return 0, out
+
+
+def check(lines, cls, clause, text):
+    """(exit code, output lines) for `--check`: TEXT must appear inside CLAUSE's own region."""
+    region = [c for c in cls if c[0] == clause]
+    if not region:
+        return 1, [f"FAIL: there is no clause §{clause} in the transcription"]
+    needle = norm(text)
+    if not needle:
+        return 1, [f"FAIL: {EMPTY_NEEDLE}"]
+    for n, t, s, e in region:
+        for i in range(s, e):
+            if needle in norm(lines[i]):
+                return 0, [f"OK  §{n} {rule_path(lines, i, s)}  ({t})\n    {lines[i].strip()[:220]}"]
+    return 1, [f"FAIL: §{clause} exists but does NOT contain {text!r}",
+               "      run --find to locate the text and get the clause it is really in"]
+
+
+def load(path: pathlib.Path = SPEC):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return lines, clauses(lines)
+
+
+def self_test() -> int:
+    """Each guard is shown to FIRE on its defect and to stay SILENT on its neighbour (kb/Work PB308, PB309)."""
+    lines, cls = load()
+    cases = [
+        ("fires EMPTY-NEEDLE (check)", check(lines, cls, "7.1", "| + | + | - |")[0] == 1),
+        ("fires EMPTY-NEEDLE (find)", find(lines, cls, "| + | - |")[0] == 1),
+        ("silent on a needle carrying digits", check(lines, cls, "15.43.4", "| S999 | +999 |")[0] == 0),
+        ("pins 14.9.8.4 1) b)", "1) b)" in check(lines, cls, "14.9.8.4", "Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value")[1][0]),
+        ("pins 14.7.7 2) bare (trailing paragraph)", check(lines, cls, "14.7.7", "The composite of operands is a hypothetical data item")[1][0].startswith("OK  §14.7.7 2)  (")),
+        ("pins 8.8.3.3 3)", check(lines, cls, "8.8.3.3", "equivalent to a literal")[1][0].startswith("OK  §8.8.3.3 3)")),
+        ("accepts the CORRECTED form (C6)", check(lines, cls, "14.9.10.4", "The value '62' is placed into the I-O status")[0] == 0),
+        ("accepts the PRINTED form (C6)", check(lines, cls, "14.9.10.4", "The valu62' is placed into the I-O status")[0] == 0),
+        ("accepts the PRINTED form (C12)", check(lines, cls, "14.9.30.4", "whose key value is greater than or equal to the key value in the file position indicator")[0] == 0),
+        ("fires on a wrong clause", check(lines, cls, "14.9.27.4", "The valu62' is placed into the I-O status")[0] == 1),
+    ]
+    for name, ok in cases:
+        print(f"{'PASS' if ok else 'FAIL'}  {name}")
+    bad = [n for n, ok in cases if not ok]
+    print("SELF-TEST: " + ("FAIL " + str(bad) if bad else "PASS"))
+    return 1 if bad else 0
 
 
 def main() -> int:
@@ -77,45 +174,21 @@ def main() -> int:
     ap.add_argument("--check", nargs=2, metavar=("CLAUSE", "TEXT"),
                     help="assert TEXT appears inside CLAUSE's own region; exit 1 if not")
     ap.add_argument("--find", metavar="TEXT", help="which clause(s) contain this text")
+    ap.add_argument("--self-test", action="store_true", help="prove each guard fires and stays silent")
     args = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:  # noqa: BLE001
         pass
-
-    lines = SPEC.read_text(encoding="utf-8").splitlines()
-    cls = clauses(lines)
-
-    if args.find:
-        needle = norm(args.find)
-        hits = [(n, t, s, e, i) for (n, t, s, e) in cls
-                for i in range(s, e) if needle in norm(lines[i])]
-        if not hits:
-            print(f"NO CLAUSE contains {args.find!r} — the citation names text the standard does not have")
-            return 1
-        for n, t, s, _e, i in hits[:12]:
-            print(f"§{n} {rule_path(lines, i, s)}  ({t})\n    {lines[i].strip()[:190]}\n")
-        print(f"{len(hits)} occurrence(s)")
-        return 0
-
-    if not args.check:
+    if args.self_test:
+        return self_test()
+    if not (args.find or args.check):
         ap.print_help()
         return 2
-
-    clause, text = args.check
-    region = [c for c in cls if c[0] == clause]
-    if not region:
-        print(f"FAIL: there is no clause §{clause} in the transcription")
-        return 1
-    needle = norm(text)
-    for n, t, s, e in region:
-        for i in range(s, e):
-            if needle in norm(lines[i]):
-                print(f"OK  §{n} {rule_path(lines, i, s)}  ({t})\n    {lines[i].strip()[:220]}")
-                return 0
-    print(f"FAIL: §{clause} exists but does NOT contain {text!r}")
-    print("      run --find to locate the text and get the clause it is really in")
-    return 1
+    lines, cls = load()
+    code, out = find(lines, cls, args.find) if args.find else check(lines, cls, *args.check)
+    print("\n".join(out))
+    return code
 
 
 if __name__ == "__main__":

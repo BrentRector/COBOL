@@ -50,10 +50,15 @@ named.
 > **About this transcription.** ISO/IEC 1989:2023 is the authoritative text; where this transcription and the
 > published standard differ, **the published standard governs**.
 >
-> This transcription is faithful to the printed standard except at three points where the standard itself is
-> defective and the defect would mislead a reader, or a tool built from the text. **Every departure is listed
-> in the [Addendum](#addendum) at the end of this document**, together with the printed form, so that any
-> correction can be reversed if it later proves mistaken. Each is also flagged in place with a ⚠ note.
+> This transcription is the working copy of the standard for the project that keeps it, and correctness rules
+> over faithfulness to a typographical error. It is faithful to the printed standard except where the standard
+> itself is defective — a character the typesetting dropped, a cross-reference to a sub-item that does not
+> exist, two rules that contradict each other — and there the defect is corrected. **Every departure is listed
+> in the [Addendum](#addendum) at the end of this document**, together with the printed form and the printed
+> page, so that any correction can be reversed if it later proves mistaken. Each is also flagged in place with a
+> ⚠ note that quotes the printed form. One class of correction is too wide to flag at each occurrence: the
+> characters the PDF's text layer uses as look-alikes for the standard's own hyphen and minus have been
+> normalized to the ASCII hyphen-minus throughout — see the Addendum (C14).
 > Defects that are doubtful rather than clear are transcribed AS PRINTED and are listed in the Addendum too.
 >
 > **There are no pages here.** A page is an artifact of one typesetting of the standard, and it has no meaning
@@ -2508,7 +2513,7 @@ Reference format specifies the conventions for writing COBOL source text and lib
 
 The following rules apply to the indicated reference formats:
 
-1. Fixed-form and free-form
+1\) Fixed-form and free-form
 
    a) Reference format is described in terms of character positions on a line on an input-output medium.
 
@@ -2518,13 +2523,13 @@ The following rules apply to the indicated reference formats:
 
    d) For purposes of analyzing the text of a compilation group, the first character-string of a compilation group is treated as though it were preceded by a separator space and the last character-string of a compilation group is treated as though it were followed by a separator space.
 
-2. Fixed-form
+2\) Fixed-form
 
    a) A COBOL compiler shall process fixed-form reference format lines as though the lines had been logically converted from fixed form to free form as described in 6.5, Logical conversion.
 
    b) After logical conversion, the equivalent free-form lines shall meet the requirements of free-form reference format, except that lines may be longer and all characters of the computer's coded character set shall be retained in alphanumeric and national literals. (See rule 3b.)
 
-3. Free-form
+3\) Free-form
 
    a) The number of character positions on a line may vary from line to line, ranging from a minimum of 0 to a maximum of 255.
 
@@ -2985,21 +2990,21 @@ The COPY statement incorporates library text into a COBOL compilation group.
 <a id="section-7-2-3-3"></a>
 ##### 7.2.3.3 Syntax rules
 
-1. A COPY statement may be specified anywhere in source text or in library text that a character-string or a separator, other than the closing delimiter of a literal, may appear except that a COPY statement shall not appear within a COPY statement.
+1\) A COPY statement may be specified anywhere in source text or in library text that a character-string or a separator, other than the closing delimiter of a literal, may appear except that a COPY statement shall not appear within a COPY statement.
 
-2. A COPY statement shall be preceded by a space except when it is the first statement in a compilation group.
+2\) A COPY statement shall be preceded by a space except when it is the first statement in a compilation group.
 
-3. Within one COBOL library, each text-name shall be unique.
+3\) Within one COBOL library, each text-name shall be unique.
 
-4. A concatenation expression or figurative constant shall not be specified for literal-1, or literal-2.
+4\) A concatenation expression or figurative constant shall not be specified for literal-1, or literal-2.
 
-5. Literal-1 and literal-2 shall be alphanumeric literals. The allowable value of literal-1 and literal-2 is defined by the implementor.
+5\) Literal-1 and literal-2 shall be alphanumeric literals. The allowable value of literal-1 and literal-2 is defined by the implementor.
 
-6. Pseudo-text-1 shall contain one or more text-words, at least one of which shall be neither a separator comma nor a separator semicolon.
+6\) Pseudo-text-1 shall contain one or more text-words, at least one of which shall be neither a separator comma nor a separator semicolon.
 
-7. Pseudo-text-2 shall contain zero, one, or more text-words.
+7\) Pseudo-text-2 shall contain zero, one, or more text-words.
 
-8. Character-strings within pseudo-text-1 and pseudo-text-2 may be continued in accordance with the rules of reference format.
+8\) Character-strings within pseudo-text-1 and pseudo-text-2 may be continued in accordance with the rules of reference format.
 
    NOTE   If a text word within Pseudo-text is a literal, then it can be continued using the rules for literal continuation.
 
@@ -4453,7 +4458,7 @@ The COBOL character repertoire consists of the basic letters, basic digits, basi
 | Basic digits | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 | digits |
 | Basic special characters | | space |
 | | + | plus sign |
-| | – | minus sign (hyphen) |
+| | - | minus sign (hyphen) |
 | | \* | asterisk |
 | | / | slant (slash, solidus) |
 | | = | equal sign |
@@ -5044,7 +5049,7 @@ Required words are of two types:
 
 | Word | Meaning |
 |--------|-------------|
-| – | Arithmetic operator - unary minus or subtraction |
+| - | Arithmetic operator - unary minus or subtraction |
 | \* | Arithmetic operator - multiplication |
 | / | Arithmetic operator - division |
 | ** | Arithmetic operator - exponentiation |
@@ -5840,7 +5845,7 @@ NOTE Qualified-data-name-1 and qualified-condition-name-1 are shown for context 
 
    b) If arithmetic-expression-1 is specified, the subscript is the result of the evaluation of arithmetic-expression-1. If the evaluation of arithmetic-expression-1 does not result in an integer, the EC-BOUND-SUBSCRIPT exception condition is set to exist.
 
-   c) If index-name-1 is specified, the subscript is the occurrence number represented by the value of the index referenced by index-name-1 modified by integer-1, if specified. The mapping of the value of the index referenced by index-name-1 to an occurrence number is defined by the implementor. If integer-1 is specified, the subscript is the occurrence number derived from the index incremented by the value of integer-1 (when the operator + is used) or decremented by the value of integer-1 (when the operator − is used).
+   c) If index-name-1 is specified, the subscript is the occurrence number represented by the value of the index referenced by index-name-1 modified by integer-1, if specified. The mapping of the value of the index referenced by index-name-1 to an occurrence number is defined by the implementor. If integer-1 is specified, the subscript is the occurrence number derived from the index incremented by the value of integer-1 (when the operator + is used) or decremented by the value of integer-1 (when the operator - is used).
 
 2\) The value of a subscript shall be a positive integer. The lowest possible occurrence number represented by a subscript is 1, which identifies the first element of any given dimension of a table. Each successive element within that dimension of the table is referenced by occurrence numbers of 2, 3, … . The highest permissible occurrence number for any given dimension of a fixed-capacity or occurs-depending table is the maximum number of occurrences of the item as specified in the associated OCCURS clause. The highest permissible occurrence number for any given dimension of a dynamic-capacity table is implementor-defined and may be affected by the availability of runtime resources. If the value of the subscript is not a positive integer or is less than one or is greater than the highest permissible occurrence number, the EC-BOUND-SUBSCRIPT exception condition is set to exist.
 
@@ -7728,7 +7733,7 @@ There are five binary arithmetic operators and two unary arithmetic operators th
 | **Binary Arithmetic Operators** | **Meaning** |
 |---|---|
 | + | Addition |
-| – | Subtraction |
+| - | Subtraction |
 | \* | Multiplication |
 | / | Division |
 | ** | Exponentiation |
@@ -7736,7 +7741,7 @@ There are five binary arithmetic operators and two unary arithmetic operators th
 | **Unary Arithmetic Operators** | **Meaning** |
 |---|---|
 | + | The effect of multiplication by the numeric literal +1 |
-| – | The effect of multiplication by the numeric literal –1 |
+| - | The effect of multiplication by the numeric literal -1 |
 
 <a id="section-8-7-2"></a>
 #### 8.7.2 Boolean operators
@@ -7894,11 +7899,11 @@ The following rules apply regardless of the mode of arithmetic that is in effect
 <a id="table-3"></a>
 **Table 3 — Combinations of symbols in arithmetic expressions**
 
-| First symbol ↓ &nbsp; Second symbol → | **Identifier or literal** | **+ − \* / \*\*** | **Unary + or −** | **(** | **)** |
+| First symbol ↓ &nbsp; Second symbol → | **Identifier or literal** | **+ - \* / \*\*** | **Unary + or -** | **(** | **)** |
 |---|---|---|---|---|---|
 | Identifier or literal | — | P | — | — | P |
-| + − \* / ** | P | — | P | P | — |
-| Unary **+** or **−** | P | — | — | P | — |
+| + - \* / ** | P | — | P | P | — |
+| Unary **+** or **-** | P | — | — | P | — |
 | ( | P | — | P | P | — |
 | ) | — | P | — | — | P |
 
@@ -7907,7 +7912,7 @@ The following rules apply regardless of the mode of arithmetic that is in effect
 The letter 'P' indicates a permissible pair of symbols.
 The character '—' indicates an invalid pair.
 
-5\) An arithmetic expression may begin only with the symbol '(', '+', '−', an identifier, or a literal and may end only with a ')', an identifier, or a literal. There shall be a one-to-one correspondence between left and right parentheses of an arithmetic expression such that each left parenthesis is to the left of its corresponding right parenthesis. If the first operator in an arithmetic expression is a unary operator, it shall be immediately preceded by a left parenthesis if that arithmetic expression immediately follows an identifier or another arithmetic expression.
+5\) An arithmetic expression may begin only with the symbol '(', '+', '-', an identifier, or a literal and may end only with a ')', an identifier, or a literal. There shall be a one-to-one correspondence between left and right parentheses of an arithmetic expression such that each left parenthesis is to the left of its corresponding right parenthesis. If the first operator in an arithmetic expression is a unary operator, it shall be immediately preceded by a left parenthesis if that arithmetic expression immediately follows an identifier or another arithmetic expression.
 
 NOTE 2 For example, when '1' and '+ 2' are used as subscripts for a two-dimensional table A, the arithmetic expression '+ 2' needs to be enclosed in parentheses, as in A (1 (+ 2)).
 
@@ -8249,18 +8254,18 @@ A concatenation expression consists of two operands separated by the concatenati
 <a id="section-8-8-3-2"></a>
 ##### 8.8.3.2 Syntax rules
 
-1. Both operands shall be of the same class, either alphanumeric, boolean, or national, except that a figurative constant may be specified as one or both operands. Neither literal-1 nor literal-2 shall be a figurative constant that begins with the word ALL.
+1\) Both operands shall be of the same class, either alphanumeric, boolean, or national, except that a figurative constant may be specified as one or both operands. Neither literal-1 nor literal-2 shall be a figurative constant that begins with the word ALL.
 
-2. For operands of class alphanumeric, the length of the value resulting from concatenation shall be less than or equal to 8,191 alphanumeric character positions.
+2\) For operands of class alphanumeric, the length of the value resulting from concatenation shall be less than or equal to 8,191 alphanumeric character positions.
 
-3. For operands of class boolean, the length of the value resulting from concatenation shall be less than or equal to 8,191 boolean character positions.
+3\) For operands of class boolean, the length of the value resulting from concatenation shall be less than or equal to 8,191 boolean character positions.
 
-4. For operands of class national, the length of the value resulting from concatenation shall be less than or equal to 8,191 national character positions.
+4\) For operands of class national, the length of the value resulting from concatenation shall be less than or equal to 8,191 national character positions.
 
 <a id="section-8-8-3-3"></a>
 ##### 8.8.3.3 General rules
 
-1. The class of the concatenation expression resulting from the concatenation operation shall be:
+1\) The class of the concatenation expression resulting from the concatenation operation shall be:
 
    a) when one of the operands is a figurative constant, the class of the literal or concatenation expression that constitutes the other operand, or
 
@@ -8268,9 +8273,9 @@ A concatenation expression consists of two operands separated by the concatenati
 
    c) the same class as the operands.
 
-2. The value of a concatenation expression shall be the concatenation of the value of the literals, figurative constants, and concatenation expressions of which it is composed. If both literal-1 and literal-2 are specified and both are zero-length literals the value of the concatenation expression is a zero-length literal.
+2\) The value of a concatenation expression shall be the concatenation of the value of the literals, figurative constants, and concatenation expressions of which it is composed. If both literal-1 and literal-2 are specified and both are zero-length literals the value of the concatenation expression is a zero-length literal.
 
-3. A concatenation expression shall be equivalent to a literal of the same class and value, and may be used anywhere a literal of that class may be used.
+3\) A concatenation expression shall be equivalent to a literal of the same class and value, and may be used anywhere a literal of that class may be used.
 
 
 
@@ -10974,9 +10979,9 @@ A source unit may contain one or more divisions, specified in the following orde
 
 
 
-2. environment division
-3. data division
-4. procedure division
+2\) environment division
+3\) data division
+4\) procedure division
 
 The beginning of a division is indicated by its division header or, in the case of the identification division when its header is omitted, by one of the paragraph headers permitted in the identification division.
 
@@ -11273,21 +11278,21 @@ End markers indicate the end of a definition.
 <a id="section-10-7-3"></a>
 #### 10.7.3 Syntax rules
 
-1. An end marker shall be present in every source unit that contains, is contained in, or precedes another source unit.
+1\) An end marker shall be present in every source unit that contains, is contained in, or precedes another source unit.
 
-2. Program-name-1 shall be identical to the program-name declared in a preceding PROGRAM-ID paragraph.
+2\) Program-name-1 shall be identical to the program-name declared in a preceding PROGRAM-ID paragraph.
 
-3. If a PROGRAM-ID paragraph declaring a specific program-name is stated between the PROGRAM-ID paragraph and the END PROGRAM marker for program-name-1, then an END PROGRAM marker referencing program-name shall precede the END PROGRAM marker referencing program-name-1.
+3\) If a PROGRAM-ID paragraph declaring a specific program-name is stated between the PROGRAM-ID paragraph and the END PROGRAM marker for program-name-1, then an END PROGRAM marker referencing program-name shall precede the END PROGRAM marker referencing program-name-1.
 
-4. Object-class-name-1 shall be identical to the object-class-name declared in the corresponding CLASS-ID paragraph.
+4\) Object-class-name-1 shall be identical to the object-class-name declared in the corresponding CLASS-ID paragraph.
 
-5. Method-name-1 shall be identical to the method-name declared in the corresponding METHOD-ID paragraph. If the PROPERTY phrase is specified in the METHOD-ID paragraph, method-name-1 shall be omitted.
+5\) Method-name-1 shall be identical to the method-name declared in the corresponding METHOD-ID paragraph. If the PROPERTY phrase is specified in the METHOD-ID paragraph, method-name-1 shall be omitted.
 
-6. Interface-name-1 shall be identical to the interface-name declared in the corresponding INTERFACE-ID paragraph.
+6\) Interface-name-1 shall be identical to the interface-name declared in the corresponding INTERFACE-ID paragraph.
 
-7. User-function-name-1 shall be identical to the user-function-name declared in the corresponding FUNCTION-ID paragraph.
+7\) User-function-name-1 shall be identical to the user-function-name declared in the corresponding FUNCTION-ID paragraph.
 
-8. Program-prototype-name-1 shall be identical to the program-prototype-name declared in the corresponding PROGRAM-ID paragraph.
+8\) Program-prototype-name-1 shall be identical to the program-prototype-name declared in the corresponding PROGRAM-ID paragraph.
 
 
 
@@ -11969,9 +11974,9 @@ The INTERMEDIATE ROUNDING clause specifies the rounding rules that are to be app
 <a id="section-11-9-11-2"></a>
 ##### 11.9.11.2 General rules
 
-1. If native arithmetic is in effect, the rounding rules that apply to intermediate data items are defined by the implementor.
+1\) If native arithmetic is in effect, the rounding rules that apply to intermediate data items are defined by the implementor.
 
-2. If standard-binary arithmetic is in effect:
+2\) If standard-binary arithmetic is in effect:
 
    a) If the INTERMEDIATE ROUNDING clause is not specified, the NEAREST-EVEN phrase is implied.
 
@@ -11985,7 +11990,7 @@ The INTERMEDIATE ROUNDING clause specifies the rounding rules that are to be app
 
    NOTE    The STANDARD-BINARY mode of arithmetic is an obsolete feature.
 
-3. If standard-decimal arithmetic is in effect:
+3\) If standard-decimal arithmetic is in effect:
 
    a) If the INTERMEDIATE ROUNDING clause is not specified, the NEAREST-AWAY-FROM-ZERO phrase is implied.
 
@@ -12215,7 +12220,7 @@ where locale-phrase-1 is:
 ╰ <u>USER-DEFAULT</u>   ╯
 </pre>
 
-> ⚠ **CORRECTED — see the Addendum (C3).** The first alternative is printed as `locae-name-1` in the standard (12.3.6.2); a TYPO, corrected here to `locale-name-1` because every other occurrence in 8.3.2.3 and the SPECIAL-NAMES paragraph spells it that way. Recorded so the correction is visible rather than silent.
+> ⚠ **CORRECTED — see the Addendum (C3).** The first alternative is printed as `locae-name-1` in the standard (12.3.6.2, page 285); a TYPO, corrected here to `locale-name-1` because every other occurrence in 8.3.2.3 and the SPECIAL-NAMES paragraph spells it that way. Recorded so the correction is visible rather than silent.
 
 where locale-phrase-2 is:
 
@@ -12598,7 +12603,7 @@ a) digits 0 through 9;
 
 b) alphabetic characters A, B, C, D, E, N, P, R, S, V, X, Z, or their lowercase equivalents; or the space;
 
-c) characters '+' '−' ',' '.' '\*' '/' ';' '(' ')' '"' '='
+c) characters '+' '-' ',' '.' '\*' '/' ';' '(' ')' '"' '='
 
 
 
@@ -12607,7 +12612,7 @@ c) characters '+' '−' ',' '.' '\*' '/' ';' '(' ')' '"' '='
 
 a) shall contain at least one non-space character and
 
-b) may consist of any characters from the computer's coded character set except for the digits 0 through 9 and the characters '+' '–' ',' '.' '\*'.
+b) may consist of any characters from the computer's coded character set except for the digits 0 through 9 and the characters '+' '-' ',' '.' '\*'.
 
 24\) Locale-name-2 shall be a locale-name defined by the LOCALE clause.
 
@@ -12621,7 +12626,7 @@ a) digits 0 through 9;
 
 b) alphabetic characters A, B, C, D, E, N, P, R, S, V, X, Z, or their lowercase equivalents; or the space;
 
-c) characters '+' '–' ',' '.' '\*' '/' ';' '(' ')' '"' '='
+c) characters '+' '-' ',' '.' '\*' '/' ';' '(' ')' '"' '='
 
 28\) If literal-7 is of class alphanumeric, the associated currency symbol may be used only to define a numeric-edited item with usage display. If literal-7 is of class national, the associated currency symbol may be used only to define a numeric-edited item with usage national.
 
@@ -15211,7 +15216,7 @@ level-number [ entry-name-clause ]
 └              ╰ <u>NATIONAL</u> ╯ ┘
 </pre>
 
-> **Figure notes (screen description entry Format 1 (group) syntax diagram).** `GLOBAL`, `LINE`, `PLUS`, `MINUS`, `COLUMN`, `COL`, `BLANK`, `SCREEN`, `SIGN`, `LEADING`, `TRAILING`, `SEPARATE`, `FULL`, `AUTO`, `SECURE`, `REQUIRED`, `OCCURS`, `USAGE`, `DISPLAY`, and `NATIONAL` are underlined in the printed standard (required words / required minimum abbreviation — `COL` is the required minimum abbreviation of `COLUMN`). `IS`, `NUMBER`, `CHARACTER`, and `TIMES` are not underlined. The sign alternatives are the words `PLUS` and `MINUS` and the symbols `+` and `–`, and that four-way group is a **bracket** (optional), not braces. The SIGN clause and the USAGE clause are each wrapped in an outer optional bracket, so the whole clause may be omitted even though `{ LEADING | TRAILING }` and `{ DISPLAY | NATIONAL }` are required once the clause is written. The entry is terminated by a period. No choice indicators appear in this figure.
+> **Figure notes (screen description entry Format 1 (group) syntax diagram).** `GLOBAL`, `LINE`, `PLUS`, `MINUS`, `COLUMN`, `COL`, `BLANK`, `SCREEN`, `SIGN`, `LEADING`, `TRAILING`, `SEPARATE`, `FULL`, `AUTO`, `SECURE`, `REQUIRED`, `OCCURS`, `USAGE`, `DISPLAY`, and `NATIONAL` are underlined in the printed standard (required words / required minimum abbreviation — `COL` is the required minimum abbreviation of `COLUMN`). `IS`, `NUMBER`, `CHARACTER`, and `TIMES` are not underlined. The sign alternatives are the words `PLUS` and `MINUS` and the symbols `+` and `-`, and that four-way group is a **bracket** (optional), not braces. The SIGN clause and the USAGE clause are each wrapped in an outer optional bracket, so the whole clause may be omitted even though `{ LEADING | TRAILING }` and `{ DISPLAY | NATIONAL }` are required once the clause is written. The entry is terminated by a period. No choice indicators appear in this figure.
 
 
 
@@ -15929,26 +15934,26 @@ Format 2 (screen-item):
                      └ –     ┘
 </pre>
 
-> **Figure notes (COLUMN clause Format 2 (screen-item) syntax diagram).** `COLUMN`, `COL`, `PLUS`, and `MINUS` are underlined in the printed standard (required words / required minimum abbreviation); `NUMBER`, `IS`, `+`, and `−` are **not** underlined. All groups are plain — re-rendered at 600 dpi and confirmed to carry **no** choice-indicator bars. Exactly one of `COLUMN`/`COL` shall be selected; the `PLUS`/`+`/`MINUS`/`−` bracket is optional (zero or one of the four); and exactly one of `identifier-1` or `integer-3` shall be selected.
+> **Figure notes (COLUMN clause Format 2 (screen-item) syntax diagram).** `COLUMN`, `COL`, `PLUS`, and `MINUS` are underlined in the printed standard (required words / required minimum abbreviation); `NUMBER`, `IS`, `+`, and `-` are **not** underlined. All groups are plain — re-rendered at 600 dpi and confirmed to carry **no** choice-indicator bars. Exactly one of `COLUMN`/`COL` shall be selected; the `PLUS`/`+`/`MINUS`/`-` bracket is optional (zero or one of the four); and exactly one of `identifier-1` or `integer-3` shall be selected.
 
 <a id="section-13-18-14-3"></a>
 ##### 13.18.14.3 Syntax rules
 
 ALL FORMATS
 
-1. COLUMN, COL, COLUMNS, and COLS are synonyms.
+1\) COLUMN, COL, COLUMNS, and COLS are synonyms.
 
-2. PLUS and + are synonyms.
+2\) PLUS and + are synonyms.
 
 FORMAT 1
 
-3. The COLUMN clause may be specified only in an elementary entry. The entry shall also contain a LINE clause or shall be subordinate to an entry containing a LINE clause.
+3\) The COLUMN clause may be specified only in an elementary entry. The entry shall also contain a LINE clause or shall be subordinate to an entry containing a LINE clause.
 
-4. The keyword ARE may be specified only if COLUMNS, COLS, or NUMBERS is specified.
+4\) The keyword ARE may be specified only if COLUMNS, COLS, or NUMBERS is specified.
 
-5. The keyword IS shall not be specified if COLUMNS, COLS, or NUMBERS is specified.
+5\) The keyword IS shall not be specified if COLUMNS, COLS, or NUMBERS is specified.
 
-6. Neither integer-1 nor integer-2 shall exceed the page width. (See 13.18.39, PAGE clause)
+6\) Neither integer-1 nor integer-2 shall exceed the page width. (See 13.18.39, PAGE clause)
 
 
 
@@ -15964,17 +15969,17 @@ FORMAT 1
 
 9\) If LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute. If any of the operands is absolute and neither LEFT, CENTER, nor RIGHT is specified, LEFT is assumed.
 
-10\) If more than one integer‑1 or integer‑2 operand is specified the clause is referred to as a multiple COLUMN clause and the following additional rules apply:
+10\) If more than one integer-1 or integer-2 operand is specified the clause is referred to as a multiple COLUMN clause and the following additional rules apply:
 
    a) No OCCURS clause shall be specified in the same entry.
 
-   b) All the occurrences of integer‑1 shall be in increasing order of magnitude.
+   b) All the occurrences of integer-1 shall be in increasing order of magnitude.
 
 FORMAT 2
 
-11\) MINUS and **–** are synonyms.
+11\) MINUS and **-** are synonyms.
 
-12\) Identifier‑1 shall be described in the file, working‑storage, local‑storage, or linkage section as an elementary unsigned integer data item.
+12\) Identifier-1 shall be described in the file, working-storage, local-storage, or linkage section as an elementary unsigned integer data item.
 
 13\) Neither the PLUS phrase nor the MINUS phrase shall be specified for the first elementary item in a screen record.
 
@@ -15987,7 +15992,7 @@ FORMAT 1
 
 2\) There is a fixed correspondence, specified by the implementor, between a column and a character in a national character set.
 
-3\) The printable‑size of a printable item is the number of columns required for printing the characters described by the item's PICTURE clause or, in the absence of a PICTURE clause, the literal specified in the VALUE clause. There is a one‑to‑one correspondence between a column and a character in an alphanumeric character set.
+3\) The printable-size of a printable item is the number of columns required for printing the characters described by the item's PICTURE clause or, in the absence of a PICTURE clause, the literal specified in the VALUE clause. There is a one-to-one correspondence between a column and a character in an alphanumeric character set.
 
 
 
@@ -16002,9 +16007,9 @@ NOTE 1 Columns might not line up in a report if the printable characters are not
 
    a) Integer-1 specifies an absolute column number.
 
-   b) If LEFT is specified, integer-**1** is the leftmost column of the printable item. The rightmost column of the printable item is integer-**1** + printable-size – 1.
+   b) If LEFT is specified, integer-**1** is the leftmost column of the printable item. The rightmost column of the printable item is integer-**1** + printable-size - 1.
 
-   c) If RIGHT is specified, integer-**1** is the rightmost column of the printable item. The leftmost column of the printable item is integer-**1** – printable-size + 1.
+   c) If RIGHT is specified, integer-**1** is the rightmost column of the printable item. The leftmost column of the printable item is integer-**1** - printable-size + 1.
 
    d) If CENTER is specified, the printable item is centered, as follows:
 
@@ -16492,20 +16497,20 @@ The FORMAT clause specifies that records written to the file are to be formatted
 <a id="section-13-18-24-3"></a>
 ##### 13.18.24.3 Syntax rules
 
-1. If more than one record description entry is associated with a file description entry in which the FORMAT clause is specified, each of these record description entries shall contain a SELECT WHEN clause.
+1\) If more than one record description entry is associated with a file description entry in which the FORMAT clause is specified, each of these record description entries shall contain a SELECT WHEN clause.
 
-2. The REDEFINES clause and the RENAMES clause shall not be specified in a record description entry associated with a file description entry in which a FORMAT clause is specified or in the data description entry of the identifier specified in a FROM phrase in a REWRITE or WRITE statement referencing that file description entry.
+2\) The REDEFINES clause and the RENAMES clause shall not be specified in a record description entry associated with a file description entry in which a FORMAT clause is specified or in the data description entry of the identifier specified in a FROM phrase in a REWRITE or WRITE statement referencing that file description entry.
 
-3. Data items of class index, message-tag, object, and pointer shall not be specified in a record description entry associated with a file description entry in which a FORMAT clause is specified or in the data description entry of the identifier specified in a FROM phrase in a REWRITE or WRITE statement referencing that file description entry.
+3\) Data items of class index, message-tag, object, and pointer shall not be specified in a record description entry associated with a file description entry in which a FORMAT clause is specified or in the data description entry of the identifier specified in a FROM phrase in a REWRITE or WRITE statement referencing that file description entry.
 
 <a id="section-13-18-24-4"></a>
 ##### 13.18.24.4 General rules
 
-1. The FORMAT clause specifies that external media format is to be used for records written to the file. In external media format, data contains the appropriate encoding for presentation or printing.
+1\) The FORMAT clause specifies that external media format is to be used for records written to the file. In external media format, data contains the appropriate encoding for presentation or printing.
 
    NOTE    The data in the record area is visible to the runtime module in internal representation.
 
-2. A record description entry or a data description entry is selected for use in formatting during an input-output operation referencing a file description entry in which a FORMAT clause is specified as follows:
+2\) A record description entry or a data description entry is selected for use in formatting during an input-output operation referencing a file description entry in which a FORMAT clause is specified as follows:
 
    a) If only one record description entry is associated with the file description entry, that record description entry is selected.
 
@@ -17090,7 +17095,7 @@ Format 2 (screen):
                └ –     ┘
 </pre>
 
-> **Figure notes (LINE clause Format 2 (screen) syntax diagram).** `LINE`, `PLUS`, and `MINUS` are underlined in the printed standard (required words); `NUMBER` and `IS` are not underlined (optional words). The four-way bracket group is optional — zero or one of `PLUS` / `+` / `MINUS` / `–` may be specified; the following braces require exactly one of `identifier-1` / `integer-3`.
+> **Figure notes (LINE clause Format 2 (screen) syntax diagram).** `LINE`, `PLUS`, and `MINUS` are underlined in the printed standard (required words); `NUMBER` and `IS` are not underlined (optional words). The four-way bracket group is optional — zero or one of `PLUS` / `+` / `MINUS` / `-` may be specified; the following braces require exactly one of `identifier-1` / `integer-3`.
 
 <a id="section-13-18-35-3"></a>
 ##### 13.18.35.3 Syntax rules
@@ -17130,21 +17135,21 @@ FORMAT 1
 
 9\) If the current report group is a control heading with the OR PAGE phrase, all the LINE clauses in the report group description shall be relative.
 
-10\) If more than one integer‑1 or integer‑2 operand is specified, the clause is referred to as a multiple LINE clause and the following additional rules apply:
+10\) If more than one integer-1 or integer-2 operand is specified, the clause is referred to as a multiple LINE clause and the following additional rules apply:
 
    a) The NEXT PAGE phrase, if specified, shall appear only with the first operand.
 
    b) All absolute operands, if present, shall precede all relative operands, if present.
 
-   c) The occurrences of integer‑1, if present, shall be in ascending numerical order.
+   c) The occurrences of integer-1, if present, shall be in ascending numerical order.
 
    d) An OCCURS clause shall not also be present in the same entry.
 
 FORMAT 2
 
-11\) MINUS and **–** are synonyms.
+11\) MINUS and **-** are synonyms.
 
-12\) Identifier‑1 shall be described in the file, working‑storage, local‑storage, or linkage section as an elementary unsigned integer data item.
+12\) Identifier-1 shall be described in the file, working-storage, local-storage, or linkage section as an elementary unsigned integer data item.
 
 13\) Neither the PLUS phrase nor the MINUS phrase shall be specified for the first elementary item in a screen record.
 
@@ -17287,17 +17292,17 @@ The NEXT GROUP clause specifies additional blank lines following the printing of
 <a id="section-13-18-37-3"></a>
 ##### 13.18.37.3 Syntax rules
 
-1. Integer-1 specifies an absolute line number. Integer-2 specifies a relative vertical distance. Integer-1 and integer-2 shall not exceed the page limit, or 9999 if the report is not divided into pages. Integer-1 and integer-2 shall be unsigned. (See 13.18.39, PAGE clause.)
+1\) Integer-1 specifies an absolute line number. Integer-2 specifies a relative vertical distance. Integer-1 and integer-2 shall not exceed the page limit, or 9999 if the report is not divided into pages. Integer-1 and integer-2 shall be unsigned. (See 13.18.39, PAGE clause.)
 
-2. PLUS and + are synonyms.
+2\) PLUS and + are synonyms.
 
-3. If the report is not divided into pages, only the relative form of the clause may be specified.
+3\) If the report is not divided into pages, only the relative form of the clause may be specified.
 
-4. The NEXT GROUP clause shall not be specified in a page heading or report footing.
+4\) The NEXT GROUP clause shall not be specified in a page heading or report footing.
 
-5. The NEXT PAGE phrase shall not be specified in a page footing.
+5\) The NEXT PAGE phrase shall not be specified in a page footing.
 
-6. If the absolute form is used, the following checks apply:
+6\) If the absolute form is used, the following checks apply:
 
    a) If the current report group is a report heading, integer-1 shall be greater than the minimum last line number of the report group and less than the FIRST DETAIL integer.
 
@@ -17305,7 +17310,7 @@ The NEXT GROUP clause specifies additional blank lines following the printing of
 
    c) If the current report group is a page footing, integer-1 shall be greater than the minimum last line number of the report group.
 
-7. If the relative form is used, the following checks apply:
+7\) If the relative form is used, the following checks apply:
 
    a) If the current report group is a report heading, the minimum last line number of the report group plus integer-2 shall be less than the FIRST DETAIL integer.
 
@@ -17656,17 +17661,17 @@ The PAGE clause defines the maximum length and width of a page of a report and t
 <a id="section-13-18-39-3"></a>
 ##### 13.18.39.3 Syntax rules
 
-1. FIRST DE is synonymous with FIRST DETAIL, LAST CH is synonymous with LAST CONTROL HEADING, and LAST DE is synonymous with LAST DETAIL.
+1\) FIRST DE is synonymous with FIRST DETAIL, LAST CH is synonymous with LAST CONTROL HEADING, and LAST DE is synonymous with LAST DETAIL.
 
-2. Either integer-1 or integer-2 or both shall be specified.
+2\) Either integer-1 or integer-2 or both shall be specified.
 
-3. The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, or FOOTING phrase may be specified only if integer-1 is specified.
+3\) The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, or FOOTING phrase may be specified only if integer-1 is specified.
 
-4. The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, and FOOTING phrases may be written in any order.
+4\) The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, and FOOTING phrases may be written in any order.
 
-5. Integer-1 shall not exceed 9999.
+5\) Integer-1 shall not exceed 9999.
 
-6. Integer-3, integer-4, integer-5, integer-6, integer-7, and integer-1 shall be greater than zero. Wherever specified, they shall be in ascending order, with equality allowed.
+6\) Integer-3, integer-4, integer-5, integer-6, integer-7, and integer-1 shall be greater than zero. Wherever specified, they shall be in ascending order, with equality allowed.
 
 
 
@@ -17704,11 +17709,11 @@ The PAGE clause defines the maximum length and width of a page of a report and t
 
 
 
-e) If FOOTING is omitted, integer‑7 will be equal to integer‑6, if LAST DETAIL is specified, or otherwise equal to the page limit given by integer‑1.
+e) If FOOTING is omitted, integer-7 will be equal to integer-6, if LAST DETAIL is specified, or otherwise equal to the page limit given by integer-1.
 
-4\) A report heading or report footing on a page by itself may occupy any region of the page from HEADING integer‑3 through the page limit integer‑1 or, if not on a page by itself, is constrained in the same way as a page heading or page footing respectively.
+4\) A report heading or report footing on a page by itself may occupy any region of the page from HEADING integer-3 through the page limit integer-1 or, if not on a page by itself, is constrained in the same way as a page heading or page footing respectively.
 
-5\) If integer‑2 is omitted, a value of 999 is assumed for the page width.
+5\) If integer-2 is omitted, a value of 999 is assumed for the page width.
 
 
 <a id="section-13-18-40"></a>
@@ -17752,19 +17757,19 @@ Format 2 (locale):
 
 ALL FORMATS
 
-1. The PICTURE clause may be specified only at the elementary level.
+1\) The PICTURE clause may be specified only at the elementary level.
 
-2. Character-string-1 shall consist of an allowable combination of characters used as picture symbols.
+2\) Character-string-1 shall consist of an allowable combination of characters used as picture symbols.
 
    The allowable combinations of symbols for a PICTURE clause are specified in 13.18.40.6, Precedence rules.
 
    NOTE 1   The currency symbol can be selected from the set of allowable characters from the computer's compile-time coded character set. All picture symbols other than the currency symbol are from the COBOL character repertoire.
 
-3. The equivalence between uppercase and lowercase letters appearing as occurrences of a currency symbol in character-string-1 is as specified in 12.3.7, SPECIAL-NAMES paragraph, Syntax rule 20. The equivalence between uppercase and lowercase letters appearing as picture symbols other than currency symbols in character-string-1 is as specified in 8.1.3, COBOL character repertoire, General rule 3.
+3\) The equivalence between uppercase and lowercase letters appearing as occurrences of a currency symbol in character-string-1 is as specified in 12.3.7, SPECIAL-NAMES paragraph, Syntax rule 20. The equivalence between uppercase and lowercase letters appearing as picture symbols other than currency symbols in character-string-1 is as specified in 8.1.3, COBOL character repertoire, General rule 3.
 
-4. The maximum number of characters allowed in character-string-1 is 63.
+4\) The maximum number of characters allowed in character-string-1 is 63.
 
-5. PIC is an abbreviation for PICTURE.
+5\) PIC is an abbreviation for PICTURE.
 
 
 
@@ -17777,7 +17782,9 @@ FORMAT 1
 
 8\) Character-1 shall be any basic letter in the COBOL character set except those specified in a CURRENCY-SIGN clause or a basic letter character A, B, C, D, E, N, P, R, S, V, X, Z or their lowercase equivalents.
 
-9\) If USAGE IS NATIONAL is specified for the subject of the entry or if character-string-1 contains the symbol 'N', literal-1, literal-2, and literal-3 shall be national literals. Otherwise, literal1, literal-2, and literal-3 shall be alphanumeric literals. The total number of characters in literal-1, literal-2, or literal-3 shall not exceed 50.
+9\) If USAGE IS NATIONAL is specified for the subject of the entry or if character-string-1 contains the symbol 'N', literal-1, literal-2, and literal-3 shall be national literals. Otherwise, literal-1, literal-2, and literal-3 shall be alphanumeric literals. The total number of characters in literal-1, literal-2, or literal-3 shall not exceed 50.
+
+> ⚠ **CORRECTED — see the Addendum (C11).** The standard prints `9) If USAGE IS NATIONAL is specified for the subject of the entry or if character-string-1 contains the symbol 'N', literal-1, literal-2, and literal-3 shall be national literals. Otherwise, literal1, literal-2, and literal-3 shall be alphanumeric literals. The total number of characters in literal-1, literal-2, or literal-3 shall not exceed 50.` (page 442): the hyphen of the placeholder `literal-1` is missing (`literal1`). Corrected to `literal-1`.
 
 10\) If the EDITING phrase is specified, the character identified by character-1 shall appear at least once in character-string-1.
 
@@ -18025,7 +18032,7 @@ Z Each symbol 'Z' represents a leading numeric position that during editing will
 
 In addition, the symbol '.' indicates the decimal point position for alignment purposes.
 
-\+ – CR DB These symbols represent the character position(s) into which the editing sign control character(s) is (are) placed during editing. Each character used in the symbol is counted in the size of the item.
+\+ - CR DB These symbols represent the character position(s) into which the editing sign control character(s) is (are) placed during editing. Each character used in the symbol is counted in the size of the item.
 
 \* Each symbol '\*' represents a leading numeric position that during editing will contain a numeric character in the range 0 through 9, or a character asterisk when the content of that position is a leading zero. Each symbol '\*' is counted in the size of the item.
 
@@ -18094,7 +18101,7 @@ NOTE 2 If reference modification is used to reference part of a data item descri
 
 . The symbol '.' (period) represents a character position that will be checked to contain the character period.
 
-+ – CR DB These symbols represent character positions that will be checked to contain a valid sign, according to the following:
++ - CR DB These symbols represent character positions that will be checked to contain a valid sign, according to the following:
 
 — the character position corresponding to the symbol '+' or '-' when such a symbol is used as a fixed insertion symbol, will be checked to contain a valid sign character as defined in Table 8, Results of fixed insertion editing;
 — the character positions corresponding to the symbols '+' or '-' when such symbols are used as floating insertion symbols, will all be checked to contain valid characters, including a valid sign character, as specified in 13.18.40.5, Editing rules, rule 6;
@@ -18210,8 +18217,8 @@ Table 8, Results of fixed insertion editing, shows the character(s) produced by 
 | **Editing symbol** | **Result** | |
 |---|---|---|
 | | **Positive or zero value** | **Negative value** |
-| + | + | – |
-| – | space | – |
+| + | + | - |
+| - | space | - |
 | CR | 2 spaces | CR |
 | DB | 2 spaces | DB |
 | character-1, NEGATIVE phrase | literal-2 | literal-2 or spaces |
@@ -18256,8 +18263,8 @@ Table 9, Results of floating insertion editing, shows the character produced by 
 | **Editing symbol in picture character-string** | **Result** | |
 |---|---|---|
 | | **Data item positive or zero** | **Data item negative** |
-| + | + | – |
-| – | space | – |
+| + | + | - |
+| - | space | - |
 | character-1 NEGATIVE phrase | literal-2 or spaces | literal-2 |
 | character-1 POSITIVE phrase | literal-3 | literal-3 or spaces |
 
@@ -18352,20 +18359,20 @@ When the DECIMAL-POINT IS COMMA clause is specified, the precedence rules for th
 | Second Symbol | | **First Symbol** | | | | | | | | | | | | | | | | | | | | | | | |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 |  |  | **Simple, special, and fixed insertion symbols** |  |  |  |  |  |  |  |  | **Zero-suppression and floating insertion symbols** |  |  |  |  |  | **Other symbols** |  |  |  |  |  |  |  |  |
-|  |  | B 0 / | , | . | + | + − | + − | CR DB | cs | cs | Z \* | Z \* | + − | + − | cs | cs | 9 | A X | S | V | P | P | 1 | N | E |
+|  |  | B 0 / | , | . | + | + - | + - | CR DB | cs | cs | Z \* | Z \* | + - | + - | cs | cs | 9 | A X | S | V | P | P | 1 | N | E |
 | **Simple, special, and fixed insertion symbols** | B 0 / | x | x | x |  | x |  |  | x |  | x | x | x | x | x | x | x | x |  | x |  | x |  | x |  |
 |  | , | x | x | x |  | x |  |  | x |  | x | x | x | x | x | x | x |  |  | x |  | x |  |  |  |
 |  | . | x | x |  |  | x |  |  | x |  | x |  | x |  | x |  | x |  |  |  |  |  |  |  |  |
 |  | + |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | x |
-|  | + − |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | + − | x | x | x |  |  |  |  | x | x | x | x |  |  | x | x | x |  |  | x | x | x |  |  |  |
+|  | + - |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | + - | x | x | x |  |  |  |  | x | x | x | x |  |  | x | x | x |  |  | x | x | x |  |  |  |
 |  | CR DB | x | x | x |  |  |  |  | x | x | x | x |  |  | x | x | x |  |  | x | x | x |  |  |  |
 |  | cs |  |  |  |  | x |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 |  | cs | x | x | x |  | x |  |  |  |  | x | x |  |  |  |  | x |  |  | x | x | x |  |  |  |
 | **Zero-suppression and floating insertion symbols** | Z \* | x | x |  |  | x |  |  | x |  | x |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 |  | Z \* | x | x | x |  | x |  |  | x |  | x | x |  |  |  |  |  |  |  | x |  | x |  |  |  |
-|  | + − | x | x |  |  |  |  |  | x |  |  |  | x |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | + − | x | x | x |  |  |  |  | x |  |  |  | x | x |  |  |  |  |  | x |  |  |  |  |  |
+|  | + - | x | x |  |  |  |  |  | x |  |  |  | x |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | + - | x | x | x |  |  |  |  | x |  |  |  | x | x |  |  |  |  |  | x |  |  |  |  |  |
 |  | cs | x | x |  |  | x |  |  |  |  |  |  |  |  | x |  |  |  |  |  |  |  |  |  |  |
 |  | cs | x | x | x |  | x |  |  |  |  |  |  |  |  | x | x |  |  |  | x |  |  |  |  |  |
 | **Other symbols** | 9 | x | x | x | x | x |  |  | x |  | x |  | x |  | x |  | x | x | x | x |  | x |  |  | x |
@@ -19223,7 +19230,7 @@ b) The implementor defines what constitutes valid signs for data items.
 
    a) The operational sign is presumed to be the leading (or, respectively, trailing) character position of the data item to which it applies; this character position is not a digit position.
 
-   b) The operational signs for positive and negative are the basic special characters '+' and '–', respectively.
+   b) The operational signs for positive and negative are the basic special characters '+' and '-', respectively.
 
 7\) Each numeric item whose picture character-string contains the symbol 'S' is a signed item. If a SIGN clause applies to such an item and conversion is necessary for purposes of computation or comparisons, conversion takes place automatically.
 
@@ -20225,9 +20232,9 @@ b) If the VALIDATE-STATUS clause is specified in an entry that is subject to one
 6\) If neither an ERROR phrase nor a NO ERROR phrase for a given entry takes effect during the execution of a given VALIDATE statement, the effect on the data item that is the subject of the entry is as follows: if any VALIDATE-STATUS clause specified in the entry has an identifier-2 that is referenced directly or indirectly as the operand of the VALIDATE statement, the data item is initialized by the execution of an implicit INITIALIZE statement without the VALUE or REPLACING phrases; otherwise, the data item remains unchanged.
 
 
-7. Data items that are subordinate to the operand of a VALIDATE statement and are not processed during the statement's execution, as indicated by a value in their internal indicators signifying not processed, are considered to be neither valid nor invalid by the VALIDATE-STATUS clause but will cause the VALIDATE-STATUS clause's data item to be initialized, where applicable, as described in General rule 6. (See 13.18.38, OCCURS clause, and 13.18.41, PRESENT WHEN clause.)
+7\) Data items that are subordinate to the operand of a VALIDATE statement and are not processed during the statement's execution, as indicated by a value in their internal indicators signifying not processed, are considered to be neither valid nor invalid by the VALIDATE-STATUS clause but will cause the VALIDATE-STATUS clause's data item to be initialized, where applicable, as described in General rule 6. (See 13.18.38, OCCURS clause, and 13.18.41, PRESENT WHEN clause.)
 
-8. If the entry containing the VALIDATE-STATUS clause is subject to one or more OCCURS clauses, the processing defined in the above General rules applies to each occurrence of the subject of the entry and each corresponding occurrence of the data item referenced by identifier-2.
+8\) If the entry containing the VALIDATE-STATUS clause is subject to one or more OCCURS clauses, the processing defined in the above General rules applies to each occurrence of the subject of the entry and each corresponding occurrence of the data item referenced by identifier-2.
 
 
 
@@ -21429,7 +21436,7 @@ If an exception object is raised by a RAISE statement, the associated declarativ
 
 If an exception object is raised by an EXIT or GOBACK statement, one of the following occurs:
 
-1. If the exception object is neither of the following:
+1\) If the exception object is neither of the following:
 
    a) an object whose class is specified or whose class is a subclass of a class specified in the RAISING phrase of the procedure division header of the source element containing this EXIT or GOBACK statement and the presence or absence of the FACTORY phrase is the same in the description of the object reference raised by the EXIT or GOBACK statement as in the RAISING phrase of the procedure division header of the source element that contains this EXIT statement, or
 
@@ -21437,11 +21444,11 @@ If an exception object is raised by an EXIT or GOBACK statement, one of the foll
 
    execution of the EXIT or GOBACK statement is as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase of the EXIT or GOBACK statement instead of an exception object and processing continues as specified in 14.6.13.1.3, Fatal exception conditions.
 
-2. Otherwise, if a USE statement in the activating runtime element specifies an applicable class or interface, the associated declarative is executed. If execution of the declarative completes normally, execution continues as specified in the activating statement for normal execution.
+2\) Otherwise, if a USE statement in the activating runtime element specifies an applicable class or interface, the associated declarative is executed. If execution of the declarative completes normally, execution continues as specified in the activating statement for normal execution.
 
-3. Otherwise, if a PROPAGATE ON directive is in effect for the activating runtime element, the exception is propagated as if a GOBACK statement with the RAISING LAST EXCEPTION phrase were specified in this activating runtime element. However, if no applicable class or interface is specified in the RAISING phrase of the procedure division header in the activating element, the RAISING phrase is EXCEPTION EC-OO-EXCEPTION, instead of LAST EXCEPTION.
+3\) Otherwise, if a PROPAGATE ON directive is in effect for the activating runtime element, the exception is propagated as if a GOBACK statement with the RAISING LAST EXCEPTION phrase were specified in this activating runtime element. However, if no applicable class or interface is specified in the RAISING phrase of the procedure division header in the activating element, the RAISING phrase is EXCEPTION EC-OO-EXCEPTION, instead of LAST EXCEPTION.
 
-4. Otherwise, execution of the EXIT or GOBACK statement in the activated element is as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase, instead of an exception object.
+4\) Otherwise, execution of the EXIT or GOBACK statement in the activated element is as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase, instead of an exception object.
 
 <a id="section-14-6-13-1-6"></a>
 ###### 14.6.13.1.6 Exception-names and exception conditions
@@ -23161,10 +23168,9 @@ FORMAT 1
 
    a) When native arithmetic, or standard-decimal arithmetic is in effect, and arithmetic-expression-1 consists of a single fixed-point numeric literal or a single fixed-point numeric data item, arithmetic-expression-1 evaluates to the exact algebraic value of that literal or item, within the constraints specified in 14.6.13.2, Incompatible data. Rounding, truncation, and decimal point alignment specifications do not apply to the production of that exact algebraic value.
 
+      NOTE Noninteger decimal values are frequently inexact when expressed in binary floating-point formats, including that of an SBIDI. For that reason, arithmetic-expression-1 is unconditionally evaluated according to the rules for arithmetic expressions for standard-binary arithmetic, regardless of the specific contents of arithmetic-expression-1.
 
-NOTE Noninteger decimal values are frequently inexact when expressed in binary floating-point formats, including that of an SBIDI. For that reason, arithmetic-expression-1 is unconditionally evaluated according to the rules for arithmetic expressions for standard-binary arithmetic, regardless of the specific contents of arithmetic-expression-1.
-
-b) Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value according to the specifications in 8.8.1, Arithmetic expressions.
+   b) Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value according to the specifications in 8.8.1, Arithmetic expressions.
 
 2\) The value obtained according to rule 1 is then stored, in conformance with the specifications in 14.6.8, Alignment and transfer of data into data items, 14.7.4, ROUNDED phrase, and 14.7.5, SIZE ERROR phrase and size error condition, into each data item referenced by identifier-1.
 
@@ -23299,17 +23305,17 @@ FORMAT 2
 
 FORMAT 1
 
-1. The open mode of the file connector referenced by file-name-1 shall be I-O and the physical file associated with that file connector shall be a mass storage file.
+1\) The open mode of the file connector referenced by file-name-1 shall be I-O and the physical file associated with that file connector shall be a mass storage file.
 
-2. For a file that is in the sequential access mode, the last input-output statement executed for file-name-1 prior to the execution of the DELETE RECORD statement shall have been a successfully executed READ statement. The mass storage control system logically removes from the physical file the record that was accessed by that READ statement.
+2\) For a file that is in the sequential access mode, the last input-output statement executed for file-name-1 prior to the execution of the DELETE RECORD statement shall have been a successfully executed READ statement. The mass storage control system logically removes from the physical file the record that was accessed by that READ statement.
 
-3. If the file is indexed and the access mode is random or dynamic, the mass storage control system logically removes from the physical file the record identified by the content of the prime record key data item associated with file-name-1. If the physical file does not contain the record specified by the key, the invalid key condition exists. (See 9.1.14, Invalid key condition.)
+3\) If the file is indexed and the access mode is random or dynamic, the mass storage control system logically removes from the physical file the record identified by the content of the prime record key data item associated with file-name-1. If the physical file does not contain the record specified by the key, the invalid key condition exists. (See 9.1.14, Invalid key condition.)
 
-4. If the file is relative and the access mode is random or dynamic, the mass storage control system logically removes from the physical file that record identified by the content of the relative key data item associated with file-name-1. If the physical file does not contain the record specified by the key, the invalid key condition exists. (See 9.1.14, Invalid key condition.)
+4\) If the file is relative and the access mode is random or dynamic, the mass storage control system logically removes from the physical file that record identified by the content of the relative key data item associated with file-name-1. If the physical file does not contain the record specified by the key, the invalid key condition exists. (See 9.1.14, Invalid key condition.)
 
-5. After the successful execution of a DELETE RECORD statement, the identified record has been logically removed from the physical file and can no longer be accessed.
+5\) After the successful execution of a DELETE RECORD statement, the identified record has been logically removed from the physical file and can no longer be accessed.
 
-6. If record locking is enabled for the file connector referenced by file-name-1 and the record identified for deletion is locked by another file connector, the result of the operation depends on the presence or absence of the RETRY phrase. If the RETRY phrase is specified, additional attempts may be made to delete the record as specified in the rules in 14.7.9, RETRY phrase. If the RETRY phrase is not specified or the record is not successfully removed as specified by the RETRY phrase, the record operation conflict condition exists. The I-O status is set in accordance with the rules for the RETRY phrase.
+6\) If record locking is enabled for the file connector referenced by file-name-1 and the record identified for deletion is locked by another file connector, the result of the operation depends on the presence or absence of the RETRY phrase. If the RETRY phrase is specified, additional attempts may be made to delete the record as specified in the rules in 14.7.9, RETRY phrase. If the RETRY phrase is not specified or the record is not successfully removed as specified by the RETRY phrase, the record operation conflict condition exists. The I-O status is set in accordance with the rules for the RETRY phrase.
 
    When the record operation conflict condition exists as a result of the DELETE RECORD statement:
 
@@ -23319,9 +23325,11 @@ FORMAT 1
 
    c) The DELETE RECORD statement is unsuccessful.
 
-7. If record locks are in effect and the file is not subject to an active APPLY COMMIT clause, the following actions take place:
+7\) If record locks are in effect and the file is not subject to an active APPLY COMMIT clause, the following actions take place:
 
-   a) If single record locking is specified for the file connector associated with filename-1:
+   a) If single record locking is specified for the file connector associated with file-name-1:
+
+> ⚠ **CORRECTED — see the Addendum (C11).** The standard prints `a) If single record locking is specified for the file connector associated with filename-1:` (page 606): the hyphen of the placeholder `file-name-1` is missing (`filename-1`). Corrected to `file-name-1`.
 
    1\. A lock held by that file connector on the deleted record is released at the completion of the successful execution of the DELETE RECORD statement.
 
@@ -23352,7 +23360,9 @@ When the file sharing conflict condition exists as a result of the DELETE FILE s
 
 a) The file is not deleted, and may be accessed.
 
-b) The valu62' is placed into the I-O status associated with file-name-1 to indicate the file operation conflict condition.
+b) The value '62' is placed into the I-O status associated with file-name-1 to indicate the file operation conflict condition.
+
+> ⚠ **CORRECTED — see the Addendum (C6).** The standard prints `b) The valu62' is placed into the I-O status associated with file-name-1 to indicate the file operation conflict condition.` (page 607): the letter, space and opening quotation mark of `value '62'` are missing from the printed line. Corrected to `The value '62'`.
 
 c) The DELETE FILE statement is unsuccessful.
 
@@ -23361,7 +23371,9 @@ c) The DELETE FILE statement is unsuccessful.
 
 NOTE For file connectors subject to APPLY COMMIT clauses, while those APPLY COMMIT clauses remain active, then file and record locking persists. Such files can still be deleted, however if they are, then in the event of a rollback they will be restored to the state they were in at the last commit or, if none, the start of the run unit.
 
-16\) If the file associated with file-name-1 is present and insufficient authority exists to delete the file, the execution of the DELETE FILE statement is unsuccessful, and the I-O status value in the file connector referenced by file-name1 is set t37'.
+16\) If the file associated with file-name-1 is present and insufficient authority exists to delete the file, the execution of the DELETE FILE statement is unsuccessful, and the I-O status value in the file connector referenced by file-name-1 is set to '37'.
+
+> ⚠ **CORRECTED — see the Addendum (C7).** The standard prints `16) If the file associated with file-name-1 is present and insufficient authority exists to delete the file, the execution of the DELETE FILE statement is unsuccessful, and the I-O status value in the file connector referenced by file-name1 is set t37'.` (page 608): two defects on the one line — the hyphen of `file-name-1` is missing, and the letter, space and opening quotation mark of `to '37'` are missing. Corrected to `file-name-1 is set to '37'`.
 
 17\) If the storage medium for the file does not allow file deletion, the execution of the DELETE FILE statement is unsuccessful, and the I-O status value in the file connector referenced by file-name-1 is set to '37'.
 
@@ -23371,7 +23383,9 @@ NOTE For file connectors subject to APPLY COMMIT clauses, while those APPLY COMM
 
 20\) If the execution of the DELETE FILE statement is successful, the file is deleted if it exists or no action takes place if the mass storage file does not exist and the following actions take place in the following order:
 
-   a) Either I-O status value '00' o05' is placed in the I-O status associated with file-name-1.
+   a) Either I-O status value '00' or '05' is placed in the I-O status associated with file-name-1.
+
+> ⚠ **CORRECTED — see the Addendum (C8).** The standard prints `a) Either I-O status value '00' o05' is placed in the I-O status associated with file-name-1.` (page 608): the letter, space and opening quotation mark of `or '05'` are missing from the printed line. Corrected to `'00' or '05'`.
 
    b) If it is enabled, the level-3 EC-I-O exception condition associated with the I-O status value is set to exist.
 
@@ -25254,7 +25268,7 @@ FORMAT 1
 
 
 
-9\) If identifier‑1 or identifier‑2 references a variable‑length group then these groups shall be compatible groups as specified in 8.5.1.12, Variable‑length groups.
+9\) If identifier-1 or identifier-2 references a variable-length group then these groups shall be compatible groups as specified in 8.5.1.12, Variable-length groups.
 
 10\) For all other cases not described in Syntax rules 8 and 9, table 16, Validity of types of MOVE statements, specifies the validity of the move.
 
@@ -25679,7 +25693,9 @@ b) When the NO REWIND phrase is specified, execution of the OPEN statement does 
 OPEN OUTPUT file-name-1.
 CLOSE file-name-1.
 
-These statements are followed by execution of the OPEN statement specified in the source element and the I-O status value associated with file-name-1 is set t05'.
+These statements are followed by execution of the OPEN statement specified in the source element and the I-O status value associated with file-name-1 is set to '05'.
+
+> ⚠ **CORRECTED — see the Addendum (C9).** The standard prints `These statements are followed by execution of the OPEN statement specified in the source element and the I-O status value associated with file-name-1 is set t05'.` (page 680): the letter, space and opening quotation mark of `to '05'` are missing from the printed line. Corrected to `is set to '05'`.
 
 18\) If the OUTPUT phrase is specified, the successful execution of the OPEN statement creates the file. After the creation of the file, the file contains no records. If physical pages have meaning for the file, the positioning of the output medium with respect to physical page boundaries is implementor-defined following the successful execution of the OPEN statement, whether or not the LINAGE clause is specified in the file description entry of file-name-1.
 
@@ -26144,37 +26160,37 @@ where retry-phrase is described in 14.7.9, RETRY phrase
 
 ALL FORMATS
 
-1. The INTO phrase may be specified in a READ statement:
+1\) The INTO phrase may be specified in a READ statement:
 
    a) If no record description entry or only one record description is subordinate to the file description entry, or
 
-   b) If the data item referenced by identifier‑1 and all record‑names associated with file‑name‑1 describe an alphanumeric group item or an elementary item of category alphanumeric or category national.
+   b) If the data item referenced by identifier-1 and all record-names associated with file-name-1 describe an alphanumeric group item or an elementary item of category alphanumeric or category national.
 
-2. If identifier‑1 is a strongly‑typed group item, there shall be at most one record area subordinate to the FD for file‑name‑1. This record area, if specified, shall be a strongly‑typed group item of the same type as identifier‑1.
+2\) If identifier-1 is a strongly-typed group item, there shall be at most one record area subordinate to the FD for file-name-1. This record area, if specified, shall be a strongly-typed group item of the same type as identifier-1.
 
-3. The LOCK phrase shall not be specified in the same READ statement as the IGNORING LOCK phrase.
+3\) The LOCK phrase shall not be specified in the same READ statement as the IGNORING LOCK phrase.
 
-4. If automatic locking has been specified for file‑name‑1, none of the phrases IGNORING LOCK, WITH LOCK, or WITH NO LOCK shall be specified.
+4\) If automatic locking has been specified for file-name-1, none of the phrases IGNORING LOCK, WITH LOCK, or WITH NO LOCK shall be specified.
 
-5. If file‑name‑1 is subject to an APPLY COMMIT clause, none of the phrases IGNORING LOCK, WITH LOCK, or WITH NO LOCK shall be specified.
+5\) If file-name-1 is subject to an APPLY COMMIT clause, none of the phrases IGNORING LOCK, WITH LOCK, or WITH NO LOCK shall be specified.
 
 FORMAT 1
 
-6. None of the phrases ADVANCING, AT END, NEXT, NOT AT END, or PREVIOUS shall be specified if ACCESS MODE RANDOM is specified in the file control entry for file‑name‑1.
+6\) None of the phrases ADVANCING, AT END, NEXT, NOT AT END, or PREVIOUS shall be specified if ACCESS MODE RANDOM is specified in the file control entry for file-name-1.
 
-7. The phrase PREVIOUS shall not be specified if FILE ORGANIZATION LINE SEQUENTIAL is specified in the file control entry for file‑name‑1.
+7\) The phrase PREVIOUS shall not be specified if FILE ORGANIZATION LINE SEQUENTIAL is specified in the file control entry for file-name-1.
 
-8. If neither the NEXT phrase nor the PREVIOUS phrase is specified and ACCESS MODE SEQUENTIAL is specified in the file control entry for file‑name‑1, the NEXT phrase is implied.
+8\) If neither the NEXT phrase nor the PREVIOUS phrase is specified and ACCESS MODE SEQUENTIAL is specified in the file control entry for file-name-1, the NEXT phrase is implied.
 
-9. If neither the NEXT phrase nor the PREVIOUS phrase is specified and ACCESS MODE DYNAMIC is specified in the file control entry for file‑name‑1, the NEXT phrase is implied if any of the following phrases is specified: ADVANCING, AT END, or NOT AT END.
+9\) If neither the NEXT phrase nor the PREVIOUS phrase is specified and ACCESS MODE DYNAMIC is specified in the file control entry for file-name-1, the NEXT phrase is implied if any of the following phrases is specified: ADVANCING, AT END, or NOT AT END.
 
 FORMAT 2
 
-10. The KEY phrase may be specified only if ORGANIZATION IS INDEXED is specified in the file control entry for file‑name‑1.
+10\) The KEY phrase may be specified only if ORGANIZATION IS INDEXED is specified in the file control entry for file-name-1.
 
-11. Data‑name‑1 or record‑key‑name‑1 shall be specified in the RECORD KEY clause or an ALTERNATE RECORD KEY clause associated with file‑name‑1.
+11\) Data-name-1 or record-key-name-1 shall be specified in the RECORD KEY clause or an ALTERNATE RECORD KEY clause associated with file-name-1.
 
-12. Data‑name‑1 or record‑key‑name‑1 may be qualified.
+12\) Data-name-1 or record-key-name-1 may be qualified.
 
 
 
@@ -26248,7 +26264,9 @@ NOTE 2 It is expected that this situation will occur only when the operating env
 
 15\) For a line sequential file, if the number of bytes in the record that is read is less than the minimum size specified by the record description entries for file-name-1, the portion of the record area that is to the right of the last valid character read is padded with trailing spaces. If the record-area associated with file-name-1 is specified implicitly or explicitly as alphanumeric, a trailing space is defined to be the alphanumeric space character. If the record-area associated with file-name-1 is specified implicitly or explicitly as national, a trailing space is defined to be the national space character.
 
-If the number of bytes in the record that is read is greater than the maximum size specified by the record description entries for file-name-1, the record is truncated on the right to the maximum size. In that case, the READ statement is successful and the I-O status in the read file connector is set t06' indicating that the line delimiter or end-of-file was not detected. (9.1.13, I-O status). After the read the file position indicator will reference the next unread character in the record.
+If the number of bytes in the record that is read is greater than the maximum size specified by the record description entries for file-name-1, the record is truncated on the right to the maximum size. In that case, the READ statement is successful and the I-O status in the read file connector is set to '06' indicating that the line delimiter or end-of-file was not detected. (9.1.13, I-O status). After the read the file position indicator will reference the next unread character in the record.
+
+> ⚠ **CORRECTED — see the Addendum (C10).** The standard prints `If the number of bytes in the record that is read is greater than the maximum size specified by the record description entries for file-name-1, the record is truncated on the right to the maximum size. In that case, the READ statement is successful and the I-O status in the read file connector is set t06' indicating that the line delimiter or end-of-file was not detected. (9.1.13, I-O status). After the read the file position indicator will reference the next unread character in the record.` (page 696): the letter, space and opening quotation mark of `to '06'` are missing from the printed line. Corrected to `is set to '06'`.
 
 NOTE 3 One or more subsequent READ statements can be used to read the rest of the record up to the line delimiter or until end of-file is detected.
 
@@ -26291,9 +26309,13 @@ d) If the previous operation on the file was a successful OPEN or START statemen
 e) If the previous operation on the file was a successful READ statement and the current key of reference is not an alternate key that allows duplicates, the first existing record to be made available is either:
 
 
-1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than or equal to the key value in the file position indicator.
+1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than the key value in the file position indicator.
 
-2. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than or equal to the key value in the file position indicator.
+> ⚠ **CORRECTED — see the Addendum (C12).** The standard prints `1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than or equal to the key value in the file position indicator.` (page 698): sub-item e)1 (NEXT, after a successful READ) says `greater than or equal to`, which would make a sequential READ return the record it has just returned. Corrected to `greater than`: see the Addendum entry for the evidence.
+
+2. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than the key value in the file position indicator.
+
+> ⚠ **CORRECTED — see the Addendum (C12).** The standard prints `2. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than or equal to the key value in the file position indicator.` (page 698): sub-item e)2 (PREVIOUS, after a successful READ) is the mirror of e)1 and has the same defect. Corrected to `less than`: see the Addendum entry for the evidence.
 
 3. If no such record is found, the at end condition exists and execution proceeds as indicated in General rule 24. Otherwise, the first record in the physical file whose key value is greater than the key of reference is made available.
 
@@ -26627,7 +26649,9 @@ AT <u>END</u> imperative-statement-1
 
    b) The current record is moved from the record area to the area specified by identifier-1 according to the rules for the MOVE statement without the CORRESPONDING phrase. The size of the current record is determined by rules specified for the RECORD clause. If the file description entry contains a RECORD IS VARYING clause, the implied move is an alphanumeric group move. The implied MOVE statement does not occur if the execution of the RETURN statement was unsuccessful. Item identification of the data item referenced by identifier-1 is done after the record has been read and immediately before it is moved to the data item. The record is available in both the record area and the data item referenced by identifier-1.
 
-   NOTE 14.6.10, Overlapping operands, and 14.9.25, MOVE statement, general rules, apply to any cases in which the storage area identified by identifier-1 and the record area associated with file-name-1 share any part of their storage areas. The result of execution of the RETURN statement is undefined if the result of execution of the implicit MOVE statement described in General rule 4b is undefined.
+   NOTE 14.6.10, Overlapping operands, and 14.9.25, MOVE statement, general rules, apply to any cases in which the storage area identified by identifier-1 and the record area associated with file-name-1 share any part of their storage areas. The result of execution of the RETURN statement is undefined if the result of execution of the implicit MOVE statement described in General rule 5b is undefined.
+
+> ⚠ **CORRECTED — see the Addendum (C13).** The standard prints `NOTE 14.6.10, Overlapping operands, and 14.9.25, MOVE statement, general rules, apply to any cases in which the storage area identified by identifier-1 and the record area associated with file-name-1 share any part of their storage areas. The result of execution of the RETURN statement is undefined if the result of execution of the implicit MOVE statement described in General rule 4b is undefined.` (page 709): General rule 4 has no lettered sub-items; the implicit MOVE of the INTO phrase is described in sub-item b) of General rule 5. Corrected to `5b`.
 
 
 <a id="section-14-9-35"></a>
@@ -26755,18 +26779,18 @@ NOTE 1 Logical records in relative and sequential files can have a length of zer
 
    where implicit-record-1 refers to the record area for file-name-1 and is treated:
 
-   a) when identifier-1 references an intrinsic function, as though implicit-record-1 were a record description entry subordinate to the file description entry having the same class, category, usage, and length as the returned value of the intrinsic function, or b) when identifier‑1 does not reference an intrinsic function, as though implicit‑record‑1 were a record description entry subordinate to the file description entry having the same description as identifier‑1, or c) when literal‑1 is specified, as though implicit‑record‑1 were a record description entry subordinate to the file description entry having the same class, category, usage, and length as literal‑1.
+   a) when identifier-1 references an intrinsic function, as though implicit-record-1 were a record description entry subordinate to the file description entry having the same class, category, usage, and length as the returned value of the intrinsic function, or b) when identifier-1 does not reference an intrinsic function, as though implicit-record-1 were a record description entry subordinate to the file description entry having the same description as identifier-1, or c) when literal-1 is specified, as though implicit-record-1 were a record description entry subordinate to the file description entry having the same class, category, usage, and length as literal-1.
 
 
-NOTE 3 14.6.10, Overlapping operands, and 14.9.25, MOVE statement, general rules, apply to any cases in which the storage area identified by identifier‑1 and the record area associated with implicit‑record‑1 share any part of their storage areas. The result of execution of the REWRITE statement is undefined if the result of execution of the implicit MOVE statement is undefined.
+NOTE 3 14.6.10, Overlapping operands, and 14.9.25, MOVE statement, general rules, apply to any cases in which the storage area identified by identifier-1 and the record area associated with implicit-record-1 share any part of their storage areas. The result of execution of the REWRITE statement is undefined if the result of execution of the implicit MOVE statement is undefined.
 
-10\) After the execution of the REWRITE statement is complete, the information in the area referenced by identifier‑1 is available, provided that identifier‑1 is not one or part of one of the record descriptions subordinate to the file‑description, even though the information in the area referenced by record‑name‑1 is not available except as specified for the SAME RECORD AREA clause as indicated in General rule 6.
+10\) After the execution of the REWRITE statement is complete, the information in the area referenced by identifier-1 is available, provided that identifier-1 is not one or part of one of the record descriptions subordinate to the file-description, even though the information in the area referenced by record-name-1 is not available except as specified for the SAME RECORD AREA clause as indicated in General rule 6.
 
-11\) If record locking is enabled for the rewrite file connector and the record identified for rewriting is locked by another file connector, the result of the operation depends on the presence or absence of the RETRY phrase. If the RETRY phrase is specified, additional attempts may be made to rewrite the record as specified in the rules in 14.7.9, RETRY phrase. If the RETRY phrase is not specified or the record is not successfully rewritten as specified by the RETRY phrase, the record operation conflict condition exists. The I‑O status is set in accordance with the rules for the RETRY phrase. When the record operation conflict condition exists as a result of the REWRITE statement:
+11\) If record locking is enabled for the rewrite file connector and the record identified for rewriting is locked by another file connector, the result of the operation depends on the presence or absence of the RETRY phrase. If the RETRY phrase is specified, additional attempts may be made to rewrite the record as specified in the rules in 14.7.9, RETRY phrase. If the RETRY phrase is not specified or the record is not successfully rewritten as specified by the RETRY phrase, the record operation conflict condition exists. The I-O status is set in accordance with the rules for the RETRY phrase. When the record operation conflict condition exists as a result of the REWRITE statement:
 
 a) The file position indicator is unchanged.
 
-b) A value is placed into the I‑O status associated with the rewrite file connector to indicate the record operation conflict condition.
+b) A value is placed into the I-O status associated with the rewrite file connector to indicate the record operation conflict condition.
 
 c) The REWRITE statement is unsuccessful.
 
@@ -26801,7 +26825,9 @@ NOTE 4 A READ statement executed on a line sequential file transfers sufficient 
 
 b) If the number of bytes in the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is greater than the number of bytes in the record being replaced, the execution of the REWRITE statement is unsuccessful and the I-O status in the rewrite file connector is set to '44'. (9.1.13, I-O status).
 
-c) If the number of bytes in the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is less than the number of bytes in the record being replaced, then a sufficient number of the space character is appended to the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 to increase the length of the record being transferred to the length of the record being replaced. If the data item referenced by identifier-1, the runtime representation of literal1, or the record referenced by record-name-1 is specified implicitly or explicitly as alphanumeric, a space is defined to be the alphanumeric space character. If the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is specified implicitly or explicitly as national, a space is defined to be the national space character.
+c) If the number of bytes in the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is less than the number of bytes in the record being replaced, then a sufficient number of the space character is appended to the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 to increase the length of the record being transferred to the length of the record being replaced. If the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is specified implicitly or explicitly as alphanumeric, a space is defined to be the alphanumeric space character. If the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is specified implicitly or explicitly as national, a space is defined to be the national space character.
+
+> ⚠ **CORRECTED — see the Addendum (C11).** The standard prints `c) If the number of bytes in the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is less than the number of bytes in the record being replaced, then a sufficient number of the space character is appended to the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 to increase the length of the record being transferred to the length of the record being replaced. If the data item referenced by identifier-1, the runtime representation of literal1, or the record referenced by record-name-1 is specified implicitly or explicitly as alphanumeric, a space is defined to be the alphanumeric space character. If the data item referenced by identifier-1, the runtime representation of literal-1, or the record referenced by record-name-1 is specified implicitly or explicitly as national, a space is defined to be the national space character.` (page 714): the hyphen of the placeholder `literal-1` is missing (`literal1`). Corrected to `literal-1`.
 
 
 
@@ -26997,9 +27023,9 @@ FORMAT 2
 
 7\) The OCCURS clause associated with identifier-1 shall contain the KEY phrase.
 
-8\) Data-name-1 and all repetitions of data-name-2 shall be subscripted by the first index-name associated with identifier-1 along with any subscripts required to uniquely identify the data item, and shall be referenced in the KEY phrase in the OCCURS clause associated with identifier-1. The index-name subscript shall not be followed by a '+' or a '–'.
+8\) Data-name-1 and all repetitions of data-name-2 shall be subscripted by the first index-name associated with identifier-1 along with any subscripts required to uniquely identify the data item, and shall be referenced in the KEY phrase in the OCCURS clause associated with identifier-1. The index-name subscript shall not be followed by a '+' or a '-'.
 
-9\) All referenced condition-names shall be defined as having only a single value and shall be subscripted by the first index-name associated with identifier-1, along with any subscripts required to uniquely identify the condition-name. The data-name associated with each condition-name shall be specified in the KEY phrase in the OCCURS clause associated with identifier-1. The index-name subscript shall not be followed by a '+' or a '–'.
+9\) All referenced condition-names shall be defined as having only a single value and shall be subscripted by the first index-name associated with identifier-1, along with any subscripts required to uniquely identify the condition-name. The data-name associated with each condition-name shall be specified in the KEY phrase in the OCCURS clause associated with identifier-1. The index-name subscript shall not be followed by a '+' or a '-'.
 
 10\) Identifier-3, identifier-4, identifiers specified in arithmetic-expression-1, and identifiers specified in arithmetic-expression-2 shall be neither referenced in the KEY phrase of the OCCURS clause associated with identifier-1 nor subscripted by the first index-name associated with identifier-1.
 
@@ -27798,23 +27824,23 @@ If the new capacity of the table is greater than the previous current capacity, 
 
 FORMAT 15
 
-32\) If FARTHEST-FROM-ZERO Is specified, the content of identifier‑14 is set as follows:
+32\) If FARTHEST-FROM-ZERO Is specified, the content of identifier-14 is set as follows:
 
-a) If the IN-ARITHMETIC-RANGE phrase is not specified, the content is set to the value farthest away from zero permitted by the specifications of identifier‑14.
+a) If the IN-ARITHMETIC-RANGE phrase is not specified, the content is set to the value farthest away from zero permitted by the specifications of identifier-14.
 
 NOTE 1 The resulting content of identifier-14 might not be within the range of values permitted for the mode of arithmetic in effect.
 
-b) If the IN-ARITHMETIC-RANGE phrase is specified, the content is set either to the value farthest away from zero permitted by the specifications of identifier‑14, or to the value farthest away from zero permitted by the specifications appropriate to the mode of arithmetic, whichever is closer to zero.
+b) If the IN-ARITHMETIC-RANGE phrase is specified, the content is set either to the value farthest away from zero permitted by the specifications of identifier-14, or to the value farthest away from zero permitted by the specifications appropriate to the mode of arithmetic, whichever is closer to zero.
 
-c) If the SIGN phrase is specified, the sign of the content of identifier‑14 is set according to the SIGN specification; otherwise, the sign of identifier‑14 shall be set to indicate that the content is positive.
+c) If the SIGN phrase is specified, the sign of the content of identifier-14 is set according to the SIGN specification; otherwise, the sign of identifier-14 shall be set to indicate that the content is positive.
 
-33\) If FLOAT-INFINITY is specified, the content of identifier‑14 is set to a canonical representation of infinity as described in ISO/IEC 60559:2020, Clause 3, for the basic interchange format corresponding to the usage of identifier‑14. If the SIGN phrase is specified, the sign of the content is set according to the SIGN specification, otherwise the sign is positive.
+33\) If FLOAT-INFINITY is specified, the content of identifier-14 is set to a canonical representation of infinity as described in ISO/IEC 60559:2020, Clause 3, for the basic interchange format corresponding to the usage of identifier-14. If the SIGN phrase is specified, the sign of the content is set according to the SIGN specification, otherwise the sign is positive.
 
-34\) If FLOAT-NOT-A-NUMBER is specified, the content of identifier‑14 is set to a canonical representation of a quiet NaN, with the payload set to an implementor‑defined value, as described in ISO/IEC 60559:2020, Clause 3, for the basic interchange format corresponding to the usage of identifier‑14. If the SIGN phrase is specified, the sign of the content is set according to the SIGN specification, otherwise the sign is positive.
+34\) If FLOAT-NOT-A-NUMBER is specified, the content of identifier-14 is set to a canonical representation of a quiet NaN, with the payload set to an implementor-defined value, as described in ISO/IEC 60559:2020, Clause 3, for the basic interchange format corresponding to the usage of identifier-14. If the SIGN phrase is specified, the sign of the content is set according to the SIGN specification, otherwise the sign is positive.
 
-35\) If FLOAT-NOT-A-NUMBER-SIGNALING is specified, the content of identifier‑14 is set to a canonical representation of a signaling NaN, with the payload set to an implementor‑defined value, as described in ISO/IEC 60559:2020, Clause 3, for the basic interchange format corresponding to the usage of identifier‑14. If the SIGN phrase is specified, the sign of the content is set according to the SIGN specification, otherwise the sign is positive.
+35\) If FLOAT-NOT-A-NUMBER-SIGNALING is specified, the content of identifier-14 is set to a canonical representation of a signaling NaN, with the payload set to an implementor-defined value, as described in ISO/IEC 60559:2020, Clause 3, for the basic interchange format corresponding to the usage of identifier-14. If the SIGN phrase is specified, the sign of the content is set according to the SIGN specification, otherwise the sign is positive.
 
-36\) If NEAREST-TO-ZERO Is specified, the content of identifier‑14 is set as follows:
+36\) If NEAREST-TO-ZERO Is specified, the content of identifier-14 is set as follows:
 
 
 a) If the IN-ARITHMETIC-RANGE phrase is not specified, the content is set to the nonzero value nearest to zero permitted by the specifications of identifier-14.
@@ -28494,7 +28520,7 @@ FORMAT 3
 
    (operand-11 + operand-12 + … + operand-1n)
 
-   where the values of operand-1 are the values of literal-1 and the data items referenced by identifier-1 in the order in which they are specified in the SUBTRACT statement. The result of the subtraction from the value of each data item referenced by identifier-2 is equivalent to the result of the arithmetic expression (identifier-2 – initial-evaluation)
+   where the values of operand-1 are the values of literal-1 and the data items referenced by identifier-1 in the order in which they are specified in the SUBTRACT statement. The result of the subtraction from the value of each data item referenced by identifier-2 is equivalent to the result of the arithmetic expression (identifier-2 - initial-evaluation)
 
 
 where initial-evaluation represents the result of the initial evaluation.
@@ -28503,7 +28529,7 @@ where initial-evaluation represents the result of the initial evaluation.
 
    When standard-decimal arithmetic, or standard-binary arithmetic is in effect, the result of the subtraction is equivalent to the arithmetic expression
 
-   (operand-2 – (operand-11 + operand-12 + … + operand-1n))
+   (operand-2 - (operand-11 + operand-12 + … + operand-1n))
 
    where the values of operand-1 are the values of literal-1 and the data items referenced by identifier-1 in the order in which they are specified in the SUBTRACT statement and the value of operand-2 is the value of either literal-2 or the data item referenced by identifier-2 in the SUBTRACT statement.
 
@@ -28511,7 +28537,7 @@ where initial-evaluation represents the result of the initial evaluation.
 
    When standard-decimal arithmetic, or standard-binary arithmetic is in effect, the result of the subtraction is equivalent to
 
-   (operand-1 – operand-2)
+   (operand-1 - operand-2)
 
    where the value of operand-1 is the value of the data item in identifier-4 and the value of operand-2 is the value of the corresponding data item in identifier-5.
 
@@ -28757,7 +28783,9 @@ e) If the COUNT IN phrase is specified, a value equal to the number of character
 
 f) If the DELIMITED BY phrase is specified the string of characters is further examined beginning with the first character position to the right of the delimiter. If the DELIMITED BY phrase is not specified the string of characters is further examined beginning with the character position to the right of the last character transferred.
 
-g) After data is transferred to the data item referenced by identifier-**4**, the current receiving area is the data item referenced by the next recurrence of identifier-**4**. The behavior described in General rules 12b through 12f is repeated until either all the characters are exhausted in the data item referenced by identifier-1, or until there are no more receiving areas.
+g) After data is transferred to the data item referenced by identifier-**4**, the current receiving area is the data item referenced by the next recurrence of identifier-**4**. The behavior described in General rules 11b through 11f is repeated until either all the characters are exhausted in the data item referenced by identifier-1, or until there are no more receiving areas.
+
+> ⚠ **CORRECTED — see the Addendum (C13).** The standard prints `g) After data is transferred to the data item referenced by identifier-**4**, the current receiving area is the data item referenced by the next recurrence of identifier-**4**. The behavior described in General rules 12b through 12f is repeated until either all the characters are exhausted in the data item referenced by identifier-1, or until there are no more receiving areas.` (page 772): General rule 12 has no lettered sub-items; the behavior repeated is the one described by sub-items b) through f) of General rule 11, the rule this sub-item belongs to. Corrected to `11b through 11f`.
 
 
 12\) The initialization of the contents of the data items associated with the POINTER phrase or the TALLYING phrase is the responsibility of the user.
@@ -30042,7 +30070,7 @@ The type of this function depends on the argument type as follows:
 
    b) When the value of argument-1 is negative,
 
-      (– (argument-1))
+      (- (argument-1))
 
 
 
@@ -30068,7 +30096,7 @@ The type of this function is numeric.
 
 1\) Argument-1 shall be of class numeric.
 
-2\) The value of argument-1 shall be greater than or equal to **–**1 and less than or equal to +1.
+2\) The value of argument-1 shall be greater than or equal to **-**1 and less than or equal to +1.
 
 <a id="section-15-8-4"></a>
 #### 15.8.4 Returned value rule
@@ -30112,7 +30140,7 @@ The type of this function is numeric.
 
    b) When the value of argument-1 is not zero,
 
-      (argument-1 / (1 − (1 + argument-1)\*\* (− (argument-2))))
+      (argument-1 / (1 - (1 + argument-1)\*\* (- (argument-2))))
 
 
 
@@ -30140,12 +30168,12 @@ The type of this function is numeric.
 
 1\) Argument-1 shall be of class numeric.
 
-2\) The value of argument-1 shall be greater than or equal to **–**1 and less than or equal to +1.
+2\) The value of argument-1 shall be greater than or equal to **-**1 and less than or equal to +1.
 
 <a id="section-15-10-4"></a>
 #### 15.10.4 Returned value rule
 
-1\) The returned value is the approximation of the arcsine of argument-1 and is greater than or equal to –p/2 and less than or equal to +p/2.
+1\) The returned value is the approximation of the arcsine of argument-1 and is greater than or equal to -p/2 and less than or equal to +p/2.
 
 
 
@@ -30175,7 +30203,7 @@ The type of this function is numeric.
 <a id="section-15-11-4"></a>
 #### 15.11.4 Returned value rule
 
-1\) The returned value is the approximation of the arctangent of argument-1 and is greater than **−**π/2 and less than +π/2.
+1\) The returned value is the approximation of the arctangent of argument-1 and is greater than **-**π/2 and less than +π/2.
 
 
 
@@ -30614,7 +30642,7 @@ The type of this function is numeric.
 <a id="section-15-20-4"></a>
 #### 15.20.4 Returned value rule
 
-1\) The returned value is the approximation of the cosine of argument-1 and is greater than or equal to **−**1 and less than or equal to +1.
+1\) The returned value is the approximation of the cosine of argument-1 and is greater than or equal to **-**1 and less than or equal to +1.
 
 
 
@@ -30650,15 +30678,15 @@ The type of this function is alphanumeric.
 | 11-12 | Two numeric digits of the minutes past the hour, in the range 00 through 59. |
 | 13-14 | Two numeric characters of the seconds past the minute in the range: — 00 through 59 when a LEAP-SECOND directive with the OFF phrase is in effect — 00 through nm, where nm is defined by the implementor, when a LEAP-SECOND directive with the ON phrase is in effect. |
 | 15-16 | Two numeric digits of the hundredths of a second past the second, in the range 00 through 99. The value 00 is returned if the system on which the function is evaluated does not have the facility to provide the fractional part of a second. |
-| 17 | Either the character '–', the character '+', or the character '0'. The character '–' is returned if the local time indicated in the previous character positions is behind Coordinated Universal Time. The character '+' is returned if the local time indicated is the same as or ahead of Coordinated Universal time. The character '0' is returned if the system on which this function is evaluated does not have the facility to provide the local time differential factor. |
-| 18-19 | If character position 17 is '–', two numeric digits are returned in the range 00 through 12 indicating the number of hours that the local time is behind Coordinated Universal Time. If character position 17 is '+', two numeric digits are returned in the range 00 through 13 indicating the number of hours that the local time is ahead of Coordinated Universal Time. If character position 17 is '0', the value 00 is returned. |
+| 17 | Either the character '-', the character '+', or the character '0'. The character '-' is returned if the local time indicated in the previous character positions is behind Coordinated Universal Time. The character '+' is returned if the local time indicated is the same as or ahead of Coordinated Universal time. The character '0' is returned if the system on which this function is evaluated does not have the facility to provide the local time differential factor. |
+| 18-19 | If character position 17 is '-', two numeric digits are returned in the range 00 through 12 indicating the number of hours that the local time is behind Coordinated Universal Time. If character position 17 is '+', two numeric digits are returned in the range 00 through 13 indicating the number of hours that the local time is ahead of Coordinated Universal Time. If character position 17 is '0', the value 00 is returned. |
 
 
 
 
 | **Character Positions** | **Contents** |
 |---|---|
-| 20-21 | Two numeric digits are returned in the range 00 through 59 indicating the number of additional minutes that the local time is ahead of or behind Coordinated Universal Time, depending on whether character position 17 is '+' or '–', respectively. If character position 17 is '0', the value 00 is returned. |
+| 20-21 | Two numeric digits are returned in the range 00 through 59 indicating the number of additional minutes that the local time is ahead of or behind Coordinated Universal Time, depending on whether character position 17 is '+' or '-', respectively. If character position 17 is '0', the value 00 is returned. |
 
 
 <a id="section-15-22"></a>
@@ -30741,11 +30769,11 @@ The type of the function is integer.
 
 
 
-and where argument‑1, argument‑2 and argument‑3 are the same as argument‑1, argument‑2, and argument‑3 of the DATE‑TO‑YYYYMMDD function reference itself.
+and where argument-1, argument-2 and argument-3 are the same as argument-1, argument-2, and argument-3 of the DATE-TO-YYYYMMDD function reference itself.
 
-NOTE 1 In the year 2002 the returned value for FUNCTION DATE‑TO‑YYYYMMDD (851003, 10) is 19851003. In the year 1994 the returned value for FUNCTION DATE‑TO‑YYYYMMDD (981002, (−10)) is 18981002.
+NOTE 1 In the year 2002 the returned value for FUNCTION DATE-TO-YYYYMMDD (851003, 10) is 19851003. In the year 1994 the returned value for FUNCTION DATE-TO-YYYYMMDD (981002, (-10)) is 18981002.
 
-NOTE 2 See the notes for the YEAR‑TO‑YYYY function for a discussion of how to specify a fixed window or a sliding window algorithm.
+NOTE 2 See the notes for the YEAR-TO-YYYY function for a discussion of how to specify a fixed window or a sliding window algorithm.
 
 
 
@@ -30836,7 +30864,7 @@ NOTE    This function does not check argument -1 to ensure that it is a valid da
 
 
 
-NOTE 1 In the year 2002 the returned value for FUNCTION DAY-TO-YYYYDDD (10004, 20) is 2010004. In the year 2013 the returned value for FUNCTION DAY-TO-YYYYDDD (95005, (−10)) is 1995005.
+NOTE 1 In the year 2002 the returned value for FUNCTION DAY-TO-YYYYDDD (10004, 20) is 2010004. In the year 2013 the returned value for FUNCTION DAY-TO-YYYYDDD (95005, (-10)) is 1995005.
 
 NOTE 2 See the notes for the YEAR-TO-YYYY function for a discussion of how to specify a fixed window or a sliding window algorithm.
 
@@ -31250,7 +31278,7 @@ The type of this function is integer.
 
    c) When the value of argument-1 is n,
 
-      (n \* (n − 1) \* (n − 2) \* ... \* 1)
+      (n \* (n - 1) \* (n - 2) \* ... \* 1)
 
 
 <a id="section-15-37"></a>
@@ -31499,11 +31527,11 @@ The type of the function is numeric.
 
 1\) The equivalent arithmetic expression is:
 
-(argument-1 – FUNCTION INTEGER-PART (argument-1))
+(argument-1 - FUNCTION INTEGER-PART (argument-1))
 
 where the argument for the INTEGER-PART function is the same as for the FRACTION-PART function itself.
 
-NOTE If the value of argument-1 is +1.5, +0.5 is returned. If the value of argument-1 is –1.5, –0.5 is returned.
+NOTE If the value of argument-1 is +1.5, +0.5 is returned. If the value of argument-1 is -1.5, -0.5 is returned.
 
 
 <a id="section-15-43"></a>
@@ -32177,10 +32205,10 @@ NOTE The following illustrates the expected results for some values of argument-
 
 | Argument-1 characteristics | Value returned |
 |---|---|
-| S999 | –999 |
-| S9(4) BINARY | –9999 |
+| S999 | -999 |
+| S9(4) BINARY | -9999 |
 | 99V9(3) | 0 |
-| $**,**9.99BCR | –99999.99 |
+| $**,**9.99BCR | -99999.99 |
 | $**,**9.99 | 0 |
 | BINARY-CHAR SIGNED | -128 (assuming an 8-bit twos-complement representation) |
 | BINARY-CHAR UNSIGNED | 0 (assuming an 8-bit twos-compliment representation) |
@@ -32415,7 +32443,7 @@ The type of this function is integer.
 
 1\) The equivalent arithmetic expression is
 
-((argument-1) – ((argument-2) \* FUNCTION INTEGER ((argument-1) / (argument-2))))
+((argument-1) - ((argument-2) \* FUNCTION INTEGER ((argument-1) / (argument-2))))
 
 where argument-1 and argument-2 for the INTEGER function are the same as the arguments for the MOD function itself.
 
@@ -32424,9 +32452,9 @@ NOTE The following illustrates the expected results for some values of argument-
 | Argument-1 | Argument-2 | Return |
 |------------|------------|--------|
 | 11 | 5 | 1 |
-| −11 | 5 | 4 |
-| 11 | −5 | −4 |
-| −11 | −5 | −1 |
+| -11 | 5 | 4 |
+| 11 | -5 | -4 |
+| -11 | -5 | -1 |
 
 
 <a id="section-15-65"></a>
@@ -32614,7 +32642,7 @@ The type of this function is numeric.
 
 1\) Argument-1 shall be of category alphanumeric or national.
 
-2\) Argument-2, if specified, shall be of the same class as argument-1. Argument-2 shall contain at least one non-space character. Any leading or trailing spaces in argument-2 are ignored. Argument-2 shall not contain any of the digits 0 through 9; the characters '\*', '+', '−', ',', or '.'; or the two consecutive letters 'CR' or 'DB', whether in uppercase or lowercase or a combination of uppercase and lowercase. Argument-2 specifies a currency string that may appear in argument-1.
+2\) Argument-2, if specified, shall be of the same class as argument-1. Argument-2 shall contain at least one non-space character. Any leading or trailing spaces in argument-2 are ignored. Argument-2 shall not contain any of the digits 0 through 9; the characters '\*', '+', '-', ',', or '.'; or the two consecutive letters 'CR' or 'DB', whether in uppercase or lowercase or a combination of uppercase and lowercase. Argument-2 specifies a currency string that may appear in argument-1.
 
    NOTE    The currency string specified by argument-2 can contain spaces, in addition to the leading and trailing spaces.
 
@@ -32634,7 +32662,7 @@ The type of this function is numeric.
 
 
 
-[ space-string ] [ currency ] [ space-string ] { digit [ , digit ] ... [ . [ digit ] ] / . digit } [ space-string ] [ + / − / CR / DB ]
+[ space-string ] [ currency ] [ space-string ] { digit [ , digit ] ... [ . [ digit ] ] / . digit } [ space-string ] [ + / - / CR / DB ]
 
 [ space-string ]
 
@@ -32912,7 +32940,7 @@ The type of this function is numeric.
 
 1\) Argument-1 and argument-2 shall be of the class numeric.
 
-2\) The value of argument-1 shall be greater than **–1**.
+2\) The value of argument-1 shall be greater than **-1**.
 
 <a id="section-15-74-4"></a>
 #### 15.74.4 Returned value rule
@@ -33014,7 +33042,7 @@ The type of this function depends upon the argument types as follows:
 
 1\) The equivalent arithmetic expression is
 
-(FUNCTION MAX (argument-list) – FUNCTION MIN (argument-list))
+(FUNCTION MAX (argument-list) - FUNCTION MIN (argument-list))
 
 where argument-list is the argument-1 list for the RANGE function itself.
 
@@ -33050,7 +33078,7 @@ The type of this function is numeric.
 
 1\) The equivalent arithmetic expression is
 
-((argument-1) – ((argument-2) \* FUNCTION INTEGER-PART ((argument-1)
+((argument-1) - ((argument-2) \* FUNCTION INTEGER-PART ((argument-1)
 / (argument-2))))
 
 where argument-1 and argument-2 of the INTEGER-PART function are the same as the arguments for the REM function itself.
@@ -33090,7 +33118,7 @@ The type of the function depends on the argument type as follows:
 <a id="section-15-78-4"></a>
 #### 15.78.4 Returned value rule
 
-1\) If argument-1 is a character string of length n, the returned value is a character string of length n such that for 1 <= j <= n, the character in position j of the returned value is the character from position n – j + 1 of argument-1.
+1\) If argument-1 is a character string of length n, the returned value is a character string of length n such that for 1 <= j <= n, the character in position j of the returned value is the character from position n - j + 1 of argument-1.
 
 
 
@@ -33174,7 +33202,7 @@ The type of this function is numeric.
 <a id="section-15-81-1"></a>
 #### 15.81.1 General
 
-The SIGN function returns +1, 0, or –1 depending on the sign of the argument.
+The SIGN function returns +1, 0, or -1 depending on the sign of the argument.
 
 The type of the function is integer.
 
@@ -33204,7 +33232,7 @@ The type of the function is integer.
 
    c) When the value of argument-1 is less than zero,
 
-      (–1)
+      (-1)
 
 
 
@@ -33234,7 +33262,7 @@ The type of this function is numeric.
 <a id="section-15-82-4"></a>
 #### 15.82.4 Returned value rule
 
-1\) The returned value is the approximation of the sine of argument-1 and is greater than or equal to **–** 1 and less than or equal to +1.
+1\) The returned value is the approximation of the sine of argument-1 and is greater than or equal to **-** 1 and less than or equal to +1.
 
 
 
@@ -33991,18 +34019,18 @@ The type of this function is numeric.
 
    b) For two occurrences of argument-1,
 
-      (((argument-11 – FUNCTION MEAN (argument-list)) ** 2 +
-            (argument-12– FUNCTION MEAN (argument-list)) ** 2) / 2)
+      (((argument-11 - FUNCTION MEAN (argument-list)) ** 2 +
+            (argument-12- FUNCTION MEAN (argument-list)) ** 2) / 2)
 
    c) For n occurrences of argument-1,
 
       (FUNCTION SUM (
 
-         ((argument-11 – FUNCTION MEAN (argument-list)) ** 2)
+         ((argument-11 - FUNCTION MEAN (argument-list)) ** 2)
 
          …
 
-         ((argument-1n – FUNCTION MEAN (argument-list)) ** 2)) / n)
+         ((argument-1n - FUNCTION MEAN (argument-list)) ** 2)) / n)
 
 where argument-list is the argument-1 list for the VARIANCE function itself and argument-1ᵢ is the ith argument of the argument-1 list for the VARIANCE function itself.
 
@@ -34037,13 +34065,13 @@ The type of this function is alphanumeric.
 | 11-12 | Two numeric digits of the minutes past the hour, in the range 00 through 59. |
 | 13-14 | Two numeric characters of the seconds past the minute in the range: - 00 through 59 when a LEAP-SECOND directive with the OFF phrase is in effect - 00 through nn, where nn is defined by the implementor, when a LEAP-SECOND directive with the ON phrase is in effect. |
 | 15-16 | Two numeric digits of the hundredths of a second past the second, in the range 00 through 99. The value 00 is returned if the system on which the compilation was done does not have the facility to provide the fractional part of a second. |
-| 17 | Either the character '–', the character '+', or the character '0'. The character '–' is returned if the local time indicated in the previous character positions is behind Coordinated Universal Time. The character '+' is returned if the local time indicated is the same as or ahead of Coordinated Universal Time. The character '0' is returned if the system on which the compilation was done does not have the facility to provide the local time differential factor. |
-| 18-19 | If character position 17 is '–', two numeric digits are returned in the range 00 through 12 indicating the number of hours that the local time is behind Coordinated Universal Time. If character position 17 is '+', two numeric digits are returned in the range 00 through 13 indicating the number of hours that the local time is ahead of Coordinated Universal Time. If character position 17 is '0', the value 00 is returned. |
+| 17 | Either the character '-', the character '+', or the character '0'. The character '-' is returned if the local time indicated in the previous character positions is behind Coordinated Universal Time. The character '+' is returned if the local time indicated is the same as or ahead of Coordinated Universal Time. The character '0' is returned if the system on which the compilation was done does not have the facility to provide the local time differential factor. |
+| 18-19 | If character position 17 is '-', two numeric digits are returned in the range 00 through 12 indicating the number of hours that the local time is behind Coordinated Universal Time. If character position 17 is '+', two numeric digits are returned in the range 00 through 13 indicating the number of hours that the local time is ahead of Coordinated Universal Time. If character position 17 is '0', the value 00 is returned. |
 
 
 
 
-20-21 Two numeric digits are returned in the range 00 through 59 indicating the number of additional minutes that the local time is ahead of or behind Coordinated Universal Time, depending on whether character position 17 is '+' or '–', respectively. If character position 17 is '0', the value 00 is returned.
+20-21 Two numeric digits are returned in the range 00 through 59 indicating the number of additional minutes that the local time is ahead of or behind Coordinated Universal Time, depending on whether character position 17 is '+' or '-', respectively. If character position 17 is '0', the value 00 is returned.
 
 2\) The returned value is the date and time of compilation of the compilation unit that contains this function. The returned value in a contained source unit is the compilation date and time associated with the compilation unit in which it is contained.
 
@@ -34105,9 +34133,9 @@ The type of the function is integer.
 
 b) Otherwise, the equivalent arithmetic expression is
 
-(argument-1 + 100 \* (FUNCTION INTEGER (maximum-year/100) – 1))
+(argument-1 + 100 \* (FUNCTION INTEGER (maximum-year/100) - 1))
 
-NOTE 1 In the year 1995, the returned value for FUNCTION YEAR-TO-YYYY (4, 23) is 2004. In the year 2008 the returned value for FUNCTION YEAR-TO-YYYY (98, (–15)) is 1898.
+NOTE 1 In the year 1995, the returned value for FUNCTION YEAR-TO-YYYY (4, 23) is 2004. In the year 2008 the returned value for FUNCTION YEAR-TO-YYYY (98, (-15)) is 1898.
 
 NOTE 2 If argument-3 is omitted, the YEAR-TO-YYYY function implements a sliding window algorithm, based on the year at the time of execution, as returned by the CURRENT-DATE function. A fixed window algorithm can be achieved by specifying suitable values for argument-2 and argument-3, such that the sum of argument-2 and argument-3 defines the ending year of the desired 100-year interval.
 
@@ -35090,51 +35118,51 @@ The requirements of A.1, Implementor-defined language element list, apply for al
 #### A.4.3 Commit and Rollback
 
 
-1. Commit and Rollback 9.1.18, Commit and Rollback
+1\) Commit and Rollback 9.1.18, Commit and Rollback
 
-2. IO-CONTROL paragraph, APPLY COMMIT clause 12.4.6.3, APPLY COMMIT clause
+2\) IO-CONTROL paragraph, APPLY COMMIT clause 12.4.6.3, APPLY COMMIT clause
 
-3. EC-FLOW-APPLY-COMMIT, EC-FLOW-COMMIT, and EC-FLOW-ROLLBACK exception conditions in the RAISING phrase of the EXIT and GOBACK statements, the RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of the PERFORM statement, the RAISE statement, and the TURN compiler directive.
+3\) EC-FLOW-APPLY-COMMIT, EC-FLOW-COMMIT, and EC-FLOW-ROLLBACK exception conditions in the RAISING phrase of the EXIT and GOBACK statements, the RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of the PERFORM statement, the RAISE statement, and the TURN compiler directive.
 
-4. COMMIT statement 14.9.7
+4\) COMMIT statement 14.9.7
 
-5. ROLLBACK statement 14.9.36
+5\) ROLLBACK statement 14.9.36
 
 <a id="section-a-4-4"></a>
 #### A.4.4 Dynamic capacity tables
 
-1. EC-BOUND-OVERFLOW, EC-BOUND-SET, EC-BOUND-TABLE-LIMIT, and EC-FLOW-SEARCH exception conditions in the RAISING phrase of the EXIT and GOBACK statements, the RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of the PERFORM statement, the RAISE statement, and the TURN compiler directive
+1\) EC-BOUND-OVERFLOW, EC-BOUND-SET, EC-BOUND-TABLE-LIMIT, and EC-FLOW-SEARCH exception conditions in the RAISING phrase of the EXIT and GOBACK statements, the RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of the PERFORM statement, the RAISE statement, and the TURN compiler directive
 
-2. OCCURS clause, format 4: dynamic-capacity-table (13.18.38)
+2\) OCCURS clause, format 4: dynamic-capacity-table (13.18.38)
 
-3. SET statement, format 14: dynamic-capacity-table (14.9.39)
+3\) SET statement, format 14: dynamic-capacity-table (14.9.39)
 
 <a id="section-a-4-5"></a>
 #### A.4.5 DYNAMIC LENGTH elementary items
 
-1. DYNAMIC LENGTH clause (13.18.19)
+1\) DYNAMIC LENGTH clause (13.18.19)
 
 <a id="section-a-4-6"></a>
 #### A.4.6 Extended letters
 
-1. Extended letters in the COBOL character repertoire (8.1.3)
+1\) Extended letters in the COBOL character repertoire (8.1.3)
 
 <a id="section-a-4-7"></a>
 #### A.4.7 File sharing and record locking
 
-1. Sharing mode (9.1.15)
+1\) Sharing mode (9.1.15)
 
-2. Record locking (9.1.16)
+2\) Record locking (9.1.16)
 
-3. File control entry, LOCK MODE clause and SHARING clause (12.4.4)
+3\) File control entry, LOCK MODE clause and SHARING clause (12.4.4)
 
-4. LOCK MODE clause (12.4.5.9)
+4\) LOCK MODE clause (12.4.5.9)
 
-5. SHARING clause (12.4.5.15)
+5\) SHARING clause (12.4.5.15)
 
-6. OPEN statement, SHARING phrase (14.9.27)
+6\) OPEN statement, SHARING phrase (14.9.27)
 
-7. EC-I-O-FILE-SHARING exception condition in the RAISING phrase of the EXIT and GOBACK statements, the RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of the PERFORM statement, the RAISE statement, and the TURN compiler directive
+7\) EC-I-O-FILE-SHARING exception condition in the RAISING phrase of the EXIT and GOBACK statements, the RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of the PERFORM statement, the RAISE statement, and the TURN compiler directive
 
 
 <a id="section-a-4-8"></a>
@@ -37359,7 +37387,7 @@ EXAMPLE 5
         03 REV-SHOP PIC S9(8)V99   OCCURS 100 TIMES.
 ```
 
-In the general case, to define an n-dimensional table, code the OCCURS clause in the data description of the element of the table and in the descriptions of (n − 1) group items that contain the element.
+In the general case, to define an n-dimensional table, code the OCCURS clause in the data description of the element of the table and in the descriptions of (n - 1) group items that contain the element.
 
 <a id="section-d-3-3"></a>
 #### D.3.3 Values of tables
@@ -37386,7 +37414,7 @@ Whenever the user references a table element or a condition-name associated with
 
 Occurrence numbers are specified by appending one or more subscripts to the data-name.
 
-The subscript may be represented either by an arithmetic-expression that produces an integer result or by an index-name associated with the table. An index-name may be followed by either the operator + or the operator – and an integer, which is used as in increment or decrement, respectively. It is permissible to mix both arithmetic-expressions and index-names in a single subscript list.
+The subscript may be represented either by an arithmetic-expression that produces an integer result or by an index-name associated with the table. An index-name may be followed by either the operator + or the operator - and an integer, which is used as in increment or decrement, respectively. It is permissible to mix both arithmetic-expressions and index-names in a single subscript list.
 
 The subscripts, enclosed in parentheses, are written immediately following any qualification for the name of the table element. The number of subscripts in such a reference shall equal the number of dimensions in the table whose element is being referenced. That is, there shall be a subscript for each OCCURS clause in the hierarchy containing the data-name including the data-name itself.
 
@@ -37865,7 +37893,7 @@ NOTE All source elements are source units as well. This is only partially indica
 *> Source unit F-1 start
 FUNCTION-ID.  F-1.        *> Source element start
 
-> ⚠ **CORRECTED — see the Addendum (C4).** The standard prints `FUNCTION-ID F-1.` here, without the separator period the paragraph header requires.
+> ⚠ **CORRECTED — see the Addendum (C4).** The standard prints `FUNCTION-ID F-1.` here (page 1043), without the separator period the paragraph header requires.
 ...
 END FUNCTION F-1.        *> Source element end
 *> Source unit F-1 end
@@ -39993,7 +40021,7 @@ The following characteristics are common to standard-binary arithmetic, and stan
 1\) A single format appropriate to the specified arithmetic mode is used for each operand in an arithmetic expression and the result of every arithmetic operation, arithmetic expression, and integer and numeric intrinsic functions.
 
 
-2\) The binary arithmetic operators +, -, \* and / and the SQRT function are defined to give results that are accurate to the precision of the format appropriate to the arithmetic mode. Exponentiation is defined to give results that are accurate to the precision of that format for exponents with the values –4, -3, -2, -1, 0, 1, 2, 3, and 4.
+2\) The binary arithmetic operators +, -, \* and / and the SQRT function are defined to give results that are accurate to the precision of the format appropriate to the arithmetic mode. Exponentiation is defined to give results that are accurate to the precision of that format for exponents with the values -4, -3, -2, -1, 0, 1, 2, 3, and 4.
 
 3\) The size error condition exists when the result of any single arithmetic operation cannot be contained in the format appropriate to the arithmetic mode.
 
@@ -44062,17 +44090,17 @@ A conforming implementation shall support obsolete language elements except for 
 
 The following are obsolete language elements:
 
-1. **FLAG-02 directive.** The FLAG-02 directive was specified in the previous COBOL standard to flag incompatibilities between that COBOL standard and the COBOL standard previous to it. The FLAG-14 directive is specified in the current COBOL standard to flag incompatibilities between the current COBOL standard and the previous COBOL standard. There is no longer a need for the older FLAG-02 directive.
+1\) **FLAG-02 directive.** The FLAG-02 directive was specified in the previous COBOL standard to flag incompatibilities between that COBOL standard and the COBOL standard previous to it. The FLAG-14 directive is specified in the current COBOL standard to flag incompatibilities between the current COBOL standard and the previous COBOL standard. There is no longer a need for the older FLAG-02 directive.
 
-2. **MOVE of ALL "literal" figurative constant containing only digits or ALL symbolic-character representing a digit to integer numeric items.** A MOVE of an ALL "literal" figurative constant containing only digits or an ALL symbolic-character representing a digit to an integer numeric item will probably result in the desired effect. However, there are other techniques such as the use of the zero figurative constant, the highest-algebraic and lowest-algebraic intrinsic functions, or the use of a numeric literal as a sending item that are thought to be less error prone in the development and maintenance of COBOL programs.
+2\) **MOVE of ALL "literal" figurative constant containing only digits or ALL symbolic-character representing a digit to integer numeric items.** A MOVE of an ALL "literal" figurative constant containing only digits or an ALL symbolic-character representing a digit to an integer numeric item will probably result in the desired effect. However, there are other techniques such as the use of the zero figurative constant, the highest-algebraic and lowest-algebraic intrinsic functions, or the use of a numeric literal as a sending item that are thought to be less error prone in the development and maintenance of COBOL programs.
 
-3. **STANDARD-BINARY arithmetic and STANDARD BINARY Intermediate Data Item.** These features have not been implemented as of the writing of this revision by any COBOL provider. Neither users nor implementors have indicated interest or intention for providing these facilities.
+3\) **STANDARD-BINARY arithmetic and STANDARD BINARY Intermediate Data Item.** These features have not been implemented as of the writing of this revision by any COBOL provider. Neither users nor implementors have indicated interest or intention for providing these facilities.
 
    Unlike other obsolete features, it is intended that interest in these facilities will be reevaluated during the next revision of standard COBOL and before any final decision is made on whether or not to remove them from the next revision
 
-4. **Use of the fixed continuation indicator (hyphen in column 7) and continuation of literals in fixed form reference format using the fixed continuation indicator.** Continuation of literals in fixed form reference format using the fixed continuation indicator is highly error-prone. Trailing spaces on the continued line often cause programming errors. Such errors can easily be avoided by using floating continuation indicators that are supported in both fixed and free form reference format
+4\) **Use of the fixed continuation indicator (hyphen in column 7) and continuation of literals in fixed form reference format using the fixed continuation indicator.** Continuation of literals in fixed form reference format using the fixed continuation indicator is highly error-prone. Trailing spaces on the continued line often cause programming errors. Such errors can easily be avoided by using floating continuation indicators that are supported in both fixed and free form reference format
 
-5. **Validate facility.** The VALIDATE facility has not been implemented as of the writing of this revision by any COBOL provider. Neither users nor implementors have indicated interest or intention for providing this facility.
+5\) **Validate facility.** The VALIDATE facility has not been implemented as of the writing of this revision by any COBOL provider. Neither users nor implementors have indicated interest or intention for providing this facility.
 
    Unlike other obsolete features, it is intended that interest in this facility will be reevaluated during the next revision of standard COBOL and before any final decision is made on whether or not to remove it from the next revision.
 
@@ -47072,12 +47100,22 @@ The following documents are useful references for implementors and users of this
 
 > **This section is NOT part of ISO/IEC 1989:2023.** It is supplied by the publisher of this transcription.
 
-- This transcription is faithful to the printed standard except at the points listed below, where the standard
-  - itself is defective and the defect would mislead a reader or a tool built from the text. **Every departure is
-  - recorded here together with the printed form, so that any correction can be reversed** if it later proves
-  - mistaken. The printed standard remains authoritative: where this transcription and ISO/IEC 1989:2023 differ,
-  - **the standard governs**.
-  - Each correction is cross-referenced from a ⚠ note at the point of change.
+This transcription is the working copy of the standard for the project that keeps it, and **correctness rules over
+faithfulness to a typographical error**: where the printed standard is defective — a character the typesetting
+dropped, a cross-reference to a sub-item that does not exist, two rules that contradict each other — the defect is
+corrected in place. **Every departure is recorded here together with the printed form and the printed page, so that
+any correction can be reversed** if it later proves mistaken. The printed standard remains authoritative: where this
+transcription and ISO/IEC 1989:2023 differ, **the standard governs**.
+
+Each correction is flagged at the point of change with a ⚠ note that quotes the printed form verbatim, so a quotation
+of either form is found in the same clause (`scripts/spec/cite.py --check` accepts both) and the rule catalog never
+carries the note. A correction that changes a CLASS of characters across the whole text (C14) is flagged once, in the
+Preface, rather than at each of its occurrences. Doubtful cases are transcribed **as printed** and recorded at the end
+of this section.
+
+`scripts/spec/verify_publishable.py` enforces the convention: a flag without an entry, an entry nothing points at, an
+entry without its printed form or printed page, and a flagged printed form `cite.py` cannot find each fail it.
+
 > **Page numbers here are the standard's own PRINTED folios** — what is printed at the foot of the page in
 > ISO/IEC 1989:2023 — so a citation can be checked directly against a copy of the standard. The
 > transcription's internal anchors (`#page-N`) instead use the PDF's sequential page, which runs 30 ahead of
@@ -47143,7 +47181,7 @@ omitted. As printed, the statement's own name would be omissible. Three independ
 A dropped `l`. Every other occurrence of the term in 12.3.7 and in the SPECIAL-NAMES paragraph spells it
 `locale-name-1`, and there is no such term as `locae-name`.
 
-### C4 · F.1 example programs · `FUNCTION-ID F-1.` → `FUNCTION-ID.  F-1.`
+### C4 · page 1043 · F.1 example programs · `FUNCTION-ID F-1.` → `FUNCTION-ID.  F-1.`
 
 | | |
 |---|---|
@@ -47181,6 +47219,167 @@ typeset apart from the defining text.
 **Why corrected rather than recorded as printed:** Table 21 is the function-name INVENTORY, consumed as
 data — a tool generated from the printed row would look up a function that does not exist and miss the one
 that does (the transcription's own row-vs-clause name diff did exactly that, which is how this was found).
+
+### C6 · page 607 · 14.9.10.4 DELETE FILE, general rule 15 sub-item b) · `valu62'` → `value '62'`
+
+| | |
+|---|---|
+| **Printed** | `b) The valu62' is placed into the I-O status associated with file-name-1 to indicate the file operation conflict condition.` |
+| **This transcription** | `b) The value '62' is placed into the I-O status associated with file-name-1 to indicate the file operation conflict condition.` |
+
+**The published document drops a letter, a space and an opening quotation mark.** The PDF's own content stream reads
+`The valu62’` — the closing quotation mark survives, the run `e ‘` before the status value does not — and the
+rendered page shows the same, so this is a typesetting fault of the published standard, not a transcription slip.
+The same fault recurs at exactly five places, in three statements — DELETE FILE (C6–C8), OPEN (C9) and READ (C10);
+a scan of the whole PDF text layer for a letter, two digits and a closing quotation mark
+(`[A-Za-z]\d\d’`) found those five and three benign matches (`binary64’` on printed page 508, `'external-ref01'` and
+`'external-ref02'` on printed page 1124, both literals in an example program).
+
+**The recovered reading is fixed by the standard itself.** I-O status 62 is the status for this very condition:
+9.1.13.9 rule 2 reads "I-O status = 62. A file sharing conflict condition exists because a DELETE FILE statement is
+attempted on a physical file and that physical file is currently open by another file connector", and this sub-item
+is the file-sharing-conflict arm of DELETE FILE.
+
+### C7 · page 608 · 14.9.10.4 DELETE FILE, general rule 16 · `file-name1 … t37'` → `file-name-1 … to '37'`
+
+| | |
+|---|---|
+| **Printed** | `16) If the file associated with file-name-1 is present and insufficient authority exists to delete the file, the execution of the DELETE FILE statement is unsuccessful, and the I-O status value in the file connector referenced by file-name1 is set t37'.` |
+| **This transcription** | `16) If the file associated with file-name-1 is present and insufficient authority exists to delete the file, the execution of the DELETE FILE statement is unsuccessful, and the I-O status value in the file connector referenced by file-name-1 is set to '37'.` |
+
+Two defects on one printed line. The letter, space and opening quotation mark of `to '37'` are dropped (the fault of
+C6), and the hyphen of the placeholder `file-name-1` is missing (`file-name1`, the fault of C11). The next general
+rule, 17, prints the same status correctly ("is set to ‘37’"), and 9.1.13.6 rule 6 b) states the condition this rule
+names: "A permanent error exists because an OPEN statement or DELETE FILE statement is attempted on a file and
+insufficient authority exists to access the file" — I-O status 37.
+
+### C8 · page 608 · 14.9.10.4 DELETE FILE, general rule 20 sub-item a) · `o05'` → `or '05'`
+
+| | |
+|---|---|
+| **Printed** | `a) Either I-O status value '00' o05' is placed in the I-O status associated with file-name-1.` |
+| **This transcription** | `a) Either I-O status value '00' or '05' is placed in the I-O status associated with file-name-1.` |
+
+The letter, space and opening quotation mark of `or '05'` are dropped (the fault of C6). The two values are the two
+outcomes of a DELETE FILE that completes: rule 14 of the same clause sets '05' when the file is not present, and
+9.1.13.2 rule 4 b) defines status 05 "For a DELETE FILE statement, the referenced file is not available".
+
+### C9 · page 680 · 14.9.27.4 OPEN, general rule 17 · `t05'` → `to '05'`
+
+| | |
+|---|---|
+| **Printed** | `These statements are followed by execution of the OPEN statement specified in the source element and the I-O status value associated with file-name-1 is set t05'.` |
+| **This transcription** | `These statements are followed by execution of the OPEN statement specified in the source element and the I-O status value associated with file-name-1 is set to '05'.` |
+
+The letter, space and opening quotation mark of `to '05'` are dropped (the fault of C6). Status 05 is the status of
+an OPEN of an optional file that is not present: 9.1.13.2 rule 4 a) "For an OPEN statement, it is successfully
+executed but the file is described as optional and the physical file is not present at the time the OPEN statement is
+executed."
+
+### C10 · page 696 · 14.9.30.4 READ, general rule 15 · `t06'` → `to '06'`
+
+| | |
+|---|---|
+| **Printed** | `If the number of bytes in the record that is read is greater than the maximum size specified by the record description entries for file-name-1, the record is truncated on the right to the maximum size. In that case, the READ statement is successful and the I-O status in the read file connector is set t06' indicating that the line delimiter or end-of-file was not detected. (9.1.13, I-O status). After the read the file position indicator will reference the next unread character in the record.` |
+| **This transcription** | the same paragraph with `is set to '06'` |
+
+The letter, space and opening quotation mark of `to '06'` are dropped (the fault of C6). The status is fixed by the
+sentence that follows it and by 9.1.13.2 rule 5: "I-O status = 06. A READ statement for a line sequential file has
+successfully executed but a line delimiter or the end-of-file has not been detected."
+
+### C11 · pages 442, 606 and 714 · a placeholder name printed without its hyphen · `literal1`, `filename-1` → `literal-1`, `file-name-1`
+
+| site | printed page | printed form | this transcription |
+|---|---:|---|---|
+| 13.18.40.3 syntax rule 9 | 442 | `Otherwise, literal1, literal-2, and literal-3 shall be alphanumeric literals.` | `literal-1` |
+| 14.9.10.4 general rule 7 sub-item a) | 606 | `… the file connector associated with filename-1:` | `file-name-1` |
+| 14.9.35.4 general rule 17 sub-item c) | 714 | `… the runtime representation of literal1, or the record referenced by record-name-1 is specified implicitly or explicitly as alphanumeric …` | `literal-1` |
+
+The placeholders `literal-1` and `file-name-1` are the names the general formats use, and the standard spells them
+with the hyphen everywhere else — 321 and 286 occurrences — so each of these is a dropped hyphen, not an alternative
+spelling. A sweep of the whole transcription for any placeholder-name family
+followed directly by a digit (`literal1`, `identifier1`, `file-name1`, `data-name1`, …, and `filename-…`) found these
+three, plus the `file-name1` of C7 (corrected there, on a line that carries a second defect).
+
+### C12 · page 698 · 14.9.30.4 READ, general rule 21 sub-items e)1. and e)2. · `greater than or equal to` → `greater than`, `less than or equal to` → `less than`
+
+| | |
+|---|---|
+| **Printed, e)1.** | `1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than or equal to the key value in the file position indicator.` |
+| **This transcription, e)1.** | `… whose key value is greater than the key value in the file position indicator.` |
+| **Printed, e)2.** | `2. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than or equal to the key value in the file position indicator.` |
+| **This transcription, e)2.** | `… whose key value is less than the key value in the file position indicator.` |
+
+Sub-item e) governs a READ whose previous operation was a SUCCESSFUL READ, and its three arms contradict each other
+as printed: e)3. ends "Otherwise, the first record in the physical file whose key value is greater than the key of
+reference is made available" — strictly greater — while e)1. and e)2. include the key itself.
+
+**Why "greater than" / "less than" is what is meant.**
+
+1. **After a successful READ the file position indicator holds the key of the record just returned.** Sub-item g)
+   (the same rule) says so: "If a record is made available, the file position indicator is set to the value of the
+   current key of reference of the record made available and the read operation is successful." A record whose key is
+   `greater than or equal to` that key is the record itself, so e)1. as printed would return the same record on every
+   sequential READ and the file could never be read to its end; e)2. has the same defect for PREVIOUS.
+2. **The "or equal to" arm belongs to the sibling sub-item d),** which governs the previous operation being an OPEN
+   or a START, when the file position indicator holds a POSITION and not a record already returned: d)1. and d)2.
+   correctly read "greater than or equal to" and "less than or equal to". The two sub-items differ in exactly this, and
+   e) was evidently typeset from d) without the change.
+3. **The duplicates arm agrees.** Sub-item f) (an alternate key that allows duplicates, previous operation a
+   successful READ) reads "the first record in the physical file whose key value is greater than the key of reference
+   value" and "less than the key of reference value" — strict in both directions.
+4. **GnuCOBOL 3.2 (`libcob/fileio.c`, `indexed_read_next`, the Berkeley DB build) steps strictly past the last key read.**
+   After anything but an OPEN or START it repositions with `DB_SET_RANGE` on the last key read; when that finds the
+   same key it takes one further `DB_NEXT` (or `DB_PREV` for PREVIOUS); only when the record has since been deleted,
+   so that the range search lands on a greater key, does it deliver that record without stepping. Read-only facts
+   about a differing implementation, recorded as corroboration; the standard is the authority.
+
+Sub-item e)3. is left as printed (see D4). `REWRITE` does not change which sub-item applies: 14.9.35.4 rule 13 states
+"The file position indicator in the rewrite file connector is not affected by the execution of a REWRITE
+statement", and the FPI, not the last statement, is what d) and e) read.
+
+### C13 · pages 709 and 772 · a cross-reference to a general-rule sub-item that does not exist · `4b` → `5b`, `12b through 12f` → `11b through 11f`
+
+| site | printed page | printed form | this transcription |
+|---|---:|---|---|
+| 14.9.34.4 RETURN, the NOTE after general rule 5 b) | 709 | `… the implicit MOVE statement described in General rule 4b is undefined.` | `General rule 5b` |
+| 14.9.48.4 UNSTRING, general rule 11 sub-item g) | 772 | `The behavior described in General rules 12b through 12f is repeated until either all the characters are exhausted …` | `General rules 11b through 11f` |
+
+Neither target exists as printed. RETURN's general rule 4 has no lettered sub-items, and its rule 5 b) is the one
+that moves the current record to the INTO operand ("The current record is moved from the record area to the area
+specified by identifier-1 according to the rules for the MOVE statement without the CORRESPONDING phrase"), which is
+what the NOTE is about. UNSTRING's general rule 12 ("The initialization of the contents of the data items associated
+with the POINTER phrase or the TALLYING phrase is the responsibility of the user") has no sub-items either, while
+sub-items b) through f) of general rule 11 are the per-receiving-area behavior that sub-item g) of rule 11 says is
+repeated.
+
+The sweep that found these two checked every "General rule(s) N<letter>" and "Syntax rule N<letter>" reference in the
+transcription whose target is in the same clause, and every such reference written with a clause number
+(`13.18.35, LINE clause, General rule 4c`) against the target clause's own sub-items. Every other reference resolves;
+two reports of the sweep are not defects (a reference to "General rules 3a to 3g of the USE statement" whose target,
+14.9.49.4 rules 3 a) to g), exists, and a reference to 13.18.35 rule 4 c), which exists).
+
+### C14 · the whole text · look-alike characters for the standard's own punctuation, normalized to `-`
+
+| character | occurrences | stands for | this transcription |
+|---|---:|---|---|
+| U+2011 NON-BREAKING HYPHEN | 107 | the hyphen inside a COBOL word or name (`integer-1`, `file-name-1`) | `-` |
+| U+2212 MINUS SIGN | 34 | the arithmetic operator, the PICTURE symbol and the sign of a numeral | `-` |
+| U+2013 EN DASH | 61 of 103 | the same minus and hyphen: a quoted `'-'`, a PICTURE symbol list or table cell, `the operator -`, a sign before a numeral, a subtraction between operands in the normative clauses | `-` |
+
+These characters print identically to the hyphen-minus, which is why they survived every review of the rendered page;
+the CHARACTER is what is wrong. The standard defines which characters a COBOL word may contain: 8.3.2.1 "Each
+character of a COBOL word that is not a special character word shall be selected from the set of basic letters, basic
+digits, extended letters, and the basic special characters hyphen and underscore." `integer` + U+2011 + `1` is
+therefore not the word `integer-1` the standard defines, and no COBOL source can contain it, yet every pattern, grep
+and quotation that spells the word with the ASCII hyphen silently matched nothing in the affected rules. Normalized in
+the text and in tables; the printed appearance is unchanged. The repair is `scripts/spec/repairs/typographic_lookalikes.py`,
+which classifies every en dash and reports each one it keeps.
+
+**Kept as printed (42 en dashes):** a numeric range (`positions 1–6`, `Formats 2–4`), a dash that opens a list line,
+every prose dash (`a single character – either an alphanumeric …`), every en dash of Annexes D to G (they are prose,
+not COBOL text) and the four inside general-format figures, which `sweep_figures.py` regenerates from the PDF and
+owns. The em dash (U+2014) is the transcription's own prose punctuation and was never in question.
 
 ## Defects recorded but NOT corrected
 
@@ -47231,6 +47430,15 @@ optional word there per 5.2.3. Three other passages (pages 549, 551 and 1093) wr
 thing.
 
 Transcribed as printed, and no correction is needed.
+
+### D4 · page 698 · 14.9.30.4 READ, general rule 21 sub-item e)3. · the closing "Otherwise" sentence
+
+e)3. prints "If no such record is found, the at end condition exists and execution proceeds as indicated in General
+rule 24. Otherwise, the first record in the physical file whose key value is greater than the key of reference is
+made available." The second sentence repeats, for any direction, what e)1. says for NEXT once C12 is applied, and is
+wrong in direction for PREVIOUS (which e)2. governs). It reads as a fragment of an earlier wording left in place, but
+what was intended is not certain, and it does no harm beside the corrected e)1. and e)2. — so it is transcribed as
+printed.
 
 ## Method
 

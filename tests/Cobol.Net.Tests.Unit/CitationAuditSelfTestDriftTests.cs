@@ -93,4 +93,23 @@ public sealed class CitationAuditSelfTestDriftTests
                 + $"unwitnessed, and its silence on the tree means nothing.\n{r.Stdout}{r.Stderr}");
         }
     }
+
+    /// <summary>
+    /// The citation gate ITSELF (<c>cite.py --check</c>, kb/Work PB308/PB309, R66): an all-punctuation quotation is
+    /// refused rather than matching every clause, the trailing-paragraph and sub-item rule paths are pinned, and a
+    /// quotation of either the corrected or the PRINTED form of a marked correction is found in its own clause only.
+    /// </summary>
+    [Fact]
+    public void CiteGate_ProvesEveryGuardCanFail()
+    {
+        var r = RunSelfTest("cite.py");
+        Assert.Equal(0, r.ExitCode);
+        Assert.Contains("SELF-TEST: PASS", r.Stdout, StringComparison.Ordinal);
+        foreach (string arm in new[] { "fires EMPTY-NEEDLE (check)", "fires EMPTY-NEEDLE (find)", "pins 14.7.7 2) bare",
+                                       "pins 14.9.8.4 1) b)", "accepts the PRINTED form (C6)", "fires on a wrong clause" })
+        {
+            Assert.True(r.Stdout.Contains(arm, StringComparison.Ordinal),
+                $"`cite.py --self-test` no longer drives '{arm}'.\n{r.Stdout}{r.Stderr}");
+        }
+    }
 }
