@@ -22,8 +22,13 @@ cobolWord
     | {!keywordContinuesHere()}? BLINK
     | {!keywordContinuesHere()}? BYTES
     | {!keywordContinuesHere()}? CAPACITY
+    | {!keywordContinuesHere()}? CHANNEL
     | {!keywordContinuesHere()}? CYCLE
     | {!keywordContinuesHere()}? DECIMAL_ENCODING
+    | {!keywordContinuesHere()}? END_INVOKE
+    | {!keywordContinuesHere()}? END_MERGE
+    | {!keywordContinuesHere()}? END_METHOD
+    | {!keywordContinuesHere()}? END_SORT
     | {!keywordContinuesHere()}? ENTRY_CONVENTION
     | {!keywordContinuesHere()}? EOL
     | {!keywordContinuesHere()}? EOS
@@ -33,6 +38,7 @@ cobolWord
     | {!keywordContinuesHere()}? FOREGROUND_COLOR
     | {!keywordContinuesHere()}? FOREVER
     | {!keywordContinuesHere()}? FULL_
+    | {!keywordContinuesHere()}? GENERIC
     | {!keywordContinuesHere()}? HIGHLIGHT
     | {!keywordContinuesHere()}? HIGH_ORDER_LEFT
     | {!keywordContinuesHere()}? HIGH_ORDER_RIGHT
@@ -51,6 +57,7 @@ cobolWord
     | {!keywordContinuesHere()}? NORMAL
     | {!keywordContinuesHere()}? NUMBERS
     | {!keywordContinuesHere()}? ONLY
+    | {!keywordContinuesHere()}? PACKED
     | {!keywordContinuesHere()}? PARAGRAPH
     | {!keywordContinuesHere()}? PARSE
     | {!keywordContinuesHere()}? PREVIOUS

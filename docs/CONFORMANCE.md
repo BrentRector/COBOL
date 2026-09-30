@@ -920,10 +920,13 @@ of an unsupported facility.
   context-sensitive word, everywhere outside its context — `CobolWordsDriftTests` proves that join empty. The
   words below are reserved at EVERY edition although ISO reserves none of them, following GnuCOBOL (the model
   implementation for implementor latitude), because each spells a vendor construct this compiler recognizes:
-  **CHANNEL, COMP-1, COMP-2, COMP-3, COMP-4, COMP-5, COMPUTATIONAL-1, COMPUTATIONAL-2, COMPUTATIONAL-3,
-  COMPUTATIONAL-4, COMPUTATIONAL-5, END-INVOKE, END-JSON, END-MERGE, END-METHOD, END-SORT, END-XML, ENTRY,
-  GENERIC, JSON, PACKED, XML**. The single source is `tests/version-matrix/cobol-words.json`
-  `extensionReserved`; `CobolWordsDriftTests` fails when this list, that array and the lexer disagree.
+  **COMP-1, COMP-2, COMP-3, COMP-4, COMP-5, COMPUTATIONAL-1, COMPUTATIONAL-2, COMPUTATIONAL-3,
+  COMPUTATIONAL-4, COMPUTATIONAL-5, END-JSON, END-XML, ENTRY, JSON, XML**. Each is a reserved word of GnuCOBOL 3.2
+  (`cobc/reserved.c`, no context test). CHANNEL, END-INVOKE, END-MERGE, END-METHOD, END-SORT, GENERIC, PACKED and
+  REMARKS were on this list until 2026-09-29 and are NOT reserved: ISO §8.9 does not reserve them, GnuCOBOL 3.2
+  has no entry (REMARKS: a context test normal code never meets), so they are user-defined words and the vendor
+  constructs they spell are recognized by position (owner: follow ISO). The single source is
+  `tests/version-matrix/cobol-words.json` `extensionReserved`; `CobolWordsDriftTests` fails when this list, that array and the lexer disagree.
   ⚠ DETERMINATION (owner may overturn): reserving them keeps the vendor forms recognizable by name; the rejected
   reading — admitting them as user words at every edition — would make each vendor construct ambiguous with a
   data reference in every operand list.

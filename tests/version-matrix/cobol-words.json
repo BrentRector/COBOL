@@ -938,6 +938,48 @@
    "note": "USE FOR DEBUGGING ON ALL REFERENCES OF ('85; VCR row 7.17)"
   },
   {
+   "token": "CHANNEL",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "The SPECIAL-NAMES CHANNEL n IS mnemonic vendor clause (IBM extension). ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no CHANNEL entry in cobc/reserved.c, so outside that clause it is a legal user-defined word. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
+   "token": "END_INVOKE",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "The vendor INVOKE scope terminator. ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no entry, so it is a legal user-defined word wherever the INVOKE statement cannot end. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
+   "token": "END_MERGE",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "The vendor MERGE scope terminator. ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no entry, so it is a legal user-defined word wherever the MERGE statement cannot end. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
+   "token": "END_METHOD",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "The vendor spelling of the END METHOD marker. ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no entry, so it is a legal user-defined word. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
+   "token": "END_SORT",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "The vendor SORT scope terminator. ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no entry, so it is a legal user-defined word wherever the SORT statement cannot end. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
+   "token": "GENERIC",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "No construct: ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no entry (the earlier note called it a GnuCOBOL extension word; it is not). Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
+   "token": "PACKED",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "No construct beyond PACKED-DECIMAL: ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no PACKED entry (only PACKED-DECIMAL), so it is a legal user-defined word. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
+  },
+  {
    "token": "REMARKS",
    "nameSlot": true,
    "subscriptTrigger": true,
@@ -1198,10 +1240,6 @@
  ],
  "extensionReserved": [
   {
-   "word": "CHANNEL",
-   "note": "SPECIAL-NAMES CHANNEL-n carriage-control mnemonic source (IBM/GnuCOBOL extension)"
-  },
-  {
    "word": "COMP-1",
    "note": "USAGE COMP-1 (single-precision float; IBM/GnuCOBOL extension)"
   },
@@ -1242,24 +1280,8 @@
    "note": "long spelling of COMP-5"
   },
   {
-   "word": "END-INVOKE",
-   "note": "INVOKE scope terminator (vendor OO extension; ISO INVOKE has none)"
-  },
-  {
    "word": "END-JSON",
    "note": "JSON GENERATE/PARSE scope terminator (IBM extension)"
-  },
-  {
-   "word": "END-MERGE",
-   "note": "MERGE scope terminator (vendor extension; ISO MERGE has none)"
-  },
-  {
-   "word": "END-METHOD",
-   "note": "vendor spelling of the END METHOD marker"
-  },
-  {
-   "word": "END-SORT",
-   "note": "SORT scope terminator (vendor extension; ISO SORT has none)"
   },
   {
    "word": "END-XML",
@@ -1270,16 +1292,8 @@
    "note": "ENTRY statement (alternate entry point; IBM/GnuCOBOL extension)"
   },
   {
-   "word": "GENERIC",
-   "note": "GnuCOBOL extension word"
-  },
-  {
    "word": "JSON",
    "note": "JSON GENERATE/PARSE statements (IBM extension)"
-  },
-  {
-   "word": "PACKED",
-   "note": "USAGE PACKED-DECIMAL shorthand (GnuCOBOL extension)"
   },
   {
    "word": "XML",
