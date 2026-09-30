@@ -262,6 +262,15 @@ jobs:
           else
             python3 scripts/spec/audit_witness_loss.py --check
           fi
+      - name: Rule catalog — the unharvested-rule manifest agrees with the transcription (extract_rule_catalog.py --check)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/spec/extract_rule_catalog.py --check
+      - name: Spec corrections — every flag, Addendum entry, printed form and page agree (verify_publishable.py)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/spec/verify_publishable.py
+      - name: Citation gate self-test — cite.py refuses an empty quotation and accepts the printed form (cite.py --self-test)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/spec/cite.py --self-test
       - name: Work register — every kb/Work note well-formed (work.py check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/work.py check

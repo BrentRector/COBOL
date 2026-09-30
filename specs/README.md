@@ -23,17 +23,24 @@ say so if it is absent. Everything that works on the transcription alone runs wi
 
 ## Corrections
 
-The transcription is faithful to the printed standard except at three points where the standard itself is
-defective and the defect would mislead a reader, or a tool built from the text — for example the reserved-word
-list on printed page 206 prints `EMD-START`, which is not a COBOL word, where the rest of the standard says
-`END-START`.
+`ISO_COBOL.md` is the working copy of the standard for the project that keeps it (kb/Work R66), and **correctness
+rules over faithfulness to a typographical error**. It is faithful to the printed standard except where the standard
+itself is defective, and there the defect is corrected in place, in the change set that finds it: a character the
+typesetting dropped (the reserved-word list on printed page 206 prints `EMD-START` where the rest of the standard says
+`END-START`; five sites print `valu62'` for `value '62'`), a placeholder printed without its hyphen, a cross-reference
+to a sub-item that does not exist, two rules that contradict each other. A transcription slip (lost indentation, a
+wrong label delimiter, a look-alike character) is repaired to the printed form and is not a departure.
 
-**Every departure is listed in the Addendum at the end of the document, together with the printed form, so that
-any correction can be reversed** if it later proves mistaken. Each is also flagged in place. Defects that are
-doubtful rather than clear are transcribed AS PRINTED and listed in the Addendum too.
+**Every departure from the printed text is listed in the Addendum at the end of the document, together with the
+printed form and the printed page, so that any correction can be reversed** if it later proves mistaken. Each is also
+flagged in place with a `> ⚠ **CORRECTED — see the Addendum (Cn).**` note that quotes the printed form verbatim:
+`scripts/spec/cite.py --check` accepts a quotation of either form, and the rule catalog never carries the note. A
+correction to a whole class of characters (C14, the look-alike hyphens and minus signs) is flagged once, in the
+Preface. Defects that are doubtful rather than clear are transcribed AS PRINTED and listed in the Addendum too.
 
 `scripts/spec/verify_publishable.py` enforces this: it fails if a correction is flagged in the text but missing
-from the Addendum, or listed in the Addendum but referenced nowhere.
+from the Addendum, listed in the Addendum but referenced nowhere, flagged without quoting the printed form and naming
+the printed page, or listed without its printed page. It runs in every gate and in CI.
 
 ## A note on page numbers
 

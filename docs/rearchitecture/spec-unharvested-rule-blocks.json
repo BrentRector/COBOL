@@ -738,13 +738,13 @@
   },
   "9.3.6": {
    "title": "Method invocation",
-   "ordinals": 23,
+   "ordinals": 21,
    "lists": 5,
    "longest": 7,
    "disposition": "rules",
    "shape": "multi-sublist",
    "kind": "GR",
-   "why": "ADMITTED 2026-08-04 (fix-queue PB29; the multi-sublist slice, all eleven read). Kind GR per SS5.3.3 - 'A general rule defines or clarifies the meaning or relationship of meanings of an element or set of elements' (cite.py --check OK) - and NOT SR, because SS5.3.2 scopes syntax rules to 'the order in which words or elements may be WRITTEN' (--check OK) and this clause states execution semantics. Lead-in: 'Method resolution proceeds as follows:' - resolution order and exact-match criteria."
+   "why": "ADMITTED 2026-08-04 (fix-queue PB29; the multi-sublist slice, all eleven read). Kind GR per SS5.3.3 - 'A general rule defines or clarifies the meaning or relationship of meanings of an element or set of elements' (cite.py --check OK) - and NOT SR, because SS5.3.2 scopes syntax rules to 'the order in which words or elements may be WRITTEN' (--check OK) and this clause states execution semantics. Lead-in: 'Method resolution proceeds as follows:' - resolution order and exact-match criteria. RE-MEASURED 2026-09-30 (kb/Work PB1588): 23 -> 21 ordinals. The two ordinals that left the count are items 4. and 5. of sub-item d) of the parameter-matching rule, which PB698 (2026-09-06) indented at their printed level (the ordinal glyph measured on the PDF) so they are nested items of d), no longer column-0 ordinals; the rule set is unchanged, only the measuring upper bound moved."
   },
   "9.3.8.2.3": {
    "title": "Conformance between interfaces",
