@@ -28,54 +28,56 @@ internal sealed class LiteralEnvironment
     private readonly DataBinder? _data;
     private readonly AlphabetDef? _collate;
     private readonly NationalAlphabetDef? _natCollate;
-    /// <summary>Non-null inside the SPECIAL-NAMES paragraph: whether the clause specifies the NATIONAL phrase,
-    /// which alone selects the native sequence GR10 names.</summary>
-    private readonly bool? _specialNamesNational;
+    /// <summary>True inside the SPECIAL-NAMES paragraph, where §12.3.7.4 GR10 makes HIGH-VALUE / LOW-VALUE the NATIVE
+    /// extremes — "in the native national collating sequence, when the NATIONAL phrase is specified, or in the native
+    /// alphanumeric collating sequence otherwise". Both native sequences are the 65,536 UTF-16 code units in code-unit
+    /// order, so the phrase selects the same pair (<see cref="CobolNet.Runtime.NativeCollatingSequence"/>, owner
+    /// decision kb/Work R52) and is not carried.</summary>
+    private readonly bool _inSpecialNames;
 
     private LiteralEnvironment(DataBinder? data, AlphabetDef? collate, NationalAlphabetDef? natCollate,
-        bool? specialNamesNational, bool refusesSymbolicCharacters)
+        bool inSpecialNames, bool refusesSymbolicCharacters)
     {
         _data = data;
         _collate = collate;
         _natCollate = natCollate;
-        _specialNamesNational = specialNamesNational;
+        _inSpecialNames = inSpecialNames;
         RefusesSymbolicCharacters = refusesSymbolicCharacters;
     }
 
     /// <summary>A literal position that precedes every table a program declares — the OPTIONS paragraph and the
     /// identification-division AS phrases: no collating sequence is declared yet (the native pins apply) and no
     /// constant-name or symbolic-character is defined yet.</summary>
-    public static LiteralEnvironment Unscoped { get; } = new(null, null, null, null, false);
+    public static LiteralEnvironment Unscoped { get; } = new(null, null, null, false, false);
 
     /// <summary>A literal position outside the SPECIAL-NAMES paragraph (the DATA and PROCEDURE divisions and the
     /// environment-division clauses bound after SPECIAL-NAMES): the program collating sequences and the program's
     /// constant-name and symbolic-character tables.</summary>
     public static LiteralEnvironment Program(DataBinder data) =>
-        new(data, data.Collating, data.NationalCollating, null, false);
+        new(data, data.Collating, data.NationalCollating, false, false);
 
-    /// <summary>A literal written INSIDE the SPECIAL-NAMES paragraph. <paramref name="nationalPhrase"/> is whether
-    /// the clause specifies NATIONAL (§12.3.7.4 GR10 — "in the native national collating sequence, when the NATIONAL
-    /// phrase is specified, or in the native alphanumeric collating sequence otherwise"); <paramref name="refusesSymbolicCharacters"/>
+    /// <summary>A literal written INSIDE the SPECIAL-NAMES paragraph (§12.3.7.4 GR10's native extremes — see
+    /// <see cref="_inSpecialNames"/>); <paramref name="refusesSymbolicCharacters"/>
     /// is true for the literals §12.3.7.3 SR11 governs ("Literal-1, literal-2, literal-3, literal-4, literal-5,
     /// literal-6, and literal-9 shall specify neither a symbolic-character figurative constant nor a zero-length
     /// literal").</summary>
-    public static LiteralEnvironment SpecialNames(DataBinder data, bool nationalPhrase, bool refusesSymbolicCharacters) =>
-        new(data, null, null, nationalPhrase, refusesSymbolicCharacters);
+    public static LiteralEnvironment SpecialNames(DataBinder data, bool refusesSymbolicCharacters) =>
+        new(data, null, null, true, refusesSymbolicCharacters);
 
     /// <summary>True where §12.3.7.3 SR11 forbids a symbolic-character operand.</summary>
     public bool RefusesSymbolicCharacters { get; }
 
     /// <summary>The HIGH-VALUE character a figurative of class <paramref name="cat"/> stands for here
     /// (§8.3.3.6.4 GR6).</summary>
-    public char HighValue(PicCategory cat) => _specialNamesNational is { } national
-        ? DataBinder.NativeHighValue(national)
+    public char HighValue(PicCategory cat) => _inSpecialNames
+        ? CobolNet.Runtime.NativeCollatingSequence.HighValue
         : cat is PicCategory.National && _natCollate is { } nat ? nat.HighValue
         : cat is not (PicCategory.National or PicCategory.Boolean) && _collate is { } alnum ? alnum.HighValue
-        : DataBinder.NativeHighValue(national: false);
+        : CobolNet.Runtime.NativeCollatingSequence.HighValue;
 
     /// <summary>The LOW-VALUE character a figurative of class <paramref name="cat"/> stands for here
     /// (§8.3.3.6.4 GR7).</summary>
-    public char LowValue(PicCategory cat) => _specialNamesNational is not null ? '\0'
+    public char LowValue(PicCategory cat) => _inSpecialNames ? CobolNet.Runtime.NativeCollatingSequence.LowValue
         : cat is PicCategory.National && _natCollate is { } nat ? nat.LowValue
         : cat is not (PicCategory.National or PicCategory.Boolean) && _collate is { } alnum ? alnum.LowValue
         : '\0';
@@ -86,7 +88,7 @@ internal sealed class LiteralEnvironment
     /// <summary>Whether <paramref name="word"/> is a symbolic-character name here — in SPECIAL-NAMES, one the
     /// paragraph declares in any clause, since the clauses are order-free (kb/Work PB226).</summary>
     public bool IsSymbolicCharacter(string word) => _data is not null
-        && (_specialNamesNational is not null ? _data.IsSymbolicCharacterName(word) : _data.SymbolicOf(word) is not null);
+        && (_inSpecialNames ? _data.IsSymbolicCharacterName(word) : _data.SymbolicOf(word) is not null);
 
     /// <summary>The ONE character a bound symbolic-character stands for (§12.3.7.4 GR11 b/c), or null when
     /// <paramref name="word"/> names none that is bound.</summary>

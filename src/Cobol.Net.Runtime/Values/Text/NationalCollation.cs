@@ -22,6 +22,6 @@ public sealed class NationalCollation : LiteralPhraseCollation
     /// <param name="highValue">The sequence's national HIGH-VALUE character (§12.3.7.4 GR8, binder-computed).</param>
     /// <param name="lowValue">The sequence's national LOW-VALUE character (§12.3.7.4 GR9).</param>
     public NationalCollation(ushort[] codes, ushort[] positions, ushort[] repByPos, int nextFree,
-        char highValue = (char)0xFFFF, char lowValue = (char)0)
+        char highValue = NativeCollatingSequence.HighValue, char lowValue = NativeCollatingSequence.LowValue)
         : base(codes, positions, repByPos, nextFree, highValue, lowValue) { }
 }

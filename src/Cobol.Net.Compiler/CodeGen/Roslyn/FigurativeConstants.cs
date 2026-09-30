@@ -14,7 +14,7 @@ namespace CobolNet.CodeGen;
 /// <c>ConditionRenderer.FigurativeFillChar</c>, <c>CSharpEmitter.FigurativeWordFill</c>, and the Report-Writer
 /// word map). ISO §8.3.3.6: HIGH-/LOW-VALUE under a PROGRAM COLLATING SEQUENCE are the sequence's extreme
 /// CHARACTERS (GR6/GR7 + §12.3.7 GR8/GR9 — character identity, not just comparison weight), natively
-/// U+00FF/U+0000 (COBOLNET_DESIGN §14.9); category national/boolean use their OWN sequence, so the alphanumeric
+/// U+FFFF/U+0000 (CobolNet.Runtime.NativeCollatingSequence, owner R52); category national/boolean use their OWN sequence, so the alphanumeric
 /// PCS never applies to them (the D-N3 pin). It is also THE OPERAND CLASSIFIER (<see cref="Classify"/>, kb/Work
 /// PB461): the five ALL-strip variants that once lived at the call sites (whitespace-only, whitespace-or-letter,
 /// glued-only, unconditional) each recognized a DIFFERENT subset of the spellings §8.3.3.6.2 admits, so the SET
@@ -75,8 +75,9 @@ internal static class FigurativeConstants
     /// sequence is active and no category pin applies. National/boolean anchors never take the alphanumeric
     /// PCS (§8.3.3.6 GR6/GR7 — each category reads its OWN sequence): a NATIONAL anchor under an explicit
     /// non-native NATIONAL program collating sequence (<paramref name="natCollate"/> — an <c>ALPHABET … FOR
-    /// NATIONAL</c> literal phrase, §12.3.7 GR8/GR9) takes THAT sequence's extremes; otherwise the D-N3
-    /// pins (U+00FF/U+0000 — the flagged native-pin divergence stays byte-stable).
+    /// NATIONAL</c> literal phrase, §12.3.7 GR8/GR9) takes THAT sequence's extremes; otherwise the NATIVE
+    /// sequence's extremes, U+FFFF / U+0000 for both classes (<see cref="CobolNet.Runtime.NativeCollatingSequence"/>,
+    /// owner decision kb/Work R52).
     /// <para>⛔ <b>DETERMINATION D-B2 — the figurative SPACE against a BOOLEAN receiving operand is the boolean
     /// character '0'</b> (CONFORMANCE.md §3; kb/Work PB425). The standard leaves this undefined and the gap is
     /// reachable: §14.9.25.4 Table 17 gives SPACE against a Boolean receiving operand the category BOOLEAN, but
@@ -102,40 +103,19 @@ internal static class FigurativeConstants
             'Q' => '"',
             'H' when nat => natCollate!.HighValue,
             'L' when nat => natCollate!.LowValue,
-            'H' => !pinned && collate is { } hc ? hc.HighValue : 'ÿ',
-            'L' => !pinned && collate is { } lc ? lc.LowValue : '\0',
+            'H' => !pinned && collate is { } hc ? hc.HighValue : CobolNet.Runtime.NativeCollatingSequence.HighValue,
+            'L' => !pinned && collate is { } lc ? lc.LowValue : CobolNet.Runtime.NativeCollatingSequence.LowValue,
             _ => ' ',
         };
     }
 
-    /// <summary>The C# <c>char</c>-literal FRAGMENT a figurative kind fills with. BYTE-IDENTITY NOTE (the 32
-    /// characterization snapshots gate this): a PCS-ACTIVE H/L renders through Roslyn's
-    /// <see cref="SymbolDisplay.FormatLiteral(char, bool)"/> (e.g. <c>'F'</c>) — exactly the former
-    /// <c>EmitContext.FigFill</c>; the native pins keep the FIXED historical escape texts
-    /// (<c>'ÿ'</c>/<c>'\0'</c>, never re-rendered) — exactly the former
-    /// <c>EmitText.FigurativeFill</c>. A NATIONAL anchor under an explicit non-native NATIONAL PCS
-    /// (<paramref name="natCollate"/>) renders THAT sequence's extremes (§12.3.7 GR8/GR9 — a new surface,
-    /// no byte-identity constraint).</summary>
+    /// <summary>The C# <c>char</c>-literal FRAGMENT a figurative kind fills with — <see cref="FillChar"/> rendered through
+    /// Roslyn's <see cref="SymbolDisplay.FormatLiteral(char, bool)"/>, which escapes the control and noncharacter
+    /// code units the HIGH-/LOW-VALUE extremes are. ONE fill rule: this used to be a second switch that kept the
+    /// retired U+00FF pin's historical escape texts byte-identical, which is exactly a rule written twice.</summary>
     public static string Fill(char kind, AlphabetDef? collate, PicCategory? cat = null,
-        NationalAlphabetDef? natCollate = null)
-    {
-        bool pinned = cat is PicCategory.National or PicCategory.Boolean;
-        bool nat = cat is PicCategory.National && natCollate is not null;
-        return kind switch
-        {
-            'H' when nat => SymbolDisplay.FormatLiteral(natCollate!.HighValue, quote: true),
-            'L' when nat => SymbolDisplay.FormatLiteral(natCollate!.LowValue, quote: true),
-            'H' when !pinned && collate is { } hc => SymbolDisplay.FormatLiteral(hc.HighValue, quote: true),
-            'L' when !pinned && collate is { } lc => SymbolDisplay.FormatLiteral(lc.LowValue, quote: true),
-            'Z' => "'0'",
-            'S' when cat is PicCategory.Boolean => "'0'",   // DETERMINATION D-B2 — see FillChar's remarks
-            'S' => "' '",
-            'H' => "'\\u00ff'",
-            'L' => "'\\u0000'",
-            'Q' => "'\\\"'",
-            _ => "' '",
-        };
-    }
+        NationalAlphabetDef? natCollate = null) =>
+        SymbolDisplay.FormatLiteral(FillChar(kind, collate, cat, natCollate), quote: true);
 
     /// <summary>The C# <c>string</c>-literal FRAGMENT holding ONE occurrence of a figurative kind's fill
     /// character — the SEED a §8.3.3.6.4 GR2 sizing repeats (kb/Work PB297). Same fill computation as

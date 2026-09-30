@@ -503,7 +503,7 @@ public sealed partial class DataBinder
         // 30- or 31-digit numeric literal (beyond decimal's range), which then fell into the alphanumeric path and
         // was refused under the wrong rule.
         if (lit.numericLiteral() is null)
-            return LiteralCharsOf(lit, national: false, sr11: false);   // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8
+            return LiteralCharsOf(lit, sr11: false);   // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8
         Edition.Error("COBOLNET0892", $"CURRENCY SIGN {ConcatFolder.Spelling(lit)}: {operand} shall be an alphanumeric or "
             + $"national literal, not a numeric one (ISO §12.3.7.3 SR{rule})");
         return null;
@@ -537,7 +537,7 @@ public sealed partial class DataBinder
             if (cur.PIC_STRING()?.GetText() is { } sym && !sym.Equals("SYMBOL", StringComparison.OrdinalIgnoreCase))
                 Edition.Error("COBOLNET0892", $"CURRENCY SIGN: expected 'WITH PICTURE SYMBOL', found 'PICTURE {sym}' (ISO §12.3.7)");
             if (lits.Length > 1 && CurrencyTextLiteral(lits[1], "literal-8", "26") is null) return;
-            string literal8 = lits.Length > 1 ? LiteralCharsOf(lits[1], national: false, sr11: false) : "";
+            string literal8 = lits.Length > 1 ? LiteralCharsOf(lits[1], sr11: false) : "";
             if (literal8.Length != 1)
             {
                 Edition.Error("COBOLNET0892", "CURRENCY SIGN: the PICTURE SYMBOL literal shall be a single "
@@ -1025,10 +1025,10 @@ public sealed partial class DataBinder
         // here and folds to the one literal SR10 then classes. Refusing it would reject conforming source.
         if (nn?.concatenationExpression() is { } cat)
         {
-            // A figurative HIGH-/LOW-VALUE written INSIDE SPECIAL-NAMES takes the NATIVE extremes of the
-            // clause's NATIONAL phrase (§12.3.7.4 GR10) — neither clause here has one — and SR11 forbids a
+            // A figurative HIGH-/LOW-VALUE written INSIDE SPECIAL-NAMES takes the NATIVE extremes
+            // (§12.3.7.4 GR10 — one pair for both classes, owner R52) and SR11 forbids a
             // symbolic-character operand in literal-9 (the posture this screen gives literal-4 as well).
-            var folded = ConcatFolder.Fold(cat, Edition, LiteralEnvironment.SpecialNames(this, nationalPhrase: false,
+            var folded = ConcatFolder.Fold(cat, Edition, LiteralEnvironment.SpecialNames(this,
                 refusesSymbolicCharacters: true));
             if (folded.Category is not (PicCategory.Alphanumeric or PicCategory.National))
             {
@@ -1288,7 +1288,7 @@ public sealed partial class DataBinder
     /// when the NATIONAL phrase is specified, or in the native alphanumeric collating sequence otherwise</i>"; the
     /// remaining figurative words are §8.3.3.6 constants of the clause's class). ONE list for both arms — the
     /// national arm used to keep its own copy under a different name.</summary>
-    private static bool IsAlphabetFigurativeWord(string word) => AlphabetFigurative(word, national: false) is not null;
+    private static bool IsAlphabetFigurativeWord(string word) => AlphabetFigurative(word) is not null;
 
     /// <summary>⛔ THE ONE literal-phrase alphabet builder (ISO §12.3.7.4 GR7 k), for the ALPHANUMERIC arm and the
     /// <c>FOR NATIONAL</c> arm alike. GR7 k states its six sub-rules once, "<i>where the native coded character set
@@ -1387,7 +1387,7 @@ public sealed partial class DataBinder
         // The sparse arrays and the §12.3.7.4 GR8/GR9 extremes — CollatingTable.Build, the ONE place either is
         // computed, shared with the implementor code-name arm (GR7 i/j) which walks a code page instead of a
         // clause. This method used to carry its own copy of the extremes rule (kb/Work PB793).
-        return CollatingTable.Build(pos, specOrder, repByPos, next, national);
+        return CollatingTable.Build(pos, specOrder, repByPos, next);
     }
 
     /// <summary>A character named in a diagnostic: its literal form when it is printable, else its U+ code point.</summary>
@@ -1537,11 +1537,11 @@ public sealed partial class DataBinder
                 // clause answering a different question (kb/Work PB976's sweep) — and the CLASS clause decoded it
                 // as the characters of its own spelling (`ALL"AB"`).
                 if (fig.ALL() is not null)
-                    return ConcatFolder.FoldAllLiteral(fig, LiteralEnvironment.SpecialNames(this, r.National,
+                    return ConcatFolder.FoldAllLiteral(fig, LiteralEnvironment.SpecialNames(this,
                             refusesSymbolicCharacters: true), Edition) is { } literal1 ? AllLiteralCharacters(fig, literal1, r)
-                        : AlphabetFigurative(fig.GetChild(1).GetText(), r.National) is { } oneChar ? oneChar
+                        : AlphabetFigurative(fig.GetChild(1).GetText()) is { } oneChar ? oneChar
                         : FigurativeNotACharacter(fig, r);
-                if (AlphabetFigurative(fig.GetText(), r.National) is { } figValue) return figValue;
+                if (AlphabetFigurative(fig.GetText()) is { } figValue) return figValue;
                 return FigurativeNotACharacter(fig, r);
             case Core.LiteralContext lit:
                 string text = lit.GetText();
@@ -1585,8 +1585,8 @@ public sealed partial class DataBinder
                         + $"through the maximum number of characters in that set (ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
                     return null;
                 }
-                if (OperandLiteralClass(lit, r.National) == r.LiteralClass)
-                    return LiteralCharsOf(lit, r.National, sr11: true);
+                if (OperandLiteralClass(lit) == r.LiteralClass)
+                    return LiteralCharsOf(lit, sr11: true);
                 // The class rule. A noninteger literal of the wrong class: name the rule, then RECOVER with the
                 // literal's characters when it is a string at all, so one bad operand does not cascade.
                 Edition.Error(r.Code, $"{r.What}: {text} — each noninteger literal shall be "
@@ -1598,7 +1598,7 @@ public sealed partial class DataBinder
                 // unrecognized word is code-name-1/-2, which AlphabetCodeName has already resolved or refused for
                 // the only shape it can legally take, and inside a multi-operand phrase it is a class-rule
                 // violation — never the characters of its own spelling (kb/Work PB770 leg e).
-                if (AlphabetFigurative(w.GetText(), r.National) is { } wordValue) return wordValue;
+                if (AlphabetFigurative(w.GetText()) is { } wordValue) return wordValue;
                 // §12.3.7.3 SR11 — literal-1 … literal-6 "shall specify neither a symbolic-character figurative
                 // constant nor a zero-length literal": a symbolic-character name reaches here as a word, and it is
                 // THAT rule it breaks, not the class rule below (kb/Work PB226).
@@ -1686,10 +1686,10 @@ public sealed partial class DataBinder
     /// <c>CLASS C IS N"0" THRU N"9"</c> compiled clean (kb/Work PB976). A §8.8.3.3 concatenation expression is of
     /// the class §8.8.3.3 GR1 folds pairwise — THE ConcatFolder answer, never the leading operand's prefix, which
     /// called <c>SPACE &amp; N"A"</c> alphanumeric (kb/Work PB1406).</summary>
-    private LiteralClass? OperandLiteralClass(Core.LiteralContext lit, bool national)
+    private LiteralClass? OperandLiteralClass(Core.LiteralContext lit)
     {
         if (lit.nonNumericLiteral()?.concatenationExpression() is { } ce)
-            return ConcatFolder.ClassOf(ce, LiteralEnvironment.SpecialNames(this, national, refusesSymbolicCharacters: true)) switch
+            return ConcatFolder.ClassOf(ce, LiteralEnvironment.SpecialNames(this, refusesSymbolicCharacters: true)) switch
             {
                 PicCategory.National => LiteralClass.National,
                 PicCategory.Boolean => LiteralClass.Boolean,
@@ -1704,24 +1704,17 @@ public sealed partial class DataBinder
     /// lowest positions, respectively, in the native national collating sequence, when the NATIONAL phrase is
     /// specified, or in the native alphanumeric collating sequence otherwise</i>" — so they are the NATIVE extremes
     /// here, never the sequence being defined. SPACE, QUOTE and ZERO are their §8.3.3.6 characters.
-    /// <para>Null for any other word, which is then not an operand at all. The alphanumeric HIGH-VALUE stays at
-    /// U+00FF: the documented §8.3.3.6 byte-stability pin recorded in PHASE4_RECONCILIATION, the same one
-    /// <see cref="AlphabetExtremes"/> keeps.</para></summary>
-    private static string? AlphabetFigurative(string word, bool national) => word.ToUpperInvariant() switch
+    /// <para>Null for any other word, which is then not an operand at all. Both native sequences answer HIGH-VALUE
+    /// U+FFFF (owner decision kb/Work R52 — <see cref="CobolNet.Runtime.NativeCollatingSequence"/>).</para></summary>
+    private static string? AlphabetFigurative(string word) => word.ToUpperInvariant() switch
     {
-        "HIGH-VALUE" or "HIGH-VALUES" => NativeHighValue(national).ToString(),
-        "LOW-VALUE" or "LOW-VALUES" => "\u0000",
+        "HIGH-VALUE" or "HIGH-VALUES" => CobolNet.Runtime.NativeCollatingSequence.HighValue.ToString(),
+        "LOW-VALUE" or "LOW-VALUES" => CobolNet.Runtime.NativeCollatingSequence.LowValue.ToString(),
         "SPACE" or "SPACES" => " ",
         "QUOTE" or "QUOTES" => "\"",
         "ZERO" or "ZEROS" or "ZEROES" => "0",
         _ => null,
     };
-
-    /// <summary>The highest character of the NATIVE collating sequence — §12.3.7.4 GR10's HIGH-VALUE inside
-    /// SPECIAL-NAMES: the native national sequence is the UTF-16 code-unit order (D-N3), so U+FFFF; the alphanumeric
-    /// one keeps the U+00FF pin <see cref="AlphabetFigurative"/> documents. ONE statement for that word-keyed operand
-    /// mapping and for the concatenation fold's <see cref="LiteralEnvironment.SpecialNames"/> context.</summary>
-    internal static char NativeHighValue(bool national) => national ? '\uFFFF' : '\u00FF';
 
     /// <summary>Whether <paramref name="word"/> is a symbolic-character name of this paragraph — declared by any
     /// SYMBOLIC CHARACTERS clause, read syntactically because the clauses are order-free (kb/Work PB226), or already
@@ -1733,15 +1726,15 @@ public sealed partial class DataBinder
     internal LiteralEnvironment LiteralEnv => LiteralEnvironment.Program(this);
 
     /// <summary>The characters of an alphabet-entry string literal: a §8.8.3.3 GR3 concatenation folded first — in
-    /// the SPECIAL-NAMES environment of the clause's NATIONAL phrase (§12.3.7.4 GR10), with §12.3.7.3 SR11's
+    /// the SPECIAL-NAMES environment (§12.3.7.4 GR10's native extremes), with §12.3.7.3 SR11's
     /// symbolic-character prohibition when <paramref name="sr11"/> —, the §8.3.3.2 hexadecimal format decoded
     /// pairwise, otherwise the literal's own characters. ⛔ It never resolves an ORDINAL — that is SR14 b1/c1's job
     /// and it lives in <see cref="AlphabetOperands"/>, so the ALPHABET path can no longer inherit the CLASS clause's
     /// descriptor, message and rule number (kb/Work PB770 leg d).</summary>
-    private string LiteralCharsOf(Core.LiteralContext lit, bool national, bool sr11)
+    private string LiteralCharsOf(Core.LiteralContext lit, bool sr11)
     {
         if (lit.nonNumericLiteral()?.concatenationExpression() is { } ce)
-            return ConcatFolder.Fold(ce, Edition, LiteralEnvironment.SpecialNames(this, national, sr11)).Value;
+            return ConcatFolder.Fold(ce, Edition, LiteralEnvironment.SpecialNames(this, sr11)).Value;
         string text = lit.GetText();
         if (CobolLiteral.IsStringLiteral(text)) return CobolLiteral.Decode(text);
         if (text.Length >= 3 && text[0] is 'X' or 'x' && text[1] is '"' or '\'') return CobolLiteral.DecodeHex(text);

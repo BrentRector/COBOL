@@ -119,16 +119,18 @@ public sealed record FixedFileAttributes(
         if (collation is null) return "NATIVE";
         try
         {
-            // FNV-1a over the sequence's position count and the weights of the Latin-1 repertoire — the byte
-            // range every record key of an indexed file is sliced from (the connectors compare key images as
-            // Latin-1 characters).
+            // FNV-1a over the sequence's position count and the weight of EVERY native character — the 65,536
+            // UTF-16 code units a key compares over in memory (D-N1; kb/Work PB1093, R52). A walk of only the
+            // Latin-1 block let two sequences that differ above U+00FF (where the alphanumeric HIGH-VALUE U+FFFF
+            // and every wide character sit) share a fingerprint, so a file created under one opened '00' under
+            // the other.
             ulong h = 14695981039346656037UL;
             void Mix(long v)
             {
                 for (int b = 0; b < 8; b++) { h ^= (byte)(v >> (b * 8)); h *= 1099511628211UL; }
             }
             Mix(collation.PositionCount);
-            for (int c = 0; c <= 0xFF; c++) Mix(collation.Weight((char)c));
+            for (int c = 0; c <= char.MaxValue; c++) Mix(collation.Weight((char)c));
             return h.ToString("x16", CultureInfo.InvariantCulture);
         }
         catch (Exception)   // a sequence that refuses to be probed is not evidence of a conflict

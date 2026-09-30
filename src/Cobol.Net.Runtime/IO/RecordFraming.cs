@@ -213,7 +213,7 @@ internal static class RecordFraming
             // The file coded character set's STRICT encoding (kb/Work PB690): the keyed WRITE/REWRITE refused any
             // record holding a character with no byte image ('91'), so an exception here is a missed refusal —
             // loud, raised before the stream is truncated — never a silent '?'.
-            byte[] payload = FileCharacterSet.Medium.GetBytes(codeSet is null ? frame.Image : codeSet.ToMedium(frame.Image));
+            byte[] payload = FileCharacterSet.Medium.GetBytes(FileCharacterSet.ToChannel(frame.Image, codeSet));
             BinaryPrimitives.WriteUInt32LittleEndian(len, FrameWord(payload.Length, frame.Extents));
             composed.Write(len);
             if (frame.Extents is { } extents) composed.Write(EncodeExtentTable(extents));
@@ -273,7 +273,7 @@ internal static class RecordFraming
                 if ((long)at + n > size) break;          // a torn tail ends the store (long: n is a uint)
                 string image = Encoding.Latin1.GetString(all, at, (int)n);
                 at += (int)n;
-                frames.Add(new StoredFrame(codeSet is null ? image : codeSet.ToNative(image), extents));
+                frames.Add(new StoredFrame(FileCharacterSet.FromChannel(image, codeSet), extents));
             }
             return frames;
         }

@@ -76,7 +76,7 @@ public static class CobolBits
         {
             int p = startBit + i, b = p / BitsPerByte;
             bits[i] = b >= 0 && b < image.Length
-                      && (image[b] & (1 << (BitsPerByte - 1 - p % BitsPerByte))) != 0 ? '1' : '0';
+                      && (StorageByte.ToByte(image[b]) & (1 << (BitsPerByte - 1 - p % BitsPerByte))) != 0 ? '1' : '0';
         }
         return new string(bits);
     }
@@ -109,7 +109,8 @@ public static class CobolBits
             if (b < 0) continue;
             if (b >= buf.Length) break;
             int mask = 1 << (BitsPerByte - 1 - p % BitsPerByte);
-            buf[b] = (char)(bits[i] == '1' ? buf[b] | mask : buf[b] & ~mask);
+            int bite = StorageByte.ToByte(buf[b]);
+            buf[b] = StorageByte.ToChar((byte)(bits[i] == '1' ? bite | mask : bite & ~mask));
         }
     }
 
@@ -139,8 +140,8 @@ public static class CobolBits
     /// disagree about which byte comes first.</summary>
     private static void PutNat(char[] buf, int at, char c)
     {
-        buf[at] = (char)(c >> 8);
-        buf[at + 1] = (char)(c & 0xFF);
+        buf[at] = StorageByte.ToChar((byte)(c >> 8));
+        buf[at + 1] = StorageByte.ToChar((byte)c);
     }
 
     /// <summary>Bytes per national character position — ISO §13.18.60.4 GR8 leaves the size to the implementor
@@ -164,7 +165,7 @@ public static class CobolBits
         {
             int hi = startByte + BytesPerNational * i;
             chars[i] = hi >= 0 && hi + 1 < image.Length
-                ? (char)((image[hi] << 8) | (image[hi + 1] & 0xFF))
+                ? (char)((StorageByte.ToByte(image[hi]) << 8) | StorageByte.ToByte(image[hi + 1]))
                 : ' ';
         }
         return new string(chars);

@@ -177,7 +177,7 @@ public static class FileStatusCode
 
     /// <summary>'91' — the SECOND implementor-defined I-O status (§9.1.13.11 item 1; Annex A.1 item 110,
     /// docs/CONFORMANCE.md DOC-A.1-110): a WRITE or REWRITE whose record holds a character with no byte image in
-    /// the file's coded character set — a character above <see cref="FileCharacterSet.Highest"/> written to a
+    /// the file's coded character set — a character with no byte image (above U+00FF and not HIGH-VALUE, <see cref="StorageByte.HasByte"/>) written to a
     /// record sequential, report, relative or indexed file with no CODE-SET conversion (owner decision
     /// kb/Work R47; Annex A.1 item 31, DOC-A.1-31; kb/Work PB690), or, on a file with one, a character the
     /// CODE-SET alphabet's coded character set does not represent (§13.18.13.4 GR6 b — a character above U+007F

@@ -40,9 +40,7 @@ namespace CobolNet.Binding;
 /// <c>NextFree + (0x10000 − Codes.Length)</c> positions — the §15.15.3 r2 domain bound.</param>
 /// <param name="HighValue">The runtime HIGH-VALUE character under this sequence (§12.3.7.4 GR8 + §8.3.3.6 GR6/7):
 /// the character at the HIGHEST position; a tie (an ALSO group at the top) takes the LAST character specified.
-/// ⚠ The ALPHANUMERIC arm deliberately still computes it over the Latin-1 block — the documented byte-stability
-/// pin (the flagged §8.3.3.6 divergence recorded in PHASE4_RECONCILIATION), not an oversight of GR7 k3's
-/// tail.</param>
+/// Both classes compute it over the whole 65,536-unit repertoire (owner decision kb/Work R52).</param>
 /// <param name="LowValue">The runtime LOW-VALUE character (§12.3.7.4 GR9): lowest position; tie takes the FIRST
 /// character specified.</param>
 public sealed record CollatingTable(ushort[] Codes, ushort[] Positions, ushort[] RepByPos, int NextFree,
@@ -64,8 +62,6 @@ public sealed record CollatingTable(ushort[] Codes, ushort[] Positions, ushort[]
     /// <param name="repByPos">Per position 0…<paramref name="nextFree"/>−1, the FIRST character DEFINED there
     /// (§12.3.7.4 GR7 k6 / §15.15.4 r2 — an ALSO group's literal-1).</param>
     /// <param name="nextFree">The first position after the specified block.</param>
-    /// <param name="national">Which native repertoire the unspecified tail sits in — it decides only where
-    /// <see cref="Extremes"/> starts looking for GR8's character.</param>
     /// <remarks>⛔ POSITIONS AND COUNTS ARE <see cref="int"/> HERE, AND ONLY THE STORED ARRAYS ARE 16-BIT (kb/Work
     /// PB1557). A position is 0 … <see cref="Repertoire"/> − 1, which a <see cref="ushort"/> holds; the COUNT of
     /// positions is 0 … <see cref="Repertoire"/>, which it does not. An alphabet that specifies every native
@@ -75,7 +71,7 @@ public sealed record CollatingTable(ushort[] Codes, ushort[] Positions, ushort[]
     /// the wrong characters and every ordinal of its coded character set "did not exist". The invariants are
     /// asserted, not assumed, so a builder that miscounts fails HERE rather than in a user's program.</remarks>
     public static CollatingTable Build(Dictionary<char, int> pos, List<char> specOrder, List<char> repByPos,
-        int nextFree, bool national)
+        int nextFree)
     {
         if (nextFree is < 0 or > Repertoire || repByPos.Count != nextFree)
             throw new ArgumentOutOfRangeException(nameof(nextFree), nextFree,
@@ -91,7 +87,7 @@ public sealed record CollatingTable(ushort[] Codes, ushort[] Positions, ushort[]
                     $"U+{(int)codes[i]:X4} is at position {p}, outside the specified block 0 … {nextFree - 1}");
             positions[i] = (ushort)p;
         }
-        var (high, low) = Extremes(pos, specOrder, positions, national);
+        var (high, low) = Extremes(pos, specOrder, positions);
         return new CollatingTable([.. codes.Select(c => (ushort)c)], positions,
             [.. repByPos.Select(c => (ushort)c)], nextFree, high, low);
     }
@@ -124,20 +120,18 @@ public sealed record CollatingTable(ushort[] Codes, ushort[] Positions, ushort[]
     /// LOWEST positions, a tie going to the LAST (GR8) / FIRST (GR9) character specified.
     /// <para>The LOW end is common to both classes: position 0 belongs to the first character specified, and a
     /// position-0 ALSO tie resolves to that same character.</para>
-    /// <para>The HIGH end differs, and the difference is a DOCUMENTED PIN, not an asymmetry of the rule.
-    /// Unspecified characters sit above every specified one (GR7 k3), so GR8's character is the largest
-    /// UNSPECIFIED code unit — U+FFFF for the national arm. The ALPHANUMERIC arm deliberately keeps computing it
-    /// over the Latin-1 block (U+00FF unless specified): the flagged §8.3.3.6 byte-stability divergence recorded
-    /// in PHASE4_RECONCILIATION, which HIGH-VALUE's single-byte alphanumeric width depends on. ⚠ When the whole
-    /// block IS specified — which every 256-entry single-byte code-name page does — the walk falls through to
-    /// GR8's own tie rule over the specified positions, giving the native character the code page puts at its
-    /// HIGHEST code unit. That is the answer an EBCDIC programmer expects (HIGH-VALUE is X'FF' on the
-    /// medium).</para></summary>
+    /// <para>The HIGH end is the same rule for both classes, over the ONE native repertoire (the 65,536 UTF-16 code
+    /// units, D-N1; owner decision kb/Work R52, which retired the alphanumeric arm's Latin-1 pin — kb/Work PB1093).
+    /// Unspecified characters sit above every specified one (GR7 k3), so GR8's character is the largest UNSPECIFIED
+    /// code unit — U+FFFF unless the definition specified it. A 256-entry single-byte code-name page (EBCDIC)
+    /// specifies only U+0000–U+00FF, so its HIGH-VALUE is U+FFFF too, which crosses a byte medium as 0xFF by the
+    /// storage-byte law (<c>CobolNet.Runtime.StorageByte</c>). Only a definition that specifies EVERY code unit
+    /// falls through to GR8's own tie rule over the specified positions.</para></summary>
     private static (char High, char Low) Extremes(Dictionary<char, int> pos, List<char> specOrder,
-        ushort[] positions, bool national)
+        ushort[] positions)
     {
         char low = specOrder[0];
-        char high = national ? (char)0xFFFF : (char)0xFF;
+        char high = CobolNet.Runtime.NativeCollatingSequence.HighValue;
         while (pos.ContainsKey(high) && high > (char)0) high--;
         if (pos.ContainsKey(high))               // the whole block is specified — GR8's tie rule over it
         {
@@ -195,7 +189,7 @@ public sealed record AlphabetDef(CollatingTable? Table, LocaleCollatingSpec? Loc
     public bool IsIdentity => Table is null && Locale is null;
 
     /// <summary>The sequence's HIGH-VALUE character (§12.3.7.4 GR8 / §8.3.3.6.4 GR6).</summary>
-    public char HighValue => Table?.HighValue ?? (Locale is not null ? (char)0xFFFF : (char)0xFF);
+    public char HighValue => Table?.HighValue ?? CobolNet.Runtime.NativeCollatingSequence.HighValue;
 
     /// <summary>The sequence's LOW-VALUE character (§12.3.7.4 GR9 / §8.3.3.6.4 GR7).</summary>
     public char LowValue => Table?.LowValue ?? (char)0;
@@ -255,7 +249,7 @@ public sealed record NationalAlphabetDef(CollatingTable? Table, LocaleCollatingS
 
     /// <summary>The national HIGH-VALUE character (§12.3.7.4 GR8): the table's, else U+FFFF (a LOCALE sequence's
     /// maximum and the native national pin alike).</summary>
-    public char HighValue => Table?.HighValue ?? (char)0xFFFF;
+    public char HighValue => Table?.HighValue ?? CobolNet.Runtime.NativeCollatingSequence.HighValue;
 
     /// <summary>The national LOW-VALUE character (§12.3.7.4 GR9): the table's, else U+0000.</summary>
     public char LowValue => Table?.LowValue ?? (char)0;

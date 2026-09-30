@@ -333,12 +333,13 @@ public static partial class CobolIntrinsics
         return (byte)'?';
     }
 
-    /// <summary>The shared char==byte reduction of the bit/byte pathway: one byte per code unit, with the
-    /// documented item-209 substitution (<see cref="ByteSub"/>) for a unit above 0xFF.</summary>
+    /// <summary>The shared char==byte reduction of the bit/byte pathway: one byte per code unit by the storage-byte
+    /// law (<see cref="StorageByte"/> — the HIGH-VALUE character U+FFFF is the byte 0xFF, owner R52), with the
+    /// documented item-209 substitution (<see cref="ByteSub"/>) for any other unit above 0xFF.</summary>
     private static byte[] RawBytes(string s)
     {
         var b = new byte[s.Length];
-        for (int i = 0; i < s.Length; i++) b[i] = s[i] <= 0xFF ? (byte)s[i] : ByteSub();
+        for (int i = 0; i < s.Length; i++) b[i] = StorageByte.HasByte(s[i]) ? StorageByte.ToByte(s[i]) : ByteSub();
         return b;
     }
 

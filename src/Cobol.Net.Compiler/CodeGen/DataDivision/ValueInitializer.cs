@@ -411,7 +411,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
         new(PicCategory.Alphanumeric, Usage.Display, item.ImageWidth, Digits: 0, Scale: 0, Signed: false);
 
     /// <summary>If <paramref name="raw"/> is a figurative constant, its C# initializer given the receiver's category
-    /// and width; otherwise null (ISO §8.3.3.6; HIGH/LOW = U+00FF/U+0000 per COBOLNET_DESIGN §14.9).</summary>
+    /// and width; otherwise null (ISO §8.3.3.6; native HIGH/LOW = U+FFFF/U+0000, owner R52).</summary>
     /// <summary>⛔ THE ONE INITIAL BOOLEAN CARRIER of an elementary boolean item with a VALUE clause — its
     /// <c>pic.Length</c> boolean positions, in the SAME three arms the standard writes them in, for every lane
     /// that needs them (the record-struct field, the §8.5.1.6.3 bit-run carrier, and the character-image seed —

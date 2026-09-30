@@ -23,19 +23,38 @@ namespace CobolNet.Runtime.IO;
 /// and <see cref="Medium"/> is the encoding every record-data write uses, with an EXCEPTION fallback: a path
 /// that ever skipped the test fails loudly instead of reviving the silent <c>?</c>. The test is the answer; the
 /// encoding is the guard that keeps it the only answer.</para>
-/// <para>Reading needs no rule: every byte decodes to U+0000–U+00FF. A file with a CODE-SET conversion is out of
-/// scope here — its conversion (§13.18.13, <see cref="CodeSetConversion"/>) decides what has an image.</para></summary>
+/// <para><b>HIGH-VALUE is the byte 0xFF</b> (owner decisions kb/Work R51 / R52; design D29; kb/Work PB1759). The
+/// native HIGH-VALUE character is U+FFFF, and it crosses the medium by the ONE storage-byte law
+/// (<see cref="StorageByte"/>): U+FFFF is written as 0xFF and 0xFF is read as U+FFFF. That is the channel mapping
+/// <see cref="ToChannel"/> / <see cref="FromChannel"/> perform on the NATIVE side of a CODE-SET conversion, so a
+/// record struct, a REDEFINES backing and an elementary record cross it identically and a byte-form leaf's 0xFF
+/// (imaged U+FFFF in memory by the same law) survives the round trip. The accepted cost: a real <c>ÿ</c>
+/// (U+00FF) also occupies 0xFF, so it reads back as HIGH-VALUE (DOC-A.1-31).</para></summary>
 public static class FileCharacterSet
 {
-    /// <summary>The highest character with a byte image — U+00FF, the last ISO/IEC 8859-1 code point.</summary>
-    public const char Highest = 'ÿ';
-
     /// <summary>True when <paramref name="record"/> holds at least one character with no byte image in the file
-    /// coded character set — a code unit above <see cref="Highest"/>. A national record area's characters reach
-    /// the connector already as their UTF-16BE byte pairs (one char per byte, §13.18.60.4 GR8 / D-N1), so the one
+    /// coded character set — a code unit above U+00FF other than the HIGH-VALUE character
+    /// (<see cref="StorageByte.HasByte"/>). A national record area's characters reach the connector already as
+    /// their UTF-16BE byte pairs (one char per byte by the storage-byte law, §13.18.60.4 GR8 / D-N1), so the one
     /// test serves both record-area classes.</summary>
-    public static bool HasCharacterWithoutByteImage(ReadOnlySpan<char> record) =>
-        record.ContainsAnyExceptInRange('\0', Highest);
+    public static bool HasCharacterWithoutByteImage(ReadOnlySpan<char> record) => StorageByte.AnyWithoutByte(record);
+
+    /// <summary>⛔ THE NATIVE → CHANNEL mapping of a record image about to be written — every physical write of
+    /// record data passes through here (<c>FileConnector.ToMedium</c>, <see cref="RecordFraming.WriteStore"/>).
+    /// The HIGH-VALUE character takes its byte 0xFF (<see cref="StorageByte"/>), and a CODE-SET conversion
+    /// (§13.18.13.4 GR6 b) then replaces each native channel character with its coded character; with none
+    /// (GR7) the channel IS the medium. The output statement has already refused a record holding a character
+    /// with no byte image (<see cref="HasCharacterWithoutByteImage"/>, <see cref="CodeSetConversion.HasCharacterWithoutImage"/>).</summary>
+    public static string ToChannel(string native, CodeSetConversion? codeSet) =>
+        codeSet is not null ? codeSet.ToMedium(native)
+        : native.Replace(NativeCollatingSequence.HighValue, (char)StorageByte.ToByte(NativeCollatingSequence.HighValue));
+
+    /// <summary>⛔ THE CHANNEL → NATIVE mapping of a record image just read — the inverse of <see cref="ToChannel"/>:
+    /// a CODE-SET conversion first (§13.18.13.4 GR6 a), then the storage-byte law, which reads 0xFF as the HIGH-VALUE
+    /// character.</summary>
+    public static string FromChannel(string channel, CodeSetConversion? codeSet) =>
+        codeSet is not null ? codeSet.ToNative(channel)
+        : channel.Replace((char)StorageByte.ToByte(NativeCollatingSequence.HighValue), NativeCollatingSequence.HighValue);
 
     /// <summary>The file coded character set as an <see cref="Encoding"/>: ISO/IEC 8859-1 with EXCEPTION
     /// fallbacks, so an unrepresentable character can never be silently replaced (see the type remarks).</summary>

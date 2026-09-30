@@ -102,7 +102,8 @@ public sealed class CodeSetConversion
     /// <summary>§13.18.13.4 GR6 b's MEMBERSHIP question — true when <paramref name="native"/> has an "<i>associated
     /// coded character as defined in the alphabet being used</i>", i.e. is a character of this coded character
     /// set. A native character above the one-byte channel never is.</summary>
-    public bool Represents(char native) => native < ChannelUnits && _toMedium[native] < _toNative.Length;
+    public bool Represents(char native) =>
+        StorageByte.HasByte(native) && _toMedium[StorageByte.ToByte(native)] < _toNative.Length;
 
     /// <summary>True when <paramref name="record"/> holds at least one character this coded character set does
     /// not represent (<see cref="Represents"/>) — GR6 b cannot replace it, so the output statement is
@@ -133,7 +134,7 @@ public sealed class CodeSetConversion
                 // It is not a member (Represents), so a WRITE or REWRITE of it is refused like any other
                 // non-member, and ToMedium carries it back to the same unit when a store re-persists the record.
                 // Unreachable for a complete single-byte page.
-                dst[i] = u < map.Length ? map[u] : u;
+                dst[i] = StorageByte.ToChar((byte)(u < map.Length ? map[u] : u));
             }
         });
     }
@@ -153,11 +154,11 @@ public sealed class CodeSetConversion
             for (int i = 0; i < src.Length; i++)
             {
                 char c = src[i];
-                if (c >= ChannelUnits)
+                if (!StorageByte.HasByte(c))
                     throw new InvalidOperationException($"the record contains U+{(int)c:X4}, which the file's "
                         + "CODE-SET coded character set does not represent, and no WRITE or REWRITE screen refused it "
                         + "(ISO §13.18.13.4 GR6 b)");
-                dst[i] = map[c];
+                dst[i] = map[StorageByte.ToByte(c)];
             }
         });
     }

@@ -831,11 +831,11 @@ public abstract class FileConnector
     /// <summary>⛔ GR6 a — the NATIVE form of a record image just taken off the storage medium. Every physical
     /// read of record data passes through here; see <see cref="CodeSetConversion"/> for why the framing around
     /// the record does not.</summary>
-    protected string FromMedium(string mediumImage) => CodeSet is null ? mediumImage : CodeSet.ToNative(mediumImage);
+    protected string FromMedium(string mediumImage) => FileCharacterSet.FromChannel(mediumImage, CodeSet);
 
     /// <summary>⛔ GR6 b — the STORAGE-MEDIUM form of a record image about to be written. Every physical write of
     /// record data passes through here.</summary>
-    protected string ToMedium(string nativeImage) => CodeSet is null ? nativeImage : CodeSet.ToMedium(nativeImage);
+    protected string ToMedium(string nativeImage) => FileCharacterSet.ToChannel(nativeImage, CodeSet);
 
     /// <summary>⛔ THE ONE ANSWER TO "can this record be written in the file's coded character set?" for every
     /// organization's WRITE and REWRITE (owner decision kb/Work R47; Annex A.1 item 31; kb/Work PB690, PB1150,

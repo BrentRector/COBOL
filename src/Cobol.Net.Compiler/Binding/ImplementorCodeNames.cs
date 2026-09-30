@@ -176,6 +176,6 @@ public static class ImplementorCodeNames
             repByPos.Add(toNative[unit]);
         }
         return new ImplementorCodeName(name, National: false, toNative.Length,
-            CollatingTable.Build(pos, order, repByPos, toNative.Length, national: false), toNative);
+            CollatingTable.Build(pos, order, repByPos, toNative.Length), toNative);
     }
 }

@@ -159,9 +159,9 @@ public static partial class CobolNum
         int take = image is null ? 0 : Math.Min(n, image.Length);
         // HIGH-ORDER-RIGHT (§13.18.60.4 GR19b): the LAST byte is the most significant — walk reversed.
         if (item.FloatLittleEndian)
-            for (int i = take - 1; i >= 0; i--) bits = (bits << 8) | (byte)image![i];
+            for (int i = take - 1; i >= 0; i--) bits = (bits << 8) | StorageByte.ToByte(image![i]);
         else
-            for (int i = 0; i < take; i++) bits = (bits << 8) | (byte)image![i];
+            for (int i = 0; i < take; i++) bits = (bits << 8) | StorageByte.ToByte(image![i]);
         return bits;
     }
 
@@ -177,7 +177,7 @@ public static partial class CobolNum
     {
         var chars = new char[n];
         for (int i = 0; i < n; i++)
-            chars[i] = (char)(byte)(bits >> (8 * (littleEndian ? i : n - 1 - i)));
+            chars[i] = StorageByte.ToChar((byte)(bits >> (8 * (littleEndian ? i : n - 1 - i))));
         return new string(chars);
     }
 
@@ -374,7 +374,7 @@ public static partial class CobolNum
     private static string BinaryBytes(UInt128 raw, int n)
     {
         var chars = new char[n];
-        for (int i = 0; i < n; i++) chars[i] = (char)(byte)(raw >> (8 * (n - 1 - i)));
+        for (int i = 0; i < n; i++) chars[i] = StorageByte.ToChar((byte)(raw >> (8 * (n - 1 - i))));
         return new string(chars);
     }
 
@@ -385,7 +385,7 @@ public static partial class CobolNum
         // A window shorter than the pinned width can only arrive from incompatible data (a short record's pad,
         // §14.6.13.2 leaves it undefined): the bytes present are read as the LOW-order bytes, deterministically.
         int take = image is null ? 0 : Math.Min(n, image.Length);
-        for (int i = 0; i < take; i++) raw = (raw << 8) | (byte)image![i];
+        for (int i = 0; i < take; i++) raw = (raw << 8) | StorageByte.ToByte(image![i]);
         // UNCHECKED: a 16-byte unsigned container value ≥ 2^127 has no Int128 image, and the reinterpretation is
         // exactly what ParseImageU128 converts back — an overflow throw here would be a wrong stage, not a
         // diagnosis (the value is legal; §13.18.60.4 GR12 gives the item its full container range).
@@ -430,7 +430,7 @@ public static partial class CobolNum
             nibbles[^1] = item.Signed ? (negative ? SignNegative : SignPositive) : SignUnsigned;
 
         var chars = new char[n];
-        for (int i = 0; i < n; i++) chars[i] = (char)((nibbles[2 * i] << 4) | nibbles[2 * i + 1]);
+        for (int i = 0; i < n; i++) chars[i] = StorageByte.ToChar((byte)((nibbles[2 * i] << 4) | nibbles[2 * i + 1]));
         return new string(chars);
     }
 
@@ -444,7 +444,7 @@ public static partial class CobolNum
         Int128 mag = 0;
         for (int i = 0; i < digitNibbles; i++)
         {
-            int nib = (i % 2 == 0 ? image![i / 2] >> 4 : image![i / 2]) & 0x0F;
+            int nib = (i % 2 == 0 ? StorageByte.ToByte(image![i / 2]) >> 4 : StorageByte.ToByte(image![i / 2])) & 0x0F;
             // A non-decimal nibble is incompatible data (§14.6.13.2, undefined) — contribute no digit, exactly
             // as the zoned decoder ignores a non-digit character, so the decode stays deterministic.
             if (nib <= 9) mag = mag * 10 + nib;
@@ -452,7 +452,7 @@ public static partial class CobolNum
         if (!hasSignNibble || take == 0) return mag;
         // The IBM sign-nibble reading every packed producer agrees on: 0xB and 0xD are negative, everything else
         // (0xA, 0xC, 0xE, 0xF, and a digit written by a careless producer) is positive.
-        int sign = image![take - 1] & 0x0F;
+        int sign = StorageByte.ToByte(image![take - 1]) & 0x0F;
         return sign is 0x0B or 0x0D ? -mag : mag;
     }
 

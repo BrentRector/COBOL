@@ -193,7 +193,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
     /// <para>⛔ This USED to be the decode itself — two private methods, invisible to every other consumer, whose
     /// <c>raw[0]</c> fall-through silently accepted a fill literal §11.9.10.3 SR1 forbids and took its first
     /// character, and whose private §11.9.10.4 GR5 map spelled HIGH-VALUES as U+FFFF where the rest of the
-    /// compiler says U+00FF (kb/Work PB152). literal-1's byte is now decoded ONCE at bind time, where SR1 gets
+    /// compiler then said U+00FF (kb/Work PB152). literal-1's byte is now decoded ONCE at bind time, where SR1 gets
     /// its diagnostic, and the figurative arms resolve through the compiler's single definition — all three
     /// initial-state arms reading one fact through <see cref="InitialStateBackground"/>.</para></summary>
     private string OptionsFillCharLiteral() => _background.AllocateFillLiteral();

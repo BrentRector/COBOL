@@ -118,7 +118,7 @@ public sealed class CodedCharacterSetTests
             pos[(char)c] = CollatingTable.Repertoire - 1 - c;
             order.Add((char)c);
         }
-        var table = CollatingTable.Build(pos, order, order, CollatingTable.Repertoire, national: true);
+        var table = CollatingTable.Build(pos, order, order, CollatingTable.Repertoire);
         Assert.Equal(CollatingTable.Repertoire, table.NextFree);
 
         var set = new CodedCharacterSet("literal-phrase", National: true, table);
@@ -133,7 +133,7 @@ public sealed class CodedCharacterSetTests
         Assert.Equal(65, runtime.Weight((char)0xFFBE));
 
         // The wrapped count the 16-bit builder used to pass is refused, not tabulated.
-        Assert.Throws<ArgumentOutOfRangeException>(() => CollatingTable.Build(pos, order, order, 0, national: true));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CollatingTable.Build(pos, order, order, 0));
     }
 
     /// <summary>The runtime membership kinds (§8.8.4.4.4 GR3 a — kb/Work PB109): Ascii = the 128 ISO 646 characters;

@@ -66,7 +66,7 @@ internal sealed class InitialStateBackground(EmitContext ctx)
     /// the high-value format "the character … that has the highest ordinal position in the program collating
     /// sequence", so it is a PCS-dependent fact, not a constant. This was measured wrong: PB151's landed
     /// ALLOCATE arm carried its own map spelling HIGH-VALUES as U+FFFF, while every other HIGH-VALUE in the
-    /// compiler is U+00FF under the native sequence — one rule, two places, two answers, and the arm with the
+    /// compiler was U+00FF under the native sequence — one rule, two places, two answers, and the arm with the
     /// private copy was the one that disagreed with the rest of the compiler.</para>
     ///
     /// <para>⛔ GR5 a is NOT GR5 d. "If BINARY ZEROES is specified, a string of binary zeros is the

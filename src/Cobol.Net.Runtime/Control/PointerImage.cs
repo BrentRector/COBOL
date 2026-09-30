@@ -96,6 +96,6 @@ public static class PointerImage
     /// order (DOC-A.1-205/207), so the image read as a BINARY-DOUBLE is the address.</summary>
     private static string Render(long address) => string.Create(Width, address, static (span, a) =>
     {
-        for (int i = 0; i < Width; i++) span[i] = (char)(byte)(a >> (8 * (Width - 1 - i)));
+        for (int i = 0; i < Width; i++) span[i] = StorageByte.ToChar((byte)(a >> (8 * (Width - 1 - i))));
     });
 }

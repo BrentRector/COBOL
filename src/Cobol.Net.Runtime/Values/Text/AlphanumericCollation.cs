@@ -23,6 +23,6 @@ public sealed class AlphanumericCollation : LiteralPhraseCollation
     /// <param name="highValue">The sequence's HIGH-VALUE character (§12.3.7.4 GR8, binder-computed).</param>
     /// <param name="lowValue">The sequence's LOW-VALUE character (§12.3.7.4 GR9).</param>
     public AlphanumericCollation(ushort[] codes, ushort[] positions, ushort[] repByPos, int nextFree,
-        char highValue = (char)0xFF, char lowValue = (char)0)
+        char highValue = NativeCollatingSequence.HighValue, char lowValue = NativeCollatingSequence.LowValue)
         : base(codes, positions, repByPos, nextFree, highValue, lowValue) { }
 }

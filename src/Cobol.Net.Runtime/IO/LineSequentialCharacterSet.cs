@@ -46,12 +46,12 @@ public static class LineSequentialCharacterSet
 
     /// <summary>True when <paramref name="codePoint"/> is a member of the line sequential character set of a
     /// record area of the given class — alphanumeric (<paramref name="national"/> false) is bounded by the file's
-    /// coded character set: <see cref="FileCharacterSet.Highest"/> with no CODE-SET, the CODE-SET alphabet's own
+    /// coded character set: the characters with a byte image (<see cref="StorageByte.HasByte"/>) with no CODE-SET, the CODE-SET alphabet's own
     /// membership (<paramref name="codeSet"/>, <see cref="CodeSetConversion.Represents"/>) with one; national has
     /// no ceiling (see the type remarks).</summary>
     public static bool Contains(int codePoint, bool national, CodeSetConversion? codeSet) =>
         codePoint >= Lowest && (national || (codeSet is null
-            ? codePoint <= FileCharacterSet.Highest
+            ? codePoint <= char.MaxValue && StorageByte.HasByte((char)codePoint)
             : codePoint <= char.MaxValue && codeSet.Represents((char)codePoint)));
 
     /// <summary>True when the record area holds at least one character OUTSIDE the set — the single predicate
@@ -79,7 +79,7 @@ public static class LineSequentialCharacterSet
         // not a byte at all, so it cannot form a national character (FileCharacterSet's one-char-per-byte rule).
         if (FileCharacterSet.HasCharacterWithoutByteImage(recordArea)) return true;
         for (int i = 0; i + 1 < recordArea.Length; i += 2)
-            if (!Contains((recordArea[i] << 8) | recordArea[i + 1], national: true, codeSet)) return true;
+            if (!Contains((StorageByte.ToByte(recordArea[i]) << 8) | StorageByte.ToByte(recordArea[i + 1]), national: true, codeSet)) return true;
         return false;
     }
 }
