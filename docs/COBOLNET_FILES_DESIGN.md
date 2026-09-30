@@ -1905,6 +1905,51 @@ and it leaves zero-padding a crashed run unit would read back as records. *Flush
 detect a full medium on its own WRITE: a syscall per record for every program, where the buffer-filling WRITE
 already reports the boundary.
 
+### D29. TEXT, BYTES AND ENCODING are three layers: the record codec knows each LEAF's kind and encodes/decodes it at the medium; the in-memory group image stays lossless; the file encoding is an attribute of the file. (kb/Work R51, R52; PB1759, PB1760.)
+
+**Decision (owner, 2026-09-29).** A file record is BYTES, and the bytes of a leaf are chosen by that leaf's KIND:
+
+| leaf kind | in memory | on the medium |
+|---|---|---|
+| alphanumeric / alphanumeric-edited (and groups of them) | characters (UTF-16 code units) | the file's encoding: one byte per position (ISO 8859-1) for the fixed-record organizations, UTF-8 for LINE SEQUENTIAL; the alphanumeric HIGH-VALUE character U+FFFF is byte `0xFF` |
+| national | characters | UTF-16BE pairs (D-N1), any encoding |
+| numeric byte forms (binary, packed, IEEE, zoned) | native value | their pinned byte form (D7 / V59) |
+| hexadecimal-alphanumeric literal, `X"FF"` | the characters U+0000-U+00FF | the same bytes |
+
+**Why per leaf and never per connector.** Today the record image is a string whose characters U+0000-U+00FF stand for
+bytes, and the connector encodes it with one strict Latin-1 (`FileCharacterSet.Medium`, R47). That conflates a TEXT
+0xFF with a BINARY 0xFF: once HIGH-VALUE became U+FFFF (R52) a connector-wide table could not decide whether a byte
+0xFF read from the medium is the HIGH-VALUE character or a byte of a packed/binary field — and one FD's 01 records
+REDEFINE the same area, so even the record layout is unknown at READ. Only the generated record struct (which owns the
+leaf types) can decide, and it decides per VIEW: an alphanumeric view reads 0xFF as HIGH-VALUE, a numeric view of the
+same bytes reads it as a number.
+
+**Two images, not one.** `GroupImageCodec` now serves two jobs with one image: the IN-MEMORY group image (group MOVE,
+group comparison, DISPLAY of a group, CALL and INVOKE windows) and the FILE image. They must differ: a lossless
+memory image keeps U+00FF and U+FFFF distinct (a group MOVE must never turn a `ÿ` into HIGH-VALUE), the medium image
+folds U+FFFF to 0xFF. `AsImage()` / `FromImage()` stay the memory image; `AsMedium()` / `FromMedium()` are the file
+image, used by the file emitters (WRITE, REWRITE, READ, RELEASE / RETURN, the keyed START / DELETE key images) and
+nowhere else. **Accepted cost (DOC-A.1-31):** a real `ÿ` (U+00FF) in an alphanumeric field of a record file reads back
+as HIGH-VALUE.
+
+**The encoding is an attribute of the FILE.** Fixed-record organizations default to one byte per alphanumeric
+position, because a variable-width encoding makes a record's byte length vary and breaks record-number positioning
+and the fixed-attribute check (§9.1.6); LINE SEQUENTIAL defaults to UTF-8, because a text line has no fixed width and
+full Unicode is required (owner). The FD CODE-SET clause selects any other encoding (`CodeSetConversion`), and Unicode
+inside a fixed-record file is NATIONAL. R47's "refuse a character above U+00FF" survives for fixed-record files with no
+CODE-SET; it is superseded for LINE SEQUENTIAL (PB1760).
+
+**Rejected alternatives.** *UTF-8 as the default for every file*: binary record content (packed, binary, float) is
+raw bytes, and a multi-byte encoding would corrupt any byte above 0x7F. *A connector-wide HIGH-VALUE byte map*: cannot
+tell text from binary (above). *Keeping HIGH-VALUE at U+00FF*: leaves U+0100..U+FFFF ordered above "the highest
+character" in a UTF-16 repertoire (§8.3.3.6.4 GR6; PB1093). *Byte-position alphanumeric items* (GnuCOBOL, IBM DISPLAY):
+safe and interoperable, but `PIC X(10) VALUE "héllo"` would hold four characters' worth of positions and truncation
+would split code points.
+
+**Work.** PB1759 (typed medium codec + HIGH-VALUE U+FFFF, absorbs PB1093), PB1760 (per-file encoding, LINE SEQUENTIAL
+UTF-8). Neither is landed; this section describes the target, and the register notes carry the sequence and the
+facts still to be measured before code.
+
 ## C# mapping
 
 > Backend neutrality (G4; SSOT §18 #23): everything semantic in this section — FILE STATUS capture, the AT END /
