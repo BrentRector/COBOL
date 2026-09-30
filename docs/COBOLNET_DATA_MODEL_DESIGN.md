@@ -1600,11 +1600,20 @@ the sole producer of a background seed; a unit drift test pins that it has exact
   linkage sections outside this rule's reach entirely). This is the first consumer `OptionsInitialize.Sections`
   has ever had — the binder built the flag set, GR1 fold included, and nothing read it.
 
-**The determination for a typed-native carrier** (recorded in `CONFORMANCE.md`): character-formed storage takes
-the fill; a native-numeric carrier and an INDEX cell take their zero, licensed by §13.18.63.4 GR4 c)'s own
-"undefined and set to a value that may or may not be allowed for that data item or index". Class object /
-message-tag / pointer take NULL, which the same sentence states as a positive requirement; USAGE BIT keeps its
-packed ceil(n/8) zero seed (D19). **With NO clause the seed is byte-unchanged** — `PicInfo.DefaultInitializer`
+**Numeric items take the fill too** (owner decision kb/Work R53, overturning this section's former "a
+native-numeric carrier takes its zero"; kb/Work PB1134; recorded in `CONFORMANCE.md`). Action 1 names "the storage
+allocated for the implied or associated sections" with no numeric exception, and §13.18.63.4 GR4 c)'s "undefined"
+is §11.9.10.4 GR6's NO-clause baseline, not a license over a clause the program wrote. A typed-native carrier holds a
+decoded value, so the storage decision moves to BIND time: `StorageFormPass` gives every VALUE-less fixed-point
+numeric item of a governed section (`OptionsInitialize.Governs` — the one section predicate the seed also asks) its
+IMAGE storage, the same promotion a group move's receiver gets, and `InitialStateBackground.Seed` fills that image:
+a USAGE DISPLAY item holds the fill CHARACTERS, a BINARY / COMP-5 / PACKED item the fill BYTES (the fill character's
+byte by the storage-byte law — HIGH-VALUES is 0xFF), a Tier-B window the same, and a floating-point carrier the value
+its fill bytes encode. An item under a VALUE (its own or a group's) is not promoted: action 2 overwrites the
+background there. **Residual (kb/Work PB1134):** an INDEX cell, a NATIONAL-usage numeric item and an OO method's
+LOCAL-STORAGE numeric item still take their zero. Class object / message-tag / pointer take NULL, which §13.18.63.4
+GR4 c) states as a positive requirement; USAGE BIT keeps its packed ceil(n/8) zero seed (D19). **With NO clause the
+seed is byte-unchanged** — `PicInfo.DefaultInitializer`
 remains the §11.9.10.4 GR6 baseline it correctly is, which is the invariant covering the entire existing corpus.
 
 ### D24. The COMPOSITION of a Format-1 PICTURE (§13.18.40.3's composition syntax rules + §13.18.40.6's Table 10) is ONE pass in `PictureComposition`, with the table as DATA and symbol ORDER decided by ROLE ASSIGNMENT — never by hand-written positional `if`s. (kb/Work PB528, PB530.)

@@ -246,7 +246,24 @@ internal static class FloatFormatPhrase
 /// literal alone).</para>
 /// </param>
 public sealed record OptionsInitialize(OptionsSections Sections, OptionsFill Fill, string? FillLiteral,
-                                       char? LiteralFillChar);
+                                       char? LiteralFillChar)
+{
+    /// <summary>False when literal-1 was rejected by §11.9.10.3 SR1 — a rejected clause behaves as an absent one.</summary>
+    public bool HasFill => Fill is not OptionsFill.Literal || LiteralFillChar is not null;
+
+    /// <summary>⛔ THE ONE §11.9.10.4 section predicate for a record ROOT (kb/Work PB152, PB1134): GR2/GR3/GR4 route
+    /// LOCAL-STORAGE / SCREEN / WORKING-STORAGE separately and GR1 folds ALL into all three; GR7 — "External items in
+    /// the Working-storage section are not initialized when runtime elements are put into the initial state, except
+    /// for those with the CONSTANT RECORD clause" — excludes an EXTERNAL root. Asked by the bind-time storage
+    /// decision (<c>StorageFormPass</c>, which gives a fillable numeric item image storage) and by the codegen seed
+    /// (<c>InitialStateBackground</c>), so the two cannot disagree about which items the background reaches.
+    /// Section MEMBERSHIP is the caller's (root membership in the binder's own section lists, never "not a file
+    /// record": §13.18.63.4 GR2/GR3 put the file and linkage sections outside this rule's reach).</summary>
+    public bool Governs(DataItem root, bool workingStorageRoot, bool localStorageRoot) =>
+        ((Sections.HasFlag(OptionsSections.WorkingStorage) && workingStorageRoot)
+         || (Sections.HasFlag(OptionsSections.LocalStorage) && localStorageRoot))
+        && !(root.HasExternalClause && !root.IsConstantRecord);
+}
 
 /// <summary>The sections an INITIALIZE OPTIONS clause targets (a flags set; ALL ⇒ all three).</summary>
 [Flags]

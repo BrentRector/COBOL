@@ -245,6 +245,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // A FLOAT member's image is its IEEE window bytes (the Step D arm-1 dissolution — the ' '×Length
         // fall-through seeded ZERO characters for the PICTURE-less float shapes, Length 0): the VALUE
         // literal through the ONE recipe, else the zero encoding.
+        if (pic.Category is PicCategory.Numeric && pic.IsFloat && !(useValues && effRaw is not null)
+            && vals.NoValueSeed(item, pic, recipe) is { } floatBackground)
+            return floatBackground;   // §14.6.2.3.2 action 1 over a float window (owner decision R53)
         if (pic.Category is PicCategory.Numeric && pic.IsFloat)
             return RuntimeApi.NumFormatImageFloat(
                 useValues && effRaw is { } fraw && !fraw.StartsWith('"')

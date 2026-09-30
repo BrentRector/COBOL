@@ -241,6 +241,8 @@ internal sealed class ValueInitializer(EmitContext ctx)
             // A WINDOWED FLOAT member (the Step D arm-1 dissolution) seeds its IEEE window bytes from the
             // (float-literal or zero) VALUE through the ONE literal recipe (RawValueAsFloat) — the integer
             // lane would throw NoByteImage on an Ieee profile.
+            // No VALUE: §14.6.2.3.2 action 1's background first (owner decision R53, kb/Work PB1134).
+            if (effRaw is null && NoValueSeed(item, pic, recipe) is { } background) return background;
             if (pic.IsFloat)
                 return RuntimeApi.NumFormatImageFloat(
                     effRaw is { } fv && FigurativeInitializer(fv, pic) is null ? RawValueAsFloat(fv, pic) : "0d",

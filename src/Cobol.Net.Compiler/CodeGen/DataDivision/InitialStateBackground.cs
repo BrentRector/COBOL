@@ -28,15 +28,18 @@ namespace CobolNet.CodeGen;
 /// After this, every storage form added later inherits the background by construction, because there is exactly
 /// one choke point to route through — and a drift test asserts the two arms agree.</para>
 ///
-/// <para><b>⛔ THE DETERMINATION: what a fill CHARACTER means to a native carrier.</b> §11.9.10.4 GR5 makes the
-/// specified-fill-character a CHARACTER, and §14.6.2.3.2 action 1 sets "the storage" to it. In a typed-native
-/// model with no byte substrate a <c>long</c> / <c>Int128</c> / <c>float</c> / <c>double</c> field and an INDEX
-/// cell have no character positions to receive one. The conforming realization, recorded rather than silently
-/// chosen: <b>character-formed storage takes the fill; a native-numeric carrier and an index cell take their
-/// zero.</b> The standard licenses exactly this — §13.18.63.4 GR4 c) says a VALUE-less item's initial content is
-/// "undefined and set to a value that may or may not be allowed for that data item or index", so the fill is a
-/// background over storage the standard does not otherwise constrain, and a carrier that cannot hold it takes
-/// the value it can. Two further carve-outs, each from a RULE rather than from convenience:</para>
+/// <para><b>⛔ EVERY STORAGE POSITION TAKES THE FILL, NUMERIC ITEMS INCLUDED</b> (owner decision kb/Work R53,
+/// overturning the former "a native-numeric carrier takes its zero" determination; kb/Work PB1134). §14.6.2.3.2
+/// action 1 sets "the storage allocated for the implied or associated sections" to the specified-fill-character
+/// with no exception for numeric items, and §13.18.63.4 GR4 c)'s "undefined" latitude is the NO-clause baseline
+/// (§11.9.10.4 GR6), not a license to ignore a clause the program wrote. So a VALUE-less fixed-point numeric item
+/// of a governed section is given IMAGE storage at bind time (<c>StorageFormPass</c>, the same promotion a group
+/// move's receiver gets) and its image is the fill: a USAGE DISPLAY item holds the fill CHARACTERS, a BINARY /
+/// COMP-5 / PACKED item holds the fill BYTES (the fill character's byte by the storage-byte law — HIGH-VALUES is
+/// 0xFF), and a floating-point item's native carrier takes the value its fill bytes encode (it holds every IEEE bit
+/// pattern). The residuals, each documented on kb/Work PB1134: an INDEX cell, a NATIONAL-usage numeric item and an
+/// OO method's LOCAL-STORAGE numeric item keep their zero. Two carve-outs, each from a RULE rather than from
+/// convenience:</para>
 /// <list type="bullet">
 ///   <item><b>Class object / message-tag / pointer take NULL, never the fill.</b> §13.18.63.4 GR4 c) states this
 ///     as a positive requirement — those items "are initialized to null" — in the same sentence that leaves
@@ -94,31 +97,14 @@ internal sealed class InitialStateBackground(EmitContext ctx)
         if (ctx.Data.Options?.Initialize is not { } init) return null;   // GR6: no clause ⇒ implementor's choice
         if (ClauseFillChar() is not { } fill) return null;               // SR1-rejected literal ⇒ as if absent
 
-        // §11.9.10.4 GR2/GR3/GR4 route LOCAL-STORAGE / SCREEN / WORKING-STORAGE separately, and GR1 folds ALL
-        // into all three. This is the FIRST consumer of Sections — until now the binder built the flag set
-        // (including the GR1 fold) and nothing read it, so the section-selective half of the clause had never
-        // executed. The predicate keys on ROOT MEMBERSHIP in the binder's own section lists, never on "not a
-        // file record": §13.18.63.4 GR2/GR3 leave file-section and linkage initial values undefined or governed
-        // by §13.7, so those sections are outside this rule's reach entirely and a negative test would sweep
-        // them in.
+        // The section predicate is OptionsInitialize.Governs — shared with the bind-time storage decision.
         var root = item;
         while (root.Parent is { } p) root = p;
         _wsRoots ??= [.. ctx.Data.WorkingStorageRoots];
         // The unit's own LOCAL-STORAGE roots — or, inside an OO method's initializers, the METHOD's (kb/Work PB1215).
         IReadOnlyList<DataItem> lsSource = ctx.ActivationLocalRoots ?? ctx.Data.LocalStorageRoots;
         if (!ReferenceEquals(_lsSource, lsSource)) { _lsRoots = [.. lsSource]; _lsSource = lsSource; }
-        bool selected =
-            (init.Sections.HasFlag(OptionsSections.WorkingStorage) && _wsRoots.Contains(root))
-            || (init.Sections.HasFlag(OptionsSections.LocalStorage) && _lsRoots!.Contains(root));
-        if (!selected) return null;
-
-        // §11.9.10.4 GR7 — "External items in the Working-storage section are not initialized when runtime
-        // elements are put into the initial state, except for those with the CONSTANT RECORD clause." An
-        // EXTERNAL record's storage is shared across the run unit and outlives any one element's initial state;
-        // a CONSTANT RECORD is the stated exception because its content IS its initialization.
-        if (root.HasExternalClause && !root.IsConstantRecord) return null;
-
-        return fill;
+        return init.Governs(root, _wsRoots.Contains(root), _lsRoots!.Contains(root)) ? fill : null;
     }
 
     /// <summary>The background seed for a VALUE-less elementary item, or null to fall back to the caller's own
@@ -131,8 +117,25 @@ internal sealed class InitialStateBackground(EmitContext ctx)
     /// the string backing its REDEFINES class shares. Two entry points would have been two places for the rule
     /// to drift apart, which is the exact defect this type exists to end (kb/Work PB152 — the fill was written
     /// in three places and one of them disagreed).</para></summary>
-    public string? Seed(DataItem item, PicInfo pic) =>
-        FillFor(item) is { } fill && CharacterFormed(pic) ? FillRun(fill, pic.Length) : null;
+    public string? Seed(DataItem item, PicInfo pic)
+    {
+        if (FillFor(item) is not { } fill) return null;
+        if (CharacterFormed(pic)) return FillRun(fill, pic.Length);
+        if (pic.Category is not PicCategory.Numeric) return null;
+        // A numeric item's storage takes the fill too (owner decision R53): DISPLAY storage holds the fill
+        // CHARACTER, a byte form holds the fill character's BYTE (the storage-byte law — HIGH-VALUES is 0xFF).
+        char unit = pic.Usage is Usage.Display ? fill : CobolNet.Runtime.StorageByte.ToChar(CobolNet.Runtime.StorageByte.ToByte(fill));
+        // Image storage — promoted by StorageFormPass for exactly these items, or a Tier-B REDEFINES window.
+        if (item.StoreAsImage || (item.Class is not null && !pic.IsFloat && pic.HasImageByteForm))
+            return FillRun(unit, item.ImageWidth);
+        // A floating-point item's native carrier holds every IEEE bit pattern: the value its fill bytes encode.
+        if (pic.IsFloat)
+        {
+            string image = FillRun(unit, item.ImageWidth);
+            return item.Class is not null ? image : RuntimeApi.NumParseImageFloat(image, item.ProfileName, pic.IsSingle);
+        }
+        return null;   // INDEX / national-usage numeric / method LOCAL-STORAGE: kb/Work PB1134's documented residual
+    }
 
     /// <summary>Whether this item's storage is a run of CHARACTER POSITIONS that a fill character can occupy —
     /// the determination in this file's header, as one predicate both arms share. ⛔ A USAGE BIT boolean is

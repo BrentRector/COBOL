@@ -58,7 +58,8 @@ public sealed class SortNumericKeyLaneTests
     /// lane added to the one reader never reached it. Each other file listed decodes for a different job and
     /// says why at its call site: the codecs that BUILD the image, the alphanumeric-rendering channel (whose
     /// own three-lane dispatch is <c>OperandText.NonTextBytes</c>), and two STORE-side re-derivations
-    /// (INSPECT's sign, SET's INDEX augment) that are not sending reads of a numeric value.</summary>
+    /// (INSPECT's sign, SET's INDEX augment) that are not sending reads of a numeric value, and the OPTIONS INITIALIZE
+    /// background (InitialStateBackground), which seeds a native float carrier from its fill image (kb/Work PB1134).</summary>
     [Fact]
     public void OnlyTheNamedSites_DecodeANumericImage()
     {
@@ -67,7 +68,7 @@ public sealed class SortNumericKeyLaneTests
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
             "RuntimeApi.cs", "NumericRenderer.cs", "OperandText.cs", "GroupImageCodec.cs", "InspectEmitter.cs",
-            "SetEmitter.cs",
+            "SetEmitter.cs", "InitialStateBackground.cs",
         };
         var decode = new Regex(@"\bNumParseImage(U128|Float|U)?\(", RegexOptions.Compiled);
         var offenders = new List<string>();

@@ -12,13 +12,14 @@
       *>
       *> EXPECTED, with INITIALIZE ALL TO X"5A" (= 'Z') in force, per 14.6.2.3.2 action 1:
       *>   GA PIC X(3), no VALUE           -> ZZZ    (3 alphanumeric positions take the fill)
-      *>   R  REDEFINES G PIC X(5)         -> ZZZ followed by GC's TWO bytes. GC is PIC 9(4) COMP, a NATIVE
-      *>      numeric carrier with no character positions, so it takes its zero (COBOLNET_DATA_MODEL_DESIGN
-      *>      D23) and its pinned 2-byte radix-2 image of zero is two NUL bytes.
+      *>   R  REDEFINES G PIC X(5)         -> ZZZ followed by GC's TWO bytes. GC is PIC 9(4) COMP: its
+      *>      storage is two BYTES and action 1 fills "the storage allocated" with no numeric exception
+      *>      (owner decision kb/Work R53; COBOLNET_DATA_MODEL_DESIGN D23), so both bytes are X'5A':
+      *>      ORD 91 each (the byte X'5A' is the character U+005A, ordinal 90 + 1).
       *>
       *> The carrier bytes are asserted with FUNCTION ORD, not with a comparison against LOW-VALUES. 15.70.1:
       *> "The ORD function returns an integer value that is the ordinal position of argument-1 in the program
-      *> collating sequence. The lowest ordinal position is 1." - so ORD of the low value is 1, exactly. The
+      *> collating sequence. The lowest ordinal position is 1." - so ORD of a byte b is b + 1. The
       *> comparison spelling was avoided DELIBERATELY while kb/Work PB297 was open: a reference-modified operand
       *> compared against the figurative LOW-VALUE/HIGH-VALUE answered WRONG whenever the ref-mod length differed
       *> from the base item's width.  PB297 is FIXED; ORD is kept here as an INDEPENDENT second channel.

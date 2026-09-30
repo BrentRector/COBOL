@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-238 drift tests.
+239 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -226,6 +226,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [StartKeyOfReferenceDriftTests](../tests/Cobol.Net.Tests.Unit/StartKeyOfReferenceDriftTests.cs) | ⛔ EVERY START FORMAT DECIDES THE KEY OF REFERENCE, AND THE EPILOGUE MAKES IT SAY SO (kb/Work PB356). | `src/Cobol.Net.Runtime/IO/IndexedConnector.cs` |
 | [StartTemporaryKeyAreaDriftTests](../tests/Cobol.Net.Tests.Unit/StartTemporaryKeyAreaDriftTests.cs) | ⛔ START's GR17 a) TEMPORARY KEY AREA IS CUT OUT OF THE RECORD AREA, NEVER BUILT OUT OF data-name-1 (kb/Work PB355). | `src/Cobol.Net.Runtime/IO/IndexedConnector.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs` |
 | [StatementDeferralAnnounceDriftTests](../tests/Cobol.Net.Tests.Unit/StatementDeferralAnnounceDriftTests.cs) | ⛔ THE PB236 INVARIANT: a statement the grammar ACCEPTED and the binder REFUSED never leaves the compiler silent. | — |
+| [StorageByteLawDriftTests](../tests/Cobol.Net.Tests.Unit/StorageByteLawDriftTests.cs) | ⛔ A BYTE BECOMES A CHARACTER IN EXACTLY ONE PLACE, AND HIGH-VALUE IS ANSWERED BY EXACTLY ONE MEMBER (kb/Work PB1759; owner decisions R51/R52; design COBOLNET_FILES_DESIGN D29). | `src` |
 | [SubscriptAdmissionDriftTests](../tests/Cobol.Net.Tests.Unit/SubscriptAdmissionDriftTests.cs) | ⛔ ISO §8.4.2.3.3 SR2 HAS TWO HALVES AND THE COMPILER ONLY EVER WROTE DOWN THE FIRST (kb/Work PB877). | — |
 | [SynthesizedNameFamilyDriftTests](../tests/Cobol.Net.Tests.Unit/SynthesizedNameFamilyDriftTests.cs) | ⛔ A SYNTHESIZED C# NAME THAT EMBEDS A USER-DEFINED WORD COMES FROM A TAGGED FAMILY IN NamingConvention, AND NO EMITTER-FIXED __X NAME ENTERS A FAMILY (kb/Work PB973). | `src/Cobol.Net.Compiler` |
 | [Table12StatementNameDriftTests](../tests/Cobol.Net.Tests.Unit/Table12StatementNameDriftTests.cs) | ⛔ Table12StatementNames IS ISO Table 12's 'Statement name' COLUMN, AND THIS RE-DERIVES IT FROM THE SPEC — BOTH DIRECTIONS. | — |

@@ -73,7 +73,34 @@ internal static class StorageFormPass
             foreach (var item in d.CharacterChannelItems)
                 if (item.Class is null && IsImagePromotable(item))
                     promoted.Add(item);
+        // (5) THE §14.6.2.3.2 ACTION-1 BACKGROUND (owner decision kb/Work R53; kb/Work PB1134): an OPTIONS
+        //     INITIALIZE clause sets "the storage allocated for the implied or associated sections" to the
+        //     specified-fill-character, numeric items included, and a native carrier holds a decoded VALUE, not a
+        //     run of fill characters or bytes. So a VALUE-less fixed-point numeric item of a governed section
+        //     stores its image, and InitialStateBackground seeds that image with the fill. An item under a VALUE
+        //     (its own or an ancestor group's) is excluded: action 2 overwrites the background there.
+        foreach (var d in ctx.AllBindersAndInterfaces())
+            if (d.Options.Initialize is { HasFill: true } init)
+            {
+                foreach (var root in d.WorkingStorageRoots)
+                    if (init.Governs(root, workingStorageRoot: true, localStorageRoot: false))
+                        AddBackgroundFilled(root, promoted);
+                foreach (var root in d.LocalStorageRoots)
+                    if (init.Governs(root, workingStorageRoot: false, localStorageRoot: true))
+                        AddBackgroundFilled(root, promoted);
+            }
         return promoted;
+
+        static void AddBackgroundFilled(DataItem item, HashSet<DataItem> promoted)
+        {
+            if (item.RawValue is not null || item.ContainsTableValue) return;   // action 2 owns this subtree
+            if (!item.IsGroup)
+            {
+                if (item.Class is null && IsImagePromotable(item)) promoted.Add(item);
+                return;
+            }
+            foreach (var child in item.Children) AddBackgroundFilled(child, promoted);
+        }
 
         static void AddImagePromotableLeaves(DataItem item, HashSet<DataItem> promoted)
         {
