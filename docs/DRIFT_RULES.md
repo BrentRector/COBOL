@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-239 drift tests.
+240 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -57,6 +57,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [CobolWordsReachDriftTests](../tests/Cobol.Net.Tests.Unit/CobolWordsReachDriftTests.cs) | The >>COBOL-WORDS REACH invariant (ISO §7.3.10; kb/Work PB250). | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `tests/version-matrix/reserved-words.json`, `tests/version-matrix/context-sensitive-words.json` |
 | [CollatingComparisonClassDriftTests](../tests/Cobol.Net.Tests.Unit/CollatingComparisonClassDriftTests.cs) | ⛔ TWO QUESTIONS, TWO CLASSIFIERS — the guard that keeps them from being folded onto one again (kb/Work PB741). | — |
 | [CompilerDirectiveCatalogDriftTests](../tests/Cobol.Net.Tests.Unit/CompilerDirectiveCatalogDriftTests.cs) | The compiler-directive roster is derived, not hand-kept (kb/Work PB725) — these tests are what keeps "derived" true. | `specs/ISO_COBOL.md` |
+| [CompilerDirectiveWordsDriftTests](../tests/Cobol.Net.Tests.Unit/CompilerDirectiveWordsDriftTests.cs) | kb/Work PB1366 — CompilerDirectiveWords is the ONE representation of ISO/IEC 1989:2023 §8.12, "Compiler-directive words", and these tests are what keeps it equal to the standard: a word the table prints and the code lacks is a compilation-variable-name this compiler would accept (§7.3.11.3 SR1, §7.3.8.4.3 SR1), and a word the code has and the table lacks is legal source it would reject. | `specs/ISO_COBOL.md` |
 | [Condition88CloneDriftTests](../tests/Cobol.Net.Tests.Unit/Condition88CloneDriftTests.cs) | ⛔ THE DRIFT CHECK THAT KEEPS CopyOnto EXHAUSTIVE (kb/Work PB555). | — |
 | [ConditionErrorConstructionDriftTests](../tests/Cobol.Net.Tests.Unit/ConditionErrorConstructionDriftTests.cs) | kb/Work PB982 — a condition error node reaches a successful compile only if its refusal forgot the diagnostic, and the emitter lowers it to a run-time NotImplemented throw: IF WS-X over a PIC X item compiled clean and aborted the run unit. | `src/Cobol.Net.Compiler` |
 | [ConditionNameAssociationDriftTests](../tests/Cobol.Net.Tests.Unit/ConditionNameAssociationDriftTests.cs) | The ISO §13.16.3 SR24 condition-name association screen's SHAPE, held against drift (kb/Work PB488). | — |

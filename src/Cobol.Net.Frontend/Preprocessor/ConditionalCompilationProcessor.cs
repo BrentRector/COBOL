@@ -126,6 +126,10 @@ public static class ConditionalCompilationProcessor
         private readonly DirectiveDiag _diag;
         private readonly CompileTimeExpressionEvaluator _evaluator;
         private readonly Stack<Frame> _stack = new();
+        // kb/Work PB1363 — the library-text identity of the text Render is now walking (1 = the source text, then one
+        // fresh id per incorporated copybook), which every frame records when it opens.
+        private int _textCounter;
+        private int _currentText;
         // COPY interleave context (null = pure CC, the legacy shape): the copybook engine + the per-group include
         // set + the current nesting depth (threaded through the recursion for the SR1 circular / depth-20 guards).
         private readonly CopyProcessor? _copy;
@@ -197,6 +201,11 @@ public static class ConditionalCompilationProcessor
         /// from — an omitted or directive line its own, a block its lines', a copybook expansion the copybook's.</summary>
         public MappedText Render(MappedText input)
         {
+            // §7.3.16.3 SR7 / §7.3.13.3 SR9 (kb/Work PB1363): every text this driver renders — the source text and
+            // each incorporated copybook — is ONE library text, and the directives OPENED in it shall be closed in it.
+            int textId = ++_textCounter;
+            int outerText = _currentText;
+            _currentText = textId;
             var lines = input.Text.Split('\n');
             var output = new List<string>(lines.Length);
             var outputOrigins = new List<SourceOrigin>(lines.Length);
@@ -226,6 +235,16 @@ public static class ConditionalCompilationProcessor
 
                 if (!trimmed.StartsWith(">>", StringComparison.Ordinal))
                 {
+                    // §7.3.13.2: `>> EVALUATE` is followed directly by its first `>> WHEN` — text-1 belongs to a WHEN phrase,
+                    // so program text between the two belongs to no phrase of the format (a blank line is no text).
+                    if (trimmed.Length > 0 && _stack.Count > 0 && _stack.Peek() is { Phase: FramePhase.EvaluateBeforeWhen } before
+                        && !before.TextBeforeWhenReported)
+                    {
+                        before.TextBeforeWhenReported = true;
+                        _diag.Structure($"text follows the >>EVALUATE opened at {DescribeStart(before)} before its first >>WHEN — "
+                            + "text-1 belongs to a >>WHEN phrase and the general format writes no text between "
+                            + ">>EVALUATE and its first >>WHEN (ISO §7.3.13.2)");
+                    }
                     if (_stack.Count == 0 || _stack.Peek().Emitting) { block.Add(line); blockOrigins.Add(origin); }   // accumulate; COPY expands at Flush
                     else { Flush(); output.Add(""); outputOrigins.Add(origin); }                                     // omitted ordinary line
                     continue;
@@ -269,6 +288,13 @@ public static class ConditionalCompilationProcessor
                     // producer; a row whose operand a downstream stage parses is a declared no-op.
                     CompilerDirectiveCatalog.CheckOperand(keyword, rest, _edition, sink);
                 }
+                else if (_bag is not null && keyword is "ELSE" or "END-IF" or "END-EVALUATE")
+                {
+                    // The phrase directives of an IF / EVALUATE in an omitted branch are not COMPILED, but they are still
+                    // the frame stack's structure, and their format writes no operand (kb/Work PB806; §7.3.3 SR3/SR4):
+                    // `>>ELSE JUNK` is as malformed inside an omitted branch as outside one.
+                    CompilerDirectiveCatalog.CheckOperand(keyword, rest, _edition, new BagSink(_bag, _diag.At.ToLocation()));
+                }
                 string emit = "";   // directives are consumed by default (output blank line)
                 switch (keyword)
                 {
@@ -276,24 +302,32 @@ public static class ConditionalCompilationProcessor
                     {
                         bool parentActive = _stack.Count == 0 || _stack.Peek().Emitting;
                         bool cond = parentActive && EvaluateCceText(rest, _evaluator, _diag, ">>IF");
-                        _stack.Push(new Frame { Kind = FrameKind.If, ParentActive = parentActive, Emitting = cond, BranchTaken = cond });
+                        _stack.Push(new Frame { Kind = FrameKind.If, Phase = FramePhase.IfThen, TextId = _currentText,
+                            ParentActive = parentActive, Emitting = cond, BranchTaken = cond, Start = origin });
                         break;
                     }
                     case "ELSE":
-                        if (_stack.Count > 0 && _stack.Peek().Kind == FrameKind.If)
+                        if (PhraseFrame(FrameKind.If, "ELSE", origin) is { } ifFrame)
                         {
-                            var f = _stack.Peek();
-                            f.Emitting = f.ParentActive && !f.BranchTaken;   // the ELSE body emits only if no prior branch did
+                            if (ifFrame.Phase == FramePhase.IfElse)
+                                _diag.Structure($">>ELSE: the >>IF opened at {DescribeStart(ifFrame)} already has its >>ELSE — "
+                                    + "the general format writes at most one (ISO §7.3.16.2)");
+                            else
+                            {
+                                ifFrame.Phase = FramePhase.IfElse;
+                                ifFrame.Emitting = ifFrame.ParentActive && !ifFrame.BranchTaken;   // the ELSE body emits only if no prior branch did
+                            }
                         }
                         break;
                     case "END-IF":
-                        if (_stack.Count > 0 && _stack.Peek().Kind == FrameKind.If) _stack.Pop();
+                        if (PhraseFrame(FrameKind.If, "END-IF", origin) is not null) _stack.Pop();
                         break;
                     case "EVALUATE":
                     {
                         // Format 1: >>EVALUATE selection-subject   Format 2: >>EVALUATE TRUE
                         bool parentActive = _stack.Count == 0 || _stack.Peek().Emitting;
-                        var f = new Frame { Kind = FrameKind.Evaluate, ParentActive = parentActive, Emitting = false, BranchTaken = false,
+                        var f = new Frame { Kind = FrameKind.Evaluate, Phase = FramePhase.EvaluateBeforeWhen, TextId = _currentText,
+                            ParentActive = parentActive, Emitting = false, BranchTaken = false,
                             Start = origin, EvaluateFlagOn = _flagScan.IsOn(FlagOption.Flag14Evaluate) };   // c anchor (§7.3.15.4 GR4 c)
                         string subj = rest.Trim();
                         if (subj.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) f.TruthForm = true;
@@ -302,35 +336,58 @@ public static class ConditionalCompilationProcessor
                         break;
                     }
                     case "WHEN":
-                        if (_stack.Count > 0 && _stack.Peek().Kind == FrameKind.Evaluate)
+                        if (PhraseFrame(FrameKind.Evaluate, "WHEN", origin) is { } evalFrame)
                         {
-                            var f = _stack.Peek();
                             string obj = rest.Trim();
+                            // §7.3.13.3 SR5/SR6: `>>WHEN OTHER` is specified entirely on its line — OTHER and nothing else.
+                            bool isOther = StartsWithWord(obj, "OTHER");
+                            if (isOther)
+                            {
+                                if (obj.Length > "OTHER".Length)
+                                    _diag.Structure($">>WHEN OTHER: '{obj["OTHER".Length..].Trim()}' follows OTHER on the directive line — "
+                                        + ">>WHEN OTHER shall be specified entirely on its line and text-2 shall begin on a new line "
+                                        + "(ISO §7.3.13.3 SR5, SR6)");
+                                if (evalFrame.Phase == FramePhase.EvaluateOther)
+                                    _diag.Structure($">>WHEN OTHER: the >>EVALUATE opened at {DescribeStart(evalFrame)} already has its "
+                                        + ">>WHEN OTHER — the general format writes at most one, after every >>WHEN (ISO §7.3.13.2)");
+                            }
+                            else if (evalFrame.Phase == FramePhase.EvaluateOther)
+                                _diag.Structure($">>WHEN: follows the >>WHEN OTHER of the >>EVALUATE opened at {DescribeStart(evalFrame)} — "
+                                    + ">>WHEN OTHER is the last phrase before >>END-EVALUATE (ISO §7.3.13.2)");
                             // c EVALUATE: record the syntactic presence of a >>WHEN / >>WHEN OTHER (independent of which
                             // branch emits) — GR4 c flags a directive containing BOTH.
-                            if (obj.Equals("OTHER", StringComparison.OrdinalIgnoreCase)) f.SawWhenOther = true; else f.SawWhen = true;
-                            if (obj.Equals("OTHER", StringComparison.OrdinalIgnoreCase))
-                                f.Emitting = f.ParentActive && !f.BranchTaken;     // OTHER fires only if nothing matched
-                            else if (!f.ParentActive || f.BranchTaken)
-                                f.Emitting = false;                                // enclosing omitted, or a prior WHEN already matched
+                            if (isOther) evalFrame.SawWhenOther = true; else evalFrame.SawWhen = true;
+                            if (isOther)
+                            {
+                                evalFrame.Phase = FramePhase.EvaluateOther;
+                                evalFrame.Emitting = evalFrame.ParentActive && !evalFrame.BranchTaken;     // OTHER fires only if nothing matched
+                                evalFrame.BranchTaken |= evalFrame.Emitting;                               // a mis-ordered later WHEN cannot re-select
+                            }
                             else
                             {
-                                bool match = f.TruthForm
-                                    ? EvaluateCceText(obj, _evaluator, _diag, ">>WHEN")               // Format 2: constant-conditional-expression
-                                    : MatchWhen(f.Subject, obj, _evaluator, _diag);                   // Format 1: subject = object [THRU object3]
-                                f.Emitting = match;
-                                if (match) f.BranchTaken = true;
+                                if (evalFrame.Phase == FramePhase.EvaluateBeforeWhen) evalFrame.Phase = FramePhase.EvaluateWhen;
+                                // §7.3.13.3 SR3/SR11/SR12/SR14-16 are properties of EVERY >>WHEN of the directive, not of the
+                                // branch §7.3.13.4 GR4 selects (kb/Work PB1364): the operand is parsed and category-checked
+                                // whenever the directive itself is being compiled; only the EMIT decision is gated on an earlier match.
+                                bool match = evalFrame.ParentActive
+                                    && (evalFrame.TruthForm
+                                        ? EvaluateCceText(obj, _evaluator, _diag, ">>WHEN")               // Format 2: constant-conditional-expression
+                                        : MatchWhen(evalFrame.Subject, obj, _evaluator, _diag));          // Format 1: subject = object [THRU object3]
+                                evalFrame.Emitting = match && !evalFrame.BranchTaken;
+                                if (evalFrame.Emitting) evalFrame.BranchTaken = true;
                             }
                         }
                         break;
                     case "END-EVALUATE":
-                        if (_stack.Count > 0 && _stack.Peek().Kind == FrameKind.Evaluate)
+                        if (PhraseFrame(FrameKind.Evaluate, "END-EVALUATE", origin) is { } endFrame)
                         {
-                            var f = _stack.Peek();
+                            if (endFrame.Phase == FramePhase.EvaluateBeforeWhen)
+                                _diag.Structure($">>END-EVALUATE: the >>EVALUATE opened at {DescribeStart(endFrame)} has no >>WHEN — "
+                                    + "the general format writes one or more (ISO §7.3.13.2)");
                             // c EVALUATE (§7.3.15.4 GR4 c; E.2 item 8) — flag the directive when it carried both a >>WHEN
                             // and a >>WHEN OTHER and FLAG-14 EVALUATE was ON at the >>EVALUATE line.
-                            if (f.SawWhen && f.SawWhenOther && f.EvaluateFlagOn)
-                                _diag.FlagWarn(FlagOption.Flag14Evaluate, f.Start);
+                            if (endFrame.SawWhen && endFrame.SawWhenOther && endFrame.EvaluateFlagOn)
+                                _diag.FlagWarn(FlagOption.Flag14Evaluate, endFrame.Start);
                             _stack.Pop();
                         }
                         break;
@@ -379,8 +436,47 @@ public static class ConditionalCompilationProcessor
             }
 
             Flush();
+            // A directive OPENED in this text and still open at its end is unclosed: the source text is a compilation
+            // group's end, a copybook's end is the end of its library text (§7.3.16.3 SR7, §7.3.13.3 SR9). Pop it, so
+            // the text that follows the COPY is judged against the frames it opened itself.
+            while (_stack.Count > 0 && _stack.Peek().TextId == textId)
+            {
+                var open = _stack.Pop();
+                _diag.At = open.Start;
+                _diag.Structure($"the >>{(open.Kind == FrameKind.If ? "IF" : "EVALUATE")} opened at {DescribeStart(open)} is not closed "
+                    + $"by >>{(open.Kind == FrameKind.If ? "END-IF" : "END-EVALUATE")} in the same "
+                    + (textId == 1 ? "source text" : "library text")
+                    + (open.Kind == FrameKind.If ? " (ISO §7.3.16.2, §7.3.16.3 SR7)" : " (ISO §7.3.13.2, §7.3.13.3 SR9)"));
+            }
+            _currentText = outerText;
             return new MappedText(string.Join('\n', output), outputOrigins.ToArray());
         }
+
+        /// <summary>The frame a phrase directive (<c>&gt;&gt;ELSE</c>, <c>&gt;&gt;END-IF</c>, <c>&gt;&gt;WHEN</c>,
+        /// <c>&gt;&gt;END-EVALUATE</c>) belongs to — the top frame when it is of <paramref name="kind"/> — or null after
+        /// reporting that there is none (§7.3.16.2 / §7.3.13.2: a phrase follows its own opening directive). A phrase
+        /// written in a different library text from its opening directive is reported too, but the frame is still
+        /// returned so the stack keeps the nesting the source wrote (§7.3.16.3 SR7, §7.3.13.3 SR9).</summary>
+        private Frame? PhraseFrame(FrameKind kind, string word, SourceOrigin at)
+        {
+            string opener = kind == FrameKind.If ? "IF" : "EVALUATE";
+            if (_stack.Count == 0 || _stack.Peek().Kind != kind)
+            {
+                _diag.Structure($">>{word} has no open >>{opener} directive to belong to"
+                    + (_stack.Count > 0 ? $" (the innermost open directive is the >>{(_stack.Peek().Kind == FrameKind.If ? "IF" : "EVALUATE")} "
+                        + $"opened at {DescribeStart(_stack.Peek())})" : "")
+                    + (kind == FrameKind.If ? " (ISO §7.3.16.2)" : " (ISO §7.3.13.2)"));
+                return null;
+            }
+            var f = _stack.Peek();
+            if (f.TextId != _currentText)
+                _diag.Structure($">>{word} is written in a different library text from the >>{opener} opened at {DescribeStart(f)} — "
+                    + "the phrases of one directive shall all be in the same library text or all in source text"
+                    + (kind == FrameKind.If ? " (ISO §7.3.16.3 SR7)" : " (ISO §7.3.13.3 SR9)"));
+            return f;
+        }
+
+        private static string DescribeStart(Frame f) => $"{f.Start.File} line {f.Start.Line}";
 
         /// <summary>Expand one incorporated copybook through the SAME driver at <paramref name="depth"/> — its own
         /// directives + nested COPY are processed with this run's shared state; the depth is restored on return so
@@ -401,10 +497,19 @@ public static class ConditionalCompilationProcessor
 
     private enum FrameKind { If, Evaluate }
 
+    /// <summary>Where a frame is in its general format (kb/Work PB1363) — §7.3.16.2: <c>IF [ELSE] END-IF</c>;
+    /// §7.3.13.2: <c>EVALUATE WHEN… [WHEN OTHER] END-EVALUATE</c>. Every phrase directive is judged against the
+    /// phase of the frame it arrives at, so a second <c>&gt;&gt;ELSE</c> or a <c>&gt;&gt;WHEN</c> after
+    /// <c>&gt;&gt;WHEN OTHER</c> is a phase that has no arrow out, not a special case.</summary>
+    private enum FramePhase { IfThen, IfElse, EvaluateBeforeWhen, EvaluateWhen, EvaluateOther }
+
     /// <summary>One <c>&gt;&gt;IF…&gt;&gt;END-IF</c> or <c>&gt;&gt;EVALUATE…&gt;&gt;END-EVALUATE</c> nesting level.</summary>
     private sealed class Frame
     {
         public FrameKind Kind;
+        public FramePhase Phase;
+        public int TextId;          // the library text (source text or one copybook incorporation) the directive was OPENED in — §7.3.16.3 SR7 / §7.3.13.3 SR9
+        public bool TextBeforeWhenReported;   // the one "text between EVALUATE and its first WHEN" complaint per directive
         public bool ParentActive;   // is the enclosing context emitting? (a nested directive inside an omitted branch stays omitted)
         public bool Emitting;       // is THIS branch's text currently being included?
         public bool BranchTaken;    // IF: the IF arm was taken (drives ELSE); EVALUATE: some WHEN already matched (drives later WHEN/OTHER)
@@ -452,27 +557,78 @@ public static class ConditionalCompilationProcessor
     /// directive at the DIRECTIVE-SYNTAX level (name / AS / OFF / PARAMETER / OVERRIDE are directive keywords, not
     /// expression syntax); the OPERAND text is handed to the ANTLR fragment parse. §7.3.11.2 makes AS optional and
     /// OVERRIDE a trailing phrase; OFF and PARAMETER are the two operand-less alternatives.</summary>
-    private static (string Name, DefineKind Kind, string Operand, bool Override) SplitDefine(string rest)
+    private static bool TrySplitDefine(string rest, out (string Name, DefineKind Kind, string Operand, bool Override) define,
+        out string complaint)
     {
+        define = default;
         string s = rest.Trim();
         int sp = 0;
         while (sp < s.Length && !char.IsWhiteSpace(s[sp])) sp++;
         string name = s[..sp];
         string body = sp < s.Length ? s[sp..].Trim() : "";
-        if (StartsWithWord(body, "AS")) body = body["AS".Length..].TrimStart();
+        // §7.3.11.2: compilation-variable-name-1 is required, and is ONE word — not a literal, not an expression.
+        if (name.Length == 0) { complaint = "no compilation-variable-name-1 is written"; return false; }
+        if (!IsCompilationVariableNameShape(name))
+        {
+            complaint = $"'{name}' is not a COBOL word, so it cannot be compilation-variable-name-1";
+            return false;
+        }
+        if (StartsWithWord(body, "AS")) body = body["AS".Length..].TrimStart();   // AS is not underlined: an optional word (§5.2.3)
+
+        // { value-group [OVERRIDE] | OFF }: OFF is an alternative of the OUTER brace, so neither OVERRIDE nor any other
+        // word may follow it (kb/Work PB1367 — the old trailing-OVERRIDE strip ran before the OFF test and took
+        // `OFF OVERRIDE` for OFF).
+        if (StartsWithWord(body, "OFF"))
+        {
+            string after = body["OFF".Length..].Trim();
+            if (after.Length == 0) { define = (name, DefineKind.Off, "", false); complaint = ""; return true; }
+            complaint = StartsWithWord(after, "OVERRIDE") && after.Length == "OVERRIDE".Length
+                ? "the OVERRIDE phrase belongs to the value alternative — OFF is an alternative of its own and is not followed by OVERRIDE"
+                : $"'{after}' follows OFF, which is an operand by itself";
+            return false;
+        }
+
         bool over = EndsWithWord(body, "OVERRIDE");
         if (over) body = body[..^"OVERRIDE".Length].TrimEnd();
         body = body.Trim();
-        if (body.Equals("OFF", StringComparison.OrdinalIgnoreCase)) return (name, DefineKind.Off, "", over);
-        if (body.Equals("PARAMETER", StringComparison.OrdinalIgnoreCase)) return (name, DefineKind.Parameter, "", over);
-        return (name, DefineKind.Value, body, over);
+        if (body.Length == 0)
+        {
+            complaint = over ? "OVERRIDE follows no operand" : "no operand follows the compilation-variable-name";
+            return false;
+        }
+        define = body.Equals("PARAMETER", StringComparison.OrdinalIgnoreCase)
+            ? (name, DefineKind.Parameter, "", over)
+            : (name, DefineKind.Value, body, over);
+        complaint = "";
+        return true;
+    }
+
+    /// <summary>A compilation-variable-name is a COBOL user-defined word (§8.3.2.1): basic letters, digits, hyphen and
+    /// underscore, neither beginning nor ending with a hyphen.</summary>
+    private static bool IsCompilationVariableNameShape(string w)
+    {
+        foreach (char c in w) if (!char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_')) return false;
+        return w[0] != '-' && w[^1] != '-';
     }
 
     private static void ApplyDefine(string rest, Dictionary<string, CtValue> defines,
         CompileTimeExpressionEvaluator evaluator, DirectiveDiag diag, int dialectLevel, CompilationInputs inputs)
     {
-        var (name, kind, operand, over) = SplitDefine(rest);
-        if (name.Length == 0) return;
+        // The directive's own general format first (kb/Work PB1367): every violation names the rule and the directive
+        // is not applied, so one malformed line cannot cascade into misleading "undefined variable" errors.
+        if (!TrySplitDefine(rest, out var define, out string complaint))
+        {
+            diag.DefineMalformed(complaint);
+            return;
+        }
+        var (name, kind, operand, over) = define;
+        // §7.3.11.3 SR1 (with §7.3.3 SR7, SR9): the name shall not be a compiler-directive word — the ONE §8.12
+        // representation, asked of the same screen the defined condition uses (kb/Work PB1366).
+        if (CompilerDirectiveWords.IsReserved(name))
+        {
+            diag.DirectiveWordAsName(name, "a DEFINE directive", "ISO §7.3.11.3 SR1");
+            return;
+        }
         // §8.3.2.1 applies to the compilation-variable-name — a word the tree-walk funnel never sees. Checked at
         // the DEFINITION site (the root: an over-long word can never become defined, so a reference-site spelling
         // is already diagnosed as an unknown variable). Report and continue, matching the funnel's posture.
@@ -484,12 +640,19 @@ public static class ConditionalCompilationProcessor
                 return;
             case DefineKind.Parameter:
             {
-                // GR4 — the value is obtained from the operating environment; unavailable ⇒ NOT defined. A value
-                // that parses as a numeric literal is numeric, else alphanumeric.
-                string? env = inputs.GetEnvironmentVariable(name);
-                if (env is null) { defines.Remove(name); return; }
-                var pv = decimal.TryParse(env, NumberStyles.Number, CultureInfo.InvariantCulture, out var num)
-                    ? CtValue.Numeric(CtNumeric.FromDecimal(num), env) : CtValue.Alphanumeric(env);
+                // GR4 — the value is obtained from the operating environment by an implementor-defined method
+                // (DOC-A.1-49, docs/CONFORMANCE.md): the environment variable named by the compilation-variable-name in
+                // its canonical upper-case spelling — a COBOL word is case-insensitive (§8.3.1), so two spellings of
+                // one name read ONE variable (kb/Work PB1533). A value that parses as a fixed-point numeric literal is
+                // numeric, else alphanumeric. Unavailable ⇒ NOT defined.
+                string? env = inputs.GetEnvironmentVariable(name.ToUpperInvariant());
+                CtValue? pv = env is null ? null
+                    : decimal.TryParse(env, NumberStyles.Number, CultureInfo.InvariantCulture, out var num)
+                        ? CtValue.Numeric(CtNumeric.FromDecimal(num), env) : CtValue.Alphanumeric(env);
+                // SR2 applies to the PARAMETER alternative like every other (kb/Work PB1367): without OVERRIDE, a name
+                // already defined may be redefined only to the SAME value, and "no value" is not the same value.
+                if (pv is null && !over && defines.ContainsKey(name)) diag.Report1618(name);
+                if (pv is null) { defines.Remove(name); return; }
                 AssignDefine(name, pv, over, defines, diag);
                 return;
             }
@@ -672,11 +835,29 @@ public static class ConditionalCompilationProcessor
             if (bag is not null) LogicalOperatorGate.Check(edition, new BagSink(bag, At.ToLocation()), fragment);
         }
 
-        public void Report(CtDiagCode code, string message) => Emit("COBOLNET1619", message);
+        public void Report(CtDiagCode code, string message) => Emit(
+            code == CtDiagCode.DirectiveWordAsName
+                ? Editions.Diagnostics.DiagnosticCatalog.DirectiveWordAsName.Code : "COBOLNET1619", message);
+
+        /// <summary>COBOLNET2650 — a compilation-variable-name that is a §8.12 compiler-directive word (kb/Work PB1366).</summary>
+        public void DirectiveWordAsName(string name, string where, string rule) =>
+            Emit(Editions.Diagnostics.DiagnosticCatalog.DirectiveWordAsName.Code,
+                $"'{name}' is a compiler-directive word (ISO §8.12) and shall not be used as a compilation-variable-name in {where} ({rule})");
+
+        /// <summary>COBOLNET2651 — a DEFINE directive that does not match its general format (kb/Work PB1367).</summary>
+        public void DefineMalformed(string complaint) =>
+            Emit(Editions.Diagnostics.DiagnosticCatalog.DefineDirectiveMalformed.Code,
+                $">>DEFINE is malformed: {complaint} — the general format is "
+                + ">>DEFINE compilation-variable-name-1 [AS] { { arithmetic-expression | boolean-expression | literal | PARAMETER } [OVERRIDE] | OFF } (ISO §7.3.11.2)");
 
         public void Report1618(string name) => Emit("COBOLNET1618",
             $">>DEFINE: compilation variable '{name}' is redefined to a different value without the OVERRIDE "
             + "phrase (ISO §7.3.11.3 SR2)");
+
+        /// <summary>COBOLNET2649 — a conditional-compilation directive breaks the structure of its general format
+        /// (kb/Work PB1363).</summary>
+        public void Structure(string message) =>
+            Emit(Editions.Diagnostics.DiagnosticCatalog.DirectiveStructureViolation.Code, message);
 
         public void Malformed(string where, string text) => Emit("COBOLNET1619",
             $"{where}: malformed compile-time expression '{text}' (ISO §7.3.6 / §7.3.7 / §7.3.8)");

@@ -246,6 +246,7 @@
   {
    "id": "leap-second-directive-2002",
    "directiveWords": ["LEAP-SECOND"],
+   "directivePlacement": { "rule": "outsideCompilationUnits", "citation": "§7.3.17.3 SR1", "text": "The LEAP-SECOND directive shall not be specified within a compilation unit" },
    "directiveOperand": {
      "form": "words",
      "choice": [
@@ -290,6 +291,7 @@
   {
    "id": "flag-14-directive-2023",
    "directiveWords": ["FLAG-14"],
+   "directivePlacement": { "rule": "betweenClauses", "citation": "§7.3.15.3 SR1", "text": "The FLAG-14 directive may be specified only between clauses in divisions other than the procedure division and only between statements in the procedure division" },
    "directiveOperand": {
      "form": "stage",
      "owner": "FlagDirectiveProcessor",
@@ -308,6 +310,7 @@
   {
    "id": "flag-02-directive-2014",
    "directiveWords": ["FLAG-02"],
+   "directivePlacement": { "rule": "betweenClauses", "citation": "§7.3.14.3 SR1", "text": "The FLAG-02 directive may be specified only between clauses in divisions other than the procedure division and only between statements in the procedure division" },
    "directiveOperand": {
      "form": "stage",
      "owner": "FlagDirectiveProcessor",
@@ -327,6 +330,7 @@
   {
    "id": "cobol-words-directive-2023",
    "directiveWords": ["COBOL-WORDS"],
+   "directivePlacement": { "rule": "beforeFirstCompilationUnit", "citation": "§7.3.10.3 SR1", "text": "The COBOL-WORDS directive may be specified only before the first IDENTIFICATION DIVISION within a compilation group" },
    "directiveOperand": {
      "form": "stage",
      "owner": "CobolWordsDirectiveProcessor",
@@ -391,7 +395,8 @@
    "directiveOperand": {
      "form": "stage",
      "owner": "ConditionalCompilationProcessor",
-     "citation": "ISO §7.3.13.2 general format: a selection subject or TRUE, with >>WHEN objects — evaluated and diagnosed by the conditional-compilation driver as COBOLNET1619."
+     "noOperandWords": ["END-EVALUATE"],
+     "citation": "ISO §7.3.13.2 general format: a selection subject or TRUE, with >>WHEN objects — evaluated and diagnosed by the conditional-compilation driver as COBOLNET1619; >>END-EVALUATE writes no operand (checked centrally, §7.3.3 SR3/SR4, as COBOLNET1911) and the driver's frame stack diagnoses the directive's structure as COBOLNET2649."
    },
    "introducedIn": 2002,
    "removedIn": null,
@@ -409,7 +414,8 @@
    "directiveOperand": {
      "form": "stage",
      "owner": "ConditionalCompilationProcessor",
-     "citation": "ISO §7.3.16.2 general format: a constant conditional expression (§7.3.8) — evaluated and diagnosed by the conditional-compilation driver as COBOLNET1619."
+     "noOperandWords": ["ELSE", "END-IF"],
+     "citation": "ISO §7.3.16.2 general format: a constant conditional expression (§7.3.8) — evaluated and diagnosed by the conditional-compilation driver as COBOLNET1619; >>ELSE and >>END-IF write no operand (checked centrally, §7.3.3 SR3/SR4, as COBOLNET1911) and the driver's frame stack diagnoses the directive's structure as COBOLNET2649."
    },
    "introducedIn": 2002,
    "removedIn": null,
@@ -464,6 +470,7 @@
    "diagnosticCode": "COBOLNET0900",
    "citation": "ISO §7.3.21; the §7.3 compiler-directive facility is a COBOL-2002 introduction (M2 catalog derivation, VCR Table 7 discipline)",
    "directiveWords": ["PROPAGATE"],
+   "directivePlacement": { "rule": "outsideCompilationUnits", "citation": "§7.3.21.3 SR1", "text": "A PROPAGATE directive shall not be specified within a compilation unit" },
    "directiveOperand": {
      "form": "words",
      "choice": [

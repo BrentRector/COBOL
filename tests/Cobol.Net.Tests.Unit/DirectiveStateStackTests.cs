@@ -138,20 +138,25 @@ public sealed class DirectiveStateStackTests
 
     private static void LeapSecondIsRestored()
     {
-        Assert.False(Directives("""
+        Assert.False(LeapSecondAtTheUnit(Directives("""
                    DISPLAY "X"
             """, prefix: """
                    >>PUSH LEAP-SECOND
                    >>LEAP-SECOND ON
                    >>POP LEAP-SECOND
-            """).LeapSecondOn);
-        Assert.True(Directives("""
+            """)));
+        Assert.True(LeapSecondAtTheUnit(Directives("""
                    DISPLAY "X"
             """, prefix: """
                    >>PUSH LEAP-SECOND
                    >>LEAP-SECOND ON
-            """).LeapSecondOn);
+            """)));
     }
+
+    /// <summary>The LEAP-SECOND state the program unit of a <see cref="Directives"/> fixture reads — the binder's own
+    /// fold (<see cref="LeapSecondState"/>, kb/Work PB1378) at a line past the prefix directives.</summary>
+    private static bool LeapSecondAtTheUnit(DirectiveResults results) =>
+        LeapSecondState.Build(results.LeapSecondEvents).IsOnAt(1000);
 
     private static void DefineIsRestored()
     {

@@ -75,6 +75,49 @@ public sealed class ConditionalCompilationDefineTests
         Assert.DoesNotContain("KEEP", text);   // undefined → the >>IF DEFINED is false → the line drops
     }
 
+    [Fact] // kb/Work PB1533 — a COBOL word is case-insensitive (§8.3.1), so two spellings of ONE compilation-variable-name
+           // read ONE environment variable: the implementor-defined method (DOC-A.1-49) names the variable by the
+           // name's canonical UPPER-CASE spelling, whatever the spelling in the directive.
+    public void Parameter_TwoSpellingsOfOneName_ReadOneVariable()
+    {
+        Environment.SetEnvironmentVariable("CN-CC-TEST-SPELLING", "7");
+        try
+        {
+            foreach (string spelling in (string[])["cn-cc-test-spelling", "Cn-Cc-Test-Spelling", "CN-CC-TEST-SPELLING"])
+            {
+                var (text, diags) = Run($">>DEFINE {spelling} AS PARAMETER\n>>IF {spelling} = 7\nKEEP\n>>END-IF\n");
+                Assert.False(Has1618(diags));
+                Assert.Contains("KEEP", text);   // defined from the ONE variable, whichever way the name is written
+            }
+        }
+        finally { Environment.SetEnvironmentVariable("CN-CC-TEST-SPELLING", null); }
+    }
+
+    [Fact] // kb/Work PB1367 — §7.3.11.3 SR2 reaches the PARAMETER alternative: without OVERRIDE, a name already defined
+           // may be redefined only to the SAME value, and "no value from the environment" is not the same value.
+    public void Parameter_NoValue_RedefiningADefinedName_WithoutOverride_Rejected1618()
+    {
+        Environment.SetEnvironmentVariable("CN-CC-TEST-PX", null);
+        var (_, diags) = Run(">>DEFINE CN-CC-TEST-PX AS 1\n>>DEFINE CN-CC-TEST-PX AS PARAMETER\n");
+        Assert.True(Has1618(diags));
+
+        var (text, over) = Run(">>DEFINE CN-CC-TEST-PX AS 1\n>>DEFINE CN-CC-TEST-PX AS PARAMETER OVERRIDE\n>>IF CN-CC-TEST-PX DEFINED\nKEEP\n>>END-IF\n");
+        Assert.False(Has1618(over));   // OVERRIDE is unconditional (GR3); no value ⇒ not defined (GR4)
+        Assert.DoesNotContain("KEEP", text);
+    }
+
+    [Fact] // kb/Work PB1367 — the PARAMETER alternative with a DIFFERENT environment value is the same SR2 violation.
+    public void Parameter_DifferentValue_RedefiningADefinedName_WithoutOverride_Rejected1618()
+    {
+        Environment.SetEnvironmentVariable("CN-CC-TEST-PY", "2");
+        try
+        {
+            Assert.True(Has1618(Run(">>DEFINE CN-CC-TEST-PY AS 1\n>>DEFINE CN-CC-TEST-PY AS PARAMETER\n").Diags));
+            Assert.False(Has1618(Run(">>DEFINE CN-CC-TEST-PY AS 2\n>>DEFINE CN-CC-TEST-PY AS PARAMETER\n").Diags));   // the SAME value
+        }
+        finally { Environment.SetEnvironmentVariable("CN-CC-TEST-PY", null); }
+    }
+
     private static bool Has1619(DiagnosticBag b) => b.Diagnostics.Any(d => d.Code == "COBOLNET1619");
 
     [Fact] // ⛔ Ledger C2 — the CLOSED DEFECT: a MULTI-TOKEN arithmetic operand now EVALUATES (§7.3.6) instead of

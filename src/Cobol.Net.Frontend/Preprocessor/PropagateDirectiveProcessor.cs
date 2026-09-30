@@ -25,10 +25,11 @@ public sealed record PropagateEvent(int Line, bool On);
 /// line-scoped directive) and blanks each line, line-count preserving (the <c>&gt;&gt;TURN</c> H3 discipline). The
 /// binder folds the timeline per source element (<c>PropagateState</c>) and the emitter applies §14.6.13.1.3 6) and
 /// §14.6.13.1.5's EXIT/GOBACK item 3 where the element's fatal default is decided (kb/Work PB1119).
-/// <para><b>§7.3.21.3 SR1 (the directive shall not be specified WITHIN a compilation unit) is NOT enforced here</b>
-/// — this pre-parse, line-based stage has no compilation-unit-boundary awareness; kb/Work PB1378 owns that
-/// placement rule. For legal source the fold at an element's first line is also the state at its containing
-/// compilation unit's first line, because no directive may intervene.</para>
+/// <para><b>§7.3.21.3 SR1 (the directive shall not be specified WITHIN a compilation unit) is judged by the ONE
+/// placement pass</b> — the <c>propagate-directive-2002</c> row's <c>directivePlacement</c> data,
+/// <c>DirectivePlacementPass</c> (COBOLNET2652, kb/Work PB1378) — not here: this pre-parse, line-based stage has no
+/// compilation-unit-boundary model. For legal source the fold at an element's first line is also the state at its
+/// containing compilation unit's first line, because no directive may intervene.</para>
 /// <para>Its INTRODUCTION edition is PROVISIONAL COBOL-2002 (the roadmap decision-1 policy, as for TYPEDEF / the FLOAT
 /// trio): §7.3.21 is live in the 2023 spec — Annex E lists no removal — and it belongs to the 2002-era EC /
 /// compiler-directive facility (the same era as <c>&gt;&gt;TURN</c>, gated at 2002).</para>

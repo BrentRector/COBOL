@@ -108,28 +108,29 @@ public static class TurnDirectiveProcessor
             if (w.Equals("CHECKING", StringComparison.OrdinalIgnoreCase))
             {
                 Flush();
-                if (k + 1 < words.Length && words[k + 1].Equals("ON", StringComparison.OrdinalIgnoreCase))
-                {
-                    on = true;
-                    checkingEnd = k + 2;
-                    // ON [WITH LOCATION] (§7.3.25.2; GR7)
-                    if (k + 2 < words.Length && words[k + 2].Equals("WITH", StringComparison.OrdinalIgnoreCase)
-                        && k + 3 < words.Length && words[k + 3].Equals("LOCATION", StringComparison.OrdinalIgnoreCase))
-                    {
-                        withLocation = true;
-                        checkingEnd = k + 4;
-                    }
-                    else if (k + 2 < words.Length && words[k + 2].Equals("LOCATION", StringComparison.OrdinalIgnoreCase))
-                    {
-                        withLocation = true;   // WITH is a noise word in this implementation's leniency
-                        checkingEnd = k + 3;
-                    }
-                }
-                else if (k + 1 < words.Length && words[k + 1].Equals("OFF", StringComparison.OrdinalIgnoreCase))
+                // { ON [ WITH LOCATION ] | OFF } — the printed diagram (PDF page 115) underlines OFF and LOCATION and
+                // NOTHING ELSE: ON and WITH are optional words (§5.2.3), so an alternative made of them is omissible
+                // and `CHECKING` alone, `CHECKING WITH LOCATION` and `CHECKING LOCATION` select ON, which §7.3.25.4 GR6
+                // says in as many words: "If the ON phrase is specified or implied" (kb/Work PB1365).
+                int q = k + 1;
+                if (q < words.Length && words[q].Equals("OFF", StringComparison.OrdinalIgnoreCase))
                 {
                     on = false;
-                    checkingEnd = k + 2;
+                    q++;
                 }
+                else
+                {
+                    on = true;
+                    if (q < words.Length && words[q].Equals("ON", StringComparison.OrdinalIgnoreCase)) q++;
+                    int r = q;
+                    if (r < words.Length && words[r].Equals("WITH", StringComparison.OrdinalIgnoreCase)) r++;
+                    if (r < words.Length && words[r].Equals("LOCATION", StringComparison.OrdinalIgnoreCase))
+                    {
+                        withLocation = true;   // GR7
+                        q = r + 1;
+                    }
+                }
+                checkingEnd = q;
                 break;
             }
             if (w.StartsWith("EC-", StringComparison.OrdinalIgnoreCase))   // SR1 — an EC- word is an exception-name
@@ -140,7 +141,18 @@ public static class TurnDirectiveProcessor
             }
             else if (currentEc is not null)
             {
-                // A non-EC word after an exception-name is a file-name (SR1); SR4 — only with an EC-I-O… name.
+                // A non-EC word after an exception-name is a file-name (SR1) — unless it duplicates a compiler-directive
+                // word (§8.12), which SR1's second sentence interprets as that directive word: ON, OFF, WITH, LOCATION,
+                // ALL… can never be file-name-1, so the directive matches no format (kb/Work PB1365).
+                if (CompilerDirectiveWords.IsReserved(w))
+                {
+                    diagnostics.ReportError("COBOLNET0718",
+                        $">>TURN: '{w}' duplicates a compiler-directive word, so it is interpreted as that directive "
+                        + "word and not as file-name-1, and the directive matches no format (ISO §7.3.25.3 SR1; §8.12)",
+                        loc, default);
+                    return null;
+                }
+                // SR4 — a file-name only with an EC-I-O… name.
                 if (!currentEc.StartsWith("EC-I-O", StringComparison.OrdinalIgnoreCase))
                     diagnostics.ReportError("COBOLNET0719",
                         $">>TURN: file-name '{w}' specified with exception-name '{currentEc}', which does not begin "

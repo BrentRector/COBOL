@@ -286,6 +286,33 @@ public sealed class CompilerDirectiveCatalogDriftTests
         Assert.True(rejected.Count == 0, string.Join("\n", rejected));
     }
 
+    /// <summary>kb/Work PB806 — a row is a directive FAMILY, and a word of it that writes no operand
+    /// (<see cref="DirectiveOperandSyntax.NoOperandWords"/>) is checked centrally whatever the row's Form says about
+    /// its other words. Derived from the rows, so the next multi-word directive that declares an operand-less word is
+    /// witnessed with no test edit: the word is a word OF ITS ROW, an operand after it draws COBOLNET1911 through the
+    /// real stage, and its complement (the bare word, and the word with an inline comment) does not.</summary>
+    [Fact]
+    public void EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord()
+    {
+        var bad = new List<string>();
+        int checkedWords = 0;
+        foreach (var row in ConstructRegistry.Entries.Where(e => e.DirectiveOperand is { NoOperandWords.Count: > 0 }))
+            foreach (string word in row.DirectiveOperand!.NoOperandWords)
+            {
+                checkedWords++;
+                if (!row.DirectiveWords.Contains(word, StringComparer.OrdinalIgnoreCase))
+                    bad.Add($"{row.Id}: noOperandWords names '{word}', which is not one of the row's directive words");
+                if (!Diagnose(word, "ZZJUNK", row.IntroducedIn).Any(d => d.Code == "COBOLNET1911"))
+                    bad.Add($">>{word} ZZJUNK is accepted in silence (ISO §7.3.3 SR3/SR4)");
+                if (Diagnose(word, "", row.IntroducedIn).Any(d => d.Code == "COBOLNET1911")
+                    || Diagnose(word, "*> why", row.IntroducedIn).Any(d => d.Code == "COBOLNET1911"))
+                    bad.Add($">>{word} bare, or with an inline comment, is rejected — §7.3.3 SR3/SR4 allow both");
+            }
+
+        Assert.True(checkedWords >= 3, "the IF and EVALUATE rows declare ELSE, END-IF and END-EVALUATE operand-less");
+        Assert.True(bad.Count == 0, string.Join("\n", bad));
+    }
+
     /// <summary>§7.3.3 SR3/SR4 — a directive "may be followed only by space characters and an optional inline
     /// comment". Six stages sliced their own operand and none of them knew that, so <c>&gt;&gt;PROPAGATE ON
     /// *&gt; on</c> was REJECTED and <c>&gt;&gt;SOURCE FORMAT FIXED *&gt; switch</c> was not recognized at all —

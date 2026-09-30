@@ -82,19 +82,33 @@ public static class CompilerDirectiveCatalog
         if (Map.Value.GetValueOrDefault(word) is not { } row) return;
         if (row.StatusAt(edition.Year) is ConstructAvailability.NotYetIntroduced or ConstructAvailability.Removed)
             return;
-        if (row.DirectiveOperand is not { } syntax || syntax.Form == DirectiveOperandForm.Stage) return;
+        if (row.DirectiveOperand is not { } syntax) return;
+        // A word of a multi-word row whose own format writes no operand (kb/Work PB806): §7.3.3 SR3/SR4 — only spaces
+        // and an optional inline comment may follow the directive, so ANY operand word is a violation, whatever the
+        // row's Form says about the row's other words.
+        if (operand.Length > 0 && syntax.NoOperandWords.Contains(word, StringComparer.OrdinalIgnoreCase))
+        {
+            sink.Report(new EditionDiagnostic(
+                Diagnostics.DiagnosticCatalog.DirectiveMalformedOperand.Code, EditionSeverity.Error, row.Id,
+                $">>{word.ToUpperInvariant()} is malformed: '{operand}' follows it, but the general format writes no operand "
+                + "and only space characters and an optional inline comment may follow a compiler directive "
+                + "(ISO §7.3.3 SR3/SR4; text-1 and text-2 begin on a new line)",
+                row.Display, syntax.Citation));
+            return;
+        }
+        if (syntax.Form == DirectiveOperandForm.Stage) return;
 
         string? complaint = syntax.Form == DirectiveOperandForm.Text
             ? syntax.OperandRequired && operand.Length == 0
                 ? "the operand is required and none is written"
                 : null
-            : CheckWords(syntax, operand);
+            : CheckWords(syntax, operand, edition);
         if (complaint is null) return;
 
         sink.Report(new EditionDiagnostic(
             Diagnostics.DiagnosticCatalog.DirectiveMalformedOperand.Code, EditionSeverity.Error, row.Id,
             $"{row.Display} is malformed: {complaint} — the general format admits "
-            + $"{syntax.Admissible(syntax.DirectiveName ? OperandDirectiveNames(syntax) : null)} ({syntax.Citation})",
+            + $"{syntax.Admissible(syntax.DirectiveName ? OperandDirectiveNames(syntax, edition) : null)} ({syntax.Citation})",
             row.Display, syntax.Citation));
     }
 
@@ -132,7 +146,7 @@ public static class CompilerDirectiveCatalog
     /// <summary>The closed-word-set arm of <see cref="CheckOperand"/>: the optional words (§5.2.3) may be written
     /// anywhere and are ignored; what remains shall be exactly one admissible word, or nothing when the general
     /// format leaves an alternative un-underlined. Returns null when the operand conforms.</summary>
-    private static string? CheckWords(DirectiveOperandSyntax syntax, string operand)
+    private static string? CheckWords(DirectiveOperandSyntax syntax, string operand, EditionInfo edition)
     {
         var words = SignificantWords(syntax, operand);
         if (words.Count == 0)
@@ -142,7 +156,7 @@ public static class CompilerDirectiveCatalog
 
         string w = words[0];
         if (syntax.Choice.Contains(w, StringComparer.OrdinalIgnoreCase)) return null;
-        if (syntax.DirectiveName && OperandDirectiveNames(syntax).Contains(w, StringComparer.OrdinalIgnoreCase))
+        if (syntax.DirectiveName && OperandDirectiveNames(syntax, edition).Contains(w, StringComparer.OrdinalIgnoreCase))
             return null;
         if (syntax.UserWord && IsCobolWord(w)) return null;
         return $"'{w}' is not an admissible operand";
@@ -151,13 +165,19 @@ public static class CompilerDirectiveCatalog
     /// <summary>The compiler-directive names §7.3.20.2 / §7.3.22.2 admit as <c>directive-name</c>, DERIVED from
     /// the catalog: every recognized directive word except those §7.3.20.3 SR1 / §7.3.22.3 SR1 exclude. The
     /// exclusion names a DIRECTIVE, so excluding EVALUATE excludes its whole row — a <c>&gt;&gt;PUSH WHEN</c>
-    /// names the EVALUATE directive by one of its own words and is excluded with it.</summary>
-    private static IReadOnlyList<string> OperandDirectiveNames(DirectiveOperandSyntax syntax)
+    /// names the EVALUATE directive by one of its own words and is excluded with it. A directive-name names a
+    /// directive of the targeted EDITION (kb/Work PB1377): FLAG-85 and FLAG-NATIVE-ARITHMETIC were removed at 2023
+    /// (Annex E.2 item 21), the only edition with PUSH and POP, so neither is a compiler directive there and neither
+    /// is admissible — the rows available at the edition ARE the set, so a removed or not-yet-introduced row drops
+    /// out by itself.</summary>
+    private static IReadOnlyList<string> OperandDirectiveNames(DirectiveOperandSyntax syntax, EditionInfo edition)
     {
         var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (string name in syntax.ExcludedDirectives)
             foreach (string w in (Find(name)?.DirectiveWords ?? [name])) excluded.Add(w);   // the whole ROW, by one of its words
-        return [.. Words.Where(w => !excluded.Contains(w))];
+        return [.. Words.Where(w => !excluded.Contains(w)
+                                    && Find(w)!.StatusAt(edition.Year) is not (ConstructAvailability.NotYetIntroduced
+                                                                               or ConstructAvailability.Removed))];
     }
 
     /// <summary>A COBOL word (§8.3.2): basic letters, digits, hyphen and underscore, not a literal and not

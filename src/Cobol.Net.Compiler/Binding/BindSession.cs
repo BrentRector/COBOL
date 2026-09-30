@@ -43,10 +43,12 @@ internal sealed class BindSession
     /// the tree does. From <c>CompilationUnitContext.TokenRetypes</c>.</summary>
     public Frontend.Parsing.TokenRetypes Retypes { get; init; } = Frontend.Parsing.TokenRetypes.None;
 
-    /// <summary>The group's <c>&gt;&gt;LEAP-SECOND</c> state (ISO §7.3.17; kb/Work PB65): true when ON — a
-    /// formatted-time argument's seconds subfield may be 60 (§15.3.3.3) and standard numeric time form is bounded at
-    /// 86,401 (GR4). Every unit's <see cref="DataBinder.LeapSecond"/> carries it to the intrinsic renderer.</summary>
-    public bool LeapSecond { get; init; }
+    /// <summary>The group's <c>&gt;&gt;LEAP-SECOND</c> resolution (ISO §7.3.17; kb/Work PB65, PB1378): folded per
+    /// compilation unit at its first line — ON means a formatted-time argument's seconds subfield may be 60
+    /// (§15.3.3.3) and standard numeric time form is bounded at 86,401 (GR4). Every unit's
+    /// <see cref="DataBinder.LeapSecond"/> carries the answer to the intrinsic renderer. Defaults to the §7.3.17.4
+    /// GR1 OFF.</summary>
+    public LeapSecondState LeapSecond { get; init; } = LeapSecondState.Empty;
 
     /// <summary>The compilation group's REPOSITORY resolution sources (<see cref="GroupRepository"/>), built ONCE by
     /// <c>BinderDriver.Bind</c> after every DATA division has bound and before the FIRST procedure body binds —

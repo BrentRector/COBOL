@@ -93,15 +93,11 @@ public sealed class Frontend
     /// consult. <see cref="CobolWordsMap.Empty"/> when the source has no COBOL-WORDS directive.</summary>
     public CobolWordsMap CobolWordsMap => Directives.CobolWordsMap;
 
-    /// <summary>The frontend's <c>&gt;&gt;LEAP-SECOND</c> state (ISO §7.3.17) — true when ON is in effect for the
-    /// compilation group (kb/Work PB65): a formatted-time argument may carry a 60 in its seconds subfield
-    /// (§15.3.3.3) and standard numeric time form is bounded at 86,401 (§7.3.17.4 GR4).</summary>
-    public bool LeapSecondOn => Directives.LeapSecondOn;
-
     /// <summary>The POSITION-RULED directive sites of the LAST parsed source (ISO §7.3.20.3 SR4, §7.3.22.3 SR4,
     /// §7.3.25.3 SR5): WHERE each <c>&gt;&gt;TURN</c> / <c>&gt;&gt;PUSH</c> / <c>&gt;&gt;POP</c> was written, in
     /// the final line frame, for the ONE lexical-containment predicate that decides all three bans (owner
-    /// decision D20; kb/Work PB595).</summary>
+    /// decision D20; kb/Work PB595) — and the sites of every directive whose row carries a placement rule
+    /// (<c>DirectivePlacementPass</c>, kb/Work PB1377/PB1378/PB1065).</summary>
     public IReadOnlyList<DirectiveSite> DirectiveSites => Directives.DirectiveSites;
 
     /// <summary>EVERY directive-derived fact the binder consumes, as ONE record (kb/Work PB65 — the fifth
@@ -264,15 +260,17 @@ public sealed class Frontend
             throw new InvalidOperationException(
                 "CobolWordsDirectiveProcessor changed the line count (hazard H3)");
 
-        // >>LEAP-SECOND (ISO §7.3.17): the ONE compilation-group ON/OFF fact the §15.3 date/time consumers read
-        // (kb/Work PB65 — it used to be consumed and discarded). Line-count preserving like the stages above.
-        (text, var leapSecondOn) = LeapSecondDirectiveProcessor.Process(text, diagnostics, sourcePath, lineMap, stackOps);
+        // >>LEAP-SECOND (ISO §7.3.17): the ON/OFF toggles the binder folds at each compilation unit's first line — the
+        // §15.3 date/time consumers' fact (kb/Work PB65 — it used to be consumed and discarded; kb/Work PB1378 — it is
+        // per UNIT, §7.3.4 GR5: a directive between two sibling units governs the units that follow). Line-count
+        // preserving like the stages above.
+        (text, var leapSecondEvents) = LeapSecondDirectiveProcessor.Process(text, stackOps);
         if (CountLines(text) != linesBefore)
             throw new InvalidOperationException(
                 "LeapSecondDirectiveProcessor changed the line count (hazard H3)");
 
         return (new MappedText(text, mapped.Lines),   // the constructor re-asserts the line-count invariant
-            new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, propagateEvents, cobolWordsMap, leapSecondOn, directiveSites),
+            new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, propagateEvents, cobolWordsMap, leapSecondEvents, directiveSites),
             manipulated);
     }
 

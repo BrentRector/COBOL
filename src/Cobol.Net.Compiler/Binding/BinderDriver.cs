@@ -62,9 +62,13 @@ internal sealed class BinderDriver
         // for the level-number screen's reason: a pure syntax rule over the raw tree, and a zero OCCURS bound left to
         // the binder used to reach Roslyn as CS0029 in generated C#.
         global::CobolNet.Validation.IntegerOperandPass.Run(tree, edition);
-        // §7.3.22.3 SR3 / §7.3.20.3 SR3 — WHERE a >>PUSH ALL / >>POP ALL may be written (kb/Work PB1005). Also a
-        // pure position rule over the tree and the directive sites; no tree walk unless the source has one.
-        global::CobolNet.Validation.PushPopAllPlacementPass.Run(tree, directives.DirectiveSites, edition);
+        // WHERE a directive may be written, for the placement rules that need the parse tree (kb/Work PB1005, PB1065,
+        // PB1377, PB1378): PUSH ALL / POP ALL (§7.3.22.3 SR3, §7.3.20.3 SR3), FLAG-02 / FLAG-14 (§7.3.14.3 SR1,
+        // §7.3.15.3 SR1) between clauses and statements; LEAP-SECOND / PROPAGATE outside every compilation unit
+        // (§7.3.17.3 SR1, §7.3.21.3 SR1); a PUSH/POP naming one inherits its rule (§7.3.20.3 SR2, §7.3.22.3 SR2). Each
+        // rule is data on the directive's constructs.json row; a pure position rule over the tree and the directive
+        // sites, with no tree walk unless the source has a site the pass judges.
+        global::CobolNet.Validation.DirectivePlacementPass.Run(tree, directives.DirectiveSites, edition);
 
         // The group's compile-time TurnState (ISO §7.3.25; deep-dive D10) — built BEFORE binding so every unit's
         // statement binder folds the same source-ordered directive events (GR6: checking spans the compilation
@@ -85,7 +89,7 @@ internal sealed class BinderDriver
             DirectiveSites = directives.DirectiveSites,
             CobolWords = cobolWordsMap ?? CobolNet.Editions.CobolWordsMap.Empty,
             Retypes = tree.TokenRetypes,
-            LeapSecond = directives.LeapSecondOn,
+            LeapSecond = LeapSecondState.Build(directives.LeapSecondEvents),
         };
         var oo = new OoDriver(session);   // P9 R1 — the OO bind driver is a binder collaborator, not an emitter seam
         foreach (var iface in table.Interfaces) oo.BindInterfaceData(iface);   // prototype formals (§10.6.2 SR4)
@@ -517,6 +521,26 @@ internal sealed class BinderDriver
     /// reference by <c>SymbolTable.NearestDeclaring</c>) and record the <c>ref</c>-bridges the nested class needs to reach the
     /// container's storage. Every unit passes through here BEFORE any unit's procedure binds
     /// (<see cref="BindUnitProcedure"/>) — the forward-reference enabler for user-function signatures.</summary>
+    /// <summary>The line of a unit's first token — where §7.3.4 GR5's "all of the source text … that follows" is folded.
+    /// A unit whose context carries no start token of its own (a header-less nested program, §11.2.1) takes its first
+    /// descendant's line.</summary>
+    private static int UnitFirstLine(Antlr4.Runtime.ParserRuleContext c)
+    {
+        if (c.Start is { } s) return s.Line;
+        for (int i = 0; i < c.ChildCount; i++)
+        {
+            int line = c.GetChild(i) switch
+            {
+                Antlr4.Runtime.ParserRuleContext p => UnitFirstLine(p),
+                Antlr4.Runtime.Tree.ITerminalNode t => t.Symbol.Line,
+                _ => 0,
+            };
+            if (line > 0) return line;
+        }
+
+        return 0;
+    }
+
     private static void BindUnitData(BoundUnit unit, BindSession session)
     {
         var edition = session.Edition;
@@ -545,7 +569,7 @@ internal sealed class BinderDriver
             RefModZeroLength = session.RefModZeroLength,
             CobolWords = session.CobolWords,   // >>COBOL-WORDS intrinsic-function-name synonym/removal (§7.3.10)
             Retypes = session.Retypes,         // the fragment re-parses read words as the tree does (kb/Work PB655)
-            LeapSecond = session.LeapSecond,   // >>LEAP-SECOND ON — the §15.3 seconds-subfield / time-form bound (§7.3.17)
+            LeapSecond = session.LeapSecond.IsOnAt(UnitFirstLine(unit.Ctx)),   // >>LEAP-SECOND ON at THIS unit — the §15.3 seconds-subfield / time-form bound (§7.3.17, §7.3.4 GR5)
             // The ANY LENGTH placement facts (ISO §13.18.2.3 SR2–SR4 — the rules differ for a contained
             // program, a function, and an outermost program): the unit kind is known only here.
             UnitIsContained = unit.Parent is not null,
