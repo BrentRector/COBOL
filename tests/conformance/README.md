@@ -68,6 +68,18 @@ Recognized keys:
 | key | values | meaning |
 |---|---|---|
 | `sign-encoding` | `ibm` (default) · `ascii` | the DISPLAY over-punch convention (`--sign-encoding`; Annex A.1 items 177/178, kb/Work PB803) |
+| `source-format` | `fixed` · `free` · `auto` | the reference format the source starts in (`--source-format`; kb/Work PB1362) |
+
+## Reference format — the harness contract today
+
+The CLI starts every source in FIXED form (`--source-format` default, ISO §7.3.24.3 2)), but the conformance and
+characterization harnesses compile with `SourceFormat: InitialReferenceFormat.Auto` unless a golden's
+`*> options: source-format=` says otherwise, and the Auto detector (`ReferenceFormatProcessor.IsFixedForm`) reads a
+file whose lines run past column 72 as FREE form. Measured 2026-09-30 (kb/Work PB1757): the harness reads 2,905 of the
+3,576 conformance sources as free form, and 181 positive goldens at 2002/2014/2023 (55 of them a `>>` directive written
+at column 7) plus about a dozen at 85 compile only because of it — the CLI refuses them. Until PB1757's owner decision
+lands, a golden that must be read in fixed form says so with `*> options: source-format=fixed`, and a new golden writes
+a fixed-form `>>` directive at column 8 and keeps program text within columns 8–72.
 
 ## The rule
 

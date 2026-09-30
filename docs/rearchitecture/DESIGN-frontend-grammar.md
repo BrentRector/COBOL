@@ -753,20 +753,24 @@ java+pwsh prerequisites — `Invoke-Antlr4CSharp.ps1`, `GenerateIfNewer.ps1`). T
 
 ### 3.6 Preprocessor pipeline (namespace + one contract fix)
 
-The five preprocessor stages stay, in the proven order (`Frontend.Preprocess`, `Frontend.cs:75-108`):
+The preprocessor runs in this order (`Frontend.Normalize` then `Frontend.Preprocess`, `src/Cobol.Net.Frontend/
+Pipeline/Frontend.cs`):
 
 ```
-StripNistArchiveMarkers → NormalizeToFreeForm(edition,permissive) → ConditionalCompilation
-  → CopyProcessor(edition,permissive) → NistPreprocessor(if NIST) → TurnDirectiveProcessor
+StripNistArchiveMarkers (every compilation — kb/Work PB1803) → NormalizeToFreeFormMapped (§6.5, main source)
+  → ConditionalCompilationProcessor.Manipulate, INTERLEAVED with CopyProcessor (§7.2.1; library text normalized by
+    the same §6.5 walker — PB1067) → NistPreprocessor (if --nist) → DirectiveSiteProcessor → TurnDirectiveProcessor
+  → PropagateDirectiveProcessor → RefModZeroLengthDirectiveProcessor → FlagDirectiveProcessor → COBOL-WORDS / LEAP-SECOND
 ```
 
-Target changes:
-1. **Namespace** all five files `CobolSharp.Compiler.Preprocessor` → `CobolNet.Frontend.Preprocessor` (D8).
-2. **Delete the per-stage edition-metadata/severity copies** (D4): `ReferenceFormatProcessor.ReferenceFormatDiagnostics`
-   and `CopyProcessor` currently re-implement the strict/permissive `Removed()` policy. They take an injected
-   `IEditionSeverityPolicy` (from `Cobol.Net.Editions`) instead, so "removed = error strict / warning
-   permissive" has ONE definition. The preprocessor keeps only its *reference-format/COPY-specific* gate rows
-   (VCR 2/94), read from the shared `ConstructRegistry`.
+Every stage after the COPY/conditional-compilation merge is line-count preserving (asserted). Status of the target
+changes:
+1. **Namespace** `CobolNet.Frontend.Preprocessor` (D8) — done.
+2. **One severity policy** (D4) — done: `ReferenceFormatProcessor.ReferenceFormatDiagnostics` asks
+   `EditionSeverityPolicy.For` and reads its rows from `ConstructRegistry`; no stage keeps a local `if (permissive)`.
+   ⚠ Library text still gets NO `ReferenceFormatDiagnostics` (`CopyProcessor.NormalizeCopybookMapped` passes
+   `diagnostics: null` — kb/Work PB1640), and the object is built per normalization call, so its once-per-compilation
+   gates are once per FILE.
 3. **Keep** the `TurnDirectiveProcessor` line-count-neutrality assertion (`Frontend.cs:103-105`, hazard H3) —
    it is a real safety invariant for TURN anchoring; convert the `throw` into a recorded internal diagnostic
    (consistent with the top-level exception boundary), not a raw exception.
@@ -783,6 +787,20 @@ reference formats, and the only place source comments are recognized. Its model:
   `IsFixedForm` runs only under `auto` — no detector can be the default, because the sequence area may hold any
   character (§6.3.2) and text past margin R is legal, so every detector misreads some conforming fixed-form text.
   Library text starts in the format in effect for its COPY statement (§7.3.24.3 3)).
+  ⚠ The test harnesses (conformance, characterization) pass `auto`, and the detector's past-column-72 veto reads
+  2,905 of the 3,576 conformance sources as FREE form, so most goldens do not exercise the CLI's fixed-form reading
+  (kb/Work PB1757, measured 2026-09-30; `tests/conformance/README.md` states the contract).
+- **There is no line-entry stage yet** (kb/Work PB1800). The raw text is split and indexed independently by
+  `StripNistArchiveMarkers`, `NormalizeToFreeFormMapped`, `FirstSourceDirectiveCandidate` / `DirectiveText`,
+  `IsFixedForm`, `FixedFormConverter.Convert` (per segment, re-joined then re-split) and `ConvertFreeFormMapped`. A
+  TAB is one character position (DOC-A.1-157 determines tab stops of 8 — kb/Work PB1586 diverges), no stage checks the
+  255-position free-form limit, and a lone CR is data here but a line end to the lexer (PB1496). **Target:** ONE
+  `PhysicalLines` reader (terminators, TAB expansion with a per-line tab map, the `--nist`-only archive-marker strip)
+  that every consumer above reads instead of the raw string — PB1800 carries the design and its drift test.
+- **The source map has no column** (kb/Work PB1801): `MappedText` records one `SourceOrigin(File, Line)` per
+  resultant line, so a fixed-form diagnostic column is program-text-relative (7 short — PB1688), a COPY/REPLACE
+  diagnostic is column 1 (PB1671), and a continuation fragment keeps the continued line's origin. **Target:** an
+  origin span list per resultant line, born in the line-entry stage and carried by `OriginWriter` (PB1801).
 - **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
   directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
   line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the
@@ -802,6 +820,17 @@ reference formats, and the only place source comments are recognized. Its model:
   conventions (S/Y debugging, P/J/H/E/U excluded alternates, any other letter a primary-configuration line) are a
   DIALECT — `ccvsIndicators`, on only under `--nist` (`FixedFormConverter.KindOf`). The obsolete comment-entry reading
   of AUTHOR … REMARKS applies only inside an IDENTIFICATION DIVISION (`_inIdentificationDivision`).
+  ⚠ Two edition-scoped questions are DECIDED here today, at every edition, that belong to later stages (kb/Work
+  PB1802): a `D` line is always emitted as the debugging-line CARRIER, which the lexer reads as a comment — so it never
+  compiles under WITH DEBUGGING MODE (PB1705) and is accepted silently at 2023, where §6.2.2 lists no `D`; and a
+  comment-entry paragraph is discarded WHOLE, header included, so the `identification-comments-removed-2002` /
+  `remarks-removed-2002` gate that fires in free form never fires in fixed form (PB1758, PB1494). **Target** (PB1802):
+  keep the paragraph header as program text and discard only the comment-entry; carry the debugging line forward and
+  let the source element's clause decide (the carrier shape is an owner decision, PB1705).
+- **Free form has no cross-line state** (kb/Work PB1804): `ConvertFreeFormMapped` converts line for line, so the
+  latest-logical-line join, the carried literal state and the continuation rules exist only in `FixedFormConverter`.
+  **Target:** ONE `LogicalLineBuilder` both formats feed (PB1804) — the floating literal continuation (PB1359), the
+  continuation-line checks (PB1492) and "a directive line is never a join target" (PB1360) are its steps.
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
 - **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
