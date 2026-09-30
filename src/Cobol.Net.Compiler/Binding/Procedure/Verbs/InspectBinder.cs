@@ -138,6 +138,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         // TALLYING counter (identifier-2) is not named. The rule shape STRING SR1 and UNSTRING SR3 share, asked of
         // the ONE predicate (AllOrNothingClass).
         _sr4Operands = [Sr4Entry(targetOperand)];
+        _identifier1IsBoolean = IntrinsicArgumentRules.ClassOf(targetOperand) == CobolClass.Boolean;
         try
         {
             var bound = BindPhraseOperands(targetOperand, ins);
@@ -154,7 +155,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             }
             return bound;
         }
-        finally { _sr4Operands = null; }
+        finally { _sr4Operands = null; _identifier1IsBoolean = false; }
     }
 
     private BoundStatement BindPhraseOperands(BoundOperand targetOperand, Core.InspectStatementContext ins)
@@ -177,29 +178,26 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 if (host.Expr.ResolveReceiving(item.dataReference()) is not { } counter)
                     return new BoundUnsupported("INSPECT TALLYING count operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
                 ctx.Validation.CheckInspectTallyCounter(counter);   // SR5 — pure check; binding continues
-                foreach (var fc in item.inspectForClause())
+                // The grammar spells the printed phrase (PB1125): ONE FOR per counter, each CHARACTERS / ALL / LEADING
+                // phrase carrying its adjective once and then its operands — GR10, ALL and LEADING are transitive
+                // across the operands that follow them, so each operand below inherits the phrase's adjective.
+                foreach (var cp in item.inspectCountPhrase())
                 {
-                    // GR10: ALL and LEADING are transitive across the bare operands that follow them until the
-                    // next adjective. The format requires an adjective on the first operand, so the All seed is
-                    // only a lenient default for that (ungrammatical) case.
-                    InspectTallyKind last = InspectTallyKind.All;
-                    foreach (var cp in fc.inspectCountPhrase())
+                    if (cp.CHARACTERS() is not null)
                     {
-                        var (before, after) = InspectDelimiters(cp.inspectDelimiters());
-                        if (cp.CHARACTERS() is not null)
-                        {
-                            tallying.Add(new BoundInspectTally(counter, InspectTallyKind.Characters, null, before, after));
-                            continue;
-                        }
-                        if (cp.FIRST() is not null || cp.TRAILING() is not null)
-                            return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "INSPECT … TALLYING … FOR "
-                                + (cp.FIRST() is not null ? "FIRST" : "TRAILING")
-                                + ": the tallying-phrase of ISO §14.9.22.2 prints only CHARACTERS, ALL and LEADING");
-                        InspectTallyKind kind = cp.ALL() is not null ? InspectTallyKind.All
-                            : cp.LEADING() is not null ? InspectTallyKind.Leading
-                            : last;   // a bare operand inherits the governing adjective (GR10)
-                        if (cp.ALL() is not null || cp.LEADING() is not null) last = kind;
-                        tallying.Add(new BoundInspectTally(counter, kind, InspectCharOperand(cp.inspectChar()).Op, before, after));
+                        var (cBefore, cAfter) = InspectDelimiters(cp.inspectDelimiters());
+                        tallying.Add(new BoundInspectTally(counter, InspectTallyKind.Characters, null, cBefore, cAfter));
+                        continue;
+                    }
+                    if (cp.FIRST() is not null || cp.TRAILING() is not null)
+                        return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "INSPECT … TALLYING … FOR "
+                            + (cp.FIRST() is not null ? "FIRST" : "TRAILING")
+                            + ": the tallying-phrase of ISO §14.9.22.2 prints only CHARACTERS, ALL and LEADING");
+                    InspectTallyKind kind = cp.ALL() is not null ? InspectTallyKind.All : InspectTallyKind.Leading;
+                    foreach (var operand in cp.inspectCountOperand())
+                    {
+                        var (before, after) = InspectDelimiters(operand.inspectDelimiters());
+                        tallying.Add(new BoundInspectTally(counter, kind, InspectCharOperand(operand.inspectChar()).Op, before, after));
                     }
                 }
             }
@@ -207,16 +205,16 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         var replacing = new List<BoundInspectReplace>();
         if (ins.inspectReplacingPhrase() is { } replPhrase)
         {
-            // GR16: ALL, FIRST, and LEADING are transitive across following bare operands until the next adjective.
-            InspectReplaceKind? last = null;
+            // GR16: ALL, FIRST, and LEADING are transitive across the pairs that follow them until the next adjective
+            // — the grammar nests them under their adjective (PB1125), so each pair inherits its item's kind.
             foreach (var item in replPhrase.inspectReplacingItem())
             {
-                var (before, after) = InspectDelimiters(item.inspectDelimiters());
                 if (item.CHARACTERS() is not null)
                 {
-                    var (rep, repFigurative) = InspectCharOperand(item.inspectChar(0));
+                    var (cBefore, cAfter) = InspectDelimiters(item.inspectDelimiters());
+                    var (rep, repFigurative) = InspectCharOperand(item.inspectChar());
                     ctx.Validation.CheckInspectCharactersReplacement(rep);   // SR7 — pure check
-                    replacing.Add(new BoundInspectReplace(InspectReplaceKind.Characters, null, rep, before, after, repFigurative));
+                    replacing.Add(new BoundInspectReplace(InspectReplaceKind.Characters, null, rep, cBefore, cAfter, repFigurative));
                     continue;
                 }
                 if (item.TRAILING() is not null)
@@ -224,19 +222,21 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                         + "prints only CHARACTERS, ALL, LEADING and FIRST");
                 InspectReplaceKind kind = item.ALL() is not null ? InspectReplaceKind.All
                     : item.FIRST() is not null ? InspectReplaceKind.First
-                    : item.LEADING() is not null ? InspectReplaceKind.Leading
-                    : last ?? InspectReplaceKind.All;   // bare operand pair — GR16 (All only when ungrammatically first)
-                if (item.ALL() is not null || item.FIRST() is not null || item.LEADING() is not null) last = kind;
+                    : InspectReplaceKind.Leading;
 
-                var (pat, _) = InspectCharOperand(item.inspectChar(0));
-                var (rep2, figurative) = InspectCharOperand(item.inspectChar(1));
-                // SR6 / GR14: a figurative literal-3 "is expanded or contracted to be the size of literal-1", and
-                // GR14 says the same of identifier-3 — whose size is a RUN-TIME fact for a function-identifier or a
-                // dynamic-length item. So the runtime sizes it, for every pattern shape alike (kb/Work PB1126: a
-                // bind-time expansion that answered only a static width left `ALL FUNCTION TRIM(P) BY SPACES` a
-                // one-character replacement the size check then skipped). Only two LITERALS are checked here.
-                ctx.Validation.CheckInspectReplacingSize(pat, rep2, figurative);   // SR6 — pure check
-                replacing.Add(new BoundInspectReplace(kind, pat, rep2, before, after, figurative));
+                foreach (var pair in item.inspectReplacingPair())
+                {
+                    var (before, after) = InspectDelimiters(pair.inspectDelimiters());
+                    var (pat, _) = InspectCharOperand(pair.inspectChar(0));
+                    var (rep2, figurative) = InspectCharOperand(pair.inspectChar(1));
+                    // SR6 / GR14: a figurative literal-3 "is expanded or contracted to be the size of literal-1", and
+                    // GR14 says the same of identifier-3 — whose size is a RUN-TIME fact for a function-identifier or a
+                    // dynamic-length item. So the runtime sizes it, for every pattern shape alike (kb/Work PB1126: a
+                    // bind-time expansion that answered only a static width left `ALL FUNCTION TRIM(P) BY SPACES` a
+                    // one-character replacement the size check then skipped). Only two LITERALS are checked here.
+                    ctx.Validation.CheckInspectReplacingSize(pat, rep2, figurative);   // SR6 — pure check
+                    replacing.Add(new BoundInspectReplace(kind, pat, rep2, before, after, figurative));
+                }
             }
         }
 
@@ -265,13 +265,8 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             // SR9 / GR22: a figurative literal-5 takes literal-4's / identifier-6's size — at RUN time, the same
             // reason as SR6 above (kb/Work PB1126).
             ctx.Validation.CheckInspectConvertingSize(from, to, figurative);   // SR9 — pure check
-            BoundOperand? before = null, after = null;
-            foreach (var ba in conv.inspectBeforeAfterPhrase())
-            {
-                var (op, _) = InspectCharOperand(ba.inspectChar());
-                if (ba.BEFORE() is not null) before = op;
-                else after = op;
-            }
+            // The after-before-phrase is the ONE inspectDelimiters rule the other two formats use (PB1125).
+            var (before, after) = InspectDelimiters(conv.inspectDelimiters());
             converting = new BoundInspectConvert(from, to, before, after, figurative);
         }
 
@@ -304,6 +299,14 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     private (BoundOperand Op, bool Figurative) InspectCharOperand(Core.InspectCharContext c, bool literal5 = false)
     {
         var bound = InspectCharOperandOf(c, literal5);
+        // ⛔ SR3: "when identifier-1 is of class boolean, the figurative constant is of class boolean and only the
+        // figurative constant ZERO may be specified" (kb/Work PB1127) — every other figurative, a symbolic-character
+        // and the ALL-literal literal-5 included, is a syntax error, not a character the runtime then guesses at.
+        if (_identifier1IsBoolean && bound.Figurative && bound.Op is not BoundFigurative { Kind: 'Z' })
+            return (BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
+                $"INSPECT operand '{c.GetText()}' is a figurative constant other than ZERO, but identifier-1 is of "
+                + "class boolean, and only the figurative constant ZERO may be specified there (ISO §14.9.22.3 SR3)",
+                $"INSPECT operand '{c.GetText()}' (ISO §14.9.22.3 SR3)"), false);
         // SR4's operand record (kb/Work PB980). A FIGURATIVE operand (and a bare symbolic character, which IS one)
         // takes identifier-1's class by SR3 — "When identifier-1 is of class national, the class of the figurative
         // constant is national; when identifier-1 is of class boolean, the figurative constant is of class
@@ -320,12 +323,29 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     /// through <see cref="InspectCharOperand"/>, so recording there reaches all of them without a per-phrase copy.</summary>
     private List<(CobolClass? Class, bool Triggers)>? _sr4Operands;
 
+    /// <summary>True while binding an INSPECT whose identifier-1 is of class boolean — SR3's "only the figurative
+    /// constant ZERO may be specified" is asked of every operand against it (kb/Work PB1127). Set and cleared with
+    /// <see cref="_sr4Operands"/>.</summary>
+    private bool _identifier1IsBoolean;
+
     /// <summary>One SR4 entry: the operand's §8.5.2.1 class, and whether it can TRIGGER the rule — SR4 is written
     /// over an operand that "references an ELEMENTARY data item or literal of class boolean or national", while
     /// "all shall reference a data item or literal" of that class, so a group conforms by its class but never
     /// triggers.</summary>
     private static (CobolClass? Class, bool Triggers) Sr4Entry(BoundOperand op) =>
         (IntrinsicArgumentRules.ClassOf(op), op is not BoundFieldOperand { Place.Item.IsGroup: true });
+
+    /// <summary>⛔ SR3's last sentence, asked of every literal position (kb/Work PB1127): "Literal-1, literal-2,
+    /// literal-3, literal-4, or literal-5 shall not be a zero-length literal" — a zero-length literal has no
+    /// character to tally, replace or convert, and as a BEFORE/AFTER delimiter it silently changed the answer
+    /// (BEFORE '' counted the whole item). Edition-invariant: the rule names no edition.</summary>
+    private BoundOperand ScreenZeroLength(BoundOperand literal, Core.InspectCharContext c) =>
+        literal is BoundStringLiteral { Value.Length: 0 }
+            ? BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
+                $"INSPECT operand '{c.GetText()}' is a zero-length literal, which literal-1 through literal-5 shall "
+                + "not be (ISO §14.9.22.3 SR3)",
+                $"INSPECT operand '{c.GetText()}' (ISO §14.9.22.3 SR3)")
+            : literal;
 
     private (BoundOperand Op, bool Figurative) InspectCharOperandOf(Core.InspectCharContext c, bool literal5)
     {
@@ -373,9 +393,20 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         // GR3), decodes each literal class char-correct (the SR4 class mix is recorded by InspectCharOperand and
         // enforced in BindPhrases — kb/Work PB980), and refuses NULL by the ONE SR1 screen (COBOLNET2576).
         if (host.Expr.NonNumericLiteralOperand(c.literal()?.nonNumericLiteral()) is { } litOp)
-            return (litOp, false);
+            return (ScreenZeroLength(litOp, c), false);
         if (c.dataReference() is { } dref)
         {
+            // ⛔ A CONSTANT-NAME IS A LITERAL HERE (kb/Work PB1127): §13.10.3 SR2 "may be used anywhere that a format
+            // specifies a literal", §13.10.4 GR1 "as if literal-1 ... were written" — so it substitutes BEFORE the
+            // identifier arm below, which would refuse it as an undefined data-name. The SAME bound shape the written
+            // literal produces, so SR3's class/zero-length screens and SR4/SR6/SR7/SR9 all see it as one.
+            if (host.Expr.ConstantOperand(dref) is { } konst)
+                return konst is BoundNumericLiteral
+                    ? (BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
+                        $"INSPECT operand '{dref.GetText()}' is a numeric constant-name; each INSPECT literal shall be an "
+                        + "alphanumeric, boolean, or national literal (ISO §14.9.22.3 SR3, §13.10.3 SR2)",
+                        $"INSPECT operand '{dref.GetText()}' (ISO §14.9.22.3 SR3)"), false)
+                    : (ScreenZeroLength(konst, c), false);
             // A bare symbolic character IS a figurative constant (§12.3.7.4 GR11; kb/Work PB110) — one character,
             // with the SR6 / GR14 figurative expansion the literal figuratives get.
             if (ctx.Data.SymbolicOf(dref) is { } sym)

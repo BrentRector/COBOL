@@ -599,6 +599,9 @@ public abstract class CobolParserCoreBase : Parser
     /// is still bare.</para></summary>
     protected bool IsBareInspectOperand()
     {
+        // A phrase ADJECTIVE begins the NEXT phrase — `ALL "B"` after `ALL "A"` is a new ALL phrase, never the
+        // figurative constant ALL "B" as one more operand (which SR3 bars from literal-1 anyway).
+        if (BeginsInspectPhrase(TokenStream.LA(1))) return false;
         int t = 2;   // LA(1) is the candidate operand's first token
         while (true)
         {
@@ -622,6 +625,19 @@ public abstract class CobolParserCoreBase : Parser
         }
         return TokenStream.LA(t) != CobolLexer.FOR;
     }
+
+    /// <summary>The words that begin an INSPECT tallying / replacing PHRASE (§14.9.22.2): the adjectives, which are
+    /// reserved words and so can never be the first token of a bare operand — except that ALL also begins the
+    /// figurative constant <c>ALL literal</c>, which is what makes the test necessary.</summary>
+    private static bool BeginsInspectPhrase(int token) =>
+        token is CobolLexer.ALL or CobolLexer.LEADING or CobolLexer.CHARACTERS or CobolLexer.FIRST or CobolLexer.TRAILING;
+
+    /// <summary>Predicate for a bare (adjective-less) INSPECT REPLACING pair — the operands AFTER the first under one
+    /// ALL / LEADING / FIRST adjective (§14.9.22.4 GR16, transitive). A pair begins with an operand, and an
+    /// adjective (or CHARACTERS) begins the NEXT item, so the pair loop ends there. Without this an
+    /// <c>ALL "A" BY "Z" ALL "B" BY "Y"</c> would read the second ALL as the figurative constant <c>ALL "B"</c>
+    /// starting one more pair.</summary>
+    protected bool IsBareInspectReplacingPair() => !BeginsInspectPhrase(TokenStream.LA(1));
 
     /// <summary>Predicate for the TO-less operand of the three §13.18.60.2 pointer usages (kb/Work PB848): TO is
     /// an optional word there (§5.2.3 — not underlined on the printed folio 503), so the word after
