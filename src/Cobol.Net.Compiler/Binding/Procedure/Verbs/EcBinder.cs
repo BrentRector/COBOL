@@ -114,7 +114,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         if (where.InPerformWhen)
         {
             ctx.EcState.Resume = true;
-            if (r.NEXT() is not null) return new BoundResume(ResumeSignal.NextStatement);
+            if (r.NEXT() is not null) return new BoundResume(DispatchResult.ResumeNext);
             return BoundRejected.Report(ctx.Edition, "COBOLNET1610", "RESUME in a WHEN phrase of an exception-checking PERFORM shall "
                 + "specify NEXT STATEMENT (ISO §14.9.33.3 SR1)");
         }
@@ -133,7 +133,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
                 + "USE statement carries the GLOBAL phrase (ISO §14.9.33.3 SR2)");
         }
         ctx.EcState.Resume = true;
-        if (r.NEXT() is not null) return new BoundResume(ResumeSignal.NextStatement);
+        if (r.NEXT() is not null) return new BoundResume(DispatchResult.ResumeNext);
 
         // SR3 — procedure-name-1 shall be in the NONdeclarative portion.
         var pn = r.procedureName()!;
@@ -685,6 +685,14 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
                     Query(["EC-RANGE-PERFORM-VARYING"]);
                     break;
             }
+            // ⛔ THE OPERAND-DECLARED RAISE NAMES (kb/Work PB1453; the model is PB1762). §14.6.13.1.1 attaches a raise
+            // to the DETECTION, wherever in the statement it happens: a program-address-identifier raises
+            // EC-PROGRAM-NOT-FOUND (§8.4.3.13.4 GR4) in a relation, an INVOKE argument or a CALL argument alike, so
+            // the operand — never the statement kind — declares the name. The node-kind arms above cover the
+            // statements that raise through their own shape (SET … TO ENTRY, the CALL's ProgramNames); this is the
+            // arm for every statement that merely CARRIES such an operand. Folding the intrinsic-bearing ambient
+            // gates below (ContainsIntrinsic) into the same walker is PB1762's follow-up.
+            Query(OperandRaisableNames(node));
             // ⛔ THE EC-SIZE FAMILY IS AMBIENT FOR EVERY OTHER STATEMENT TOO (kb/Work PB75). §14.7.5: the size error
             // condition "may occur as a result of … the evaluation of an arithmetic expression" — a condition, a
             // function argument, a subscript, an INVOKE argument all render inline — and without a SIZE ERROR
@@ -924,6 +932,54 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         string element = ctx.CurrentMethodScope?.MethodName ?? ctx.EcState.ProgramName;
         return $"{element}; {proc}; {lineId}";
     }
+
+    /// <summary>One OPERAND kind that raises an exception condition wherever it is written, and the name it raises
+    /// (kb/Work PB1453, PB1762). ISO §14.6.13.1.1 makes a raise the consequence of a DETECTION during "the execution
+    /// of a statement", so the enabled set a statement's guard carries has to be derived from what the statement
+    /// CARRIES, not from its node kind — a node-kind switch is a hand-maintained list, and each statement kind added
+    /// without its arm silently lost the raise (PB452, PB409, PB326, PB349/PB1036, PB233 before this).</summary>
+    internal static readonly (Func<BoundOperand, bool> Carries, string Name)[] OperandRaises =
+    [
+        // §8.4.3.13.4 GR4 — "If the runtime system cannot locate the program, the EC-PROGRAM-NOT-FOUND exception
+        // condition is set to exist": the program-address-identifier is the operand, in a relation (§8.8.4.2.2
+        // Format 3) and an INVOKE argument (§14.9.23.3 SR9) alike.
+        (o => o is BoundAddressOperand { Program: not null }, "EC-PROGRAM-NOT-FOUND"),
+    ];
+
+    /// <summary>⛔ THE OPERAND-DECLARED RAISE NAMES OF A STATEMENT (kb/Work PB1453; the model is PB1762): the
+    /// exception-names that an operand in THIS statement's own value parts (<see cref="BoundStatementTree.OwnValueParts"/>,
+    /// generated from the semantic model — a statement kind or operand slot added tomorrow is covered without an edit)
+    /// can raise, per <see cref="OperandRaises"/>. Nested statements are NOT walked: each is bound and wrapped through
+    /// its own <see cref="EcWrap"/> and is an EC region boundary of its own (kb/Work PB441), so an operand is asked
+    /// where it is written, under that statement's own TURN state.</summary>
+    internal static IEnumerable<string> OperandRaisableNames(BoundStatement s)
+    {
+        var operands = s.OwnValueParts().SelectMany(OperandsIn).ToList();
+        if (operands.Count == 0) return [];
+        return OperandRaises.Where(r => operands.Any(r.Carries)).Select(r => r.Name);
+    }
+
+    /// <summary>The operands one generated value part holds: itself when it is one, or those a condition compares,
+    /// classifies or tests (the condition hierarchy is walked to its leaves). Expressions hold no address operand
+    /// (§8.5.2.1 Table 2 — a pointer is not an arithmetic operand), so they contribute none.</summary>
+    private static IEnumerable<BoundOperand> OperandsIn(object part) => part switch
+    {
+        BoundOperand o => [o],
+        BoundCondition c => ConditionOperands(c),
+        _ => [],
+    };
+
+    private static IEnumerable<BoundOperand> ConditionOperands(BoundCondition c) => c switch
+    {
+        BoundRelational r => [r.Left, r.Right],
+        BoundLogical l => l.Operands.SelectMany(ConditionOperands),
+        BoundNot n => ConditionOperands(n.Operand),
+        BoundClassCondition cc => [cc.Operand],
+        BoundUserClassCondition uc => [uc.Operand],
+        BoundCodedSetClassCondition cs => [cs.Operand],
+        BoundUdfEvaluated u => ConditionOperands(u.Inner),
+        _ => [],
+    };
 
     /// <summary>Does a bound statement (or a statement nested inside it) contain an intrinsic-function call — the
     /// EC-ARGUMENT-FUNCTION wrap test? Checks THIS statement's own operand/expression shapes via <see cref="DirectIntrinsic"/>,

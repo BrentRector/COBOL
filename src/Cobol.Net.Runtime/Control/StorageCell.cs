@@ -15,12 +15,33 @@ public sealed class StorageCell
     /// <summary>True for a cell obtained by ALLOCATE (ISO §14.9.3) — the only cells FREE releases (§14.9.15.4 GR1a).</summary>
     public bool Allocated;
 
-    /// <summary>True once FREE released the cell (§14.9.15.4 GR1a — "the contents of any data items located
-    /// within the released storage area become undefined"; this implementation makes any later dereference
-    /// loud, EC-BOUND-PTR). ⚠ The clause and the quotation were re-derived here: this comment and its twin
-    /// below carried a PARAPHRASE of GR1a ("the contents become undefined") at the construct clause, one
-    /// level short of the rule's own subclause (CLAUDE.md rule 1's inherited-citation failure mode).</summary>
-    public bool Freed;
+    /// <summary>⛔ THE ONE LIFETIME STATE OF A CELL (kb/Work PB1216): how many lives of this storage have ENDED. A data
+    /// pointer (<see cref="CellPointer"/>) records the generation it was taken in, and ISO §13.18.5.4 GR4 makes a
+    /// reference through one whose generation is no longer the cell's current one a reference to "an address [that is]
+    /// not a valid address of storage" — EC-BOUND-PTR. A counter rather than a flag because a STATIC cell is
+    /// re-seeded IN PLACE at CANCEL (<see cref="Reinitialize"/>): a flag would come back to 'live' and resurrect every
+    /// pointer taken before the CANCEL, while the counter keeps those dead and lets a pointer taken afterwards
+    /// live.</summary>
+    public int Generation { get; private set; }
+
+    /// <summary>Why the most recent life ended — <see cref="StorageEnd.None"/> until <see cref="End"/> has run.</summary>
+    public StorageEnd LastEnd { get; private set; }
+
+    /// <summary>End the cell's current life for <paramref name="reason"/> — the ONE way storage stops existing. FREE
+    /// (§14.9.15.4 GR1a: "the contents of any data items located within the released storage area become undefined")
+    /// also releases the image and the managed slots, which are one storage area with it; the activation and CANCEL
+    /// ends (§8.6.4) leave the image to its owner, who re-seeds or drops it. Every pointer taken before this call
+    /// now fails its dereference loud (<c>CobolPtr.Deref</c>).</summary>
+    public void End(StorageEnd reason)
+    {
+        Generation++;
+        LastEnd = reason;
+        if (reason == StorageEnd.Freed)
+        {
+            Ref = "";
+            ClearSlots();   // GR1a — the managed slots are the SAME storage area (kb/Work PB231)
+        }
+    }
 
     /// <summary>⛔ THE MANAGED SLOTS OF THE SAME STORAGE AREA, keyed by the slot's BYTE OFFSET within it
     /// (kb/Work PB231 — the pointer third). A data item of class pointer or class object holds a managed
@@ -162,10 +183,12 @@ public sealed class StorageCell
     /// the byte image becomes <paramref name="image"/> (the declaration's own VALUE-honoring seed) and every
     /// managed slot reads null again, which is §13.18.63's initial state for a pointer or object member with no
     /// VALUE. IN PLACE, never a fresh cell, because the cell IS the storage a <c>ManagedPointer.At</c> window
-    /// aliases: a RECURSIVE unit's WORKING-STORAGE is ONE static copy (§13.5.4 GR1), so a pointer taken before
-    /// the CANCEL still names that copy after it.</summary>
+    /// aliases: a RECURSIVE unit's WORKING-STORAGE is ONE static copy (§13.5.4 GR1) and the window keeps naming it —
+    /// but the window's generation (<see cref="Generation"/>) no longer matches, so a pointer taken BEFORE the CANCEL
+    /// is an invalid address (§8.6.5, §13.18.5.4 GR4) and one taken after is live.</summary>
     public StorageCell Reinitialize(string image)
     {
+        End(StorageEnd.Cancelled);   // §8.6.4: the static item persisted "to … the execution of a CANCEL statement" — every pointer taken into the old life is dead (kb/Work PB1216)
         Ref = image;
         _slots = null;
         return this;   // a dynamic-length item's VALUE is re-seeded by a chained SeedDyn (kb/Work PB1026)

@@ -17,6 +17,18 @@ and lessons learned — intended as source material for a series of articles.
 
 Six Sonnet batch implementers dispatched to the 10-20-bug workflow each stopped at the 220-turn cap (`maxTurns` in `.claude/agents/cobol-implementer.md`, adopted by PB468 for ONE rendered kb/Work group per agent) with uncommitted work and no report; they were resumed and told to finish or revert, gate and commit. The owner raised the cap to 400 and asked for smaller scopes (R67): `maxTurns: 400`; MANDATORY-PRACTICES P5 and the workstream SKILL table updated (the old "never extend" is superseded for the implementer cap); dispatch rules from now on — 6-8 bugs per implementer, a checkpoint commit every 3-4 verified bugs, per-bug targeted verification with ONE full gate at the end, no gate polling, stop and report at about 350 turns. The read-only cap stays 160 and the lander 220.
 
+## Entry 1818 — 2026-09-30 12:19 PDT — Exceptions batch: DispatchResult protocol type (PB1122-A), operand-declared raise names (PB1453), closed EC-IMP family (PB1531), storage lifetime ends at activation exit and CANCEL (PB1216)
+
+**PB1122-A (no behaviour change).** The declarative dispatch-result protocol (-1..-4 as bare literals at a dozen emit sites) is now `CobolNet.Runtime.Exceptions.DispatchResult` (`Normal`, `ResumeNext`, `NoHandler`, `HandledNonfatal`, reserved `NotNormal`; predicates `IsTransfer`, `SuppressesFatal`, `TerminatesSortMerge`, `ForHandledWarning`, `RanAHandler`). `ResumeSignal.NextStatement/HandledNonfatal` and `ExceptionState.DeclarativeCompleted/NoDeclarative` deleted, every emitter renders names; `DispatchResultProtocolDriftTests` (proved red once). No characterization snapshot changed. Design doc protocol bullet updated. PB1122 Task B and PB1160 remain.
+
+**PB1453.** A program-address-identifier operand raises EC-PROGRAM-NOT-FOUND wherever written: `EcBinder.OperandRaisableNames` derives the enabled names from a statement's own operands (nested statements are their own EC regions, so not walked — a deliberate deviation from the brief); `FatalAmbientGates` gained the row. Baseline measured silent (`MISS NULL`, blank status) for IF/EVALUATE/PERFORM UNTIL and INVOKE arguments. Golden `2002/pb1453_program_address_operand_not_found`, `FatalRaiseSelectionTests` x5, `OperandRaiseNamesDriftTests`.
+
+**PB1531.** `ExceptionCatalog.TryGet` refuses `EC-IMP-suffix` (COBOLNET0711 in RAISE / `>>TURN` / USE; TURN's 0711 now carries the directive's line). The spelling stays reserved in directives (§8.12). Negatives `pb1531-ec-imp-suffix-*`; CONFORMANCE DOC-A.1-99 and the design doc updated; DIAGNOSTICS.md regenerated.
+
+**PB1216.** `StorageCell.Freed` replaced by a generation + `End(StorageEnd)`; `CellPointer` records its generation; `CobolPtr.Deref` raises EC-BOUND-PTR for a pointer into ended storage. One classification (`DataBinder.LifetimeOfCell`) decides who ends a cell: activation exit (`Call` / method `finally`), `ICobolProgram.EndStorage` (INITIAL/RECURSIVE exit, CANCEL), `__ResetStatics`. Baseline measured every dead-pointer shape reading silently. Three goldens `2002/pb1216_*_pointer_lifetime`. Drift test over the generated program owed (PB1860).
+
+**Not reached (turn cap, nothing applied):** PB1118, PB963, PB867 — documented on their notes. Inventory: GR-8.4.3.13.4-4 and GR-13.18.5.4-4 CONFORMS via record_verdicts.py.
+
 ## Entry 1817 — 2026-09-30 12:18 PDT — Grammar / OO decisions: END-INVOKE removed, `N + 1` is one argument, method WORKING-STORAGE illegal at every edition
 
 Three owner/spec-derived decisions landed (PB758/R58, PB1135/R59, PB1308/R62); the rest of the batch (PB1498, PB935 and the OO-1 items) was NOT reached — the implementer hit its turn limit — and each of those notes says so.

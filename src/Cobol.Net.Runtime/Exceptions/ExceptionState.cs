@@ -404,10 +404,10 @@ public sealed class ExceptionEngine
     /// rules for that statement." #3 and #4 are ALTERNATIVES, so the outcome is decided by whether a declarative
     /// qualified:</para>
     /// <list type="bullet">
-    /// <item><c>-3</c> — no qualifying declarative (or this element has no F3 machinery at all): #4, the raise
+    /// <item><see cref="DispatchResult.NoHandler"/> — no qualifying declarative (or this element has no F3 machinery at all): #4, the raise
     /// site returns and its caller's documented outcome stands (the substitution character is stored, the table
     /// grows, the range is empty).</item>
-    /// <item><c>-1</c> — the declarative RAN and completed normally (§14.6.13.1.2). #3's own sentence places the
+    /// <item><see cref="DispatchResult.Normal"/> — the declarative RAN and completed normally (§14.6.13.1.2). #3's own sentence places the
     /// return: "If execution of the declarative completes normally, execution continues as specified in the
     /// RULES FOR NORMAL EXECUTION", and every condition reaching this method has a rule that names that
     /// continuation outright — §14.7.8 rule 2 ("upon completion of any exception processing, execution proceeds
@@ -419,7 +419,7 @@ public sealed class ExceptionEngine
     /// of the statement's own execution and the two readings coincide). Where a specific rule DOES name one, #3's
     /// "the rules for normal execution" is that rule, and it is the only reading under which §14.7.8's empty range
     /// is observable at all. Recorded as PB367b's determination.</item>
-    /// <item><c>-2</c> / <c>≥ 0</c> — RESUME AT NEXT STATEMENT (§14.9.33.4 GR2) / RESUME AT procedure-name
+    /// <item><see cref="DispatchResult.ResumeNext"/> / <c>≥ 0</c> — RESUME AT NEXT STATEMENT (§14.9.33.4 GR2) / RESUME AT procedure-name
     /// (GR3, ≡ GO TO): an explicit transfer of control out of the interrupted statement, which unwinds the rest
     /// of it through <see cref="RaiseResumeSignal"/> — the raise site's own leg of the unwind, landing at the
     /// emitted nonfatal-gate wrapper (the declarative's own <see cref="ResumeSignal"/> leg ended at
@@ -440,26 +440,19 @@ public sealed class ExceptionEngine
     {
         if (!enabled) return;
         Set(ec, fatal: false);
-        int r = NonfatalDispatcher?.NonfatalDispatch(ec) ?? NoDeclarative;
-        // -1 (#3, the declarative completed normally) and -3 (#4, none qualified) both leave the statement to
-        // finish under its own rules; only an explicit RESUME transfers control out of it.
-        if (r is DeclarativeCompleted or NoDeclarative) return;
-        if (nextStatementContinues && r == ResumeSignal.NextStatement) return;
-        throw new RaiseResumeSignal(r);   // §14.9.33.4 GR2 (-2 ≡ ResumeSignal.NextStatement) / GR3 (≥ 0)
+        int r = NonfatalDispatcher?.NonfatalDispatch(ec) ?? DispatchResult.NoHandler;
+        // Normal (#3, the declarative completed normally) and NoHandler (#4, none qualified) both leave the statement
+        // to finish under its own rules; only an explicit RESUME transfers control out of it.
+        if (r is DispatchResult.Normal or DispatchResult.NoHandler) return;
+        if (nextStatementContinues && r == DispatchResult.ResumeNext) return;
+        throw new RaiseResumeSignal(r);   // §14.9.33.4 GR2 (DispatchResult.ResumeNext) / GR3 (≥ 0)
     }
-
-    /// <summary>The dispatch result protocol's "the declarative completed normally" (§14.6.13.1.2) — shared with
-    /// the generated <c>__RunUse</c> / <c>__EcDispatch</c> (EcEmitter documents the protocol).</summary>
-    private const int DeclarativeCompleted = -1;
-
-    /// <summary>The dispatch result protocol's "no qualifying declarative" (§14.9.49.4 GR3 g) last sentence).</summary>
-    private const int NoDeclarative = -3;
 
     /// <summary>The runtime element whose declaratives §14.6.13.1.4 #3 selects over — the ACTIVATION now
     /// executing, installed and restored by the activation boundary (<c>ProgramTable.RunMain</c> /
     /// <c>CallProgram</c>), null outside any COBOL activation. A generated program class overrides
     /// <see cref="INonfatalSelector.NonfatalDispatch"/> only when it has Format-3 selection machinery; every other
-    /// element takes the interface's default and answers <see cref="NoDeclarative"/>, which is why installing it
+    /// element takes the interface's default and answers <see cref="DispatchResult.NoHandler"/>, which is why installing it
     /// unconditionally is correct and why an element with no declaratives costs nothing.
     /// <para>⛔ This is the channel a RUNTIME raise site reaches a declarative through, and it has to be the
     /// ACTIVATION's rather than the statement's: the ambient checking flags are run-unit state that a CALL does
@@ -1531,7 +1524,7 @@ public sealed class ExceptionEngine
     /// GR21 — a frame is transparent to exception conditions raised while it is handling). Walks the stack
     /// innermost→outermost, skipping frames already <see cref="PerformFrame.Handling"/>; the first frame whose
     /// matcher does not return <see cref="PerformFrame.NoMatch"/> handled it (<paramref name="handled"/> = true),
-    /// and its returned dispatch action (<c>-1</c>/<c>-2</c>/pc) is passed back to the raise site. Every frame
+    /// and its returned dispatch action (a <see cref="DispatchResult"/> or a pc) is passed back to the raise site. Every frame
     /// visited in THIS resolution stays marked <c>Handling</c> until it completes (deferred clear), so an
     /// exception raised inside a selected (outer) handler is not re-caught by a skipped inner frame whose imp-1 is
     /// suspended. When no frame matches, returns <see cref="PerformFrame.NoMatch"/> and the caller falls to the
@@ -1551,7 +1544,7 @@ public sealed class ExceptionEngine
                 int a = f.Matcher(ec, file);                // runs imp-2 (+COMMON) synchronously iff it matches
                 if (a != PerformFrame.NoMatch) { handled = true; return a; }
             }
-            return PerformFrame.NoMatch;                    // → caller falls to __EcDispatch (USE) / -3
+            return PerformFrame.NoMatch;                    // → caller falls to __EcDispatch (USE) / NoHandler
         }
         finally { foreach (var f in marked) f.Handling = false; }
     }

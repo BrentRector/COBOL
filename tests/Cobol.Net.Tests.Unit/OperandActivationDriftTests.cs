@@ -131,7 +131,7 @@ public sealed class OperandActivationDriftTests
         // through: per activation, the GOBACK RAISING pickup AND the activation-failure catch (both render through
         // EcEmitter.EmitSelection since kb/Work PB1549, so they share its result-variable spelling) — 2 × 2.
         Assert.Equal(2, Regex.Matches(cs, @"catch \(RaiseResumeSignal __as\d+\)").Count);
-        Assert.Equal(4, Regex.Matches(cs, @"== ResumeSignal\.NextStatement\) throw new RaiseResumeSignal\(__r\d+\);").Count);
+        Assert.Equal(4, Regex.Matches(cs, @"DispatchResult\.SuppressesFatal\(__r\d+\)\) throw new RaiseResumeSignal\(__r\d+\);").Count);
         Assert.Equal(2, Regex.Matches(cs, @"TakeRaisedPropagation\(").Count);
     }
 
@@ -176,7 +176,7 @@ public sealed class OperandActivationDriftTests
         Assert.DoesNotContain("goto ", body);
         // Both IFs carry a landing, and both stores' selections throw (the lambda's and the hoisted one's).
         Assert.Equal(2, Regex.Matches(cs, @"catch \(RaiseResumeSignal __as\d+\)").Count);
-        Assert.Equal(2, Regex.Matches(cs, @"== ResumeSignal\.NextStatement\) throw new RaiseResumeSignal\(__r\d+\);").Count);
+        Assert.Equal(2, Regex.Matches(cs, @"DispatchResult\.SuppressesFatal\(__r\d+\)\) throw new RaiseResumeSignal\(__r\d+\);").Count);
     }
 
     /// <summary>The control: a statement with no operand activation binds no landing.</summary>

@@ -288,7 +288,14 @@ public sealed class ProgramTable
             exc.TrimPerformTo(savedPerformDepth);
             exc.NonfatalDispatcher = savedNonfatalDispatcher;
             exc.RestoreChecking(savedChecking);
-            if (freshInstance) n.Instance = displacedInstance;   // kb/Work PB133 — see above
+            if (freshInstance)
+            {
+                // The fresh instance dies with its activation: the storage it owned (an INITIAL program's items — "An
+                // initial item persists while the program is in active state" — and a RECURSIVE one's LOCAL-STORAGE)
+                // has ended (ISO §8.6.4; kb/Work PB1216), so a pointer taken into it is no longer a valid address.
+                inst.EndStorage(StorageEnd.ActivationEnded);
+                n.Instance = displacedInstance;   // kb/Work PB133 — see above
+            }
         }
 
         if (n.Initial && n.Active == 0)
@@ -476,6 +483,10 @@ public sealed class ProgramTable
         var parentInst = n.ParentPath is not null && _byPath.TryGetValue(n.ParentPath, out var pp)
             ? pp.Instance : null;
         (n.Instance ?? n.Factory(parentInst)).CloseFiles();
+        // §8.6.4: a static item persists to "the execution of a CANCEL statement of a program that directly or
+        // indirectly contains the items" — the instance's storage ends HERE (contained programs already did, above),
+        // and a pointer taken into it is no longer a valid address of storage (§8.6.5; §13.18.5.4 GR4; kb/Work PB1216).
+        n.Instance?.EndStorage(StorageEnd.Cancelled);
         n.Instance = null;   // GR3 — the next CALL finds the initial state (GR8: the external store untouched)
         // A RECURSIVE unit's WS is STATIC data on the class (§13.5.4 GR1) — dropping the instance does not
         // touch it; the emitted __ResetStatics reassigns every static WS field/index cell to its initializer

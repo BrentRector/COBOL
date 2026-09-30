@@ -45,6 +45,35 @@ public sealed partial class DataBinder
     internal IReadOnlyDictionary<RedefinesClass, string> PtrAddressableCellOf => _ptrAddressableCellOf;
     private readonly Dictionary<RedefinesClass, string> _ptrAddressableCellOf = [];
 
+    /// <summary>⛔ WHO ENDS A CELL'S LIFE, ONE CLASSIFICATION (kb/Work PB1216). ISO §13.18.5.4 GR4 raises EC-BOUND-PTR for a
+    /// reference through an address that is "not a valid address of storage", and §8.6.5 says the association "may cease
+    /// to exist because the actual data no longer exists, as specified 8.6.4" — so every cell-backed record's storage
+    /// duration (§8.6.4) decides which event ENDS the cell, and this is the one place the three are told apart:
+    /// <list type="bullet">
+    /// <item><see cref="CellLifetime.Static"/> — a RECURSIVE unit's static WORKING-STORAGE and a method's WORKING-STORAGE
+    /// (<see cref="StaticAddressableCells"/>): one copy, re-seeded IN PLACE by <c>__ResetStatics</c> at a CANCEL, which
+    /// ends the old life (<c>StorageCell.Reinitialize</c>).</item>
+    /// <item><see cref="CellLifetime.Activation"/> — LOCAL-STORAGE and non-formal LINKAGE (a program's, a method's):
+    /// "persists while that instance of the runtime element is in active state", so the cell ends at the activation's exit
+    /// — inside <c>Call</c> for a program, in the method's <c>finally</c> (<c>OoEmitter.ActivationPointerSeeds</c>).</item>
+    /// <item><see cref="CellLifetime.Instance"/> — a program's WORKING-STORAGE cell owned by its instance: an INITIAL
+    /// program's items end at its activation's exit, any other program's at the CANCEL that drops the instance, both
+    /// through the emitted <c>EndStorage</c> (<c>ICobolProgram.EndStorage</c>).</item>
+    /// </list>
+    /// A cell added to <see cref="PtrAddressableBackings"/> tomorrow is classified here and so ended by the matching
+    /// event without an edit elsewhere; <c>CellLifetimeDriftTests</c> reads the generated program and fails if a cell
+    /// field is named by none of them.</summary>
+    internal CellLifetime LifetimeOfCell(string cellField, DataItem canonical) =>
+        StaticAddressableCells.Contains(cellField) ? CellLifetime.Static
+        : OoMethodScopedRoots.Contains(canonical) || LocalStorageRoots.Contains(canonical)
+          || LinkageRoots.Contains(canonical) ? CellLifetime.Activation
+        : CellLifetime.Instance;
+
+    /// <summary>The cell fields of <see cref="PtrAddressableBackings"/> whose life ends with <paramref name="lifetime"/>'s
+    /// event, in declaration order.</summary>
+    internal IEnumerable<string> CellFieldsOf(CellLifetime lifetime) =>
+        _ptrAddressableBackings.Where(b => LifetimeOfCell(b.CellField, b.Canonical) == lifetime).Select(b => b.CellField);
+
     /// <summary>The post-build data-pointer pass (runs beside <see cref="CallBindExternalAndGlobal"/> — the
     /// proven post-classification tier-overwrite seam): (1) every BASED root becomes a pointer-routed
     /// StringCanonical template; (2) every plain record named by a data-address-identifier (<c>ADDRESS OF x</c> — a SET sender or a CALL argument) is

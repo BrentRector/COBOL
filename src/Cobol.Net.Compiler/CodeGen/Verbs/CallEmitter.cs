@@ -351,7 +351,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             w.Line($"ExceptionState.SetObject(__po{id});   // GR1b2 — the current exception object HERE (the activator)");
             w.Line($"int __or{id} = {ec.ObjDispatchExpr($"__po{id}")};   // rule 2 — USE AFTER EXCEPTION OBJECT (GR14)");
             w.Line(dispatch.ResumeTransfer($"__or{id}", "   // RESUME AT procedure-name"));
-            using (w.Block($"if (__or{id} == -3)   // no declarative took it: item 3 (PROPAGATE ON), else item 4"))
+            using (w.Block($"if (__or{id} == DispatchResult.NoHandler)   // no declarative took it: item 3 (PROPAGATE ON), else item 4"))
             {
                 // Item 3 — under >>PROPAGATE ON the activator re-propagates it (kb/Work PB1119); it returns, so what
                 // follows is item 4 for an element without the directive (or a main program, which has no activator).
@@ -363,7 +363,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                     EcEmitter.FatalTermination("\"EC-OO-EXCEPTION\"",
                         "\"an exception object was not handled (ISO 14.6.13.1.5; Table 13 - fatal)\""));
             }
-            w.Line("// -1/-2: declarative completed / RESUME NEXT — normal continuation (:24604)");
+            w.Line("// Normal/ResumeNext: declarative completed / RESUME NEXT — normal continuation (:24604)");
         }
         using (w.Block($"if (ExceptionState.TakeRaisedPropagation({CsLiteral(site.ActivatorChecking.Encoded)}, "
             + $"out var __pn{id}, out var __pf{id}))   // §14.9.18.4 GR1b — raised HERE iff checking is enabled HERE"))

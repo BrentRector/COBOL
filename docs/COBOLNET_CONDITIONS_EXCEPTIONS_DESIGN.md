@@ -119,16 +119,22 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
 - **The declarative dispatch-result protocol.** Declaratives are pc
   RANGES run by the bounded `__Dispatch`, not C# methods — so RESUME throws the runtime `ResumeSignal`, the
   int-returning `__RunUse` (emitted only when the group is EC-active; the void form stays byte-identical otherwise)
-  catches it, and every raise site speaks ONE protocol: `-1` normal completion (§14.6.13.1.2), `-2` RESUME AT NEXT
-  STATEMENT (suppresses a fatal — §14.6.13.1.3 #5 NOTE 2), `-3` no qualifying declarative, `≥0` RESUME AT
-  procedure-name's pc (≡ GO TO, §14.9.33.4 GR3), and — from an I-O hook's SUCCESSFUL arm only — `-4`
-  (`ResumeSignal.HandledNonfatal`): a WHEN phrase or USE declarative handled a warning a successful statement
-  raised, so the statement's NOT phrase is skipped (§14.6.13.1.4 2)/3); a NOT phrase runs on `-1` alone; kb/Work PB1120). There is no `ExceptionDispatch` registry class: the F3 selector is
+  catches it, and every raise site speaks ONE protocol, the runtime type **`DispatchResult`**
+  (`Runtime/Exceptions/DispatchResult.cs`; kb/Work PB1122 Task A, PB1761): `Normal` (`-1`) completion
+  (§14.6.13.1.2), `ResumeNext` (`-2`) RESUME AT NEXT STATEMENT (suppresses a fatal — §14.6.13.1.3 #5 NOTE 2),
+  `NoHandler` (`-3`) no qualifying declarative, a value `≥0` RESUME AT procedure-name's pc (≡ GO TO, §14.9.33.4 GR3),
+  `HandledNonfatal` (`-4`) — from an I-O hook's SUCCESSFUL arm only: a WHEN phrase or USE declarative handled a warning
+  a successful statement raised, so the statement's NOT phrase is skipped (§14.6.13.1.4 2)/3); a NOT phrase runs on
+  `Normal` alone; kb/Work PB1120) — and `NotNormal` (`-5`), RESERVED for the declarative activation record of
+  §14.6.13.1.2 1) (kb/Work PB1122 Task B; nothing produces it yet). ⛔ **The emitters render the NAMES and the
+  PREDICATES (`IsTransfer`, `SuppressesFatal`, `TerminatesSortMerge`, `ForHandledWarning`, `RanAHandler`), never the
+  numbers** — `DispatchResultProtocolDriftTests` fails the build when a bare literal reappears in an emitted string, so
+  a new result value lands in one file. There is no `ExceptionDispatch` registry class: the F3 selector is
   the GENERATED `__EcDispatch` (source-ordered GR3c–g tiers over the program's own declaratives).
   ⛔ **An emitted raise site renders the selection through ONE method, `EcEmitter.EmitSelection`** (kb/Work
   PB1549): the selector call, the RESUME landing, and — for a FATAL condition — the default of §14.6.13.1.3 5)/7)
-  (`-1` declarative completed normally and `-3` no handler both terminate the run unit abnormally; only `-2` / a
-  `≥0` transfer continues). A raise site whose exception-name is known at compile time calls
+  (`Normal` declarative completed normally and `NoHandler` both terminate the run unit abnormally; only `ResumeNext` /
+  a transfer continues — `DispatchResult.SuppressesFatal`). A raise site whose exception-name is known at compile time calls
   `EmitConditionRaise` (or `EmitConditionSet` when its own conditional phrase takes the condition), which reads
   the fatality from Table 13 (`EcInfo.IsFatal`) instead of the site's author; a dynamic-name site (CALL catch, the
   GOBACK RAISING pickup, the EC-SIZE family, the statement guard's rethrow) passes its terminate statement.
@@ -442,9 +448,12 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   under WITH LOCATION — the F3 defect family. The ONE remaining positional channel is `__IoCheckEc`'s
   per-(name, FILE) `__locMask` (a name set cannot express file-scoped WITH LOCATION); its explicit operands
   always win over the ambient fallback. `AmbientExceptionContextTests` pins the contract.
-- **The catalog is NAME-keyed, not a C# enum:** EC-USER-* / EC-IMP-* are
-  OPEN families (§14.6.13.1.1 — user-defined by mention, always nonfatal ¶24505), so the canonical identity is the
-  NAME; an enum would need a parallel name channel (two representations — the singular-pattern rule).
+- **The catalog is NAME-keyed, not a C# enum:** EC-USER-* is an
+  OPEN family (§14.6.13.1.1 — user-defined by mention, always nonfatal ¶24505), so the canonical identity is the
+  NAME; an enum would need a parallel name channel (two representations — the singular-pattern rule). EC-IMP-*suffix*
+  is NOT open here: §14.6.13.1.1 leaves those names, their fatality and their raise sites to the implementor, this
+  implementation defines none (CONFORMANCE DOC-A.1-99), and `ExceptionCatalog.TryGet` refuses them — COBOLNET0711 in
+  RAISE / >>TURN / USE (kb/Work PB1531); only the compiler-directive RESERVATION (§8.12) tests the spelling.
 - **Grammar continuity:** RAISE/RAISING/RESUME/STATEMENT/CONDITION/EC are context-sensitive tokens mirrored in
   `cobolWord` — legal user-defined words at EVERY edition (pinned by a version-matrix continuity test). The
   RAISE/RESUME statement alternatives are UNgated so `--std 85` gets the targeted COBOLNET0876 diagnostic, not a
@@ -899,7 +908,7 @@ CobolNum.TryStore (the single settled name — see the C# mapping) computes the 
 
 ### RESUME control flow (NEXT STATEMENT vs procedure-name vs GLOBAL-declarative≡CONTINUE) requires a declarative to redirect the caller's control after it returns (ISO §14.9.33).
 
-As built there is no ResumeAction enum: declaratives are pc ranges, a RESUME statement throws `ResumeSignal`, and the generated `__RunUse` converts it into the int dispatch result every raise site reads (`-2` RESUME AT NEXT STATEMENT → fall through past the applicable statement, suppressing a fatal termination; `≥0` RESUME AT procedure-name's pc → as if GO TO; `-1` fell off the end → continue for a nonfatal condition, terminate for a fatal one, §14.9.49.4 GR13) — the full protocol is "The declarative dispatch-result protocol" under EC engine specifics above. A RESUME written directly in a USE … GLOBAL declarative is refused at bind (COBOLNET0713, §14.9.33.3 SR2). ⚠ §14.9.33.4 GR1 — a RESUME *executed within the scope of* a global declarative (one the global declarative PERFORMs) is a CONTINUE — is NOT yet realized: `EcEmitter.EmitResume` throws unconditionally, so such a RESUME unwinds the global declarative and its action is applied (kb/Work PB1160). Nor does `__RunUse` yet record the §14.6.13.1.2 1) "fatal exception occurs within the scope of the declarative" half of normal completion (kb/Work PB1122; the model is kb/Work PB1761).
+As built there is no ResumeAction enum: declaratives are pc ranges, a RESUME statement throws `ResumeSignal`, and the generated `__RunUse` converts it into the `DispatchResult` every raise site reads (`ResumeNext` RESUME AT NEXT STATEMENT → fall through past the applicable statement, suppressing a fatal termination; `≥0` RESUME AT procedure-name's pc → as if GO TO; `Normal` fell off the end → continue for a nonfatal condition, terminate for a fatal one, §14.9.49.4 GR13) — the full protocol is "The declarative dispatch-result protocol" under EC engine specifics above. A RESUME written directly in a USE … GLOBAL declarative is refused at bind (COBOLNET0713, §14.9.33.3 SR2). ⚠ §14.9.33.4 GR1 — a RESUME *executed within the scope of* a global declarative (one the global declarative PERFORMs) is a CONTINUE — is NOT yet realized: `EcEmitter.EmitResume` throws unconditionally, so such a RESUME unwinds the global declarative and its action is applied (kb/Work PB1160). Nor does `__RunUse` yet record the §14.6.13.1.2 1) "fatal exception occurs within the scope of the declarative" half of normal completion (kb/Work PB1122; the model is kb/Work PB1761).
 
 ### >>TURN must gate WHETHER a guard is emitted per statement, in source order, with EC-ALL/level-2 expansion — without a runtime cost when OFF.
 

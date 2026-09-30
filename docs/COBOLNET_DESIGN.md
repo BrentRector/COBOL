@@ -1087,9 +1087,9 @@ stateful runtime + emitted guards that appear ONLY when a program uses the featu
   written** and do NOT require `>>TURN`; `>>TURN` is resolved at COMPILE time (a `TurnState` walking the procedure
   division) and decides WHETHER an EC guard is emitted at all — OFF compiles to nothing.
 - **USE…EXCEPTION/ERROR declaratives** → paragraph-methods + a compile-time registry keyed (EC/file/open-mode); the
-  declarative is a pc range run by the generated `__RunUse`, which turns a RESUME's `ResumeSignal` into the int
-  dispatch result the raise site reads (`-1` fell off the end, `-2` RESUME NEXT STATEMENT, `-3` none, `-4` handled
-  nonfatal, `≥0` RESUME AT pc — the conditions deep-dive's "declarative dispatch-result protocol").
+  declarative is a pc range run by the generated `__RunUse`, which turns a RESUME's `ResumeSignal` into the
+  `DispatchResult` the raise site reads (`Normal` fell off the end, `ResumeNext` RESUME NEXT STATEMENT, `NoHandler` none,
+  `HandledNonfatal` handled nonfatal, `≥0` RESUME AT pc — the conditions deep-dive's "declarative dispatch-result protocol").
 - The exception-checking **PERFORM…WHEN** form (M2) is the one place a real C# `try/catch` is used; RAISE/RESUME and
   fatal/nonfatal termination are runtime calls (`CobolException.Raise`; an unhandled fatal EC → `CobolFatalException`
   caught at `Main` → nonzero exit).

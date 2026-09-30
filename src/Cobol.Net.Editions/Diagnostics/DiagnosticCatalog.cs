@@ -109,8 +109,9 @@ public static class DiagnosticCatalog
     //    introduction-gate texts existed as four verbatim copies each before the funnel. ────────────────────────
     public static readonly DiagnosticDescriptor EcNameUnknown = new(
         "COBOLNET0711", "ec-name-unknown", EditionSeverity.Error,
-        "A written exception-name is neither in the §14.6.13.1 catalog nor a valid EC-USER-/EC-IMP- open-family "
-        + "name (suffix of basic letters/digits/hyphen/underscore, not ending in hyphen or underscore).",
+        "A written exception-name is neither in the §14.6.13.1 catalog nor a valid EC-USER- name (suffix of basic "
+        + "letters/digits/hyphen/underscore, not ending in hyphen or underscore). EC-IMP-suffix names are defined by "
+        + "the implementor, and this implementation defines none.",
         "ISO §14.6.13.1.1");
     public static readonly DiagnosticDescriptor EcNameIntroducedLater = new(
         "COBOLNET0878", "ec-name-introduced-later", EditionSeverity.Error,

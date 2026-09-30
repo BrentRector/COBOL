@@ -22,7 +22,7 @@ namespace CobolNet.Binding;
 internal static class EcNameResolution
 {
     /// <summary>Resolve a written exception-name: COBOLNET0711 when it is neither in the §14.6.13.1 catalog nor
-    /// a valid EC-USER-/EC-IMP- open-family name; optionally COBOLNET0710 when a level-1/-2 name stands where
+    /// a valid EC-USER- name; optionally COBOLNET0710 when a level-1/-2 name stands where
     /// only level-3 is legal (the RAISE/RAISING contexts — checked BEFORE the introduction gate so the level
     /// error keeps priority for a level-2 name of a later family); COBOLNET0878 when the name's family postdates
     /// the targeted edition. Otherwise <see cref="Advise"/> decides: it carries the §15.33 width advisory AND the
@@ -37,7 +37,7 @@ internal static class EcNameResolution
         if (!ExceptionCatalog.TryGet(raw, out info))
         {
             edition.Error(DiagnosticCatalog.EcNameUnknown, $"{where}: '{raw}' is not an exception-name of "
-                + "ISO/IEC 1989 §14.6.13.1 (and not a valid EC-USER-/EC-IMP- name)");
+                + "ISO/IEC 1989 §14.6.13.1 (and not a valid EC-USER- name; this implementation defines no EC-IMP- name, DOC-A.1-99)");
             return false;
         }
         // The EC-LOCALE family (Annex A.4.9 item 1) WAS refused here by name while the locale module was documented

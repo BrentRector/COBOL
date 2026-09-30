@@ -105,14 +105,23 @@ public interface ICobolProgram : INonfatalSelector
     /// override and takes this no-op (zero scaffolding).</summary>
     void DescribeExternals() { }
 
+    /// <summary>End the life of every data-pointer cell this INSTANCE owns, for <paramref name="reason"/> (ISO §8.6.4 /
+    /// §8.6.5; kb/Work PB1216): the activation boundary calls it when an instance is DISCARDED — at the return of an
+    /// INITIAL or RECURSIVE activation, whose fresh instance dies with it, and at a CANCEL of the program — so every
+    /// pointer taken into that storage is thereafter "not a valid address of storage" (§13.18.5.4 GR4). A unit with no
+    /// instance-owned ADDRESS-OF cell emits no override and takes this no-op (zero scaffolding); a STATIC cell is
+    /// ended by the unit's <c>__ResetStatics</c> (<see cref="StorageCell.Reinitialize"/>), and a LOCAL-STORAGE cell by
+    /// the end of each activation inside <see cref="Call"/> itself.</summary>
+    void EndStorage(StorageEnd reason) { }
+
     /// <summary>Close every file connector this program owns (CANCEL GR9 / run-unit termination §14.6.11).</summary>
     void CloseFiles();
 
     /// <summary>Select and execute this element's USE declarative for a NONFATAL exception condition raised at a
     /// RUNTIME site (ISO §14.6.13.1.4 #3 — "If there is an applicable USE statement in the source unit that
     /// specifies the exception-name associated with the exception condition … the associated declarative is
-    /// executed"), returning the dispatch result protocol: <c>-1</c> completed normally, <c>-2</c> RESUME AT NEXT
-    /// STATEMENT, <c>-3</c> no qualifying declarative, <c>≥ 0</c> RESUME AT that pc.
+    /// executed"), returning the <see cref="Exceptions.DispatchResult"/> protocol: <c>Normal</c> completed normally, <c>ResumeNext</c> RESUME AT NEXT
+    /// STATEMENT, <c>NoHandler</c> no qualifying declarative, a value <c>≥ 0</c> RESUME AT that pc.
     /// <para>This is the §14.9.49.4 GR3 selection seen from OUTSIDE the generated code. A raise the emitter can
     /// place a dispatch AT (RAISE, an I-O status, an ON OVERFLOW-less STRING) never needs it; a condition detected
     /// INSIDE the runtime — an untranslatable code unit deep in an expression, a dynamic table growing under a
@@ -123,7 +132,7 @@ public interface ICobolProgram : INonfatalSelector
     /// it without emitting anything, which is what keeps the zero-scaffolding invariant true for every program
     /// that declares no USE AFTER EXCEPTION CONDITION declarative and every non-COBOL implementation of this
     /// interface.</para></summary>
-    int INonfatalSelector.NonfatalDispatch(string ec) => -3;
+    int INonfatalSelector.NonfatalDispatch(string ec) => Exceptions.DispatchResult.NoHandler;
 }
 
 /// <summary>The §14.6.13.1.4 #3 selection of ONE runtime element, seen from a RUNTIME raise site: the activation
@@ -135,8 +144,8 @@ public interface ICobolProgram : INonfatalSelector
 /// over its own selection — or <see cref="NonfatalSelectorFn.None"/> when it declares none (kb/Work PB1010).</summary>
 public interface INonfatalSelector
 {
-    /// <summary>The dispatch result protocol: <c>-1</c> completed normally, <c>-2</c> RESUME AT NEXT STATEMENT,
-    /// <c>-3</c> no qualifying declarative, <c>≥ 0</c> RESUME AT that pc (see <see cref="ICobolProgram"/>).</summary>
+    /// <summary>The <see cref="Exceptions.DispatchResult"/> protocol: <c>Normal</c> completed normally, <c>ResumeNext</c> RESUME AT NEXT STATEMENT,
+    /// <c>NoHandler</c> no qualifying declarative, a value <c>≥ 0</c> RESUME AT that pc (see <see cref="ICobolProgram"/>).</summary>
     int NonfatalDispatch(string ec);
 }
 
@@ -146,7 +155,7 @@ public sealed class NonfatalSelectorFn(Func<string, int> select) : INonfatalSele
 {
     /// <summary>The selector of an element that declares no USE procedures and no exception-checking PERFORM:
     /// "no qualifying declarative", shared, allocation-free.</summary>
-    public static readonly NonfatalSelectorFn None = new(static _ => -3);
+    public static readonly NonfatalSelectorFn None = new(static _ => Exceptions.DispatchResult.NoHandler);
 
     public int NonfatalDispatch(string ec) => select(ec);
 }

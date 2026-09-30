@@ -12,7 +12,7 @@ split + the reused `COBOLNET1533`; the broader every-code→descriptor migration
 
 | Code | Id | Severity | ISO § | Suppress key | Title |
 | --- | --- | --- | --- | --- | --- |
-| COBOLNET0711 | ec-name-unknown | Error | ISO §14.6.13.1.1 | COBOLNET0711 | A written exception-name is neither in the §14.6.13.1 catalog nor a valid EC-USER-/EC-IMP- open-family name (suffix of basic letters/digits/hyphen/underscore, not ending in hyphen or underscore). |
+| COBOLNET0711 | ec-name-unknown | Error | ISO §14.6.13.1.1 | COBOLNET0711 | A written exception-name is neither in the §14.6.13.1 catalog nor a valid EC-USER- name (suffix of basic letters/digits/hyphen/underscore, not ending in hyphen or underscore). EC-IMP-suffix names are defined by the implementor, and this implementation defines none. |
 | COBOLNET0718 | turn-directive-malformed | Error | ISO §7.3.25.2 / §7.3.25.3 SR1/SR3 | COBOLNET0718 | A >>TURN directive is malformed: the format is '>>TURN {exception-name [file-name]…}… CHECKING {ON [WITH LOCATION] \| OFF}' — an unexpected word, a missing CHECKING phrase, or a repeated exception-name/file-name combination is rejected (ISO §7.3.25.2 / §7.3.25.3 SR1, SR3). |
 | COBOLNET0719 | turn-file-name-non-io | Error | ISO §7.3.25.3 SR4 | COBOLNET0719 | A >>TURN file-name may follow only an exception-name beginning 'EC-I-O' (ISO §7.3.25.3 SR4). |
 | COBOLNET0801 | digit-capacity-over-31 | Error | ISO §8.3.3.3.2 | COBOLNET0801 | A fixed-point item/literal exceeds the 31-digit ISO limit. |

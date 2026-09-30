@@ -35,9 +35,12 @@ public readonly record struct EcInfo(string Name, int Level, string? Level2Paren
 /// The exception-name catalog — the ONE machine form of ISO/IEC 1989:2023 §14.6.13.1.6 Table 13 plus the
 /// three-level hierarchy of §14.6.13.1.1: level-1 <c>EC-ALL</c>; the level-2 family names; level-3 = level-2 +
 /// suffix (only level-3 names carry exception status indicators). The catalog is NAME-keyed (not an enum): the
-/// open-ended <c>EC-USER-*</c> (§14.6.13.1.1 — always nonfatal, user-defined by mention) and <c>EC-IMP-*</c>
-/// (implementor-defined) families make the NAME the canonical identity of an EC; a closed enum would need a
-/// parallel name channel — two representations for one concept (the singular-pattern rule). Compile-time consumers
+/// open-ended <c>EC-USER-*</c> family (§14.6.13.1.1 — always nonfatal, user-defined by mention) makes the NAME the
+/// canonical identity of an EC; a closed enum would need a parallel name channel — two representations for one
+/// concept (the singular-pattern rule). The implementor-defined <c>EC-IMP-*suffix</c> family is CLOSED: §14.6.13.1.1
+/// leaves "the implementor [to define] the action to be taken, the fatality, and when any of these exceptions are
+/// raised", and this implementation defines none (docs/CONFORMANCE.md DOC-A.1-99), so no EC-IMP-suffix name exists
+/// to resolve (kb/Work PB1531). Compile-time consumers
 /// (TURN expansion, RAISE/USE-F3 validation, edition gating) and the runtime (last-exception state, the generated
 /// <c>__EcDispatch</c> selector's level-2 matching) share THIS table.
 /// </summary>
@@ -241,10 +244,12 @@ public static class ExceptionCatalog
         return t;
     }
 
-    /// <summary>Look up a name's catalog row. Handles the Table 13 fixed names AND the open families: an
-    /// <c>EC-USER-suffix</c> (always nonfatal — §14.6.13.1.1) or <c>EC-IMP-suffix</c> (implementor-defined) with
-    /// a valid suffix (basic letters/digits/hyphen/underscore, not ending in hyphen or underscore — §14.6.13.1.1)
-    /// resolves to a synthesized level-3 row. Unknown names return false.</summary>
+    /// <summary>Look up a name's catalog row. Handles the Table 13 fixed names AND the one open family: an
+    /// <c>EC-USER-suffix</c> (always nonfatal — §14.6.13.1.1: "The name is defined by specifying it anywhere that an
+    /// exception-name may be specified") with a valid suffix (basic letters/digits/hyphen/underscore, not ending in
+    /// hyphen or underscore) resolves to a synthesized level-3 row. ⛔ An <c>EC-IMP-suffix</c> does NOT: it is
+    /// defined by the IMPLEMENTOR, this implementation defines none (DOC-A.1-99), so it names no exception condition
+    /// and returns false like any other unknown name (kb/Work PB1531). Unknown names return false.</summary>
     public static bool TryGet(string name, out EcInfo info)
     {
         if (Table.TryGetValue(name, out info)) return true;
@@ -254,13 +259,16 @@ public static class ExceptionCatalog
             info = new EcInfo(upper, 3, "EC-USER", EcFatality.Nonfatal, 2002);
             return true;
         }
-        if (upper.StartsWith("EC-IMP-", StringComparison.Ordinal) && ValidOpenSuffix(upper["EC-IMP-".Length..]))
-        {
-            info = new EcInfo(upper, 3, "EC-IMP", EcFatality.Imp, 2002);
-            return true;
-        }
         return false;
     }
+
+    /// <summary>Does <paramref name="name"/> have the FORM of an implementor-defined level-3 name — <c>EC-IMP-</c> then
+    /// a valid suffix (§14.6.13.1.1)? A statement about SPELLING only, never about existence: no such name is
+    /// catalogued (<see cref="TryGet"/> refuses it), but the standard still RESERVES the family in compiler
+    /// directives (§8.12 — "all of the exception-names specified in 14.6.13.1", which lists EC-IMP-<i>suffix</i>), so
+    /// <c>CompilerDirectiveWords.IsReserved</c> asks this.</summary>
+    public static bool IsImplementorSuffixForm(string name) =>
+        name.StartsWith("EC-IMP-", StringComparison.OrdinalIgnoreCase) && ValidOpenSuffix(name["EC-IMP-".Length..]);
 
     /// <summary>The §14.6.13.1.1 open-suffix character rule: basic letters, basic digits, hyphen and underscore;
     /// the hyphen or underscore shall not be the last character.</summary>
@@ -310,8 +318,8 @@ public static class ExceptionCatalog
             && UnderLevel2(level3, directiveName);                                               // GR3
     }
 
-    /// <summary>All catalogued LEVEL-3 names (the >>TURN GR2/GR3 expansion universe). The open EC-USER-*/EC-IMP-*
-    /// families are not enumerable — TURN matching treats EC-ALL / a level-2 event as covering them by the
+    /// <summary>All catalogued LEVEL-3 names (the >>TURN GR2/GR3 expansion universe). The open EC-USER-*
+    /// family is not enumerable — TURN matching treats EC-ALL / a level-2 event as covering them by the
     /// hierarchy predicate instead of by expansion (same observable behavior, ISO §7.3.25.4 GR2/GR3).</summary>
     public static IEnumerable<EcInfo> Level3Rows => Table.Values.Where(i => i.Level == 3);
 

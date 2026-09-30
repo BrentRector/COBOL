@@ -280,7 +280,7 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
         // bool (a void __RunUse that returns HAS completed normally — RESUME is an EC-model statement, and every
         // other not-normal completion unwinds by its own signal). Callers that do not need the answer discard it.
         bool ecInt = ecState.Active;
-        string none = ecInt ? "return -1;" : "return false;";
+        string none = ecInt ? "return DispatchResult.Normal;" : "return false;";
         using (w.Block($"{mod}{(ecInt ? "int" : "bool")} __IoCheck(string __f, bool __atEnd, bool __invKey)"))
         {
             w.Line($"string __st = {RuntimeApi.FileStatus("__f")};");
@@ -300,8 +300,8 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
             // DECLARING program's instance — its data (§8.4.6.2) — via the container's __RunGlobalUse (whose
             // RESUME, if any, resolves in the DECLARING program's own dispatch, never this one's pc space).
             if (dispatchState.OuterGlobalUse)
-                w.Line(ecInt ? "if (__outer.__RunGlobalUse(__f)) return -1;" : "if (__outer.__RunGlobalUse(__f)) return true;");
-            w.Line(ecInt ? "return -3;   // no qualifying declarative (the __EcDispatch convention)" : "return false;");
+                w.Line(ecInt ? "if (__outer.__RunGlobalUse(__f)) return DispatchResult.Normal;" : "if (__outer.__RunGlobalUse(__f)) return true;");
+            w.Line(ecInt ? "return DispatchResult.NoHandler;   // no qualifying declarative (the __EcDispatch convention)" : "return false;");
         }
         w.Line();
     }
@@ -328,7 +328,7 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
     /// method-local <c>__RunUse</c> is ALL handlers (DeclCount 0), so it emits the bare guard unchanged.</para></summary>
     internal void EmitRunUseBody(CodeWriter w, bool ecModel)
     {
-        string ret = ecModel ? " -1" : "";
+        string ret = ecModel ? " DispatchResult.Normal" : "";
         // The void form belongs to an EC-FREE group (EmitUseMachinery picks it on !ecState.Active), and enabling
         // EC-FLOW-USE checking anywhere makes the group EC-active by construction — EcBinder.EcWrap binds a
         // BoundEcChecked for it, which is EcFeatures.HasChecked. So the void arm provably cannot need the raise,
@@ -358,7 +358,7 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
             w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }}");
             w.Line("catch (ResumeSignal __rs) { return __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
             w.Line("finally { __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
-            w.Line("return -1;   // normal completion (§14.6.13.1.2)");
+            w.Line("return DispatchResult.Normal;   // normal completion (§14.6.13.1.2)");
         }
         else
             w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }} finally {{ __useActive[__id] = false; }}");

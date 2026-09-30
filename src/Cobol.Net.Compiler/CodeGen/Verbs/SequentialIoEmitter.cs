@@ -72,7 +72,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         void NotNormal(int id)
         {
             if (notNormalLabel is null) return;
-            w.Line($"if (__ior{id} == ResumeSignal.NextStatement) goto {notNormalLabel};"
+            w.Line($"if (DispatchResult.TerminatesSortMerge(__ior{id})) goto {notNormalLabel};"
                 + "   // the USE procedure did not complete normally (§14.6.13.1.2 #1) — the statement is terminated (§14.9.40.4 GR17; §14.9.33.4 GR2 a) 1.)");
         }
         if (ec.IoMaskFor(file) is not 0 and var mask)
@@ -89,8 +89,8 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                 + $"{(verbDisposes ? ", __verbRule: true" : "")});");
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
-            Completed($"__ior{id} == -1 || __ior{id} == ResumeSignal.HandledNonfatal");
-            return new UseHookResult(notNormalLabel is not null, $"__ior{id} == -1");
+            Completed($"__ior{id} == DispatchResult.Normal || __ior{id} == DispatchResult.HandledNonfatal");
+            return new UseHookResult(notNormalLabel is not null, $"__ior{id} == DispatchResult.Normal");
         }
         if (!dispatch.UseDecls) { Completed("false"); return default; }
         // An ON EXCEPTION phrase is the statement's own handler for EVERY unsuccessful family (§14.9.10.4
@@ -104,7 +104,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line($"int __ior{id} = __IoCheck({FileKeyExpr(file)}, {(atEndHandled ? "true" : "false")}, {(invalidKeyHandled ? "true" : "false")});");
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
-            Completed($"__ior{id} == -1");
+            Completed($"__ior{id} == DispatchResult.Normal");
             return new UseHookResult(notNormalLabel is not null, null);
         }
         // The non-EC form cannot report a resume action, and it does not need to: RESUME is a §14.9.33 statement
