@@ -42,11 +42,20 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// every I-O statement and at every edition (the determination is on <see cref="UseTierEmitter"/> —
     /// kb/Work PB344), and the only per-statement inputs are the phrases it wrote, which are the flags
     /// below.</para></summary>
-    public bool EmitUseHook(FileModel file, bool atEndHandled = false, bool invalidKeyHandled = false,
+    /// <para>⛔ THE RESULT CARRIES THE NOT-PHRASE GATE (kb/Work PB1120). A raised-and-handled nonfatal condition on a
+    /// SUCCESSFUL statement (EC-I-O-WARNING on a '0x' status) runs the WHEN / USE and then "the imperative-statement in
+    /// [the NOT] phrase is not executed" (§14.6.13.1.4 2)/3); §9.1.14 item 2 gives the NOT INVALID KEY phrase to a
+    /// successful completion that nothing interrupted). <see cref="UseHookResult.NotPhraseGate"/> is the C#
+    /// condition a statement's NOT phrase must also satisfy — null where no EC hook can interrupt it.
+    /// <paramref name="successArm"/> is a call from a statement's SUCCESS branch (a sequential READ, whose failure
+    /// branch owns the plain hook): only the EC bridge can raise there, so nothing is emitted without an EC-I-O
+    /// mask.</para></summary>
+    public UseHookResult EmitUseHook(FileModel file, bool atEndHandled = false, bool invalidKeyHandled = false,
         bool onExceptionHandled = false, string? notNormalLabel = null, bool verbDisposes = false,
-        string? useCompletedVar = null)
+        string? useCompletedVar = null, bool successArm = false)
     {
         var w = ctx.Writer;
+        if (successArm && ec.IoMaskFor(file) == 0) return default;
         // verbDisposes / useCompletedVar — the SORT/MERGE implicit transfers only (kb/Work PB993). verbDisposes
         // tells __IoCheckEc that the VERB's rules dispose of a fatal status (§14.6.13.1.3 2) precedes 5)/7)), so
         // it must not end the run unit; useCompletedVar, where the verb's rule turns on it, declares a bool that is
@@ -80,13 +89,13 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                 + $"{(verbDisposes ? ", __verbRule: true" : "")});");
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
-            Completed($"__ior{id} == -1");
-            return notNormalLabel is not null;
+            Completed($"__ior{id} == -1 || __ior{id} == ResumeSignal.HandledNonfatal");
+            return new UseHookResult(notNormalLabel is not null, $"__ior{id} == -1");
         }
-        if (!dispatch.UseDecls) { Completed("false"); return false; }
+        if (!dispatch.UseDecls) { Completed("false"); return default; }
         // An ON EXCEPTION phrase is the statement's own handler for EVERY unsuccessful family (§14.9.10.4
         // GR20c) — no declarative runs, and the plain path has no EC to raise, so the hook is a no-op.
-        if (onExceptionHandled) { Completed("false"); return false; }
+        if (onExceptionHandled) { Completed("false"); return default; }
         if (ecState.Active)
         {
             // The EC-model __IoCheck returns the declarative's RESUME action — consumed exactly like the
@@ -96,7 +105,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
             Completed($"__ior{id} == -1");
-            return notNormalLabel is not null;
+            return new UseHookResult(notNormalLabel is not null, null);
         }
         // The non-EC form cannot report a resume action, and it does not need to: RESUME is a §14.9.33 statement
         // of the EC model, so a group without it has no declarative that can end in one. It answers only whether
@@ -104,10 +113,25 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         string call = $"__IoCheck({FileKeyExpr(file)}, {(atEndHandled ? "true" : "false")}, {(invalidKeyHandled ? "true" : "false")})";
         if (useCompletedVar is not null) Completed(call);
         else w.Line($"{call};");
-        return false;
+        return default;
+    }
+
+    /// <summary>A NOT phrase's body, behind <see cref="UseHookResult.NotPhraseGate"/> when the statement's hook can
+    /// interrupt a successful completion (kb/Work PB1120) — else the bare list, so a build with no enabled EC-I-O
+    /// name emits byte-identical text.</summary>
+    internal void EmitNotPhrase(string? gate, IReadOnlyList<BoundStatement> body)
+    {
+        if (gate is null) { Statements.EmitStatementList(body); return; }
+        using (ctx.Writer.Block($"if ({gate})")) Statements.EmitStatementList(body);
     }
 
 
+
+    /// <summary>What <see cref="EmitUseHook"/> tells its statement: whether the hook can leave the statement by a
+    /// transfer the USE-procedure's completion rules turn on (<see cref="Terminable"/>, the SORT/MERGE
+    /// implicit transfers), and the C# condition the statement's NOT phrase must also satisfy
+    /// (<see cref="NotPhraseGate"/>, kb/Work PB1120 — null when no EC-I-O hook can interrupt a success).</summary>
+    internal readonly record struct UseHookResult(bool Terminable, string? NotPhraseGate);
 
     /// <summary>Emit the file registry init + one <c>Register</c> per SELECTed sequential file (at <c>Main</c> start).
     /// The ASSIGN target becomes a host path at run time (the runtime's <c>ResolveHostPath</c>); the record width is the
@@ -471,18 +495,19 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// ONLY on successful completion (<c>'0x'</c>, §9.1.14 final rule item 2). On a sequential-organization file
     /// no '2x' status is reachable at all (§9.1.13.5 items 1–4 all name a relative or indexed file), so the
     /// INVALID arm renders as a branch that provably never fires — dead, never silently rerouted.</summary>
-    public void EmitInvalid(string st, KeyedInvalidKey? ik)
+    public void EmitInvalid(string st, KeyedInvalidKey? ik, string? notGate = null)
     {
         if (ik is null) return;
         var w = ctx.Writer;
+        string success = notGate is null ? IoStatusClass.Successful(st) : $"{IoStatusClass.Successful(st)} && {notGate}";
         if (ik.Invalid is { } inv)
         {
             using (w.Block($"if ({IoStatusClass.InvalidKey(st)})")) Statements.EmitStatementList(inv);
             if (ik.NotInvalid is { } not)
-                using (w.Block($"else if ({IoStatusClass.Successful(st)})")) Statements.EmitStatementList(not);
+                using (w.Block($"else if ({success})")) Statements.EmitStatementList(not);
         }
         else if (ik.NotInvalid is { } not)
-            using (w.Block($"if ({IoStatusClass.Successful(st)})")) Statements.EmitStatementList(not);
+            using (w.Block($"if ({success})")) Statements.EmitStatementList(not);
     }
 
     /// <summary>WRITE record [FROM x] [ADVANCING …] (ISO §14.9.51): a FROM operand first MOVEs into the record area,
@@ -538,7 +563,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // exception-checking PERFORM's WHEN or the USE declarative for GR27 a)'s EC-I-O-EOP / -OVERFLOW only
         // "If the END-OF-PAGE phrase is not specified" (kb/Work PB854). NOT END-OF-PAGE alone does not count —
         // it is GR28's arm for the ABSENCE of the condition.
-        EmitUseHook(wr.File, atEndHandled: wr.AtEop is not null);
+        var hook = EmitUseHook(wr.File, atEndHandled: wr.AtEop is not null);
         // END-OF-PAGE branches (ISO §14.9.51 GR27b/GR28): an end-of-page WRITE is SUCCESSFUL — the branch runs
         // after the status store and the hook (which sets GR27 a)'s condition and, with the phrase present,
         // dispatches nothing). The flag is read in the
@@ -553,12 +578,12 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             }
             if (wr.NotAtEop is { } not)
                 using (w.Block($"else if ({IoStatusClass.Successful(wst!)})"))
-                    Statements.EmitStatementList(not);
+                    EmitNotPhrase(hook.NotPhraseGate, not);
         }
         // The forbidden-but-tolerated INVALID KEY pair, through THE ONE §9.1.14 renderer the keyed arm uses.
         // Last, after the END-OF-PAGE branches: both are end-of-statement phrase transfers, and GR27b's EOP
         // imperative belongs to the WRITE's own general rules while §9.1.14 is the outer transfer contract.
-        if (wst is not null) EmitInvalid(wst, wr.InvalidKey);
+        if (wst is not null) EmitInvalid(wst, wr.InvalidKey, hook.NotPhraseGate);
     }
 
     /// <summary>The ADVANCING phrase of ONE WRITE statement as the runtime's <c>WriteAdvance</c> descriptor
@@ -657,18 +682,22 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             EmitRecordAreaStore(rd.File, area, tmp, RuntimeApi.FileCurrentRecord(name), RuntimeApi.FileCurrentRecordExtents(name));
             EmitReadLengthStore(rd.File);   // §13.18.43 GR15 — the just-read length into DEPENDING
             EmitStoreFileStatus(rd.File);
+            // ⛔ A SUCCESSFUL READ RUNS THE EC HOOK TOO (kb/Work PB1382): a '0x' status (04, 06, 09 …) is
+            // EC-I-O-WARNING (§9.1.13.1) and, with it enabled (§7.3.25.4 GR4), a WHEN / USE handles it and the NOT
+            // phrase below is not executed (§14.6.13.1.4 2)/3, kb/Work PB1120). OPEN and the keyed verbs already did.
+            var hook = EmitUseHook(rd.File, atEndHandled: rd.AtEnd is not null, successArm: true);
             // READ … INTO is READ then MOVE THE CURRENT RECORD to the target (ISO §14.9.30.4 GR4 b)) — the
             // move is BOUND (kb/Work PB348), its sender the record sliced to the §13.18.43.4 GR16 byte count
             // through the ONE builder the keyed READ and the sort RETURN also use (kb/Work PB339).
             if (rd.IntoMove is { } intoMove) move.Emit(intoMove);
-            if (rd.NotAtEnd is { } not) Statements.EmitStatementList(not);
+            if (rd.NotAtEnd is { } not) EmitNotPhrase(hook.NotPhraseGate, not);
             // §14.9.30.4 GR13c — on a successful READ "control is transferred to the end of the READ statement,
             // or, if the NOT AT END phrase or NOT INVALID KEY phrase is specified, to imperative-statement-2".
             // The phrase is never conforming source on this arm (Format 1 has no INVALID KEY bracket — the
             // binder reports COBOLNET1720), so this renders only under --permissive, where the bind stands and
             // the block has to MEAN something rather than vanish. There is deliberately NO invalid-key arm: a
             // sequential-organization READ raises no '2x' status (§9.1.13.5), so the condition cannot exist.
-            if (rd.InvalidKey?.NotInvalid is { } notInvalid) Statements.EmitStatementList(notInvalid);
+            if (rd.InvalidKey?.NotInvalid is { } notInvalid) EmitNotPhrase(hook.NotPhraseGate, notInvalid);
         }
         using (w.Block("else"))
         {
@@ -707,8 +736,8 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line($"var {rst} = {RuntimeApi.FileStatus(FileKeyExpr(rw.File))};");
         }
         EmitStoreFileStatus(rw.File);
-        EmitUseHook(rw.File);   // invalidKeyHandled stays false: no '2x' status is reachable here (§9.1.13.5)
-        if (rst is not null) EmitInvalid(rst, rw.InvalidKey);
+        var hook = EmitUseHook(rw.File);   // invalidKeyHandled stays false: no '2x' status is reachable here (§9.1.13.5)
+        if (rst is not null) EmitInvalid(rst, rw.InvalidKey, hook.NotPhraseGate);
     }
 
     /// <summary>⛔ THE ONE RECORD-AREA STORE of a READ / RETURN — "the record is made available in the record

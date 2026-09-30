@@ -185,7 +185,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
                 arith.StoreArith(rkPlace, new NumX(RuntimeApi.FileRelativeSlot(name), 0), CobolRounding.Truncation);
         }
         SeqIo.EmitStoreFileStatus(file);
-        SeqIo.EmitUseHook(file, atEndHandled: rd.AtEnd is not null, invalidKeyHandled: rd.InvalidKey?.Invalid is not null);
+        var hook = SeqIo.EmitUseHook(file, atEndHandled: rd.AtEnd is not null, invalidKeyHandled: rd.InvalidKey?.Invalid is not null);
 
         // The §9.1.14 / §14.9.30 GR24 transfer-of-control branches, uniform across the read kinds (a phrase
         // whose status family cannot arise for this kind — e.g. INVALID KEY on a sequential read — is simply
@@ -207,8 +207,8 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
                 // record area, never the padded area): the BOUND move, built by the SAME binder call the
                 // sequential arm makes (kb/Work PB348 over PB339).
                 if (into) move.Emit(rd.IntoMove!);
-                if (rd.NotAtEnd is { } nae) Statements.EmitStatementList(nae);                  // §14.9.30 — NOT AT END on success
-                if (rd.InvalidKey?.NotInvalid is { } nik) Statements.EmitStatementList(nik);    // §9.1.14 — success only
+                if (rd.NotAtEnd is { } nae) SeqIo.EmitNotPhrase(hook.NotPhraseGate, nae);                  // §14.9.30 — NOT AT END on success
+                if (rd.InvalidKey?.NotInvalid is { } nik) SeqIo.EmitNotPhrase(hook.NotPhraseGate, nik);    // §9.1.14 — success only
             }
         if (rd.AtEnd is { } at)
             using (w.Block($"if ({IoStatusClass.AtEnd(st)})"))
@@ -254,8 +254,8 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             using (w.Block($"if ({IoStatusClass.Successful(st)})"))
                 arith.StoreArith(rkPlace, new NumX(RuntimeApi.FileRelativeSlot(name), 0), CobolRounding.Truncation);
         SeqIo.EmitStoreFileStatus(file);
-        SeqIo.EmitUseHook(file, invalidKeyHandled: wr.InvalidKey?.Invalid is not null);
-        SeqIo.EmitInvalid(st, wr.InvalidKey);
+        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: wr.InvalidKey?.Invalid is not null);
+        SeqIo.EmitInvalid(st, wr.InvalidKey, hook.NotPhraseGate);
     }
 
     // ── REWRITE (ISO §14.9.35) ─────────────────────────────────────────────────────────────────────────────────
@@ -287,8 +287,8 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         string lenArg = SeqIo.VaryingLengthArg(file) ?? "-1";
         w.Line($"var {st} = {RuntimeApi.FileRewriteShared(name, rimg, lenArg, SequentialIoEmitter.RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordAreaExtents(rw.Record))};");
         SeqIo.EmitStoreFileStatus(file);
-        SeqIo.EmitUseHook(file, invalidKeyHandled: rw.InvalidKey?.Invalid is not null);
-        SeqIo.EmitInvalid(st, rw.InvalidKey);
+        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: rw.InvalidKey?.Invalid is not null);
+        SeqIo.EmitInvalid(st, rw.InvalidKey, hook.NotPhraseGate);
     }
 
     // ── DELETE RECORD / DELETE FILE (ISO §14.9.10) ─────────────────────────────────────────────────────────────
@@ -325,8 +325,8 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         var (retryKind, retryAmount) = SeqIo.RenderRetry(del.Retry);
         w.Line($"var {st} = {RuntimeApi.FileDeleteShared(name, image, retryKind, retryAmount, areaExtents)};");
         SeqIo.EmitStoreFileStatus(file);
-        SeqIo.EmitUseHook(file, invalidKeyHandled: del.InvalidKey?.Invalid is not null);
-        SeqIo.EmitInvalid(st, del.InvalidKey);
+        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: del.InvalidKey?.Invalid is not null);
+        SeqIo.EmitInvalid(st, del.InvalidKey, hook.NotPhraseGate);
     }
 
     public void EmitDeleteFile(BoundKeyedDeleteFile df)
@@ -434,8 +434,8 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             w.Line($"var {st} = {RuntimeApi.FileStartIndexed(name, sta.KeyIndex, CsLiteral(sta.Op), areaImage, len, areaExtents)};");
         }
         SeqIo.EmitStoreFileStatus(file);
-        SeqIo.EmitUseHook(file, invalidKeyHandled: sta.InvalidKey?.Invalid is not null);
-        SeqIo.EmitInvalid(st, sta.InvalidKey);   // §14.9.41 GR6 — transfer per §9.1.14
+        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: sta.InvalidKey?.Invalid is not null);
+        SeqIo.EmitInvalid(st, sta.InvalidKey, hook.NotPhraseGate);   // §14.9.41 GR6 — transfer per §9.1.14
     }
 
     /// <summary>The <c>StartKeyLength</c> expression for a WITH LENGTH count already funnelled to its exact lane

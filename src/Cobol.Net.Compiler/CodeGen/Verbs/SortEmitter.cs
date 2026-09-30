@@ -451,7 +451,7 @@ internal sealed class SortEmitter(EmitContext ctx,
     {
         string? used = RuleFor(tx.Merge, io).NeedsCompletion ? $"__sru{ctx.Names.NextSort()}" : null;
         tx.Terminable |= seqIo.EmitUseHook(file, atEndHandled: atEndHandled, notNormalLabel: tx.EndLabel,
-            verbDisposes: true, useCompletedVar: used);
+            verbDisposes: true, useCompletedVar: used).Terminable;
         return used;
     }
 

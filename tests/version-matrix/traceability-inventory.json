@@ -3908,7 +3908,7 @@
   "rule-digest": "b4be462de137",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs#DirectiveCovers; src/Cobol.Net.Compiler/Binding/TurnState.cs#WithImplicitEnable",
-  "test-ref": "conformance:2023/l1c33_turn_io_warning_explicit_only",
+  "test-ref": "conformance:2023/l1c33_turn_io_warning_explicit_only; conformance:2023/pb1382_successful_read_raises_io_warning_for_the_use_declarative",
   "derivation": "",
   "editions": "2023",
   "notes": "cite.py --check 7.3.25.4 \"may be turned on only by specifying it explicitly within a TURN directive\" OK. TURN half (probes via OPEN INPUT of a missing OPTIONAL file, status 05): TRNO1 EC-ALL ON -> not raised; TRNO2 EC-I-O ON -> not raised; TRNO3 EC-I-O-WARNING ON -> EC-I-O-WARNING; TRNO4 then EC-ALL OFF -> still raised; TRNO5 then EC-I-O OFF -> still raised; TRNO6 then EC-I-O-WARNING OFF -> not raised. PERFORM half: TRNQ1 'PERFORM OPEN INPUT F2 WHEN EC-I-O-WARNING ...' -> the WHEN runs with EC-I-O-WARNING; after END-PERFORM a second OPEN (status 05) does not raise it (status stays the EC-USER-X raised between); TRNQ2 WHEN EC-I-O and TRNQ3 WHEN EC-ALL do not enable it. All four halves verified. Test-ref empty: unit:TurnStateTests.EcAll_DoesNotEnableIoWarning witnesses only the TURN on/EC-ALL arm; the WHEN-phrase and end-of-PERFORM arms have no spec-derived witness. SIBLING DEFECT FOUND WHILE PROBING (not this rule's): a SUCCESSFUL READ with a nonzero status never calls the EC hook, so EC-I-O-WARNING is never raised by READ even when explicitly enabled — see findings (§9.1.13.1). || editions (adjudicator): 2023 (EC-I-O-WARNING and the exception-checking PERFORM are COBOL-2023 additions, Annex E)",
@@ -11121,13 +11121,13 @@
   "ordinal": 2,
   "subject": "Files",
   "rule-digest": "cd2a5ecbe2c4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid; src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/IoStatusClass.cs#Successful",
-  "test-ref": "conformance:2023/l1_delete_invalid_key_transfer",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitIoCheckEc; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitUseHook; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitNotPhrase; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid",
+  "test-ref": "conformance:2023/l1_delete_invalid_key_transfer; conformance:2023/pb1120_unhandled_warning_still_runs_not_invalid_key; conformance:2023/pb1120_handled_warning_by_use_declarative_skips_not_invalid_key",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1120: Rule (not-exists item 2): \"If the I-O status indicates a successful completion, control is transferred to the end of the input-output statement or to the imperative-statement specified in the NOT INVALID KEY phrase if it is specified.\" [cite.py --check PASS 9.1.14]. Successful = first character '0' (9.1.13.1), so the '0x' warnings take the NOT INVALID KEY arm too. Covering test l1_delete_invalid_key_transfer arm B (NOTINV=00); conformance:2023/l1_start_indexed_invalid_key S1 (START). Probes E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d2b\\out\\probe\\p914\\k1.cob T4 (T4-NOTINV 00, 85 and 2023) and k4.cob (duplicate ALTERNATE key WITH DUPLICATES: W-NOTINV 02 — the successful-with-warning edge). || REFUTED: PARTIAL — The success-with-warning edge breaks once EC-I-O-WARNING checking is enabled (7.3.25.4 GR4: only by an explicit TURN or a WHEN naming it). A WRITE that ends 02 (duplicate alternate key WITH DUPLICATES) with a NOT INVALID KEY phrase runs the handler AND THEN the NOT INVALID KEY phrase. That matches neither reading of the spec. Under 9.1.14 L2.2 read alone, a successful completion transfers control to the NOT INVALID KEY phrase or the end of the statement, with no exception processing statement between. Under 14.6.13.1.4, the handler runs and the NOT phrase is suppressed: item 2 for a WHEN (\"the imperative-statement in that phrase is also not executed\") and item 3 for a USE declarative (\"the imperative-statement in that phrase is not executed\"). With checking off, the behavior is correct: 02 goes to NOT INVALID KEY (the adjudicator k4 probe, and covering test arm B NOTINV=00). No register note covers this. It is a NEW defect lead for the registrar: EcEmitter __IoCheckEc successful-completion arm (the EC-I-O-WARNING dispatch) returns -1 and the emitted NOT INVALID KEY still runs. The same shape probably affects NOT AT END on a READ that ends 0x; that was not probed. || Editions (adjudicator, verbatim): 1985, 2002, 2014, 2023 (no Annex E change) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid (else-if Successful); src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs (READ arm: NOT INVALID KEY inside the Successful block); src/Cobol.Net.Compiler/CodeGen/Verbs/IoStatusClass.cs#Successful",
-  "state": "GAP"
+  "notes": "kb/Work PB1120 landed. Item 2 (successful completion -> NOT INVALID KEY) holds for the success-with-warning edge: an unhandled 02 runs the phrase (control), and a 02 that an enabled EC-I-O-WARNING HANDLED does not (14.6.13.1.4 3) - the later, more specific rule for an interrupted statement). Earlier evidence kept: l1_delete_invalid_key_transfer arm B, l1_start_indexed_invalid_key S1.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.15-1",
@@ -32661,13 +32661,13 @@
   "ordinal": 2,
   "subject": "Exception conditions",
   "rule-digest": "ef014f360168",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitIoCheckEc; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid; src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitIoCheckEc; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitUseHook; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitNotPhrase; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid",
+  "test-ref": "conformance:2023/pb1120_handled_warning_by_when_phrase_skips_not_invalid_key",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1120 (open). Rule: §14.6.13.1.4 2) (cite.py --check 14.6.13.1.4 \"No associated USE EXCEPTION declarative is executed\" -> OK 2)). Three sentences: the WHEN imperative runs and completes per the PERFORM rules; no USE declarative runs; and 'If a conditional phrase with a NOT phrase is specified in the interrupted statement, the imperative-statement in that phrase is also not executed.' Sentences 1-2 VERIFIED: probe out/probe/exc-nonfatal/g1 - PERFORM imp-1 = CALL \"EXG1B\" ON EXCEPTION / NOT ON EXCEPTION, callee GOBACK RAISING EXCEPTION EC-USER-X, WHEN EC-USER-X -> 'B-RUNS / WHEN EC-USER-X / IMP1-NEXT / A-END' (NOT ON EXCEPTION suppressed; continuation at the implicit CONTINUE after the CALL per §14.9.28.4 GR20, cite.py OK 20)). Sentence 3 DIVERGES on the I-O path: probe g3 - indexed file, ALTERNATE KEY WITH DUPLICATES, second WRITE yields status '02' (EC-I-O-WARNING, §9.1.13.1 cite.py OK) inside PERFORM imp-1 with WHEN EC-I-O-WARNING -> 'WHEN 02 / NOTINV2 02 / IMP1-NEXT': the WHEN handler ran AND the WRITE's NOT INVALID KEY imperative ran. Spec-derived expected: 'WHEN 02 / IMP1-NEXT'. Mechanism: SequentialIoEmitter.EmitInvalid (the one §9.1.14 renderer, shared with KeyedIo) gates NOT INVALID KEY on IoStatusClass.Successful(st) alone, and __IoCheckEc's successful-completion arm returns -1 both when a WHEN/USE ran and when nothing applied, so the verb site cannot know the condition was handled. The standard's own successful-with-exception WRITE rule (§14.9.51.4 GR27 c)/d): 'If control is returned from that declarative, control is then transferred to the end of the WRITE statement', cite.py OK 27)) shows the same intent. §9.1.14 final item 2 (successful -> NOT INVALID KEY, cite.py OK 2)) is the statement rule that this sentence overrides once the condition is raised and handled. Finding: nonfatal-handled-NOT-phrase. || editions as adjudicated: 2002, 2014, 2023 (the EC model and the exception-checking PERFORM are 2002+; the measured defective cell uses EC-I-O-WARNING, new in 2023 per Annex E.3.3 item 18, so it is observable at 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1120 landed. Sentence 3 (a NOT phrase in the interrupted statement \"is also not executed\" after a WHEN handled the condition) now holds on the I-O path: __IoCheckEc answers ResumeSignal.HandledNonfatal (-4) when a WHEN/USE handled a warning raised by a SUCCESSFUL statement, and every NOT phrase (NOT INVALID KEY, NOT AT END, NOT END-OF-PAGE) asks for -1 only. Witness: an indexed WRITE ending 02 inside PERFORM ... WHEN EC-I-O-WARNING runs the WHEN and skips NOT INVALID KEY; sentences 1-2 were verified earlier (g1) and the CALL arm is pb606.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.13.1.4-3",
@@ -32676,13 +32676,13 @@
   "ordinal": 3,
   "subject": "Exception conditions",
   "rule-digest": "5b5590c16501",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitIoCheckEc; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitIoCheckEc; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitUseHook; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitNotPhrase; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitInvalid",
+  "test-ref": "conformance:2023/pb1120_handled_warning_by_use_declarative_skips_not_invalid_key; conformance:2023/pb1120_unhandled_warning_still_runs_not_invalid_key",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1120 (open). Rule: §14.6.13.1.4 3) (cite.py --check 14.6.13.1.4 \"If execution of the declarative completes normally, execution continues as specified in the rules for normal execution\" -> OK 3)). Sentences 1-2 (the applicable USE runs; normal completion continues) VERIFIED: conformance-test:ExceptionConditionConformanceTests.StringOverflow_NoPhrase_RaisesEcOverflowString ('H: EC-OVERFLOW-STRING / R=ABC'); the CALL NOT ON EXCEPTION arm of the NOT-phrase sentence is pinned by golden 2002/pb606_call_not_on_propagated (kb/Work PB606, landed). Sentence 3 ('If a conditional phrase with a NOT phrase is specified in the interrupted statement, the imperative-statement in that phrase is not executed') DIVERGES on the I-O path: probe out/probe/exc-nonfatal/g2 - >>TURN EC-I-O-WARNING ON, USE AFTER EC EC-I-O-WARNING, indexed WRITE with a duplicate alternate key (status '02') carrying NOT INVALID KEY -> 'F3-DECL 02 / NOTINV2 02 / AFTER 02'. Spec-derived expected: 'F3-DECL 02 / AFTER 02'. Control g4 (no declarative) -> 'NOTINV2 02', correct per 4). Same mechanism as GR-14.6.13.1.4-2. Finding: nonfatal-handled-NOT-phrase. || editions as adjudicated: 2002, 2014, 2023 (EC model introduced by ISO 2002; the measured defective EC-I-O-WARNING cell exists at 2023, Annex E.3.3 item 18)",
-  "state": "GAP"
+  "notes": "kb/Work PB1120 landed. Sentence 3 (\"the imperative-statement in that phrase is not executed\") holds on the I-O path for a USE-declarative-handled EC-I-O-WARNING (indexed WRITE, status 02: NOTINV1 00 / DECL 02 / AFTER 02, no NOTINV2), and the unhandled control still runs the NOT phrase (a raised-but-unhandled nonfatal is only recorded, 4)). Sentences 1-2 and the CALL arm as before (ExceptionConditionConformanceTests, pb606).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.13.1.4-4",

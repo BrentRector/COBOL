@@ -121,7 +121,9 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   int-returning `__RunUse` (emitted only when the group is EC-active; the void form stays byte-identical otherwise)
   catches it, and every raise site speaks ONE protocol: `-1` normal completion (§14.6.13.1.2), `-2` RESUME AT NEXT
   STATEMENT (suppresses a fatal — §14.6.13.1.3 #5 NOTE 2), `-3` no qualifying declarative, `≥0` RESUME AT
-  procedure-name's pc (≡ GO TO, §14.9.33.4 GR3). There is no `ExceptionDispatch` registry class: the F3 selector is
+  procedure-name's pc (≡ GO TO, §14.9.33.4 GR3), and — from an I-O hook's SUCCESSFUL arm only — `-4`
+  (`ResumeSignal.HandledNonfatal`): a WHEN phrase or USE declarative handled a warning a successful statement
+  raised, so the statement's NOT phrase is skipped (§14.6.13.1.4 2)/3); a NOT phrase runs on `-1` alone; kb/Work PB1120). There is no `ExceptionDispatch` registry class: the F3 selector is
   the GENERATED `__EcDispatch` (source-ordered GR3c–g tiers over the program's own declaratives).
   ⛔ **An emitted raise site renders the selection through ONE method, `EcEmitter.EmitSelection`** (kb/Work
   PB1549): the selector call, the RESUME landing, and — for a FATAL condition — the default of §14.6.13.1.3 5)/7)

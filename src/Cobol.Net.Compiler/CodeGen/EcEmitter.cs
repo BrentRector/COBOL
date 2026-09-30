@@ -19,7 +19,9 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// is gated: a compilation group with no enabling TURN, no F3, no RAISE/RESUME/RAISING and no EXCEPTION-*
 /// function emits byte-identical source to a pre-EC build (the zero-scaffolding invariant, SSOT §18.16).
 /// <para><b>The dispatch result protocol</b> (shared by <c>__RunUse</c>/<c>__EcDispatch</c>/<c>__IoCheckEc</c>):
-/// <c>-1</c> = the declarative completed normally (§14.6.13.1.2) or no action; <c>-2</c> = RESUME AT NEXT
+/// <c>-1</c> = the declarative completed normally (§14.6.13.1.2) or no action (an I-O hook's SUCCESSFUL arm
+/// answers <c>-4</c> = <c>ResumeSignal.HandledNonfatal</c> when a WHEN/USE handled the raised warning, so the
+/// statement's NOT phrase is skipped — §14.6.13.1.4 2)/3), kb/Work PB1120); <c>-2</c> = RESUME AT NEXT
 /// STATEMENT (fall through past the raising statement, §14.9.33.4 GR2 — suppresses a fatal termination,
 /// §14.6.13.1.3 #5 NOTE 2); <c>-3</c> = no qualifying declarative; <c>≥0</c> = RESUME AT procedure-name's pc
 /// (≡ GO TO, GR3).</para>
@@ -866,12 +868,12 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
                 if (ecState.UnitHasF3Perform)
                 {
                     w.Line("int __w = __EcPerform(__ec!, __f);   // GR17 — a matching WHEN preempts USE; warning is nonfatal");
-                    w.Line("return __w == -3 ? -1 : __w;");
+                    w.Line("return __w == -3 ? -1 : __w == -1 ? ResumeSignal.HandledNonfatal : __w;   // handled → §14.6.13.1.4 2)/3): no NOT phrase");
                 }
                 else
                 {
                     w.Line($"int __w = {(decls.Any(d => d.EcEntries is not null) ? "__EcDispatch(__ec!, __f)" : "-3")};");
-                    w.Line("return __w == -3 ? -1 : __w;");
+                    w.Line("return __w == -3 ? -1 : __w == -1 ? ResumeSignal.HandledNonfatal : __w;   // handled → §14.6.13.1.4 2)/3): no NOT phrase");
                 }
             }
             // The statement's ON EXCEPTION phrase is its own handler for EVERY unsuccessful family (§14.9.10.4
