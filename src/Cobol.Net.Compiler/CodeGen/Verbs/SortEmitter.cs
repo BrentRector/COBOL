@@ -45,7 +45,10 @@ internal sealed class SortEmitter(EmitContext ctx,
             EmitFilesNotOpen(sd, so.Using);
             if (so.Using.Count > 0)
                 foreach (var input in so.Using)
+                {
                     EmitInputFile(input, sd, so.File.RecordWidth, so.Varying, tx);
+                    EmitInputClose(input, tx);   // GR12c — the release phase ends with each file's as-if CLOSE
+                }
             else if (so.InputProcedure is { IsEmpty: false } ip)   // an EMPTY procedure releases nothing (kb/Work PB440)
             {
                 w.Line($"{RuntimeApi.SortEnterProcedure(sd, output: false)};   // §14.9.32.4 GR1 — RELEASE is legal from here to the sequence phase");
@@ -138,10 +141,17 @@ internal sealed class SortEmitter(EmitContext ctx,
             // GR7 / GR12: "At the start of execution of the MERGE statement" no USING or GIVING file may be open —
             // one test point for both, unlike SORT's per-phase GR9 (kb/Work PB1036).
             EmitFilesNotOpen(sd, [.. mg.Using, .. mg.Giving]);
+            // §14.9.24.4 GR7 c) (kb/Work PB1141): the USING file's as-if CLOSE — "If an output procedure is specified,
+            // this termination is not performed until after control passes the last statement in the output
+            // procedure." So with an OUTPUT PROCEDURE each file's FILE STATUS still holds the as-if READ's at end
+            // '10' inside the procedure, and a CLOSE USE procedure runs after it; with GIVING (or no procedure) the
+            // close follows the file's own release loop, as SORT's does.
+            bool closeAfterOutputProcedure = mg.OutputProcedure is not null;
             foreach (var input in mg.Using)
             {
                 w.Line($"{RuntimeApi.SortNextInput(sd)};   // a new pre-sorted USING stream (GR4 — file order breaks ties)");
                 EmitInputFile(input, sd, mg.File.RecordWidth, mg.Varying, tx);
+                if (!closeAfterOutputProcedure) EmitInputClose(input, tx);
             }
             w.Line($"{RuntimeApi.SortMerge(sd, KeysExpr(mg.Keys))};   // the GR5 sequences are the Init snapshot's; GR6's sequence test");
             if (mg.Giving.Count > 0)
@@ -152,6 +162,9 @@ internal sealed class SortEmitter(EmitContext ctx,
                 w.Line($"{RuntimeApi.SortEnterProcedure(sd, output: true)};   // §14.9.34.4 GR1 — RETURN is legal until the statement ends");
                 Statements.EmitProcedureRange(op, "   // OUTPUT PROCEDURE (GR9)");
             }
+            if (closeAfterOutputProcedure)
+                foreach (var input in mg.Using)
+                    EmitInputClose(input, tx);   // GR7 c) — after control passes the output procedure's last statement
             // MERGE has no GR17 of its own — only SORT's rule names the statement's termination — but the LANDING
             // rule is the same one: §14.9.33.4 GR2 a) 1. makes the applicable statement of a condition raised
             // inside an implicit transfer the MERGE itself, so a RESUME AT NEXT STATEMENT leaves the whole
@@ -161,8 +174,8 @@ internal sealed class SortEmitter(EmitContext ctx,
     }
 
     /// <summary>The implicit USING transfer for one input file (SORT GR12 / MERGE GR7): OPEN INPUT, READ-loop
-    /// releasing each record, CLOSE — through the ordinary runtime file verbs so status (and declaratives,
-    /// later) behave exactly as for explicit I/O. The loop ends on AT END or ANY unsuccessful read (a missing
+    /// releasing each record — through the ordinary runtime file verbs so status (and declaratives,
+    /// later) behave exactly as for explicit I/O; the closing CLOSE is <see cref="EmitInputClose"/>. The loop ends on AT END or ANY unsuccessful read (a missing
     /// file's failed OPEN makes the first READ unsuccessful — never a spin). Each of the three as-if statements
     /// stores its own status and offers it to its own USE hook (kb/Work PB837); the file's FILE STATUS item then
     /// holds the final (CLOSE) status, the only value visible after the statement.</summary>
@@ -219,6 +232,14 @@ internal sealed class SortEmitter(EmitContext ctx,
         // CLOSE ('00') ran no declarative at all.
         seqIo.EmitStoreFileStatus(input);
         EmitTransferHook(input, RuntimeApi.FileStatus(f), TransferIo.UsingRead, tx, atEndHandled: true);
+    }
+
+    /// <summary>The as-if CLOSE that ends one USING file's processing (SORT GR12 c) / MERGE GR7 c)) — its own step so
+    /// MERGE can place it after the output procedure (kb/Work PB1141), and offered to its own USE hook.</summary>
+    private void EmitInputClose(FileModel input, Transfer tx)
+    {
+        var w = ctx.Writer;
+        string f = FileKeyExpr(input);
         w.Line($"{RuntimeApi.FileClose(f)};   // implicit CLOSE (GR12c / GR7c)");
         // The as-if CLOSE gets the hook an explicit CLOSE gets (SequentialIoEmitter.EmitClose): no AT END phrase
         // exists on a CLOSE, so nothing takes precedence over its declarative.

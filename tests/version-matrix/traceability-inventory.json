@@ -40026,13 +40026,13 @@
   "ordinal": 9,
   "subject": "MERGE statement",
   "rule-digest": "6eb623a789ab",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitMerge; src/Cobol.Net.Runtime/IO/CobolSort.cs#EnterProcedure; src/Cobol.Net.Runtime/IO/CobolSort.cs#ReturnStatement",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitMerge; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputClose",
+  "test-ref": "conformance:2023/pb1141_merge_using_close_after_output_procedure",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1141 (open). Rule: 'If an output procedure is specified, control passes to it during execution of the MERGE statement. The compiler inserts a return mechanism after the last statement in the output procedure. When control passes to that return mechanism, the mechanism provides for termination of the merge, and then passes control to the next executable statement after the MERGE statement. ... The RETURN statements in the output procedure are the requests for the next record.' (cite.py --check 14.9.24.4 -> OK §14.9.24.4 9)). Code: EmitMerge performs the merge (Merge) BEFORE entering the procedure (the 'point at which it selects the next record ... when requested'), then SortEnterProcedure(output:true) and Statements.EmitProcedureRange(op) - a bounded __Dispatch(start,end) whose bounded return IS the inserted return mechanism; after it SortClose ends the merge and control falls to the next statement. RETURN -> CobolSort.ReturnStatement pulls the next record from the cursor. Probe probe/merge-p2/m1.cob: OUTPUT PROCEDURE OUT-P (a paragraph after STOP RUN) runs, its RETURNs yield the 9 records in merged order, and 'AFTER CNT=09' shows control resumed at the statement after MERGE (85 and 2023). Note: the USING files' as-if CLOSE (GR7 c), 'not performed until after control passes the last statement in the output procedure') is performed BEFORE the procedure in this implementation - that is GR7's timing (part 1 / not in this part), not GR9's return mechanism. pb837/pb349/pb678 goldens run MERGE output procedures but assert other rules; no golden is derived from GR9 - test-needed. || REFUTED: PARTIAL — GR9 says the inserted return mechanism, reached after the last statement of the output procedure, 'provides for termination of the merge'. GR7 c) defines part of that termination: the as-if CLOSE of each USING file, which 'is not performed until after control passes the last statement in the output procedure'. EmitMerge instead runs EmitInputFile, including its FileClose and CLOSE USE hook, for every USING file BEFORE SortEnterProcedure and the output procedure. So the termination the mechanism provides is missing the USING CLOSE, which has already happened, and the difference is observable. Inside the output procedure the USING file's FILE STATUS holds the as-if CLOSE's '00' instead of the at-end '10' left by the as-if READ with AT END. Any CLOSE USE procedure also runs before the output procedure instead of after it. The adjudicator named this timing and sent it to GR7 c). But it is the same event GR9's mechanism is required to perform, so the half of GR9 about what happens on entry and on RETURN is verified and the termination half is not.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1141: with an OUTPUT PROCEDURE each USING file's as-if CLOSE (GR7 c) follows the procedure's last statement - FILE STATUS reads 10 inside it - so the termination the return mechanism provides includes the USING CLOSE.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-10",

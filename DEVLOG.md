@@ -13,6 +13,10 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1792 — 2026-09-29 18:51 PDT — PB1141: MERGE closes its USING files after the output procedure
+
+`EmitMerge` ran the whole implicit USING transfer — OPEN, READ loop, CLOSE and the CLOSE USE hook — for every file before entering the output procedure, so inside the procedure each file's FILE STATUS held the CLOSE's `00` instead of the as-if READ's `10`, and a CLOSE declarative ran too early. §14.9.24.4 GR7 c) defers the as-if CLOSE until "after control passes the last statement in the output procedure". `EmitInputFile` is split into the READ half and `EmitInputClose`; SORT keeps its back-to-back pair (its release phase ends with each CLOSE), MERGE emits the closes after the procedure when one is specified. Closes GR-14.9.24.4-9; GAP 801 to 800.
+
 ## Entry 1791 — 2026-09-29 16:57 PDT — PB1184 + PB1179: a zero-length UNSTRING sender terminates the statement; STRING into a national receiver
 
 `EmitUnstring` ran its GR15 a) initiation test unconditionally, so a zero-length identifier-1 (DYNAMIC LENGTH, empty) took ON OVERFLOW and set EC-OVERFLOW-UNSTRING where §14.9.48.4 GR2 terminates the statement immediately. The whole statement after the sender read now sits under `if (src.Length != 0)`; neither overflow imperative runs and the pointer and tally are untouched (the reading GR17 supports: it acts after a completed transfer). Closes GR-14.9.48.4-2 and -15; GAP 805 to 803.
