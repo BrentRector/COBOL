@@ -303,7 +303,6 @@ public class BoundTreeBuilderDecompositionTests
     [Theory]
     [InlineData("BindInspect")]
     [InlineData("ExtractInspectPattern")]
-    [InlineData("BindInspectBeforeAfter")]
     [InlineData("ExtractStringValue")]
     [InlineData("ExtractNthStringValue")]
     [InlineData("ExtractLiteralString")]
