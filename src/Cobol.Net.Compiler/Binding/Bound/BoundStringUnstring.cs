@@ -9,11 +9,12 @@ namespace CobolNet.Binding.Bound;
 // visitor and StatementChildren key on this namespace).
 
 // The entire STRING/UNSTRING surface — including NOT ON OVERFLOW and END-STRING/END-UNSTRING — is
-// COBOL-85 (both verbs' phrases were complete by 1985); no edition gate applies. The post-85 deltas
-// (class national / boolean operands, zero-length-item rules, dynamic-length SIZE — §14.9.43.4 GR1)
-// concern data shapes the current data model cannot describe, and the EC-OVERFLOW-STRING /
-// EC-OVERFLOW-UNSTRING names (2002+, GR8b / GR16b) await the EC model; the ON/NOT ON OVERFLOW control
-// flow itself is edition-invariant.
+// COBOL-85 (both verbs' phrases were complete by 1985); no edition gate applies. The post-85 deltas — class
+// national operands (a national receiver stores through the same image writer as an alphanumeric one, kb/Work
+// PB1179), the zero-length-item rules (UNSTRING GR2 terminates before any other rule, kb/Work PB1184) and
+// dynamic-length SIZE (§14.9.43.4 GR1) — are bound here and emitted by StringEmitter; the EC-OVERFLOW-STRING /
+// EC-OVERFLOW-UNSTRING names (2002+, GR8b / GR16b) are raised through EcEmitter.EmitOverflow; the ON/NOT ON
+// OVERFLOW control flow itself is edition-invariant.
 
 /// <summary>One STRING sending operand with its governing delimiter (ISO §14.9.43.2): the DELIMITED phrase
 /// written after a run of senders governs every sender of that run, so the binder back-propagates it

@@ -65,41 +65,44 @@ internal sealed class _PRG_CHAR_STRING_OPS : ICobolProgram
                     __strInto0 = CobolStringOps.StringTransfer(__strInto0, "-", null, ref __strPtr0, ref __strOvf0);
                     WS_OUT = __strInto0;
                     string __unsSrc1 = WS_TXT;
-                    string[] __unsDel1 = { " " };
-                    bool[] __unsAll1 = { false };
-                    long __unsPtr1 = 1;
-                    long __unsPtr1__0 = __unsPtr1;
-                    Int128 __unsTly1 = 0;
-                    bool __unsOvf1 = false;
-                    if (__unsPtr1 < 1 || __unsPtr1 > __unsSrc1.Length)
+                    if (__unsSrc1.Length != 0)
                     {
-                        __unsOvf1 = true;
-                    }
-                    else
-                    {
-                        long __unsCnt1_0 = CobolStringOps.UnstringExtract(__unsSrc1, __unsDel1, __unsAll1, 0, ref __unsPtr1, out var __unsFld1_0, out var __unsDlm1_0);
-                        if (__unsCnt1_0 >= 0)
+                        string[] __unsDel1 = { " " };
+                        bool[] __unsAll1 = { false };
+                        long __unsPtr1 = 1;
+                        long __unsPtr1__0 = __unsPtr1;
+                        Int128 __unsTly1 = 0;
+                        bool __unsOvf1 = false;
+                        if (__unsPtr1 < 1 || __unsPtr1 > __unsSrc1.Length)
                         {
-                            __concept5_UNSTRING = CobolDynString.Store(__unsFld1_0, 1073741791);
-                            if (__concept5_UNSTRING.Length == 0) {
-                            WS_P1 = new string(' ', 5);
-                            } else {
-                            WS_P1 = CobolString.Store(__concept5_UNSTRING, 5);
-                            }
-                            __unsTly1 += 1;
+                            __unsOvf1 = true;
                         }
-                        long __unsCnt1_1 = CobolStringOps.UnstringExtract(__unsSrc1, __unsDel1, __unsAll1, 0, ref __unsPtr1, out var __unsFld1_1, out var __unsDlm1_1);
-                        if (__unsCnt1_1 >= 0)
+                        else
                         {
-                            __concept5_UNSTRING = CobolDynString.Store(__unsFld1_1, 1073741791);
-                            if (__concept5_UNSTRING.Length == 0) {
-                            WS_P2 = new string(' ', 5);
-                            } else {
-                            WS_P2 = CobolString.Store(__concept5_UNSTRING, 5);
+                            long __unsCnt1_0 = CobolStringOps.UnstringExtract(__unsSrc1, __unsDel1, __unsAll1, 0, ref __unsPtr1, out var __unsFld1_0, out var __unsDlm1_0);
+                            if (__unsCnt1_0 >= 0)
+                            {
+                                __concept5_UNSTRING = CobolDynString.Store(__unsFld1_0, 1073741791);
+                                if (__concept5_UNSTRING.Length == 0) {
+                                WS_P1 = new string(' ', 5);
+                                } else {
+                                WS_P1 = CobolString.Store(__concept5_UNSTRING, 5);
+                                }
+                                __unsTly1 += 1;
                             }
-                            __unsTly1 += 1;
+                            long __unsCnt1_1 = CobolStringOps.UnstringExtract(__unsSrc1, __unsDel1, __unsAll1, 0, ref __unsPtr1, out var __unsFld1_1, out var __unsDlm1_1);
+                            if (__unsCnt1_1 >= 0)
+                            {
+                                __concept5_UNSTRING = CobolDynString.Store(__unsFld1_1, 1073741791);
+                                if (__concept5_UNSTRING.Length == 0) {
+                                WS_P2 = new string(' ', 5);
+                                } else {
+                                WS_P2 = CobolString.Store(__concept5_UNSTRING, 5);
+                                }
+                                __unsTly1 += 1;
+                            }
+                            if (__unsPtr1 <= __unsSrc1.Length) __unsOvf1 = true;   // unexamined characters remain (ISO §14.9.48.4 GR15b)
                         }
-                        if (__unsPtr1 <= __unsSrc1.Length) __unsOvf1 = true;   // unexamined characters remain (ISO §14.9.48.4 GR15b)
                     }
                     System.Console.WriteLine(CobolNum.FormatDisplay(WS_CNT, _P_1) + WS_OUT + WS_P1 + WS_P2);
                     throw new StopRun();

@@ -94,7 +94,8 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     /// COUNT IN stored per GR11d/e, and the tally bumped — all skipped when the sender was already exhausted
     /// (GR11g: that receiver is not acted upon; exhaustion is NOT overflow, GR15). After the receivers, unexamined
     /// sender characters with every receiver acted upon raise the GR15b overflow. Pointer/tally write back before
-    /// the ON / NOT ON OVERFLOW dispatch (GR16c/GR16e/GR17; EC-OVERFLOW-UNSTRING, GR16b, awaits the EC model).</summary>
+    /// the ON / NOT ON OVERFLOW dispatch (GR16c/GR16e/GR17; EC-OVERFLOW-UNSTRING, GR16b, awaits the EC model). A
+    /// ZERO-LENGTH identifier-1 ends the statement first of all (GR2), outside every one of those steps.</summary>
     public void EmitUnstring(BoundUnstringStmt s)
     {
         var w = ctx.Writer;
@@ -102,6 +103,13 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         string src = $"__unsSrc{id}", dels = $"__unsDel{id}", alls = $"__unsAll{id}",
                ptr = $"__unsPtr{id}", tly = $"__unsTly{id}", ovf = $"__unsOvf{id}";
         w.Line($"string {src} = {OperandText.AsString(s.Source, num)};");   // DA4: an operand (may be a function)
+        // §14.9.48.4 GR2 (kb/Work PB1184): "If the data item referenced by identifier-1 is a zero-length item, execution
+        // of the UNSTRING statement terminates immediately." — BEFORE any initiation test, so the GR15 a) overflow
+        // (a pointer of 1 is past a zero-length sender) is never evaluated, EC-OVERFLOW-UNSTRING is never set, and
+        // neither the ON nor the NOT ON OVERFLOW imperative runs (GR17 acts "after completion of the transfer of
+        // data", and none takes place); the pointer and the tally are untouched. The rest of the statement is this
+        // guard's scope.
+        using var zeroLengthSender = w.Block($"if ({src}.Length != 0)");
         if (s.Delimiters.Count > 0)
         {
             // GR10: applied in statement order (the kernel's earliest-match-then-first-listed scan); a figurative
@@ -210,7 +218,9 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     /// (§14.9.43.4 GR7 — the image already carries the untouched positions): a character-image group distributes
     /// via <c>FromImage</c>; a Tier-B view / reference window splices through its own <c>Write</c>; a long-stored
     /// numeric-DISPLAY receiver (SR1 admits usage-display numeric) decodes the updated zoned image back to its
-    /// value; an alphanumeric / image-stored receiver assigns the image directly (same width by construction).</summary>
+    /// value; an alphanumeric, NATIONAL or image-stored receiver assigns the image directly (same width by
+    /// construction — a national elementary item is a string of national character positions, and §14.9.43.4 GR3 a)
+    /// moves "national-to-national" with no space fill, GR7 keeping every position not written; kb/Work PB1179).</summary>
     private void WriteImage(Place p, string imageExpr)
     {
         var w = ctx.Writer;
@@ -228,9 +238,9 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             return;
         }
         if (p is not RedefViewPlace && !p.Item.StoreAsImage
-            && p.Item.Pic is not { Category: PicCategory.Alphanumeric })
+            && p.Item.Pic is not { Category: PicCategory.Alphanumeric or PicCategory.National })
         {
-            w.Line(LoudStmt($"STRING INTO receiver '{p.Item.CobolName}' (usage display required, ISO §14.9.43.3 SR1)"));
+            w.Line(LoudStmt($"STRING INTO receiver '{p.Item.CobolName}' (usage display or national required, ISO §14.9.43.3 SR1)"));
             return;
         }
         w.Line(PlaceRenderer.Write(p, imageExpr));

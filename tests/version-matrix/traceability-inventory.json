@@ -47391,13 +47391,13 @@
   "ordinal": 2,
   "subject": "STRING statement",
   "rule-digest": "67bcb1449751",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#FigurativeOperand; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#WriteImage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#WriteImage",
+  "test-ref": "conformance:2023/pb1179_string_into_national_receiver",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR2: a figurative literal-1/literal-2 is an implicit ONE-character item whose usage is identifier-3's (display or national). cite.py --check 14.9.43.4 'it refers to an implicit one character data item whose usage shall be the same as the usage of identifier-3' -> OK §14.9.43.4 2). Display arm verified by probe gr2.cob: STRING ZERO SPACE QUOTE ZEROES DELIMITED BY SIZE INTO OUT1 -> A[0 \"0......] (one character each); S1 DELIMITED BY SPACE / S2 DELIMITED BY ZERO -> B[AB12......]. National arm: probe nat.cob (STRING NS DELIMITED BY N\"-\" SPACE ZERO DELIMITED BY SIZE ... INTO NOUT PIC N(8)) compiles clean and crashes - NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. Mechanism = finding M1. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text); the national arm needs class national (not at 85)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179: a figurative constant is one character of the receiver's usage - a national receiver stores it as one national space.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-3",
@@ -47406,13 +47406,13 @@
   "ordinal": 3,
   "subject": "STRING statement",
   "rule-digest": "dc866f213d06",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolStringOps.cs#StringTransfer; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#WriteImage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#WriteImage",
+  "test-ref": "conformance:2023/pb1179_string_into_national_receiver",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR3 a) alphanumeric-to-alphanumeric MOVE rules, or national-to-national when identifier-3 is class national, with no space filling; a zero-length identifier-1 is ignored. b) delimiter-bounded transfer, delimiter not transferred. c) SIZE / zero-length identifier-2 transfers the whole sender, repeated per sender. Verified (display): pb664 golden L1-L4 (conformance:85/pb664_string_operand_screen - delimiter cut, numeric/group/edited senders' character images); probe gr1.cob B: zero-length dynamic DZ ignored -> B[Q.........] 02; C: zero-length DD delimiter behaves as SIZE -> C[AB,CD!....]; gr8.cob E: signed numeric senders contribute their content ('-012' SIGN LEADING SEPARATE, '01K' overpunch) with no conversion; numrcv.cob: numeric-display / alphabetic / group receivers keep untouched positions (A[5634], B[ABYZ], C[QR57]). DIVERGES on the explicitly named national-to-national arm: NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. cite.py --check 14.9.43.4 'or, when identifier-3 is of class national, national-to-national moves, except that no space filling is provided' -> OK §14.9.43.4 3) a). [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text); zero-length items and class national are post-85]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179: STRING into a class-national receiver (elementary or group) transfers national-to-national with no space fill; it used to abort at run time.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-4",
@@ -48141,13 +48141,13 @@
   "ordinal": 2,
   "subject": "UNSTRING statement",
   "rule-digest": "0b1823d26e0c",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitUnstring",
-  "test-ref": "",
+  "test-ref": "conformance:2023/pb1184_unstring_zero_length_sender_terminates",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1184 (registrar 14c). GR2 'If the data item referenced by identifier-1 is a zero-length item, execution of the UNSTRING statement terminates immediately' (cite.py --check -> OK 14.9.48.4 2)). No code implements it: EmitUnstring's initiation test 'if (ptr < 1 || ptr > src.Length) ovf = true' turns a zero-length sender into the GR15a overflow (1 > 0), then EmitOverflow dispatches ON OVERFLOW (and, under >>TURN, sets EC-OVERFLOW-UNSTRING). Probe p1 (WS-D PIC X DYNAMIC LENGTH, MOVE \"\" TO WS-D), --std 2023 and --std 2014 identical: `UNSTRING WS-D DELIMITED BY \",\" INTO A1 WITH POINTER P TALLYING IN T ON OVERFLOW DISPLAY \"GR2 OVF\" NOT ON OVERFLOW DISPLAY \"GR2 NOVF\"` prints 'GR2 OVF'; without POINTER prints 'GR2B OVF'. A1/P/T are untouched (correct). Spec: terminate immediately - no overflow condition (GR15 is never reached), so ON OVERFLOW must not run and EC-OVERFLOW-UNSTRING must not be set; whether NOT ON OVERFLOW runs is itself a reading question (GR17 speaks of 'after completion of the transfer of data according to the other general rules'; 'terminates immediately' reads as transfer to the end of the statement with neither phrase) - the finding records it. No open kb/Work note owns this (searched kb/Work for UNSTRING + zero-length: PB425/PB871/PB979 landed and about other rules). [editions as adjudicated: 2014, 2023 (zero-length items: zero-length literals and dynamic-length elementary items are post-2002; Annex E lists no zero-length-item introduction in the 2014->2023 delta, so the provision predates 2023; probed at --std 2014 and 2023)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1184: a zero-length identifier-1 terminates the statement before any other rule - no overflow, no ON / NOT ON OVERFLOW imperative, pointer and tally untouched.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.48.4-3",
@@ -48336,13 +48336,13 @@
   "ordinal": 15,
   "subject": "UNSTRING statement",
   "rule-digest": "20d77d869df9",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitUnstring",
-  "test-ref": "",
+  "test-ref": "conformance:2023/pb1184_unstring_zero_length_sender_terminates",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1184 (registrar 14c). GR15 a) 'the value in the data item referenced by identifier-7 is less than 1 or greater than the number of character positions described for the data item referenced by identifier-1'; b) all receiving areas acted upon and unexamined characters remain (cite.py --check -> OK 14.9.48.4 15) a)). b) CONFORMS: emitter 'if (ptr <= src.Length) ovf = true' after the receivers (probe p2 T7 OVF; golden pb979 RM1/RM2/SEP/GRP, phrase_order_overflow UNS-ON). a) CONFORMS WITH a POINTER phrase (p2 T4 P=0 OVF, T5 P=13 > 12 OVF, T6 P=12 NOVF). DIVERGES: the emitter evaluates the a) test 'if (ptr < 1 || ptr > src.Length)' UNCONDITIONALLY - with no POINTER phrase ptr is the literal 1, and a zero-length identifier-1 makes 1 > 0 true, so an overflow condition is raised where GR15 a) names identifier-7 (which does not exist) and GR2 says the statement terminates immediately. Probe p1 GR2B: `UNSTRING WS-D DELIMITED BY \",\" INTO A1 ON OVERFLOW ...` with WS-D PIC X DYNAMIC LENGTH after MOVE \"\" displays 'GR2B OVF'; spec: no overflow condition. Mechanism shared with GR-14.9.48.4-2 (finding 'zero-length sender'). Spec-derived tests pin a)/b) only through goldens for b); no golden pins a) -> test-ref empty.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1184: GR15 a) is judged only for a sender GR2 lets the statement examine; the zero-length sender no longer reports the initiation overflow.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.48.4-16",

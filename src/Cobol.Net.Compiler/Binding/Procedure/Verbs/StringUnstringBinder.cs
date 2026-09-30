@@ -11,9 +11,10 @@ using Core = CobolParserCore;
 
 // The entire STRING/UNSTRING surface bound here — including NOT ON OVERFLOW and END-STRING/END-UNSTRING — is
 // COBOL-85 (both verbs' phrases were complete by 1985); no edition gate applies. The post-85 deltas (class
-// national / boolean operands, zero-length-item rules, dynamic-length SIZE — §14.9.43.4 GR1) concern data shapes
-// the current data model cannot describe, and the EC-OVERFLOW-STRING / EC-OVERFLOW-UNSTRING names (2002+, GR8b /
-// GR16b) await the EC model; the ON/NOT ON OVERFLOW control flow itself is edition-invariant.
+// national operands, the zero-length-item rules, dynamic-length SIZE — §14.9.43.4 GR1) are bound here and emitted
+// by StringEmitter (kb/Work PB1179, PB1184); the EC-OVERFLOW-STRING / EC-OVERFLOW-UNSTRING names (2002+, GR8b /
+// GR16b) are raised through EcEmitter.EmitOverflow; the ON/NOT ON OVERFLOW control flow itself is
+// edition-invariant.
 
 /// <summary>The STRING/UNSTRING verb binder (P7 Step 10d — a real collaborator over
 /// <see cref="BinderContext"/>, extracted from the <c>StatementBinder.StringUnstring</c> partial; the
