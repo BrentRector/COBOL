@@ -38961,13 +38961,13 @@
   "ordinal": 10,
   "subject": "INSPECT statement",
   "rule-digest": "13dd72ee0afb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs#IsBareInspectOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#inspectCountPhrase",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs#IsBareInspectOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#inspectCountPhrase",
+  "test-ref": "conformance:2023/pb1125_inspect_tallying_next_counter_extent",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1125 (open). Rule: 'Both the ALL and LEADING phrases are transitive across the operands that follow them until another ALL or LEADING phrase is encountered.' (cite.py --check 14.9.22.4 -> OK 10)). The binder half is right: a bare operand inherits the last adjective (InspectBinder 'last' seed); probe p1.cob T4 'ABAB' TALLYING N FOR ALL \"A\" \"B\" -> 04. The DEFECT is in the parse that decides where the transitive operand list ENDS: inspectCountPhrase's bare alternative is guarded by IsBareInspectOperand() => TokenStream.LA(2) != FOR, which only recognizes the next identifier-2 when it is a single bare word. A subscripted, qualified or reference-modified identifier-2 (C(1) FOR / M OF G FOR) is swallowed as a transitive ALL operand of the previous counter, and its FOR clause is re-attached to the previous counter. Probe p6.cob: S1='AAB', INSPECT S1 TALLYING N FOR ALL \"A\" C(1) FOR ALL \"B\" -> N=3 C=000; with M OF G -> N=3 M=0. Spec-derived: C(1)/M OF G can only be identifier-2 (an operand is never followed by FOR in the tallying-phrase format), so expected N=2, C(1)=1 / M=1. Silent wrong answer, all editions. || editions as adjudicated: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1125: an identifier followed by FOR - subscripted, qualified or reference-modified - is the next tallying counter; the end of a transitive ALL/LEADING list is decided over the whole reference extent, not LA(2).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-11",

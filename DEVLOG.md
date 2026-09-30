@@ -13,6 +13,10 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1795 — 2026-09-29 19:18 PDT — PB1125: INSPECT TALLYING's next counter is found over the whole reference
+
+`IsBareInspectOperand()` was `LA(2) != FOR`, so a SUBSCRIPTED, QUALIFIED or reference-modified next counter (`INSPECT S TALLYING N FOR ALL "A" C(1) FOR ALL "B"`) had `(` or `OF` at LA(2), was swallowed as one more operand of the previous counter, and its FOR clause re-attached to THAT counter — a silent wrong count at every edition (N=3, C(1) untouched where the standard gives N=2, C(1)=1). The predicate now scans the reference's own extent and asks whether FOR follows. Closes GR-14.9.22.4-10; GAP 797 to 796. FMT-14.9.22.2 (the printed formats' over-generation) needs the §14.9.22.2 diagram rendered first and stays with the note (HALF).
+
 ## Entry 1794 — 2026-09-29 19:07 PDT — PB1135: INVOKE takes a keyword-less expression argument
 
 `invokeArgument`'s BY-less arms were `addressIdentifier | dataReference | literal`, so `INVOKE o "M" USING N * 2` was COBOL0307, `USING (N + 1)` COBOL0001 and `USING B1 B-AND B2` a reserved-word error, all legal per §14.9.23.2 (BY CONTENT is optional over the expression forms). The rule now carries `CALL`'s two bare expression arms, after dataReference and literal so `N + 1` keeps the list reading PB130 gave CALL; `OfInvokeArgument` marks the argument an expression so it is passed BY CONTENT. Closes FMT-14.9.23.2; the note stays HALF because the adjudicator's `N + 1`-is-one-argument expectation contradicts CALL's recorded determination and needs one decision for both verbs. GAP 798 to 797.

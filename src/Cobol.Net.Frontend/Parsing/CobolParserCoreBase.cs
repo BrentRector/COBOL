@@ -586,11 +586,42 @@ public abstract class CobolParserCoreBase : Parser
     /// Predicate for the bare (adjective-less) INSPECT TALLYING count phrase. An ALL or
     /// LEADING adjective is transitive across the operands that follow it (ISO 1989:1985
     /// 14.9.22 GR 10), so "FOR LEADING ""S"" ""S"" ""T""" lists three operands under one
-    /// counter. But a data-name immediately followed by FOR is the NEXT tallying counter,
-    /// not a transitive operand. Returning false there stops the count-phrase repetition so
-    /// the data-name begins a new inspectTallyingItem instead of being swallowed as a pattern.
-    /// </summary>
-    protected bool IsBareInspectOperand() => TokenStream.LA(2) != CobolLexer.FOR;
+    /// counter. But an identifier followed by FOR is the NEXT tallying counter (§14.9.22.2 writes
+    /// <c>identifier-2 FOR</c>), not a transitive operand. Returning false there stops the count-phrase
+    /// repetition so the identifier begins a new inspectTallyingItem instead of being swallowed as a pattern.
+    /// <para>⛔ THE WHOLE REFERENCE, NOT ITS FIRST TOKEN (kb/Work PB1125). The test used to be <c>LA(2) != FOR</c>, which
+    /// sees the token after the first one only: a SUBSCRIPTED, QUALIFIED or REFERENCE-MODIFIED next counter
+    /// (<c>C(1) FOR</c>, <c>M OF G FOR</c>) has <c>(</c> or <c>OF</c> at LA(2), so it was taken as one more
+    /// operand of the previous counter and its FOR clause re-attached to THAT counter — a silent wrong count at every
+    /// edition. The scan steps over the reference's own extent — each qualifier (<c>OF|IN word</c>) and each
+    /// parenthesised subscript / reference-modification group, whose tokens are SUBSCRIPT-mode and close at the
+    /// matching SUB_RPAREN — and asks whether FOR follows. A literal or figurative operand has no such extent, so it
+    /// is still bare.</para></summary>
+    protected bool IsBareInspectOperand()
+    {
+        int t = 2;   // LA(1) is the candidate operand's first token
+        while (true)
+        {
+            int k = TokenStream.LA(t);
+            // GROUPING-PAREN-ONLY: the plain LPAREN here is a data reference's own SUBSCRIPT / reference-modification
+            // group. A function-argument list (FNARG_LPAREN) belongs to a function-identifier, which is never a
+            // tallying counter, so it has no extent this scan should step over.
+            if (k == CobolLexer.LPAREN)
+            {
+                int depth = 1;
+                for (t++; depth > 0 && TokenStream.LA(t) != Antlr4.Runtime.TokenConstants.EOF; t++)
+                {
+                    int u = TokenStream.LA(t);
+                    if (u == CobolLexer.SUB_LPAREN) depth++;
+                    else if (u == CobolLexer.SUB_RPAREN) depth--;
+                }
+                continue;
+            }
+            if ((k == CobolLexer.OF || k == CobolLexer.IN) && TokenStream.LA(t + 1) != Antlr4.Runtime.TokenConstants.EOF) { t += 2; continue; }
+            break;
+        }
+        return TokenStream.LA(t) != CobolLexer.FOR;
+    }
 
     /// <summary>Predicate for the TO-less operand of the three §13.18.60.2 pointer usages (kb/Work PB848): TO is
     /// an optional word there (§5.2.3 — not underlined on the printed folio 503), so the word after
