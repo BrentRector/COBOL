@@ -18,13 +18,12 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// EXCEPTION CONDITION declaratives) and <c>__IoCheckEc</c> (the §9.1.13.1 status→EC bridge). EVERY artifact here
 /// is gated: a compilation group with no enabling TURN, no F3, no RAISE/RESUME/RAISING and no EXCEPTION-*
 /// function emits byte-identical source to a pre-EC build (the zero-scaffolding invariant, SSOT §18.16).
-/// <para><b>The dispatch result protocol</b> (shared by <c>__RunUse</c>/<c>__EcDispatch</c>/<c>__IoCheckEc</c>):
-/// <c>-1</c> = the declarative completed normally (§14.6.13.1.2) or no action (an I-O hook's SUCCESSFUL arm
-/// answers <c>-4</c> = <c>ResumeSignal.HandledNonfatal</c> when a WHEN/USE handled the raised warning, so the
-/// statement's NOT phrase is skipped — §14.6.13.1.4 2)/3), kb/Work PB1120); <c>-2</c> = RESUME AT NEXT
-/// STATEMENT (fall through past the raising statement, §14.9.33.4 GR2 — suppresses a fatal termination,
-/// §14.6.13.1.3 #5 NOTE 2); <c>-3</c> = no qualifying declarative; <c>≥0</c> = RESUME AT procedure-name's pc
-/// (≡ GO TO, GR3).</para>
+/// <para><b>The dispatch result protocol</b> (shared by <c>__RunUse</c>/<c>__EcDispatch</c>/<c>__IoCheckEc</c>) is the
+/// runtime's <see cref="DispatchResult"/>: every value is rendered by NAME (<c>DispatchResult.Normal</c>,
+/// <c>ResumeNext</c>, <c>NoHandler</c>, <c>HandledNonfatal</c>, <c>NotNormal</c>) and every question a consumer asks
+/// by PREDICATE (<c>IsTransfer</c>, <c>SuppressesFatal</c>, <c>TerminatesSortMerge</c>), never by a bare literal —
+/// <c>DispatchResultProtocolDriftTests</c> pins that (kb/Work PB1122 Task A, PB1761). The values' meanings are
+/// documented once, on <see cref="DispatchResult"/>.</para>
 /// </summary>
 internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState dispatch)
 {
@@ -41,7 +40,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     public string EcDispatchExpr(string ecNameExpr, string fileExpr) =>
         ecState.UnitHasF3Perform ? $"__EcPerform({ecNameExpr}, {fileExpr})"
         : ecState.UnitHasF3       ? $"__EcDispatch({ecNameExpr}, {fileExpr})"
-        :                           "-3";
+        :                           "DispatchResult.NoHandler";
 
     /// <summary>Does <see cref="EcDispatchExpr"/> render a real selector for this unit (rather than the
     /// no-declarative constant)? Asked by the two emissions that must AGREE with it and with each other: the
@@ -54,7 +53,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// <summary>The <c>__EcObjDispatch</c> invocation (or the no-declarative constant when this unit has no
     /// Format-4 declaratives) — the §14.9.49.4 GR14 exception-OBJECT selector (the EC-OO wave).</summary>
     public string ObjDispatchExpr(string objExpr) =>
-        ecState.UnitHasF4 ? $"__EcObjDispatch({objExpr})" : "-3";
+        ecState.UnitHasF4 ? $"__EcObjDispatch({objExpr})" : "DispatchResult.NoHandler";
 
     // ── The raise-site selection: ONE place for "select, land the RESUME, apply the fatal default" ────────────
 
@@ -63,7 +62,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// condition — the default ISO §14.6.13.1.3 5) and 7) prescribe: "If execution of the declarative completes
     /// normally the execution of the run unit is terminated abnormally", and with no handler at all "If checking
     /// for the exception condition is enabled, execution of the run unit is terminated abnormally as specified in
-    /// 14.6.12". Only RESUME (NOTE 2 — result <c>-2</c>, or a <c>≥0</c> transfer the landing already took) lets
+    /// 14.6.12". Only RESUME (NOTE 2 — <c>ResumeNext</c>, or a <c>IsTransfer</c> result the landing already took) lets
     /// execution continue; a nonfatal condition continues in every case (§14.6.13.1.4 3)/4)).
     /// <para>⛔ THIS IS THE ONE PLACE THE FATAL DEFAULT IS DECIDED (kb/Work PB1549). Every emitted raise site used
     /// to spell <c>dispatch + ResumeTransfer</c> itself and was separately responsible for remembering the
@@ -88,11 +87,11 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         if (terminate is null)
             return;   // nonfatal: declarative completed / RESUME NEXT / no handler all continue (§14.6.13.1.4 3)/4))
         string when = fatalWhen is null ? "" : $" && {fatalWhen}";
-        // §14.6.13.1.3 6) sits between 5) (a declarative ran: -1 terminates below) and 7): with NO handler (-3) and
+        // §14.6.13.1.3 6) sits between 5) (a declarative ran: Normal terminates below) and 7): with NO handler (NoHandler) and
         // the element under >>PROPAGATE ON, the condition propagates as if GOBACK RAISING LAST EXCEPTION.
         if (PropagationReturn(ecNameExpr) is { } propagate)
-            w.Line($"if ({r} == -3{when}) {propagate}   // no handler: automatic propagation (§14.6.13.1.3 6); §7.3.21.4 GR2)");
-        w.Line($"if ({r} != ResumeSignal.NextStatement{when}) {terminate}"
+            w.Line($"if ({r} == DispatchResult.NoHandler{when}) {propagate}   // no handler: automatic propagation (§14.6.13.1.3 6); §7.3.21.4 GR2)");
+        w.Line($"if ({r} != DispatchResult.ResumeNext{when}) {terminate}"
             + "   // fatal, not resumed → abnormal run-unit termination (§14.6.13.1.3 5)/7))");
     }
 
@@ -200,7 +199,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         w.Line($"ExceptionState.SetObject({(ro.Source is { } roSrc ? RuntimeApi.AsExceptionObject(PlaceRenderer.Read(roSrc)) : "this")});   // §14.6.13.1.5 (1)/(2) — EXCEPTION-OBJECT + the status sentinel");
         w.Line($"int __r{id} = {ObjDispatchExpr($"ExceptionState.ExceptionObject")};");
         w.Line(dispatch.ResumeTransfer($"__r{id}"));
-        w.Line($"// -1/-2/-3: declarative completed / RESUME NEXT / no match — continue after RAISE (§14.9.29.4 GR2)");
+        w.Line($"// Normal/ResumeNext/NoHandler: declarative completed / RESUME NEXT / no match — continue after RAISE (§14.9.29.4 GR2)");
         return false;   // the continue-after-RAISE path IS the normal exit (GR2 — never fatal by itself)
     }
 
@@ -455,6 +454,13 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         // typed-native model can never proceed through — there is no lenient value to return, exactly as with a
         // null dereference. The entry exists so the statement still gets its try/catch and the condition can
         // reach a USE declarative; a flag nothing reads would be state a future maintainer has to disprove.
+        // ⛔ EC-PROGRAM-NOT-FOUND OF A program-address-identifier OPERAND (kb/Work PB1453): the raise site is
+        // ProgramRegistry.EntryOfOperand, an unconditional fatal throw whose only switch is the carrying statement's
+        // compile-time TURN state (PtrEmitter.ProgramAddressText renders `checkNotFound: true` exactly when this name
+        // is enabled at the statement), so there is no ambient flag — the row gives the statement its try/catch and
+        // the condition its way to a declarative. SET … TO ENTRY and a CALL argument raise it through their own
+        // shapes (EmitSetEntry's in-statement selection; CobolCallException), which this catch never sees.
+        ("EC-PROGRAM-NOT-FOUND", null),                         // §8.4.3.13.4 GR4 — a program-address-identifier operand's locate miss
         ("EC-OO-NULL", null),                                   // §14.9.23.4 GR5 — INVOKE on a null receiver
         ("EC-OO-METHOD", null),                                 // §14.9.23.4 GR7b — method could not be located
         // FLAGGED, unlike its two neighbours: §14.9.23.4 GR7c raises only when checking is enabled in BOTH
@@ -632,8 +638,8 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     }
 
     public void EmitResume(BoundResume r) =>
-        ctx.Writer.Line(r.TargetPc == ResumeSignal.NextStatement
-            ? "throw new ResumeSignal(ResumeSignal.NextStatement);   // RESUME AT NEXT STATEMENT (§14.9.33.4 GR2)"
+        ctx.Writer.Line(r.TargetPc == DispatchResult.ResumeNext
+            ? "throw new ResumeSignal(DispatchResult.ResumeNext);   // RESUME AT NEXT STATEMENT (§14.9.33.4 GR2)"
             : $"throw new ResumeSignal({r.TargetPc});   // RESUME AT procedure-name ≡ GO TO (§14.9.33.4 GR3)");
 
     // ── The EC-SIZE family over the checked-arithmetic shape (§14.7.5 ↔ Table 13) ───────────────────────────
@@ -730,7 +736,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// <summary>Generate <c>__EcDispatch</c> — the Format-3 declarative selector (ISO §14.9.49.4 GR3c–g): the
     /// USE statements are analyzed in SOURCE order within each tier — file+level-3, file+level-2, level-3,
     /// level-2, level-1 (EC-ALL) — and the FIRST match runs (GR3: "no other declaratives are executed"). Level-2
-    /// matching uses the catalog's longest-family-prefix predicate (so the open EC-USER-*/EC-IMP-* names select
+    /// matching uses the catalog's longest-family-prefix predicate (so the open EC-USER-* names select
     /// correctly). The GR3g outward-GLOBAL continuation is realized only on the I-O path (the existing F1
     /// <c>__RunGlobalUse</c> walk) — recorded in the deep-dive.</summary>
     public void EmitDispatchSelector(IReadOnlyList<BoundDeclarative> decls, CodeWriter w, bool asLocal)
@@ -763,7 +769,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
                 f is null && L2(ec) ? $"ExceptionCatalog.UnderLevel2(__ec, {CsLiteral(ec)})" : null);
             Tier("// GR3g — the level-1 EC-ALL entry", (ec, f, i) =>
                 f is null && ec.Equals(ExceptionCatalog.EcAll, StringComparison.OrdinalIgnoreCase) ? "true" : null);
-            w.Line("return -3;   // no qualifying declarative (GR3g tail)");
+            w.Line("return DispatchResult.NoHandler;   // no qualifying declarative (GR3g tail)");
         }
         w.Line();
     }
@@ -803,7 +809,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             EmitObjDispatchPass(decls, eo => (eo as BoundEoInterface)?.Symbol.ImplementedCsTypes,
                 "// GR14 b) — \"all of the USE statements in the source element are analyzed again\": "
                 + "the interface-name-1 entries", w);
-            w.Line("return -3;   // no qualifying declarative (GR14 b) tail → 14.6.13.1.5)");
+            w.Line("return DispatchResult.NoHandler;   // no qualifying declarative (GR14 b) tail → 14.6.13.1.5)");
         }
         w.Line();
     }
@@ -857,23 +863,23 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
                 // A successful completion: '00' raises nothing; '0x' (x≠0) is EC-I-O-WARNING — F3 may select it
                 // (no F1: those fire on unsuccessful execution only, §14.9.49.4 GR6). Nonfatal — never terminates.
                 // With an exception-checking PERFORM active, a matching WHEN preempts (and ignores) the USE (GR17).
-                w.Line("if (!__en) return -1;");
+                w.Line("if (!__en) return DispatchResult.Normal;");
                 // §14.9.51.4 GR27 — an end-of-page condition rides a SUCCESSFUL WRITE, and the statement's own
                 // END-OF-PAGE phrase takes it: b) transfers to the phrase, and c)/d) (the exception-checking
                 // PERFORM's WHEN, the USE declarative) apply only "If the END-OF-PAGE phrase is not specified".
                 // The condition is still SET above (a)), so EXCEPTION-STATUS names it inside the phrase. __atEnd
                 // carries the statement's own condition phrase — AT END on a READ, END-OF-PAGE on a WRITE; no
                 // statement has both (kb/Work PB854).
-                w.Line("if (__atEnd && ExceptionCatalog.IsEndOfPage(__ec)) return -1;   // GR27 b) — the END-OF-PAGE phrase takes it");
+                w.Line("if (__atEnd && ExceptionCatalog.IsEndOfPage(__ec)) return DispatchResult.Normal;   // GR27 b) — the END-OF-PAGE phrase takes it");
                 if (ecState.UnitHasF3Perform)
                 {
                     w.Line("int __w = __EcPerform(__ec!, __f);   // GR17 — a matching WHEN preempts USE; warning is nonfatal");
-                    w.Line("return __w == -3 ? -1 : __w == -1 ? ResumeSignal.HandledNonfatal : __w;   // handled → §14.6.13.1.4 2)/3): no NOT phrase");
+                    w.Line("return DispatchResult.ForHandledWarning(__w);   // handled → §14.6.13.1.4 2)/3): no NOT phrase");
                 }
                 else
                 {
-                    w.Line($"int __w = {(decls.Any(d => d.EcEntries is not null) ? "__EcDispatch(__ec!, __f)" : "-3")};");
-                    w.Line("return __w == -3 ? -1 : __w == -1 ? ResumeSignal.HandledNonfatal : __w;   // handled → §14.6.13.1.4 2)/3): no NOT phrase");
+                    w.Line($"int __w = {(decls.Any(d => d.EcEntries is not null) ? "__EcDispatch(__ec!, __f)" : "DispatchResult.NoHandler")};");
+                    w.Line("return DispatchResult.ForHandledWarning(__w);   // handled → §14.6.13.1.4 2)/3): no NOT phrase");
                 }
             }
             // The statement's ON EXCEPTION phrase is its own handler for EVERY unsuccessful family (§14.9.10.4
@@ -881,10 +887,10 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             // whole hook, leaving EXCEPTION-STATUS stale inside imperative-statement-3, kb/Work PB141), and
             // only the declarative dispatch and the fatal default are suppressed, exactly like the AT END /
             // INVALID KEY suppressions below.
-            w.Line("if (__onExc) return -1;");
-            w.Line($"if (__atEnd && {IoStatusClass.AtEnd("__st")}) return -1;    // the statement's AT END phrase covers the family (§9.1.13.1)");
-            w.Line($"if (__invKey && {IoStatusClass.InvalidKey("__st")}) return -1;   // the statement's INVALID KEY phrase covers its family (§9.1.13.1)");
-            w.Line("int __sel = -3;");
+            w.Line("if (__onExc) return DispatchResult.Normal;");
+            w.Line($"if (__atEnd && {IoStatusClass.AtEnd("__st")}) return DispatchResult.Normal;    // the statement's AT END phrase covers the family (§9.1.13.1)");
+            w.Line($"if (__invKey && {IoStatusClass.InvalidKey("__st")}) return DispatchResult.Normal;   // the statement's INVALID KEY phrase covers its family (§9.1.13.1)");
+            w.Line("int __sel = DispatchResult.NoHandler;");
             // The F1 file/open-mode + F3 USE declarative tiers (§14.9.49.4 GR3a–g/GR4b) — byte-identical to a pre-F3
             // build. With an exception-checking PERFORM active they run ONLY when no WHEN matched (GR17: a matching
             // WHEN ignores the USE); the frame is consulted FIRST, above these tiers.
@@ -895,25 +901,25 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             void EmitUseTiers()
             {
                 UseTierEmitter.EmitScopeTiers(w, decls,
-                    i => $"__sel = {dispatch.RunUseCall(i, decls[i].Range)}; break;", "__sel == -3");
+                    i => $"__sel = {dispatch.RunUseCall(i, decls[i].Range)}; break;", "__sel == DispatchResult.NoHandler");
                 if (decls.Any(d => d.EcEntries is not null))
-                    w.Line("if (__sel == -3 && __en) __sel = __EcDispatch(__ec!, __f);   // F3 tiers behind F1 (GR3c–g)");
+                    w.Line("if (__sel == DispatchResult.NoHandler && __en) __sel = __EcDispatch(__ec!, __f);   // F3 tiers behind F1 (GR3c–g)");
                 if (dispatch.OuterGlobalUse)
-                    w.Line("if (__sel == -3 && __outer.__RunGlobalUse(__f)) __sel = -1;   // outward GLOBAL walk (GR4b)");
+                    w.Line("if (__sel == DispatchResult.NoHandler && __outer.__RunGlobalUse(__f)) __sel = DispatchResult.Normal;   // outward GLOBAL walk (GR4b)");
             }
             if (ecState.UnitHasF3Perform)
             {
                 w.Line("bool __wh = false;");
                 w.Line("__sel = ExceptionState.RunTopFrame(__ec!, __f, out __wh);   // GR17 — a matching WHEN preempts the USE declaratives");
-                w.Line("if (!__wh) __sel = -3;   // no WHEN matched → fall to the USE tiers below");
+                w.Line("if (!__wh) __sel = DispatchResult.NoHandler;   // no WHEN matched → fall to the USE tiers below");
                 using (w.Block("if (!__wh)")) EmitUseTiers();
             }
             else EmitUseTiers();
-            w.Line("if (__sel >= 0 || __sel == -2) return __sel;   // RESUME redirected/suppressed (§14.9.33)");
+            w.Line("if (DispatchResult.SuppressesFatal(__sel)) return __sel;   // RESUME redirected/suppressed (§14.9.33)");
             // §14.6.13.1.3 3) sends a fatal EC-I-O condition on to "the following rules", so 6)'s automatic propagation
-            // applies here exactly as at EmitSelection: no procedure qualified (-3) under >>PROPAGATE ON (kb/Work PB1119).
+            // applies here exactly as at EmitSelection: no procedure qualified (NoHandler) under >>PROPAGATE ON (kb/Work PB1119).
             if (PropagationReturn("__ec!") is { } propagate)
-                w.Line($"if (__sel == -3 && __en && !__verbRule && {IoStatusClass.Fatal("__st")}) {propagate}"
+                w.Line($"if (__sel == DispatchResult.NoHandler && __en && !__verbRule && {IoStatusClass.Fatal("__st")}) {propagate}"
                     + "   // automatic propagation (§14.6.13.1.3 6))");
             // ⛔ §14.6.13.1.3 2) PRECEDES 5) and 7): "If the executed statement is a MERGE or SORT statement, then
             // the rules for those statements apply." A SORT/MERGE implicit transfer passes __verbRule, and the fatal
@@ -922,7 +928,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             w.Line($"if (__en && !__verbRule && {IoStatusClass.Fatal("__st")})");
             w.Line("    throw new CobolFatalException(__ec!, \"I-O status \" + __st + \" on \" + __f"
                 + " + (__stmt is null ? \"\" : \" (\" + __stmt + \")\")) { Dispatched = true };   // §9.1.13.1 fatal classes; §14.6.13.1.3 #5/#7 (dispatched above)");
-            // -1 = a qualifying procedure ran and completed normally; -3 = none qualified (HookNoProcedure). The two
+            // Normal = a qualifying procedure ran and completed normally; NoHandler = none qualified (HookNoProcedure). The two
             // are the same to every explicit I-O statement (both fall through) but not to the SORT/MERGE implicit
             // transfers, whose rules turn on "an applicable USE procedure that completes normally" (§14.9.24.4
             // GR7 a), GR12 a)/b)) — kb/Work PB993.
@@ -935,9 +941,9 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// emitted ONLY for a unit that contains an F3 PERFORM (<see cref="EcState.UnitHasF3Perform"/>), so a non-F3
     /// unit's source is byte-identical. <c>__EcPerform</c> consults the ambient F3-frame stack first (GR17: a
     /// matching WHEN preempts — and ignores — the USE declaratives) and falls to <c>__EcDispatch</c> (or the
-    /// no-declarative <c>-3</c>) only when no frame handled the condition. <c>__RunF3</c> composes a WHEN handler
+    /// no-declarative <c>NoHandler</c>) only when no frame handled the condition. <c>__RunF3</c> composes a WHEN handler
     /// (imp-2/imp-3) with WHEN COMMON (imp-4, GR19): COMMON runs ONLY after the handler COMPLETES (falls off →
-    /// <c>-1</c>); a RESUME NEXT STATEMENT (<c>-2</c>) is a transfer out of the handler and short-circuits COMMON
+    /// <c>Normal</c>); a RESUME NEXT STATEMENT (<c>ResumeNext</c>) is a transfer out of the handler and short-circuits COMMON
     /// (design SSOT §9.6 Q3). Both handler bodies are bounded pc-ranges run by the reused <c>__RunUse</c>.</summary>
     public void EmitPerformInterceptor(CodeWriter w, bool asLocal)
     {
@@ -963,8 +969,8 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         using (w.Block($"{MemberMod(asLocal)}int __EcPerform(string __ec, string __f)"))
         {
             w.Line("int __a = ExceptionState.RunTopFrame(__ec, __f.Length == 0 ? null : __f, out bool __h);");
-            w.Line($"return __h ? __a : {(ecState.UnitHasF3 ? "__EcDispatch(__ec, __f)" : "-3")};   "
-                + "// GR17/18 win over USE; else the USE tiers / -3");
+            w.Line($"return __h ? __a : {(ecState.UnitHasF3 ? "__EcDispatch(__ec, __f)" : "DispatchResult.NoHandler")};   "
+                + "// GR17/18 win over USE; else the USE tiers / NoHandler");
         }
         w.Line();
     }
@@ -985,7 +991,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             // guard. It is done by __RunUse, which opens the all-off checking scope for EVERY procedure it runs
             // (kb/Work PB891) — a second push here would be a second realization of the same window.
             w.Line("int __a = __RunUse(__u, __pc, __pc);   // imp-2 / imp-3 (a single-pc synthetic handler range)");
-            w.Line("if (__a == -1 && __cpc >= 0) __a = __RunUse(__cu, __cpc, __cpc);   // WHEN COMMON (imp-4, GR19); -2 short-circuits");
+            w.Line("if (__a == DispatchResult.Normal && __cpc >= 0) __a = __RunUse(__cu, __cpc, __cpc);   // WHEN COMMON (imp-4, GR19); ResumeNext short-circuits");
             w.Line("return __a;");
         }
         w.Line();

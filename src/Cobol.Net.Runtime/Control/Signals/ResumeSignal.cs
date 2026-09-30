@@ -13,21 +13,8 @@ namespace CobolNet.Runtime.Exceptions;
 /// </summary>
 public sealed class ResumeSignal(int targetPc) : Exception
 {
-    /// <summary><c>RESUME AT NEXT STATEMENT</c> (§14.9.33.4 GR2): control transfers to the implicit CONTINUE
-    /// after the statement that raised the condition — the raise site falls through (suppressing a fatal
-    /// termination, §14.6.13.1.3 #5 NOTE 2).</summary>
-    public const int NextStatement = -2;
-
-    /// <summary>The dispatch result of a NONFATAL condition raised by a SUCCESSFUL statement that a WHEN phrase or a
-    /// USE declarative HANDLED and that completed normally (kb/Work PB1120): §14.6.13.1.4 2)/3) — "If a conditional
-    /// phrase with a NOT phrase is specified in the interrupted statement, the imperative-statement in that phrase is
-    /// not executed" — so the statement's NOT phrase asks for exactly <c>-1</c> ("nothing applied") and this value,
-    /// like <see cref="NextStatement"/>, keeps it from running. Distinct from <c>-1</c> so a raised-and-handled
-    /// condition and no condition at all can be told apart.</summary>
-    public const int HandledNonfatal = -4;
-
     /// <summary>The resume target: a nondeclarative pc (<c>RESUME AT procedure-name</c> ≡ GO TO, GR3), or
-    /// <see cref="NextStatement"/>.</summary>
+    /// <see cref="DispatchResult.ResumeNext"/> (the dispatch-result protocol lives in <see cref="DispatchResult"/>).</summary>
     public int TargetPc { get; } = targetPc;
 }
 
@@ -48,6 +35,6 @@ public sealed class RaiseResumeSignal(int targetPc) : Exception
 {
     /// <summary>The resume action returned by the declarative that was selected at the raise site: a
     /// nondeclarative pc (<c>RESUME AT procedure-name</c> ≡ GO TO, §14.9.33.4 GR3), or
-    /// <see cref="ResumeSignal.NextStatement"/>.</summary>
+    /// <see cref="DispatchResult.ResumeNext"/>.</summary>
     public int TargetPc { get; } = targetPc;
 }

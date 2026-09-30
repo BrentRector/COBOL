@@ -238,7 +238,7 @@ internal sealed class DispatchState
     public string ResumeTransfer(string resultVar, string comment = "   // RESUME AT procedure-name (§14.9.33.4 GR3)")
         => InOperandEvaluation
             ? OperandEvaluationResume(resultVar)
-            : $"if ({resultVar} >= 0) {{ {ExplicitTransferOut(resultVar)} }}{comment}";
+            : $"if (DispatchResult.IsTransfer({resultVar})) {{ {ExplicitTransferOut(resultVar)} }}{comment}";
 
     /// <summary>True while the statement emitter is emitting an operand-evaluation step
     /// (<see cref="Binding.Bound.BoundStatement.OperandEvaluation"/>) — opened by
@@ -270,11 +270,11 @@ internal sealed class DispatchState
     /// leave, and even a hoisted one sits BEFORE the statement, so <see cref="ResumeTransfer"/>'s fall-through
     /// would re-enter the very statement GR2 says to abandon. Both actions therefore unwind as
     /// <c>RaiseResumeSignal</c> to the carrying statement's <c>BoundActivationSite</c>, which lands them with
-    /// <see cref="ResumeTransfer"/>. A declarative that completed normally (-1) or no qualifying declarative (-3)
+    /// <see cref="ResumeTransfer"/>. A declarative that completed normally (Normal) or no qualifying declarative (NoHandler)
     /// leaves the activation's result in place and the statement continues (§14.9.18.4 GR1 b) "execution continues
     /// … as specified in the rules for the activating statement after the result … is returned").</summary>
     private static string OperandEvaluationResume(string resultVar) =>
-        $"if ({resultVar} >= 0 || {resultVar} == ResumeSignal.NextStatement) throw new RaiseResumeSignal({resultVar});"
+        $"if (DispatchResult.SuppressesFatal({resultVar})) throw new RaiseResumeSignal({resultVar});"
         + "   // RESUME leaves the statement the activation was specified in (§14.9.33.4 GR2 a) 2.)";
 
     /// <summary>The program being emitted declares USE procedures (drives the <c>__IoCheck</c> hooks). Set per

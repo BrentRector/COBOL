@@ -130,11 +130,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     {
         foreach (var (backing, cellField, canonical, cellWidth) in data.PtrAddressableBackings)
         {
-            bool isStatic = data.StaticAddressableCells.Contains(cellField);
-            // A method's LOCAL-STORAGE / LINKAGE cell and a program's LOCAL-STORAGE cell are re-seeded at each activation
-            // (ActivationPointerSeeds — kb/Work PB956 / PB1132), so neither is readonly.
-            bool perActivation = !isStatic
-                && (data.OoMethodScopedRoots.Contains(canonical) || data.LocalStorageRoots.Contains(canonical));
+            // The storage duration (§8.6.4) is classified ONCE, by DataBinder.LifetimeOfCell — the same answer decides who
+            // ENDS the cell's life (kb/Work PB1216). A method's LOCAL-STORAGE / LINKAGE cell and a program's LOCAL-STORAGE
+            // cell are re-seeded at each activation (ActivationPointerSeeds — kb/Work PB956 / PB1132), so neither is readonly.
+            var lifetime = data.LifetimeOfCell(cellField, canonical);
+            bool isStatic = lifetime == CellLifetime.Static;
+            bool perActivation = lifetime == CellLifetime.Activation;
             string mod = isStatic ? "private static readonly" : perActivation ? "private" : "private readonly";
             string rmod = isStatic ? "private static" : "private";
             w.Line($"{mod} StorageCell {cellField} = {AddressableCellInit(canonical, cellWidth)};   // ADDRESS-OF-taken record — cell storage (ISO §8.4.3.11; Phase-4b inc 2)");
@@ -172,15 +173,18 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// time the runtime element containing them is activated"). These are exactly the storage channels the root-field
     /// re-initialization loops skip (a cell-backed root has no root field), so every loop that re-initializes automatic
     /// data for an activation also emits these.</summary>
-    internal IEnumerable<(string Member, string Type, string Fresh)> ActivationPointerSeeds(DataBinder data, IEnumerable<DataItem> roots)
+    internal IEnumerable<(string Member, string Type, string Fresh, string? End)> ActivationPointerSeeds(DataBinder data, IEnumerable<DataItem> roots)
     {
         foreach (var root in roots)
         {
             if (root.Class is not { IsCellBacked: true } cls || !ReferenceEquals(cls.Canonical, root)) continue;
             if (cls.BasedPointerField is { } addr)
-                yield return (addr, "ManagedPointer", "ManagedPointer.Null");
+                yield return (addr, "ManagedPointer", "ManagedPointer.Null", null);
             else if (data.PtrAddressableCellOf.TryGetValue(cls, out var cell))
-                yield return (cell, "StorageCell", AddressableCellInit(root, cls.Width));
+                // End = the statement that ends THIS activation's life of the cell at its exit (§8.6.4: LOCAL-STORAGE "persists
+                // while that instance of the runtime element is in active state"; kb/Work PB1216). A BASED pointer owns no
+                // storage, so it has none.
+                yield return (cell, "StorageCell", AddressableCellInit(root, cls.Width), $"{cell}.End(StorageEnd.ActivationEnded);");
         }
     }
 
@@ -1101,7 +1105,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // GOBACK unwinding as MethodReturn, and an exception propagating to the invoker — or the stack leaks a
             // frame and every later MODULE-NAME reads one element too deep.
             w.Line("}");
-            string ptrRestore = string.Concat(ptrSeeds.Select((p, i) => $"{p.Member} = __ptrSv{i}; "));
+            // This activation's cells end BEFORE the activator's are restored (§8.6.4 / §8.6.5; kb/Work PB1216): a pointer
+            // taken into the method's LOCAL-STORAGE is not a valid address once the method returns.
+            string ptrRestore = string.Concat(ptrSeeds.Select((p, i) => $"{(p.End is null ? "" : p.End + " ")}{p.Member} = __ptrSv{i}; "));
             string nfRestore = nfInstall ? "ExceptionState.NonfatalDispatcher = __nfM; " : "";
             w.Line($"finally {{ {ptrRestore}{nfRestore}__ms.Pop(); }}   // §15.65.4 — the activation ends with the method");
             callState.MethodFormals = [];

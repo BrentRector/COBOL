@@ -15,7 +15,7 @@ public sealed class PerformFrame
 {
     /// <summary>The tier-ordered WHEN selector the emitted PERFORM installs. Given the raised exception-name and
     /// (for EC-I-O) the file-connector key, it returns the per-statement dispatch-result action —
-    /// <c>-1</c> handled/continue, <c>-2</c> RESUME AT NEXT STATEMENT, or a pc <c>&gt;= 0</c> (the last is
+    /// <see cref="DispatchResult.Normal"/> handled/continue, <see cref="DispatchResult.ResumeNext"/> RESUME AT NEXT STATEMENT, or a pc <c>&gt;= 0</c> (the last is
     /// unreachable from a WHEN body: RESUME AT procedure-name in a WHEN is bind-rejected, COBOLNET1610) — or
     /// <see cref="NoMatch"/> when neither a WHEN nor WHEN OTHER selects <c>(ec, file)</c>. <c>file</c> is null for a
     /// non-I-O condition. <c>fatal</c> is deliberately NOT a parameter: the fatal-vs-nonfatal split (GR20) is
@@ -27,8 +27,8 @@ public sealed class PerformFrame
     /// whose imp-1 is suspended while this handler runs) — see <see cref="ExceptionEngine.RunTopFrame"/>.</summary>
     public bool Handling { get; set; }
 
-    /// <summary>The "no WHEN selected" sentinel — distinct from every real dispatch action (<c>-1</c>/<c>-2</c>/
-    /// <c>-3</c> and any non-negative pc), so a frame that legitimately returns <c>-1</c> (handled) is never
+    /// <summary>The "no WHEN selected" sentinel — distinct from every real <see cref="DispatchResult"/> action (every named value
+    /// and any non-negative pc), so a frame that legitimately returns <see cref="DispatchResult.Normal"/> (handled) is never
     /// confused with "no frame matched".</summary>
     public const int NoMatch = int.MinValue;
 }

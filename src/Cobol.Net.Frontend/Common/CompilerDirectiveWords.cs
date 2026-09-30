@@ -52,7 +52,9 @@ public static class CompilerDirectiveWords
     public static IReadOnlyList<string> All => Table;
 
     /// <summary>True when <paramref name="word"/> is reserved in compiler directives: a §8.12 table word, or an
-    /// exception-name of §14.6.13.1 (the open <c>EC-USER-</c> / <c>EC-IMP-</c> families included). Case-insensitive,
+    /// exception-name of §14.6.13.1 (the <c>EC-USER-</c> family and the <c>EC-IMP-suffix</c> FORM included: §8.12 reserves the
+    /// family whether or not an implementor defines a member). Case-insensitive,
     /// like every COBOL word (§8.3.1).</summary>
-    public static bool IsReserved(string word) => Set.Contains(word) || ExceptionCatalog.TryGet(word, out _);
+    public static bool IsReserved(string word) =>
+        Set.Contains(word) || ExceptionCatalog.TryGet(word, out _) || ExceptionCatalog.IsImplementorSuffixForm(word);
 }

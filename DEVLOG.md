@@ -13,6 +13,18 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1818 — 2026-09-30 12:19 PDT — Exceptions batch: DispatchResult protocol type (PB1122-A), operand-declared raise names (PB1453), closed EC-IMP family (PB1531), storage lifetime ends at activation exit and CANCEL (PB1216)
+
+**PB1122-A (no behaviour change).** The declarative dispatch-result protocol (-1..-4 as bare literals at a dozen emit sites) is now `CobolNet.Runtime.Exceptions.DispatchResult` (`Normal`, `ResumeNext`, `NoHandler`, `HandledNonfatal`, reserved `NotNormal`; predicates `IsTransfer`, `SuppressesFatal`, `TerminatesSortMerge`, `ForHandledWarning`, `RanAHandler`). `ResumeSignal.NextStatement/HandledNonfatal` and `ExceptionState.DeclarativeCompleted/NoDeclarative` deleted, every emitter renders names; `DispatchResultProtocolDriftTests` (proved red once). No characterization snapshot changed. Design doc protocol bullet updated. PB1122 Task B and PB1160 remain.
+
+**PB1453.** A program-address-identifier operand raises EC-PROGRAM-NOT-FOUND wherever written: `EcBinder.OperandRaisableNames` derives the enabled names from a statement's own operands (nested statements are their own EC regions, so not walked — a deliberate deviation from the brief); `FatalAmbientGates` gained the row. Baseline measured silent (`MISS NULL`, blank status) for IF/EVALUATE/PERFORM UNTIL and INVOKE arguments. Golden `2002/pb1453_program_address_operand_not_found`, `FatalRaiseSelectionTests` x5, `OperandRaiseNamesDriftTests`.
+
+**PB1531.** `ExceptionCatalog.TryGet` refuses `EC-IMP-suffix` (COBOLNET0711 in RAISE / `>>TURN` / USE; TURN's 0711 now carries the directive's line). The spelling stays reserved in directives (§8.12). Negatives `pb1531-ec-imp-suffix-*`; CONFORMANCE DOC-A.1-99 and the design doc updated; DIAGNOSTICS.md regenerated.
+
+**PB1216.** `StorageCell.Freed` replaced by a generation + `End(StorageEnd)`; `CellPointer` records its generation; `CobolPtr.Deref` raises EC-BOUND-PTR for a pointer into ended storage. One classification (`DataBinder.LifetimeOfCell`) decides who ends a cell: activation exit (`Call` / method `finally`), `ICobolProgram.EndStorage` (INITIAL/RECURSIVE exit, CANCEL), `__ResetStatics`. Baseline measured every dead-pointer shape reading silently. Three goldens `2002/pb1216_*_pointer_lifetime`. Drift test over the generated program owed (PB1860).
+
+**Not reached (turn cap, nothing applied):** PB1118, PB963, PB867 — documented on their notes. Inventory: GR-8.4.3.13.4-4 and GR-13.18.5.4-4 CONFORMS via record_verdicts.py.
+
 ## Entry 1811 — 2026-09-30 10:59 PDT — Directives cluster: conditional-compilation structure, §8.12 words as data, DEFINE/TURN formats, placement rules as row data, per-unit LEAP-SECOND
 
 Batch of the frontend/directives defects, each probed against the ISO text first (every citation run through `cite.py --check`).

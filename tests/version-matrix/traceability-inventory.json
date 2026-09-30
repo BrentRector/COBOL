@@ -7506,13 +7506,13 @@
   "ordinal": 4,
   "subject": "Program-address-identifier",
   "rule-digest": "66676bdba9ae",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#EntryOf; src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#EntryOfArgument; src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#EntryOfOperand; src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs#EmitSetEntry",
-  "test-ref": "conformance:2014/pb239_call_program_address_not_found; conformance:2002/pb239_call_address_identifier",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#OperandRaisableNames; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#FatalAmbientGates; src/Cobol.Net.Runtime/Control/ProgramRegistry.cs#EntryOfOperand; src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs#EmitSetEntry",
+  "test-ref": "conformance:2014/pb239_call_program_address_not_found; conformance:2002/pb239_call_address_identifier; conformance:2002/pb1453_program_address_operand_not_found; conformance:2002/pb1549_set_program_address_fatal_resume; conformance-test:FatalRaiseSelectionTests.RelationOperandAddressOfProgram_NotFound_DeclarativeCompletesNormally_TerminatesAbnormally",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1453 (registrar 15c). cite.py --check 8.4.3.13.4 'the EC-PROGRAM-NOT-FOUND exception condition is set to exist and the value of the address-identifier is the predefined address NULL' OK (GR4). EntryOf returns ProgramPointer.Null with notFound; with checking on each surface raises the EC (SET: NULL stored, then ExceptionState.Set + declarative dispatch; CALL argument: pre-transfer CobolCallException -> ON EXCEPTION; relation/INVOKE operand: fatal raise), unchecked it is NULL (14.6.13.1.4). Probed: unchecked SET -> NF-NULL, unchecked relation -> REL-NULL (ok2); checked SET with USE AFTER EXCEPTION CONDITION EC-PROGRAM-NOT-FOUND -> 'DECL EC-PROGRAM-NOT-FOUND', AFTER, NF-NULL (ec1). pb239_call_program_address_not_found pins the set-to-exist half (CALL argument); pb239_call_address_identifier pins the NULL value (Q=NULL). Both spec-derived. || REFUTED: PARTIAL — The NULL-value half conforms on every surface. The 'EC-PROGRAM-NOT-FOUND is set to exist' half is broken on two surfaces. (1) Relation operand: with >>TURN EC-PROGRAM-NOT-FOUND CHECKING ON, the IF emits EntryOfOperand(\"NOSUCHP\", false), so the condition is never set. EXCEPTION-STATUS stays blank, no declarative runs and execution continues. The adjudicator's note says this surface raises the fatal condition; the probe shows it does not. PtrEmitter.ProgramAddressText reads ecState.Info for the carrying statement, and inside a condition that yields no enabled entry. (2) SET surface: the condition is set, but it is processed as nonfatal. EC-PROGRAM-NOT-FOUND is Fatal in Table 13, so §14.6.13.1.3 items 5 and 7 require abnormal run-unit termination once checking is enabled, whether the USE declarative completes normally or no declarative applies. Instead SET continues with the next statement. Only the CALL-argument surface (pb239) behaves correctly (declarative, then abnormal termination). [editions as adjudicated: 2002, 2014, 2023 (the program-pointer family; absent from COBOL-85 - Annex E covers only 2014->2023, the introduction is the 2002 address-identifier; probe: --std 85 draws COBOLNET0900)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1453 landed: the relation-operand and INVOKE-argument surfaces now raise the fatal EC-PROGRAM-NOT-FOUND (operand-declared raise names); the SET half landed with PB1549.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.14.3-1",
@@ -19806,13 +19806,13 @@
   "ordinal": 4,
   "subject": "BASED clause",
   "rule-digest": "f0f7c54c2b1e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Control/CobolPtr.cs#Deref; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#BoundPtrError",
-  "test-ref": "unit:CobolPtrTests.Deref_Null_And_OutOfBounds_AreLoud",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Control/CobolPtr.cs#Deref; src/Cobol.Net.Runtime/Control/StorageCell.cs#End; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#BoundPtrError",
+  "test-ref": "unit:CobolPtrTests.Deref_Null_And_OutOfBounds_AreLoud; conformance:2002/pb1216_ls_and_cancel_pointer_lifetime; conformance:2002/pb1216_recursive_initial_pointer_lifetime; conformance:2002/pb1216_method_pointer_lifetime",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1216, 14d). cite.py --check 13.18.5.4 'If the subject of the entry is referenced while its address is not NULL and not a valid address of storage, the EC-BOUND-PTR exception condition is set to exist.' OK §13.18.5.4 4). Deref raises EC-BOUND-PTR for a non-window carrier, a FREEd cell, and a window outside the cell (overflow-safe bound, PB465). Probe E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/based/gr4.cob (checking on, declarative): reference after FREE P -> HANDLED=EC-BOUND-PTR; SET P UP BY 1000 then reference -> EC-BOUND-PTR; B PIC X(4) over ALLOCATE 2 CHARACTERS -> EC-BOUND-PTR; an in-bounds displaced pointer (UP BY 1 inside W) reads BCDE with no exception. Unit test's expected values (window past end = EC-BOUND-PTR, last position addressable) follow from the rule; Free_ThreeWay_And_DanglingAliasIsLoud covers the freed case. || REFUTED: DIVERGES — GR4 requires EC-BOUND-PTR for any reference while the address is 'not NULL and not a valid address of storage'. §8.6.5 says the association 'may cease to exist because the actual data no longer exists, as specified 8.6.4'. §8.6.4 makes LOCAL-STORAGE items persist only 'while that instance of the runtime element is in active state', and ends static working-storage at a CANCEL of the containing program. A pointer to either kind of storage, used after that storage's life ends, is therefore a non-NULL invalid address. The runtime's only validity notion is the StorageCell.Freed flag, which FREE sets. CobolPtr.Deref checks NULL, non-window carrier, Freed and the window bound, and nothing else. No activation end or CANCEL ever invalidates a cell, so both shapes read stale storage silently with checking on. The adjudicator's FREE, out-of-window, before-start and tail-straddle branches do conform. I re-probed the before-start and tail-straddle branches myself.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1216 landed: a pointer into storage whose life ended (FREE, activation exit, CANCEL) fails its dereference with EC-BOUND-PTR.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.6.3-1",

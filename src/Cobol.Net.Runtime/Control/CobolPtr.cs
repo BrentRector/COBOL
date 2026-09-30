@@ -44,12 +44,14 @@ public static class CobolPtr
             throw new CobolFatalException("EC-BOUND-PTR",
                 "reference to a based item whose data-address pointer does not address data storage (ISO 13.18.5.4 GR4)");
         }
-        if (w.Cell.Freed)
+        if (w.Generation != w.Cell.Generation)
         {
-            ExceptionState.BoundPtrError(
-                "reference to a based item addressing storage released by FREE (ISO 14.9.15 GR1a / 13.18.5.4 GR4)");
-            throw new CobolFatalException("EC-BOUND-PTR",
-                "reference to a based item addressing storage released by FREE (ISO 14.9.15 GR1a / 13.18.5.4 GR4)");
+            // The storage this pointer named has ENDED (kb/Work PB1216): FREE, the end of the activation that owned it,
+            // or a CANCEL — §13.18.5.4 GR4's "not a valid address of storage", with §8.6.5 naming the ways the
+            // association ceases ("the actual data no longer exists, as specified 8.6.4 … and in 14.9.3").
+            string ended = DanglingDetail(w.Cell.LastEnd);
+            ExceptionState.BoundPtrError(ended);
+            throw new CobolFatalException("EC-BOUND-PTR", ended);
         }
         // ⛔ THE SUBTRACTION IS ON THE CELL SIDE, and that is the whole point (kb/Work PB465). The obvious
         // `w.Offset + classWidth > w.Cell.Ref.Length` WRAPS at 2^63 — and an offset that high is now a REACHABLE
@@ -68,6 +70,20 @@ public static class CobolPtr
         }
         return w.Cell;
     }
+
+    /// <summary>The EC-BOUND-PTR detail of a dereference through a pointer whose storage ended for <paramref name="why"/>.</summary>
+    private static string DanglingDetail(StorageEnd why) => why switch
+    {
+        StorageEnd.Freed =>
+            "reference to a based item addressing storage released by FREE (ISO 14.9.15 GR1a / 13.18.5.4 GR4)",
+        StorageEnd.ActivationEnded =>
+            "reference to a based item addressing storage whose life ended with its activation — a LOCAL-STORAGE or "
+            + "initial item persists only while the runtime element is in active state (ISO 8.6.4 / 8.6.5 / 13.18.5.4 GR4)",
+        StorageEnd.Cancelled =>
+            "reference to a based item addressing static storage whose life ended at a CANCEL of the program that "
+            + "contains it (ISO 8.6.4 / 8.6.5 / 13.18.5.4 GR4)",
+        _ => "reference to a based item addressing storage that no longer exists (ISO 8.6.5 / 13.18.5.4 GR4)",
+    };
 
     /// <summary>The window pointer's character offset (0 for the null carrier — <see cref="Deref"/> trips
     /// FIRST on every generated read/write path, so this never masks a null dereference).</summary>
@@ -127,7 +143,7 @@ public static class CobolPtr
         if (by >= -AddressSpan && by <= AddressSpan)
         {
             Int128 r = (Int128)w.Offset + (down ? -by : by);
-            if (r >= MinAddress && r <= MaxAddress) return new CellPointer(w.Cell, (long)r);
+            if (r >= MinAddress && r <= MaxAddress) return new CellPointer(w.Cell, (long)r, w.Generation);   // the SAME life of the storage (kb/Work PB1216)
         }
         return Unrepresentable(p);
     }
@@ -224,7 +240,7 @@ public static class CobolPtr
     }
 
     /// <summary>FREE (ISO §14.9.15 GR1): (a) a pointer addressing the START of storage obtained by ALLOCATE
-    /// and not yet freed — release it (the cell is marked <see cref="StorageCell.Freed"/> and its image
+    /// and not yet freed — release it (the cell's life ends, <see cref="StorageCell.End"/>, and its image is
     /// dropped; every dangling alias then fails loud at <see cref="Deref"/>, the "contents become undefined"
     /// license made loud) and the operand becomes NULL; (b) a NULL operand — no operation; (c) anything else
     /// — the operand is unchanged and <paramref name="notAlloc"/> reports the nonfatal
@@ -233,11 +249,11 @@ public static class CobolPtr
     {
         notAlloc = false;
         if (p is null || p.IsNull) return ManagedPointer.Null;   // GR1b — no-op
-        if (p is CellPointer { Offset: 0, Cell: { Allocated: true, Freed: false } } w)
+        // "currently allocated" (GR1a): an allocated cell whose CURRENT life the pointer names — a pointer into an
+        // ended life (an earlier FREE) is not the start of storage that is currently allocated, so it falls to GR1c.
+        if (p is CellPointer { Offset: 0, Cell.Allocated: true } w && w.Generation == w.Cell.Generation)
         {
-            w.Cell.Freed = true;   // GR1a — released; dangling aliases trip Deref loud
-            w.Cell.Ref = "";
-            w.Cell.ClearSlots();   // GR1a — the managed slots are the SAME storage area (kb/Work PB231)
+            w.Cell.End(StorageEnd.Freed);   // GR1a — released; dangling aliases trip Deref loud
             return ManagedPointer.Null;
         }
         notAlloc = true;           // GR1c — not the start of an allocation

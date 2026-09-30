@@ -1924,7 +1924,7 @@ public sealed record BoundRaise(
 
 /// <summary><c>RESUME AT {NEXT STATEMENT | procedure-name}</c> (ISO §14.9.33): unwinds the active declarative
 /// via the runtime ResumeSignal; <paramref name="TargetPc"/> is the resolved NONdeclarative pc (SR3), or the
-/// NextStatement sentinel (−2) — the raise site then falls through past the raising statement (GR2).</summary>
+/// <see cref="CobolNet.Runtime.Exceptions.DispatchResult.ResumeNext"/> sentinel — the raise site then falls through past the raising statement (GR2).</summary>
 public sealed record BoundResume(int TargetPc) : BoundStatement;
 
 /// <summary><c>SET LAST EXCEPTION TO OFF</c> (ISO §14.9.39 Format 13): clears the run-unit last exception

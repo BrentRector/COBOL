@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
 using CobolNet.Runtime.Exceptions;
 using CobolNet.Frontend.Preprocessor;
 
@@ -64,6 +65,10 @@ public sealed class TurnState
         for (int k = 0; k < timeline.Count; k++)
         {
             var ev = timeline[k];
+            // Position every diagnostic of this directive at ITS line (the event's resultant-text line, which the
+            // sink maps to the source file and line): a bad name in `>>TURN` was reported with no location at all
+            // (kb/Work PB1531's sibling — COBOLNET0711 printed `error COBOLNET0711: >>TURN: …` with no file(line,col)).
+            using var _ = edition.At(ev.Line, 0);
             foreach (var (ec, file) in ev.Names)
             {
                 // Resolution + the 0711/0878/1636 diagnostics live in the ONE funnel (kb/Work R05).

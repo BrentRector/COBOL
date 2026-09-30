@@ -376,6 +376,13 @@ internal sealed class ProgramEmitter
             }
             else
                 w.Line("void ICobolProgram.Activate() => __Activate();");
+            // The INSTANCE-owned ADDRESS-OF cells (WORKING-STORAGE of a non-recursive program) end when the instance is
+            // discarded — an INITIAL program's activation exit, any other program's CANCEL (ISO §8.6.4; ICobolProgram.
+            // EndStorage; kb/Work PB1216). Emitted only when the unit owns such a cell (zero scaffolding).
+            var instanceCells = data.CellFieldsOf(CellLifetime.Instance).ToList();
+            if (instanceCells.Count > 0)
+                using (w.Block("public void EndStorage(StorageEnd __why)   // §8.6.4 / §8.6.5: the instance's storage ends — pointers into it are no longer valid (§13.18.5.4 GR4)"))
+                    foreach (string cell in instanceCells) w.Line($"{cell}.End(__why);");
             using (w.Block("public void CloseFiles()"))   // CANCEL §14.9.5 GR9 / run-unit close §14.6.11
                 foreach (var file in data.Files)
                     // CANCEL closes INTERNAL connectors only (§14.9.5 GR9); an EXTERNAL connector persists
@@ -524,7 +531,7 @@ internal sealed class ProgramEmitter
             // with none — NULL, the method arm's answer (a formal's storage is the activator's, adopted below, and the
             // RETURNING item keeps the last-used state every other program RETURNING item keeps).
             if (!unit.Initial && !unit.Recursive)
-                foreach (var (member, _, fresh) in _oo.ActivationPointerSeeds(unit.Data, unit.Data.LocalStorageRoots
+                foreach (var (member, _, fresh, _) in _oo.ActivationPointerSeeds(unit.Data, unit.Data.LocalStorageRoots
                              .Concat(unit.Data.LinkageRoots.Where(r => !ReferenceEquals(r, unit.Data.LinkageReturning)
                                  && !unit.Data.LinkageFormals.Any(f => ReferenceEquals(f.Item, r))))))
                     w.Line($"{member} = {fresh};   // per-activation data-pointer storage (ISO §14.6.2.3.2 action 5; §8.6.4; §8.6.5)");
@@ -581,7 +588,14 @@ internal sealed class ProgramEmitter
                 }
             }
             w.Line("__asCalled = true;");
-            w.Line("try { __Activate(); } finally { __asCalled = false; }");
+            // The activation's LOCAL-STORAGE cells end with it (ISO §8.6.4 — "persists while that instance of the runtime
+            // element is in active state"), for EVERY kind of unit: a fresh INITIAL / RECURSIVE instance and the cached
+            // singleton alike. A pointer returned past this point names storage that is no longer a valid address
+            // (§8.6.5; §13.18.5.4 GR4 — kb/Work PB1216). The same DataBinder.LifetimeOfCell answer the cell's declaration
+            // modifier reads, so a cell cannot be declared per-activation and never ended.
+            string endCells = string.Concat(unit.Data.CellFieldsOf(CellLifetime.Activation)
+                .Select(c => $" {c}.End(StorageEnd.ActivationEnded);"));
+            w.Line($"try {{ __Activate(); }} finally {{ __asCalled = false;{endCells} }}");
             foreach (var (f, place, crossing, _) in formals)
             {
                 if (f.CarrierResident || place is null || f.ByValue) continue;
