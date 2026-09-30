@@ -336,20 +336,6 @@ internal static class RuntimeApi
             + $"{Emit.EmitText.CsLiteral(le.Picture)}, {LocaleTagArg(le.Locale)}, {le.Size}, out var {imgVar}{cfgArgs})";
     }
 
-    /// <summary>The ONE PicInfo-keyed receiver-scale rule (kb/Work PB64 T6 — it was written twice, in
-    /// <c>MoveEmitter.SenderContext</c> and <c>ArithmeticEmitter.ScaleOf</c>, and both copies silently fell to
-    /// <c>pic.Scale</c> = 0 for a locale item, truncating a fractional sender): a floating-point edited receiver
-    /// has no fixed scale (0 — the caller's form dispatch never uses it); a format-2 (LOCALE) receiver's scale is
-    /// the picture's digits right of '.' (<see cref="PicInfo.Scale"/> — the analyzer set it; there is no mask);
-    /// a masked numeric-edited receiver's is the MASK's; everything else <see cref="PicInfo.Scale"/>.</summary>
-    public static int ReceiverScaleOf(PicInfo pic, bool commaMode) =>
-        pic.LocaleEdit is not null ? pic.Scale
-        // A float-edited receiver rides the mask arm too — its significand scale drives the working scale of
-        // an intermediate landing (measured: returning 0 here flipped a DIVIDE quotient golden to 0.00000E+00).
-        : pic is { Category: PicCategory.NumericEdited, EditMask: { } m }
-            ? MaskScale(pic, m, '$', commaMode)
-        : pic.Scale;
-
     /// <summary>A format-2 (LOCALE) sender's DE-EDIT read (§14.9.25.4 GR5/GR6 d over §14.6.13.2 r4) — the
     /// <c>CobolLocaleEdit.DeEdit</c> call under the locale current NOW; the scale is the picture's.</summary>
     public static string LocaleDeEdit(PicInfo pic, string read, bool blankWhenZero)

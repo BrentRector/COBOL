@@ -62,6 +62,20 @@ public sealed class CobolTimingTests
     }
 
     /// <summary>Run <paramref name="act"/> with CONTINUE AFTER's suspension REPORTED instead of performed.</summary>
+    /// <summary>§14.9.9.4 GR1 / kb/Work PB1529 — an interval above the maximum meaningful value suspends for exactly
+    /// the maximum, however large it is: the double is compared with the maximum BEFORE it is narrowed, so 1E30 (past
+    /// the long range) and 9.3E18 (just past it) no longer wrap to a negative count and suspend 0 s.</summary>
+    [Theory]
+    [InlineData(1e30)]
+    [InlineData(9.3e18)]
+    [InlineData(86400.5)]
+    [InlineData(86400.0)]
+    public void HugeInterval_SuspendsForTheMaximumMeaningfulValue(double seconds)
+    {
+        var suspensions = Observe(() => Assert.False(CobolTiming.ContinueAfter(seconds, checkLessThanZero: false)));
+        Assert.Equal([(int)(CobolTiming.MaxSeconds * 1000)], suspensions);
+    }
+
     private static List<int> Observe(Action act)
     {
         var seen = new List<int>();

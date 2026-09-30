@@ -46,9 +46,17 @@ public static class CobolTiming
             if (checkLessThanZero) { ExceptionState.Set("EC-CONTINUE-LESS-THAN-ZERO", fatal: false); return true; }
             return false;                                           // GR1a - value set to 0 → no suspension
         }
-        SleepTruncated((long)seconds);                              // m = 0: truncate toward zero (GR1, no ROUNDED)
+        SleepTruncated(WholeSeconds(seconds));                      // m = 0: truncate toward zero (GR1, no ROUNDED)
         return false;
     }
+
+    /// <summary>⛔ THE INTERVAL'S WHOLE SECONDS, CLAMPED BEFORE THE NARROWING (kb/Work PB1529). §14.9.9.4 GR1: a value
+    /// "greater than this maximum meaningful value" is replaced by the maximum meaningful value
+    /// (<see cref="MaxSeconds"/>), so the comparison has to come BEFORE any cast — an unchecked <c>(long)</c> of a
+    /// double past the long range is unspecified (it wrapped to a negative or small count, so a huge interval
+    /// suspended 0 s or a few seconds instead of the maximum). Every value at or above the maximum IS the maximum;
+    /// only a smaller one is truncated toward zero.</summary>
+    private static long WholeSeconds(double seconds) => seconds >= MaxSeconds ? MaxSeconds : (long)seconds;
 
     /// <summary>The EXACT-lane overload (kb/Work PB138): a fixed-point or standard-decimal interval's
     /// binary64 image can round UP across an integer boundary (0.999… with enough nines converts to exactly

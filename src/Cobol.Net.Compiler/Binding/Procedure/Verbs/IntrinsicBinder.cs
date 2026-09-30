@@ -2661,6 +2661,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         if (SoleDataReference(a) is { } cref
             && ctx.Data.ConstantOf(cref) is { Category: not PicCategory.Numeric } k)
             return new BoundStringLiteral(k.Text) { Category = k.Category };
+        // ⛔ A SYMBOLIC-CHARACTER IS A FIGURATIVE CONSTANT, AND A FIGURATIVE STANDS IN AN INTRINSIC ARGUMENT (kb/Work
+        // PB1577). §8.3.3.6 SR1 / §12.3.7.4 GR11 make it a figurative constant usable wherever one is, and
+        // `FUNCTION ORD(SPACE)` compiles — but the bare word S67 fell to the numeric-expression path below, which
+        // resolves data items only, so `FUNCTION ORD(S67)` drew COBOLNET1639 "not defined" about a name SPECIAL-NAMES
+        // declared. Its value is the ONE character it was defined as, of the alphabet's class (national when it was
+        // defined FOR NATIONAL) — exactly what a one-character literal of that class is.
+        if (SoleDataReference(a) is { } sref && ctx.Data.SymbolicOf(sref) is { } sym)
+            return new BoundStringLiteral(sym.Value)
+            { Category = sym.National ? PicCategory.National : PicCategory.Alphanumeric };
         // An argument is NOT an §8.8.1.1 arithmetic expression: its legality comes from this function's own §15.x
         // ARGUMENT RULE, and the string functions admit alphanumeric data. The named entry says so at the call
         // site — TRIM / SUBSTITUTE / FIND-STRING / CONVERT over a PIC X item are legal (DA6).

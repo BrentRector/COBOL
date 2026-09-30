@@ -605,6 +605,21 @@ public sealed record PicInfo(
     /// <see cref="Digits"/> (the two coincide). (CA33.)</summary>
     public int DigitPositions { get => _digitPositions ?? Digits; init => _digitPositions = value; }
 
+    /// <summary>The ONE PicInfo-keyed receiver-scale rule (kb/Work PB64 T6 — it was written twice, in
+    /// <c>MoveEmitter.SenderContext</c> and <c>ArithmeticEmitter.ScaleOf</c>, and both copies silently fell to
+    /// <c>Scale</c> = 0 for a locale item, truncating a fractional sender; kb/Work PB1685 moved it HERE so the
+    /// report-writer SUM binder asks the same question the emitters do): a floating-point edited receiver has no
+    /// fixed scale (0 — the caller's form dispatch never uses it); a format-2 (LOCALE) receiver's scale is the
+    /// picture's digits right of '.' (<see cref="Scale"/> — the analyzer set it; there is no mask); a masked
+    /// numeric-edited receiver's is the MASK's (<c>CobolEdit.MaskScale</c> — an edited PicInfo's own
+    /// <see cref="Scale"/> is 0); everything else <see cref="Scale"/>. A float-edited receiver rides the mask arm
+    /// too — its significand scale drives the working scale of an intermediate landing.</summary>
+    public int ReceiverScale(bool commaMode) =>
+        LocaleEdit is not null ? Scale
+        : this is { Category: PicCategory.NumericEdited, EditMask: { } mask }
+            ? CobolNet.Runtime.CobolEdit.MaskScale(mask, '$', commaMode, EditingRules as CobolNet.Runtime.CobolEdit.EditRule[])
+        : Scale;
+
     /// <summary>For a <see cref="PicCategory.ObjectReference"/> item: the FULL §13.18.60.2 description —
     /// kind × FACTORY × ONLY × name (<see cref="ObjectRefDescriptor"/>). Null for every other category.
     /// <para>⛔ It replaced a single <c>string? ObjectClassName</c> (kb/Work PB389): the general format prints

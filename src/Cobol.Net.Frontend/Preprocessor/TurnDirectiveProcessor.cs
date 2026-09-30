@@ -70,6 +70,7 @@ public static class TurnDirectiveProcessor
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         bool? on = null;
         bool withLocation = false;
+        int checkingEnd = -1;   // the index just past the last word the CHECKING phrase consumed
 
         // §8.3.2.1 applies to DIRECTIVE-carried words too — the tree-walk funnel never sees them, so this was
         // the hole through which a 44-character exception-name compiled at --std 2002 (CobolWordRule; the R05
@@ -110,15 +111,25 @@ public static class TurnDirectiveProcessor
                 if (k + 1 < words.Length && words[k + 1].Equals("ON", StringComparison.OrdinalIgnoreCase))
                 {
                     on = true;
+                    checkingEnd = k + 2;
                     // ON [WITH LOCATION] (§7.3.25.2; GR7)
                     if (k + 2 < words.Length && words[k + 2].Equals("WITH", StringComparison.OrdinalIgnoreCase)
                         && k + 3 < words.Length && words[k + 3].Equals("LOCATION", StringComparison.OrdinalIgnoreCase))
+                    {
                         withLocation = true;
+                        checkingEnd = k + 4;
+                    }
                     else if (k + 2 < words.Length && words[k + 2].Equals("LOCATION", StringComparison.OrdinalIgnoreCase))
+                    {
                         withLocation = true;   // WITH is a noise word in this implementation's leniency
+                        checkingEnd = k + 3;
+                    }
                 }
                 else if (k + 1 < words.Length && words[k + 1].Equals("OFF", StringComparison.OrdinalIgnoreCase))
+                {
                     on = false;
+                    checkingEnd = k + 2;
+                }
                 break;
             }
             if (w.StartsWith("EC-", StringComparison.OrdinalIgnoreCase))   // SR1 — an EC- word is an exception-name
@@ -148,6 +159,19 @@ public static class TurnDirectiveProcessor
                     + "ISO §7.3.25.3 SR1)", loc, default);
                 return null;
             }
+        }
+
+        // ⛔ THE DIRECTIVE ENDS AT THE CHECKING PHRASE (kb/Work PB1365). §7.3.3 SR3: a directive "may be followed only by
+        // space characters and an optional inline comment". TURN is owned by THIS stage, so the shared closed-word screen
+        // (CompilerDirectiveCatalog.CheckOperand, COBOLNET1911) skips it by design — and the loop above `break`s at CHECKING,
+        // so a word after ON / OFF [WITH LOCATION] was never looked at (`>>TURN EC-ALL CHECKING OFF JUNK` took effect).
+        if (checkingEnd >= 0 && checkingEnd < words.Length)
+        {
+            diagnostics.ReportError("COBOLNET0718",
+                $">>TURN: unexpected word '{words[checkingEnd]}' after the CHECKING phrase — the directive ends at "
+                + "CHECKING {ON [WITH LOCATION] | OFF} (ISO §7.3.25.2), and may be followed only by space characters "
+                + "and an optional inline comment (ISO §7.3.3 SR3)", loc, default);
+            return null;
         }
 
         if (on is null || names.Count == 0)

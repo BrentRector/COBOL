@@ -131,7 +131,14 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // for a strongly-typed sender, whose clone is a DIFFERENT strongly-typed item (it carries the type-name,
         // kb/Work PB888, but is not the sender's declaration) — report a violation that no rule
         // states. The move itself is an identity copy by construction (the temp's description IS the sender's).
-        ctx.Data.PendingPreOps.Add(new BoundMove(op, [place]));
+        // ⛔ AN INDEX DATA ITEM IS STORED BY SET, NEVER BY MOVE (kb/Work PB1661). A USAGE INDEX item is class index, not
+        // category numeric (§13.16.3 SR10): §14.9.39 GR2 b) is what stores a value into one, and a MOVE into it is not that
+        // store — `EVALUATE IDA WHEN I2 WHEN I1` materialized its subject into an index clone through a MOVE and
+        // then compared a value that never arrived, so it took WHEN OTHER. The identity copy of an index data item into
+        // its own class-index clone is the SET it names.
+        ctx.Data.PendingPreOps.Add(op is BoundFieldOperand { Place: var src } && model.Item.Pic is { Usage: Usage.Index }
+            ? new BoundSetTo([new SetPlaceTarget(place)], new BoundNumRef(src))
+            : new BoundMove(op, [place]));
         return place;
     }
 

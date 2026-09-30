@@ -2491,13 +2491,19 @@ public sealed partial class DataBinder
             ? PictureAnalyzer.Analyze(picText, Usage.Display, Edition, sumWhere, currencies: CurrencySigns,
                 decimalPointIsComma: DecimalPointIsComma)
             : null;
+        // ⛔ THE COUNTER'S SCALE IS THE ENTRY PICTURE'S RECEIVER SCALE, NOT `pic.Scale` (kb/Work PB1685). §13.18.54.4 GR1
+        // derives the counter's digits — integral AND fractional — from the entry's PICTURE excluding insertion editing
+        // characters, and a NUMERIC-EDITED PicInfo carries Scale 0 (its fraction lives in the mask), so `PIC 99.99 SUM
+        // WS-F` registered a scale-0 counter and truncated every addend to an integer (2.75 twice printed 04.00 for the
+        // 05.50 owed). The one rule every store already asks (PicInfo.ReceiverScale) answers it.
+        int sumScale = pic?.ReceiverScale(DecimalPointIsComma) ?? 0;
         var sum = new ReportSumModel
         {
             // §13.18.54.4 GR1 — one counter per ENTRY: the identity is this entry's ordinal in the report
             // description, and GR5's data-name rides alongside as the counter's NAME (kb/Work PB882).
             Id = model.Sums.Count,
             Name = entryName,
-            Scale = pic?.Scale ?? 0,
+            Scale = sumScale,
             PrintedIn = group,
             // The counter AS A DATA ITEM (GR1) — the implicitly-defined register a procedure division reference
             // resolves to (GR5 names it, GR12 permits altering it). Off ByName/Roots, exactly like the OCCURS
@@ -2508,7 +2514,7 @@ public sealed partial class DataBinder
                 DeclaredAt = Edition.Cursor,
                 CobolName = entryName,
                 CsName = NamingConvention.SumCounterName(model.Name, model.Sums.Count),
-                Pic = PicInfo.SumCounterItem(pic is null ? 18 : SumCounterDigits(pic), pic?.Scale ?? 0),
+                Pic = PicInfo.SumCounterItem(pic is null ? 18 : SumCounterDigits(pic), sumScale),
                 Uid = _uidCounter++,
             },
             // Preserve a floating-point-edited / national-edited PICTURE gate for the post-bind GateData report-Sums

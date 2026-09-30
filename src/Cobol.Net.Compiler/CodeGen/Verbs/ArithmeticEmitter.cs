@@ -360,7 +360,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         // the numeric-EDITED and LOCALE-edited arms did not, and both silently stored the truncated value:
         // `COMPUTE E ROUNDED MODE IS PROHIBITED = C2 * 1` with C2 = SQRT(3) into `PIC ZZ9.999` stored 1.732 and
         // raised nothing (feedback_two_arm_dispatch — one dispatch, three arms, one of them gated). Writing the
-        // gate ONCE here, keyed on the ONE receiver-scale rule (RuntimeApi.ReceiverScaleOf through ScaleOf), is
+        // gate ONCE here, keyed on the ONE receiver-scale rule (PicInfo.ReceiverScale through ScaleOf), is
         // what makes the next receiver category inherit it.
         //
         // A FLOATING-POINT numeric-edited receiver is deliberately OUT: it has no fixed fraction scale to test
@@ -556,9 +556,9 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     };
 
     private int ScaleOf(Place p) =>
-        // The ONE receiver-scale rule (RuntimeApi.ReceiverScaleOf; PB64 T6 — this copy and MoveEmitter's
+        // The ONE receiver-scale rule (PicInfo.ReceiverScale; PB64 T6 — this copy and MoveEmitter's
         // SenderContext were the same rule written twice, and both fell to pic.Scale = 0 for a LOCALE item).
-        p.Item.Pic is { } pic ? RuntimeApi.ReceiverScaleOf(pic, ctx.Data.DecimalPointIsComma) : 0;
+        p.Item.Pic is { } pic ? pic.ReceiverScale(ctx.Data.DecimalPointIsComma) : 0;
 
     /// <summary>The receiver's INTEGER digit positions — <see cref="ReceiverContext.IntegerDigits"/>, which caps
     /// the float quantization working scale (PB13). Measured from <c>DigitPositions</c> (ISO §13.18.40.3 SR14 —
