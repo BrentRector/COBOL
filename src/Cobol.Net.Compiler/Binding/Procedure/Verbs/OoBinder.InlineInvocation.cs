@@ -42,10 +42,16 @@ internal readonly record struct InvocationArg(
     Core.AddressIdentifierContext? Address = null,
     bool Self = false)
 {
-    /// <summary>The INVOKE statement's <c>invokeArgument</c> reading (§14.9.23.2).</summary>
+    /// <summary>The INVOKE statement's <c>invokeArgument</c> reading (§14.9.23.2). A KEYWORD-LESS expression
+    /// (kb/Work PB1135) has no BY phrase to say it is BY CONTENT, so — like the inline form's bare argument —
+    /// it is marked <c>Expression</c>: §14.9.23.3 SR9 cannot make it BY REFERENCE and §14.9.23.4 GR6 a) 2 implies
+    /// BY CONTENT. Written with a phrase, the phrase says so and <c>Expression</c> stays false.</summary>
     public static InvocationArg OfInvokeArgument(Core.InvokeArgumentContext a) => new(
         a.VALUE() is not null, a.REFERENCE() is not null, a.CONTENT() is not null, Omitted: a.OMITTED() is not null,
-        Expression: false, a.booleanExpression(), a.arithmeticExpression(), a.literal(), a.dataReference(),
+        Expression: a.VALUE() is null && a.REFERENCE() is null && a.CONTENT() is null
+            && a.dataReference() is null && a.literal() is null && a.OMITTED() is null && a.addressIdentifier() is null
+            && !(a.SELF() is not null),
+        a.booleanExpression(), a.arithmeticExpression(), a.literal(), a.dataReference(),
         a.addressIdentifier(), a.SELF() is not null);
 
     /// <summary>The inline form's <c>argument</c> reading (§8.4.3.4.2). No passing phrase exists in that

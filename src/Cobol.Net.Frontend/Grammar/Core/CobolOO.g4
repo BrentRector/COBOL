@@ -231,8 +231,16 @@ invokeArgument
     | OMITTED
     | addressIdentifier   // §14.9.23.3 SR9 / SR19 — a sending operand whatever the mode
     | SELF
+    // The keyword-less EXPRESSION arms (kb/Work PB1135) — the twin of `callArgument`'s. §14.9.23.2 prints BY CONTENT
+    // and BY VALUE as OPTIONAL over {arithmetic-expression-1 | boolean-expression-1 | identifier-5 | literal-2}, so
+    // an expression written with no BY is a legal argument (§14.9.23.4 GR6 a) 2 makes it BY CONTENT). They come AFTER
+    // dataReference and literal, so a bare `N + 1` keeps the LIST reading CALL's determination gives it (the
+    // arguments N and +1 — parenthesize, `USING (N + 1)`, to select the expression); what these arms add is every
+    // expression that no list reading covers: `N * 2`, `(N + 1)` and `B1 B-AND B2`, which were parse errors.
+    | {boolExprAhead()}? booleanExpression
     | dataReference
     | literal
+    | arithmeticExpression
     ;
 
 invokeReturning

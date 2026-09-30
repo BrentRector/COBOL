@@ -13,6 +13,10 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1794 — 2026-09-29 19:07 PDT — PB1135: INVOKE takes a keyword-less expression argument
+
+`invokeArgument`'s BY-less arms were `addressIdentifier | dataReference | literal`, so `INVOKE o "M" USING N * 2` was COBOL0307, `USING (N + 1)` COBOL0001 and `USING B1 B-AND B2` a reserved-word error, all legal per §14.9.23.2 (BY CONTENT is optional over the expression forms). The rule now carries `CALL`'s two bare expression arms, after dataReference and literal so `N + 1` keeps the list reading PB130 gave CALL; `OfInvokeArgument` marks the argument an expression so it is passed BY CONTENT. Closes FMT-14.9.23.2; the note stays HALF because the adjudicator's `N + 1`-is-one-argument expectation contradicts CALL's recorded determination and needs one decision for both verbs. GAP 798 to 797.
+
 ## Entry 1793 — 2026-09-29 18:59 PDT — PB1148: a GO TO out of a PERFORM's exit paragraph no longer returns to the PERFORM
 
 The dispatcher's return test (`__atExit && __pc == __exitPc + 1`) could not tell the exit paragraph COMPLETING from an explicit GO TO (or RESUME AT) to the paragraph that physically follows it, so `PERFORM M2` with `M2. GO TO M3.` returned to the PERFORM where §14.6.3 rule 1 and §14.9.28.4 GR5 put the return mechanism after a last statement that never executes. `ExplicitTransferOut` (GO TO, altered GO TO, RESUME AT) clears `__atExit` before the jump; EXIT PARAGRAPH / EXIT SECTION / NEXT SENTENCE keep the ordinary transfer, being the implied return. One site serves every dispatch method, so the sweep is that one test. Closes GR-14.6.3-1 and GR-14.9.33.4-3; GAP 800 to 798.
