@@ -258,7 +258,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // keyword-less arms read the SAME helper; the reduction used to be written out here only, so
                 // GR8 held for one spelling of an argument and not for the others).
                 var (cLit, cBareLit, cDref, cBool, cArith) = Gr8Classify(
-                    byContent.literal(), byContent.dataReference(),
+                    byContent.literal(), null,
                     byContent.booleanExpression(), byContent.arithmeticExpression());
                 // §14.9.4.2 FORMAT 1's BY CONTENT IS `{ identifier-2 } …` AND NOTHING ELSE. An expression operand
                 // is legal only under Format 2, which the AS phrase selects — so accepting one here without that
@@ -390,7 +390,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 if (AddressArg(bareAddr, addrMode) is not { } ba) return BoundRejected.Reported(ctx.Edition);
                 args.Add(ba);
             }
-            else if (a.dataReference() is { } bare)
+            else if (ConditionBinder.SoleDataReference(a.arithmeticExpression()) is { } bare)
             {
                 // Format 1: a bare argument takes the prevailing transitive mode — §14.9.4.4 GR5 names
                 // BY REFERENCE and BY CONTENT only. Format 2 (kb/Work PB131): GR5 is a FORMAT 1 rule; GR9
@@ -506,18 +506,11 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             }
             else if (a.arithmeticExpression() is { } bArith)
             {
-                // A parenthesized sole reference reduces to its identifier (the callByContent discipline).
-                if (ConditionBinder.SoleDataReference(bArith) is { } sd)
-                {
-                    if (host.Expr.ResolveReceiving(sd) is not { } sp)
-                        return OperandUnresolved(sd, "USING argument");
-                    ScreenCallOperand(sp, sd, mode, formatTwo, isReturning: false);
-                    args.Add(new BoundCallArg(mode, sp, null));
-                }
-                else if (!formatTwo && !BareNeedsFormat2(bArith.GetText())) return BoundRejected.Reported(ctx.Edition);
-                else
-                    args.Add(new BoundCallArg(CobolPassMode.Content, null,
-                        IntrinsicBinder.OperandOf(host.Expr.BindExpr(bArith))));
+                // A SOLE reference never reaches here — it took the keyword-less identifier arm above (§14.9.4.4 GR8).
+                // What is left is a real arithmetic-expression-1: `N + 1` is ONE argument (kb/Work PB1135, decision R59).
+                if (!formatTwo && !BareNeedsFormat2(bArith.GetText())) return BoundRejected.Reported(ctx.Edition);
+                args.Add(new BoundCallArg(CobolPassMode.Content, null,
+                    IntrinsicBinder.OperandOf(host.Expr.BindExpr(bArith))));
             }
         }
 

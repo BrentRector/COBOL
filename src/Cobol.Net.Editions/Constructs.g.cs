@@ -116,7 +116,6 @@ public static class Constructs
     public const string OpenReversedRemoved2002 = "open-reversed-removed-2002";
     public const string CloseWithLockRemoved2023 = "close-with-lock-removed-2023";
     public const string ExitMethodWindow = "exit-method-window";
-    public const string MethodWorkingStorageWindow = "method-working-storage-window";
     public const string ExitFunctionWindow = "exit-function-window";
     public const string ExitProgramArchaic2023 = "exit-program-archaic-2023";
     public const string NextSentenceArchaic2023 = "next-sentence-archaic-2023";

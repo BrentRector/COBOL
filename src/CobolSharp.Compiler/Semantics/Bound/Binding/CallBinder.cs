@@ -69,7 +69,8 @@ internal sealed class CallBinder
         if (ctx.invokeUsing() is { } using_)
             foreach (var argCtx in using_.invokeArgument())
             {
-                bool supported = argCtx.dataReference() != null
+                var invokeRef = argCtx.dataReference() ?? CobolNet.Frontend.Expressions.SoleOperand.DataRef(argCtx.arithmeticExpression());
+                bool supported = invokeRef != null
                     && argCtx.CONTENT() == null && argCtx.VALUE() == null;
                 if (!supported)
                 {
@@ -78,7 +79,7 @@ internal sealed class CallBinder
                         TextSpan.Empty);
                     continue;
                 }
-                if (_ctx.Expression.BindDataReferenceWithSubscripts(argCtx.dataReference()) is { } boundArg)
+                if (_ctx.Expression.BindDataReferenceWithSubscripts(invokeRef!) is { } boundArg)
                     args.Add(boundArg);
             }
 
@@ -156,7 +157,7 @@ internal sealed class CallBinder
                 {
                     currentMode = ParameterMode.ByContent;
                     BoundExpression? expr = null;
-                    if (byContent.dataReference() is { } dr)
+                    if (CobolNet.Frontend.Expressions.SoleOperand.DataRef(byContent.arithmeticExpression()) is { } dr)
                         expr = _ctx.Expression.BindDataReferenceWithSubscripts(dr);
                     else if (byContent.literal() is { } lit)
                         expr = _ctx.Expression.BindLiteral(lit);
@@ -177,7 +178,7 @@ internal sealed class CallBinder
                     if (expr != null)
                         arguments.Add(new BoundCallArgument(currentMode, expr));
                 }
-                else if (argCtx.dataReference() is { } bareRef)
+                else if (CobolNet.Frontend.Expressions.SoleOperand.DataRef(argCtx.arithmeticExpression()) is { } bareRef)
                 {
                     // Bare argument: inherit the most recent explicit mode (transitive); default BY REFERENCE.
                     var expr = _ctx.Expression.BindDataReferenceWithSubscripts(bareRef);

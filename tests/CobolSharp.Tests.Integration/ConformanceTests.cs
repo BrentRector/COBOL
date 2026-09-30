@@ -313,7 +313,6 @@ public sealed class ConformanceTests : EndToEndTestBase
         // static/method-local) — greenfield reclamation (was COBOLNET0899). Greenfield CorpusRunner byte-compares both.
         ("2002", "oo_method_redefines_linkage"),
         ("2002", "oo_method_redefines_local"),
-        ("2002", "oo_method_redefines_ws"),
         // M2-OO-1h step 4, DEVLOG 640: OCCURS … INDEXED BY in METHOD data (per-method index namespace; §11.7.4 GR5
         // privacy) — greenfield reclamation (was COBOLNET0899). Greenfield CorpusRunner byte-compares both.
         ("2002", "oo_method_indexed_search"),

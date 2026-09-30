@@ -26,6 +26,9 @@
       *>   9 nested argument   the argument is itself Format 4; §14.8.2.3.3 rule 2d (MOVE rules) governs the
       *>                       crossing, because the GR1 c) temporary is not a data item defined in any of
       *>                       §14.9.23.3 SR9's sections and GR6 a)2 therefore assumes BY CONTENT.
+      *>  10 expression arg     kb/Work PB1135 / decision R59: `(5 + 1)` is ONE argument, the arithmetic-expression-1
+      *>                       of the printed brace (the spacing makes the + the binary operator, §8.7.1) - 6 is
+      *>                       added to BAL 15 (after 2 and 3) = 21.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB428IMI.
        ENVIRONMENT DIVISION.
@@ -64,6 +67,8 @@
            END-IF.
            MOVE A1 :: "ECHO" (A1 :: "GETNAME") TO W.
            DISPLAY "9=" W.
+           MOVE A1 :: "ADDTO" (5 + 1) TO N.
+           DISPLAY "10=" N.
            STOP RUN.
        END PROGRAM PB428IMI.
 

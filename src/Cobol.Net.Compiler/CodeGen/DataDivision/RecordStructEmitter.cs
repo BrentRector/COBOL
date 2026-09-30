@@ -38,25 +38,18 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
                 // A RECURSIVE unit's WS table cell rides its table's static storage (RouteStaticUnitStorage —
                 // a last-used table with per-activation indexes would silently lose SET positions).
                 w.Line($"private {(ctx.Data.StaticIndexCells.Contains(idx.Cell) ? "static " : "")}long {idx.Cell} = 1;   // INDEX-NAME {idx.Name}");
-        // A method WORKING-STORAGE table's index cell is a class STATIC (persistent across activations, §11.7;
-        // M2-OO-1h step 4). LOCAL/LINKAGE table cells are per-activation method locals, emitted in OoEmitMethod.
-        // (A method cell is never one of the unit's own declarations — the loop above — so only the method channel
-        // emits here.)
-        var unitCells = new HashSet<string>(ctx.Data.IndexNames.Own.Select(d => d.Cell), StringComparer.Ordinal);
-        foreach (var cell in ctx.Data.StaticIndexCells)
-            if (!unitCells.Contains(cell))
-                w.Line($"private static long {cell} = 1;   // method-WS INDEX-NAME cell (M2-OO-1h)");
+        // (A METHOD's table cells are never here: a method owns no WORKING-STORAGE, §13.5.3 SR1, and its LOCAL/LINKAGE
+        // table cells are per-activation method locals, emitted in OoEmitMethod.)
         foreach (var f in phys.RootPhysicals())
             if (!ctx.Data.CallSuppressedRootFields.Contains(f.Name))
-                // A static-channel root is a STATIC field: method WS (OO deep-dive D3 — one copy per class,
-                // shared across instances, persistent across activations, ISO §11.7; pre-2023 editions only,
-                // §13.5.3 SR 1) or a RECURSIVE unit's WS (§13.5.4 GR1 — see RouteStaticUnitStorage).
+                // A static-channel root is a STATIC field: a RECURSIVE unit's WS (§13.5.4 GR1 — see
+                // RouteStaticUnitStorage).
                 w.Line($"private {(ctx.Data.StaticRootFields.Contains(f.Name) ? "static " : "")}{f.Type} {f.Name} = {f.Init};   // {f.Comment}");
         if (ctx.Data.EmitsStaticReset) EmitStaticReset(w);
     }
 
     /// <summary>Emit the <c>__ResetStatics</c> of a unit with STATIC data — a RECURSIVE program or a function
-    /// (static working-storage, §13.5.4 GR1), or a class half (its methods' working-storage, OO deep-dive D3) — the
+    /// (static working-storage, §13.5.4 GR1) — the
     /// §14.6.2.3.2 initial-state action for that static data AND a unit's file-registration guard. A program
     /// registers it with the run-unit ProgramTable; a class's factory adopts it when the run unit first creates the
     /// factory object (<c>OoEmitter.EmitClassUnit</c>); either way the run unit runs it at its start AND at its
@@ -75,7 +68,7 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
     private void EmitStaticReset(CodeWriter w)
     {
         var stmts = new List<string>();
-        foreach (var root in ctx.Data.StaticStorageRoots)
+        foreach (var root in ctx.Data.WorkingStorageRoots)
         {
             // §14.6.2.3.2 action 5: "The address of each based item is set to null" — the static bridge
             // field (kb/Work PB154; the DATA lives in the allocated cell, so there is no value to re-seed).

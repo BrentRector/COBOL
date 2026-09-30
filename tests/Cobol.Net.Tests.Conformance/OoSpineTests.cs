@@ -781,66 +781,121 @@ public sealed class OoSpineTests
             """)), "COBOLNET0828");   // method declares no RETURNING
     }
 
-    /// <summary>D3 — method WORKING-STORAGE is STATIC state (one copy per class, shared across INSTANCES,
-    /// persistent across activations — the naive instance-field mapping silently miscompiles this exact
-    /// counter) in the editions that HAVE it; the 2023 §13.5.3 SR 1 ban is 0902 strict / pre-removal
-    /// semantics under --permissive (the migration contract; VCR Table 6 row 130e).</summary>
-    [Fact]
-    public void MethodWorkingStorage_StaticSemantics_EditionWindow()
+    /// <summary>ISO §13.5.3 SR1 — "Within a class definition, the working-storage section may be specified only in a
+    /// factory definition or an instance definition, but not in a method definition" — is the standard's own text, not
+    /// a 2023 window (kb/Work PB1308, decision R62; Annex E.2 lists no removal of it), so a method's WORKING-STORAGE
+    /// SECTION is refused at EVERY edition with COBOLNET1519 and <c>--permissive</c> does not relax it (a syntax-rule
+    /// violation is not an edition-gated construct). The legal way to share a counter across activations is the
+    /// instance definition's working-storage, which the same program then compiles and runs: one copy per INSTANCE,
+    /// persistent across activations, while the method's LOCAL-STORAGE is initial on every activation (§8.6.4).</summary>
+    [Theory]
+    [InlineData(2002, false)]
+    [InlineData(2014, false)]
+    [InlineData(2023, false)]
+    [InlineData(2002, true)]
+    [InlineData(2023, true)]
+    public void MethodWorkingStorage_IsRefusedAtEveryEdition(int dialect, bool permissive)
     {
+        var (ok, errors, _) = EditionHarness.CompileFull(MethodCounterSource("OOSP23", "OSPC23",
+            "WORKING-STORAGE SECTION.\n01 CTR PIC 9(2) VALUE 0."), dialect, permissive: permissive);
+        Assert.False(ok, $"method WS must be rejected at --std {dialect} (ISO §13.5.3 SR1)");
+        EditionHarness.AssertHasDiagnostic(errors, "COBOLNET1519");
+    }
+
+    [Fact]
+    public void MethodStorage_ObjectWorkingStorageSharesAcrossActivations_LocalStorageDoesNot()
+    {
+        // The same counter, moved to where §13.5.3 SR1 allows it: the instance definition's working-storage.
         const string src = """
             IDENTIFICATION DIVISION.
-            PROGRAM-ID. OOSP23.
+            PROGRAM-ID. OOSP24.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS OSPC23.
+                CLASS OSPC24.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
-            01 T1 USAGE OBJECT REFERENCE OSPC23.
-            01 T2 USAGE OBJECT REFERENCE OSPC23.
+            01 T1 USAGE OBJECT REFERENCE OSPC24.
+            01 T2 USAGE OBJECT REFERENCE OSPC24.
             PROCEDURE DIVISION.
             MAIN.
-                INVOKE OSPC23 "NEW" RETURNING T1.
-                INVOKE OSPC23 "NEW" RETURNING T2.
+                INVOKE OSPC24 "NEW" RETURNING T1.
+                INVOKE OSPC24 "NEW" RETURNING T2.
                 INVOKE T1 "TICK".
                 INVOKE T2 "TICK".
                 INVOKE T1 "TICK".
                 STOP RUN.
-            END PROGRAM OOSP23.
+            END PROGRAM OOSP24.
 
             IDENTIFICATION DIVISION.
-            CLASS-ID. OSPC23 INHERITS FROM BASE.
+            CLASS-ID. OSPC24 INHERITS FROM BASE.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
                 CLASS BASE.
             IDENTIFICATION DIVISION.
             OBJECT.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 OBJ-CTR PIC 9(2) VALUE 0.
             PROCEDURE DIVISION.
             METHOD-ID. TICK.
             DATA DIVISION.
-            WORKING-STORAGE SECTION.
-            01 WS-CTR PIC 9(2) VALUE 0.
+            LOCAL-STORAGE SECTION.
+            01 LOC-CTR PIC 9(2) VALUE 0.
             PROCEDURE DIVISION.
             MAIN.
-                ADD 1 TO WS-CTR.
-                DISPLAY "CTR=" WS-CTR.
+                ADD 1 TO OBJ-CTR.
+                ADD 1 TO LOC-CTR.
+                DISPLAY "OBJ=" OBJ-CTR " LOC=" LOC-CTR.
             END METHOD TICK.
             END OBJECT.
-            END CLASS OSPC23.
+            END CLASS OSPC24.
             """;
         var (ok, stdout, detail) = CompileAndRun(src, 2002);
         Assert.True(ok, detail);
-        Assert.Equal("CTR=01\nCTR=02\nCTR=03", CutRunner.Normalize(stdout));   // shared + persistent, NOT per-instance
-        var (ok23, errors23, _) = EditionHarness.CompileFull(src, 2023);
-        Assert.False(ok23, "method WS must be rejected at --std 2023 strict (ISO §13.5.3 SR 1)");
-        EditionHarness.AssertHasDiagnostic(errors23, "COBOLNET0902");
-        var (okPerm, errsPerm, warnsPerm) = EditionHarness.CompileFull(src, 2023, permissive: true);
-        Assert.True(okPerm, "the §10 #1 migration contract: --permissive keeps the pre-removal semantics: "
-            + string.Join("\n", errsPerm));
-        EditionHarness.AssertHasDiagnostic(warnsPerm, "COBOLNET0902");
+        // T1, T2, T1: object data is one copy per INSTANCE and persists; local-storage starts over every time.
+        Assert.Equal("OBJ=01 LOC=01\nOBJ=01 LOC=01\nOBJ=02 LOC=01", CutRunner.Normalize(stdout));
     }
+
+    /// <summary>The one-method counter program of the method-storage tests, the method's data division supplied.</summary>
+    private static string MethodCounterSource(string program, string cls, string methodData) => $$"""
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. {{program}}.
+        ENVIRONMENT DIVISION.
+        CONFIGURATION SECTION.
+        REPOSITORY.
+            CLASS {{cls}}.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 T1 USAGE OBJECT REFERENCE {{cls}}.
+        PROCEDURE DIVISION.
+        MAIN.
+            INVOKE {{cls}} "NEW" RETURNING T1.
+            INVOKE T1 "TICK".
+            STOP RUN.
+        END PROGRAM {{program}}.
+
+        IDENTIFICATION DIVISION.
+        CLASS-ID. {{cls}} INHERITS FROM BASE.
+        ENVIRONMENT DIVISION.
+        CONFIGURATION SECTION.
+        REPOSITORY.
+            CLASS BASE.
+        IDENTIFICATION DIVISION.
+        OBJECT.
+        PROCEDURE DIVISION.
+        METHOD-ID. TICK.
+        DATA DIVISION.
+        {{methodData}}
+        PROCEDURE DIVISION.
+        MAIN.
+            ADD 1 TO CTR.
+            DISPLAY "CTR=" CTR.
+        END METHOD TICK.
+        END OBJECT.
+        END CLASS {{cls}}.
+        """;
 
     // ── Slice 3a/3b (INHERITS + SELF/SUPER — deep-dive D5/D7, §8.4.3.8, §9.3.6/§9.3.8.2) ───────────────────
 
@@ -1527,8 +1582,9 @@ public sealed class OoSpineTests
     }
 
     /// <summary>§13.18.44.3 SR (M2-OO-1h review B) — a REDEFINES target must be in the SAME data description; a
-    /// LOCAL-STORAGE 01 may NOT redefine a method WORKING-STORAGE 01 (their storage classes differ — static WS vs
-    /// per-activation LOCAL). The scope is the redefiner's OWN section, so the cross-section target is not found → 1518.</summary>
+    /// LOCAL-STORAGE 01 may NOT redefine a method LINKAGE 01 (their storage classes differ — caller storage vs
+    /// per-activation LOCAL; a method has no WORKING-STORAGE, §13.5.3 SR1). The scope is the redefiner's OWN section,
+    /// so the cross-section target is not found → 1577.</summary>
     [Fact]
     public void MethodRedefines_CrossSection_Rejected()
     {
@@ -1537,10 +1593,10 @@ public sealed class OoSpineTests
             """, """
             METHOD-ID. M.
             DATA DIVISION.
-            WORKING-STORAGE SECTION.
-            01 WNUM PIC 9(4) VALUE 1234.
             LOCAL-STORAGE SECTION.
             01 LVIEW REDEFINES WNUM PIC X(4).
+            LINKAGE SECTION.
+            01 WNUM PIC 9(4).
             PROCEDURE DIVISION.
             MAIN.
                 DISPLAY LVIEW.

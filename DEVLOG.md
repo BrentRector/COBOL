@@ -13,6 +13,15 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1817 — 2026-09-30 12:18 PDT — Grammar / OO decisions: END-INVOKE removed, `N + 1` is one argument, method WORKING-STORAGE illegal at every edition
+
+Three owner/spec-derived decisions landed (PB758/R58, PB1135/R59, PB1308/R62); the rest of the batch (PB1498, PB935 and the OO-1 items) was NOT reached — the implementer hit its turn limit — and each of those notes says so.
+
+- **PB758 (R58).** `END_INVOKE?` deleted from `invokeStatement`, the `END_INVOKE` lexer token and its `cobol-words.json` row deleted (generated files regenerated). `INVOKE … END-INVOKE` is a plain syntax error at 2002/2014/2023; the two PB1689 positive goldens became the negatives `pb758-invoke-end-invoke-after-returning` / `-after-using-returning`. END-SORT / END-MERGE remain (R58 decided END-INVOKE only) — the note stays half.
+- **PB1135 (R59).** A keyword-less `N + 1` is ONE argument (CALL §14.9.4.2 SR20/SR17, INVOKE §14.9.23.2, §8.7.1, §8.3.3.3.2 SR2). The grammar no longer names a bare `dataReference` in `callArgument` / `callByContent` / `invokeArgument` (the ambiguity went to the lower alternative, i.e. the LIST reading), the binders recover the sole identifier, and the literal arms carry `{!numericLiteralIsLeftOperand()}?` so `5 + 1` is an expression too. Legacy oracle CallBinder adapted. D-ARGEXPR added to CONFORMANCE.md; goldens extended (`pb130_call_format2_bare`, `pb1135_invoke_keywordless_expression_argument`, `pb428_inline_method_invocation` leg 10). Side effect worth knowing: `USING N -1` (contiguous sign) is now also the expression N - 1.
+- **PB1308 (R62).** Method WORKING-STORAGE refused at every edition with COBOLNET1519 (no registry window, no `--permissive` relaxation). The D3 static-field mapping of method data was deleted across the binder/emitter; four goldens that used it moved to LOCAL-STORAGE/object data, `oo_method_redefines_ws` deleted, OoSpine test re-derived, RunUnitScope method-WS test deleted. PB1850 records the now-inert class-half run-unit adoption machinery.
+- Rows SR-13.5.3-1 and GR-14.9.23.4-6 recorded CONFORMS via `record_verdicts.py`; docs/DIAGNOSTICS.md and the VCR status index regenerated.
+
 ## Entry 1811 — 2026-09-30 10:59 PDT — Directives cluster: conditional-compilation structure, §8.12 words as data, DEFINE/TURN formats, placement rules as row data, per-unit LEAP-SECOND
 
 Batch of the frontend/directives defects, each probed against the ISO text first (every citation run through `cite.py --check`).

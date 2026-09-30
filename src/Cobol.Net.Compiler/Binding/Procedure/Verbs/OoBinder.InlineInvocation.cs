@@ -46,13 +46,21 @@ internal readonly record struct InvocationArg(
     /// (kb/Work PB1135) has no BY phrase to say it is BY CONTENT, so — like the inline form's bare argument —
     /// it is marked <c>Expression</c>: §14.9.23.3 SR9 cannot make it BY REFERENCE and §14.9.23.4 GR6 a) 2 implies
     /// BY CONTENT. Written with a phrase, the phrase says so and <c>Expression</c> stays false.</summary>
-    public static InvocationArg OfInvokeArgument(Core.InvokeArgumentContext a) => new(
-        a.VALUE() is not null, a.REFERENCE() is not null, a.CONTENT() is not null, Omitted: a.OMITTED() is not null,
-        Expression: a.VALUE() is null && a.REFERENCE() is null && a.CONTENT() is null
-            && a.dataReference() is null && a.literal() is null && a.OMITTED() is null && a.addressIdentifier() is null
-            && !(a.SELF() is not null),
-        a.booleanExpression(), a.arithmeticExpression(), a.literal(), a.dataReference(),
-        a.addressIdentifier(), a.SELF() is not null);
+    public static InvocationArg OfInvokeArgument(Core.InvokeArgumentContext a)
+    {
+        bool keywordLess = a.VALUE() is null && a.REFERENCE() is null && a.CONTENT() is null;
+        // ⛔ A KEYWORD-LESS IDENTIFIER ARRIVES INSIDE AN EXPRESSION NODE (kb/Work PB1135, decision R59): the grammar has no
+        // bare `dataReference` arm, so that `USING N + 1` is one expression — the sole-identifier reduction (ISO
+        // §14.9.4.4 GR8's INVOKE twin) happens HERE, once, for every consumer of the argument (the typed path and the
+        // universal path alike), and it is what `Ref` has always meant.
+        var reference = a.dataReference() ?? (keywordLess ? ConditionBinder.SoleDataReference(a.arithmeticExpression()) : null);
+        return new(
+            a.VALUE() is not null, a.REFERENCE() is not null, a.CONTENT() is not null, Omitted: a.OMITTED() is not null,
+            Expression: keywordLess && reference is null && a.literal() is null && a.OMITTED() is null
+                && a.addressIdentifier() is null && !(a.SELF() is not null),
+            a.booleanExpression(), a.arithmeticExpression(), a.literal(), reference,
+            a.addressIdentifier(), a.SELF() is not null);
+    }
 
     /// <summary>The inline form's <c>argument</c> reading (§8.4.3.4.2). No passing phrase exists in that
     /// general format, so the mode is §14.9.23.4 GR6's default — exactly what a bare INVOKE argument takes.

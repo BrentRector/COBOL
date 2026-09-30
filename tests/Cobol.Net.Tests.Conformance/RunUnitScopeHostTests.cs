@@ -82,12 +82,8 @@ public sealed class RunUnitScopeHostTests
         END CLASS RUSCNT.
         """;
 
-    /// <summary>The host: run the compiled <paramref name="program"/>'s entry point twice in ONE process. After each
-    /// run unit has TERMINATED, the host reads the static field <paramref name="staticField"/> of generated type
-    /// <paramref name="staticType"/> (when named) — the
-    /// one piece of run-unit storage that lives outside the <c>RunUnit</c> object, so the one a termination must
-    /// release by itself (§14.6.11 3/4/6).</summary>
-    private static string Host(string program, string? staticType, string? staticField) => $$"""
+    /// <summary>The host: run the compiled <paramref name="program"/>'s entry point twice in ONE process.</summary>
+    private static string Host(string program) => $$"""
         using System;
         using System.IO;
         using System.Reflection;
@@ -101,14 +97,13 @@ public sealed class RunUnitScopeHostTests
                 {
                     Console.WriteLine("RUN " + run);
                     asm.EntryPoint!.Invoke(null, null);
-                    {{(staticType is null ? "" : $"Console.WriteLine(\"AFTER {staticField}=\" + asm.GetType(\"{staticType}\")!.GetField(\"{staticField}\", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null));")}}
                 }
                 return 0;
             }
         }
         """;
 
-    private static void CompileHost(string dir, string program, string? staticType = null, string? staticField = null)
+    private static void CompileHost(string dir, string program)
     {
         var tpa = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
         var refs = tpa
@@ -117,7 +112,7 @@ public sealed class RunUnitScopeHostTests
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
         var compilation = CSharpCompilation.Create("RUSCOPEHOST",
-            [CSharpSyntaxTree.ParseText(Host(program, staticType, staticField))], refs,
+            [CSharpSyntaxTree.ParseText(Host(program))], refs,
             new CSharpCompilationOptions(OutputKind.ConsoleApplication, nullableContextOptions: NullableContextOptions.Enable));
         var emit = compilation.Emit(Path.Combine(dir, "RUSCOPEHOST.dll"));
         Assert.True(emit.Success, string.Join("\n", emit.Diagnostics));
@@ -126,8 +121,7 @@ public sealed class RunUnitScopeHostTests
 
     /// <summary>Compile <paramref name="source"/> as <paramref name="program"/> at <paramref name="dialect"/>, run it
     /// twice in one host process, and return the host's stdout (asserting a clean exit).</summary>
-    private static string RunTwice(string program, string source, int dialect, string? staticType = null,
-        string? staticField = null)
+    private static string RunTwice(string program, string source, int dialect)
     {
         string dir = CutRunner.NewTempDir("ruscope");
         try
@@ -136,7 +130,7 @@ public sealed class RunUnitScopeHostTests
             var r = CompiledProgramCache.Compile(
                 new CompilerDriver.Options(src, Path.Combine(dir, $"{program}.dll"), DialectLevel: dialect, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Success, $"compile {program}: {string.Join("; ", r.Errors)}");
-            CompileHost(dir, program, staticType, staticField);
+            CompileHost(dir, program);
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "RUSCOPEHOST.dll"), dir);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);
@@ -155,67 +149,4 @@ public sealed class RunUnitScopeHostTests
             "SW1 OFF\n" +
             "COUNT 1", RunTwice("RUSCOPE", Program, 2002));
 
-    /// <summary>kb/Work PB1069's remainder — a METHOD's WORKING-STORAGE (a pre-2023 edition; §13.5.3 SR 1 removed it in
-    /// 2023) is static data, OO deep-dive D3: ONE copy per class, persistent across activations. ISO §14.6.2.3.2 1)
-    /// puts it in its initial state "The first time the function, method, or program in which it is described is
-    /// activated in a run unit", so the SECOND run unit's first BUMP finds MC at its VALUE 0 again: both runs print
-    /// "COUNT 1" then "COUNT 2" (before the fix run 2 printed 3 and 4 — the static field was never reset). And ISO
-    /// §14.6.11 3/4/6 release what the run unit's storage holds at its termination, so once each run unit has ended
-    /// the host reads MC back at its initial 0 (before the fix: 2, then 4) — the static no longer outlives the run
-    /// unit it belonged to.</summary>
-    [Fact]
-    public void ASecondRunUnitInOneProcess_FindsMethodWorkingStorageInItsInitialState() =>
-        Assert.Equal(
-            "RUN 1\n" +
-            "COUNT 1\n" +
-            "COUNT 2\n" +
-            "AFTER MC=0\n" +
-            "RUN 2\n" +
-            "COUNT 1\n" +
-            "COUNT 2\n" +
-            "AFTER MC=0", RunTwice("RUSMWS", MethodWsProgram, 2002, staticType: "RUSMWSC", staticField: "MC"));
-
-    private const string MethodWsProgram = """
-        IDENTIFICATION DIVISION.
-        PROGRAM-ID. RUSMWS.
-        ENVIRONMENT DIVISION.
-        CONFIGURATION SECTION.
-        REPOSITORY.
-            CLASS RUSMWSC.
-        DATA DIVISION.
-        WORKING-STORAGE SECTION.
-        01 N PIC 9.
-        01 O USAGE OBJECT REFERENCE RUSMWSC.
-        PROCEDURE DIVISION.
-        P1.
-            INVOKE RUSMWSC "NEW" RETURNING O
-            INVOKE O "BUMP" RETURNING N
-            DISPLAY "COUNT " N
-            INVOKE O "BUMP" RETURNING N
-            DISPLAY "COUNT " N
-            GOBACK.
-        END PROGRAM RUSMWS.
-
-        IDENTIFICATION DIVISION.
-        CLASS-ID. RUSMWSC INHERITS BASE.
-        ENVIRONMENT DIVISION.
-        CONFIGURATION SECTION.
-        REPOSITORY.
-            CLASS BASE.
-        IDENTIFICATION DIVISION.
-        OBJECT.
-        PROCEDURE DIVISION.
-        METHOD-ID. BUMP.
-        DATA DIVISION.
-        WORKING-STORAGE SECTION.
-        01 MC PIC 9 VALUE 0.
-        LINKAGE SECTION.
-        01 R PIC 9.
-        PROCEDURE DIVISION RETURNING R.
-            ADD 1 TO MC
-            MOVE MC TO R.
-        END METHOD BUMP.
-        END OBJECT.
-        END CLASS RUSMWSC.
-        """;
 }

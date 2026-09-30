@@ -1844,7 +1844,10 @@
   "pb1377-push-cobol-words-within-unit",
   "pb1377-push-removed-directive-name",
   "pb1364-when-other-trailing-text-after-match",
-  "pb1364-when-operand-split-after-match"
+  "pb1364-when-operand-split-after-match",
+  "pb758-invoke-end-invoke-after-returning",
+  "pb758-invoke-end-invoke-after-using-returning",
+  "pb1308-method-working-storage-every-edition"
  ],
  "pending": []
 }

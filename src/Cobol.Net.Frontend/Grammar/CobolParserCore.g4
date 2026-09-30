@@ -1326,10 +1326,22 @@ callUsingPhrase
 // kb/Work PB130: Format 2's keyword-less argument may be literal-2, arithmetic-expression-1,
 // boolean-expression-1 or OMITTED (all three BY phrases print in plain brackets there) — parsed WIDE on the
 // callByContent alternation's own precedent and narrowed in the binder by formatTwo (Format 1's bare
-// argument is identifier-2 only). DETERMINATION (whitespace is lexer-skipped, so `N + 1` is ambiguous
-// between one expression and the two arguments N and +1 — both legal Format-2 lists): the LIST reading
-// wins; parenthesize — `USING (N + 1)` — to force the expression reading (the paren cannot start a
-// dataReference or literal, so it selects the arithmeticExpression arm unambiguously). OMITTED joins both the bare list and the BY REFERENCE arm (§14.9.4.2
+// argument is identifier-2 only).
+// ⛔ DETERMINATION (kb/Work PB1135, decision R59 — it REVERSES PB130's list reading, for CALL and INVOKE together):
+// a keyword-less `N + 1` is ONE argument, the arithmetic-expression-1 the format prints under its OPTIONAL
+// `[ BY CONTENT ]` bracket (§14.9.4.2 Format 2; SR20 forbids omitting BY CONTENT only for an identifier permitted as a receiving operand; SR17
+// makes every identifier inside it a sending operand). The lexer skips whitespace, so `N + 1` could also be read as
+// the two arguments N and +1, but a sign separated from its digits is no literal (§8.3.3.3.2 SR2) and an operator is
+// "preceded by a space and followed by a space" (§8.7.1): the `+` is the BINARY operator. (The two-argument list is
+// still writable: a literal that opens an argument list or follows a BY phrase is a literal, `USING +1 N` and
+// `USING N BY CONTENT +1` — `N (+ 1)` is N subscripted, never a list.)
+// ⚠ HOW THE GRAMMAR SAYS IT. There is NO bare `dataReference` arm: `arithmeticExpression` subsumes the identifier, so a
+// lone identifier arrives inside an expression node and the binder recovers it (§14.9.4.4 GR8, `Gr8Classify` /
+// `ConditionBinder.SoleDataReference` — the reduction the BY CONTENT / BY VALUE arms already ran), and with no
+// `dataReference` alternative to win the ambiguity `N + 1` is parsed greedily as the expression. The `literal` arm
+// is the one other operand the expression spine subsumes (a numeric literal), so it carries the
+// `numericLiteralIsLeftOperand()` guard: `5 + 1` is the expression too, while `"AB"`, `ZERO`, `NULL` and a lone
+// numeric literal keep the literal arm. OMITTED joins both the bare list and the BY REFERENCE arm (§14.9.4.2
 // Format 2: `[BY REFERENCE] {identifier-2 | OMITTED}`).
 // ⛔ THE ADDRESS-IDENTIFIER ARM (kb/Work PB239). §14.9.4.3 SR3 — "Identifier-2 shall reference an
 // address-identifier or a data item defined in the file, working-storage, local-storage, or linkage section" —
@@ -1347,8 +1359,7 @@ callArgument
     | OMITTED
     | addressIdentifier   // §14.9.4.3 SR3/SR4 — a sending operand whatever the mode
     | {boolExprAhead()}? booleanExpression
-    | literal
-    | dataReference       // bare argument = the transitive mode (GR5) / the formal's mode (GR9)
+    | {!numericLiteralIsLeftOperand()}? literal
     | arithmeticExpression
     ;
 
@@ -1392,19 +1403,17 @@ callByValue
 // parsed WIDE and narrowed in the binder by whether the AS phrase selected Format 2 — the repo's standing
 // superset-parse / bind-narrow doctrine. Widening the GRAMMAR alone would trade a rejection of legal Format-2
 // source for an acceptance of illegal Format-1 source, which is the trade this item's note correctly refused.
-// ⚠ The alternation is the SAME shape invokeArgument uses, for the same reasons: `literal` FIRST because
-// `arithmeticExpression` subsumes numeric literals; `dataReference` deliberately ABSENT because
+// ⚠ The alternation is the SAME shape invokeArgument uses, for the same reasons: `literal` FIRST — guarded, so a
+// numeric literal that is the left operand of an operator is the expression (`BY CONTENT 5 + 1`, kb/Work PB1135) —
+// because `arithmeticExpression` subsumes numeric literals; `dataReference` deliberately ABSENT because
 // `arithmeticExpression` subsumes it and the identifier case is recovered in the binder from a sole-dataReference
-// expression; and the boolean arm behind `{boolExprAhead()}?` because booleanExpression's leaf is valueOperand
-// and an unguarded alternative is ambiguous with the arithmetic one.
-// ⚠ `dataReference` STAYS IN THE ALTERNATION, unlike invokeArgument's, and §0's standing caution is why: this
-// rule lives in the SHARED `CobolParserCore.g4`, and the LEGACY binder reads `callByContent.dataReference()`.
-// Removing it deletes that generated accessor and breaks a compiler that shares this grammar until the P15
-// cut-over — the change must be ADDITIVE. Placing it BEFORE `arithmeticExpression` is also what preserves the
-// bare-identifier path: ANTLR predicts the alternative that matches the WHOLE operand, so `A` takes the
-// dataReference arm and `A + 1` falls through to the expression one.
+// expression (Gr8Classify); and the boolean arm behind `{boolExprAhead()}?` because booleanExpression's leaf is
+// valueOperand and an unguarded alternative is ambiguous with the arithmetic one. ⛔ The `dataReference` arm this
+// rule used to keep for the legacy binder's accessor is what made `BY CONTENT N + 1` read as the two arguments
+// N and +1 (ANTLR resolves the ambiguity to the lower alternative); it is gone and the legacy oracle recovers the
+// sole identifier from the expression exactly as the current binder does (kb/Work PB1135, decision R59).
 callByContent
-    : BY? CONTENT (addressIdentifier | {boolExprAhead()}? booleanExpression | literal | dataReference | arithmeticExpression)
+    : BY? CONTENT (addressIdentifier | {boolExprAhead()}? booleanExpression | {!numericLiteralIsLeftOperand()}? literal | arithmeticExpression)
     ;
 
 callReturningPhrase

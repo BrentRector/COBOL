@@ -18,7 +18,7 @@
       *>   argument's storage, so its value is -42 and SUBTRACT 1 leaves
       *>   the caller's item at -43, from a native and a REDEFINED
       *>   argument, into a plain and a REDEFINED formal.  The REDEFINED
-      *>   formal's bytes equal the method's WORKING-STORAGE image of
+      *>   formal's bytes equal the method's LOCAL-STORAGE image of
       *>   -42 (same description, VALUE -42) - BYTES-OK.
       *>   INVOKE BY CONTENT: the formal holds the COMPUTE of the
       *>   argument (-42) into its description - BYTES-OK, VALUE-OK -
@@ -105,7 +105,7 @@
        END METHOD MN.
        METHOD-ID. MR.
        DATA DIVISION.
-       WORKING-STORAGE SECTION.
+       LOCAL-STORAGE SECTION.
        01 E   PIC S9(5) COMP-3 VALUE -42.
        01 EX  REDEFINES E PIC X(3).
        LINKAGE SECTION.

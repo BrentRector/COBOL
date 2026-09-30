@@ -1473,20 +1473,6 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. XM.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS XMC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OBJ USAGE OBJECT REFERENCE XMC.\nPROCEDURE DIVISION.\nMAIN.\n    INVOKE XMC \"NEW\" RETURNING OBJ.\n    INVOKE OBJ \"M1\".\n    STOP RUN.\nEND PROGRAM XM.\n\nIDENTIFICATION DIVISION.\nCLASS-ID. XMC INHERITS FROM BASE.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS BASE.\nIDENTIFICATION DIVISION.\nOBJECT.\nPROCEDURE DIVISION.\nMETHOD-ID. M1.\nPROCEDURE DIVISION.\nMAIN.\n    EXIT METHOD.\nEND METHOD M1.\nEND OBJECT.\nEND CLASS XMC.\n"
   },
   {
-   "id": "method-working-storage-window",
-   "status": "active",
-   "description": "A WORKING-STORAGE SECTION in a method definition - legal 2002/2014 (OO deep-dive D3: STATIC-field semantics - one copy per class, shared across instances, persistent across activations, ISO 11.7; proven by OoSpineTests), BANNED by 2023 13.5.3 SR 1 (deep-dive Spec correction #1). ACTIVE since OO port slice 2 (DEVLOG 602): 0900 at 85 (class parse gate), 0902 at 2023 (method-working-storage-window registry row); --permissive at 2023 keeps the pre-removal static semantics (the RemovedMatrix migration contract).",
-   "display": "a WORKING-STORAGE SECTION in a method definition",
-   "diagnosticCode": "COBOLNET0902",
-   "citation": "legal 2002/2014 (OO deep-dive D3: STATIC-field semantics — shared across instances, persistent across activations, ISO §11.7), BANNED by 2023 §13.5.3 SR 1 (spec @16461; deep-dive Spec correction #1; VCR Table 6 row 130e) — 0900 below 2002, 0902 at 2023; --permissive keeps the pre-removal static semantics (slice 2, DEVLOG 602)",
-   "introducedIn": 2002,
-   "removedIn": 2023,
-   "expectDiagnostic": "COBOLNET0902",
-   "expectDiagnosticBelow": "COBOLNET0900",
-   "vcr": "VCR Table 6 row 130e (13.5.3 SR 1 @16461; deep-dive Spec correction #1; the 2002/2014-legal boundary is PINNED provisional - E.2 does not itemize the removal)",
-   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. MW.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS MWC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OBJ USAGE OBJECT REFERENCE MWC.\nPROCEDURE DIVISION.\nMAIN.\n    INVOKE MWC \"NEW\" RETURNING OBJ.\n    INVOKE OBJ \"TICK\".\n    STOP RUN.\nEND PROGRAM MW.\n\nIDENTIFICATION DIVISION.\nCLASS-ID. MWC INHERITS FROM BASE.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS BASE.\nIDENTIFICATION DIVISION.\nOBJECT.\nPROCEDURE DIVISION.\nMETHOD-ID. TICK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-CTR PIC 9(2) VALUE 0.\nPROCEDURE DIVISION.\nMAIN.\n    ADD 1 TO WS-CTR.\n    DISPLAY \"CTR=\" WS-CTR.\nEND METHOD TICK.\nEND OBJECT.\nEND CLASS MWC.\n"
-  },
-  {
    "id": "exit-function-window",
    "status": "active",
    "description": "EXIT FUNCTION statement - introduced 2002 with user-defined functions, REMOVED 2023 (Annex E :49036; dual-obligation window: 0900 below 2002 via expectDiagnosticBelow, 0902 at 2023). ACTIVE as of Phase 4c (DEVLOG 616): the binder realizes the function-return synonym (UdfBindExitFunction -> BoundGoback, the 14.9.18.4 GR5 semantics) with the 0827 placement band (only in a function definition); the conforming witness is a whole-source caller + FUNCTION-ID unit (the udf_exit_function golden proves the early-return behavior X=0014). At 85 the {is2002()}? PD-header RETURNING parse hint names the edition (0900).",

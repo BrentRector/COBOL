@@ -1595,9 +1595,10 @@ public static class DiagnosticCatalog
     // yet implemented") was DELETED by kb/Work PB956: the OO type-halves now render the SAME BASED bridges and
     // ADDRESS-OF cells the program class does (OoEmitter.EmitPointerBackings), so no site can raise it. The NAME is
     // retired and never reused.
-    public static readonly DiagnosticDescriptor OoExternalMethodWorkingStorage = new(
-        NotImplemented, "oo-external-method-working-storage", EditionSeverity.Error,
-        "EXTERNAL on a method WORKING-STORAGE item is not yet implemented.", "ISO §14.5", RecognizedNotImplemented);
+    // ⛔ `oo-external-method-working-storage` (COBOLNET0899, "EXTERNAL on a method WORKING-STORAGE item is not yet
+    // implemented") was DELETED by kb/Work PB1308 (decision R62): a method's WORKING-STORAGE SECTION is illegal at
+    // every edition (COBOLNET1519, ISO §13.5.3 SR1), so no item of one can carry EXTERNAL and no site can raise it. The
+    // NAME is retired and never reused.
     public static readonly DiagnosticDescriptor OoInterfacePropertyPrototype = new(
         NotImplemented, "oo-interface-property-prototype", EditionSeverity.Error,
         "A GET/SET PROPERTY prototype in an interface is not yet implemented.", "ISO §10.6.2", RecognizedNotImplemented);

@@ -28,13 +28,13 @@ public sealed class OoMethodDataScope
 }
 
 /// <summary>
-/// The METHOD-data half of the data binder (OO deep-dive D3/D6 — port slice 2): a method's LINKAGE SECTION
-/// (→ typed C# parameters via capturable locals), LOCAL-STORAGE SECTION (→ C# locals, re-initialized each
-/// activation, §8.6.4), and — in the editions that permit it — WORKING-STORAGE (→ STATIC fields, shared across
-/// instances and persistent across activations per §11.7; ILLEGAL in 2023 per §13.5.3 SR 1, gated by the
-/// version-conformance pass's <c>method-working-storage-window</c> row). Items bind into the CLASS's one forest (so
-/// USAGE/SIGN inheritance, object-reference resolution, profiles, and struct types all apply unchanged) but
-/// their NAMES move into the method's own scope.
+/// The METHOD-data half of the data binder (OO deep-dive D6 — port slice 2): a method's LINKAGE SECTION
+/// (→ typed C# parameters via capturable locals) and LOCAL-STORAGE SECTION (→ C# locals, re-initialized each
+/// activation, §8.6.4). A method has NO WORKING-STORAGE at any edition: §13.5.3 SR1 allows it "only in a factory
+/// definition or an instance definition, but not in a method definition", so one is refused (COBOLNET1519; kb/Work
+/// PB1308, decision R62) and its entries bind as LOCAL-STORAGE for recovery only. Items bind into the CLASS's one
+/// forest (so USAGE/SIGN inheritance, object-reference resolution, profiles, and struct types all apply unchanged)
+/// but their NAMES move into the method's own scope.
 /// </summary>
 public sealed partial class DataBinder
 {
@@ -163,11 +163,10 @@ public sealed partial class DataBinder
     }
 
     /// <summary>The STATIC-field channel: every emitted root field name whose storage is ONE per-class copy —
-    /// consumed by <c>RecordStructEmitter</c> to add the <c>static</c> modifier. TWO producers, one mechanism
-    /// (the singular-pattern rule): (a) method WORKING-STORAGE roots (D3 — one copy per class, shared across
-    /// instances, persistent across activations, ISO §11.7); (b) a RECURSIVE-and-not-INITIAL unit's (incl.
-    /// every FUNCTION's, §8.6.6) WORKING-STORAGE roots + Tier-B backings (<see cref="RouteStaticUnitStorage"/>
-    /// — §13.5.4 GR1 static data, ONE last-used copy across all activations, §14.6.2.3.3).
+    /// consumed by <c>RecordStructEmitter</c> to add the <c>static</c> modifier. ONE producer: a RECURSIVE-and-not-INITIAL
+    /// unit's (incl. every FUNCTION's, §8.6.6) WORKING-STORAGE roots + Tier-B backings
+    /// (<see cref="RouteStaticUnitStorage"/> — §13.5.4 GR1 static data, ONE last-used copy across all activations,
+    /// §14.6.2.3.3). A method has no WORKING-STORAGE to put here (§13.5.3 SR1, kb/Work PB1308).
     /// (READ-ONLY view — P6 Step 5.)</summary>
     public IReadOnlySet<string> StaticRootFields => _staticRootFields;
     private readonly HashSet<string> _staticRootFields = new(StringComparer.Ordinal);
@@ -182,9 +181,7 @@ public sealed partial class DataBinder
     /// record's <c>StorageCell</c> — its ONE storage, which <c>ManagedPointer.At</c> aliases — emits STATIC
     /// (§13.5.4 GR1: one copy shared by every activation) and <c>__ResetStatics</c> re-seeds it IN PLACE
     /// (§14.6.2.3.2 action 2), where the old routing REJECTED `ADDRESS OF` a static item outright
-    /// (COBOLNET0899 — legal source refused). A METHOD's WORKING-STORAGE record's cell rides the same set (kb/Work
-    /// PB956 — §8.6.4 static items, one copy per class), the <see cref="StaticBasedBridgeAddrs"/> twin for the
-    /// addressable-cell surface.</summary>
+    /// (COBOLNET0899 — legal source refused).</summary>
     public IReadOnlySet<string> StaticAddressableCells => _staticAddressableCells;
     private readonly HashSet<string> _staticAddressableCells = new(StringComparer.Ordinal);
 
@@ -195,12 +192,11 @@ public sealed partial class DataBinder
     internal Dictionary<DataItem, OoMethodSymbol> OoRootOwner { get; } = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The STATIC index-cell channel — INDEXED BY cells emitted as class-level STATIC <c>long</c>
-    /// fields because their table's storage is static. TWO producers, one mechanism: (a) method-WS table cells
-    /// (M2-OO-1h step 4 — persistent across activations, §11.7; a method LOCAL/LINKAGE table's cell is instead
-    /// a per-activation method local, emitted in <c>OoEmitMethod</c>, and never appears here); (b) a RECURSIVE
-    /// unit's WS table cells (<see cref="RouteStaticUnitStorage"/> — the cell rides its table's §13.5.4 GR1
-    /// static storage; these DO also appear in <see cref="IndexNames"/>, so the emitter's instance-cell loop
-    /// consults this set for the modifier). (READ-ONLY view — P6 Step 5.)</summary>
+    /// fields because their table's storage is static: a RECURSIVE unit's WS table cells
+    /// (<see cref="RouteStaticUnitStorage"/> — the cell rides its table's §13.5.4 GR1 static storage; these DO also
+    /// appear in <see cref="IndexNames"/>, so the emitter's instance-cell loop consults this set for the modifier).
+    /// A method table's cell is instead a per-activation method local, emitted in <c>OoEmitMethod</c>, and never
+    /// appears here. (READ-ONLY view — P6 Step 5.)</summary>
     public IReadOnlySet<string> StaticIndexCells => _staticIndexCells;
     private readonly HashSet<string> _staticIndexCells = new(StringComparer.Ordinal);
 
@@ -288,8 +284,8 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain a SCREEN SECTION — it "
                     + "may appear only in a factory or instance definition (ISO §13.9.3 SR1)");
             // §13.18.27.3 SR4: the GLOBAL clause is barred in a method definition — on a level-01 item of ANY
-            // section a method may own (WS / LOCAL-STORAGE / LINKAGE). Spec-FORBIDDEN (COBOLNET1520), not merely
-            // unimplemented. (EXTERNAL is a separate deferred leg — WS only, below.)
+            // section a method may own (LOCAL-STORAGE / LINKAGE). Spec-FORBIDDEN (COBOLNET1520), not merely
+            // unimplemented.
             void GateMethodGlobal(IEnumerable<Core.DataDescriptionEntryContext> entries)
             {
                 foreach (var e in entries)
@@ -300,22 +296,19 @@ public sealed partial class DataBinder
             }
             if (dd.workingStorageSection() is { } ws)
             {
-                // D3: method WS → STATIC fields (per-class, shared, persistent — §11.7; the naive instance-field
-                // mapping silently miscompiles a method-WS counter). The 2023 §13.5.3 SR 1 ban is the
-                // version-conformance pass's method-working-storage-window row — binding proceeds so `--permissive`
-                // keeps the pre-removal semantics (the §10 #1 migration contract).
-                GateMethodGlobal(ws.dataDescriptionEntry());
-                // EXTERNAL in method WS would silently miss CallBindExternalAndGlobal (it scans the synthetic unit's
-                // OBJECT section only) — gate loud rather than mis-scope run-unit storage.
-                foreach (var entry in ws.dataDescriptionEntry())
-                    if (entry.dataDescriptionBody()?.dataDescriptionClauses()?.dataDescriptionClause()
-                            ?.Any(cl => cl.externalClause() is not null) == true)
-                        Edition.Error(DiagnosticCatalog.OoExternalMethodWorkingStorage, $"{where}: EXTERNAL on a method WORKING-STORAGE item is "
-                            + "recognized but not yet implemented (Phase 3, OO port)");
-                var roots = BindEntries(ws.dataDescriptionEntry(), _rootNames);
-                m.Binding!.StaticRoots.AddRange(roots);
-                _methodWorkingStorageRoots.AddRange(roots);
-                foreach (var r in roots) _staticRootFields.Add(r.CsName);
+                // §13.5.3 SR1: "Within a class definition, the working-storage section may be specified only in a
+                // factory definition or an instance definition, but not in a method definition." The ban is the
+                // standard's own text at EVERY edition — 2002, 2014 and 2023 alike (kb/Work PB1308, decision R62;
+                // the former 2023-only window rested on a provisional reading) — so it is an ERROR here, the sibling
+                // of the FILE / REPORT / SCREEN refusals above, never an edition gate and never relaxed by
+                // --permissive. The entries are still bound — in their own (working-storage) section, so every
+                // section rule keeps answering — into the method's local roots: recovery only (the compile has
+                // failed), so the method body's references to these names do not draw a cascade of "not defined"
+                // errors that would bury the real one. There is no static-field mapping of method data any more.
+                Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain a WORKING-STORAGE "
+                    + "SECTION — it may appear only in a factory or instance definition (ISO §13.5.3 SR1); the "
+                    + "method's own storage is its LOCAL-STORAGE and LINKAGE sections");
+                m.Binding!.LocalRoots.AddRange(BindEntries(ws.dataDescriptionEntry(), _rootNames));
             }
             if (dd.localStorageSection() is { } ls)
             {
@@ -332,20 +325,16 @@ public sealed partial class DataBinder
         }
         _bindingMethodScope = null;
 
-        foreach (var root in m.Binding!.StaticRoots.Concat(m.Binding!.LocalRoots).Concat(m.Binding!.LinkageRoots))
+        foreach (var root in m.Binding!.LocalRoots.Concat(m.Binding!.LinkageRoots))
         {
             OoMethodScopedRoots.Add(root);
             OoRootOwner[root] = m;   // M2-OO-1h: the post-build passes resolve names through the owning method
             OoGateUnsupportedShapes(root, where);
             OoScopeSubtree(root, m.DataScope);
         }
-        // M2-OO-1h step 4: a method-WS table's index cell is a class STATIC (persistent); a LOCAL/LINKAGE table's
-        // cell is a per-activation method local (emitted in OoEmitMethod).
-        foreach (var root in m.Binding!.StaticRoots)
-            foreach (var idx in IndexDeclarationsUnder(root))
-                _staticIndexCells.Add(idx.Cell);
+        // M2-OO-1h step 4: a method table's index cell is a per-activation method local (emitted in OoEmitMethod).
         // LINKAGE + LOCAL-STORAGE roots are C# LOCALS of the emitted method (their struct types and numeric
-        // profiles still emit at class level) — never instance fields. Method-WS roots DO emit (as statics).
+        // profiles still emit at class level) — never instance fields.
         foreach (var root in m.Binding!.LocalRoots.Concat(m.Binding!.LinkageRoots))
             _callSuppressedRootFields.Add(root.CsName);
 
@@ -407,7 +396,7 @@ public sealed partial class DataBinder
         // synthesized accessor clones object data, where the clause is already rejected). SR3: referenced in the
         // method's PD header as a formal (all header formals are BY REFERENCE today — SR3a) or the RETURNING
         // item (SR3b). Violations clear the flag (the IsBased discipline). ──
-        foreach (var root in m.Binding!.StaticRoots.Concat(m.Binding!.LocalRoots))
+        foreach (var root in m.Binding!.LocalRoots)
             if (root.IsAnyLength)
             {
                 Edition.Error("COBOLNET1542", $"{where}: data item '{root.CobolName ?? "FILLER"}': the ANY "
@@ -748,20 +737,16 @@ public sealed partial class DataBinder
         foreach (var ren in item.Renames66) OoGateUnsupportedShapes(ren, where);
     }
 
-    /// <summary>Route a method-scoped Tier-B REDEFINES class's ONE string backing to the right storage (M2-OO-1h
-    /// step 3): a method-WS canonical → STATIC (<see cref="StaticRootFields"/>, matching the static root); a
-    /// method LOCAL/LINKAGE canonical → a method LOCAL (suppressed from the class-level field loop via
-    /// <see cref="CallSuppressedRootFields"/>, emitted in <c>OoEmitMethod</c>). Runs after
+    /// <summary>Route a method-scoped Tier-B REDEFINES class's ONE string backing to its method LOCAL (M2-OO-1h
+    /// step 3): a method LOCAL-STORAGE / LINKAGE canonical → a method LOCAL (suppressed from the class-level field
+    /// loop via <see cref="CallSuppressedRootFields"/>, emitted in <c>OoEmitMethod</c>). A method owns no
+    /// WORKING-STORAGE (§13.5.3 SR1 — COBOLNET1519), so there is no static arm. Runs after
     /// <c>ClassifyRedefinesClasses</c>. A subordinate (02) canonical rides its root's composed initializer and
     /// needs no routing (its backing is a member of the method-local root struct already).</summary>
     internal void OoRouteMethodRedefinesBackings()
     {
         foreach (var root in OoMethodScopedRoots)
-            if (root.Class is { Tier: RedefinesTier.StringCanonical } cls && ReferenceEquals(cls.Canonical, root)
-                && OoRootOwner.TryGetValue(root, out var m))
-            {
-                if (m.Binding!.StaticRoots.Contains(root)) _staticRootFields.Add(cls.BackingCsName);   // method-WS → static
-                else _callSuppressedRootFields.Add(cls.BackingCsName);   // LOCAL/LINKAGE → emitted as a method local
-            }
+            if (root.Class is { Tier: RedefinesTier.StringCanonical } cls && ReferenceEquals(cls.Canonical, root))
+                _callSuppressedRootFields.Add(cls.BackingCsName);   // emitted as a method local
     }
 }

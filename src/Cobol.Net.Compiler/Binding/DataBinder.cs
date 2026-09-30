@@ -98,34 +98,23 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// connectors. The two emitter sites previously mirrored this predicate BY HAND with a comment warning
     /// that divergence is a CS0103 in generated code; reading it here retires the mirroring (kb/Work PB168;
     /// the one-rule-one-place discipline).
-    /// <para>The static channel is populated for exactly two kinds of storage — a <see cref="UnitStaticWs"/> unit's
-    /// WORKING-STORAGE (<see cref="RouteStaticUnitStorage"/>) and a class's METHOD WORKING-STORAGE (OO deep-dive D3,
-    /// <see cref="MethodWorkingStorageRoots"/>) — so a non-empty channel IS the condition, with no unit-kind conjunct.
-    /// A class half therefore emits <c>__ResetStatics</c> too, and its factory adopts it into each run unit
-    /// (kb/Work PB1069: a pre-2023 method's WORKING-STORAGE was a C# static nothing ever reset, so a second run unit
-    /// in one process saw the first one's values).</para></summary>
+    /// <para>The static channel is populated for one kind of storage — a <see cref="UnitStaticWs"/> unit's
+    /// WORKING-STORAGE (<see cref="RouteStaticUnitStorage"/>) — so a non-empty channel IS the condition, with no
+    /// unit-kind conjunct. (A class's METHOD had a second producer until kb/Work PB1308: a method owns no
+    /// WORKING-STORAGE at any edition, §13.5.3 SR1.)</para></summary>
     public bool EmitsStaticReset =>
         StaticRootFields.Count > 0 || StaticBasedBridgeAddrs.Count > 0
         || StaticAddressableCells.Count > 0 || StaticIndexCells.Count > 0
         || (UnitStaticFiles && Files.Count > 0);
 
-    /// <summary>Every WORKING-STORAGE root whose storage is STATIC data — this unit's own when it is a
-    /// <see cref="UnitStaticWs"/> unit, then each METHOD's (a class half; OO deep-dive D3), in source order. The ONE
-    /// walk <c>__ResetStatics</c> emits from; each arm there is gated on the static-channel membership, so an
-    /// automatic-storage root in this list contributes nothing.</summary>
-    public IEnumerable<DataItem> StaticStorageRoots => _workingStorageRoots.Concat(_methodWorkingStorageRoots);
-
     /// <summary>The unit's WORKING-STORAGE SECTION roots, in source order — the subset of <see cref="Roots"/>
     /// whose storage class is decided by §13.5.4 (static/initial data), captured at bind so the static-WS
     /// routing (<see cref="RouteStaticUnitStorage"/>) and the emitter's <c>__ResetStatics</c> never guess from
-    /// the mixed forest (FILE records and compiler temps share <see cref="Roots"/>).</summary>
+    /// the mixed forest (FILE records and compiler temps share <see cref="Roots"/>). The ONE walk
+    /// <c>__ResetStatics</c> emits from; each arm there is gated on the static-channel membership, so an
+    /// automatic-storage root in this list contributes nothing.</summary>
     public IReadOnlyList<DataItem> WorkingStorageRoots => _workingStorageRoots;
     private readonly List<DataItem> _workingStorageRoots = [];
-
-    /// <summary>A class half's METHOD WORKING-STORAGE roots, every method's in source order — the static data of
-    /// OO deep-dive D3 (one copy per class, persistent across activations; §13.5.4 GR1 via §11.7).</summary>
-    public IReadOnlyList<DataItem> MethodWorkingStorageRoots => _methodWorkingStorageRoots;
-    private readonly List<DataItem> _methodWorkingStorageRoots = [];
 
     /// <summary>The unit's LOCAL-STORAGE SECTION roots, in source order (ISO §13.6 — automatic data,
     /// §13.6.4 GR1). Emitted as ordinary INSTANCE fields: for an INITIAL or RECURSIVE unit the fresh instance
@@ -6541,11 +6530,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     scope = par.Children;
                 else if (OoRootOwner.TryGetValue(RootOf(item), out var mm))
                     // A top-level method redefiner scopes to its OWN section only (§13.18.44.3 SR — the target is a
-                    // preceding item in the SAME data description; cross-section WS↔LOCAL↔LINKAGE aliasing is illegal,
-                    // and their storage classes differ [static WS vs per-activation LOCAL] — review B). RootOf(item)
+                    // preceding item in the SAME data description; cross-section LOCAL↔LINKAGE aliasing is illegal,
+                    // and their storage classes differ — review B). RootOf(item)
                     // == item here (Parent is null).
-                    scope = mm.Binding!.StaticRoots.Contains(item) ? mm.Binding!.StaticRoots
-                          : mm.Binding!.LocalRoots.Contains(item) ? mm.Binding!.LocalRoots
+                    scope = mm.Binding!.LocalRoots.Contains(item) ? mm.Binding!.LocalRoots
                           : mm.Binding!.LinkageRoots;
                 else
                     scope = Roots;
