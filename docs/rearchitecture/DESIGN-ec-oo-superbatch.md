@@ -1,6 +1,11 @@
 # DESIGN — EC-infra + OO super-batch (coordinated fix pass)
 
-> **STATUS: DESIGN — not yet implemented.** Decision-complete plan for the 13 remaining EC-infra + OO conformance
+> **STATUS: EXECUTED — the batch is COMPLETE (10 findings landed; CA12 REFUTED — a Format-3 USE cannot be GLOBAL, so
+> the outward walk it asked for is unreachable; DEVLOG entries 1090–1091).** This document is the plan as it was
+> written; its §1 line anchors are a snapshot and have drifted (the per-EC checking flags now live in
+> `Runtime/Exceptions/CheckingFlags.cs`, and the dispatch-result protocol gained `-4` — kb/Work PB1120). The CURRENT
+> scaffold is described in `docs/COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN.md` ("The EC model — file map and engine
+> specifics"). Decision-complete plan for the 13 remaining EC-infra + OO conformance
 > findings (CA9/CA10/CA11/CA12/V57 · CA21/CA22/V58 · CA29/CA30/V55 · CA37/CA38), which share the EC dispatch
 > scaffold (EcBinder/EcEmitter/ExceptionState) and so land as ONE SERIAL coordinated pass. Produced by anchor
 > re-scout `wf_d20dadb7-de9` (machinery map + 13 spec/code re-verifications + synthesis). ⛔ **Live status is each
