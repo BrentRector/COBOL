@@ -820,7 +820,9 @@ internal sealed class StatementValidation(DataBinder data)
     /// <summary>SR5 — a TALLYING counter shall be an elementary numeric data item.</summary>
     public bool CheckInspectTallyCounter(Place counter)
     {
-        if (counter.Item.Pic is { Category: PicCategory.Numeric }) return true;
+        // "An elementary numeric data item" is §8.5.2.1 Table 2's class NUMERIC — a USAGE INDEX item is class INDEX, and
+        // its storage PicInfo (category Numeric, Digits 0) must not pass for it (kb/Work PB1127, the R27/PB640 trap).
+        if (counter.Item.Pic is { Category: PicCategory.Numeric, Usage: not Usage.Index }) return true;
         data.Edition.Error("COBOLNET0847", $"INSPECT TALLYING counter '{counter.Item.CobolName}' shall "
             + "be an elementary numeric data item (ISO §14.9.22.3 SR5)");
         return false;

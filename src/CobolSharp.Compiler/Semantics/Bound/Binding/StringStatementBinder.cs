@@ -47,59 +47,22 @@ internal sealed class StringStatementBinder
                 var counterExpr = _ctx.Expression.BindDataReferenceWithSubscripts(item.dataReference());
                 if (counterExpr is not BoundIdentifierExpression counterId) continue;
 
-                foreach (var forClause in item.inspectForClause())
+                // The shared grammar nests each phrase's operands under its adjective (PB1125): ALL / LEADING are
+                // transitive across the operands that follow them, so every operand inherits the phrase's kind.
+                foreach (var countPhrase in item.inspectCountPhrase())
                 {
-                    // Track last-seen keyword within this FOR clause.
-                    // Per ISO spec, bare patterns (no keyword) inherit from
-                    // the preceding phrase in the same FOR clause.
-                    InspectTallyKind lastKind = InspectTallyKind.All;
-
-                    foreach (var countPhrase in forClause.inspectCountPhrase())
+                    if (countPhrase.CHARACTERS() != null)
                     {
-                        InspectTallyKind kind;
-                        InspectPatternValue? pattern = null;
-
-                        if (countPhrase.CHARACTERS() != null)
-                        {
-                            kind = InspectTallyKind.Characters;
-                            lastKind = kind;
-                        }
-                        else if (countPhrase.LEADING() != null)
-                        {
-                            kind = InspectTallyKind.Leading;
-                            lastKind = kind;
-                            pattern = ExtractInspectPattern(countPhrase.inspectChar());
-                        }
-                        else if (countPhrase.ALL() != null)
-                        {
-                            kind = InspectTallyKind.All;
-                            lastKind = kind;
-                            pattern = ExtractInspectPattern(countPhrase.inspectChar());
-                        }
-                        else if (countPhrase.FIRST() != null)
-                        {
-                            // FIRST maps to All for tallying (count first occurrence)
-                            kind = InspectTallyKind.All;
-                            lastKind = kind;
-                            pattern = ExtractInspectPattern(countPhrase.inspectChar());
-                        }
-                        else if (countPhrase.TRAILING() != null)
-                        {
-                            // TRAILING maps to All for tallying (no dedicated enum yet)
-                            kind = InspectTallyKind.All;
-                            lastKind = kind;
-                            pattern = ExtractInspectPattern(countPhrase.inspectChar());
-                        }
-                        else
-                        {
-                            // No keyword — inherit from preceding phrase in this FOR clause
-                            kind = lastKind;
-                            pattern = ExtractInspectPattern(countPhrase.inspectChar());
-                        }
-
-                        var region = BindInspectDelimiters(countPhrase.inspectDelimiters());
-                        tallying.Add(new BoundInspectTallyingItem(counterId, kind, pattern, region));
+                        tallying.Add(new BoundInspectTallyingItem(counterId, InspectTallyKind.Characters, null,
+                            BindInspectDelimiters(countPhrase.inspectDelimiters())));
+                        continue;
                     }
+                    // LEADING stays Leading; ALL, and the FIRST / TRAILING spellings the legacy engine has no
+                    // dedicated tally kind for, count as All.
+                    var kind = countPhrase.LEADING() != null ? InspectTallyKind.Leading : InspectTallyKind.All;
+                    foreach (var operand in countPhrase.inspectCountOperand())
+                        tallying.Add(new BoundInspectTallyingItem(counterId, kind,
+                            ExtractInspectPattern(operand.inspectChar()), BindInspectDelimiters(operand.inspectDelimiters())));
                 }
             }
         }
@@ -109,35 +72,32 @@ internal sealed class StringStatementBinder
         {
             foreach (var item in replPhrase.inspectReplacingItem())
             {
-                InspectReplaceKind kind;
-                if (item.CHARACTERS() != null) kind = InspectReplaceKind.Characters;
-                else if (item.FIRST() != null) kind = InspectReplaceKind.First;
-                else if (item.LEADING() != null) kind = InspectReplaceKind.Leading;
-                else kind = InspectReplaceKind.All;
-
-                InspectPatternValue pattern;
-                InspectPatternValue replacement;
-
-                var inspChars = item.inspectChar();
                 if (item.CHARACTERS() != null)
                 {
-                    pattern = InspectPatternValue.FromLiteral("");
-                    replacement = inspChars.Length > 0
-                        ? ExtractInspectPattern(inspChars[0]) ?? InspectPatternValue.FromLiteral("")
-                        : InspectPatternValue.FromLiteral("");
-                }
-                else
-                {
-                    pattern = inspChars.Length > 0
-                        ? ExtractInspectPattern(inspChars[0]) ?? InspectPatternValue.FromLiteral("")
-                        : InspectPatternValue.FromLiteral("");
-                    replacement = inspChars.Length > 1
-                        ? ExtractInspectPattern(inspChars[1]) ?? InspectPatternValue.FromLiteral("")
-                        : InspectPatternValue.FromLiteral("");
+                    var characterReplacement = ExtractInspectPattern(item.inspectChar())
+                        ?? InspectPatternValue.FromLiteral("");
+                    replacing.Add(new BoundInspectReplacingItem(InspectReplaceKind.Characters,
+                        InspectPatternValue.FromLiteral(""), characterReplacement,
+                        BindInspectDelimiters(item.inspectDelimiters())));
+                    continue;
                 }
 
-                var region = BindInspectDelimiters(item.inspectDelimiters());
-                replacing.Add(new BoundInspectReplacingItem(kind, pattern, replacement, region));
+                // The shared grammar nests the pairs under their adjective (PB1125); each inherits its item's kind.
+                var kind = item.FIRST() != null ? InspectReplaceKind.First
+                    : item.LEADING() != null ? InspectReplaceKind.Leading
+                    : InspectReplaceKind.All;
+                foreach (var pair in item.inspectReplacingPair())
+                {
+                    var inspChars = pair.inspectChar();
+                    var pattern = inspChars.Length > 0
+                        ? ExtractInspectPattern(inspChars[0]) ?? InspectPatternValue.FromLiteral("")
+                        : InspectPatternValue.FromLiteral("");
+                    var replacement = inspChars.Length > 1
+                        ? ExtractInspectPattern(inspChars[1]) ?? InspectPatternValue.FromLiteral("")
+                        : InspectPatternValue.FromLiteral("");
+                    replacing.Add(new BoundInspectReplacingItem(kind, pattern, replacement,
+                        BindInspectDelimiters(pair.inspectDelimiters())));
+                }
             }
         }
 
@@ -151,8 +111,8 @@ internal sealed class StringStatementBinder
             var toSet = inspChars.Length > 1
                 ? ExtractInspectPattern(inspChars[1]) ?? InspectPatternValue.FromLiteral("")
                 : InspectPatternValue.FromLiteral("");
-            // CONVERTING uses inspectBeforeAfterPhrase*, map to BoundInspectRegion
-            var region = BindInspectBeforeAfter(convPhrase.inspectBeforeAfterPhrase());
+            // CONVERTING's after-before-phrase is the same inspectDelimiters rule as the other two formats (PB1125).
+            var region = BindInspectDelimiters(convPhrase.inspectDelimiters());
             converting = new BoundInspectConverting(fromSet, toSet, region);
         }
 
@@ -185,37 +145,6 @@ internal sealed class StringStatementBinder
             return InspectPatternValue.FromLiteral(ctx.figurativeConstant().GetText());
         }
         return null;
-    }
-
-    /// <summary>
-    /// Bind INSPECT BEFORE/AFTER INITIAL phrases into a BoundInspectRegion.
-    /// </summary>
-    internal BoundInspectRegion BindInspectBeforeAfter(
-        CobolParserCore.InspectBeforeAfterPhraseContext[]? phrases)
-    {
-        if (phrases == null || phrases.Length == 0)
-            return BoundInspectRegion.Empty;
-
-        InspectPatternValue? beforePattern = null;
-        bool beforeInitial = false;
-        InspectPatternValue? afterPattern = null;
-        bool afterInitial = false;
-
-        foreach (var p in phrases)
-        {
-            if (p.BEFORE() != null)
-            {
-                beforePattern = ExtractInspectPattern(p.inspectChar());
-                beforeInitial = p.INITIAL_() != null;
-            }
-            else if (p.AFTER() != null)
-            {
-                afterPattern = ExtractInspectPattern(p.inspectChar());
-                afterInitial = p.INITIAL_() != null;
-            }
-        }
-
-        return new BoundInspectRegion(beforePattern, beforeInitial, afterPattern, afterInitial);
     }
 
     internal string ExtractStringValue(

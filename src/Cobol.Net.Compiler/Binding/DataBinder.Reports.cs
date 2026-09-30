@@ -2885,7 +2885,9 @@ public sealed partial class DataBinder
         }
         // SR5's category half. A group item and every non-numeric category fail it — the addend is added into
         // the counter by §13.18.54.4 GR3's ADD, which has no meaning for a non-numeric sending operand.
-        if (item.Pic is not { Category: PicCategory.Numeric })
+        // A USAGE INDEX item is class INDEX, never numeric (§8.5.2.1 Table 2), but its storage PicInfo carries category
+        // Numeric — the R27/PB640 trap the INSPECT tally counter (PB1127) had (kb/Work PB1830).
+        if (item.Pic is not { Category: PicCategory.Numeric, Usage: not Usage.Index })
         {
             Edition.Error(DiagnosticCatalog.ReportSumAddendNotNumeric, $"RD '{model.Name}': SUM addend '{addend.Written}' is "
                 + $"{(item.IsGroup ? "a group item" : $"of category {item.Pic?.Category.ToString().ToLowerInvariant() ?? "unknown"}")}; "

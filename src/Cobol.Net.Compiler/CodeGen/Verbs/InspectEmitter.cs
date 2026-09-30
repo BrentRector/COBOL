@@ -5,6 +5,7 @@ using CobolNet.Binding.Model;
 using CobolNet.Binding.Bound;
 using CobolNet.CodeGen.Emit;
 using CobolNet.Runtime;
+using ClassKind = CobolNet.Binding.CobolClass;
 
 namespace CobolNet.CodeGen;
 
@@ -24,9 +25,15 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     /// REPLACING/CONVERTING result stores back through the target's <see cref="Place"/>, re-signing a signed
     /// numeric target with its retained original sign (GR4d).
     /// </summary>
-    public void Emit(BoundInspect ins)
+    public void Emit(BoundInspect statement)
     {
         var w = ctx.Writer;
+        // ⛔ GR6 — ITEM IDENTIFICATION IS THE FIRST OPERATION, AND IT IS DONE ONCE (kb/Work PB1123): every operand's
+        // subscripts / reference modifier are evaluated HERE, left to right, before identifier-1 is read or any counter
+        // is stored — so a subscript that names a TALLYING counter (`YE(J) … TALLYING J`) still addresses the item
+        // the statement identified when the replaced image is stored, and a REPLACING operand `T(ND)` reads the
+        // occurrence ND named BEFORE the tally incremented it (GR19: a format 3's second pass shares the first's).
+        var ins = IdentifyOperands(statement);
         int id = ctx.Names.NextInspectTmp();
         string img = $"__ins{id}";
         // identifier-1 is read as its character image whatever its SHAPE — a field, or (Format 1 only) a
@@ -41,6 +48,53 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         // The one image read above is the whole of item identification this statement then owes (GR6).
         using (w.Block($"if ({img}.Length != 0)"))
             EmitBody(ins, id, img);
+    }
+
+    /// <summary>§14.9.22.4 GR6 / §14.6.4 7): identify every identifier of the statement once, in SOURCE order —
+    /// identifier-1, then each TALLYING counter with its pattern and delimiters, each REPLACING pattern / replacement /
+    /// delimiters, then CONVERTING's operands — by freezing each <see cref="Place"/>'s run-time address into locals
+    /// (<see cref="PlaceIdentification"/>). The returned statement addresses the locals; nothing after this reads a
+    /// subscript variable again.</summary>
+    private BoundInspect IdentifyOperands(BoundInspect ins)
+    {
+        string Hoist(string fragment)
+        {
+            string name = $"__insId{ctx.Names.NextInspectTmp()}";
+            ctx.Writer.Line($"var {name} = {fragment};");
+            return name;
+        }
+        BoundOperand? Identify(BoundOperand? op) =>
+            op is BoundFieldOperand f ? f with { Place = PlaceIdentification.Freeze(f.Place, Hoist) } : op;
+
+        var target = Identify(ins.Target)!;
+        var tallying = new List<BoundInspectTally>(ins.Tallying.Count);
+        foreach (var t in ins.Tallying)
+        {
+            var counter = PlaceIdentification.Freeze(t.Counter, Hoist);
+            var pattern = Identify(t.Pattern);
+            var before = Identify(t.Before);
+            var after = Identify(t.After);
+            tallying.Add(t with { Counter = counter, Pattern = pattern, Before = before, After = after });
+        }
+        var replacing = new List<BoundInspectReplace>(ins.Replacing.Count);
+        foreach (var r in ins.Replacing)
+        {
+            var pattern = Identify(r.Pattern);
+            var replacement = Identify(r.Replacement)!;
+            var before = Identify(r.Before);
+            var after = Identify(r.After);
+            replacing.Add(r with { Pattern = pattern, Replacement = replacement, Before = before, After = after });
+        }
+        BoundInspectConvert? converting = null;
+        if (ins.Converting is { } cv)
+        {
+            var from = Identify(cv.From)!;
+            var to = Identify(cv.To)!;
+            var before = Identify(cv.Before);
+            var after = Identify(cv.After);
+            converting = cv with { From = from, To = to, Before = before, After = after };
+        }
+        return ins with { Target = target, Tallying = tallying, Replacing = replacing, Converting = converting };
     }
 
     /// <summary>The TALLYING / REPLACING / CONVERTING passes and the write-back, over the non-empty image.</summary>
@@ -181,6 +235,16 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     private string OperandTextOf(BoundOperand? op, PicCategory? cat) =>
         op is null ? "null" : OperandText.AsString(op, num, deSign: true, characterCategory: cat);
 
-    private static PicCategory? CharacterCategoryOf(BoundOperand target) =>
-        target is BoundFieldOperand { Place.Item.Pic: { } pic } ? pic.Category : null;
+    /// <summary>The character CONTEXT a figurative operand is read in: identifier-1's §8.5.2.1 Table 2 CLASS, never
+    /// its raw PICTURE category (kb/Work PB1414). The category test this replaced read <c>Pic.Category</c>, which
+    /// is null for EVERY GROUP — so a GROUP-USAGE NATIONAL identifier-1 took the alphanumeric collating sequence —
+    /// and for a function-identifier. The class answers all of them: national ⇒ the national program collating
+    /// sequence, boolean ⇒ the pinned boolean fill, everything else ⇒ the alphanumeric one.</summary>
+    private static PicCategory CharacterCategoryOf(BoundOperand target) =>
+        IntrinsicArgumentRules.ClassOf(target) switch
+        {
+            ClassKind.National => PicCategory.National,
+            ClassKind.Boolean => PicCategory.Boolean,
+            _ => PicCategory.Alphanumeric,
+        };
 }

@@ -1154,24 +1154,30 @@ inspectTallyingPhrase
     : TALLYING inspectTallyingItem+
     ;
 
+// ⛔ THE TALLYING-PHRASE AS PRINTED (§14.9.22.2, the page rendered from the PDF — kb/Work PB1125):
+//   { identifier-2 FOR { CHARACTERS [abp] | ALL { {identifier-3|literal-1} [abp] } … | LEADING { … } … } … } …
+// ONE FOR per identifier-2 (the outer ellipsis repeats `identifier-2 FOR …`, the middle one repeats the selected
+// CHARACTERS/ALL/LEADING phrase, the inner one the operand), and the adjective is REQUIRED on the first operand of a
+// phrase — only the operands AFTER it are bare. The grammar used to spell `identifier-2 (FOR phrase+)+` with an
+// adjective-less alternative at every position, so `N FOR ALL "A" FOR ALL "B"` and `N FOR "A"` were accepted.
 inspectTallyingItem
-    : dataReference inspectForClause+
-    ;
-
-inspectForClause
-    : FOR inspectCountPhrase+
+    : dataReference FOR inspectCountPhrase+
     ;
 
 // ALL/LEADING are transitive across the bare operands that follow them (GR 10), so a
-// count phrase may omit the adjective: "FOR LEADING ""S"" ""S"" ""T""" lists three
+// count phrase lists the operands after its adjective: "FOR LEADING ""S"" ""S"" ""T""" is three
 // operands. That bare form is ambiguous with the next counter in multi-counter TALLYING
 // ("c1 FOR ALL x  c2 FOR ALL y"): a greedy parser swallows c2 as a pattern of c1. The
 // IsBareInspectOperand() predicate resolves it — a data-name immediately followed by FOR
-// is the next counter, so the bare alternative declines it and the count-phrase loop ends.
+// is the next counter, and a phrase ADJECTIVE (ALL/LEADING/CHARACTERS …) begins the next phrase, so a bare
+// operand declines both and the operand loop ends.
 inspectCountPhrase
     : CHARACTERS inspectDelimiters?
-    | (ALL | LEADING | FIRST | TRAILING) inspectChar inspectDelimiters?
-    | {IsBareInspectOperand()}? inspectChar inspectDelimiters?
+    | (ALL | LEADING | FIRST | TRAILING) inspectCountOperand ({IsBareInspectOperand()}? inspectCountOperand)*
+    ;
+
+inspectCountOperand
+    : inspectChar inspectDelimiters?
     ;
 
 // ⛔ A FUNCTION-IDENTIFIER IS ADMISSIBLE HERE (ISO §8.4.3.1.2 Format 1 makes it an identifier; fix-queue PB45).
@@ -1194,22 +1200,28 @@ inspectReplacingPhrase
     : REPLACING inspectReplacingItem+
     ;
 
+// ⛔ THE REPLACING-PHRASE AS PRINTED (§14.9.22.2 — kb/Work PB1125): CHARACTERS, ALL, LEADING and FIRST are all
+// underlined and sit in ONE choice, so the adjective is REQUIRED on the first pair of an ALL/LEADING/FIRST phrase
+// and only the pairs AFTER it are bare (GR16's transitivity); a CHARACTERS phrase repeats nothing. The grammar used
+// to make the adjective optional at every pair, so `REPLACING "A" BY "Z"` and a bare pair after CHARACTERS parsed.
 inspectReplacingItem
     : CHARACTERS BY inspectChar inspectDelimiters?
-    | (ALL | LEADING | FIRST | TRAILING)? inspectChar BY inspectChar inspectDelimiters?
+    | (ALL | LEADING | FIRST | TRAILING) inspectReplacingPair ({IsBareInspectReplacingPair()}? inspectReplacingPair)*
+    ;
+
+inspectReplacingPair
+    : inspectChar BY inspectChar inspectDelimiters?
     ;
 
 // ----- CONVERTING -----
 
+// The after-before-phrase is ONE rule (§5.2.6.4's choice indicators: AFTER and BEFORE each at most once, in either
+// order) — the same inspectDelimiters the TALLYING and REPLACING phrases use. CONVERTING used to spell its own
+// `inspectBeforeAfterPhrase*`, which let BEFORE or AFTER repeat (the last one silently won).
 inspectConvertingPhrase
     : CONVERTING inspectChar
       TO inspectChar
-      inspectBeforeAfterPhrase*
-    ;
-
-inspectBeforeAfterPhrase
-    : BEFORE INITIAL_? inspectChar
-    | AFTER INITIAL_? inspectChar
+      inspectDelimiters?
     ;
 
 inspectDelimiters

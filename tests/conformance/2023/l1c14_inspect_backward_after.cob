@@ -27,9 +27,13 @@
       *>    "21" at 5..6 is no match; "12" at 8..9 and 2..3 -> 02.
       *> K5 "ABABABXY" FIRST "AB" BY "**": the rightmost "AB" (5..6)
       *>    -> ABAB**XY.
-      *> K6 "AAA" ALL "AA" BY "XY": first compare uses 2..3 (ends at
-      *>    the rightmost position), match; 8c resumes left of 2, i.e.
-      *>    at 1, where "AA" cannot fit -> AXY (forward gives XYA).
+      *> K6 "AAA" ALL "AA" BY "XY" (1-based positions): NOTE 2 compares
+      *>    each literal LEFT-to-right from the current position, so at
+      *>    3 "AA" cannot fit and at 2 it matches (2..3); 8c resumes
+      *>    one position left of the match's leftmost character, at 1,
+      *>    where "AA" (1..2) matches again; both read the original and
+      *>    the later write wins position 2 -> XYY (forward gives XYA).
+      *>    kb/Work PB1152 - the pattern-reversing scan gave AXY.
       *> K7 "ABCABC" ALL "A" BY "X" AFTER "B": first "B" from the
       *>    right is at 5 -> region 1..4 -> XBCXBC.
        IDENTIFICATION DIVISION.
