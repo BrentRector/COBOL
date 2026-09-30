@@ -23,6 +23,11 @@ public enum CtDiagCode
     /// consumer that evaluates only arithmetic operands (the CONSTANT-entry binder) never sees it; the frontend
     /// routes it to COBOLNET1619.</summary>
     DirectiveRule,
+
+    /// <summary>A compilation-variable-name that is a compiler-directive word (§8.12; §7.3.8.4.3 SR1, §7.3.11.3 SR1) —
+    /// raised by the defined-condition evaluation, which only a directive's constant-conditional-expression reaches
+    /// (kb/Work PB1366); the frontend routes it to COBOLNET2650.</summary>
+    DirectiveWordAsName,
 }
 
 /// <summary>A CODE-preserving diagnostic sink for the shared compile-time expression evaluator. The evaluator

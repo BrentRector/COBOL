@@ -29,7 +29,10 @@ public sealed class CobolWordsDirectiveTests
         // stage alone would test a path the compiler does not have.
         string text = ConditionalCompilationProcessor.Process(
             src, CobolNet.Frontend.Frontend.LeftDirectives, bag, "t.cob", std);
-        var (_, map) = CobolWordsDirectiveProcessor.Process(text, bag, "t.cob");
+        // Then the site stage, which judges §7.3.10.3 SR1's placement from the row's directivePlacement data and
+        // consumes PUSH/POP into the ops the state stages replay (kb/Work PB1377).
+        var (sited, _, stackOps) = DirectiveSiteProcessor.Process(text, bag, "t.cob");
+        var (_, map) = CobolWordsDirectiveProcessor.Process(sited, bag, "t.cob", stackOps: stackOps);
         return (map, bag);
     }
 
@@ -111,11 +114,26 @@ public sealed class CobolWordsDirectiveTests
         Assert.True(Has(diags, "COBOLNET1623"));
     }
 
-    [Fact] // SR1 — a directive after the first IDENTIFICATION DIVISION is illegal.
-    public void Sr1_AfterIdDivision_Rejected1623()
+    [Fact] // SR1 — a directive after the first IDENTIFICATION DIVISION is illegal: COBOLNET2652, the ONE placement screen.
+    public void Sr1_AfterIdDivision_RejectedAsAPlacementViolation()
     {
         var (_, diags) = Run("IDENTIFICATION DIVISION.\nPROGRAM-ID. P.\n>>COBOL-WORDS RESERVE \"FOO\"\n");
-        Assert.True(Has(diags, "COBOLNET1623"));
+        Assert.True(Has(diags, "COBOLNET2652"));
+        Assert.False(Has(diags, "COBOLNET1623"));   // the directive stage no longer writes the rule a second time
+    }
+
+    [Fact] // §7.3.22.3 SR2 / §7.3.20.3 SR2 — a PUSH / POP NAMING COBOL-WORDS inherits its placement rule.
+    public void PushOrPopNamingCobolWords_AfterIdDivision_Rejected()
+    {
+        foreach (string op in (string[])["PUSH", "POP"])
+        {
+            var (_, diags) = Run($">>PUSH COBOL-WORDS\nIDENTIFICATION DIVISION.\nPROGRAM-ID. P.\n>>{op} COBOL-WORDS\n");
+            Assert.True(Has(diags, "COBOLNET2652"), op);
+        }
+
+        // and the control: the same PUSH/POP BEFORE the first unit is legal.
+        var (_, ok) = Run(">>PUSH COBOL-WORDS\n>>POP COBOL-WORDS\nIDENTIFICATION DIVISION.\nPROGRAM-ID. P.\n");
+        Assert.False(ok.HasErrors);
     }
 
     [Fact] // SR1 — a directive BEFORE the first IDENTIFICATION DIVISION is legal.

@@ -40,6 +40,34 @@ public sealed class PushPopAllPlacementTests
         Assert.Contains(w, x => x.Contains(Code) && x.Contains("outside every compilation unit") && x.Contains(rule));
     }
 
+    /// <summary>kb/Work PB1065 (§7.3.14.3 SR1, §7.3.15.3 SR1) and PB1377 (§7.3.20.3 SR2, §7.3.22.3 SR2): FLAG-02 and
+    /// FLAG-14 "may be specified only between clauses … and only between statements", and a PUSH / POP NAMING one
+    /// inherits the rule — each inside a MOVE draws the warning, each between statements draws none.</summary>
+    [Theory]
+    [InlineData(">>FLAG-02 MOVE-TO-SAME-NAME ON", "§7.3.14.3 SR1")]
+    [InlineData(">>FLAG-14 ALL ON", "§7.3.15.3 SR1")]
+    [InlineData(">>PUSH FLAG-14", "§7.3.22.3 SR2")]
+    [InlineData(">>POP FLAG-02", "§7.3.20.3 SR2")]
+    public void FlagDirectivesAndNamedPushPop_InsideAStatement_Warn_BetweenStatements_DoNot(string directive, string rule)
+    {
+        string Program(bool inside) => $"""
+                   IDENTIFICATION DIVISION.
+                   PROGRAM-ID. PB1065{(inside ? "A" : "B")}.
+                   DATA DIVISION.
+                   WORKING-STORAGE SECTION.
+                   01 X PIC X.
+                   PROCEDURE DIVISION.
+                       MOVE
+                   {(inside ? directive : "")}
+                         "A" TO X
+                   {(inside ? "" : directive)}
+                       DISPLAY X
+                       STOP RUN.
+            """;
+        Assert.Contains(Warnings(Program(inside: true)), x => x.Contains(Code) && x.Contains(rule) && x.Contains("MOVE statement"));
+        Assert.DoesNotContain(Warnings(Program(inside: false)), x => x.Contains(Code));
+    }
+
     [Fact]
     public void AfterEndProgram_IsOutside_ButAfterTheLastStatementOfAnOpenProgram_IsInside()
     {

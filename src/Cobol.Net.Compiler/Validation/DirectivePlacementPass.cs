@@ -10,20 +10,36 @@ using CobolNet.Frontend.Preprocessor;
 namespace CobolNet.Validation;
 
 /// <summary>
-/// The POSITION rule of the ALL form of <c>&gt;&gt;PUSH</c> / <c>&gt;&gt;POP</c> (kb/Work PB1005):
+/// THE POSITION PASS for the placement rules of the §7.3 directives that need the PARSE TREE (kb/Work PB1005,
+/// PB1065, PB1377, PB1378). Each rule is DATA on the directive's <c>constructs.json</c> row
+/// (<see cref="ConstructDialectStatus.Placement"/>), so this pass is written once and a directive with one of these
+/// restrictions is one row field:
 /// <list type="bullet">
-/// <item>ISO §7.3.22.3 SR3 — "If ALL is specified, the PUSH directive shall be specified only in a compilation unit
-/// between clauses in divisions other than the procedure division and between statements in the procedure
-/// division."</item>
-/// <item>ISO §7.3.20.3 SR3 — the same for POP.</item>
+/// <item><see cref="DirectivePlacementRule.BetweenClauses"/> — ISO §7.3.14.3 SR1 (FLAG-02), §7.3.15.3 SR1 (FLAG-14)
+/// and, for the ALL form, §7.3.22.3 SR3 / §7.3.20.3 SR3: "shall be specified only between clauses in divisions other
+/// than the procedure division and only between statements in the procedure division" (and, for ALL, only in a
+/// compilation unit). A WARNING (<c>COBOLNET2344</c>, §4.2.2 — the D20 disposition of the sibling SR4 bans): the
+/// directive is still processed.</item>
+/// <item><see cref="DirectivePlacementRule.OutsideCompilationUnits"/> — ISO §7.3.17.3 SR1 (LEAP-SECOND) and §7.3.21.3
+/// SR1 (PROPAGATE): "shall not be specified within a compilation unit". An ERROR (<c>COBOLNET2652</c>): the
+/// directive's effect is folded per unit at the unit's first line, which a directive inside the unit leaves
+/// undefined. BETWEEN two sibling units, or before the first, or after the last END marker, is outside every unit
+/// and LEGAL.</item>
 /// </list>
+/// A <c>&gt;&gt;PUSH</c> or <c>&gt;&gt;POP</c> that NAMES a directive inherits that directive's rule (§7.3.20.3 SR2,
+/// §7.3.22.3 SR2: "shall not be specified where directive-name must not be specified") — the site carries the named
+/// row, and the rule of the NAMED row is judged at the PUSH/POP's own position. (The text-level rule,
+/// <see cref="DirectivePlacementRule.BeforeFirstCompilationUnit"/>, is judged where the text is —
+/// <see cref="DirectiveSiteProcessor"/>.)
+///
 /// <para>A compiler directive is in no parse tree, so its position is the GAP between the last token before its
 /// line and the first token after it — the final line frame, where a directive line and a token line are the same
-/// number (<see cref="DirectiveSiteProcessor"/>). Two arms, one warning (<c>COBOLNET2344</c>, §4.2.2):</para>
+/// number (<see cref="DirectiveSiteProcessor"/>). Two arms for the between-clauses rule:</para>
 /// <list type="number">
 /// <item>OUTSIDE a compilation unit — before the first unit's first token, or after a unit's END marker and before
 /// the next unit. A program with no END PROGRAM header runs on to the end of the text, so a directive after
-/// its last token is still inside it.</item>
+/// its last token is still inside it. (Only the ALL form says "in a compilation unit"; FLAG-02 / FLAG-14 say only
+/// "between clauses … between statements", which a position outside every unit satisfies vacuously.)</item>
 /// <item>INSIDE a clause or statement — the innermost clause (a <c>…Clause</c> rule) or <see
 /// cref="CobolParserCore.StatementContext"/> spanning the gap, unless the gap is itself a boundary of a nested
 /// clause or statement (the next token STARTS one, or the previous token ENDS one): <c>IF X = 1 &gt;&gt;PUSH ALL
@@ -32,44 +48,85 @@ namespace CobolNet.Validation;
 /// <para>The rule reads "between clauses", and an entry's name, a paragraph header or a division header is not a
 /// clause; those gaps are not diagnosed — the reading that cannot reject a position the rule admits.</para>
 /// </summary>
-internal static class PushPopAllPlacementPass
+internal static class DirectivePlacementPass
 {
     public static void Run(CobolParserCore.CompilationUnitContext tree, IReadOnlyList<DirectiveSite> sites,
         CobolNet.Binding.EditionContext sink)
     {
-        List<DirectiveSite>? all = null;
-        foreach (var s in sites) if (s.AllForm) (all ??= []).Add(s);
-        if (all is null) return;   // the common case: no tree walk at all
+        List<(DirectiveSite Site, ConstructDialectStatus? Named, bool BetweenClauses, DirectivePlacement? Placement)>? judged = null;
+        foreach (var s in sites)
+        {
+            // The row whose rule judges this site: the directive NAMED by a PUSH/POP, else the directive itself.
+            var named = s.NamedRow is { } id ? ConstructRegistry.Find(id) : null;
+            var subject = named ?? (s.AllForm ? null : CompilerDirectiveCatalog.Find(s.Word));
+            var placement = subject?.Placement;
+            bool between = s.AllForm || placement?.Rule == DirectivePlacementRule.BetweenClauses;
+            bool outside = placement?.Rule == DirectivePlacementRule.OutsideCompilationUnits;
+            if (between || outside) (judged ??= []).Add((s, named, between, placement));
+        }
+        if (judged is null) return;   // the common case: no tree walk at all
 
         var tokens = new List<ITerminalNode>();
         Collect(tree, tokens);
         var units = TopLevelUnits(tree);
-        foreach (var site in all)
+        foreach (var (site, named, between, placement) in judged)
         {
             // The gap: the last token before the directive's line and the first token after it.
             int k = FirstAfter(tokens, site.Line);
             ITerminalNode? next = k < tokens.Count ? tokens[k] : null;
             ITerminalNode? prev = k > 0 ? tokens[k - 1] : null;
-            string? where = !InsideUnit(units, prev) ? "outside every compilation unit"
-                : InnermostContainer(prev!, next) is { } c ? $"inside {Describe(c)}"
+            bool insideUnit = InsideUnit(units, prev);
+            using var _ = sink.At(site.Line, 0);
+            if (!between)
+            {
+                // OutsideCompilationUnits (§7.3.17.3 SR1, §7.3.21.3 SR1).
+                if (!insideUnit) continue;
+                sink.Error(DiagnosticCatalog.DirectivePlacementViolation, Describe(site, named, placement!, "within a compilation unit"));
+                continue;
+            }
+            string? where = !insideUnit ? "outside every compilation unit"
+                : InnermostContainer(prev!, next) is { } c ? $"inside {DescribeContainer(c)}"
                 : null;
             if (where is null) continue;
-            var (rule, text) = site.Word == "PUSH" ? PushRule : PopRule;
-            using var _ = sink.At(site.Line, 0);
-            sink.Warning(DiagnosticCatalog.PushPopAllPlacement,
-                $"the >>{site.Word} ALL directive on line {site.Line} is written {where} — \"{text}\" (ISO {rule}). "
-                + "The directive is still processed. Move it to a point between two clauses or statements of the "
-                + "compilation unit.");
+            sink.Warning(DiagnosticCatalog.DirectiveBetweenClausesPlacement,
+                Describe(site, named, placement, where) + " The directive is still processed. Move it to a point "
+                + "between two clauses or statements of the compilation unit.");
         }
     }
 
-    /// <summary>The two rules, each in its own words (the PUSH sentence is printed without the POP sentence's commas).</summary>
+    /// <summary>The diagnostic's sentence: the directive, where it was found, and the rule it broke in the standard's
+    /// own words — the named directive's for a PUSH/POP that names one (§7.3.20.3 SR2, §7.3.22.3 SR2), the ALL
+    /// form's own otherwise.</summary>
+    private static string Describe(DirectiveSite site, ConstructDialectStatus? named, DirectivePlacement? placement, string where)
+    {
+        if (site.AllForm)
+        {
+            var (rule, text) = site.Word.Equals("PUSH", StringComparison.OrdinalIgnoreCase) ? PushRule : PopRule;
+            return $"the >>{site.Word} ALL directive on line {site.Line} is written {where} — \"{text}\" (ISO {rule}).";
+        }
+        if (named is not null)
+        {
+            var (rule, _) = site.Word.Equals("PUSH", StringComparison.OrdinalIgnoreCase) ? PushNameRule : PopNameRule;
+            return $"the >>{site.Word} {named.DirectiveWords[0]} directive on line {site.Line} is written {where}, where "
+                + $"{named.DirectiveWords[0]} must not be specified (ISO {rule}: \"the {site.Word} directive shall not be "
+                + $"specified where directive-name must not be specified\") — \"{placement!.Text}\" (ISO {placement.Citation}).";
+        }
+        return $"the >>{site.Word} directive on line {site.Line} is written {where} — \"{placement!.Text}\" (ISO {placement.Citation}).";
+    }
+
+    /// <summary>The two ALL-form rules, each in its own words (the PUSH sentence is printed without the POP sentence's commas).</summary>
     private static readonly (string Rule, string Text) PushRule = ("§7.3.22.3 SR3",
         "If ALL is specified, the PUSH directive shall be specified only in a compilation unit between clauses in "
         + "divisions other than the procedure division and between statements in the procedure division");
     private static readonly (string Rule, string Text) PopRule = ("§7.3.20.3 SR3",
         "If ALL is specified, the POP directive shall be specified only in a compilation unit, between clauses in "
         + "divisions other than the procedure division, and between statements in the procedure division");
+
+    /// <summary>The two directive-name rules (SR2 of each).</summary>
+    private static readonly (string Rule, string Text) PushNameRule = ("§7.3.22.3 SR2",
+        "If directive-name is specified, the PUSH directive shall not be specified where directive-name must not be specified");
+    private static readonly (string Rule, string Text) PopNameRule = ("§7.3.20.3 SR2",
+        "If directive-name is specified, the POP directive shall not be specified where directive-name must not be specified");
 
     /// <summary>Every token of the tree in source order, EOF excluded.</summary>
     private static void Collect(IParseTree node, List<ITerminalNode> into)
@@ -149,7 +206,7 @@ internal static class PushPopAllPlacementPass
         c is CobolParserCore.StatementContext
         || CobolParserCore.ruleNames[c.RuleIndex].EndsWith("Clause", StringComparison.Ordinal);
 
-    private static string Describe(ParserRuleContext c) =>
+    private static string DescribeContainer(ParserRuleContext c) =>
         c is CobolParserCore.StatementContext s
             ? $"the {s.Start.Text.ToUpperInvariant()} statement starting on line {s.Start.Line}"
             : $"a clause ({CobolParserCore.ruleNames[c.RuleIndex]}) starting on line {c.Start.Line}";

@@ -54,6 +54,12 @@ public sealed record ConstructDialectStatus(
     /// </summary>
     public DirectiveOperandSyntax? DirectiveOperand { get; init; }
 
+    /// <summary>The §7.3 directive's PLACEMENT rule, when its syntax rules say where it may not (or may only) be
+    /// written (kb/Work PB1377, PB1378, PB1065) — rendered from the row's <c>directivePlacement</c> object. Null on
+    /// every row whose directive may be written anywhere §7.3.3 SR8 allows. A <c>&gt;&gt;PUSH</c> or
+    /// <c>&gt;&gt;POP</c> naming the directive inherits the rule (§7.3.20.3 SR2, §7.3.22.3 SR2).</summary>
+    public DirectivePlacement? Placement { get; init; }
+
     /// <summary>The availability verdict at <paramref name="edition"/>.</summary>
     public ConstructAvailability StatusAt(int edition)
     {

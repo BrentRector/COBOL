@@ -917,7 +917,7 @@ code:
   driver and COPY.
 * **Where the ALL form may be written** (§7.3.22.3 SR3 / §7.3.20.3 SR3: "only in a compilation unit, between clauses
   in divisions other than the procedure division, and between statements in the procedure division") is decided by
-  `Validation/PushPopAllPlacementPass` from the directive sites (`DirectiveSite.AllForm`) and the parse tree: the
+  `Validation/DirectivePlacementPass (renamed from PushPopAllPlacementPass, kb/Work PB1065; it also judges FLAG-02/14 and the LEAP-SECOND/PROPAGATE placement rows)` from the directive sites (`DirectiveSite.AllForm`) and the parse tree: the
   directive's position is the gap between the tokens around its line; outside every unit, or inside the innermost
   `…Clause` / statement context spanning the gap (unless the gap is a boundary of a nested one), draws the §4.2.2
   warning COBOLNET2344 (kb/Work PB1005). A reference-format note that belongs here: §7.2.1 Step 1 REQUIRES a SOURCE

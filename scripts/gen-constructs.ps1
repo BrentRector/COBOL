@@ -58,6 +58,14 @@ foreach ($r in $rows) {
         if ($r.directiveOperand.form -eq 'words' -and @($r.directiveOperand.choice).Count -eq 0 -and -not $r.directiveOperand.directiveName -and -not $r.directiveOperand.userWord) { throw "row '$($r.id)': a words operand needs a choice, a directiveName or a userWord alternative" }
     }
     elseif ($null -ne $r.directiveOperand) { throw "row '$($r.id)' carries directiveOperand but no directiveWords" }
+    # A directive's PLACEMENT rule (kb/Work PB1377/PB1378/PB1065) — where §7.3 says it may not be written — is data on
+    # the same row, so the stage that judges the rule shape is written once and a new directive with the same
+    # restriction is one field here.
+    if ($null -ne $r.directivePlacement) {
+        if ($null -eq $r.directiveWords -or @($r.directiveWords).Count -eq 0) { throw "row '$($r.id)' carries directivePlacement but no directiveWords" }
+        if ($r.directivePlacement.rule -notin 'outsideCompilationUnits','beforeFirstCompilationUnit','betweenClauses') { throw "row '$($r.id)': directivePlacement.rule '$($r.directivePlacement.rule)' is not outsideCompilationUnits/beforeFirstCompilationUnit/betweenClauses" }
+        if ([string]::IsNullOrWhiteSpace($r.directivePlacement.citation) -or [string]::IsNullOrWhiteSpace($r.directivePlacement.text)) { throw "row '$($r.id)': directivePlacement needs a citation and the rule's text" }
+    }
 }
 
 $hdr = @"
@@ -103,10 +111,17 @@ foreach ($r in $rows) {
         if ($null -ne $r.directiveOperand.excludedDirectives -and @($r.directiveOperand.excludedDirectives).Count -gt 0) {
             $init += ', ExcludedDirectives = [{0}]' -f ((@($r.directiveOperand.excludedDirectives) | ForEach-Object { '"' + (Esc $_) + '"' }) -join ', ')
         }
+        if ($null -ne $r.directiveOperand.noOperandWords -and @($r.directiveOperand.noOperandWords).Count -gt 0) {
+            $init += ', NoOperandWords = [{0}]' -f ((@($r.directiveOperand.noOperandWords) | ForEach-Object { '"' + (Esc $_) + '"' }) -join ', ')
+        }
         if ($r.directiveOperand.userWord)        { $init += ', UserWord = true' }
         if ($r.directiveOperand.operandRequired) { $init += ', OperandRequired = true' }
         if (-not [string]::IsNullOrEmpty($r.directiveOperand.owner)) { $init += ', Owner = "{0}"' -f (Esc $r.directiveOperand.owner) }
         $init += ', Citation = "{0}" }}' -f (Esc $r.directiveOperand.citation)
+        if ($null -ne $r.directivePlacement) {
+            $rule = $r.directivePlacement.rule
+            $init += ', Placement = new(DirectivePlacementRule.{0}, "{1}", "{2}")' -f ($rule.Substring(0,1).ToUpper() + $rule.Substring(1)), (Esc $r.directivePlacement.citation), (Esc $r.directivePlacement.text)
+        }
         $line += (' {{ {0} }}' -f $init)
     }
     [void]$sb.AppendLine($line + ',')

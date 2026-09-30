@@ -72,10 +72,10 @@ public static class CobolWordsDirectiveProcessor
             // the ONE directive-recognition point — CompilerDirectiveCatalog, from the cobol-words-directive-2023
             // row's directiveWords (kb/Work PB725). This stage parses; it does not re-decide the edition.
 
-            // SR1 — a COBOL-WORDS directive after the first IDENTIFICATION DIVISION is illegal (§7.3.10.3 SR1).
-            if (sawFirstIdDivision)
-                Invalid(diagnostics, loc,
-                    ">>COBOL-WORDS may be specified only before the first IDENTIFICATION DIVISION (ISO §7.3.10.3 SR1)");
+            // §7.3.10.3 SR1 — a COBOL-WORDS directive after the first IDENTIFICATION DIVISION is illegal — is judged by
+            // the ONE placement screen, from the row's directivePlacement data (DirectiveSiteProcessor, COBOLNET2652,
+            // kb/Work PB1377), for the directive itself and for a PUSH/POP naming it. This stage keeps the boundary only
+            // as STATE: the map is the set in effect where the region closes.
 
             if (TryParseOption(operand, i, diagnostics, loc, out var op))
             {

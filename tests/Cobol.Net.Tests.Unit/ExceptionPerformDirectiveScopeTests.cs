@@ -166,6 +166,7 @@ public sealed class ExceptionPerformDirectiveScopeTests
                    >>REF-MOD-ZERO-LENGTH ON
                    >>FLAG-14 READ-PREVIOUS ON
                    >>PROPAGATE ON
+                   >>LEAP-SECOND ON
                        DISPLAY "X"
             """);
         int pop = Line("X");

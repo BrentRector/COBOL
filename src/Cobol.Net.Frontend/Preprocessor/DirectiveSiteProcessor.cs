@@ -14,7 +14,11 @@ namespace CobolNet.Frontend.Preprocessor;
 /// <param name="Word">The compiler-directive word, upper-cased (§7.3.3 SR6 / §8.12).</param>
 /// <param name="AllForm">True for a <c>&gt;&gt;PUSH ALL</c> / <c>&gt;&gt;POP ALL</c> — the form §7.3.22.3 SR3 and
 /// §7.3.20.3 SR3 confine to positions between clauses / statements of a compilation unit (kb/Work PB1005).</param>
-public readonly record struct DirectiveSite(int Line, string Word, bool AllForm = false);
+/// <param name="NamedRow">For a <c>&gt;&gt;PUSH</c> / <c>&gt;&gt;POP</c> that names a directive (§7.3.20.2 / §7.3.22.2
+/// <c>directive-name</c>): that directive's <c>constructs.json</c> row. §7.3.20.3 SR2 / §7.3.22.3 SR2 — the PUSH or
+/// POP "shall not be specified where directive-name must not be specified" — so the named row's placement rule
+/// judges the PUSH/POP too (kb/Work PB1377). Null for every other directive and for the ALL form.</param>
+public readonly record struct DirectiveSite(int Line, string Word, bool AllForm = false, string? NamedRow = null);
 
 /// <summary>
 /// The POSITION-RULED compiler directives (ISO §7.3): the three whose syntax rules are about WHERE the directive
@@ -52,6 +56,14 @@ public static class DirectiveSiteProcessor
     private static readonly IReadOnlySet<string> Consumed =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "PUSH", "POP" };
 
+    /// <summary>The directive words whose row carries a PLACEMENT rule (<see cref="ConstructDialectStatus.Placement"/>
+    /// — kb/Work PB1377, PB1378, PB1065), DERIVED from the catalog so a directive with a new placement restriction
+    /// is one <c>constructs.json</c> field. Their sites are recorded too: the post-parse
+    /// <c>DirectivePlacementPass</c> judges the rules that need the parse tree.</summary>
+    private static readonly IReadOnlySet<string> PlacementRuled =
+        CompilerDirectiveCatalog.Words.Where(w => CompilerDirectiveCatalog.Find(w)?.Placement is not null)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Record the position-ruled directive sites on <paramref name="text"/>, record the PUSH/POP ops the
     /// later stages replay (<see cref="DirectiveStateStack"/>), warn for each unsuccessful named POP (§7.3.20.4
     /// GR2, <c>COBOLNET2297</c> — here, once, because only this stage sees every PUSH/POP of the final text), and
@@ -65,14 +77,34 @@ public static class DirectiveSiteProcessor
         List<DirectiveStackOp>? ops = null;
         DirectiveStateStack? pairing = null;   // carries nothing: it answers GR2's "was it saved?" and no more
         bool blanked = false;
+        bool sawUnit = false;   // a compilation unit's first line has been passed — §7.3.10.3 SR1's boundary
         for (int i = 0; i < lines.Length; i++)
         {
             // The ONE compiler-directive line parse (kb/Work PB794) — the indicator's optional space and the
             // trailing inline comment are its rules, not this stage's.
-            if (!CompilerDirectiveLine.TryParse(lines[i], out var directive)) continue;
-            if (!PositionRuled.Contains(directive.Word)) continue;
+            if (!CompilerDirectiveLine.TryParse(lines[i], out var directive))
+            {
+                if (!sawUnit && CompilationUnitStart.IsAt(lines[i].TrimEnd('\r').TrimStart())) sawUnit = true;
+                continue;
+            }
+            if (!PositionRuled.Contains(directive.Word) && !PlacementRuled.Contains(directive.Word)) continue;
             bool isOp = DirectiveStackOp.TryParse(directive, i + 1, out var op);
-            (sites ??= []).Add(new DirectiveSite(i + 1, directive.Word, AllForm: isOp && op.Row is null));
+            (sites ??= []).Add(new DirectiveSite(i + 1, directive.Word, AllForm: isOp && op.Row is null,
+                NamedRow: isOp ? op.Row : null));
+            // §7.3.10.3 SR1 (COBOL-WORDS) is a rule about the TEXT — the directive's own state boundary is the first
+            // unit's first line, and COBOL-WORDS is consumed before the parse — so it is judged here, for the
+            // directive itself and for a PUSH/POP that names it (§7.3.20.3 SR2, §7.3.22.3 SR2). The rules that need
+            // the parse tree are judged by DirectivePlacementPass from the sites just recorded.
+            if (sawUnit && diagnostics is not null
+                && (isOp && op.Row is not null ? ConstructRegistry.Find(op.Row) : CompilerDirectiveCatalog.Find(directive.Word))
+                    is { Placement: { Rule: DirectivePlacementRule.BeforeFirstCompilationUnit } placement } subject)
+                diagnostics.ReportError(DiagnosticCatalog.DirectivePlacementViolation.Code,
+                    isOp
+                        ? $">>{directive.Word} {directive.Operand} is written where {subject.DirectiveWords[0]} must not be specified "
+                          + $"(ISO §7.3.20.3 SR2, §7.3.22.3 SR2) — \"{placement.Text}\" (ISO {placement.Citation})"
+                        : $">>{directive.Word} is written after the first compilation unit began — \"{placement.Text}\" "
+                          + $"(ISO {placement.Citation}); write it before the first IDENTIFICATION DIVISION of the compilation group",
+                    lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0), default);
             if (!Consumed.Contains(directive.Word)) continue;
             if (isOp)
             {

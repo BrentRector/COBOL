@@ -718,7 +718,13 @@
   "l1_write_from_national_fn",
   "l1_write_indexed_every_key",
   "pb690_line_sequential_byte_image_2023",
-  "pb1542_code_set_line_sequential"
+  "pb1542_code_set_line_sequential",
+  "pb1363_conditional_compilation_structure_legal",
+  "pb1365_turn_checking_implied_on",
+  "pb1365_turn_checking_with_location_implied_on",
+  "pb1365_turn_checking_location_optional_with",
+  "pb1378_leap_second_between_units",
+  "pb1820_leap_second_reaches_object_methods"
  ],
  "pending": [
   "pb485_value_only_format1"

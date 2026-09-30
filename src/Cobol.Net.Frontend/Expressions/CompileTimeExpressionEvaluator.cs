@@ -501,15 +501,24 @@ public sealed class CompileTimeExpressionEvaluator
     private bool? EvalCcePrimary(Core.CcePrimaryContext p, string where)
     {
         if (p.constantConditionalExpression() is { } inner) return EvaluateCce(inner, where);   // ( … )
-        if (p.definedCondition() is { } d) return EvalDefined(d);
+        if (p.definedCondition() is { } d) return EvalDefined(d, where);
         return EvalRelationOrBoolean(p.cceRelationOrBoolean(), where);
     }
 
     /// <summary>A defined-condition (§7.3.8.4.4): <c>name IS [NOT] DEFINED</c> — true iff the compilation variable
     /// is currently defined (a name in scope resolves to a non-null value), negated by NOT.</summary>
-    private bool EvalDefined(Core.DefinedConditionContext d)
+    private bool EvalDefined(Core.DefinedConditionContext d, string where)
     {
-        bool defined = _resolveName(d.cobolWord().GetText()) is not null;
+        string name = d.cobolWord().GetText();
+        // §7.3.8.4.3 SR1 (kb/Work PB1366): "Compilation-variable-name-1 shall not be the same as a compiler-directive
+        // word" — the same screen as the DEFINE's own name slot, asked of the ONE §8.12 representation.
+        if (CobolNet.Frontend.Common.CompilerDirectiveWords.IsReserved(name))
+        {
+            _diag.Report(CtDiagCode.DirectiveWordAsName, $"{where}: '{name}' is a compiler-directive word (ISO §8.12) and "
+                + "shall not be used as a compilation-variable-name in a defined condition (ISO §7.3.8.4.3 SR1)");
+            return false;
+        }
+        bool defined = _resolveName(name) is not null;
         return d.NOT() is not null ? !defined : defined;
     }
 

@@ -1476,13 +1476,13 @@
   "ordinal": 7,
   "subject": "Compiler directives",
   "rule-digest": "98d50a47835e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CompilerDirectiveWords.cs#CompilerDirectiveWords; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine",
+  "test-ref": "conformance:negative/pb1366-define-name-is-directive-word-off; unit:CompilerDirectiveWordsDriftTests.Table_IsEqualToTheSpecTable",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1366 (registrar 15a). §7.3.3 SR7 'When a compiler-directive word is specified in the general format of a compiler directive, that compiler-directive word is reserved within the context of that directive.' (cite.py --check 7.3.3 OK). Two halves. (a) the words are reserved ONLY in the directive's context: outside directives they remain ordinary user words - R11 declares and DISPLAYs data items DEFINED, CHECKING, PARAMETER, TURN, PUSH, POP, PROPAGATE, EQUATE, UNDEFINE, SUBSTITUTE, LEAP-SECOND, LISTING, ZERO-LENGTH and prints '12456789ABCDE' (LOCATION is correctly refused: it is a §8.9 reserved word) - CONFORMS. (b) reserved WITHIN the directive: NOT enforced where a user-defined word slot exists. >>DEFINE's own general-format words are accepted as compilation-variable-name-1: R2 '>>DEFINE OVERRIDE AS 1', R3 'DEFINED', R4 'PARAMETER', R5 'OFF', R6 'IS', R7 'PUSH', I2 'IMP' all compile clean; R1 '>>DEFINE AS AS 1' is accepted at the DEFINE and only the later >>IF fails with a misleading 'malformed expression'. The specific sibling rule §7.3.11.3 SR1 'Compilation-variable-name-1 shall not be the same as a compiler-directive word.' (cite.py --check 7.3.11.3 OK; also §7.3.8.4.4 SR1 for the defined-condition) is the same missing check - inventory row SR-7.3.11.3-1 is still unadjudicated. No check anywhere in src consults the §8.12 list. Finding 'directive-word-reservation'. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1366. cite.py --check 7.3.3 'that compiler-directive word is reserved within the context of that directive' OK 7). The 8.12 table is data (CompilerDirectiveWords), equal to the spec table by drift test; the DEFINE name, the defined condition and the TURN file-name slots consult it.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-8",
@@ -1507,12 +1507,12 @@
   "subject": "Compiler directives",
   "rule-digest": "2e732b6fc777",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#Find",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#Find; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine",
+  "test-ref": "conformance:negative/pb1366-define-name-is-directive-word-imp; conformance:negative/w59h-imp-directive-undefined",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "§7.3.3 SR9 'The compiler-directive word 'IMP' is reserved for use by the implementor. If the implementor defines the IMP directive, the syntax rules for that directive shall be implementor-defined.' (cite.py --check 7.3.3 OK). COBOL.NET defines NO IMP directive: no constructs.json row claims 'IMP' as a directiveWord, so >>IMP is an unrecognized word left for the parser - I1 '>>IMP SOMETHING' and I3 '>> IMP' are rejected (COBOL0001). The conditional second sentence is therefore vacuous, and Annex A.1 item 30 (IMP syntax/general rules) is conditionally required only 'upon support for an IMP directive', so no CONFORMANCE.md entry is owed. CompilerDirectiveCatalogDriftTests.Roster_Matches_TheSpecSection keeps any non-standard directive word from entering the catalog without a clause (a drift test, not a spec-derived closer). The use of IMP as a compilation-variable-name (I2 '>>DEFINE IMP AS 1' accepted) is the §7.3.11.3 SR1 / SR-7.3.3-7 reservation defect, charged there. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1366. IMP is an 8.12 word, so >>DEFINE IMP is COBOLNET2650; the IMP directive itself stays undefined (w59h negative).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-10",
@@ -1791,13 +1791,13 @@
   "ordinal": 1,
   "subject": "Defined condition",
   "rule-digest": "5699e9302a7a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#definedCondition; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalDefined",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalDefined",
+  "test-ref": "conformance:negative/pb1366-defined-condition-directive-word; conformance:negative/pb1366-defined-condition-exception-name",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1366 (registrar 15a). Rule: 'Compilation-variable-name-1 shall not be the same as a compiler-directive word.' (cite.py --check 7.3.8.4.3 OK); the words are the §8.12 table plus 'all of the exception-names specified in 14.6.13.1' (cite.py --check 8.12 OK). No check exists: definedCondition takes any cobolWord and EvalDefined only looks it up. Words the primed directive lexer tokenizes (IF, PAGE, SOURCE, FORMAT) fail as COBOLNET1619 'malformed compile-time expression' (rejected, though not as this SR), but every other directive word is accepted silently and evaluates as an undefined variable: probe sr_<W>.cob `>>IF <W> IS DEFINED` compiles and prints UNDEF for W = LISTING, TURN, EC-SIZE, CHECKING, LEAP-SECOND, DEFINE, NUMVAL (--std 2023). Expected: a compile-time diagnostic for each. Sibling §7.3.11.3 SR1 (same text, for >>DEFINE) is also unenforced: `>>DEFINE LISTING AS 1` then `>>IF LISTING IS DEFINED` prints DEF (probe sib.cob). No kb/Work note in the dossier owns this. Probe dir E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d2\\out\\probe\\defined-condition || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility incl. >>DEFINE/>>IF is not in ISO 1989:1985; no 2023 Annex E change to §7.3.8.4)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1366. cite.py --check 7.3.8.4.3 'Compilation-variable-name-1 shall not be the same as a compiler-directive word.' OK 1). Words the primed directive lexer does not admit as a cobolWord are still COBOLNET1619 (a diagnostic, not silent).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.8.4.4-1",
@@ -2046,13 +2046,13 @@
   "ordinal": 1,
   "subject": "DEFINE directive",
   "rule-digest": "5699e9302a7a",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1366-define-name-is-directive-word-off; conformance:negative/pb1366-define-name-is-directive-word-exception-name; conformance:negative/pb1366-define-name-is-directive-word-listing",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1366 (registrar 15a). cite.py --check 7.3.11.3 \"Compilation-variable-name-1 shall not be the same as a compiler-directive word.\" -> OK SR1; --check 8.12 \"The following words are reserved in compiler directives\" -> OK (IF, DEFINED, OFF, ... listed). ApplyDefine checks only the §8.3.2.1 word length (CobolWordRule.LengthViolation); nothing in src consults the §8.12 table for a compilation-variable-name (grep 'compiler-directive word' over src: only CompilerDirectiveCatalog, which keys the HEAD word of a line). Probes: n2.cob '>>DEFINE IF AS 1' and n3.cob '>>DEFINE DEFINED AS 1' compile and run clean. Expected: a syntax-rule error. Sibling: §7.3.8.4.3 SR1 (the same restriction on a defined condition) has no check either. || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1366. cite.py --check 7.3.11.3 'Compilation-variable-name-1 shall not be the same as a compiler-directive word.' OK 1).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.11.3-2",
@@ -2061,13 +2061,13 @@
   "ordinal": 2,
   "subject": "DEFINE directive",
   "rule-digest": "ca40457f3e2b",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#AssignDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Expressions/CtValue.cs",
-  "test-ref": "unit:ConditionalCompilationDefineTests.Redefine_DifferentValue_NoOverride_Rejected1618",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#AssignDefine",
+  "test-ref": "unit:ConditionalCompilationDefineTests.Redefine_DifferentValue_NoOverride_Rejected1618; unit:ConditionalCompilationDefineTests.Parameter_NoValue_RedefiningADefinedName_WithoutOverride_Rejected1618; unit:ConditionalCompilationDefineTests.Parameter_DifferentValue_RedefiningADefinedName_WithoutOverride_Rejected1618",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1367 (registrar 15a). cite.py --check 7.3.11.3 \"the last previous DEFINE directive referring to compilation-variable-name-1 shall have specified the same value\" -> OK SR2. OFF removes the name (so bullet 1 'not declared' and bullet 2 'last previous was OFF' coincide), AssignDefine reports COBOLNET1618 when !OVERRIDE and the stored value differs by category-aware equality. Probes: n4 (1 then 2 -> 1618), q11 (1/1/1.0 accepted; 'A' then 'A ' -> 1618, length-sensitive), t7/q7 (after OFF, redefine accepted), q5 (after an OVERRIDE to 2, a plain '1' -> 1618: the LAST previous value governs), t9 (name case-insensitive), r2 (PARAMETER value differing without OVERRIDE -> 1618). Interpretive edge noted, not a defect: a PARAMETER DEFINE whose environment supplies no value undefines silently and a later plain DEFINE is accepted (u1.cob) - SR2 does not say what value a value-less PARAMETER 'specified'. Also covered by unit:ConditionalCompilationDefineTests.Redefine_SameValue_NoOverride_Accepted / Redefine_AfterOff_Accepted. || REFUTED: PARTIAL — SR2 has three admitting bullets; the implementation checks only a stored-value comparison, and a value-less PARAMETER DEFINE bypasses it entirely. After >>DEFINE PX AS 1, a no-OVERRIDE >>DEFINE PX AS PARAMETER with PX unset in the environment silently removes the name (ApplyDefine: 'if (env is null) { defines.Remove(name); return; }', no AssignDefine call), and a following no-OVERRIDE >>DEFINE PX AS 2 is then accepted as if PX had never been declared. Neither DEFINE meets any SR2 bullet: PX WAS declared previously, the last previous DEFINE was not OFF, and it did not specify the same value (1 vs no value; no value vs 2). The value 1 -> 2 change without OVERRIDE, which SR2 exists to forbid, compiles silently. The adjudicator named this edge and called it interpretive. That leaves the edge unverified, not verified. The ordinary branches hold: 1 then 2 -> 1618; after OFF a redefine is accepted; the last value governs; a program in the same compilation group inherits the value (g1: a DEFINE in program 2 differing from program 1 -> 1618); a DEFINE in an omitted >>IF branch does not count (s1). || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1367. SR2 reaches the PARAMETER alternative: a no-OVERRIDE PARAMETER redefinition of a defined name with no environment value, or a different one, is COBOLNET1618. A value-less PARAMETER DEFINE of a never-defined name stays not-defined (GR4); whether it 'declares' the name for a later plain DEFINE is left as before (interpretive edge recorded on the note).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.11.3-3",
@@ -2391,13 +2391,13 @@
   "ordinal": 3,
   "subject": "EVALUATE directive",
   "rule-digest": "15870facace9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
+  "test-ref": "conformance:negative/pb1364-when-operand-split-after-match",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \">>WHEN operand-2 [THROUGH operand-3] shall begin on a new line and shall be specified entirely on that line.\" OK. Same line-based directive recognition as SR2; the whole WHEN operand (incl. THROUGH operand-3) is the rest of one line, a partial/continued operand is malformed (probe O/H: COBOLNET1619). Caveat owned by the SR14-16 finding: a WHEN line that is NOT evaluated (after a match) is never parsed, so a split operand there goes undiagnosed -- recorded against SR14/15/16, not here. || REFUTED: PARTIAL — The rule constrains every >>WHEN line of the directive, but a WHEN after a prior match is never parsed, and a WHEN whose THROUGH operand-3 is moved to the next line is accepted as `>>WHEN 1` plus a text-1 line. Probe R2 (`>>WHEN 2 +` / `3` after a matched WHEN 1) compiles clean; probe R3 (`>>WHEN 1` / `THROUGH 5`, subject 9, falls to OTHER) compiles clean. The adjudicator itself recorded the lazy-evaluation hole but still granted CONFORMS -- a two-halves rule with one half verified is PARTIAL. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. cite.py --check 7.3.13.3 '>>WHEN operand-2 [THROUGH operand-3] shall begin on a new line and shall be specified entirely on that line.' OK 3). A split operand is malformed on EVERY WHEN. A `THROUGH 5` line after a bare >>WHEN is text-1, which may be any source line (SR8) - not a violation (the refuter's probe R3 is legal source).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-4",
@@ -2406,13 +2406,13 @@
   "ordinal": 4,
   "subject": "EVALUATE directive",
   "rule-digest": "6d311a146838",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1364-when-after-match-text-on-line",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"Text-1 shall begin on a new line.\" OK. Probe H `>>WHEN 1 DISPLAY \"W1\"` -> COBOLNET1619 malformed compile-time expression '1 DISPLAY \"W1\"' (text on the WHEN line is not admitted as text-1). Same lazy-evaluation caveat as SR3 for a WHEN not evaluated. || REFUTED: PARTIAL — Text-1 on the >>WHEN line is diagnosed only incidentally, as a malformed expression, and only when that WHEN is actually evaluated. After a prior match `>>WHEN 2 DISPLAY \"W2\"` compiles without any diagnostic (probe R4). Same lazy-evaluation mechanism as SR3; the rule is not enforced for every WHEN of the directive. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. Every >>WHEN operand is parsed whenever the EVALUATE's parent is compiled, independent of an earlier match; text on the WHEN line is COBOLNET1619.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-5",
@@ -2421,13 +2421,13 @@
   "ordinal": 5,
   "subject": "EVALUATE directive",
   "rule-digest": "7bce4991c192",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1364-when-other-trailing-text-after-match",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \">>WHEN OTHER shall begin on a new line and shall be specified entirely on that line.\" OK. The WHEN arm treats the operand as OTHER only when it equals exactly `OTHER` (case-insensitive); probe H2 `>>WHEN OTHER DISPLAY \"O\"` -> COBOLNET1619 malformed 'OTHER DISPLAY \"O\"'. Caveat: that diagnostic arises only because the text falls to the WHEN-evaluation path, so after a prior match (BranchTaken) it would be skipped -- same mechanism as the SR14-16 finding. || REFUTED: PARTIAL — `>>WHEN OTHER <anything>` is recognized as OTHER only when the operand is exactly OTHER; otherwise it becomes a plain WHEN, and after a prior match that WHEN is never parsed. So `>>WHEN OTHER X` and `>>WHEN OTHER DISPLAY \"O\"` after a matched WHEN compile clean (probes R7, R5). The adjudicator's own caveat names exactly this; it is an unverified (in fact failing) edge, so PARTIAL. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. cite.py --check 7.3.13.3 '>>WHEN OTHER shall begin on a new line and shall be specified entirely on that line.' OK 5): OTHER is recognized as a word, and anything after it is COBOLNET2649 whether or not a WHEN matched.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-6",
@@ -2436,13 +2436,13 @@
   "ordinal": 6,
   "subject": "EVALUATE directive",
   "rule-digest": "4ca719a910e5",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1364-when-other-trailing-text-after-match",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"Text-2 shall begin on a new line.\" OK. Text on the >>WHEN OTHER line is rejected (probe H2, COBOLNET1619); text-2 lines following are ordinary lines emitted/omitted by the frame. || REFUTED: PARTIAL — Text-2 placed on the >>WHEN OTHER line is rejected only when no prior WHEN matched (R6 -> COBOLNET1619, and then only as a 'malformed compile-time expression', not as text on the OTHER line); after a prior match it is silently accepted and dropped (R5). Half verified -> PARTIAL. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. cite.py --check 7.3.13.3 'Text-2 shall begin on a new line.' OK 6): text-2 on the WHEN OTHER line is COBOLNET2649.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-7",
@@ -2451,13 +2451,13 @@
   "ordinal": 7,
   "subject": "EVALUATE directive",
   "rule-digest": "ad0191e16074",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Editions/ConstructRegistry.g.cs#evaluate-directive-2002",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
+  "test-ref": "conformance:negative/pb806-end-evaluate-trailing-word; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB806 (registrar 15a). cite.py --check 7.3.13.3 \">>END-EVALUATE shall be specified on a new line and shall be specified entirely on that line.\" OK. New-line half conforms (line-based recognition). The 'entirely on that line' half diverges: probe P `>>END-EVALUATE DISPLAY \"Z\"` compiles clean and silently DROPS the DISPLAY -- the END-EVALUATE arm ignores `rest`. This is exactly kb/Work PB806 (open: `>>END-EVALUATE JUNK` compiles clean; evaluate-directive-2002 row declares form: stage and the END-EVALUATE arm never checks the operand) -- PB806 owns this row; no new finding. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB806. cite.py --check 7.3.13.3 '>>END-EVALUATE shall be specified on a new line and shall be specified entirely on that line.' OK 7).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-8",
@@ -2481,13 +2481,13 @@
   "ordinal": 9,
   "subject": "EVALUATE directive",
   "rule-digest": "682f31dbfe06",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#RenderCopybook",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#PhraseFrame",
+  "test-ref": "conformance:negative/pb1363-evaluate-closed-in-library-text; conformance:negative/pb1363-evaluate-not-closed; conformance:negative/pb1363-evaluate-when-other-twice; conformance:negative/pb1363-evaluate-when-after-when-other; conformance:negative/pb1363-evaluate-without-when",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1363 (registrar 15a). cite.py --check 7.3.13.3 \"the phrases of a given EVALUATE directive shall all be specified in the same library text or all in source-text\" OK. The frame stack is SHARED across the COPY boundary (Run is threaded through RenderCopybook) and a Frame records no originating library text, so nothing checks it. Probe T2: copybook TSPLIT2 = `>>EVALUATE 1 / >>WHEN 1`, END-EVALUATE in source -> compiles clean, prints `MID | AFTER`. Probe T: >>EVALUATE in source, COPY TSPLIT (holding >>WHEN 1 / >>END-EVALUATE) -> the COPY line sits in the not-yet-emitting frame so it is never expanded, the frame never closes, and the REST OF THE PROGRAM (DISPLAY \"AFTER\") is silently omitted -- rc 0, no output. Expected: a diagnostic for the violated syntax rule. Second sentence (nested EVALUATE in text is a new directive) conforms (probe U). || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1363. cite.py --check 7.3.13.3 'the phrases of a given EVALUATE directive shall all be specified in the same library text or all in source-text' OK 9).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-10",
@@ -2511,13 +2511,13 @@
   "ordinal": 11,
   "subject": "EVALUATE directive",
   "rule-digest": "a66007fa20f8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen",
+  "test-ref": "conformance:negative/pb1364-when-after-match-category-mismatch; conformance:negative/pb1364-when-format2-after-match-malformed",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"All operands of one EVALUATE directive shall be of the same category.\" OK. MatchWhen checks subject.Category vs lo.Category (COBOLNET1619; unit ConditionalCompilationDefineTests.Evaluate_ObjectCategoryMismatch_Rejected1619 pins the evaluated case) -- but MatchWhen runs ONLY for a WHEN that is evaluated (ParentActive && !BranchTaken). Probe F `>>EVALUATE 1 / >>WHEN 1 / >>WHEN \"A\"` compiles clean (prints W1); probe M `>>EVALUATE B\"1100\" B-AND B\"0110\" / >>WHEN B\"0100\" / >>WHEN 4` compiles clean; probe Z `>>EVALUATE \"A\" / >>WHEN \"A\" / >>WHEN 1 THRU 2` compiles clean. The rule is 'ALL operands of one directive', independent of which branch is selected. Also the hi operand's category is checked only via the numeric SR12 test. Finding: WHEN operands validated only on the evaluated path. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. Category check on every WHEN, matched or not.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-12",
@@ -2526,13 +2526,13 @@
   "ordinal": 12,
   "subject": "EVALUATE directive",
   "rule-digest": "9c7593ac62dd",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen",
+  "test-ref": "conformance:negative/pb1364-when-after-match-through-non-numeric",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"If the THROUGH phrase is specified, all selection subjects and selection objects shall be of category numeric.\" OK. Evaluated path conforms: probe G2 `>>EVALUATE \"B\" / >>WHEN \"A\" THRU \"C\"` and M2 (boolean THRU) -> COBOLNET1619 SR12. Unevaluated path diverges: probe G `>>EVALUATE 1 / >>WHEN 1 / >>WHEN 2 THRU \"Z\"` compiles clean; probe Z (alphanumeric subject, a later `>>WHEN 1 THRU 2`) compiles clean -- note the rule also requires the SUBJECT numeric whenever ANY WHEN has THROUGH. Same mechanism as SR11. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. THROUGH needs numeric operands on every WHEN, matched or not.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-13",
@@ -2586,13 +2586,13 @@
   "ordinal": 16,
   "subject": "EVALUATE directive",
   "rule-digest": "444bcb35db93",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#EvaluateCceText; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
+  "test-ref": "conformance:negative/pb1364-when-format2-after-match-malformed",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"Constant-conditional-expression-1 shall be formed in accordance with 7.3.8, Constant conditional expression.\" OK; §7.3.8.2 'Abbreviated combined relation conditions shall not be specified.' --check OK. Evaluated path: probe N `1 = \"A\"` -> SR1a.1, `\"A\" < \"B\"` -> SR1a.2; X `V = 2 OR 3` rejected; N2 defined condition + AND + relation selects V3 correctly. Unevaluated path: probe LZ_cce `>>EVALUATE TRUE / >>WHEN 1 = 1 / >>WHEN 1 = \"A\" / >>WHEN B\"1\" B-AND 1` compiles clean (T1). Same mechanism as SR11. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. A Format-2 constant-conditional-expression is formed per 7.3.8 on every WHEN, matched or not.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.13.4-1",
@@ -2751,13 +2751,13 @@
   "ordinal": 1,
   "subject": "FLAG-02 directive",
   "rule-digest": "7bef74ce85be",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/FlagDirectiveProcessor.cs#Process",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run",
+  "test-ref": "unit:PushPopAllPlacementTests.FlagDirectivesAndNamedPushPop_InsideAStatement_Warn_BetweenStatements_DoNot",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "kb/Work PB1065 (registrar 15a). cite.py --check 7.3.14.3 'may be specified only between clauses in divisions other than the procedure division and only between statements in the procedure division' OK. Owned by OPEN kb/Work PB1065 (not re-reported). Re-confirmed on the pin: probe s.cbl — `MOVE` / `>>FLAG-02 MOVE-TO-SAME-NAME ON` / `\"ABC\" TO X.` compiles and runs (ABC) with no diagnostic; expected a placement error. Process blanks every directive line with no position screen. || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1065. cite.py --check 7.3.14.3 'The FLAG-02 directive may be specified only between clauses in divisions other than the procedure division and only between statements in the procedure division' OK 1). Row data (directivePlacement: betweenClauses) judged by the pass the PUSH/POP ALL rule uses; a suppressible COBOLNET2344 warning (D20 / 4.2.2), witnessed by unit tests because the program still compiles.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-1",
@@ -2901,13 +2901,13 @@
   "ordinal": 1,
   "subject": "FLAG-14 directive",
   "rule-digest": "57e7afd0c221",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/FlagDirectiveProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run",
+  "test-ref": "unit:PushPopAllPlacementTests.FlagDirectivesAndNamedPushPop_InsideAStatement_Warn_BetweenStatements_DoNot",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1065 (registrar 15a). cite.py --check 7.3.15.3 'only between clauses in divisions other than the procedure division and only between statements in the procedure division' OK. The directive line is blanked wherever it appears, and no stage checks its position. Probe SR: a >>FLAG-14 between MOVE and its operands ('MOVE' / '>>FLAG-14 READ-PREVIOUS ON' / '\"B\" TO X') compiles and runs (prints B). The expected result is a syntax diagnostic. A directive between the PICTURE and VALUE clauses of one entry is legal and is correctly accepted. OWNED by the open kb/Work note PB1065, whose inventory_rows already claim SR-7.3.15.3-1, so this is not re-reported as a new finding.",
-  "state": "GAP"
+  "notes": "kb/Work PB1065. The FLAG-14 twin of SR-7.3.14.3-1 (cite.py --check 7.3.15.3 OK 1)).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.15.4-1",
@@ -3021,13 +3021,13 @@
   "ordinal": 3,
   "subject": "IF directive",
   "rule-digest": "7169750533f3",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
+  "test-ref": "conformance:negative/pb806-else-trailing-word; conformance:negative/pb806-else-trailing-word-in-omitted-branch; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB806 (registrar 15a). SR3 (cite.py --check 7.3.16.3 OK): '>>ELSE shall begin on a new line and shall be specified entirely on that line.' Begin-on-a-new-line half conforms (a mid-line '>>ELSE' is not a directive: p18, in omitted text, correctly treated as ordinary text). The 'entirely on that line' half fails: case \"ELSE\" ignores `rest`, so '>>ELSE DISPLAY \"B\"' compiles clean and the trailing words vanish (p19). OWNED by open kb/Work PB806 (`>>ELSE JUNK` compiles clean) — not re-reported. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, incl. conditional compilation, is absent from COBOL-85; the pinned compiler gates >>IF at --std 85 with COBOLNET0900, probe p01)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB806. cite.py --check 7.3.16.3 '>>ELSE shall begin on a new line and shall be specified entirely on that line.' OK 3). NoOperandWords is data on the if/evaluate rows, checked centrally (COBOLNET1911).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.16.3-4",
@@ -3051,13 +3051,13 @@
   "ordinal": 5,
   "subject": "IF directive",
   "rule-digest": "07a3f3b65ef6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
+  "test-ref": "conformance:negative/pb806-end-if-trailing-word; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB806 (registrar 15a). SR5 (cite.py --check 7.3.16.3 OK): '>>END-IF shall begin on a new line and shall be specified entirely on that line.' case \"END-IF\" ignores `rest`: probe p19 '>>END-IF DISPLAY \"C\"' compiles clean and C is never displayed. OWNED by open kb/Work PB806 (`>>END-IF JUNK`) — not re-reported. Begin-on-a-new-line half conforms (Render's trimmed '>>' prefix test). || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, incl. conditional compilation, is absent from COBOL-85; the pinned compiler gates >>IF at --std 85 with COBOLNET0900, probe p01)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB806. cite.py --check 7.3.16.3 '>>END-IF shall begin on a new line and shall be specified entirely on that line.' OK 5).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.16.3-6",
@@ -3081,13 +3081,13 @@
   "ordinal": 7,
   "subject": "IF directive",
   "rule-digest": "3b26943bcb86",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Run; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#RenderCopybook",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#PhraseFrame",
+  "test-ref": "conformance:negative/pb1363-if-opened-in-library-text; conformance:negative/pb1363-else-without-if; conformance:negative/pb1363-else-twice; conformance:negative/pb1363-if-not-closed; conformance:2023/pb1363_conditional_compilation_structure_legal",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1363 (registrar 15a). SR7 (cite.py --check 7.3.16.3 OK): 'The phrases of a given IF directive shall be specified all in the same library text or all in source-text.' Run keeps ONE frame stack shared through RenderCopybook recursion and RenderCopybook neither records the stack depth at entry nor checks it at exit, so an >>IF opened in a copybook may be closed in the including source. Probe p10: copybook IFCB1 = '>>IF V = 1 / DISPLAY \"IN-CB\"', main '>>DEFINE V AS 1 / COPY IFCB1. / DISPLAY \"MID\" / >>END-IF' -> compiles clean, prints IN-CB MID. Expected: a diagnostic (the >>IF phrase is in library text, the >>END-IF in source text). Harm: under-rejects. New finding. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, incl. conditional compilation, is absent from COBOL-85; the pinned compiler gates >>IF at --std 85 with COBOLNET0900, probe p01) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Run (shared _stack across RenderCopybook); src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Run.RenderCopybook",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1363. cite.py --check 7.3.16.3 'The phrases of a given IF directive shall be specified all in the same library text or all in source-text.' OK 7). Each rendered text (source or copybook) has an id, every frame records the id it opened in, and a phrase or the end of the text is judged against it (COBOLNET2649).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.16.4-1",
@@ -3141,13 +3141,13 @@
   "ordinal": 1,
   "subject": "LEAP-SECOND directive",
   "rule-digest": "9381c74a5774",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/LeapSecondDirectiveProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/CompilationUnitStart.cs#IsAt; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#LeapSecondDirectiveSyntax",
-  "test-ref": "conformance:negative/pb65-leap-second-within-unit",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#DirectivePlacementViolation",
+  "test-ref": "conformance:negative/pb65-leap-second-within-unit; conformance:2023/pb1378_leap_second_between_units; conformance:negative/pb1377-push-leap-second-within-unit",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1378 (registrar 15a). Rule: 'The LEAP-SECOND directive shall not be specified within a compilation unit.' (cite.py --check 7.3.17.3 OK). The rejecting half CONFORMS: a directive after PROGRAM-ID (probe g_seq.cob, and the negative golden) draws COBOLNET1650. But Process() sets insideUnit=true at the FIRST unit start and never clears it, so a directive written AFTER 'END PROGRAM X.' and before the next unit's IDENTIFICATION DIVISION - not within any compilation unit - is also rejected (probe b_between.cob: two sibling programs, '>>LEAP-SECOND ON' between END PROGRAM LSB1 and the second IDENTIFICATION DIVISION -> 'error COBOLNET1650 ... write it before the first IDENTIFICATION DIVISION of the compilation group'). That message states the COBOL-WORDS rule (§7.3.10.3 SR1 'only before the first IDENTIFICATION DIVISION within a compilation group'), not this one. §7.3.3 SR8 ('A compiler directive may be specified anywhere in a compilation group' except as its own rules restrict) and §7.3.4 GR5 ('A compiler directive applies to all of the source text and library text that follows') make the between-units directive legal and effective for the following unit; the single group-wide bool (BindSession.LeapSecond) cannot represent that. A directive after the last statement of a unit with NO end marker (probe f_endofunit.cob) is textually inside the unit and is correctly rejected. Finding: leap-second-between-units. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 directive facility is absent in 1985; the 2002 edge is DERIVED per docs/VERSION_CHANGE_REFERENCE.md row 7.21 - Annex E itemizes the 2014->2023 delta and does not list LEAP-SECOND, so it predates 2023). The time-form / formatted-time consumers the rule bounds are COBOL-2014 intrinsics (§15.3).",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1378. cite.py --check 7.3.17.3 'The LEAP-SECOND directive shall not be specified within a compilation unit.' OK 1). Judged on the parse tree's unit spans; a directive BETWEEN sibling units is outside both and takes effect for the units that follow (7.3.4 GR5), pinned by pb1378_leap_second_between_units. retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#LeapSecondDirectiveSyntax (kb/Work PB1378: the COBOLNET1650 descriptor is retired; the within-a-unit rule is data on the row, judged by DirectivePlacementPass (COBOLNET2652))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.17.4-1",
@@ -3411,13 +3411,13 @@
   "ordinal": 1,
   "subject": "POP directive",
   "rule-digest": "6f84a268135b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#OperandDirectiveNames; src/Cobol.Net.Editions/ConstructRegistry.g.cs#pop-directive-2023; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateStack.cs#TryParse",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#OperandDirectiveNames",
+  "test-ref": "conformance:negative/pb1377-push-removed-directive-name",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1377 (registrar 15a). Rule: 'Directive-name shall be the name of a compiler directive that is other than an EVALUATE, IF, PAGE, POP, or PUSH directive.' (cite.py --check 7.3.20.3 -> OK §7.3.20.3 1)). directive-name is ONE user-defined word (§8.3.2.2.7, --check OK). Code: CheckOperand -> CheckWords admits ALL or OperandDirectiveNames = every catalog DirectiveWord minus the whole rows of EVALUATE/IF/PAGE/POP/PUSH. Probed (pinned cobol.exe, probe/popdir/p4.cob): >>POP IF, WHEN, POP, PUSH, PAGE, ELSE, END-EVALUATE, XYZ each -> COBOLNET1911 error, correct; p6.cob: POP SOURCE/TURN/DEFINE/CALL-CONVENTION/ref-mod-zero-length accepted, correct. DEFECT (p3.cob): the admissible set is NOT edition-filtered - it includes FLAG-85 and FLAG-NATIVE-ARITHMETIC, rows removed at 2023 (Annex E.2 item 21: obsolete elements removed - FLAG-85, FLAG-NATIVE-ARITHMETIC), and POP exists only at 2023, so wherever POP is legal those two words are NOT the name of a compiler directive. `>>PUSH FLAG-85` / `>>POP FLAG-85` at --std 2023 compile clean and run (prints A); the COBOLNET1911 message even lists FLAG-85 and FLAG-NATIVE-ARITHMETIC as admissible. Expected: COBOLNET1911 ('FLAG-85' is not an admissible operand). DirectiveStateRegistry's 'no source may contain both' reasoning misses that the operand itself is such a source. No spec-derived test pins the SR1 exclusions (CompilerDirectiveCatalogDriftTests uses generic malformed operands) -> test-ref empty. || editions (adjudicator): 2023 only (the POP directive is added in 2023: the standard's list of added compiler directives names 'POP directive'; registry row cites Annex E.2 item 5 / E.3.3 item 38); below 2023 the line is COBOLNET0900 (probed at --std 2014). || code-location detail: src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CompilerDirectiveCatalog.CheckOperand; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CompilerDirectiveCatalog.OperandDirectiveNames; src/Cobol.Net.Editions/ConstructRegistry.g.cs#pop-directive-2023 (DirectiveOperand.ExcludedDirectives); src/Cobol.Net.Frontend/Preprocessor/DirectiveStateStack.cs#DirectiveStackOp.TryParse",
-  "state": "GAP"
+  "notes": "kb/Work PB1377. The admissible directive-name set is the rows AVAILABLE at the edition, so FLAG-85 and FLAG-NATIVE-ARITHMETIC (removed at 2023, Annex E.2 21)) are not names at 2023 for PUSH or POP alike (one OperandDirectiveNames, PUSH and POP share the row shape).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.20.3-2",
@@ -3426,13 +3426,13 @@
   "ordinal": 2,
   "subject": "POP directive",
   "rule-digest": "ceb0c41d6ca0",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run; src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#Process",
+  "test-ref": "conformance:negative/pb1377-pop-propagate-within-unit; unit:PushPopAllPlacementTests.FlagDirectivesAndNamedPushPop_InsideAStatement_Warn_BetweenStatements_DoNot; unit:CobolWordsDirectiveTests.PushOrPopNamingCobolWords_AfterIdDivision_Rejected",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1377 (registrar 15a). Rule: 'If directive-name is specified, the POP directive shall not be specified where directive-name must not be specified.' (cite.py --check 7.3.20.3 -> OK §7.3.20.3 2)). Placement-ruled directives a POP can name: LEAP-SECOND ('shall not be specified within a compilation unit', §7.3.17.3 SR1, --check OK), PROPAGATE ('shall not be specified within a compilation unit', §7.3.21.3 SR1, --check OK), COBOL-WORDS ('may be specified only before the first IDENTIFICATION DIVISION within a compilation group', §7.3.10.3 SR1, --check OK), and TURN (§7.3.25.3 SR5, exception PERFORM - subsumed by §7.3.20.3 SR4, which bans every POP there). Search: no code consults the NAMED directive's placement rule for a POP - DirectiveSiteProcessor records only DirectiveSite(Line, Word, AllForm) and its PositionRuled set {TURN, PUSH, POP} serves the exception-PERFORM ban; PushPopAllPlacementPass handles the ALL form (SR3) only; COBOLNET1650 (LEAP-SECOND) and COBOLNET1623 (COBOL-WORDS) are keyed on their own directive lines, never on a POP naming them. Probes (probe/popdir): p1.cob `>>PUSH LEAP-SECOND` / `>>POP LEAP-SECOND` in the PROCEDURE DIVISION -> compiles clean, runs (A B), while p2.cob `>>LEAP-SECOND ON` at the same place -> COBOLNET1650 error; p5.cob `>>POP PROPAGATE` and `>>POP COBOL-WORDS` inside the procedure division -> clean, while p7.cob `>>COBOL-WORDS` there -> COBOLNET1623. Expected: a diagnostic for each POP naming a directive at a position that directive's own SR forbids. Sibling §7.3.22.3 SR2 (PUSH) has the identical gap. Note: bare >>PROPAGATE inside a compilation unit is itself not diagnosed (p7.cob) - outside this subject. || editions (adjudicator): 2023 only (POP added in 2023).",
-  "state": "GAP"
+  "notes": "kb/Work PB1377. A POP naming a directive inherits the named directive's placement rule, which is data on its constructs.json row (directivePlacement): COBOL-WORDS (text, DirectiveSiteProcessor), LEAP-SECOND/PROPAGATE (tree, COBOLNET2652), FLAG-02/FLAG-14 (tree, COBOLNET2344 warning).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.20.3-3",
@@ -3442,11 +3442,11 @@
   "subject": "POP directive",
   "rule-digest": "412770b8d262",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/PushPopAllPlacementPass.cs#Run; src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#Process",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#Process; src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run",
   "test-ref": "unit:PushPopAllPlacementTests.BeforeTheFirstUnit_IsOutsideEveryCompilationUnit; unit:PushPopAllPlacementTests.AfterEndProgram_IsOutside_ButAfterTheLastStatementOfAnOpenProgram_IsInside; unit:PushPopAllPlacementTests.InsideAStatement_Warns_BetweenNestedStatements_DoesNot; unit:PushPopAllPlacementTests.InsideAClause_Warns_BetweenClauses_DoesNot; unit:PushPopAllPlacementTests.NamedForm_HasNoPositionRule; conformance:2023/pb941_push_pop_directive_state",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work/PB1005 (2026-09-22): >>POP ALL outside a compilation unit (before the first, or after an END marker) or inside a clause or statement (not at a boundary of a nested one) draws the 4.2.2 warning COBOLNET2344; the directive is still processed (the D20 disposition of the sibling SR4 bans). The position is the gap between the tokens around the directive's line in the final line frame (DirectiveSite.AllForm). Gaps at an entry name, a paragraph header or a division header are not diagnosed - they are not inside a clause, the reading that cannot reject a position the rule admits. pb941's golden is the legal-position control (compiles with no COBOLNET2344).",
+  "notes": "kb/Work/PB1005 (2026-09-22): >>POP ALL outside a compilation unit (before the first, or after an END marker) or inside a clause or statement (not at a boundary of a nested one) draws the 4.2.2 warning COBOLNET2344; the directive is still processed (the D20 disposition of the sibling SR4 bans). The position is the gap between the tokens around the directive's line in the final line frame (DirectiveSite.AllForm). Gaps at an entry name, a paragraph header or a division header are not diagnosed - they are not inside a clause, the reading that cannot reject a position the rule admits. pb941's golden is the legal-position control (compiles with no COBOLNET2344). retired-witness: src/Cobol.Net.Compiler/Validation/PushPopAllPlacementPass.cs#Run (kb/Work PB1065: PushPopAllPlacementPass was renamed DirectivePlacementPass when it gained the FLAG-02/FLAG-14 and named-directive rules)",
   "state": "OK"
  },
  {
@@ -3516,13 +3516,13 @@
   "ordinal": 1,
   "subject": "PROPAGATE directive",
   "rule-digest": "3322e38c434f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/PropagateDirectiveProcessor.cs#Process",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run; src/Cobol.Net.Frontend/Preprocessor/PropagateDirectiveProcessor.cs#Process",
+  "test-ref": "conformance:negative/pb1378-propagate-within-unit; conformance:negative/pb1377-pop-propagate-within-unit",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1378 (registrar 15a). Rule: 'A PROPAGATE directive shall not be specified within a compilation unit.' (cite.py --check 7.3.21.3 -> OK §7.3.21.3 1)). Code: PropagateDirectiveProcessor's own doc says 'SR1 ... is NOT enforced — this pre-parse, line-based stage has no compilation-unit-boundary awareness'. That justification is stale: the sibling LeapSecondDirectiveProcessor enforces the identical §7.3.17.3 SR1 ('The LEAP-SECOND directive shall not be specified within a compilation unit', cite.py --check 7.3.17.3 -> OK) in the same pre-parse layer with CompilationUnitStart.IsAt + COBOLNET1650, and PushPopAllPlacementPass tracks unit extents for §7.3.20.3/§7.3.22.3 SR3. Probe sr1.cob (2023): >>PROPAGATE ON written between PROCEDURE DIVISION. and the first paragraph compiles clean and runs ('SR1 COMPILED', exit 0). Expected: a compile-time error. Under-rejects. No register note owns it. Finding: PROPAGATE-SR1-PLACEMENT-UNCHECKED. || editions (adjudicator): COBOL-2002, 2014, 2023 (§7.3.21 is live in the 2023 text; Annex E.2/E.3 list no 2023 introduction or removal, so it predates 2023; not in COBOL-85 — the §7.3 compiler-directive facility)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1378. cite.py --check 7.3.21.3 'A PROPAGATE directive shall not be specified within a compilation unit.' OK 1). Same row data and pass as LEAP-SECOND.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.21.4-1",
@@ -3591,13 +3591,13 @@
   "ordinal": 1,
   "subject": "PUSH directive",
   "rule-digest": "5abf02a3366f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#OperandDirectiveNames; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#Words; src/Cobol.Net.Editions/ConstructRegistry.g.cs#push-directive-2023",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#OperandDirectiveNames",
+  "test-ref": "conformance:negative/pb1377-push-removed-directive-name",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1377 (registrar 15a). Rule (cite.py --check 7.3.22.3 'Directive-name shall be the name of a compiler directive other than an EVALUATE, IF, PAGE, POP, or PUSH directive.' -> OK §7.3.22.3 1)). Code: the push-directive-2023 row's operand is {Words, Choice=[ALL], DirectiveName=true, ExcludedDirectives=[EVALUATE,IF,PAGE,POP,PUSH]}; CompilerDirectiveCatalog.OperandDirectiveNames admits every catalog Word minus the excluded ROWS (so WHEN/END-EVALUATE/ELSE/END-IF go with their rows). Probed with the pinned cobol.exe at --std 2023 (probe/push-directive/A*.cob): >>PUSH EVALUATE / IF / PAGE / POP / PUSH / WHEN / ELSE / END-IF / END-EVALUATE / FOO / IMP / (no operand) -> COBOLNET1911 citing SR1 (correct); >>PUSH TURN / SOURCE / FLAG-02 / DISPLAY / LISTING / turn (lower case) -> clean (correct). DEFECT: >>PUSH FLAG-85 and >>PUSH FLAG-NATIVE-ARITHMETIC compile clean at 2023 (A10, A21 print OK), although both directives were REMOVED in 2023 (cite.py --check E.2 'The following features that were classified as obsolete in the previous COBOL standard, have been removed' -> OK §E.2 21), listing FLAG-85 and FLAG-NATIVE-ARITHMETIC) and the compiler itself rejects >>FLAG-85 ON at 2023 with COBOLNET0902 (probe C1). A word naming no 2023 compiler directive is therefore not 'the name of a compiler directive'; OperandDirectiveNames draws from CompilerDirectiveCatalog.Words, which is the edition-INDEPENDENT catalog map, so the two removed-window rows (flag-85-directive-window, flag-native-arithmetic-directive-window, removed 2023) stay admissible and even appear in COBOLNET1911's admissible-name list. Expected (spec): at --std 2023 >>PUSH FLAG-85 is a syntax-rule violation (diagnostic), exactly like >>PUSH FOO. Since PUSH exists only in 2023 the removed rows can never be legal PUSH operands. Edge note: >>PUSH SOURCE FORMAT is rejected as 'more than one operand' — defensible, since directive-name is a single user-defined word (cite.py --check 8.3.2.2.7 'A directive-name identifies a compiler directive whose setting is saved or restored' -> OK) and SOURCE is the directive's word; not reported. No existing spec-derived test asserts the SR1 exclusions by name (CompilerDirectiveCatalogDriftTests witnesses only ZZBOGUS; DirectiveStateStackTests.ThePushableSet_IsTheCatalogMinusGr2sFive tests the GR2 pushed set, not rejection) -> test-ref empty. No register note owns this (PB794/PB941 landed; neither mentions the removed-window rows). || editions (adjudicator): 2023 only (the PUSH directive is new in 2023: Annex E.3.3 item 38 'PUSH and POP directives ... are added'; it does not exist in 1985/2002/2014, where >>PUSH is rejected by the edition gate COBOLNET0900)",
-  "state": "GAP"
+  "notes": "kb/Work PB1377. cite.py --check 7.3.22.3 'Directive-name shall be the name of a compiler directive other than an EVALUATE, IF, PAGE, POP, or PUSH directive.' OK 1); the edition-filtered name set rejects FLAG-85 at 2023.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.22.3-2",
@@ -3606,13 +3606,13 @@
   "ordinal": 2,
   "subject": "PUSH directive",
   "rule-digest": "e4e435da3c05",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run; src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#Process",
+  "test-ref": "conformance:negative/pb1377-push-leap-second-within-unit; conformance:negative/pb1377-push-cobol-words-within-unit; unit:PushPopAllPlacementTests.FlagDirectivesAndNamedPushPop_InsideAStatement_Warn_BetweenStatements_DoNot",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1377 (registrar 15a). Rule (cite.py --check 7.3.22.3 'If directive-name is specified, the PUSH directive shall not be specified where directive-name must not be specified.' -> OK §7.3.22.3 2)). The directives with a placement restriction in 7.3: LEAP-SECOND (cite.py --check 7.3.17.3 'The LEAP-SECOND directive shall not be specified within a compilation unit.' -> OK), PROPAGATE (cite.py --check 7.3.21.3 'A PROPAGATE directive shall not be specified within a compilation unit.' -> OK) and TURN (§7.3.25.3 SR5, not within an exception processing PERFORM — subsumed for PUSH by §7.3.22.3 SR4, which IS enforced by COBOLNET2187). Search of src: no stage relates a PUSH operand to the placement rule of the directive it names — DirectiveSiteProcessor/PushPopAllPlacementPass handle only SR3 (ALL form) and SR4; the operand screen (CompilerDirectiveCatalog.OperandDiagnostic) checks the word only. Probes (pinned cobol.exe, --std 2023): >>PUSH LEAP-SECOND inside the PROCEDURE DIVISION (B1) compiles clean and prints OK, while >>LEAP-SECOND ON at the same position (B5) is rejected COBOLNET1650 citing §7.3.17.3 SR1 — the compiler knows the placement rule and does not apply it to the PUSH that names the directive. >>PUSH PROPAGATE inside a unit (B2) also compiles clean (PROPAGATE's own SR1 is itself unenforced — PropagateDirectiveProcessor's header documents it as a 'documented limitation'; >>PROPAGATE ON in a unit, B6, compiles clean). Expected: B1 and B2 are syntax-rule violations at 2023; >>PUSH LEAP-SECOND / >>PUSH PROPAGATE written BEFORE the first IDENTIFICATION DIVISION (B3, B4) are legal and correctly compile clean. The TURN leg is satisfied only because SR4 bans every PUSH in an exception-checking PERFORM. Not owned by any register note. || editions (adjudicator): 2023 only (PUSH added in 2023, Annex E.3.3 item 38)",
-  "state": "GAP"
+  "notes": "kb/Work PB1377. The PUSH twin of SR-7.3.20.3-2 (same mechanism, same data).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.22.3-3",
@@ -3622,11 +3622,11 @@
   "subject": "PUSH directive",
   "rule-digest": "0fe085e1d39d",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/PushPopAllPlacementPass.cs#Run; src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#Process",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#Process; src/Cobol.Net.Compiler/Validation/DirectivePlacementPass.cs#Run",
   "test-ref": "unit:PushPopAllPlacementTests.BeforeTheFirstUnit_IsOutsideEveryCompilationUnit; unit:PushPopAllPlacementTests.InsideAStatement_Warns_BetweenNestedStatements_DoesNot; unit:PushPopAllPlacementTests.InsideAClause_Warns_BetweenClauses_DoesNot; unit:PushPopAllPlacementTests.NamedForm_HasNoPositionRule; conformance:2023/pb941_push_pop_directive_state",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work/PB1005 (2026-09-22): >>PUSH ALL - the same pass and warning (COBOLNET2344) as SR-7.3.20.3-3, quoting the PUSH sentence in its own words.",
+  "notes": "kb/Work/PB1005 (2026-09-22): >>PUSH ALL - the same pass and warning (COBOLNET2344) as SR-7.3.20.3-3, quoting the PUSH sentence in its own words. retired-witness: src/Cobol.Net.Compiler/Validation/PushPopAllPlacementPass.cs#Run (kb/Work PB1065: PushPopAllPlacementPass was renamed DirectivePlacementPass when it gained the FLAG-02/FLAG-14 and named-directive rules)",
   "state": "OK"
  },
  {
@@ -3786,13 +3786,13 @@
   "ordinal": 1,
   "subject": "TURN directive",
   "rule-digest": "fee40bc7e4e9",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1365-turn-file-name-is-directive-word",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (registrar 15a). cite.py --check 7.3.25.3 \"Any user-defined word that duplicates a compiler-directive word is interpreted as a compiler-directive word rather than as file-name-1\" OK; §8.12 lists ON, OFF, WITH, LOCATION, CHECKING, ALL, SIZE, SOURCE, DISPLAY, ... as compiler-directive words (cite.py --check 8.12 OK). First sentence CONFORMS: every 'EC-' word starts a new exception-name (w.StartsWith(\"EC-\")). Second sentence DIVERGES: only CHECKING is recognized; ANY other non-EC word after an EC-I-O name is taken as file-name-1. Probes: TRNF4 '>>TURN EC-I-O ON CHECKING ON' and TRNF5 '>>TURN EC-I-O LOCATION CHECKING ON' compile clean with ON / LOCATION silently treated as a file-name (no EC-I-O checking results for F1/F2). Per SR1 those words are compiler-directive words, so the directive is malformed (ON/LOCATION cannot stand before CHECKING) and must be diagnosed. Harm: under-rejects. || editions (adjudicator): 2002, 2014, 2023 (the TURN directive is a COBOL-2002 introduction; §7.3 compiler directives)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1365. cite.py --check 7.3.25.3 'Any user-defined word that duplicates a compiler-directive word is interpreted as a compiler-directive word rather than as file-name-1' OK 1): ON/LOCATION/ALL... after an EC-I-O name make the directive match no format (COBOLNET0718).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.25.3-2",
@@ -3937,11 +3937,11 @@
   "subject": "TURN directive",
   "rule-digest": "fcd1b7e39f5a",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/TurnState.cs#EnabledAtHeader; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData",
-  "test-ref": "conformance:2002/pb1381_turn_at_procedure_header; unit:TurnStateTests.LastMatchingEventWins; unit:TurnStateTests.FileScopedEvent_AppliesOnlyToThatFile",
+  "code-location": "src/Cobol.Net.Compiler/Binding/TurnState.cs#EnabledAtHeader; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn",
+  "test-ref": "conformance:2002/pb1381_turn_at_procedure_header; unit:TurnStateTests.LastMatchingEventWins; unit:TurnStateTests.FileScopedEvent_AppliesOnlyToThatFile; conformance:2023/pb1365_turn_checking_implied_on; conformance:2023/pb1365_turn_checking_with_location_implied_on; conformance:2023/pb1365_turn_checking_location_optional_with",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1381 (w68z). cite.py --check 7.3.25.4 'procedure division statements and procedure division headers that follow in the compilation group' -> OK §7.3.25.4 6). The STATEMENT and file-name-1 halves were verified by the 15a adjudicator and refuter (probes TRNF2/TRNF3/TRNG5B; TurnState.Fold); the HEADER half diverged: the activated-program half of EC-PROGRAM-ARG-MISMATCH (§14.9.4.4 GR3 d)) was folded at the Environment/Data division line — §14.8.4.1's EC-EXTERNAL-only rule — so a TURN between the DATA DIVISION and the PROCEDURE DIVISION header was ignored (TRNH1: 'IN SUB'/'OK'). Both activated-element halves (the program's ArgMismatchChecking and the method twin OoUniversalCheckingHere, §14.9.23.4 GR7 c), which asked the METHOD-ID line) now fold at the procedure division header through the ONE TurnState.EnabledAtHeader. TRNH1 now prints 'EXC [EC-PROGRAM-ARG-MISMATCH]'; the golden's A and TAKE legs are ON-at-header.",
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1365. The printed diagram (PDF page 115, rendered) underlines only OFF and LOCATION: ON and WITH are optional words, so CHECKING alone / CHECKING WITH LOCATION select ON (GR6 'specified or implied').",
   "state": "OK"
  },
  {
@@ -57157,11 +57157,11 @@
   "subject": "DEFINE directive",
   "rule-digest": "a589579ff194",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#SplitDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#TrySplitDefine",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1367 (registrar 15a). Format: >>DEFINE compilation-variable-name-1 [AS] { {arith-expr-1|boolean-expr-1|literal-1|PARAMETER} [OVERRIDE] | OFF }. cite.py --check 7.3.11.2 \"OVERRIDE\" -> OK (general format). Every LEGAL form is accepted (probes p1b/q7/r1/t6: AS omitted, AS OFF, bare OFF, PARAMETER, PARAMETER OVERRIDE, value OVERRIDE, arith/boolean/literal). SplitDefine is a string splitter that under-rejects two ILLEGAL shapes: (1) '>>DEFINE X AS OFF OVERRIDE' compiles clean (probe n1.cob) - OVERRIDE belongs only to the value group, never to OFF (figure notes: outer brace = value group [OVERRIDE] | OFF); SplitDefine strips a trailing OVERRIDE before testing for OFF. (2) a bare '>>DEFINE' with no compilation-variable-name-1 compiles clean (probe t1.cob) - ApplyDefine 'if (name.Length == 0) return;' and the registry row's DirectiveOperandForm.Stage delegates the operand check to this stage. Expected: both rejected (COBOLNET1619-class directive-syntax error). Other malformed shapes ARE caught (t2 'OVERRIDE OVERRIDE', t3 'PARAMETER OFF', t4 '1 2', n8 missing operand -> COBOLNET1619). || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900)",
+  "notes": "kb/Work PB1367 (registrar 15a). Format: >>DEFINE compilation-variable-name-1 [AS] { {arith-expr-1|boolean-expr-1|literal-1|PARAMETER} [OVERRIDE] | OFF }. cite.py --check 7.3.11.2 \"OVERRIDE\" -> OK (general format). Every LEGAL form is accepted (probes p1b/q7/r1/t6: AS omitted, AS OFF, bare OFF, PARAMETER, PARAMETER OVERRIDE, value OVERRIDE, arith/boolean/literal). SplitDefine is a string splitter that under-rejects two ILLEGAL shapes: (1) '>>DEFINE X AS OFF OVERRIDE' compiles clean (probe n1.cob) - OVERRIDE belongs only to the value group, never to OFF (figure notes: outer brace = value group [OVERRIDE] | OFF); SplitDefine strips a trailing OVERRIDE before testing for OFF. (2) a bare '>>DEFINE' with no compilation-variable-name-1 compiles clean (probe t1.cob) - ApplyDefine 'if (name.Length == 0) return;' and the registry row's DirectiveOperandForm.Stage delegates the operand check to this stage. Expected: both rejected (COBOLNET1619-class directive-syntax error). Other malformed shapes ARE caught (t2 'OVERRIDE OVERRIDE', t3 'PARAMETER OFF', t4 '1 2', n8 missing operand -> COBOLNET1619). || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#SplitDefine (kb/Work PB1367: SplitDefine became TrySplitDefine when DEFINE was parsed from its general format)",
   "state": "GAP"
  },
  {

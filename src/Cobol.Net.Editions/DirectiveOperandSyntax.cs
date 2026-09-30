@@ -80,6 +80,14 @@ public sealed record DirectiveOperandSyntax
     /// comment-text-1 is bracketed and optional (§7.3.19.2); DISPLAY's operand braces are not (§7.3.12.2).</summary>
     public bool OperandRequired { get; init; }
 
+    /// <summary>The directive words of THIS row whose own general format writes NO operand at all, whatever the row's
+    /// <see cref="Form"/> says about its other words (kb/Work PB806): a row is a directive FAMILY — <c>IF</c> /
+    /// <c>ELSE</c> / <c>END-IF</c>, <c>EVALUATE</c> / <c>WHEN</c> / <c>END-EVALUATE</c> — and its stage-owned
+    /// operand is true of <c>&gt;&gt;IF</c> only. <see cref="CompilerDirectiveCatalog.CheckOperand"/> rejects any
+    /// operand word after one of these, ISO §7.3.3 SR3/SR4 (only spaces and an inline comment may follow a
+    /// directive), so the next multi-word directive states its operand-less words here and is checked.</summary>
+    public IReadOnlyList<string> NoOperandWords { get; init; } = [];
+
     /// <summary>For <see cref="DirectiveOperandForm.Stage"/>: the type name of the stage that parses and
     /// diagnoses this operand. The drift test resolves it, so a renamed stage is a red test rather than a
     /// silently unchecked directive.</summary>

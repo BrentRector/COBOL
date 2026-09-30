@@ -1097,6 +1097,42 @@ public static class DiagnosticCatalog
         + "or wrong-category operand, an exponentiation or division-by-zero in a compile-time arithmetic expression, "
         + "or a category-mismatched / non-numeric-ordering constant-conditional relation.",
         "ISO §7.3.6 / §7.3.7 / §7.3.8");
+    /// <summary>COBOLNET2649 — a conditional-compilation directive breaks the STRUCTURE its general format writes
+    /// (kb/Work PB1363): an <c>&gt;&gt;ELSE</c> / <c>&gt;&gt;END-IF</c> / <c>&gt;&gt;WHEN</c> / <c>&gt;&gt;END-EVALUATE</c>
+    /// with no open directive of its kind, a second <c>&gt;&gt;ELSE</c> or <c>&gt;&gt;WHEN OTHER</c>, a
+    /// <c>&gt;&gt;WHEN</c> after <c>&gt;&gt;WHEN OTHER</c>, an <c>&gt;&gt;EVALUATE</c> with no <c>&gt;&gt;WHEN</c>,
+    /// text between <c>&gt;&gt;EVALUATE</c> and its first <c>&gt;&gt;WHEN</c>, a directive left open at the end of its
+    /// library text or source text, or phrases of one directive written in different library texts.
+    /// <c>ConditionalCompilationProcessor</c>'s frame stack is its only reporter.</summary>
+    public static readonly DiagnosticDescriptor DirectiveStructureViolation = new(
+        "COBOLNET2649", "directive-structure-violation", EditionSeverity.Error,
+        "A conditional-compilation directive breaks the structure of its general format. ISO §7.3.16.2: "
+        + ">> IF, an optional >> ELSE, then >> END-IF; §7.3.13.2: >> EVALUATE, one or more >> WHEN, an optional final "
+        + ">> WHEN OTHER, then >> END-EVALUATE. The phrases of one IF directive (§7.3.16.3 SR7) and of one EVALUATE "
+        + "directive (§7.3.13.3 SR9) are all in the same library text or all in source text. The message names the "
+        + "violated phrase.",
+        "ISO §7.3.16.2 / §7.3.16.3 SR7 / §7.3.13.2 / §7.3.13.3 SR9");
+    /// <summary>COBOLNET2650 — a compilation-variable-name is a compiler-directive word (kb/Work PB1366): the name of a
+    /// DEFINE directive or of a defined condition. <c>CompilerDirectiveWords</c> is the one §8.12 representation and
+    /// the DEFINE arm of <c>ConditionalCompilationProcessor</c> and the defined-condition evaluation are its callers.</summary>
+    public static readonly DiagnosticDescriptor DirectiveWordAsName = new(
+        "COBOLNET2650", "directive-word-as-compilation-variable-name", EditionSeverity.Error,
+        "A compilation-variable-name is the same as a compiler-directive word. ISO §7.3.11.3 SR1: "
+        + "\"Compilation-variable-name-1 shall not be the same as a compiler-directive word.\" ISO §7.3.8.4.3 SR1 says "
+        + "the same of a defined condition. ISO §7.3.3 SR7: a compiler-directive word is reserved within the context of "
+        + "a directive that specifies it, and §8.12 lists the words — and reserves every exception-name of §14.6.13.1 "
+        + "in the context of compiler directives. §7.3.3 SR9 reserves IMP for the implementor.",
+        "ISO §7.3.11.3 SR1 / §7.3.8.4.3 SR1 / §7.3.3 SR7, SR9 / §8.12");
+
+    /// <summary>COBOLNET2651 — a DEFINE directive does not match its general format (kb/Work PB1367): no
+    /// compilation-variable-name, a name that is not a COBOL word, no operand, OVERRIDE attached to OFF, or words after
+    /// OFF. The DEFINE arm of <c>ConditionalCompilationProcessor</c> is its only reporter.</summary>
+    public static readonly DiagnosticDescriptor DefineDirectiveMalformed = new(
+        "COBOLNET2651", "define-directive-malformed", EditionSeverity.Error,
+        "A >>DEFINE directive does not match its general format (ISO §7.3.11.2): >>DEFINE compilation-variable-name-1 "
+        + "[AS] { { arithmetic-expression-1 | boolean-expression-1 | literal-1 | PARAMETER } [OVERRIDE] | OFF }. "
+        + "OVERRIDE qualifies the value alternative only; OFF is an alternative of its own. The message names the "
+        + "violated part.", "ISO §7.3.11.2");
     // §7.3.14 / §7.3.15 migration-flagging directives — the warning channel (one code per directive; each emit
     // carries the specific option's message + GR4/Annex-E citation). Warning: a flag NEVER fails a compile.
     public static readonly DiagnosticDescriptor Flag02Warning = new(
@@ -1116,8 +1152,8 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor CobolWordsDirectiveInvalid = new(
         "COBOLNET1623", "cobol-words-directive-invalid", EditionSeverity.Error,
         "A >>COBOL-WORDS directive is malformed or violates a syntax rule — a missing/unknown option word, a "
-        + "missing WITH/BY, a non-plain-alphanumeric literal (SR2), a placement after the first IDENTIFICATION "
-        + "DIVISION (SR1), a word used in more than one directive (SR5), an existing word that is not a reserved / "
+        + "missing WITH/BY, a non-plain-alphanumeric literal (SR2), a word used in more than one directive (SR5), "
+        + "an existing word that is not a reserved / "
         + "context-sensitive / intrinsic-function word (SR3), or a new word that is not a valid user-defined word "
         + "or is itself reserved/context/intrinsic (SR4). The message names the specific rule.",
         "ISO §7.3.10.2 / §7.3.10.3");
@@ -2061,16 +2097,12 @@ public static class DiagnosticCatalog
         + "function-specifier in the REPOSITORY paragraph\" — that identification is what lets a reference omit the "
         + "word FUNCTION (§8.4.3.2.3 SR2), so the same word cannot also name a data item. Rename the item, or take "
         + "the function out of the REPOSITORY and write FUNCTION name(…) at each reference.", "ISO §8.3.2.1 rule 5");
-    // §7.3.17 — the LEAP-SECOND directive's PLACEMENT rule (kb/Work PB65): SR1 "shall not be specified within a
-    // compilation unit". ⛔ It owned the operand half too until kb/Work PB794 gave the whole §7.3 family ONE
-    // malformed-operand producer (COBOLNET1911, from the row's directiveOperand column) — the operand is the
-    // catalog's question now, and this code is the placement rule alone.
-    public static readonly DiagnosticDescriptor LeapSecondDirectiveSyntax = new(
-        "COBOLNET1650", "leap-second-directive-syntax", EditionSeverity.Error,
-        "The >>LEAP-SECOND directive is misplaced: it shall not be specified within a compilation unit "
-        + "(ISO §7.3.17.3 SR1) — it precedes the first IDENTIFICATION DIVISION of the compilation group and "
-        + "governs the whole group. Its OPERAND — ON (an optional word, so a bare >>LEAP-SECOND selects ON) or "
-        + "OFF, §7.3.17.2 — is checked with every other directive's, as COBOLNET1911.", "ISO §7.3.17.3 SR1");
+    // ⛔ COBOLNET1650 ("leap-second-directive-syntax") is RETIRED — NEVER REALLOCATE IT. It was >>LEAP-SECOND's own
+    // PLACEMENT code (§7.3.17.3 SR1 "shall not be specified within a compilation unit"; kb/Work PB65) after kb/Work
+    // PB794 had taken its operand half onto COBOLNET1911. kb/Work PB1378 found the rule written for LEAP-SECOND
+    // alone (and wrongly — it latched at the first unit and rejected a directive BETWEEN two sibling units) while
+    // PROPAGATE's twin SR1 was unchecked, so both directives' placement is now DATA on their constructs.json rows
+    // (directivePlacement) judged by ONE pass — COBOLNET2652 (DirectivePlacementViolation) below.
     // §14.9.43.3 / §14.9.48.3 — the STRING and UNSTRING operand rules that are not about USAGE (those are
     // COBOLNET1626): a reference-modified, edited, JUSTIFIED or strongly-typed STRING receiver (SR4/SR5/SR6), a
     // POINTER / COUNT IN / TALLYING item that is not an integer without P (STRING SR7, UNSTRING SR5/SR6), an
@@ -4851,19 +4883,38 @@ public static class DiagnosticCatalog
         + "by an earlier POP; nothing is restored.",
         "ISO §7.3.20.4 GR2");
 
-    /// <summary>COBOLNET2344 — a <c>&gt;&gt;PUSH ALL</c> or <c>&gt;&gt;POP ALL</c> written where §7.3.22.3 SR3 /
-    /// §7.3.20.3 SR3 do not admit it: "If ALL is specified, the POP directive shall be specified only in a
-    /// compilation unit, between clauses in divisions other than the procedure division, and between statements in
-    /// the procedure division" (PUSH: the same). Two arms: OUTSIDE every compilation unit (before the first, or
-    /// after an END marker), and INSIDE a clause or statement rather than between two. A WARNING: §4.2.2 requires
-    /// "a warning mechanism … to indicate violations of the general formats and the explicit syntax rules", and the
-    /// directive is processed as written (the D20 disposition of the sibling SR4 bans, COBOLNET2187). kb/Work
-    /// PB1005.</summary>
-    public static readonly DiagnosticDescriptor PushPopAllPlacement = new(
-        "COBOLNET2344", "push-pop-all-placement", EditionSeverity.Warning,
-        "A PUSH ALL or POP ALL directive is written outside a compilation unit, or inside a clause or statement "
-        + "rather than between two.",
-        "ISO §7.3.22.3 SR3 / §7.3.20.3 SR3");
+    /// <summary>COBOLNET2344 — a directive written where the standard admits it only BETWEEN clauses and statements
+    /// of a compilation unit: the ALL form of <c>&gt;&gt;PUSH</c> / <c>&gt;&gt;POP</c> (§7.3.22.3 SR3 / §7.3.20.3 SR3:
+    /// "If ALL is specified, the POP directive shall be specified only in a compilation unit, between clauses in
+    /// divisions other than the procedure division, and between statements in the procedure division"),
+    /// <c>&gt;&gt;FLAG-02</c> (§7.3.14.3 SR1) and <c>&gt;&gt;FLAG-14</c> (§7.3.15.3 SR1), and a PUSH or POP that names
+    /// one of those (§7.3.20.3 SR2, §7.3.22.3 SR2). Two arms: OUTSIDE every compilation unit (before the first, or
+    /// after an END marker; ALL form only), and INSIDE a clause or statement rather than between two. A WARNING:
+    /// §4.2.2 requires "a warning mechanism … to indicate violations of the general formats and the explicit syntax
+    /// rules", and the directive is processed as written (the D20 disposition of the sibling SR4 bans,
+    /// COBOLNET2187). kb/Work PB1005, PB1065.</summary>
+    public static readonly DiagnosticDescriptor DirectiveBetweenClausesPlacement = new(
+        "COBOLNET2344", "directive-between-clauses-placement", EditionSeverity.Warning,
+        "A directive that may be specified only between clauses and between statements (PUSH ALL, POP ALL, FLAG-02, "
+        + "FLAG-14, or a PUSH / POP naming FLAG-02 or FLAG-14) is written outside a compilation unit, or inside a "
+        + "clause or statement rather than between two.",
+        "ISO §7.3.22.3 SR3 / §7.3.20.3 SR3 / §7.3.14.3 SR1 / §7.3.15.3 SR1 / §7.3.20.3 SR2 / §7.3.22.3 SR2");
+
+    /// <summary>COBOLNET2652 — a directive is written where its placement rule forbids it (kb/Work PB1377, PB1378):
+    /// LEAP-SECOND and PROPAGATE "shall not be specified within a compilation unit" (§7.3.17.3 SR1, §7.3.21.3 SR1),
+    /// COBOL-WORDS "may be specified only before the first IDENTIFICATION DIVISION within a compilation group"
+    /// (§7.3.10.3 SR1), and a PUSH or POP that names one of them "shall not be specified where directive-name must not
+    /// be specified" (§7.3.20.3 SR2, §7.3.22.3 SR2). The rule lives as data on the directive's constructs.json row;
+    /// <c>DirectiveSiteProcessor</c> (the text rule) and <c>DirectivePlacementPass</c> (the parse-tree rule) are its
+    /// only reporters. An ERROR: a directive misplaced in a unit has no well-defined compilation-group state to
+    /// apply (the warning rules of COBOLNET2344 and COBOLNET2187 leave the directive's effect unambiguous).</summary>
+    public static readonly DiagnosticDescriptor DirectivePlacementViolation = new(
+        "COBOLNET2652", "directive-placement-violation", EditionSeverity.Error,
+        "A compiler directive is written where its syntax rules forbid it: LEAP-SECOND (§7.3.17.3 SR1) and PROPAGATE "
+        + "(§7.3.21.3 SR1) not within a compilation unit, COBOL-WORDS (§7.3.10.3 SR1) only before the first "
+        + "IDENTIFICATION DIVISION of the compilation group, and a POP or PUSH naming a directive (§7.3.20.3 SR2, "
+        + "§7.3.22.3 SR2) not where that directive must not be specified.",
+        "ISO §7.3.17.3 SR1 / §7.3.21.3 SR1 / §7.3.10.3 SR1 / §7.3.20.3 SR2 / §7.3.22.3 SR2");
     /// <summary>A PICTURE clause was written on a data description entry that HAS SUBORDINATE ENTRIES.
     /// §13.18.40.3 SR1 is the whole rule — "The PICTURE clause may be specified only at the elementary level" —
     /// and §8.5.1.3.1 says which entries those are: "The most basic subdivisions of a record, that is, those not

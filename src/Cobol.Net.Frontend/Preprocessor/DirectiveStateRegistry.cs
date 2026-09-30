@@ -57,9 +57,10 @@ public static class DirectiveStateRegistry
             "The word-table modifications in effect for the group; §7.3.10.3 SR1 confines the directive to before "
             + "the first IDENTIFICATION DIVISION, so the state is the one in effect there."),
         new(Constructs.LeapSecondDirective2002, [nameof(LeapSecondDirectiveProcessor)],
-            [nameof(DirectiveResults.LeapSecondOn)],
-            "ON/OFF for the group; §7.3.17.3 SR1 keeps the directive out of every compilation unit, so the state is "
-            + "the one in effect where the first unit begins."),
+            [nameof(DirectiveResults.LeapSecondEvents)],
+            "The ON/OFF toggles (§7.3.17.4), folded per compilation unit at its first line by the binder's "
+            + "LeapSecondState (§7.3.4 GR5; kb/Work PB1378) — §7.3.17.3 SR1 keeps the directive out of every unit, "
+            + "so the fold at a unit's first line is the state its whole text reads."),
         new(Constructs.CallConventionDirective2002, [], [],
             "NONE HELD: the directive is recognized and consumed and every name is processed under the §7.3.9.3 "
             + "GR1 default (COBOL); no call-convention state exists for a PUSH to save."),
