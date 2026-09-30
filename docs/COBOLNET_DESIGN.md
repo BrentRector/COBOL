@@ -1087,7 +1087,9 @@ stateful runtime + emitted guards that appear ONLY when a program uses the featu
   written** and do NOT require `>>TURN`; `>>TURN` is resolved at COMPILE time (a `TurnState` walking the procedure
   division) and decides WHETHER an EC guard is emitted at all — OFF compiles to nothing.
 - **USE…EXCEPTION/ERROR declaratives** → paragraph-methods + a compile-time registry keyed (EC/file/open-mode); the
-  declarative method returns a `ResumeAction {Default, NextStatement, Procedure(name)}` so RESUME can redirect.
+  declarative is a pc range run by the generated `__RunUse`, which turns a RESUME's `ResumeSignal` into the int
+  dispatch result the raise site reads (`-1` fell off the end, `-2` RESUME NEXT STATEMENT, `-3` none, `-4` handled
+  nonfatal, `≥0` RESUME AT pc — the conditions deep-dive's "declarative dispatch-result protocol").
 - The exception-checking **PERFORM…WHEN** form (M2) is the one place a real C# `try/catch` is used; RAISE/RESUME and
   fatal/nonfatal termination are runtime calls (`CobolException.Raise`; an unhandled fatal EC → `CobolFatalException`
   caught at `Main` → nonzero exit).
@@ -1378,13 +1380,14 @@ round trip (the locked NC107A shape: `MOVE U5 TO U9`, `IF U22 > U12`). Non-align
   mechanisms.
 - **Declaratives share the pc index space but are unreachable by fall-through:** ONE index space over ALL paragraphs
   (so every pc value agrees), `Main` starts at `EntryParagraphIndex`; a USE handler runs via `Dispatch(declStart,
-  declEnd)` from the runtime I/O/error path and returns a `ResumeAction` (§11.2). This is the same `ResumeAction`
-  used by RESUME — one mechanism.
+  declEnd)` from the runtime I/O/error path and returns the int dispatch result (§11.2) — the same result a RESUME
+  produces — one mechanism.
   **IMPLEMENTED with one refinement:** the handler invocation is the generated `__RunUse(id, start, end)`
   (a GR2 re-entrancy-guarded bounded `__Dispatch`) called from the generated `__IoCheck` selector
   emitted after every FILE STATUS store — selection is COMPILE-TIME knowledge (the program's USE set), so there is
-  no runtime registry for local dispatch and the return is VOID (continue after the failing statement, GR7b; the
-  `ResumeAction` form waits for the §11 EC subsystem where RESUME exists). One settled deviation: a successful
+  no runtime registry for local dispatch. The return is VOID only in an EC-FREE group (continue after the failing
+  statement, GR7b); a group that uses the EC model gets the int-returning `__RunUse` and an int `__IoCheck` that hand
+  the dispatch result back to the verb site (kb/Work PB141). One settled deviation: a successful
   CLOSE resets the connector's open-mode view to none (§9.1.4) — a failed OPEN records the ATTEMPTED mode for
   GR6b "being opened" scoping.
   **⛔ THE PAIR HANDED TO `__RunUse` IS THE DECLARATIVE SECTION'S OWN `PcRange`, AND NOTHING SHORTENS IT**
