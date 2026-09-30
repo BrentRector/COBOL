@@ -129,10 +129,15 @@ public abstract class NistDifferentialTestsBase<TSlot>
 
     /// <summary>The NIST acceptance basis (exactly <c>scripts/guard.sh</c>'s <c>normalize()</c>): drop CR, strip
     /// per-line trailing spaces, and mask the COMPUTED= operand (a value some CCVS programs print that is not part of
-    /// the pass/fail decision). Applied identically to the golden and the produced output.</summary>
+    /// the pass/fail decision). Applied identically to the golden and the produced output.
+    /// <para>⛔ A LONE CR IS DROPPED, NOT TURNED INTO A LINE BREAK. <c>ReplaceLineEndings("\n")</c> — what this used
+    /// to call — maps a bare CR to LF, which silently ignored the basis above: a WRITE … ADVANCING 0 is an OVERPRINT
+    /// written as a carriage return (docs/CONFORMANCE.md "ADVANCING 0"; kb/Work PB1667), and the NIST print programs
+    /// (SQ101M, SQ207M) check that the overprinted line follows its marker on the same line. The basis exists to
+    /// compare listing TEXT, and a carriage return is not text.</para></summary>
     private static string Normalize(string s)
     {
-        var lines = s.ReplaceLineEndings("\n").Split('\n')
+        var lines = s.Replace("\r\n", "\n").Replace("\r", "").ReplaceLineEndings("\n").Split('\n')
             .Select(line => System.Text.RegularExpressions.Regex.Replace(line.TrimEnd(' '), "COMPUTED=  [0-9]*", "COMPUTED=  XXXXXXXXX"));
         return string.Join("\n", lines).TrimEnd('\n');
     }

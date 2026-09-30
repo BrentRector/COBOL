@@ -5835,6 +5835,34 @@ public static class DiagnosticCatalog
         + "entry specifies. ISO §13.4.5.3 SR1 and §13.4.6.3 SR1: \"File-name-1 shall be specified in a file control "
         + "entry.\" Add a SELECT clause for the file in the FILE-CONTROL paragraph.", "ISO §13.4.5.3 SR1 / §13.4.6.3 SR1");
 
+    /// <summary>COBOLNET2670 — a reference modification whose leftmost-position and/or length are integer LITERALS
+    /// and whose range violates §8.4.3.3.4 5) b)/c) against an item of FIXED size, at a statement where checking
+    /// for EC-BOUND-REF-MOD is NOT enabled (kb/Work PB1707 part 1, owner decision R60). Reported by
+    /// <c>ReferenceResolver</c> at the reference; the statement is refused. <see cref="RefModLiteralOutOfRangeChecked"/>
+    /// is the same finding where checking IS enabled.</summary>
+    public static readonly DiagnosticDescriptor RefModLiteralOutOfRange = new(
+        "COBOLNET2670", "refmod-literal-out-of-range", EditionSeverity.Error,
+        "A reference modification of an item of fixed size has a literal leftmost-position or length that lies "
+        + "outside the item, and checking for EC-BOUND-REF-MOD is not enabled at this statement. ISO §8.4.3.3.4 5) "
+        + "b) and c): the leftmost position shall be positive and not exceed the number of positions in the data "
+        + "item, and \"The sum of leftmost-position and length minus the value one shall be less than or equal to "
+        + "the number of positions in the data item referenced by identifier-1\"; a violation is the fatal "
+        + "EC-BOUND-REF-MOD. §14.6.13.1.3 8) (last paragraph) licenses the compiler, when checking is not enabled "
+        + "and it detects a fatal condition, to produce no executable code, and WiseOwl COBOL (as GnuCOBOL) refuses "
+        + "the statement rather than build a program that can only terminate. Correct the literal, or enable "
+        + "checking (>>TURN EC-BOUND-REF-MOD CHECKING ON) to have the run unit raise the condition at run time.",
+        "ISO §8.4.3.3.4 5) b)/c) / §14.6.13.1.3 8)");
+
+    /// <summary>COBOLNET2671 — the <see cref="RefModLiteralOutOfRange"/> finding at a statement where checking for
+    /// EC-BOUND-REF-MOD IS enabled: the statement compiles, because the run-time raise of the condition is what the
+    /// program asked for (a USE declarative may handle it), and the compiler warns that the raise is certain.</summary>
+    public static readonly DiagnosticDescriptor RefModLiteralOutOfRangeChecked = new(
+        "COBOLNET2671", "refmod-literal-out-of-range-checked", EditionSeverity.Warning,
+        "A reference modification of an item of fixed size has a literal leftmost-position or length that lies "
+        + "outside the item (ISO §8.4.3.3.4 5) b)/c)). Checking for EC-BOUND-REF-MOD is enabled at this statement, so "
+        + "the program compiles and every execution of the statement raises the fatal EC-BOUND-REF-MOD.",
+        "ISO §8.4.3.3.4 5) b)/c) / §14.6.13.1.3 8)");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

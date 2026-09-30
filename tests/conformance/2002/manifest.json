@@ -564,6 +564,8 @@
   "w66g_pb1300_type_same_as_composition",
   "w66g_pb1475_strong_type_locale_identification",
   "pb1130_report_sum_size_line_overlap",
+  "pb1667_reinitiate_open_report_file",
+  "pb1516_relative_key_binary_char_digit_size",
   "pb1272_present_when_snapshot",
   "pb1188_report_nonfatal_raise",
   "pb1509_sum_counter_wide_native",

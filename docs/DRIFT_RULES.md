@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-240 drift tests.
+241 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -207,6 +207,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ReservedWordMigrationGateDriftTests](../tests/Cobol.Net.Tests.Unit/ReservedWordMigrationGateDriftTests.cs) | ⛔ THE MIGRATION MODE IS NOT A BLANKET EXEMPTION FROM THE §8.9 RESERVATION GATE (kb/Work PB792). | — |
 | [ReservedWordsDriftTests](../tests/Cobol.Net.Tests.Unit/ReservedWordsDriftTests.cs) | The P2.4/P2.5 drift check: tests/version-matrix/reserved-words.json (the canonical per-edition word flags, emitted by scripts/gen-reserved-words.ps1) and the generated C# table (Validation/ReservedWords.Table.cs, emitted by the SAME script) must agree in BOTH directions — a hand edit to either, or a regeneration that touched only one, fails here. | `tests/version-matrix/reserved-words.json` |
 | [RunUnitStateDriftTests](../tests/Cobol.Net.Tests.Unit/RunUnitStateDriftTests.cs) | ⛔ RUN-UNIT STATE LIVES ON RunUnit, NEVER IN A PROCESS-GLOBAL MUTABLE STATIC (kb/Work PB307). | — |
+| [RuntimeApiWindowDriftTests](../tests/Cobol.Net.Tests.Unit/RuntimeApiWindowDriftTests.cs) | ⛔ A REFERENCE MODIFICATION THE PROGRAM WROTE AND A WINDOW THE COMPILER CHOSE ARE TWO EMITS, AND THE FIRST LIST IS CLOSED (kb/Work PB1707 part 2, owner decision R60). | `src/Cobol.Net.Compiler/CodeGen` |
 | [ScreenFacilityConstructDriftTests](../tests/Cobol.Net.Tests.Unit/ScreenFacilityConstructDriftTests.cs) | The Annex A.4.2 (screen handling) REFUSAL, held from the three directions a negative golden cannot reach (kb/Work PB260). | `tests/version-matrix/cobol-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4`, `src/Cobol.Net.Frontend/Grammar/Core/CobolSpecialNames.g4` |
 | [SearchAllFormat2RuleCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/SearchAllFormat2RuleCoverageDriftTests.cs) | ⛔ THE GUARD THAT KEEPS "ONE MODEL, SEVEN PREDICATES" TRUE (kb/Work PB445). | `specs/ISO_COBOL.md`, `src/Cobol.Net.Compiler/Binding/Validation/SearchAllFormat2Rules.cs`, `src/Cobol.Net.Compiler/Binding/Model/OdoModel.cs` |
 | [SearchOperandResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/SearchOperandResolutionDriftTests.cs) | ⛔ THE PB443 INVARIANT: a SEARCH operand is a WRITTEN REFERENCE, resolved by ISO §8.4.2.2 — never a BASE WORD looked up and tie-broken by declaration order. | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SearchBinder.cs` |

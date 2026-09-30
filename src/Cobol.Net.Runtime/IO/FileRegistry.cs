@@ -482,6 +482,10 @@ public sealed class FileRegistry
         connector.HeldLineDrain = drain;
     }
 
+    /// <summary>Does the print device of the connector of <paramref name="name"/> stand on a line that has been
+    /// presented and not travelled past (<see cref="SequentialConnector.DeviceOnOpenLine"/>)?</summary>
+    internal bool DeviceOnOpenLine(string name) => SequentialOf(name, "REPORT").DeviceOnOpenLine;
+
     /// <summary>The sequential connector a sequential-surface entry acts on: an unregistered name and a keyed
     /// connector are both compiler defects (the binder routes keyed files to the keyed entries), so both are
     /// LOUD — the old <c>TryGetValue</c> guard wrote nothing and reported nothing (kb/Work PB360).</summary>

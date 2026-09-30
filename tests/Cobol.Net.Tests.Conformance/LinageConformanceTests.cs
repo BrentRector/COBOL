@@ -297,13 +297,16 @@ public sealed class LinageConformanceTests
     [Theory]
     // The OTHER placements keep their own answers — the plain WRITE's placement is the only thing PB964 moved.
     // A BEFORE write after an AFTER write presents on the line the device stands on (GR25 e): "the line is
-    // presented before the representation of the printed page is advanced") — the same line, as AFTER
-    // ADVANCING 0 LINES does (GR25 c)); a BEFORE write followed by an AFTER write is two advances, so one blank
+    // presented before the representation of the printed page is advanced") — the same line, appended to it
+    // (GnuCOBOL's behaviour, kb/Work PB1840 holds the overprint question); AFTER ADVANCING 0 LINES is an OVERPRINT
+    // (GR25 c): "no repositioning of the representation of the printed page is performed"), written as a bare
+    // carriage return (docs/CONFORMANCE.md "ADVANCING 0", owner decision kb/Work R54), so BBBB returns to the
+    // start of AAAA's line; a BEFORE write followed by an AFTER write is two advances, so one blank
     // line; and a plain WRITE after a BEFORE write, whose advance already ended the line, adds no blank line.
     [InlineData("LNGBYF", "lngbyf.prt", "AFTER ADVANCING 1 LINE", "BEFORE ADVANCING 1 LINE", "\r\nAAAABBBB\r\nCCCC\r\n")]
     [InlineData("LNGBYG", "lngbyg.prt", "BEFORE ADVANCING 1 LINE", "AFTER ADVANCING 1 LINE", "AAAA\r\n\r\nBBBB\r\nCCCC\r\n")]
     [InlineData("LNGBYH", "lngbyh.prt", "BEFORE ADVANCING 1 LINE", "", "AAAA\r\nBBBB\r\nCCCC\r\n")]
-    [InlineData("LNGBYI", "lngbyi.prt", "AFTER ADVANCING 1 LINE", "AFTER ADVANCING 0 LINES", "\r\nAAAABBBB\r\nCCCC\r\n")]
+    [InlineData("LNGBYI", "lngbyi.prt", "AFTER ADVANCING 1 LINE", "AFTER ADVANCING 0 LINES", "\r\nAAAA\rBBBB\r\nCCCC\r\n")]
     public void Bytes_LineSequential_EveryPlacementMix(string programId, string file, string first, string second, string expected)
         => AssertBytes(BytesProgram(programId, file, LineSequentialOrg, "", $"""
                 MOVE "AAAA" TO P-REC.

@@ -646,10 +646,26 @@ public sealed class ExceptionEngine
     /// <summary>Raise EC-BOUND-REF-MOD for a reference-modification whose leftmost-position or length is out of
     /// range — a zero-length result (unless the REF-MOD-ZERO-LENGTH directive is in effect), a specified negative
     /// length (never relaxable, review C14), a leftmost &lt; 1, or a position outside the data item (ISO §8.4.3.3.4
-    /// item 5b/5c, spec :7085-7089; Table 13 Fatal). When checking is
-    /// enabled it throws <see cref="CobolFatalException"/> (caught by the statement guard for USE F3 dispatch, else
-    /// terminating the run unit per §14.6.13.1.3 #5/#7); when checking is OFF it returns and the caller's lenient
-    /// clamp/space-pad default stands (byte-identical to a pre-slice build).</summary>
+    /// item 5b/5c, spec :7085-7089; Table 13 Fatal). ⛔ THIS NEVER RETURNS. When checking is enabled the condition is
+    /// raised first (<see cref="FatalIfEnabled"/>: set, then <see cref="CobolFatalException"/> for the statement
+    /// guard's USE dispatch, else the run unit's termination per §14.6.13.1.3 #5/#7). When checking is OFF it throws
+    /// the same exception with NO condition set: §8.4.3.3.4 5) c) makes the range a `shall`, and the standard names
+    /// no outcome for the violated `shall` with checking not enabled, so the owner's rule of 2026-07-28 — lenient
+    /// wherever the standard names the outcome, LOUD ABORT wherever it names none — decides, and kb/Work R60
+    /// (PB1707 part 2) confirmed it: the unchecked run unit terminates with a runtime error and never clamps or
+    /// pads (a reference modification that addresses storage no item owns has no result to return). It is the
+    /// twin of <c>CobolPtr.Deref</c>'s unconditional throw.</summary>
+    [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+    public void RefModViolation(string detail)
+    {
+        RefModError(detail);   // checking enabled: set the condition and throw (the statement guard's USE dispatch)
+        throw new CobolFatalException("EC-BOUND-REF-MOD", detail);   // checking off: the loud abort
+    }
+
+    /// <summary>The flag-gated raise of EC-BOUND-REF-MOD alone: it records the condition and throws when checking is
+    /// enabled, and RETURNS when it is off. <see cref="RefModViolation"/> is its one caller — the raise-helper
+    /// census (<c>ExceptionRaiseHelperDriftTests</c>) pairs every emitter gate flag with an …Error helper like this
+    /// one, and the terminate-when-off decision is a separate method so that pairing stays behavioural.</summary>
     public void RefModError(string detail) => FatalIfEnabled(BoundRefModChecking, "EC-BOUND-REF-MOD", detail);
 
     // ── The pointer fatal ECs (CA9): EC-DATA-PTR-NULL / EC-BOUND-PTR / EC-SIZE-ADDRESS ────────────────────────
@@ -1325,7 +1341,7 @@ public sealed class ExceptionEngine
     /// <summary>Raise EC-RANGE-PERFORM-VARYING when a PERFORM VARYING (or AFTER) initializes an INDEX-NAME from a
     /// data-item FROM operand whose value is NOT POSITIVE (&lt;= 0) at the time of initialization (ISO §14.9.28.4 GR3,
     /// spec :29222; Table 13 Fatal). The <paramref name="value"/> is the DATA ITEM's value (GR3 tests the data item,
-    /// not the post-conversion index). Same fatal throw/dispatch contract as <see cref="RefModError"/>.</summary>
+    /// not the post-conversion index). Same fatal throw/dispatch contract as <see cref="RefModViolation"/>.</summary>
     public void PerformVaryingIndexError(long value, string detail)
         => FatalIfEnabled(PerformVaryingChecking && value <= 0, "EC-RANGE-PERFORM-VARYING", detail);
 
@@ -2140,8 +2156,9 @@ public static class ExceptionState
         set => E.BoundRefModChecking = value;
     }
 
-    /// <inheritdoc cref="ExceptionEngine.RefModError"/>
-    public static void RefModError(string detail) => E.RefModError(detail);
+    /// <inheritdoc cref="ExceptionEngine.RefModViolation"/>
+    [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+    public static void RefModViolation(string detail) => E.RefModViolation(detail);
 
     /// <inheritdoc cref="ExceptionEngine.PerformVaryingChecking"/>
     public static bool PerformVaryingChecking

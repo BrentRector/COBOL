@@ -1212,7 +1212,12 @@ public sealed class CobolReport(
         // for §13.18.34 GR6 to evaluate here (kb/Work PB673).
         ClaimDevice();
         FlushPendingLine();                       // no line on the NEW page can overprint the old page's last one
-        CobolFile.WriteAdvancing(_fileName, "", -1, before: false, page: null);   // GR6b — form feed
+        // ⛔ BEFORE, not AFTER (kb/Work PB1667): the feed carries no record, so the empty image is presented FIRST and
+        // the feed ends its (empty) line. An AFTER write would leave the connector standing on an "open" line — a
+        // record presented after the feed — and the device is then NOT at the start of the new page's empty line 1,
+        // which is what `_physLine == 0` tells PresentLine (CobolFile.DeviceOnOpenLine) and what makes a zero
+        // advance on it an overprint return (§14.9.51.4 GR25 c)).
+        CobolFile.WriteAdvancing(_fileName, "", -1, before: true, page: null);   // GR6b — form feed
         _physLine = 0;
         // GR6d — "If the page advance was preceded by the printing of a group whose description has a NEXT GROUP
         // clause with the NEXT PAGE and WITH RESET phrases, PAGE-COUNTER is set to 1; otherwise PAGE-COUNTER is
@@ -1407,7 +1412,13 @@ public sealed class CobolReport(
         // line `target` is target − 1 while the page is still empty — target − _physLine only once a line has
         // been printed. `_physLine == 0` IS that empty page, not a line zero to advance off; reading it as one
         // put every report line of every report one line too low.
-        long from = _physLine == 0 ? 1 : _physLine;
+        // ⛔ …BUT ONLY WHILE THE DEVICE IS NOT ON A LINE ALREADY (kb/Work PB1667). The connector owns "the open
+        // line" (CobolFile.DeviceOnOpenLine); a report file that stays open after a TERMINATE stands on that run's
+        // last line, and INITIATE's _physLine = 0 names an empty PAGE MODEL, not an empty device. The new page's
+        // line 1 is then the line BELOW it, so the device stands at line 0 and the first line travels `target`
+        // lines — one of which ends the open line. Reading it as "at line 1" gave a zero advance, which
+        // §14.9.51.4 GR25 c) makes an overprint: the new run's first line landed ON the old run's last one.
+        long from = _physLine != 0 ? _physLine : CobolFile.DeviceOnOpenLine(_fileName) ? 0 : 1;
         int advance = (int)(target - from);
         // An unchecked overlap (GR3 — "the results are undefined"), or an overprint whose preceding line was
         // already written out by a close: the line goes on the next physical line, and is recorded THERE.

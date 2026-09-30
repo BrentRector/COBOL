@@ -96,7 +96,7 @@ public sealed class StorageCell
     /// content, truncated on the right at its maximum size (§8.5.1.10.4).</summary>
     public void StoreVarGroupAt(int fixedAt, int fixedWidth, int dynBase, ReadOnlySpan<int> dynMax, CobolVarGroup v)
     {
-        Ref = CobolString.SpliceInto(Ref, fixedAt + 1, fixedWidth, CobolString.Store(v.Fixed, fixedWidth));
+        Ref = CobolString.WindowInto(Ref, fixedAt + 1, fixedWidth, CobolString.Store(v.Fixed, fixedWidth));
         for (int k = 0; k < dynMax.Length; k++)
             SetDynAt(dynBase + k, CobolDynString.Store(v.Dyn(k), dynMax[k]));
     }

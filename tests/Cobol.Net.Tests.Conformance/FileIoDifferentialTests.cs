@@ -192,8 +192,10 @@ public sealed class FileIoDifferentialTests
 
     /// <summary>§14.9.46 — WRITE {BEFORE|AFTER} ADVANCING mnemonic-name: the positioning is IMPLEMENTOR-DEFINED
     /// for the associated feature; the feature-name CSP's rule (docs/CONFORMANCE.md §7 item 190, kb/Work PB862 —
-    /// the rule the SQ207M golden encodes) is a ZERO-line advance — a BEFORE-mnemonic write welds the NEXT write
-    /// onto its line. (The entry used to name PRT-CHAN, which was never a feature-name: any word was accepted.)
+    /// the rule the SQ207M golden encodes) is a ZERO-line advance, which is ADVANCING 0's overprint written as a
+    /// carriage return (owner decision kb/Work R54, PB1667) — a BEFORE-mnemonic write returns to the start of its
+    /// line, so the NEXT write overprints it. (The entry used to name PRT-CHAN, which was never a feature-name: any
+    /// word was accepted.)
     /// SPEC-PINNED (not legacy-differential) because the record is ALWAYS released (§14.9.46 GR1 — the WRITE
     /// transfers the record regardless of positioning): the legacy DROPS an AFTER-mnemonic write entirely, a
     /// non-conformance its goldens fossilize (SQ207M is swept-only pending re-baseline). The last WRITE also
@@ -246,7 +248,12 @@ public sealed class FileIoDifferentialTests
         // and nothing in §14.9.51.4 adds a terminator at CLOSE. This expectation used to carry a third, empty record
         // ("\nL=") - the spurious CLOSE-time line terminator kb/Work PB864 removed (its sibling
         // LinageConformanceTests.Bytes_OverflowWithBeforePhrase_PresentsThenRepositions pinned the same defect).
-        Assert.Equal("L=AAAABBBB\nL=CCCCDDDD", cout);
+        // The first record is "AAAA" CR "BBBB": BEFORE ADVANCING CSP presents AAAA and then writes the zero advance's
+        // carriage return (§14.9.51.4 GR25 c) — an overprint; docs/CONFORMANCE.md "ADVANCING 0"), a lone CR is DATA
+        // to a line sequential read (kb/Work PB1540), and the harness's normalization shows it as a line break.
+        // The second record, "CCCC" then "DDDD": AFTER ADVANCING CSP finds no open line (BBBB's own advance ended
+        // it), so there is nothing to overprint and nothing is written, and DDDD is presented on CCCC's line.
+        Assert.Equal("L=AAAA\nBBBB\nL=CCCCDDDD", cout);
     }
 
     /// <summary>The feature-name <c>C01</c> (docs/CONFORMANCE.md §7, Annex A.1 items 190 and 222 — kb/Work PB862):

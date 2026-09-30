@@ -34,6 +34,13 @@ public sealed class SequentialConnector : FileConnector
     /// line and nothing else.</summary>
     private bool _lineOpen;
 
+    /// <summary>The device stands on a line that has been presented and not yet travelled past
+    /// (<see cref="_lineOpen"/>) — the ONE representation of "the open line" (kb/Work PB1667). The report writer
+    /// asks it, through <see cref="CobolFile.DeviceOnOpenLine"/>, before it reads its own page-empty state as "the
+    /// device is at line 1": a report file that is still open after a TERMINATE stands on that report's last line,
+    /// so a re-INITIATEd report's first line belongs on the NEXT one.</summary>
+    internal bool DeviceOnOpenLine => _lineOpen;
+
     // The byte offset of the most recently read record's fixed-width block (for the in-place record-sequential
     // REWRITE) and the LOGICAL read offset it derives from. The logical offset counts characters CONSUMED from
     // the reader (Latin1 — one byte per character; a record-sequential file is pure fixed-width blocks): the
@@ -662,7 +669,7 @@ public sealed class SequentialConnector : FileConnector
             _endOfPage = Exceptions.ExceptionCatalog.IoEopOverflow;   // §14.9.51.4 GR27 a) — caused by GR26 a)
             return true;
         }
-        AdvanceLines(lines);
+        WriteTravel(lines);
         LinageCounter += lines;
         if (_footing is { } footingStart && LinageCounter >= footingStart)
         {
@@ -1308,7 +1315,26 @@ public sealed class SequentialConnector : FileConnector
     private void Advance(int lines)
     {
         if (lines < 0) { _writer!.Write('\f'); _lineOpen = false; return; }   // ADVANCING PAGE — GR25 h), the NO-LINAGE arm
-        AdvanceLines(lines);
+        WriteTravel(lines);
+    }
+
+    /// <summary>⛔ THE TRAVEL OF ONE WRITE'S ADVANCING AMOUNT — <see cref="Advance"/> and
+    /// <see cref="PositionOnLogicalPage"/> are the two places a statement's own amount reaches the device (a margin
+    /// or a page fill is computed, never stated, and calls <see cref="AdvanceLines"/> directly, where a zero
+    /// must stay nothing). §14.9.51.4 GR25 c) (cite.py --check OK §14.9.51.4 25) c)): <i>"If integer-1 or the
+    /// value of the data item referenced by identifier-2 is zero, no repositioning of the representation of the
+    /// printed page is performed"</i> — the next line is presented at the SAME vertical position: an OVERPRINT.
+    /// The standard leaves the device representation to the implementor, so rule 1's precedence decides and
+    /// GnuCOBOL (<c>cob_seq_write_opt</c> / <c>cob_file_write_opt</c>, libcob/fileio.c) writes a bare CARRIAGE
+    /// RETURN for AFTER/BEFORE ADVANCING 0: the device goes back to the start of the line it stands on and does not
+    /// feed (docs/CONFORMANCE.md "ADVANCING 0"; owner decision kb/Work R54, kb/Work PB1667).
+    /// <para>The return is written only when a line IS open (<see cref="_lineOpen"/>): with none the device
+    /// already stands at the start of a line and there is nothing to overprint, so a zero is nothing — which is also
+    /// what the report writer's zero advance on a page it has printed nothing on asks for.</para></summary>
+    private void WriteTravel(int lines)
+    {
+        if (lines > 0) AdvanceLines(lines);
+        else if (_lineOpen) _writer!.Write('\r');   // lines == 0: a negative amount (PAGE) never reaches here
     }
 
     /// <summary>Move the device down <paramref name="lines"/> lines (never negative) — the one place a blank

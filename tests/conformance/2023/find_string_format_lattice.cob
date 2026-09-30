@@ -16,16 +16,12 @@
       *> The [START AFTER] words are an optional introducer of the SAME argument-3, so S03/S05, S04/S06,
       *> S09/S11 and S10/S12 are each one meaning written two ways and must agree.
       *>
-      *> ⛔ NOTHING HERE PINS WHAT AN "OCCURRENCE" IS WHEN MATCHES OVERLAP, AND THAT IS DELIBERATE.
-      *> Both needles above were chosen so that adjacent matches are exactly len(argument-2) apart, so
-      *> every value below is the same under an overlapping-inclusive and a non-overlapping reading of
-      *> §15.37.4 r1/r2. §15.37 states NO consumption or resumption rule in either direction — unlike
-      *> §15.87.4 r3 (SUBSTITUTE), which spells non-overlapping resumption outright — so the axis is
-      *> UNDER-DETERMINED by the standard and is an owner/adjudicator call, not something a golden may
-      *> settle by transcribing what the implementation happens to do. A draft of this file carried
-      *> FIND-STRING("AAAAA" "AA" LAST) and FIND-STRING("AAAAA" "AA" 1); both were removed because
-      *> their values (4 and 2) follow only from the overlapping reading. Re-add them here, one line
-      *> each, in the change set that records the adjudication.
+      *> NOTHING HERE PINS WHAT AN "OCCURRENCE" IS WHEN MATCHES OVERLAP: both needles above were chosen so
+      *> that adjacent matches are exactly len(argument-2) apart, so every value below is the same under an
+      *> overlapping-inclusive and a non-overlapping reading. That axis is pinned by its own golden,
+      *> conformance:2023/pb314_find_string_overlapping_matches, under the determination recorded in
+      *> docs/CONFORMANCE.md (overlapping matches count; §15.37.4 states no consumption rule, unlike
+      *> §15.87.4 r3).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1FSFMT.
        DATA DIVISION.

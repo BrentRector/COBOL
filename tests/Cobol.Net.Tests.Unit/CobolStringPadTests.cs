@@ -63,14 +63,38 @@ public sealed class CobolStringPadTests
     public void SpliceInto_PadZero_FillsWindow(string dst, int leftmost, int length, string slice, string expected)
         => Assert.Equal(expected, CobolString.SpliceInto(dst, leftmost, length, slice, pad: '0'));
 
-    /// <summary>The default-pad SpliceInto paths are byte-identical to the pre-pad behavior (space fill;
-    /// out-of-range starts leave the destination untouched).</summary>
+    /// <summary>The default-pad SpliceInto path in range: space fill of the unreplaced tail of the window.</summary>
     [Theory]
     [InlineData("ABCDEF", 2, 3, "x", "Ax  EF")]
-    [InlineData("ABC", 0, 2, "zz", "ABC")]    // start before position 1 ⇒ unchanged
-    [InlineData("ABC", 2, -1, "z", "Az ")]    // negative length ⇒ to the end, space-filled
+    [InlineData("ABC", 2, CobolString.OmittedRefModLength, "z", "Az ")]    // omitted length ⇒ to the end, space-filled
     public void SpliceInto_DefaultPad_ByteIdentical(string dst, int leftmost, int length, string slice, string expected)
         => Assert.Equal(expected, CobolString.SpliceInto(dst, leftmost, length, slice));
+
+    /// <summary>An out-of-range write is the fatal EC-BOUND-REF-MOD whether or not checking is on (kb/Work PB1707
+    /// part 2, R60): it never leaves the destination untouched and never clamps. A start before position 1 and a
+    /// negative specified length are both §8.4.3.3.4 5) violations.</summary>
+    [Theory]
+    [InlineData("ABC", 0, 2)]
+    [InlineData("ABC", 2, -1)]
+    [InlineData("ABC", 2, 3)]
+    public void SpliceInto_OutOfRange_TerminatesWithTheFatalCondition(string dst, int leftmost, int length)
+        => Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(
+            () => CobolString.SpliceInto(dst, leftmost, length, "z"));
+
+    /// <summary>The compiler-chosen window keeps the lenient semantics the range-checked pair gave up: it clamps
+    /// and pads and raises nothing.</summary>
+    [Theory]
+    [InlineData("ABC", 0, 2, "zz", "ABC")]
+    [InlineData("ABC", 2, -1, "z", "Az ")]
+    public void WindowInto_IsLenient(string dst, int leftmost, int length, string slice, string expected)
+        => Assert.Equal(expected, CobolString.WindowInto(dst, leftmost, length, slice));
+
+    [Fact]
+    public void Window_PadsAShortImage_AndRefModDoesNot()
+    {
+        Assert.Equal("AB   ", CobolString.Window("AB", 1, 5));
+        Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(() => CobolString.RefMod("AB", 1, 5));
+    }
 
     /// <summary>A FIGURATIVE seed (<c>repeat: true</c>) is repeated character by character over every position of
     /// the slice — ISO §8.3.3.6.4 GR2 against the reference-modified data item (§8.4.3.3.4 GR5), and the same

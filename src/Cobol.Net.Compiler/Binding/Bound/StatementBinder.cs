@@ -174,11 +174,19 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     /// (fix-queue PB17). Called from BOTH procedure-bind entry points — <see cref="Bind"/> and
     /// <see cref="BindMethodRoster"/> — because the primary constructor has no body to install it in, and because
     /// a resolver only needs the hook once a PROCEDURE DIVISION is actually being bound. Idempotent.
-    /// <para>⛔ THIS IS THE ONLY EDGE FROM THE PROCEDURE BINDER BACK INTO THE RESOLVER, and it is a delegate, not
-    /// a type reference: the dependency is one-way by design (<c>StatementBinder(DataBinder, ReferenceResolver)</c>),
-    /// so a resolver that never gets one keeps the pre-D18 loud posture — which is exactly what the DATA-division
-    /// throwaway resolvers in <c>DataBinder.Constants</c>/<c>Ptr</c> should have.</para></summary>
-    private void AttachSegmentMaterializer() => refs.MaterializeSegment ??= MaterializeSubscriptSegment;
+    /// <para>⛔ THESE TWO (the materializer and the EC-BOUND-REF-MOD checking query) ARE THE ONLY EDGES FROM THE
+    /// PROCEDURE BINDER BACK INTO THE RESOLVER, and they are delegates, not type references: the dependency is
+    /// one-way by design (<c>StatementBinder(DataBinder, ReferenceResolver)</c>), so a resolver that never gets them
+    /// keeps the pre-D18 loud posture — which is exactly what the DATA-division throwaway resolvers in
+    /// <c>DataBinder.Constants</c>/<c>Ptr</c> should have.</para></summary>
+    private void AttachSegmentMaterializer()
+    {
+        refs.MaterializeSegment ??= MaterializeSubscriptSegment;
+        // The second edge, of the same shape: the literal reference-modification range screen asks whether
+        // EC-BOUND-REF-MOD checking is enabled at the reference's line (kb/Work PB1707 part 1). Read through
+        // Ctx.EcState.Turn AT CALL TIME, so an exception-checking PERFORM's GR14 overlay is the state it sees.
+        refs.RefModCheckingAt ??= line => Ctx.EcState.Turn.Enabled("EC-BOUND-REF-MOD", null, line);
+    }
 
     /// <summary>Bind a program unit's PROCEDURE DIVISION into a <see cref="BoundProgram"/>.</summary>
     public BoundProgram Bind(Core.ProgramUnitContext program)
