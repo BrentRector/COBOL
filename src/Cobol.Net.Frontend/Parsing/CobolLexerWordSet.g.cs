@@ -164,6 +164,7 @@ public partial class CobolLexer
         RECEIVE,
         RECURSIVE,
         REFERENCES,
+        REMARKS,
         REPOSITORY,
         REQUIRED,
         RERUN,

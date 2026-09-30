@@ -922,7 +922,7 @@ of an unsupported facility.
   implementation for implementor latitude), because each spells a vendor construct this compiler recognizes:
   **CHANNEL, COMP-1, COMP-2, COMP-3, COMP-4, COMP-5, COMPUTATIONAL-1, COMPUTATIONAL-2, COMPUTATIONAL-3,
   COMPUTATIONAL-4, COMPUTATIONAL-5, END-INVOKE, END-JSON, END-MERGE, END-METHOD, END-SORT, END-XML, ENTRY,
-  GENERIC, JSON, PACKED, REMARKS, XML**. The single source is `tests/version-matrix/cobol-words.json`
+  GENERIC, JSON, PACKED, XML**. The single source is `tests/version-matrix/cobol-words.json`
   `extensionReserved`; `CobolWordsDriftTests` fails when this list, that array and the lexer disagree.
   ⚠ DETERMINATION (owner may overturn): reserving them keeps the vendor forms recognizable by name; the rejected
   reading — admitting them as user words at every edition — would make each vendor construct ambiguous with a

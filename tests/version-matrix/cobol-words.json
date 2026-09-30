@@ -938,6 +938,12 @@
    "note": "USE FOR DEBUGGING ON ALL REFERENCES OF ('85; VCR row 7.17)"
   },
   {
+   "token": "REMARKS",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "The COBOL-74 REMARKS comment-entry paragraph word. ISO 8.9 reserves it at no edition and GnuCOBOL 3.2 makes it context-sensitive with a context normal code never enters (cobc/reserved.c: CB_CS_DAY, 'we only want it to normally be not usable'), so outside the IDENTIFICATION DIVISION it is a legal user-defined word (a paragraph-name, a PERFORM target). Owner 2026-09-29 (kb/Work PB1689): not a special word."
+  },
+  {
    "token": "REPOSITORY",
    "nameSlot": true,
    "subscriptTrigger": true,
@@ -1274,10 +1280,6 @@
   {
    "word": "PACKED",
    "note": "USAGE PACKED-DECIMAL shorthand (GnuCOBOL extension)"
-  },
-  {
-   "word": "REMARKS",
-   "note": "REMARKS paragraph (COBOL-68/74 identification-division paragraph kept as an extension)"
   },
   {
    "word": "XML",

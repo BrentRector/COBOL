@@ -57,6 +57,7 @@ cobolWord
     | {!keywordContinuesHere()}? PROCESSING
     | {!keywordContinuesHere()}? PROHIBITED
     | {!keywordContinuesHere()}? RECURSIVE
+    | {!keywordContinuesHere()}? REMARKS
     | {!keywordContinuesHere()}? REQUIRED
     | {!keywordContinuesHere()}? REVERSE_VIDEO
     | {!keywordContinuesHere()}? ROUNDING
