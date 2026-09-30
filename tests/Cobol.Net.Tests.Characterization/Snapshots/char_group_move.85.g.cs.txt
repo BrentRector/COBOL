@@ -78,7 +78,7 @@ internal sealed class _PRG_CHAR_GROUP_MOVE : ICobolProgram
                     break;
                 }
             }
-            if (__atExit && __pc == __exitPc + 1) return __pc;   // a named THRU exit paragraph fell off its end
+            if (__atExit && __pc == __exitPc + 1) return __pc;   // a named THRU exit paragraph COMPLETED (an explicit GO TO cleared __atExit — §14.6.3 rule 1)
         }
         return __pc;
     }

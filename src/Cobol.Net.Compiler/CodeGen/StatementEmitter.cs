@@ -140,7 +140,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     // ⛔ Every one of these leaves the paragraph body through DispatchState.TransferOut — `__pc = t; goto __xfer;`
     // — and never through a bare `break;`, which C# binds to the innermost lowered container (an inline PERFORM's
     // loop, a DEPENDING switch) rather than to the dispatcher (kb/Work PB405; see EmitterState.cs).
-    public bool Visit(BoundGoTo n) { var w = _ctx.Writer; _dispatchState.EmitDebugCause(w, "Transfer", n.SourceLine); w.Line(_dispatchState.TransferOut(n.TargetPc)); return true; }
+    public bool Visit(BoundGoTo n) { var w = _ctx.Writer; _dispatchState.EmitDebugCause(w, "Transfer", n.SourceLine); w.Line(_dispatchState.ExplicitTransferOut(n.TargetPc)); return true; }
 
     // EXIT PARAGRAPH (§14.9.14.4 GR6): control passes to "an implicit CONTINUE statement immediately following the
     // last explicit statement of the current paragraph, preceding any return mechanisms for that paragraph" — pc+1,

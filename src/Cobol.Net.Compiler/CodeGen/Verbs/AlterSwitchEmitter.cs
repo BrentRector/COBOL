@@ -53,7 +53,7 @@ internal sealed class AlterSwitchEmitter(EmitContext ctx, DispatchState dispatch
         // X3.23-1985 USE FOR DEBUGGING (VCR 7.17): an altered GO TO transfer is DEBUG-CONTENTS SPACES (Transfer),
         // DEBUG-LINE the GO TO statement's own line.
         dispatch.EmitDebugCause(w, "Transfer", g.SourceLine);
-        w.Line(dispatch.TransferOut(g.AlterField));
+        w.Line(dispatch.ExplicitTransferOut(g.AlterField));
     }
 
     /// <summary>ALTER assigns each entry's new destination pc into the target paragraph's field at the ALTER site

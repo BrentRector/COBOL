@@ -31911,13 +31911,13 @@
   "ordinal": 1,
   "subject": "Execution",
   "rule-digest": "e4912002b5c8",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/ControlFlowEmitter.cs; src/Cobol.Net.Compiler/CodeGen/DispatchEmitter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs",
-  "test-ref": "conformance:2023/pb367_use_procedure_is_the_section",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/DispatchEmitter.cs#EmitDispatchMethod; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#ExplicitTransferOut",
+  "test-ref": "conformance:2023/pb367_use_procedure_is_the_section; conformance:2002/pb1148_perform_exit_paragraph_go_to_next",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1148 (open). Rule: a procedure executed under control of PERFORM, USE, SORT or MERGE that is the last in the range returns from its last statement to 'the control mechanism of the last executed controlling statement'; an iterative PERFORM re-enters the first procedure each iteration (cite.py --check 14.6.3 -> OK, rule 1). All four controllers verified: probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out\\probe\\xfer\\xfer.cob (2023 and 85 identical): PERFORM P1 THRU P3 with P1 itself executing PERFORM P2 THRU P3 (a shared exit) -> P1 P2 P3 P1b P2 P3 M1 (the P3 exit returns to the LAST EXECUTED controller first, then the outer one); PERFORM S2 (a section of two paragraphs) -> S2A S2B M2; PERFORM P4 3 TIMES -> P4-1 P4-2 P4-3 M3. USE: probe xsort.cob, OPEN INPUT of a missing file -> USE-RAN FS=35 then AFTER-OPEN FS=35 (return to the statement after the OPEN), plus the spec-derived golden conformance:2023/pb367_use_procedure_is_the_section (its header derives the USE return point from §14.6.3 rule 1 and §14.9.14.4 GR7) and its 85 twin. SORT: xsort.cob INPUT/OUTPUT PROCEDURE sections, the output procedure's LAST paragraph O2 runs and control returns after the SORT (OUT AAA/BBB/CCC, O2-LAST, AFTER-SORT). MERGE: xmerge.cob, OUT AAA..DDD, O2-LAST, AFTER-MERGE. || REFUTED: PARTIAL — Rule 1 makes the implicit return happen 'from the last statement in the procedure' that is the last in the controlling statement's range. The emitted dispatch instead returns whenever the exit paragraph's pc is followed by pc == exitPc+1. An explicit GO TO from inside the exit paragraph to the paragraph that physically follows it therefore looks like fall-through and returns to the PERFORM. The PERFORM should stay active while control runs the GO TO target, which is outside the range (§14.9.28 treats the range as left). In the probe the target paragraph never runs and the run unit continues after the PERFORM. Nested THRU, sections, TIMES, VARYING re-entry, GO TO out and fall-back-in, SORT, MERGE and USE all behave correctly, so the verdict is PARTIAL. The same `__atExit && __pc == __exitPc + 1` shape in every emitted __Dispatch is the sibling to sweep: GO TO, and also a PERFORM or SORT/MERGE procedure exit, whose next paragraph is the transfer target. || editions as adjudicated: 85, 2002, 2014, 2023 (the sections-as-well-as-paragraphs clarification is Annex E.2 item 26, a 2023 change 'potentially affecting existing programs'; the return rule itself is unchanged)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1148: the implied return fires only for control that completes the exit paragraph (fall-through, EXIT PARAGRAPH / SECTION, NEXT SENTENCE); an explicit GO TO to the paragraph that physically follows clears __atExit, so it is not mistaken for fall-through.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.3-2",
@@ -43056,13 +43056,13 @@
   "ordinal": 3,
   "subject": "RESUME statement",
   "rule-digest": "6062ddca7b9b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindResume; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitResume; src/Cobol.Net.Compiler/CodeGen/DispatchEmitter.cs#__Dispatch",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#ResumeTransfer; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#ExplicitTransferOut",
+  "test-ref": "conformance:2023/pb1148_resume_at_paragraph_after_perform_exit",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1148 (registrar 14c). Rule: 'If procedure-name-1 is specified, control is transferred to procedure-name-1 as if a GO TO procedure-name-1 were executed.' (cite.py --check 14.9.33.4 -> OK §14.9.33.4 3)); NOTE 2 is informative. BindResume resolves procedure-name-1 through the ONE procedure-operand resolution and binds BoundResume(target.Range.Start); EmitResume throws ResumeSignal(pc), __RunUse returns it as the resume action and every raise site lands it with `__pc = action; goto __xfer;` - exactly the GO TO landing. The RESUME half is faithful, but it inherits a defect of the GO TO landing itself: the out-of-line __Dispatch(start, exit) return test `__atExit && __pc == __exitPc + 1` cannot tell 'the exit paragraph FELL OFF its end' from 'a GO TO in the exit paragraph TRANSFERRED to the physically next paragraph'. §14.9.28.4 5) a) puts the return mechanism 'after the last statement of procedure-name-1' (cite.py OK §14.9.28.4 5) a)), and a GO TO out of the middle of it never executes that last statement. PROBED (probe/resume-statement/gr3.cob): M1: PERFORM M2 DISPLAY 'BACK-IN-M1' STOP RUN; M2: OPEN INPUT F (missing -> status 35) DISPLAY 'AFTER-OPEN'; M3: DISPLAY 'M3' STOP RUN; declarative on F: DISPLAY 'D ' FS RESUME AT M3. Expected (GR3 + §14.9.28.4 5) a)): 'D 35' / 'M3'. Observed: 'D 35' / 'BACK-IN-M1'. Control: gr3b.cob (RESUME AT a non-adjacent paragraph) lands correctly, and goto.cob (plain GO TO M3 as the first statement of the performed M2, no RESUME) reproduces the same wrong return, so the root is the dispatcher's return test, not the RESUME binder - see the finding. No register note owns it (PB405/PB413/PB440 are landed and about inline PERFORM / empty ranges).",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1148: a RESUME AT procedure-name landing is an explicit GO TO-like transfer, so it does not return to a PERFORM whose exit paragraph is the one just before the target.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.34.3-1",

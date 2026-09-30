@@ -13,6 +13,10 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1793 — 2026-09-29 18:59 PDT — PB1148: a GO TO out of a PERFORM's exit paragraph no longer returns to the PERFORM
+
+The dispatcher's return test (`__atExit && __pc == __exitPc + 1`) could not tell the exit paragraph COMPLETING from an explicit GO TO (or RESUME AT) to the paragraph that physically follows it, so `PERFORM M2` with `M2. GO TO M3.` returned to the PERFORM where §14.6.3 rule 1 and §14.9.28.4 GR5 put the return mechanism after a last statement that never executes. `ExplicitTransferOut` (GO TO, altered GO TO, RESUME AT) clears `__atExit` before the jump; EXIT PARAGRAPH / EXIT SECTION / NEXT SENTENCE keep the ordinary transfer, being the implied return. One site serves every dispatch method, so the sweep is that one test. Closes GR-14.6.3-1 and GR-14.9.33.4-3; GAP 800 to 798.
+
 ## Entry 1792 — 2026-09-29 18:51 PDT — PB1141: MERGE closes its USING files after the output procedure
 
 `EmitMerge` ran the whole implicit USING transfer — OPEN, READ loop, CLOSE and the CLOSE USE hook — for every file before entering the output procedure, so inside the procedure each file's FILE STATUS held the CLOSE's `00` instead of the as-if READ's `10`, and a CLOSE declarative ran too early. §14.9.24.4 GR7 c) defers the as-if CLOSE until "after control passes the last statement in the output procedure". `EmitInputFile` is split into the READ half and `EmitInputClose`; SORT keeps its back-to-back pair (its release phase ends with each CLOSE), MERGE emits the closes after the procedure when one is specified. Closes GR-14.9.24.4-9; GAP 801 to 800.

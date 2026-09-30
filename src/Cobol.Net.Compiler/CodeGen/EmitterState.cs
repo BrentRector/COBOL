@@ -210,6 +210,20 @@ internal sealed class DispatchState
     /// <summary>The <see cref="TransferOut(string,string)"/> of a compile-time pc.</summary>
     public string TransferOut(int pc, string comment = "") => TransferOut(pc.ToString(), comment);
 
+    /// <summary>⛔ AN EXPLICIT TRANSFER — GO TO (and its alterable / DEPENDING forms) or a RESUME AT landing — is NOT a
+    /// paragraph falling off its end (kb/Work PB1148). The dispatcher's return test
+    /// (<c>__atExit &amp;&amp; __pc == __exitPc + 1</c>) is the §14.6.3 rule 1 implied return "from the last statement in
+    /// the procedure", so it must fire only for control that LEAVES the exit paragraph by completing it: fall-through,
+    /// EXIT PARAGRAPH (§14.9.14.4 GR6), EXIT SECTION (GR7), NEXT SENTENCE in a last sentence — all
+    /// <see cref="TransferOut(string,string)"/>. A GO TO whose target is the paragraph that physically follows the
+    /// exit paragraph is an explicit transfer out of the range (§14.9.28.4 GR5: the return mechanism sits after the
+    /// last statement, which never executes), so this clears <c>__atExit</c> before the jump and the test cannot mistake
+    /// the target for fall-through.</summary>
+    public string ExplicitTransferOut(string pcExpr, string comment = "") => $"__atExit = false; {TransferOut(pcExpr, comment)}";
+
+    /// <summary>The <see cref="ExplicitTransferOut(string,string)"/> of a compile-time pc.</summary>
+    public string ExplicitTransferOut(int pc, string comment = "") => ExplicitTransferOut(pc.ToString(), comment);
+
     /// <summary>Render the RESUME landing of one dispatch result: a USE declarative / Format-3 handler that
     /// completed with RESUME AT procedure-name returns that paragraph's pc, and the raise site transfers there
     /// (ISO §14.9.33.4 GR3); a negative result is "no transfer" (normal completion, RESUME NEXT STATEMENT, or no
@@ -224,7 +238,7 @@ internal sealed class DispatchState
     public string ResumeTransfer(string resultVar, string comment = "   // RESUME AT procedure-name (§14.9.33.4 GR3)")
         => InOperandEvaluation
             ? OperandEvaluationResume(resultVar)
-            : $"if ({resultVar} >= 0) {{ {TransferOut(resultVar)} }}{comment}";
+            : $"if ({resultVar} >= 0) {{ {ExplicitTransferOut(resultVar)} }}{comment}";
 
     /// <summary>True while the statement emitter is emitting an operand-evaluation step
     /// (<see cref="Binding.Bound.BoundStatement.OperandEvaluation"/>) — opened by

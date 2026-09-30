@@ -192,7 +192,7 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                 // transfer-free unit's generated source is unchanged.
                 if (dispatchState.TransferUsed)
                     w.Line($"{dispatchState.TransferLabel}: ;   // a transfer of control out of a paragraph (ISO §14.9.14.4 GR6/GR7, §14.9.17.4, §14.9.19.4 GR4/GR6, §14.9.33.4 GR3)");
-                w.Line("if (__atExit && __pc == __exitPc + 1) return __pc;   // a named THRU exit paragraph fell off its end");
+                w.Line("if (__atExit && __pc == __exitPc + 1) return __pc;   // a named THRU exit paragraph COMPLETED (an explicit GO TO cleared __atExit — §14.6.3 rule 1)");
             }
             w.Line("return __pc;");
         }
