@@ -3,7 +3,7 @@ name: cobol-implementer
 description: WiseOwl COBOL fix-lane implementer — fixes one kb/Work group at its root cause in an isolated worktree, gates it, and reports. Dispatch with a rendered spec from make_dispatch_specs.py.
 model: opus
 effort: high
-maxTurns: 220
+maxTurns: 400
 experimental:
   cacheTtl: 1h
 ---

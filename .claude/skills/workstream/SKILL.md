@@ -95,7 +95,7 @@ largest line item in the burn-down.
 | agent | cap | at the cap |
 |---|---|---|
 | any read-only agent — adjudicator, refuter, validator, probe, reviewer | **160 turns** | checkpoint, return what is decided, name what is not |
-| implementer | **220 turns** | checkpoint, write `STATUS.md` `NEXT`, return a report headed `SPLIT` |
+| implementer | **400 turns** (owner, 2026-09-30, R67) | checkpoint, write `STATUS.md` `NEXT`, return a report headed `SPLIT` |
 
 ⛔ **A job that will not fit is SPLIT, never extended.** A fresh agent starting from the checkpoint is on the flat
 part of the curve; the killed one's continuation is on the steep part.
