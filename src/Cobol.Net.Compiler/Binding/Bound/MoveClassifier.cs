@@ -154,14 +154,36 @@ public static class MoveClassifier
     /// Item 1 — the occurs-depending group with integer-1 zero — is the shape that gets here, and the predicate
     /// covers the others without a second site if SR9 ever admits one.</para>
     /// </summary>
-    public static Place? ZeroLengthItemRoute(BoundOperand source, Place target) =>
-        source is BoundFieldOperand { Place.DenotedItem: not null } f
-        && SubstitutesForZeroLength(target)
-        && !IsVariableLengthGroupMove(f.Place, target)
-        && (f.Place.Item is { IsGroup: false } si ? si.IsDynamicLength || si.IsAnyLength
-                                                  : f.Place.Item.MinimumLengthIsZero)
-            ? f.Place
-            : null;
+    public static ZeroLengthSender? ZeroLengthItemRoute(BoundOperand source, Place target) =>
+        source switch
+        {
+            BoundFieldOperand { Place.DenotedItem: not null } f
+                when SubstitutesForZeroLength(target)
+                && !IsVariableLengthGroupMove(f.Place, target)
+                && (f.Place.Item is { IsGroup: false } si ? si.IsDynamicLength || si.IsAnyLength
+                                                          : f.Place.Item.MinimumLengthIsZero)
+                => new ZeroLengthSender(f.Place, null),
+            // ⛔ §8.5.4 item 5 — "A logical record that has been specified using the variable-length or the
+            // fixed-or-variable-length format of the RECORD clause in which the number of characters positions is
+            // zero" — IS a zero-length item, and the sender of READ / RETURN INTO over such a file is the CURRENT
+            // RECORD (a BoundCurrentRecord, PB339), not a field: the route used to match BoundFieldOperand alone, so
+            // a zero-length record was stored as an empty alphanumeric slice with no SPACE substitution and no
+            // editing (kb/Work PB1409: `READ F INTO PIC XX/XX` left five raw spaces where GR2's SPACE edits to
+            // "  /  "). "Whose minimum length is zero" (§8.5.4's stem) is the file's minimum record size (VaryMin).
+            BoundCurrentRecord { Area.DenotedItem: not null } cr
+                when SubstitutesForZeroLength(target)
+                && cr.File.VaryMin == 0
+                && !cr.AlphanumericGroupMove   // Format 2 (RECORD VARYING): §14.9.30.4 4) b) designates the implied move an alphanumeric GROUP move — no substitution
+                && !IsVariableLengthGroupMove(cr.Area, target)
+                => new ZeroLengthSender(cr.Area, cr),
+            _ => null,
+        };
+
+    /// <summary>The sending operand <see cref="ZeroLengthItemRoute"/> found and the length the emitted test reads:
+    /// the sending <see cref="Place"/> (its item's category picks GR2's SPACE or GR3's ZERO, and a field's own
+    /// current length is read off it), or — for a READ / RETURN INTO current record (§8.5.4 item 5) — the
+    /// <see cref="CurrentRecord"/> operand whose length is GR16's byte count, not any field's.</summary>
+    public readonly record struct ZeroLengthSender(Place Place, BoundCurrentRecord? CurrentRecord);
 
     /// <summary>§14.9.25.4 GR9's antecedent — "If both the sending operand and the receiving data item are group
     /// items and one or both is a variable-length group" — asked of a sending PLACE, for
@@ -177,8 +199,8 @@ public static class MoveClassifier
     /// <summary>The figurative constant GR1's route substitutes for a zero-length SENDING ITEM — GR2's SPACE for
     /// an alphanumeric or national item, GR3's ZERO for a boolean one, read off the sending item's own category
     /// exactly as <see cref="Sender"/> reads it off the literal's (one rule, one two-armed answer).</summary>
-    public static BoundFigurative ZeroLengthItemFigurative(Place sender) =>
-        new(sender.Item.OperandPic?.Category is PicCategory.Boolean ? 'Z' : 'S');
+    public static BoundFigurative ZeroLengthItemFigurative(ZeroLengthSender sender) =>
+        new(sender.Place.Item.OperandPic?.Category is PicCategory.Boolean ? 'Z' : 'S');
 
     /// <summary>True when <paramref name="source"/> is a sending operand GR1's zero-length-item clause can
     /// reach but whose LENGTH is not a stable field read — a reference-modified or function-identifier operand

@@ -45,9 +45,10 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // reader, because a bit or national group's plain Read() is its STRUCT and has no length at all
                 // (kb/Work PB943: `NG.Length`, CS1061). Asking the plain place would also read the MAXIMUM extent
                 // and the test could never fire.
-                string len = zlSend.Item.IsGroup
-                    ? $"{PlaceRenderer.SendingGroupValue(zlSend, "zero-length-item test of")}.Length"
-                    : $"{PlaceRenderer.Read(zlSend)}.Length";
+                string len = zlSend.CurrentRecord is { } curRec ? OperandText.CurrentRecordLength(curRec)   // §8.5.4 item 5 — the record length is §13.18.43.4 GR16's byte count
+                    : zlSend.Place.Item.IsGroup
+                    ? $"{PlaceRenderer.SendingGroupValue(zlSend.Place, "zero-length-item test of")}.Length"
+                    : $"{PlaceRenderer.Read(zlSend.Place)}.Length";
                 // ⛔ BOTH ARMS ARE THE STATEMENT'S OWN DISPATCH. GR1's substitution changes the move's KIND — a
                 // group sender becomes a literal one, so GR4's first sentence makes the zero-length arm an
                 // ELEMENTARY move while the non-zero arm stays the group move (kb/Work PB896) — and the zero arm's

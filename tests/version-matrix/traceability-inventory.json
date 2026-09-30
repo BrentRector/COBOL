@@ -8601,13 +8601,13 @@
   "ordinal": 5,
   "subject": "Data description and representation",
   "rule-digest": "100db9c2745c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/MoveBinder.cs#BindIntoPhrase; src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs#BoundCurrentRecord; src/Cobol.Net.Compiler/Binding/Bound/MoveClassifier.cs#ZeroLengthItemRoute; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#CurrentRecordImage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/MoveClassifier.cs#ZeroLengthItemRoute; src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#CurrentRecordLength",
+  "test-ref": "conformance:2023/pb1409_read_into_zero_length_record_takes_the_literal_substitution; conformance:2023/pb721_zero_length_record",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1409 (registrar 15b). `OK §8.5.4 5)` \"A logical record that has been specified using the variable-length or the fixed-or-variable-length format of the RECORD clause in which the number of characters positions is zero.\" The spec's consumer is the READ/RETURN INTO implicit MOVE: `OK §13.18.43.4 16)` \"If the number of bytes determined as above is zero, the record is a zero-length item\" + `OK §14.9.25.4 1)` \"If identifier-1 is a zero-length item, it is as if literal-1 were specified as a zero-length literal.\" FORMAT 2 (VARYING) half CONFORMS: `OK §14.9.30.4 4) b)` designates the implied move an alphanumeric group move, so a zero-byte current record space-fills the receiver without editing — p6/p8 READ INTO X(10)/999/XX/XX all space-filled, and 2023/pb721_zero_length_record pins the alphanumeric case. FORMAT 3 (fixed-or-variable, `RECORD CONTAINS 0 TO 10 CHARACTERS`) half DIVERGES: the move is NOT group-designated (FileModel.VaryingRecordInfo's own doc: 'its move is classified normally'), so GR1->GR2 must substitute SPACE and edit it. Probe p9 (pinned cobol.exe): FD F RECORD CONTAINS 0 TO 10; 01 FR0. 05 FR0E PIC X OCCURS 0 TO 10 DEPENDING ON K; K=0; WRITE FR0; READ F INTO WE (PIC XX/XX) -> observed [     ]; expected [  /  ] — and the same program's `MOVE FR0 TO WE` prints [  /  ], so one record gives two answers. Mechanism: BindIntoPhrase wraps every file with a Varying model (Format 2 AND 3) in BoundCurrentRecord, and ZeroLengthItemRoute only matches BoundFieldOperand, so no current-length test is emitted for an INTO sender; the route's doc-comment additionally reasons item 5 away as a 'VARIABLE-LENGTH group' that never reaches an elementary receiver — a variable-length RECORD is not a §8.5.1.12 variable-length group, and READ/RETURN INTO is exactly where it reaches one. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (§13.18.43.3 SR7 'Integer-2 shall be greater than or equal to zero' — PB721 found no Annex E delta; golden 85/pb721_zero_length_record_85)",
-  "state": "GAP"
+  "notes": "kb/Work PB1409 landed. Format 3 (RECORD CONTAINS 0 TO n) half: ZeroLengthItemRoute now matches the READ/RETURN INTO sender, a BoundCurrentRecord whose file has VaryMin 0 and whose implied move is not the Format 2 alphanumeric group move (14.9.30.4 4) b)), returning a ZeroLengthSender the emitter tests with OperandText.CurrentRecordLength (GR16 byte count): a zero-byte record is a zero-length item (8.5.4 5)), GR1 -> GR2 substitutes SPACE and EDITS it into PIC XX/XX (\"  /  \"), a 3-byte record stays a group move (no editing), and the same program's MOVE FR0 TO WE agrees. Format 2 half unchanged (pb721_zero_length_record).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.4-6",
