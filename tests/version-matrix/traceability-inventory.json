@@ -49761,13 +49761,13 @@
   "ordinal": 22,
   "subject": "WRITE statement",
   "rule-digest": "1004ca564e9f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileConnector.cs#TrimRecordEnd",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#TrimRecordEnd; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitAreaRegistrations",
+  "test-ref": "conformance:2023/pb1191_line_sequential_trailing_space_strip",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1191 (registrar 14c). GR22: 'For a line sequential file with a file description entry containing a RECORD clause with the DEPENDING phrase, the record area is, if necessary, filled to the right of the rightmost non-space character with one or more space characters depending on the value of data-name-1.' (cite.py --check 14.9.51.4 -> OK rule 22). GR21 excludes exactly this FD shape from the trailing-space strip, and GR22 says the record carries spaces out to data-name-1's length. SequentialConnector.Write's IsVarying+_lineSequential arm is EmitLineSequentialRecord(TrimRecordEnd(FitRecord(image, len)), page) — it fits to the DEPENDING length and then strips the trailing spaces anyway, so the DEPENDING shape is treated exactly like GR21's. PROBE E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/write-p2/pc.cob: FD LV RECORD IS VARYING IN SIZE FROM 1 TO 10 DEPENDING ON VL; MOVE 'AB' TO LVR, VL=6, WRITE -> file line 'AB' CRLF (expected 'AB' + 4 spaces CRLF, six characters). The truncation half works (VL=1 'XY' -> 'X').",
-  "state": "GAP"
+  "notes": "kb/Work PB1191: a line sequential FD whose RECORD clause has the DEPENDING phrase registers RecordLengthFromDepending, so its records are written at data-name-1's length, trailing spaces kept.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-23",

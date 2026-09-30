@@ -230,6 +230,10 @@ public static class CobolFile
     /// the national space character; kb/Work PB327).</summary>
     public static void RegisterNationalArea(string name) => _reg.RegisterNationalArea(name);
 
+    /// <summary>Declare a SELECTed file's RECORD clause as carrying a DEPENDING phrase — see
+    /// <see cref="FileRegistry.RegisterRecordLengthFromDepending"/> (§14.9.51.4 GR21/GR22; kb/Work PB1191).</summary>
+    public static void RegisterRecordLengthFromDepending(string name) => _reg.RegisterRecordLengthFromDepending(name);
+
     /// <summary>Register the file's §13.18.13 CODE-SET conversion — see
     /// <see cref="FileRegistry.RegisterCodeSet"/>.</summary>
     public static void RegisterCodeSet(string name, char[] toNative) => _reg.RegisterCodeSet(name, toNative);

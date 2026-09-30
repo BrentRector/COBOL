@@ -1042,6 +1042,13 @@ internal static class RuntimeApi
     public static string FileRegisterNationalArea(string name) =>
         $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterNationalArea)}({name})";
 
+    /// <summary>Declare the connector's RECORD clause as carrying a DEPENDING phrase —
+    /// <c>CobolFile.RegisterRecordLengthFromDepending</c>, emitted right after the registration (the
+    /// <see cref="FileRegisterNationalArea"/> pattern) for exactly those files (§14.9.51.4 GR21/GR22; kb/Work
+    /// PB1191).</summary>
+    public static string FileRegisterRecordLengthFromDepending(string name) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterRecordLengthFromDepending)}({name})";
+
     /// <summary>Declare the connector's §13.18.13 CODE-SET conversion — <c>CobolFile.RegisterCodeSet</c>,
     /// emitted right after the registration (the <see cref="FileRegisterNationalArea"/> pattern) for exactly the
     /// files whose CODE-SET clause names a coded character set whose correspondence with the native one is NOT

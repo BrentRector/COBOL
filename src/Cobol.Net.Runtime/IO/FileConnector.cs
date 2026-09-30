@@ -812,6 +812,13 @@ public abstract class FileConnector
     /// re-derived per read.</summary>
     public bool NationalRecordArea { get; internal set; }
 
+    /// <summary>⛔ THE FD's RECORD CLAUSE CARRIES A DEPENDING PHRASE — set by the emitter right after registration for
+    /// exactly those files (kb/Work PB1191), the <see cref="NationalRecordArea"/> pattern. §14.9.51.4 GR21 strips a
+    /// line sequential record's trailing spaces only for a file description "not containing a RECORD clause with the
+    /// DEPENDING phrase"; GR22 says such a record is transferred at data-name-1's length, spaces included. So a
+    /// connector with this property never trims (<see cref="TrimRecordEnd"/>).</summary>
+    public bool RecordLengthFromDepending { get; internal set; }
+
     /// <summary>⛔ THE FILE'S §13.18.13 CODE-SET CONVERSION, or null for the native character set — §13.18.13.4
     /// GR7, "<i>If the CODE-SET clause is not specified, the native character set is assumed for data on the
     /// external media</i>". Set by the emitter right after registration for exactly the files whose CODE-SET
@@ -886,7 +893,11 @@ public abstract class FileConnector
     /// bytes, `00 41 00 42 00 20 00 20 00`).</summary>
     protected string TrimRecordEnd(string image)
     {
-        if (!NationalRecordArea) return image.TrimEnd();
+        // §14.9.51.4 GR22: a DEPENDING-phrase file keeps the record at data-name-1's length — GR21's strip does not apply.
+        if (RecordLengthFromDepending) return image;
+        // GR21's "spaces" are the alphanumeric SPACE CHARACTER only — <c>TrimEnd()</c> stripped every Unicode White_Space
+        // character too, so a trailing U+00A0 (a member of the line sequential character set, DOC-A.1-115) vanished.
+        if (!NationalRecordArea) return image.TrimEnd(' ');
         int n = image.Length & ~1;                                  // whole national positions only
         while (n >= 2 && image[n - 2] == '\0' && image[n - 1] == ' ') n -= 2;
         return image[..n];

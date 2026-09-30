@@ -238,6 +238,10 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     internal static void EmitAreaRegistrations(CodeWriter w, FileModel file)
     {
         EmitNationalAreaRegistration(w, file);   // §14.9.30.4 GR15 (kb/Work PB327)
+        // §14.9.51.4 GR21 / GR22 (kb/Work PB1191): a RECORD clause WITH the DEPENDING phrase keeps a line sequential
+        // record at data-name-1's length — the connector's trailing-space strip is off for it.
+        if (file.Varying is { DependingName: not null })
+            w.Line($"{RuntimeApi.FileRegisterRecordLengthFromDepending(FileKeyExpr(file))};");
         EmitCodeSetRegistration(w, file);        // §13.18.13.4 GR2/GR6 (kb/Work PB793)
     }
 

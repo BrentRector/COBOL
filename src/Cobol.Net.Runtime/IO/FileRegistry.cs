@@ -895,6 +895,14 @@ public sealed class FileRegistry
         if (_files.TryGetValue(name, out var c)) c.NationalRecordArea = true;
     }
 
+    /// <summary>Declare that the file's RECORD clause has a DEPENDING phrase (§14.9.51.4 GR21/GR22; emitted right after
+    /// registration, only for such a file — kb/Work PB1191): its line sequential records are written at data-name-1's
+    /// length, so the connector never trims their trailing spaces.</summary>
+    public void RegisterRecordLengthFromDepending(string name)
+    {
+        if (_files.TryGetValue(name, out var c)) c.RecordLengthFromDepending = true;
+    }
+
     /// <summary>Declare the file's §13.18.13 CODE-SET conversion (§13.18.13.4 GR2: the coded character set used
     /// to represent data on the storage medium, established at OPEN and constant thereafter).
     /// <paramref name="toNative"/> is §12.3.7.4 GR7 i's correspondence — the native character each medium code

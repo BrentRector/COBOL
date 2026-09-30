@@ -13,6 +13,10 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1796 — 2026-09-29 19:32 PDT — PB1191: a line sequential DEPENDING record keeps its spaces; only the space character is stripped
+
+`FileConnector.TrimRecordEnd` ran on every line sequential WRITE, keyed on none of what §14.9.51.4 GR21/GR22 key it on. Two of the three legs are fixed: a FD whose RECORD clause has the DEPENDING phrase registers `RecordLengthFromDepending` and is written at data-name-1's length (GR22), and the alphanumeric arm strips `' '` only, not every Unicode White_Space character (so U+00A0 is transferred). The third — the strip choosing national vs alphanumeric from record-name-1's category rather than the per-connector flag — needs the WRITE statement to carry its category into the connector and is left owed on the note (HALF). Closes GR-14.9.51.4-22; GAP 796 to 795.
+
 ## Entry 1795 — 2026-09-29 19:18 PDT — PB1125: INSPECT TALLYING's next counter is found over the whole reference
 
 `IsBareInspectOperand()` was `LA(2) != FOR`, so a SUBSCRIPTED, QUALIFIED or reference-modified next counter (`INSPECT S TALLYING N FOR ALL "A" C(1) FOR ALL "B"`) had `(` or `OF` at LA(2), was swallowed as one more operand of the previous counter, and its FOR clause re-attached to THAT counter — a silent wrong count at every edition (N=3, C(1) untouched where the standard gives N=2, C(1)=1). The predicate now scans the reference's own extent and asks whether FOR follows. Closes GR-14.9.22.4-10; GAP 797 to 796. FMT-14.9.22.2 (the printed formats' over-generation) needs the §14.9.22.2 diagram rendered first and stays with the note (HALF).
