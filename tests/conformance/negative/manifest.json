@@ -1844,7 +1844,9 @@
   "pb1377-push-cobol-words-within-unit",
   "pb1377-push-removed-directive-name",
   "pb1364-when-other-trailing-text-after-match",
-  "pb1364-when-operand-split-after-match"
+  "pb1364-when-operand-split-after-match",
+  "pb1496-free-form-line-256",
+  "pb1803-nist-marker-outside-nist"
  ],
  "pending": []
 }

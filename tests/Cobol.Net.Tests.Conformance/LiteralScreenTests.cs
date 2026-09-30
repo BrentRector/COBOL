@@ -18,11 +18,13 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class LiteralScreenTests
 {
+    /// <summary>Laid out in FIXED form (<see cref="FixedFormLayout"/>): an 8,192-position literal cannot be written on
+    /// one free-form line (§6.1 3) a) — at most 255 positions, COBOLNET2653) and is continued as fixed form continues it.</summary>
     private static string Program(string id, string data, string proc, string special = "") =>
-        ">>SOURCE FORMAT FREE\nIDENTIFICATION DIVISION.\nPROGRAM-ID. " + id + ".\n"
+        FixedFormLayout.Source("IDENTIFICATION DIVISION.\nPROGRAM-ID. " + id + ".\n"
         + (special.Length > 0 ? "ENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\n" + special + "\n" : "")
         + "DATA DIVISION.\nWORKING-STORAGE SECTION.\n" + data + "\nPROCEDURE DIVISION.\nMAIN.\n" + proc
-        + "\n    STOP RUN.\n";
+        + "\n    STOP RUN.\n");
 
     /// <summary>Each position × class the length rule reaches. <c>{0}</c> is the literal's BODY length in
     /// positions: the case is compiled at 8,191 (legal) and 8,192 (COBOLNET0814). The BX case writes a quarter of

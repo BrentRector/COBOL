@@ -136,14 +136,15 @@ internal readonly record struct LiteralParts(string Prefix, char Quote, string C
 internal static class TextWordScanner
 {
     /// <summary>The characters that separate as the COBOL character space does (§8.3.5 1) "The COBOL character space is
-    /// a separator") — the space, the horizontal tab (white space throughout source text, CONFORMANCE.md DOC-A.1-23 /
-    /// item 157) and the line end — exactly the lexer's <c>WS</c> set (<c>CobolLexer.g4</c>: <c>[ \t\r\n]</c>), so a
-    /// text-word ends where the lexer's word ends. Never Unicode White_Space: U+00A0, U+2000–U+200A, U+3000 and the
-    /// rest only LOOK like a space and are ordinary text-word characters (§7.2.2.5 3); kb/Work PB1543).</summary>
-    public static readonly char[] SeparatorSpaces = [' ', '\t', '\r', '\n'];
+    /// a separator") — the space and the line end, exactly the lexer's <c>WS</c> set (<c>CobolLexer.g4</c>:
+    /// <c>[ \n]</c>), so a text-word ends where the lexer's word ends. No tab and no CR LF reaches this stage: the
+    /// line-entry stage (<see cref="PhysicalLines"/>, DOC-A.1-157 / DOC-A.1-156) has expanded the one and taken the other
+    /// to its LF. Never Unicode White_Space: U+00A0, U+2000–U+200A, U+3000 and the rest only LOOK like a space and are
+    /// ordinary text-word characters (§7.2.2.5 3); kb/Work PB1543).</summary>
+    public static readonly char[] SeparatorSpaces = [' ', '\n'];
 
     /// <summary>Whether <paramref name="c"/> is one of the <see cref="SeparatorSpaces"/>.</summary>
-    public static bool IsSeparatorSpace(char c) => c is ' ' or '\t' or '\r' or '\n';
+    public static bool IsSeparatorSpace(char c) => c is ' ' or '\n';
 
     /// <summary>Every text-word of <paramref name="text"/>, in order.</summary>
     public static List<TextWord> Scan(string text)
@@ -299,12 +300,11 @@ internal static class TextWordScanner
     {
         if (pos + 1 >= text.Length || text[pos + 1] != '>') return -1;
         int lineStart = pos;
-        while (lineStart > 0 && text[lineStart - 1] is ' ' or '\t') lineStart--;
+        while (lineStart > 0 && text[lineStart - 1] == ' ') lineStart--;
         if (lineStart > 0 && text[lineStart - 1] != '\n') return -1;
 
         int lineEnd = text.IndexOf('\n', pos);
         if (lineEnd < 0) lineEnd = text.Length;
-        if (lineEnd > pos && text[lineEnd - 1] == '\r') lineEnd--;
         return CobolNet.Editions.CompilerDirectiveLine.TryParse(text[pos..lineEnd], out _) ? lineEnd : -1;
     }
 
@@ -342,7 +342,7 @@ internal static class TextWordScanner
     {
         char quote = text[quotePos];
         int i = quotePos + 1;
-        while (i < text.Length && text[i] is not ('\n' or '\r'))
+        while (i < text.Length && text[i] != '\n')
         {
             if (text[i] == quote)
             {

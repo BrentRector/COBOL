@@ -27,11 +27,12 @@ public sealed class DiagnosticPositionTests : IDisposable
     /// error + warning line the driver produced. The test directory, which holds the copybooks too, is named as a
     /// <c>--copy</c> search path, as a user names theirs: the default COBOL library is the working directory plus the
     /// --copy directories, never the source file's own (docs/CONFORMANCE.md DOC-A.1-40, kb/Work PB1355).</summary>
-    private (bool Ok, List<string> Lines) Compile(string mainName, int edition = 2023, bool checkOnly = true)
+    private (bool Ok, List<string> Lines) Compile(string mainName, int edition = 2023, bool checkOnly = true,
+        string? nist = null, InitialReferenceFormat format = InitialReferenceFormat.Auto)
     {
         var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-            Path.Combine(_dir, mainName), Path.Combine(_dir, "out.dll"), DialectLevel: edition, CheckOnly: checkOnly,
-            CopyPaths: [_dir], SourceFormat: InitialReferenceFormat.Auto));
+            Path.Combine(_dir, mainName), Path.Combine(_dir, "out.dll"), NistTestName: nist, DialectLevel: edition,
+            CheckOnly: checkOnly, CopyPaths: [_dir], SourceFormat: format));
         return (r.Success, [.. r.Errors, .. r.Warnings]);
     }
 
@@ -151,13 +152,22 @@ public sealed class DiagnosticPositionTests : IDisposable
         AssertPositioned(lines, "f.cob", 9, "error COBOLNET1639");
     }
 
-    [Fact] // a NIST archive marker line is blanked, not dropped — the physical numbering holds
+    [Fact] // under --nist a CCVS archive marker line is blanked, not dropped — the physical numbering holds (kb/Work PB1803)
     public void NistArchiveMarker_DoesNotShiftLaterLines()
     {
         Write("n.cob", "*HEADER,COBOL,PB82N\n" + Head + "       PROCEDURE DIVISION.\n           MOVE UNDEF TO W.\n           STOP RUN.\n");
-        var (ok, lines) = Compile("n.cob");
+        var (ok, lines) = Compile("n.cob", nist: "PB82N");
         Assert.False(ok);
         AssertPositioned(lines, "n.cob", 8, "error COBOLNET1639");
+    }
+
+    [Fact] // and without --nist the same line is NOT discarded: its indicator area holds 'R' (§6.3.3; kb/Work PB1803)
+    public void ArchiveMarker_OutsideNist_IsDiagnosedAtItsOwnLine()
+    {
+        Write("m.cob", "*HEADER,COBOL,PB82N\n" + Head + "       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        var (ok, lines) = Compile("m.cob", format: InitialReferenceFormat.Fixed);   // the standard default (§7.3.24.3 2))
+        Assert.False(ok);
+        AssertPositioned(lines, "m.cob", 1, "error COBOLNET2616");
     }
 
     [Fact] // the parse-tree conformance arm: an edition gate names the construct's position

@@ -92,9 +92,10 @@ public static class SeparatorRule
     /// <summary>The source character at <paramref name="index"/>, or -1 before the first or after the last.</summary>
     public static int CharAt(string text, int index) => (uint)index < (uint)text.Length ? text[index] : -1;
 
-    /// <summary>The separator space as the lexer reads it — the characters of its skipped <c>WS</c> rule — or the start
-    /// or end of the text, which no character-string can extend past.</summary>
-    private static bool IsSeparatorSpace(int c) => c is ' ' or '\t' or '\r' or '\n' or -1;
+    /// <summary>The separator space as the lexer reads it — the characters of its skipped <c>WS</c> rule (the space and
+    /// the line end: the line-entry stage leaves no tab or CR LF, kb/Work PB1800) — or the start or end of the text,
+    /// which no character-string can extend past.</summary>
+    private static bool IsSeparatorSpace(int c) => c is ' ' or '\n' or -1;
 
     /// <summary>§8.3.5 5): space, left parenthesis, or the opening pseudo-text delimiter <c>==</c>.</summary>
     private static bool OpeningDelimiterSeparated(string text, int start)

@@ -757,7 +757,7 @@ The preprocessor runs in this order (`Frontend.Normalize` then `Frontend.Preproc
 Pipeline/Frontend.cs`):
 
 ```
-StripNistArchiveMarkers (every compilation — kb/Work PB1803) → NormalizeToFreeFormMapped (§6.5, main source)
+PhysicalLines.Read (line entry: terminators, tabs, --nist archive markers — kb/Work PB1800) → NormalizeToFreeFormMapped (§6.5, main source)
   → ConditionalCompilationProcessor.Manipulate, INTERLEAVED with CopyProcessor (§7.2.1; library text normalized by
     the same §6.5 walker — PB1067) → NistPreprocessor (if --nist) → DirectiveSiteProcessor → TurnDirectiveProcessor
   → PropagateDirectiveProcessor → RefModZeroLengthDirectiveProcessor → FlagDirectiveProcessor → COBOL-WORDS / LEAP-SECOND
@@ -790,17 +790,32 @@ reference formats, and the only place source comments are recognized. Its model:
   ⚠ The test harnesses (conformance, characterization) pass `auto`, and the detector's past-column-72 veto reads
   2,905 of the 3,576 conformance sources as FREE form, so most goldens do not exercise the CLI's fixed-form reading
   (kb/Work PB1757, measured 2026-09-30; `tests/conformance/README.md` states the contract).
-- **There is no line-entry stage yet** (kb/Work PB1800). The raw text is split and indexed independently by
-  `StripNistArchiveMarkers`, `NormalizeToFreeFormMapped`, `FirstSourceDirectiveCandidate` / `DirectiveText`,
-  `IsFixedForm`, `FixedFormConverter.Convert` (per segment, re-joined then re-split) and `ConvertFreeFormMapped`. A
-  TAB is one character position (DOC-A.1-157 determines tab stops of 8 — kb/Work PB1586 diverges), no stage checks the
-  255-position free-form limit, and a lone CR is data here but a line end to the lexer (PB1496). **Target:** ONE
-  `PhysicalLines` reader (terminators, TAB expansion with a per-line tab map, the `--nist`-only archive-marker strip)
-  that every consumer above reads instead of the raw string — PB1800 carries the design and its drift test.
+- **ONE line-entry stage: `PhysicalLines`** (`PhysicalLines.cs`, kb/Work PB1800 / PB1586 / PB1496 / PB1803) — the only
+  place decoded source or library text becomes LINES, called once, at the entry of `NormalizeToFreeFormMapped` (main
+  source and library text alike). It owns the four determinations ISO §6.1 leaves to the implementor:
+  **terminators** (DOC-A.1-156: LF, or CR LF; a CR not followed by LF is a character of the line — GnuCOBOL's
+  `ppinput`; the lexer's line end is the LF only, so no stage ends a line at a lone CR); **tabs** (DOC-A.1-157: every
+  TAB becomes the one to eight spaces up to the next tab stop — positions 1, 9, 17, … — everywhere, literals included,
+  owner decision R55; the line keeps a `TabMap` from expanded position to physical index ONLY when it held a tab, for the
+  physical columns PB1801 needs); **the `--nist` archive markers** (`*HEADER,` / `*END-OF,` become empty lines, only when
+  `ccvsIndicators`, PB1803); and the line NUMBER (every `PhysicalLine` carries the file's own, so a SOURCE FORMAT segment
+  needs no offset). Every consumer — `IsFixedForm` (the Auto detector), `FirstSourceDirectiveCandidate` / `DirectiveText`
+  / `FormatSegments`, `FixedFormConverter.Convert` and `ConvertFreeLines` — takes `ReadOnlySpan<PhysicalLine>` and never
+  a string, so no caller can bypass the reader; `StripNistArchiveMarkers`, `ConvertFixedToFree`, the string
+  `IsFixedForm` and the per-segment re-join are deleted. The free-form 255-position limit (§6.1 3) a); COBOLNET2653) is
+  asked in the free-form arm (`ConvertFreeLine`) on the expanded line — never on a fixed-form line, which may run past
+  margin R (§6.1 2) b)). Nothing after the stage has a tab or CR rule: the lexer's `WS` set is `[ \n]`, `TextWordScanner`
+  and `SeparatorRule` agree, and `PhysicalLinesDriftTests` fails if a pipeline stage spells `\t` or `\r`, if a
+  reference-format walker splits text itself, or if `PhysicalLines.Read` gains a second production caller.
+  ⚠ The stage's scope estimate ("five consumers, one slot") held; what the estimate missed is that the lexer and the
+  text-word scanner each carried a private copy of the tab and CR rules (nine lexer sites, `TextWord`, `SeparatorRule`,
+  three `TrimEnd('\r')` in later stages) — deleted in the same change.
 - **The source map has no column** (kb/Work PB1801): `MappedText` records one `SourceOrigin(File, Line)` per
   resultant line, so a fixed-form diagnostic column is program-text-relative (7 short — PB1688), a COPY/REPLACE
-  diagnostic is column 1 (PB1671), and a continuation fragment keeps the continued line's origin. **Target:** an
-  origin span list per resultant line, born in the line-entry stage and carried by `OriginWriter` (PB1801).
+  diagnostic is column 1 (PB1671), and a continuation fragment keeps the continued line's origin — and, after PB1586, a
+  diagnostic column on a line that held a tab is the EXPANDED position, not the editor's physical column (the `TabMap`
+  is the stage's answer; nothing consumes it yet). **Target:** an origin span list per resultant line, born in the
+  line-entry stage and carried by `OriginWriter` (PB1801).
 - **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
   directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
   line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the

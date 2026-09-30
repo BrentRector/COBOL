@@ -59,28 +59,6 @@ public static partial class ReferenceFormatProcessor
         "AUTHOR", "INSTALLATION", "DATE-WRITTEN", "DATE-COMPILED", "SECURITY", "REMARKS",
     };
 
-    /// <summary>
-    /// Remove NIST CCVS archive-control lines ('*HEADER,…' and '*END-OF,…') that delimit
-    /// members inside newcob.val. They begin in column 1 (the sequence area), so reference-format
-    /// normalization would otherwise read column 7 as an indicator and emit the rest of the line
-    /// (e.g. ',SM102A') as stray code. These markers are never valid COBOL, so blank them out of
-    /// the raw text before any other processing. LINE-COUNT PRESERVING (kb/Work PB82): a marker becomes an
-    /// empty line, so the source-line map the normalizer builds next still names the physical lines of the
-    /// file on disk (dropping the header made every reported line one short).
-    /// </summary>
-    public static string StripNistArchiveMarkers(string sourceText)
-    {
-        var lines = sourceText.Split('\n');
-        var kept = new List<string>(lines.Length);
-        foreach (var line in lines)
-        {
-            string trimmed = line.TrimStart();
-            kept.Add(trimmed.StartsWith("*HEADER,", StringComparison.Ordinal) ||
-                     trimmed.StartsWith("*END-OF,", StringComparison.Ordinal) ? "" : line);
-        }
-        return string.Join('\n', kept);
-    }
-
     /// <summary>The compiler-directive word this stage owns (ISO §7.3.24; the <c>source-format-directive-2002</c>
     /// registry row's single <c>directiveWords</c> entry — FORMAT and IS are §5.2.3 optional words, not part of
     /// the word).</summary>
@@ -134,21 +112,24 @@ public static partial class ReferenceFormatProcessor
         bool ccvsIndicators = false)
     {
         var gates = diagnostics is null ? null : new ReferenceFormatDiagnostics(dialectLevel, permissive, diagnostics, sourcePath);
-        var lines = sourceText.Split('\n');
+        // THE line-entry stage (kb/Work PB1800): every line below is read from here — terminators, tabs and (under
+        // --nist) archive markers are settled, so no consumer splits, trims or expands anything itself.
+        var lines = PhysicalLines.Read(sourceText, ccvsIndicators).Lines;
 
         // The initial format: the one the caller selected (fixed form by default, §7.3.24.3 2)) or inherited from the
         // COPY statement (3)), or — only under the documented Auto extension — the one IsFixedForm detects in the text
         // before the first line that could be a >>SOURCE directive in either reading (kb/Work PB1362).
-        bool firstFixed = initialFixed ?? IsFixedForm(string.Join('\n', lines[..FirstSourceDirectiveCandidate(lines)]));
+        bool firstFixed = initialFixed ?? IsFixedForm(lines[..FirstSourceDirectiveCandidate(lines)]);
         var segments = FormatSegments(lines, firstFixed, gates);
 
         // No format boundary → the whole text is one segment in its initial format.
         if (segments.Count == 0)
         {
             formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, []);
-            if (!firstFixed) return ConvertFreeFormMapped(sourceText, gates, sourcePath);
-            var (fl, fo) = ConvertFixedToFreeMapped(sourceText, gates, 0, ccvsIndicators);
-            return Mapped(fl, fo, sourcePath);
+            var (wl, wo) = firstFixed
+                ? new FixedFormConverter(gates, ccvsIndicators).Convert(lines)
+                : ConvertFreeLines(lines, gates);
+            return Mapped(wl, wo, sourcePath);
         }
 
         // Per-segment. The INITIAL segment (before the first boundary) is in the initial format; each subsequent
@@ -171,19 +152,12 @@ public static partial class ReferenceFormatProcessor
             int segEnd = s < segments.Count ? segments[s].Index + (keepsLine ? 1 : 0) : lines.Length;   // exclusive
             if (segEnd > segStart)
             {
-                if (segFixed)
-                {
-                    var (sl, so) = ConvertFixedToFreeMapped(string.Join('\n', lines[segStart..segEnd]), gates, segStart,
-                        ccvsIndicators);
-                    outLines.AddRange(sl);
-                    outOrigins.AddRange(so);
-                }
-                else
-                    for (int k = segStart; k < segEnd; k++)   // free: line for line, its comment removed (§6.5 2) / 3))
-                    {
-                        outLines.Add(ConvertFreeLine(lines[k].TrimEnd('\r'), k + 1, gates));
-                        outOrigins.Add(k + 1);
-                    }
+                var segment = lines[segStart..segEnd];
+                var (sl, so) = segFixed
+                    ? new FixedFormConverter(gates, ccvsIndicators).Convert(segment)
+                    : ConvertFreeLines(segment, gates);   // free: line for line, its comment removed (§6.5 2) / 3))
+                outLines.AddRange(sl);
+                outOrigins.AddRange(so);
             }
             if (s < segments.Count)
             {
@@ -225,7 +199,7 @@ public static partial class ReferenceFormatProcessor
     /// following segment was read in the WRONG reference format (kb/Work PB794).</para>
     /// </summary>
     private static List<(int Index, bool Fixed, bool KeepsLine)> FormatSegments(
-        string[] lines, bool initialFixed, ReferenceFormatDiagnostics? gates)
+        ReadOnlySpan<PhysicalLine> lines, bool initialFixed, ReferenceFormatDiagnostics? gates)
     {
         bool current = initialFixed;
         var state = new DirectiveStateStack().Carry(Constructs.SourceFormatDirective2002,
@@ -234,11 +208,11 @@ public static partial class ReferenceFormatProcessor
         for (int i = 0; i < lines.Length; i++)
         {
             CompilerDirectiveLine d = default;
-            bool isDirective = DirectiveText(lines[i], current) is { } text && CompilerDirectiveLine.TryParse(text, out d);
+            bool isDirective = DirectiveText(lines[i].Text, current) is { } text && CompilerDirectiveLine.TryParse(text, out d);
             // §7.3.24.3 4): "A SOURCE FORMAT directive that is the first line of a compilation group or library text
             // may be in either fixed form or free form" — so `>>SOURCE FORMAT FREE` in column 1 of line 1 is a
             // directive even though the text starts in fixed form, where column 1 is the sequence area.
-            if (!isDirective && i == 0 && DirectiveText(lines[0], !current) is { } other
+            if (!isDirective && i == 0 && DirectiveText(lines[0].Text, !current) is { } other
                 && CompilerDirectiveLine.TryParse(other, out d) && d.Word == SourceFormatWord)
                 isDirective = true;
             if (!isDirective) continue;
@@ -264,9 +238,8 @@ public static partial class ReferenceFormatProcessor
     /// program-text area"; SR2: "A compiler directive shall be preceded only by zero, one, or more space
     /// characters") — character positions 8 through margin R of a SOURCE line in fixed form (a comment, debugging or
     /// continuation line holds no directive), the whole line in free form — or null when the line holds none.</summary>
-    private static string? DirectiveText(string rawLine, bool fixedForm)
+    private static string? DirectiveText(string line, bool fixedForm)
     {
-        string line = rawLine.TrimEnd('\r');
         if (!fixedForm) return line;
         return line.Length > SourceAreaStart && line[IndicatorColumn] == ' ' ? ProgramTextArea(line) : null;
     }
@@ -274,11 +247,11 @@ public static partial class ReferenceFormatProcessor
     /// <summary>For the <see cref="InitialReferenceFormat.Auto"/> detector only: the index of the first line that is a
     /// &gt;&gt;SOURCE directive in EITHER reading (the format is not known yet — it is what is being detected), or
     /// the line count. The detector classifies the text before it.</summary>
-    private static int FirstSourceDirectiveCandidate(string[] lines)
+    private static int FirstSourceDirectiveCandidate(ReadOnlySpan<PhysicalLine> lines)
     {
         for (int i = 0; i < lines.Length; i++)
             foreach (bool fixedForm in (ReadOnlySpan<bool>)[true, false])
-                if (DirectiveText(lines[i], fixedForm) is { } text
+                if (DirectiveText(lines[i].Text, fixedForm) is { } text
                     && CompilerDirectiveLine.TryParse(text, SourceFormatWord, out _))
                     return i;
         return lines.Length;
@@ -337,6 +310,14 @@ public static partial class ReferenceFormatProcessor
                 $"the floating indicator {indicator} is split across a continued line and its continuation line; all the "
                 + "characters of a multiple-character floating indicator shall be on the same line (ISO §6.2.3.2 SR3)",
                 new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn), default);
+
+        /// <summary>§6.1 3) a) — COBOLNET2653: a free-form line of more than 255 character positions (kb/Work PB1496).
+        /// Every such line is reported, at the first position past the limit; it is then read in full.</summary>
+        public void OnFreeFormLineTooLong(int line, int positions)
+            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FreeFormLineTooLong.Code,
+                $"this free-form line has {positions} character positions; ISO §6.1 3) a) allows at most {FreeFormMaxPositions} "
+                + "(a tab counts the positions it advances over, DOC-A.1-157)",
+                new SourceOrigin(sourcePath, line).ToLocation(FreeFormMaxPositions), default);
 
         /// <summary>§6.3.3 / §6.2.2 — COBOLNET2616: the indicator area holds a character that is not a fixed indicator
         /// (kb/Work PB1494). Every such line is reported; it is then read as a source line.</summary>
@@ -408,23 +389,22 @@ public static partial class ReferenceFormatProcessor
     /// - Column 7 often contains space, *, or -
     /// - Columns 1-6 are often digits or spaces
     /// </summary>
-    public static bool IsFixedForm(string sourceText)
+    public static bool IsFixedForm(ReadOnlySpan<PhysicalLine> lines)
     {
         // NOTE: do NOT treat the presence of a *> floating comment (COBOL-2002, ISO §6.2.3) as proof of
         // free-form. *> is legal in BOTH fixed and free reference format; a file with a genuine fixed-format
         // column structure (numeric sequence area + consistent column-7 indicators) is fixed-format that merely
         // uses inline comments, and must still be column-normalized. Classification is therefore driven purely
-        // by the structural heuristic below; ConvertFixedToFree strips any inline *> from the source area.
-        var lines = sourceText.Split('\n');
+        // by the structural heuristic below; the fixed-form converter strips any inline *> from the source area.
         int fixedIndicators = 0;
         int totalLines = 0;
         bool hasNumericSequence = false;
         bool hasFixedIndicatorGlyph = false;
         bool hasContentPastSourceArea = false;
 
-        foreach (var rawLine in lines)
+        foreach (var physical in lines)
         {
-            var line = rawLine.TrimEnd('\r');
+            string line = physical.Text;
             if (string.IsNullOrWhiteSpace(line)) continue;
             totalLines++;
 

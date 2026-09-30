@@ -152,7 +152,7 @@ public sealed class Frontend
     }
 
     /// <summary>
-    /// Phase 0 — source preprocessing: NIST archive-marker stripping → free-form normalization → conditional
+    /// Phase 0 — source preprocessing: line entry and free-form normalization (NIST archive-marker stripping under --nist) → conditional
     /// compilation (<c>&gt;&gt;DEFINE/IF/…</c>) → COPY expansion → NIST placeholder substitution. Each stage is a
     /// no-op on source that does not use it, so an ordinary program passes through essentially unchanged.
     /// </summary>
@@ -162,9 +162,8 @@ public sealed class Frontend
     {
         string raw = Inputs.ReadAllText(sourcePath);
 
-        // The archive-marker strip is line-count preserving (markers become blank lines), so the origin map the
-        // normalizer builds below still names the physical lines of the file on disk.
-        raw = ReferenceFormatProcessor.StripNistArchiveMarkers(raw);
+        // The normalizer's line-entry stage (PhysicalLines, kb/Work PB1800) reads the raw text: terminators, tabs and —
+        // under --nist only (PB1803) — the line-count-preserving archive-marker strip all happen there.
         // The edition-aware overload carries the fixed-form continuation gates (VCR rows 2/94, W3): only the
         // column-aware pass can see the col-7 indicator, so the per-edition obligations emit HERE. Mapped (kb/Work
         // PB82): a fixed-form continuation JOINS physical lines, and the map records which line each output came from.

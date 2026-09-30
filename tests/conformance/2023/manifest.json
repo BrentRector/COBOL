@@ -724,7 +724,11 @@
   "pb1365_turn_checking_with_location_implied_on",
   "pb1365_turn_checking_location_optional_with",
   "pb1378_leap_second_between_units",
-  "pb1820_leap_second_reaches_object_methods"
+  "pb1820_leap_second_reaches_object_methods",
+  "pb1586_tab_in_literal",
+  "pb1586_tab_free_form",
+  "pb1496_lone_cr_is_a_character",
+  "pb1496_free_form_line_255"
  ],
  "pending": [
   "pb485_value_only_format1"
