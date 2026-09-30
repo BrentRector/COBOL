@@ -954,6 +954,15 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     w.Line($"{type} {root.CsName} = {formal.OmittedFlag} ? {init} : {formal.ParamName};   "
                         + $"// LINKAGE formal {root.CobolName} (BY REFERENCE copy-in; omitted → initial state)");
             }
+            // ⛔ THE METHOD'S OWN OPTIONS AND LOCAL-STORAGE ROOTS GOVERN ITS LOCAL-STORAGE INITIAL STATE (kb/Work PB1215):
+            // §13.6.4 GR2 sends LOCAL-STORAGE to §11.9.10, whose GR2 applies the OPTIONS INITIALIZE clause of the source
+            // element — this method's own OPTIONS paragraph, else the class's (§11.9.4 GR1) — to "the storage allocated
+            // for" the sections it names. The class half's data model carries the class-level clause only and no method
+            // roots, so both are swapped in for these initializers and restored after.
+            var savedOptions = Ctx.Data.Options;
+            var savedActivationRoots = Ctx.ActivationLocalRoots;
+            if (m.MethodOptions is { } methodOptions) Ctx.Data.Options = methodOptions;
+            Ctx.ActivationLocalRoots = m.Binding!.LocalRoots;
             foreach (var root in m.Binding!.LocalRoots)
             {
                 if (root.Class is { Tier: RedefinesTier.Alias } && !root.IsCanonical) continue;   // Tier-A view → no local (review C)
@@ -966,6 +975,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 var (type, init) = fields.RootDecl(root);
                 w.Line($"{type} {root.CsName} = {init};   // LOCAL-STORAGE {root.CobolName} — re-initialized each activation (§8.6.4)");
             }
+            Ctx.Data.Options = savedOptions;   // an emission error abandons the whole compile, so no finally is owed
+            Ctx.ActivationLocalRoots = savedActivationRoots;
             // A method LOCAL/LINKAGE table's INDEXED BY cell is a per-activation local (§8.6.4; M2-OO-1h step 4) —
             // the method's own cell (§11.7.4 GR5), reset to 1 each activation, never the shared class index field.
             foreach (var root in m.Binding!.LocalRoots.Concat(m.Binding!.LinkageRoots))

@@ -33,6 +33,13 @@ internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAlloca
     /// <summary>The bound DATA DIVISION model.</summary>
     public DataBinder Data { get; } = data;
 
+    /// <summary>⛔ THE LOCAL-STORAGE ROOTS OF THE ACTIVATION BEING INITIALIZED, when it is not the unit's own — an OO
+    /// METHOD's (kb/Work PB1215). <see cref="Data"/> is the CLASS half's data model, whose <c>LocalStorageRoots</c>
+    /// never list a method's LOCAL-STORAGE (it binds into the method's own <c>Binding.LocalRoots</c>), so the §11.9.10.4
+    /// GR2 section selection of OPTIONS INITIALIZE could never select one. <c>OoEmitter.EmitMethod</c> sets this
+    /// around the method's LOCAL-STORAGE initializers and restores it; null everywhere else.</summary>
+    public IReadOnlyList<DataItem>? ActivationLocalRoots { get; set; }
+
     /// <summary>The RUN-UNIT-scoped unique-name allocator (P7 Step 9a) — the SAME instance rides every per-unit
     /// context of one generated module, so minted temporaries never collide across units.</summary>
     public NameAllocator Names { get; } = names;

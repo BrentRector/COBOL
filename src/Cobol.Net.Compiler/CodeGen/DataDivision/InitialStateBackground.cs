@@ -52,6 +52,7 @@ internal sealed class InitialStateBackground(EmitContext ctx)
 {
     private HashSet<DataItem>? _wsRoots;
     private HashSet<DataItem>? _lsRoots;
+    private IReadOnlyList<DataItem>? _lsSource;   // the list _lsRoots was built from — rebuilt when the activation changes
 
     /// <summary>The §11.9.10.4 GR5 specified-fill-character that applies to THIS item's initial state, or null
     /// when no background applies to it — the ONE predicate, so section selectivity, the GR7 exclusion and the
@@ -103,10 +104,12 @@ internal sealed class InitialStateBackground(EmitContext ctx)
         var root = item;
         while (root.Parent is { } p) root = p;
         _wsRoots ??= [.. ctx.Data.WorkingStorageRoots];
-        _lsRoots ??= [.. ctx.Data.LocalStorageRoots];
+        // The unit's own LOCAL-STORAGE roots — or, inside an OO method's initializers, the METHOD's (kb/Work PB1215).
+        IReadOnlyList<DataItem> lsSource = ctx.ActivationLocalRoots ?? ctx.Data.LocalStorageRoots;
+        if (!ReferenceEquals(_lsSource, lsSource)) { _lsRoots = [.. lsSource]; _lsSource = lsSource; }
         bool selected =
             (init.Sections.HasFlag(OptionsSections.WorkingStorage) && _wsRoots.Contains(root))
-            || (init.Sections.HasFlag(OptionsSections.LocalStorage) && _lsRoots.Contains(root));
+            || (init.Sections.HasFlag(OptionsSections.LocalStorage) && _lsRoots!.Contains(root));
         if (!selected) return null;
 
         // §11.9.10.4 GR7 — "External items in the Working-storage section are not initialized when runtime

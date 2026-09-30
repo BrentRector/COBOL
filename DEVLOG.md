@@ -13,6 +13,10 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1797 — 2026-09-29 19:43 PDT — PB1215: a method's LOCAL-STORAGE takes OPTIONS INITIALIZE
+
+`InitialStateBackground.FillFor` chose the fill from the class half's `Options` and `LocalStorageRoots`, neither of which knows a METHOD: its OPTIONS paragraph is `m.MethodOptions` and its LOCAL-STORAGE binds into `m.Binding.LocalRoots`, so `INITIALIZE LOCAL-STORAGE TO X"41"` on a method (or on its class, inherited per §11.9.4 GR1) was silently ignored and every activation started with spaces. `EmitContext.ActivationLocalRoots` plus a scoped swap of the method's options around its LOCAL-STORAGE initializers in `OoEmitter.EmitMethod`. Closes GR-13.6.4-2; GAP 795 to 794. Not measured here: object / factory / method WORKING-STORAGE under INITIALIZE WORKING-STORAGE (the note's outside-subject sibling).
+
 ## Entry 1796 — 2026-09-29 19:32 PDT — PB1191: a line sequential DEPENDING record keeps its spaces; only the space character is stripped
 
 `FileConnector.TrimRecordEnd` ran on every line sequential WRITE, keyed on none of what §14.9.51.4 GR21/GR22 key it on. Two of the three legs are fixed: a FD whose RECORD clause has the DEPENDING phrase registers `RecordLengthFromDepending` and is written at data-name-1's length (GR22), and the alphanumeric arm strips `' '` only, not every Unicode White_Space character (so U+00A0 is transferred). The third — the strip choosing national vs alphanumeric from record-name-1's category rather than the per-connector flag — needs the WRITE statement to carry its category into the connector and is left owed on the note (HALF). Closes GR-14.9.51.4-22; GAP 796 to 795.
