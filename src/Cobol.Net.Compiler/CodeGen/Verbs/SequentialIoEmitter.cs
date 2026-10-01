@@ -678,7 +678,13 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// UNCHANGED — the store sits in the success branch only — extending the spec's own rule for every other
     /// unsuccessful I-O verb (REWRITE GR14 / WRITE GR15 / DELETE GR8 / START GR2 all say "unaffected"). The
     /// legacy's LOW-VALUE fill there was a byte-engine artifact (ST146A's golden is re-baselined over it,
-    /// DEVLOG 570).</summary>
+    /// DEVLOG 570).
+    /// <para>⚠ THE ONE EXCEPTION is §9.1.13.6 item 4 b)'s '34' (kb/Work PB1513): the READ is unsuccessful BECAUSE of what
+    /// the landed record's OCCURS DEPENDING ON item says, so the verdict is known only after the record has landed in
+    /// the area (<see cref="OdoRecordExceedsMaximum"/>) and the area then HOLDS that record. Its content after an
+    /// unsuccessful READ is undefined anyway (§14.9.30.4 GR18), so this is within the standard, not a divergence; the
+    /// success-only steps — the DEPENDING length store, INTO, NOT AT END — still follow the verdict. The keyed READ
+    /// (<c>KeyedIoEmitter.EmitRead</c>) and the SORT/MERGE USING transfer have the same shape.</para></summary>
     public void EmitRead(BoundRead rd)
     {
         var w = ctx.Writer;

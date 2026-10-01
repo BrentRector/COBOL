@@ -689,11 +689,17 @@ public sealed class FileRegistry
     public string ReadExceedsRecordMaximum(string name)
     {
         var c = Require(name);
-        // The governed READ already took the record's lock (GR11) before the verdict was known; an unsuccessful READ
-        // acquires none (the pre-flight denials above say the same), so it is given back here — otherwise another
-        // connector would answer '51' for a record no READ made available.
-        if (c.LastReadRecordId is { Length: > 0 } lockedId)
-            PhysicalFileTable.ReleaseSingle(_physical.For(c.HostPath), name, lockedId);
+        // The governed READ already ran its record-lock actions (GR11 b)/c)/d) — they speak of the SUCCESSFUL execution)
+        // before the verdict was known; an unsuccessful READ acquires none (the pre-flight denials above say the same),
+        // so the record's lock goes back to what this READ FOUND — released when the READ took it, KEPT when an earlier
+        // READ WITH LOCK took it under multiple record locking (§14.9.30.4 GR11 b)/GR9: another connector's READ of it
+        // must still answer '51'), and re-taken when GR11 b)'s NO LOCK release had given it up.
+        if (c.RecordLockHeldBeforeRead is { } held && c.LastReadRecordId is { Length: > 0 } lockedId)
+        {
+            var st = _physical.For(c.HostPath);
+            if (held) _physical.LockRecord(st, name, lockedId);
+            else PhysicalFileTable.ReleaseSingle(st, name, lockedId);
+        }
         c.ApplyUnsuccessfulReadPosition();
         c.SetStatus(FileStatusCode.PermanentBoundary);
         return FileStatusCode.PermanentBoundary;
@@ -1340,8 +1346,11 @@ public sealed class FileRegistry
     /// <para>GR11 a)'s release is NOT here: it is tied to EXECUTION, so it fires at the top of the statement —
     /// see <see cref="ReleasePriorRecordLocks"/>.</para></summary>
     private void ApplyPostReadLockActions(ConnectorShare meta, PhysicalFileTable.State st, string name,
-        string recId, FileRecordLock phrase)
+        FileConnector c, string recId, FileRecordLock phrase)
     {
+        // What this READ found — so an unsuccessful verdict reached AFTER these actions (ReadExceedsRecordMaximum) restores it.
+        c.RecordLockHeldBeforeRead = st.RecordLocks.TryGetValue(recId, out var holder)
+            && string.Equals(holder, name, StringComparison.OrdinalIgnoreCase);
         if (ReadSetsRecordLock(meta, phrase) && LocksEffective(meta, st, name))
             _physical.LockRecord(st, name, recId);              // GR11 c)/d)
         else if (meta.Multiple && phrase == FileRecordLock.WithNoLock)
@@ -1406,6 +1415,7 @@ public sealed class FileRegistry
     {
         image = "";
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
+        c.RecordLockHeldBeforeRead = null;   // this READ has run no lock action yet (ApplyPostReadLockActions sets it)
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         // §14.9.30.4 GR11 a) / §12.4.5.9.4 GR6 — released by the EXECUTION of the statement, so before anything
@@ -1451,7 +1461,7 @@ public sealed class FileRegistry
                 c.ApplyUnsuccessfulReadPosition();
                 return denied;
             }
-            ApplyPostReadLockActions(meta, st, name, recId, phrase);   // GR11 b)/c)/d)
+            ApplyPostReadLockActions(meta, st, name, c, recId, phrase);   // GR11 b)/c)/d)
             return status;
         }
     }
@@ -1488,6 +1498,7 @@ public sealed class FileRegistry
     {
         image = "";
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
+        c.RecordLockHeldBeforeRead = null;   // this READ has run no lock action yet (ApplyPostReadLockActions sets it)
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         ReleasePriorRecordLocks(meta, st, name);   // §14.9.30.4 GR11 a) / §12.4.5.9.4 GR6 — on EXECUTION
@@ -1506,7 +1517,7 @@ public sealed class FileRegistry
         if (status.Length == 0 || status[0] != '0') return status;   // invalid key (§9.1.14) or a mode failure
         if (!RecordLocksGovern(meta, st, name)) return status;   // no lock on the file and none to set
         string recId = c.LastReadRecordId;
-        if (recId.Length > 0) ApplyPostReadLockActions(meta, st, name, recId, phrase);   // GR11 b)/c)/d)
+        if (recId.Length > 0) ApplyPostReadLockActions(meta, st, name, c, recId, phrase);   // GR11 b)/c)/d)
         return status;
     }
 

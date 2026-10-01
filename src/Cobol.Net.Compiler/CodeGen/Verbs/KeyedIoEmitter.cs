@@ -184,7 +184,10 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             SeqIo.EmitRecordAreaStore(file, area, img, RuntimeApi.FileCurrentRecord(name), RuntimeApi.FileCurrentRecordExtents(name));
             // §9.1.13.6 item 4 b) (kb/Work PB1513): the record has landed; an OCCURS DEPENDING ON item that makes it
             // exceed the file's maximum makes the READ unsuccessful — '34' — so the success-only steps below follow
-            // the verdict. The status local is the statement's own, and every later phrase test reads it.
+            // the verdict. The status local is the statement's own, and every later phrase test reads it. The record
+            // area therefore HOLDS the landed record after that '34' — an unsuccessful READ's area content is undefined
+            // (§14.9.30.4 GR18), so it is within the standard; the area-untouched posture is for the denials that
+            // come BEFORE the landing (a '51', above), and SequentialIoEmitter.EmitRead states the exception.
             string? tooLong = SeqIo.OdoRecordExceedsMaximum(file);
             if (tooLong is not null)
                 using (w.Block($"if ({tooLong})"))

@@ -586,6 +586,14 @@ public abstract class FileConnector
     /// post-read lock acquisition targets; §14.9.30 GR11c/d).</summary>
     public virtual string LastReadRecordId => "";
 
+    /// <summary>Whether THIS connector already held a record lock on <see cref="LastReadRecordId"/> when the governed READ
+    /// that made it available began its own §14.9.30.4 GR11 lock actions — null when that READ ran none (no record
+    /// locking governs the file, or the record has no identity). A READ whose record then proves unsuccessful AFTER
+    /// the lock actions (§9.1.13.6 item 4 b)'s '34', <c>FileRegistry.ReadExceedsRecordMaximum</c>) puts the record's
+    /// lock back exactly as it was: GR11 b)/c)/d) speak of the SUCCESSFUL execution, and an earlier READ WITH LOCK's lock
+    /// under multiple record locking is not this READ's to give up.</summary>
+    internal bool? RecordLockHeldBeforeRead { get; set; }
+
     /// <summary>The lock identity of the record a REWRITE/DELETE executed NOW would target (§14.9.35 GR11 /
     /// §14.9.10 GR6 — the pre-operation conflict check; <paramref name="recordImage"/> supplies the key slice
     /// for an indexed random/dynamic target, §14.9.35 GR23 / §14.9.10 GR3, and <paramref name="recordExtents"/> the
