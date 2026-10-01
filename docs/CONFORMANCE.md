@@ -744,6 +744,47 @@ of an unsupported facility.
   increment BEFORE the reset, and that arm implements exactly it. Witnesses:
   `conformance:85/pb436_varying_after_from_outer`; `SpecPinnedNistTests.NC201A_VaryingAfterFromOuterInductionVariable_RunsEightBodies`.
   (kb/Work PB436.)
+- **Normal completion of a declarative — "a fatal exception occurs within the scope of the declarative" (§14.6.13.1.2 1),
+  spec silent on three points)**: the rule makes a declarative that falls off its end "not complete normally" when a
+  fatal exception occurs within its scope. **Pinned choices: (a) "occurs" is read as "is RAISED"** — checking for it is
+  enabled (§14.6.13.1.1: with checking off nothing is set to exist, so nothing occurs); **(b) the scope is DYNAMIC and
+  run-unit wide** — a fatal raised in a procedure the declarative PERFORMs or a program it CALLs is within it, and the
+  mark reaches every open declarative; **(c) a RESUME that §14.9.33.4 GR1 made a CONTINUE marks only the open
+  declaratives of ITS OWN program instance** ("specified in this … program"). The disposition after a declarative falls
+  off its end is by FATALITY, not by how it completed, wherever a rule does not key on normal completion (§14.9.49.4
+  GR13, GR7 b)/c), GR12 b)/c)), so only the SORT (§14.9.40.4 GR17) and MERGE (§14.9.24.4 GR7, GR12) implicit transfers
+  tell a not-normal fall-off from a normal one. **(d) A Format 4 (EXCEPTION OBJECT) declarative's not-normal fall-off is
+  treated as normal**: §14.6.13.1.5 names only the normal case ("completes normally, execution continues as specified
+  in the activating statement for normal execution"). Witnesses `conformance:2002/pb1122_declarative_fatal_in_scope_merge`
+  (a MERGE GIVING file whose implicit OPEN fails: a declarative that completes normally BYPASSES the file, one that
+  RESUMEs, fell off after a handled fatal, or PERFORMed a procedure whose RESUME §14.9.33.4 GR1 made a CONTINUE
+  TERMINATES the MERGE) and `unit:DeclarativeActivationRecordTests`.
+  (kb/Work PB1122.)
+- **An exception object converted to EC-OO-EXCEPTION is "propagated" (CALL / INVOKE NOT ON EXCEPTION) only when it is
+  RAISED in the activator (§14.9.4.4 GR3 i), §14.6.13.1.5 items 1 and 4, spec silent on the pairing)**: GR3 i) runs the
+  NOT ON EXCEPTION phrase unless "an exception condition is propagated from the called program". An object that a USE
+  AFTER EXCEPTION OBJECT declarative of the activator takes IS raised there. An object no declarative takes becomes,
+  by items 1 and 4, "as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase", and a RAISING condition is
+  raised in the activator only "if checking for that exception condition is enabled in the activating runtime element"
+  (§14.9.18.4 GR1 b)). **Pinned choice: with EC-OO-EXCEPTION checking OFF in the activator nothing is raised, so the
+  call completes normally and its NOT ON EXCEPTION phrase RUNS; with checking ON the condition is raised and the NOT
+  ON EXCEPTION phrase does not run** — the reading the NAMED GOBACK … RAISING arm already follows (kb/Work PB606).
+  The last exception status after an unraised conversion is left holding the exception object. Witnesses
+  `conformance:2002/pb1121_object_propagation_boundary`;
+  `conformance-test:OoSpineTests.GobackRaisingObject_NoF4_ActivatorUnchecked_RaisesNothing`;
+  `conformance-test:FatalRaiseSelectionTests.ObjectPropagation_ActivatorChecked_NoHandler_TerminatesAbnormally`.
+  (kb/Work PB1121.)
+- **RESUME within the scope of execution of a global declarative is CONTINUE — "scope" is per program instance
+  (§14.9.33.4 GR1, spec silent on what bounds the scope)**: GR1 makes a RESUME executed "within the scope of execution
+  of a global declarative" a CONTINUE. A global declarative may PERFORM a local declarative (§14.9.49.3 SR4), so the
+  question is dynamic, and the standard says only "scope of execution". **Pinned choice: the scope is bounded by the
+  PROGRAM INSTANCE that declares the GLOBAL declarative**, the same test as §14.9.18.4 GR6's "specified in the same
+  program" (the per-instance `__useActive[global ids]`). A RESUME in a program CALLed from a global declarative runs in
+  a fresh activation whose resume point is well defined, so it resumes normally there; GR1 exists because a resume point
+  inside a global declarative's on-behalf-of invocation is not. Witnesses `conformance:2002/pb1160_resume_in_global_scope`
+  (a RESUME in a PERFORMed local declarative, `NEXT STATEMENT` and `procedure-name` arms, and the contained-program arm
+  through `__RunGlobalUse`); `conformance:negative/pb1160-resume-in-when-in-global-declarative` (SR2 asked before the
+  WHEN-phrase question). (kb/Work PB1160.)
 - **Exception-checking PERFORM — RESUME NEXT STATEMENT in a WHEN skips WHEN COMMON (§14.9.28.4 GR17/GR19, spec silent)**:
   GR17 passes control to imp-4 (WHEN COMMON) "at the completion of the execution of imperative-statement-2"; a RESUME
   (§14.9.33) is a transfer of control OUT of imp-2, so imp-2 does not "complete" and the GR17→imp-4 hand-off is not

@@ -355,10 +355,34 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
             // of its statements sets only what its own line enables (§7.3.25.4 GR6; kb/Work PB891). This is also
             // §14.9.28.4 GR14's implicit PUSH ALL + TURN OFF ALL for the F3 handlers imp-2/3/4, which run here.
             w.Line("var __ckU = ExceptionState.PushAllCheckingOff();   // the procedure's checking baseline (§7.3.25.4 GR6)");
-            w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }}");
-            w.Line("catch (ResumeSignal __rs) { return __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
-            w.Line("finally { __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
-            w.Line("return DispatchResult.Normal;   // normal completion (§14.6.13.1.2)");
+            // ⛔ THE FALL-OFF IS TWO-WAY (kb/Work PB1122 Task B). §14.6.13.1.2 1): a declarative does not complete normally
+            // when a RESUME / GOBACK / EXIT PROGRAM / STOP it specifies is executed "or a fatal exception occurs within
+            // the scope of the declarative". The statements unwind (a RESUME returns its action below; the others leave
+            // through the finally), so what is left to record is the fatal exception — and a RESUME that GR1 made a
+            // CONTINUE, which fell through. Both land on the activation record this declarative opens here; falling
+            // off the end answers by what the record says. Only a DECLARATIVE id opens one: the exception-checking
+            // PERFORM's imp-2/3/4 handler ids share this invoker (ids at and above DeclCount) but are not
+            // declaratives, and §14.6.13.1.2 speaks of declaratives only. A unit with no declaratives never emits it.
+            if (decls > 0)
+            {
+                w.Line(dispatchState.F3HandlerBasePc is not null
+                    ? $"int __tok = __id < {decls} ? ExceptionState.EnterDeclarative(__useActive) : -1;   // the declarative's activation record (§14.6.13.1.2 1))"
+                    : "int __tok = ExceptionState.EnterDeclarative(__useActive);   // the declarative's activation record (§14.6.13.1.2 1))");
+                w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc);"
+                    + " return ExceptionState.DeclarativeNotNormal(__tok) ? DispatchResult.NotNormal : DispatchResult.Normal; }"
+                    + "   // fell off its end: normal completion unless a fatal exception occurred within its scope (§14.6.13.1.2 1))");
+                w.Line("catch (ResumeSignal __rs) { return __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
+                w.Line("finally { ExceptionState.LeaveDeclarative(__tok); __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
+            }
+            else
+            {
+                // No declarative id exists (an OO method's all-handlers invoker, or an F3-PERFORM-only unit): nothing
+                // to record, the fall-off is the handler's completion.
+                w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }}");
+                w.Line("catch (ResumeSignal __rs) { return __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
+                w.Line("finally { __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
+                w.Line("return DispatchResult.Normal;   // the handler completed (§14.6.13.1.2: only declaratives carry the fatal-in-scope half)");
+            }
         }
         else
             w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }} finally {{ __useActive[__id] = false; }}");

@@ -116,6 +116,51 @@ public sealed class ExceptionEngine
         LastLocation = location;
         ExceptionObject = null;
         _propagatedObject = default;   // a NAMED raise supersedes any staged object (the slots are exclusive)
+        if (fatal) MarkDeclarativesNotNormal(null);   // §14.6.13.1.2 1) — "a fatal exception occurs within the scope of the declarative"
+    }
+
+    // ── The DECLARATIVE ACTIVATION RECORD (§14.6.13.1.2 1); kb/Work PB1122 Task B, PB1761) ──────────────────────
+    // "Normal completion of a declarative procedure": a declarative does not complete normally when a RESUME, GOBACK,
+    // EXIT PROGRAM or STOP it specifies is executed "or a fatal exception occurs within the scope of the declarative".
+    // The statements leave through their own signals; the fatal exception, and a RESUME that §14.9.33.4 GR1 made a
+    // CONTINUE, leave NO trace in the control flow — they land here. The scope is DYNAMIC (a declarative may PERFORM
+    // procedures and CALL programs), so the record is run-unit state, a stack of the declaratives now executing.
+
+    private readonly List<(object Owner, bool NotNormal)> _declaratives = [];
+
+    /// <summary>A declarative begins executing: open its activation record. <paramref name="owner"/> is the identity of
+    /// the invoking element's guard array (the emitted <c>__useActive</c> — per program instance), which is how "a
+    /// RESUME … specified in this program" is told from one in another program of the call chain. Returns the token
+    /// <see cref="LeaveDeclarative"/> and <see cref="DeclarativeNotNormal"/> take.</summary>
+    public int EnterDeclarative(object owner)
+    {
+        _declaratives.Add((owner, false));
+        return _declaratives.Count - 1;
+    }
+
+    /// <summary>The declarative whose record <paramref name="token"/> names stops executing (the emitted finally, so
+    /// it runs on every unwind): close it and any record a nested unwind left above it. A token of −1 — the
+    /// invoker was running something that is not a declarative — is a no-op.</summary>
+    public void LeaveDeclarative(int token)
+    {
+        if (token >= 0 && token < _declaratives.Count) _declaratives.RemoveRange(token, _declaratives.Count - token);
+    }
+
+    /// <summary>Did the declarative <paramref name="token"/> names fail to complete normally (§14.6.13.1.2 1)?
+    /// False for the −1 token of a non-declarative.</summary>
+    public bool DeclarativeNotNormal(int token) =>
+        token >= 0 && token < _declaratives.Count && _declaratives[token].NotNormal;
+
+    /// <summary>Mark every open declarative record of <paramref name="owner"/> — or of the whole run unit when it is
+    /// null — as not having completed normally. The fatal raise marks them ALL ("occurs within the scope of the
+    /// declarative" is dynamic, so a fatal inside a CALLed program is within its caller's declarative); a RESUME that
+    /// GR1 made a CONTINUE marks only its OWN program's, because the rule's wording is "a RESUME … specified in this
+    /// … program".</summary>
+    public void MarkDeclarativesNotNormal(object? owner)
+    {
+        for (int i = 0; i < _declaratives.Count; i++)
+            if (owner is null || ReferenceEquals(_declaratives[i].Owner, owner))
+                _declaratives[i] = (_declaratives[i].Owner, true);
     }
 
     /// <summary>Record a raised EC-I-O exception condition with its file connector and I-O status
@@ -238,10 +283,30 @@ public sealed class ExceptionEngine
     /// RAISING statement itself causes; null unless its TURN carried WITH LOCATION (§7.3.25.4 GR7). The
     /// unsubstituted condition keeps the operands of the raise that actually set the status.</param>
     /// <param name="location">See <paramref name="statement"/>.</param>
-    public void SetPropagatingLast(string[]? pdRaising = null, string? statement = null, string? location = null)
+    /// <param name="objectApplicable">Is the current exception OBJECT (when the status is one) "an object whose class
+    /// is specified, or whose class is a subclass of a class specified, in the RAISING phrase of the procedure
+    /// division header of the source element containing this EXIT or GOBACK statement", or one that "implements an
+    /// interface specified" there (§14.6.13.1.5 EXIT/GOBACK item 1) — the emitted type test over the element's ONE
+    /// census (<c>EcState.PdRaisingObjectCsTypes</c>). When it is not, the GOBACK "is as if EXCEPTION
+    /// EC-OO-EXCEPTION were specified in the RAISING phrase" and the NAMED condition is staged instead of the object
+    /// (kb/Work PB1121). Ignored for a named status: its PD-header rule is <paramref name="pdRaising"/>.</param>
+    public void SetPropagatingLast(bool objectApplicable, string[]? pdRaising = null, string? statement = null, string? location = null)
     {
-        // An OBJECT status re-propagates the OBJECT (GR1b3a's second sentence → the §14.6.13.1.5 rules).
-        if (LastName == ExceptionState.ObjectSentinel) { _propagatedObject = (true, ExceptionObject, StagingFor); _propagated = null; return; }
+        if (LastName == ExceptionState.ObjectSentinel)
+        {
+            // An OBJECT status re-propagates the OBJECT (GR1b3a's second sentence → the §14.6.13.1.5 rules) — item 1
+            // admits it only when the PD-header RAISING phrase names its class or an interface it implements; the
+            // static discharge of RAISING identifier-1 (D-EO5: the declared class is checked at bind, SR4/SR5)
+            // cannot reach LAST, whose object's class is known only here.
+            if (objectApplicable) { _propagatedObject = (true, ExceptionObject, StagingFor); _propagated = null; }
+            else SetPropagating(OoException, OoExceptionFatal);
+            return;
+        }
+        StageLastName(pdRaising, statement, location);
+    }
+
+    private void StageLastName(string[]? pdRaising, string? statement, string? location)
+    {
         if (LastName is not { } n) return;   // GR1b3b — nothing is raised, the RAISING phrase is ignored
         if (ExceptionCatalog.UnderLevel2(n, "EC-USER") && !Names(pdRaising).Contains(n, StringComparer.OrdinalIgnoreCase))
         {
@@ -264,7 +329,7 @@ public sealed class ExceptionEngine
     /// <c>&gt;&gt;PROPAGATE ON</c>; kb/Work PB1119). The emitted fatal default calls this only where the other three
     /// conditions already hold — checking is enabled (the raise happened), no declarative or WHEN phrase qualified,
     /// and the element was compiled under PROPAGATE ON — so what is decided here is the name exclusion, and the
-    /// staging IS <see cref="SetPropagatingLast"/>: the condition just raised is the last exception status. Returns
+    /// staging IS <see cref="StageLastName"/>: the condition just raised is the last exception status. Returns
     /// false (stage nothing) for the two excluded names, whose #7 termination then stands. The caller performs the
     /// GOBACK's return.</summary>
     public bool StageAutomaticPropagation(string name)
@@ -272,26 +337,29 @@ public sealed class ExceptionEngine
         if (string.Equals(name, "EC-FLOW-GLOBAL-EXIT", StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, "EC-FLOW-GLOBAL-GOBACK", StringComparison.OrdinalIgnoreCase))
             return false;
-        SetPropagatingLast();   // "as if … RAISING LAST EXCEPTION" — no PD-header operand: a fatal name is never EC-USER
+        StageLastName(null, null, null);   // "as if … RAISING LAST EXCEPTION" — no PD-header operand: a fatal name is never EC-USER
         return true;
     }
 
-    /// <summary>AUTOMATIC PROPAGATION of an exception OBJECT no declarative of the activating element took — ISO
-    /// §14.6.13.1.5, EXIT/GOBACK item 3: "if a PROPAGATE ON directive is in effect for the activating runtime
-    /// element, the exception is propagated as if a GOBACK statement with the RAISING LAST EXCEPTION phrase were
-    /// specified in this activating runtime element. However, if no applicable class or interface is specified in the
-    /// RAISING phrase of the procedure division header in the activating element, the RAISING phrase is EXCEPTION
-    /// EC-OO-EXCEPTION, instead of LAST EXCEPTION" (kb/Work PB1119). <paramref name="applicable"/> is the emitted type
-    /// test against that header's classes and interfaces; the object is the current exception status here (the pickup
-    /// made it so), so the LAST arm re-stages the object itself.</summary>
-    public void StageAutomaticObjectPropagation(bool applicable)
-    {
-        if (applicable) { SetPropagatingLast(); return; }
-        bool fatal = !ExceptionCatalog.TryGet(OoException, out var info) || info.IsFatal;   // Table 13, never a literal
-        SetPropagating(OoException, fatal);
-    }
-
     private const string OoException = "EC-OO-EXCEPTION";
+
+    /// <summary>Table 13's fatality of EC-OO-EXCEPTION, never a literal here.</summary>
+    private static bool OoExceptionFatal => !ExceptionCatalog.TryGet(OoException, out var info) || info.IsFatal;
+
+    /// <summary>The ACTIVATOR-SIDE conversion of a propagated exception OBJECT no declarative took — ISO §14.6.13.1.5
+    /// EXIT/GOBACK item 4: "Otherwise, execution of the EXIT or GOBACK statement in the activated element is as if
+    /// EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase, instead of an exception object." The pickup
+    /// has just taken the object; this re-stages the NAMED condition for THIS activation, so the pickup's one named
+    /// arm (<see cref="TakeRaisedPropagation"/>) takes it through §14.9.18.4 GR1 b) — raised only "if checking for
+    /// that exception condition is enabled in the activating runtime element" — exactly as the named arm of every
+    /// other GOBACK … RAISING does (kb/Work PB408, PB1121). The staging is for the CURRENT activation, unlike
+    /// <see cref="SetPropagating"/>'s (which names the running element's activator): the activator is the element
+    /// running now.</summary>
+    public void ConvertObjectPropagationToNamed()
+    {
+        _propagated = (OoException, OoExceptionFatal, null, null, _activations?.CurrentActivation ?? 0);
+        _propagatedObject = default;
+    }
 
     private static string[] Names(string[]? names) => names ?? [];
 
@@ -441,9 +509,10 @@ public sealed class ExceptionEngine
         if (!enabled) return;
         Set(ec, fatal: false);
         int r = NonfatalDispatcher?.NonfatalDispatch(ec) ?? DispatchResult.NoHandler;
-        // Normal (#3, the declarative completed normally) and NoHandler (#4, none qualified) both leave the statement
-        // to finish under its own rules; only an explicit RESUME transfers control out of it.
-        if (r is DispatchResult.Normal or DispatchResult.NoHandler) return;
+        // Normal (#3, the declarative completed normally; NotNormal, it fell off its end after a fatal exception in its
+        // scope — §14.6.13.1.2 1), which no rule of THIS statement keys on) and NoHandler (#4, none qualified) all
+        // leave the statement to finish under its own rules; only an explicit RESUME transfers control out of it.
+        if (DispatchResult.FinishesStatement(r)) return;
         if (nextStatementContinues && r == DispatchResult.ResumeNext) return;
         throw new RaiseResumeSignal(r);   // §14.9.33.4 GR2 (DispatchResult.ResumeNext) / GR3 (≥ 0)
     }
@@ -1649,18 +1718,30 @@ public static class ExceptionState
     public static bool TakePropagatedObject(out CobolObject? obj) => E.TakePropagatedObject(out obj);
 
     /// <inheritdoc cref="ExceptionEngine.SetPropagatingLast"/>
-    public static void SetPropagatingLast(string[]? pdRaising = null, string? statement = null, string? location = null)
-        => E.SetPropagatingLast(pdRaising, statement, location);
+    public static void SetPropagatingLast(bool objectApplicable, string[]? pdRaising = null, string? statement = null, string? location = null)
+        => E.SetPropagatingLast(objectApplicable, pdRaising, statement, location);
 
     /// <inheritdoc cref="ExceptionEngine.StageAutomaticPropagation"/>
     public static bool StageAutomaticPropagation(string name) => E.StageAutomaticPropagation(name);
 
-    /// <inheritdoc cref="ExceptionEngine.StageAutomaticObjectPropagation"/>
-    public static void StageAutomaticObjectPropagation(bool applicable) => E.StageAutomaticObjectPropagation(applicable);
+    /// <inheritdoc cref="ExceptionEngine.ConvertObjectPropagationToNamed"/>
+    public static void ConvertObjectPropagationToNamed() => E.ConvertObjectPropagationToNamed();
 
     /// <inheritdoc cref="ExceptionEngine.TakeRaisedPropagation"/>
     public static bool TakeRaisedPropagation(string activatorChecking, out string name, out bool fatal)
         => E.TakeRaisedPropagation(activatorChecking, out name, out fatal);
+
+    /// <inheritdoc cref="ExceptionEngine.EnterDeclarative"/>
+    public static int EnterDeclarative(object owner) => E.EnterDeclarative(owner);
+
+    /// <inheritdoc cref="ExceptionEngine.LeaveDeclarative"/>
+    public static void LeaveDeclarative(int token) => E.LeaveDeclarative(token);
+
+    /// <inheritdoc cref="ExceptionEngine.DeclarativeNotNormal"/>
+    public static bool DeclarativeNotNormal(int token) => E.DeclarativeNotNormal(token);
+
+    /// <inheritdoc cref="ExceptionEngine.MarkDeclarativesNotNormal"/>
+    public static void MarkDeclarativesNotNormal(object? owner) => E.MarkDeclarativesNotNormal(owner);
 
 
     /// <inheritdoc cref="ExceptionEngine.DataPtrNullChecking"/>

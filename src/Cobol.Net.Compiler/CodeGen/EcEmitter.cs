@@ -119,12 +119,23 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     public string? ObjectPropagationReturn(string objExpr)
     {
         if (ecState.Propagation is not { } p) return null;
-        string applicable = p.RaisingObjectCsTypes.Count == 0
-            ? "false" : $"{objExpr} is {string.Join(" or ", p.RaisingObjectCsTypes)}";
+        // "as if a GOBACK statement with the RAISING LAST EXCEPTION phrase" — whose object status stages the object when
+        // it is applicable and "EXCEPTION EC-OO-EXCEPTION, instead of LAST EXCEPTION" when no applicable class or
+        // interface is specified in the header (the one SetPropagatingLast, item 1's test too).
+        string applicable = ObjectApplicableTest(objExpr);
         return p.InMethod
-            ? $"{{ ExceptionState.StageAutomaticObjectPropagation({applicable}); throw new MethodReturn(); }}"
-            : $"if (__asCalled) {{ ExceptionState.StageAutomaticObjectPropagation({applicable}); throw new ProgramReturn(); }}";
+            ? $"{{ ExceptionState.SetPropagatingLast({applicable}); throw new MethodReturn(); }}"
+            : $"if (__asCalled) {{ ExceptionState.SetPropagatingLast({applicable}); throw new ProgramReturn(); }}";
     }
+
+    /// <summary>⛔ §14.6.13.1.5 EXIT/GOBACK item 1's test, rendered ONCE for items 1 and 3: is <paramref name="objExpr"/>
+    /// "a) an object whose class is specified or whose class is a subclass of a class specified in the RAISING phrase of
+    /// the procedure division header … or b) an object that implements an interface specified in" it. <c>false</c> when
+    /// the element's header names no class or interface (<see cref="EcState.PdRaisingObjectCsTypes"/>), because then no
+    /// object is applicable (kb/Work PB1121).</summary>
+    public string ObjectApplicableTest(string objExpr) =>
+        ecState.PdRaisingObjectCsTypes.Count == 0
+            ? "false" : $"{objExpr} is {string.Join(" or ", ecState.PdRaisingObjectCsTypes)}";
 
     /// <summary>The standard terminate statement of <see cref="EmitSelection"/>: a <c>CobolFatalException</c>
     /// pre-marked <c>Dispatched</c> (one dispatch per raise — kb/Work PB75 — so an enclosing statement's guard lets
@@ -637,10 +648,38 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         return false;
     }
 
-    public void EmitResume(BoundResume r) =>
-        ctx.Writer.Line(r.TargetPc == DispatchResult.ResumeNext
-            ? "throw new ResumeSignal(DispatchResult.ResumeNext);   // RESUME AT NEXT STATEMENT (§14.9.33.4 GR2)"
-            : $"throw new ResumeSignal({r.TargetPc});   // RESUME AT procedure-name ≡ GO TO (§14.9.33.4 GR3)");
+    /// <summary>Emit RESUME (ISO §14.9.33.4). Returns true when the statement UNCONDITIONALLY unwinds (the
+    /// caller then treats it as a transfer out of the paragraph case), false when GR1 can make it a CONTINUE.
+    /// <para>⛔ GR1 IS A RUN-TIME QUESTION, ASKED HERE AND ANSWERED BY THE SAME ARRAY GOBACK USES (kb/Work PB1160):
+    /// "If the RESUME statement is executed within the scope of execution of a global declarative, it is the
+    /// equivalent of the execution of a CONTINUE statement." A declarative may PERFORM a LOCAL declarative or any
+    /// other procedure (§14.9.49.3 SR4), so a RESUME that SR2 let through statically can still be executed while a
+    /// GLOBAL declarative is active — and it must then fall through. The "scope of execution of a global
+    /// declarative" is exactly §14.9.18.4 GR6's "within the range of a declarative procedure whose USE statement
+    /// contains the GLOBAL phrase", so the ONE test is <see cref="DispatchState.InGlobalDeclarativeRangeTest"/> (the
+    /// per-program-instance <c>__useActive[global ids]</c>); a unit declaring no GLOBAL declarative emits the
+    /// unconditional unwind, byte-identical to before. The RESUME was EXECUTED even when it continues, so the
+    /// declaratives of THIS program that are open have not completed normally (§14.6.13.1.2 1: "a RESUME … that is
+    /// specified in this … program is executed") — the no-op arm marks their activation records, and the declarative
+    /// falls off its end as <see cref="DispatchResult.NotNormal"/> (kb/Work PB1122 Task B).</para></summary>
+    public bool EmitResume(BoundResume r)
+    {
+        string signal = r.TargetPc == DispatchResult.ResumeNext
+            ? "throw new ResumeSignal(DispatchResult.ResumeNext);"
+            : $"throw new ResumeSignal({r.TargetPc});";
+        string why = r.TargetPc == DispatchResult.ResumeNext
+            ? "RESUME AT NEXT STATEMENT (§14.9.33.4 GR2)"
+            : "RESUME AT procedure-name ≡ GO TO (§14.9.33.4 GR3)";
+        if (dispatch.InGlobalDeclarativeRangeTest is not { } inGlobalRange)
+        {
+            ctx.Writer.Line($"{signal}   // {why}");
+            return true;
+        }
+        ctx.Writer.Line($"if (!({inGlobalRange})) {signal}   // {why}");
+        ctx.Writer.Line("else ExceptionState.MarkDeclarativesNotNormal(__useActive);   "
+            + "// GR1: within a global declarative's scope of execution RESUME ≡ CONTINUE — executed, so not normal completion (§14.6.13.1.2 1))");
+        return false;
+    }
 
     // ── The EC-SIZE family over the checked-arithmetic shape (§14.7.5 ↔ Table 13) ───────────────────────────
 

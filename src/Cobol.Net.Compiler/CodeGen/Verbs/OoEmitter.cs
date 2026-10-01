@@ -478,11 +478,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             ecState.UnitHasF3Perform = classHasF3Perform;
             // The class-member __IoCheckEc serves every method's I-O statements, so its fatal default takes the METHODS'
             // automatic propagation (kb/Work PB1119). §7.3.21.3 SR1 keeps the directive out of a class, so every method
-            // of one class folds the same state; the raising types are not read here (they serve the INVOKE pickup,
-            // which is emitted inside each method with that method's own header).
+            // of one class folds the same state; the header RAISING census (EcState.PdRaisingObjectCsTypes) is not read
+            // here (it serves GOBACK … RAISING LAST and the INVOKE pickup, which are emitted inside each method with
+            // that method's own header).
             var savedPropagation = ecState.Propagation;
-            ecState.Propagation = AutomaticPropagation.Of(roster.Any(m => m.AutomaticPropagationHere), inMethod: true,
-                [], ecState.OoClasses);
+            ecState.Propagation = AutomaticPropagation.Of(roster.Any(m => m.AutomaticPropagationHere), inMethod: true);
             if (bound.Ec is { HasIoChecked: true }) U.Ec.EmitIoCheckEc([], w, asLocal: false);
             if (classHasF3Perform) U.Ec.EmitEcPerformMember(w);   // the raise-site funnel, once per class (§9.10.1-C1)
             ecState.UnitHasF3Perform = savedUnitF3P;
@@ -1020,8 +1020,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // A method is a source element of its own for §7.3.21.4 GR1 too (kb/Work PB1119): ITS automatic
             // propagation and ITS header's RAISING classes drive the fatal default and the INVOKE pickup in its body.
             var savedPropagation = ecState.Propagation;
-            ecState.Propagation = AutomaticPropagation.Of(m.AutomaticPropagationHere, inMethod: true, m.Raising,
-                ecState.OoClasses);
+            var savedRaisingTypes = ecState.PdRaisingObjectCsTypes;
+            ecState.Propagation = AutomaticPropagation.Of(m.AutomaticPropagationHere, inMethod: true);
+            ecState.PdRaisingObjectCsTypes = EcState.RaisingObjectCsTypes(m.Raising, ecState.OoClasses);   // §14.6.13.1.5 items 1 and 3 (kb/Work PB1121)
             if (methodSelects)
             {
                 ecState.UnitHasF3Perform = methodF3;                            // raise sites emit __EcPerform
@@ -1087,6 +1088,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 dispatch.DeclCount, dispatch.F3HandlerBasePc) = savedSel;
             dispatch.GlobalDeclIds = savedGlobalDecls;
             ecState.Propagation = savedPropagation;
+            ecState.PdRaisingObjectCsTypes = savedRaisingTypes;
             // BY REFERENCE copy-out (§14.2.3 GR8) / RETURNING (§14.9.23.4 GR8). A Tier-B REDEFINES canonical's
             // storage IS its string backing (a width-correct image), not the suppressed root struct — write that
             // back / return that, else the generated C# names an undeclared local (review A/emission).

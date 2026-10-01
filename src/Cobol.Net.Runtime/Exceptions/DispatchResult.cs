@@ -19,9 +19,13 @@ namespace CobolNet.Runtime.Exceptions;
 /// <item><see cref="HandledNonfatal"/> — a NONFATAL condition raised by a SUCCESSFUL statement that a WHEN phrase or a
 /// USE declarative handled and that completed normally (kb/Work PB1120): §14.6.13.1.4 2)/3) — the statement's NOT
 /// phrase is skipped. Distinct from <see cref="Normal"/> so "handled" and "no condition at all" can be told apart.</item>
-/// <item><see cref="NotNormal"/> — RESERVED for the declarative activation record (PB1122 Task B): the declarative
-/// fell off its end but §14.6.13.1.2 1) says it did not complete normally ("a fatal exception occurs within the scope
-/// of the declarative"). No producer yet; <see cref="TerminatesSortMerge"/> already accounts for it.</item>
+/// <item><see cref="NotNormal"/> — the declarative fell off its end but §14.6.13.1.2 1) says it did not complete
+/// normally ("a fatal exception occurs within the scope of the declarative", or a RESUME that §14.9.33.4 GR1 made a
+/// CONTINUE was executed): <c>__RunUse</c> answers it from the declarative's activation record (kb/Work PB1122 Task B).
+/// Only a rule that KEYS on normal completion distinguishes it — the SORT (§14.9.40.4 GR17) and MERGE (§14.9.24.4 GR7,
+/// GR12) implicit transfers, <see cref="TerminatesSortMerge"/>; every other consumer treats it as <see cref="Normal"/>
+/// (<see cref="FinishesStatement"/>, <see cref="ForHandledWarning"/>), because §14.9.49.4 GR13 and GR7 b)/c), GR12 b)/c)
+/// dispose of the condition by its FATALITY after the procedure returns, not by how it completed.</item>
 /// <item>any value <c>≥ 0</c> — RESUME AT procedure-name's pc (≡ GO TO, §14.9.33.4 GR3).</item>
 /// </list>
 /// </summary>
@@ -42,8 +46,8 @@ public static class DispatchResult
     /// (§14.6.13.1.4 2)/3); the statement's NOT phrase is skipped (kb/Work PB1120).</summary>
     public const int HandledNonfatal = -4;
 
-    /// <summary>The declarative fell off its end but did not complete normally (§14.6.13.1.2 1), a fatal exception
-    /// having occurred within its scope). Reserved for PB1122 Task B — nothing produces it yet.</summary>
+    /// <summary>The declarative fell off its end but did not complete normally (§14.6.13.1.2 1): a fatal exception
+    /// occurred within its scope, or a RESUME that §14.9.33.4 GR1 made a CONTINUE was executed (kb/Work PB1122 Task B).</summary>
     public const int NotNormal = -5;
 
     /// <summary>A RESUME AT procedure-name transfer: the result is the target pc (§14.9.33.4 GR3).</summary>
@@ -59,12 +63,18 @@ public static class DispatchResult
     /// <see cref="NotNormal"/>ly fell off its end).</summary>
     public static bool TerminatesSortMerge(int result) => result == ResumeNext || result == NotNormal;
 
+    /// <summary>Does a raise site that selected a procedure LET THE INTERRUPTED STATEMENT FINISH? True when no RESUME
+    /// redirected control: the procedure fell off its end (<see cref="Normal"/>, or <see cref="NotNormal"/> — how it
+    /// completed does not matter to a statement whose own rule names the continuation, §14.6.13.1.4 3)) or none
+    /// qualified (<see cref="NoHandler"/>, #4).</summary>
+    public static bool FinishesStatement(int result) => result is Normal or NoHandler or NotNormal;
+
     /// <summary>The result an I-O hook's SUCCESSFUL arm hands the verb site after selecting over a nonfatal warning
     /// (§14.6.13.1.4 2)/3), kb/Work PB1120): nothing applied (<see cref="NoHandler"/>) is <see cref="Normal"/>, a
-    /// handler that ran normally is <see cref="HandledNonfatal"/> — the statement's NOT phrase is skipped — and a
-    /// RESUME action passes through unchanged.</summary>
+    /// handler that fell off its end (<see cref="Normal"/> or <see cref="NotNormal"/>) is <see cref="HandledNonfatal"/>
+    /// — the statement's NOT phrase is skipped — and a RESUME action passes through unchanged.</summary>
     public static int ForHandledWarning(int selected) =>
-        selected == NoHandler ? Normal : selected == Normal ? HandledNonfatal : selected;
+        selected == NoHandler ? Normal : selected is Normal or NotNormal ? HandledNonfatal : selected;
 
     /// <summary>Did a USE procedure or WHEN handler actually RUN (as opposed to <see cref="NoHandler"/>)?</summary>
     public static bool RanAHandler(int result) => result != NoHandler;

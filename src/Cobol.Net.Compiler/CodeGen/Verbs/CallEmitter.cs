@@ -347,21 +347,27 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         if (raised is not null) w.Line($"bool {raised} = false;");
         using (w.Block($"if (ExceptionState.TakePropagatedObject(out var __po{id}))   // §14.6.13.1.5 — an exception OBJECT propagated"))
         {
-            if (raised is not null) w.Line($"{raised} = true;");
             w.Line($"ExceptionState.SetObject(__po{id});   // GR1b2 — the current exception object HERE (the activator)");
             w.Line($"int __or{id} = {ec.ObjDispatchExpr($"__po{id}")};   // rule 2 — USE AFTER EXCEPTION OBJECT (GR14)");
             w.Line(dispatch.ResumeTransfer($"__or{id}", "   // RESUME AT procedure-name"));
+            // The object was RAISED here iff a USE AFTER EXCEPTION OBJECT declarative took it. One that no declarative
+            // took becomes the NAMED EC-OO-EXCEPTION below, and THAT is raised (and reported) only by the named arm's
+            // activator-checking gate (§14.9.4.4 GR3i: the NOT ON EXCEPTION phrase keys on a condition "propagated"
+            // and raised, the reading the named arm already follows — kb/Work PB606, PB1121).
+            if (raised is not null)
+                w.Line($"if (__or{id} != DispatchResult.NoHandler) {raised} = true;");
             using (w.Block($"if (__or{id} == DispatchResult.NoHandler)   // no declarative took it: item 3 (PROPAGATE ON), else item 4"))
             {
                 // Item 3 — under >>PROPAGATE ON the activator re-propagates it (kb/Work PB1119); it returns, so what
                 // follows is item 4 for an element without the directive (or a main program, which has no activator).
                 if (ec.ObjectPropagationReturn($"__po{id}") is { } propagate)
                     w.Line(propagate + "   // §14.6.13.1.5 item 3");
-                // As if EXCEPTION EC-OO-EXCEPTION (:24608): the name enters the F3 tiers; Table 13 makes it fatal.
-                ec.EmitConditionSet("EC-OO-EXCEPTION", "as if EXCEPTION EC-OO-EXCEPTION (:24608)");
-                ec.EmitSelection("\"EC-OO-EXCEPTION\"",
-                    EcEmitter.FatalTermination("\"EC-OO-EXCEPTION\"",
-                        "\"an exception object was not handled (ISO 14.6.13.1.5; Table 13 - fatal)\""));
+                // Item 4 — "as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase, instead of an
+                // exception object": re-stage it as that NAMED propagation, which the named arm below takes through
+                // §14.9.18.4 GR1 b) — raised HERE only if EC-OO-EXCEPTION checking is enabled HERE, then the F3
+                // selection and Table 13's fatal default. With checking off nothing is raised and the activation
+                // completes (§14.6.13.1.1: "By default, checking is not enabled for any exception condition").
+                w.Line("ExceptionState.ConvertObjectPropagationToNamed();   // §14.6.13.1.5 item 4");
             }
             w.Line("// Normal/ResumeNext: declarative completed / RESUME NEXT — normal continuation (:24604)");
         }
@@ -1174,8 +1180,11 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             string loc = r.WithLocation
                 ? $", {CsLiteral(r.StatementName!)}, {CsLiteral(r.Location!)}"
                 : "";
-            w.Line($"ExceptionState.SetPropagatingLast({names}{loc});"
-                + "   // RAISING LAST EXCEPTION (§14.9.18.4 GR1b3a — the PD-header RAISING list is GR1b3a's operand)");
+            // An OBJECT status is admitted only when the header's RAISING phrase names its class or an interface it
+            // implements (§14.6.13.1.5 item 1 — the one census, EcState.PdRaisingObjectCsTypes); otherwise the GOBACK
+            // is "as if EXCEPTION EC-OO-EXCEPTION were specified" (kb/Work PB1121).
+            w.Line($"ExceptionState.SetPropagatingLast({ec.ObjectApplicableTest("ExceptionState.ExceptionObject")}, {names}{loc});"
+                + "   // RAISING LAST EXCEPTION (§14.9.18.4 GR1b3a — the PD-header RAISING list is GR1b3a's operand; §14.6.13.1.5 item 1 for an object)");
             return;
         }
         // kb/Work R07: the §15.32.3 r2 / §15.30.3 r2 operands travel WITH the staged condition and are applied by

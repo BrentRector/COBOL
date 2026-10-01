@@ -1531,6 +1531,7 @@
   "pb466-ambiguous-section-name",
   "pb466-ambiguous-alter-85",
   "pb466-ambiguous-resume-at",
+  "pb1160-resume-in-when-in-global-declarative",
   "pb466-ambiguous-sort-procedure",
   "pb431-inline-head-two-control-phrases",
   "pb431-format3-control-phrase",

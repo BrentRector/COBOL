@@ -59,14 +59,21 @@ OO mechanism (feedback_one_mechanism_per_job):
   pins BOTH arms through the corpus, each `.err` naming its own statement's citation.
 - **GOBACK / EXIT PROGRAM / method-return RAISING identifier-1** → `BoundRaising.ObjectSource` (exactly
   one of EcName/IsLast/ObjectSource); the no-universal sub-item (EXIT SR5d / GOBACK SR4d) + the
-  declared-class-in-header one (EXIT SR5a / GOBACK SR4a, walking the base chain) = 0849 at COMPILE time — which statically discharges the activated-side rule-1 check in v1
-  (D-EO5; revisit when FACTORY OF / interface RAISING legs land). The stage
+  declared-class-in-header one (EXIT SR5a / GOBACK SR4a, walking the base chain) = 0849 at COMPILE time — which statically discharges the activated-side item-1 check for an identifier-1
+  (D-EO5). `RAISING LAST EXCEPTION` of an object status is tested at RUN time against the element's header census
+  (`EcState.PdRaisingObjectCsTypes`, rendered by `EcEmitter.ObjectApplicableTest`) and, on a miss, stages the NAMED
+  EC-OO-EXCEPTION instead of the object (kb/Work PB1121). The stage
   (`ExceptionState.SetPropagatingObject`) has no Enabled/Fatal logic — objects are not TURN-gated.
 - **The pickup** (`CallEmitter.EmitPropagationPickup`) has an object branch (slots exclusive): GR1b2
-  re-registers in the activator → F4 dispatch (rule 2) → on −3, the rule-4 conversion:
-  `Set("EC-OO-EXCEPTION", true)` → the F3 tiers (EC-OO-EXCEPTION/EC-OO/EC-ALL match) → unresumed ⇒
-  `CobolFatalException` (fatal per Table 13 — surviving needs RESUME AT NEXT STATEMENT, the standard
-  fatal-EC protocol). The SAME pickup runs after every CALL and every Instance/Self/Super/Factory INVOKE
+  re-registers in the activator → F4 dispatch (rule 2) → on `NoHandler`, item 3 (PROPAGATE ON) and else the item-4
+  conversion: `ExceptionState.ConvertObjectPropagationToNamed()` re-stages the object as the NAMED EC-OO-EXCEPTION
+  for this activation, and the pickup's one NAMED arm (`TakeRaisedPropagation(site.ActivatorChecking…)`, the PB408
+  activator gate) takes it from there: raised — last status set, the F3 tiers (EC-OO-EXCEPTION/EC-OO/EC-ALL match),
+  unresumed ⇒ `CobolFatalException` (fatal per Table 13 — surviving needs RESUME AT NEXT STATEMENT, the standard
+  fatal-EC protocol) — only when EC-OO-EXCEPTION checking is enabled in the ACTIVATING element, else nothing is
+  raised and the statement completes (§14.9.18.4 GR1 b), §14.6.13.1.1). The object counts as "propagated" for the
+  CALL's NOT ON EXCEPTION test (GR3i) only when a USE AFTER EXCEPTION OBJECT declarative took it or the named arm
+  raised it. The SAME pickup runs after every CALL and every Instance/Self/Super/Factory INVOKE
   and every UNIVERSAL dispatch (`OoEmitter.EmitInvokePickup`); NEW needs none (the ctor runs no user statements).
   GR1b's result-before-exception ordering falls out of stage-then-`throw MethodReturn` + the entry catch
   delivering RETURNING/copy-outs before the site's pickup.
@@ -125,9 +132,12 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   `NoHandler` (`-3`) no qualifying declarative, a value `≥0` RESUME AT procedure-name's pc (≡ GO TO, §14.9.33.4 GR3),
   `HandledNonfatal` (`-4`) — from an I-O hook's SUCCESSFUL arm only: a WHEN phrase or USE declarative handled a warning
   a successful statement raised, so the statement's NOT phrase is skipped (§14.6.13.1.4 2)/3); a NOT phrase runs on
-  `Normal` alone; kb/Work PB1120) — and `NotNormal` (`-5`), RESERVED for the declarative activation record of
-  §14.6.13.1.2 1) (kb/Work PB1122 Task B; nothing produces it yet). ⛔ **The emitters render the NAMES and the
-  PREDICATES (`IsTransfer`, `SuppressesFatal`, `TerminatesSortMerge`, `ForHandledWarning`, `RanAHandler`), never the
+  `Normal` alone; kb/Work PB1120) — and `NotNormal` (`-5`): the declarative fell off its end but did not complete
+  normally (§14.6.13.1.2 1: a fatal exception occurred within its scope, or a GR1 CONTINUE-RESUME was executed;
+  `__RunUse` answers it from the declarative activation record, kb/Work PB1122 Task B — see "RESUME control flow"
+  below). ⛔ **The emitters render the NAMES and the
+  PREDICATES (`IsTransfer`, `SuppressesFatal`, `TerminatesSortMerge`, `FinishesStatement`, `ForHandledWarning`,
+  `RanAHandler`), never the
   numbers** — `DispatchResultProtocolDriftTests` fails the build when a bare literal reappears in an emitted string, so
   a new result value lands in one file. There is no `ExceptionDispatch` registry class: the F3 selector is
   the GENERATED `__EcDispatch` (source-ordered GR3c–g tiers over the program's own declaratives).
@@ -908,7 +918,7 @@ CobolNum.TryStore (the single settled name — see the C# mapping) computes the 
 
 ### RESUME control flow (NEXT STATEMENT vs procedure-name vs GLOBAL-declarative≡CONTINUE) requires a declarative to redirect the caller's control after it returns (ISO §14.9.33).
 
-As built there is no ResumeAction enum: declaratives are pc ranges, a RESUME statement throws `ResumeSignal`, and the generated `__RunUse` converts it into the `DispatchResult` every raise site reads (`ResumeNext` RESUME AT NEXT STATEMENT → fall through past the applicable statement, suppressing a fatal termination; `≥0` RESUME AT procedure-name's pc → as if GO TO; `Normal` fell off the end → continue for a nonfatal condition, terminate for a fatal one, §14.9.49.4 GR13) — the full protocol is "The declarative dispatch-result protocol" under EC engine specifics above. A RESUME written directly in a USE … GLOBAL declarative is refused at bind (COBOLNET0713, §14.9.33.3 SR2). ⚠ §14.9.33.4 GR1 — a RESUME *executed within the scope of* a global declarative (one the global declarative PERFORMs) is a CONTINUE — is NOT yet realized: `EcEmitter.EmitResume` throws unconditionally, so such a RESUME unwinds the global declarative and its action is applied (kb/Work PB1160). Nor does `__RunUse` yet record the §14.6.13.1.2 1) "fatal exception occurs within the scope of the declarative" half of normal completion (kb/Work PB1122; the model is kb/Work PB1761).
+As built there is no ResumeAction enum: declaratives are pc ranges, a RESUME statement throws `ResumeSignal`, and the generated `__RunUse` converts it into the `DispatchResult` every raise site reads (`ResumeNext` RESUME AT NEXT STATEMENT → fall through past the applicable statement, suppressing a fatal termination; `≥0` RESUME AT procedure-name's pc → as if GO TO; `Normal` fell off the end → continue for a nonfatal condition, terminate for a fatal one, §14.9.49.4 GR13) — the full protocol is "The declarative dispatch-result protocol" under EC engine specifics above. A RESUME written in a USE … GLOBAL declarative is refused at bind (COBOLNET0713, §14.9.33.3 SR2), whether written directly or nested in a WHEN phrase inside it (`EcBinder.BindResume` asks the GLOBAL question before the WHEN-phrase one, the order `PlacementRules.RefusedInGlobalDeclarative` gives GOBACK and EXIT). §14.9.33.4 GR1 — a RESUME *executed within the scope of* a global declarative (one the global declarative PERFORMs, §14.9.49.3 SR4) is a CONTINUE — is a RUN-TIME question, answered by the same per-program-instance `__useActive[global ids]` test (`DispatchState.InGlobalDeclarativeRangeTest`) that §14.9.18.4 GR6's EC-FLOW-GLOBAL-GOBACK uses: `EcEmitter.EmitResume` renders `if (!(<test>)) throw new ResumeSignal(…);` in a unit that declares a GLOBAL declarative, so the RESUME is a no-op while one is active and falls through (kb/Work PB1160); a unit with none emits the unconditional unwind. "Scope of execution" is read per program instance: a RESUME in a program CALLed from a global declarative resumes normally in its own activation (docs/CONFORMANCE.md §3). Consequently a declarative reached through `__RunGlobalUse` can never return a resume action. The §14.6.13.1.2 1) "fatal exception occurs within the scope of the declarative" half of normal completion is recorded by the DECLARATIVE ACTIVATION RECORD (kb/Work PB1122 Task B; the model is kb/Work PB1761): `__RunUse` of a DECLARATIVE id (`__id < DeclCount`; an exception-checking PERFORM's WHEN-handler ids share the invoker and are not declaratives) opens a record on the run-unit `ExceptionEngine` (`EnterDeclarative(__useActive)`), closes it in its `finally`, and on falling off its end answers `NotNormal` when the record was marked. Two marks: the fatal raise funnel (`ExceptionEngine.Set(…, fatal: true)` — "occurs" read as "is raised", i.e. checking enabled; it marks EVERY open record, the scope being dynamic across PERFORM and CALL) and the no-op RESUME of `EmitResume` (`MarkDeclarativesNotNormal(__useActive)` — only the records of the RESUME's own program instance, the rule saying "specified in this … program"). Only a rule keyed on normal completion tells `NotNormal` from `Normal`: the SORT (§14.9.40.4 GR17) and MERGE (§14.9.24.4 GR7, GR12) implicit transfers (`SequentialIoEmitter.EmitUseHook` jumps on `DispatchResult.TerminatesSortMerge`); every other consumer lets the statement finish (`FinishesStatement`, `ForHandledWarning`), because §14.9.49.4 GR13 and GR7 b)/c), GR12 b)/c) dispose of the condition by its FATALITY after the procedure returns. The Format 4 object selector's result is likewise treated as `Normal` (§14.6.13.1.5 names only the normal case; docs/CONFORMANCE.md §3). Pinned by `conformance:2002/pb1122_declarative_fatal_in_scope_merge` and `unit:DeclarativeActivationRecordTests`.
 
 ### >>TURN must gate WHETHER a guard is emitted per statement, in source order, with EC-ALL/level-2 expansion — without a runtime cost when OFF.
 

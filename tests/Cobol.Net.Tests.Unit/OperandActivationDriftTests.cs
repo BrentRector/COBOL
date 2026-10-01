@@ -128,10 +128,14 @@ public sealed class OperandActivationDriftTests
         Assert.Contains("throw new RaiseResumeSignal(", body);
         Assert.DoesNotContain("goto ", body);
         // Two landings — the PERFORM's and the COMPUTE's — and every operand selection throws rather than falls
-        // through: per activation, the GOBACK RAISING pickup AND the activation-failure catch (both render through
-        // EcEmitter.EmitSelection since kb/Work PB1549, so they share its result-variable spelling) — 2 × 2.
+        // through. Per activation the pickup has TWO selections: the exception-OBJECT arm's F4 landing (`__or`, the
+        // object's USE AFTER EXCEPTION OBJECT declarative's RESUME) and the NAMED arm's (`__r`, rendered through
+        // EcEmitter.EmitSelection since kb/Work PB1549). The item-4 conversion of an object no declarative took is no
+        // selection of its own any more: it re-stages the NAMED EC-OO-EXCEPTION, which the named arm raises under the
+        // ACTIVATOR's checking (kb/Work PB1121) — so 2 × 1 `__r` and 2 × 1 `__or`.
         Assert.Equal(2, Regex.Matches(cs, @"catch \(RaiseResumeSignal __as\d+\)").Count);
-        Assert.Equal(4, Regex.Matches(cs, @"DispatchResult\.SuppressesFatal\(__r\d+\)\) throw new RaiseResumeSignal\(__r\d+\);").Count);
+        Assert.Equal(2, Regex.Matches(cs, @"DispatchResult\.SuppressesFatal\(__r\d+\)\) throw new RaiseResumeSignal\(__r\d+\);").Count);
+        Assert.Equal(2, Regex.Matches(cs, @"DispatchResult\.SuppressesFatal\(__or\d+\)\) throw new RaiseResumeSignal\(__or\d+\);").Count);
         Assert.Equal(2, Regex.Matches(cs, @"TakeRaisedPropagation\(").Count);
     }
 

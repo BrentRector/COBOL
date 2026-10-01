@@ -774,14 +774,20 @@ invariant: exactly one of EcName / IsLast / ObjectSource. `EcBindRaising` (:149-
 declarative/WHEN; methods have no declaratives yet — 0899 wording pointing at the method-declaratives stage).
 GOBACK RETURNING/GIVING in a method stays unsupported (unchanged).
 
-### D-EO5. The activated-side EC-OO-EXCEPTION check (:24596-24602 rule 1) is STATICALLY discharged in v1
-SR4a forces the identifier's DECLARED class (or superclass) into the header list; every object a typed
-reference holds conforms to its declared class (§14.8), and v1 has no universal identifier-1 (SR4d), no
-FACTORY objects, no interfaces. Therefore rule 1a **always holds** at runtime — no generated check at the
-GOBACK/EXIT site. Record this in the deep-dive; the check must be revisited when FACTORY/INTERFACE-ID land
-(the FACTORY-parity clause of SR4a/:24598 is the trigger). **Rejected:** emitting a defensive runtime class
-check now (dead code with no reachable failure path; the loud-failure doctrine wants real raise sites, not
-scaffolding).
+### D-EO5. The activated-side EC-OO-EXCEPTION check (§14.6.13.1.5 EXIT/GOBACK item 1) — static for `RAISING identifier-1`, run-time for `RAISING LAST EXCEPTION`
+`RAISING identifier-1`: GOBACK SR4 / EXIT SR5 force the identifier's DECLARED class (or superclass, or an interface
+it conforms to, with the SAME FACTORY presence) into the header list, and every object a typed reference holds
+conforms to its declared class (§14.8), and an identifier-1 that is UNIVERSAL is refused (SR4d). So item 1 **always
+holds** for the operand and the binder discharges it at COMPILE time (`EcBinder.RaisingObjectMismatch`,
+COBOLNET0849); no generated check follows the operand's staging.
+`RAISING LAST EXCEPTION` (kb/Work PB1121): the object it re-propagates is whatever the last exception status holds,
+its class known only at run time, so the static discharge cannot reach it. The emitted staging passes
+`ExceptionState.ExceptionObject is <census>` to `ExceptionState.SetPropagatingLast`, where `<census>` is the element's
+ONE header-RAISING list of C# types (`EcState.PdRaisingObjectCsTypes`: each class entry's own type, a FACTORY OF entry's
+factory type, each interface entry's implementing types; `false` when the header names none). A miss stages the NAMED
+EC-OO-EXCEPTION instead of the object ("as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase"), which
+the activator raises only when checking for it is enabled there (§14.9.18.4 GR1 b)). The same census serves item 3
+(PROPAGATE ON). **Rejected:** a second, narrower list for LAST (two copies of one membership rule).
 
 ### D-EO6. Staging + pickup: the GOBACK/EXIT/MethodReturn side stages, the activating SITE consumes
 `CallEmitRaisingStage` (CSharpEmitter.Call.cs:863-883) gains the object leg:

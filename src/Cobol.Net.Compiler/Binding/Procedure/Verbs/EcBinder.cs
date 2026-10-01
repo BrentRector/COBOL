@@ -111,6 +111,17 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         // and the EXIT / GOBACK rules that state the same two positions cannot drift apart — which they had,
         // RESUME being the only one of the family that asked at all.
         var where = ctx.Enclosing;
+        // SR2 — not in a GLOBAL-phrase declarative — IS ASKED FIRST (kb/Work PB1160), the order
+        // PlacementRules.RefusedInGlobalDeclarative gives GOBACK and EXIT. SR2 is a flat prohibition ("shall not be
+        // specified in a declarative procedure for which the GLOBAL phrase is specified"): it has no exception for a
+        // statement nested in a WHEN phrase inside that declarative, so the WHEN-phrase arm below must never be
+        // reached for one. (A RESUME EXECUTED within a global declarative's dynamic scope is CONTINUE, GR1 —
+        // EcEmitter.EmitResume; this is the STATIC case, which rejects.)
+        if (where.Declarative is { Global: true })
+        {
+            return BoundRejected.Report(ctx.Edition, "COBOLNET0713", "RESUME shall not be specified in a declarative procedure whose "
+                + "USE statement carries the GLOBAL phrase (ISO §14.9.33.3 SR2)");
+        }
         if (where.InPerformWhen)
         {
             ctx.EcState.Resume = true;
@@ -118,19 +129,12 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Report(ctx.Edition, "COBOLNET1610", "RESUME in a WHEN phrase of an exception-checking PERFORM shall "
                 + "specify NEXT STATEMENT (ISO §14.9.33.3 SR1)");
         }
-        if (where.Declarative is not { } decl)
+        if (where.Declarative is null)
         {
             // XS-RESUME-PLACEMENT (§14.9.28.3): a RESUME in imperative-statement-1 or FINALLY of an F3 PERFORM
             // (neither a declarative nor a WHEN phrase) lands here too — the same "declarative or WHEN only" rule.
             return BoundRejected.Report(ctx.Edition, "COBOLNET0712", "RESUME may be specified only in a declarative or a WHEN phrase of "
                 + "an exception-checking PERFORM (ISO §14.9.33.3 SR1)");
-        }
-        // SR2 — not in a GLOBAL-phrase declarative (a RESUME executed within a global declarative's DYNAMIC
-        // scope is CONTINUE, GR1 — realized by __RunGlobalUse swallowing the signal; the STATIC case rejects).
-        if (decl.Global)
-        {
-            return BoundRejected.Report(ctx.Edition, "COBOLNET0713", "RESUME shall not be specified in a declarative procedure whose "
-                + "USE statement carries the GLOBAL phrase (ISO §14.9.33.3 SR2)");
         }
         ctx.EcState.Resume = true;
         if (r.NEXT() is not null) return new BoundResume(DispatchResult.ResumeNext);

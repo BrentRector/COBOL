@@ -84,7 +84,10 @@ internal sealed class DispatchState
     /// <c>__RunUse</c> already maintains exactly the activated-and-not-yet-returned flag the rule asks for.
     /// "Specified in the same program as the GOBACK statement" comes free: the array is per program instance,
     /// and a container's GLOBAL declarative selected on behalf of a contained program (GR4 b)) runs in the
-    /// CONTAINER's instance.</para></summary>
+    /// CONTAINER's instance.</para>
+    /// <para>It is the ONE test of "within a global declarative's range" for BOTH rules that ask it: §14.9.18.4 GR6's
+    /// EC-FLOW-GLOBAL-GOBACK (<c>CallEmitter.EmitGoback</c>) and §14.9.33.4 GR1's RESUME-is-CONTINUE
+    /// (<c>EcEmitter.EmitResume</c>, kb/Work PB1160).</para></summary>
     public string? InGlobalDeclarativeRangeTest =>
         GlobalDeclIds.Count == 0 ? null : string.Join(" || ", GlobalDeclIds.Select(i => $"__useActive[{i}]"));
 
@@ -352,6 +355,30 @@ internal sealed class EcState
     /// decided (§14.6.13.1.3 6)) and where an activator disposes of an exception object (§14.6.13.1.5).</summary>
     public AutomaticPropagation? Propagation { get; set; }
 
+    /// <summary>⛔ THE ONE CENSUS OF "AN APPLICABLE CLASS OR INTERFACE … SPECIFIED IN THE RAISING PHRASE OF THE
+    /// PROCEDURE DIVISION HEADER" (ISO §14.6.13.1.5 EXIT/GOBACK items 1 and 3; kb/Work PB1121): the C# types an
+    /// exception object must be an instance of for the element being emitted — each class entry's own type (a
+    /// FACTORY OF entry: the factory type, "the presence or absence of the FACTORY phrase is the same", item 1 a)),
+    /// and each interface entry's implementing types (item 1 b)). EVERY element with a header has one, so item 1
+    /// (<c>GOBACK … RAISING LAST EXCEPTION</c> of an object status) and item 3 (the activator's automatic propagation
+    /// under <c>&gt;&gt;PROPAGATE ON</c>) ask the same list; it used to exist only under PROPAGATE ON, which is how
+    /// item 1 went untested. Empty when the header has no RAISING phrase (no object is then applicable). Set per
+    /// program unit and per METHOD, saved and restored beside <see cref="Propagation"/>; rendered by
+    /// <c>EcEmitter.ObjectApplicableTest</c>.</summary>
+    public IReadOnlyList<string> PdRaisingObjectCsTypes { get; set; } = [];
+
+    /// <summary>Build <see cref="PdRaisingObjectCsTypes"/> for an element whose header RAISING phrase is
+    /// <paramref name="raising"/>, resolved through <paramref name="table"/>.</summary>
+    public static IReadOnlyList<string> RaisingObjectCsTypes(IEnumerable<Binding.Model.RaisingTarget> raising,
+        Compiler.Oo.OoClassTable? table) =>
+        [.. raising.SelectMany(t => t.Kind switch
+        {
+            Binding.Model.RaisingTargetKind.ObjectClass when table?.Find(t.Name) is { } c =>
+                (IEnumerable<string>)[t.Factory ? c.FactoryCsName : c.CsName],
+            Binding.Model.RaisingTargetKind.Interface when table?.FindInterface(t.Name) is { } i => i.ImplementedCsTypes,
+            _ => [],
+        }).Distinct(StringComparer.Ordinal)];
+
     /// <summary>The wrapper context of the statement being emitted (else null) — statement-scoped, saved/restored
     /// around each <c>BoundEcChecked</c> body.</summary>
     public EcStatementInfo? Info { get; set; }
@@ -451,21 +478,10 @@ internal sealed class CallUnitState
 /// activator. Otherwise a program or function: <c>ProgramReturn</c>, and only while <c>__asCalled</c> — §7.3.21.1
 /// propagates "to the activating runtime element", and a run unit's main program has none (§14.9.18.4 GR3 makes
 /// its GOBACK a STOP that ignores RAISING), so there the §14.6.13.1.3 7) termination stands.</param>
-/// <param name="RaisingObjectCsTypes">The C# types an exception object must be an instance of to be "an applicable
-/// class or interface … specified in the RAISING phrase of the procedure division header" of this element
-/// (§14.6.13.1.5 item 3) — the classes' own types (FACTORY OF: the factory type) and each interface's implementing
-/// types.</param>
-internal sealed record AutomaticPropagation(bool InMethod, IReadOnlyList<string> RaisingObjectCsTypes)
+internal sealed record AutomaticPropagation(bool InMethod)
 {
-    /// <summary>The element's automatic propagation, or null when it is OFF; <paramref name="raising"/> is its
-    /// PROCEDURE DIVISION header RAISING phrase, resolved through <paramref name="table"/>.</summary>
-    public static AutomaticPropagation? Of(bool on, bool inMethod, IEnumerable<Binding.Model.RaisingTarget> raising,
-        Compiler.Oo.OoClassTable? table) =>
-        !on ? null : new(inMethod, [.. raising.SelectMany(t => t.Kind switch
-        {
-            Binding.Model.RaisingTargetKind.ObjectClass when table?.Find(t.Name) is { } c =>
-                (IEnumerable<string>)[t.Factory ? c.FactoryCsName : c.CsName],
-            Binding.Model.RaisingTargetKind.Interface when table?.FindInterface(t.Name) is { } i => i.ImplementedCsTypes,
-            _ => [],
-        }).Distinct(StringComparer.Ordinal)]);
+    /// <summary>The element's automatic propagation, or null when it is OFF. The exception-OBJECT half of the
+    /// §14.6.13.1.5 disposition tests the element's header census, <see cref="EcState.PdRaisingObjectCsTypes"/>,
+    /// which every element has whether or not it is under PROPAGATE ON.</summary>
+    public static AutomaticPropagation? Of(bool on, bool inMethod) => on ? new(inMethod) : null;
 }

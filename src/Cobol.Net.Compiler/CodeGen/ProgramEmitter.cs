@@ -252,8 +252,10 @@ internal sealed class ProgramEmitter
         _ecState.UnitHasF3Perform = unit.Bound.Ec?.HasF3Perform ?? false;   // → __EcPerform + the F3-frame interceptor (§14.9.28)
         _ecState.UnitHasF4 = unit.Bound.Declaratives?.Any(d => d.Eo is not null) ?? false;   // → __EcObjDispatch exists (EC-OO F4)
         // §7.3.21.4 GR1 — this program or function's automatic propagation (kb/Work PB1119), read at its fatal default.
-        _ecState.Propagation = AutomaticPropagation.Of(data.AutomaticPropagation, inMethod: false,
-            unit.Bound.RaisingObjects ?? [], _ecState.OoClasses);
+        _ecState.Propagation = AutomaticPropagation.Of(data.AutomaticPropagation, inMethod: false);
+        // §14.6.13.1.5 items 1 and 3 — this element's header RAISING census (kb/Work PB1121), read by every GOBACK /
+        // EXIT … RAISING LAST EXCEPTION and by the activator's pickup, PROPAGATE ON or not.
+        _ecState.PdRaisingObjectCsTypes = EcState.RaisingObjectCsTypes(unit.Bound.RaisingObjects ?? [], _ecState.OoClasses);
         // A containing program with USE … GLOBAL declaratives makes this unit's I-O hooks walk outward on a
         // no-local-match (ISO §14.9.49.4 GR4b) — consumed by EmitDispatcher/EmitUseMachinery.
         _dispatchState.OuterGlobalUse = ChainHasGlobalUse(unit.Parent);
@@ -485,13 +487,15 @@ internal sealed class ProgramEmitter
         // edition-invariant — the determination is written there (kb/Work PB344).
         using (w.Block("public bool __RunGlobalUse(string __f)"))
         {
-            // ⛔ DISCARDING __RunUse's RESUME ACTION HERE IS THE RULE, NOT the PB141 defect it resembles.
-            // ISO §14.9.33.4 GR1: "If the RESUME statement is executed within the scope of execution of a global
-            // declarative, it is the equivalent of the execution of a CONTINUE statement." Every declarative this
-            // selector can run is a GLOBAL one (globalOnly), so its resume action is a CONTINUE by definition and
-            // there is nothing to hand back — unlike __IoCheck's LOCAL tier, where discarding it WAS kb/Work
-            // PB141. Said out loud because the two call sites look identical and only one of them may discard
-            // (measured as a candidate defect and refuted by the rule, kb/Work PB368).
+            // ⛔ __RunUse CAN NEVER HAND A RESUME ACTION BACK HERE, SO THERE IS NOTHING TO DISCARD (kb/Work PB1160).
+            // Every declarative this selector can run is a GLOBAL one (globalOnly). A RESUME written in it is
+            // refused (§14.9.33.3 SR2), and a RESUME in a procedure it PERFORMs is executed "within the scope of
+            // execution of a global declarative", which ISO §14.9.33.4 GR1 makes "the equivalent of the execution
+            // of a CONTINUE statement" — EcEmitter.EmitResume renders that as a no-op while this program's
+            // __useActive[global ids] is set, so the action is never produced. That is the rule's REALIZATION; it
+            // is not this call site's decision, and a declarative's action is not "discarded by GR1" (the raiser
+            // is not what GR1 is about — kb/Work PB368 answered that question, not this one). __IoCheck's LOCAL
+            // tier, which does hand the action back, is kb/Work PB141.
             UseTierEmitter.EmitScopeTiers(w, decls,
                 i => $"{_dispatchState.RunUseCall(i, decls[i].Range)}; return true;", globalOnly: true);
             w.Line(unit.Parent is { } p && ChainHasGlobalUse(p)

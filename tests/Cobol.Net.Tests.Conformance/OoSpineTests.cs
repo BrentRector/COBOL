@@ -2625,14 +2625,16 @@ public sealed class OoSpineTests
         Assert.Equal("CONTINUED", CutRunner.Normalize(stdout));
     }
 
-    /// <summary>§14.6.13.1.5 rule 4 — the EC-OO-EXCEPTION conversion enters the F3 tiers: a USE AFTER EC
-    /// EC-OO declarative catches an unhandled propagated object. EC-OO-EXCEPTION is FATAL (Table 13), so
-    /// surviving it needs RESUME AT NEXT STATEMENT (§14.6.13.1.3 #5 NOTE 2 — the same rule as every fatal
-    /// named condition).</summary>
+    /// <summary>§14.6.13.1.5 rule 4 + §14.9.18.4 GR1 b) — the EC-OO-EXCEPTION conversion of an object no F4 declarative
+    /// took is RAISED in the activating element only "if checking for that exception condition is enabled" THERE
+    /// (§14.6.13.1.1: off by default), and then it enters the F3 tiers: a USE AFTER EC EC-OO declarative catches it.
+    /// EC-OO-EXCEPTION is FATAL (Table 13), so surviving it needs RESUME AT NEXT STATEMENT (§14.6.13.1.3 #5 NOTE 2
+    /// — the same rule as every fatal named condition). The checking-OFF twin below is kb/Work PB1121.</summary>
     [Fact]
-    public void GobackRaisingObject_NoF4_F3CatchesEcOoException()
+    public void GobackRaisingObject_NoF4_ActivatorChecked_F3CatchesEcOoException()
     {
         var (ok, stdout, detail) = CompileAndRun("""
+            >>TURN EC-OO-EXCEPTION CHECKING ON
             IDENTIFICATION DIVISION.
             PROGRAM-ID. OOEC11.
             ENVIRONMENT DIVISION.
@@ -2691,6 +2693,74 @@ public sealed class OoSpineTests
             """);
         Assert.True(ok, detail);
         Assert.Equal("F3-CAUGHT\nAFTER", CutRunner.Normalize(stdout));
+    }
+
+    /// <summary>kb/Work PB1121 — the checking-OFF twin of <see cref="GobackRaisingObject_NoF4_ActivatorChecked_F3CatchesEcOoException"/>:
+    /// EC-OO-EXCEPTION checking is not enabled in the activator, so §14.9.18.4 GR1 b) raises nothing, the F3
+    /// declarative does not run and the INVOKE completes. (The unrecovered checked arm is
+    /// <c>FatalRaiseSelectionTests.ObjectPropagation_ActivatorChecked_NoHandler_TerminatesAbnormally</c>.)</summary>
+    [Fact]
+    public void GobackRaisingObject_NoF4_ActivatorUnchecked_RaisesNothing()
+    {
+        var (ok, stdout, detail) = CompileAndRun("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. OOEC11B.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS CEOY1B
+                CLASS CEOY2B.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 S USAGE OBJECT REFERENCE CEOY2B.
+            PROCEDURE DIVISION.
+            DECLARATIVES.
+            CATCH-SEC SECTION.
+                USE AFTER EC EC-OO.
+            CATCH-P.
+                DISPLAY "F3-WRONG".
+                RESUME AT NEXT STATEMENT.
+            END DECLARATIVES.
+            MAIN SECTION.
+            MAIN-P.
+                INVOKE CEOY2B "NEW" RETURNING S.
+                INVOKE S "BOOM".
+                DISPLAY "AFTER".
+                STOP RUN.
+            END PROGRAM OOEC11B.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. CEOY1B INHERITS FROM BASE.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS BASE.
+            END CLASS CEOY1B.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. CEOY2B INHERITS FROM BASE.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS BASE
+                CLASS CEOY1B.
+            IDENTIFICATION DIVISION.
+            OBJECT.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 W-E USAGE OBJECT REFERENCE CEOY1B.
+            PROCEDURE DIVISION.
+            METHOD-ID. BOOM.
+            PROCEDURE DIVISION RAISING CEOY1B.
+            MAIN.
+                INVOKE CEOY1B "NEW" RETURNING W-E.
+                GOBACK RAISING W-E.
+            END METHOD BOOM.
+            END OBJECT.
+            END CLASS CEOY2B.
+            """);
+        Assert.True(ok, detail);
+        Assert.Equal("AFTER", CutRunner.Normalize(stdout));
     }
 
     /// <summary>§9.3.8.2 :12291 — SET typed TO EXCEPTION-OBJECT narrows at RUNTIME; a wrong-class object

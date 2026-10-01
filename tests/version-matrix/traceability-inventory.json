@@ -32496,13 +32496,13 @@
   "ordinal": 1,
   "subject": "Exception conditions",
   "rule-digest": "ff3972cb6134",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/DispatchEmitter.cs#EmitRunUseBody; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitArgOrPlain; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitRaise",
-  "test-ref": "conformance:2023/pb367b_sort_use_not_normal",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/DispatchEmitter.cs#EmitRunUseBody; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#EnterDeclarative; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#MarkDeclarativesNotNormal; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitResume; src/Cobol.Net.Runtime/Exceptions/DispatchResult.cs#NotNormal",
+  "test-ref": "conformance:2023/pb367b_sort_use_not_normal; conformance:2002/pb1122_declarative_fatal_in_scope_merge; unit:DeclarativeActivationRecordTests.FatalRaiseWithinTheScope_MarksTheOpenDeclarative; unit:DeclarativeActivationRecordTests.ResumeContinue_MarksOnlyItsOwnPrograms",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1122 (open). Rule: §14.6.13.1.2 1) (cite.py --check 14.6.13.1.2 \"An EXIT PROGRAM, GOBACK, RESUME, or STOP statement that is specified in this function, method, or program is executed\" -> OK 1)). A declarative completes normally only if none of EXIT PROGRAM/GOBACK/RESUME/STOP is executed and no fatal exception occurs in its scope. Code: the EC-model __RunUse (DispatchEmitter.EmitRunUseBody) returns -1 ONLY when the bounded __Dispatch falls off its end; RESUME unwinds as ResumeSignal and is converted to the resume action (-2 / pc), and GOBACK/EXIT PROGRAM/STOP RUN/CobolFatalException unwind through the finally (guard reset + checking restore) without producing -1, so every caller's 'completed normally' arm (EmitArgOrPlain '__r != -2 -> throw', EmitRaise, __IoCheckEc) is never reached for a non-normal completion. Probes (pinned cobol.exe, out/probe/exc-normal): n1 fatal EC-BOUND-SUBSCRIPT in a CALLed program whose USE AFTER EC declarative executes GOBACK -> 'B-DECL / A-AFTER', exit 0 (no abnormal termination: GOBACK made it not-normal, so 14.6.13.1.3 #5's terminate-after-normal-completion does not fire); n2 same with STOP RUN -> 'B-DECL', exit 0 (normal STOP, not abnormal); n3 control (declarative falls off) -> abnormal termination exit 1; n4 nonfatal EC-USER-X declarative that itself raises a checked fatal EC-BOUND-SUBSCRIPT -> 'DECL-START' then abnormal termination, exit 1, DECL-END/AFTER-RAISE never shown; n6 EXIT PROGRAM in a nonfatal declarative of a called program -> 'DECL / A-AFTER', statement after RAISE not executed. RESUME half pinned by the golden (DECL-RAN / AFTER-SORT). All halves verified. || REFUTED: PARTIAL — Only the statement half holds. Normal completion is decided solely by whether __Dispatch falls off its end (DispatchEmitter.EmitRunUseBody returns -1). Nothing records that a fatal exception occurred within the scope of the declarative. A fatal exception that is handled inside the declarative's scope (a second declarative that RESUMEs AT NEXT STATEMENT) therefore lets the first declarative be treated as completing normally, which contradicts the second half of 14.6.13.1.2 1). || editions as adjudicated: 2002, 2014, 2023 (the §14.6.13 exception-condition model and its USE-completion definition arrive with ISO 2002; COBOL-85 has no RESUME/GOBACK/EC model)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1122 LANDED (Task A DispatchResult, Task B the declarative activation record). __RunUse of a DECLARATIVE id opens a record on the run-unit ExceptionEngine and answers DispatchResult.NotNormal on falling off its end when it was marked: by a fatal raise (ExceptionEngine.Set fatal, every open record: the scope is dynamic) or by a RESUME that GR1 made a CONTINUE (its own program's records). Only the SORT/MERGE implicit transfers key on normal completion (TerminatesSortMerge, 14.9.40.4 GR17, 14.9.24.4 GR7/GR12); every other consumer treats NotNormal as Normal (14.9.49.4 GR13). Readings pinned in docs/CONFORMANCE.md section 3: occurs = is raised (checking enabled); Format 4 selector treats it as normal.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.13.1.2-2",
@@ -32736,13 +32736,13 @@
   "ordinal": 1,
   "subject": "Exception conditions",
   "rule-digest": "733b06be87b5",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#SetPropagatingLast; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitRaisingStage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#SetPropagatingLast; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitRaisingStage; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#PdRaisingObjectCsTypes; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#ObjectApplicableTest",
+  "test-ref": "conformance:2002/pb1121_object_propagation_boundary",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1121 (open). Rule: §14.6.13.1.5 EXIT/GOBACK list item 1 (cite.py --check 14.6.13.1.5 \"execution of the EXIT or GOBACK statement is as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase of the EXIT or GOBACK statement instead of an exception object\" -> OK; cite.py labels the numbered list '2) b)', a transcription-indentation artifact of the PB718/PB719 family - the rule is list item 1 under 'If an exception object is raised by an EXIT or GOBACK statement'). For RAISING identifier-1 the binder discharges the test STATICALLY (EcBinder: GOBACK §14.9.18.3 SR4 a)-d) / EXIT SR5 -> COBOLNET0849, design D-EO5), which is sound because a typed reference holds only a conforming object. But RAISING LAST EXCEPTION re-raises the CURRENT exception object (§14.9.18.4 GR1 b) 3. a. 'If the exception condition is an exception object, additional rules are specified in 14.6.13.1.5', cite.py OK), whose class is known only at run time, and ExceptionState.SetPropagatingLast's object branch ('if (LastName == ObjectSentinel) { _propagatedObject = (true, ExceptionObject, StagingFor); ... return; }') stages it with NO test against the containing element's PD-header RAISING classes/interfaces - the pdRaising argument it receives carries only the EC-USER names. D-EO5's own text said the static discharge 'must be revisited' when FACTORY/interface RAISING legs landed (they have - PB814/PB815) and never covered LAST. Probe out/probe/exc-oo/o3: >>TURN EC-OO-EXCEPTION ON; EXO3B (PD header with NO RAISING phrase) RAISEs a CXO3E object, its USE AFTER EXCEPTION OBJECT CXO3E declarative displays B-F4 and executes GOBACK RAISING LAST EXCEPTION; activator EXO3A has USE AFTER EO CXO3E ('A-F4') and USE AFTER EC EC-OO-EXCEPTION ('A-ECOO' + RESUME AT NEXT STATEMENT). Observed: 'B-F4 / A-F4 / A-AFTER'. Spec-derived expected: the object is neither a) nor b) for EXO3B's (empty) RAISING list, so the GOBACK is as if RAISING EXCEPTION EC-OO-EXCEPTION, raised in the activator (checking enabled there) and fatal (Table 13) -> §14.6.13.1.3 #5 selects DF3 -> 'B-F4 / A-ECOO EC-OO-EXCEPTION / A-AFTER'; the F4 declarative must not run. Finding: raising-last-object-no-pd-check. || editions as adjudicated: 2002, 2014, 2023 (ISO 2002 OO/EC model; RAISING LAST EXCEPTION per §14.9.18.3 SR5)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1121 LANDED. GOBACK/EXIT ... RAISING LAST EXCEPTION of an object status tests the object at run time against the containing element's PD-header RAISING census (EcState.PdRaisingObjectCsTypes, the one list item 3's PROPAGATE ON also reads; a FACTORY OF entry lists the factory type); a miss stages the NAMED EC-OO-EXCEPTION instead of the object (item 1). RAISING identifier-1 keeps its static discharge (design D-EO5). Witness: program B (no header RAISING) converts, program C (header RAISING the class) keeps the object.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.13.1.5-L2.2",
@@ -32767,11 +32767,11 @@
   "subject": "Exception conditions",
   "rule-digest": "7026ca3cf283",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#ObjectPropagationReturn; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#StageAutomaticObjectPropagation; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#AutomaticPropagation",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#ObjectPropagationReturn; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#AutomaticPropagation; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#SetPropagatingLast; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#PdRaisingObjectCsTypes; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#ObjectApplicableTest",
   "test-ref": "conformance-test:AutomaticPropagationTests.ExceptionObject_ItemThree_ObjectOrEcOoException",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1119 LANDED (wave 73 D2). cite.py --check 14.6.13.1.5 'the RAISING phrase is EXCEPTION EC-OO-EXCEPTION, instead of LAST EXCEPTION' -> OK (label '2) b)' is the list-indentation artifact; the rule is the EXIT/GOBACK list's item 3). The pickup's -3 arm (no F4 declarative in the activator) now emits EcEmitter.ObjectPropagationReturn ahead of item 4 when the ACTIVATOR is under PROPAGATE ON: an 'is' test over the activator's PD-header RAISING classes (FACTORY OF: the factory type) and interfaces (AutomaticPropagation.Of) decides between re-staging the object (LAST) and staging EXCEPTION EC-OO-EXCEPTION, then the activator returns. Witness: a program whose header names the class re-propagates the object to the main program's F4 declarative; one whose header names none propagates EC-OO-EXCEPTION to its F3 declarative - before the fix both terminated the run unit in the middle program (item 4).",
+  "notes": "kb/Work PB1119 LANDED (wave 73 D2). cite.py --check 14.6.13.1.5 'the RAISING phrase is EXCEPTION EC-OO-EXCEPTION, instead of LAST EXCEPTION' -> OK (label '2) b)' is the list-indentation artifact; the rule is the EXIT/GOBACK list's item 3). The pickup's -3 arm (no F4 declarative in the activator) now emits EcEmitter.ObjectPropagationReturn ahead of item 4 when the ACTIVATOR is under PROPAGATE ON: an 'is' test over the activator's PD-header RAISING classes (FACTORY OF: the factory type) and interfaces (AutomaticPropagation.Of) decides between re-staging the object (LAST) and staging EXCEPTION EC-OO-EXCEPTION, then the activator returns. Witness: a program whose header names the class re-propagates the object to the main program's F4 declarative; one whose header names none propagates EC-OO-EXCEPTION to its F3 declarative - before the fix both terminated the run unit in the middle program (item 4). retired-witness: src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#StageAutomaticObjectPropagation (kb/Work PB1121 deleted StageAutomaticObjectPropagation: it was the object-or-EC-OO-EXCEPTION choice that SetPropagatingLast(bool objectApplicable) now makes for items 1 and 3 alike, over the one EcState.PdRaisingObjectCsTypes census)",
   "state": "OK"
  },
  {
@@ -32781,13 +32781,13 @@
   "ordinal": 4,
   "subject": "Exception conditions",
   "rule-digest": "3eaa9534c424",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#ConvertObjectPropagationToNamed",
+  "test-ref": "conformance:2002/pb1121_object_propagation_boundary; conformance-test:OoSpineTests.GobackRaisingObject_NoF4_ActivatorUnchecked_RaisesNothing; conformance-test:OoSpineTests.GobackRaisingObject_NoF4_ActivatorChecked_F3CatchesEcOoException; conformance-test:FatalRaiseSelectionTests.ObjectPropagation_ActivatorChecked_NoHandler_TerminatesAbnormally",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1121 (open). Rule: §14.6.13.1.5 EXIT/GOBACK list item 4 (cite.py --check 14.6.13.1.5 \"Otherwise, execution of the EXIT or GOBACK statement in the activated element is as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase\" -> OK, cite.py label '2) b)' is the list-indentation artifact). 'As if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase' imports §14.9.18.4 GR1 b): 'an exception condition is raised in the activating runtime element if checking for that exception condition is enabled in the activating runtime element' (cite.py OK 1) b)), and §14.6.13.1.1 'By default, checking is not enabled for any exception condition' (cite.py OK). The NAMED arm of the same pickup honours this (TakeRaisedPropagation(site.ActivatorChecking...) - kb/Work PB408, landed); the OBJECT arm's conversion does not: on __EcObjDispatch == -3 it emits ExceptionState.Set(\"EC-OO-EXCEPTION\", true), the F3 dispatch and an unconditional CobolFatalException, never consulting the activator's checking profile. Probe out/probe/exc-oo/o1 (no >>TURN anywhere; method BOOM with PROCEDURE DIVISION RAISING CXO1E executes GOBACK RAISING W-E; the invoking program has no declaratives): observed 'abnormal run-unit termination: EC-OO-EXCEPTION (fatal)', exit 1, 'AFTER' never displayed. Spec-derived expected: EC-OO-EXCEPTION is not enabled in the activator, so no exception condition is raised there and the INVOKE completes normally -> 'AFTER ...' displayed, exit 0. Control o2 (same + >>TURN EC-OO-EXCEPTION CHECKING ON) -> abnormal termination, which IS correct (#7). The existing conformance-test:OoSpineTests.GobackRaisingObject_NoF4_F3CatchesEcOoException asserts the divergent behaviour (a USE AFTER EC EC-OO declarative runs for EC-OO-EXCEPTION with no >>TURN enabling it) and cannot close this row. Finding: object-conversion-ignores-activator-checking. || editions as adjudicated: 2002, 2014, 2023 (ISO 2002 OO/EC model)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1121 LANDED. The activator-side item-4 conversion of an object no declarative took re-stages it as the NAMED EC-OO-EXCEPTION for the current activation (ExceptionState.ConvertObjectPropagationToNamed) and the pickup's one named arm takes it through TakeRaisedPropagation(site.ActivatorChecking), the PB408 gate: checking OFF raises nothing and the CALL/INVOKE completes; checking ON raises, runs the F3 selection and applies Table 13's fatal default. CALL and INVOKE (including the universal path) share the one pickup. The NOT ON EXCEPTION reading is pinned in docs/CONFORMANCE.md section 3.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.13.2-1",
@@ -42996,13 +42996,13 @@
   "ordinal": 2,
   "subject": "RESUME statement",
   "rule-digest": "c3d99945530f",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindResume",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1160-resume-in-when-in-global-declarative",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1160 (registrar 14c). Rule: 'The RESUME statement shall not be specified in a declarative procedure for which the GLOBAL phrase is specified in the associated USE statement.' (cite.py --check 14.9.33.3 -> OK §14.9.33.3 2)). The prohibition is flat: it names the declarative procedure, with no exception for a statement nested in it. BindResume tests `where.InPerformWhen` FIRST and returns BoundResume for NEXT STATEMENT before the `decl.Global` test is ever reached, so a RESUME written in a WHEN phrase of an exception-checking PERFORM that sits inside a USE GLOBAL declarative is admitted. PROBED (probe/resume-statement/sr2w.cob): G SECTION. USE GLOBAL AFTER STANDARD ERROR PROCEDURE ON F. G1. PERFORM ADD 1 TO N WHEN EC-SIZE RESUME NEXT STATEMENT END-PERFORM. -> compiles clean at 2023; expected COBOLNET0713. The direct case (RESUME as a statement of the GLOBAL declarative) IS refused with COBOLNET0713 and is pinned by ExceptionConditionConformanceTests.Resume_InGlobalDeclarative_Diagnosed and ExitPlacementContextDriftTests.Resume_InADeclarative_FollowsTheGlobalPhrase (PBRS07/PBRS08) - one half verified, the nested half under-rejects, so the row cannot close. The sibling screen PlacementRules.RefusedInGlobalDeclarative (GOBACK/EXIT, PB404/PB409) asks InGlobalDeclarative irrespective of the WHEN frame; RESUME's own arm should ask the same question before its WHEN branch.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1160 LANDED. EcBinder.BindResume asks the GLOBAL-declarative question (COBOLNET0713) BEFORE the WHEN-phrase question, the order PlacementRules.RefusedInGlobalDeclarative gives GOBACK and EXIT, so a RESUME nested in a WHEN phrase inside a USE GLOBAL declarative is refused like the direct form.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.33.3-3",
@@ -43026,13 +43026,13 @@
   "ordinal": 1,
   "subject": "RESUME statement",
   "rule-digest": "700579ec37cf",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitResume; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#EmitRunGlobalUse; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#InGlobalDeclarativeRangeTest",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitResume; src/Cobol.Net.Compiler/CodeGen/EmitterState.cs#InGlobalDeclarativeRangeTest; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#EmitRunGlobalUse",
+  "test-ref": "conformance:2002/pb1160_resume_in_global_scope",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1160 (registrar 14c). Rule: 'If the RESUME statement is executed within the scope of execution of a global declarative, it is the equivalent of the execution of a CONTINUE statement.' (cite.py --check 14.9.33.4 -> OK §14.9.33.4 1)). SR2 forbids RESUME written statically in a GLOBAL declarative, so GR1 is reached DYNAMICALLY: a GLOBAL declarative may PERFORM a procedure of another declarative section (cite.py --check 14.9.49.3 'Procedure-names within a declarative section may be referenced in a different declarative section or in a nondeclarative procedure only with a PERFORM statement' -> OK §14.9.49.3 4)), and a RESUME executed there is within the global declarative's scope of execution, so it shall be a CONTINUE: execution proceeds with the statement after the RESUME. Code: EcEmitter.EmitResume unconditionally emits `throw new ResumeSignal(...)`; the only GR1 realization is EmitRunGlobalUse DISCARDING the resume action after the throw has already unwound the declarative (its comment cites GR1 for that), which ends the declarative instead of continuing it, and the LOCAL tier (a global declarative selected for its own program's statement) does not even discard - it honors the action. The run-time `__useActive[global ids]` test the emitter already has (EmitterState.InGlobalDeclarativeRangeTest, used for EC-FLOW-GLOBAL-GOBACK) is never consulted by EmitResume. PROBED with the pinned cobol.exe (probe/resume-statement): gr1a.cob - G SECTION USE GLOBAL AFTER STANDARD ERROR PROCEDURE ON F; G1: DISPLAY 'G-START' PERFORM D DISPLAY 'G-END'; D SECTION USE AFTER ... ON OUTPUT; D1: DISPLAY 'D-START' RESUME NEXT STATEMENT DISPLAY 'D-AFTER-RESUME'; main OPEN INPUT F (missing file) then DISPLAY 'MAIN-AFTER-OPEN ' FS. Expected (GR1): G-START / D-START / D-AFTER-RESUME / G-END / MAIN-AFTER-OPEN 35. Observed: G-START / D-START / MAIN-AFTER-OPEN 35. gr1b.cob (same, with the OPEN in a contained program, so __RunGlobalUse runs G): observed G-START / D-START / INNER-AFTER-OPEN 35 / MAIN-END (expected D-AFTER-RESUME and G-END too). gr1c.cob (gr1a with RESUME AT M2): observed G-START / D-START / M2-JUMPED - a GO TO where GR1 requires CONTINUE. No register note owns this: PB404's body records that GR1's dynamic-scope CONTINUE 'was NOT imported' for EXIT and treats it as realized for RESUME; PB368 (landed) refuted the discard as a defect on the premise that discarding the ACTION equals CONTINUE, which answers a different question (what the raiser does) from GR1's (what the RESUME statement does). [editions as adjudicated: 2002, 2014, 2023 (RESUME is part of the 2002 exception model; not in 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1160 LANDED. A RESUME executed within a GLOBAL declarative's scope of execution (reached through the PERFORM of §14.9.49.3 SR4) is a CONTINUE: EcEmitter.EmitResume renders `if (!(__useActive[global ids])) throw new ResumeSignal(...)` in a unit that declares a GLOBAL declarative, the same per-instance test §14.9.18.4 GR6 uses. Witness covers the NEXT STATEMENT arm, the procedure-name arm (no GO TO is performed) and the contained-program arm through __RunGlobalUse. The scope is per program instance (docs/CONFORMANCE.md §3).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.33.4-2",

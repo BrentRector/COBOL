@@ -357,4 +357,66 @@ public sealed class FatalRaiseSelectionTests
         var (exit, stdout, stderr) = new CobolNetCompiler(2023).CompileAndRunExit(source);
         AssertAbnormal(exit, stdout, stderr, "BEFORE", "EC-FUNCTION-PTR-INVALID");
     }
+
+    /// <summary>§14.6.13.1.5 EXIT/GOBACK item 4 with checking ENABLED in the activator (kb/Work PB1121): the GOBACK of an
+    /// exception object no declarative takes "is as if EXCEPTION EC-OO-EXCEPTION were specified in the RAISING phrase",
+    /// §14.9.18.4 GR1 b) raises it in the activating element because EC-OO-EXCEPTION checking is enabled THERE, and
+    /// §14.6.13.1.3 7) terminates the run unit (Table 13: fatal). The checking-OFF twin continues, and is golden
+    /// <c>2002/pb1121_object_propagation_boundary</c>.</summary>
+    [Fact]
+    public void ObjectPropagation_ActivatorChecked_NoHandler_TerminatesAbnormally()
+    {
+        const string source = """
+            >>TURN EC-OO-EXCEPTION CHECKING ON
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB1121T1.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS CPB1121TS.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 S USAGE OBJECT REFERENCE CPB1121TS.
+            PROCEDURE DIVISION.
+            MAIN-P.
+                INVOKE CPB1121TS "NEW" RETURNING S
+                DISPLAY "BEFORE"
+                INVOKE S "BOOM"
+                DISPLAY "AFTER"
+                STOP RUN.
+            END PROGRAM PB1121T1.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. CPB1121TE INHERITS FROM BASE.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS BASE.
+            END CLASS CPB1121TE.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. CPB1121TS INHERITS FROM BASE.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS BASE
+                CLASS CPB1121TE.
+            IDENTIFICATION DIVISION.
+            OBJECT.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 W-E USAGE OBJECT REFERENCE CPB1121TE.
+            PROCEDURE DIVISION.
+            METHOD-ID. BOOM.
+            PROCEDURE DIVISION RAISING CPB1121TE.
+            MAIN.
+                INVOKE CPB1121TE "NEW" RETURNING W-E
+                GOBACK RAISING W-E.
+            END METHOD BOOM.
+            END OBJECT.
+            END CLASS CPB1121TS.
+            """;
+        var (exit, stdout, stderr) = new CobolNetCompiler(2002).CompileAndRunExit(source);
+        AssertAbnormal(exit, stdout, stderr, "BEFORE", "EC-OO-EXCEPTION");
+    }
 }
