@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-246 drift tests.
+247 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -224,6 +224,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [SharedReadCoherenceDriftTests](../tests/Cobol.Net.Tests.Unit/SharedReadCoherenceDriftTests.cs) | ⛔ A READ DELIVERS THE RECORD THE PHYSICAL FILE HOLDS NOW, NEVER A BUFFERED IMAGE A SIBLING CONNECTOR HAS ALREADY REPLACED (kb/Work PB753) — the READ-side twin of SharedExtendWriteDriftTests's write-side rule. | `src/Cobol.Net.Runtime/IO/SequentialConnector.cs`, `src/Cobol.Net.Runtime/IO/FileSupport.cs`, `src/Cobol.Net.Runtime/IO/FileRegistry.cs` |
 | [SignedIntegerSlotDriftTests](../tests/Cobol.Net.Tests.Unit/SignedIntegerSlotDriftTests.cs) | ⛔ THE SIGNED-INTEGER SLOT INVENTORY (kb/Work PB553). The grammar carries TWO integer-literal rules and the difference between them is a RULE, not an oversight: integerLiteral : INTEGERLIT is the metalanguage integer-n of a printed general format. | `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Compiler` |
 | [SignedLiteralShapeDriftTests](../tests/Cobol.Net.Tests.Unit/SignedLiteralShapeDriftTests.cs) | ⛔ THE SIGNED-LITERAL SHAPE SYMMETRY (kb/Work R17 — ledger F12). | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4` |
+| [SingleInstancePictureDriftTests](../tests/Cobol.Net.Tests.Unit/SingleInstancePictureDriftTests.cs) | ⛔ ONE "ONE INSTANCE OF THE PICTURE SYMBOL" PREDICATE FOR BOTH CLAUSES THAT ASK IT (kb/Work PB1210). | `src/Cobol.Net.Compiler/Binding/DataBinder.cs` |
 | [SortTransferRuleDriftTests](../tests/Cobol.Net.Tests.Unit/SortTransferRuleDriftTests.cs) | ⛔ THE SORT/MERGE IMPLICIT-TRANSFER TERMINATION RULES ARE ONE TABLE (kb/Work PB993). | `src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs`, `src/Cobol.Net.Compiler/CodeGen` |
 | [SourceEncodingDriftTests](../tests/Cobol.Net.Tests.Unit/SourceEncodingDriftTests.cs) | ⛔ A UTF-8 BOM ON A `.g4` FILE BREAKS THE ANTLR BUILD, AND IT BROKE CI WHILE EVERY LOCAL GATE STAYED GREEN. | `src` |
 | [SpecTraceabilityInventoryDriftTests](../tests/Cobol.Net.Tests.Unit/SpecTraceabilityInventoryDriftTests.cs) | The battery gate over the PHASE-14 Step-0 spec-traceability inventory — the artifact whose GAP count DEFINES v1.0 (owner decision D13: zero GAP = P14 done). | `tests/version-matrix/inventory-schema.json`, `tests/version-matrix/traceability-inventory.json`, `docs/rearchitecture/spec-rule-catalog.json`, `tests/version-matrix/derivation-parity-cases.json`, `scripts/spec/audit_derivations.py`, `scripts/spec/build_inventory.py` … |
