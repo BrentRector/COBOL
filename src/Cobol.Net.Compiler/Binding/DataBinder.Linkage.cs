@@ -372,23 +372,19 @@ public sealed partial class DataBinder
             {
                 // §14.2.2 SR2 (:23664): "Each data-name-1 specified in a BY VALUE phrase shall be defined as a
                 // data item of class numeric, message-tag, object, or pointer." Class message-tag is the MCS
-                // module (not modeled — undeclarable here, so unreachable). Fixed-point class numeric and the
-                // MANAGED classes (object / the three pointer categories) are the CARRIED legs of the §14.2.3
-                // GR10 detached-cell value copy — GR10 names both: "a COMPUTE statement without the ROUNDED
+                // module (not modeled — undeclarable here, so unreachable). Class numeric (fixed-point or floating-
+                // point) and the MANAGED classes (object / the three pointer categories) are the CARRIED legs of the
+                // §14.2.3 GR10 detached-cell value copy — GR10 names both: "a COMPUTE statement without the ROUNDED
                 // phrase" for the numeric one, "a SET statement" for class object or pointer, which is the
-                // reference copy CobolArgAdapt.SlotValue performs (kb/Work PB663). Only the FLOATING-POINT
-                // usage remains loud, by name — never silently by-ref.
+                // reference copy CobolArgAdapt.SlotValue performs (kb/Work PB663). The FLOATING-POINT usage is the
+                // same COMPUTE on the float lane — landed by FloatResultant into a detached float cell
+                // (CobolArgAdapt.NumValue; kb/Work PB1114).
                 if (!(item.IsElementary && item.Pic?.Category is PicCategory.Numeric or PicCategory.Pointer
                         or PicCategory.ProgramPointer or PicCategory.FunctionPointer
                         or PicCategory.ObjectReference))
                     Edition.Error("COBOLNET1553",
                         $"BY VALUE formal parameter '{pname}' shall be of class numeric, message-tag, object, "
                         + "or pointer (ISO §14.2.2 SR2)");
-                else if (item.Pic is { Category: PicCategory.Numeric, IsFloat: true })
-                    Edition.Error(DiagnosticCatalog.ByValueFormalCarrier,
-                        $"BY VALUE formal parameter '{pname}': a FLOATING-POINT value-copy carrier "
-                        + "(ISO §14.2.3 GR10) is not yet implemented — the fixed-point numeric and the "
-                        + "object/pointer BY VALUE formals are carried");
             }
 
             // ⛔ THE CARRIER NAME IS Uid-KEYED, NOT POSITIONAL (kb/Work PB1009). A carrier-resident formal's

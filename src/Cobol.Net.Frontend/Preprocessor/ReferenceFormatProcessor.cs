@@ -107,9 +107,13 @@ public static partial class ReferenceFormatProcessor
     /// <param name="ccvsIndicators">Honor the NIST CCVS column-7 conventions (S/Y debugging lines, P/J/H/E/U excluded
     /// alternates, any other letter a primary-configuration line) — the <c>--nist</c> dialect only (kb/Work PB1494);
     /// otherwise a character that is not a fixed indicator (§6.2.2) is diagnosed.</param>
+    /// <param name="implicitOps">The §14.9.28.4 GR14 implicit PUSH ALL / POP ALL written in THIS text, at its physical
+    /// lines (<see cref="ImplicitFormatOps.For"/>) — the format state they save and restore is this walker's
+    /// (kb/Work PB1066). Null or empty for every text without an exception-checking PERFORM that holds a format
+    /// directive in a handler.</param>
     public static MappedText NormalizeToFreeFormMapped(string sourceText, int dialectLevel, bool permissive,
         DiagnosticBag? diagnostics, string sourcePath, bool? initialFixed, out ReferenceFormatMap formats,
-        bool ccvsIndicators = false)
+        bool ccvsIndicators = false, IReadOnlyList<DirectiveStackOp>? implicitOps = null)
     {
         var gates = diagnostics is null ? null : new ReferenceFormatDiagnostics(dialectLevel, permissive, diagnostics, sourcePath);
         // THE line-entry stage (kb/Work PB1800): every line below is read from here — terminators, tabs and (under
@@ -120,12 +124,14 @@ public static partial class ReferenceFormatProcessor
         // COPY statement (3)), or — only under the documented Auto extension — the one IsFixedForm detects in the text
         // before the first line that could be a >>SOURCE directive in either reading (kb/Work PB1362).
         bool firstFixed = initialFixed ?? IsFixedForm(lines[..FirstSourceDirectiveCandidate(lines)]);
-        var segments = FormatSegments(lines, firstFixed, gates);
+        var (segments, directiveLines) = FormatSegments(lines, firstFixed, gates, implicitOps ?? []);
+        var physicalText = new string[lines.Length];   // the map keeps what the line-entry stage settled (ReferenceFormatMap.PhysicalText)
+        for (int i = 0; i < physicalText.Length; i++) physicalText[i] = lines[i].Text;
 
         // No format boundary → the whole text is one segment in its initial format.
         if (segments.Count == 0)
         {
-            formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, []);
+            formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, [], directiveLines, physicalText);
             var (wl, wo) = firstFixed
                 ? new FixedFormConverter(gates, ccvsIndicators).Convert(lines)
                 : ConvertFreeLines(lines, gates);
@@ -139,7 +145,7 @@ public static partial class ReferenceFormatProcessor
         // whole-file path already does.
         // A segment boundary at 0-based line i changes the format from the NEXT line: 1-based line i + 2.
         formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null,
-            segments.Select(s => (s.Index + 2, s.Fixed)));
+            segments.Select(s => (s.Index + 2, s.Fixed)), directiveLines, physicalText);
         var outLines = new List<string>();
         var outOrigins = new List<int>();   // the 1-based source line of each output line (kb/Work PB82)
         bool segFixed = firstFixed;
@@ -198,15 +204,31 @@ public static partial class ReferenceFormatProcessor
     /// failed to match a legal <c>&gt;&gt;SOURCE FORMAT FIXED *&gt; switch</c>, so the line stayed in the text and the
     /// following segment was read in the WRONG reference format (kb/Work PB794).</para>
     /// </summary>
-    private static List<(int Index, bool Fixed, bool KeepsLine)> FormatSegments(
-        ReadOnlySpan<PhysicalLine> lines, bool initialFixed, ReferenceFormatDiagnostics? gates)
+    private static (List<(int Index, bool Fixed, bool KeepsLine)> Segments, List<int> DirectiveLines) FormatSegments(
+        ReadOnlySpan<PhysicalLine> lines, bool initialFixed, ReferenceFormatDiagnostics? gates,
+        IReadOnlyList<DirectiveStackOp> implicitOps)
     {
         bool current = initialFixed;
         var state = new DirectiveStateStack().Carry(Constructs.SourceFormatDirective2002,
             new DirectiveValueCarrier<bool>(() => current, saved => current = saved));
         var segments = new List<(int Index, bool Fixed, bool KeepsLine)>();
+        var directiveLines = new List<int>();   // every written SOURCE FORMAT / PUSH / POP line (ReferenceFormatMap.DirectiveLines)
+        // §14.9.28.4 GR14's implicit ops, as boundaries BETWEEN physical lines (see ImplicitBoundaries).
+        var boundaries = ImplicitBoundaries(implicitOps);
+        int nextBoundary = 0;
         for (int i = 0; i < lines.Length; i++)
         {
+            // The implicit PUSH ALL / POP ALL boundaries that fall before this line apply BEFORE it is read — through the
+            // SAME stack the written >>PUSH / >>POP use, so they nest with them and restore whatever format is in force.
+            // A POP that restores a DIFFERENT format closes the previous line's segment: the restored format governs this
+            // line itself ("immediately preceding the END PERFORM phrase"), and the line before it is kept (it is not a
+            // directive line, so nothing of it is discarded) — the shape of a written POP's boundary one line earlier.
+            while (nextBoundary < boundaries.Count && boundaries[nextBoundary].BeforeLine <= i + 1)
+            {
+                bool before = current;
+                state.Apply(new DirectiveStackOp(i + 1, boundaries[nextBoundary++].Kind, null));
+                if (current != before) segments.Add((i - 1, current, true));
+            }
             CompilerDirectiveLine d = default;
             bool isDirective = DirectiveText(lines[i].Text, current) is { } text && CompilerDirectiveLine.TryParse(text, out d);
             // §7.3.24.3 4): "A SOURCE FORMAT directive that is the first line of a compilation group or library text
@@ -218,19 +240,59 @@ public static partial class ReferenceFormatProcessor
             if (!isDirective) continue;
             if (DirectiveStackOp.TryParse(d, i + 1, out var op))
             {
+                directiveLines.Add(i + 1);
                 bool before = current;
                 state.Apply(op);
                 if (current != before) segments.Add((i, current, true));
             }
             else if (d.Word == SourceFormatWord)
             {
+                directiveLines.Add(i + 1);
                 gates?.OnSourceFormatDirective(i + 1, d.Operand);
                 if (CompilerDirectiveCatalog.TryOperandWord(SourceFormatWord, d.Operand, out string w) && w is "FIXED" or "FREE")
                     current = w == "FIXED";
                 segments.Add((i, current, false));
             }
         }
-        return segments;
+        return (segments, directiveLines);
+    }
+
+    /// <summary>⛔ ISO §14.9.28.4 GR14's implicit PUSH ALL / POP ALL (kb/Work PB1066) as BOUNDARIES between physical lines,
+    /// in the order they apply (<paramref name="ops"/> are at this text's PHYSICAL lines and in token order, which nests
+    /// each PERFORM's pair — <see cref="ImplicitFormatOps"/>). A reference format is read PER LINE, so an op is a position
+    /// between two lines, and the two ops of a pair sit on opposite sides of the lines they bracket:
+    /// <list type="bullet">
+    /// <item>the PUSH — "assumed at the end of imperative-statement-1" — after the physical line P that ends it, so it
+    /// takes effect before line P + 1;</item>
+    /// <item>the POP — "immediately preceding the END PERFORM phrase" — before the physical line L that holds the phrase,
+    /// so the restored format governs END-PERFORM's own line (§7.3.24.3 1: the format governs "the source text … following"
+    /// the directive, and the phrase follows the POP).</item>
+    /// </list>
+    /// A pair whose POP boundary is not past its PUSH boundary (<c>L &lt;= P</c>: END-PERFORM on the line imperative-
+    /// statement-1 ends on) brackets no line, so no directive can lie between — it is dropped whole, which keeps the
+    /// remaining boundaries nested. Ties keep token order, so an inner PERFORM's POP precedes an outer one's.</summary>
+    private static List<(int BeforeLine, DirectiveStackKind Kind)> ImplicitBoundaries(IReadOnlyList<DirectiveStackOp> ops)
+    {
+        var boundaries = new List<(int BeforeLine, DirectiveStackKind Kind)>();
+        if (ops.Count == 0) return boundaries;
+        var open = new Stack<int>();
+        var pairs = new List<(int Push, int Pop)>();
+        for (int i = 0; i < ops.Count; i++)
+        {
+            if (ops[i].Kind == DirectiveStackKind.Push) { open.Push(i); continue; }
+            if (open.Count == 0) continue;   // a POP with no PUSH of this text saves nothing to restore
+            pairs.Add((open.Pop(), i));
+        }
+        var kept = new List<(int Order, int BeforeLine, DirectiveStackKind Kind)>();
+        foreach (var (push, pop) in pairs)
+        {
+            int pushBefore = ops[push].Line + 1, popBefore = ops[pop].Line;
+            if (popBefore <= pushBefore - 1) continue;   // END-PERFORM on or before the line that ends imperative-statement-1
+            kept.Add((push, pushBefore, DirectiveStackKind.Push));
+            kept.Add((pop, popBefore, DirectiveStackKind.Pop));
+        }
+        foreach (var k in kept.OrderBy(k => k.BeforeLine).ThenBy(k => k.Order)) boundaries.Add((k.BeforeLine, k.Kind));
+        return boundaries;
     }
 
     /// <summary>The program-text area in which a compiler directive line is recognized, in the reference format in

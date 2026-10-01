@@ -228,8 +228,20 @@ internal static class IntegerOperandRules
     /// screens — rather than throwing: an <c>int.Parse</c> here used to take the whole compiler down with an
     /// unhandled <see cref="OverflowException"/> on <c>PAGE LIMIT 77777777777</c>, <c>COLUMN 77777777777</c>
     /// and <c>LINAGE 77777777777</c>.</summary>
-    internal static int HostValue(Core.IntegerLiteralContext operand) =>
-        TryHostValue(operand.GetText(), out int v) ? v : HostLimit;
+    internal static int HostValue(Core.IntegerLiteralContext operand) => HostValue(operand.GetText());
+
+    /// <summary>⛔ THE ONE READER of a SPECIAL-NAMES ORDINAL too (ISO §12.3.7.3 SR14 b1/c1, SR16 e/f, SR17 b2/c2 — kb/Work
+    /// PB1091): an unsigned integer literal naming a 1-based position in a character set is read through THIS, whether
+    /// it is written as an <c>integerLiteral</c> (SYMBOLIC CHARACTERS integer-1) or as a numeric literal of an ALPHABET
+    /// or CLASS literal phrase (whose digits <c>DataBinder.IntegerLiteralDigits</c> extracts). The value SATURATES at
+    /// <see cref="HostLimit"/>, which no character set reaches (UCS-4, the largest, has 0x110000 − 0x800), so a
+    /// saturated ordinal is out of range exactly when the literal is and the clause's range rule — never a "not an
+    /// integer" answer — reports it. <c>DataBinder.Switches.cs</c> had a second, private saturating reader for the
+    /// literal phrases and an <c>int.TryParse</c> before it (two decoders for one rule, the two-arm shape);
+    /// <c>SpecialNamesOrdinalReaderDriftTests</c> holds it to this one.</summary>
+    /// <param name="integerText">The literal's text: decimal digits, optionally signed.</param>
+    internal static int HostValue(string integerText) =>
+        TryHostValue(integerText, out int v) ? v : HostLimit;
 
     /// <summary>⛔ THE ONE READER of the TEXT of a COBOL integer literal — an optional sign and decimal digits
     /// (§8.3.3.3.2: "An integer literal is a fixed-point numeric literal that contains no decimal point"; the

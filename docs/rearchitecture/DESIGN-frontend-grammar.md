@@ -922,14 +922,33 @@ code:
     (the driver applies a keyed op immediately before its encounter, through its own `DirectiveStateStack`) until
     the parse places the program it was run with. An ordinary source — no DEFINE, FLAG or PUSH/POP inside a handler
     — converges on the first pass with no re-run. Each pass settles at least one more encounter (an op changes only
-    the text after the first directive whose state it changes), and a pass that does not parse is final. Only the
+    the text after the first directive whose state it changes), and a pass that does not parse is final unless its
+    recovered tree places ops the pass did not run with (the bootstrap below). Only the
     converged pass's diagnostics are reported. The encounter lines are exact across COPY (the driver tracks the
     output-frame line at which each copybook's expansion is spliced — `ExpandCopiesOneLevel` hands the splice
     offset to the callback) and across REPLACE (`CopyProcessor.ReplaceLineMap` runs the REPLACE pass over
     line-index origins; a line REPLACE removed or joined maps to where that text now starts).
-  The TURN OFF ALL half is `TurnState.WithAllDisabledFrom` (the handler floor) in `EcBinder`. The one pre-parse state
-  the implicit ops do not reach is SOURCE FORMAT, held by the normalizer, which runs before the conditional-compilation
-  driver and COPY.
+  - **the reference-format normalizer's state** — the SOURCE FORMAT in force (§7.3.22.4 GR2: ALL includes it), the one
+    pushable state settled before every other stage, because the §6.5 logical conversion reads the PHYSICAL lines in
+    order with the format as state. The same fixed point covers it, keyed in the normalizer's own frame:
+    `ImplicitFormatOps.Place` maps each op from the resultant-line frame through the source-line map to its FILE and
+    PHYSICAL line (each file — the compilation group and every library text — is converted by its own walker with its
+    own format state, §7.3.24.3 3 and 5), keeps only a bracket that encloses a written format directive of that file
+    (`ReferenceFormatMap.DirectiveLines`; a pair across two files is kept by neither), and the walker
+    (`ReferenceFormatProcessor.FormatSegments`, through the same `DirectiveStateStack` the written `>>PUSH`/`>>POP` use)
+    applies each op as a BOUNDARY between physical lines (`ImplicitBoundaries`): the PUSH after the line that ends
+    imperative-statement-1, the POP BEFORE the line that holds END-PERFORM — so the restored format governs the
+    END-PERFORM line itself ("immediately preceding the END PERFORM phrase"; §7.3.24.3 1: a format governs the text
+    following the directive). `Frontend.Parse` re-normalizes each pass and `CopyProcessor` hands each library text its
+    own ops. **Bootstrap:** the unrestored format often makes the text after the handler unparsable (a free-form
+    `END-PERFORM` read as a sequence area), so a pass that did not parse reads its ops off the parser's RECOVERED tree
+    and, where the recovered construct has no END-PERFORM token, `Frontend.LocateEndPerform` finds the phrase in the
+    PHYSICAL text (the first `END-PERFORM` word after imperative-statement-1 outside a comment line and outside a nested
+    PERFORM that parsed). That is a guess, verified by the fixed point: speculative re-runs are made while they place
+    ops the previous run did not have (each settles at least one more bracket; at most `SpeculationBound` — the
+    directives the text holds, plus two), and if none parses the FIRST failure's diagnostics — the source's own — are
+    reported. The TURN OFF ALL half is
+    `TurnState.WithAllDisabledFrom` (the handler floor) in `EcBinder`.
 * **Where the ALL form may be written** (§7.3.22.3 SR3 / §7.3.20.3 SR3: "only in a compilation unit, between clauses
   in divisions other than the procedure division, and between statements in the procedure division") is decided by
   `Validation/DirectivePlacementPass (renamed from PushPopAllPlacementPass, kb/Work PB1065; it also judges FLAG-02/14 and the LEAP-SECOND/PROPAGATE placement rows)` from the directive sites (`DirectiveSite.AllForm`) and the parse tree: the

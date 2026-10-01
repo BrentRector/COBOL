@@ -14136,13 +14136,13 @@
   "ordinal": 1,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "74c3ce6a776e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseRules.Alphabet",
-  "test-ref": "conformance:negative/pb770-alphabet-ordinal-out-of-range",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseRules.Alphabet; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#HostValue",
+  "test-ref": "conformance:negative/pb770-alphabet-ordinal-out-of-range; conformance:negative/pb1091-alphabet-ordinal-beyond-int32; conformance-test:SpecialNamesOrdinalTests.OneOrdinalText_IsOutOfRange_AtEverySite; unit:SpecialNamesOrdinalReaderDriftTests.TheSpecialNamesBinder_ReadsEveryOrdinalThroughTheOneReader",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1091: Rule (SR14 b)1): 'Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set.' cite.py --check 12.3.7.3 -> OK §12.3.7.3 14). Native alphanumeric set = 65,536 UTF-16 code units (DOC-A.1-188/D-N1). Both halves are enforced for literals that fit an Int32: l21_zero (0) and l21_max (65537) -> COBOLNET1906 SR14 b1 range; l21_signed (+66) -> 'UNSIGNED integer (SR14 b1)'; l21_ok `67 66 65` builds C,B,A at positions 1-3 (A=2 B=1 C=68 ... as a PCS, also at --std 85, l21_85). THE EDGE THAT FAILS: an integer beyond Int32 falls out of int.TryParse into the class arm, so l21_huge `ALPHABET AL IS 99999999999999` is refused as 'each noninteger literal shall be an alphanumeric literal (SR14 b2)' - an INTEGER reported under the noninteger rule; the violated rule is b1's range half. Refused, so no wrong program, but the diagnostic is false about the source (PB791/PB789 treat that shape as a defect). The CLASS clause shares the decoder and the same misattribution (sr17_huge_sibling -> 'SR17 b3'). See finding 'large ordinal reported under the class rule'. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (SR14 b)1; the ALPHABET literal phrase with numeric ordinals exists at every edition) | code-location as adjudicated: src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand (int.TryParse ordinal arm); src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseRules.Alphabet]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR14 b)1 (cite.py --check 12.3.7.3 'Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set' -> OK 14) 1.). BOTH halves are enforced at every magnitude: the ordinal is read by THE ONE integer reader IntegerOperandRules.HostValue (saturating), so an integer too long for an int is held to the ordinal range rule, never to the noninteger-literal class rule (SR14 b2). SpecialNamesOrdinalReaderDriftTests forbids a second host-integer parse in DataBinder.Switches.cs.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L2.2",
@@ -14196,13 +14196,13 @@
   "ordinal": 1,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "755bff779da7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetBindNational",
-  "test-ref": "conformance-test:AlphabetLiteralPhraseTests.NationalOrdinal_OutsideTheNativeSet_IsSR14c1",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetBindNational; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#HostValue",
+  "test-ref": "conformance-test:AlphabetLiteralPhraseTests.NationalOrdinal_OutsideTheNativeSet_IsSR14c1; conformance-test:SpecialNamesOrdinalTests.OneOrdinalText_IsOutOfRange_AtEverySite",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1091: Rule (SR14 c)1): 'Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native national character set.' cite.py --check 12.3.7.3 -> OK §12.3.7.3 14). Native national set = 65,536 UTF-16 code units. l31_zero (0) and l31_over (65537) -> COBOLNET1906 SR14 c1; l31_signed (+65) -> 'UNSIGNED integer (SR14 c1)'; l31_max_ok (65536 66 65) accepted. Same failing edge as the alphanumeric twin: l31_huge `FOR NATIONAL IS 99999999999999` is refused as 'each noninteger literal shall be a NATIONAL literal (SR14 c2)' - an integer reported under the noninteger rule. Existing spec-derived coverage: AlphabetLiteralPhraseTests.NationalOrdinal_OutsideTheNativeSet_IsSR14c1 and SignedOrdinal_IsSR14b1c1_UnsignedHalf. See finding 'large ordinal reported under the class rule'. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (ALPHABET ... FOR NATIONAL enters at 2002; conformance:negative/alphabet-national-at-85 gates it) | code-location as adjudicated: src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand (int.TryParse ordinal arm); src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetBindNational]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR14 c)1 (cite.py --check 12.3.7.3 'Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native national character set' -> OK 14) 1.). The national arm reads its ordinal through the same ONE reader as the alphanumeric arm, so 0, 65537, 2147483648 and a 31-digit literal are all refused under SR14 c1.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L3.2",
@@ -14286,13 +14286,13 @@
   "ordinal": 1,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "b62adf64a012",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindSymbolic; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#CodedCharacterSetOf; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#CharAt",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindSymbolic; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#CodedCharacterSetOf; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#CharAt; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#HostValue",
+  "test-ref": "conformance-test:SpecialNamesOrdinalTests.SymbolicOrdinalUnderIn_MustExistInTheInSet; conformance-test:SpecialNamesOrdinalTests.LastPositionOfEachSet_IsLegal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1091: SR16 e)1 (cite.py --check 12.3.7.3 'When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines an alphanumeric character set, and the ordinal position specified by integer-1 shall exist in that character set.' -> OK 16) 1.). Half 1, the class of the IN alphabet, CONFORMS: SwitchBindSymbolic compares inSet.National with the clause's class. Probe SA8 (`SYMBOLIC CHARACTERS S0 IS 5 IN NA`, NA FOR NATIONAL) -> COBOLNET1670 'SR16 e1'. Half 2, the ordinal must exist, holds for Int32 ordinals: SA7/SA12 (129 IN STANDARD-1, at 2023 and 85) -> COBOLNET1670; AL3 (65536 IN a literal-phrase alphabet whose ALSO leaves 65,535 positions) -> COBOLNET1670; SA13 (128 IN STANDARD-1) runs, and ORD reads back 128. DEFECT: when integer-1 exceeds Int32, `if (!int.TryParse(ords[i].GetText(), out int ordinal)) continue;` skips the name without a diagnostic. SA17 (`ALPHABET STD IS STANDARD-1` + `SYMBOLIC CHARACTERS S0 IS 99999999999 IN STD`) COMPILES CLEAN and runs 'OK'. The spec requires a diagnostic here, because ordinal 99999999999 does not exist in STANDARD-1's 128-character set. A later reference to S0 draws a false COBOLNET1639 'not defined' instead. See the int-overflow finding. No negative test covers e1 (grep 'SR16 e' in tests: none), so test-ref is empty. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (base clause present at every edition; Annex E records no 2014->2023 change)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR16 e)1 (cite.py --check 12.3.7.3 'When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines an alphanumeric character set, and the ordinal position specified by integer-1 shall exist in that character set.' -> OK 16) 1.). The class of the IN alphabet is compared with the clause's, and the ordinal is read by the one reader, so 129 and 99999999999 IN STANDARD-1 are refused under SR16 e1 (the silent int.TryParse skip is gone); 128 IN STANDARD-1 defines the character.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L4.2",
@@ -14301,13 +14301,13 @@
   "ordinal": 2,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "f16a01fdae5d",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindSymbolic; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#ForPhraseIsNational",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1557-symbolic-ordinal-too-long; conformance-test:SpecialNamesOrdinalTests.OneOrdinalText_IsOutOfRange_AtEverySite; conformance-test:SpecialNamesOrdinalTests.AnOutOfRangeOrdinal_DoesNotMakeItsNameUndefined; conformance-test:SpecialNamesOrdinalTests.LastPositionOfEachSet_IsLegal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1091: SR16 e)2 (cite.py --check 12.3.7.3 'When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native alphanumeric character set.' -> OK 16) 2.). The native alphanumeric set is the 65,536 UTF-16 code units (CollatingModel.cs CodedCharacterSet summary; GR6 makes the order the implementor's, cite.py --check 12.3.7.4 'The implementor shall define the order of characters within the native alphanumeric coded character set' -> OK 6)). The code tests `ordinal >= 1 && ordinal <= 65536`. SA3 (0) and SA4 (65537) -> COBOLNET1670 'SR16 e2' at 2023, and SA11 (0) at 85 does the same. SA5 (65536) runs and ORD gives 65536; the pb110_symbolic_and_class_in golden (ESC IS 28 -> ORD 28) is a positive witness. DEFECT, same mechanism as L4.1: integer-1 above Int32 fails int.TryParse and is `continue`d silently. SA1 (`SYMBOLIC CHARACTERS BIG IS 99999999999`) and SA15 (4294967297) compile clean and run 'OK', where the spec requires a diagnostic. SA2 (which then MOVEs BIG) draws a false COBOLNET1639 'BIG is not defined' in place of the SR16 e2 diagnostic. The trailing fragment 'f) When the NATIONAL phrase is specified:' is a heading, decided under L5.x. Test-ref is empty because the positive golden cannot witness the defective edge. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (base clause present at every edition; Annex E records no 2014->2023 change)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR16 e)2 (cite.py --check 12.3.7.3 'When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native alphanumeric character set.' -> OK 16) 2.). The native alphanumeric set is the 65,536 UTF-16 code units (DOC-A.1-188). An ordinal outside 1..65536 at ANY magnitude draws COBOLNET1670 naming SR16 e2 on the clause (SA1/SA15 used to compile clean), and the name stays DEFINED so its first use draws no second, false 'not defined' diagnostic.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L5.1",
@@ -14316,13 +14316,13 @@
   "ordinal": 1,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "2fcc7b4f9c40",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindSymbolic; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#CodedCharacterSetOf; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#OrdinalCount",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindSymbolic; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#CodedCharacterSetOf; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#OrdinalCount; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#HostValue",
+  "test-ref": "conformance-test:SpecialNamesOrdinalTests.SymbolicOrdinalUnderIn_MustExistInTheInSet; conformance-test:SpecialNamesOrdinalTests.LastPositionOfEachSet_IsLegal",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1091: SR16 f)1 (cite.py --check 12.3.7.3 'When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines a national character set, and the ordinal position specified by integer-1 shall exist in that character set.' -> OK 16) 1.). The class half CONFORMS: SA9 (`SYMBOLIC CHARACTERS FOR NATIONAL S0 IS 5 IN AA`, AA alphanumeric) -> COBOLNET1670 'SR16 f1'. The ordinal half holds within Int32: AL5 (1112065 IN UCS-4) -> COBOLNET1670 naming UCS-4's 1,112,064 scalar values; AL6 (1112064) compiles. The l1_alphabet_ucs4_utf8_utf16_correspondence golden is a positive witness for UTF-16/UCS-4/UTF-8 IN sets. DEFECT, the shared int.TryParse `continue`: an integer-1 above Int32 with IN is skipped silently, the SA17 shape on the national arm, because the arms share one loop. Test-ref is empty: no negative test covers f1. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (the NATIONAL phrase and the national character set enter at 2002; Annex E records no 2014->2023 change)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR16 f)1 (cite.py --check 12.3.7.3 'When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines a national character set, and the ordinal position specified by integer-1 shall exist in that character set.' -> OK 16) 1.). The class half compares the IN alphabet with FOR NATIONAL; the ordinal half (UCS-4 has 1,112,064 scalar values) is read by the one reader, so 1112065 and 4294967297 IN a UCS-4 alphabet are refused under SR16 f1 and 1112064 defines the character.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L5.2",
@@ -14331,13 +14331,13 @@
   "ordinal": 2,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "9ac83bd4051a",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindSymbolic; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#CodedCharacterSetOf; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#IsLocaleAlphabet",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1091-symbolic-national-ordinal-beyond-int32; conformance:negative/pb110-symbolic-locale-alphabet; conformance-test:SpecialNamesOrdinalTests.OneOrdinalText_IsOutOfRange_AtEverySite",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1091: Two rules in one row. (1) SR16 f)2 (cite.py --check 12.3.7.3 'When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native national character set.' -> OK 16) 2.): the native national set is 65,536 code units. SA6 (FOR NATIONAL 65537) -> COBOLNET1670 'SR16 f2', and SA14 (FOR NATIONAL 946) runs with ORD 946. DEFECT: SA16 (`SYMBOLIC CHARACTERS FOR NATIONAL S0 IS 99999999999`) compiles clean, the Int32 int.TryParse `continue`. (2) SR16 g) (cite.py --check 12.3.7.3 'Alphabet-name-3 shall not reference an alphabet specified with the LOCALE phrase.' -> OK 16) g)) CONFORMS through the one resolver CodedCharacterSetOf, whose LOCALE alphabet has a null CodedSet. SA10 (national LOCALE alphabet) -> COBOLNET1669 citing SR16 g, and conformance:negative/pb110-symbolic-locale-alphabet witnesses the alphanumeric LOCALE alphabet. An undeclared IN name is refused with COBOLNET0898, but that message still appends the g) LOCALE rule text: the open note kb/Work PB789 owns this, and it is a message-quality issue, not a g) enforcement gap. So g) conforms and f2 diverges, and the row is DIVERGES. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (the NATIONAL phrase and the national character set enter at 2002; Annex E records no 2014->2023 change); g) (the LOCALE phrase) likewise 2002+]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: two rules. (1) SR16 f)2 (cite.py --check 12.3.7.3 'When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native national character set.' -> OK 16) 2.): the native national set is 65,536 code units; an ordinal outside 1..65536 at any magnitude is refused under SR16 f2 (SA16 used to compile clean). (2) SR16 g) (cite.py --check 12.3.7.3 'Alphabet-name-3 shall not reference an alphabet specified with the LOCALE phrase.' -> OK 16) g)) is enforced by the one resolver CodedCharacterSetOf (pb110-symbolic-locale-alphabet); the undeclared-IN-name message quality is kb/Work PB789's.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-17",
@@ -14376,13 +14376,13 @@
   "ordinal": 2,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "5e9bf1d70223",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindClass; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#CharAt",
-  "test-ref": "conformance-test:ClassClauseForPhraseTests.Ordinal_IsSR17_2",
+  "test-ref": "conformance-test:ClassClauseForPhraseTests.Ordinal_IsSR17_2; conformance-test:SpecialNamesOrdinalTests.OneOrdinalText_IsOutOfRange_AtEverySite",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1091: SR17 b)2 (cite.py --check 12.3.7.3 'Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set' -> OK 17) 2.). Both halves are enforced within Int32. Unsigned: `+65` -> 'SR17 b2' (PB976B2S). Range: CA7 (0) -> 'SR17 b2' native (65536); PB976B2R (129 IN STANDARD-1) -> 'SR17 b2'; conformance:negative/pb110-class-ordinal-range (70000) is also a witness. CA9 (66 THRU 68, i.e. native ordinals -> U+0041..U+0043 'A'..'C') runs and 'ABC' IS C1 is true, which is correct under GR12 a. The edge is wrong: an integer literal above Int32 (CA1 `CLASS C1 IS 99999999999`, CA3 the same with IN STD) is refused, but under the WRONG rule. It fails int.TryParse, falls through to the class test, and reports 'each noninteger literal shall be an alphanumeric literal (SR17 b3)'. 99999999999 IS an integer, and the violated rule is b2's range. The source is rejected, so no program misbehaves, but the diagnostic names a rule the source does not break. This is the int-overflow finding. PARTIAL because the rejection is right and its cited rule is wrong. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 (base clause present at every edition; Annex E records no 2014->2023 change)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1091: SR17 b)2 (cite.py --check 12.3.7.3 'Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set' -> OK 17) 2.). Both halves at every magnitude through the one ordinal reader: +65 -> 'unsigned', 129 IN STANDARD-1 and 99999999999 (with or without IN) -> the range rule, never the noninteger-literal rule SR17 b3.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L6.3",
@@ -14451,13 +14451,13 @@
   "ordinal": 2,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "fe3ddfcf6436",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#LiteralPhraseOperand; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#CharAt",
-  "test-ref": "conformance-test:ClassClauseForPhraseTests.Ordinal_IsSR17_2",
+  "test-ref": "conformance-test:ClassClauseForPhraseTests.Ordinal_IsSR17_2; conformance-test:ClassClauseForPhraseTests.TooLongNationalOrdinal_IsSR17_c2; conformance-test:SpecialNamesOrdinalTests.OneOrdinalText_IsOutOfRange_AtEverySite",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1091: SR17 c)2 (cite.py --check 12.3.7.3 'Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the number of characters in the native national character set' -> OK 17) 2.). It is enforced within Int32: PB976C2S (+65) -> 'SR17 c2', PB976C2R (65537) -> 'SR17 c2', and CA8 (0 THRU 5) -> 'SR17 c2' native national (65536). The IN arm uses CharAt against the national set's OrdinalCount (UCS-4/UTF-8 have 1,112,064 scalar values). The edge is wrong, as in L6.2: CA2 (`CLASS C1 FOR NATIONAL IS 99999999999`) is refused as 'each noninteger literal shall be a NATIONAL literal (SR17 c3)'. That is the wrong rule for an integer whose only fault is its range (c2). This is the int-overflow finding. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (the NATIONAL phrase and the national character set enter at 2002; Annex E records no 2014->2023 change)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR17 c)2 (cite.py --check 12.3.7.3 'Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the number of characters in the native national character set' -> OK 17) 2.). The national arm and its IN arm (CharAt against the IN set, UCS-4: 1,112,064 characters) read the ordinal through the one reader at every magnitude.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L7.3",
@@ -14481,13 +14481,13 @@
   "ordinal": 4,
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "f9e663dd4fd0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindClass; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#OneCharacterOperands",
-  "test-ref": "conformance-test:ClassClauseForPhraseTests.MultiCharacterThroughOperand_IsSR17_4",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#SwitchBindClass; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#OneCharacterOperands; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#PhraseOperand",
+  "test-ref": "conformance-test:ClassClauseForPhraseTests.MultiCharacterThroughOperand_IsSR17_4; conformance-test:ClassClauseForPhraseTests.SupplementaryOrdinalUnderThrough_IsRefusedByGR12_NotC4; conformance-test:ClassClauseForPhraseTests.NumericOrdinals_AreNotNationalLiterals_SoC4DoesNotApply; conformance:negative/pb1091-class-supplementary-through; conformance:2023/pb1091_class_national_ordinal_in_ucs4",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1091: SR17 c)4 (cite.py --check 12.3.7.3 'Each national literal, when a THROUGH phrase is specified, shall be one character in length.' -> OK 17) 4.). This is the same OneCharacterOperands call as b4, with the national message. The PB976C4 test (N\"A\" THRU N\"YZ\") pins 'SR17 c4', and CA10 (N\"A\" THRU N\"C\") runs with the class membership correct. || REFUTED: PARTIAL — The rule constrains NATIONAL LITERALS only. OneCharacterOperands runs on the DECODED operand, so a NUMERIC ordinal under IN a UCS-4/UTF-8 alphabet that names a supplementary character (decoded to a 2-code-unit surrogate pair) is falsely refused under SR17 c4. SR17 c2 permits that ordinal, since it is within the IN set's 1,112,064 characters, and c4 does not apply to a numeric literal. This rejects legal source under the wrong rule. The national-literal half is correct and tested; the numeric-operand edge diverges. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (the NATIONAL phrase and the national character set enter at 2002; Annex E records no 2014->2023 change)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1091: SR17 c)4 (cite.py --check 12.3.7.3 'Each national literal, when a THROUGH phrase is specified, shall be one character in length.' -> OK 17) 4.). The one-character test is asked of the operand AS WRITTEN (PhraseOperand.IsOrdinal): a national LITERAL of other than one character is refused under c4 (N\"A\" THRU N\"YZ\"), a NUMERIC ordinal is no national literal and is held to c2 instead, so a BMP ordinal range under IN UCS-4 is accepted. A numeric ordinal that names a SUPPLEMENTARY character (two UTF-16 code units) has no position in the native-set run GR12 expands for a THROUGH phrase; the specification is silent on that pair, so it is refused under its own message naming GR12 (implementor-defined, docs/CONFORMANCE.md DOC-A.1-188), never under c4.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.7.3-L7.5",
@@ -41691,13 +41691,13 @@
   "ordinal": 14,
   "subject": "PERFORM statement",
   "rule-digest": "f330a2d7a1b7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/TurnState.cs#WithImplicitEnable; src/Cobol.Net.Compiler/Binding/TurnState.cs#WithAllDisabledFrom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs#EcBindExceptionPerform; src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs#EmitStatementList; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EnterNestedStatements; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitRunF3; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#PushAllCheckingOff; src/Cobol.Net.Frontend/Preprocessor/DirectiveResults.cs#WithStackOps; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateStack.cs#WithStackOps; src/Cobol.Net.Frontend/Preprocessor/ExceptionPerformDirectiveScope.cs#ImplicitOps; src/Cobol.Net.Frontend/Parsing/PerformFormat.cs#IsFormat3; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#Parse; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Manipulate; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationResult.cs#KeyImplicitOps; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReplaceLineMap",
-  "test-ref": "conformance:2023/pb441_f3_gr14_window_emit_gated; conformance:2023/f3_perform_handler_turn_off_all; conformance:negative/pb441-f3-perform-below-2023; unit:NestedStatementEcRegionDriftTests.Gr14Window_LeavesNoCompiledInSizeGuard_InEitherHandlerOrFinally; conformance:2023/pb1004_gr14_implicit_push_pop_all; unit:ExceptionPerformDirectiveScopeTests.RefModZeroLength_WrittenInAWhenPhrase_IsRestoredAtEndPerform; unit:ExceptionPerformDirectiveScopeTests.Directive_WrittenInImperativeStatement1_PrecedesThePushAndSurvives; unit:ExceptionPerformDirectiveScopeTests.Flag_WrittenInAFinallyPhrase_IsRestoredAtEndPerform; unit:ExceptionPerformDirectiveScopeTests.Turn_WrittenInAWhenPhrase_IsRestoredAtEndPerform; unit:ExceptionPerformDirectiveScopeTests.NestedPerforms_EachPopRestoresItsOwnPush; unit:ExceptionPerformDirectiveScopeTests.WithStackOps_ReplaysEveryTimelineMember; conformance:2023/pb1066_gr14_implicit_pop_all_define; conformance:negative/pb1066-perform-when-define-below-2023; unit:ExceptionPerformDefineScopeTests.Define_WrittenInAWhenPhrase_IsUndoneAtEndPerform; unit:ExceptionPerformDefineScopeTests.DefineOff_WrittenInAFinallyPhrase_IsUndoneAtEndPerform; unit:ExceptionPerformDefineScopeTests.Define_WrittenInImperativeStatement1_PrecedesThePushAndSurvives; unit:ExceptionPerformDefineScopeTests.NestedPerforms_TheInnerPopRestoresTheOuterHandlersState; unit:ExceptionPerformDefineScopeTests.Define_ReadFromACopybookInTheHandler_IsUndoneAtEndPerform; unit:ExceptionPerformDefineScopeTests.Define_AfterAReplaceStatement_IsPlacedInTheResultantFrame; unit:ExceptionPerformDefineScopeTests.FrontendInlineFlagOption_FollowsTheSameImplicitPopAll; unit:ExceptionPerformDefineScopeTests.RerunDiagnostics_AreReportedOnce; unit:ExceptionPerformDefineScopeTests.KeyImplicitOps_KeysToTheNextEncounter_AndDropsBracketsEnclosingNoStateChange",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ImplicitFormatOps.cs#Place; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#LocateEndPerform; src/Cobol.Net.Compiler/Binding/TurnState.cs#WithImplicitEnable; src/Cobol.Net.Compiler/Binding/TurnState.cs#WithAllDisabledFrom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs#EcBindExceptionPerform; src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs#EmitStatementList; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EnterNestedStatements; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitRunF3; src/Cobol.Net.Runtime/Exceptions/ExceptionState.cs#PushAllCheckingOff; src/Cobol.Net.Frontend/Preprocessor/DirectiveResults.cs#WithStackOps; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateStack.cs#WithStackOps; src/Cobol.Net.Frontend/Preprocessor/ExceptionPerformDirectiveScope.cs#ImplicitOps; src/Cobol.Net.Frontend/Parsing/PerformFormat.cs#IsFormat3; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#Parse; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Manipulate; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationResult.cs#KeyImplicitOps; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReplaceLineMap",
+  "test-ref": "conformance:2023/pb441_f3_gr14_window_emit_gated; conformance:2023/f3_perform_handler_turn_off_all; conformance:negative/pb441-f3-perform-below-2023; unit:NestedStatementEcRegionDriftTests.Gr14Window_LeavesNoCompiledInSizeGuard_InEitherHandlerOrFinally; conformance:2023/pb1004_gr14_implicit_push_pop_all; unit:ExceptionPerformDirectiveScopeTests.RefModZeroLength_WrittenInAWhenPhrase_IsRestoredAtEndPerform; unit:ExceptionPerformDirectiveScopeTests.Directive_WrittenInImperativeStatement1_PrecedesThePushAndSurvives; unit:ExceptionPerformDirectiveScopeTests.Flag_WrittenInAFinallyPhrase_IsRestoredAtEndPerform; unit:ExceptionPerformDirectiveScopeTests.Turn_WrittenInAWhenPhrase_IsRestoredAtEndPerform; unit:ExceptionPerformDirectiveScopeTests.NestedPerforms_EachPopRestoresItsOwnPush; unit:ExceptionPerformDirectiveScopeTests.WithStackOps_ReplaysEveryTimelineMember; conformance:2023/pb1066_gr14_implicit_pop_all_define; conformance:negative/pb1066-perform-when-define-below-2023; unit:ExceptionPerformDefineScopeTests.Define_WrittenInAWhenPhrase_IsUndoneAtEndPerform; unit:ExceptionPerformDefineScopeTests.DefineOff_WrittenInAFinallyPhrase_IsUndoneAtEndPerform; unit:ExceptionPerformDefineScopeTests.Define_WrittenInImperativeStatement1_PrecedesThePushAndSurvives; unit:ExceptionPerformDefineScopeTests.NestedPerforms_TheInnerPopRestoresTheOuterHandlersState; unit:ExceptionPerformDefineScopeTests.Define_ReadFromACopybookInTheHandler_IsUndoneAtEndPerform; unit:ExceptionPerformDefineScopeTests.Define_AfterAReplaceStatement_IsPlacedInTheResultantFrame; unit:ExceptionPerformDefineScopeTests.FrontendInlineFlagOption_FollowsTheSameImplicitPopAll; unit:ExceptionPerformDefineScopeTests.RerunDiagnostics_AreReportedOnce; unit:ExceptionPerformDefineScopeTests.KeyImplicitOps_KeysToTheNextEncounter_AndDropsBracketsEnclosingNoStateChange; conformance:2023/pb1066_gr14_implicit_pop_all_source_format; conformance:2023/pb1066_gr14_implicit_pop_all_source_format_free; conformance:negative/pb1066-perform-when-source-format-below-2023; unit:ExceptionPerformSourceFormatScopeTests.FixedToFree_InAHandler_IsUndoneAtEndPerform; unit:ExceptionPerformSourceFormatScopeTests.FreeToFixed_InAHandler_RestoresBeforeTheEndPerformLineItself; unit:ExceptionPerformSourceFormatScopeTests.SourceFormat_InImperativeStatement1_PrecedesThePushAndSurvives; unit:ExceptionPerformSourceFormatScopeTests.FixedToFree_InAFinallyPhrase_IsUndoneAtEndPerform; unit:ExceptionPerformSourceFormatScopeTests.NestedPerforms_EachPopRestoresItsOwnPush; unit:ExceptionPerformSourceFormatScopeTests.ThePerformInALibraryText_IsRestoredByTheLibraryTextsOwnWalker; unit:ExceptionPerformSourceFormatScopeTests.ARealSyntaxError_AfterTheBracket_KeepsItsOwnDiagnostics; unit:ExceptionPerformSourceFormatScopeTests.TheWalker_AppliesThePopBeforeItsLine_AndThePushAfterItsLine; unit:ExceptionPerformSourceFormatScopeTests.ABracketOnOneLine_ChangesNothing; unit:ExceptionPerformSourceFormatScopeTests.Place_KeepsOnlyBracketsEnclosingAFormatDirective_OfOneFile; unit:ExceptionPerformSourceFormatScopeTests.AnInnerPerformEndingTheOuterImperative1_PopsBeforeTheOuterPush; unit:ExceptionPerformSourceFormatScopeTests.AutoDetectedFixedForm_IsRestoredAtEndPerform",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work/PB1066 (open; its DEFINE / FLAG-inline half landed by w59f 2026-09-24): the implicit PUSH ALL / POP ALL now reach the conditional-compilation driver's state too - the compilation-variable table (7.3.22.4 GR3) and the frontend-inline FLAG-02/14 options - through a front-end fixed point (Frontend.Parse re-runs the text manipulation with the ops the parse placed, keyed to the driver's directive encounters, until the program is stable). Probe C38DF now prints HANDLER / ZZ-POPPED (was ZZ-LEAKED). REMAINING RESIDUAL, why this row stays PARTIAL: SOURCE FORMAT, the one pushable state held by the normalizer (which runs before the conditional-compilation driver and COPY), is still not restored at END-PERFORM - a >>SOURCE FORMAT IS FREE written in a WHEN phrase leaves the fixed-form line after END-PERFORM read as free form (COBOL0307 'unexpected 000100'); PB1066 stays open for it. PRIOR notes: kb/Work/PB441 (TURN state), kb/Work/PB1004 (every post-COPY line-scoped state: TURN, REF-MOD-ZERO-LENGTH, FLAG-02/14 bound options). retired-witness: src/Cobol.Net.Compiler/Binding/BinderDriver.cs#Bind (kb/Work PB1066 moved the implicit-op placement into the front end (Frontend.Preprocessor.ExceptionPerformDirectiveScope, applied by Frontend.Parse), so BinderDriver.Bind no longer replays the ops) retired-witness: src/Cobol.Net.Compiler/Binding/ExceptionPerformDirectiveScope.cs#ImplicitOps (kb/Work PB1066 moved the implicit-op placement into the front end (Frontend.Preprocessor.ExceptionPerformDirectiveScope, applied by Frontend.Parse), so BinderDriver.Bind no longer replays the ops)",
-  "state": "GAP"
+  "notes": "kb/Work PB1066 (landed): the implicit PUSH ALL / POP ALL reach EVERY pushable state - the post-COPY line-scoped timelines (PB441, PB1004), the conditional-compilation driver's compilation-variable table and frontend-inline FLAG options (w59f), and now the reference-format normalizer's SOURCE FORMAT (7.3.22.4 GR2: ALL includes it). The ops are keyed to the PHYSICAL lines of the file each was written in (ImplicitFormatOps.Place) and applied by the normalizer's walker as boundaries between lines: the PUSH after the line that ends imperative-statement-1, the POP BEFORE the END-PERFORM line, so the restored format governs END-PERFORM itself (14.9.28.4 GR14 'Immediately preceding the END PERFORM phrase'; 7.3.24.3 GR1 'the source text ... following the directive'). Frontend.Parse re-normalizes per pass; because the unrestored format often makes the text after the handler unparsable, a pass that did not parse reads its ops off the recovered tree (the END-PERFORM phrase located in the physical text when the recovered construct lacks it) and re-runs speculatively, falling back to the first failure's own diagnostics. DEFINE half: probe C38DF prints HANDLER / ZZ-POPPED (w59f). PRIOR notes: kb/Work/PB441 (TURN state), kb/Work/PB1004 (every post-COPY line-scoped state).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.28.4-15",

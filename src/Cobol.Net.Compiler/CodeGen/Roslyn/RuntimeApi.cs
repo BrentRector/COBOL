@@ -681,17 +681,32 @@ internal static class RuntimeApi
     /// landed value is exactly representable, so the caller's <c>(float)</c> cast is exact (kb/Work PB1196).</summary>
     public static string FloatResultantStore(Emit.NumX value, CobolRounding mode, bool single, string? tryOut = null)
     {
-        const string T = nameof(Runtime.FloatResultant);
-        var (method, args) = value switch
-        {
-            { Real: true } => (nameof(Runtime.FloatResultant.FromReal), value.Expr),
-            { Dec: true } => (nameof(Runtime.FloatResultant.FromDec), value.Expr),
-            { U: true } => (nameof(Runtime.FloatResultant.FromUnsignedScaled), $"(UInt128)({value.Expr}), {value.Scale}"),
-            _ => (nameof(Runtime.FloatResultant.FromScaled), $"(Int128)({value.Expr}), {value.Scale}"),
-        };
+        var (method, args) = FloatResultantEntry(value);
         string tail = $"{RoundingText(mode)}, {(single ? "true" : "false")}";
-        return tryOut is null ? $"{T}.{method}({args}, {tail})" : $"{T}.Try{method}({args}, {tail}, out double {tryOut})";
+        return tryOut is null
+            ? $"{nameof(Runtime.FloatResultant)}.{method}({args}, {tail})"
+            : $"{nameof(Runtime.FloatResultant)}.Try{method}({args}, {tail}, out double {tryOut})";
     }
+
+    /// <summary>The RAISING form of <see cref="FloatResultantStore"/> — an EXPRESSION that lands the value and throws
+    /// the EC-SIZE-TRUNCATION size error when it is further from zero than the float format permits (§14.7.5 case 3 +
+    /// no-phrase rule 4): the store of an argument crossing that has no SIZE ERROR phrase to offer, compiled when
+    /// EC-SIZE-TRUNCATION checking is enabled at the activating statement (kb/Work PB1114).</summary>
+    public static string FloatResultantStoreOrRaise(Emit.NumX value, CobolRounding mode, bool single)
+    {
+        var (method, args) = FloatResultantEntry(value);
+        return $"{nameof(Runtime.FloatResultant)}.{method}OrRaise({args}, {RoundingText(mode)}, {(single ? "true" : "false")})";
+    }
+
+    /// <summary>The <c>FloatResultant</c> entry (method stem and leading arguments) for a value's carrier — ONE choice
+    /// for the checked, unchecked and raising renderings.</summary>
+    private static (string Method, string Args) FloatResultantEntry(Emit.NumX value) => value switch
+    {
+        { Real: true } => (nameof(Runtime.FloatResultant.FromReal), value.Expr),
+        { Dec: true } => (nameof(Runtime.FloatResultant.FromDec), value.Expr),
+        { U: true } => (nameof(Runtime.FloatResultant.FromUnsignedScaled), $"(UInt128)({value.Expr}), {value.Scale}"),
+        _ => (nameof(Runtime.FloatResultant.FromScaled), $"(Int128)({value.Expr}), {value.Scale}"),
+    };
 
     /// <summary>The checked read of a standard-float SENDING operand — <c>CobolFloat.Sending(value)</c>: raises the
     /// fatal EC-DATA-NOT-FINITE for a NaN/±Infinity content under checking (ISO §14.6.13.2 item 3), else returns the

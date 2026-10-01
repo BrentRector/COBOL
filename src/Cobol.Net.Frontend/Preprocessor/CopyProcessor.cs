@@ -18,7 +18,8 @@ public sealed class CopyProcessor(
     int dialectLevel = 85,
     bool permissive = false,
     CompilationInputs? inputs = null,
-    bool ccvsIndicators = false)   // the --nist column-7 conventions for library text too (kb/Work PB1494)
+    bool ccvsIndicators = false,   // the --nist column-7 conventions for library text too (kb/Work PB1494)
+    ImplicitFormatOps? implicitFormatOps = null)   // §14.9.28.4 GR14's implicit PUSH/POP ALL written in library text (kb/Work PB1066)
 {
     /// <summary>The compilation's ambient-input gateway (kb/Work PB985): every copybook probe and read below goes
     /// through it, so the record names each library text the group incorporated AND each candidate that was not
@@ -76,6 +77,12 @@ public sealed class CopyProcessor(
     /// in effect for its COPY statement (§7.3.24.3 3)). A text with no registered map (a caller that normalized
     /// without one) has its library text's initial format detected, as the compilation group's is.</summary>
     public void RegisterReferenceFormat(string file, ReferenceFormatMap formats) => _referenceFormats[file] = formats;
+
+    /// <summary>The reference format map of EVERY text read so far — the compilation group's and each library text's —
+    /// by file: where each text's written format directives are (<see cref="ReferenceFormatMap.DirectiveLines"/>), which
+    /// decides whether a §14.9.28.4 GR14 implicit PUSH ALL / POP ALL bracket can change the format at all
+    /// (<see cref="ImplicitFormatOps.Place"/>; kb/Work PB1066).</summary>
+    public IReadOnlyDictionary<string, ReferenceFormatMap> ReferenceFormats => _referenceFormats;
 
     /// <summary>Report at a SOURCE origin (kb/Work PB82) — the file and physical line the text at a position came
     /// from, never an ordinal of the text being processed.</summary>
@@ -772,7 +779,8 @@ public sealed class CopyProcessor(
     private MappedText NormalizeCopybookMapped(string text, string copybookPath, bool? copyFixed)
     {
         var mapped = ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, dialectLevel, permissive,
-            diagnostics: null, copybookPath, copyFixed, out var formats, ccvsIndicators);
+            diagnostics: null, copybookPath, copyFixed, out var formats, ccvsIndicators,
+            implicitOps: implicitFormatOps?.For(copybookPath));   // GR14's implicit ops written IN this library text
         _referenceFormats[copybookPath] = formats;
         return mapped;
     }

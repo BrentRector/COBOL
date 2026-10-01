@@ -18,13 +18,37 @@ public sealed class ReferenceFormatMap
     // element 0 starts at line 1.
     private readonly (int FromLine, bool Fixed, bool Detected)[] _changes;
 
-    private ReferenceFormatMap((int FromLine, bool Fixed, bool Detected)[] changes) => _changes = changes;
+    private ReferenceFormatMap((int FromLine, bool Fixed, bool Detected)[] changes, int[] directiveLines,
+        string[] physicalText)
+    {
+        _changes = changes;
+        DirectiveLines = directiveLines;
+        PhysicalText = physicalText;
+    }
+
+    /// <summary>The text of each PHYSICAL line of this file, as the line-entry stage settled it (<see cref="PhysicalLines"/>:
+    /// terminators gone, tabs expanded), 0-based. The line-entry stage is the ONLY place a text becomes lines
+    /// (<c>PhysicalLinesDriftTests</c>), so a later stage that must look at the physical text of a file — the front end's
+    /// search for an END-PERFORM phrase the parse could not read (kb/Work PB1066) — reads it HERE, never splits the file
+    /// again.</summary>
+    public IReadOnlyList<string> PhysicalText { get; }
+
+    /// <summary>The 1-based physical lines of this text that hold a WRITTEN directive the reference format answers to —
+    /// a <c>&gt;&gt;SOURCE FORMAT</c>, <c>&gt;&gt;PUSH</c> or <c>&gt;&gt;POP</c> line — ascending, whether or not it
+    /// changed the format. What decides whether a §14.9.28.4 GR14 implicit PUSH ALL / POP ALL bracket can matter to the
+    /// normalizer at all: a bracket that encloses no such line restores exactly the format it saved
+    /// (<see cref="ImplicitFormatOps.Place"/>; kb/Work PB1066).</summary>
+    public IReadOnlyList<int> DirectiveLines { get; }
 
     /// <summary>A text read in <paramref name="initialFixed"/> from line 1 — <paramref name="detected"/> when no
     /// directive or COPY statement stated it — and then in each format of <paramref name="changes"/> (a directive
-    /// states each) from its 1-based physical line on (<paramref name="changes"/> ascending).</summary>
-    public static ReferenceFormatMap Create(bool initialFixed, bool detected, IEnumerable<(int FromLine, bool Fixed)> changes)
-        => new([(1, initialFixed, detected), .. changes.Select(c => (c.FromLine, c.Fixed, false))]);
+    /// states each) from its 1-based physical line on (<paramref name="changes"/> ascending).
+    /// <paramref name="directiveLines"/> are the lines of its written format directives (<see cref="DirectiveLines"/>) and
+    /// <paramref name="physicalText"/> the text of each of its physical lines (<see cref="PhysicalText"/>).</summary>
+    public static ReferenceFormatMap Create(bool initialFixed, bool detected, IEnumerable<(int FromLine, bool Fixed)> changes,
+        IEnumerable<int> directiveLines, IEnumerable<string> physicalText)
+        => new([(1, initialFixed, detected), .. changes.Select(c => (c.FromLine, c.Fixed, false))], [.. directiveLines],
+            [.. physicalText]);
 
     /// <summary>The initial reference format of library text copied by a COPY statement at 1-based physical line
     /// <paramref name="line"/> of this text — §7.3.24.3 3)'s "reference format that was in effect for the COPY

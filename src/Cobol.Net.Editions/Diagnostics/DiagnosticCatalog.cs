@@ -1622,11 +1622,10 @@ public static class DiagnosticCatalog
     // ── COBOLNET0899 — inter-program header-formal deferrals (P10 Step 10) ──────────────────────────
     public static readonly DiagnosticDescriptor ByValueFormalCarrier = new(
         NotImplemented, "by-value-formal-carrier", EditionSeverity.Error,
-        "A BY VALUE formal parameter of FLOATING-POINT usage is legal (§14.2.2 SR2) but its value-copy "
-        + "carrier is not yet implemented; so is a BY VALUE formal on a METHOD, whose value-copy model the "
-        + "INVOKE channel does not carry. The fixed-point numeric and the class object / class pointer "
-        + "program formals ARE carried — the §14.2.3 GR10 detached-cell copy, whose filling GR10 names as "
-        + "a COMPUTE without ROUNDED and a SET respectively (kb/Work PB663).",
+        "A BY VALUE formal parameter on a METHOD is legal (§14.2.2 SR2) but its value-copy model is not yet "
+        + "implemented on the INVOKE channel. The fixed-point and floating-point numeric and the class object / "
+        + "class pointer program and function formals ARE carried — the §14.2.3 GR10 detached-cell copy, whose "
+        + "filling GR10 names as a COMPUTE without ROUNDED and a SET respectively (kb/Work PB663, PB1114).",
         "ISO §14.2.2 SR2 / §14.2.3 GR10", RecognizedNotImplemented);
 
     // ── COBOLNET0899 — miscellaneous deferrals ───────────────────────────────────────────────────────

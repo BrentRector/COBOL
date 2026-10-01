@@ -339,21 +339,48 @@ public static class CobolArgAdapt
             WriteNumericCell(cell, CobolNum.ParseImage(image, d));
     }
 
-    /// <summary>The argument's value as binary64 — the sending operand of GR10's COMPUTE when the receiving
-    /// description is a FLOATING-POINT one (§14.6.8.3 GR1: the IEEE receiver takes the algebraic value, so
-    /// there is no scale to quantize to). Null when the carrier is outside the numeric vocabulary.</summary>
-    private static double? ArgDouble(in CobolArg a) => a.Carrier switch
+    /// <summary>True when <paramref name="formal"/> describes a FLOATING-POINT item — the test that sends a crossing
+    /// to the float lane (<see cref="LandFloat"/>) instead of the fixed-point one (<see cref="LandScalar"/>).
+    /// ONE spelling for every arm of this ABI that has a fixed-point and a float landing (kb/Work PB1114).</summary>
+    private static bool IsFloatFormal(in NumProfile formal) =>
+        formal.ByteForm is NumericByteForm.Ieee32 or NumericByteForm.Ieee64;
+
+    /// <summary>⛔ THE ONE FLOAT LANDING OF THIS ABI — §14.2.3 GR9/GR10's "COMPUTE statement without the ROUNDED
+    /// phrase" when the receiving record is FLOATING-POINT (kb/Work PB1114), the float twin of
+    /// <see cref="LandScalar"/>. The sending operand is landed by <see cref="FloatResultant"/>, THE one transfer of
+    /// an arithmetic value into a float resultant identifier: implied TRUNCATION (§14.7.4.3 rule 10 — the value
+    /// nearer to zero), a fixed-point sender converted EXACTLY in one rounding (never through a binary64 first, so a
+    /// binary32 formal takes no double rounding — kb/Work PB1110), and a value past the format's range the §14.7.5
+    /// case-3 size error. <paramref name="checking"/> selects the disposition as <see cref="LandScalar"/>'s does:
+    /// EC-SIZE-TRUNCATION raises (<see cref="CobolSizeError.FloatTruncation"/>) on the activating side when
+    /// enabled, and the no-phrase unchecked landing stands otherwise (CONFORMANCE.md DOC-A.1-70). Null when the
+    /// carrier is outside the numeric vocabulary. The landed binary64 is exact in a binary32 formal's carrier.</summary>
+    private static double? LandFloat(in CobolArg a, in NumProfile formal, bool checking)
     {
-        { } rp when ReadRealCell(rp) is { } rv => rv,
-        { } np when ReadNumericCell(np) is { } nv => CobolFloat.ScaledToDouble(nv, a.Scale),
-        // An image-carried argument's carrier is its STORAGE image (kb/Work PB970) — the float lane's IEEE bytes
-        // or a fixed-point record image, each through THE record-image codec under its own description.
-        ManagedPointer<string> sp when a.Num is { ByteForm: NumericByteForm.Ieee32 or NumericByteForm.Ieee64 } fd =>
-            CobolNum.ParseImageFloat(sp.Value, fd),
-        ManagedPointer<string> sp when a.Num is { ByteForm: not NumericByteForm.None } d =>
-            CobolFloat.ScaledToDouble(CobolNum.ParseImage(sp.Value, d), d.FractionScale),
-        _ => null,
-    };
+        bool single = formal.ByteForm is NumericByteForm.Ieee32;
+        const CobolRounding Mode = CobolRounding.Truncation;   // "without the ROUNDED phrase"
+        double Real(double v) => checking ? FloatResultant.FromRealOrRaise(v, Mode, single) : FloatResultant.FromReal(v, Mode, single);
+        double Scaled(Int128 u, int scale) =>
+            checking ? FloatResultant.FromScaledOrRaise(u, scale, Mode, single) : FloatResultant.FromScaled(u, scale, Mode, single);
+        return a.Carrier switch
+        {
+            { } rp when ReadRealCell(rp) is { } rv => Real(rv),
+            // The 16-byte unsigned container reaches 2^128 − 1, past every signed carrier (kb/Work R10): its own lane.
+            ManagedPointer<UInt128> up => checking
+                ? FloatResultant.FromUnsignedScaledOrRaise(up.Value, a.Scale, Mode, single)
+                : FloatResultant.FromUnsignedScaled(up.Value, a.Scale, Mode, single),
+            { } np when ReadNumericCell(np) is { } nv => Scaled(nv, a.Scale),
+            // An image-carried argument's carrier is its STORAGE image (kb/Work PB970) — the float lane's IEEE bytes
+            // or a fixed-point record image, each through THE record-image codec under its own description.
+            ManagedPointer<string> sp when a.Num is { ByteForm: NumericByteForm.Ieee32 or NumericByteForm.Ieee64 } fd =>
+                Real(CobolNum.ParseImageFloat(sp.Value, fd)),
+            ManagedPointer<string> sp when a.Num is { ByteForm: not NumericByteForm.None } d =>
+                Scaled(CobolNum.ParseImage(sp.Value, d), d.FractionScale),
+            // A CHARACTER argument has no numeric description of its own: its storage reads as the formal's.
+            ManagedPointer<string> sp => Real(CobolNum.ParseImageFloat(sp.Value, formal)),
+            _ => null,
+        };
+    }
 
     /// <summary>⛔ THE ACTIVATING ELEMENT'S §14.2.3 GR9/GR10 CROSSING (kb/Work PB640) — the caller-side half of
     /// this ABI's numeric landing, emitted by <c>CallEmitter.ArgText</c> around the argument carrier it just
@@ -387,6 +414,16 @@ public static class CobolArgAdapt
     {
         // OMITTED (§14.9.4.4 GR11): there is no argument to be the COMPUTE's sending operand.
         if (arg.Carrier.IsNull) return arg;
+        // A FLOATING-POINT formal is the same COMPUTE on the float lane (kb/Work PB1114): the landed value is a
+        // binary64 that is exact in the formal's own carrier, never an Int128 through a zero-digit profile.
+        if (IsFloatFormal(formal))
+        {
+            if (LandFloat(arg, formal, checking) is not { } fv) return arg;
+            T floatLanded = T.CreateTruncating(fv);
+            return arg.Carrier is ManagedPointer<T> sameFloat && sameFloat.Value == floatLanded
+                ? arg with { Num = formal }
+                : arg with { Carrier = ManagedPointer<T>.Cell(floatLanded), Num = formal };
+        }
         // A carrier outside the numeric vocabulary (a variable-length group, an object/pointer handle) is not a
         // numeric crossing to land — it reaches the callee unchanged and takes that side's own arm.
         if (LandScalar(arg, formal, formalScale, checking) is not { } v) return arg;
@@ -491,6 +528,23 @@ public static class CobolArgAdapt
                     // arm that skips it (§14.2.3 GR11 — every reference resolves through the SAME description).
                     () => T.CreateTruncating(Land(CobolNum.ParseImage(sp.Value, formal), formalScale, formalScale, formal)),
                     v => sp.Value = CobolNum.FormatImage(Int128.CreateTruncating(v), formal));
+            case { } fc when IsFloatFormal(formal) && (ReadRealCell(fc) is not null || ReadNumericCell(fc) is not null
+                                                        || fc is ManagedPointer<UInt128>):
+            {
+                // A native numeric cell of ANOTHER description viewed through a FLOATING-POINT formal (kb/Work
+                // PB1114): the converting view on the float lane — the read is the shared float landing (§14.2.3
+                // GR9/GR10 + GR11), the write un-scales back into the caller's cell in ITS representation. The
+                // fixed-point arms below land through a float description's ZERO digits, which is the value 0.
+                int callerScale = args[i].Scale;
+                return ManagedPointer<T>.OverField(
+                    () => T.CreateTruncating(LandFloat(args[i], formal, checking: false)!.Value),
+                    v =>
+                    {
+                        double dv = double.CreateTruncating(v);
+                        if (!WriteRealCell(fc, dv))
+                            WriteNumericCell(fc, CobolFloat.ToScaledUnchecked(dv, callerScale, CobolRounding.Truncation));
+                    });
+            }
             case { } rp when ReadRealCell(rp) is not null:
                 // A native FLOAT cell viewed through a fixed-point formal (kb/Work PB238): the same §14.2.3 GR8
                 // converting view, on the float lane, because no Int128 holds the fractional value. The scale
@@ -626,6 +680,11 @@ public static class CobolArgAdapt
         where T : struct, System.Numerics.INumberBase<T> =>
         // Land's 16-byte-unsigned result is container BITS (R10); CreateTruncating reinterprets them exactly.
         !Present(args, i) ? Omitted<T>()
+        // A FLOATING-POINT formal lands on the float lane (kb/Work PB1114): the fixed-point landing's Int128 store
+        // through a float description's zero digits was the value 0.
+        : IsFloatFormal(formal) ? LandFloat(args[i], formal, checking: false) is { } fv
+            ? ManagedPointer<T>.Cell(T.CreateTruncating(fv))
+            : Unreadable<T>(args, i, "a BY VALUE numeric formal")
         : LandScalar(args[i], formal, formalScale, checking: false) is { } v
             ? ManagedPointer<T>.Cell(T.CreateTruncating(v))
             : Unreadable<T>(args, i, "a BY VALUE numeric formal");
@@ -650,8 +709,8 @@ public static class CobolArgAdapt
             return ManagedPointer<string>.Cell(CobolVarGroup.ToFixedImage(vp.Value ?? CobolVarGroup.Empty, width, vspans));
         if (formal is { } f)
         {
-            string? image = f.ByteForm is NumericByteForm.Ieee32 or NumericByteForm.Ieee64
-                ? ArgDouble(args[i]) is { } dv ? CobolNum.FormatImageFloat(dv, f) : null
+            string? image = IsFloatFormal(f)
+                ? LandFloat(args[i], f, checking: false) is { } dv ? CobolNum.FormatImageFloat(dv, f) : null
                 : LandScalar(args[i], f, formalScale, checking: false) is { } v ? CobolNum.FormatImage(v, f) : null;
             return image is null
                 ? Unreadable<string>(args, i, "a BY VALUE numeric formal")

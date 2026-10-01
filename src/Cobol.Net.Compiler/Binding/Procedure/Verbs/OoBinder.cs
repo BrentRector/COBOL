@@ -957,21 +957,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + $"'{formal.CobolName}': {cerr} (ISO §14.8.2.3.3)");
                 return null;
             }
-            // ⛔ AN INVOKE CARRIER LIMIT, NOT A CONFORMANCE RULE (kb/Work PB165). §14.8.2.3.3 rule 2a is "the
-            // same as for a COMPUTE statement", and a COMPUTE takes any numeric sender in either direction —
-            // so this belongs HERE, beside INVOKE's other marshalling limits, not in the shared rule. It used
-            // to live inside the rule, and the moment the Format-2 CALL lane started asking, it refused the
-            // float crossing PB238 landed on purpose (conformance:2023/pb238_call_format2_operands).
-            // OoEmitter's INVOKE argument marshalling carries no fixed-point⇄float CONTENT conversion.
-            if (!byReference && formal.Pic is { Category: PicCategory.Numeric } fp
-                && (fp.IsFloat || place.Item.Pic is { IsFloat: true })
-                && !(fp.IsFloat && place.Item.Pic is { IsFloat: true } ap2 && ap2.Usage == fp.Usage))
-            {
-                Err($"BY CONTENT argument '{argText}' for formal '{formal.CobolName}': the "
-                    + "fixed-point⇄float CONTENT conversion is not carried across INVOKE — a float formal "
-                    + "takes the identical float usage (a documented marshalling residue, not ISO §14.8.2.3.3)");
-                return null;
-            }
+            // §14.8.2.3.3 rule 2a is "the same as for a COMPUTE statement", and a COMPUTE takes any numeric sender
+            // in either direction: the INVOKE marshalling carries the fixed-point⇄float and float⇄float CONTENT
+            // conversions (OoEmitter's float landing through FloatResultant — kb/Work PB1114, which retired the
+            // marshalling residue that used to refuse them here).
             return new BoundInvokeArg(formal, place, null, null, WriteBack: false, ByContent: true);
         }
 
@@ -1083,7 +1072,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // The CARRIER split the shared rule admits: rule 2a's COMPUTE lane for a numeric formal, and rule
                 // 2d's MOVE lane, which moves an unsigned integer literal to an alphanumeric receiver as its digit
                 // characters (§14.9.25).
-                return formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
+                return formal.Pic is { Category: PicCategory.Numeric }
                     ? new BoundInvokeArg(formal, null, numLit.Text, null, WriteBack: false, ByContent: true)
                     : new BoundInvokeArg(formal, null, null, numLit.Text, WriteBack: false, ByContent: true);
             case BoundPredefinedNull:

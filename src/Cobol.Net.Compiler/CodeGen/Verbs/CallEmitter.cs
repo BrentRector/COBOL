@@ -405,13 +405,18 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// is entered, which is exactly GR3g's ordering — and it works in an EXPRESSION-position activation (a
     /// user-defined function reference inside a per-evaluation condition window) as well as at statement
     /// position.</para>
-    /// <para>Only BY CONTENT / BY VALUE, and only a FIXED-POINT NUMERIC formal: BY REFERENCE is GR8's storage
+    /// <para>Only BY CONTENT / BY VALUE, and only a NUMERIC formal: BY REFERENCE is GR8's storage
     /// aliasing with no crossing conversion; a group, index, pointer, object or edited formal takes GR9's
     /// MOVE leg; a formal "of class index, object, or pointer" takes GR9's SET leg — and USAGE INDEX is why the
-    /// guard is <c>PicInfo.IsClassNumericFixedPoint</c> and not a bare category test: an index item's storage
+    /// guard is <c>PicInfo.IsClassNumeric</c> and not a bare category test: an index item's storage
     /// description carries category Numeric with ZERO digits, so landing it through a numeric profile stored
-    /// <c>value % 10^0</c> = 0 and <c>BY CONTENT</c> an index of 3 crossed as 0 (measured); and a floating-point
-    /// formal has no digit capacity to overflow (§14.6.8.3 GR1 — the IEEE receiver takes the algebraic value). <c>a.Formal</c> is null for exactly GR9's FIRST branch, whose
+    /// <c>value % 10^0</c> = 0 and <c>BY CONTENT</c> an index of 3 crossed as 0 (measured). A FLOATING-POINT
+    /// formal is a numeric receiver of the same COMPUTE (§14.8.2.3.3 2) a) names no exemption — kb/Work PB1114:
+    /// the activator's COMPUTE covered the fixed-point formals only, so a fixed-point argument BY CONTENT to a
+    /// FLOAT-LONG formal of a NESTED activation arrived as 0): it lands through <c>FloatResultant</c> rather
+    /// than <c>CobolNum.Store</c>, because a float description has no digit positions to reduce to (§14.6.8.3
+    /// GR1 — the IEEE receiver takes the algebraic value, rounded as the no-ROUNDED COMPUTE rounds it).
+    /// <c>a.Formal</c> is null for exactly GR9's FIRST branch, whose
     /// record is moved "without conversion" — see <see cref="BoundCallArg.Formal"/>.</para>
     /// <para>⛔ The carrier is <c>PicInfo.ClrType</c>, NOT <c>DataItem.ElementType</c>: an IMAGE-STORED numeric
     /// formal (a REDEFINED elementary one, a Tier-B window) answers <c>"string"</c> for its field type, which
@@ -427,7 +432,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         !a.Omitted
         && a.Mode is CobolPassMode.Content or CobolPassMode.Value
         && a.Formal is { } f
-        && f.Pic is { IsClassNumericFixedPoint: true } fp
+        && f.Pic is { IsClassNumeric: true } fp
             ? RuntimeApi.ArgLandForFormal(built, fp.ProfileInitializer(ctx.SignEncoding), $"{fp.Scale}",
                                           fp.ClrType, ecState.SizeTruncationChecking)
             : built;

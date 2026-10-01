@@ -35,7 +35,8 @@ public static class DirectiveStateRegistry
     public static IReadOnlyList<Entry> Entries { get; } =
     [
         new(Constructs.SourceFormatDirective2002, [nameof(ReferenceFormatProcessor)], [],
-            "The reference format of the following text (§7.3.24.3 GR1) — the normalizer's running segment format."),
+            "The reference format of the following text (§7.3.24.3 GR1) — the normalizer's running segment format, which "
+            + "§14.9.28.4 GR14's implicit PUSH ALL / POP ALL reach through ImplicitFormatOps (kb/Work PB1066)."),
         new(Constructs.DefineDirective2002, [nameof(ConditionalCompilationProcessor)], [],
             "The compilation-variable table — every instance at once (§7.3.22.4 GR3, §7.3.20.4 GR1: \"all instances "
             + "of that directive are restored\")."),

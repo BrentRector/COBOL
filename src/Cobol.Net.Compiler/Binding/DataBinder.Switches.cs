@@ -1359,12 +1359,12 @@ public sealed partial class DataBinder
             // SR14 b3/c3: "Each … literal, when a THROUGH or ALSO phrase is specified, shall be one character in
             // length." A multi-character operand used to be silently DROPPED on the alphanumeric arm — the whole
             // entry vanished from the table with no diagnostic (kb/Work PB770 leg b).
-            if ((thru || entry.ALSO().Length > 0) && !OneCharacterOperands(operands, rules)) continue;
+            if ((thru || entry.ALSO().Length > 0) && !OneCharacterOperands(operands, rules, through: thru)) continue;
             if (thru)
             {
                 // k5: the native run from operand-1 to operand-2, in EITHER direction, ascending positions.
                 if (operands.Count < 2) continue;          // a malformed shape already drew a parse error
-                int a = operands[0][0], b = operands[1][0], step = a <= b ? 1 : -1;
+                int a = operands[0].Characters[0], b = operands[1].Characters[0], step = a <= b ? 1 : -1;
                 for (int c = a; ; c += step) { Assign((char)c, advance: true); if (c == b) break; }
                 continue;
             }
@@ -1375,12 +1375,12 @@ public sealed partial class DataBinder
                 // (PB59): an all-duplicate ALSO group must not advance past an unoccupied position — GR7 k3
                 // admits no hole, and RepByPos would acquire one.
                 int before = repByPos.Count;
-                foreach (var op in operands) Assign(op[0], advance: false);
+                foreach (var op in operands) Assign(op.Characters[0], advance: false);
                 if (repByPos.Count > before) next++;
                 continue;
             }
             // k1b: a (possibly multi-character) literal — each character, leftmost first, ascending positions.
-            foreach (char c in operands[0]) Assign(c, advance: true);
+            foreach (char c in operands[0].Characters) Assign(c, advance: true);
         }
         if (specOrder.Count == 0) return null;      // nothing was specified — the operand diagnostics stand alone
 
@@ -1463,14 +1463,30 @@ public sealed partial class DataBinder
     /// (NATIONAL). Both arms had their own copy until kb/Work PB770, and the alphanumeric copy implemented NONE of
     /// the rules (<c>feedback_two_arm_dispatch</c>, fifth instance); the CLASS clause had a third copy until kb/Work
     /// PB976, which is why the decoder is now shared by clause rather than by arm.</summary>
-    private List<string> AlphabetOperands(Core.AlphabetEntryContext entry, LiteralPhraseRules rules)
+    private List<PhraseOperand> AlphabetOperands(Core.AlphabetEntryContext entry, LiteralPhraseRules rules)
     {
-        var result = new List<string>();
+        var result = new List<PhraseOperand>();
         for (int i = 0; i < entry.ChildCount; i++)
             if (entry.GetChild(i) is Core.LiteralContext or Core.CobolWordContext
                 && LiteralPhraseOperand(entry.GetChild(i), rules) is { } chars)
-                result.Add(chars);
+                result.Add(new PhraseOperand(entry.GetChild(i), chars));
         return result;
+    }
+
+    /// <summary>One decoded operand of a literal phrase: the characters it stands for AND the parse node it was
+    /// WRITTEN as. The SYNTAX RULES that speak of "each alphanumeric / national LITERAL" (§12.3.7.3 SR14 b3/c3,
+    /// SR17 b4/c4 — one character under THROUGH) are asked of the operand as written, never of the decoded characters:
+    /// a NUMERIC literal is an ordinal (SR14 b1/c1, SR17 b2/c2), names one character of its set by construction, and
+    /// is no national literal (kb/Work PB1091's L7.4 measurement — a numeric ordinal naming a supplementary
+    /// character decodes to a two-code-unit surrogate pair and was refused under c4).</summary>
+    private readonly record struct PhraseOperand(Antlr4.Runtime.Tree.IParseTree Node, string Characters)
+    {
+        /// <summary>True when the operand is written as a numeric literal that is an integer — an ORDINAL.</summary>
+        public bool IsOrdinal => Node is Core.LiteralContext { } lit && lit.numericLiteral() is { } numeric
+            && IntegerLiteralDigits(numeric) is not null;
+
+        /// <summary>The operand as the source spelled it, for a diagnostic.</summary>
+        public string Spelling => Node.GetText();
     }
 
     /// <summary>⛔ THE SYNTAX RULES A SPECIAL-NAMES CLAUSE HOLDS ITS LITERAL OPERANDS TO — one value per clause, so
@@ -1569,7 +1585,7 @@ public sealed partial class DataBinder
                             + $"(ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
                         return null;
                     }
-                    int ordinal = OrdinalValue(digits);
+                    int ordinal = CobolNet.Validation.IntegerOperandRules.HostValue(digits);
                     if (r.InSet is { } inSet)
                     {
                         if (inSet.CharAt(ordinal) is { } ch) return ch;
@@ -1621,7 +1637,11 @@ public sealed partial class DataBinder
     /// ordinal rule (ISO §12.3.7.3 SR14 b1/c1, SR17 b2/c2) is asked of the PARSE, not of the text:
     /// <c>int.TryParse</c> accepts a sign and FAILS on an integer too long for an <c>int</c>, so it answered
     /// "is this an integer?" and "what is its value?" as one question and got the first wrong whenever the second
-    /// overflowed.</summary>
+    /// overflowed. The VALUE is read by THE one ordinal reader, <c>IntegerOperandRules.HostValue</c> — the same one
+    /// SYMBOLIC CHARACTERS integer-1 (SR16 e/f) is read by, so the three ordinal sites of this paragraph (ALPHABET,
+    /// CLASS, SYMBOLIC CHARACTERS) cannot disagree about an integer too long for an <c>int</c> (kb/Work PB1091,
+    /// PB1557's sibling): it saturates, and a saturated ordinal is out of range of every character set exactly when
+    /// the literal is.</summary>
     private static (string Digits, bool Signed)? IntegerLiteralDigits(Core.NumericLiteralContext numeric)
     {
         if (numeric.signedNumericLiteral() is not { } s || s.numericLiteralCore() is not { ChildCount: 1 } core)
@@ -1631,25 +1651,6 @@ public sealed partial class DataBinder
         // A sign-adjacent literal (a FUNCTION-argument lexer region) is one token whose first character is the sign.
         if (core.SIGNED_INTEGERLIT() is { } adjacent) return (adjacent.GetText()[1..], true);
         return null;
-    }
-
-    /// <summary>⛔ THE ONE reading of a SPECIAL-NAMES ORDINAL — an unsigned integer literal naming a 1-based
-    /// position in a character set (ISO §12.3.7.3 SR14 b1/c1 and SR17 b2/c2 for the ALPHABET and CLASS literal
-    /// phrases; SYMBOLIC CHARACTERS integer-1, SR16 e/f, is an integer-n and is read by the one integer-n reader
-    /// <c>IntegerOperandRules.HostValue</c>, which saturates the same way). The value SATURATES at <see cref="int.MaxValue"/>:
-    /// every character set here has far fewer ordinals than that (the largest, UCS-4, has 0x110000 − 0x800), so a
-    /// saturated value is out of range exactly when the literal is, and the caller's range check needs no second
-    /// path. The caller quotes the literal's own TEXT in its diagnostic, never the saturated number.
-    /// <para>⛔ kb/Work PB1557's sibling: both ordinal sites read the ordinal with <c>int.TryParse</c>, and a literal
-    /// too long for an <c>int</c> fell out of the ordinal rule — into the literal-class rule for a literal phrase,
-    /// and into a silent <c>continue</c> that bound nothing for SYMBOLIC CHARACTERS.</para></summary>
-    /// <param name="digits">The literal's digits — ASCII decimal digits only, as <c>INTEGERLIT</c> lexes them.</param>
-    private static int OrdinalValue(string digits)
-    {
-        var significant = digits.AsSpan().TrimStart('0');
-        return significant.Length == 0 ? 0
-            : significant.Length > 9 ? int.MaxValue          // ≥ 10^9 — out of range of every set, whatever it is
-            : int.Parse(significant, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     /// <summary>A figurative constant that names no character (NULL, and ALL NULL) — never an operand of these
@@ -1794,7 +1795,8 @@ public sealed partial class DataBinder
             // SR17 b4/c4 — "Each alphanumeric / national literal, when a THROUGH phrase is specified, shall be one
             // character in length." A multi-character operand used to be taken as a plain literal-5 with literal-6
             // silently dropped (`"AB" THRU "C"` was the class {A, B}).
-            if (LiteralPhraseOperand(lits[1], rules) is not { } hi || !OneCharacterOperands([lo, hi], rules)) continue;
+            if (LiteralPhraseOperand(lits[1], rules) is not { } hi
+                || !OneCharacterOperands([new PhraseOperand(lits[0], lo), new PhraseOperand(lits[1], hi)], rules, through: true)) continue;
             // GR12: "the contiguous characters in the NATIVE character set beginning with … literal-5, and ending
             // with … literal-6" — native, even under IN (GR12 a/b place each END in alphabet-name-4's set).
             char a = lo[0], b = hi[0];
@@ -1829,18 +1831,47 @@ public sealed partial class DataBinder
 
     /// <summary>The one-character rule a THROUGH (or, in an alphabet, ALSO) phrase imposes on its operands —
     /// §12.3.7.3 SR14 b3/c3 for the ALPHABET clause, SR17 b4/c4 for the CLASS clause, one check for both. False,
-    /// with each offending operand reported, when any is not exactly one character.</summary>
-    private bool OneCharacterOperands(IReadOnlyList<string> operands, LiteralPhraseRules r)
+    /// with each offending operand reported, when any is not exactly one character.
+    /// <para>⛔ The syntax rule governs "each alphanumeric / national LITERAL", so it is asked of the operand AS WRITTEN
+    /// (<see cref="PhraseOperand.IsOrdinal"/>): a NUMERIC literal is an ordinal, names exactly one character of its set,
+    /// and is held to the ordinal rule instead (SR14 b1/c1, SR17 b2/c2). What a THROUGH phrase then needs of that
+    /// character is a POSITION in the native set: §12.3.7.4 GR12 (CLASS) expands "the contiguous characters in the native
+    /// character set" between the bounds and GR7 k5 (ALPHABET) "the set of consecutive characters in the native character
+    /// set", and the native national set is the 65,536 UTF-16 code units (DOC-A.1-188; docs/CONFORMANCE.md) — so a
+    /// numeric ordinal under <c>IN</c> UCS-4 / UTF-8 that names a SUPPLEMENTARY character (two code units) is a character
+    /// with no position in that run, and is refused under the rule that says so, not under c4 (kb/Work PB1091). An ALSO
+    /// phrase (ALPHABET only, GR7 k6: the operands share ONE ordinal position) asks the same of each operand.</para></summary>
+    /// <param name="through">True for a THROUGH phrase, false for an ALSO phrase — the rule the supplementary-character
+    /// refusal names.</param>
+    private bool OneCharacterOperands(IReadOnlyList<PhraseOperand> operands, LiteralPhraseRules r, bool through)
     {
         bool ok = true;
         foreach (var op in operands)
-            if (op.Length != 1)
+        {
+            if (op.IsOrdinal)
             {
-                Edition.Error(r.Code, $"{r.What}: the operand '{op}' is {op.Length} characters — each "
+                if (op.Characters.Length == 1) continue;
+                Edition.Error(r.Code, $"{r.What}: the ordinal {op.Spelling} names a character outside the native "
+                    + $"{(r.National ? "national" : "alphanumeric")} character set (it needs {op.Characters.Length} of its "
+                    + "16-bit code units), so it has no position in "
+                    + (through
+                        ? "the run of native characters a THROUGH phrase expands "
+                          + $"(ISO §12.3.7.4 {(r.RuleNumber == "SR17" ? "GR12" : "GR7 k5")}"
+                        : "the native character set whose characters an ALSO phrase gives one shared ordinal position "
+                          + "(ISO §12.3.7.4 GR7 k6")
+                    + "; the native set is the 65,536 UTF-16 code units — docs/CONFORMANCE.md DOC-A.1-188)");
+                ok = false;
+                continue;
+            }
+            string chars = op.Characters;
+            if (chars.Length != 1)
+            {
+                Edition.Error(r.Code, $"{r.What}: the operand '{chars}' is {chars.Length} characters — each "
                     + $"{(r.National ? "national" : "alphanumeric")} literal, when {r.LengthPhrases} is specified, shall "
                     + $"be one character in length (ISO §12.3.7.3 {r.Rule(r.LengthItem)})");
                 ok = false;
             }
+        }
         return ok;
     }
 
@@ -1889,8 +1920,9 @@ public sealed partial class DataBinder
                 // be wrong. ⛔ It used to be read with `int.TryParse` and a failure `continue`d: an ordinal too long
                 // for an int bound NOTHING and drew NO diagnostic, and the name then surfaced as "not defined" at
                 // its first use (kb/Work PB1557's sibling). It is an integer-n, so it is read by THE ONE integer-n
-                // reader, which saturates at int.MaxValue exactly as OrdinalValue does for the literal phrases —
-                // a saturated value is out of range of every character set, so the SR16 check below reports it.
+                // reader — the very one the ALPHABET and CLASS literal phrases read their ordinals through
+                // (LiteralPhraseOperand; kb/Work PB1091) — which saturates at int.MaxValue: a saturated value is out
+                // of range of every character set, so the SR16 check below reports it.
                 string ordText = ords[i].GetText();
                 int ordinal = CobolNet.Validation.IntegerOperandRules.HostValue(ords[i]);
                 string? value = inSet is not null ? inSet.CharAt(ordinal)
@@ -1901,6 +1933,12 @@ public sealed partial class DataBinder
                         + $"{ordText}: the ordinal position does not exist in the "
                         + $"{(inSet is not null ? $"character set referenced by the IN alphabet ({inSet.Phrase}, {inSet.OrdinalCount} characters)" : $"native character set ({CollatingTable.Repertoire} characters)")}"
                         + $" — ISO §12.3.7.3 SR16 {(national ? "f" : "e")}{(inSet is not null ? "1" : "2")}");
+                    // RECOVERY, so one bad ordinal does not cascade: the name is DECLARED (DeclareUserWord above), and a
+                    // statement that uses it must find it defined rather than draw a second, false diagnostic ("'BIG' is
+                    // not defined") for a name the program did write. The placeholder value is never observed — the
+                    // clause already failed, so the compilation produces no program (the posture LiteralPhraseOperand's
+                    // class-rule recovery takes for an operand of the wrong class). kb/Work PB1091.
+                    SymbolicCharacters.TryAdd(symName, ("\0", national));
                     continue;
                 }
                 if (!SymbolicCharacters.TryAdd(symName, (value, national)))

@@ -112,43 +112,133 @@ public sealed class Frontend
     /// </summary>
     public CobolParserCore.CompilationUnitContext? Parse(string sourcePath, DiagnosticBag diagnostics)
     {
-        var (normalized, referenceFormats) = Normalize(sourcePath, diagnostics);
+        string raw = Inputs.ReadAllText(sourcePath);
 
         // ISO §14.9.28.4 GR14 (kb/Work PB1004, PB1066): "An implicit PUSH ALL … is assumed at the end of
-        // imperative-statement-1. Immediately preceding the END PERFORM phrase, there is an implicit POP ALL". Only
-        // the PARSE can place the two ops, yet the conditional-compilation driver — which runs before it — holds
-        // directive state they restore (the compilation-variable table, the frontend-inline FLAG options), so a
-        // >>DEFINE written in a WHEN phrase would outlive END-PERFORM. The text manipulation therefore re-runs with
-        // the ops the previous parse placed, keyed to its directive encounters, until the parse places the same
-        // program it was run with. KeyImplicitOps keeps only brackets that enclose a state change, so an ordinary
-        // source converges on the FIRST pass. Convergence: the ops of a pass change only the text AFTER the first
-        // directive whose state they change, so each pass settles at least one more directive encounter.
+        // imperative-statement-1. Immediately preceding the END PERFORM phrase, there is an implicit POP ALL". ALL is
+        // EVERY pushable directive (§7.3.22.4 GR2), and each stage of the front end holds its own share of that state
+        // BEFORE the parse that can place the two ops: the reference-format normalizer holds the SOURCE FORMAT in force,
+        // the conditional-compilation driver the compilation-variable table and the frontend-inline FLAG options. A
+        // >>DEFINE or >>SOURCE FORMAT written in a WHEN phrase would therefore outlive END-PERFORM. The stages re-run with
+        // the ops the previous parse placed — each keyed in ITS frame: to the driver's directive encounters
+        // (ConditionalCompilationResult.KeyImplicitOps) and to the physical lines of the file the normalizer reads
+        // (ImplicitFormatOps.Place) — until the parse places the same program they were run with. Both keyings keep only
+        // brackets that enclose a state change, so an ordinary source converges on the FIRST pass. Convergence: the ops of
+        // a pass change only the text AFTER the first directive whose state they change, so each pass settles at least
+        // one more directive (an encounter of the driver, a written format directive of the normalizer).
         IReadOnlyList<KeyedDirectiveOp> implicitOps = [];
+        var formatOps = ImplicitFormatOps.None;
+        // The FIRST pass that did not parse, kept so a speculative re-run that does no better reports the user's own
+        // syntax errors, not ours (see below).
+        (DiagnosticBag Diagnostics, DirectiveResults Directives, SourceLineMap LineMap)? firstFailure = null;
         for (int pass = 1; ; pass++)
         {
-            // Every stage from the driver on reports into THIS pass's bag; only the converged pass's diagnostics
-            // are the compilation's (a DEFINE's SR2 redefinition or a FLAG warning depends on the state in effect).
+            // Every stage from the normalizer on reports into THIS pass's bag; only the converged pass's diagnostics
+            // are the compilation's (a DEFINE's SR2 redefinition, a FLAG warning or a line's reference-format gate
+            // depends on the state in effect).
             var passDiagnostics = new DiagnosticBag();
-            var (processed, directives, encounters) = Preprocess(normalized, referenceFormats, sourcePath, passDiagnostics, implicitOps);
-            LineMap = new SourceLineMap(processed.Lines);
-            var tree = LexAndParse(processed.Text, sourcePath, directives.CobolWordsMap, passDiagnostics);
-            bool mayMatter = directives.HasLineScopedEvents() || encounters.Directives.Any(e => e.ChangesState);
-            var ops = tree is null || !mayMatter ? [] : ExceptionPerformDirectiveScope.ImplicitOps(tree);
+            var (normalized, referenceFormats) = Normalize(raw, sourcePath, passDiagnostics, formatOps);
+            var (processed, directives, encounters, formats) =
+                Preprocess(normalized, referenceFormats, sourcePath, passDiagnostics, implicitOps, formatOps);
+            var passLineMap = new SourceLineMap(processed.Lines);
+            LineMap = passLineMap;
+            var (tree, parsed) = LexAndParse(processed.Text, sourcePath, directives.CobolWordsMap, passDiagnostics);
+            bool mayMatter = directives.HasLineScopedEvents() || encounters.Directives.Any(e => e.ChangesState)
+                || formats.Values.Any(f => f.DirectiveLines.Count > 0);
+            // The ops are read off the parse tree even when the parse reported errors: the state an op restores is what
+            // MISREADS the text after it (a handler's >>SOURCE FORMAT left in force turns the lines that follow END-PERFORM
+            // into syntax errors), so the very error that stops the parse is often the symptom of the missing op.
+            var ops = !mayMatter ? []
+                : ExceptionPerformDirectiveScope.ImplicitOps(tree, parsed ? null : p => LocateEndPerform(p, processed, formats));
             var keyed = encounters.KeyImplicitOps(ops);
-            // A pass that did not parse is final: its syntax errors are the compilation's answer, and with no tree
-            // there are no ops to converge on.
-            if (tree is null || keyed.SequenceEqual(implicitOps))
+            var placed = ImplicitFormatOps.Place(ops, processed.Lines, formats);
+            bool settled = keyed.SequenceEqual(implicitOps) && placed.Equals(formatOps);
+            if (!parsed)
+            {
+                // A pass that did not parse is final — its syntax errors are the compilation's answer — UNLESS the tree it
+                // recovered places GR14 brackets the pass did not run with: those restore state the unparsable text
+                // depends on, so the pass is re-run speculatively with them. Each re-run settles at least one more
+                // bracket (the text before a bracket's first state-changing directive reads the same under every
+                // program), so the speculation is bounded by the directives the text holds; if it ever parses and
+                // settles, that run is the answer, and if it never does, the FIRST failure's diagnostics are reported
+                // (the source's own errors, not the guess's).
+                if (!settled && pass <= SpeculationBound(encounters, formats))
+                {
+                    firstFailure ??= (passDiagnostics, directives, passLineMap);
+                    implicitOps = keyed;
+                    formatOps = placed;
+                    continue;
+                }
+                var (finalDiagnostics, finalDirectives, finalLineMap) = firstFailure ?? (passDiagnostics, directives, passLineMap);
+                foreach (var d in finalDiagnostics.Diagnostics) diagnostics.Add(d);
+                LineMap = finalLineMap;
+                Directives = finalDirectives.WithStackOps([]);
+                return null;
+            }
+            if (settled)
             {
                 foreach (var d in passDiagnostics.Diagnostics) diagnostics.Add(d);
                 Directives = directives.WithStackOps(ops);
                 return tree;
             }
-            if (pass > encounters.Directives.Count + 1)
+            if (pass > SpeculationBound(encounters, formats))
                 throw new InvalidOperationException(
                     "the §14.9.28.4 GR14 implicit-op fixed point did not converge (kb/Work PB1066) — each pass must "
-                    + "settle at least one more directive encounter");
+                    + "settle at least one more directive");
             implicitOps = keyed;
+            formatOps = placed;
         }
+    }
+
+    /// <summary>How many passes the §14.9.28.4 GR14 fixed point may take: each settles at least one more directive — an
+    /// encounter of the conditional-compilation driver or a written format directive of the normalizer — plus the final
+    /// confirming pass and one for the unrestored first run.</summary>
+    private static int SpeculationBound(ConditionalCompilationResult encounters,
+        IReadOnlyDictionary<string, ReferenceFormatMap> formats) =>
+        encounters.Directives.Count + formats.Values.Sum(f => f.DirectiveLines.Count) + 2;
+
+    /// <summary>The word that closes an inline PERFORM, as a whole word of a physical line (a hyphen is a word
+    /// character — <c>END-PERFORM-X</c> is another word).</summary>
+    private static readonly System.Text.RegularExpressions.Regex EndPerformWord =
+        new(@"(?<![\w-])END-PERFORM(?![\w-])", System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            | System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>The RESULTANT line of the END-PERFORM phrase that closes an exception-checking PERFORM the parse could not
+    /// read it of (kb/Work PB1066) — 0 when it cannot be found. The phrase is unreadable exactly when the reference format
+    /// §14.9.28.4 GR14's implicit POP ALL would restore is still the wrong one for it (the handler's &gt;&gt;SOURCE
+    /// FORMAT left in force reads a free-form <c>END-PERFORM</c> as a sequence area), so only the PHYSICAL text can still
+    /// say where it is: the first line after the one that ends imperative-statement-1 that holds the word outside a
+    /// comment line (a fixed-form <c>*</c> or <c>/</c> indicator, or a floating <c>*&gt;</c>), and is not the END-PERFORM
+    /// line of a PERFORM nested in this one that DID parse (those close the inner constructs). The statement that ends
+    /// the handler cannot be the anchor: the misread phrase's remains are often consumed into it as operands. It is a
+    /// GUESS, and the caller's fixed point verifies it: a program the guess does not make parse keeps the diagnostics of
+    /// the run without it.</summary>
+    private static int LocateEndPerform(CobolParserCore.PerformStatementContext p, MappedText processed,
+        IReadOnlyDictionary<string, ReferenceFormatMap> formats)
+    {
+        var origins = processed.Lines;
+        SourceOrigin OriginOf(int resultantLine) => origins[Math.Clamp(resultantLine, 1, origins.Length) - 1];
+        var at = OriginOf(p.statementBlock().Stop.Line);
+        // The physical text is the line-entry stage's product, kept by the file's reference-format map — this stage never
+        // splits a file itself (PhysicalLinesDriftTests).
+        if (!formats.TryGetValue(at.File, out var map)) return 0;
+        var physical = map.PhysicalText;
+        var nested = new HashSet<int>();   // physical lines of this file closed by a nested PERFORM that parsed
+        foreach (var inner in Antlr4.Runtime.Tree.Trees.FindAllRuleNodes(p, CobolParserCore.RULE_performStatement))
+            if (inner != p && ((CobolParserCore.PerformStatementContext)inner).END_PERFORM() is { } innerEnd
+                && OriginOf(innerEnd.Symbol.Line) is var o && o.File == at.File)
+                nested.Add(o.Line);
+        for (int n = at.Line + 1; n <= physical.Count; n++)
+        {
+            string line = physical[n - 1];
+            if (nested.Contains(n) || line.TrimStart().StartsWith("*>", StringComparison.Ordinal)
+                || (line.Length > 6 && line[6] is '*' or '/') || !EndPerformWord.IsMatch(line))
+                continue;
+            for (int r = 0; r < origins.Length; r++)
+                if (origins[r].File == at.File && origins[r].Line >= n) return r + 1;
+            return 0;
+        }
+        return 0;
     }
 
     /// <summary>
@@ -158,17 +248,17 @@ public sealed class Frontend
     /// </summary>
     /// <returns>The logical free-form text and the reference format each physical line was read in — which the COPY
     /// statements of the text need (§7.3.24.3 3), kb/Work PB1067).</returns>
-    private (MappedText Text, ReferenceFormatMap Formats) Normalize(string sourcePath, DiagnosticBag diagnostics)
+    private (MappedText Text, ReferenceFormatMap Formats) Normalize(string raw, string sourcePath, DiagnosticBag diagnostics,
+        ImplicitFormatOps implicitOps)
     {
-        string raw = Inputs.ReadAllText(sourcePath);
-
         // The normalizer's line-entry stage (PhysicalLines, kb/Work PB1800) reads the raw text: terminators, tabs and —
         // under --nist only (PB1803) — the line-count-preserving archive-marker strip all happen there.
         // The edition-aware overload carries the fixed-form continuation gates (VCR rows 2/94, W3): only the
         // column-aware pass can see the col-7 indicator, so the per-edition obligations emit HERE. Mapped (kb/Work
         // PB82): a fixed-form continuation JOINS physical lines, and the map records which line each output came from.
         var text = ReferenceFormatProcessor.NormalizeToFreeFormMapped(raw, DialectLevel, Permissive, diagnostics, sourcePath,
-            InitialFormat.InitialFixed(), out var formats, ccvsIndicators: NistTestName is not null);   // kb/Work PB1494
+            InitialFormat.InitialFixed(), out var formats, ccvsIndicators: NistTestName is not null,   // kb/Work PB1494
+            implicitOps: implicitOps.For(sourcePath));   // §14.9.28.4 GR14's implicit PUSH/POP ALL written in the source (kb/Work PB1066)
         return (text, formats);
     }
 
@@ -176,9 +266,10 @@ public sealed class Frontend
     /// §14.9.28.4 GR14 implicit-op program (<paramref name="implicitOps"/>) comes from a parse of their own output
     /// (<see cref="Parse"/>). Returns the resultant text, the directive results (WITHOUT the implicit ops, which the
     /// caller replays once the program has converged), and the driver's directive encounters.</summary>
-    private (MappedText Text, DirectiveResults Directives, ConditionalCompilationResult Encounters) Preprocess(
+    private (MappedText Text, DirectiveResults Directives, ConditionalCompilationResult Encounters,
+        IReadOnlyDictionary<string, ReferenceFormatMap> Formats) Preprocess(
         MappedText normalized, ReferenceFormatMap referenceFormats, string sourcePath, DiagnosticBag diagnostics,
-        IReadOnlyList<KeyedDirectiveOp> implicitOps)
+        IReadOnlyList<KeyedDirectiveOp> implicitOps, ImplicitFormatOps formatOps)
     {
         // The MERGED text-manipulation driver (ISO §7.2.1) — conditional compilation INTERLEAVED with COPY, so a
         // >>DEFINE/>>IF/>>EVALUATE INSIDE a copybook is processed (the CC-before-COPY split could not see them), while
@@ -186,7 +277,8 @@ public sealed class Frontend
         // the expanded group. leave* keep the post-85 directive families flowing to their dedicated stages below.
         // COPY runs BEFORE NIST substitution so placeholders inside copied library text are substituted.
         var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
-            dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs, ccvsIndicators: NistTestName is not null);
+            dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs, ccvsIndicators: NistTestName is not null,
+            implicitFormatOps: formatOps);   // library text's share of GR14's implicit PUSH/POP ALL (kb/Work PB1066)
         copy.RegisterReferenceFormat(sourcePath, referenceFormats);
         var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, copy, LeftDirectives,
             diagnostics, sourcePath, DialectLevel, Permissive, Inputs, implicitOps);
@@ -270,7 +362,7 @@ public sealed class Frontend
 
         return (new MappedText(text, mapped.Lines),   // the constructor re-asserts the line-count invariant
             new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, propagateEvents, cobolWordsMap, leapSecondEvents, directiveSites),
-            manipulated);
+            manipulated, copy.ReferenceFormats);
     }
 
     /// <summary>The ISO §7.3 directive keywords the merged text-manipulation driver LEAVES in the text for the
@@ -298,9 +390,11 @@ public sealed class Frontend
     /// Phase 1 — lex + parse. Uses the proven two-stage strategy: fast SLL prediction first (with a
     /// <see cref="BailErrorStrategy"/> so an ambiguity throws rather than hangs), falling back to full LL on
     /// failure. The <c>ZERO</c>→<c>ZERO_ARITH</c> token rewrite runs between lexing and parsing to avoid an
-    /// exponential-prediction ambiguity. Returns <see langword="null"/> if any syntax error was reported.
+    /// exponential-prediction ambiguity. Returns the tree the parser built and whether it is the program's (no syntax
+    /// error was reported); the tree of a parse that reported errors is the parser's RECOVERED one, for the one reader that
+    /// can use it (<see cref="Parse"/>'s §14.9.28.4 GR14 op placement) and never an answer to hand on.
     /// </summary>
-    private CobolParserCore.CompilationUnitContext? LexAndParse(string text, string sourcePath, CobolWordsMap cobolWordsMap,
+    private (CobolParserCore.CompilationUnitContext Tree, bool Parsed) LexAndParse(string text, string sourcePath, CobolWordsMap cobolWordsMap,
         DiagnosticBag diagnostics)
     {
         var lexer = new CobolLexer(new AntlrInputStream(text));
@@ -352,7 +446,7 @@ public sealed class Frontend
         var tree = ReservationGateRewriter.ParseToFixpoint(parser, tokens, retypes, diagnostics,
             (bag, witness) => ParsePass(parser, tokens, bag, witness, sourcePath));
 
-        return parser.NumberOfSyntaxErrors > 0 ? null : tree;
+        return (tree, parser.NumberOfSyntaxErrors == 0);
     }
 
     /// <summary>One parse of the whole token stream from token 0: fast SLL prediction first (with a

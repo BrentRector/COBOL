@@ -46,4 +46,12 @@ public sealed class CobolSizeError(string detail, string ecName) : CobolFatalExc
     /// answered 0 and the binary64 lane ±Infinity (or NaN), and the run went on with that value.</summary>
     public static CobolSizeError ZeroDivide() =>
         new("a zero divisor in a divide operation (ISO §14.7.5 case 2)", "EC-SIZE-ZERO-DIVIDE");
+
+    /// <summary>A value further from zero than a FLOATING-POINT receiving item's format permits, with no SIZE ERROR
+    /// phrase to offer — §14.7.5 case 3, EC-SIZE-TRUNCATION by no-phrase rule 4, the float twin of the fixed-point
+    /// receiver's raise (<c>CobolNum.StoreOrRaise</c>). The raise of the activating element's §14.2.3 GR9/GR10
+    /// crossing COMPUTE into a floating-point formal (<c>CobolArgAdapt.LandForFormal</c>; kb/Work PB1114).</summary>
+    public static CobolSizeError FloatTruncation(bool single) =>
+        new($"the value is further from zero than the {(single ? "binary32" : "binary64")} floating-point receiving item "
+            + "permits (ISO §14.7.5 case 3 — EC-SIZE-TRUNCATION)", "EC-SIZE-TRUNCATION");
 }

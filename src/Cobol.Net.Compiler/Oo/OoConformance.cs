@@ -873,8 +873,8 @@ public static class OoConformance
     // is why one entry point answers for a group formal too.
 
     /// <summary>ISO §14.8.2.3.3 — the BY CONTENT / BY VALUE conformance rules for an IDENTIFIER argument,
-    /// per formal category: COMPUTE for numeric (any fixed-point numeric argument; float formals require the
-    /// identical float usage — the cross-float CONTENT conversion is a documented later refinement), SET for
+    /// per formal category: COMPUTE for numeric (any numeric argument, fixed-point or floating-point, into a
+    /// fixed-point or floating-point formal — kb/Work PB1114), SET for
     /// object references (widening — the argument's class shall be the receiver's class or a subclass), MOVE
     /// otherwise (§14.9.25.3 Table 16). Null when conformant.</summary>
     /// <param name="invokedWith">INVOKE only — see <see cref="DescriptionMismatch"/>: an ACTIVE-CLASS formal takes
@@ -927,13 +927,14 @@ public static class OoConformance
             // object reference (GR6c), so their arg.Pic detail reads are only reachable for a whole-item arg.
             // ⛔ RULE 2a IS "the same as for a COMPUTE statement", AND A COMPUTE TAKES ANY NUMERIC SENDER —
             // fixed-point or floating-point, either direction. The float restrictions that used to sit here
-            // ("a float formal takes the identical float usage BY CONTENT") are an INVOKE CARRIER limitation,
+            // ("a float formal takes the identical float usage BY CONTENT") were an INVOKE CARRIER limitation,
             // not a conformance rule, and moving them into the shared rule REJECTED LEGAL SOURCE the moment
             // the CALL lane started asking: kb/Work PB238 landed the float crossing for a Format-2 CALL
             // deliberately (§14.2.3 GR10's "COMPUTE statement without the ROUNDED phrase" makes
             // `01 F FLOAT-LONG VALUE 1.5` reach a `PIC S9(3)V99` BY VALUE formal as 001.50), and the landed
-            // golden conformance:2023/pb238_call_format2_operands proves it. The carrier residue stays where
-            // the carrier is — OoBinder screens it for INVOKE alone, next to its other marshalling limits.
+            // golden conformance:2023/pb238_call_format2_operands proves it. The INVOKE carrier now lands a
+            // fixed-point or other-usage float argument in a float formal through FloatResultant too
+            // (OoEmitter.IsFloatLanding; kb/Work PB1114), so no carrier residue is left to screen.
             PicCategory.Numeric =>
                 argIsGroup ? "a group argument does not conform to a numeric formal (§14.8.2.3.3)"
                 : argCat is PicCategory.Numeric ? null
@@ -991,16 +992,13 @@ public static class OoConformance
 
     /// <summary>ISO §14.8.2.3.3 rule 2a for an ARITHMETIC-EXPRESSION argument: "the conformance rules are the
     /// same as for a COMPUTE statement", whose receiving operand is category numeric — so a non-numeric formal
-    /// has no conforming rule. The float sub-arm is the same documented refinement
-    /// <see cref="ContentMismatch"/>'s identifier lane defers (the fixed-point→float CONTENT conversion).
-    /// Null when conformant.</summary>
+    /// has no conforming rule. A FLOATING-POINT formal is a numeric receiver like any other: a COMPUTE takes its
+    /// value into a float resultant identifier (§14.7.4.3), so the fixed-point→float CONTENT conversion is
+    /// conformant, not a refinement to defer (kb/Work PB1114). Null when conformant.</summary>
     public static string? ContentArithmeticMismatch(DataItem formal) =>
         formal.IsGroup || formal.Pic is not { Category: PicCategory.Numeric }
             ? "§14.8.2.3.3 rule 2a transfers an expression by the COMPUTE rules, which requires a "
               + "category-numeric formal parameter"
-            : formal.Pic is { IsFloat: true }
-            ? "the fixed-point→float CONTENT conversion is the same documented refinement the identifier arm "
-              + "defers (ISO §14.8.2.3.3)"
             : null;
 
     /// <summary>ISO §14.8.2.3.3 rule 2d for a BOOLEAN-EXPRESSION or boolean-literal argument: the MOVE rules,
@@ -1064,11 +1062,11 @@ public static class OoConformance
             : null;
     }
 
-    /// <summary>ISO §14.8.2.3.3 for a NUMERIC literal argument: rule 2a (COMPUTE) into a fixed-point numeric
-    /// formal, and rule 2d's MOVE rules put an UNSIGNED INTEGER literal into an alphanumeric receiver as its
-    /// digit characters (§14.9.25). Null when conformant.</summary>
+    /// <summary>ISO §14.8.2.3.3 for a NUMERIC literal argument: rule 2a (COMPUTE) into a numeric formal —
+    /// fixed-point or floating-point alike (kb/Work PB1114) — and rule 2d's MOVE rules put an UNSIGNED INTEGER
+    /// literal into an alphanumeric receiver as its digit characters (§14.9.25). Null when conformant.</summary>
     public static string? ContentNumericLiteralMismatch(DataItem formal, string raw) =>
-        formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
+        formal.Pic is { Category: PicCategory.Numeric }
         || (!formal.IsGroup && formal.Pic?.Category is PicCategory.Alphanumeric
             && !raw.Contains('.') && !raw.StartsWith('-') && !raw.StartsWith('+'))
             ? null

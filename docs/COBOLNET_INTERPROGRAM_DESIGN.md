@@ -360,8 +360,8 @@ without the ROUNDED phrase"* into it. Every consequence of that COMPUTE is there
 - §14.9.4.4 GR3 g) transfers control to the called program only *"if a fatal exception condition has not been
   raised"*, which a landing performed **after** the transfer can no longer honour.
 
-So `CallEmitter.ArgText` wraps every BY CONTENT / BY VALUE argument whose corresponding formal is a fixed-point
-numeric item in `CobolArgAdapt.LandForFormal<T>` — one wrapper around every carrier shape, `T` being the
+So `CallEmitter.ArgText` wraps every BY CONTENT / BY VALUE argument whose corresponding formal is a numeric
+item (fixed-point or floating-point — `PicInfo.IsClassNumeric`) in `CobolArgAdapt.LandForFormal<T>` — one wrapper around every carrier shape, `T` being the
 formal's `PicInfo.ClrType` (**not** `DataItem.ElementType`, which answers `"string"` for an image-stored formal
 and cannot satisfy the landing's `struct, INumberBase<T>` constraint). The landed `CobolArg` carries the
 **formal's** whole description (`Num = formal`), because GR9's last sentence makes the allocated record *the*
@@ -387,6 +387,27 @@ well as at statement position. The kernel is chosen at COMPILE time from `EcStat
 the same way the arithmetic store chooses `checkedLanding`, so a unit with checking off emits the landing it
 always had.
 
+**A FLOATING-POINT FORMAL IS A NUMERIC RECEIVER OF THE SAME COMPUTE (kb/Work PB1114).** §14.8.2.3.3 2) a) and
+§14.2.3 GR9/GR10 say *"if the formal parameter is numeric"* and name no floating-point exemption, yet the landing
+above was guarded on the fixed-point description: a `PIC 9(3)V99` 12.5 BY CONTENT to a `FLOAT-LONG` formal of a
+NESTED activation crossed with no landing and the callee's `Num` then landed it through the float formal's
+description — which has ZERO digit positions, so the capacity reduction stored 0. The float lane is
+`CobolArgAdapt.LandFloat`, the float twin of `LandScalar`, and it lands through **`FloatResultant`** — THE one
+transfer of an arithmetic value into a float resultant identifier (kb/Work PB1196), not a second float store:
+implied TRUNCATION (§14.7.4.3 rule 10 — the representable value nearer to zero, so `0.1` into a FLOAT-SHORT formal
+is the binary32 just BELOW 0.1), a fixed-point or integer sender converted EXACTLY in one rounding (never through
+binary64 first — kb/Work PB1110), and a value past the format's range is §14.7.5 case 3's size error: raised as
+EC-SIZE-TRUNCATION (`FloatResultant.From…OrRaise`, the float twin of `CobolNum.StoreOrRaise`) when checking is
+enabled at the activating statement, the no-phrase unchecked landing (DOC-A.1-70) otherwise. One predicate,
+`CallAbi.IsFloatFormal`, sends the crossing to that lane at every arm that has a fixed-point and a float landing:
+`LandForFormal` (activating side), `NumValue` (BY VALUE residue), `TextValue` (an image-carried float formal) and the `Num` converting view (the callee-side GR8
+view over a native cell of another description, whose write-back un-scales into the caller's own representation).
+The BY VALUE float formal needed nothing more: it is non-resident (a float formal is not carrier-resident), so the
+existing copy-in / no-copy-out round trip over the detached cell carries it; the header's COBOLNET0899 refusal of
+it (a "value-copy carrier not yet implemented" that was not true of the program and function arms) is gone. The
+literal and arithmetic-expression arguments into a float formal, refused COBOLNET1688 as "a documented
+refinement", are conformant (`OoConformance.ContentNumericLiteralMismatch` / `ContentArithmeticMismatch`).
+
 **The INVOKE lane is the same rule and was the same defect's other arm.** `OoEmitter`'s BY CONTENT arms already
 landed caller-side (§14.8.2.3.3 rule 2 a): *"If the formal parameter is numeric, the conformance rules are the
 same as for a COMPUTE statement"*), but always through the UNCHECKED `CobolNum.Store`, so they were silent under
@@ -396,7 +417,13 @@ is the same primitive `LandForFormal`'s checked lane uses. The numeric-LITERAL a
 well. Pinned per edition by `{2002,2014,2023}/pb640_call_argument_landing_checked` and
 `{2002,2014,2023}/pb640_invoke_argument_landing_checked`, and structurally by
 `CallAbiNumericCarrierDriftTests.TheCheckedLandingRaisesExactlyWhereTheValueDoesNotFit` plus the
-activating-side identity assertions inside `TheGr8ViewAndTheGr10Copy_LandIdentically`.
+activating-side identity assertions inside `TheGr8ViewAndTheGr10Copy_LandIdentically`. A FLOATING-POINT method
+formal takes the same landing through `FloatResultant` in `OoEmitter`'s float arm (`IsFloatLanding`: a fixed-point
+or other-usage float identifier, a literal-2 or an arithmetic expression; a same-usage float identifier keeps its
+verbatim §14.9.25.4 GR6 c) read), raising under EC-SIZE checking through `RuntimeApi.FloatResultantStoreOrRaise`;
+the binder's "fixed-point⇄float CONTENT conversion is not carried across INVOKE" refusal is retired
+(kb/Work PB1114; `conformance:2002/pb1114_invoke_content_float_formal`, CALL lane
+`conformance:2023/pb1114_call_content_float_formal`, `CallAbiFloatLandingTests`).
 
 **THE ONE NUMERIC LANDING — `CobolArgAdapt.Land` (kb/Work PB288).** Every numeric arm of the callee-side adapter
 reaches its receiving side through a single private helper, because §14.2.3 GR9 and GR10 describe the *same*
@@ -449,7 +476,7 @@ item holds its RECORD IMAGE under the description beside it — zoned digits, ra
 sides, in both directions, for every pass mode and for RETURNING. The activating element reads an image-carried
 numeric place (an image-stored leaf or a REDEFINES view — `CallEmitter.IsImageCarriedNumeric`, the ONE predicate
 the read and write halves share) as its window, which already holds those bytes, and stores a returned text into it
-as it stands; the ABI's numeric legs over a string carrier (`LandScalar`, `ArgDouble`, `Num`'s GR8 view,
+as it stands; the ABI's numeric legs over a string carrier (`LandScalar`, `LandFloat`, `Num`'s GR8 view,
 `StoreReturn`) decode and encode with THE record-image codec (`CobolNum.ParseImage`/`FormatImage`, the float lane on
 `ParseImageFloat`/`FormatImageFloat`), never the DISPLAY codec — whose zoned arm is the same code, so a zoned item
 is unchanged. Before PB970 the image-carried side spoke the OPERAND text (`OperandText.FieldImage`) while the

@@ -576,10 +576,17 @@ public sealed record PicInfo(
     /// argument crossing three ways ("if the formal parameter is numeric, a COMPUTE statement without the
     /// ROUNDED phrase" / "if the formal parameter is of class index, object, or pointer, a SET statement" /
     /// "otherwise, a MOVE statement"), and an activating-side landing guarded on the bare test sent
-    /// <c>BY CONTENT</c> an index of 3 across as 0. <see cref="IsIntegerDescription"/> narrows this by scale;
-    /// callers asking "is this a numeric receiver / a COMPUTE receiving operand" want THIS one.</para></summary>
-    public bool IsClassNumericFixedPoint =>
-        Category is PicCategory.Numeric && !IsFloat && Usage is not Usage.Index;
+    /// <c>BY CONTENT</c> an index of 3 across as 0. <see cref="IsIntegerDescription"/> narrows this by scale; callers
+    /// asking "is this a FIXED-POINT numeric receiver" want THIS one. A caller asking "is this a COMPUTE receiving
+    /// operand" — which a floating-point item is too — wants <see cref="IsClassNumeric"/>.</para></summary>
+    public bool IsClassNumericFixedPoint => IsClassNumeric && !IsFloat;
+
+    /// <summary>True for a description whose item is of CLASS NUMERIC, fixed-point OR floating-point, and never a
+    /// USAGE INDEX item (see <see cref="IsClassNumericFixedPoint"/> for the trap). The population §14.2.3 GR9's
+    /// numeric alternative and §14.8.2.3.3 2) a) speak of — "if the formal parameter is numeric, a COMPUTE statement
+    /// without the ROUNDED phrase" — which has NO floating-point exemption: a FLOAT-SHORT or FLOAT-LONG formal is such a
+    /// receiver, landed by <c>FloatResultant</c> rather than <c>CobolNum.Store</c> (kb/Work PB1114).</summary>
+    public bool IsClassNumeric => Category is PicCategory.Numeric && Usage is not Usage.Index;
 
     /// <summary>True for an UNSIGNED BinaryCapacity item whose 16-byte container range [0, 2^128) exceeds every
     /// signed carrier — its CLR carrier is <see cref="UInt128"/> (kb/Work R10, owner decision 2026-08-07: the item

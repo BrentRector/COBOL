@@ -1261,7 +1261,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         {
             var a = args[i];
             bool stringCarried = OoStringCarried(a.Formal);
-            string qualProfile = a.Formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
+            string qualProfile = a.Formal.Pic is { Category: PicCategory.Numeric }
                 ? $"{inv.OwnerCsName}{(inv.Form is InvokeForm.Factory ? NamingConvention.FactorySuffix : "")}.{a.Formal.ProfileName}" : "";
 
             // ⛔ THE OMITTED ARGUMENT (kb/Work PB757) — spelled, or trailing-omitted: its slot is a placeholder of the
@@ -1359,6 +1359,27 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // the formal reads the argument's image through the pair's correspondence, each corresponding
                 // table fitted to the formal's occurrence count (§8.5.1.12.3 sentence 3).
                 w.Line($"string {tmp} = {RuntimeApi.VarGroupToFixedImage(PlaceRenderer.VarGroupImage(vsp, "INVOKE argument"), a.Formal.ImageWidth, CallEmitter.LayoutArray(vs))};");
+            // ⛔ A BY CONTENT VALUE INTO A FLOATING-POINT FORMAL OF ANOTHER DESCRIPTION (kb/Work PB1114). §14.8.2.3.3 2)
+            // a) — "the same as for a COMPUTE statement" — and §14.2.3 GR9's "a COMPUTE statement without the ROUNDED
+            // phrase" have no floating-point exemption, so a fixed-point or other-usage float sender, a literal-2 or an
+            // arithmetic-expression-1 lands through FloatResultant, THE one transfer of an arithmetic value into a float
+            // resultant identifier (implied TRUNCATION; the CALL lane's CobolArgAdapt.LandForFormal is the same store).
+            // FIRST in the chain, before the image-carried arms, because an image-carried float formal takes the landed
+            // value in its STORAGE image. A same-usage float identifier keeps the verbatim read below (§14.9.25.4 GR6 c).
+            else if (IsFloatLanding(a))
+            {
+                var fpF = a.Formal.Pic!;
+                NumX fv = a.Source is { } lsrc ? Num.AsNum(new BoundFieldOperand(lsrc), ReceiverContext.None)
+                    : a.ContentExpr is { } fex ? Num.AsNum(new BoundComputedOperand(fex), ReceiverContext.None)
+                    : UnscaledLit(a.NumericLiteral!);
+                string landed = ecState.SizeTruncationChecking
+                    ? RuntimeApi.FloatResultantStoreOrRaise(fv, CobolRounding.Truncation, fpF.IsSingle)
+                    : RuntimeApi.FloatResultantStore(fv, CobolRounding.Truncation, fpF.IsSingle);
+                string algebraic = $"({fpF.ClrType})({landed})";
+                w.Line(stringCarried
+                    ? $"string {tmp} = {RuntimeApi.NumFormatImageFloat(algebraic, qualProfile, fpF.IsSingle)};"
+                    : $"{fpF.ClrType} {tmp} = {algebraic};");
+            }
             // ⛔ A NUMERIC VALUE INTO AN IMAGE-CARRIED FIXED-POINT FORMAL (kb/Work PB1064): a method formal is a character
             // channel (§14.2.3 GR8), so a numeric-DISPLAY formal is carried as its image — and a literal-2 or an
             // arithmetic-expression-1 has no image, only a VALUE. §14.2.3 GR9 fills the formal's record by "a COMPUTE
@@ -1410,7 +1431,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                                                  or PicCategory.ProgramPointer or PicCategory.FunctionPointer })
                 w.Line($"{a.Formal.ElementType} {tmp} = {PlaceRenderer.Read(a.Source!)};");
             else if (a.Formal.Pic is { IsFloat: true })
-                // Same-usage float (bind-enforced): read the float value directly — never through the
+                // Same-usage float — a BY REFERENCE pairing (§14.8.2.3.2, bind-enforced), or a BY CONTENT identifier
+                // of the formal's own usage (every other BY CONTENT shape took IsFloatLanding above): read the float
+                // value directly — never through the
                 // scaled-integer path (the review's silent-truncation finding) — and on the item's OWN carrier
                 // (NumericRenderer.FloatCarrierRead): a same-usage transfer is §14.9.25.4 GR6 c)'s "without
                 // change", which a windowed binary32 decoded through binary64 is not (kb/Work PB961).
@@ -1582,6 +1605,15 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// Self/Super/Factory + UNIVERSAL dispatches all pick up; NEW needs none (the generated ctor runs no
     /// user statements, D4). Gated on <c>EcState.Active</c>, which spans class units.</summary>
     private void EmitInvokePickup(IActivatingStatement site) => U.Call.EmitPropagationPickup(site);
+
+    /// <summary>True when a BY CONTENT argument lands in a FLOATING-POINT method formal by the §14.2.3 GR9 COMPUTE
+    /// (kb/Work PB1114): the formal is floating-point, and the argument is a literal-2, an arithmetic expression or an
+    /// identifier that is NOT a same-usage float — a same-usage float identifier crosses verbatim, which is §14.9.25.4
+    /// GR6 c)'s "without change" (a windowed binary32 decoded through binary64 is not). One predicate, for the
+    /// emitter arm that lands and the arms that must leave the same-usage crossing alone.</summary>
+    private static bool IsFloatLanding(BoundInvokeArg a) =>
+        a.ByContent && !a.Formal.IsGroup && a.Formal.Pic is { Category: PicCategory.Numeric, IsFloat: true } fp
+        && !(a.Source?.Item.Pic is { IsFloat: true } sp && sp.Usage == fp.Usage);
 
     /// <summary>The VALUE a literal-2 or arithmetic-expression-1 argument stores into a fixed-point numeric method formal
     /// (kb/Work PB1064): §14.2.3 GR9 fills the formal's record by "a COMPUTE statement without the ROUNDED phrase", so

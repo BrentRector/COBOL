@@ -91,6 +91,29 @@ public static class FloatResultant
         return Admits(o, mode);
     }
 
+    // ── The RAISING forms: the third caller shape — an EXPRESSION with no SIZE ERROR phrase to offer and no
+    //    arithmetic statement to hang a flag on, compiled when EC-SIZE-TRUNCATION checking is enabled at the
+    //    activating statement (§14.7.5 case 3 + no-phrase rule 4; the float twin of CobolNum.StoreOrRaise). Its live
+    //    callers are the §14.2.3 GR9/GR10 argument crossings — "a COMPUTE statement without the ROUNDED phrase" into
+    //    a floating-point formal — on the CALL lane (CobolArgAdapt.LandForFormal) and the INVOKE lane
+    //    (kb/Work PB1114). ──
+
+    /// <summary>The raising landing of a binary64 intermediate.</summary>
+    public static double FromRealOrRaise(double v, CobolRounding mode, bool single) =>
+        TryFromReal(v, mode, single, out double landed) ? landed : throw CobolSizeError.FloatTruncation(single);
+
+    /// <summary>The raising landing of an exact scaled value.</summary>
+    public static double FromScaledOrRaise(Int128 unscaled, int scale, CobolRounding mode, bool single) =>
+        TryFromScaled(unscaled, scale, mode, single, out double landed) ? landed : throw CobolSizeError.FloatTruncation(single);
+
+    /// <summary>The raising landing of an exact UNSIGNED-wide scaled value.</summary>
+    public static double FromUnsignedScaledOrRaise(UInt128 unscaled, int scale, CobolRounding mode, bool single) =>
+        TryFromUnsignedScaled(unscaled, scale, mode, single, out double landed) ? landed : throw CobolSizeError.FloatTruncation(single);
+
+    /// <summary>The raising landing of an SDIDI.</summary>
+    public static double FromDecOrRaise(CobolDec v, CobolRounding mode, bool single) =>
+        TryFromDec(v, mode, single, out double landed) ? landed : throw CobolSizeError.FloatTruncation(single);
+
     // ── The rounding ─────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>What a landing did: stored the value itself, rounded it (the mode chose a neighbor), or found it
