@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-245 drift tests.
+246 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -104,6 +104,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [FileDescriptionFormatDriftTests](../tests/Cobol.Net.Tests.Unit/FileDescriptionFormatDriftTests.cs) | ⛔ EVERY FILE DESCRIPTION CLAUSE THE GRAMMAR PARSES HAS DECIDED WHICH §13.4.5.2 FORMATS CONTAIN IT (kb/Work PB1238). | — |
 | [FileLockPostureDriftTests](../tests/Cobol.Net.Tests.Unit/FileLockPostureDriftTests.cs) | ⛔ ISO §9.1.15 ADDRESSES TWO AUDIENCES WITH ONE SHARING MODE, AND THE OPERATING ENVIRONMENT'S SHARE MODE CAN ONLY SERVE THE SECOND (kb/Work PB740). | `src/Cobol.Net.Runtime/IO`, `src/Cobol.Net.Runtime/IO/Sharing/FileLockPosture.cs`, `src/Cobol.Net.Runtime/IO/FileRegistry.cs` |
 | [FilterPopulationGuardDriftTests](../tests/Cobol.Net.Tests.Unit/FilterPopulationGuardDriftTests.cs) | ⛔ THE INVARIANT: no filtered dotnet test invocation anywhere in this repository — CI leg, generator script or gate — may treat exit 0 as evidence that the filtered tests RAN (kb/Work PB708, PB751, PB752). | `scripts`, `.github/workflows`, `.github/workflows/build-and-test.yml`, `scripts/test_population.py`, `scripts/hooks`, `scripts/gen-vcr.ps1` … |
+| [FixedFormRecordDriftTests](../tests/Cobol.Net.Tests.Unit/FixedFormRecordDriftTests.cs) | ⛔ A FILE OF FIXED-LENGTH RECORDS CARRIES A VARIABLE-LENGTH RECORD IN ITS FIXED FORM, ASKED AT THE PLACES A PROGRAM'S RECORD AREA ENTERS A CONNECTOR AND LEAVES IT (kb/Work PB1562, docs/CONFORMANCE.md §3 D-FRA (vi)). | `src/Cobol.Net.Runtime/IO`, `src/Cobol.Net.Compiler` |
 | [FloatLandingModeDriftTests](../tests/Cobol.Net.Tests.Unit/FloatLandingModeDriftTests.cs) | ⛔ THE FLOAT→FIXED QUANTIZER TAKES THE STATEMENT'S ROUNDING DECISION, AND TAKES IT ONCE (kb/Work PB647). | `src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs`, `src/Cobol.Net.Compiler/CodeGen/Emit` |
 | [FloatQuantizeHeadroomDriftTests](../tests/Cobol.Net.Tests.Unit/FloatQuantizeHeadroomDriftTests.cs) | ⛔ THE FLOAT→FIXED QUANTIZER MUST NEVER SATURATE SILENTLY (fix-queue PB13). | `src` |
 | [ForPhrasePairDriftTests](../tests/Cobol.Net.Tests.Unit/ForPhrasePairDriftTests.cs) | ⛔ EVERY REPEATED FOR ALPHANUMERIC / FOR NATIONAL PHRASE IS READ BY THE ONE CHOICE-INDICATOR READER (kb/Work PB1075). | `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Compiler/Binding` |

@@ -423,7 +423,12 @@ or other-usage float identifier, a literal-2 or an arithmetic expression; a same
 verbatim §14.9.25.4 GR6 c) read), raising under EC-SIZE checking through `RuntimeApi.FloatResultantStoreOrRaise`;
 the binder's "fixed-point⇄float CONTENT conversion is not carried across INVOKE" refusal is retired
 (kb/Work PB1114; `conformance:2002/pb1114_invoke_content_float_formal`, CALL lane
-`conformance:2023/pb1114_call_content_float_formal`, `CallAbiFloatLandingTests`).
+`conformance:2023/pb1114_call_content_float_formal`, `CallAbiFloatLandingTests`). **The third sender class** (the train review's
+finding): a FLOATING-POINT sender BY CONTENT into a FIXED-POINT image-carried method formal takes the SAME §14.2.3 GR9 COMPUTE as a
+fixed-point sender — `OoEmitter.OoStringReadOf`'s landing asks `IsClassNumericFixedPoint` of the formal and `IsClassNumeric` of the
+sender (a COMPUTE's sending operand may be floating-point), through `NumericRenderer.StoreExpr`, which tells the lanes apart; it fell
+to a MOVE store rendering the formal's profile bare (a Roslyn CS0103), and a MOVE where §14.7.5 r4 owes the EC-SIZE raise
+(`conformance:2023/pb1114_invoke_content_float_to_fixed_formal`).
 
 **THE ONE NUMERIC LANDING — `CobolArgAdapt.Land` (kb/Work PB288).** Every numeric arm of the callee-side adapter
 reaches its receiving side through a single private helper, because §14.2.3 GR9 and GR10 describe the *same*
