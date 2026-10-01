@@ -2481,6 +2481,83 @@ public static class DiagnosticCatalog
         + "(the floating literal continuation indicator continues a literal) or split the statement.",
         "ISO §6.1 3) a)");
 
+    /// <summary>COBOLNET2684 — a continuation line of a literal whose first nonblank character is not the quotation
+    /// symbol of the literal's opening delimiter (kb/Work PB1492, PB1359). One check for the fixed continuation
+    /// indicator and the floating one, in both reference formats: before, a fixed-form continuation line with no
+    /// quotation symbol, or the OTHER one, was spliced into the literal silently.</summary>
+    public static readonly DiagnosticDescriptor LiteralContinuationQuote = new(
+        "COBOLNET2684", "literal-continuation-quote", EditionSeverity.Error,
+        "The first nonblank character of a continuation line of a literal is not the quotation symbol used in the "
+        + "literal's opening delimiter. ISO §6.2.3.2 SR6: \"the first nonblank character of each continuation line "
+        + "shall be the quotation symbol used in the opening delimiter of the literal\". Begin the continuation "
+        + "line with the same quotation symbol (a quotation mark for a literal opened with one, an apostrophe for "
+        + "one opened with an apostrophe).", "ISO §6.2.3.2 SR6 / §6.3.5 2) / §6.4.2");
+
+    /// <summary>COBOLNET2685 — a national literal continued by the fixed continuation indicator (kb/Work PB1492).
+    /// §6.3.5 2): "National literals may be continued only with a floating literal continuation indicator."</summary>
+    public static readonly DiagnosticDescriptor NationalLiteralFixedContinuation = new(
+        "COBOLNET2685", "national-literal-fixed-continuation", EditionSeverity.Error,
+        "A national literal is continued with the fixed continuation indicator (a hyphen in column 7). ISO §6.3.5 "
+        + "2): \"National literals may be continued only with a floating literal continuation indicator.\" End the "
+        + "continued line with the literal's quotation symbol followed by a hyphen, and begin the continuation line "
+        + "with the quotation symbol.", "ISO §6.3.5 2)");
+
+    /// <summary>COBOLNET2686 — a floating literal continuation indicator on a line that holds the fixed continuation
+    /// indicator (kb/Work PB1359). §6.2.3.2 SR5.</summary>
+    public static readonly DiagnosticDescriptor FloatingContinuationOnFixedContinuation = new(
+        "COBOLNET2686", "floating-continuation-on-fixed-continuation", EditionSeverity.Error,
+        "A line with the fixed continuation indicator (a hyphen in column 7) ends in a floating literal continuation "
+        + "indicator. ISO §6.2.3.2 SR5: \"A floating literal continuation indicator shall not be specified on a line "
+        + "that contains a fixed literal continuation indicator.\" Continue the literal with one form only.",
+        "ISO §6.2.3.2 SR5");
+
+    /// <summary>COBOLNET2687 — a literal continued with both the fixed and the floating form (kb/Work PB1359).
+    /// §6.2.3.2 SR4, second sentence.</summary>
+    public static readonly DiagnosticDescriptor LiteralContinuedTwoForms = new(
+        "COBOLNET2687", "literal-continued-two-forms", EditionSeverity.Error,
+        "A literal is continued with more than one form of continuation (the fixed indicator, a hyphen in column 7, "
+        + "and the floating indicator, a quotation symbol followed by a hyphen). ISO §6.2.3.2 SR4: \"A given literal "
+        + "shall not be continued with more than one form of continuation.\" Use the floating indicator on every "
+        + "line of the literal.", "ISO §6.2.3.2 SR4");
+
+    /// <summary>COBOLNET2688 — a fixed-form continuation line that completes a multiple-character separator or
+    /// invocation operator (<c>==</c>, <c>::</c>) begun at the end of the line it continues (kb/Work PB1492). The
+    /// floating INDICATORS <c>*&gt;</c> and <c>&gt;&gt;</c> keep <see cref="FloatingIndicatorSplit"/>.</summary>
+    public static readonly DiagnosticDescriptor MultipleCharacterTokenSplit = new(
+        "COBOLNET2688", "multiple-character-token-split", EditionSeverity.Error,
+        "A continuation line completes a multiple-character separator or operator (== or ::) begun at the end of the "
+        + "line it continues. ISO §6.3.5 2): \"All characters composing any multiple-character separator or "
+        + "multiple-character indicator shall be specified on the same line. All characters forming an invocation "
+        + "operator shall be specified on the same line.\" Write all its characters on one line.", "ISO §6.3.5 2)");
+
+    /// <summary>COBOLNET2689 — an inline comment on a line that ends in a floating literal continuation indicator
+    /// (kb/Work PB1359). §6.3.7.3 / §6.4.4.3: an inline comment may be written on any line except one that contains
+    /// a floating literal continuation indicator.</summary>
+    public static readonly DiagnosticDescriptor FloatingContinuationComment = new(
+        "COBOLNET2689", "floating-continuation-comment", EditionSeverity.Error,
+        "A line that contains a floating literal continuation indicator also holds an inline comment. ISO §6.3.7.3 "
+        + "and §6.4.4.3: \"An inline comment may be written on any line of a compilation group except on a line that "
+        + "contains a floating literal continuation indicator.\" Move the comment to its own line.",
+        "ISO §6.3.7.3 / §6.4.4.3");
+
+    /// <summary>COBOLNET2690 — a free-form line of a continued literal that holds no literal content (kb/Work PB1359).
+    /// §6.4.2.</summary>
+    public static readonly DiagnosticDescriptor LiteralContinuationPartEmpty = new(
+        "COBOLNET2690", "literal-continuation-part-empty", EditionSeverity.Error,
+        "The continued line or a continuation line of a literal holds no literal content. ISO §6.4.2: \"At least one "
+        + "alphanumeric character, national character, or hexadecimal digit of the literal content shall be specified "
+        + "on the continued line and on each continuation line.\" Move content onto the line, or end the literal "
+        + "on the previous one.", "ISO §6.4.2");
+
+    /// <summary>COBOLNET2691 — a compiler directive written after program text on its line (kb/Work PB1690).
+    /// §7.3.3 SR2. Before, the line stayed program text and the parser rejected the <c>&gt;&gt;</c> as a stray
+    /// character (COBOL0001) without naming the directive or the rule.</summary>
+    public static readonly DiagnosticDescriptor DirectiveAfterProgramText = new(
+        "COBOLNET2691", "directive-after-program-text", EditionSeverity.Error,
+        "A compiler directive is written after program text on its line. ISO §7.3.3 SR2: \"A compiler directive "
+        + "shall be preceded only by zero, one, or more space characters.\" Write the directive on a line of its own.",
+        "ISO §7.3.3 SR2");
+
     /// <summary>COBOLNET2450 — COPY literal-1 / literal-2 that is not a plain alphanumeric literal (kb/Work PB1354):
     /// a concatenation expression or figurative constant (§7.2.3.3 SR4), or a national or boolean literal (SR5
     /// "Literal-1 and literal-2 shall be alphanumeric literals").</summary>

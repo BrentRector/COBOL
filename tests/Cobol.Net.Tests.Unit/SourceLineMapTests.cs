@@ -68,7 +68,7 @@ public sealed class SourceLineMapTests : IDisposable
             "000500 01 A PIC X(20) VALUE \"abc\n" +
             "000600-    \"def\".\n" +
             "000700 01 B PIC X.\n";
-        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(src, 2023, false, null, "p.cob");
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(src, null, "p.cob");
         var lines = m.Text.Split('\n');
         int bIndex = Array.FindIndex(lines, l => l.Contains("01 B PIC X"));
         Assert.True(bIndex >= 0, m.Text);

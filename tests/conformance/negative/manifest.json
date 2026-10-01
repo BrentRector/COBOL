@@ -1886,7 +1886,21 @@
   "pb758-invoke-end-invoke-after-using-returning",
   "pb1308-method-working-storage-every-edition",
   "pb1496-free-form-line-256",
-  "pb1803-nist-marker-outside-nist"
+  "pb1803-nist-marker-outside-nist",
+  "pb1359-floating-continuation-below-2002",
+  "pb1359-floating-on-fixed-continuation",
+  "pb1359-literal-two-continuation-forms",
+  "pb1492-continuation-no-quotation-symbol",
+  "pb1492-continuation-other-quotation-symbol",
+  "pb1492-national-literal-fixed-continuation",
+  "pb1492-pseudo-text-delimiter-split",
+  "pb1690-directive-after-program-text-fixed",
+  "pb1359-floating-continuation-inline-comment",
+  "pb1359-floating-continuation-no-content",
+  "pb1359-floating-continuation-no-quotation-symbol",
+  "pb1758-fixed-author-at-2014",
+  "pb1758-fixed-remarks-at-2023",
+  "pb1494-debugging-line-at-2014"
  ],
  "pending": []
 }

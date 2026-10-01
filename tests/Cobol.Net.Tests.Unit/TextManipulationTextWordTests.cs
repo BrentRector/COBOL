@@ -89,7 +89,7 @@ public sealed class TextManipulationTextWordTests : IDisposable
     public void FixedFormDebuggingLine_TextWordsTakePartInMatching()
     {
         var free = ReferenceFormatProcessor.NormalizeToFreeFormMapped(
-            "000100     DISPLAY\n000200D    KK.\n", 2023, false, null, "t.cob", InitialReferenceFormat.Fixed).Text;
+            "000100     DISPLAY\n000200D    KK.\n", null, "t.cob", InitialReferenceFormat.Fixed).Text;
         Assert.Contains(ReferenceFormatProcessor.DebugLineCarrier + "    KK.", free);
         var (text, bag) = Run("REPLACE ==DISPLAY KK== BY ==DISPLAY W1==.\n" + free);
         Clean(bag);

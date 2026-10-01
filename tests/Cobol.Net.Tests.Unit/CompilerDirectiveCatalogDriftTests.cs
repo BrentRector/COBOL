@@ -171,12 +171,12 @@ public sealed class CompilerDirectiveCatalogDriftTests
     {
         var bag = new DiagnosticBag();
         ReferenceFormatProcessor.NormalizeToFreeForm(
-            ">>SOURCE FORMAT IS FREE\nIDENTIFICATION DIVISION.\n", 85, permissive: false, bag, "t.cob");
+            ">>SOURCE FORMAT IS FREE\nIDENTIFICATION DIVISION.\n", new ReferenceFormatDiagnostics(85, false, bag), "t.cob");
         Assert.Contains(bag.Diagnostics, d => d.Code == "COBOLNET0900");
 
         var ok = new DiagnosticBag();
         ReferenceFormatProcessor.NormalizeToFreeForm(
-            ">>SOURCE FORMAT IS FREE\nIDENTIFICATION DIVISION.\n", 2002, permissive: false, ok, "t.cob");
+            ">>SOURCE FORMAT IS FREE\nIDENTIFICATION DIVISION.\n", new ReferenceFormatDiagnostics(2002, false, ok), "t.cob");
         Assert.DoesNotContain(ok.Diagnostics, d => d.Code == "COBOLNET0900");
     }
 
@@ -332,7 +332,7 @@ public sealed class CompilerDirectiveCatalogDriftTests
         // stage: the directive is RECOGNIZED with a comment on it, and the following segment switches.
         var bag = new DiagnosticBag();
         string free = ReferenceFormatProcessor.NormalizeToFreeForm(
-            ">>SOURCE FORMAT IS FREE *> switch\nIDENTIFICATION DIVISION.\n", 2023, permissive: false, bag, "t.cob");
+            ">>SOURCE FORMAT IS FREE *> switch\nIDENTIFICATION DIVISION.\n", new ReferenceFormatDiagnostics(2023, false, bag), "t.cob");
         Assert.DoesNotContain(bag.Diagnostics, d => d.Code == "COBOLNET1911");
         Assert.DoesNotContain(">>SOURCE", free);   // consumed, so the parser never sees it
 
@@ -356,7 +356,7 @@ public sealed class CompilerDirectiveCatalogDriftTests
         {
             var bag = new DiagnosticBag();
             string outp = ReferenceFormatProcessor.NormalizeToFreeForm(
-                $">>SOURCE FORMAT {operand}\nIDENTIFICATION DIVISION.\n", 2023, permissive: false, bag, "t.cob");
+                $">>SOURCE FORMAT {operand}\nIDENTIFICATION DIVISION.\n", new ReferenceFormatDiagnostics(2023, false, bag), "t.cob");
             Assert.Contains(bag.Diagnostics, d => d.Code == "COBOLNET1911");
             Assert.DoesNotContain(">>SOURCE", outp);
         }
@@ -371,7 +371,7 @@ public sealed class CompilerDirectiveCatalogDriftTests
         string line = $">>{word} {operand}".TrimEnd();
         if (word == "SOURCE")
             ReferenceFormatProcessor.NormalizeToFreeForm(
-                line + "\nIDENTIFICATION DIVISION.\n", edition, permissive: false, bag, "t.cob");
+                line + "\nIDENTIFICATION DIVISION.\n", new ReferenceFormatDiagnostics(edition, false, bag), "t.cob");
         else
             ConditionalCompilationProcessor.Process(
                 line + "\nIDENTIFICATION DIVISION.\n", CobolNet.Frontend.Frontend.LeftDirectives, bag, "t.cob",

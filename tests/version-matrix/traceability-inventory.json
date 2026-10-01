@@ -126,13 +126,13 @@
   "ordinal": 1,
   "subject": "Reference format",
   "rule-digest": "11fd4f5da5c1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#IsFixedForm; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#WS",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#LogicalLineBuilder",
+  "test-ref": "conformance:2002/pb1359_floating_continuation_fixed; conformance:2002/pb1359_floating_continuation_free; unit:LogicalLineBuilderTests.FloatingContinuation_JoinsTheLiteral",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1362 (also PB1359, PB1496): Four parts. a) descriptive. b) 'A COBOL compiler shall accept source text and library text written in reference format' (cite.py --check 6.1 -> OK §6.1 b)): FAILS twice — (1) a floating literal continuation indicator \"- / '- (§6.2.3.1, §6.4.2) is rejected in both formats (probe rf1.cob free: COBOL0001 near '\"DEF\"'; rf2.cob fixed: same) — no code anywhere in src handles it (searched the lexer STR_BODY, every Preprocessor/*.cs); (2) fixed-form source without a directive, which §7.3.24.3 GR2 / §6.1 intro make fixed-form by default, is reclassified FREE by the IsFixedForm heuristic when the sequence area holds letters (§6.3.2 'may consist of any character', rf7.cob: COBOL0001 unexpected 'ABC000') or when it is blank with no indicator glyph and cols 73+ hold a tag (rf8.cob: COBOL0001 near 'RF800000'). c) 'The implementor shall specify the meaning of lines and character positions' (--check OK §6.1 c)) = A.1 item 157, required + documented: docs/CONFORMANCE.md has DOC-A.1-158 only — no DOC-A.1-157 determination. d) the leading/trailing implied separator space: the lexer's WS skip makes it structural — CONFORMS. Verdict DIVERGES on b); findings F1 and F4. || Editions (adjudicator, verbatim): 85/2002/2014/2023 (Clause 6 applies to every edition; free-form and floating indicators exist from 2002 — absent from 2023 Annex E, so present at 2014)",
-  "state": "GAP"
+  "notes": "kb/Work PB1359 landed the last failure of b) 'A COBOL compiler shall accept source text and library text written in reference format': the floating literal continuation indicator is accepted in both formats (the other, the fixed-form default, landed with PB1362; c) is DOC-A.1-157 with PB1586/PB1800; the free-form 255-position limit is PB1496).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.1-2",
@@ -157,11 +157,11 @@
   "subject": "Reference format",
   "rule-digest": "605f8fd34b8f",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#OnFreeFormLineTooLong",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLines; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatDiagnostics.cs#OnFreeFormLineTooLong",
   "test-ref": "conformance:2023/pb1496_free_form_line_255; conformance:negative/pb1496-free-form-line-256; unit:PhysicalLinesTests.FreeForm_LineOfMoreThan255Positions_IsDiagnosed; unit:PhysicalLinesTests.FreeForm_TheLimitCountsTheExpandedLine",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1496. cite.py --check 6.1 'ranging from a minimum of 0 to a maximum of 255' OK 6.1 a); 'The implementor shall specify any control characters that terminate a free-form line' OK 6.1 b). a) a free-form line of more than 255 character positions is COBOLNET2653 (probe rf9-shaped: 256 positions diagnosed at column 256, exactly 255 accepted, at --std 85 2002 2014 2023; a fixed-form line past margin R is not diagnosed). b) the terminator set and its reach into comments and literals are DOC-A.1-156.",
+  "notes": "kb/Work PB1496. cite.py --check 6.1 'ranging from a minimum of 0 to a maximum of 255' OK 6.1 a); 'The implementor shall specify any control characters that terminate a free-form line' OK 6.1 b). a) a free-form line of more than 255 character positions is COBOLNET2653 (probe rf9-shaped: 256 positions diagnosed at column 256, exactly 255 accepted, at --std 85 2002 2014 2023; a fixed-form line past margin R is not diagnosed). b) the terminator set and its reach into comments and literals are DOC-A.1-156. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine (kb/Work PB1804 / PB1640: the free-form arm is ConvertFreeLines over the shared LogicalLineBuilder, and ReferenceFormatDiagnostics moved to its own file) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#OnFreeFormLineTooLong (kb/Work PB1804 / PB1640: the free-form arm is ConvertFreeLines over the shared LogicalLineBuilder, and ReferenceFormatDiagnostics moved to its own file)",
   "state": "OK"
  },
  {
@@ -172,11 +172,11 @@
   "subject": "Floating indicators",
   "rule-digest": "64cae027c749",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ScanProgramText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ScanProgramText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLines",
   "test-ref": "conformance:2002/pb1493_floating_comment_fixed; conformance:2002/pb1493_floating_comment_free",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1493: *> directly followed by comment-text is a comment in both formats (W-D in 2002/pb1493_floating_comment_fixed, W-P in 2002/pb1493_floating_comment_free), and because comments are removed in the §6.5 pass no later text-analysis stage can read them otherwise. The REPLACE ==A== *>junk BY ==B==. probe that the refuter cited is CORRECTLY rejected: §6.3.7.3 \"All characters following the floating comment indicator up to margin R are comment-text\", so BY is inside the comment; with BY on the next line the statement works (golden 2002/pb1493_floating_comment_fixed). retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#StripInlineComment (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
+  "notes": "kb/Work PB1493: *> directly followed by comment-text is a comment in both formats (W-D in 2002/pb1493_floating_comment_fixed, W-P in 2002/pb1493_floating_comment_free), and because comments are removed in the §6.5 pass no later text-analysis stage can read them otherwise. The REPLACE ==A== *>junk BY ==B==. probe that the refuter cited is CORRECTLY rejected: §6.3.7.3 \"All characters following the floating comment indicator up to margin R are comment-text\", so BY is inside the comment; with BY on the next line the statement works (golden 2002/pb1493_floating_comment_fixed). retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#StripInlineComment (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine (kb/Work PB1804: the one literal-aware scan moved to LogicalLineBuilder.cs and the free arm is ConvertFreeLines) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ScanProgramText (kb/Work PB1804: the one literal-aware scan moved to LogicalLineBuilder.cs and the free arm is ConvertFreeLines)",
   "state": "OK"
  },
  {
@@ -187,11 +187,11 @@
   "subject": "Floating indicators",
   "rule-digest": "5d45316da471",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FloatingComment; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ReferenceFormatDiagnostics",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ReportComment; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatDiagnostics.cs#ReferenceFormatDiagnostics",
   "test-ref": "conformance:negative/pb1493-floating-comment-not-separated; unit:ReferenceFormatLogicalConversionTests.FloatingComment_NotPrecededBySeparatorSpace_IsDiagnosed",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1493: a *> not preceded by a separator space (the start of the program text is preceded by an implied space, §6.3.5 / §6.4.2) is COBOLNET2495 in both reference formats. Exception b) (after a floating literal continuation indicator) has no instance to accept: that indicator is not recognized at all yet (kb/Work PB1359, which owns it). retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#StripInlineComment (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
+  "notes": "kb/Work PB1493: a *> not preceded by a separator space (the start of the program text is preceded by an implied space, §6.3.5 / §6.4.2) is COBOLNET2495 in both reference formats. Exception b) (after a floating literal continuation indicator) has no instance to accept: that indicator is not recognized at all yet (kb/Work PB1359, which owns it). retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#StripInlineComment (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FloatingComment (kb/Work PB1804 / PB1640: the floating-comment report is LogicalLineBuilder.ReportComment, and ReferenceFormatDiagnostics is its own file) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ReferenceFormatDiagnostics (kb/Work PB1804 / PB1640: the floating-comment report is LogicalLineBuilder.ReportComment, and ReferenceFormatDiagnostics is its own file)",
   "state": "OK"
  },
  {
@@ -216,13 +216,13 @@
   "ordinal": 4,
   "subject": "Floating indicators",
   "rule-digest": "f002b9f6303f",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ScanProgramText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFixed; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFloating",
+  "test-ref": "conformance:2002/pb1359_floating_continuation_fixed; conformance:2002/pb1359_floating_continuation_free; conformance:negative/pb1359-literal-two-continuation-forms; unit:LogicalLineBuilderTests.LiteralContinuedWithBothForms_IsDiagnosed; unit:LogicalLineBuilderTests.FloatingContinuation_EveryLiteralKind_BothQuotationSymbols",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1359: Rule: 'A floating literal continuation indicator shall be specified only for an alphanumeric, boolean, or national literal. A given literal shall not be continued with more than one form of continuation.' (cite.py --check 6.2.3.2 OK; §6.4.2 'the incomplete portion of the literal shall be terminated by a floating continuation indicator' and §6.3.5 'National literals may be continued only with a floating literal continuation indicator' --check OK; §6.5 rule 4 sets the end of the program-text area before the indicator). Searched src/ (grammar, Preprocessor, Editions, Compiler): no recognizer of the '\"-' / \"'-\" floating literal continuation indicator exists; the lexer's STR_BODY (CobolLexer.g4 line 872) closes the literal at the quote and the '-' lexes as MINUS; ReferenceFormatProcessor has only the col-7 '-' arm. Every LEGAL floating continuation is rejected with COBOL0001 unexpected '-': p01 free `MOVE \"ABC\"-` / `\"DEF\" TO X` (expected [ABCDEF      ]), p02 apostrophe form, p03 indicator followed by spaces, p04 hex X\"4142\"- (expected ABC), p05 national N\"AB\"- (expected ABCD), p06 boolean B\"0101\"- (expected 01011111), p07 fixed form, p08 interleaved comment/blank line, p20 at --std 2002. The negative halves (n18 numeric, n14 mixed fixed+floating) are rejected only incidentally by the same parse failure. Harm: rejects-legal-source. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (floating indicators are a COBOL-2002 introduction: §6.2.3.1 defines them for both reference formats, 1985 had only the §6.2.2 fixed indicators; Annex E, the 2014->2023 delta, lists no change to them)",
-  "state": "GAP"
+  "notes": "kb/Work PB1359 landed: the floating literal continuation indicator is recognized in ONE place (LogicalLineBuilder, both reference formats) for alphanumeric, boolean (B, BX) and national (N, NX) literals, hexadecimal alphanumeric included; 'A given literal shall not be continued with more than one form of continuation' is COBOLNET2687 (a hyphen in column 7 after a floating indicator, or after a literal a floating indicator continued before). The FIRST sentence ('only for an alphanumeric, boolean, or national literal') has no violation to detect: the indicator is recognized only inside a literal, and every quotation symbol opens one of those three kinds (the premise of a negative case is not expressible).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-6.2.3.2-5",
@@ -231,13 +231,13 @@
   "ordinal": 5,
   "subject": "Floating indicators",
   "rule-digest": "613b38a8af3f",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#Scan",
+  "test-ref": "conformance:negative/pb1359-floating-on-fixed-continuation; unit:LogicalLineBuilderTests.FloatingIndicator_OnAFixedContinuationLine_IsDiagnosed",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1359: Rule: 'A floating literal continuation indicator shall not be specified on a line that contains a fixed literal continuation indicator.' (cite.py --check 6.2.3.2 OK). The floating literal continuation indicator is not recognized anywhere in src/ (see SR-6.2.3.2-4), so this restriction has no implementing code. Probe n15_fixed_and_floating_same_line (fixed form: col-7 '-' continuation line `\"CD\"-`) is rejected with the generic COBOL0001 unexpected '-' plus COBOLNET0903 - the same failure the legal p07 gets, so it is not an enforcement of this rule. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (floating indicators are a COBOL-2002 introduction: §6.2.3.1 defines them for both reference formats, 1985 had only the §6.2.2 fixed indicators; Annex E, the 2014->2023 delta, lists no change to them)",
-  "state": "GAP"
+  "notes": "kb/Work PB1359 landed: a floating literal continuation indicator on a line that holds the fixed continuation indicator (a hyphen in column 7) is COBOLNET2686.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-6.2.3.2-6",
@@ -246,13 +246,13 @@
   "ordinal": 6,
   "subject": "Floating indicators",
   "rule-digest": "a5d3415eb552",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#AfterOpeningQuote",
+  "test-ref": "conformance:negative/pb1492-continuation-no-quotation-symbol; conformance:negative/pb1492-continuation-other-quotation-symbol; conformance:negative/pb1359-floating-continuation-no-quotation-symbol; conformance:85/pb1492_continued_literal_other_quote_content; unit:LogicalLineBuilderTests.RuleViolations_AreDiagnosedByName_InBothFormats",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1492: Rule: 'For a continued alphanumeric, boolean, or national literal, the first nonblank character of each continuation line shall be the quotation symbol used in the opening delimiter of the literal.' (cite.py --check 6.2.3.2 OK). Two halves. FLOATING half: not implemented (no floating continuation at all; n16/n17 rejected only by the generic unexpected '-'). FIXED half: HandleContinuation's in-literal arm appends a non-quote first character as content ('Not a quote - non-literal continuation') and strips ANY quote character as the resume marker without comparing it to the opening delimiter (ScanLiteralState does not record which quote opened the literal). Probes (fixed form, both --std 2023 and --std 85): n26 `MOVE \"ABC` (to col 72) / `-    DEF\" TO X.` compiles silently (only COBOLNET0903 at 2023) and runs [ABC       ] (the literal became ABC+52 spaces+DEF); n27 opened with apostrophe, continued with a quotation mark `-    \"DEF' TO X.` likewise accepted. Expected: a diagnostic on each continuation line. The correctly-continued p28 produces ABC...DEF as §6.3.5 requires. Harm: under-rejects. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (floating indicators are a COBOL-2002 introduction: §6.2.3.1 defines them for both reference formats, 1985 had only the §6.2.2 fixed indicators; Annex E, the 2014->2023 delta, lists no change to them) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
-  "state": "GAP"
+  "notes": "kb/Work PB1492 / PB1359 landed: the first nonblank character of EVERY continuation line (the fixed indicator's and the floating one's, in both reference formats) shall be the quotation symbol that opened the literal, else COBOLNET2684; the literal state carries the opening quotation symbol across lines (PB1491), so an apostrophe inside a quotation-mark literal continued by the fixed indicator is content (85/pb1492_continued_literal_other_quote_content).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-6.3.4-1",
@@ -276,13 +276,13 @@
   "ordinal": 2,
   "subject": "Fixed-form reference format",
   "rule-digest": "2deabd82a1c3",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertLine; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#Add",
+  "test-ref": "conformance:negative/pb1494-indicator-not-fixed; conformance:2002/pb1359_floating_continuation_fixed; unit:ReferenceFormatLogicalConversionTests.IndicatorArea_OnlyFixedIndicators_OutsideNist",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1494: Rule (§6.3.4 2): the program-text area may contain character-strings, separators, comments and floating indicators \"when the indicator area contains a continuation indicator or a source indicator\". cite.py --check 6.3.4 \"when the indicator area contains a continuation indicator or a source indicator\" -> OK §6.3.4 2). cite.py --check 6.2.3.1 \"Floating indicators may be used in fixed-form or free-form reference format\" -> OK. cite.py --check 6.2.2 \"any line that is not a comment line or a continuation line\" -> OK (the source indicator is SPACE). VERIFIED: source-indicator lines with words and separators compile (every probe). The floating comment indicator is stripped by StripInlineComment. The >>SOURCE directive indicator is handled by TryMatchDirective. DIVERGES, half 1: the third floating indicator, the floating literal continuation indicator (\"- / '-), is not implemented anywhere. STR_BODY in CobolLexer.g4 is '\"' (~[\"\\r\\n] | '\"\"')* '\"', which has no continuation form. No preprocessor stage joins a \"- line: grep for 'floating continuation' over src finds only the COBOLNET0903 message text. Probe ffp5 (`01 X PIC X(20) VALUE \"ABC\"-` / `    \"DEF\".`) fails with COBOL0001 \"cannot parse construct near '\\\"DEF\\\"'\" at --std 2023 and at --std 2002. Expected: X = \"ABCDEF\". DIVERGES, half 2: the indicator dispatch treats column-7 characters that are NOT fixed indicators (§6.2.2 lists only * / - space) as follows. S/Y/P/J/H/E/U, and D at 2023 where D is not in the table, become comment lines with no diagnostic. Every other character (for example 'X') makes the line an ordinary SOURCE line. Probe ffp10 at --std 2023 and --std 85: the 'E' line's DISPLAY \"E-LINE\" silently vanishes and the 'X' line's DISPLAY \"X-LINE\" executes. Both lines are nonconforming, and neither draws a diagnostic. These are NIST CCVS alternate-configuration letters, active outside --nist and not dialect-gated. See findings F3 (floating continuation) and F5 (indicator dispatch). || Editions (adjudicator, verbatim): 1985, 2002, 2014, 2023 for character-strings, separators and the continuation/source indicators. The floating-indicator content (*>, >>, \"- / '-) applies to 2002, 2014 and 2023 (§6.2.3.1: 'Floating indicators may be used in fixed-form or free-form reference format') || Code sites (adjudicator, verbatim): src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ConvertFixedToFree (switch on indicator: default arm, '-' arm, 'P'/'J'/'H'/'E'/'U' and 'D'/'S'/'Y' arms); src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ConvertFixedToFree (ConvertFixedToFree was deleted by PB1800; FixedFormConverter is the converter it named)",
-  "state": "GAP"
+  "notes": "kb/Work PB1494 + PB1359 landed both halves: the third floating indicator (the floating literal continuation indicator) is implemented in both reference formats, and a column-7 character that is not a fixed indicator is COBOLNET2616 (the NIST CCVS letters only under --nist), so the program-text area holds text only 'when the indicator area contains a continuation indicator or a source indicator'.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-6.3.4-3",
@@ -306,13 +306,13 @@
   "ordinal": 1,
   "subject": "Fixed-form reference format",
   "rule-digest": "5d73ba6c96f6",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ScanProgramText",
-  "test-ref": "conformance:85/pb1491_continued_literal_logical_line; unit:ReferenceFormatLogicalConversionTests.ContinuedLiteral_JoinsAcrossADiscardedLine",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFixed",
+  "test-ref": "conformance:85/pb1491_continued_literal_logical_line; unit:ReferenceFormatLogicalConversionTests.ContinuedLiteral_JoinsAcrossADiscardedLine; conformance:negative/pb1492-national-literal-fixed-continuation; unit:LogicalLineBuilderTests.NationalLiteral_FixedContinuation_IsDiagnosed",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1491 landed: the continuation line is the next line that is not a comment line or a blank line - FixedFormConverter keeps the literal state across discarded lines and joins the latest logical line (a * or / comment line, an empty line and a sequence-number-only line between the parts, golden 85/pb1491_continued_literal_logical_line). Remaining: a NATIONAL literal continued by the fixed indicator (\"alphanumeric or boolean literal\" only) is accepted silently - kb/Work PB1492. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ScanLiteralState (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
-  "state": "GAP"
+  "notes": "kb/Work PB1491 + PB1492 landed: the fixed continuation indicator continues an alphanumeric or boolean literal (the next line that is not a comment or blank line is the continuation line), and a NATIONAL literal continued by it is COBOLNET2685.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-6.3.5-2",
@@ -321,13 +321,13 @@
   "ordinal": 2,
   "subject": "Fixed-form reference format",
   "rule-digest": "5cc8c58a91e2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ProgramTextArea",
-  "test-ref": "conformance:85/pb1491_continued_literal_logical_line; unit:ReferenceFormatLogicalConversionTests.ContinuedLiteral_JoinsAcrossADiscardedLine",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFixed; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFloating",
+  "test-ref": "conformance:85/pb1491_continued_literal_logical_line; unit:ReferenceFormatLogicalConversionTests.ContinuedLiteral_JoinsAcrossADiscardedLine; conformance:2002/pb1359_floating_continuation_fixed; conformance:negative/pb1492-continuation-no-quotation-symbol; conformance:negative/pb1492-pseudo-text-delimiter-split; unit:LogicalLineBuilderTests.MultipleCharacterToken_SplitAcrossTheJoin_IsDiagnosed",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1491 landed the fixed-indicator half: \"any spaces at the end of the fixed-form continued line are part of the literal\" (the program-text area is read space-filled to margin R, DOC-A.1-157) and \"the next line that is not a comment line or a blank line is the continuation line\". Remaining: the floating literal continuation indicator (kb/Work PB1359) and the matching-quotation-symbol requirement (kb/Work PB1492). retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ScanLiteralState (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
-  "state": "GAP"
+  "notes": "kb/Work PB1491 + PB1359 + PB1492 landed: spaces at the end of the fixed-form continued line are part of the literal (program-text area read space-filled to margin R, DOC-A.1-157); the continuation line is the next non-comment non-blank line, for the fixed and the floating indicator; its first nonblank character is the matching quotation symbol (COBOLNET2684); a join that would SPELL a multiple-character separator, invocation operator or indicator split across lines is COBOLNET2688 (== and ::) / COBOLNET2496 (*> and >>).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.5-1",
@@ -352,11 +352,11 @@
   "subject": "Reference format",
   "rule-digest": "2121317b3c52",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLines; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#Add",
   "test-ref": "conformance:85/pb1491_continued_literal_logical_line; conformance:2002/pb1493_floating_comment_fixed; conformance:2002/pb1493_floating_comment_free; unit:ReferenceFormatLogicalConversionTests.ContinuedLiteral_JoinsAcrossADiscardedLine; unit:ReferenceFormatLogicalConversionTests.CommentLines_BecomeEmpty_InBothReferenceFormats",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1491/PB1493: a comment line or blank line is logically discarded in BOTH reference formats - it becomes an empty line (slot kept for the line map), is never the continuation join target and never resets a continued literal; no later stage (lexer picture mode, COPY/REPLACE scanner) sees comment-text. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
+  "notes": "kb/Work PB1491/PB1493: a comment line or blank line is logically discarded in BOTH reference formats - it becomes an empty line (slot kept for the line map), is never the continuation join target and never resets a continued literal; no later stage (lexer picture mode, COPY/REPLACE scanner) sees comment-text. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine (kb/Work PB1804: the free arm is ConvertFreeLines feeding LogicalLineBuilder.Add)",
   "state": "OK"
  },
  {
@@ -367,11 +367,11 @@
   "subject": "Reference format",
   "rule-digest": "da2605bcefd8",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ScanProgramText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ScanProgramText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLines",
   "test-ref": "conformance:2002/pb1493_floating_comment_fixed; conformance:2002/pb1493_floating_comment_free; unit:ReferenceFormatLogicalConversionTests.InlineCommentOnAContinuationLine_IsRemovedBeforeTheNextJoin; unit:ReferenceFormatLogicalConversionTests.FloatingIndicatorInsideALiteral_IsContent",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1491/PB1493: the inline comment is removed on EVERY line - source lines, continuation lines (with the literal state carried in, so a continuation appended after it is not swallowed) and free-form lines - by the ONE literal-aware scan ScanProgramText; *> inside a literal stays content. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#StripInlineComment (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
+  "notes": "kb/Work PB1491/PB1493: the inline comment is removed on EVERY line - source lines, continuation lines (with the literal state carried in, so a continuation appended after it is not swallowed) and free-form lines - by the ONE literal-aware scan ScanProgramText; *> inside a literal stays content. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#StripInlineComment (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine (kb/Work PB1804: the one literal-aware scan moved to LogicalLineBuilder.cs and the free arm is ConvertFreeLines) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ScanProgramText (kb/Work PB1804: the one literal-aware scan moved to LogicalLineBuilder.cs and the free arm is ConvertFreeLines)",
   "state": "OK"
  },
  {
@@ -381,13 +381,13 @@
   "ordinal": 4,
   "subject": "Reference format",
   "rule-digest": "01f1b4b2b883",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#Scan; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ScanProgramText",
+  "test-ref": "conformance:2002/pb1359_floating_continuation_fixed; conformance:2002/pb1359_floating_continuation_free; unit:LogicalLineBuilderTests.FloatingContinuation_JoinsTheLiteral; unit:LogicalLineBuilderTests.FloatingContinuation_KeepsSpacesBeforeTheIndicator_AndIgnoresSpacesAfterIt",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1359: 'If the line is a fixed-form or free-form line that contains a floating literal continuation indicator, the end of the program text area is set to immediately follow the character preceding the continuation indicator' (--check OK §6.5 4)); the indicator is '\"-' / \"'-\" (--check OK §6.2.3.1). Searched src/Cobol.Net.Frontend (Preprocessor/*.cs, Grammar/Core/CobolLexer.g4 STR_BODY: '\"' (~[\"\\r\\n] | '\"\"')* '\"') and src/Cobol.Net.Compiler: no code recognizes the indicator; STR_BODY cannot span a line, and ReferenceFormatProcessor handles only the col-7 hyphen. Probes: rf1.cob free-form `VALUE \"ABC\"-` / `\"DEF\".` -> COBOL0001 cannot parse near '\"DEF\"'; rf2.cob same in fixed form -> same; rf10.cob apostrophe form with an interspersed comment and blank line -> COBOL0001; rf12.cob national `N\"AB\"-` -> COBOL0001 (§6.3.5: national literals may be continued ONLY this way, so a continued national literal cannot be written at all). COBOLNET0903's message tells the user to 'use the floating continuation indicator' — which the compiler then rejects. Finding F1. || Editions (adjudicator, verbatim): 2002/2014/2023 (the floating literal continuation indicator belongs to the 2002 floating-indicator set; not in 2023 Annex E, so present at 2014; in 2023 it is THE non-obsolete way to continue a literal — the fixed '-' is obsolete, Annex F.2 item 4)",
-  "state": "GAP"
+  "notes": "kb/Work PB1359 landed: a line that ends in a floating literal continuation indicator ends its program text before the indicator (the literal stays open; the spaces before the indicator are literal content), in fixed and free form; the indicator is recognized only when nothing but spaces (and, diagnosed, an inline comment) follow it.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.5-5",
@@ -396,13 +396,13 @@
   "ordinal": 5,
   "subject": "Reference format",
   "rule-digest": "ff0cdad9ea7f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#IsCommentEntryText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#KindOf",
-  "test-ref": "unit:ReferenceFormatLogicalConversionTests.CommentEntryParagraphs_AreOnlyInTheIdentificationDivision; unit:ReferenceFormatLogicalConversionTests.IndicatorArea_OnlyFixedIndicators_OutsideNist; conformance:negative/pb1494-indicator-not-fixed",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#CommentEntryOf; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#KindOf; src/Cobol.Net.Frontend/Preprocessor/DivisionCursor.cs#DivisionCursor",
+  "test-ref": "unit:ReferenceFormatLogicalConversionTests.CommentEntryParagraphs_AreOnlyInTheIdentificationDivision; unit:ReferenceFormatLogicalConversionTests.IndicatorArea_OnlyFixedIndicators_OutsideNist; conformance:negative/pb1494-indicator-not-fixed; conformance:85/pb1758_comment_entry_multiline; conformance:negative/pb1758-fixed-author-at-2014; conformance:negative/pb1758-fixed-remarks-at-2023; unit:LogicalLineBuilderTests.CommentEntryParagraph_KeepsItsHeader; conformance:85/pb1494_remarks_paragraph_in_copybook; conformance:85/pb1494_comment_entry_in_copybook; unit:LogicalLineBuilderTests.LibraryText_IsConvertedInTheDivisionItsCopyStatementStandsIn",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1494 (w70b): '5) If the line is a fixed-form line, contains a source indicator, and is not a continuation line, the program text area of that line is copied to the resultant compilation group.' (cite.py --check 6.5 -> OK §6.5 5)). FIXED: the obsolete comment-entry reading (AUTHOR/INSTALLATION/DATE-WRITTEN/DATE-COMPILED/SECURITY/REMARKS header and its Area-B body discarded as commentary) now applies only inside an IDENTIFICATION DIVISION, so a PROCEDURE DIVISION paragraph named REMARKS and the lines after it are copied (probe rf18: before, only START printed and the rest was silently dropped; after, the lines reach the parser, which then rejects REMARKS as a keyword - a separate reserved-word lead); and a line whose indicator area is not a fixed indicator (§6.2.2, OK) is diagnosed COBOLNET2616 instead of being silently dropped (E) or compiled (X) - the CCVS letters are honored under --nist only. PARTIAL residue: at 2002+ a FIXED-FORM identification comment paragraph is still discarded whole, so the §6.5 5) copy does not happen and the identification-comments-removed-2002 gate (COBOLNET0902) never sees the paragraph that free form reports - registered as a w70b lead.",
-  "state": "GAP"
+  "notes": "kb/Work PB1494 landed (w70b the indicator area and the division scope; w1001c the edition scope): every source-indicator line's program text is copied (a PROCEDURE DIVISION paragraph named REMARKS is program text); the obsolete COBOL-85 comment-entry (AUTHOR / INSTALLATION / DATE-WRITTEN / DATE-COMPILED / SECURITY / REMARKS, IDENTIFICATION DIVISION only) keeps its paragraph HEADER, written 'AUTHOR. .', and only the entry is discarded, so the ONE removal gate (COBOLNET0902 from 2002, owner decision kb/Work R61) sees a fixed-form paragraph as it sees a free-form one; the D indicator is gated by row debugging-line-removed-2014 (obsolete 2002, removed 2014).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.5-6",
@@ -441,13 +441,13 @@
   "ordinal": 8,
   "subject": "Reference format",
   "rule-digest": "46e494bb7516",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFloating",
+  "test-ref": "conformance:2002/pb1359_floating_continuation_fixed; conformance:2002/pb1359_floating_continuation_free; conformance:2002/pb1359_floating_continuation_copy_replacing; unit:LogicalLineBuilderTests.FloatingContinuation_SkipsCommentAndBlankLines",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1359: 'If the line is a fixed-form or free-form continuation line that follows a line continued with a floating literal continuation indicator, the content of the program-text area, beginning with the first character after the initial quotation symbol, is appended immediately to the right of the last character in the latest logical line' (--check OK §6.5 8)). There is no floating-continuation state anywhere in src (see GR-6.5-4): the free arm copies lines unchanged and the fixed arm joins only on a col-7 hyphen. Probes rf1 (free), rf2 (fixed), rf10 (apostrophe + interspersed comment/blank, which §6.4.2 permits), rf12 (national) all fail COBOL0001 at the continuation line. Expected rf1: X = 'ABCDEF' padded to 12. Finding F1. || Editions (adjudicator, verbatim): 2002/2014/2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1359 landed: the next line that is not a comment or blank line after a floating-continued line is its continuation line; its content after the initial quotation symbol is appended immediately to the latest logical line, in both formats, across comment and blank lines, and a literal may be continued over any number of lines.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-6.5-9",
@@ -621,13 +621,13 @@
   "ordinal": 8,
   "subject": "COPY statement",
   "rule-digest": "faa8650d0f61",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#NormalizeToFreeFormMapped; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFloating",
+  "test-ref": "conformance:2002/pb1359_floating_continuation_copy_replacing; conformance:2002/pb1359_floating_continuation_fixed",
   "derivation": "",
-  "editions": "2023",
-  "notes": "kb/Work PB1359 (registrar 15a). cite.py --check 7.2.3.3 'may be continued in accordance with the rules of reference format' OK. Fixed continuation works: r01 (2023, fixed literal continuation inside ==\"HEL / -\"LO\"==) -> WORLD; r02 word continuation at --std 2014 -> replaced (2023 rejects word continuation per E.2, correct). The FLOATING literal continuation indicator (§6.2.3.1 '\"- '- literal continuation indicator', --check OK; the only non-obsolete form in 2023) is not implemented anywhere in ReferenceFormatProcessor: s11 '01 T PIC X(5) VALUE \"AB\"- / \"CDE\".' is rejected (COBOL0001), and inside pseudo-text s10 '==\"HEL\"- / \"LO\"== BY ==\"WOR\"- / \"LD\"==' silently fails to match (HELLO printed; expected WORLD). Finding F5 (root cause is §6, not §7.2.3). || editions (adjudicator): all four editions (1985/2002/2014/2023) per the 2023 clause text; Annex E.2 item 1 bullet 4 changes only the non-pseudo-text REPLACING operands; the pre-2023 texts of this rule are not in-repo, so no earlier edition boundary is asserted retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's))",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1359 landed: a literal continued with the floating indicator inside COPY REPLACING pseudo-text is joined by the §6.5 logical conversion BEFORE text manipulation, so pseudo-text-1 \"HELLO\" matches the library text's literal (golden 2002/pb1359_floating_continuation_copy_replacing); fixed-indicator continuation inside pseudo-text already worked (PB1491).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-9",
@@ -1101,13 +1101,13 @@
   "ordinal": 8,
   "subject": "REPLACE statement",
   "rule-digest": "a53b5f30d57f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadOperand; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ContinueFloating",
+  "test-ref": "conformance:2002/pb1359_floating_continuation_fixed; conformance:2002/pb1359_floating_continuation_free",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1359 (registrar 15a). Rule (cite.py --check 7.2.4.3 \"may be continued in accordance with the rules of reference format\" -> OK 7.2.4.3 8)). Continuation is resolved by ReferenceFormatProcessor before the REPLACE pass, so pseudo-text inherits it. Verified: fixed-indicator word continuation inside pseudo-text-1 and literal continuation inside pseudo-text-2 at --std 85 and 2014 (probe sr8.cob -> HELLO-WORLD); at 2023 the fixed literal continuation works with the obsolete warning COBOLNET0903 (sr8f.cob -> HELLO-WORLD) and word continuation draws COBOLNET0902 (removed 2023 per Annex E.2 item 1 -- correct). NOT working: the floating literal continuation indicator \"- (6.2.3.1, cite.py --check 6.2.3.1 \"continuation of a literal when specified in an unterminated literal\" -> OK) -- probes sr8d.cob (fixed form) and sr8e.cob (free form) fail with COBOL0001 at the continuation line both inside pseudo-text AND in an ordinary VALUE clause, so the defect is the reference-format processor's, not REPLACE's; no kb/Work note owns it (searched). -> PARTIAL. || editions (adjudicator): 85, 2002, 2014, 2023 (2023 text; Annex E records no change to this rule 2014->2023) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadReplaceOperand (the symbol was removed by kb/Work PB1350/PB1354; the successor that now implements the same step is named in its place (verdict untouched — the row is another note's)) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#HandleContinuation (moved or replaced by the ONE §6.5 logical conversion in ReferenceFormatProcessor.LogicalConversion.cs (kb/Work PB1491))",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1359 landed: a literal continued with the floating indicator inside REPLACE pseudo-text (fixed and free form) is joined before text manipulation; REPLACE ==XX1== BY ==MOVE \"HELLO-WO\"-/\"RLD\" TO W-A== sets W-A to HELLO-WORLD.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.4.3-9",
@@ -1402,11 +1402,11 @@
   "subject": "Compiler directives",
   "rule-digest": "407508469427",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#DirectiveText",
-  "test-ref": "conformance:negative/pb1361-directive-after-program-text; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; unit:ReferenceFormatLogicalConversionTests.FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#FormatSegments; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#DirectiveText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ScanProgramText; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#DirectiveAfterText",
+  "test-ref": "conformance:negative/pb1361-directive-after-program-text; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; conformance:negative/pb1690-directive-after-program-text-fixed; unit:ReferenceFormatLogicalConversionTests.FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective_AndIsDiagnosed; unit:ReferenceFormatLogicalConversionTests.DirectiveAfterProgramText_IsDiagnosedByName",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1361 (w70b): '2) A compiler directive shall be preceded only by zero, one, or more space characters.' (cite.py --check 7.3.3 -> OK §7.3.3 2)). CompilerDirectiveLine.TryParse has ONE reading (only spaces/tab before >>); the allowSequenceArea 'digits or spaces' mode is deleted. The reference-format stage hands it the program-text area of the format in effect (DirectiveText: positions 8 to margin R of a source line in fixed form, §7.3.3 SR3 'When the reference format is fixed-form, a compiler directive shall be written in the program-text area' -> OK §7.3.3 3); the whole line in free form), so '       12 >>SOURCE FORMAT FREE' (fixed) and '000100 >>SOURCE FORMAT FIXED' (free) are program text, not switches, and are rejected (COBOL0001); the post-normalization stages already held the same reading.",
+  "notes": "kb/Work PB1361 (w70b): '2) A compiler directive shall be preceded only by zero, one, or more space characters.' (cite.py --check 7.3.3 -> OK §7.3.3 2)). CompilerDirectiveLine.TryParse has ONE reading (only spaces/tab before >>); the allowSequenceArea 'digits or spaces' mode is deleted. The reference-format stage hands it the program-text area of the format in effect (DirectiveText: positions 8 to margin R of a source line in fixed form, §7.3.3 SR3 'When the reference format is fixed-form, a compiler directive shall be written in the program-text area' -> OK §7.3.3 3); the whole line in free form), so '       12 >>SOURCE FORMAT FREE' (fixed) and '000100 >>SOURCE FORMAT FIXED' (free) are program text, not switches, and are rejected (COBOL0001); the post-normalization stages already held the same reading. retired-witness: unit:ReferenceFormatLogicalConversionTests.FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective (kb/Work PB1690: the test now also pins the named diagnostic COBOLNET2691 and is renamed FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective_AndIsDiagnosed)",
   "state": "OK"
  },
  {
@@ -64222,11 +64222,11 @@
   "subject": "Reference format (meaning of lines and character positions in free-form and fixed-form format)",
   "rule-digest": "6f34dcc9e8c7",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-157; src/Cobol.Net.Frontend/Preprocessor/PhysicalLines.cs#Read; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-157; src/Cobol.Net.Frontend/Preprocessor/PhysicalLines.cs#Read; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLines",
   "test-ref": "conformance:85/pb1586_tab_stops_fixed_form; conformance:2023/pb1586_tab_in_literal; conformance:2023/pb1586_tab_free_form; conformance:2023/pb1496_free_form_line_255; conformance:negative/pb1496-free-form-line-256; unit:PhysicalLinesTests.ATabAdvancesToTheNextTabStop; unit:PhysicalLinesTests.FreeForm_LineOfMoreThan255Positions_IsDiagnosed",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1586 + PB1496 + PB1800. cite.py --check 6.1 'The implementor shall specify the meaning of lines and character positions' OK 6.1 c); 6.1 'ranging from a minimum of 0 to a maximum of 255' OK 6.1 a). The determination is written and now true of the compiler: ONE line-entry stage (PhysicalLines.Read) expands every TAB to the next tab stop (positions 1, 9, 17, ...) before any stage reads the line, literals included (owner decision R55); a free-form line of more than 255 expanded positions is COBOLNET2653 at every edition; a fixed-form line is not subject to the limit (6.1 2) b)); the short-line padding half landed under PB1491. Probed: two leading TABs in fixed form start DISPLAY at position 17 (before: COBOLNET2616 'column 7 holds L'); 000100<TAB><TAB>DISPLAY likewise; a TAB at position 64 carries the next text past margin R, where it is ignored.",
+  "notes": "kb/Work PB1586 + PB1496 + PB1800. cite.py --check 6.1 'The implementor shall specify the meaning of lines and character positions' OK 6.1 c); 6.1 'ranging from a minimum of 0 to a maximum of 255' OK 6.1 a). The determination is written and now true of the compiler: ONE line-entry stage (PhysicalLines.Read) expands every TAB to the next tab stop (positions 1, 9, 17, ...) before any stage reads the line, literals included (owner decision R55); a free-form line of more than 255 expanded positions is COBOLNET2653 at every edition; a fixed-form line is not subject to the limit (6.1 2) b)); the short-line padding half landed under PB1491. Probed: two leading TABs in fixed form start DISPLAY at position 17 (before: COBOLNET2616 'column 7 holds L'); 000100<TAB><TAB>DISPLAY likewise; a TAB at position 64 carries the next text past margin R, where it is ignored. retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#ConvertFreeLine (kb/Work PB1804: the free-form 255-position limit is asked in ConvertFreeLines)",
   "state": "OK"
  },
  {

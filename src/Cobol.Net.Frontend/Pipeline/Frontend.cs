@@ -137,9 +137,12 @@ public sealed class Frontend
             // are the compilation's (a DEFINE's SR2 redefinition, a FLAG warning or a line's reference-format gate
             // depends on the state in effect).
             var passDiagnostics = new DiagnosticBag();
-            var (normalized, referenceFormats) = Normalize(raw, sourcePath, passDiagnostics, formatOps);
+            // ONE reference-format diagnostics per pass: the main source and every copybook report through it, so a
+            // once-per-compilation gate (the obsolete column-7 hyphen) fires once however many files use it (kb/Work PB1640).
+            var referenceFormatGates = new ReferenceFormatDiagnostics(DialectLevel, Permissive, passDiagnostics);
+            var (normalized, referenceFormats) = Normalize(raw, sourcePath, referenceFormatGates, formatOps);
             var (processed, directives, encounters, formats) =
-                Preprocess(normalized, referenceFormats, sourcePath, passDiagnostics, implicitOps, formatOps);
+                Preprocess(normalized, referenceFormats, sourcePath, passDiagnostics, referenceFormatGates, implicitOps, formatOps);
             var passLineMap = new SourceLineMap(processed.Lines);
             LineMap = passLineMap;
             var (tree, parsed) = LexAndParse(processed.Text, sourcePath, directives.CobolWordsMap, passDiagnostics);
@@ -248,15 +251,15 @@ public sealed class Frontend
     /// </summary>
     /// <returns>The logical free-form text and the reference format each physical line was read in — which the COPY
     /// statements of the text need (§7.3.24.3 3), kb/Work PB1067).</returns>
-    private (MappedText Text, ReferenceFormatMap Formats) Normalize(string raw, string sourcePath, DiagnosticBag diagnostics,
-        ImplicitFormatOps implicitOps)
+    private (MappedText Text, ReferenceFormatMap Formats) Normalize(string raw, string sourcePath,
+        ReferenceFormatDiagnostics referenceFormatGates, ImplicitFormatOps implicitOps)
     {
         // The normalizer's line-entry stage (PhysicalLines, kb/Work PB1800) reads the raw text: terminators, tabs and —
         // under --nist only (PB1803) — the line-count-preserving archive-marker strip all happen there.
         // The edition-aware overload carries the fixed-form continuation gates (VCR rows 2/94, W3): only the
         // column-aware pass can see the col-7 indicator, so the per-edition obligations emit HERE. Mapped (kb/Work
         // PB82): a fixed-form continuation JOINS physical lines, and the map records which line each output came from.
-        var text = ReferenceFormatProcessor.NormalizeToFreeFormMapped(raw, DialectLevel, Permissive, diagnostics, sourcePath,
+        var text = ReferenceFormatProcessor.NormalizeToFreeFormMapped(raw, referenceFormatGates, sourcePath,
             InitialFormat.InitialFixed(), out var formats, ccvsIndicators: NistTestName is not null,   // kb/Work PB1494
             implicitOps: implicitOps.For(sourcePath));   // §14.9.28.4 GR14's implicit PUSH/POP ALL written in the source (kb/Work PB1066)
         return (text, formats);
@@ -269,7 +272,7 @@ public sealed class Frontend
     private (MappedText Text, DirectiveResults Directives, ConditionalCompilationResult Encounters,
         IReadOnlyDictionary<string, ReferenceFormatMap> Formats) Preprocess(
         MappedText normalized, ReferenceFormatMap referenceFormats, string sourcePath, DiagnosticBag diagnostics,
-        IReadOnlyList<KeyedDirectiveOp> implicitOps, ImplicitFormatOps formatOps)
+        ReferenceFormatDiagnostics referenceFormatGates, IReadOnlyList<KeyedDirectiveOp> implicitOps, ImplicitFormatOps formatOps)
     {
         // The MERGED text-manipulation driver (ISO §7.2.1) — conditional compilation INTERLEAVED with COPY, so a
         // >>DEFINE/>>IF/>>EVALUATE INSIDE a copybook is processed (the CC-before-COPY split could not see them), while
@@ -278,7 +281,8 @@ public sealed class Frontend
         // COPY runs BEFORE NIST substitution so placeholders inside copied library text are substituted.
         var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
             dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs, ccvsIndicators: NistTestName is not null,
-            implicitFormatOps: formatOps);   // library text's share of GR14's implicit PUSH/POP ALL (kb/Work PB1066)
+            implicitFormatOps: formatOps,   // library text's share of GR14's implicit PUSH/POP ALL (kb/Work PB1066)
+            referenceFormatGates: referenceFormatGates);   // library text reports through the compilation's reference-format gates (PB1640)
         copy.RegisterReferenceFormat(sourcePath, referenceFormats);
         var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, copy, LeftDirectives,
             diagnostics, sourcePath, DialectLevel, Permissive, Inputs, implicitOps);

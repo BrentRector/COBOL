@@ -582,7 +582,11 @@
   "pb1305_report_varying_expression",
   "pb1234_report_control_float",
   "pb1115_prototype_group_description",
-  "pb1112_active_class_invocation"
+  "pb1112_active_class_invocation",
+  "pb1359_floating_continuation_fixed",
+  "pb1359_floating_continuation_free",
+  "pb1359_floating_continuation_copy_replacing",
+  "pb1494_debugging_line_obsolete_2002"
   ],
   "pending": []
 }

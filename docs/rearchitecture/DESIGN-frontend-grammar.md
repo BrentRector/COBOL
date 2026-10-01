@@ -803,7 +803,7 @@ reference formats, and the only place source comments are recognized. Its model:
   / `FormatSegments`, `FixedFormConverter.Convert` and `ConvertFreeLines` — takes `ReadOnlySpan<PhysicalLine>` and never
   a string, so no caller can bypass the reader; `StripNistArchiveMarkers`, `ConvertFixedToFree`, the string
   `IsFixedForm` and the per-segment re-join are deleted. The free-form 255-position limit (§6.1 3) a); COBOLNET2653) is
-  asked in the free-form arm (`ConvertFreeLine`) on the expanded line — never on a fixed-form line, which may run past
+  asked in the free-form arm (`ConvertFreeLines`) on the expanded line — never on a fixed-form line, which may run past
   margin R (§6.1 2) b)). Nothing after the stage has a tab or CR rule: the lexer's `WS` set is `[ \n]`, `TextWordScanner`
   and `SeparatorRule` agree, and `PhysicalLinesDriftTests` fails if a pipeline stage spells `\t` or `\r`, if a
   reference-format walker splits text itself, or if `PhysicalLines.Read` gains a second production caller.
@@ -822,50 +822,76 @@ reference formats, and the only place source comments are recognized. Its model:
   state, and a SOURCE FORMAT directive on the first line may be in either format (§7.3.24.3 4)).
   `CompilerDirectiveLine.TryParse` has ONE reading — only spaces before `>>` — shared with every later stage.
 
-- **Lines, not a character buffer.** The resultant compilation group is a list of lines with a parallel origin list
-  (kb/Work PB82) — one resultant line per physical line, except a fixed-form continuation line, which occupies none.
+- **ONE `LogicalLineBuilder` both formats feed** (kb/Work PB1804, PB1359, PB1492): the resultant compilation group is a
+  list of lines with a parallel origin list (kb/Work PB82) — one resultant line per physical line, except a continuation
+  line, which occupies none — together with the LATEST LOGICAL line and the literal state that line ends in
+  (`LiteralState`: the opening quotation symbol, the literal kind, the form of continuation used so far, and whether
+  the line ended in a floating indicator). Each reference format supplies only a per-line classifier:
+  `FixedFormConverter` reads the indicator area and the program-text area (positions 8–72, space-filled), the free
+  converter takes the whole line. The builder's operations are the §6.5 rules: a blank or comment line is logically
+  discarded (§6.5 2)) — it keeps its slot as an EMPTY line, is never the join target and never touches the literal state
+  (§6.3.5 / §6.4.2 "Comment lines and blank lines may be interspersed among lines containing the parts of a literal");
+  a source line is a new logical line (§6.5 5), 7)); a fixed continuation line (hyphen in column 7) joins the latest
+  logical line (§6.5 6)); and **the line after one that ended in a floating literal continuation indicator** — a
+  quotation symbol followed by a hyphen, ending the line inside a literal — is the continuation line of §6.5 8), in
+  EITHER format (§6.5 4) cuts the continued line before the indicator, §6.5 8) appends the continuation line's content
+  after its opening quotation symbol). Writing the join against "the last line written" is what made an interspersed
+  comment line receive the continuation and a blank line crash the origin tracking.
+  The continuation RULES are checks of this state, written once for both formats: the first nonblank character of a
+  continuation line is the literal's opening quotation symbol (§6.2.3.2 SR6; COBOLNET2684), a national literal is
+  continued only by the floating form (§6.3.5 2); 2685), a floating indicator never stands on a fixed-continuation
+  line (SR5; 2686), a literal is continued by one form only (SR4; 2687), a join never spells `==` or `::` (§6.3.5 2); 2688,
+  and `*>` / `>>` keep 2496), no inline comment follows the indicator (§6.3.7.3 / §6.4.4.3; 2689), and a free-form
+  line of a continued literal holds literal content (§6.4.2; 2690). §6.2.3.2 SR4's first sentence — the floating
+  indicator only for an alphanumeric, boolean or national literal — has no violation to detect: the indicator is
+  recognized only inside a literal, and every quotation symbol opens one of those three kinds. The one literal-aware
+  scan also finds a compiler directive written after program text (§7.3.3 SR2; 2691), so a rule broken in a copybook
+  or in free form is found where it is broken. Pseudo-text continues by these rules for free (§7.2.3.3 SR8, §7.2.4.3 8)):
+  the join precedes text manipulation.
 - **The join target is the LATEST LOGICAL line** (§6.5 6) a)/b) "appended immediately to the right of the last
-  character in the latest logical line of the resultant compilation group"), tracked by index. A comment line or a
-  blank line is "logically discarded" (§6.5 2)): it keeps its slot as an EMPTY line but is never the join target and
-  never touches the literal state a continued line left open (§6.3.5 "Comment lines and blank lines may be
-  interspersed among lines containing the parts of a literal"). Writing the join against "the last line written" is
-  what made an interspersed comment line receive the continuation and a blank line crash the origin tracking.
+  character in the latest logical line of the resultant compilation group"), tracked by index.
 - **The indicator area holds a §6.2.2 fixed indicator or it is diagnosed** (kb/Work PB1494): `*` `/` `-` space, and
   COBOL-85's debugging `D`; anything else is COBOLNET2616 and the line is read as source. The NIST CCVS column-7
   conventions (S/Y debugging, P/J/H/E/U excluded alternates, any other letter a primary-configuration line) are a
   DIALECT — `ccvsIndicators`, on only under `--nist` (`FixedFormConverter.KindOf`). The obsolete comment-entry reading
   of AUTHOR … REMARKS applies only inside an IDENTIFICATION DIVISION (`_inIdentificationDivision`).
-  ⚠ Two edition-scoped questions are DECIDED here today, at every edition, that belong to later stages (kb/Work
-  PB1802): a `D` line is always emitted as the debugging-line CARRIER, which the lexer reads as a comment — so it never
-  compiles under WITH DEBUGGING MODE (PB1705) and is accepted silently at 2023, where §6.2.2 lists no `D`; and a
-  comment-entry paragraph is discarded WHOLE, header included, so the `identification-comments-removed-2002` /
-  `remarks-removed-2002` gate that fires in free form never fires in fixed form (PB1758, PB1494). **Target** (PB1802):
-  keep the paragraph header as program text and discard only the comment-entry; carry the debugging line forward and
-  let the source element's clause decide (the carrier shape is an owner decision, PB1705).
-- **Free form has no cross-line state** (kb/Work PB1804): `ConvertFreeFormMapped` converts line for line, so the
-  latest-logical-line join, the carried literal state and the continuation rules exist only in `FixedFormConverter`.
-  **Target:** ONE `LogicalLineBuilder` both formats feed (PB1804) — the floating literal continuation (PB1359), the
-  continuation-line checks (PB1492) and "a directive line is never a join target" (PB1360) are its steps.
+  The edition-scoped questions are decided by LATER stages and the registry, not by this pass (kb/Work PB1802, owner
+  decision kb/Work R61): a comment-entry paragraph (AUTHOR … SECURITY, REMARKS) keeps its HEADER as program text — the
+  header line is written `AUTHOR. .`, the paragraph's terminating period standing for the discarded comment-entry,
+  because COBOL-85 ended the entry at the next Area-A word — and only the entry (the rest of the header line and its
+  Area-B body) is discarded, at every edition, so the `identification-comments-removed-2002` / `remarks-removed-2002`
+  gate (COBOLNET0902 from 2002) sees a fixed-form paragraph exactly as it sees a free-form one. The comment-entry exists
+  only in an IDENTIFICATION DIVISION, so library text is converted starting in the division its COPY statement stands in
+  (`DivisionCursor` reads it off the text-words before the COPY; `CopyProcessor` hands it to the shared walker, and the
+  state is carried across a text's SOURCE FORMAT segments) — a `REMARKS.` paragraph copied into a PROCEDURE DIVISION is
+  program text; and the `D` indicator is
+  gated by the registry row `debugging-line-removed-2014` (accepted at 85, obsolete at 2002 — COBOLNET0903 — removed at
+  2014 — COBOLNET0902; the NIST S / Y letters are the CCVS dialect and never gated). ⚠ Still decided here: a `D` line is
+  always emitted as the debugging-line CARRIER, which the lexer reads as a comment, so it never compiles under WITH
+  DEBUGGING MODE (kb/Work PB1705; the carrier shape is an owner decision there).
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
 - **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
-  3) removes an inline comment on a continuation line too, and a quotation symbol ends a literal only when it is the
-  one that opened it. It replaced two scanners that disagreed (a comment strip that assumed "not in a literal" and a
+  3) removes an inline comment on a continuation line too, a quotation symbol ends a literal only when it is the one
+  that opened it, and it stops at the floating literal continuation indicator and at a directive after program text.
+  It replaced two scanners that disagreed (a comment strip that assumed "not in a literal" and a
   state scan that treated either quotation symbol as closing).
 - **Comments never leave this pass.** A comment line becomes an empty line and an inline comment is cut, in fixed
   AND free form, so no later stage (the lexer's picture mode, the COPY/REPLACE text-word scanner, the NIST
   substitutions) has a comment rule to get wrong. The lexer keeps `COMMENT_START` (and `PIC_COMMENT` /
   `SUB_COMMENT` in its other modes) only for the INTERNAL `*>` carriers written after this pass: the debugging-line
   carrier and the COPY stage's not-found notes.
-- **The §6.2.3.2 syntax rules and the edition gate live here**, in `ReferenceFormatDiagnostics`: SR2 (a `*>` not
-  preceded by a separator space — COBOLNET2495; the text after it is still the comment), SR3 (a continuation line
-  completing a `*>` or `>>` begun at the end of the line it continues — COBOLNET2496), and the 2002 introduction
-  gate `floating-comment-indicator-2002` (COBOLNET0900, once per compilation), asked in FIXED form only — free form
-  is itself a 2002 introduction reached below 2002 only through the `--source-format free|auto` selection, and its
-  only comment is the floating one.
-- **The next case is automatic.** The floating literal continuation indicator (§6.5 4) and 8); kb/Work PB1359) and
-  the continuation-line validation (§6.2.3.2 SR6; kb/Work PB1492) are further steps of the same per-line pass over
-  the same literal state — not a second scanner.
+- **The reference-format diagnostics live in ONE per-COMPILATION object** (kb/Work PB1640): `ReferenceFormatDiagnostics`
+  (edition, strictness, the bag), created once per front-end pass and shared by the main source and EVERY copybook —
+  library text is read by the same §6.5 walker (§6.5 applies to "lines of source text and library text"), so a rule
+  broken in a copybook is reported at the copybook's file and line, and a once-per-compilation gate fires once, not
+  once per file (the file is an argument of each report, never state of the instance). It holds the edition gates —
+  `floating-comment-indicator-2002` and `floating-literal-continuation-2002` (COBOLNET0900, once per compilation, asked
+  in FIXED form only: free form is itself a 2002 introduction reached below 2002 only through the `--source-format
+  free|auto` selection, and its comment and its literal continuation are the floating ones), `debugging-line-removed-2014`,
+  `col7-continuation-obsolete-2023` and `fixed-form-word-continuation-removed-2023` — and the syntax-rule diagnostics
+  above, plus SR2 (a `*>` not preceded by a separator space — COBOLNET2495; the text after it is still the comment) and
+  SR3 (a continuation line completing a `*>` or `>>` begun at the end of the line it continues — COBOLNET2496).
 
 #### 3.6.1 Directive state — `>>PUSH` / `>>POP` (kb/Work PB941)
 

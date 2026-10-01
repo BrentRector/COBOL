@@ -29,7 +29,7 @@ public static partial class ReferenceFormatProcessor
     private const int SequenceAreaLength = 6;
 
     /// <summary>Column index of the indicator area (column 7, zero-based index 6).</summary>
-    private const int IndicatorColumn = 6;
+    internal const int IndicatorColumn = 6;
 
     /// <summary>Column index where the source area begins (column 8, zero-based index 7).</summary>
     private const int SourceAreaStart = 7;
@@ -50,9 +50,12 @@ public static partial class ReferenceFormatProcessor
     /// periods, reserved words, numbers and quoted strings, spanning one or more lines until the next
     /// Area-A header. That free text cannot be reliably bounded by a token grammar (e.g. the FCTC address
     /// in RW101A's INSTALLATION contains "...AUTOMATED DATA AND..." and "5203 LEESBURG PIKE"), so we treat
-    /// the whole paragraph as commentary in the column-aware preprocessor: comment out the header and its
-    /// content up to the next Area-A header. The paragraphs are optional (identificationParagraph*), so the
-    /// parser simply never sees them — no grammar change, no embedded-period/terminating-period edge cases.
+    /// the comment-entry as commentary in the column-aware preprocessor: discard the entry — the rest of the
+    /// header line and its content up to the next Area-A header — and keep the paragraph HEADER, written
+    /// <c>AUTHOR. .</c> (the paragraph's terminating period standing for the entry, which COBOL-85 ended at the next
+    /// Area-A word), so the parser and the ONE removal gate (<c>VersionConformancePass</c>, COBOLNET0902 from 2002) see a
+    /// fixed-form paragraph exactly as they see a free-form one (kb/Work PB1494, PB1758) — no embedded-period or
+    /// terminating-period edge cases reach the grammar.
     /// </summary>
     private static readonly HashSet<string> CommentEntryParagraphs = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -62,7 +65,7 @@ public static partial class ReferenceFormatProcessor
     /// <summary>The compiler-directive word this stage owns (ISO §7.3.24; the <c>source-format-directive-2002</c>
     /// registry row's single <c>directiveWords</c> entry — FORMAT and IS are §5.2.3 optional words, not part of
     /// the word).</summary>
-    private const string SourceFormatWord = "SOURCE";
+    internal const string SourceFormatWord = "SOURCE";
 
     /// <summary>
     /// Normalize a compilation group to logical free form, starting in <paramref name="initial"/> — fixed form, the
@@ -73,8 +76,7 @@ public static partial class ReferenceFormatProcessor
     /// conversion, step 1) and left as a blank line so downstream source-line numbers stay aligned.
     /// </summary>
     public static string NormalizeToFreeForm(string sourceText, InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
-        => NormalizeToFreeForm(sourceText, dialectLevel: 85, permissive: false, diagnostics: null, sourcePath: "<source>",
-            initial);
+        => NormalizeToFreeForm(sourceText, gates: null, sourcePath: "<source>", initial);
 
     /// <summary>
     /// The edition-aware overload (W3 preprocessor threading, VCR rows 2/4/94 — DEVLOG 598): fixed-form
@@ -83,22 +85,23 @@ public static partial class ReferenceFormatProcessor
     /// compilation), and continuing a COBOL WORD across lines is REMOVED at 2023 (Annex E.2 item 1 bullet 2
     /// → COBOLNET0902, error strict / warning permissive — the pre-removal join semantics preserved).
     /// </summary>
-    public static string NormalizeToFreeForm(string sourceText, int dialectLevel, bool permissive,
-        DiagnosticBag? diagnostics, string sourcePath, InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
-        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath, initial).Text;
+    public static string NormalizeToFreeForm(string sourceText, ReferenceFormatDiagnostics? gates, string sourcePath,
+        InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
+        => NormalizeToFreeFormMapped(sourceText, gates, sourcePath, initial).Text;
 
     /// <summary>The MAPPED normalizer (kb/Work PB82): the free-form text plus, per output line, the physical line of
     /// <paramref name="sourcePath"/> it came from — a fixed-form continuation JOINS lines, so the output line count is
     /// smaller than the source's and every later stage (COPY, the parser, the binder) would otherwise number lines the
     /// user cannot find. The string overload is this one's <c>.Text</c>.</summary>
-    public static MappedText NormalizeToFreeFormMapped(string sourceText, int dialectLevel, bool permissive,
-        DiagnosticBag? diagnostics, string sourcePath, InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
-        => NormalizeToFreeFormMapped(sourceText, dialectLevel, permissive, diagnostics, sourcePath, initial.InitialFixed(),
-            out _);
+    public static MappedText NormalizeToFreeFormMapped(string sourceText, ReferenceFormatDiagnostics? gates, string sourcePath,
+        InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
+        => NormalizeToFreeFormMapped(sourceText, gates, sourcePath, initial.InitialFixed(), out _);
 
     /// <summary>The ONE §6.5 logical-conversion walker, for source text AND library text (§6.5 applies to both "in
     /// the order that lines of source text and library text are obtained"), also reporting the reference format it
     /// read each physical line in (<paramref name="formats"/>).</summary>
+    /// <param name="gates">The compilation's reference-format diagnostics — the ONE instance the main source and every
+    /// copybook share (kb/Work PB1640), or null for a conversion that reports nothing.</param>
     /// <param name="initialFixed">The format the text starts in: for a compilation group, its
     /// <see cref="InitialReferenceFormat"/> selection (fixed form by default, §7.3.24.3 2) — kb/Work PB1362); for
     /// library text, the format in effect for its COPY statement (§7.3.24.3 3) — kb/Work PB1067). Null DETECTS it
@@ -111,11 +114,13 @@ public static partial class ReferenceFormatProcessor
     /// lines (<see cref="ImplicitFormatOps.For"/>) — the format state they save and restore is this walker's
     /// (kb/Work PB1066). Null or empty for every text without an exception-checking PERFORM that holds a format
     /// directive in a handler.</param>
-    public static MappedText NormalizeToFreeFormMapped(string sourceText, int dialectLevel, bool permissive,
-        DiagnosticBag? diagnostics, string sourcePath, bool? initialFixed, out ReferenceFormatMap formats,
-        bool ccvsIndicators = false, IReadOnlyList<DirectiveStackOp>? implicitOps = null)
+    /// <param name="startsInIdentificationDivision">Whether the text starts in an IDENTIFICATION DIVISION — the only
+    /// division with comment-entry paragraphs (kb/Work PB1494): true for a source text, which begins with one; for library
+    /// text, whether its COPY statement stands in one (<see cref="DivisionCursor"/>).</param>
+    public static MappedText NormalizeToFreeFormMapped(string sourceText, ReferenceFormatDiagnostics? gates, string sourcePath,
+        bool? initialFixed, out ReferenceFormatMap formats, bool ccvsIndicators = false,
+        IReadOnlyList<DirectiveStackOp>? implicitOps = null, bool startsInIdentificationDivision = true)
     {
-        var gates = diagnostics is null ? null : new ReferenceFormatDiagnostics(dialectLevel, permissive, diagnostics, sourcePath);
         // THE line-entry stage (kb/Work PB1800): every line below is read from here — terminators, tabs and (under
         // --nist) archive markers are settled, so no consumer splits, trims or expands anything itself.
         var lines = PhysicalLines.Read(sourceText, ccvsIndicators).Lines;
@@ -124,7 +129,7 @@ public static partial class ReferenceFormatProcessor
         // COPY statement (3)), or — only under the documented Auto extension — the one IsFixedForm detects in the text
         // before the first line that could be a >>SOURCE directive in either reading (kb/Work PB1362).
         bool firstFixed = initialFixed ?? IsFixedForm(lines[..FirstSourceDirectiveCandidate(lines)]);
-        var (segments, directiveLines) = FormatSegments(lines, firstFixed, gates, implicitOps ?? []);
+        var (segments, directiveLines) = FormatSegments(lines, firstFixed, gates, sourcePath, implicitOps ?? []);
         var physicalText = new string[lines.Length];   // the map keeps what the line-entry stage settled (ReferenceFormatMap.PhysicalText)
         for (int i = 0; i < physicalText.Length; i++) physicalText[i] = lines[i].Text;
 
@@ -133,8 +138,8 @@ public static partial class ReferenceFormatProcessor
         {
             formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, [], directiveLines, physicalText);
             var (wl, wo) = firstFixed
-                ? new FixedFormConverter(gates, ccvsIndicators).Convert(lines)
-                : ConvertFreeLines(lines, gates);
+                ? new FixedFormConverter(gates, sourcePath, ccvsIndicators, startsInIdentificationDivision).Convert(lines)
+                : ConvertFreeLines(lines, gates, sourcePath);
             return Mapped(wl, wo, sourcePath);
         }
 
@@ -149,6 +154,7 @@ public static partial class ReferenceFormatProcessor
         var outLines = new List<string>();
         var outOrigins = new List<int>();   // the 1-based source line of each output line (kb/Work PB82)
         bool segFixed = firstFixed;
+        bool inIdentification = startsInIdentificationDivision;   // carried across the text's fixed segments
         int segStart = 0;
         for (int s = 0; s <= segments.Count; s++)
         {
@@ -159,9 +165,16 @@ public static partial class ReferenceFormatProcessor
             if (segEnd > segStart)
             {
                 var segment = lines[segStart..segEnd];
-                var (sl, so) = segFixed
-                    ? new FixedFormConverter(gates, ccvsIndicators).Convert(segment)
-                    : ConvertFreeLines(segment, gates);   // free: line for line, its comment removed (§6.5 2) / 3))
+                List<string> sl;
+                List<int> so;
+                if (segFixed)
+                {
+                    var converter = new FixedFormConverter(gates, sourcePath, ccvsIndicators, inIdentification);
+                    (sl, so) = converter.Convert(segment);
+                    inIdentification = converter.InIdentificationDivision;
+                }
+                else
+                    (sl, so) = ConvertFreeLines(segment, gates, sourcePath);   // free form: its comments removed, floating-continued literals joined (§6.5 2) / 3) / 4) / 8))
                 outLines.AddRange(sl);
                 outOrigins.AddRange(so);
             }
@@ -205,7 +218,7 @@ public static partial class ReferenceFormatProcessor
     /// following segment was read in the WRONG reference format (kb/Work PB794).</para>
     /// </summary>
     private static (List<(int Index, bool Fixed, bool KeepsLine)> Segments, List<int> DirectiveLines) FormatSegments(
-        ReadOnlySpan<PhysicalLine> lines, bool initialFixed, ReferenceFormatDiagnostics? gates,
+        ReadOnlySpan<PhysicalLine> lines, bool initialFixed, ReferenceFormatDiagnostics? gates, string file,
         IReadOnlyList<DirectiveStackOp> implicitOps)
     {
         bool current = initialFixed;
@@ -248,7 +261,7 @@ public static partial class ReferenceFormatProcessor
             else if (d.Word == SourceFormatWord)
             {
                 directiveLines.Add(i + 1);
-                gates?.OnSourceFormatDirective(i + 1, d.Operand);
+                gates?.OnSourceFormatDirective(file, i + 1, d.Operand);
                 if (CompilerDirectiveCatalog.TryOperandWord(SourceFormatWord, d.Operand, out string w) && w is "FIXED" or "FREE")
                     current = w == "FIXED";
                 segments.Add((i, current, false));
@@ -330,118 +343,6 @@ public static partial class ReferenceFormatProcessor
     /// <summary>Our documented margin R (Annex A item 158 / CONFORMANCE.md §7): the program-text area is columns
     /// 8–72, so column position <see cref="SourceAreaStart"/>+<see cref="SourceAreaWidth"/> = 72.</summary>
     private const int MarginR = SourceAreaStart + SourceAreaWidth;
-
-    /// <summary>
-    /// The per-compilation diagnostics of reference format — the ones only the §6.5 logical conversion can raise,
-    /// because only it sees the indicator area and the line boundaries: the edition gates of the fixed-form
-    /// continuation mechanism (registry rows <c>col7-continuation-obsolete-2023</c> /
-    /// <c>fixed-form-word-continuation-removed-2023</c>), of the floating comment indicator
-    /// (<c>floating-comment-indicator-2002</c>) and of the <c>&gt;&gt;SOURCE</c> directive, and the §6.2.3.2 syntax
-    /// rules of the floating comment indicator. The edition metadata stays registry-canonical, and the
-    /// strict/permissive decision is the ONE <see cref="EditionSeverityPolicy"/> (P2.9 — removed = error strict /
-    /// warning permissive, obsolete = warning always; never a local <c>if(permissive)</c>). One diagnostic per file
-    /// per edition gate.
-    /// </summary>
-    private sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive, DiagnosticBag diagnostics, string sourcePath)
-    {
-        private bool _col7Flagged, _wordFlagged, _floatingCommentFlagged;
-
-        /// <summary>A floating comment indicator in program text (§6.2.3.1) — a COBOL-2002 introduction, so COBOL-85
-        /// source has none (row <c>floating-comment-indicator-2002</c>). Gated once per compilation, at its first use.</summary>
-        public void OnFloatingComment(int line, int column)
-        {
-            if (_floatingCommentFlagged) return;
-            _floatingCommentFlagged = true;
-            var row = ConstructRegistry.Find(Constructs.FloatingCommentIndicator2002)!;
-            ConstructRegistry.Check(EditionInfo.Of(dialectLevel, permissive),
-                new BagSink(diagnostics, new SourceOrigin(sourcePath, line).ToLocation(column)), row.Id, row.Display);
-        }
-
-        /// <summary>§6.2.3.2 SR2: "The floating comment indicator of an inline comment shall be preceded by a
-        /// separator space" — COBOLNET2495. The text from the indicator on is still taken as the comment.</summary>
-        public void OnUnseparatedFloatingComment(int line, int column)
-            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FloatingCommentNotSeparated.Code,
-                "the floating comment indicator *> shall be preceded by a separator space (ISO §6.2.3.2 SR2); write a "
-                + "space before it", new SourceOrigin(sourcePath, line).ToLocation(column), default);
-
-        /// <summary>§6.2.3.2 SR3: "All the characters forming a multiple-character floating indicator shall be
-        /// specified on the same line" — COBOLNET2496, for a continuation line that completes one begun at the end of
-        /// the latest logical line.</summary>
-        public void OnSplitFloatingIndicator(int line, string indicator)
-            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FloatingIndicatorSplit.Code,
-                $"the floating indicator {indicator} is split across a continued line and its continuation line; all the "
-                + "characters of a multiple-character floating indicator shall be on the same line (ISO §6.2.3.2 SR3)",
-                new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn), default);
-
-        /// <summary>§6.1 3) a) — COBOLNET2653: a free-form line of more than 255 character positions (kb/Work PB1496).
-        /// Every such line is reported, at the first position past the limit; it is then read in full.</summary>
-        public void OnFreeFormLineTooLong(int line, int positions)
-            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FreeFormLineTooLong.Code,
-                $"this free-form line has {positions} character positions; ISO §6.1 3) a) allows at most {FreeFormMaxPositions} "
-                + "(a tab counts the positions it advances over, DOC-A.1-157)",
-                new SourceOrigin(sourcePath, line).ToLocation(FreeFormMaxPositions), default);
-
-        /// <summary>§6.3.3 / §6.2.2 — COBOLNET2616: the indicator area holds a character that is not a fixed indicator
-        /// (kb/Work PB1494). Every such line is reported; it is then read as a source line.</summary>
-        public void OnInvalidIndicator(int line, char indicator)
-            => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FixedIndicatorInvalid.Code,
-                $"the indicator area (column 7) holds '{indicator}', which is not a fixed indicator: ISO §6.2.2 lists "
-                + "*, / (comment line), - (continuation line) and space (source line); a NIST CCVS program's column-7 "
-                + "conventions are honored under --nist", new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn), default);
-
-        /// <summary>Any col-7 '-' continuation — OBSOLETE at 2023 (Annex F.2 item 4; VCR row 94).</summary>
-        public void OnContinuation(int line)
-        {
-            if (dialectLevel < 2023 || _col7Flagged) return;
-            _col7Flagged = true;
-            var severity = EditionSeverityPolicy.For(ConstructAvailability.Obsolete, EditionInfo.Of(dialectLevel, permissive));
-            Emit(severity, "COBOLNET0903",
-                "the fixed continuation indicator (hyphen in column 7) is obsolete as of COBOL-2023 "
-                + "(Annex F.2 item 4; use the floating continuation indicator) — first use at line " + line,
-                new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn));
-        }
-
-        /// <summary>A continuation that SPLICES a COBOL word across lines — REMOVED at 2023
-        /// (Annex E.2 item 1 bullet 2; VCR row 2). Pre-removal join semantics are preserved either way.</summary>
-        public void OnWordContinuation(int line)
-        {
-            if (dialectLevel < 2023 || _wordFlagged) return;
-            _wordFlagged = true;
-            const string msg = "continuation of a COBOL word in fixed-form reference format was removed in "
-                + "COBOL-2023 (Annex E.2 item 1 bullet 2) — first use at line ";
-            var loc = new SourceOrigin(sourcePath, line).ToLocation(IndicatorColumn);
-            var severity = EditionSeverityPolicy.For(ConstructAvailability.Removed, EditionInfo.Of(dialectLevel, permissive));
-            Emit(severity, "COBOLNET0902", msg + line, loc);
-        }
-
-        /// <summary>
-        /// The <c>&gt;&gt;SOURCE FORMAT</c> directive's edition gate (ISO §7.3.24; registry row
-        /// <c>source-format-directive-2002</c>) — the §7.3 compiler-directive facility is a COBOL-2002
-        /// introduction, so a <c>&gt;&gt;</c> line cannot occur in a conforming COBOL-85 source. It emits HERE
-        /// rather than at the shared directive-recognition point because this stage consumes the line before the
-        /// conditional-compilation driver can see it: same ONE producer, one stage earlier (kb/Work PB725).
-        /// Every occurrence is reported — a format switch is not a once-per-file fact like the continuation gates.
-        /// <para>The OPERAND is checked here for the same reason and from the same row (kb/Work PB794): §7.3.24.2
-        /// admits FIXED or FREE and nothing else, and this is the only stage that sees the line. One producer
-        /// (COBOLNET1911) for every directive whose operand is a closed word set.</para>
-        /// </summary>
-        public void OnSourceFormatDirective(int line, string operand)
-        {
-            var edition = EditionInfo.Of(dialectLevel, permissive);
-            var sink = new BagSink(diagnostics, new SourceOrigin(sourcePath, line).ToLocation());
-            CompilerDirectiveCatalog.CheckRow(Constructs.SourceFormatDirective2002, edition, sink);
-            CompilerDirectiveCatalog.CheckOperand(SourceFormatWord, operand, edition, sink);
-        }
-
-        /// <summary>Emit through the <see cref="DiagnosticBag"/> at the ONE-policy-decided severity (P2.9).</summary>
-        private void Emit(EditionSeverity severity, string code, string message, Common.SourceLocation loc)
-        {
-            if (severity == EditionSeverity.Error)
-                diagnostics.ReportError(code, message, loc, default);
-            else
-                diagnostics.ReportWarning(code, message, loc, default);
-        }
-    }
 
     /// <summary>
     /// The <see cref="InitialReferenceFormat.Auto"/> extension's detector — NEVER the default (kb/Work PB1362: it reads

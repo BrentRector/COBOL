@@ -319,7 +319,12 @@
   "pb1247_line_placement_unpaged_85",
   "pb1296_sum_counter_digits_85",
   "pb1297_sum_reset_level_upon_85",
-  "pb1586_tab_stops_fixed_form"
+  "pb1586_tab_stops_fixed_form",
+  "pb1492_continued_literal_other_quote_content",
+  "pb1758_comment_entry_multiline",
+  "pb1494_debugging_line_85",
+  "pb1494_remarks_paragraph_in_copybook",
+  "pb1494_comment_entry_in_copybook"
  ],
  "pending": []
 }

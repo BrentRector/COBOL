@@ -22,7 +22,7 @@ public sealed class ReferenceFormatLogicalConversionTests
         InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
     {
         var bag = new DiagnosticBag();
-        return (ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, std, permissive: false, bag, "t.cob", initial), bag);
+        return (ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, new ReferenceFormatDiagnostics(std, false, bag), "t.cob", initial), bag);
     }
 
     private static string[] Codes(DiagnosticBag bag) => bag.Diagnostics.Select(d => d.Code).ToArray();
@@ -44,7 +44,9 @@ public sealed class ReferenceFormatLogicalConversionTests
     // Each row: the text, then the resultant first two lines — a consumed directive leaves an empty slot and the next
     // line is read FREE (from column 1); otherwise the next line is read FIXED (from column 8).
     [InlineData("SEQ001 >>SOURCE FORMAT FREE\nDISPLAY \"F\".\n", "", "DISPLAY \"F\".")]               // letters in cols 1-6
-    [InlineData("       12 >>SOURCE FORMAT FREE\n       DISPLAY \"F\".\n", "12 >>SOURCE FORMAT FREE", "DISPLAY \"F\".")]
+    // program text before `>>`: not a directive (the next line is read FIXED), and §7.3.3 SR2 names it — COBOLNET2691 —
+    // cutting the directive text (kb/Work PB1690)
+    [InlineData("       12 >>SOURCE FORMAT FREE\n       DISPLAY \"F\".\n", "12", "DISPLAY \"F\".")]
     [InlineData("      *>>SOURCE FORMAT FREE\n     X DISPLAY \"F\".\n", "", "DISPLAY \"F\".")]           // a comment line
     public void FixedFormDirective_IsRecognizedInTheProgramTextArea(string src, string first, string second)
     {
@@ -73,8 +75,8 @@ public sealed class ReferenceFormatLogicalConversionTests
     public void IndicatorArea_OnlyFixedIndicators_OutsideNist(char indicator, bool ccvs, bool diagnosed, string line)
     {
         var bag = new DiagnosticBag();
-        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped("000100" + indicator + "DISPLAY \"L\".\n", 2023,
-            permissive: false, bag, "t.cob", initialFixed: true, out _, ccvsIndicators: ccvs);
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped("000100" + indicator + "DISPLAY \"L\".\n",
+            new ReferenceFormatDiagnostics(2023, false, bag), "t.cob", initialFixed: true, out _, ccvsIndicators: ccvs);
         Assert.Equal(diagnosed, Codes(bag).Contains("COBOLNET2616"));
         Assert.Equal(line.Replace("<debug>", ReferenceFormatProcessor.DebugLineCarrier), m.Text.Split('\n')[0]);
     }
@@ -92,15 +94,35 @@ public sealed class ReferenceFormatLogicalConversionTests
                    + "000600 REMARKS.\n"
                    + "000700     DISPLAY \"IN-REMARKS\".\n";
         string[] lines = Convert(src).Text.Text.Split('\n');
-        Assert.Equal(["", ""], lines[2..4]);                           // the comment-entry is commentary
+        // the comment-entry is commentary, discarded; the paragraph HEADER stays program text, its terminating period
+        // written explicitly (kb/Work PB1494, PB1758), so the parser and the removal gate see the paragraph
+        Assert.Equal(["AUTHOR. .", ""], lines[2..4]);
         Assert.Equal("REMARKS.", lines[5]);                            // a procedure paragraph is program text
         Assert.Equal("DISPLAY \"IN-REMARKS\".", lines[6].Trim());
     }
 
-    [Fact] // kb/Work PB1361 — SR2: in free form "000100 >>SOURCE ..." is program text; the line is kept, not consumed.
-    public void FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective()
-        => Assert.Equal("000100 >>SOURCE FORMAT FIXED",
-            Convert(">>SOURCE FORMAT FREE\n000100 >>SOURCE FORMAT FIXED\n", std: 2002).Text.Text.Split('\n')[1]);
+    [Fact] // kb/Work PB1361 + PB1690 — §7.3.3 SR2: in free form "000100 >>SOURCE ..." is NOT a directive (the sequence
+           // number is program text, so the format is not switched) and is diagnosed by name, COBOLNET2691; the directive
+           // text is cut so the parser does not add a nameless second error.
+    public void FreeFormLine_WithTextBeforeTheIndicator_IsNotADirective_AndIsDiagnosed()
+    {
+        var (m, bag) = Convert(">>SOURCE FORMAT FREE\n000100 >>SOURCE FORMAT FIXED\n01 A PIC X.\n", std: 2002);
+        Assert.Equal("000100", m.Text.Split('\n')[1].Trim());
+        Assert.Equal("01 A PIC X.", m.Text.Split('\n')[2]);         // still read in FREE form: nothing was switched
+        Assert.Equal(["COBOLNET2691"], Codes(bag));
+    }
+
+    [Theory] // §7.3.3 SR2 — a directive after program text is diagnosed in either reference format; a `>>` that is a
+             // literal's content, a comment's, or not followed by a directive word is not a directive.
+    [InlineData("000100     DISPLAY A >>DEFINE X AS 1\n", true)]
+    [InlineData(">>SOURCE FORMAT FREE\nDISPLAY A >> DEFINE X AS 1\n", true)]
+    [InlineData("000100     >>DEFINE X AS 1\n", false)]              // a directive LINE: only spaces precede it
+    [InlineData("000100     DISPLAY \">>DEFINE X AS 1\".\n", false)] // literal content
+    [InlineData("000100     DISPLAY A. *> >>DEFINE X AS 1\n", false)] // comment text
+    [InlineData("000100     DISPLAY A >>NOTADIRECTIVE\n", false)]    // no compiler-directive word follows
+    [InlineData("000100     >>PAGE any text STOP RUN. >>TURN x\n", false)]   // comment-text of a directive LINE (§7.3.19.3 SR1)
+    public void DirectiveAfterProgramText_IsDiagnosedByName(string src, bool diagnosed)
+        => Assert.Equal(diagnosed, Codes(Convert(src).Bag).Contains("COBOLNET2691"));
 
     [Theory] // §6.3.5 "Comment lines and blank lines may be interspersed among lines containing the parts of a literal".
     [InlineData("000600* a comment with a \"quote")]

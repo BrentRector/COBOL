@@ -9,8 +9,9 @@ namespace CobolNet.Tests.Conformance;
 /// for one line. ISO §6.1 3) a) bounds a FREE-form line at 255 character positions ("ranging from a minimum of 0 to a
 /// maximum of 255"; kb/Work PB1496, COBOLNET2653), so an 8,192-position literal written on one free-form line is not
 /// a program the standard allows — the tests that build one programmatically must continue it, as fixed form does
-/// (§6.3.5 / §6.5 6): the continued line fills to margin R, and the continuation line carries the hyphen in position 7
-/// and resumes the literal at a quotation symbol. §6.1 2) b): after logical conversion the line may be as long as it
+/// (§6.3.5 / §6.5 4) and 8)): the continued line fills to margin R and ends in the floating literal continuation
+/// indicator, and the continuation line resumes the literal at a quotation symbol. §6.1 2) b): after logical conversion
+/// the line may be as long as it
 /// likes, which is exactly what the literal-length rule (§8.3.3.2.3 SR1 and its siblings) is asked about.
 /// </summary>
 internal static class FixedFormLayout
@@ -57,18 +58,21 @@ internal static class FixedFormLayout
                 continue;
             }
 
-            // A token longer than a line is a literal: fill the line to margin R and continue it. The continuation
-            // line holds the hyphen in position 7 and resumes the literal at a quotation symbol; a continued line
-            // never ends on a quotation symbol, which would read as the first half of a doubled one (§6.3.5).
+            // A token longer than a line is a literal: fill the line to margin R and continue it with the FLOATING
+            // literal continuation indicator — the opening quotation symbol and a hyphen end the line (§6.2.3.1, §6.5
+            // 4)), and the next line begins with the quotation symbol (§6.2.3.2 SR6, §6.5 8)). It is the one form that
+            // continues EVERY literal kind: a national literal may be continued only so (§6.3.5 2)), and the fixed
+            // indicator is obsolete at 2023 (Annex F.2 item 4). A continued line never ends in content that is a
+            // quotation symbol, which would read as the first half of a doubled one.
             char quote = token[token.IndexOfAny(['"', '\''])];
             string rest = token;
             while (cur.Length + rest.Length > MarginR)
             {
-                int take = MarginR - cur.Length;
+                int take = MarginR - cur.Length - 2;   // two positions for the indicator
                 if (rest[take - 1] == quote) take--;
-                lines.Add(cur + rest[..take]);
+                lines.Add(cur + rest[..take] + quote + "-");
                 rest = rest[take..];
-                cur = "      -    " + quote;
+                cur = new string(' ', TextStart + 4) + quote;
             }
             cur += rest;
             empty = false;

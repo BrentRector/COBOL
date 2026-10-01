@@ -499,6 +499,31 @@
    "source": "000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. PB1493FC.\n000300 PROCEDURE DIVISION.\n000400 MAIN.\n000500     DISPLAY \"X\". *> an inline comment\n000600     STOP RUN.\n"
   },
   {
+   "id": "floating-literal-continuation-2002",
+   "description": "The floating literal continuation indicator (ISO 6.2.3.1: a quotation symbol followed by a hyphen, ending a line inside an unterminated alphanumeric, boolean or national literal) - in either reference format; the continuation line begins with the opening quotation symbol and its content is appended to the latest logical line (6.5 4) and 8)). It is the only way to continue a literal in free form and the only way to continue a national literal in either format (6.3.5 2)), and the replacement the 2023 text recommends for the obsolete column-7 hyphen (Annex F.2 item 4). Recognized in ONE place, the 6.5 logical conversion's LogicalLineBuilder (kb/Work PB1359), which also enforces 6.2.3.2 SR4-SR6 (COBOLNET2684-2687, 2689, 2690). THE EDGE IS DERIVED, NOT QUOTED (rows 7.21/7.23's discipline; the repo holds no 2002 or 2014 text): the floating indicators are one table in 6.2.3.1 and the M2 post-85 feature catalog places the floating indicators in COBOL-2002; Annex E, which itemizes the 2014->2023 delta, does not list them, so they predate 2023. Gated in FIXED form only, once per compilation - the reference format a COBOL-85 source is written in; free form is itself a 2002 introduction reached below 2002 only through the documented auto-detection extension (DOC-A.1-158), where this indicator is its only continuation.",
+   "display": "the floating literal continuation indicator",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO 6.2.3.1 (floating indicators, both reference formats); 6.5 4) and 8); a COBOL-2002 introduction (M2 catalog derivation, VCR row 7.21 discipline)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "floating indicators (6.2.3) - 2002 introduction",
+   "source": "000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. PB1359FC.\n000300 DATA DIVISION.\n000400 WORKING-STORAGE SECTION.\n000500 01 W-TXT PIC X(20) VALUE \"AAAAAAAAAA\"-\n000600     \"BBBBBBBBBB\".\n000700 PROCEDURE DIVISION.\n000800 MAIN.\n000900     DISPLAY W-TXT.\n001000     STOP RUN.\n"
+  },
+  {
+   "id": "debugging-line-removed-2014",
+   "description": "The fixed-form DEBUGGING LINE (indicator D in column 7) - the COBOL-85 debug module's lines, compiled only under WITH DEBUGGING MODE. ISO 6.2.2 lists no such fixed indicator at COBOL-2023. Owner decision kb/Work R61 (researched against GnuCOBOL's per-standard dialect files, debugging-mode: ok at 85, obsolete at 2002, unconformable at 2014): accepted at 85, OBSOLETE at 2002 (the obsolete-element warning COBOLNET0903), REMOVED at 2014 (COBOLNET0902, error strict / warning permissive, the pre-removal comment semantics kept). Medium confidence on the 2002/2014 edge (the ISO 2002 and 2014 texts are not in the repository). Recognized in ONE place, the fixed-form classifier of the 6.5 logical conversion (kb/Work PB1494). The WITH DEBUGGING MODE clause and USE FOR DEBUGGING keep their own rows.",
+   "display": "the fixed-form debugging line (indicator D)",
+   "diagnosticCode": "COBOLNET0902",
+   "citation": "ISO 6.2.2 (no D indicator at 2023); kb/Work R61 (owner decision 2026-09-30): obsolete 2002, removed 2014",
+   "introducedIn": 85,
+   "removedIn": 2014,
+   "obsoleteIn": 2002,
+   "expectDiagnostic": "COBOLNET0902",
+   "vcr": "VCR rows 7.9 and 7.17 (the debug facility); kb/Work R61",
+   "source": "000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. PB1494DL.\n000300 PROCEDURE DIVISION.\n000400 MAIN.\n000500     DISPLAY \"A\".\n000600D    DISPLAY \"DEBUG\".\n000700     STOP RUN.\n"
+  },
+  {
    "id": "source-format-directive-2002",
    "description": "The >>SOURCE [FORMAT] [IS] { FIXED | FREE } compiler directive (ISO §7.3.24) - it switches the reference format of the source or library text that follows. Implemented by ReferenceFormatProcessor, which runs BEFORE the conditional-compilation driver (it must, to normalize the text), so the introduction gate for this ONE directive emits there rather than at the shared directive-recognition point. The §7.3 compiler-directive facility is a COBOL-2002 introduction: COBOL-85 has no compiler directives at all, so a '>>' line cannot occur in a conforming COBOL-85 source. The edition edge below 2023 is DERIVED, not quoted (VCR Table 7's discipline, rows 7.19/7.20 - the repo holds no 2002 or 2014 text, ratified decision #1): the derivation is (a) the M2 post-85 feature catalog in docs/ISO2023_CONFORMANCE_PLAN.md, which places '*>' inline comments, >>SOURCE FORMAT, conditional compilation and 'recognize-and-ignore of the other standard >> directives' in COBOL-2002, (b) the sibling row leap-second-directive-2002, already landed on the same derivation (kb/Work PB65), and (c) Annex E, which itemizes the 2014->2023 delta and does NOT list this directive among the additions, so it predates 2023. Overturnable in one line if the 2002/2014 text is ever acquired.",
    "display": ">>SOURCE FORMAT directive",

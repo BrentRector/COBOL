@@ -336,8 +336,8 @@ public sealed class Compilation
         string rawText = File.ReadAllText(sourcePath);
         string sourceDir = Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? ".";
 
-        string normalizedText = ReferenceFormatProcessor.NormalizeToFreeFormMapped(rawText, dialectLevel: 85,
-            permissive: false, diagnostics: null, sourcePath, initialFixed: null, out var referenceFormats,
+        string normalizedText = ReferenceFormatProcessor.NormalizeToFreeFormMapped(rawText,
+            gates: null, sourcePath, initialFixed: null, out var referenceFormats,
             ccvsIndicators: true).Text;   // the legacy oracle keeps its CCVS column-7 reading (kb/Work PB1494)
 
         // Conditional compilation (>>DEFINE / >>IF / >>ELSE / >>END-IF) runs on the free-form text BEFORE COPY

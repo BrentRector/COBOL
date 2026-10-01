@@ -14,7 +14,7 @@ public sealed class LibraryTextReferenceFormatTests
 {
     private static ReferenceFormatMap MapOf(string text, bool? initialFixed = null)
     {
-        ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, 2023, permissive: false, diagnostics: null, "t.cob",
+        ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, gates: null, "t.cob",
             initialFixed, out var formats);
         return formats;
     }

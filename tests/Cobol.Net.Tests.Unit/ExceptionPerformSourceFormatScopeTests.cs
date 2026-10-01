@@ -262,7 +262,7 @@ public sealed class ExceptionPerformSourceFormatScopeTests
             "       >>SOURCE FORMAT IS FREE",
             "DISPLAY \"B\"",
             "000100     DISPLAY \"D\".", "");
-        var withOps = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, 2023, permissive: false, null, "t.cob",
+        var withOps = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, null, "t.cob",
             initialFixed: true, out var formats,
             implicitOps: [new(1, DirectiveStackKind.Push, null), new(4, DirectiveStackKind.Pop, null)]);
         string[] lines = withOps.Text.Split('\n');
@@ -272,7 +272,7 @@ public sealed class ExceptionPerformSourceFormatScopeTests
         Assert.True(formats.LibraryTextDefaultAt(4) == true);
 
         // …without the ops the same line is read in free form, sequence area and all — the unfixed behavior.
-        var without = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, 2023, permissive: false, null, "t.cob",
+        var without = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, null, "t.cob",
             initialFixed: true, out _);
         Assert.Contains("000100", without.Text.Split('\n')[3], StringComparison.Ordinal);
     }
@@ -286,7 +286,7 @@ public sealed class ExceptionPerformSourceFormatScopeTests
             "           DISPLAY \"A\".",
             "       >>SOURCE FORMAT IS FREE",
             "DISPLAY \"B\"", "");
-        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, 2023, permissive: false, null, "t.cob",
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, null, "t.cob",
             initialFixed: true, out var formats,
             implicitOps: [new(3, DirectiveStackKind.Push, null), new(3, DirectiveStackKind.Pop, null)]);
         Assert.Equal("DISPLAY \"B\"", m.Text.Split('\n')[2].Trim());

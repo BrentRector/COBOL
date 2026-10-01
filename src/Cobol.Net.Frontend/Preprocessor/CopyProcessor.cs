@@ -19,7 +19,8 @@ public sealed class CopyProcessor(
     bool permissive = false,
     CompilationInputs? inputs = null,
     bool ccvsIndicators = false,   // the --nist column-7 conventions for library text too (kb/Work PB1494)
-    ImplicitFormatOps? implicitFormatOps = null)   // §14.9.28.4 GR14's implicit PUSH/POP ALL written in library text (kb/Work PB1066)
+    ImplicitFormatOps? implicitFormatOps = null,   // §14.9.28.4 GR14's implicit PUSH/POP ALL written in library text (kb/Work PB1066)
+    ReferenceFormatDiagnostics? referenceFormatGates = null)   // the compilation's ONE reference-format diagnostics, shared with the main source (kb/Work PB1640)
 {
     /// <summary>The compilation's ambient-input gateway (kb/Work PB985): every copybook probe and read below goes
     /// through it, so the record names each library text the group incorporated AND each candidate that was not
@@ -83,6 +84,26 @@ public sealed class CopyProcessor(
     /// decides whether a §14.9.28.4 GR14 implicit PUSH ALL / POP ALL bracket can change the format at all
     /// (<see cref="ImplicitFormatOps.Place"/>; kb/Work PB1066).</summary>
     public IReadOnlyDictionary<string, ReferenceFormatMap> ReferenceFormats => _referenceFormats;
+
+    /// <summary>Whether each library text, by file, was converted starting in an IDENTIFICATION DIVISION — the division its
+    /// COPY statement stood in — so a COPY inside library text asks the division that library text is in at that point
+    /// (kb/Work PB1494). A file with no entry is a source text, which begins in one.</summary>
+    private readonly Dictionary<string, bool> _libraryStartsInIdentification = new(StringComparer.Ordinal);
+
+    private DivisionCursor? _divisionCursor;
+    private int _divisionCursorPosition;
+
+    /// <summary>Whether the COPY statement at <paramref name="position"/> of <paramref name="text"/> (written in
+    /// <paramref name="file"/>) stands in an IDENTIFICATION DIVISION — the only place the obsolete comment-entry
+    /// paragraphs exist, so the only place library text may hold them (kb/Work PB1494). One cursor walks a text once as
+    /// its COPY statements are resolved in order.</summary>
+    private bool CopyStandsInIdentificationDivision(string file, string text, int position)
+    {
+        if (_divisionCursor is null || !ReferenceEquals(_divisionCursor.Text, text) || position < _divisionCursorPosition)
+            _divisionCursor = new DivisionCursor(text, _libraryStartsInIdentification.GetValueOrDefault(file, true));
+        _divisionCursorPosition = position;
+        return _divisionCursor.InIdentificationDivisionAt(position);
+    }
 
     /// <summary>Report at a SOURCE origin (kb/Work PB82) — the file and physical line the text at a position came
     /// from, never an ordinal of the text being processed.</summary>
@@ -515,7 +536,8 @@ public sealed class CopyProcessor(
         // effect for this COPY statement (§7.3.24.3 3)) — its own >>SOURCE FORMAT directives switch it from there, and
         // the COPY's text is unaffected after it (5), the revert). Then COPY … REPLACING (§7.2.3.4 9)).
         bool? copyFixed = _referenceFormats.TryGetValue(at.File, out var copyFormats) ? copyFormats.LibraryTextDefaultAt(at.Line) : null;
-        var normalizedMapped = NormalizeCopybookMapped(_inputs.ReadAllText(copybookPath), copybookPath, copyFixed);
+        var normalizedMapped = NormalizeCopybookMapped(_inputs.ReadAllText(copybookPath), copybookPath, copyFixed,
+            CopyStandsInIdentificationDivision(at.File, text, copyIdx));
         string normalized = normalizedMapped.Text;
         // §7.2.3.3 SR9: "The length of a text-word within pseudo-text and within library text shall be from 1 through
         // 65,535 character positions" — the library-text half (the pseudo-text half is ScreenOperandPair's).
@@ -771,16 +793,21 @@ public sealed class CopyProcessor(
     }
 
     /// <summary>Normalize library text to logical free form (kb/Work PB82 / PB1067) through the ONE §6.5 walker the
-    /// source text uses — <see cref="ReferenceFormatProcessor.NormalizeToFreeFormMapped(string, int, bool, DiagnosticBag?, string, bool?, out ReferenceFormatMap)"/>
+    /// source text uses — <see cref="ReferenceFormatProcessor.NormalizeToFreeFormMapped(string, ReferenceFormatDiagnostics?, string, bool?, out ReferenceFormatMap, bool, IReadOnlyList{DirectiveStackOp})"/>
     /// — starting in <paramref name="copyFixed"/>, the format in effect for the COPY statement (§7.3.24.3 3); null
     /// when that is unknown, and then detected as the compilation group's is). The text's own &gt;&gt;SOURCE FORMAT
     /// directives switch it (1), 5)); the resulting map is registered so a COPY inside this library text starts its
     /// library text in the format in effect THERE. Per line: the copybook's path and physical line.</summary>
-    private MappedText NormalizeCopybookMapped(string text, string copybookPath, bool? copyFixed)
+    private MappedText NormalizeCopybookMapped(string text, string copybookPath, bool? copyFixed, bool inIdentificationDivision)
     {
-        var mapped = ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, dialectLevel, permissive,
-            diagnostics: null, copybookPath, copyFixed, out var formats, ccvsIndicators,
-            implicitOps: implicitFormatOps?.For(copybookPath));   // GR14's implicit ops written IN this library text
+        _libraryStartsInIdentification[copybookPath] = inIdentificationDivision;
+        // Library text is read by the same §6.5 walker WITH the compilation's reference-format diagnostics (§6.5: the rules
+        // of logical conversion apply to lines "of source text and library text"), sited at the copybook's own file and
+        // line, so a rule broken in a copybook is reported as it is in the main source (kb/Work PB1640).
+        var mapped = ReferenceFormatProcessor.NormalizeToFreeFormMapped(text, referenceFormatGates,
+            copybookPath, copyFixed, out var formats, ccvsIndicators,
+            implicitOps: implicitFormatOps?.For(copybookPath),   // GR14's implicit ops written IN this library text
+            startsInIdentificationDivision: inIdentificationDivision);
         _referenceFormats[copybookPath] = formats;
         return mapped;
     }

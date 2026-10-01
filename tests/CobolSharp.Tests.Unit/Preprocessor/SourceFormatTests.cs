@@ -11,8 +11,7 @@ namespace CobolSharp.Tests.Unit.Preprocessor;
 public class SourceFormatTests
 {
     private static string Norm(string src) =>
-        ReferenceFormatProcessor.NormalizeToFreeForm(src, dialectLevel: 2002, permissive: false,
-            diagnostics: null, sourcePath: "t.cob");
+        ReferenceFormatProcessor.NormalizeToFreeForm(src, gates: null, sourcePath: "t.cob");
 
     [Fact] // A FIXED segment then a FREE segment: the fixed lines are column-stripped, the free lines pass through.
     public void MidFile_FixedThenFree()

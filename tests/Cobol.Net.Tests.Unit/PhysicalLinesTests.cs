@@ -105,7 +105,7 @@ public sealed class PhysicalLinesTests
         int std = 2023, bool ccvs = false)
     {
         var bag = new DiagnosticBag();
-        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, std, permissive: false, bag, "t.cob",
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(source, new ReferenceFormatDiagnostics(std, false, bag), "t.cob",
             initial.InitialFixed(), out _, ccvs);
         return (m.Text, bag);
     }
@@ -195,8 +195,11 @@ public sealed class PhysicalLinesTests
     [Fact] // DOC-A.1-156: a lone CR does not end a line — `>>` after it is not at a line start.
     public void ALoneCr_DoesNotStartADirectiveLine()
     {
-        var (text, _) = Normalize("DISPLAY \"A\"\r>>SOURCE FORMAT FIXED\nX\n", InitialReferenceFormat.Free);
-        Assert.Equal("DISPLAY \"A\"\r>>SOURCE FORMAT FIXED", text.Split('\n')[0]);   // kept: not a directive, one line
+        var (text, bag) = Normalize("DISPLAY \"A\"\r>>SOURCE FORMAT FIXED\nX\n", InitialReferenceFormat.Free);
+        // one line, the format NOT switched; the `>>` follows program text, so §7.3.3 SR2 names it (kb/Work PB1690)
+        Assert.Equal("DISPLAY \"A\"", text.Split('\n')[0]);
+        Assert.Equal("X", text.Split('\n')[1]);
+        Assert.Contains(bag.Diagnostics, d => d.Code == "COBOLNET2691");
     }
 
     [Fact] // the lines of a SOURCE FORMAT segment keep the FILE's numbers (the stage numbers the lines once).
@@ -204,7 +207,7 @@ public sealed class PhysicalLinesTests
     {
         var bag = new DiagnosticBag();
         var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(
-            ">>SOURCE FORMAT FIXED\n      *\n" + "000100" + "X" + "DISPLAY \"A\".\n", 2023, permissive: false, bag, "t.cob",
+            ">>SOURCE FORMAT FIXED\n      *\n" + "000100" + "X" + "DISPLAY \"A\".\n", new ReferenceFormatDiagnostics(2023, false, bag), "t.cob",
             InitialReferenceFormat.Free);
         Assert.Contains(bag.Diagnostics, d => d.Code == "COBOLNET2616" && d.Location.Line == 2);   // line 3 (0-based 2)
         Assert.Equal(3, m.Lines[2].Line);
