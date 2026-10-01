@@ -3172,12 +3172,12 @@
   "subject": "LEAP-SECOND directive",
   "rule-digest": "50447ee3cf2a",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/Clock.cs#Clock; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#SecondsPastMidnight",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/IO/Clock.cs#Clock; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#SecondsPastMidnight; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#Format21; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#ProgramEmitter; src/Cobol.Net.Frontend/Preprocessor/LeapSecondDirectiveProcessor.cs#LeapSecondDirectiveProcessor",
+  "test-ref": "conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_On_LastTickBeforeLeapSecond_NeverExceeds59; conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_ImpliedOn_BareDirective_LastTickBeforeLeapSecond_NeverExceeds59; conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_On_2002_LastTickBeforeLeapSecond_NeverExceeds59; unit:WhenCompiledStampTests.WhenCompiled_LeapSecondOn_LastTickBeforeLeapSecond_Bakes59; unit:WhenCompiledStampTests.WhenCompiled_LeapSecondImpliedOn_BareDirective_LastTickBeforeLeapSecond_Bakes59",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Rule: 'When ON is specified or implied, the implementor defines whether a value greater than 59 may be reported in the seconds position ...' (cite.py --check 7.3.17.4 OK). Determination made: never - ACCEPT FROM TIME, CURRENT-DATE, FORMATTED-CURRENT-DATE and WHEN-COMPILED all read a .NET DateTime through the one Clock seam, which cannot represent second 60 (LeapSecondDirectiveProcessor summary; CONFORMANCE.md line 523). DOCUMENTATION defect only: CONFORMANCE.md line 523 and the processor summary cite this as 'A.1 item 112', but item 112 is the >= 86,400 SECONDS-PAST-MIDNIGHT determination; the >59-seconds determination is A.1 item 111 (Annex A.1 item 111 cites '7.3.17, LEAP-SECOND directive, General rule 2'), which has no DOC-A.1-111 row in CONFORMANCE.md - acknowledged open in kb/Work PB191 'Still open, deliberately'; the DOC-A.1-111 catalog row is owned by the A.1 register. No test pins the ON-mode reported side. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 directive facility is absent in 1985; the 2002 edge is DERIVED per docs/VERSION_CHANGE_REFERENCE.md row 7.21 - Annex E itemizes the 2014->2023 delta and does not list LEAP-SECOND, so it predates 2023). The time-form / formatted-time consumers the rule bounds are COBOL-2014 intrinsics (§15.3).",
-  "state": "GAP"
+  "notes": "GR2 (cite OK 7.3.17.4 2)): the determination per DOC-A.1-111 is never >59 (nn = 59). Both arms are pinned, ON specified and ON implied by a bare >>LEAP-SECOND (§7.3.17.2 un-underlined ON; §5.2.3 cite OK), at 2002 and 2023. Every source, the WHEN-COMPILED bake included, reports second 59 with hundredths 99, never 60, at the pinned 23:59:59.9999999.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.17.4-3",
@@ -3187,12 +3187,12 @@
   "subject": "LEAP-SECOND directive",
   "rule-digest": "835fa6ce1ad9",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/Clock.cs#Clock; src/Cobol.Net.Runtime/IO/AcceptSource.cs#AcceptSource",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/IO/Clock.cs#Clock; src/Cobol.Net.Runtime/IO/AcceptSource.cs#AcceptSource; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#Format21; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#ProgramEmitter",
+  "test-ref": "conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_ImpliedOff_LastTickBeforeLeapSecond_NeverExceeds59; conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_SpecifiedOff_LastTickBeforeLeapSecond_NeverExceeds59; conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_SpecifiedOff_2002_LastTickBeforeLeapSecond_NeverExceeds59; unit:WhenCompiledStampTests.WhenCompiled_LeapSecondOff_LastTickBeforeLeapSecond_Bakes59; unit:WhenCompiledStampTests.WhenCompiled_LeapSecondImpliedOff_LastTickBeforeLeapSecond_Bakes59",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Rule: 'When OFF is specified or implied, a value greater than 59 shall not be reported in the seconds position ...' (cite.py --check 7.3.17.4 OK). Holds by construction: all four sources derive from DateTime/DateTimeOffset (Second is 0..59), the COBOLNET_CLOCK pin included. unit CurrentDateOffsetDeterminationTests asserts CURRENT-DATE positions 13-14 in 0..59 citing GR1/GR3 but covers one of the four named sources only, so no test-ref is claimed. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 directive facility is absent in 1985; the 2002 edge is DERIVED per docs/VERSION_CHANGE_REFERENCE.md row 7.21 - Annex E itemizes the 2014->2023 delta and does not list LEAP-SECOND, so it predates 2023). The time-form / formatted-time consumers the rule bounds are COBOL-2014 intrinsics (§15.3).",
-  "state": "GAP"
+  "notes": "GR3 (cite OK 7.3.17.4 3)) on both arms, specified and GR1-implied OFF: all four sources pinned at 2016-12-31T23:59:59.9999999+00:00. Run time (COBOLNET_CLOCK) gives 23595999 / 2016123123595999+0000 / 20161231T235959 (2014+). The WHEN-COMPILED bake (IntrinsicBinder.CompileClock, 2002 and 2023) gives 2016123123595999+0000. The live-clock goldens are layout witnesses only and are not claimed.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.17.4-4",
@@ -63532,12 +63532,12 @@
   "subject": "LEAP-SECOND directive (whether a value greater than 59 seconds may be reported and, if so, the maximum number of seconds",
   "rule-digest": "6a0562cd0d9e",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-111; src/Cobol.Net.Runtime/IO/AcceptSource.cs#Time; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#CurrentDate; src/Cobol.Net.Frontend/Preprocessor/LeapSecondDirectiveProcessor.cs#LeapSecondDirectiveProcessor; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#FormattedCurrentDate",
-  "test-ref": "",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-111; src/Cobol.Net.Runtime/IO/AcceptSource.cs#Time; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#CurrentDate; src/Cobol.Net.Frontend/Preprocessor/LeapSecondDirectiveProcessor.cs#LeapSecondDirectiveProcessor; src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#FormattedCurrentDate; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#ProgramEmitter",
+  "test-ref": "conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_On_LastTickBeforeLeapSecond_NeverExceeds59; conformance-test:LeapSecondReportedSecondsPinTests.ReportedSeconds_ImpliedOn_BareDirective_LastTickBeforeLeapSecond_NeverExceeds59; unit:WhenCompiledStampTests.WhenCompiled_LeapSecondOn_LastTickBeforeLeapSecond_Bakes59; unit:WhenCompiledStampTests.WhenCompiled_LeapSecondImpliedOn_BareDirective_LastTickBeforeLeapSecond_Bakes59",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "§7.3.17.4 GR2 (cite.py OK §7.3.17.4 2)) leaves to the implementor whether ACCEPT TIME / CURRENT-DATE / FORMATTED-CURRENT-DATE / WHEN-COMPILED may report >59 seconds under ON; COBOL.NET answers never. Verified by code reading (AcceptSource.Time uses DateTime.Second; CobolDate.CurrentDate formats RunUnit.Current.Clock.Now(); every temporal source reads IClock -> DateTimeOffset, range 0..59) and probe /tmp/adj/doc/doc-w1-s4/probe/p111.cob with >>LEAP-SECOND ON and COBOLNET_CLOCK=2016-12-31T23:59:59Z: --std 2014 and 2023 print '59 59 <compile-secs> 59'; p111b.cob at --std 2002 accepts the directive. A 23:59:60 clock pin cannot be expressed (DateTimeOffset.TryParse rejects it), so no test can pin the reported side; Pinned by —. Resolves the misnumbering PB1369 recorded (the §3 directives bullet and LeapSecondDirectiveProcessor's summary label this determination item 112; the integrator should re-key those mentions to item 111 in the same change).",
-  "state": "GAP"
+  "notes": "A.1 item 111 (cite OK) is documented in CONFORMANCE.md as 'never >59, maximum 59'. The observable is the ON-mode pins for every source A.1 111 cites: run time through COBOLNET_CLOCK, and the WHEN-COMPILED bake (15.99 Returned value rule 1, cite OK) through IntrinsicBinder.CompileClock. Both expect 59 at the tick before a leap second. The CONFORMANCE.md Test cell is filled only once the Unit fact is in the tree.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-112",
