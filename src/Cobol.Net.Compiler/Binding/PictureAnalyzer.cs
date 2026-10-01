@@ -770,6 +770,28 @@ public static class PictureAnalyzer
         return true;
     }
 
+    /// <summary>⛔ THE ONE "one instance of the picture symbol" PREDICATE (kb/Work PB1210) — asked by §13.18.2.3 SR1
+    /// (ANY LENGTH: "shall be one instance of the picture symbol 'N', 'X', or '1'") and §13.18.19.3 SR1 (DYNAMIC
+    /// LENGTH: 'N' or 'X'); the symbol set is the caller's, the COUNT rule is here. A character-string is one
+    /// instance when it is a single symbol of <paramref name="symbols"/>, bare or followed by a repetition factor
+    /// whose value is 1 — SR6 of §13.18.40.3: the parenthesized integer "indicates the number of consecutive
+    /// occurrences of the symbol", so <c>X</c>, <c>X(1)</c>, <c>X(01)</c> and <c>N(001)</c> all denote one. The
+    /// factor is read by <see cref="TryRepetitionFactor"/>, the ONE reader of a factor, so a constant-name factor
+    /// (rewritten to its integer by <c>DataBinder.ExpandPicConstants</c> before any caller asks) is covered too.
+    /// The two clauses used to carry two different spellings of this test — a closed list of six strings for ANY
+    /// LENGTH, a count-1 regex for DYNAMIC LENGTH — so <c>PIC X(01) ANY LENGTH</c> was refused while its DYNAMIC
+    /// LENGTH twin compiled.</summary>
+    /// <param name="picture">The PICTURE character-string (constant-name factors already expanded), or null.</param>
+    /// <param name="symbols">The admissible symbols, upper case (e.g. <c>"NX1"</c>).</param>
+    internal static bool IsSingleInstance(string? picture, string symbols)
+    {
+        string p = picture?.Trim().ToUpperInvariant() ?? "";
+        if (p.Length == 0 || !symbols.Contains(p[0])) return false;
+        if (p.Length == 1) return true;
+        return p.Length >= 4 && p[1] == '(' && p[^1] == ')'
+            && TryRepetitionFactor(p[2..^1], closed: true, out int n) && n == 1;
+    }
+
     private static void ReportTooLarge(EditionContext edition, string where, string picture, long positions)
         => edition.Error(DiagnosticCatalog.PictureItemTooLarge, $"{where}: PICTURE {picture} describes "
             + $"{(positions > MaxCharacterPositions ? "more than " : "")}{Math.Min(positions, (long)MaxCharacterPositions)} "

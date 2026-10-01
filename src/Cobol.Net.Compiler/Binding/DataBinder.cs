@@ -5349,10 +5349,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (isAnyLength)
         {
             // §13.18.2.3 SR1: a PICTURE clause shall be specified, and its character-string shall be ONE
-            // instance of the picture symbol 'N', 'X', or '1' (a "(1)" repetition count writes the same one
-            // instance). Checked on the WRITTEN character-string — category+length cannot distinguish 'A'.
-            string norm = pictureText?.Trim().ToUpperInvariant() ?? "";
-            if (norm is not ("X" or "N" or "1" or "X(1)" or "N(1)" or "1(1)"))
+            // instance of the picture symbol 'N', 'X', or '1' — a repetition factor of 1 in any spelling (`X(01)`,
+            // a constant-name) is still one instance (§13.18.40.3 SR6). Checked on the WRITTEN character-string —
+            // category+length cannot distinguish 'A' — by the ONE predicate DYNAMIC LENGTH SR1 also asks
+            // (PictureAnalyzer.IsSingleInstance, kb/Work PB1210).
+            if (!PictureAnalyzer.IsSingleInstance(pictureText, "NX1"))
             {
                 Edition.Error("COBOLNET1542", $"{entryWhere}: the ANY LENGTH clause requires a PICTURE whose "
                     + "character-string is exactly one instance of the picture symbol 'N', 'X', or '1' "
@@ -5390,12 +5391,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         {
             // §13.18.19.3 SR1: a PICTURE clause shall be specified and its character-string shall be exactly ONE
             // instance of the picture symbol 'N' or 'X'. A count of 1 in ANY spelling is still one instance —
-            // `X`, `X(1)`, `X(01)`, `N(001)` all denote one position (the regex `^[XN](\(0*1\))?$` matches every
-            // count-1 form and rejects `XX`, `X(2)`, `A`, `9`, editing symbols, …). Unlike ANY LENGTH (§13.18.2.3
-            // SR1), the boolean symbol '1' is NOT permitted — a dynamic-length item is alphanumeric or national only
-            // (§13.18.19.4 GR1).
-            string norm = pictureText?.Trim().ToUpperInvariant() ?? "";
-            if (!System.Text.RegularExpressions.Regex.IsMatch(norm, @"^[XN](\(0*1\))?$"))
+            // `X`, `X(1)`, `X(01)`, `N(001)` all denote one position — asked of the ONE predicate ANY LENGTH SR1
+            // also asks (PictureAnalyzer.IsSingleInstance, kb/Work PB1210). Unlike ANY LENGTH (§13.18.2.3 SR1),
+            // the boolean symbol '1' is NOT permitted, so a dynamic-length item is alphanumeric or national only ("The
+            // picture symbol determines the class", §13.18.19.4 GR1).
+            if (!PictureAnalyzer.IsSingleInstance(pictureText, "NX"))
             {
                 Edition.Error("COBOLNET1561", $"{entryWhere}: the DYNAMIC LENGTH clause requires a PICTURE whose "
                     + "character-string is exactly one instance of the picture symbol 'N' or 'X' "
