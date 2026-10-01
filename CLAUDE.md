@@ -1,7 +1,7 @@
 # WiseOwl COBOL — Claude Code Instructions
 
 ## ⛔ Non-negotiable process rules
-Owner-emphasized, each earned by a correction. These eight are the SSOT; `PROMPT.md` holds the standing doctrine
+Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.md` holds the standing doctrine
 (mission, architectural commitments, the four required reviews) and does not restate them.
 
 1. **The ISO/IEC 1989:2023 spec (`specs/ISO_COBOL.md`) defines correct behavior for EVERY case.** Read it and cite
@@ -56,6 +56,16 @@ Owner-emphasized, each earned by a correction. These eight are the SSOT; `PROMPT
    feel the urge to start a list, add notes to `kb/Work/` instead.** The only other registers are the ones
    derived mechanically from the spec (the rule catalog → the traceability inventory → its generated burn-down)
    and `constructs.json`; those are GENERATED or CI-owned, never hand-maintained work lists.
+
+9. **⛔ NO DISPATCH WITHOUT THE `workstream` SKILL, AND AN AGENT FIXES WHAT IT FINDS.** Before ANY implementer, lander
+   or fleet dispatch, invoke the `workstream` skill and follow `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md`:
+   render specs with `make_dispatch_specs.py`, get `check_practices.py` GREEN, read the quota meter first, dispatch
+   through the Workflow rolling wave. `scripts/hooks/dispatch_guard.py` REFUSES the call otherwise (owner 2026-09-30,
+   after a session hand-wrote three briefs and skipped the skill: "all future sessions cannot skip learning this").
+   Token frugality is met by the skill's levers, never by skipping it. And an agent that has already read a file
+   and finds NEW issues in it FIXES them in the same change, with golden and sibling sweep, unless the effort is so
+   excessive (a redesign beyond its slice, or its turn budget) that the issue must become a `kb/Work/` note instead
+   (MANDATORY-PRACTICES I9, owner 2026-09-30).
 
 ## Start here every session
 1. **`kb/Work/` — THE WORK REGISTER, and the answer to "what do I do now".** Run

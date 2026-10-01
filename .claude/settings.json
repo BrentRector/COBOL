@@ -68,6 +68,16 @@
         ]
       },
       {
+        "matcher": "Agent|Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/dispatch_guard.py\"",
+            "timeout": 90
+          }
+        ]
+      },
+      {
         "matcher": "PowerShell",
         "hooks": [
           {

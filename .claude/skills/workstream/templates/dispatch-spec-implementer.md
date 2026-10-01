@@ -67,8 +67,7 @@ LINUX GATE (I8, PB1732): after the Windows gate is green and COMMITTED, run `wsl
 Parser + emitter + golden + manifest entry in ONE commit.
 
 REGISTER: flip each note's `status` and write its `closes_rows` IN THE COMMIT THAT LANDS IT (with `closes_rows_reason:`
-when it closes none). Run `python scripts/spec/work.py check`. Do NOT open a list anywhere — new defects are LEADS in your
-report, each with its repro path and code site (file:line) so the registrar does not re-survey.
+when it closes none). Run `python scripts/spec/work.py check`. Do NOT open a list anywhere. FIX WHAT YOU FIND (I9, owner 2026-09-30): an issue you find in a file you have already read and understood is FIXED in this same change, with its golden and its sibling sweep, unless the effort is so excessive that it needs a redesign beyond your slice or would blow your turn budget. Only then file a kb/Work note (id from the orchestrator's allocation) carrying its repro path and code site (file:line) and why it was too large to fix now, and list it in the report. A found issue left only in prose or the DEVLOG is a defect in your work.
 
 CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, and after EVERY commit (the small
 trailing ones too: a gate-red fix, a regenerated index) rewrite `STATUS.md` (DONE / NEXT / BLOCKED / GATE / batch

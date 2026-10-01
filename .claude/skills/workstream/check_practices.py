@@ -22,8 +22,9 @@ BRIEFS = {
     'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'STATUS-AT:',
                                       r'status_delta\.py', r'BUILD-LOCAL GATE: GREEN',
                                       # PB1732 (I8): CI's Linux legs run under WSL before the report
-                                      r'linux-gate\.sh'],
-    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN'],
+                                      r'linux-gate\.sh', r'FIX WHAT YOU FIND'],  # I9
+    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
+                             r'FIX WHAT YOU FIND'],  # I9
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
                               r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
                               r'linux-gate\.sh'],  # PB1732 (L10): CI's Linux legs under WSL before push-main
@@ -39,7 +40,7 @@ BRIEFS = {
                                      # PB1721: the ordered gate, blocked on its own verdict line
                                      r'BUILD-LOCAL GATE: ',
                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
-                                     r'linux-gate\.sh'],
+                                     r'linux-gate\.sh', r'FIX WHAT YOU FIND'],  # I9
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
@@ -47,7 +48,7 @@ BRIEFS = {
                            r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
                            r"status: 'NO-RESULT', error"],
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
-    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh'],  # O8; PB1732
+    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py'],  # O8; PB1732; I9, O9
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.
