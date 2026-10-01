@@ -90,7 +90,7 @@ public static class FileStatusCode
     public const string WriteNotOpenForOutput = "48";
     /// <summary>49 — DELETE/REWRITE on a file not open for I-O.</summary>
     public const string DeleteRewriteNotOpenForIO = "49";
-    /// <summary>44 — record-size boundary violation (§9.1.13.6 item 2): a WRITE/REWRITE outside the RECORD IS
+    /// <summary>44 — record-size boundary violation (§9.1.13.7 item 4, a logic error): a WRITE/REWRITE outside the RECORD IS
     /// VARYING bounds (§13.18.43 GR14 / §14.9.35 GR20), or a record-sequential REWRITE whose size differs from
     /// the record being replaced (§14.9.35 GR16).</summary>
     public const string RecordSizeViolation = "44";

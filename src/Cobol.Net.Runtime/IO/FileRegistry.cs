@@ -144,6 +144,23 @@ public sealed class FileRegistry
         { IsOptional = optional, SelectName = selectName ?? KeyTail(cobolName), Edition = edition, RecordMax = recordMax };
     }
 
+    /// <summary>Register a SELECTed REPORT FILE (§9.1.22; a file description entry with REPORT IS and, legally, no
+    /// record description — §13.4.5.3 SR8). It is a <see cref="SequentialConnector"/> whose
+    /// <paramref name="lineWidth"/> is the widest hosted RD's line width, NOT a record length, so the connector is
+    /// told it has no record description (<c>recordDescribed: false</c>) and no rule that compares the file's bytes
+    /// with a record length applies to it (kb/Work PB677). The one registration a record-less FD makes, beside
+    /// <see cref="Register"/>'s one for every FD that has records.</summary>
+    public void RegisterReport(string cobolName, string assignTarget, int lineWidth, bool optional,
+        string? selectName = null, int edition = 2023)
+    {
+        if (cobolName.StartsWith("::EXT::", StringComparison.Ordinal) && _files.ContainsKey(cobolName))
+            return;   // the run-unit EXTERNAL connector already exists (§13.18.22.4 GR4a)
+        CloseDisplaced(cobolName);
+        _files[cobolName] = new SequentialConnector(CobolFile.ResolveHostPath(assignTarget), lineWidth,
+            lineSequential: false, recordDescribed: false)
+        { IsOptional = optional, SelectName = selectName ?? KeyTail(cobolName), Edition = edition };
+    }
+
     /// <summary>Close a still-open INTERNAL connector a registration is about to replace (kb/Work PB168):
     /// NO normal path replaces an open connector — a unit-scoped (RECURSIVE) unit registers once per run
     /// unit behind its static guard, an INITIAL unit's files are implicitly closed at its termination, and
@@ -659,6 +676,29 @@ public sealed class FileRegistry
         };
     }
 
+    /// <summary>⛔ A READ whose record has just landed in the record area and whose OCCURS DEPENDING ON item then
+    /// makes it too long is unsuccessful with '34' (§9.1.13.6 item 4 b): <i>"A READ statement is unsuccessfully
+    /// executed because the records are variable in length because of an OCCURS DEPENDING ON clause in the record
+    /// in the associated record description entry and the associated DEPENDING ON item contains a value that makes
+    /// the number of bytes in the record exceed the value specified or implied by the file description
+    /// entry"</i> (kb/Work PB1513). The connector cannot see the record's layout — the generated READ evaluates the
+    /// predicate where the record description is known and reports the outcome here, so the ONE I-O status
+    /// assignment path assigns it (and, the connector being open, starts the permanent error of §9.1.13.1 —
+    /// kb/Work PB1541). It is an unsuccessful READ, so §14.9.30.4 GR18's "no valid record position" applies.
+    /// Returns the status.</summary>
+    public string ReadExceedsRecordMaximum(string name)
+    {
+        var c = Require(name);
+        // The governed READ already took the record's lock (GR11) before the verdict was known; an unsuccessful READ
+        // acquires none (the pre-flight denials above say the same), so it is given back here — otherwise another
+        // connector would answer '51' for a record no READ made available.
+        if (c.LastReadRecordId is { Length: > 0 } lockedId)
+            PhysicalFileTable.ReleaseSingle(_physical.For(c.HostPath), name, lockedId);
+        c.ApplyUnsuccessfulReadPosition();
+        c.SetStatus(FileStatusCode.PermanentBoundary);
+        return FileStatusCode.PermanentBoundary;
+    }
+
     /// <summary>Random keyed READ (§14.9.30 F2): indexed slices the key value from
     /// <paramref name="keyedRecordImage"/> (GR30–GR32); relative uses the staged relative key (GR29).</summary>
     public string ReadKeyed(string name, int keyIndex, string keyedRecordImage, out string image,
@@ -728,7 +768,8 @@ public sealed class FileRegistry
         // ordering: an unassociated connector cannot be open, because Open associates before it opens.
         if (c.HostPath.Length == 0) { c.SetStatus(FileStatusCode.OptionalFileNotFound); return FileStatusCode.OptionalFileNotFound; }
         string status;
-        if (c.IsOpen) status = FileStatusCode.FileAlreadyOpen;             // '41' GR13
+        // '41' GR13 — but a permanent error in effect on the open connector (§9.1.13.1, kb/Work PB1541) answers first.
+        if (c.IsOpen) status = c.PermanentErrorInEffect ?? FileStatusCode.FileAlreadyOpen;
         else if (ValidateFixedFileAttributes(c, overridden) is { } conflict)
             status = conflict;                                             // '39' GR18 — see the method
         // §9.1.13.9 2) asks about EVERY other file connector: this run unit's are the registry's to see, and
@@ -1483,7 +1524,9 @@ public sealed class FileRegistry
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         ReleasePriorRecordLocks(meta, st, name);   // §14.9.51.4 GR10 / §12.4.5.9.4 GR6
-        bool wantLock = phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name);   // GR11
+        // GR11 — and never under a permanent error in effect (§9.1.13.1, kb/Work PB1541): that WRITE is refused by the
+        // connector before any record is released, so no lock may be pre-flighted for it ('53'/'54' would outrank).
+        bool wantLock = phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name) && c.PermanentErrorInEffect is null;
         if (wantLock)
         {
             string pf = _physical.PreflightNewLock(st, name);   // §12.4.5.9 GR7 — the statement fails BEFORE the write (§14.9.51 GR15)
@@ -1607,6 +1650,9 @@ public sealed class FileRegistry
         _ = records;
         var c = Require(name);
         if (!c.IsOpen) { c.SetStatus(FileStatusCode.FileNotOpen); return; }
+        // §9.1.13.1 — a permanent error in effect makes UNLOCK unsuccessful too, with the status that began it
+        // (kb/Work PB1541); it releases nothing, like every statement the condition holds.
+        if (c.PermanentErrorInEffect is { } stuck) { c.SetStatus(stuck); return; }
         if (_physical.TryGet(c.HostPath, out var st)) PhysicalFileTable.ReleaseAllForConnector(st, name);
         c.SetStatus(FileStatusCode.Success);
     }

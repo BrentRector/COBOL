@@ -1957,6 +1957,57 @@ U+0100..U+FFFF ordered above "the highest character" in a UTF-16 repertoire (§8
 *Byte-position alphanumeric items* (GnuCOBOL, IBM DISPLAY): safe and interoperable, but `PIC X(10) VALUE "héllo"`
 would hold four characters' worth of positions and truncation would split code points.
 
+### D30. Seven statement-level rules the connectors used to leave to chance, each written in ONE place (kb/Work PB1541, PB1513, PB1195, PB1097, PB1562, PB679, PB677).
+
+Each of the seven was a rule the standard states once and the runtime or emitter honored on one arm only.
+
+**A permanent error remains in effect (PB1541; §9.1.13.1, Annex A.1 item 105, `docs/CONFORMANCE.md` DOC-A.1-105).**
+`FileConnector.Status`'s setter — the one I-O status assignment path — starts the condition when a status beginning
+'3' is assigned to a connector that is OPEN (a failed OPEN leaves the connector closed, which already is the corrected
+state), and a completed CLOSE ends it: CLOSE is the implementor's correction technique. Every other statement
+asks `PermanentErrorReplay` once, in the precondition its verb family already shares — `ReadOpenModeGuard`,
+`StartOpenModeGuard`, `MutationOpenModeGuard`, the first line of each WRITE entry, `Open`, the registry's UNLOCK and
+DELETE FILE — and answers the same status without touching the file; the replay outranks '41', '43', '46', '47',
+'48' and '49'. No producer starts it by hand, so the next producer of a '3x' (a host failure, a boundary, the ODO
+READ below) is covered. `PermanentErrorInEffectTests` is the organization x verb matrix and the drift guard.
+*Rejected:* a flag each '3x' producer sets (the producers are the open-ended set); replaying only the verbs that
+already had a '4x' guard (WRITE had none shared, which is why it asks first on its own line).
+
+**A READ of a record made variable by OCCURS DEPENDING ON is judged after the record lands (PB1513; §9.1.13.6 item 4 b),
+D-ODO2).** The connector cannot see the record layout, so the generated READ evaluates the predicate where the record
+description is known — one comparison of the DEPENDING ON item against a compile-time limit
+(`SequentialIoEmitter.OdoRecordExceedsMaximum`, which sizes the record with the arithmetic `OdoModel.WrapGroup`
+already uses) — and reports the outcome through `FileRegistry.ReadExceedsRecordMaximum`, which assigns '34' through the
+one status path. The sequential READ, the keyed READ and the SORT/MERGE USING transfer's implicit READ share that
+predicate; a file with no such record emits nothing.
+
+**A released record is also available in the other records of its SAME RECORD AREA (PB1195; §14.9.51.4 GR4,
+§14.9.35.4 GR6, §14.9.32.4 GR3).** Character-window records share one backing and get it for free; an OUT-OF-LINE
+record (D27) does not, so WRITE, REWRITE and RELEASE run `EmitReleasedRecordAlsoAvailable` after a SUCCESSFUL statement:
+the shared character area takes the released out-of-line record's image, and each other out-of-line record of the area
+(`FileModel.OutOfLineRecordsOfArea` — the same enumeration a READ's `OutOfLineRecords` is now defined over) takes the
+record at its GR13 length with its extent table. The READ twin was completed in the same change
+(`EmitRecordAreaStore` reaches a clause peer's character window when the file has none of its own).
+
+**A sort-merge file's own ASSIGN USING is associated at its SORT or MERGE (PB1097; §12.4.5.3 GR3, DOC-A.1-73).**
+`FileConnector.AssociationFailure` is the one rule — a pure function of the specification; `Associate` records the
+path of an OPEN with it and `CobolSort.AssociationMade` asks it for the sort-merge file, which is never a connector.
+`SortEmitter.EmitAssociation` leaves for the statement's end label before any phase when it fails (§3.176: an
+unsuccessful execution performs not all the operations of the statement).
+
+**The RECORD clause's size rules screen variable-length records, and such a file frames its records (PB1562; §13.18.43.3
+SR3/SR4, D-FRA (iv)/(v)).** `RecordClauseRules` no longer skips a record holding a dynamic-length item: GR8 b)'s maximum
+is the item's maximum size and its minimum is zero. `FileModel.ImpliesVariableFormat` no longer requires an absent
+RECORD clause, so a variable-length record's frame carries its extent table whatever Format 1 says about the area.
+
+**One pad, one trim, keyed on the record area's category (PB679; §14.9.30.4 GR15).** `FileConnector.FitRecord` is the only
+short-record pad; the indexed key slice, the varying-record store and the blank area an unsuccessful READ returns
+(`BlankRecordArea`) all use it, so a national record area is never padded with a byte-level space.
+
+**A report file has no record description (PB677; §13.4.5.3 SR8, §9.1.22).** The emitter's one record-less arm registers
+it through `CobolFile.RegisterReport`; its connector is told `recordDescribed: false`, and `NoticeIfLayoutDisagrees` — the
+one rule that compares the file's bytes with a record length — asks that first. A line width is not a record length.
+
 ## C# mapping
 
 > Backend neutrality (G4; SSOT §18 #23): everything semantic in this section — FILE STATUS capture, the AT END /

@@ -40,6 +40,7 @@ internal sealed class SortEmitter(EmitContext ctx,
         w.Line($"{RuntimeApi.SortInit(sd, WeightsExpr(so.Collating), NatWeightsExpr(so.Collating))};   // SORT {so.File.CobolName} (ISO §14.9.40.4; BOTH GR5 sequences snapshotted — §14.6.6 r5)");
         using (StatementBody(sd))
         {
+            EmitAssociation(so.File, tx);   // §12.4.5.3 GR3 — at the time of execution, before any phase (kb/Work PB1097)
             // Phase a — release (GR9a). A USING file must not be open when the phase commences (GR9 —
             // EC-SORT-MERGE-FILE-OPEN, tested by the runtime before any implicit OPEN; kb/Work PB1036).
             EmitFilesNotOpen(sd, so.Using);
@@ -109,6 +110,22 @@ internal sealed class SortEmitter(EmitContext ctx,
         }
     }
 
+    /// <summary>⛔ THE STATEMENT'S OWN ASSOCIATION, made first (§12.4.5.3 GR3; kb/Work PB1097): <i>"The association
+    /// occurs at the time of execution of an OPEN, SORT, or MERGE statement that referenced file-name-1"</i>, so the
+    /// sort-merge file's <c>ASSIGN USING</c> content is checked at the start of the statement — by the very rule
+    /// every OPEN applies — and <i>"the OPEN, SORT, or MERGE statement is unsuccessful"</i> when the association
+    /// cannot be made (DOC-A.1-73). An unsuccessful statement is one that does "not result in the execution of all
+    /// the operations specified by that statement" (§3.176), so it leaves for the statement's end label before any
+    /// phase runs: nothing is released, sequenced or returned and no USING or GIVING file is touched. A
+    /// <c>TO</c>-only entry names a file by a source constant (GR3 a) and cannot fail, so it emits nothing.</summary>
+    private void EmitAssociation(FileModel sd, Transfer tx)
+    {
+        var (assign, dynamic) = seqIo.ExecutingAssignment(sd);
+        if (!dynamic) return;
+        ctx.Writer.Line($"if (!{RuntimeApi.SortAssociationMade(assign)}) goto {tx.EndLabel};   // §12.4.5.3 GR3 b) — the association cannot be made: the statement is unsuccessful (DOC-A.1-73)");
+        tx.Terminable = true;
+    }
+
     /// <summary>The EC-SORT-MERGE-FILE-OPEN tests for <paramref name="files"/> (§14.9.40.4 GR9, §14.9.24.4 GR7 /
     /// GR12; kb/Work PB1036) — emitted only where the condition is enabled at this statement (§14.6.13.1.1: with
     /// checking off nothing is raised, so the checking-off output carries no test at all).</summary>
@@ -138,6 +155,7 @@ internal sealed class SortEmitter(EmitContext ctx,
         w.Line($"{RuntimeApi.SortInit(sd, WeightsExpr(mg.Collating), NatWeightsExpr(mg.Collating))};   // MERGE {mg.File.CobolName} (ISO §14.9.24.4; BOTH GR5 sequences snapshotted — §14.6.6 r5)");
         using (StatementBody(sd))
         {
+            EmitAssociation(mg.File, tx);   // §12.4.5.3 GR3 — at the time of execution, before any phase (kb/Work PB1097)
             // GR7 / GR12: "At the start of execution of the MERGE statement" no USING or GIVING file may be open —
             // one test point for both, unlike SORT's per-phase GR9 (kb/Work PB1036).
             EmitFilesNotOpen(sd, [.. mg.Using, .. mg.Giving]);
@@ -204,6 +222,21 @@ internal sealed class SortEmitter(EmitContext ctx,
         // statement-written direction — this loop renders no READ statement of the program's (kb/Work PB334).
         using (w.Block($"while ({RuntimeApi.FileReadSharedOk(f, "false", "FileRecordLock.None", "false", "true", "FileRetryKind.None", "0", tmp)})"))
         {
+            // §9.1.13.6 item 4 b) applies to the as-if READ exactly as to a READ statement (kb/Work PB1513): a file
+            // whose record is variable in length by OCCURS DEPENDING ON lands the record in its record area — which an
+            // implicit READ is free to do (GR12's closing paragraph only forbids a USE procedure from touching it) —
+            // so the DEPENDING ON item has a value to judge, and a count that makes the record too long ends the
+            // retrieval with '34'. The loop's exit then reads that status as the as-if READ's, and §9.1.13.1's fatal
+            // default (the one table, RuleFor) terminates the statement. A file with no such record pays nothing.
+            if (seqIo.OdoRecordExceedsMaximum(input) is { } tooLong)
+            {
+                seqIo.EmitImplicitReadLanding(input, tmp);
+                using (w.Block($"if ({tooLong})"))
+                {
+                    w.Line($"{RuntimeApi.FileReadExceedsRecordMaximum(f)};   // §9.1.13.6 item 4 b) — the as-if READ is unsuccessful");
+                    w.Line("break;");
+                }
+            }
             // GR12 b) / MERGE GR7 b): a record READ larger than the SD's largest record — or, for a
             // variable-length SD, smaller than its smallest — is EC-SORT-MERGE-RELEASE, tested by the runtime
             // against the size the record had when READ (LastReadLength: the frame length on a varying input
@@ -502,19 +535,32 @@ internal sealed class SortEmitter(EmitContext ctx,
         // §13.18.43.4 GR14 b) / GR19 b): a size outside the record range is EC-SORT-MERGE-RELEASE and the RELEASE
         // is unsuccessful — the runtime's test, before the release (kb/Work PB1036).
         var (min, max) = RecordRange(rl.Varying, rl.RecordWidth);
+        // §14.9.32.4 GR3 — the released record is also available as a record of the other files of a SAME RECORD AREA
+        // clause (kb/Work PB1195): held in a local so the statement and the store after it see the SAME record.
+        string? released = seqIo.BeginReleasedRecord(rl.File, rl.Record, ref image);
+        string call, length;
         if (rl.Varying is { Depending: { } dep })
         {
             // §13.18.43 GR13a: the released record's length = the RECORD VARYING DEPENDING ON item's current value.
             // The runtime slices the area to it AFTER the range test — an emitted reference modification would
             // raise EC-BOUND-REF-MOD for a value past the area, a condition no RELEASE rule names.
-            w.Line($"{RuntimeApi.SortReleaseStatement(sd, image, min, max, $"(int){PlaceRenderer.CountRead(dep)}")};");
-            return;
+            length = $"(int){PlaceRenderer.CountRead(dep)}";
+            call = RuntimeApi.SortReleaseStatement(sd, image, min, max, length);
         }
-        // GR13b/c (no DEPENDING — incl. a varying m-TO-n SD): the named record's own size; the image renders at
-        // exactly that width, so the release carries it — with the record's extent table when it is a
-        // variable-length group (D-FRA (v); kb/Work PB1053; the DEPENDING arm above sends a record cut to another
-        // length, which no table describes). The STATEMENT entry: §14.9.32.4 GR1's phase test.
-        w.Line($"{RuntimeApi.SortReleaseStatement(sd, image, min, max, extents: OperandText.RecordAreaExtents(rl.Record))};");
+        else
+        {
+            // GR13b/c (no DEPENDING — incl. a varying m-TO-n SD): the named record's own size; the image renders at
+            // exactly that width, so the release carries it — with the record's extent table when it is a
+            // variable-length group (D-FRA (v); kb/Work PB1053; the DEPENDING arm above sends a record cut to another
+            // length, which no table describes). The STATEMENT entry: §14.9.32.4 GR1's phase test.
+            length = "-1";
+            call = RuntimeApi.SortReleaseStatement(sd, image, min, max, extents: OperandText.RecordAreaExtents(rl.Record));
+        }
+        if (released is null) { w.Line($"{call};"); return; }
+        // The statement's own success (it returns whether the record reached the sort file) gates the store.
+        using (w.Block($"if ({call})"))
+            seqIo.EmitReleasedRecordAlsoAvailable(rl.File, rl.Record, RuntimeApi.FileReleasedRecord(released, length),
+                OperandText.RecordAreaExtents(rl.Record));
     }
 
     /// <summary>The record range the EC-SORT-MERGE-RELEASE tests use (kb/Work PB1036): a variable-length

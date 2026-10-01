@@ -3976,7 +3976,11 @@ public static class DiagnosticCatalog
         + "records that contain a greater number of bytes than that specified by integer-3\". A record "
         + "description's byte count is §13.18.43.4 GR8's: the sum over its elementary items excluding "
         + "redefinitions and renamings, with an occurs-depending table contributing its minimum occurrences for "
-        + "the lower comparison (GR8 a) and its maximum for the upper (GR8 b).",
+        + "the lower comparison (GR8 a) and its maximum for the upper (GR8 b), and a dynamic-length elementary "
+        + "item contributing zero for the lower and its maximum size (§8.5.1.10.1: the smallest of its LIMIT "
+        + "phrase, the largest integer its prefixed usage can store and the implementor maximum) for the upper — "
+        + "so a record with an unbounded dynamic-length member is refused by a fixed or bounded RECORD clause "
+        + "(kb/Work PB1562).",
         "ISO §13.18.43.3 SR3 / SR4");
 
     /// <summary>COBOLNET2027 — the DYNAMIC LENGTH clause's LIMIT phrase asks for more characters than this

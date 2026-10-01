@@ -160,7 +160,10 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                     int width = Math.Max(1, ctx.Data.Reports
                         .Where(r => ReferenceEquals(r.File, file))
                         .Select(r => r.LineWidth).DefaultIfEmpty(1).Max());
-                    w.Line($"{RuntimeApi.FileRegister(FileKeyExpr(file), CsLiteral(file.AssignTarget), $"{width}", "false", file.Optional ? "true" : "false", ctx.Data.Edition.DialectLevel, selectName: CsLiteral(file.SelectName))};");
+                    // The width is the widest RD's LINE WIDTH, not a record length: the connector is registered as a
+                    // file with NO record description, so no rule comparing its bytes with a record length (the
+                    // layout notice) applies to it (kb/Work PB677).
+                    w.Line($"{RuntimeApi.FileRegisterReport(FileKeyExpr(file), CsLiteral(file.AssignTarget), $"{width}", file.Optional ? "true" : "false", ctx.Data.Edition.DialectLevel, CsLiteral(file.SelectName))};");
                 }
                 continue;
             }
@@ -202,12 +205,22 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// total.</para></summary>
     internal string ExecutingElementArgs(FileModel file)
     {
-        string page = LinageArg(file);
+        var (assign, dynamic) = ExecutingAssignment(file);
+        return RuntimeApi.ExecutingElementArgs(assign, dynamic, LinageArg(file));
+    }
+
+    /// <summary>⛔ THE ONE RENDERING OF THE EXECUTING ELEMENT'S ASSIGN SPECIFICATION (§12.4.5.3 GR3 a)/b)): the
+    /// content of data-name-1 when the file control entry writes the USING phrase, else the literal/device value.
+    /// Shared by the OPEN entries (<see cref="ExecutingElementArgs"/>) and by the SORT/MERGE statement's association
+    /// of its OWN sort-merge file (<see cref="SortEmitter"/>, kb/Work PB1097), so the two cannot render the
+    /// operand differently.</summary>
+    internal (string Assign, bool Dynamic) ExecutingAssignment(FileModel file)
+    {
         if (file.AssignUsingItem is { } item && refs.ResolveItem(item) is { } p)
             // OperandText.FieldImage is THE operand-to-character-image renderer for every shape — an elementary
             // alphanumeric leaf reads its carrier, an alphanumeric group its generated AsImage(). No second arm.
-            return RuntimeApi.ExecutingElementArgs(OperandText.FieldImage(p), assignDynamic: true, page);
-        return RuntimeApi.ExecutingElementArgs(CsLiteral(file.AssignTarget), assignDynamic: false, page);
+            return (OperandText.FieldImage(p), true);
+        return (CsLiteral(file.AssignTarget), false);
     }
 
     /// <summary>The executing element's LINAGE operand values (ISO §13.18.34 GR6) as a <c>LinagePage</c>, or
@@ -531,7 +544,11 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // Status lands on the connector either way.
         var (retryKind, retryAmount) = RenderRetry(wr.Retry);
         string lenArg = VaryingLengthArg(wr.File) ?? "-1";
+        // §14.9.51.4 GR4 — the released record is also available as a record of the other files of a SAME RECORD AREA
+        // clause (kb/Work PB1195): held in a local so the statement and the store after it see the SAME record.
+        string? released = BeginReleasedRecord(wr.File, wr.Record, ref image);
         w.Line($"{RuntimeApi.FileWriteShared(name, image, lenArg, RuntimeRecordLock(wr.Lock), retryKind, retryAmount, LinageArg(wr.File), AdvanceArg(wr), OperandText.RecordAreaExtents(wr.Record))};");
+        EndReleasedRecord(wr.File, wr.Record, released, lenArg, RuntimeApi.FileStatus(name));
         // The §9.1.14 status SNAPSHOT for a --permissive INVALID KEY phrase (kb/Work PB691). Taken HERE, before
         // the FILE STATUS store and the USE hook, for the same reason the end-of-page flag is read in the `if`
         // header below: a declarative or a phrase body may operate on this same connector and move its status.
@@ -677,9 +694,29 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // sequential-file rules b)/c) then select the record NUMBER from it (kb/Work PB334). With one call shape
         // there is no longer a second place to drop it — which is how `READ … PREVIOUS` became a forward read.
         string readCall = EmitReadSharedCall(rd, name, tmp);
-        using (w.Block($"if ({readCall})"))
+        // §9.1.13.6 item 4 b) (kb/Work PB1513): a record that LANDS with an OCCURS DEPENDING ON item making it too long
+        // makes the READ unsuccessful — '34' — so the verdict on the READ is known only after the area store, and
+        // every success-only step (length store, INTO, NOT AT END) follows the verdict, not the physical retrieval.
+        string cond = readCall;
+        bool stored = false;
+        if (OdoRecordExceedsMaximum(rd.File) is { } tooLong)
         {
-            EmitRecordAreaStore(rd.File, area, tmp, RuntimeApi.FileCurrentRecord(name), RuntimeApi.FileCurrentRecordExtents(name));
+            cond = $"__rok{ctx.Names.NextRead()}";
+            w.Line($"bool {cond} = {readCall};");
+            using (w.Block($"if ({cond})"))
+            {
+                EmitRecordAreaStore(rd.File, area, tmp, RuntimeApi.FileCurrentRecord(name), RuntimeApi.FileCurrentRecordExtents(name));
+                using (w.Block($"if ({tooLong})"))
+                {
+                    w.Line($"{RuntimeApi.FileReadExceedsRecordMaximum(name)};   // §9.1.13.6 item 4 b) — the READ is unsuccessful");
+                    w.Line($"{cond} = false;");
+                }
+            }
+            stored = true;
+        }
+        using (w.Block($"if ({cond})"))
+        {
+            if (!stored) EmitRecordAreaStore(rd.File, area, tmp, RuntimeApi.FileCurrentRecord(name), RuntimeApi.FileCurrentRecordExtents(name));
             EmitReadLengthStore(rd.File);   // §13.18.43 GR15 — the just-read length into DEPENDING
             EmitStoreFileStatus(rd.File);
             // ⛔ A SUCCESSFUL READ RUNS THE EC HOOK TOO (kb/Work PB1382): a '0x' status (04, 06, 09 …) is
@@ -726,7 +763,11 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // connector, opted in or not (kb/Work PB669). The status lands on the connector either way.
         var (retryKind, retryAmount) = RenderRetry(rw.Retry);
         string rwLenArg = RewriteLengthArg(rw, VaryingLengthArg(rw.File));
+        // §14.9.35.4 GR6 — the released record is also available as a record of the other files of a SAME RECORD AREA
+        // clause: held in a local so the statement and the store after it see the SAME record (kb/Work PB1195).
+        string? released = BeginReleasedRecord(rw.File, rw.Record, ref image);
         w.Line($"{RuntimeApi.FileRewriteShared(FileKeyExpr(rw.File), image, rwLenArg, RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordAreaExtents(rw.Record))};");
+        EndReleasedRecord(rw.File, rw.Record, released, rwLenArg, RuntimeApi.FileStatus(FileKeyExpr(rw.File)));
         // The §9.1.14 status snapshot for a --permissive INVALID KEY phrase, taken before the status store and
         // the USE hook — the WRITE arm above carries the full reasoning (kb/Work PB691).
         string? rst = null;
@@ -755,7 +796,15 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     {
         if (area is not null)
         {
-            if (FileModel.IsOutOfLineRecord(area.Item)) EmitOutOfLineInto(area, currentRecord, currentExtents);
+            if (FileModel.IsOutOfLineRecord(area.Item))
+            {
+                EmitOutOfLineInto(area, currentRecord, currentExtents);
+                // A file whose every record is out of line has no character window of its own, but a file of its
+                // SAME RECORD AREA clause may: the shared character area holds the record too (§12.4.6.4.4 GR2;
+                // the READ twin of the released-record rule, kb/Work PB1195). It takes the CURRENT RECORD, not the
+                // area image: an out-of-line file's area image is cut to its own character width, which is not the record.
+                if (AreaCharacterViewFor(file, area.Item) is { } peerChars) EmitImageInto(peerChars, currentRecord);
+            }
             else EmitImageInto(area, areaImage);
         }
         foreach (var record in file.OutOfLineRecords)
@@ -790,6 +839,131 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         }
         // A pointer-class record: no character image (A.1 items 210/216) — nothing of the record lands in it.
         w.Line($"// '{item.CobolName}' — pointer-class record: no character image, the READ leaves its value unchanged (D-FRA)");
+    }
+
+    /// <summary>⛔ THE C# CONDITION "the record the READ just landed is made too long by its OCCURS DEPENDING ON item",
+    /// or null when the rule has nothing to ask (kb/Work PB1513). §9.1.13.6 item 4 b): <i>"A READ statement is
+    /// unsuccessfully executed because the records are variable in length because of an OCCURS DEPENDING ON clause
+    /// in the record in the associated record description entry and the associated DEPENDING ON item contains a
+    /// value that makes the number of bytes in the record exceed the value specified or implied by the file
+    /// description entry"</i> — '34'. The record's byte size at a count <c>n</c> is §13.18.43.4 GR13 c)'s: the fixed
+    /// portion plus the table at <c>n</c> occurrences (the very arithmetic <see cref="OdoModel.WrapGroup"/> sizes a
+    /// group operand by, bit-granular when the subtree holds a USAGE BIT leaf), and "the value specified or
+    /// implied by the file description entry" is the file's maximum record size (<see cref="FileModel.VaryMax"/>
+    /// for a variable-length file, else <see cref="FileModel.RecordWidth"/> — which an explicit
+    /// <c>RECORD CONTAINS</c> raises above the largest description). The test is therefore a compile-time constant
+    /// LIMIT on the count, the largest <c>n</c> whose size still fits, so the emitted code is one comparison of the
+    /// DEPENDING ON item against a literal.
+    /// <para>⚠ DETERMINATION (docs/CONFORMANCE.md D-ODO2): the rule speaks of "THE record in the associated record
+    /// description entry" — one description. A file description with several record descriptions (implicit
+    /// redefinitions of one area, §13.18.33.4 GR3) has no one description the READ is associated with, and
+    /// evaluating a description's count over bytes that belong to another record type would reject every legal
+    /// record of the other types, so the rule is asked of a file with exactly ONE record description. The
+    /// DEPENDING ON item may lie in the record or outside it; it is read AFTER the record has landed, which is the
+    /// only moment a count carried in the record has a value.</para></summary>
+    internal string? OdoRecordExceedsMaximum(FileModel file)
+    {
+        if (file.Records.Count != 1) return null;
+        var record = file.Records[0];
+        if (OdoModel.TableUnder(record) is not { OccursSpec: { } spec } table || spec.Depending is not { } depItem
+            || refs.ResolveItem(depItem) is not { } dep)
+            return null;
+        int max = table.Occurs ?? spec.Max;
+        bool bits = record.HasBitDescendant && BitLayout.StartBitOf(record, table) >= 0;
+        int elem = bits ? BitLayout.StrideBits(table) : RecordLayout.PhysicalOccurrenceWidth(table);
+        long fixedUnits = bits ? BitLayout.StartBitOf(record, table) : RecordLayout.PhysicalWidth(record) - (long)elem * max;
+        // The record's size in BYTES at n occurrences (GR13 c) — bits round up to the byte the last one ends in (GR4).
+        long BytesAt(long n) => bits
+            ? BitLayout.Characters((int)(fixedUnits + (n == 0 ? 0 : (long)elem * (n - 1) + BitLayout.WidthBits(table))))
+            : fixedUnits + n * elem;
+        long fdMax = file.RecordSizeVaries ? file.VaryMax : file.RecordWidth;
+        long limit = max;
+        for (int guard = 0; BytesAt(limit + 1) <= fdMax && guard < (1 << 22); guard++) limit++;
+        while (limit >= 0 && BytesAt(limit) > fdMax) limit--;
+        return $"{PlaceRenderer.CountRead(dep)} > {limit}L";
+    }
+
+    /// <summary>Land the record an IMPLICIT READ (the SORT/MERGE USING transfer) just retrieved into the file's record
+    /// area, through the same store a READ statement uses — what a file whose record description is judged by its own
+    /// content (<see cref="OdoRecordExceedsMaximum"/>) needs before the judgment can be made.</summary>
+    internal void EmitImplicitReadLanding(FileModel file, string areaImage)
+    {
+        string name = FileKeyExpr(file);
+        EmitRecordAreaStore(file, refs.RecordArea(file), areaImage, RuntimeApi.FileCurrentRecord(name),
+            RuntimeApi.FileCurrentRecordExtents(name));
+    }
+
+    /// <summary>⛔ THE CHARACTER-WINDOW RECORD a released OUT-OF-LINE record must reach for the shared character area to
+    /// hold it, or null when none is needed: the released record is itself a character-window record (it IS the
+    /// shared backing — the other character-window records of the area see it for free), or no file of the area
+    /// has a character-window record. Among the area files' views it is the WIDEST, so the store spans the whole
+    /// shared backing (§13.18.33.4 GR3: every record of the area redefines the same storage).</summary>
+    private Place? AreaCharacterViewFor(FileModel file, DataItem released)
+    {
+        if (!FileModel.IsOutOfLineRecord(released)) return null;
+        Place? widest = null;
+        int width = -1;
+        foreach (var f in file.AreaFiles)
+            if (refs.RecordArea(f) is { } view && !FileModel.IsOutOfLineRecord(view.Item)
+                && RecordLayout.PhysicalWidth(view.Item) > width)
+                (widest, width) = (view, RecordLayout.PhysicalWidth(view.Item));
+        return widest;
+    }
+
+    /// <summary>⛔ DOES THE RECORD A STATEMENT JUST RELEASED HAVE ANYWHERE TO BE "ALSO AVAILABLE"? (§14.9.51.4 GR4
+    /// for WRITE, §14.9.35.4 GR6 for REWRITE, §14.9.32.4 GR3 for RELEASE — one rule, three statements; kb/Work
+    /// PB1195.) The rule is the SAME RECORD AREA clause's: <i>"The logical record is also available as a record of
+    /// other file-names referenced in the same SAME RECORD AREA clause ... as well as the file associated with
+    /// record-name-1"</i>. Character-window records share one backing, so among them it holds for free; it needs
+    /// an emitted store exactly where an OUT-OF-LINE record (D-FRA, <see cref="FileModel.IsOutOfLineRecord"/>) is on
+    /// either side — the released record is out of line (the shared character area must be told), or some other
+    /// record of the area is (<see cref="FileModel.OutOfLineRecordsOfArea"/>). Decided at compile time, so a
+    /// program with no such pair renders byte-for-byte as before.</summary>
+    internal bool ReleasedRecordNeedsAlsoAvailable(FileModel file, Place released) =>
+        file.SameRecordAreaPeers.Count > 0
+        && (AreaCharacterViewFor(file, released.Item) is not null
+            || file.OutOfLineRecordsOfArea(released.Item).Any());
+
+    /// <summary>The first half of a released record's "also available" rule (see
+    /// <see cref="ReleasedRecordNeedsAlsoAvailable"/>): when it applies, declares the local that holds the record
+    /// image the statement sends and rewrites <paramref name="image"/> to that local, so the statement and the store
+    /// after it (<see cref="EndReleasedRecord"/>) use one evaluation. Returns the local's name, or null when the rule
+    /// has nowhere to store and the statement renders exactly as before.</summary>
+    internal string? BeginReleasedRecord(FileModel file, Place record, ref string image)
+    {
+        if (!ReleasedRecordNeedsAlsoAvailable(file, record)) return null;
+        string local = $"__rel{ctx.Names.NextKeyedSeq()}";
+        ctx.Writer.Line($"string {local} = {image};");
+        image = local;
+        return local;
+    }
+
+    /// <summary>The second half: after the statement, on a SUCCESSFUL completion only (§14.9.35.4 GR6 "a successful
+    /// execution"; the status is the connector's, read as the statement's own <paramref name="statusExpr"/>), store
+    /// the released record — at the length GR13 gives it (<paramref name="lengthArg"/>) — into the other records of
+    /// the area. A null <paramref name="released"/> (the rule has nothing to do) emits nothing.</summary>
+    internal void EndReleasedRecord(FileModel file, Place record, string? released, string lengthArg, string statusExpr)
+    {
+        if (released is null) return;
+        using (ctx.Writer.Block($"if ({IoStatusClass.Successful(statusExpr)})"))
+            EmitReleasedRecordAlsoAvailable(file, record, RuntimeApi.FileReleasedRecord(released, lengthArg),
+                OperandText.RecordAreaExtents(record));
+    }
+
+    /// <summary>⛔ THE ONE "ALSO AVAILABLE" STORE of a released record — the WRITE / REWRITE / RELEASE twin of
+    /// <see cref="EmitRecordAreaStore"/>, and built from the same two halves so a record released and a record read
+    /// reach the same records of the area: the CHARACTER half (<see cref="AreaCharacterViewFor"/>) through
+    /// <see cref="EmitImageInto"/>, each OTHER out-of-line record of the area through <see cref="EmitOutOfLineInto"/>.
+    /// Emitted only after a SUCCESSFUL statement (§14.9.35.4 GR6 says "a successful execution"). The released
+    /// record is the statement's own — <paramref name="releasedRecord"/> is a C# string expression of it at its
+    /// released length (<see cref="RuntimeApi.FileReleasedRecord"/>) and <paramref name="extents"/> its extent table
+    /// expression or null — never re-read from the record area after the statement.</summary>
+    internal void EmitReleasedRecordAlsoAvailable(FileModel file, Place released, string releasedRecord, string? extents)
+    {
+        if (AreaCharacterViewFor(file, released.Item) is { } chars) EmitImageInto(chars, releasedRecord);
+        foreach (var record in file.OutOfLineRecordsOfArea(released.Item))
+            if (refs.ResolveItem(record) is { } place)
+                EmitOutOfLineInto(place, releasedRecord, extents ?? "null");
     }
 
     /// <summary>Store a read record image into the FD record area: a character-image group distributes via FromImage;

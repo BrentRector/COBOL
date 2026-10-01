@@ -32,6 +32,12 @@ public static class CobolFile
         int recordMax = 0)
         => _reg.Register(cobolName, assignTarget, recordWidth, lineSequential, optional, varyMin, varyMax, selectName, edition, recordMax);
 
+    /// <summary>Register a SELECTed REPORT FILE — a file with no record description (§13.4.5.3 SR8), whose width is
+    /// the widest report line; see <see cref="FileRegistry.RegisterReport"/> (kb/Work PB677).</summary>
+    public static void RegisterReport(string cobolName, string assignTarget, int lineWidth, bool optional,
+        string? selectName = null, int edition = 2023)
+        => _reg.RegisterReport(cobolName, assignTarget, lineWidth, optional, selectName, edition);
+
     /// <summary>Register a SELECTed RELATIVE file (emitted at program start).</summary>
     public static void RegisterRelative(string cobolName, string assignTarget, int recordWidth, bool optional,
         int accessMode, int relativeKeyDigits, int varyMin = -1, int varyMax = -1, string? selectName = null,
@@ -160,6 +166,21 @@ public static class CobolFile
     /// the variable-length group that wrote it ended (docs/CONFORMANCE.md §3 D-FRA (v); kb/Work PB1053); null when
     /// the record carries none. An out-of-line variable-length group record decomposes the current record by it.</summary>
     public static RecordExtents? CurrentRecordExtents(string name) => _reg.CurrentRecordExtents(name);
+
+    /// <summary>A READ whose just-landed record has an OCCURS DEPENDING ON item that makes it exceed the file
+    /// description's maximum is unsuccessful with '34' (§9.1.13.6 item 4 b); kb/Work PB1513) — see
+    /// <see cref="FileRegistry.ReadExceedsRecordMaximum"/>. Returns the status.</summary>
+    public static string ReadExceedsRecordMaximum(string name) => _reg.ReadExceedsRecordMaximum(name);
+
+    /// <summary>⛔ THE LOGICAL RECORD A WRITE, REWRITE OR RELEASE RELEASES, at its released length — what the
+    /// "also available as a record of other files referenced in the same SAME RECORD AREA clause" rule makes
+    /// available in the other records of the area (§14.9.51.4 GR4, §14.9.35.4 GR6, §14.9.32.4 GR3; kb/Work PB1195):
+    /// the record-area image cut to the §13.18.43.4 GR13 a) length when a DEPENDING ON item names one
+    /// (<paramref name="length"/> ≥ 0), else the image itself (GR13 b)/c) — a record of its own size). A length past
+    /// the image releases the image: a record cannot be longer than the area it was released from, so there is
+    /// nothing to pad (and a byte-level pad would be wrong for a national area).</summary>
+    public static string ReleasedRecord(string image, int length) =>
+        length < 0 || length >= image.Length ? image : image[..length];
 
     /// <summary>The file's current FILE STATUS two-character code (ISO §9.1.13). "00" for an unknown name.</summary>
     public static string Status(string name) => _reg.Status(name);

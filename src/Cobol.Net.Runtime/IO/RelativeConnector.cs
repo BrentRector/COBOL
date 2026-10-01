@@ -305,7 +305,7 @@ public sealed class RelativeConnector : KeyedConnector
 
     private string ReadSequential(out string image, bool previous)
     {
-        image = new string(' ', RecordWidth);
+        image = BlankRecordArea();
         if (SequentialReadGuard() is { } pre) return Status = pre;   // '47'/'46'/'10' — FileConnector
         if (!_fpiValid) return Status = FileStatusCode.NoValidNextRecord;              // '46' §9.1.13.7 6a (failed START)
 
@@ -335,7 +335,7 @@ public sealed class RelativeConnector : KeyedConnector
     /// <see cref="SetPendingKey"/>); no such record → invalid key '23'; an absent optional file → '23' (GR28).</summary>
     public string ReadRandom(out string image)
     {
-        image = new string(' ', RecordWidth);
+        image = BlankRecordArea();
         if (ReadOpenModeGuard() is { } notOpen) return Status = notOpen;                  // '47' §14.9.30.4 GR2
         if (RandomReadAbsentOptionalGuard() is { } absent) return Status = absent;        // '23' §9.1.13.5 3 b)
         if (!_slots.TryGetValue(_pendingKey, out StoredFrame rec))
@@ -379,6 +379,7 @@ public sealed class RelativeConnector : KeyedConnector
         // ⛔ The open mode is NOT a disjunct here (kb/Work PB325): a random- or dynamic-access connector open
         // in the extend mode is illegal source (§14.9.27.3 SR2) but a REACHABLE runtime state, and Table 20
         // leaves its WRITE cell blank — item 8 b) below is what it must answer, not GR29 a)'s append.
+        if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
         bool sequentialRelease = Access == KeyedAccess.Sequential;
         if (sequentialRelease)
         {

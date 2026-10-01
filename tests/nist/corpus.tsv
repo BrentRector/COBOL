@@ -220,7 +220,7 @@ RL114A	RL	green	-	valid	-
 RL115A	RL	green	-	valid	-
 RL116A	RL	green	-	valid	-
 RL117A	RL	green	RL107A	valid	-
-RL118A	RL	green	-	valid	-
+RL118A	RL	divergent	-	valid	ISO §9.1.13.1 — CCVS-DEFECT: REL-TEST-2 asserts '22' after the 100th WRITE, whose key 100 lands in the PIC 99 relative key as key 0 — '34' by §14.9.51.4 GR29 b), a permanent error that REMAINS IN EFFECT (A.1 item 105) — so the duplicate-key WRITE answers '34'; the golden records the CCVS FAIL (kb/Work PB1541). Original reading: the 100th WRITE puts key 100 into PIC 99, i.e. key 0, which §14.9.51.4 GR29 b) answers '34', a permanent error that REMAINS IN EFFECT; REL-TEST-2's duplicate-key WRITE therefore answers '34', not '22' (the CCVS85 golden predates the persistence rule's enforcement)
 RL119A	RL	green	-	valid	-
 RL201A	RL	green	-	valid	-
 RL202A	RL	green	RL201A	valid	-

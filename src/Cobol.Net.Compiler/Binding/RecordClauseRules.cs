@@ -233,12 +233,15 @@ internal static class RecordClauseRules
         if (!Rules.Any(r => r.Format == clause.Format && r.Subject == RecordRuleSubject.RecordDescription)) return;
         foreach (var record in file.Records)
         {
-            // ⛔ A record whose extent is NOT A STATIC BYTE COUNT is not a subject of these rules and is skipped
-            // rather than screened against a meaningless number: a DYNAMIC-capacity table is out-of-line
-            // (§8.5.1.9.1 — "the number of occurrences … may vary during execution" with no static allocation)
-            // and a DYNAMIC LENGTH item is a variable-length string (§8.5.1.10). GR8's summation has nothing to
-            // sum for either, so the standard's own quantity does not exist and no comparison can be made.
-            if (!HasStaticExtent(record)) continue;
+            // ⛔ EVERY record description is a subject, a variable-length one included (kb/Work PB1562). GR8 b) sums
+            // the MAXIMUM, and §8.5.1.10.1 gives a dynamic-length item one — "the smallest of" its LIMIT phrase, the
+            // largest integer storable in its prefixed usage and the implementor maximum (DOC-A.1-62) — so a record
+            // holding one has a maximum byte count like a record holding a table (FileModel.MaxRecordSize already
+            // computes it, and the implied clause of PB1276 reads it), and its minimum is the item at zero length
+            // (FileModel.MinRecordSize). Skipping these records made SR3 and SR4 vacuous for exactly the descriptions
+            // that can overflow them: `RECORD CONTAINS 20` over two unbounded dynamic members compiled clean and its
+            // records read back mis-split. (A dynamic-capacity table cannot be in a record at all — COBOLNET1526,
+            // §8.5.1.9.1 3) — so it needs no exclusion.)
             var subject = new RecordClauseSubject(record, FileModel.MinRecordSize(record), FileModel.MaxRecordSize(record));
             foreach (var rule in Rules)
             {
@@ -247,12 +250,4 @@ internal static class RecordClauseRules
             }
         }
     }
-
-    /// <summary>Whether a record description's byte count is the STATIC quantity §13.18.43.4 GR8 sums. False for
-    /// a subtree holding a DYNAMIC-capacity table (§8.5.1.9.1) or a DYNAMIC LENGTH item (§8.5.1.10), whose extent
-    /// is not fixed by the description at all — the same pair <see cref="DataItem.IsCharacterImage"/> excludes,
-    /// and for the same reason.</summary>
-    private static bool HasStaticExtent(DataItem item) =>
-        !item.IsDynamicTable && !item.IsDynamicLength
-        && (item.IsElementary || item.Children.All(HasStaticExtent));
 }

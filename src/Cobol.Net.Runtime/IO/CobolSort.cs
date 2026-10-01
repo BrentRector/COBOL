@@ -192,7 +192,12 @@ public static class CobolSort
     /// <param name="extents">The record's EXTENT TABLE when a variable-length group record is released
     /// (determination D-FRA (v); kb/Work PB1053) — it travels with the record through the sort, as a file frame
     /// carries it.</param>
-    public static void ReleaseStatement(string name, string image, int min, int max, int? size = null,
+    /// <returns><see langword="true"/> when the record was released to the sort file — the condition this
+    /// implementation gates the "also available as a record of other files referenced in the same SAME RECORD AREA
+    /// clause" store on (§14.9.32.4 GR3 states no success condition of its own; WRITE and REWRITE name one,
+    /// §14.9.51.4 GR4 and §14.9.35.4 GR6 — kb/Work PB1195); <see langword="false"/> when no SORT is executing and the
+    /// record is discarded.</returns>
+    public static bool ReleaseStatement(string name, string image, int min, int max, int? size = null,
         RecordExtents? extents = null)
     {
         if (ExceptionState.SortMergeActiveChecking && AnyProcedureRunning(ProcedurePhase.Output))
@@ -206,8 +211,9 @@ public static class CobolSort
         if (bytes < min || bytes > max)
             ExceptionState.SortMergeReleaseError($"RELEASE for sort file {name}: a {bytes}-byte record is outside "
                 + $"the record range {min} to {max} (ISO §13.18.43.4 GR14 b) / GR19 b))");
-        if (f is null) return;   // no SORT executing: there is no sort file to release to — never a stranded store
+        if (f is null) return false;   // no SORT executing: there is no sort file to release to — never a stranded store
         f.Records.Add(new StoredFrame(size is { } s ? Released(image, s) : image, extents));
+        return true;
     }
 
     /// <summary>The record area image at the §13.18.43.4 GR13 a) length <paramref name="size"/> — the lenient
@@ -296,6 +302,19 @@ public static class CobolSort
                 + $"record is outside the record range {min} to {max} (ISO §14.9.40.4 GR12 b), §14.9.24.4 GR7 b))");
         Get(name).Records.Add(new StoredFrame(image ?? "", extents));
     }
+
+    /// <summary>⛔ THE SORT/MERGE STATEMENT'S OWN ASSOCIATION (§12.4.5.3 GR3; kb/Work PB1097): <i>"The association
+    /// occurs at the time of execution of an OPEN, SORT, or MERGE statement that referenced file-name-1"</i>, and
+    /// when the content of data-name-1 is not consistent <i>"the OPEN, SORT, or MERGE statement is unsuccessful"</i>.
+    /// A sort-merge file is the in-memory sort store (§13.4.6), never a host connector, so nothing else asks the
+    /// question for it; the rule is <see cref="FileConnector.AssociationFailure"/>, the very one every OPEN
+    /// applies (DOC-A.1-73). <see langword="false"/> = the association cannot be made: the statement is
+    /// unsuccessful, which §3.176 defines as an attempt that "does not result in the execution of all the
+    /// operations specified by that statement" — the emitted statement leaves before any phase runs. The sort-merge
+    /// file entry has no FILE STATUS clause (§12.4.5.1 Format 4), so there is no I-O status to set.</summary>
+    /// <param name="assign">The executing element's specification: data-name-1's content.</param>
+    public static bool AssociationMade(string assign) =>
+        FileConnector.AssociationFailure(assign, dynamic: true, out _) is null;
 
     /// <summary>The EC-SORT-MERGE-FILE-OPEN test for one USING or GIVING file (kb/Work PB1036), rendered where the
     /// rule places it: SORT at the start of the phase that processes the file — §14.9.40.4 GR9 a) "If the file

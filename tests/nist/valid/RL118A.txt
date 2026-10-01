@@ -14,7 +14,11 @@ TEST RESULT OF RL118A    IN  HIGH        LEVEL VALIDATION FOR ON-SITE VALIDATION
 
  ***********************************************************************************************************************
  CREATE RL-FD2        ***** REL-TEST-1                    ****TEST DELETED****
- CREATE RL-FD2        PASS  REL-TEST-2
+ CREATE RL-FD2        FAIL* REL-TEST-2                    DUPLICATE KEY SHOULD HAVE OCCURRED
+
+                                     COMPUTED= 34
+                                     CORRECT = 22                    VII-3 1.3.4 3A
+
  CREATE RL-FD2        PASS  REL-TEST-3
  CREATE RL-FD2        ***** REL-TEST-4                    ****TEST DELETED****
  ***********************************************************************************************************************
@@ -24,8 +28,8 @@ TEST RESULT OF RL118A    IN  HIGH        LEVEL VALIDATION FOR ON-SITE VALIDATION
 
                                                     END OF TEST-  RL118A
 
-                                                    002 OF 004  TESTS WERE EXECUTED SUCCESSFULLY
-                                                    NO  TEST(S) FAILED
+                                                    001 OF 004  TESTS WERE EXECUTED SUCCESSFULLY
+                                                    001 TEST(S) FAILED
                                                     002 TEST(S) DELETED
                                                     NO  TEST(S) REQUIRE INSPECTION
  FOR OFFICIAL USE ONLY            ON-SITE VALIDATION, NATIONAL INSTITUTE OF STD & TECH.                   COPYRIGHT 1985

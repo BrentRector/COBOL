@@ -763,12 +763,23 @@ public sealed class SequentialConnector : FileConnector
     /// <summary>True between a successful OPEN and the matching CLOSE (an absent-OPTIONAL INPUT open counts —
     /// the connector is open at EOF with no physical stream).</summary>
     public SequentialConnector(string hostPath, int recordWidth, bool lineSequential,
-        int varyMin = -1, int varyMax = -1)
+        int varyMin = -1, int varyMax = -1, bool recordDescribed = true)
         : base(hostPath, recordWidth, varyMin, varyMax)
     {
         _lineSequential = lineSequential;
         _lineEnd = lineSequential ? LineSequentialDelimiter : PrintLineEnd;
+        _recordDescribed = recordDescribed;
     }
+
+    /// <summary>⛔ DOES THIS CONNECTOR'S FILE HAVE A RECORD DESCRIPTION THAT A READ WILL CONSUME (kb/Work PB677)? A
+    /// file description entry with record description entries does; a REPORT FILE's does not (§13.4.5.3 SR8 lets
+    /// a report file carry none, and §9.1.22 makes its content the report writer's print lines), so the
+    /// <see cref="RecordWidth"/> such a connector holds is the widest RD's LINE WIDTH, a figure that is not the
+    /// length of any record. Every rule that compares the file's bytes with a record length asks this first —
+    /// <see cref="NoticeIfLayoutDisagrees"/> is the one such rule today — so the next one cannot treat a
+    /// line width as a record length either. Fixed at registration by the emitter's one record-less arm
+    /// (<see cref="FileRegistry.RegisterReport"/>); never re-derived from the file's bytes.</summary>
+    private readonly bool _recordDescribed;
 
     /// <summary>⛔ THE LINE SEQUENTIAL LINE DELIMITER — Annex A.1 item 114, <c>docs/CONFORMANCE.md</c>
     /// <c>DOC-A.1-114</c>: the HOST platform's newline (CR LF on Windows, LF on Linux and macOS). §12.4.5.10.3
@@ -1008,10 +1019,12 @@ public sealed class SequentialConnector : FileConnector
     /// because it truncates: whatever the file held is discarded, so nothing can disagree.
     /// Excluded, because a differing physical length is NORMAL for them: LINE SEQUENTIAL (records are delimited,
     /// §9.1.13.2) and RECORD IS VARYING (each record carries its own length prefix, so a mismatch is detected
-    /// per record — §14.9.30.4 GR14).</summary>
+    /// per record — §14.9.30.4 GR14). Excluded too: a REPORT FILE, which has no record description to disagree
+    /// with — its <see cref="RecordWidth"/> is the widest RD's line width and its bytes are print lines with their
+    /// terminators and spacing (<see cref="_recordDescribed"/>, kb/Work PB677).</summary>
     private void NoticeIfLayoutDisagrees()
     {
-        if (_lineSequential || IsVarying) return;
+        if (_lineSequential || IsVarying || !_recordDescribed) return;
         try
         {
             // No existence test at all — not FileInfo.Exists (which swallows an access error into "no file"
@@ -1101,6 +1114,7 @@ public sealed class SequentialConnector : FileConnector
     private string WriteRecord(string image, int length, LinagePage? page, RecordExtents? extents)
     {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
+        if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
         if (!IsOpen || _writer is null) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (Mode is not (FileOpenMode.Output or FileOpenMode.Extend)) return Status = FileStatusCode.WriteNotOpenForOutput;
         // §13.18.34.4 GR6 b) 2 — "all subsequent WRITE statements referencing the file cause the EC-I-O-LINAGE
@@ -1239,6 +1253,7 @@ public sealed class SequentialConnector : FileConnector
     private string WriteAdvancingRecord(string image, int length, int lines, bool before, LinagePage? page)
     {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
+        if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
         if (!IsOpen || _writer is null) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (Mode is not (FileOpenMode.Output or FileOpenMode.Extend)) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (_linagePageBroken) return LinageViolationStatus();   // §13.18.34.4 GR6 b) 2's latch — see Write()
@@ -1357,7 +1372,7 @@ public sealed class SequentialConnector : FileConnector
     public bool Read(bool previous, out string image)
     {
         try { return ReadRecord(previous, out image); }
-        catch (IOException) { image = new string(' ', RecordWidth); return ReadFailed(); }   // '30' — see ReadFailed
+        catch (IOException) { image = BlankRecordArea(); return ReadFailed(); }   // '30' — see ReadFailed
     }
 
     /// <summary>⛔ THE READ-SIDE MEDIUM BOUNDARY'S ONE CATCH SHAPE (kb/Work PB1512) — the twin of the write side's
@@ -1381,7 +1396,7 @@ public sealed class SequentialConnector : FileConnector
     /// <summary>The body of <see cref="Read"/>, inside its medium-boundary catch.</summary>
     private bool ReadRecord(bool previous, out string image)
     {
-        image = new string(' ', RecordWidth);
+        image = BlankRecordArea();
         if (SequentialReadGuard() is { } guard) { Status = guard; return false; }   // '47'/'46'/'10' — FileConnector
         if (_reader is null) { Status = FileStatusCode.ReadNotOpenForInput; return false; }
 

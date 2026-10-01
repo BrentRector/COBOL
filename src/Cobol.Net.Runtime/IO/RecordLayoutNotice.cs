@@ -9,7 +9,7 @@ namespace CobolNet.Runtime.IO;
 /// Why this exists: a fixed-length record-sequential file carries NO self-description IN ITS BYTES. If the record
 /// description says 5 bytes and the file holds 8-byte records — the shape a data file written by a build before
 /// V59 has, when a BINARY or PACKED field was stored as its zoned digits — every read after the first is
-/// misaligned and the program computes on rubbish. The standard's own detection (§14.9.30.4 GR14: a record whose
+/// misaligned and the program computes on rubbish. The standard's own detection (§14.9.30.4 GR14/GR15 for the record area, §9.1.13.2 item 3 for the status: a record whose
 /// byte count is outside the description's min/max is a SUCCESSFUL read with I-O status '04') fires only on the
 /// trailing partial record, only if the total length is not a multiple, and only if the program inspects FILE
 /// STATUS. That is too late and too quiet for a layout migration, so the arithmetic fact — a file length that is

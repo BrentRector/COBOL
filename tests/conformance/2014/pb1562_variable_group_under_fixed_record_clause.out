@@ -1,0 +1,6 @@
+W1 00
+W2 00
+W3 00
+R1 A=[AAA] KY=[KEY] C=[CCCC] 00
+R2 A=[B] KY=[K2K] C=[DDDDDD] 00
+R3 A=[] KY=[K3K] C=[] 00

@@ -1248,6 +1248,11 @@ internal static class RuntimeApi
         $"{nameof(CobolFile)}.{nameof(CobolFile.Register)}({name}, {assign}, {width}, {lineSeq}, {optional}{varyArgs}{SelectNameArg(selectName)}{EditionArg(edition)}"
         + (recordMax > 0 ? $", recordMax: {recordMax})" : ")");
 
+    /// <summary>Register a REPORT FILE connector — <c>CobolFile.RegisterReport</c>: a file with no record description,
+    /// whose <paramref name="lineWidth"/> is the widest hosted RD's line width (kb/Work PB677).</summary>
+    public static string FileRegisterReport(string name, string assign, string lineWidth, string optional, int edition, string? selectName = null) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterReport)}({name}, {assign}, {lineWidth}, {optional}{SelectNameArg(selectName)}{EditionArg(edition)})";
+
     /// <summary>⛔ THE PER-STATEMENT OPERANDS OF THE RUNTIME ELEMENT EXECUTING A FILE STATEMENT — the
     /// <c>assign, assignDynamic, page</c> argument triple every OPEN entry takes (kb/Work PB673). ISO
     /// §12.4.5.3 GR3 a)/b) associate the connector using the specification "in the source unit that specifies" /
@@ -1360,6 +1365,16 @@ internal static class RuntimeApi
     public static string FileLastReadLength(string name) =>
         $"{nameof(CobolFile)}.{nameof(CobolFile.LastReadLength)}({name})";
 
+    /// <summary>A READ's ODO-too-long outcome — <c>CobolFile.ReadExceedsRecordMaximum</c> (§9.1.13.6 item 4 b);
+    /// kb/Work PB1513): sets '34' on the connector and yields the status.</summary>
+    public static string FileReadExceedsRecordMaximum(string name) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.ReadExceedsRecordMaximum)}({name})";
+
+    /// <summary>The logical record a WRITE / REWRITE / RELEASE released, at its released length —
+    /// <c>CobolFile.ReleasedRecord</c> (§14.9.51.4 GR4, §14.9.35.4 GR6, §14.9.32.4 GR3; kb/Work PB1195).</summary>
+    public static string FileReleasedRecord(string image, string length) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.ReleasedRecord)}({image}, {length})";
+
     /// <summary>The record the last successful READ made available, at its own length —
     /// <c>CobolFile.CurrentRecord</c> (determination D-FRA; kb/Work PB981).</summary>
     public static string FileCurrentRecord(string name) =>
@@ -1383,6 +1398,11 @@ internal static class RuntimeApi
     /// (D-FRA (v); kb/Work PB1053).</summary>
     public static string SortRelease(string sd, string image, string readSize, int min, int max, string? extents = null) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.Release)}({sd}, {image}, {readSize}, {min}, {max}{(extents is null ? "" : $", extents: {extents}")})";
+
+    /// <summary>The SORT/MERGE statement's association of its own sort-merge file — <c>CobolSort.AssociationMade</c>
+    /// (§12.4.5.3 GR3 b); kb/Work PB1097). <paramref name="assign"/> is data-name-1's content.</summary>
+    public static string SortAssociationMade(string assign) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.AssociationMade)}({assign})";
 
     /// <summary>The EC-SORT-MERGE-FILE-OPEN test for one USING/GIVING file — <c>CobolSort.FileNotOpen</c>
     /// (§14.9.40.4 GR9, §14.9.24.4 GR7 / GR12).</summary>

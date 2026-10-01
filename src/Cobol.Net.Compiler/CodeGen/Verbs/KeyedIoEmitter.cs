@@ -177,12 +177,24 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         using (w.Block($"if ({IoStatusClass.Successful(st)})"))
         {
             SeqIo.EmitRecordAreaStore(file, area, img, RuntimeApi.FileCurrentRecord(name), RuntimeApi.FileCurrentRecordExtents(name));
-            SeqIo.EmitReadLengthStore(file);   // §13.18.43 GR15 — the just-read length into DEPENDING
-            // §14.9.30 GR25 — a sequential READ of a relative file MOVEs the RRN of the record made available
-            // into the RELATIVE KEY data item (MOVE rules — the canonical numeric store path).
-            if (rd.Kind != ReadKind.Random && file.Organization == FileOrganization.Relative
-                && file.RelativeKeyItem is { } rk && refs.ResolveItem(rk) is { } rkPlace)
-                arith.StoreArith(rkPlace, new NumX(RuntimeApi.FileRelativeSlot(name), 0), CobolRounding.Truncation);
+            // §9.1.13.6 item 4 b) (kb/Work PB1513): the record has landed; an OCCURS DEPENDING ON item that makes it
+            // exceed the file's maximum makes the READ unsuccessful — '34' — so the success-only steps below follow
+            // the verdict. The status local is the statement's own, and every later phrase test reads it.
+            string? tooLong = SeqIo.OdoRecordExceedsMaximum(file);
+            if (tooLong is not null)
+                using (w.Block($"if ({tooLong})"))
+                    w.Line($"{st} = {RuntimeApi.FileReadExceedsRecordMaximum(name)};   // §9.1.13.6 item 4 b) — the READ is unsuccessful");
+            void SuccessSteps()
+            {
+                SeqIo.EmitReadLengthStore(file);   // §13.18.43 GR15 — the just-read length into DEPENDING
+                // §14.9.30 GR25 — a sequential READ of a relative file MOVEs the RRN of the record made available
+                // into the RELATIVE KEY data item (MOVE rules — the canonical numeric store path).
+                if (rd.Kind != ReadKind.Random && file.Organization == FileOrganization.Relative
+                    && file.RelativeKeyItem is { } rk && refs.ResolveItem(rk) is { } rkPlace)
+                    arith.StoreArith(rkPlace, new NumX(RuntimeApi.FileRelativeSlot(name), 0), CobolRounding.Truncation);
+            }
+            if (tooLong is null) SuccessSteps();
+            else using (w.Block($"if ({IoStatusClass.Successful(st)})")) SuccessSteps();
         }
         SeqIo.EmitStoreFileStatus(file);
         var hook = SeqIo.EmitUseHook(file, atEndHandled: rd.AtEnd is not null, invalidKeyHandled: rd.InvalidKey?.Invalid is not null);
@@ -246,7 +258,11 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         // The LINAGE page rides the governed entry through the SAME helper the sequential surface uses; for a
         // keyed FD it renders `null` because ISO §13.4.5.2 Format 2 (relative-or-indexed) carries no
         // linage-clause — derived from the file model, never a hand-written null here (kb/Work PB673).
+        // §14.9.51.4 GR4 — the released record is also available as a record of the other files of a SAME RECORD AREA
+        // clause (kb/Work PB1195): held in a local so the statement and the store after it see the SAME record.
+        string? released = SeqIo.BeginReleasedRecord(file, wr.Record, ref wimg);
         w.Line($"var {st} = {RuntimeApi.FileWriteShared(name, wimg, lenArg, SequentialIoEmitter.RuntimeRecordLock(wr.Lock), retryKind, retryAmount, SeqIo.LinageArg(file), areaExtents: OperandText.RecordAreaExtents(wr.Record))};");
+        SeqIo.EndReleasedRecord(file, wr.Record, released, lenArg, RuntimeApi.FileStatus(name));
         // §14.9.51 GR29a/GR30 — sequential access (incl. EXTEND): the released RRN is MOVEd into the RELATIVE KEY
         // item during execution of the WRITE.
         if (file.Organization == FileOrganization.Relative && file.AccessMode == FileAccessMode.Sequential
@@ -285,7 +301,11 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         // runtime body (§13.18.43 GR13a / §14.9.35 GR20) governs every connector, opted in or not (kb/Work PB669).
         var (retryKind, retryAmount) = SeqIo.RenderRetry(rw.Retry);
         string lenArg = SeqIo.VaryingLengthArg(file) ?? "-1";
+        // §14.9.35.4 GR6 — the released record is also available as a record of the other files of a SAME RECORD AREA
+        // clause (kb/Work PB1195): held in a local so the statement and the store after it see the SAME record.
+        string? released = SeqIo.BeginReleasedRecord(file, rw.Record, ref rimg);
         w.Line($"var {st} = {RuntimeApi.FileRewriteShared(name, rimg, lenArg, SequentialIoEmitter.RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordAreaExtents(rw.Record))};");
+        SeqIo.EndReleasedRecord(file, rw.Record, released, lenArg, RuntimeApi.FileStatus(name));
         SeqIo.EmitStoreFileStatus(file);
         var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: rw.InvalidKey?.Invalid is not null);
         SeqIo.EmitInvalid(st, rw.InvalidKey, hook.NotPhraseGate);

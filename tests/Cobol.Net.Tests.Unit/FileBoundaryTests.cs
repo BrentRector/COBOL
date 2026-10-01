@@ -89,7 +89,7 @@ public sealed class FileBoundaryTests : IDisposable
     /// LOCKED. A host offering neither must be neither of them, so the test cannot pass on a CI host by not
     /// running.</summary>
     [Fact]
-    public void SequentialRead_HostFailure_Is30_AndInvalidatesThePosition()
+    public void SequentialRead_HostFailure_Is30_AndRemainsInEffect()
     {
         FileStream? locker = null;
         string path;
@@ -115,8 +115,12 @@ public sealed class FileBoundaryTests : IDisposable
             }
             Assert.False(c.Read(previous: false, out _));
             Assert.Equal(FileStatusCode.PermanentError, c.Status);
+            // §9.1.13.1 (kb/Work PB1541): the '30' is a permanent error and REMAINS IN EFFECT for every later
+            // statement, so the next READ answers it again — not GR21's '46', which would say the previous READ
+            // merely left no valid position. (The failed READ still invalidated the position, §14.9.30.4 GR18; it is
+            // moot until a CLOSE ends the condition, DOC-A.1-105, and the next OPEN repositions.)
             Assert.False(c.Read(previous: false, out _));
-            Assert.Equal(FileStatusCode.NoValidNextRecord, c.Status);   // '46' — the '30' READ left no position
+            Assert.Equal(FileStatusCode.PermanentError, c.Status);
             Assert.Equal(FileStatusCode.PermanentError, c.StartFirstLast(last: false));
         }
         finally

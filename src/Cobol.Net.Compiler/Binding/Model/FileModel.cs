@@ -443,8 +443,19 @@ public sealed class FileModel
     /// group — §8.5.1.12.1): such a record has no one size, and §13.18.43.4 GR13 c) already sizes a record containing a
     /// variable-occurrence item by its extent at the time of the output statement, which is what WRITE sends.
     /// Every other file keeps the implied Format 1 it has always had, so no fixed-record file changes
-    /// shape.</summary>
-    public bool ImpliesVariableFormat => Varying is null && RecordContains is null && Records.Any(IsVariableLengthRecord);
+    /// shape.
+    /// <para>⛔ AN EXPLICIT FORMAT 1 CLAUSE DOES NOT UNDO IT (kb/Work PB1562). The question is what the RECORDS are, not
+    /// what the clause says about the area: a variable-length record has no one size on the medium, and the
+    /// extent table that makes it invertible (D-FRA (v)) lives in the frame of a file that frames its records. A
+    /// file whose records vary but whose frames are the plain fixed blocks of <c>RECORD CONTAINS 20</c> could
+    /// not carry it — a record written as <c>"AAA" "KEY" "CCCC"</c> came back as one dynamic member holding the
+    /// whole 20 bytes and the fixed member beside it blank. So such a file frames its records like any other
+    /// variable-length one, and integer-1 stays what Format 1 says it is, "the number of bytes contained in
+    /// each record" at most — <see cref="RecordWidth"/> still sizes the record AREA and
+    /// <see cref="VaryMax"/> is therefore integer-1 (§13.18.43.3 SR3 keeps every description within it). The
+    /// physical form is the implementor's: "The size of records on physical storage media may be different due
+    /// to control information required by the operating environment" (§13.18.43.4 GR2).</para></summary>
+    public bool ImpliesVariableFormat => Varying is null && Records.Any(IsVariableLengthRecord);
 
     /// <summary>The maximum size specified by the record description entries — ISO §14.9.30.4 GR14/GR15's
     /// truncation bound ("the record is truncated on the right to the maximum size"), computed by
@@ -533,9 +544,21 @@ public sealed class FileModel
     /// processing the current logical record"). A READ / RETURN on this file makes the current record available
     /// in each of them — the out-of-line half of the one-area rule; the character half is the shared
     /// backing.</summary>
-    public IEnumerable<DataItem> OutOfLineRecords =>
-        new[] { this }.Concat(SameRecordAreaPeers).SelectMany(f => f.Records)
-            .Where(r => IsOutOfLineRecord(r) && !ReferenceEquals(r, AreaRecord)).Distinct();
+    public IEnumerable<DataItem> OutOfLineRecords => OutOfLineRecordsOfArea(except: AreaRecord);
+
+    /// <summary>This file and every file that shares its record area through a record-area SAME clause
+    /// (§12.4.6.4.4 GR2) — the files whose records are "the area" for every rule that names it.</summary>
+    public IEnumerable<FileModel> AreaFiles => new[] { this }.Concat(SameRecordAreaPeers);
+
+    /// <summary>⛔ THE ONE ENUMERATION of the out-of-line records of the shared area (D-FRA; kb/Work PB981), other
+    /// than <paramref name="except"/>: what a READ / RETURN (<see cref="OutOfLineRecords"/>, which excepts the
+    /// area record it stores through) and a WRITE / REWRITE / RELEASE of a record (<c>except</c> = the released
+    /// record, which already holds the value — §14.9.51.4 GR4, §14.9.35.4 GR6, §14.9.32.4 GR3; kb/Work PB1195) make a
+    /// record available in. One definition of "the other records of the area", so the two directions cannot
+    /// disagree about which records they reach.</summary>
+    public IEnumerable<DataItem> OutOfLineRecordsOfArea(DataItem? except) =>
+        AreaFiles.SelectMany(f => f.Records)
+            .Where(r => IsOutOfLineRecord(r) && !ReferenceEquals(r, except)).Distinct();
 
     /// <summary>The OTHER files named with this one in a record-area SAME clause (§12.4.6.4.4 GR2), set by
     /// <c>DataBinder</c> when it links their records into one area.</summary>

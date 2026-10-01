@@ -150,6 +150,30 @@ public sealed class RecordLayoutNoticeTests : IDisposable
         c.Close();
     }
 
+    /// <summary>⛔ kb/Work PB677 — a REPORT FILE has no record description: its connector's width is the widest RD's
+    /// LINE WIDTH and its bytes are print lines with terminators and spacing, so "not a whole multiple of the
+    /// record length" is a statement about nothing and the notice's "reads will be misaligned" is false. The
+    /// emitter's one record-less arm registers it through <see cref="FileRegistry.RegisterReport"/>, and OPEN
+    /// EXTEND over an existing 11-byte report (the shape the PB326 golden leaves behind: 11 bytes against a 3-byte
+    /// line width) must print nothing. The control — a file that DOES have a record description, over the same
+    /// bytes and width — is still reported, so the silence is the registration's and not the notice's removal.</summary>
+    [Fact]
+    public void ReportFile_ExtendOverAnExistingReport_IsSilent_ButARecordFileOverTheSameBytesIsNot()
+    {
+        RecordLayoutNotice.ResetForTests();
+        string report = TempFile(11);
+        var reg = new FileRegistry();
+        reg.RegisterReport("RPT", report, lineWidth: 3, optional: false);
+        Assert.Equal("", CaptureStderr(() => reg.OpenStatic("RPT", FileOpenMode.Extend)));
+        Assert.Equal(FileStatusCode.Success, reg.Status("RPT"));
+        reg.Close("RPT");
+
+        string records = TempFile(11);
+        reg.Register("REC", records, 3, lineSequential: false, optional: false, -1, -1);
+        Assert.Contains("not a whole multiple", CaptureStderr(() => reg.OpenStatic("REC", FileOpenMode.Extend)));
+        reg.Close("REC");
+    }
+
     /// <summary>One notice per file, however many times the program OPENs it — a loop that opens and closes must
     /// not produce a wall of identical lines.</summary>
     [Fact]

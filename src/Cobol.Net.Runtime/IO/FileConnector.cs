@@ -71,6 +71,22 @@ public abstract class FileConnector
     public string? Associate(string spec, bool dynamic)
     {
         if (IsOpen) return null;                           // §14.9.27.4 GR2/GR25 — an already-open connector is untouched
+        if (AssociationFailure(spec, dynamic, out string? hostPath) is { } failed) return failed;
+        if (hostPath is not null) HostPath = hostPath;
+        return null;
+    }
+
+    /// <summary>⛔ THE ONE RULE FOR WHETHER AN ASSIGN SPECIFICATION CAN BE ASSOCIATED (§12.4.5.3 GR3 / GR4; Annex A.1
+    /// items 10 and 73, docs/CONFORMANCE.md DOC-A.1-73) — a pure function of the specification, so the OPEN
+    /// (<see cref="Associate"/>, which then records the host path on its connector) and the SORT/MERGE statement's
+    /// association of its OWN sort-merge file (<see cref="CobolSort.AssociationMade"/>, which has no connector to
+    /// record it on — a sort-merge file is the in-memory sort store, §13.4.6; kb/Work PB1097) ask the same question
+    /// and cannot answer it differently. Returns null when the association can be made, else the I-O status of the
+    /// failure ('31'); <paramref name="hostPath"/> is the physical file the specification identifies, or null when
+    /// it identifies none and the registration's stands (the bare <c>ASSIGN USING</c> placeholder).</summary>
+    internal static string? AssociationFailure(string spec, bool dynamic, out string? hostPath)
+    {
+        hostPath = null;
         if (!dynamic)
         {
             // GR3 a) — literal-1/device-name-1 identify the physical file directly. The value is a source-text
@@ -79,14 +95,14 @@ public abstract class FileConnector
             // associated with the file the EXECUTING element's own entry names. §12.4.5.2 SR4 already bars a
             // zero-length literal, so an empty spec here can only be the bare `ASSIGN USING` shape's placeholder —
             // it identifies nothing and leaves the registration's unassociated (empty) host path standing.
-            if (spec.Length != 0) HostPath = CobolFile.ResolveHostPath(spec);
+            if (spec.Length != 0) hostPath = CobolFile.ResolveHostPath(spec);
             return null;
         }
         string target = spec.Trim(' ');
         foreach (char ch in target)
             if (ch < ' ') return FileStatusCode.AssignNotConsistent;   // '31' §9.1.13.6 item 2
         if (target.Length == 0) return FileStatusCode.AssignNotConsistent;
-        HostPath = CobolFile.ResolveHostPath(target);
+        hostPath = CobolFile.ResolveHostPath(target);
         return null;
     }
 
@@ -122,9 +138,34 @@ public abstract class FileConnector
             // the already-open '41' OPEN and the sharing '38'/'61' OPEN arms all reported '00' on a following
             // DELETE where the spec requires '43' (kb/Work PB140).
             PrevOpWasSuccessfulRead = false;
+            // §9.1.13.1: a permanent error (an I-O status beginning '3', §9.1.13.6) "remains in effect for all
+            // subsequent input-output operations on the file" — recorded HERE, at the one chokepoint every
+            // operation's outcome passes, so no producer (a host failure '30', a boundary '34', the ODO READ's
+            // '34') can forget to start it. Only an OPEN connector keeps one: a failed OPEN leaves the connector
+            // closed, which already is the corrected state (docs/CONFORMANCE.md DOC-A.1-105).
+            if (value.Length > 0 && value[0] == '3' && IsOpen) _permanentError = value;
         }
     }
     private string _status = FileStatusCode.Success;
+
+    /// <summary>⛔ THE PERMANENT ERROR IN EFFECT (kb/Work PB1541; ISO §9.1.13.1: <i>"The permanent error condition
+    /// remains in effect for all subsequent input-output operations on the file unless an implementor-defined
+    /// technique is invoked to correct the permanent error condition"</i>; Annex A.1 item 105, which is optional and
+    /// documented when provided — <c>docs/CONFORMANCE.md</c> DOC-A.1-105): the status that began it, or
+    /// <see langword="null"/> when none is. The technique this processor provides is <b>CLOSE</b>: a completed CLOSE
+    /// ends the condition (<see cref="Close"/>), so the next OPEN starts clean. Set only by the
+    /// <see cref="Status"/> setter; read by <see cref="PermanentErrorReplay"/>.</summary>
+    public string? PermanentErrorInEffect => _permanentError;
+    private string? _permanentError;
+
+    /// <summary>⛔ THE ONE REPLAY of a permanent error in effect — every input-output statement except CLOSE starts
+    /// by asking it, through the preconditions each verb family already shares (<see cref="ReadOpenModeGuard"/>,
+    /// <see cref="StartOpenModeGuard"/>, <see cref="MutationOpenModeGuard"/>, the WRITE entries' own first line,
+    /// <see cref="Open"/>, and the registry's UNLOCK and DELETE FILE). The statement is unsuccessful, touches
+    /// nothing, and sets the same I-O status again — which §9.1.13.1 also makes raise that status's exception
+    /// condition again. Returns the status, or <see langword="null"/> when no permanent error is in effect. Assigns
+    /// nothing: the caller owns the single <see cref="Status"/> assignment (the '43' gate drops exactly once).</summary>
+    protected string? PermanentErrorReplay() => _permanentError;
 
     /// <summary>Set the I-O status directly (facade-level conditions: a locked-file OPEN, a REEL/UNIT CLOSE) — an
     /// attempted access like any other status assignment.</summary>
@@ -378,7 +419,8 @@ public abstract class FileConnector
     /// 7). Returns the failing status, or <see langword="null"/> when the READ may proceed. Assigns nothing —
     /// the caller owns the single <see cref="Status"/> assignment, so the '43' gate drops exactly once.</summary>
     protected string? ReadOpenModeGuard() =>
-        !IsOpen || Mode is FileOpenMode.Output or FileOpenMode.Extend ? FileStatusCode.ReadNotOpenForInput : null;
+        PermanentErrorReplay()   // §9.1.13.1 — a permanent error in effect answers first (kb/Work PB1541)
+        ?? (!IsOpen || Mode is FileOpenMode.Output or FileOpenMode.Extend ? FileStatusCode.ReadNotOpenForInput : null);
 
     /// <summary>The preconditions of a SEQUENTIAL READ, in the standard's own order: GR2's open mode ('47');
     /// then ISO §14.9.30.4 GR21's first sentence — "For a sequential READ statement, if the previous READ or
@@ -468,6 +510,11 @@ public abstract class FileConnector
     /// drops exactly once.</summary>
     protected string? StartOpenModeGuard()
     {
+        if (PermanentErrorReplay() is { } stuck)   // §9.1.13.1 — still an unsuccessful START, so GR7 applies (kb/Work PB1541)
+        {
+            InvalidateFilePosition();
+            return stuck;
+        }
         if (IsOpen && Mode is not (FileOpenMode.Output or FileOpenMode.Extend)) return null;
         InvalidateFilePosition();
         return FileStatusCode.ReadNotOpenForInput;
@@ -565,7 +612,8 @@ public abstract class FileConnector
     /// <see cref="ReadOpenModeGuard"/>: the caller owns the single status assignment. Written once here for
     /// every organization's REWRITE and DELETE body and for <see cref="MutationTargetRecordId"/>.</summary>
     protected string? MutationOpenModeGuard() =>
-        IsOpen && Mode == FileOpenMode.IO ? null : FileStatusCode.DeleteRewriteNotOpenForIO;
+        PermanentErrorReplay()   // §9.1.13.1 — a permanent error in effect answers first (kb/Work PB1541)
+        ?? (IsOpen && Mode == FileOpenMode.IO ? null : FileStatusCode.DeleteRewriteNotOpenForIO);
 
     /// <summary>The lock identity of the record released by the most recent successful WRITE (§14.9.51 GR11 —
     /// the WITH LOCK acquisition target).</summary>
@@ -580,7 +628,7 @@ public abstract class FileConnector
     /// failure mapping ('37'/'30'). Sets and returns the status.</summary>
     public string Open(FileOpenMode mode)
     {
-        if (IsOpen) return Status = FileStatusCode.FileAlreadyOpen;
+        if (IsOpen) return Status = PermanentErrorReplay() ?? FileStatusCode.FileAlreadyOpen;   // §9.1.13.1 (kb/Work PB1541) before '41'
         Mode = mode;
         ModeKnown = true;   // a FAILED open still records the attempted mode (GR6b "being opened")
         OptionalAbsent = false;
@@ -778,6 +826,10 @@ public abstract class FileConnector
         if (HeldLineDrain is { } drain)
         {
             HeldLineDrain = null;
+            // The held line is a WRITE the program already issued; a CLOSE is the correction technique of a permanent
+            // error in effect (DOC-A.1-105), so the condition is lifted first or the drain's write would be refused
+            // and the line silently lost (kb/Work PB1541). A failure of the drain itself ends here with the CLOSE.
+            _permanentError = null;
             drain();
         }
         string s;
@@ -785,6 +837,11 @@ public abstract class FileConnector
         catch (UnauthorizedAccessException) { s = FileStatusCode.PermanentError; }
         catch (IOException) { s = FileStatusCode.PermanentError; }
         _openMode = false;
+        // §9.1.13.1 / Annex A.1 item 105 — THE CORRECTION TECHNIQUE: a completed CLOSE ends a permanent error in
+        // effect, successful or not (an unsuccessful CLOSE also leaves the connector closed), so the next OPEN
+        // starts clean (kb/Work PB1541, docs/CONFORMANCE.md DOC-A.1-105). A CLOSE that itself fails '30' does not
+        // restart the condition: `_openMode` is already false, which the Status setter's IsOpen test reads.
+        _permanentError = null;
         return Status = s;
     }
 
@@ -899,6 +956,13 @@ public abstract class FileConnector
         return new string(buf);
     }
 
+    /// <summary>⛔ THE RECORD AREA IN ITS ALL-SPACES STATE — what an unsuccessful READ hands back in place of a
+    /// record (§14.9.30.4 GR18: its content is then undefined, and the connector offers spaces). It is
+    /// <see cref="FitRecord"/> of the empty image, so a NATIONAL record area holds national spaces and never
+    /// U+2020 positions a byte-level <c>new string(' ', n)</c> manufactures (kb/Work PB679, the sibling of the key
+    /// pad fixed in <see cref="IndexedConnector"/>): ONE pad, ONE trim, keyed on the area's category.</summary>
+    protected string BlankRecordArea() => FitRecord("", RecordWidth);
+
     /// <summary>⛔ THE ONE TRAILING-SPACE TRIM of a record image on the way OUT to a line-oriented stream — the
     /// inverse of <see cref="FitRecord"/>'s pad, and it has to shed the SAME space (kb/Work PB327). A national
     /// record area's trailing space is the national space, the two bytes 0x00 0x20 (§14.9.30.4 GR15;
@@ -926,7 +990,7 @@ public abstract class FileConnector
         if (!IsVarying) return Fit(image);
         int len = length >= 0 ? length : image.Length;
         if (len < VaryMin || len > VaryMax) return null;
-        return image.Length == len ? image : image.Length > len ? image[..len] : image.PadRight(len, ' ');
+        return image.Length == len ? image : image.Length > len ? image[..len] : FitRecord(image, len);   // the ONE pad (kb/Work PB679)
     }
 
     /// <summary>A record about to be stored, with the EXTENT TABLE it was sent with (determination D-FRA (v);

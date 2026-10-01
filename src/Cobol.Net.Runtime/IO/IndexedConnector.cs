@@ -447,7 +447,7 @@ public sealed class IndexedConnector : KeyedConnector
 
     private string ReadSequential(out string image, bool previous)
     {
-        image = new string(' ', RecordWidth);
+        image = BlankRecordArea();
         if (SequentialReadGuard() is { } pre) return Status = pre;   // '47'/'46'/'10' — FileConnector
         if (!_fpiValid) return Status = FileStatusCode.NoValidNextRecord;
 
@@ -485,7 +485,7 @@ public sealed class IndexedConnector : KeyedConnector
     /// invalid key '23'; an absent optional file → '23' (GR28).</summary>
     public string ReadRandom(int keyIndex, string keyedRecordImage, out string image, RecordExtents? areaExtents = null)
     {
-        image = new string(' ', RecordWidth);
+        image = BlankRecordArea();
         if (ReadOpenModeGuard() is { } notOpen) return Status = notOpen;                  // '47' §14.9.30.4 GR2
         _refKey = keyIndex;                                                // GR30/GR31
         if (RandomReadAbsentOptionalGuard() is { } absent) return Status = absent;        // '23' §9.1.13.5 3 b)
@@ -516,6 +516,7 @@ public sealed class IndexedConnector : KeyedConnector
     /// variable-length members precede.</param>
     public string Write(string image, int length = -1, RecordExtents? extents = null)
     {
+        if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
         if (Stored(image, length) is not { } stored)
             return Status = FileStatusCode.RecordSizeViolation;            // '44' §13.18.43 GR14a
         if (RecordHasCharacterWithoutByteImage(stored))
@@ -891,7 +892,14 @@ public sealed class IndexedConnector : KeyedConnector
         var (off, len, layout) = keyIndex < 0 ? (_primeOff, _primeLen, _primeLayout)
             : (_alts[keyIndex].Off, _alts[keyIndex].Len, _alts[keyIndex].Layout);
         if (layout is not null) off = layout.Position(image, off, extents);
-        if (image.Length < off + len) image = image.PadRight(off + len, ' ');
+        // A record shorter than the key's span (a RECORD VARYING record, or an area image taken as composed) is
+        // extended with the RECORD AREA's own space — §14.9.30.4 GR15: a trailing space "is defined to be the
+        // national space character" for a national record area — through the ONE pad, FitRecord. A byte-level
+        // PadRight(' ') here manufactured U+2020 positions in a national key window, which no stored key equals
+        // (kb/Work PB679). The two defensive pads that note named were this one site after PB325 rewrote the
+        // keyed connectors' base; the START operand and the stored key both come through here, so they cannot
+        // be padded differently.
+        if (image.Length < off + len) image = FitRecord(image, off + len);
         return image.Substring(off, len);
     }
 
