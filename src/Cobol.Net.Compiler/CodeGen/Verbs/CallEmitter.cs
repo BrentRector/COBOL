@@ -991,8 +991,12 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         p is OdoGroupPlace ? PlaceRenderer.SendingGroupValue(p, "CALL BY CONTENT argument") : CallStringRead(p);
 
     /// <summary>A place that crosses the boundary as a bit / national group's ELEMENTARY value (kb/Work PB1166 —
-    /// see <see cref="CallStringRead"/>). A redefinition view over one is character storage, never the group.</summary>
-    private static bool IsAsIfGroupCrossing(Place p) => p is not RedefViewPlace && p.Item.IsAsIfElementary;
+    /// see <see cref="CallStringRead"/>). A redefinition view over one crosses the same way (kb/Work PB1653): its
+    /// window's coding IS the elementary alphabet (<see cref="BitWindow"/> boolean positions, <see cref="NationalWindow"/>
+    /// national positions), so the view's value is exactly what <c>PlaceRenderer.SendingGroupValue</c> /
+    /// <c>PlaceRenderer.Write</c> read and store — excluding it sent a national group's 2m storage bytes against a
+    /// formal that counts m positions.</summary>
+    private static bool IsAsIfGroupCrossing(Place p) => p.Item.IsAsIfElementary;
 
     /// <summary>The full-allocation place of a boundary operand (§14.2.3 GR8): an occurs-depending wrapper unwrapped.</summary>
     private static Place FullAllocation(Place p) => p is OdoGroupPlace o ? o.Inner : p;

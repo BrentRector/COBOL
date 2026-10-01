@@ -114,7 +114,7 @@ internal static class PlaceRenderer
         // A VARIABLE-LENGTH GROUP of a cell-backed class (kb/Work PB1026): read as its contiguous image at its
         // current extent — §8.5.1.11.2, the same composition a declared group's CurrentImage() performs.
         RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g),
-        RedefViewPlace v => RuntimeApi.StrWindow(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString()),
+        RedefViewPlace v => ByteWindowRead(v),
         // The OCCURS DYNAMIC CAPACITY register (§13.18.38 GR15): a read-only view over the table's current capacity.
         CapacityRegisterPlace c => $"{RenderPath(c.Table, AccessDir.Sending)}.Capacity",
         // A REPORT SECTION sum counter (§13.18.54.4 GR1/GR4/GR12): RWCS engine state, read at the counter's own
@@ -240,8 +240,7 @@ internal static class PlaceRenderer
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Sending),
             $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, rhs)};",
         // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
-        RedefViewPlace v => $"{RenderPath(v.Backing, AccessDir.Sending)} = " +
-            $"{RuntimeApi.StrWindowInto(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString(), rhs)};",
+        RedefViewPlace v => ByteWindowWrite(v, rhs),
         // Unreachable: SET Format 14 routes to BoundSetCapacity, and any other store into the CAPACITY register is
         // rejected COBOLNET1523 at bind time (§13.18.38 SR30–32). The backstop for a receiver path that forgot the gate.
         CapacityRegisterPlace => throw new System.InvalidOperationException(
@@ -301,6 +300,20 @@ internal static class PlaceRenderer
 
     // A Tier-B view's 1-based window start = the 0-based offset expression + 1 (OffsetExpr is the D10 transitional string).
     private static string RvOffset(RedefViewPlace v) => $"(int)({v.OffsetExpr} + 1)";
+
+    /// <summary>The BYTE window of a Tier-B view — its storage as one character per byte of the class's one backing,
+    /// whatever the coding of its VALUE (§13.18.44.4 GR1: the same storage area, seen as bytes). The identity-coded
+    /// member's value IS this string; a national GROUP's value is not (its m positions ride 2m of these bytes,
+    /// <see cref="NationalWindow"/>), but its STORAGE image — what a file record, a CALL boundary copy or a group
+    /// MOVE deposits positionally — still is (kb/Work PB1653).</summary>
+    private static string ByteWindowRead(RedefViewPlace v) =>
+        RuntimeApi.StrWindow(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString());
+
+    /// <summary>The receiving twin of <see cref="ByteWindowRead"/>: splice <paramref name="image"/> into the class's
+    /// ONE backing at the view's window, preserving its full width (§13.18.44).</summary>
+    private static string ByteWindowWrite(RedefViewPlace v, string image) =>
+        $"{RenderPath(v.Backing, AccessDir.Sending)} = " +
+        $"{RuntimeApi.StrWindowInto(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString(), image)};";
 
     /// <summary>The contiguous image of a cell-backed variable-length group view (kb/Work PB1026).</summary>
     private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g) =>
@@ -412,6 +425,9 @@ internal static class PlaceRenderer
 
     public static string WriteGroupImage(Place group, string image, string context) => group switch
     {
+        // A NATIONAL GROUP view's STORAGE image is its 2m-byte window; its Write is the m-position VALUE store
+        // (kb/Work PB1653 — WriteGroupValue is the value channel).
+        RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => ByteWindowWrite(v, image),
         RedefViewPlace => Write(group, image),
         // A level-66 THROUGH alias is an alphanumeric GROUP item (ISO §13.18.45.4 GR2), so a §14.9.25.4 GR4
         // group-image store can land on one; distributing it into the spanned leaves IS the WriteRenames store
@@ -456,6 +472,7 @@ internal static class PlaceRenderer
     /// pointer/object leaf (its reserved placeholder positions). Comparison and every read-back leave it false.</param>
     public static string GroupImage(Place group, string context = "whole-group image of", bool transfer = false) => group switch
     {
+        RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => ByteWindowRead(v),   // the storage image — see ByteWindowRead (kb/Work PB1653)
         RedefViewPlace => Read(group),
         // The READ twin of WriteGroupImage's RenamesPlace arm (kb/Work PB907): a level-66 THROUGH alias is an
         // alphanumeric GROUP item (ISO §13.18.45.4 GR2) whose image IS the composed span string Read renders —
@@ -638,17 +655,24 @@ internal static class PlaceRenderer
     /// consumer that reaches for the image reader on a bit group compares packed bytes against boolean literals
     /// (kb/Work PB173: <c>OperandText.FieldAsString</c>'s ODO early return did exactly that, and the character-unit
     /// extent it then computed was NEGATIVE, so the whole operand rendered as the empty string).
-    /// <para>A Tier-B <c>RedefViewPlace</c> never reaches here: <c>ReferenceResolver</c> does not wrap one in a
-    /// <see cref="BitImagePlace"/> (kb/Work PB203 holds that gap), and §13.18.44.3 SR5 bars an occurs-depending
-    /// table on either side of a REDEFINES, so <c>OdoGroupPlace</c> over a view cannot carry one either.</para></summary>
+    /// <para>A Tier-B <c>RedefViewPlace</c> over a bit group has no struct to ask <c>AsBits()</c> of: its
+    /// <see cref="BitWindow"/> read already IS the boolean-position string, so <see cref="BitValue"/> serves the
+    /// view with its own read (kb/Work PB1653 — a national group's window is the same shape, and both reach every
+    /// verb through <see cref="SendingGroupValue"/> now). §13.18.44.3 SR5 bars an occurs-depending table on either
+    /// side of a REDEFINES, so an <c>OdoGroupPlace</c> over a view cannot carry one beyond a BASED record's.</para></summary>
     public static string SendingBits(Place group) => BitsAs(group, AccessDir.Sending);
 
     /// <summary>A bit group's boolean-position string as seen in direction <paramref name="dir"/> (the GR8 law
     /// is <see cref="UsesCurrentExtent"/>).</summary>
     private static string BitsAs(Place group, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{Read(o.Inner)}.AsBits().Substring(0, {LengthExpr(o)})"
-            : $"{Read(group)}.AsBits()";
+            ? $"{BitValue(o.Inner)}.Substring(0, {LengthExpr(o)})"
+            : BitValue(group);
+
+    /// <summary>A bit group's boolean-position string: the generated <c>AsBits()</c> of its record struct — or, for a
+    /// Tier-B REDEFINES VIEW, the window's own read, which already IS that string (<see cref="BitWindow"/>; a view has
+    /// no struct to ask).</summary>
+    private static string BitValue(Place group) => group is RedefViewPlace ? Read(group) : $"{Read(group)}.AsBits()";
 
     /// <summary>⛔ THE ONE WRITER of a bit group's boolean-position string — <c>FromBits</c> distributes the
     /// positions to the subordinates. GR8a (data-name-1 OUTSIDE an occurs-depending table beneath the group)
@@ -659,8 +683,15 @@ internal static class PlaceRenderer
     /// <summary>The bit writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
     private static string BitsWrite(Place group, string bits, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{GroupTarget(o.Inner)}.FromBits({RuntimeApi.StrWindowInto($"{GroupTarget(o.Inner)}.AsBits()", "1", LengthExpr(o), bits, "'0'")});"
-            : $"{GroupTarget(group)}.FromBits({bits});";
+            ? BitStore(o.Inner, RuntimeApi.StrWindowInto(BitTargetValue(o.Inner), "1", LengthExpr(o), bits, "'0'"))
+            : BitStore(group, bits);
+
+    /// <summary>Distribute a boolean-position string into a bit group: the struct's generated <c>FromBits</c>, or a
+    /// Tier-B VIEW's window write (its <see cref="BitWindow"/> splices the positions into the class's backing).</summary>
+    private static string BitStore(Place group, string bits) =>
+        group is RedefViewPlace ? Write(group, bits) : $"{GroupTarget(group)}.FromBits({bits});";
+
+    private static string BitTargetValue(Place group) => group is RedefViewPlace ? Read(group) : $"{GroupTarget(group)}.AsBits()";
 
     /// <summary>⛔ <b>THE ONE WRITER OF A GROUP OPERAND'S VALUE</b> — the receiving twin of
     /// <see cref="SendingGroupValue"/>, over the same three kinds of group (ISO §13.18.29.4): a BIT group takes its
@@ -675,12 +706,16 @@ internal static class PlaceRenderer
     /// <see cref="AccessDir.Sending"/> splices over the CURRENT extent whatever the depending position — the store
     /// of a statement whose rules size the operand "as a sending data item" (INSPECT §14.9.22.4 GR1), so the value
     /// it writes back is exactly as long as the value it read.
-    /// <para>A Tier-B REDEFINES view (<see cref="RedefViewPlace"/>) is written as its character WINDOW, whatever its
-    /// group kind, because that is what the operand readers read it as (<c>OperandText</c>'s view arm precedes the
-    /// group dispatch, and this generated struct-less window has no <c>FromNat</c> / <c>FromBits</c>): the pair
-    /// must agree, so the view is served first, exactly as <see cref="WriteGroupImage"/> serves it.</para></summary>
+    /// <para>A Tier-B REDEFINES view (<see cref="RedefViewPlace"/>) is written through its window's own
+    /// <see cref="Write"/>, whatever its group kind, because that is the pair of what the operand readers read
+    /// (<c>OperandText</c>'s view arm precedes the group dispatch, and this struct-less window has no
+    /// <c>FromNat</c> / <c>FromBits</c>): the window's coding IS the value alphabet — characters for an alphanumeric
+    /// group, boolean positions for a bit group, national positions for a national group (§13.18.29.4 GR1b/GR2b;
+    /// kb/Work PB1653 — a national group's view was written as its BYTE window, so ten characters stood for five
+    /// positions). The STORAGE image of a view is the other channel, <see cref="WriteGroupImage"/>.</para></summary>
     public static string WriteGroupValue(Place group, string value, string context, AccessDir dir = AccessDir.Receiving) =>
-        group is RedefViewPlace || !group.Item.IsAsIfElementary
+        group is RedefViewPlace ? Write(group, value)
+        : !group.Item.IsAsIfElementary
             ? (group is OdoGroupPlace o && UsesCurrentExtent(o, dir) ? ReceiveInto(o, value) : WriteGroupImage(group, value, context))
         : group.Item.GroupUsage is GroupUsage.Bit ? BitsWrite(group, value, dir)
         : NatWrite(group, value, dir);
@@ -702,8 +737,13 @@ internal static class PlaceRenderer
     /// law is <see cref="UsesCurrentExtent"/>).</summary>
     private static string NatAs(Place group, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{Read(o.Inner)}.AsNat().Substring(0, {NatLengthExpr(o)})"
-            : $"{Read(group)}.AsNat()";
+            ? $"{NatValue(o.Inner)}.Substring(0, {NatLengthExpr(o)})"
+            : NatValue(group);
+
+    /// <summary>A national group's national-position string: the generated <c>AsNat()</c> of its record struct — or,
+    /// for a Tier-B REDEFINES VIEW, the window's own read, which already IS that string (<see cref="NationalWindow"/>
+    /// transcodes the 2m UTF-16BE bytes to m positions, kb/Work PB1653; a view has no struct to ask).</summary>
+    private static string NatValue(Place group) => group is RedefViewPlace ? Read(group) : $"{Read(group)}.AsNat()";
 
     /// <summary>⛔ THE ONE WRITER of a national group's national-position string — <c>FromNat</c> re-serializes it
     /// to the group's byte image and distributes it. GR8a (data-name-1 OUTSIDE an occurs-depending table beneath
@@ -714,8 +754,16 @@ internal static class PlaceRenderer
     /// <summary>The national writer with the GR8 extent law of direction <paramref name="dir"/> (<see cref="UsesCurrentExtent"/>).</summary>
     private static string NatWrite(Place group, string value, AccessDir dir) =>
         group is OdoGroupPlace o && UsesCurrentExtent(o, dir)
-            ? $"{GroupTarget(o.Inner)}.FromNat({RuntimeApi.StrWindowInto($"{GroupTarget(o.Inner)}.AsNat()", "1", NatLengthExpr(o), value)});"
-            : $"{GroupTarget(group)}.FromNat({value});";
+            ? NatStore(o.Inner, RuntimeApi.StrWindowInto(NatTargetValue(o.Inner), "1", NatLengthExpr(o), value))
+            : NatStore(group, value);
+
+    /// <summary>Distribute a national-position string into a national group: the struct's generated <c>FromNat</c>,
+    /// or a Tier-B VIEW's window write (<see cref="NationalWindow"/> re-serializes the positions as UTF-16BE into the
+    /// class's backing).</summary>
+    private static string NatStore(Place group, string value) =>
+        group is RedefViewPlace ? Write(group, value) : $"{GroupTarget(group)}.FromNat({value});";
+
+    private static string NatTargetValue(Place group) => group is RedefViewPlace ? Read(group) : $"{GroupTarget(group)}.AsNat()";
 
     /// <summary>An occurs-depending NATIONAL group's current extent in NATIONAL POSITIONS: the byte extent the
     /// AsImage channel slices at, divided by the pinned bytes-per-national-position (kb/Work PB327).</summary>

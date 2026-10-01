@@ -415,11 +415,16 @@ content-validation half is separately answered by the declined A.4.14 facility (
 - **D-N2 byte≠char containment** (NARROWED 2026-09-05, kb/Work PB231 — RESIDUE-11 DISCHARGED on the byte-window
   channel). The BYTE-WINDOW surfaces — REDEFINES (`ComputeTier`), and the EXTERNAL / ADDRESS-OF / BASED cells
   (`ForceStringCanonical`) — now CARRY a national leaf: the class walk advances by each member's storage extent
-  (`ClassExtentBits` → `BitLayout.WidthBits` → `ElementaryByteWidth`), the class width is the members' maximum
+  (`BitLayout.RunBits` → `WidthBits` → `ElementaryByteWidth`), the class width is the members' maximum
   `ByteWidth`, the in-class OCCURS stride is `ByteWidth`, and `Place.NationalWindow` transcodes the window's
   UTF-16BE pairs through `CobolBits.NatReadWindow`/`NatWriteWindow` — the same serialization `NatBytes` already
   gave CONVERT's raw-storage channel. The §13.18.44.3 SR8 size screen and the Tier-A alias arm read `ByteWidth`
-  for the same reason. **WIDENED AGAIN 2026-09-05, kb/Work PB327:** the FD/SD RECORD is the same channel after all — see D-N5, now
+  for the same reason. **A NATIONAL GROUP's own window is a `NationalWindow` too** (kb/Work PB1653,
+  `NationalWindow.WindowPositionsOf` — §13.18.29.4 GR2 b): its VALUE is its m national positions over the 2m bytes
+  of its window, exactly as a bit group's window is a `BitWindow`, so every value reader/writer (`Read`/`Write`,
+  `WriteGroupValue`, ACCEPT, the CALL crossing) takes the window's own coding; its STORAGE image — what a file
+  record, a group MOVE or a status group deposits — is the byte window (`PlaceRenderer.ByteWindowRead/Write`,
+  reached by `GroupImage`/`WriteGroupImage`). **WIDENED AGAIN 2026-09-05, kb/Work PB327:** the FD/SD RECORD is the same channel after all — see D-N5, now
   discharged — and its gate is the same predicate (`DataBinder.GateFileRecordByteSurface`). **STILL REFUSED:**
   a pointer-class leaf on any byte-window surface, the file record included (§13.18.60.3 SR14 / PB183 — no byte
   image at all; PB231's remaining third).
@@ -655,7 +660,7 @@ bits. Three consequences, each of them a rule rather than a case:
 
 | surface | rule |
 |---|---|
-| `DataItem.ClassBitOffset` | the member's in-class offset in BITS — `8 × ClassOffset` for every byte-aligned item, and different only where §8.5.1.6.3 shares a byte. `DataBinder.AssignClassOffsets` carries the bit cursor; **`HasBitDescendant` now gates only the ALIGNMENT round-up** (a no-op in a byte-aligned class, so still byte-identical for every bit-free one), while the per-member ADVANCE has ONE authority for every shape — `DataBinder.ClassExtentBits` → `BitLayout.WidthBits`, which is where the national two-bytes-per-position extent lives (kb/Work PB231). The advance used to be spelled a second way, `ImageWidth × 8`, and that second spelling was exactly half the truth for a national member |
+| `DataItem.ClassBitOffset` | the member's in-class offset in BITS — `8 × ClassOffset` for every byte-aligned item, and different only where §8.5.1.6.3 shares a byte. `DataBinder.AssignClassBitOffsets` runs NO cursor of its own: it places each child at the group's absolute bit offset plus `BitLayout.ChildStarts`, the RELATIVE §8.5.1.6.3 walk that `ExtentBits` and `StartBitWithin` also read (kb/Work PB1572 — a private absolute-seeded cursor rounded a bit group's first member to the next byte). The per-member ADVANCE inside that walk has ONE authority for every shape — `BitLayout.RunBits` → `WidthBits`, which is where the national two-bytes-per-position extent lives (kb/Work PB231). The advance used to be spelled a second way, `ImageWidth × 8`, and that second spelling was exactly half the truth for a national member |
 | the window builder | ONE factory, `RedefViewPlace.For`. Three sites compose a Tier-B window (the resolver, the INITIALIZE receiver cursor, the MOVE CORRESPONDING leaf cursor) and each carried its own copy of the offset law, which is how the bit unit came to be missing from all three at once |
 | the subscript stride | a bit member's occurrences lie at successive BIT positions, so the stride is `BitLayout.WidthBits`, not the item's `ceil(n/8)` byte ceiling — `PIC 1(4) USAGE BIT OCCURS 6` strides 4 bits |
 

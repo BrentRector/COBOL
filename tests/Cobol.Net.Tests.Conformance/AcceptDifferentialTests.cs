@@ -595,4 +595,47 @@ public sealed class AcceptDifferentialTests
             expected: "0005]HIJKL]",
             stdin: "HIJKLMNOP\n",
             dialect: 2002);
+
+    // ⛔ kb/Work PB1653 — a NATIONAL GROUP receiver is the ELEMENTARY national item of its as-if PICTURE N(m)
+    // (§13.18.29.4 GR2 b)), so the device transfer of §14.9.1.4 (GR3 and GR4) is m characters, one per national position. The
+    // device window used to be poured through the group's 2m-byte STORAGE image (FromImage), so "HELLO" read back
+    // as five unrelated CJK characters. The same statement runs over the plain group and over a REDEFINES view of
+    // alphanumeric storage (a Tier-B window), because the transfer is the group's VALUE channel in both shapes.
+    [Fact]
+    public void Device_NationalGroupReceiver_TransfersItsPositions()
+        => AssertOutputs(
+            Program("ACCNATG", """
+                01 AX PIC X(10).
+                01 NGV REDEFINES AX GROUP-USAGE NATIONAL.
+                   05 V1 PIC N(2).
+                   05 V2 PIC N(3).
+                01 NGP GROUP-USAGE NATIONAL.
+                   05 P1 PIC N(2).
+                   05 P2 PIC N(3).
+                """, """
+                ACCEPT NGV.
+                ACCEPT NGP.
+                DISPLAY NGV "|" V1 "|" V2 "|" NGP "|" P1 "|" P2.
+            """),
+            expected: "HELLO|HE|LLO|WORLD|WO|RLD",
+            stdin: "HELLO\nWORLD\n",
+            dialect: 2002);
+
+    // §14.9.1.4 GR1 + §13.18.29.4 GR1 b): a BIT GROUP receiver is the elementary boolean item of PICTURE 1(m);
+    // each transferred '1' converts to boolean one and every other character to zero (the boolean receiver's own
+    // implementor-defined conversion), m positions — never ceil(m/8) packed characters.
+    [Fact]
+    public void Device_BitGroupReceiver_TransfersItsPositions()
+        => AssertOutputs(
+            Program("ACCBITG", """
+                01 BG GROUP-USAGE BIT.
+                   05 B1 PIC 1(2) USAGE BIT.
+                   05 B2 PIC 1(2) USAGE BIT.
+                """, """
+                ACCEPT BG.
+                DISPLAY BG "|" B1 "|" B2.
+            """),
+            expected: "1001|10|01",
+            stdin: "10x1\n",
+            dialect: 2002);
 }

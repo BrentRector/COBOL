@@ -184,18 +184,7 @@ internal static class BitLayout
     /// </summary>
     public static int ExtentBits(DataItem group)
     {
-        int cursor = 0;
-        DataItem? prev = null;
-        foreach (var c in group.Children)
-        {
-            if (c.RedefinesTargetName is not null) continue;   // overlays its target — no advance (§13.18.44)
-
-            // Rule 1 vs 2 (and §13.18.1.4 GR1) — ONE predicate, shared with StartBitWithin below.
-            if (!SharesByteWith(prev, c)) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
-
-            cursor += RunBits(c);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
-            prev = c;
-        }
+        int cursor = Walk(group, null);
         // Rule 4 — the trailing filler: stated for "a record that is an alphanumeric group or strongly-typed group
         // item" (§13.18.29.4 GR3 makes every group WITHOUT a GROUP-USAGE clause alphanumeric), and its NOTE excludes
         // "the end of a record that is entirely a bit group" — so a GROUP-USAGE BIT group (D20/PB79) keeps its EXACT
@@ -211,26 +200,77 @@ internal static class BitLayout
     /// on -1).</summary>
     public static int StartBitWithin(DataItem group, DataItem child)
     {
-        // §13.18.44.3 SR17 bars a dynamic item under REDEFINES, so chasing the overlay chain terminates.
-        for (int hops = 0; child.RedefinesTargetName is not null && hops < 64; hops++)
-        {
-            DataItem? target = null;
-            foreach (var c in group.Children)
-                if (string.Equals(c.CobolName, child.RedefinesTargetName, System.StringComparison.OrdinalIgnoreCase))
-                { target = c; break; }
-            if (target is null) return -1;
-            child = target;
-        }
+        var children = group.Children;
+        for (int i = 0; i < children.Count; i++)
+            if (ReferenceEquals(children[i], child)) return ChildStarts(group)[i];
+        return -1;
+    }
+
+    /// <summary>⛔ EVERY DIRECT CHILD'S start bit RELATIVE to <paramref name="group"/>, in <c>group.Children</c>
+    /// order, from <see cref="Walk"/> — the one §8.5.1.6.3 placement. A redefining child's entry is its target's
+    /// (§13.18.44.4 GR1); -1 marks an unresolvable overlay chain, exactly as <see cref="StartBitWithin"/> reports
+    /// it. The REDEFINES-class walk (<c>DataBinder.AssignClassOffsets</c>) adds the group's own absolute bit
+    /// offset to each — it must not run a cursor of its own (kb/Work PB1572).</summary>
+    public static int[] ChildStarts(DataItem group)
+    {
+        var starts = new int[group.Children.Count];
+        Walk(group, starts);
+        return starts;
+    }
+
+    /// <summary>
+    /// ⛔ THE ONE §8.5.1.6.3 CURSOR WALK over a group's DIRECT children — <see cref="ExtentBits"/>,
+    /// <see cref="StartBitWithin"/> and <see cref="ChildStarts"/> all read it, so a placement is written once. It had
+    /// THREE copies of the loop (kb/Work PB1572): the third, in <c>DataBinder.AssignClassOffsets</c>, started its
+    /// cursor at the group's ABSOLUTE bit offset and rounded THAT up to a byte before the first child, so a bit group
+    /// placed at bit 1 of a byte (§8.5.1.6.3 — "a bit group item immediately following … elementary bit data item …
+    /// of the same level") put its first member at bit 8 instead of bit 1, against "the alignment of the start of a
+    /// group item and the alignment of the first item within that group, when the first item is a bit data item, are
+    /// at the same bit position in storage". The cursor here is RELATIVE to the group's start, so the first child is
+    /// at 0 whatever the group's own offset; callers add their origin.
+    /// <para>When <paramref name="starts"/> is non-null it receives each child's start bit relative to the group;
+    /// a child that REDEFINES a sibling takes its target's start, or -1 when the target is not among the siblings.
+    /// Returns the cursor after the last non-redefining child, before rule 4's trailing filler.</para></summary>
+    private static int Walk(DataItem group, int[]? starts)
+    {
+        var children = group.Children;
         int cursor = 0;
         DataItem? prev = null;
-        foreach (var c in group.Children)
+        for (int i = 0; i < children.Count; i++)
         {
-            if (c.RedefinesTargetName is not null) continue;
-            if (!SharesByteWith(prev, c)) cursor = RoundUpToByte(cursor);
-            if (ReferenceEquals(c, child)) return cursor;
-            cursor += RunBits(c);
+            var c = children[i];
+            if (c.RedefinesTargetName is not null) continue;   // overlays its target — no advance (§13.18.44)
+
+            // Rule 1 vs 2 (and §13.18.1.4 GR1) — ONE predicate.
+            if (!SharesByteWith(prev, c)) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
+            if (starts is not null) starts[i] = cursor;
+            cursor += RunBits(c);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
             prev = c;
         }
+        if (starts is null) return cursor;
+        // A redefining child begins at its target's first position (§13.18.44.4 GR1). §13.18.44.3 SR17 bars a
+        // dynamic item under REDEFINES, so chasing the overlay chain terminates.
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (children[i].RedefinesTargetName is null) continue;
+            int at = -1;
+            var c = children[i];
+            for (int hops = 0; hops < 64 && c.RedefinesTargetName is { } name; hops++)
+            {
+                int t = IndexOfNamed(children, name);
+                if (t < 0) break;
+                c = children[t];
+                if (c.RedefinesTargetName is null) at = starts[t];
+            }
+            starts[i] = at;
+        }
+        return cursor;
+    }
+
+    private static int IndexOfNamed(IReadOnlyList<DataItem> siblings, string name)
+    {
+        for (int i = 0; i < siblings.Count; i++)
+            if (string.Equals(siblings[i].CobolName, name, System.StringComparison.OrdinalIgnoreCase)) return i;
         return -1;
     }
 

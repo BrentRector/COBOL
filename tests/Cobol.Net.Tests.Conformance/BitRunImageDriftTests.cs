@@ -64,6 +64,21 @@ public sealed class BitRunImageDriftTests
     [InlineData("BRD06", 2,
         "05 M1 PIC 1(4) USAGE BIT OCCURS 2 VALUE B\"1010\". 05 M2 PIC X(1) VALUE \"F\".",
         "M1 (1)|M1 (2)|M2")]
+    // ⛔ PB1572 — a bit GROUP CONTINUING a run, then a bit leaf after it: the group sits at bit 1 and its FIRST
+    // member shares the group's start bit ("the alignment of the start of a group item and the alignment of the
+    // first item within that group, when the first item is a bit data item, are at the same bit position in
+    // storage"). The REDEFINES class walk used to round the group's absolute bit up to a byte before its first
+    // member, so N1 read bit 8 and the aliased group answered differently from its twin.
+    [InlineData("BRD07", 1,
+        "05 M1 PIC 1 USAGE BIT VALUE B\"1\". 05 M2 GROUP-USAGE BIT. 10 N1 PIC 1 USAGE BIT VALUE B\"0\"."
+        + " 10 N2 PIC 1 USAGE BIT VALUE B\"1\". 05 M3 PIC 1 USAGE BIT VALUE B\"1\".",
+        "M1|N1|N2|M2|M3")]
+    // The same law one level down: S6 continues Q1's run INSIDE S5, which itself starts mid-byte, so Q2 sits at
+    // the sum of two relative placements — the shape a per-level absolute round-up gets wrong twice.
+    [InlineData("BRD08", 1,
+        "05 M1 PIC 1(4) USAGE BIT VALUE B\"1010\". 05 S5 GROUP-USAGE BIT. 10 Q1 PIC 1(2) USAGE BIT VALUE B\"01\"."
+        + " 10 S6 GROUP-USAGE BIT. 15 Q2 PIC 1 USAGE BIT VALUE B\"1\".",
+        "M1|Q1|Q2|S6|S5")]
     public void AliasedGroup_ReadsBackExactlyAsItsUnaliasedTwin(string pid, int width, string members, string reads)
     {
         string aliased = Program(pid + "A", members, reads, $"01 V REDEFINES G PIC X({width}).");
@@ -91,6 +106,31 @@ public sealed class BitRunImageDriftTests
             Assert.True(Regex.IsMatch(text, @"BitLayout\.RunsOf\s*\("),
                 $"{rel} composes a group image but no longer asks BitLayout.RunsOf (ISO §8.5.1.6.3).");
         }
+    }
+
+    /// <summary>⛔ THE §8.5.1.6.3 CURSOR HAS ONE WALK (kb/Work PB1572). <c>BitLayout</c>'s private walk is the only
+    /// code that rounds a placement up to a byte or asks whether a member shares its predecessor's byte; the
+    /// extent (<c>ExtentBits</c>), the in-group offset (<c>StartBitWithin</c>) and the REDEFINES-class offsets
+    /// (<c>DataBinder.AssignClassBitOffsets</c>, through <c>ChildStarts</c>) all read it. The class walk once kept
+    /// a third cursor seeded with the group's ABSOLUTE bit offset and rounded that up, which placed a bit group's
+    /// first member a byte too far. Any caller outside <c>BitLayout.cs</c> spelling either call is a second walk.</summary>
+    [Fact]
+    public void NoCodeOutsideBitLayout_RunsItsOwnPlacementCursor()
+    {
+        string root = TestRepo.Src();
+        string layout = Path.GetFullPath(TestRepo.Src("Cobol.Net.Compiler", "Binding", "Model", "BitLayout.cs"));
+        var offenders = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
+                        && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar))
+            .Where(f => !string.Equals(Path.GetFullPath(f), layout, StringComparison.OrdinalIgnoreCase))
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\b(SharesByteWith|RoundUpToByte)\s*\("))
+            .Select(f => Path.GetRelativePath(root, f))
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "a second ISO 8.5.1.6.3 placement cursor: " + string.Join(", ", offenders)
+            + " calls SharesByteWith/RoundUpToByte outside BitLayout.cs — read BitLayout.ChildStarts / StartBitWithin instead.");
+        string binder = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.cs"));
+        Assert.Matches(@"BitLayout\.ChildStarts\s*\(", binder);
     }
 
     private static string Normalize(string s) => s.Replace("\r\n", "\n").TrimEnd('\n');

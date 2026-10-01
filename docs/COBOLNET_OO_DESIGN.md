@@ -363,8 +363,13 @@ the narrowing tool is an OBJECT VIEW, deferred to the EC-OO/object-view wave). O
 NULL never width-materializes). ⚠ String equality is used as §9.3.6's MATCH test, which is not the same relation as the §14.8.2 conformance the
 descriptor projects (match rule 3 e) makes two alphanumeric groups of any size match and a group NOT match an `X(n)`,
 while both are keyed `S:<width>`); national / boolean / numeric-edited items are the `T:!` sentinel (0866); and a fixed
-alphanumeric GROUP argument through a universal receiver is today a backend CS0029 (the caller boxes the record struct
-and copies back a string — kb/Work PB1781). The structured replacement is kb/Work PB480 / PB1780.
+GROUP argument boxes as its character IMAGE on BOTH sides of the crossing (kb/Work PB1781): `OoEmitter.OoUnivCallerRead`
+reads it through `CallEmitter.CallStringRead` and `OoUnivCallerWrite` returns it through `CallEmitter.CallStringWrite` —
+the one boundary reader / writer the CALL and typed INVOKE lanes use, so an alphanumeric group is its full image and a
+bit / national group (`G:<usage>:<m>`) its m positions — and `UniversalCrossingShapeDriftTests` holds the universal lane
+to the typed lane shape by shape. An UNEQUAL-width group (§14.8.2.2 rule 1's by-reference prefix) is still no MATCH
+here, because the descriptor is compared for equality: that, and group-versus-`X(n)`, are kb/Work PB480 / PB1780's
+structured replacement.
 Descriptor-vs-DescriptionMismatch drift protection is a UNIT MATRIX over ELEMENTARY
 pictures ANALYZED by `PictureAnalyzer` (groups, pointers and object references are outside it — kb/Work PB1576) (`PictureClauseIdentityDriftTests.ConformanceDescriptor_AgreesWithTheComparator_OverEveryCarriedPair`,
 kb/Work PB1166) plus the behavioral EC-OO-METHOD (no match) / conforming-crossing pair over the 9(4)/9(8) hazard. Both

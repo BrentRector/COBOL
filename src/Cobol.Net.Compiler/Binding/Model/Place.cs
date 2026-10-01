@@ -275,7 +275,7 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
                         ? new DynSlotWindow(cell, item.ClassDynOrdinal)
                         : VarGroupWindow.Of(item, cell),
                 };
-        if (NationalWindow.PositionsOf(item) is { } positions)
+        if (NationalWindow.WindowPositionsOf(item) is { } positions)
             return window with { Coding = new NationalWindow(positions) };
         if (!BitLayout.IsBitItem(item)) return window;
         string at = runtimeByteDisplacement is null or "" or "0"
@@ -341,9 +341,21 @@ public sealed record NationalWindow(int Positions) : WindowCoding
     /// widths are EQUAL for every category-national item — <c>ElementaryImageWidth</c>'s default arm IS
     /// <c>pic.Length</c> — so collapsing them changes no answer and makes the next SR12 shape automatic.</para>
     /// <para>A national GROUP is not one of them: §13.18.29.4 GR2b makes it as-if <c>PICTURE N(m)</c> but its
-    /// LAYOUT stays its children's (D20), and each national leaf inside it gets its own window.</para></summary>
+    /// LAYOUT stays its children's (D20), and each national leaf inside it gets its own window — the group's OWN
+    /// window is a separate question, answered by <see cref="WindowPositionsOf"/>.</para></summary>
     public static int? PositionsOf(DataItem item) =>
         item is { IsElementary: true, Pic.Usage: Usage.National } ? item.ElementaryImageWidth : null;
+
+    /// <summary>⛔ THE POSITION COUNT OF A MEMBER'S OWN WINDOW (kb/Work PB1653) — <see cref="PositionsOf"/> for an
+    /// elementary national item, and for a NATIONAL GROUP its as-if <c>PICTURE N(m)</c> length: §13.18.29.4 GR2 b)
+    /// "a national group is treated as though it were an elementary data item of usage national and class and
+    /// category national described with PICTURE N(m), where m is the length of the group". The window of a national
+    /// group (<see cref="RedefViewPlace.For"/>) is therefore a NATIONAL window exactly as a bit group's is a bit
+    /// window: its VALUE is its m national positions, over the 2m bytes <see cref="RedefViewPlace.Width"/> says —
+    /// never ten characters read from a ten-byte window. <see cref="PositionsOf"/> stays the ELEMENTARY test the
+    /// storage-geometry and carriage gates ask (a group's layout is its children's, D20).</summary>
+    public static int? WindowPositionsOf(DataItem item) =>
+        PositionsOf(item) ?? (item is { IsAsIfElementary: true, GroupUsage: GroupUsage.National } ? item.AsIfPic!.Length : null);
 }
 
 /// <summary>A window coding whose value lives (wholly or partly) on the class's backing <c>StorageCell</c> rather

@@ -7075,64 +7075,38 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// first position, ISO §13.18.44 GR1) and contributes NO width of its own. Every subordinate of a class member
     /// is itself a view (its stored field is suppressed — SR9).</summary>
     private static void AssignClassOffsets(DataItem item, int off, RedefinesClass cls) =>
-        AssignClassOffsets(item, off * BitLayout.BitsPerCharacter, cls, item.HasBitDescendant);
-
-    /// <summary>⛔ THE ONE STORAGE EXTENT for the byte-addressed class walk: what a member ADVANCES the cursor
-    /// by, per occurrence, in the unit §13.18.44.4 GR1 states the association in ("an area sufficient to contain
-    /// the number of bits required by the data item referenced by the subject of the entry").
-    /// <para>It is <c>BitLayout.RunBits</c> and nothing else. That method already answers the storage extent
-    /// for every shape: a bit leaf's declared boolean positions, an elementary item's
-    /// <c>ElementaryByteWidth × 8</c> — which is where the NATIONAL two-bytes-per-position lives (kb/Work PB231,
-    /// RESIDUE-11) — and a group's §8.5.1.6.3 cursor extent, each times its OCCURS. The walk used to spell the
-    /// byte case a SECOND way, <c>ImageWidth × 8</c>, chosen by a <c>bitLaid</c> flag; the two agree for every leaf
-    /// kind but national, whose character-position count is HALF its storage extent, so the second spelling
-    /// silently displaced every member after a national one and under-sized the area. The flag is gone: the
-    /// alignment rules below still need to know whether sub-byte runs are in play, but the EXTENT has one
-    /// authority. It spelled the OCCURS multiplication itself until kb/Work PB487, which was a second place the
-    /// §13.18.1.4 GR2 ALIGNED stride would have had to be remembered.</para></summary>
-    private static int ClassExtentBits(DataItem c) => BitLayout.RunBits(c);
+        AssignClassBitOffsets(item, off * BitLayout.BitsPerCharacter, cls);
 
     /// <summary>The walk proper, carrying the offset in BITS — the unit §13.18.44.4 GR1 states the storage
     /// association in ("starts at the first BIT … an area sufficient to contain the number of BITS required").
-    /// <para>⛔ <paramref name="bitLaid"/> now selects the ALIGNMENT rule only, never the extent (kb/Work PB231
-    /// collapsed the extent onto <see cref="ClassExtentBits"/>). When the member's subtree holds no
-    /// <c>USAGE BIT</c> leaf every item is byte-aligned, so §8.5.1.6.3's round-up is the identity and skipping it
-    /// is exact. When it does hold one, the round-up is what puts a bit run's successor on the next byte, and
-    /// omitting it is WRONG in two silent ways at once: two same-level bit members SHARE a byte (§8.5.1.6.3
-    /// rule 1) and every item after such a run is displaced. Measured before the PB203 fix on
-    /// `01 A PIC X(1). 01 V REDEFINES A. 05 F1 PIC 1(4) USAGE BIT. 05 F2 PIC 1(4) USAGE BIT.`: F1 read byte 0 as
-    /// a character and F2 read PAST the one-byte backing.</para></summary>
-    private static void AssignClassOffsets(DataItem item, int bitOff, RedefinesClass cls, bool bitLaid)
+    /// <para>⛔ <b>IT RUNS NO CURSOR OF ITS OWN.</b> Every child's place is the group's ABSOLUTE offset plus
+    /// <see cref="BitLayout.ChildStarts"/> — THE one §8.5.1.6.3 walk, whose cursor is RELATIVE to the group (the
+    /// extent of a member is <c>BitLayout.RunBits</c> inside it: a bit leaf's declared boolean positions, an
+    /// elementary item's <c>ElementaryByteWidth × 8</c> — where the NATIONAL two-bytes-per-position lives, kb/Work
+    /// PB231 — and a group's cursor extent, each times its OCCURS). This method used to keep its own cursor
+    /// seeded with the ABSOLUTE bit offset and round THAT up to a byte before the first child, so the first member
+    /// of a bit group sitting at bit 1 of a shared byte was placed at bit 8 (kb/Work PB1572 — a store through
+    /// `05 P1 PIC 1 USAGE BIT` under `05 S3 GROUP-USAGE BIT` after `05 F3 PIC 1 USAGE BIT` was lost in a REDEFINES
+    /// view): §8.5.1.6.3 puts "the start of a group item and … the first item within that group, when the first
+    /// item is a bit data item, … at the same bit position in storage". A subtree with no <c>USAGE BIT</c> leaf
+    /// needs no special case: every item there is a whole number of bytes, so the round-up is the identity.</para></summary>
+    private static void AssignClassBitOffsets(DataItem item, int bitOff, RedefinesClass cls)
     {
         item.ClassBitOffset = bitOff;
         item.ClassOffset = bitOff / BitLayout.BitsPerCharacter;
         item.Class = cls;
-        int childBit = bitOff;
-        DataItem? prev = null;
-        foreach (var c in item.Children)
+        if (item.Children.Count == 0) return;
+        var starts = BitLayout.ChildStarts(item);
+        for (int i = 0; i < starts.Length; i++)
         {
+            var c = item.Children[i];
             c.IsCanonical = false;
-            // The inner-REDEFINES target is a PRIOR sibling, so its offset is already assigned this walk.
-            int cBit;
-            if (c.RedefinesTarget is { } target) cBit = target.ClassBitOffset;
-            else
-            {
-                // §8.5.1.6.3 rules 1 and 2 plus §13.18.1.4 GR1, through THE one placement predicate that
-                // BitLayout.ExtentBits and BitLayout.StartBitWithin also call. ⛔ It was spelled out a THIRD
-                // time here until kb/Work PB487 — the comment even said it was "the SAME pair" — and a third
-                // copy is a third arm to forget: the ALIGNED case would have reached the extent and offset
-                // walks and NOT the REDEFINES class walk, so a redefining view of an ALIGNED bit member would
-                // have read the wrong bits with no diagnostic anywhere.
-                if (bitLaid && !BitLayout.SharesByteWith(prev, c))
-                    childBit = BitLayout.RoundUpToByte(childBit);
-                cBit = childBit;
-            }
-            AssignClassOffsets(c, cBit, cls, bitLaid);
-            if (c.RedefinesTarget is null)
-            {
-                childBit += ClassExtentBits(c);
-                prev = c;
-            }
+            // -1 is "a REDEFINES name with no sibling target"; an unresolved redefiner is demoted to an ordinary
+            // entry (RedefinesTargetName = null, kb/Work PB93, COBOLNET1654), so no live child can carry it here.
+            if (starts[i] < 0)
+                throw new InvalidOperationException(
+                    $"'{c.CobolName ?? c.CsName}' REDEFINES '{c.RedefinesTargetName}', which is not a sibling in its group");
+            AssignClassBitOffsets(c, bitOff + starts[i], cls);
         }
     }
 
@@ -7218,7 +7192,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // "National characters shall be represented in the storage of the computer as characters of a uniform
         // size equal to or a multiple of the size of characters in the computer's alphanumeric character set" —
         // and D-N1 pins two), and that is now the window's own geometry: the class walk advances by the
-        // member's STORAGE extent (ClassExtentBits → BitLayout.WidthBits → ElementaryByteWidth, already 2n for
+        // member's STORAGE extent (BitLayout.RunBits → WidthBits → ElementaryByteWidth, already 2n for
         // national), the class width is the members' maximum ByteWidth, and Place.NationalWindow transcodes the
         // pair through CobolBits.NatReadWindow/NatWriteWindow — the same UTF-16BE serialization CONVERT's
         // raw-storage channel and FUNCTION BYTE-LENGTH already answer with.
@@ -7244,7 +7218,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // group item of the same level" takes the next bit position, everything else the first bit of
             // the first available byte) and §13.18.29.4 GR1c ("Data items contained within a bit group are
             // allocated in storage in accordance with the rules specified in 8.5.1.6.3") are walked by
-            // AssignClassOffsets' bit-laid arm — the SAME walk this predicate's two callers share — and the
+            // BitLayout.ChildStarts — the SAME walk this predicate's two callers share — and the
             // resulting window is read/written by CobolBits.ReadWindow/WriteWindow over the class backing
             // (D19/PB43 for the layout, PB203 for the window). DataItem.ImageWidth is already the
             // ceil(bits/8) byte extent, so the area a cell allocates for such a record is GR3's byte

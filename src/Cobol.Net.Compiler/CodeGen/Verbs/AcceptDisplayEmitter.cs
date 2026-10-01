@@ -101,19 +101,29 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             return;
         }
 
+        // ⛔ THE TRANSFER SIZE IS THE RECEIVER'S, AT EXECUTION — §14.9.1.4 GR3/GR4 are written over "the size of the
+        // receiving data item", and an ANY LENGTH receiver's size is its carrier's (§13.18.2.4 GR1 b)), never the one
+        // symbol its PICTURE spells (§13.18.2.3 SR1). Every arm below, the group arm included, reads this ONE
+        // expression (ReceivingStore.CharacterPositions — a group's is its character positions, a bit / national
+        // group's its as-if positions); each used to read the declared width, so an ANY LENGTH receiver bound to a
+        // 6-character argument stored ONE character of the record (kb/Work PB1013).
+        string size = ReceivingStore.CharacterPositions(target);
+
         if (item.IsGroup)
         {
-            // A group receiver takes the device characters positionally — the ONE group-image store (§14.9.25.4 GR4).
-            w.Line(PlaceRenderer.WriteGroupImage(target, $"AcceptSource.Device({item.DisplayTextWidth})", "ACCEPT into group"));
+            // A group receiver takes the device characters positionally — the ONE group-value store: an alphanumeric
+            // group's character image (§14.9.25.4 GR4), and for a BIT / NATIONAL group the ELEMENTARY item of its
+            // as-if PICTURE (§13.18.29.4 GR1b/GR2b) — m boolean or m national positions, converted exactly as the
+            // elementary arms below convert them, NOT m characters poured through the 2m-byte / ceil(m/8)-byte
+            // storage image (kb/Work PB1653: `ACCEPT NG` of "HELLO" into a national group stored five characters as
+            // ten UTF-16BE bytes and read back as five CJK characters).
+            string device = item.GroupUsage is GroupUsage.Bit
+                ? $"AcceptSource.DeviceBoolean({size})"
+                : $"AcceptSource.Device({size})";
+            w.Line(PlaceRenderer.WriteGroupValue(target, device, "ACCEPT into group"));
             return;
         }
 
-        // ⛔ THE TRANSFER SIZE IS THE RECEIVER'S, AT EXECUTION — §14.9.1.4 GR3/GR4 are written over "the size of the
-        // receiving data item", and an ANY LENGTH receiver's size is its carrier's (§13.18.2.4 GR1 b)), never the one
-        // symbol its PICTURE spells (§13.18.2.3 SR1). Every elementary arm below reads this ONE expression
-        // (ReceivingStore.CharacterPositions); each used to read the declared width, so an ANY LENGTH receiver
-        // bound to a 6-character argument stored ONE character of the record (kb/Work PB1013).
-        string size = ReceivingStore.CharacterPositions(target);
         var pic = item.Pic!;
         switch (pic)
         {

@@ -785,17 +785,34 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             ? VariableLengthCompatibility.CorrespondingSpans(fixedSide, varSide.Item)
             : null;
 
+    /// <summary>⛔ THE CALLER'S BOX OF ONE UNIVERSAL ARGUMENT — D10's canonical box (<c>S:*</c> → string, <c>V:*</c> →
+    /// the variable-length carrier, <c>O:*</c> → the reference, <c>N:*</c> → per <see cref="OoUnivImageBridged"/> /
+    /// <see cref="OoUnivNativeBoxOverImage"/>). A fixed GROUP is string-carried (<see cref="OoStringCarried"/> is true of
+    /// every group, and the callee unboxes it as <c>(string)box</c>), so its box is its character IMAGE — read through
+    /// <see cref="CallEmitter.CallStringRead"/>, the ONE boundary reader the CALL and the typed INVOKE lanes use (the full
+    /// image of an alphanumeric group, the elementary alphabet of a bit / national group, kb/Work PB1166). It used to fall
+    /// to <c>PlaceRenderer.Read(p)</c>, the record STRUCT, which the copy-out then overwrote with a string: a Roslyn
+    /// CS0029 on every legal group argument (kb/Work PB1781 — the READ half of a pair whose WRITE half had the arm).
+    /// <see cref="OoUnivCallerWrite"/> carries the twin of every arm here; <c>UniversalCrossingShapeDriftTests</c> holds
+    /// the pair together shape by shape.</summary>
     private static string OoUnivCallerRead(Place p) =>
         p is RefModPlace ? PlaceRenderer.Read(p)
         : CallEmitter.CallPlaceIsVarGroup(p) ? PlaceRenderer.VarGroupImage(p, "INVOKE argument")
+        : p.Item.IsGroup ? CallEmitter.CallStringRead(p)
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Read(new NumericImagePlace(p))
         : OoUnivNativeBoxOverImage(p.Item) ? $"(object?){NumericRenderer.CarrierOfImage(PlaceRenderer.Read(p), p.Item)}"   // kb/Work PB187
         : PlaceRenderer.Read(p);
 
+    /// <summary>The caller's copy-out / RETURNING delivery of a universal box — the twin of <see cref="OoUnivCallerRead"/>,
+    /// arm for arm. A fixed group takes its image back through <see cref="CallEmitter.CallStringWrite"/>, the boundary
+    /// writer that distributes the FULL image (the elementary alphabet for a bit / national group). The callee's box is
+    /// exactly the argument's width: the universal descriptor is compared for equality, so §14.8.2.2 rule 1's by-reference
+    /// prefix (a smaller formal group) cannot reach here until the match relation admits it (kb/Work PB480).</summary>
     private static string OoUnivCallerWrite(Place p, string box) =>
         p is RefModPlace ? PlaceRenderer.Write(p, $"(string){box}!")
         : CallEmitter.CallPlaceIsVarGroup(p)
             ? PlaceRenderer.WriteVarGroupImage(p, $"({RuntimeApi.VarGroupType}){box}!", "INVOKE copy-out into")
+        : p.Item.IsGroup ? CallEmitter.CallStringWrite(p, $"(string){box}!")
         : OoUnivNativeBoxOverImage(p.Item) ? PlaceRenderer.Write(p, NumericRenderer.ImageOfCarrier($"({p.Item.Pic!.ClrType}){box}!", p.Item))   // kb/Work PB187
         : OoStringCarried(p.Item) ? PlaceRenderer.Write(p, $"(string){box}!")
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Write(new NumericImagePlace(p), $"(string){box}!")

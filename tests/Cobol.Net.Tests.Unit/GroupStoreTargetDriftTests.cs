@@ -26,7 +26,7 @@ public sealed class GroupStoreTargetDriftTests
     public void EveryPlaceRendererGroupStore_ReceivesThroughGroupTarget()
     {
         string[] lines = File.ReadAllLines(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Roslyn", "PlaceRenderer.cs"));
-        int stores = 0;
+        var kinds = new HashSet<string>();
         var offenders = new List<string>();
         for (int i = 0; i < lines.Length; i++)
         {
@@ -34,7 +34,7 @@ public sealed class GroupStoreTargetDriftTests
             if (line.TrimStart().StartsWith("//")) continue;
             foreach (Match m in Store.Matches(line))
             {
-                stores++;
+                kinds.Add(m.Groups[1].Value);
                 // The receiver is the interpolation hole the store is called on: `{GroupTarget(x)}.FromY(`.
                 int open = line.LastIndexOf('{', m.Index);
                 string receiver = open < 0 ? "" : line[(open + 1)..m.Index];
@@ -42,8 +42,12 @@ public sealed class GroupStoreTargetDriftTests
                     offenders.Add($"PlaceRenderer.cs:{i + 1}: {line.Trim()}");
             }
         }
-        // The scan must be able to fail: if the writers stop matching the pattern, it would pass vacuously.
-        Assert.True(stores >= 7, $"expected the group writers' stores in PlaceRenderer.cs, found {stores}");
+        // The scan must be able to fail: if the writers stop matching the pattern, it would pass vacuously. Every
+        // kind of generated group store has exactly one spelling in PlaceRenderer (the bit and national writers
+        // share theirs between the plain and the GR8a current-extent arms, kb/Work PB1653), so each kind must be
+        // found; a count would have to be edited whenever a spelling is shared or split.
+        Assert.True(kinds.SetEquals(["Image", "VarImage", "ContiguousImage", "Bits", "Nat"]),
+            $"expected every group store kind in PlaceRenderer.cs, found {string.Join(", ", kinds.Order())}");
         Assert.True(offenders.Count == 0,
             "A group-level store is called on a receiver other than PlaceRenderer.GroupTarget — an element of a "
             + "dynamic-capacity table would be reached through RefSending and the store discarded "
