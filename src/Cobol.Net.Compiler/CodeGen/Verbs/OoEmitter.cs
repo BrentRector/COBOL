@@ -1644,8 +1644,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // the matching conformance rule), so the argument's VALUE is stored into the formal's description and the carrier is that record's STORAGE image — through the
         // OWNER's profile, qualified, exactly as the native CONTENT arm does. The MOVE store below rendered the
         // formal's profile BARE in the activating class, a Roslyn CS0103 on conforming source.
-        if (fp is { Category: PicCategory.Numeric, IsFloat: false }
-            && sp.DenotedItem is { Pic: { Category: PicCategory.Numeric, IsFloat: false } })
+        // ⛔ THE SENDER IS ANY NUMERIC ONE (kb/Work PB1114's review finding): a COMPUTE's sending operand may be a
+        // FLOATING-POINT item too (§14.2.3 GR9 has no float exemption on the sender), and a float sender fell to the
+        // MOVE store below — the same bare-profile CS0103, and a MOVE where §14.7.5 r4 owes the EC-SIZE raise.
+        // StoreExpr tells the lanes apart (a Real intermediate lands through ToScaled, CHECKED when it raises).
+        if (fp.IsClassNumericFixedPoint
+            && sp.DenotedItem is { Pic.IsClassNumeric: true })
         {
             return RuntimeApi.NumFormatImage(NumericRenderer.StoreExpr(
                 Num.AsNum(new BoundFieldOperand(sp), ReceiverContext.None), fp.Scale, qualProfile,
