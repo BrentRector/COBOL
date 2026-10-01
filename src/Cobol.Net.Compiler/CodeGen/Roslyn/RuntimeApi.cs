@@ -1826,14 +1826,15 @@ internal static class RuntimeApi
     /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>.</summary>
     public static string CellVarStoreContiguous(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase,
                                                 IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax, string imageExpr,
-                                                string? extentsExpr = null) =>
+                                                string? extentsExpr = null, bool fixedForm = false) =>
         $"{cellExpr}.{nameof(StorageCell.StoreContiguousAt)}({fixedAtExpr}, {fixedWidth}, {dynBase}, "
-        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {imageExpr}{(extentsExpr is null ? "" : $", {extentsExpr}")})";
+        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
 
     /// <summary>A cell-backed variable-length group's EXTENT TABLE — <c>StorageCell.ContiguousExtentsAt</c>
     /// (determination D-FRA (v); kb/Work PB1053).</summary>
-    public static string CellVarContiguousExtents(string cellExpr, int dynBase, IEnumerable<int> dynFixedAt) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({dynBase}, {IntSpan(dynFixedAt)})";
+    public static string CellVarContiguousExtents(string cellExpr, int fixedWidth, int dynBase,
+                                                  IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({fixedWidth}, {dynBase}, {IntSpan(dynFixedAt)}, {IntSpan(dynMax)})";
 
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>.</summary>
     public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase, int dynCount) =>

@@ -652,10 +652,15 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// WRITE's whole-record-area rule, which is exactly what a shorter record-name-1 must NOT get here (kb/Work
     /// PB1168), and an image's character count is not a byte count for every record shape (a pointer-class
     /// record sends no character image); and −1 on a variable-length file without DEPENDING, whose image is the
-    /// record at its current length (GR13 b)/c)).</summary>
+    /// record at its current length (GR13 b)/c)).
+    /// <para>⛔ A VARIABLE-LENGTH record-name-1 in a FIXED-length file (D-FRA (vi), <see cref="FileModel.FixedFormRecords"/>)
+    /// is the size it occupies in the fixed form — every member at its maximum, <see cref="FileModel.MaxRecordSize"/>
+    /// (§13.18.43.4 GR8 b) — never <see cref="RecordLayout.PhysicalWidth"/>, which is only the record's FIXED run:
+    /// a REWRITE of a record that exactly fills the file's integer-1 bytes was refused '44' as "3 bytes".</para></summary>
     private static string RewriteLengthArg(BoundRewrite rw, string? dependingArg) =>
         dependingArg ?? (rw.File.RecordSizeVaries ? "-1"
-            : RecordLayout.PhysicalWidth(rw.Record.Item).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            : (FileModel.IsVariableLengthRecord(rw.Record.Item) ? FileModel.MaxRecordSize(rw.Record.Item)
+                : RecordLayout.PhysicalWidth(rw.Record.Item)).ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     /// <summary>After a SUCCESSFUL read of a RECORD VARYING … DEPENDING file, store the just-read record's length
     /// into the DEPENDING item (ISO §13.18.43 GR15; GR12 — an unsuccessful READ leaves it unchanged, so the call
@@ -794,11 +799,14 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     public void EmitRecordAreaStore(FileModel file, Place? area, string areaImage, string currentRecord,
         string currentExtents)
     {
+        // D-FRA (vi): a file of FIXED-length records holds a variable-length record in its fixed form, so the record
+        // this READ just retrieved is decomposed at the members' maximum widths and each drops its space padding.
+        bool fixedForm = file.FixedFormRecords;
         if (area is not null)
         {
             if (FileModel.IsOutOfLineRecord(area.Item))
             {
-                EmitOutOfLineInto(area, currentRecord, currentExtents);
+                EmitOutOfLineInto(area, currentRecord, currentExtents, fixedForm);
                 // A file whose every record is out of line has no character window of its own, but a file of its
                 // SAME RECORD AREA clause may: the shared character area holds the record too (§12.4.6.4.4 GR2;
                 // the READ twin of the released-record rule, kb/Work PB1195). It takes the CURRENT RECORD, not the
@@ -809,7 +817,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         }
         foreach (var record in file.OutOfLineRecords)
             if (refs.ResolveItem(record) is { } place)
-                EmitOutOfLineInto(place, currentRecord, currentExtents);
+                EmitOutOfLineInto(place, currentRecord, currentExtents, fixedForm);
     }
 
     /// <summary>Make the current record available in ONE out-of-line record (D-FRA; kb/Work PB981) — the
@@ -819,14 +827,14 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// "the new value becomes the content of the item", truncated on the right at its maximum; a NATIONAL one
     /// decodes the record's byte pairs first, the inverse of its NatBytes image); a pointer-class record has no
     /// character image, so the record does not reach it and its value is unchanged.</summary>
-    private void EmitOutOfLineInto(Place record, string currentRecord, string currentExtents)
+    private void EmitOutOfLineInto(Place record, string currentRecord, string currentExtents, bool fixedForm = false)
     {
         var w = ctx.Writer;
         var item = record.Item;
         if (item.IsGroup)
         {
             w.Line(PlaceRenderer.WriteVarGroupContiguous(record, currentRecord, currentExtents,
-                $"record area '{item.CobolName}' read"));
+                $"record area '{item.CobolName}' read", fixedForm));
             return;
         }
         if (item.IsDynamicLength)
@@ -834,6 +842,9 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             string content = item.Pic?.Category is PicCategory.National
                 ? RuntimeApi.NatReadWindow(currentRecord, "0", $"{currentRecord}.Length / 2")
                 : currentRecord;
+            // D-FRA (vi): the fixed form of a dynamic-length record fills its whole field with the content and spaces;
+            // the spaces are padding, never data (the group arm drops them member by member, in Decompose).
+            if (fixedForm) content = $"({content}).TrimEnd(' ')";
             w.Line(PlaceRenderer.Write(record, ReceivingStore.Characters(item, content, "0")));   // the ONE elementary character store (PB871)
             return;
         }

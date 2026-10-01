@@ -60,7 +60,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             SequentialIoEmitter.EmitAreaRegistrations(w, file);   // §14.9.30.4 GR15 + §13.18.13.4 GR2
             return;
         }
-        if (file.RecordKeyItem is not { } pk || KeyWindow(pk) is not var (pkOff, pkLayout))
+        if (file.RecordKeyItem is not { } pk || KeyWindow(pk, file.FixedFormRecords) is not var (pkOff, pkLayout))
         {
             w.Line(LoudStmt($"indexed file '{file.CobolName}': RECORD KEY missing or not locatable in the record "
                 + "image (ISO §12.4.5.12)"));
@@ -73,7 +73,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         for (int i = 0; i < file.AlternateKeys.Count; i++)
         {
             var (alt, dups, suppress) = file.AlternateKeys[i];
-            if (KeyWindow(alt) is not var (aOff, aLayout))
+            if (KeyWindow(alt, file.FixedFormRecords) is not var (aOff, aLayout))
             {
                 w.Line(LoudStmt($"indexed file '{file.CobolName}': ALTERNATE RECORD KEY '{alt.CobolName}' not "
                     + "locatable in the record image (ISO §12.4.5.6)"));
@@ -94,13 +94,18 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
     /// the key's FIXED-run offset and the connector locates the key per record (kb/Work PB1025; docs/CONFORMANCE.md
     /// §3 D-KWV). ONE reader, <see cref="Binding.Model.RecordLayout.KeyWindowOf"/>, the same one the SORT/MERGE
     /// key and the §12.4.5.12.3 SR4 / §12.4.5.6.3 SR5 screens read. Null when the key has no locatable window.</summary>
-    private (int Offset, string Layout)? KeyWindow(Binding.Model.DataItem key)
+    private (int Offset, string Layout)? KeyWindow(Binding.Model.DataItem key, bool fixedForm)
     {
         var root = key;
         while (root.Parent is { } p) root = p;
         if (Binding.Model.RecordLayout.KeyWindowOf(root, key, key.ByteWidth) is { FollowsVariable: true } win
             && refs.ResolveItem(root) is { } place)
-            return (win.Offset, RuntimeApi.ContiguousLayoutOf(PlaceRenderer.Read(place)));
+            // ⛔ In a file of FIXED-length records (D-FRA (vi)) every record has the one fixed form, so the key sits at
+            // ONE position — the fixed-run offset plus the MAXIMUM extent of every member that precedes it
+            // (KeyWindow.MaxEnd less the key's own width) — and registers as a plain window, exactly the window a
+            // second program describing the same file with plain fields declares (§9.1.6, §14.9.27.4 GR10).
+            return fixedForm ? ((int)(win.MaxEnd - key.ByteWidth), "null")
+                : (win.Offset, RuntimeApi.ContiguousLayoutOf(PlaceRenderer.Read(place)));
         // Every other key keeps the area offset it has always registered (§12.4.5.12.4 GR4's byte positions).
         return Binding.Model.RecordLayout.OffsetOf(key) is { } off ? (off, "null") : null;
     }

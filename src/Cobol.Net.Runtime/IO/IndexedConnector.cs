@@ -907,8 +907,12 @@ public sealed class IndexedConnector : KeyedConnector
     /// §14.9.41.4 GR17 a)): fitted to the area width, as the record area is — except on a connector whose key
     /// positions vary with the record, where the image is taken as composed, because truncating it would move
     /// the key (<see cref="_layoutKeys"/>).</summary>
-    private string AreaKey(string areaImage, RecordExtents? areaExtents, int keyIndex) =>
-        KeyOf(_layoutKeys ? areaImage : Fit(areaImage), _layoutKeys ? areaExtents : null, keyIndex);
+    private string AreaKey(string areaImage, RecordExtents? areaExtents, int keyIndex)
+    {
+        // A file of FIXED-length records keys the record in its fixed form (D-FRA (vi)) — the shape it is stored in.
+        var (image, extents) = FixedForm(areaImage, areaExtents);
+        return KeyOf(_layoutKeys ? image : Fit(image), _layoutKeys ? extents : null, keyIndex);
+    }
 
     /// <summary>The key value of a STORED record — <see cref="KeyOf(string, RecordExtents?, int)"/> over its image
     /// and the extent table it was released with.</summary>

@@ -444,18 +444,26 @@ public sealed class FileModel
     /// variable-occurrence item by its extent at the time of the output statement, which is what WRITE sends.
     /// Every other file keeps the implied Format 1 it has always had, so no fixed-record file changes
     /// shape.
-    /// <para>⛔ AN EXPLICIT FORMAT 1 CLAUSE DOES NOT UNDO IT (kb/Work PB1562). The question is what the RECORDS are, not
-    /// what the clause says about the area: a variable-length record has no one size on the medium, and the
-    /// extent table that makes it invertible (D-FRA (v)) lives in the frame of a file that frames its records. A
-    /// file whose records vary but whose frames are the plain fixed blocks of <c>RECORD CONTAINS 20</c> could
-    /// not carry it — a record written as <c>"AAA" "KEY" "CCCC"</c> came back as one dynamic member holding the
-    /// whole 20 bytes and the fixed member beside it blank. So such a file frames its records like any other
-    /// variable-length one, and integer-1 stays what Format 1 says it is, "the number of bytes contained in
-    /// each record" at most — <see cref="RecordWidth"/> still sizes the record AREA and
-    /// <see cref="VaryMax"/> is therefore integer-1 (§13.18.43.3 SR3 keeps every description within it). The
-    /// physical form is the implementor's: "The size of records on physical storage media may be different due
-    /// to control information required by the operating environment" (§13.18.43.4 GR2).</para></summary>
-    public bool ImpliesVariableFormat => Varying is null && Records.Any(IsVariableLengthRecord);
+    /// <para>⛔ AN EXPLICIT FORMAT 1 CLAUSE KEEPS THE FILE FIXED (kb/Work PB1562). The implied clause above is
+    /// GR5's, for a file whose entry writes NO RECORD clause; an explicit <c>RECORD CONTAINS integer-1</c> states
+    /// the record type, and GR6 reads "Format 1 is used to specify fixed-length records" while §9.1.6 makes that
+    /// type and size a fixed file attribute every program using the file shares — a second program describing
+    /// the same file as <c>RECORD CONTAINS 20</c> over <c>PIC X(20)</c> has the same attributes and must read the
+    /// same bytes. Such a file therefore registers as FIXED, and a record of it that holds variable-length
+    /// members is carried in the FIXED FORM (<see cref="FixedFormRecords"/>), not framed.</para></summary>
+    public bool ImpliesVariableFormat => Varying is null && RecordContains is null && Records.Any(IsVariableLengthRecord);
+
+    /// <summary>⛔ DETERMINATION D-FRA (vi) (docs/CONFORMANCE.md §3, kb/Work PB1562) — a file whose RECORD clause is an
+    /// explicit Format 1 (<c>RECORD CONTAINS integer-1</c>, fixed-length records, §13.18.43.4 GR6) and whose records
+    /// hold VARIABLE-LENGTH members. Its physical records are the plain fixed blocks of every Format 1 file, with
+    /// no frame to carry a control table, so each such record is carried in the FIXED FORM: every member at the
+    /// position it has when it holds its maximum size, padded with spaces
+    /// (<c>CobolContiguousLayout.ToFixedForm</c>), and a READ takes each member back at that width and drops the
+    /// padding (<c>CobolContiguousLayout.Decompose</c> with <c>fixedForm</c>). The one question the READ landing
+    /// asks (<c>SequentialIoEmitter.EmitRecordAreaStore</c>); the WRITE side needs no answer, because a fixed-type
+    /// connector applies the form to every record it is sent with its layout's extent table.</summary>
+    public bool FixedFormRecords =>
+        !IsSortMerge && Varying is null && RecordContains is not null && Records.Any(IsVariableLengthRecord);
 
     /// <summary>The maximum size specified by the record description entries — ISO §14.9.30.4 GR14/GR15's
     /// truncation bound ("the record is truncated on the right to the maximum size"), computed by

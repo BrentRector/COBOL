@@ -21,10 +21,13 @@ namespace CobolNet.Runtime;
 /// </summary>
 public sealed class RecordExtents
 {
-    /// <summary>A table of <paramref name="fixedAt"/>.Length components. The two arrays are owned by the table
-    /// from here on.</summary>
+    /// <summary>A table of <paramref name="fixedAt"/>.Length components. The arrays are owned by the table from
+    /// here on. <paramref name="layout"/> is the record type's layout, which a table a PROGRAM built (the sending
+    /// side of a WRITE, <see cref="CobolContiguousLayout.ExtentsOf"/>) carries so a file of fixed-length records can
+    /// ask for the record's fixed form (<see cref="CobolContiguousLayout.ToFixedForm"/>); a table read back from a
+    /// frame has none, because a frame records only where each component ended.</summary>
     /// <exception cref="ArgumentException">The arrays differ in length, or a length is negative.</exception>
-    public RecordExtents(int[] fixedAt, int[] lengths)
+    public RecordExtents(int[] fixedAt, int[] lengths, CobolContiguousLayout? layout = null)
     {
         ArgumentNullException.ThrowIfNull(fixedAt);
         ArgumentNullException.ThrowIfNull(lengths);
@@ -34,7 +37,12 @@ public sealed class RecordExtents
             if (n < 0) throw new ArgumentException("a component length is never negative", nameof(lengths));
         FixedAt = fixedAt;
         Lengths = lengths;
+        Layout = layout;
     }
+
+    /// <summary>The layout of the record type this table was built over, or null for a table read from a frame
+    /// (see the constructor).</summary>
+    public CobolContiguousLayout? Layout { get; }
 
     /// <summary>Component k's offset in the record's FIXED run.</summary>
     public IReadOnlyList<int> FixedAt { get; }

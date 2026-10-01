@@ -1995,10 +1995,19 @@ path of an OPEN with it and `CobolSort.AssociationMade` asks it for the sort-mer
 `SortEmitter.EmitAssociation` leaves for the statement's end label before any phase when it fails (§3.176: an
 unsuccessful execution performs not all the operations of the statement).
 
-**The RECORD clause's size rules screen variable-length records, and such a file frames its records (PB1562; §13.18.43.3
-SR3/SR4, D-FRA (iv)/(v)).** `RecordClauseRules` no longer skips a record holding a dynamic-length item: GR8 b)'s maximum
-is the item's maximum size and its minimum is zero. `FileModel.ImpliesVariableFormat` no longer requires an absent
-RECORD clause, so a variable-length record's frame carries its extent table whatever Format 1 says about the area.
+**The RECORD clause's size rules screen variable-length records, and an explicit Format 1 file carries them in the FIXED
+FORM (PB1562; §13.18.43.3 SR3/SR4, §13.18.43.4 GR6, §9.1.6, D-FRA (iv)/(vi)).** `RecordClauseRules` no longer skips a record
+holding a dynamic-length item: GR8 b)'s maximum is the item's maximum size and its minimum is zero. An explicit
+`RECORD CONTAINS integer-1` keeps the file FIXED (`FileModel.ImpliesVariableFormat` again requires an absent clause):
+its record type and size are attributes every program using the file shares (§9.1.6), so a second program describing
+it as `PIC X(20)` reads the same bytes, and no frame or extent table can be added by one program's description. A
+record that holds variable-length members is therefore carried in its fixed form (`FileModel.FixedFormRecords`;
+`CobolContiguousLayout.ToFixedForm`): every member at the position it has at its MAXIMUM size, space padded. ONE
+place decides it on the way out — `FileConnector.FixedForm`, asked by the registry's governed WRITE and REWRITE
+entries and by `IndexedConnector.AreaKey` — and ONE on the way in — the READ landing's `fixedForm` flag
+(`SequentialIoEmitter.EmitRecordAreaStore`), which makes `CobolContiguousLayout.Decompose` take each member at its
+maximum width and drop its trailing padding. An indexed key a dynamic member precedes registers as a plain window at
+its fixed-form offset (`KeyedIoEmitter.KeyWindow`), the window the second program names.
 
 **One pad, one trim, keyed on the record area's category (PB679; §14.9.30.4 GR15).** `FileConnector.FitRecord` is the only
 short-record pad; the indexed key slice, the varying-record store and the blank area an unsuccessful READ returns

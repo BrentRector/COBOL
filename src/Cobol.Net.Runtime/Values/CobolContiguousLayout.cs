@@ -42,14 +42,48 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
     {
         var lengths = new int[FixedAt.Length];
         for (int k = 0; k < lengths.Length; k++) lengths[k] = current.Dyn(k).Length;
-        return new RecordExtents(FixedAt, lengths);
+        return new RecordExtents(FixedAt, lengths, this);
+    }
+
+    /// <summary>⛔ THE FIXED FORM OF A VARIABLE-LENGTH RECORD — the record as a file of FIXED-LENGTH records holds it
+    /// (determination D-FRA (vi); kb/Work PB1562). ISO §13.18.43.4 GR6 makes every record of a Format 1 file the same
+    /// size and §9.1.6 makes the record type and size fixed file attributes that every program using the file
+    /// shares, so such a file can neither frame its records as variable-length ones nor carry an extent table: a
+    /// second program describing the same file as <c>RECORD CONTAINS 20</c> over <c>PIC X(20)</c> must read the
+    /// same bytes. A record with variable-length members therefore occupies the one shape every record of the file
+    /// shares — each member at the position it has when it holds its MAXIMUM size (§13.18.43.4 GR8 b), padded with
+    /// spaces) — and <see cref="Decompose(string, RecordExtents?, bool)"/> takes each member back at that width and
+    /// drops the padding: a space in a fixed-size field is padding, never data.
+    /// <para>The characters of a member are its content character for character (a national item holds UTF-16
+    /// characters, DOC-A.1-63), so the padding is the space character. Returns <paramref name="image"/> unchanged
+    /// when <paramref name="extents"/> do not describe it (a record sent through another description, a table read
+    /// from a frame) — there is then no member boundary to pad at.</para></summary>
+    /// <param name="image">The record's contiguous image (<c>CurrentImage()</c>).</param>
+    /// <param name="extents">The table that was sent with it (<see cref="ExtentsOf"/>).</param>
+    public string ToFixedForm(string image, RecordExtents? extents)
+    {
+        if (Recorded(image, extents) is not { } lengths) return image;
+        var sb = new System.Text.StringBuilder(image.Length);
+        int at = 0, fixedDone = 0;
+        for (int k = 0; k < FixedAt.Length; k++)
+        {
+            int lead = FixedAt[k] - fixedDone;
+            sb.Append(image, at, lead + lengths[k]);
+            at += lead + lengths[k];
+            fixedDone = FixedAt[k];
+            sb.Append(' ', (int)Math.Min(Math.Max(0, MaxUnits[k] * Unit[k] - lengths[k]), int.MaxValue));
+        }
+        sb.Append(image, at, image.Length - at);
+        return sb.ToString();
     }
 
     /// <summary>The record decomposed into its carrier — <see cref="CobolVarGroup.FromContiguous"/>'s rule, by the
     /// record's own <paramref name="extents"/> when they describe it (<see cref="RecordExtents.Describes"/>), by the
-    /// take step otherwise.</summary>
-    public CobolVarGroup Decompose(string record, RecordExtents? extents = null) =>
-        CobolVarGroup.FromContiguous(record, FixedTotal, FixedAt, Unit, MaxUnits, Recorded(record, extents));
+    /// take step otherwise. <paramref name="fixedForm"/> says the record is the fixed form of a file of
+    /// FIXED-LENGTH records (<see cref="ToFixedForm"/>): the members then take their maximum widths and each drops
+    /// the space padding that fills its field.</summary>
+    public CobolVarGroup Decompose(string record, RecordExtents? extents = null, bool fixedForm = false) =>
+        CobolVarGroup.FromContiguous(record, FixedTotal, FixedAt, Unit, MaxUnits, Recorded(record, extents), fixedForm);
 
     /// <summary>The character position, in <paramref name="record"/>, of the fixed material at
     /// <paramref name="fixedOffset"/> of the FIXED run: that offset plus what every variable-length component

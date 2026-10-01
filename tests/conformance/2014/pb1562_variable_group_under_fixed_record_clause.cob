@@ -10,10 +10,12 @@
       *> makes that very record available again: every member takes back exactly the characters it was written
       *> with. The standard leaves the physical form to the implementor (§13.18.43.4 GR2: "The size of records on
       *> physical storage media may be different due to control information required by the operating
-      *> environment"); docs/CONFORMANCE.md D-FRA (v) carries the record's extent table in its frame, because the
-      *> contiguous image alone cannot be inverted with two variable members ("AAA" "KEY" "CCCC" and "AAAK" "EYC"
-      *> "CCC" are the same ten characters). Before kb/Work PB1562 the fixed clause gave the file plain 20-byte
-      *> blocks that carry no table, and the first record came back as A=[AAAKEYCCCC       ] KY=[   ] C=[].
+      *> environment"); docs/CONFORMANCE.md D-FRA (vi) fixes it for a FIXED-length file. The contiguous image alone
+      *> cannot be inverted with two variable members ("AAA" "KEY" "CCCC" and "AAAK" "EYC" "CCC" are the same ten
+      *> characters), and a Format 1 file is plain 20-byte blocks (GR6: no frame can carry a table that a second
+      *> program describing the file as PIC X(20) would not misread), so each member sits at the position it has
+      *> at its maximum size, space padded, and a READ takes it back at that width and drops the padding. Before
+      *> kb/Work PB1562 the first record came back as A=[AAAKEYCCCC       ] KY=[   ] C=[].
       *>
       *> WHY EACH LEG CAN FAIL: the members are overwritten with junk before every READ, so a value that is right
       *> can only have come from the file. R1 has both variable members non-empty; R2 shifts the boundary (1 and 6

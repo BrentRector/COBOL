@@ -433,7 +433,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // component of CurrentImage() ends, and the READ / RETURN side decomposes by it when it describes the record
         // received — so every layout round-trips, however many variable-length members flank a fixed one.
         w.Line($"public readonly RecordExtents CurrentExtents() => {RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage());");
-        w.Line($"public void FromContiguousImage(string __r, RecordExtents? __e) => FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e));");
+        w.Line($"public void FromContiguousImage(string __r, RecordExtents? __e, bool __fixedForm = false) => FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e, __fixedForm));");
         using (w.Block("public void FromVarImage(CobolVarGroup __v)"))
         {
             w.Line($"string __s = {RuntimeApi.StrStore("__v.Fixed", $"{totalFixed}")};");

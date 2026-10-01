@@ -143,6 +143,7 @@
   "pb232_entry_convention_cobol",
   "pb1026_external_out_of_line_records",
   "pb1562_variable_group_under_fixed_record_clause",
+  "pb1562_fixed_clause_file_second_description",
   "l1c01_arithmetic_clause_forms",
   "l1c06_dyn_table_unlimited_capacity",
   "l1c06_entry_convention_oo",

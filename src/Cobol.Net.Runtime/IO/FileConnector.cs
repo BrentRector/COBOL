@@ -982,6 +982,23 @@ public abstract class FileConnector
         return image[..n];
     }
 
+    /// <summary>⛔ A RECORD SENT TO A FILE OF FIXED-LENGTH RECORDS, in the FIXED FORM those records have (determination
+    /// D-FRA (vi); kb/Work PB1562). The sending side of a WRITE / REWRITE hands every connector the same thing — a
+    /// variable-length group record's contiguous image with the extent table of its layout. A connector of
+    /// VARIABLE-length records frames both (D-FRA (v)); a FIXED connector cannot, because §13.18.43.4 GR6 and §9.1.6
+    /// make its records one size and its record type and size fixed attributes that a second program describing
+    /// the file with a plain <c>PIC X(n)</c> shares, so it carries the record in the one shape every record of the
+    /// file has (<see cref="CobolContiguousLayout.ToFixedForm"/>), and the table, which described the CONTIGUOUS
+    /// image, is spent: it is returned null, so nothing downstream frames or keys by it. Asked at the two places a
+    /// program's record area enters a connector — the registry's governed WRITE and REWRITE entries, above the
+    /// organizations, and <c>IndexedConnector.AreaKey</c> for a key a statement reads from the record area. A record
+    /// with no table (a character-window record, a dynamic-length elementary record) comes back as it is — its
+    /// <see cref="Fit"/> already is its fixed form — and so does any record sent to a file of variable-length
+    /// records.</summary>
+    internal (string Image, RecordExtents? Extents) FixedForm(string image, RecordExtents? extents) =>
+        !IsVarying && extents?.Layout is { } layout && layout.ToFixedForm(image, extents) is var form
+        && !ReferenceEquals(form, image) ? (form, null) : (image, extents);
+
     /// <summary>The stored image of a record being written: a varying record keeps exactly its declared length
     /// (ISO §13.18.43 GR13 — truncate/pad the area image to it); a fixed record fills the record width. Returns
     /// null (→ '44') when a varying length violates the declared bounds (GR14 / §14.9.35 GR20).</summary>

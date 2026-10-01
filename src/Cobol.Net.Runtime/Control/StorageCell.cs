@@ -146,11 +146,23 @@ public sealed class StorageCell
     /// dynamic-length item's fixed-run position <paramref name="dynFixedAt"/> and its current length — what a WRITE /
     /// REWRITE / RELEASE of the group sends beside <see cref="ContiguousAt"/>, the declared group's
     /// <c>CurrentExtents()</c> composed from the cell.</summary>
-    public RecordExtents ContiguousExtentsAt(int dynBase, ReadOnlySpan<int> dynFixedAt)
+    public RecordExtents ContiguousExtentsAt(int fixedWidth, int dynBase, ReadOnlySpan<int> dynFixedAt,
+                                             ReadOnlySpan<int> dynMax)
     {
         var lengths = new int[dynFixedAt.Length];
         for (int k = 0; k < lengths.Length; k++) lengths[k] = DynAt(dynBase + k).Length;
-        return new RecordExtents(dynFixedAt.ToArray(), lengths);
+        return new RecordExtents(dynFixedAt.ToArray(), lengths, LayoutOf(fixedWidth, dynFixedAt, dynMax));
+    }
+
+    /// <summary>The contiguous layout of a cell-backed variable-length group: unit 1 per component — a
+    /// dynamic-length item contributes its content character for character, the same unit a declared group's
+    /// generated layout gives it (<c>GroupImageCodec.ContiguousLayout</c>).</summary>
+    private static CobolContiguousLayout LayoutOf(int fixedWidth, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynMax)
+    {
+        var ones = new int[dynFixedAt.Length];
+        var max = new long[dynMax.Length];
+        for (int k = 0; k < ones.Length; k++) { ones[k] = 1; max[k] = dynMax[k]; }
+        return new CobolContiguousLayout(fixedWidth, dynFixedAt.ToArray(), ones, max);
     }
 
     /// <summary>Make a contiguous image the group's content — the inverse of <see cref="ContiguousAt"/>, through the
@@ -159,15 +171,11 @@ public sealed class StorageCell
     /// kb/Work PB1053), otherwise by the take step, each dynamic-length item taking as many characters as the image
     /// holds beyond the fixed material still to come, up to its maximum size.</summary>
     public void StoreContiguousAt(int fixedAt, int fixedWidth, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                                  ReadOnlySpan<int> dynMax, string image, RecordExtents? extents = null)
+                                  ReadOnlySpan<int> dynMax, string image, RecordExtents? extents = null,
+                                  bool fixedForm = false)
     {
-        // Unit 1 per component: a dynamic-length item contributes its content character for character, the same
-        // unit a declared group's generated layout gives it (GroupImageCodec.ContiguousLayout).
-        var ones = new int[dynFixedAt.Length];
-        var max = new long[dynMax.Length];
-        for (int k = 0; k < ones.Length; k++) { ones[k] = 1; max[k] = dynMax[k]; }
-        var layout = new CobolContiguousLayout(fixedWidth, dynFixedAt.ToArray(), ones, max);
-        StoreVarGroupAt(fixedAt, fixedWidth, dynBase, dynMax, layout.Decompose(image ?? "", extents));
+        var layout = LayoutOf(fixedWidth, dynFixedAt, dynMax);
+        StoreVarGroupAt(fixedAt, fixedWidth, dynBase, dynMax, layout.Decompose(image ?? "", extents, fixedForm));
     }
 
     private string FixedRun(int fixedAt, int fixedWidth) =>

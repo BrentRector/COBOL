@@ -261,6 +261,9 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     /// determination's reading for a record that carries no extent table).</item>
     /// </list>
     /// The fixed material then lands at its own positions.
+    /// <para><paramref name="fixedForm"/> marks the record as the FIXED FORM a file of fixed-length records holds
+    /// (<see cref="CobolContiguousLayout.ToFixedForm"/>, D-FRA (vi)): every member filled its field to its maximum,
+    /// so the take step finds each at that width, and each then drops the space padding.</para>
     /// <para><paramref name="fixedAt"/>[k] is component k's offset in the FIXED run (the §8.5.1.12.3
     /// zero-length accounting <see cref="Fixed"/> uses), <paramref name="unit"/>[k] its unit width in
     /// characters, <paramref name="maxUnits"/>[k] its maximum size in units (§8.5.1.10.1's maximum size / the
@@ -270,7 +273,8 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     /// the item's own receiving store (§8.5.1.10.4 — "If the maximum length is reached, the value is truncated on
     /// the right as necessary").</para></summary>
     public static CobolVarGroup FromContiguous(string record, int fixedTotal, IReadOnlyList<int> fixedAt,
-        IReadOnlyList<int> unit, IReadOnlyList<long> maxUnits, IReadOnlyList<int>? recorded = null)
+        IReadOnlyList<int> unit, IReadOnlyList<long> maxUnits, IReadOnlyList<int>? recorded = null,
+        bool fixedForm = false)
     {
         var dyn = new string[fixedAt.Count];
         var fixedRun = new System.Text.StringBuilder(fixedTotal);
@@ -285,6 +289,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
             int take = recorded is not null ? recorded[k] : ContiguousTake(ref excess, unit[k], maxUnits[k]);
             dyn[k] = Slice(record, pos, take);
             pos += take;
+            // THE FIXED FORM (D-FRA (vi); CobolContiguousLayout.ToFixedForm): the member filled its whole field, and
+            // a space in a fixed-size field is padding, never data. ISO's own LINE SEQUENTIAL record does the same
+            // (§14.9.51.4 GR21 — spaces to the right of the rightmost non-space are not transferred).
+            if (fixedForm) dyn[k] = dyn[k].TrimEnd(' ');
         }
         fixedRun.Append(Slice(record, pos, fixedTotal - fpos));
         return new CobolVarGroup(fixedRun.ToString(), dyn);

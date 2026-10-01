@@ -536,8 +536,8 @@ internal static class PlaceRenderer
     public static string VarGroupCurrentExtents(Place group) => group switch
     {
         OdoGroupPlace o => VarGroupCurrentExtents(o.Inner),
-        RedefViewPlace { Coding: VarGroupWindow g } => RuntimeApi.CellVarContiguousExtents(
-            RenderPath(g.Cell, AccessDir.Sending), g.DynBase, g.DynFixedAt),
+        RedefViewPlace { Coding: VarGroupWindow g } v => RuntimeApi.CellVarContiguousExtents(
+            RenderPath(g.Cell, AccessDir.Sending), v.Width, g.DynBase, g.DynFixedAt, g.DynMax),
         _ when !group.Item.CurrentExtentImageCapable => "null",
         _ => $"{Read(group)}.CurrentExtents()",
     };
@@ -546,15 +546,17 @@ internal static class PlaceRenderer
     /// record, decomposed by the generated <c>FromContiguousImage</c> (the ONE decomposition,
     /// <c>CobolContiguousLayout.Decompose</c>; determination D-FRA, kb/Work PB981) by the record's own
     /// <paramref name="extents"/> when they describe it (D-FRA (v), kb/Work PB1053) and by the take step
-    /// otherwise.</summary>
-    public static string WriteVarGroupContiguous(Place group, string record, string extents, string context) => group switch
+    /// otherwise. <paramref name="fixedForm"/> marks a record of a file of FIXED-LENGTH records (D-FRA (vi),
+    /// <c>CobolContiguousLayout.ToFixedForm</c>): each member takes its maximum width and drops the space padding.</summary>
+    public static string WriteVarGroupContiguous(Place group, string record, string extents, string context,
+                                                 bool fixedForm = false) => group switch
     {
-        OdoGroupPlace o => WriteVarGroupContiguous(o.Inner, record, extents, context),
+        OdoGroupPlace o => WriteVarGroupContiguous(o.Inner, record, extents, context, fixedForm),
         // the cell decomposition (kb/Work PB1026) — the same rule, over the cell's dynamic slots
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Sending),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, record, extents)};",
+            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, record, extents, fixedForm)};",
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
-        _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents});",
+        _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents}{(fixedForm ? ", true" : "")});",
     };
 
     /// <summary>⛔ THE ONE READER OF A GROUP OPERAND'S IMAGE IN A <b>SENDING</b> CONTEXT — <see cref="GroupImage"/>,

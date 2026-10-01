@@ -1532,7 +1532,9 @@ public sealed class FileRegistry
             string pf = _physical.PreflightNewLock(st, name);   // §12.4.5.9 GR7 — the statement fails BEFORE the write (§14.9.51 GR15)
             if (pf != FileStatusCode.Success) { c.SetStatus(pf); return pf; }
         }
-        string status = WriteAnyOrg(c, image, length, page, advance, extents);
+        // A file of FIXED-length records carries a variable-length record in its fixed form (D-FRA (vi)).
+        var (medium, mediumExtents) = c.FixedForm(image, extents);
+        string status = WriteAnyOrg(c, medium, length, page, advance, mediumExtents);
         if (wantLock && status.Length > 0 && status[0] == '0' && c.LastWrittenRecordId is { Length: > 0 } recId)
             _physical.LockRecord(st, name, recId);   // GR11 — the just-released record's lock is set
         return status;
@@ -1568,7 +1570,8 @@ public sealed class FileRegistry
                 if (pf != FileStatusCode.Success) { c.SetStatus(pf); return pf; }
             }
         }
-        string status = RewriteAnyOrg(c, image, length, extents);
+        var (medium, mediumExtents) = c.FixedForm(image, extents);   // D-FRA (vi), as WriteShared
+        string status = RewriteAnyOrg(c, medium, length, mediumExtents);
         if (status.Length > 0 && status[0] == '0' && target.Length > 0)
         {
             if (phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name))
