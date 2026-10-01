@@ -27,4 +27,36 @@ public sealed class SingleInstancePictureDriftTests
         Assert.DoesNotMatch(@"""[XN1]\(1\)""", binder);
         Assert.DoesNotMatch(@"\\\(0\*1\\\)", binder);
     }
+
+    /// <summary>The predicate itself, over the spellings §13.18.40.3 SR6 makes one instance (a repetition factor of
+    /// 1 in any spelling) and the ones that are not: more than one occurrence, a zero or empty factor (SR6 requires "an
+    /// unsigned nonzero integer"), an unclosed or spaced factor, a trailing symbol, a symbol outside the caller's set,
+    /// and no PICTURE at all.</summary>
+    [Theory]
+    [InlineData("X", "NX1", true)]
+    [InlineData("x", "NX1", true)]
+    [InlineData("N", "NX", true)]
+    [InlineData("1", "NX1", true)]
+    [InlineData("X(1)", "NX1", true)]
+    [InlineData("X(01)", "NX1", true)]
+    [InlineData("N(001)", "NX", true)]
+    [InlineData("1(1)", "NX1", true)]
+    [InlineData(" X(01) ", "NX1", true)]
+    [InlineData("1", "NX", false)]               // DYNAMIC LENGTH SR1 admits only 'N' or 'X'
+    [InlineData("1(1)", "NX", false)]
+    [InlineData("XX", "NX1", false)]
+    [InlineData("X(2)", "NX1", false)]
+    [InlineData("X(10)", "NX1", false)]
+    [InlineData("X(0)", "NX1", false)]
+    [InlineData("X()", "NX1", false)]
+    [InlineData("X(1", "NX1", false)]
+    [InlineData("X(1)X", "NX1", false)]
+    [InlineData("X (1)", "NX1", false)]
+    [InlineData("X(+1)", "NX1", false)]
+    [InlineData("A", "NX1", false)]
+    [InlineData("9", "NX1", false)]
+    [InlineData("", "NX1", false)]
+    [InlineData(null, "NX1", false)]
+    public void IsSingleInstance_AnswersSr6CountRule(string? picture, string symbols, bool expected)
+        => Assert.Equal(expected, CobolNet.Binding.PictureAnalyzer.IsSingleInstance(picture, symbols));
 }
