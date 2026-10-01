@@ -8033,11 +8033,11 @@
   "rule-digest": "eae971e2dcf0",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#CancelContained; src/Cobol.Net.Runtime/Control/ProgramTable.cs#CancelNode; src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#CobolDynString; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#CobolDynTable",
-  "test-ref": "",
+  "test-ref": "conformance:2014/l1_vldi_initial_program_reverts",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "PERMISSIVE rule: §8.5.1.11.3 says the resources 'MAY be freed automatically when' the listed event occurs, and 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' (Annex A item 220: required, need not be documented). The only binding content is that freeing is unobservable ('this has no effect on the results of the execution of the program') and persistence equals a fixed-length item's. COBOL.NET's variable-length items are managed .NET objects: a dynamic-length item IS a System.String field (CobolDynString), a dynamic-capacity table IS a CobolDynTable<T> (T[] + count); reclamation is by the CLR GC once unreachable, so every listed event is honoured at a GC-determined time, which the implementor-defined timing admits. cite.py --check 8.5.1.11.3 \"The resources used by a variable-length data item may be freed automatically when\" -> OK; --check 8.5.1.11.3 \"The actual time when the resources used by a variable-length data item are freed is implementor-defined\" -> OK; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. Editions: the facility is ISO 2014+ (Annex E item 17 of 2023 records only the SET SIZE enhancement as new, so the items pre-exist in 2014). Event 2 (INITIAL program EXIT PROGRAM/GOBACK): the INITIAL program's activation slot is restored to null on return, dropping the instance that owns the items (the ProgramTable comment: 'the activation's finally restored an INITIAL/RECURSIVE container's slot to null'). Probe probe/vldi/p1.cob: INITIAL program VLDII grows its dynamic table to 5 and stores 'ABCD' in a DYNAMIC LENGTH item, GOBACK; second CALL prints 'INIT CAP=0000000001 LEN=0' both times -- storage released and the next activation starts fresh (persistence equals a fixed-length item's). No existing golden covers an INITIAL program with variable-length items.",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "§8.6.4 + §11.10.4 GR3 + §8.5.1.9.1: an INITIAL program returning by GOBACK (L1VL2I) or by EXIT PROGRAM (L1VL2E, §14.9.14.4 GR3) restarts its dynamic table and dynamic-length item at CAP=00 LEN=00 on every CALL; the non-initial control keeps CAP=05 LEN=04.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.11.3-3",
@@ -8077,12 +8077,12 @@
   "subject": "Variable-length data items",
   "rule-digest": "9ba5e8931667",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#CobolDynString; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#CobolDynTable",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#CobolDynString; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#CobolDynTable; src/Cobol.Net.Runtime/Control/Signals/ResumeSignal.cs#ResumeSignal; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefReceiving; src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#Store",
+  "test-ref": "conformance:2014/l1_vldi_fatal_exception_resumed",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "PERMISSIVE rule: §8.5.1.11.3 says the resources 'MAY be freed automatically when' the listed event occurs, and 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' (Annex A item 220: required, need not be documented). The only binding content is that freeing is unobservable ('this has no effect on the results of the execution of the program') and persistence equals a fixed-length item's. COBOL.NET's variable-length items are managed .NET objects: a dynamic-length item IS a System.String field (CobolDynString), a dynamic-capacity table IS a CobolDynTable<T> (T[] + count); reclamation is by the CLR GC once unreachable, so every listed event is honoured at a GC-determined time, which the implementor-defined timing admits. cite.py --check 8.5.1.11.3 \"The resources used by a variable-length data item may be freed automatically when\" -> OK; --check 8.5.1.11.3 \"The actual time when the resources used by a variable-length data item are freed is implementor-defined\" -> OK; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. Editions: the facility is ISO 2014+ (Annex E item 17 of 2023 records only the SET SIZE enhancement as new, so the items pre-exist in 2014). Event 5 (fatal exception): a fatal exception not handled terminates the run unit (§14.6.13), and with it every managed object; release at run-unit termination is within the implementor-defined timing. Not separately observable.",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "§14.7.5 + Table 13 + §14.6.13.1.3 5) + §14.9.33.4 GR2 a): after a fatal EC-SIZE-ZERO-DIVIDE handled by a declarative that RESUMEs, the dynamic table still reads CAP=02 111222 and the dynamic-length item D=[ABCD] 04 (§8.5.1.11.3 persistence, §8.6.4 static).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.11.3-6",
@@ -8092,12 +8092,12 @@
   "subject": "Variable-length data items",
   "rule-digest": "01b8d874f7d0",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#SetSize; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#SetSize; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#RefReceiving",
+  "test-ref": "conformance:2014/l1_vldi_reduce_regrow; conformance:2023/set_size",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "PERMISSIVE rule: §8.5.1.11.3 says the resources 'MAY be freed automatically when' the listed event occurs, and 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' (Annex A item 220: required, need not be documented). The only binding content is that freeing is unobservable ('this has no effect on the results of the execution of the program') and persistence equals a fixed-length item's. COBOL.NET's variable-length items are managed .NET objects: a dynamic-length item IS a System.String field (CobolDynString), a dynamic-capacity table IS a CobolDynTable<T> (T[] + count); reclamation is by the CLR GC once unreachable, so every listed event is honoured at a GC-determined time, which the implementor-defined timing admits. cite.py --check 8.5.1.11.3 \"The resources used by a variable-length data item may be freed automatically when\" -> OK; --check 8.5.1.11.3 \"The actual time when the resources used by a variable-length data item are freed is implementor-defined\" -> OK; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. Editions: the facility is ISO 2014+ (Annex E item 17 of 2023 records only the SET SIZE enhancement as new, so the items pre-exist in 2014). Event 6 (reduced in size): a dynamic-length shrink returns current[..n], a NEW string, so the old buffer is garbage immediately. A dynamic-capacity table shrink (SetCapacity n<_count) only lowers _count: the T[] backing array is not trimmed and the vacated slots keep their element values (and any string references) until the table itself is collected or the slots are re-seeded by GrowTo. That is RETENTION, which the permissive 'may be freed' plus implementor-defined timing admits; the binding half -- no observable effect -- holds because GrowTo re-seeds every slot in [old,new) through _seedAt before exposure. Probe probe/vldi/p1.cob: MOVE 'AB' TO E(4); SET CP TO 2; SET CP TO 4 -> 'E3=ZZ E4=ZZ' (the VALUE seed, not the stale 'AB'); dynamic-length MOVE 'HELLO', SET SIZE 2, SET SIZE 4 -> 'D=[HE  ]' (§14.9.39.4 GR39 spaces, truncated content not resurrected). Implicit reduction (MOVE of a shorter value) is the Store path, a new string. At --std 2014 SET SIZE is correctly COBOLNET0900 (Annex E item 17). Observation for the owner, not a defect: the untrimmed array means a table shrunk from a huge capacity keeps its peak memory for the table's lifetime -- a quality-of-implementation choice inside the latitude.",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "§8.5.1.9.4 + §14.9.39.4 GR30 + §8.5.1.9.5 (INITIALIZED): explicit SET reduction then regrowth reads 000; implicit reduction by a variable-length group MOVE (§14.6.9.2) gives G=01 888, then H=03 888000999 (never the freed 666); MOVE 'XY' gives length 2; set_size pins SET SIZE (GR39 spaces).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.11.3-7",
@@ -8108,11 +8108,11 @@
   "rule-digest": "560e1b5ee751",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#Store; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage",
-  "test-ref": "",
+  "test-ref": "conformance:2014/dynamic_length_item; conformance:2014/l1_vldi_reduce_regrow",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "PERMISSIVE rule: §8.5.1.11.3 says the resources 'MAY be freed automatically when' the listed event occurs, and 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' (Annex A item 220: required, need not be documented). The only binding content is that freeing is unobservable ('this has no effect on the results of the execution of the program') and persistence equals a fixed-length item's. COBOL.NET's variable-length items are managed .NET objects: a dynamic-length item IS a System.String field (CobolDynString), a dynamic-capacity table IS a CobolDynTable<T> (T[] + count); reclamation is by the CLR GC once unreachable, so every listed event is honoured at a GC-determined time, which the implementor-defined timing admits. cite.py --check 8.5.1.11.3 \"The resources used by a variable-length data item may be freed automatically when\" -> OK; --check 8.5.1.11.3 \"The actual time when the resources used by a variable-length data item are freed is implementor-defined\" -> OK; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. Editions: the facility is ISO 2014+ (Annex E item 17 of 2023 records only the SET SIZE enhancement as new, so the items pre-exist in 2014). Event 7 (overwritten with a new value) + the implementor-defined timing sentence: CobolDynString.Store returns the sender string (or its truncation) and the field is re-assigned, so the previous string is unreachable at once and collected by the GC at a GC-chosen time; a table overwrite (FromCurrentImage/element store) replaces element values in place. Probe probe/vldi/p1.cob: after 'HE  ' a MOVE 'Q' gives 'D=[Q] 1'. The second sentence ('The actual time ... is implementor-defined') is Annex A item 220 'required ... does not have to be documented', so no CONFORMANCE.md row is owed; COBOL.NET's answer is 'when the CLR garbage collector reclaims the unreachable object'.",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "§8.5.1.10.4 + §15.50.4 GR6: a dynamic-length item overwritten by a shorter value or an empty value keeps no residue (3[ABCDEFGHIJ] 3LEN=10, 4[] 4LEN=00); §14.6.9.2: a dynamic table overwritten by a group MOVE gives G=01 888 and never resurrects the freed 666 (H=03 888000999).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.12.1-1",
@@ -28928,11 +28928,11 @@
   "rule-digest": "647818b29969",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RegisterTypeDecl",
-  "test-ref": "",
+  "test-ref": "conformance:negative/l1-typedef-external-subordinate",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py --check 13.18.58.3 \"If the TYPEDEF clause is specified with the EXTERNAL clause, the type declaration shall be at level-number 1\" OK. The compiler confines EVERY TYPEDEF to level 1 (§13.16.3 SR15, --check OK), which subsumes this rule: probe td10extsub ('01 G. 05 T TYPEDEF EXTERNAL PIC X.') -> COBOLNET1529; level-1 TYPEDEF EXTERNAL accepted (td15extnote, td22nois); TYPEDEF STRONG EXTERNAL accepted at 2023 and COBOLNET0900 at 2002/2014 (td21strongext). conformance:negative/pb488-typedef-subordinate covers a subordinate TYPEDEF WITHOUT EXTERNAL, so it does not witness this rule's combination; test-ref empty. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (STRONG with EXTERNAL only from 2023: E.3.3 item 20, --check OK \"External data items may now be strongly typed\"; gated by VersionConformancePass.VisitExternalClause)",
-  "state": "GAP"
+  "notes": "§13.18.58.3 SR3: a level-05 TYPEDEF EXTERNAL entry under group G must be rejected (COBOLNET1529); this pins the TYPEDEF+EXTERNAL combination, which pb488-typedef-subordinate does not.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.58.4-1",
@@ -28958,11 +28958,11 @@
   "rule-digest": "2f15218b7dce",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RegisterTypeDecl",
-  "test-ref": "",
+  "test-ref": "conformance:negative/l1-typedef-name-no-storage",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "cite.py --check 13.18.58.4 \"A type declaration has no storage associated with it\" OK. A TYPEDEF root is registered in TypeDecls and never added to _roots/newRoots (the storage emitter's source) nor to ByName. Probe td06storage ('01 T TYPEDEF PIC X(5).' MOVE \"A\" TO T) -> COBOLNET1639 'T' is not defined: the type-name is not a storage-bearing item. td06len FUNCTION LENGTH(T) = 5 is correct and not storage: §15.50.3 rule 1 (--check OK) admits a type-name as argument-1. No spec-derived test asserts the absence of storage; test-ref empty.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "§13.18.58.4 GR2 + §8.5.3.1 + §8.4.2.1: MOVE to a type-name identifies no storage, so it is rejected (COBOLNET1639); the typed item V in the same source is legal.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.58.4-3",
