@@ -459,9 +459,12 @@ public sealed class FileModel
     /// no frame to carry a control table, so each such record is carried in the FIXED FORM: every member at the
     /// position it has when it holds its maximum size, padded with spaces
     /// (<c>CobolContiguousLayout.ToFixedForm</c>), and a READ takes each member back at that width and drops the
-    /// padding (<c>CobolContiguousLayout.Decompose</c> with <c>fixedForm</c>). The one question the READ landing
-    /// asks (<c>SequentialIoEmitter.EmitRecordAreaStore</c>); the WRITE side needs no answer, because a fixed-type
-    /// connector applies the form to every record it is sent with its layout's extent table.</summary>
+    /// padding (<c>CobolContiguousLayout.Decompose</c> with <c>fixedForm</c>). Its consumers: the READ landing
+    /// (<c>SequentialIoEmitter.EmitRecordAreaStore</c>, which every READ organization and the sort RETURN route through) and
+    /// the indexed key registration (<c>KeyedIoEmitter.KeyWindow</c>: the key sits at ONE position, its fixed-form offset);
+    /// the WRITE side needs no answer, because a fixed-type connector applies the form to every record it is sent with
+    /// its layout's extent table, and a REWRITE's record-name-1 size is <see cref="MaxRecordSize"/>
+    /// (<c>SequentialIoEmitter.RewriteLengthArg</c>).</summary>
     public bool FixedFormRecords =>
         !IsSortMerge && Varying is null && RecordContains is not null && Records.Any(IsVariableLengthRecord);
 

@@ -51,8 +51,8 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
     /// shares, so such a file can neither frame its records as variable-length ones nor carry an extent table: a
     /// second program describing the same file as <c>RECORD CONTAINS 20</c> over <c>PIC X(20)</c> must read the
     /// same bytes. A record with variable-length members therefore occupies the one shape every record of the file
-    /// shares — each member at the position it has when it holds its MAXIMUM size (§13.18.43.4 GR8 b), padded with
-    /// spaces) — and <see cref="Decompose(string, RecordExtents?, bool)"/> takes each member back at that width and
+    /// shares — each member at the position it has when it holds its MAXIMUM size (§8.5.1.10.1 — the number
+    /// §13.18.43.4 GR8 b) sums for the record), padded with spaces — and <see cref="Decompose(string, RecordExtents?, bool)"/> takes each member back at that width and
     /// drops the padding: a space in a fixed-size field is padding, never data.
     /// <para>The characters of a member are its content character for character (a national item holds UTF-16
     /// characters, DOC-A.1-63), so the padding is the space character. Returns <paramref name="image"/> unchanged

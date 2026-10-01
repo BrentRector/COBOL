@@ -295,14 +295,15 @@ of an unsupported facility.
   "required by the operating environment", and the environment's requirement is a function of the file's type and
   size, not of a description the other program does not have). Each such record therefore occupies the ONE shape
   every record of the file shares: every dynamic-length member at the position it has when it holds its MAXIMUM size
-  (§13.18.43.4 GR8 b) — the LIMIT, so that `A` limit 9, `KY` X(3), `C` limit 8 are bytes 1-9, 10-12 and 13-20),
+  (its §8.5.1.10.1 maximum size — the LIMIT — which is the maximum §13.18.43.4 GR8 b) sums for the record, as PB1276 reads it, so
+  that `A` limit 9, `KY` X(3), `C` limit 8 are bytes 1-9, 10-12 and 13-20),
   space padded, the remainder of the integer-1 bytes spaces; a READ takes each member back at that width and drops
   its trailing spaces, so a member that does not end in a space round-trips exactly. **The one loss is stated:** in
   a fixed-size field a trailing space is padding, never data (the same convention as a line sequential record,
   §14.9.51.4 GR21), so `"AB "` is written as `"AB"`'s bytes and reads back with length 2. The form is the same in
   every organization — sequential, relative and indexed — and an indexed RECORD KEY a dynamic member precedes is
   one plain window at its fixed-form offset, the key a second program names; a REWRITE's record-name-1 size is the
-  maximum layout (GR16), and a dynamic-length ELEMENTARY record is its content padded to integer-1 and read back
+  maximum layout (§13.18.43.4 GR13 — the number of bytes in the record — compared by §14.9.35.4 GR16), and a dynamic-length ELEMENTARY record is its content padded to integer-1 and read back
   without the padding. A file whose RECORD clause is Format 2 or 3, or is absent (the implied Format 2 of (iv)),
   keeps (v): its frames are variable-length records. **Rejected readings:** framing the Format 1 file as
   variable-length records with the extent table (the first PB1562 landing: a second program describing the file as

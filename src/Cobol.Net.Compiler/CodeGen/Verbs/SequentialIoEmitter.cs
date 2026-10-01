@@ -655,7 +655,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// record at its current length (GR13 b)/c)).
     /// <para>⛔ A VARIABLE-LENGTH record-name-1 in a FIXED-length file (D-FRA (vi), <see cref="FileModel.FixedFormRecords"/>)
     /// is the size it occupies in the fixed form — every member at its maximum, <see cref="FileModel.MaxRecordSize"/>
-    /// (§13.18.43.4 GR8 b) — never <see cref="RecordLayout.PhysicalWidth"/>, which is only the record's FIXED run:
+    /// (the sum §13.18.43.4 GR8 b) states) — never <see cref="RecordLayout.PhysicalWidth"/>, which is only the record's FIXED run:
     /// a REWRITE of a record that exactly fills the file's integer-1 bytes was refused '44' as "3 bytes".</para></summary>
     private static string RewriteLengthArg(BoundRewrite rw, string? dependingArg) =>
         dependingArg ?? (rw.File.RecordSizeVaries ? "-1"

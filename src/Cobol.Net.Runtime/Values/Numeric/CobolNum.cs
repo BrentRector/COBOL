@@ -665,10 +665,10 @@ public static partial class CobolNum
     private static bool DivisionLosesPrecision(Int128 a, int aScale, Int128 b, int bScale, int resultScale)
     {
         int exp = bScale + resultScale - aScale;
-        // An alignment past the carrier: exact on the 256-bit numerator (the scale-down case — a divisor scaled past
-        // the carrier — leaves the whole dividend as the remainder, which is nonzero for a nonzero dividend).
+        // An alignment past the carrier: exact on the remainder of a × 10^exp (the scale-down case — a divisor scaled
+        // past the carrier — leaves the whole dividend as the remainder, which is nonzero for a nonzero dividend).
         if (a != 0 && (exp >= 0 ? !WideningFits(a, exp) : !WideningFits(b, -exp)))
-            return exp is >= 0 and <= 38 ? CobolDec.QuotientHasRemainder(a, b, exp) : true;
+            return exp < 0 || CobolDec.QuotientHasRemainder(a, b, exp);
         Int128 num = a, den = b;   // wide radix alignment — mirrors Divide exactly
         if (exp >= 0) num *= Pow10Wide(exp); else den *= Pow10Wide(-exp);
         return num % den != 0;

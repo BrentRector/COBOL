@@ -669,12 +669,19 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     }
 
     /// <summary>Does <c>a × 10^exp / b</c> leave a remainder — the exact test <see cref="CobolNum.DivideOrThrow"/>'s
-    /// PROHIBITED check needs when the aligned dividend does not fit <c>Int128</c> (<paramref name="exp"/> ≤ 38).</summary>
+    /// PROHIBITED check needs when the aligned dividend does not fit <c>Int128</c>.</summary>
     public static bool QuotientHasRemainder(Int128 a, Int128 b, int exp)
     {
-        var (hi, lo) = Mul128(UAbs(a), (UInt128)Pow10.AsWide(exp));
-        UInt128 den = UAbs(b);
-        return hi >= den || DivRem256(hi, lo, den).Remainder != 0;   // a quotient of 2^128 or more is no exact result either
+        // a × 10^exp mod |b|, one decimal digit at a time: the running remainder stays below |b| ≤ 2^127, so each step's
+        // product is below 2^131 and its quotient below 10 — inside DivRem256's precondition — for ANY exp, with no
+        // numerator wider than 256 bits to form.
+        UInt128 den = UAbs(b), r = UAbs(a) % den;
+        for (int i = 0; i < exp && r != 0; i++)
+        {
+            var (hi, lo) = Mul128(r, 10);
+            r = DivRem256(hi, lo, den).Remainder;
+        }
+        return r != 0;
     }
 
     /// <summary>The 256-bit magnitude <paramref name="hi"/>:<paramref name="lo"/> modulo 10^38 — the low-order 38 decimal

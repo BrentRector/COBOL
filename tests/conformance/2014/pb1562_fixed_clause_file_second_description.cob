@@ -22,7 +22,11 @@
       *> with "WXYZ" "NEW" "Q" replaces the same 20 bytes. The relative and indexed files open under the plain
       *> description with I-O status 00 - the record key of the writing description (KY) is the bytes 10-12 the
       *> plain description names (PK) - and a dynamic-length ELEMENTARY record in a fixed file is its content
-      *> padded to integer-1, read back without the padding.
+      *> padded to integer-1, read back without the padding. The keyed statements that take a key from the RECORD AREA
+      *> (READ KEY, START, REWRITE, DELETE through a DYNAMIC-access connector) and a relative REWRITE are walked too:
+      *> a REWRITE of "NEW" "KEY" "Z" replaces the same 20 bytes ("NEW" + 6 spaces + "KEY" + "Z" + 7 spaces), the
+      *> record the plain description then reads, and after DELETE of the LOW record only that one is left (XP3 is
+      *> the at-end '10').
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1562SD.
        ENVIRONMENT DIVISION.
@@ -44,6 +48,9 @@
            SELECT XP ASSIGN TO "pb1562sd-idx.dat"
                ORGANIZATION IS INDEXED ACCESS MODE IS SEQUENTIAL
                RECORD KEY IS PK FILE STATUS IS ST.
+           SELECT XD ASSIGN TO "pb1562sd-idx.dat"
+               ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+               RECORD KEY IS DK FILE STATUS IS ST.
            SELECT DW ASSIGN TO "pb1562sd-dyn.dat"
                ORGANIZATION IS SEQUENTIAL FILE STATUS IS ST.
            SELECT DP ASSIGN TO "pb1562sd-dyn.dat"
@@ -74,6 +81,11 @@
            05 FILLER PIC X(9).
            05 PK  PIC X(3).
            05 FILLER PIC X(8).
+       FD  XD RECORD CONTAINS 20 CHARACTERS.
+       01  XDR.
+           05 DA  PIC X DYNAMIC LENGTH LIMIT 9.
+           05 DK  PIC X(3).
+           05 DC  PIC X DYNAMIC LENGTH LIMIT 8.
        FD  DW RECORD CONTAINS 12 CHARACTERS.
        01  DWR PIC X DYNAMIC LENGTH LIMIT 12.
        FD  DP RECORD CONTAINS 12 CHARACTERS.
@@ -142,6 +154,38 @@
            DISPLAY "XP-OPEN " ST.
            READ XP.
            DISPLAY "XP1 [" XPR "] KEY=[" PK "] " ST.
+           CLOSE XP.
+           OPEN I-O RW.
+           READ RW.
+           MOVE "WXYZ" TO RA. MOVE "REL" TO RK. MOVE "Q" TO RC.
+           REWRITE RWR.
+           DISPLAY "RRW " ST.
+           CLOSE RW.
+           OPEN INPUT RP.
+           READ RP.
+           DISPLAY "RP1 [" RPR "] " ST.
+           CLOSE RP.
+           OPEN I-O XD.
+           MOVE "ZZZ" TO DA. MOVE "KEY" TO DK. MOVE "Y" TO DC.
+           READ XD KEY IS DK.
+           DISPLAY "D1 A=[" DA "] K=[" DK "] C=[" DC "] " ST.
+           MOVE "NEW" TO DA. MOVE "KEY" TO DK. MOVE "Z" TO DC.
+           REWRITE XDR.
+           DISPLAY "XRW " ST.
+           MOVE "ZZZ" TO DA. MOVE "???" TO DC. MOVE "KEY" TO DK.
+           READ XD KEY IS DK.
+           DISPLAY "D2 A=[" DA "] K=[" DK "] C=[" DC "] " ST.
+           MOVE "LOW" TO DK.
+           START XD KEY IS EQUAL TO DK.
+           DISPLAY "XST " ST.
+           DELETE XD.
+           DISPLAY "XDEL " ST.
+           CLOSE XD.
+           OPEN INPUT XP.
+           READ XP.
+           DISPLAY "XP2 [" XPR "] KEY=[" PK "] " ST.
+           READ XP.
+           DISPLAY "XP3 " ST.
            CLOSE XP.
            OPEN OUTPUT DW.
            MOVE "HELLO" TO DWR.

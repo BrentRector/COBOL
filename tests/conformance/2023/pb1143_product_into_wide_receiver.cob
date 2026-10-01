@@ -17,6 +17,8 @@
       *>     P * Q2 = 12193263113702179527312909616606462429.50
       *>       NEAREST-EVEN (429 is odd) -> ...462430; NEAREST-AWAY -> ...462430; NEAREST-TOWARD-ZERO -> ...462429;
       *>       TOWARD-LESSER -> ...462429; TOWARD-GREATER -> ...462430.
+      *>   COMPUTE R ROUNDED MODE IS AWAY-FROM-ZERO R2 = P * Q: R is ...190825 and R2, with no phrase of its own, ...190824
+      *>     (each receiver of the one evaluation is rounded at its own mode).
       *>   G = H = 99999999999999999999: G * H is 40 digits, past what ANY receiver holds: the size error.
       *> The receivers' digits are shown as HI = R / 10**7 and LO = R mod 10**7 (a COMP-5 value past its PICTURE
       *> would display its low 31 digits only).  Every statement is a single-receiver product (the final transfer) or
@@ -56,6 +58,13 @@
            MOVE E5 TO R
            PERFORM SHOW
            DISPLAY "T4 MULTIPLY BY"
+           MOVE 7 TO R
+           MOVE 7 TO R2
+           COMPUTE R ROUNDED MODE IS AWAY-FROM-ZERO R2 = P * Q
+           PERFORM SHOW
+           MOVE R2 TO R
+           PERFORM SHOW
+           DISPLAY "T5a COMPUTE two receivers, each with its own mode"
            MOVE 7 TO R
            MOVE 7 TO R2
            COMPUTE R R2 = E * F

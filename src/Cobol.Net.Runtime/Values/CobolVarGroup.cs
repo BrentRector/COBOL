@@ -291,7 +291,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
             pos += take;
             // THE FIXED FORM (D-FRA (vi); CobolContiguousLayout.ToFixedForm): the member filled its whole field, and
             // a space in a fixed-size field is padding, never data. ISO's own LINE SEQUENTIAL record does the same
-            // (§14.9.51.4 GR21 — spaces to the right of the rightmost non-space are not transferred).
+            // (§14.9.51.4 GR21 — spaces to the right of the rightmost non-space are not transferred). Every component
+            // of a FILE record is a dynamic-length ELEMENTARY item — a dynamic-capacity table "may be defined in any
+            // place, other than the file section" (§8.5.1.9.1 3), COBOLNET1526 — so the trim never meets a table whose
+            // blank elements are data; `fixedForm` is passed for a file record and nothing else.
             if (fixedForm) dyn[k] = dyn[k].TrimEnd(' ');
         }
         fixedRun.Append(Slice(record, pos, fixedTotal - fpos));
