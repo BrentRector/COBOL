@@ -48,7 +48,7 @@ BRIEFS = {
                            r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
                            r"status: 'NO-RESULT', error"],
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
-    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py'],  # O8; PB1732; I9, O9
+    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py'],  # O8; PB1732; I9, O9, O10
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.
