@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Self-test for dispatch_guard.py — a fleet dispatch without the workstream skill, or an implementer/lander dispatch
 without a checked brief, is blocked; a compliant dispatch and every other role pass.
-Run: python scripts/hooks/test_dispatch_guard.py   (CI `audits` job and build-local run it too.)"""
+Run: python scripts/hooks/test_dispatch_guard.py   (needs the tools/claude-skills submodule, like check_practices.py;
+CI's fleet-practices step runs it after `git submodule update --init tools/claude-skills`.)"""
 import json
 import pathlib
 import subprocess
