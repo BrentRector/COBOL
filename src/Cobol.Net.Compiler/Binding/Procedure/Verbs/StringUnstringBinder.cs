@@ -381,9 +381,12 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     /// A reference-modified operand answers with identifier-1's own usage, which is what §8.4.3.3.4 GR6 gives
     /// the unique data item ("the same class, category, and usage as that defined for identifier-1").</item>
     /// </list>
-    /// <para>A GROUP is EXEMPT: usage is an elementary property, and §14.9.43.4 GR3a defines the transfer "in
-    /// accordance with the MOVE statement rules for alphanumeric-to-alphanumeric moves", which admit a group —
-    /// including one holding a BINARY/PACKED leaf (V59).</para>
+    /// <para>An ALPHANUMERIC or NATIONAL GROUP is EXEMPT: §8.5.2.1 treats an alphanumeric group as usage display,
+    /// and §14.9.43.4 GR3a defines the transfer "in accordance with the MOVE statement rules for
+    /// alphanumeric-to-alphanumeric moves", which admit a group — including one holding a BINARY/PACKED leaf (V59).
+    /// A STRONGLY-TYPED group is NOT: its class is its type-name and nothing gives it a usage, so SR1 reads the
+    /// usage off its elementary items and refuses one holding a leaf that is neither display nor national
+    /// (kb/Work PB244).</para>
     /// <para>A FUNCTION-IDENTIFIER is not screened here and that is deliberate: SR1's antecedent is a
     /// DESCRIPTION ("shall be described … as usage display or national"), and a function result has no data
     /// description entry to read a usage from (§8.4.3.2.1 — "the unique data item that results from the
@@ -398,8 +401,40 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             && pic.Usage is not (Usage.Display or Usage.National) =>
             $"is an elementary item of USAGE {pic.Usage}, which has no character image; SR1 requires every "
             + "identifier except the POINTER to be usage display or national",
+        // ⛔ A STRONGLY-TYPED GROUP HAS NO USAGE OF ITS OWN (kb/Work PB244): §8.5.2.1 gives "an alphanumeric group
+        // item" the usage of display ("is treated as though it had a usage of display") and a national group its
+        // class national, but the class AND category of a strongly-typed group are its type-name, so SR1's
+        // "described implicitly or explicitly as usage display or national" can only be read off the elementary
+        // items it is made of. A strong group holding a POINTER / OBJECT REFERENCE / BINARY ... leaf is therefore
+        // not described as usage display, and was compiled and then aborted at run time in the Tier-C whole-group
+        // island ("whole-group image ... with a pointer/object-class leaf"). The strong group whose every leaf is
+        // display or national satisfies the sentence and keeps working.
+        BoundFieldOperand { Place: { } p } when p.DenotedItem is not null && StrongTypeModel.IsStrongGroup(p.Item)
+            && FirstLeafOutsideDisplayOrNational(p.Item) is { } leaf =>
+            $"is a strongly-typed group item holding '{leaf.CobolName ?? leaf.CsName}' of USAGE {leaf.Pic!.Usage}, "
+            + "which has no character image; SR1 requires every identifier except the POINTER to be usage display "
+            + "or national, and a strongly-typed group's usage is that of the elementary items it is made of "
+            + "(§8.5.2.1 gives only an alphanumeric group the usage of display)",
         _ => null,
     };
+
+    /// <summary>The first elementary item beneath <paramref name="group"/> (declaration order, REDEFINES views
+    /// excluded: they occupy no storage of their own) whose usage is neither display nor national — null when the
+    /// group is made wholly of character-form items. A leaf stored as a character image (<c>StoreAsImage</c>) is a
+    /// DISPLAY or NATIONAL numeric by construction and passes.</summary>
+    private static DataItem? FirstLeafOutsideDisplayOrNational(DataItem group)
+    {
+        foreach (var c in group.Children.Where(c => c.RedefinesTargetName is null))
+        {
+            if (c.IsGroup)
+            {
+                if (FirstLeafOutsideDisplayOrNational(c) is { } inner) return inner;
+            }
+            else if (!c.StoreAsImage && c.Pic is { } pic && pic.Usage is not (Usage.Display or Usage.National))
+                return c;
+        }
+        return null;
+    }
 
     /// <summary>The ONE report site for SR1's FIRST sentence (ISO §14.9.43.3 — the usage / literal-kind rule) — so
     /// the three identifier positions and the two literal positions cannot drift onto different diagnostics for
@@ -455,6 +490,13 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     /// a change of verdict for existing source, so it is recorded rather than made silently.</para></summary>
     private static string? Sr2OffendingCategory(DataItem item) => item.Pic switch
     {
+        // ⛔ A STRONGLY-TYPED GROUP is none of the three (kb/Work PB244): §8.5.2.1 — "Both the class and the category
+        // of a strongly-typed group item are the type-name specified in the TYPE clause", and only the groups that
+        // are NOT strongly typed are alphanumeric, boolean or national. SR2 admits category alphanumeric or
+        // national only, so it offends by construction (it compiled and aborted at run time when it held a
+        // pointer leaf, and quietly examined the image of one that did not).
+        null when StrongTypeModel.IsStrongGroup(item) =>
+            $"'{StrongTypeModel.TypeAnchor(item)?.TypeName ?? item.CobolName}' — the type-name of a strongly-typed group item (§8.5.2.1)",
         null => item.GroupUsage is GroupUsage.Bit ? "boolean (a bit group, §13.18.29.4 GR1 a)" : null,
         { Category: PicCategory.Alphanumeric or PicCategory.National, EditMask: null } => null,
         { Category: PicCategory.Alphanumeric or PicCategory.National } p =>

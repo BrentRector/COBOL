@@ -290,11 +290,16 @@ content-validation half is separately answered by the declined A.4.14 facility (
 
 - **D-N1 national**: an elementary national item's VALUE CARRIER is a plain C# `string` of `Length` characters —
   .NET strings are natively UTF-16, so "two bytes per character position" is the documented implementor choice
-  (§13.18.60.4 GR8 + §8.1.2 NOTE 2). `ImageWidth` counts CHARACTER POSITIONS and is never byte-doubled;
-  `ByteWidth` counts the STORAGE the item occupies and is `2 × Length`. **The two are equal for every other leaf
-  kind, and national is the ONE place they differ — so which one a site reads is a real decision, not a style
-  choice.** A site counting what an item OCCUPIES reads `ByteWidth`; a site counting the carrier's positions
-  reads `ImageWidth`.
+  (§13.18.60.4 GR8 + §8.1.2 NOTE 2). An ELEMENTARY national item's `ImageWidth` counts CHARACTER POSITIONS
+  (never byte-doubled); `ByteWidth` counts the STORAGE the item occupies and is `2 × Length`. **For an elementary
+  item the two are equal for every other leaf kind, and national is the ONE place they differ.** A GROUP's
+  `ImageWidth` is in the unit of its class (kb/Work PB1665, `RecordLayout.ImageWidth` — the one copy of the rule,
+  `DataItem.ImageWidth` is that answer): a `GROUP-USAGE NATIONAL` group is as-if `PICTURE N(m)`, so its width is
+  national POSITIONS; any other group is an ALPHANUMERIC group (§8.5.2.1), a string of STORAGE characters in which
+  a national position counts as the two it occupies — so for an alphanumeric group `ImageWidth == ByteWidth`, and
+  every consumer of a group's image (MOVE, comparison, boundary windows, ref-mod positions, RENAMES) sizes by
+  it. A site counting what an elementary item OCCUPIES reads `ByteWidth`; a site counting an elementary
+  carrier's positions reads `ImageWidth`.
 - **D-N6 national-edited IS category National carrying an `EditMask`** (kb/Work PB492, 2026-09-12). §8.5.2.11's
   category has no `PicCategory` member of its own, exactly as alphanumeric-edited has none: an item is
   national-edited iff `{ Category: National, EditMask: not null }` and alphanumeric-edited iff
@@ -372,9 +377,11 @@ content-validation half is separately answered by the declined A.4.14 facility (
     read by every site that VIEWS an item through its characters (reference modification §8.4.3.3.4 GR3/GR5a, a
     RENAMES span's `NumericImagePlace`, a STRING receiver). ⚠ It is **not** read by the sites that decide whether
     the carrier may be REPLACED by that string (`MarkImageForced` / `StorageFormPass`'s whole-group promotion):
-    promotion pins the carrier at `ImageWidth` CHARACTER positions, which is the whole storage of a DISPLAY item
-    and half of a national one, and promoting a national-form numeric leaf was measured to corrupt a plain
-    group-to-group MOVE between two of them. Those sites stay DISPLAY-only and say so.
+    promotion pins the carrier at the leaf's `ImageWidth` CHARACTER positions, which is the whole storage of a
+    DISPLAY item and half of a national one. A national-form numeric leaf IS promoted since kb/Work PB1665 made
+    an alphanumeric group's `ImageWidth` count storage characters (the group MOVE that corrupted across such a
+    leaf is sized by the image it carries), which is what lets `IS NUMERIC` read its stored characters
+    (kb/Work PB1466); only `USAGE INDEX` stays out.
   - only the **CHARACTER→BYTE step differs**, and it is applied ONCE, by the one national coding, at every byte
     boundary: `NationalWindow.PositionsOf` (now a single test — `Pic.Usage is National` → `ElementaryImageWidth`,
     the count §13.18.40.4 GR1 defines and §15.50.4 r2 returns) plus `CobolBits.NatBytes`/`NatReadWindow`.
@@ -503,15 +510,15 @@ content-validation half is separately answered by the declined A.4.14 facility (
   through the same `CobolBits.NatBytes` / `NatReadWindow` pair the Tier-B window and the cell seed ride.
   **The width authority moved with it:** `RecordLayout.PhysicalWidth`/`OffsetOf` and
   `PhysicalModel.BuildPhysicals` read `ByteWidth`, which IS `ImageWidth` for every other leaf kind — so the
-  change is byte-identical for national-free programs, and `ImageWidth` stays the CARRIER authority
-  (`StorageFormPass`'s form widths, §13.18.29.4 GR2b's as-if `PICTURE N(m)` length).
-  <br>⛔ **`ImageWidth` was NOT byte-doubled**, which is what kept the blast radius bounded: the four decisions
-  PB231 said would move together did not all move. What DID move is the ALPHANUMERIC group's operand value —
-  DISPLAY, group MOVE, group comparison and group ref-mod now see the bytes — and that is the answer
-  §13.18.29.4 GR2's own NOTE predicts ("Without the GROUP-USAGE NATIONAL clause, the content of such a group
-  item would be treated as category alphanumeric, possibly leading to corruption or invalid handling of
-  data"). It also removed a real disagreement: `FUNCTION LENGTH(G)` answered 8 for
-  `01 G. 05 A PIC X(2). 05 N PIC N(3).` while `MOVE G TO R` moved 5 characters.
+  change is byte-identical for national-free programs, and an ELEMENTARY item's `ImageWidth` stays the CARRIER
+  authority (`StorageFormPass`'s form widths). A GROUP's `ImageWidth` is in the unit of its class
+  (`RecordLayout.ImageWidth`, kb/Work PB1665): national positions for a `GROUP-USAGE NATIONAL` group (§13.18.29.4
+  GR2b's as-if `PICTURE N(m)` length), storage characters for an ALPHANUMERIC group — whose operand value is its
+  bytes: DISPLAY, group MOVE, group comparison, the CALL boundary windows and group ref-mod all see the bytes,
+  the answer §13.18.29.4 GR2's own NOTE predicts ("Without the GROUP-USAGE NATIONAL clause, the content of such
+  a group item would be treated as category alphanumeric, possibly leading to corruption or invalid handling of
+  data"). `FUNCTION LENGTH(G)` and the width a `MOVE G TO R` copies are therefore one number: 8 for
+  `01 G. 05 A PIC X(2). 05 N PIC N(3).`.
   <br>A **national group** keeps its character alphabet through a second generated face, `AsNat()`/`FromNat()`,
   exactly as a bit group keeps its boolean alphabet through `AsBits()`/`FromBits()` — §13.18.29.4 GR2b's as-if
   `PICTURE N(m)`, reached by `Place.NatImagePlace` / `PlaceRenderer.SendingNat`. CONFORMANCE.md DOC-A.1-57's
@@ -736,8 +743,8 @@ comparisons, INSPECT/STRING/UNSTRING legality, LENGTH, ref-mod). Therefore:
 - `DataItem.AsIfPic : PicInfo?` — the GR1b/GR2b picture: `new PicInfo(PicCategory.Boolean, Usage.Bit, m, 0, 0, false)` for a bit
   group, `new PicInfo(PicCategory.National, Usage.National, m, 0, 0, false)` for a national group, null
   otherwise — where m is the group's BIT extent (`BitLayout.ExtentBits` WITHOUT rule 4: §8.5.1.6.3's trailing
-  filler is excluded for "a record that is entirely a bit group") or its NATIONAL length (`ImageWidth` — national
-  leaves already contribute CHARACTER positions to a group image, never byte-doubled, and every subordinate is
+  filler is excluded for "a record that is entirely a bit group") or its NATIONAL length (`ImageWidth` of a
+  national group — beneath a national group every leaf is counted in national positions, and every subordinate is
   usage national by SR3). Computed lazily from the forest (no new pass): the extent is a pure function of the
   children, exactly as `ImageWidth`/`ByteWidth` are today.
 - **`DataItem.OperandPic => Pic ?? AsIfPic`** — THE ONE READER for category. Every site that today asks
@@ -840,8 +847,8 @@ evaluation are bit positions". So `ReferenceResolver` wraps a bit group in `BitI
 of `GroupImagePlace`, and because `RefModPlace` sits OVER it, the start/length index the boolean string directly:
 GR5a is satisfied STRUCTURALLY, and §8.4.3.3.4 GR6's unique item really does keep usage bit / category boolean.
 ⛔ **A NATIONAL group deliberately keeps `GroupImagePlace`** — §13.18.29.4 GR2b's as-if `PICTURE N(m)` is in
-NATIONAL positions and `DataItem.IsCharacterImage` guarantees a national leaf contributes `ImageWidth = Length`
-character positions, "never byte-doubled", so its `AsImage()` already IS its national-position string. The
+NATIONAL positions and a national group's `ImageWidth` counts its national leaves as `Length` character positions
+(only an enclosing ALPHANUMERIC group doubles them — kb/Work PB1665), so its `AsNat()` is its national-position string. The
 asymmetry is derived, not an oversight, and it is written into the type's XML doc so the split is not
 "simplified" back: two types because they carry two UNITS, which is GR5a's own two-branch sentence.
 This also DELETED the PB157 containment it made unnecessary — `ArithmeticBinder`'s 0899 stage, the

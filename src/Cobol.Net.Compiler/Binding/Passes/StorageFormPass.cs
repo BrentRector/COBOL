@@ -129,17 +129,19 @@ internal static class StorageFormPass
     /// over garbage. The storage image holds every content, and the class test reads it
     /// (<c>CobolNum.IsNumericImage</c>, keyed on the byte form). The price is DISPLAY's own: arithmetic on such a
     /// leaf decodes and encodes its image.</para>
-    /// <para>⚠ NATIONAL IS STILL EXCLUDED — the CARRIAGE question (kb/Work PB646): promotion replaces the carrier
-    /// with a string of the leaf's ImageWidth character positions, which is HALF of a national leaf's storage (D-N1
-    /// — two bytes per position), and a character-image group's MOVE is sized by that position count while its
-    /// AsImage serializes national positions as byte pairs, so a group-to-group MOVE across a promoted national
-    /// numeric leaf truncates the group (measured, w65e probe p9 — the same width disagreement already truncates a
-    /// group with a PIC N leaf, reported as a lead). USAGE INDEX is class index, never a numeric operand of a class
-    /// test, and keeps its IndexCell. Floating-point leaves keep their native carrier, which holds every IEEE bit
-    /// pattern its usage can store.</para></summary>
+    /// <para>⛔ NATIONAL IS PROMOTED TOO (kb/Work PB1466 arm 1, unblocked by kb/Work PB1665). It was excluded because
+    /// promotion pins the carrier at the leaf's ImageWidth character POSITIONS — half of a national leaf's storage
+    /// (D-N1, two bytes per position) — and a group MOVE was sized by that position count while the group's
+    /// AsImage serialized national positions as byte pairs, so a MOVE across a promoted national numeric leaf
+    /// truncated the group. A group's ImageWidth is now the storage characters of its image
+    /// (<see cref="RecordLayout.ImageWidth"/>), so the carrier of a promoted national numeric leaf (its positions,
+    /// the string the codec serializes as UTF-16BE pairs) and the width every group consumer sizes by agree.
+    /// USAGE INDEX is class index, never a numeric operand of a class test, and keeps its IndexCell.
+    /// Floating-point leaves keep their native carrier, which holds every IEEE bit pattern its usage can
+    /// store.</para></summary>
     private static bool IsImagePromotable(DataItem item) =>
         !item.IsGroup && item.Pic is { Category: PicCategory.Numeric, IsFloat: false, HasImageByteForm: true } p
-        && p.Usage is not (Usage.National or Usage.Index);
+        && p.Usage is not Usage.Index;
 
     /// <summary>The STORAGE-level twin of <see cref="HarmonizeOverrideCrossings"/> (P5.7): the identical
     /// override-chain + implements-pair fixed point, deciding string-carriage off the just-classified
@@ -298,12 +300,6 @@ internal static class StorageFormPass
             ? item.Storage!.IsCharacterImage
             : item.IsGroup && item.Children.All(IsCharacterImageOf));
 
-    /// <summary>Reproduces <c>DataItem.ImageWidth</c> off <see cref="StorageForm"/> — single-sourced through the
-    /// PHASE-05 §2.6 width authority <see cref="RecordLayout.ImageWidth"/> (leaf = its form's width; group = the sum
-    /// over NON-redefining children of child image width × the child's own OCCURS count). The Step-2 corpus assert
-    /// (<see cref="Verify"/> identity #3) thus also proves <c>RecordLayout.ImageWidth == DataItem.ImageWidth</c>.</summary>
-    public static int ImageWidthOf(DataItem item) => RecordLayout.ImageWidth(item);
-
     /// <summary>Reproduces <c>DataItem.ElementType</c> off <see cref="StorageForm"/> (a group is its record-struct
     /// name; an elementary is its form's CLR type — a promoted numeric leaf is "string", not its Pic.ClrType).</summary>
     public static string ElementTypeOf(DataItem item) =>
@@ -349,8 +345,8 @@ internal static class StorageFormPass
             }
             if (IsCharacterImageOf(item) != item.IsCharacterImage)
                 d.Add($"#2 IsCharacterImage: {Desc(item)} derived={IsCharacterImageOf(item)} legacy={item.IsCharacterImage}");
-            if (ImageWidthOf(item) != item.ImageWidth)
-                d.Add($"#3 ImageWidth: {Desc(item)} derived={ImageWidthOf(item)} legacy={item.ImageWidth}");
+            // (identity #3 — RecordLayout.ImageWidth == DataItem.ImageWidth — RETIRED at kb/Work PB1665: the copy
+            //  is deleted, DataItem.ImageWidth IS RecordLayout.ImageWidth, so the comparison became tautological.)
             // #5 (PHASE-05 Step 4): the RecordLayout §2.6 width authority reproduces the legacy tier-aware physical
             // (identity #5 — RecordLayout.PhysicalWidth == OdoModel.PhysicalWidth — RETIRED at P5.9: the last
             //  duplicate copy is deleted; RecordLayout is the single width/offset authority.)

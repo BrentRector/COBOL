@@ -1,0 +1,10 @@
+M=[AB][CD][EF]
+EQ
+RT=[AB][CD][EF]
+S1=[AB][CD][EF]
+R1=[AB][CD][EF]
+RM=[EF]
+NG=[L][R]
+NN=[12][3]
+LEN=0009
+TAIL=[FG ]

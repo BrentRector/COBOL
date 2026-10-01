@@ -31,6 +31,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     public string ImageInitOf(DataItem item, bool useValues = true, Subscripts subs = default,
         SeedRecipe recipe = SeedRecipe.InitialState)
     {
+        recipe = ValueInitializer.RecipeFor(item, recipe);   // a CONSTANT RECORD root: §13.18.15.4 GR1 (kb/Work PB1233)
         // ⛔ A FORMAT 2 (table) VALUE GIVES EACH OCCURRENCE ITS OWN IMAGE — §13.18.63.4 GR12 ("A format 2 VALUE
         // clause initializes a table element to the value of literal-1"), GR13 (cyclic reuse under TO), GR14
         // (no TO = fill to the maximum), GR15 (a later FROM wins on overlap). This method read only

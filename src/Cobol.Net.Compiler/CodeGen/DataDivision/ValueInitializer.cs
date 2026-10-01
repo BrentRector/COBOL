@@ -14,7 +14,8 @@ namespace CobolNet.CodeGen;
 /// (action 1), then every VALUE clause, a group-level VALUE included (§13.18.63.4 GR5).</item>
 /// <item><see cref="Initialize"/> — the new element of a dynamic-capacity table whose OCCURS carries INITIALIZED:
 /// §8.5.1.9.5, "as though they had been the subject of a statement of the form INITIALIZE … WITH FILLER ALL TO
-/// VALUE THEN TO DEFAULT". §14.9.20.4 GR5 c) 1. b qualifies a leaf by "a data-item format VALUE clause … in the
+/// VALUE THEN TO DEFAULT" — and the whole content of a CONSTANT RECORD, §13.18.15.4 GR1 (kb/Work PB1233,
+/// chosen once at the root by <see cref="ValueInitializer.RecipeFor"/>). §14.9.20.4 GR5 c) 1. b qualifies a leaf by "a data-item format VALUE clause … in the
 /// data description entry of the ELEMENTARY data item" (so a group-level VALUE is not an INITIALIZE sender), GR6
 /// a) 3. makes that leaf's sender "a literal that, when moved to the receiving-operand with a MOVE statement,
 /// produces the same result as the initial value of the data item as produced by the application of the VALUE
@@ -43,6 +44,19 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// One instance per emitter so its section-root sets are built once.</summary>
     public InitialStateBackground Background { get; } = new(ctx);
 
+    /// <summary>⛔ THE ONE CHOICE OF SEED RECIPE FOR A ROOT (kb/Work PB1233) — asked at the two roots every seed
+    /// enters through, <see cref="FieldInit"/> (the record-struct lane) and <see cref="GroupImageCodec.ImageInitOf"/>
+    /// (the image lane), so the lanes cannot answer it differently. A record described with CONSTANT RECORD has
+    /// the content "as though the clause had been omitted and the record had been the subject of an INITIALIZE
+    /// statement that is specified with" the FILLER phrase, the VALUE phrase with ALL and the DEFAULT phrase
+    /// (§13.18.15.4 GR1) — i.e. <see cref="SeedRecipe.Initialize"/>, not the initial state: a VALUE-less numeric-
+    /// edited item takes the edited ZERO of §14.9.20.4 GR6 c), no OPTIONS INITIALIZE background reaches it (the
+    /// INITIALIZE overwrites it), and a group-level VALUE is no sender (GR5 c) 1. b). The flag lives on the
+    /// level-01 root (<see cref="DataItem.IsConstantRecord"/>) and a root is where every seed starts, so the
+    /// choice is made once here and rides the <paramref name="requested"/> recipe down the subtree.</summary>
+    internal static SeedRecipe RecipeFor(DataItem root, SeedRecipe requested) =>
+        root.IsConstantRecord ? SeedRecipe.Initialize : requested;
+
     /// <summary>The C# initializer for a field: an array literal for an OCCURS table (every element initialized so
     /// none is left at <c>default</c>), a composed object-initializer for a group, else the elementary VALUE.
     /// <para><paramref name="outer"/> is the OCCURRENCE CONTEXT — the subscripts of every OCCURS level already
@@ -56,6 +70,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// everywhere except inside the INITIALIZED seed of a dynamic-capacity table's new elements.</param>
     public string FieldInit(DataItem item, Subscripts outer = default, SeedRecipe recipe = SeedRecipe.InitialState)
     {
+        recipe = RecipeFor(item, recipe);
         // A DYNAMIC-capacity table (§13.18.38 Format 4, D9): an out-of-line CobolDynTable seeded per occurrence with
         // the SAME one-occurrence initializer the fixed path repeats (heed DEVLOG 643 — seed EVERY occurrence). Opens
         // at FROM (min), raised to the §13.18.63.4 GR16 initial capacity when a table VALUE applies; TO is the

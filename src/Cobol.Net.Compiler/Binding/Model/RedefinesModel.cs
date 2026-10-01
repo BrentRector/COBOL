@@ -15,6 +15,28 @@ public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int Start, 
 
     /// <summary>A part that covers only some characters of its occurrence (renders as the cell's ref-mod view).</summary>
     public bool IsPartial => Occurrence is not null && (Start != 1 || Length != Leaf.ImageWidth);
+
+    /// <summary>Storage bytes per character position of <paramref name="leaf"/> — 1, or
+    /// <c>CobolBits.BytesPerNational</c> for a national leaf (D-N1). The one conversion between the unit a RENAMES
+    /// window is tiled in (storage bytes: it is a re-grouping of the record's STORAGE, §13.18.45.4 GR2) and the unit
+    /// a part is kept in (its leaf's own positions, which is what a ref-mod view of the leaf indexes).</summary>
+    private static int BytesPerPosition(DataItem leaf) =>
+        leaf.ImageWidth > 0 ? leaf.ByteWidth / leaf.ImageWidth : 1;
+
+    /// <summary>This part's extent in STORAGE bytes — what it contributes to the alias's image
+    /// (<see cref="Length"/> × bytes per position).</summary>
+    public int Bytes => Length * BytesPerPosition(Leaf);
+
+    /// <summary>A part from a tiling stated in storage BYTES (<paramref name="startByte"/> 1-based within the
+    /// occurrence), expressed in the leaf's own positions; null when a boundary falls inside a character position
+    /// (the odd byte of a national character), which is no range of that item.</summary>
+    public static RenamesSpanPart? FromBytes(DataItem leaf, int? occurrence, int startByte, int lengthBytes)
+    {
+        int u = BytesPerPosition(leaf);
+        return (startByte - 1) % u != 0 || lengthBytes % u != 0
+            ? null
+            : new RenamesSpanPart(leaf, occurrence, (startByte - 1) / u + 1, lengthBytes / u);
+    }
 }
 
 /// <summary>

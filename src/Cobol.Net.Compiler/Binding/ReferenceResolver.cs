@@ -1097,7 +1097,7 @@ public sealed class ReferenceResolver(DataBinder data)
                     return null;
                 if (part.IsPartial) cell = new RefModPlace(cell, part.Start.ToString(), part.Length.ToString());
                 leafPlaces.Add(cell);
-                widths.Add(part.Length);
+                widths.Add(part.Bytes);   // STORAGE bytes — the unit the alias's image is in (kb/Work PB1665)
                 continue;
             }
             // An OCCURS leaf inside the span contributes EVERY occurrence in order (§13.18.45 — the alias covers
@@ -1106,7 +1106,7 @@ public sealed class ReferenceResolver(DataBinder data)
             for (int k = 1; k <= occ; k++)
             {
                 if (SpanLeafPlace(leaf, leaf.Occurs is null ? [] : [k.ToString()], out gap) is not { } lp) return null;
-                widths.Add(leaf.ImageWidth);   // a whole part: every occurrence, at the leaf's width (kb/Work PB96)
+                widths.Add(leaf.ByteWidth);   // a whole part: every occurrence, at the leaf's storage width (kb/Work PB96, PB1665)
                 leafPlaces.Add(lp);
             }
         }

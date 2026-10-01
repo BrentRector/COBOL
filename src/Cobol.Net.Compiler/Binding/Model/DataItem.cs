@@ -98,8 +98,8 @@ public sealed class DataItem
     /// the bit length of the group" / "of usage national … PICTURE N(m), where m is the length of the group" —
     /// null for every other item. m is the group's bit extent (the §8.5.1.6.3 walk WITHOUT the trailing filler,
     /// whose NOTE excludes "a record that is entirely a bit group") or its national positions (<see cref="ImageWidth"/>
-    /// — national leaves contribute character positions to a group image, never byte-doubled). A pure function of the
-    /// children, exactly as the width members are.</summary>
+    /// of a national group counts national POSITIONS — only an enclosing ALPHANUMERIC group doubles them to the
+    /// storage characters they occupy). A pure function of the children, exactly as the width members are.</summary>
     public PicInfo? AsIfPic => GroupUsage switch
     {
         GroupUsage.Bit => new PicInfo(PicCategory.Boolean, Usage.Bit, BitLayout.ExtentBits(this), Digits: 0, Scale: 0, Signed: false),
@@ -331,9 +331,11 @@ public sealed class DataItem
     public bool ExternalFromType { get; set; }
 
     /// <summary>True when this level-01 entry carries a CONSTANT RECORD clause (ISO §13.18.15) — a STRUCTURED
-    /// CONSTANT: its content is the record's normal initial content (§13.18.15.4 GR1 — as though
-    /// <c>INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT</c>, which the typed-native VALUE/default
-    /// initialization already produces), and neither it nor any subordinate may be a receiving operand
+    /// CONSTANT: its content is that of an INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT (§13.18.15.4 GR1),
+    /// which is NOT the ordinary initial state — a VALUE-less numeric-edited item holds its edited zero, no OPTIONS
+    /// INITIALIZE background reaches it and a group-level VALUE sends nothing (§14.9.20.4 GR5 c), GR6) — so the
+    /// emitters seed a constant record by <c>SeedRecipe.Initialize</c> (<c>ValueInitializer.RecipeFor</c>, kb/Work
+    /// PB1233), and neither it nor any subordinate may be a receiving operand
     /// (§13.18.15.3 SR2 → COBOLNET1548 at the receiving chokepoints; <c>DataBinder.IsConstantRecordItem</c>
     /// walks ancestors). Set only on the root; subordinates are covered by the ancestor walk.</summary>
     [DescriptionCopy(DescriptionCopyKind.None,
@@ -810,9 +812,9 @@ public sealed class DataItem
         // width. Either makes a group CONTAINING it a variable-length group — it drops out via Children.All below.
         !IsDynamicTable && !IsDynamicLength && (
         IsElementary
-            // National and boolean leaves are string-stored (D-N1/D-B1) and contribute their CHARACTER
-            // positions to a group image (ImageWidth = Length — never byte-doubled for national; a byte
-            // width, if ever needed, is a NEW member, not this one).
+            // National and boolean leaves are string-stored (D-N1/D-B1). An elementary item's ImageWidth is its
+            // CARRIER positions (a national item's Length); the group that holds it counts a national position as
+            // the storage characters it occupies (RecordLayout.ImageWidth — kb/Work PB1665).
             ? Pic?.Category is PicCategory.Alphanumeric or PicCategory.NumericEdited
                 or PicCategory.National or PicCategory.Boolean || StoreAsImage
             : IsGroup && Children.All(c => c.IsCharacterImage));
@@ -944,17 +946,12 @@ public sealed class DataItem
     /// fixed-OCCURS count (every OCCURS position is part of the group image, ISO §14.9). A numeric-DISPLAY leaf's image
     /// is its digit count plus a separate-sign character when SIGN IS SEPARATE (ISO §13.18.52); an over-punched sign
     /// occupies no extra position. (This is the per-occurrence width of THIS item; a parent multiplies by THIS item's
-    /// own OCCURS count.)</summary>
-    public int ImageWidth =>
-        // A REDEFINING child occupies NO new storage (ISO §13.18.44 — it overlays its target), so a group's size
-        // sums only the non-redefining subordinates (NC252A: REDEF10 is 46 chars, not 46 + its RDF3 overlay).
-        IsElementary ? ElementaryImageWidth
-        // D19/PB43: a subtree containing a USAGE BIT leaf cannot be SUMMED — two same-level bit items share a
-        // byte and a bit item after anything else skips to the next one, so position depends on the previous
-        // sibling. It is laid out by the ONE §8.5.1.6.3 walk instead. Without a bit leaf the walk and this sum
-        // agree by construction, so every bit-free program keeps byte-identical widths.
-        : HasBitDescendant ? BitLayout.Characters(BitLayout.ExtentBits(this))
-        : Children.Where(c => c.RedefinesTargetName is null).Sum(c => c.ImageWidth * (c.Occurs ?? 1));
+    /// own OCCURS count.)
+    /// <para>⛔ A group's unit is its class's: an ALPHANUMERIC group counts a national position as the
+    /// <c>CobolBits.BytesPerNational</c> storage characters it occupies, a <c>GROUP-USAGE NATIONAL</c> group counts
+    /// national positions (§13.18.29.4 GR2b). The rule — redefining children, the bit walk, the national unit — is
+    /// written ONCE, in <see cref="RecordLayout.ImageWidth"/> (kb/Work PB1665); this member is that answer.</para></summary>
+    public int ImageWidth => RecordLayout.ImageWidth(this);
 
     /// <summary>⛔ <b>ISO §8.5.4's STEM, AS A STRUCTURE</b> — "A zero-length item is a data item or a literal
     /// whose minimum length is zero and whose length at runtime is zero." This is the FIRST half, the only half
@@ -1102,7 +1099,7 @@ public sealed class DataItem
                 Usage.FloatDecimal16 => 8,                            // decimal64 = 8 bytes
                 Usage.Pointer or Usage.ProgramPointer or Usage.FunctionPointer
                     or Usage.ObjectReference => 8,
-                Usage.National => 2 * ElementaryImageWidth,     // 2 bytes per national position (UTF-16, D-N1/D-N3)
+                Usage.National => CobolNet.Runtime.CobolBits.BytesPerNational * ElementaryImageWidth,   // UTF-16, D-N1/D-N3
                 _ => ElementaryImageWidth,                       // DISPLAY / BIT: 1 byte per character/boolean position
             };
         }

@@ -186,6 +186,7 @@
   "pb152_options_initialize_background",
   "pb152_options_initialize_sections",
   "pb152_options_initialize_external",
+  "pb1233_constant_record_options_initialize",
   "pb152_options_initialize_tier_b",
   "pb152_options_initialize_local_storage",
   "pb152_options_initialize_figurative",

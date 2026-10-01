@@ -26,18 +26,53 @@ namespace CobolNet.Binding.Model;
 /// </summary>
 internal static class RecordLayout
 {
-    /// <summary>The character-image width of an item, per THIS item's occurrence (a parent multiplies by this item's
-    /// own OCCURS count): a leaf's declared image width (digits + separate-sign, or PIC length); a group's sum over
-    /// its NON-redefining children of (child image width × the child's own fixed-OCCURS count) — every OCCURS
-    /// position is part of the group image (ISO §14.9), and a REDEFINING child overlays its target and adds no
-    /// storage (§13.18.44). Mirrors <c>DataItem.ImageWidth</c>.</summary>
+    /// <summary>⛔ THE ONE WIDTH RULE of an item's character image — <c>DataItem.ImageWidth</c> IS this (kb/Work
+    /// PB1665: the rule was written twice, as a mirror the StorageFormPass identity audit compared, and both copies
+    /// counted a national leaf ONCE inside an alphanumeric group). Per THIS item's occurrence (a parent multiplies
+    /// by this item's own OCCURS count): a leaf's declared image width (digits + separate-sign, or PIC length,
+    /// national in POSITIONS); a group's sum over its NON-redefining children of (child contribution × the child's
+    /// own fixed-OCCURS count) — every OCCURS position is part of the group image (ISO §14.9), and a REDEFINING
+    /// child overlays its target and adds no storage (§13.18.44).
+    /// <para>⛔ THE UNIT OF A GROUP'S WIDTH IS ITS OWN CLASS'S. A <c>GROUP-USAGE NATIONAL</c> group is as-if
+    /// <c>PICTURE N(m)</c> (§13.18.29.4 GR2b), so its m is NATIONAL POSITIONS and every item beneath it is counted
+    /// in them. Any other group is an alphanumeric group (§8.5.2.1: "an alphanumeric group item has class and
+    /// category alphanumeric"), moved "exactly as if it were an alphanumeric to alphanumeric elementary move"
+    /// (§14.9.25.4 GR4) — a string of STORAGE characters, in which a national position occupies
+    /// <c>CobolBits.BytesPerNational</c> of them (§13.18.60.4 GR8, pinned by D-N1). Counting the national leaf once
+    /// there made a group MOVE copy fewer characters than the sending group's image holds, so the trailing
+    /// members were lost (kb/Work PB1665: <c>MOVE G5 TO G6</c> left <c>B</c> as spaces). Every consumer of a group's
+    /// character-image width — MOVE, the receiving store, the boundary windows, ref-mod positions, LENGTH folds,
+    /// the Tier-B strides — reads this one answer, so none restates the unit.</para></summary>
     public static int ImageWidth(DataItem item) =>
         item.IsElementary ? item.ElementaryImageWidth
-        // D19/PB43 — a bit-bearing subtree is laid out by the ONE §8.5.1.6.3 walk, never summed. This mirror must
-        // move WITH DataItem.ImageWidth: they are two copies of one rule, and the whole point of this class's
-        // header is that the copies stay in step.
+        // D19/PB43 — a bit-bearing subtree is laid out by the ONE §8.5.1.6.3 walk, never summed.
         : item.HasBitDescendant ? BitLayout.Characters(BitLayout.ExtentBits(item))
-        : item.Children.Where(c => c.RedefinesTargetName is null).Sum(c => ImageWidth(c) * (c.Occurs ?? 1));
+        : item.Children.Where(c => c.RedefinesTargetName is null).Sum(c => ImageContribution(item, c) * (c.Occurs ?? 1));
+
+    /// <summary>ONE occurrence of <paramref name="child"/> in the character positions of its enclosing
+    /// <paramref name="group"/> — see <see cref="ImageWidth"/>: its own width, doubled to storage characters when
+    /// the enclosing group is alphanumeric and the child is of class national.</summary>
+    private static int ImageContribution(DataItem group, DataItem child)
+    {
+        int w = ImageWidth(child);
+        return !InNationalGroup(group) && IsNationalClass(child) ? w * CobolNet.Runtime.CobolBits.BytesPerNational : w;
+    }
+
+    /// <summary>A national item is an elementary item of usage national or a national group
+    /// (§13.18.29.4 GR2b treats the group as an elementary national item).</summary>
+    private static bool IsNationalClass(DataItem item) =>
+        item.IsElementary ? item.Pic?.Usage is Usage.National : InNationalGroup(item);
+
+    /// <summary>The item is a GROUP-USAGE NATIONAL group or beneath one. Asked of the ancestor chain rather than of
+    /// the group's own <see cref="DataItem.GroupUsage"/> alone, because usage is propagated to subordinate groups
+    /// by a later bind walk (§13.16.4 GR2's implied clause) and a width is a pure function of the declared shape,
+    /// callable before it runs.</summary>
+    private static bool InNationalGroup(DataItem item)
+    {
+        for (var p = item; p is not null; p = p.Parent)
+            if (p.IsGroup && p.GroupUsage is GroupUsage.National) return true;
+        return false;
+    }
 
     /// <summary>The tier-aware PHYSICAL image width of an item — the extent the emitted <c>AsImage()</c>/<c>FromImage()</c>
     /// codec spans (COBOLNET_DESIGN §4.2): a REDEFINING child overlays its target and contributes nothing; a Tier-B

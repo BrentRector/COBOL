@@ -6654,7 +6654,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // ONE recursive storage function (a redefiner sits at its target's offset, §13.18.44), the parts are
                 // the record's NON-redefining leaves that intersect the window, and a boundary inside a leaf (a FROM /
                 // THRU that partially redefines it) is a partial part.
-                int Width(DataItem d) => d.ImageWidth * (d.Occurs ?? 1);
+                int Width(DataItem d) => d.ByteWidth * (d.Occurs ?? 1);   // STORAGE bytes: a national position is two (D-N1; kb/Work PB1665)
                 int Offset(DataItem d)
                 {
                     if (d.RedefinesTarget is { } tgt) return Offset(tgt);          // an overlay starts where its target does
@@ -6703,7 +6703,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 var leaves = new List<(DataItem Leaf, int Off, int W, int Occ)>();
                 void Walk(DataItem n)
                 {
-                    if (n.IsElementary) { if (Width(n) > 0) leaves.Add((n, Offset(n), n.ImageWidth, n.Occurs ?? 1)); return; }
+                    if (n.IsElementary) { if (Width(n) > 0) leaves.Add((n, Offset(n), n.ByteWidth, n.Occurs ?? 1)); return; }
                     foreach (var c in n.Children) Walk(c);
                 }
                 Walk(root);
@@ -6735,16 +6735,20 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     void Consider((DataItem Leaf, int? Occ, int Start, int Len, int Cover) c)
                     {
                         // prefer: whole (non-partial) over partial; then the longest cover; then the narrowest leaf
-                        bool cPartial = c.Occ is not null && (c.Start != 1 || c.Len != c.Leaf.ImageWidth);
-                        bool bPartial = best is { } b0 && b0.Occ is not null && (b0.Start != 1 || b0.Len != b0.Leaf.ImageWidth);
+                        bool cPartial = c.Occ is not null && (c.Start != 1 || c.Len != c.Leaf.ByteWidth);
+                        bool bPartial = best is { } b0 && b0.Occ is not null && (b0.Start != 1 || b0.Len != b0.Leaf.ByteWidth);
                         if (best is null
                             || (bPartial && !cPartial)
                             || (bPartial == cPartial && c.Cover > best.Value.Cover)
-                            || (bPartial == cPartial && c.Cover == best.Value.Cover && c.Leaf.ImageWidth < best.Value.Leaf.ImageWidth))
+                            || (bPartial == cPartial && c.Cover == best.Value.Cover && c.Leaf.ByteWidth < best.Value.Leaf.ByteWidth))
                             best = c;
                     }
                     if (best is not { } chosen || chosen.Cover <= 0) { stuck = true; break; }
-                    info.Span.Add(new RenamesSpanPart(chosen.Leaf, chosen.Occ, chosen.Start, chosen.Len));
+                    // The tiling ran in STORAGE bytes; a part is kept in its leaf's own positions. A national leaf's boundary
+                    // inside a position (an odd byte) is no whole character of that item - nothing can address it.
+                    if (RenamesSpanPart.FromBytes(chosen.Leaf, chosen.Occ, chosen.Start, chosen.Len) is not { } spanPart)
+                    { stuck = true; break; }
+                    info.Span.Add(spanPart);
                     pos += chosen.Cover;
                 }
                 if (stuck || info.Span.Count == 0)

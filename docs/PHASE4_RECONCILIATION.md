@@ -689,9 +689,10 @@ both ways); negative corpus +1 (based-level-05).
   (Length = count of N positions); .NET strings are natively UTF-16, so the golden header's "two bytes per
   character position" is the *documented implementor choice* (§13.18.60.4 GR8 + §8.1.2 NOTE 2). ALL width
   machinery stays CHARACTER-position based (`CobolString.Store/RefMod/SpliceInto/Compare`, `ImageWidth`,
-  `FUNCTION LENGTH`) — exactly the §14.6.8.5/§8.4.3.3/§15.50 unit. **ImageWidth is NEVER doubled** (a national
-  leaf contributes `Length` chars to a group image; if a byte width is ever needed it is a NEW `ByteWidth`
-  member, never an overload of ImageWidth). **D-N2 byte=char containment**: byte=char does NOT hold for
+  `FUNCTION LENGTH`) — exactly the §14.6.8.5/§8.4.3.3/§15.50 unit. **An elementary item's ImageWidth is NEVER
+  doubled** (a national leaf's is its `Length` positions; its storage is the separate `ByteWidth` member). A
+  GROUP's `ImageWidth` is in its class's unit: national positions for a `GROUP-USAGE NATIONAL` group, storage
+  characters for an alphanumeric group, which counts a national position as the two it occupies (kb/Work PB1665). **D-N2 byte=char containment**: byte=char does NOT hold for
   national under D-N1 — every byte-addressed surface REFUSES a national leaf, loud (REDEFINES via ComputeTier,
   EXTERNAL/ADDRESS-OF/BASED cells via ForceStringCanonical, FD/SD records via a new record gate; details
   below). Rationale over the size-equal-1-byte alternative GR8 would also permit: forward-compat — the named

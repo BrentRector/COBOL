@@ -57,7 +57,8 @@ internal sealed class DataEmitter
     /// (<c>PtrEmitter</c>). Whichever runs first CREATES the cell, so a divergence between them would make the
     /// record's initial content depend on statement order. A plain external item seeds with the category
     /// DEFAULT image (§13.18.63 GR4a — its VALUE takes effect only during INITIALIZE); a CONSTANT RECORD seeds
-    /// with its VALUE-composed image (§11.9.10.4 GR7, the one external item initialized at initial state).</summary>
+    /// with its §13.18.15.4 GR1 INITIALIZE-composed image (§11.9.10.4 GR7, the one external item initialized at
+    /// initial state; the recipe is chosen at the root by <see cref="ValueInitializer.RecipeFor"/>, kb/Work PB1233).</summary>
     public string ExternalCellSeed(CallExternalBacking ext) =>
         RuntimeApi.StrStore(ImageInitOf(ext.Record, useValues: ext.Record.IsConstantRecord), $"{ext.Width}");
 }

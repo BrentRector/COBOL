@@ -149,9 +149,9 @@ internal static class VariableLengthCompatibility
                     leaf.ImageWidth * n));
                 continue;
             }
-            // part.Length is in CHARACTER positions; the relation is stated in bytes (a national leaf's
-            // character is two of them), so the part's bytes are its share of the leaf's byte width.
-            int bytes = leaf.ImageWidth > 0 ? part.Length * leaf.ByteWidth / leaf.ImageWidth : part.Length;
+            // part.Length is in the leaf's own CHARACTER positions; the relation is stated in bytes (a national
+            // leaf's character is two of them) — RenamesSpanPart.Bytes is the one conversion.
+            int bytes = part.Bytes;
             into.Add(new Atom(AtomKind.Fixed, leaf, bytes, DynamicCapacity: false, bytes, part.Length));
         }
     }

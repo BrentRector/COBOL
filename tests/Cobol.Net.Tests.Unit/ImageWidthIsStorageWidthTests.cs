@@ -195,4 +195,67 @@ public sealed class ImageWidthIsStorageWidthTests
         Assert.Equal(9, group.ByteWidth);
         Assert.Equal(group.ByteWidth, group.ImageWidth);
     }
+
+    private static PicInfo Alnum(int length) =>
+        new(PicCategory.Alphanumeric, Usage.Display, Length: length, Digits: 0, Scale: 0, Signed: false);
+
+    private static PicInfo National(int length) =>
+        new(PicCategory.National, Usage.National, Length: length, Digits: 0, Scale: 0, Signed: false);
+
+    private static DataItem Add(DataItem group, DataItem child)
+    {
+        child.Parent = group;
+        group.Children.Add(child);
+        return child;
+    }
+
+    /// <summary>⛔ kb/Work PB1665 — THE GROUP ARM OF THE ONE-WIDTH INVARIANT. The national leaf is the one
+    /// sanctioned divergence between an ELEMENTARY item's two widths (positions vs bytes, asserted above), but an
+    /// ALPHANUMERIC group is a string of storage characters (§8.5.2.1; §14.9.25.4 GR4 moves it as an alphanumeric
+    /// item), so a national position counts as the two it occupies and the group's ImageWidth IS its ByteWidth —
+    /// the quantity every group MOVE, comparison and boundary window is sized by. Counting the leaf once made
+    /// <c>MOVE G5 TO G6</c> drop the trailing members.</summary>
+    [Fact]
+    public void AlphanumericGroupHoldingANationalLeaf_ImageWidthEqualsByteWidth()
+    {
+        var group = new DataItem { Level = 1, CobolName = "G5", CsName = "G5" };
+        Add(group, Leaf(Alnum(2)));
+        Add(group, Leaf(National(2)));
+        Add(group, Leaf(Alnum(2)));
+        Assert.Equal(8, group.ByteWidth);
+        Assert.Equal(8, group.ImageWidth);
+    }
+
+    /// <summary>A GROUP-USAGE NATIONAL group is as-if PICTURE N(m) (§13.18.29.4 GR2b): m is NATIONAL POSITIONS, so
+    /// its ImageWidth stays the position count and only its ByteWidth doubles. A group nested in it is counted the
+    /// same way even before the usage-inheritance walk has stamped its own GroupUsage.</summary>
+    [Fact]
+    public void NationalGroup_ImageWidthIsPositions_AndANestedGroupIsCountedTheSameWay()
+    {
+        var group = new DataItem { Level = 1, CobolName = "NG", CsName = "NG", GroupUsage = GroupUsage.National };
+        Add(group, Leaf(National(2)));
+        var inner = new DataItem { Level = 5, CobolName = "IN", CsName = "IN", GroupUsage = GroupUsage.None };
+        Add(group, inner);
+        Add(inner, Leaf(National(3)));
+        Assert.Equal(3, inner.ImageWidth);
+        Assert.Equal(5, group.ImageWidth);
+        Assert.Equal(10, group.ByteWidth);
+    }
+
+    /// <summary>A national group INSIDE an alphanumeric group is an elementary national item to its parent
+    /// (§13.18.29.4 GR2b), so it contributes the storage characters its positions occupy.</summary>
+    [Fact]
+    public void NationalGroupInsideAnAlphanumericGroup_ContributesItsBytes()
+    {
+        var outer = new DataItem { Level = 1, CobolName = "G", CsName = "G" };
+        Add(outer, Leaf(Alnum(1)));
+        var ng = new DataItem { Level = 5, CobolName = "NG", CsName = "NG", GroupUsage = GroupUsage.National };
+        Add(outer, ng);
+        Add(ng, Leaf(National(2)));
+        Add(ng, Leaf(National(1)));
+        Add(outer, Leaf(Alnum(1)));
+        Assert.Equal(3, ng.ImageWidth);
+        Assert.Equal(8, outer.ImageWidth);
+        Assert.Equal(outer.ByteWidth, outer.ImageWidth);
+    }
 }

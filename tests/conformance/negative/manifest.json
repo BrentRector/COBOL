@@ -940,6 +940,8 @@
   "pb88-unstring-sender-numeric",
   "pb88-unstring-count-without-delimited",
   "pb88-string-into-strong-group",
+  "pb244-string-strong-group-pointer-leaf",
+  "pb244-unstring-strong-group-sender",
   "pb88-string-into-variable-length-group",
   "pb73-move-numeric-function-to-alphanumeric",
   "pb73-move-numval-function-to-national",

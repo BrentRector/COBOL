@@ -850,5 +850,6 @@ before a reader is flipped. Each later phase is a self-contained commit with the
    explicit methods), or is init-only-fields-on-DataItem + a thin accessor object sufficient? The former is cleaner
    but a wider refactor of the ~30 public collections.
 5. **National / boolean widths under the model.** Today national is one UTF-16 char per position (D-N1) so
-   `ImageWidth == Length` (never byte-doubled). `StorageForm.CharImage.Width` inherits that. Confirm national stays
+   an elementary national item's `ImageWidth == Length` (never byte-doubled; an alphanumeric GROUP counts it as the two
+   storage characters it occupies, kb/Work PB1665). `StorageForm.CharImage.Width` inherits that. Confirm national stays
    character-width in the unified model (a future 2-byte layout would be a *new* `StorageForm` case, not a mutation).
