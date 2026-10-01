@@ -621,6 +621,15 @@ internal static class RuntimeApi
     public static string DecMulToOdd(string leftOperand, string rightOperand) =>
         $"{nameof(CobolDec)}.{nameof(CobolDec.MulToOdd)}({leftOperand}, {rightOperand})";
 
+    /// <summary>The FINAL TRANSFER of a native product past the Int128 carrier — <c>CobolDec.MulAtScale</c> (kb/Work PB1143,
+    /// review finding N1): the exact product rounded once to <paramref name="resultScale"/> with <paramref name="mode"/>,
+    /// as an unscaled Int128 at that scale. <paramref name="checkedTransfer"/> is the statement's ON SIZE ERROR /
+    /// EC-SIZE checking (PROHIBITED raises only when it is on).</summary>
+    public static string DecMulAtScale(string left, int leftScale, string right, int rightScale, int resultScale,
+                                       CobolRounding mode, bool checkedTransfer) =>
+        $"{nameof(CobolDec)}.{nameof(CobolDec.MulAtScale)}({left}, {leftScale}, {right}, {rightScale}, {resultScale}, "
+        + $"{RoundingText(mode)}, {(checkedTransfer ? "true" : "false")})";
+
     /// <summary>The exact §15.27.3 r3 FUNCTION E constant under a standard mode — <c>CobolDec.E</c> (kb/Work R18).</summary>
     public static string DecE => $"{nameof(CobolDec)}.{nameof(CobolDec.E)}";
 

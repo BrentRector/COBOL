@@ -289,7 +289,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     public bool Visit(BoundSubtractFrom n) { _arith.EmitInPlace(n.Targets, "-", n.Minuends, n.SizeError); return false; }
     public bool Visit(BoundSubtractGiving n) { _arith.EmitGiving(n.Targets, rcv => _num.Combine(_num.Render(n.From, rcv), "-", _num.Fold(n.Minuends, rcv), rcv), n.SizeError); return false; }
     public bool Visit(BoundMultiplyBy n) { _arith.EmitInPlace(n.Targets, "*", [n.A], n.SizeError); return false; }
-    public bool Visit(BoundMultiplyGiving n) { _arith.EmitGiving(n.Targets, rcv => _num.Combine(_num.Render(n.A, rcv), "*", _num.Render(n.B, rcv), rcv), n.SizeError); return false; }
+    public bool Visit(BoundMultiplyGiving n) { _arith.EmitMultiplyGiving(n.Targets, n.A, n.B, n.SizeError); return false; }
     public bool Visit(BoundDivideInto n) { _arith.EmitDivide(n.Targets, null, n.Divisor, n.SizeError); return false; }
     public bool Visit(BoundDivideGiving n) { _arith.EmitDivide(n.Targets, n.Dividend, n.Divisor, n.SizeError); return false; }
     public bool Visit(BoundDivideRemainder n) { _arith.EmitDivideRemainder(n); return false; }

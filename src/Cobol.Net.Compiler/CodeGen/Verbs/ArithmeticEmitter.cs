@@ -41,7 +41,9 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // close it; deferred to avoid restructuring the byte-critical arithmetic store loop for an undefined case.
             foreach (var r in targets)
                 GuardedStore(ise, () =>
-                    StoreArith(r.Place, num.Combine(num.FieldNum(r.Place), op, value, RcvFor(r, ise)), r.Rounding));
+                    // The combine IS the final transfer to r (receiver ← receiver op value): outermost, so a MULTIPLY
+                    // BY product past the carrier rounds once at r's scale with r's mode (NumericRenderer.Multiply).
+                    StoreArith(r.Place, num.Combine(num.FieldNum(r.Place), op, value, RcvFor(r, ise), outermost: true), r.Rounding));
         });
 
     /// <summary>GIVING arithmetic: the value is computed once and stored into each receiver, rounded by that
@@ -63,6 +65,28 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // aliasing a sender cannot change the value the remaining receivers store.
             if (targets.Count > 1) v = Snapshot(v);
             foreach (var r in targets) GuardedStore(ise, () => StoreArith(r.Place, v, r.Rounding));
+        });
+
+    /// <summary><c>MULTIPLY a BY b GIVING r…</c> (ISO §14.9.26): the product is each receiver's FINAL TRANSFER, so — like the
+    /// quotient of <see cref="EmitDivide"/> — it renders PER RECEIVER at that receiver's scale and ROUNDED mode
+    /// (<see cref="NumericRenderer.Multiply"/>'s outermost arm: a product past the Int128 carrier is the exact product
+    /// rounded once, whatever width the receiver is — kb/Work PB1143's review finding N1), from operands that are
+    /// identified and evaluated ONCE (§14.7.7 GR4 + NOTE 3), materialized with several receivers so a receiver that
+    /// aliases an operand cannot poison the products stored after it.</summary>
+    public void EmitMultiplyGiving(IReadOnlyList<Receiver> targets, BoundExpr a, BoundExpr b, SizeErrorPhrase? sizeErr)
+        => EmitArith(sizeErr, ise =>
+        {
+            // Operand sub-expressions render for the receiver SET (the widest scale, Real only when EVERY receiver is
+            // float — D16), as EmitDivide's operands do.
+            var opRcv = targets.Count == 1 ? RcvFor(targets[0], ise)
+                : new ReceiverContext(targets.Max(t => ScaleOf(t.Place)),
+                    targets.All(t => t.Place.Item.Pic is { IsFloat: true }), CobolRounding.Truncation, ise,
+                    targets.Max(t => IntDigitsOf(t.Place)));
+            NumX ax = num.Render(a, opRcv), bx = num.Render(b, opRcv);
+            if (targets.Count > 1) { ax = Snapshot(ax); bx = Snapshot(bx); }
+            foreach (var r in targets)
+                GuardedStore(ise, () =>
+                    StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
         });
 
     public void EmitDivide(IReadOnlyList<Receiver> targets, BoundExpr? dividend, BoundExpr divisor, SizeErrorPhrase? sizeErr)
@@ -205,6 +229,17 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                 var rcv = new ReceiverContext(c.Targets.Max(t => ScaleOf(t.Place)),
                     c.Targets.All(t => t.Place.Item.Pic is { IsFloat: true }), CobolRounding.Truncation, ise,
                     c.Targets.Max(t => IntDigitsOf(t.Place)));
+                // A PRODUCT at the root of the RHS is each receiver's FINAL TRANSFER, so it renders per receiver like
+                // MULTIPLY GIVING's (NumericRenderer.Multiply's outermost arm: exact, rounded once at the receiver's
+                // scale with its mode — whatever width it is), from operands that are still evaluated ONCE.
+                if (c.Rhs is BoundBinary { Op: '*' } product)
+                {
+                    NumX ax = Snapshot(num.Render(product.Left, rcv)), bx = Snapshot(num.Render(product.Right, rcv));
+                    foreach (var r in c.Targets)
+                        GuardedStore(ise, () =>
+                            StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
+                    return;
+                }
                 NumX v = Snapshot(num.Render(c.Rhs, rcv));
                 foreach (var r in c.Targets)
                     GuardedStore(ise, () => StoreArith(r.Place, v, r.Rounding));

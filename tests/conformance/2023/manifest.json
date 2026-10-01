@@ -4,6 +4,8 @@
   "pb1114_invoke_float_formal_landing_checked",
   "pb1114_invoke_content_float_to_fixed_formal",
   "pb1513_odo_read_unsuccessful_keeps_record_locks",
+  "pb1143_product_into_wide_receiver",
+  "pb1143_quotient_into_wide_receiver",
   "pb1114_call_float_formal_landing_checked",
   "pb1066_gr14_implicit_pop_all_source_format_free",
   "pb1066_gr14_implicit_pop_all_source_format",

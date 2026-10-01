@@ -704,17 +704,28 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// <list type="bullet">
     ///   <item><b>Both bounds known and N+M ≤ 38</b> — the product provably fits: a bare multiply, with no
     ///         overflow check even under a size-error phrase (it cannot overflow).</item>
-    ///   <item><b>Both bounds known and N+M &gt; 38</b> — it MAY NOT fit, so the product is formed on the SDIDI, the
-    ///         carrier that owns its exponent at run time (<c>CobolDec.MulToOdd</c>: the exact 256-bit product reduced to
-    ///         34 significant digits by ROUND-TO-ODD). Native arithmetic rounds ONCE, at the final transfer into the
-    ///         resultant (§14.7.4.3's ROUNDED phrase; the intermediate's rounding is the implementor's, §8.8.1.3), and
-    ///         that transfer has to see whether anything lay beyond the 34th digit: a truncation hid it (ROUNDED
-    ///         AWAY-FROM-ZERO stored 1.000…002 for a product 1 + 2e-30 + 1e-60, a NEAREST-EVEN tie was manufactured,
-    ///         PROHIBITED stored an inexact product silently). Round-to-odd keeps an odd last digit whenever digits
-    ///         were dropped, so the receiver's ONE rounding — it holds at most 31 digit positions, §13.18.40.3 SR14,
-    ///         a margin of 3 digits where 2 suffice — equals rounding the exact product, in every mode. The result
-    ///         continues on the decimal lane exactly as a floating-point literal's does (the PB69 / D-B consumers),
-    ///         and the final store is <c>CobolNum.Store(CobolDec, …)</c>.</item>
+    ///   <item><b>Both bounds known and N+M &gt; 38, and this product IS the final transfer to a single resultant</b>
+    ///         (<see cref="_outermost"/> — a single-receiver COMPUTE, MULTIPLY BY / GIVING) — the exact 256-bit product is
+    ///         rounded ONCE to the resultant's scale with the resultant's own mode
+    ///         (<c>CobolDec.MulAtScale</c>, the multiplicative twin of the outermost division). It does not matter how
+    ///         wide the resultant is: a 16-byte COMP-5 item owns a 38-digit container (§13.18.60.4 GR12), where an
+    ///         SDIDI product keeps 34 and the receiver's ROUNDED phrase — PROHIBITED included — would never see the tail
+    ///         (kb/Work PB1143's review finding N1: <c>E * F</c> of two 20-digit operands into <c>PIC S9(31) COMP-5</c>
+    ///         stored …5370000 for …5361999). A product past the Int128 carrier at that scale is the size error
+    ///         condition, never a rounding.</item>
+    ///   <item><b>Both bounds known and N+M &gt; 38, nested or with several receivers</b> — it MAY NOT fit, so the product
+    ///         is formed on the SDIDI, the carrier that owns its exponent at run time (<c>CobolDec.MulToOdd</c>: the
+    ///         exact 256-bit product reduced to 34 significant digits by ROUND-TO-ODD). The intermediate's rounding is the
+    ///         implementor's (§8.8.1.3) and native arithmetic rounds ONCE, at the final transfer into the resultant
+    ///         (§14.7.4.3's ROUNDED phrase), which has to see whether anything lay beyond the 34th digit: a truncation hid
+    ///         it (ROUNDED AWAY-FROM-ZERO stored 1.000…002 for a product 1 + 2e-30 + 1e-60, a NEAREST-EVEN tie was
+    ///         manufactured, PROHIBITED stored an inexact product silently). Round-to-odd keeps an odd last digit whenever
+    ///         digits were dropped, so a receiver of at most 32 digit positions — every PICTURE-limited one, §13.18.40.3
+    ///         SR14 caps them at 31 — rounds this value, in every mode, exactly as it would round the exact product. The
+    ///         result continues on the decimal lane exactly as a floating-point literal's does (the PB69 / D-B
+    ///         consumers), and the final store is <c>CobolNum.Store(CobolDec, …)</c>. (Several receivers share ONE
+    ///         evaluation, §14.7.7 GR4, so no single scale is the transfer's; a 16-byte COMP-5 receiver among them keeps
+    ///         the 34 digits — DOC-A.1-123.)</item>
     ///   <item><b>A bound unknown</b> (an intrinsic's value, a windowed view, a counter) — the carrier's own
     ///         behaviour, now NEVER a silent wrap: <c>CobolNum.MulChecked</c> raises the size error condition at the
     ///         Int128 escape boundary (§14.7.5 case 5, A.1 item 179) in every statement, not only under a phrase.</item>
@@ -723,7 +734,14 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     {
         bool known = a.Digits > 0 && b.Digits > 0;
         if (known && a.Digits + b.Digits > ReceiverContext.IntermediateDigits)
+        {
+            // The final transfer to ONE fixed-point resultant: exact, rounded once at ITS scale with ITS mode. A
+            // receiver-less or floating-point context has no such transfer (the bound alone cannot tell the value's
+            // magnitude), and a nested product is not it either.
+            if (_outermost && !_rcv.Receiverless && !_rcv.Real)
+                return new NumX(RuntimeApi.DecMulAtScale(a.Expr, a.Scale, b.Expr, b.Scale, _rcv.Scale, _rcv.Rounding, Checked), _rcv.Scale);
             return new NumX(RuntimeApi.DecMulToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
+        }
         string product = known
             ? $"((Int128)({a.Expr}) * ({b.Expr}))"
             : $"CobolNum.MulChecked({a.Expr}, {b.Expr})";

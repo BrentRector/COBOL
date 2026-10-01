@@ -665,6 +665,10 @@ public static partial class CobolNum
     private static bool DivisionLosesPrecision(Int128 a, int aScale, Int128 b, int bScale, int resultScale)
     {
         int exp = bScale + resultScale - aScale;
+        // An alignment past the carrier: exact on the 256-bit numerator (the scale-down case — a divisor scaled past
+        // the carrier — leaves the whole dividend as the remainder, which is nonzero for a nonzero dividend).
+        if (a != 0 && (exp >= 0 ? !WideningFits(a, exp) : !WideningFits(b, -exp)))
+            return exp is >= 0 and <= 38 ? CobolDec.QuotientHasRemainder(a, b, exp) : true;
         Int128 num = a, den = b;   // wide radix alignment — mirrors Divide exactly
         if (exp >= 0) num *= Pow10Wide(exp); else den *= Pow10Wide(-exp);
         return num % den != 0;
@@ -998,9 +1002,16 @@ public static partial class CobolNum
         // a wrapped digit string.
         if (a == 0) return 0;                        // 0 ÷ b at any scale (b ≠ 0, checked above)
         bool fits = exp >= 0 ? WideningFits(a, exp) : WideningFits(b, -exp);
+        // A dividend that scales up past the carrier: the exact quotient is formed on the 256-bit numerator and rounded
+        // once by its true remainder (CobolDec.QuotientAtScale), so a receiver that holds more than the SDIDI's 34 digits
+        // — a 16-byte COMP-5 item, 38 — still gets every digit (kb/Work PB1143's review finding N1). Only a scale-down
+        // alignment (a divisor scaled past the carrier, whose quotient is below one unit of the carrier's own range) or
+        // an exponent past 10^38 takes the SDIDI.
         if (!fits)
-            return CobolDec.DivToOdd(CobolDec.From(a, aScale), CobolDec.From(b, bScale))
-                .ToUnscaledIntermediate(resultScale, mode);
+            return exp is >= 0 and <= 38
+                ? CobolDec.QuotientAtScale(a, b, exp, mode)
+                : CobolDec.DivToOdd(CobolDec.From(a, aScale), CobolDec.From(b, bScale))
+                    .ToUnscaledIntermediate(resultScale, mode);
         Int128 num = a, den = b;
         if (exp >= 0) num *= Pow10Wide(exp); else den *= Pow10Wide(-exp);
         if (den < 0) { num = -num; den = -den; }     // RoundDiv requires a positive divisor

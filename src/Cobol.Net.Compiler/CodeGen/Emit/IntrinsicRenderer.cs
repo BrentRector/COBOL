@@ -982,12 +982,12 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
 
     /// <summary>Can aligning this call's arguments to their common scale — and accumulating the aligned values —
     /// leave the <see cref="Int128"/> carrier? True only when EVERY argument is an exact scaled operand with a KNOWN
-    /// digit bound (<see cref="NumX.Digits"/>) and the widest aligned bound, plus the digits the function's own
-    /// accumulation can add, exceeds the carrier's 38. An argument whose bound is unknown answers false: nothing is
-    /// provable, and the escape-checked native arm (PB252) keeps its documented behaviour for it.</summary>
+    /// digit bound (<see cref="NumX.Digits"/>) and the sum of the magnitudes the function adds, each bounded by its
+    /// aligned digits, exceeds <see cref="Int128.MaxValue"/>. An argument whose bound is unknown answers false: nothing
+    /// is provable, and the escape-checked native arm (PB252) keeps its documented behaviour for it.</summary>
     /// <remarks>
-    /// <para>The accumulation allowance is a property of the FUNCTION: SUM and MEAN add n aligned values (the digits
-    /// of n, plus 9 for a table(ALL) argument whose run-time count is unknown); RANGE subtracts two; MEDIAN and
+    /// <para>Which magnitudes are added is a property of the FUNCTION: SUM and MEAN add every argument (a table(ALL)
+    /// argument, whose run-time count is unknown, is charged 9 more digits); RANGE subtracts two; MEDIAN and
     /// MIDRANGE add two and halve through ×10; MOD and REM align a pair and return one of them.</para>
     /// <para>The aligned value's own digits are an UPPER bound by construction: an argument's unscaled digits plus
     /// the scale gap it is shifted by.</para></remarks>
@@ -1003,15 +1003,41 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         var xs = ic.Args.Select(a => num.AsNum(a, num.Receiver)).ToList();
         if (xs.Count == 0 || xs.Any(x => x.Dec || x.Real || x.Digits == 0)) return false;
         int s = xs.Max(x => x.Scale);
-        int widest = xs.Max(x => x.Digits + (s - x.Scale));
-        bool tableAll = ic.Args.Any(a => a is BoundFieldOperand { Place: TableAllPlace });
-        int accumulation = ic.Sig.RuntimeMethod switch
+        // ⛔ THE BOUND IS ON THE VALUE, NOT ON THE WIDEST ARGUMENT PLUS A DIGIT COUNT. Argument i, aligned to the common
+        // scale, is below 10^D_i (D_i its unscaled digits plus the scale gap — a table(ALL) argument stands for an
+        // unknown number of elements, so it is charged nine more digits); the function's value is bounded by the sum of
+        // the magnitudes it adds: every argument for SUM and MEAN, the two largest for RANGE, and those two times ten
+        // for MEDIAN and MIDRANGE (added, then halved through ×10). `9(29)` beside `V9(9)` is 38 + 9 digits of two
+        // values whose sum is 1.0000000010e38 — the Int128 carrier holds it, and the old "widest + digits of n"
+        // allowance sent it to the SDIDI, which keeps 34 digits (kb/Work PB621's review follow-up).
+        var terms = xs.Select((x, i) => Pow10Bound(x.Digits + (s - x.Scale)
+            + (ic.Args[i] is BoundFieldOperand { Place: TableAllPlace } ? 9 : 0))).OrderByDescending(t => t).ToList();
+        UInt128? bound = ic.Sig.RuntimeMethod switch
         {
-            "SumScaled" or "MeanScaled" => ic.Args.Count.ToString(System.Globalization.CultureInfo.InvariantCulture).Length + (tableAll ? 9 : 0),
-            "RangeScaled" => 1,
-            _ => 2,                                              // MEDIAN / MIDRANGE: two added, then halved through ×10
+            "SumScaled" or "MeanScaled" => SumOf(terms),
+            "RangeScaled" => SumOf(terms.Take(2)),
+            _ => SumOf(terms.Take(2)) is { } two && two <= UInt128.MaxValue / 10 ? two * 10 : null,   // MEDIAN / MIDRANGE
         };
-        return widest + accumulation > ReceiverContext.IntermediateDigits;
+        return bound is not { } b || b > (UInt128)Int128.MaxValue;
+
+        // 10^digits − 1 — the largest magnitude of `digits` digits; null once it is past UInt128 (never fits).
+        static UInt128? Pow10Bound(int digits)
+        {
+            if (digits is < 0 or > 38) return null;
+            UInt128 p = 1;
+            for (int i = 0; i < digits; i++) p *= 10;
+            return p - 1;
+        }
+        static UInt128? SumOf(IEnumerable<UInt128?> terms)
+        {
+            UInt128 total = 0;
+            foreach (var t in terms)
+            {
+                if (t is not { } v || total > UInt128.MaxValue - v) return null;
+                total += v;
+            }
+            return total;
+        }
     }
 
     /// <summary>Does any argument arrive on the SDIDI carrier (a native integer power — kb/Work PB69)?</summary>

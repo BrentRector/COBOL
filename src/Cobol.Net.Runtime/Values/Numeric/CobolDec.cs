@@ -568,6 +568,125 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return Round34Wide(hi, lo, negative, a.Exp + b.Exp, CobolRounding.Truncation, jam: true);
     }
 
+    /// <summary>⛔ THE EXACT PRODUCT OF TWO SCALED OPERANDS, TRANSFERRED ONCE TO <paramref name="resultScale"/> — the
+    /// FINAL TRANSFER of a native multiplication whose scaled operands could leave <c>Int128</c>
+    /// (<c>NumericRenderer.Multiply</c>; kb/Work PB1143, PB1641's review finding N1). The exact 256-bit product is
+    /// rounded ONCE to the result scale with the RECEIVER's mode and lands as an unscaled <see cref="Int128"/> —
+    /// the multiplicative twin of <see cref="CobolNum.Divide"/>'s outermost division, so the receiver's ROUNDED phrase
+    /// sees every digit of the product whatever width the receiver is. <see cref="MulToOdd"/> cannot do this job for a
+    /// receiver that holds more than 32 digits: a 16-byte COMP-5 item owns a 38-digit container
+    /// (§13.18.60.4 GR12), and an SDIDI product keeps 34.
+    /// <para>The two statement dispositions are <see cref="ToUnscaled"/>'s and <see cref="ToUnscaledChecked"/>'s, the final
+    /// transfer's pair. <paramref name="checkedTransfer"/> — the statement is under ON SIZE ERROR / EC-SIZE checking —
+    /// raises ROUNDED MODE IS PROHIBITED on an inexact product (§14.7.4.3 r7, EC-SIZE-TRUNCATION) and a product the
+    /// Int128 carrier cannot hold, which no fixed-point receiver can hold either (§14.7.5 case 3, EC-SIZE-TRUNCATION);
+    /// unchecked, PROHIBITED truncates (DOC-A.1-70's no-phrase disposition, as <see cref="CobolNum.DivideOrThrow"/>'s
+    /// unchecked sibling does for a quotient) and a product past the carrier keeps the low-order digits a ≤38-digit
+    /// store can use, which the store's own capacity rules then apply to.</para></summary>
+    public static Int128 MulAtScale(Int128 a, int aScale, Int128 b, int bScale, int resultScale, CobolRounding mode,
+                                    bool checkedTransfer)
+    {
+        if (a == 0 || b == 0) return 0;
+        bool negative = (a < 0) ^ (b < 0);
+        var (hi, lo) = Mul128(UAbs(a), UAbs(b));
+        int shift = aScale + bScale - resultScale;     // digits to drop (> 0) or to append (< 0)
+        UInt128 limit = (UInt128)Int128.MaxValue;
+        if (shift > 0)
+        {
+            // Drop `shift` digits one at a time (the same walk Round34Wide takes), keeping the LAST dropped digit as the
+            // round digit and folding every earlier nonzero digit into the sticky bit.
+            bool sticky = false;
+            int roundDigit = 0;
+            for (int i = 0; i < shift; i++)
+            {
+                sticky |= roundDigit != 0;
+                if (hi == 0 && lo == 0) { roundDigit = 0; break; }   // only zero digits remain: the tail adds nothing
+                (hi, lo, roundDigit) = DivRem10_256(hi, lo);
+            }
+            if ((roundDigit != 0 || sticky) && (checkedTransfer || mode != CobolRounding.Prohibited))
+            {
+                // ONE rounding table (RoundFromRemainder), asked with the quotient's parity alone — the one fact of the
+                // quotient NEAREST-EVEN reads: the round digit over 10 is the fraction dropped, `sticky` says the exact
+                // value lies a little further from zero than that digit shows, and a tail that is only sticky is a
+                // fraction below one half carrying the value's sign, which a zero quotient cannot.
+                Int128 parity = negative ? -(Int128)(lo & 1) : (Int128)(lo & 1);
+                Int128 rem = roundDigit != 0 ? (negative ? -roundDigit : roundDigit) : (negative ? -1 : 1);
+                if (RoundFromRemainder(parity, rem, 10, sticky, mode) != parity)   // PROHIBITED raises in here
+                    if (++lo == 0) hi++;                                           // the magnitude grows by one unit
+            }
+        }
+        else if (shift < 0)
+        {
+            // Append -shift zero digits: exact, never rounded. Past 2^128 (or 10^39) the value is past the carrier.
+            if (hi == 0 && -shift <= 38) (hi, lo) = Mul128(lo, (UInt128)Pow10.AsWide(-shift));
+            else
+            {
+                (UInt128 mh, UInt128 ml) = (hi, lo);
+                (hi, lo) = (1, 0);                                         // marks "past the carrier"; the low digits follow
+                if (!checkedTransfer)
+                {
+                    UInt128 low = LowOrder38(mh, ml);
+                    if (-shift >= 38) low = 0;
+                    else { var (h2, l2) = Mul128(low, (UInt128)Pow10.AsWide(-shift)); low = LowOrder38(h2, l2); }
+                    return negative ? -(Int128)low : (Int128)low;
+                }
+            }
+        }
+        if (hi == 0 && lo <= limit) return negative ? -(Int128)lo : (Int128)lo;
+        if (checkedTransfer)
+            throw new CobolSizeError("the product is further from zero than any fixed-point receiver permits (ISO §14.7.5 "
+                + "case 3 — EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
+        UInt128 kept = LowOrder38(hi, lo);                                 // the digits a ≤38-digit store could use
+        return negative ? -(Int128)kept : (Int128)kept;
+    }
+
+    /// <summary>⛔ THE EXACT QUOTIENT <c>a × 10^exp / b</c> ROUNDED ONCE — the radix alignment of <see cref="CobolNum.Divide"/>
+    /// when the aligned dividend would leave <c>Int128</c> although the quotient need not (kb/Work PB1143's review finding
+    /// N1, the DIVIDE sibling of <see cref="MulAtScale"/>). The dividend scales into the exact 256-bit numerator
+    /// (<paramref name="exp"/> ≤ 38), the 256÷128 division yields quotient and true remainder, and the receiver's mode
+    /// rounds by that remainder — so a 38-digit quotient reaches a 16-byte COMP-5 receiver whole, where the SDIDI's 34
+    /// digits (<see cref="DivToOdd"/>) would have lost the last four. A quotient past the carrier is the §14.7.5 case-5
+    /// size error (EC-SIZE-OVERFLOW), never a wrapped digit string.</summary>
+    public static Int128 QuotientAtScale(Int128 a, Int128 b, int exp, CobolRounding mode)
+    {
+        bool negative = (a < 0) ^ (b < 0);
+        UInt128 den = UAbs(b);
+        var (hi, lo) = Mul128(UAbs(a), (UInt128)Pow10.AsWide(exp));
+        CobolSizeError Overflow() => new("the quotient exceeds the native Int128 carrier at the result scale "
+            + "(ISO §14.7.5 case 5 — the implementor-defined intermediate range is checked, A.1 item 179: EC-SIZE-OVERFLOW)",
+            "EC-SIZE-OVERFLOW");
+        if (hi >= den) throw Overflow();                     // the quotient would be 2^128 or more
+        var (q, rem) = DivRem256(hi, lo, den);
+        if (q > (UInt128)Int128.MaxValue || den > (UInt128)Int128.MaxValue) throw Overflow();
+        Int128 sq = negative ? -(Int128)q : (Int128)q;
+        if (rem == 0) return sq;
+        // PROHIBITED: this is CobolNum.Divide's UNCHECKED landing, which truncates (DOC-A.1-70, kb/Work PB1196);
+        // CobolNum.DivideOrThrow asks QuotientHasRemainder and raises for a checked statement.
+        Int128 rounded = RoundFromRemainder(sq, negative ? -(Int128)rem : (Int128)rem, (Int128)den, sticky: false,
+            mode == CobolRounding.Prohibited ? CobolRounding.Truncation : mode);
+        if (negative ? rounded > 0 : rounded < 0) throw Overflow();   // rounding up from the very top of the carrier wrapped
+        return rounded;
+    }
+
+    /// <summary>Does <c>a × 10^exp / b</c> leave a remainder — the exact test <see cref="CobolNum.DivideOrThrow"/>'s
+    /// PROHIBITED check needs when the aligned dividend does not fit <c>Int128</c> (<paramref name="exp"/> ≤ 38).</summary>
+    public static bool QuotientHasRemainder(Int128 a, Int128 b, int exp)
+    {
+        var (hi, lo) = Mul128(UAbs(a), (UInt128)Pow10.AsWide(exp));
+        UInt128 den = UAbs(b);
+        return hi >= den || DivRem256(hi, lo, den).Remainder != 0;   // a quotient of 2^128 or more is no exact result either
+    }
+
+    /// <summary>The 256-bit magnitude <paramref name="hi"/>:<paramref name="lo"/> modulo 10^38 — the low-order 38 decimal
+    /// digits, the most a native Int128 store can use. Reducing <c>hi</c> first keeps the 256÷128 division's quotient
+    /// inside 2^128 (<see cref="DivRem256"/>'s precondition): after <c>hi %= 10^38</c> the dividend is below
+    /// 10^38 × 2^128.</summary>
+    private static UInt128 LowOrder38(UInt128 hi, UInt128 lo)
+    {
+        UInt128 m = (UInt128)Pow10.AsWide(38);
+        return DivRem256(hi % m, lo, m).Remainder;
+    }
+
     /// <summary>Divide: the dividend pre-scales so the exact quotient carries ≥34 significant digits, the
     /// shift-subtract 256÷128 division yields quotient+remainder, and one rounding lands the SDIDI result.
     /// A zero divisor raises <see cref="CobolSizeError.ZeroDivide"/> (§14.7.5 case 2), checked or not — the SDIDI
@@ -835,7 +954,9 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     private static Int128 RoundFromRemainder(Int128 q, Int128 rem, Int128 den, bool sticky, CobolRounding mode)
     {
         if (rem == 0 && !sticky) return q;
-        Int128 absRem2 = Int128.Abs(rem) * 2;
+        // 2·|rem| against den, written without the doubling — |rem| < den may be as large as 2^127, where 2·|rem| wraps.
+        Int128 absRem = Int128.Abs(rem), rest = den - absRem;
+        bool above = absRem > rest, half = absRem == rest;
         int sign = q < 0 || rem < 0 ? -1 : 1;
         return mode switch
         {
@@ -846,9 +967,11 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
             CobolRounding.AwayFromZero => q + sign,
             CobolRounding.TowardGreater => sign > 0 ? q + 1 : q,
             CobolRounding.TowardLesser => sign < 0 ? q - 1 : q,
-            CobolRounding.NearestEven => absRem2 > den || (absRem2 == den && !sticky && q % 2 != 0) ? q + sign : q,
-            CobolRounding.NearestTowardZero => absRem2 > den || (absRem2 == den && sticky) ? q + sign : q,
-            _ => absRem2 >= den ? q + sign : q,   // NearestAwayFromZero
+            // A tie is exact only without a sticky tail: with one the value lies ABOVE the half and rounds away, as the
+            // NEAREST-TOWARD-ZERO arm below already reads it (MulAtScale is the one caller that passes a tail).
+            CobolRounding.NearestEven => above || (half && (sticky || q % 2 != 0)) ? q + sign : q,
+            CobolRounding.NearestTowardZero => above || (half && sticky) ? q + sign : q,
+            _ => above || half ? q + sign : q,   // NearestAwayFromZero
         };
     }
 

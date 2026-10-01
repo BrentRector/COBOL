@@ -996,20 +996,31 @@ clause text and fails if a new member is silently exempted.
    COMP-5 / BINARY-CHAR… item owns its whole container range, §13.18.60.4 GR12), a literal its own digit count, and the
    exact sum, difference, negation and product derive theirs. A product of N- and M-digit unscaled values is below
    10^(N+M), so `NumericRenderer.Multiply` decides at COMPILE time: N+M ≤ 38 — a bare multiply (no check needed, none
-   emitted); N+M > 38 — the exact 256-bit product on the SDIDI (`CobolDec.MulToOdd`: 34 digits by ROUND-TO-ODD — an inexact
-   product keeps an odd last digit, so the receiver's ONE rounding, §14.7.4.3, in any mode, equals rounding the exact
-   product: a receiver holds ≤ 31 digit positions, a margin of 3 where 2 suffice); an unknown bound — `CobolNum.MulChecked` in EVERY statement (a native product never wraps). The old emitter
+   emitted); N+M > 38 — the exact 256-bit product, which is (i) when it IS the final transfer to a resultant (the
+   renderer's `_outermost`: a single-receiver COMPUTE, MULTIPLY BY / GIVING, and each receiver of a several-receiver
+   MULTIPLY GIVING or product-rooted COMPUTE, which render per receiver like DIVIDE) rounded ONCE at the resultant's scale
+   with its mode (`CobolDec.MulAtScale` — exact for EVERY receiver width: a 16-byte COMP-5 item owns a 38-digit
+   container, where an SDIDI product keeps 34 and the receiver's ROUNDED phrase would never see the tail, the review
+   finding N1), and (ii) when it is NESTED (a compound expression's operand, a relation operand) formed on the SDIDI
+   (`CobolDec.MulToOdd`: 34 digits by ROUND-TO-ODD — an inexact product keeps an odd last digit, so the receiver's ONE
+   rounding, §14.7.4.3, in any mode, equals rounding the exact product for a receiver of ≤ 32 digit positions, every
+   PICTURE-limited one; a wider receiver of a COMPOUND expression is the implementor's intermediate precision,
+   §8.8.1.3); an unknown bound — `CobolNum.MulChecked` in EVERY statement (a native product never wraps). The old emitter
    multiplied unchecked and `PIC 9V9(30)` × `PIC 9V9(30)` — a legal statement, §14.7.7 r2 a) caps the COMPOSITE — stored a
    wrapped product. The same bound drives `IntrinsicRenderer.AlignmentMayLeaveCarrier`: SUM / RANGE / MEAN / MEDIAN /
-   MIDRANGE align every argument to the list's maximum scale, and when the aligned bound plus the function's
-   accumulation digits passes 38 the call goes to its SDIDI body (`SumDec` …) instead of raising for a value the receiver
-   holds (MOD / REM are deliberately NOT routed: their value is a difference of nearly equal magnitudes — MOD(9E30,
+   MIDRANGE align every argument to the list's maximum scale, and when the SUM of the magnitudes the function adds (each
+   bounded by its aligned digits: every argument for SUM / MEAN, the two largest for RANGE, ×10 for MEDIAN / MIDRANGE)
+   passes `Int128.MaxValue` the call goes to its SDIDI body (`SumDec` …) instead of raising for a value the receiver
+   holds — its 34 NEAREST-rounded digits are §15.4.1's implementor-defined approximation, not an exact value
+   (`9(29)` beside `V9(9)` sums to 1.0000000010e38, which the carrier holds, and is NOT routed) (MOD / REM are deliberately NOT routed: their value is a difference of nearly equal magnitudes — MOD(9E30,
    0.12345678) needs 39 digits of the dividend — so the 34-digit SDIDI body would answer an approximation silently where
    the native arm refuses loudly). ⚠ The note's first proposal — align to the RECEIVER's scale, as MAX/MIN do — is unsound for arithmetic
    (RANGE(0.6, −0.5) into a scale-0 receiver is 1.1 → 1, but arguments cut to scale 0 first give 0 − 0): the arguments keep
    their own digits and the CARRIER is what changes. The DIVIDE kernel's radix alignment (`CobolNum.Divide`) never wraps for the
-   same reason: past the carrier the quotient is formed on the SDIDI (`CobolDec.DivToOdd`, round-to-odd) and rounded once at
-   the result scale; a quotient past the carrier is EC-SIZE-OVERFLOW.
+   same reason: a dividend that scales up past the carrier is the exact 256-bit numerator, divided by the 128-bit divisor
+   with its true remainder and rounded once at the result scale (`CobolDec.QuotientAtScale` — a 38-digit quotient reaches a
+   16-byte COMP-5 receiver whole); only a divisor scaled past the carrier takes the SDIDI (`CobolDec.DivToOdd`,
+   round-to-odd); a quotient past the carrier is EC-SIZE-OVERFLOW.
 2. *Does a float operand own this lane?* D16 evaluates an expression in binary64 when an operand is "described with usage
    float-…" (§14.9.2.4 GR4 and §14.9.44.4 GR4 — ADD and SUBTRACT, the other statements' native rule being the implementor's,
    §8.8.1.3; §14.7.7 r2 lists an intrinsic function and the float / binary usages in separate bullets). A floating-math function's returned value and a non-integer native power are engine-produced approximations,
