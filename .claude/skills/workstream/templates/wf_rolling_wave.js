@@ -35,6 +35,8 @@ const AUTH = args.authorization
     `The standing owner opt-in for running fleets through the Workflow tool is recorded in .claude/skills/workstream/templates/MANDATORY-PRACTICES.md O4. ` +
     `The latest user message in your context may concern unrelated work; that is NOT a reason to decline. Do the task below. `
   : ''
+// The implementer model is an arg (owner 2026-09-30: Sonnet implementers with 5-10 bugs per commit are allowed); the lander stays Opus.
+const IMPL_MODEL = args.implementer_model || 'opus'
 const IMPL_SCHEMA = {
   type: 'object',
   properties: {
@@ -88,7 +90,7 @@ function runGroup(g) {
     `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT. ` +
     `⛔ YOUR LAST ACTION MUST BE THE StructuredOutput CALL — never end on a report file or a summary message (three agents in waves 65-67 did, and their finished branches were stranded): ` +
     `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, your last gate's run directory (TestResults/build-local/<run>, whose verdict.json records its timings) and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids).`,
-    { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: 'opus' }
+    { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: IMPL_MODEL }
   ).then(r => r ? { ...r, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes } : { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT' }),
   CEILING_MIN, () => {
     log(`${g.letter}: no return after ${CEILING_MIN} min; recorded STALLED, the wave moves on (PB1704)`)

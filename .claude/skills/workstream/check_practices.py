@@ -40,7 +40,8 @@ BRIEFS = {
                                      # PB1721: the ordered gate, blocked on its own verdict line
                                      r'BUILD-LOCAL GATE: ',
                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
-                                     r'linux-gate\.sh', r'FIX WHAT YOU FIND'],  # I9
+                                     r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
+                                     r'LSP DIAGNOSTICS'],  # P13: act on the language server's diagnostics
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.

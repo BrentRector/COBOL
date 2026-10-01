@@ -145,7 +145,7 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   once, not once per cluster. It is a FRESH agent, not a longer transcript, because of the quadratic cost law above:
   the cap exists because the sixth defect in one transcript costs more than a new agent, and the successor keeps the
   cheap part (the learned context) without the expensive part (the long transcript).
-- **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), devlog_n, previous_train,
+- **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), implementer_model ('opus'; 'sonnet' when the owner allows it), devlog_n, previous_train,
   lead_id_blocks: ["PBa-PBb", …] (one block per train), groups: [{ letter, lead, notes, codes, after? }] }`.
 - **Specs.** Render them with `make_dispatch_specs.py <groups.json>`, which takes the same groups plus `slug`,
   `group`, `root`, `files`, `body`, an optional `pred` text (predecessor or resume instructions) and the optional
