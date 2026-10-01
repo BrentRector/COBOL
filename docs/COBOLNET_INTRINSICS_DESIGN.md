@@ -675,6 +675,24 @@ has no leap seconds). SR1 (not within a compilation unit) is COBOLNET1650 — th
 see; the OPERAND (§7.3.17.2's ON/OFF, with ON un-underlined so a bare directive selects it) is checked with every
 other directive's, as COBOLNET1911 off the row's `directiveOperand` column (kb/Work PB794), and below 2002 the
 directive is the introduction gate (construct `leap-second-directive-2002`). Goldens `pb65_leap_second_on` / `_off`.
+**The floor is a fact about the exact value, on every carrier (PB1379).** The screen compares the LANDED (unscaled, scale)
+pair, so a float or SDIDI seconds argument lands through `CobolDate.SecondsOfReal` / `SecondsOfDec`, which round toward
+NEGATIVE infinity (a COMP-2 `-1.0E-10` lands negative, NaN lands out of the form, an SDIDI past the carrier saturates by sign
+instead of raising a size error) — it was truncated to 0 first and formatted as midnight while the fixed-point and
+COMBINED-DATETIME arms refused it. `CobolDate.TimeOfDay` is the ONE reading of whole seconds as hh:mm:ss shared by
+FORMATTED-TIME, FORMATTED-DATETIME and LOCALE-TIME-FROM-SECONDS (86,400 under ON is 23:59:60 in all three — LOCALE-TIME-FROM-SECONDS
+said 24:00:00, §15.54.4 r2). Goldens `pb1379_time_form_floor_float_carriers_off` / `_on`.
+
+### The §15.3 type-6 integer-argument intake asks the VALUE'S integrality on every carrier (PB1526, PB638).
+
+`RuntimeApi.IntegerArgOf` is the ONE family of landings behind `IntrinsicRenderer.AsInt` (bounded, `long`) and `AsIntWide`
+(total, `Int128`), keyed on `NumX.Carrier` (scaled, SDIDI, binary64; the unsigned-wide lane funnels through
+`NumericRenderer.DeU` first — the bounded intake had no arm for it and a COMP-5 PIC 9(19+) operand reached Roslyn as a
+CS1503). Each landing asks `CobolNum.HasFraction` / `CobolDec.HasFraction` / the binary64 truncation test of the EXACT value
+and raises EC-ARGUMENT-FUNCTION (§15.3's closing paragraph) before the truncating narrowing; `IntrinsicArgumentRules`'s
+compile-time screen stays fail-open (it can only refuse the provably non-integral), so `FACTORIAL(X / 2 + 1)` with X = 5 is a
+run-time condition. `IntrinsicCarrierAgreementDriftTests.EveryIntegerIntake_IsTotalOverTheNumXCarriers` walks `NumXCarrier`.
+Goldens `pb1526_integer_argument_has_integral_value`, `pb638_unsigned_wide_item_as_integer_argument`.
 
 ## Edge cases
 

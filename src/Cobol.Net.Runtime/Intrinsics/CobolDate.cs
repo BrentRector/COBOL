@@ -373,11 +373,7 @@ public static class CobolDate
             isoD = ((int)dt.DayOfWeek + 6) % 7 + 1;                    // Mon=1..Sun=7 (§15.3.1.7)
         }
         long tot = (long)Math.Floor(secs);
-        int hh = (int)(tot / 3600), mi = (int)(tot % 3600 / 60), ss = (int)(tot % 60);
-        // >>LEAP-SECOND ON (§7.3.17.4 GR4): a standard numeric time form value in [86 400, 86 401) is the day's leap
-        // second, presented as 23:59:60 (§15.3.3.3 — the seconds subfield may be 60); OFF never admits it (the
-        // bound above). A UTC-offset roll has already normalized the value into the day, so this reads the plain case.
-        if (leapSecond && tot >= 86400) { hh = 23; mi = 59; ss = 60 + (int)(tot - 86400); }
+        var (hh, mi, ss) = TimeOfDay(tot, leapSecond);
         decimal frac = secs - tot;
         long offMag = Math.Abs(offsetMinutes);
         int oh = (int)(offMag / 60), om = (int)(offMag % 60);
@@ -448,6 +444,45 @@ public static class CobolDate
     /// value in standard numeric time form"): ONE rule, one place.</summary>
     internal static bool SecondsOutOfStandardFormFor(string fn, Int128 secUnscaled, int secScale, bool leapSecond)
         => SecondsOutOfStandardForm(fn, "argument-1", secUnscaled, secScale, leapSecond);
+
+    /// <summary>⛔ THE ONE reading of a WHOLE number of seconds past midnight as hours, minutes and seconds — shared by
+    /// every function that shows a standard numeric time form (FORMATTED-TIME, FORMATTED-DATETIME, and
+    /// LOCALE-TIME-FROM-SECONDS, kb/Work PB1379): under <c>&gt;&gt;LEAP-SECOND ON</c> (§7.3.17.4 GR4) a value in
+    /// [86 400, 86 401) is the day's leap second and IS the time 23:59:60 (§15.3.3.3 — the seconds subfield may be
+    /// 60); OFF never admits such a value (<see cref="SecondsOutOfStandardForm(string, string, CobolDec, bool)"/>
+    /// has already refused it). LOCALE-TIME-FROM-SECONDS read 86 400 as <c>24:00:00</c> — a time the day does not
+    /// have — where §15.54.4 r2 returns "a character-string containing hours, minutes, and seconds of the time specified by argument-1",
+    /// which for the leap second are 23, 59 and 60, exactly what FORMATTED-TIME presents for the same value.</summary>
+    internal static (int Hours, int Minutes, int Seconds) TimeOfDay(long wholeSeconds, bool leapSecond) =>
+        leapSecond && wholeSeconds >= 86400
+            ? (23, 59, 60 + (int)(wholeSeconds - 86400))
+            : ((int)(wholeSeconds / 3600), (int)(wholeSeconds % 3600 / 60), (int)(wholeSeconds % 60));
+
+    /// <summary>⛔ THE MEMBERSHIP-PRESERVING LANDING of a binary64 seconds argument (kb/Work PB1379), scale 9 — the
+    /// FORMATTED-CURRENT-DATE nanosecond convention. §7.3.17.4 GR4/GR5 make a standard numeric time form "greater
+    /// than or equal to zero and less than 86,401 / 86,400", so the screen's verdict is a fact about the EXACT
+    /// value, and a landing that rounds toward ZERO changes it: a COMP-2 −1.0E−10 truncated to 0 BEFORE the screen
+    /// saw it and was formatted as midnight, while the same value in a fixed-point item (and COMBINED-DATETIME's
+    /// own binary64 body) was refused — the two-arm shape. This landing rounds toward NEGATIVE INFINITY, so a
+    /// negative value lands negative and every bound the screen compares against (0, 86 400, 86 401 — all
+    /// representable at scale 9) is crossed by the landed value exactly when it is crossed by the exact one;
+    /// for a value in the form it is the truncation it always was. NaN is in no time form (neither comparison
+    /// holds) and lands out of it; ±∞ saturate out of it.</summary>
+    public static Int128 SecondsOfReal(double seconds) =>
+        double.IsNaN(seconds) ? Int128.MinValue : CobolFloat.ToScaled(seconds, 9, CobolRounding.TowardLesser);
+
+    /// <summary>The SDIDI sibling of <see cref="SecondsOfReal"/>, scale 18 — the documented §15.3.3.2 maximum
+    /// fraction width (CONFORMANCE.md item 202). A magnitude the Int128 carrier cannot hold at scale 18 is past both
+    /// bounds and saturates by sign (it used to be EC-SIZE-OVERFLOW from the intermediate landing, a size error
+    /// where §15.3 names EC-ARGUMENT-FUNCTION); below it, rounding toward negative infinity keeps the sign.</summary>
+    public static Int128 SecondsOfDec(CobolDec seconds) =>
+        CobolDec.Compare(seconds, SaturatingSeconds) >= 0 ? Int128.MaxValue
+        : CobolDec.Compare(seconds, NegativeSaturatingSeconds) <= 0 ? Int128.MinValue
+        : seconds.ToUnscaled(18, CobolRounding.TowardLesser);
+
+    /// <summary>10^19 seconds: far beyond every bound, and small enough that ×10^18 still fits <see cref="Int128"/>.</summary>
+    private static readonly CobolDec SaturatingSeconds = new(1, 19);
+    private static readonly CobolDec NegativeSaturatingSeconds = new(-1, 19);
 
     /// <summary>The (unscaled, scale) form of the screen — the exact carrier's spelling of the SAME value, lifted
     /// through <see cref="CobolDec.From"/> (exact for every fixed-point operand, §8.8.1.5.2 r1) so that both

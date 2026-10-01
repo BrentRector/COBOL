@@ -497,12 +497,14 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // on the unsigned-wide lane. Value paths (store/display/relation) keep the full [0, 2^128) range via the
         // runtime's UInt128 overloads; arithmetic funnels through CobolNum.Widen (loud beyond the Int128
         // intermediate), never a silent wrap.
-        { IsUnsignedWideBinary: true } pic => new NumX(PlaceRenderer.Read(p), pic.Scale, U: true),
+        { IsUnsignedWideBinary: true } pic => new NumX(PlaceRenderer.Read(p), pic.Scale, U: true, Digits: pic.UnscaledDigitBound),
         // An 8-byte UNSIGNED BinaryCapacity item (ulong carrier): every ulong value fits the Int128 engine — the
         // read is lifted at THIS one site so downstream text (comparisons against long literals, raw-expr
         // alignment) never mixes ulong with long, which C# rejects as ambiguous.
-        { IsUnsignedLongBinary: true } pic => new NumX($"(Int128)({PlaceRenderer.Read(p)})", pic.Scale),
-        { } pic => new NumX(PlaceRenderer.Read(p), pic.Scale),
+        { IsUnsignedLongBinary: true } pic => new NumX($"(Int128)({PlaceRenderer.Read(p)})", pic.Scale, Digits: pic.UnscaledDigitBound),
+        // Every exact item read states how many digits its unscaled value can have (PicInfo.UnscaledDigitBound), so
+        // the carrier decisions downstream (a product, an aligned list) are made from a fact and not from hope.
+        { } pic => new NumX(PlaceRenderer.Read(p), pic.Scale, Digits: pic.UnscaledDigitBound),
     };
 
     /// <summary>Left-fold a list of bound expressions with <c>+</c> (the addends of an ADD / minuends of a SUBTRACT).
@@ -551,6 +553,31 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // (store/display/relation) never come through here and keep the full [0, 2^128) range.
         a = DeU(a);
         b = DeU(b);
+        // ⛔ AN APPROXIMATION THE ENGINE RETURNED IS NOT A FLOAT OPERAND (kb/Work PB1641). D16 evaluates an
+        // expression in binary64 when an operand is a floating-point DATA ITEM, a float literal carrier or a float
+        // RECEIVER — the operands §14.9.2.4 GR4 and §14.9.44.4 GR4 (ADD and SUBTRACT; the other statements' native
+        // rule is the implementor's, §8.8.1.3) except from "enough places shall be carried so as not to lose
+        // significant digits": those with usage binary-char, binary-short, binary-long, binary-double, float-short,
+        // float-long or float-extended (§14.7.7 r2 lists them, a floating-point literal and an intrinsic function as
+        // separate bullets). A function's returned value is described with no usage at all — §15.4.1 leaves "the
+        // characteristics and representation of the returned value" to the implementor — and a non-integer native
+        // power is an engine-computed approximation too (§8.8.1.3: under native arithmetic the method of
+        // evaluation is the implementor's). Beside operands that are NOT floats nothing licenses carrying them in
+        // binary64, and doing so loses a digit: `COMPUTE R = 13.2 + FUNCTION SQRT(16)` into PIC 99V9 stored 17.1
+        // (13.199999999999999 + 4.0 truncated) where SQRT(16) alone is exactly 4 and the sum is 17.2. So the
+        // approximation enters the arithmetic through its shortest-round-trip decimal (the §8.8.1.5.1
+        // implementor-defined float→SDIDI conversion, defined here as shortest round-trip, which every standard mode
+        // already applies to a float operand — the same VALUE the binary64 carries) and the operation runs on the
+        // decimal lane; a float ITEM, a float literal carrier or a float receiver keeps the whole expression in
+        // binary64 exactly as before (the approximation then stays a double beside it). GnuCOBOL, the precedent where
+        // the ISO text is silent, evaluates every intrinsic result as a decimal.
+        // Every producer of an Approximate Real is IntrinsicRenderer.RenderFloatNative / NUMVAL-F's receiver-less arm
+        // and Power's non-integer arm; FloatItemLane is the ONE statement of "does a float operand own this lane".
+        if (!StandardDecimal && !FloatItemLane(a, b))
+        {
+            a = LiftApproximation(a);
+            b = LiftApproximation(b);
+        }
         // STANDARD / STANDARD-DECIMAL arithmetic (§8.8.1.5): every operation of an arithmetic expression
         // evaluates in SDIDI form (decimal128 semantics), rounded per-op to 34 significant digits with the
         // INTERMEDIATE ROUNDING mode (§11.9.11) and range-checked at the decimal128 bounds (§8.8.1.5.2 r2);
@@ -597,6 +624,18 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         if (a.Real || b.Real || _rcv.Real) return CombineReal(a, op, b);
         return CombineNative(a, op, b);
     }
+
+    /// <summary>Does a FLOAT operand own this operation's lane — a floating-point data item or carrier literal
+    /// (<c>Real</c> and not <see cref="NumX.Approximate"/>) or a floating-point receiver (kb/Work PB1641)? When none
+    /// does, an <see cref="NumX.Approximate"/> operand is a returned value beside non-float operands and
+    /// <see cref="LiftApproximation"/> takes it to the SDIDI.</summary>
+    private bool FloatItemLane(NumX a, NumX b) =>
+        _rcv.Real || (a.Real && !a.Approximate) || (b.Real && !b.Approximate);
+
+    /// <summary>An engine-produced binary64 approximation as the SDIDI of its shortest round-trip decimal
+    /// (<see cref="DecOperand"/>'s conversion — the VALUE is unchanged); every other operand passes through.</summary>
+    private static NumX LiftApproximation(NumX x) =>
+        x is { Real: true, Approximate: true } ? new NumX(RuntimeApi.DecFromDouble(x.Expr), 0, Dec: true) : x;
 
     /// <summary>The binary64 lane of <see cref="CombineCore"/> — the floating arm of the native dispatch whose other
     /// arm is <see cref="CombineNative"/>, and it owes the SAME size-error rules (kb/Work PB1147, PB1581; the
@@ -650,13 +689,46 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     private NumX CombineNative(NumX a, string op, NumX b) => op switch
     {
         "+" or "-" => CombineAdditive(a, op, b),
-        // Multiplication: scales add (exact). Under an ON SIZE ERROR phrase the product is overflow-checked at the
-        // Int128 ESCAPE boundary (~38 digits, design D1) → OverflowException maps to the size error condition
-        // (§14.7.5 case 5); without the phrase it is unchecked wide multiplication.
-        "*" => new NumX(Checked ? $"CobolNum.MulChecked({a.Expr}, {b.Expr})" : $"((Int128)({a.Expr}) * ({b.Expr}))", a.Scale + b.Scale),
+        "*" => Multiply(a, b),
         "/" => Divide(a, b),
         _ => a,
     };
+
+    /// <summary>⛔ MULTIPLICATION ON THE EXACT CARRIER, DECIDED FROM THE OPERANDS' DIGIT BOUNDS (kb/Work PB1143).
+    /// Scales add, so the product of an N-digit and an M-digit UNSCALED value is below 10^(N+M) — and that, not the
+    /// operands' values, is what leaves the <see cref="Int128"/> carrier: <c>PIC 9V9(30)</c> times <c>PIC 9V9(30)</c>
+    /// is the product 3.375 of 1.5 and 2.25, and the product of their 31-digit unscaled values is 61 digits. The
+    /// emitter multiplied them unchecked, so a legal statement (§14.7.7 r2a limits the COMPOSITE of operands to 31
+    /// digits, not the unscaled product) wrapped modulo 2^128 and stored a wrong product with no condition —
+    /// §14.9.26.4 GR1/GR2: "The product of the multiplier and the multiplicand is stored".
+    /// <list type="bullet">
+    ///   <item><b>Both bounds known and N+M ≤ 38</b> — the product provably fits: a bare multiply, with no
+    ///         overflow check even under a size-error phrase (it cannot overflow).</item>
+    ///   <item><b>Both bounds known and N+M &gt; 38</b> — it MAY NOT fit, so the product is formed on the SDIDI, the
+    ///         carrier that owns its exponent at run time (<c>CobolDec.MulToOdd</c>: the exact 256-bit product reduced to
+    ///         34 significant digits by ROUND-TO-ODD). Native arithmetic rounds ONCE, at the final transfer into the
+    ///         resultant (§14.7.4.3's ROUNDED phrase; the intermediate's rounding is the implementor's, §8.8.1.3), and
+    ///         that transfer has to see whether anything lay beyond the 34th digit: a truncation hid it (ROUNDED
+    ///         AWAY-FROM-ZERO stored 1.000…002 for a product 1 + 2e-30 + 1e-60, a NEAREST-EVEN tie was manufactured,
+    ///         PROHIBITED stored an inexact product silently). Round-to-odd keeps an odd last digit whenever digits
+    ///         were dropped, so the receiver's ONE rounding — it holds at most 31 digit positions, §13.18.40.3 SR14,
+    ///         a margin of 3 digits where 2 suffice — equals rounding the exact product, in every mode. The result
+    ///         continues on the decimal lane exactly as a floating-point literal's does (the PB69 / D-B consumers),
+    ///         and the final store is <c>CobolNum.Store(CobolDec, …)</c>.</item>
+    ///   <item><b>A bound unknown</b> (an intrinsic's value, a windowed view, a counter) — the carrier's own
+    ///         behaviour, now NEVER a silent wrap: <c>CobolNum.MulChecked</c> raises the size error condition at the
+    ///         Int128 escape boundary (§14.7.5 case 5, A.1 item 179) in every statement, not only under a phrase.</item>
+    /// </list></summary>
+    private NumX Multiply(NumX a, NumX b)
+    {
+        bool known = a.Digits > 0 && b.Digits > 0;
+        if (known && a.Digits + b.Digits > ReceiverContext.IntermediateDigits)
+            return new NumX(RuntimeApi.DecMulToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
+        string product = known
+            ? $"((Int128)({a.Expr}) * ({b.Expr}))"
+            : $"CobolNum.MulChecked({a.Expr}, {b.Expr})";
+        return new NumX(product, a.Scale + b.Scale, Digits: known ? a.Digits + b.Digits : 0);
+    }
 
     /// <summary>Guard digits past the deepest receiver/operand scale for a division NESTED inside a larger
     /// expression (numeric design D2): rounding happens ONCE, at the receiver, so the nested quotient must carry
@@ -706,14 +778,19 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     private NumX CombineAdditive(NumX a, string op, NumX b)
     {
         int s = Math.Max(a.Scale, b.Scale);
+        // The result's digit bound (NumX.Digits): both operands aligned to s, plus one carry digit — known only when
+        // both bounds are, and "unknown" (0) once it passes the carrier's own 38.
+        int digits = a.Digits > 0 && b.Digits > 0
+            ? Math.Max(a.Digits + (s - a.Scale), b.Digits + (s - b.Scale)) + 1 : 0;
+        if (digits > ReceiverContext.IntermediateDigits) digits = 0;
         // Under an ON SIZE ERROR phrase the sum/difference is overflow-checked at the Int128 ENGINE boundary
         // (AddChecked/SubChecked → OverflowException → the size error condition, §14.7.5 case 5) — the exact
         // MulChecked contract. Reachable: HIGHEST-ALGEBRAIC of PIC S9(19) COMP-5 is Int128.MaxValue itself
         // (kb/Work R10), where an unchecked `+ 1` wraps to the container's far end and stores with no error.
         // Without the phrase it stays the bare unchecked operator, like every other engine op.
         if (Checked)
-            return new NumX($"CobolNum.{(op == "+" ? "AddChecked" : "SubChecked")}({Align(a, s)}, {Align(b, s)})", s);
-        return new NumX($"((Int128)({Align(a, s)}) {op} ({Align(b, s)}))", s);
+            return new NumX($"CobolNum.{(op == "+" ? "AddChecked" : "SubChecked")}({Align(a, s)}, {Align(b, s)})", s, Digits: digits);
+        return new NumX($"((Int128)({Align(a, s)}) {op} ({Align(b, s)}))", s, Digits: digits);
     }
 
     /// <summary>⛔ A FLOAT ITEM'S CONTENT ON ITS OWN CARRIER — <c>float</c> for binary32, <c>double</c> for
@@ -969,23 +1046,25 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // Under size-error checking the binary64 power is range-checked like every other checked native operation
         // (§14.7.5 case 5 — kb/Work PB1581); unchecked it stays the bare approximation.
         string pow = RuntimeApi.Intrinsic(Checked ? "PowNativeRealChecked" : "PowNativeReal", $"{Real(b)}, {Real(e)}");
+        // The binary64 power is an APPROXIMATION the engine produced (§8.8.1.3) unless an operand is itself a float
+        // ITEM's content, which then owns the result (kb/Work PB1641 — see CombineCore's lane note).
         if (b.Real || e.Real || !landing.Quantize)
-            return new NumX(pow, 0, Real: true);
+            return new NumX(pow, 0, Real: true, Approximate: !((b.Real && !b.Approximate) || (e.Real && !e.Approximate)));
         return new NumX(RuntimeApi.Intrinsic("FromDouble",
             $"{pow}, {landing.Scale}, {RuntimeApi.RoundingText(landing.Mode)}{CheckedFlag}"), landing.Scale);
     }
 
     private static NumX Negate(NumX x) =>
-        x.Real ? new NumX($"(-({Real(x)}))", 0, Real: true)
+        x.Real ? new NumX($"(-({Real(x)}))", 0, Real: true, Approximate: x.Approximate)
         : x.Dec ? new NumX($"(new CobolDec(-({x.Expr}).Sig, ({x.Expr}).Exp))", 0, Dec: true)
-        : x.U ? new NumX($"(-{DeU(x).Expr})", x.Scale)   // negation is arithmetic — the Widen funnel applies
-        : new($"(-{x.Expr})", x.Scale);
+        : x.U ? new NumX($"(-{DeU(x).Expr})", x.Scale, Digits: x.Digits)   // negation is arithmetic — the Widen funnel applies
+        : new($"(-{x.Expr})", x.Scale, Digits: x.Digits);
 
     /// <summary>The unsigned-wide → Int128-lane funnel (kb/Work R10): a <c>U</c> operand narrows through
     /// <c>CobolNum.Widen</c> (loud beyond the documented Int128 intermediate, CONFORMANCE.md §4.2.16); every
     /// other operand passes through unchanged. The ONE chokepoint every arithmetic path shares (internal: the
     /// CALL BY CONTENT computed-argument site funnels through the same rule).</summary>
-    internal static NumX DeU(NumX x) => x.U ? new NumX(RuntimeApi.NumWiden(x.Expr), x.Scale) : x;
+    internal static NumX DeU(NumX x) => x.U ? new NumX(RuntimeApi.NumWiden(x.Expr), x.Scale, Digits: x.Digits) : x;
 
     /// <summary>
     /// Land a rendered intermediate into the exact <c>Int128</c> lane at the receiver's working scale — the ONE

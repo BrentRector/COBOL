@@ -603,13 +603,13 @@ public static partial class CobolNum
         return $"{(neg ? "-" : "")}{mag / div}.{(mag % div).ToString().PadLeft(scale, '0')}";
     }
 
-    /// <summary>Multiply two unscaled operands with overflow checking against the long engine's range: raises
-    /// <see cref="OverflowException"/> (mapped to the size error condition, ISO §14.7.5 case 5) when the product
-    /// exceeds <see cref="long"/>. Emitted inside a statement that carries an ON SIZE ERROR phrase and — kb/Work
-    /// PB91 — in every receiver-less render (a condition, an argument, a subscript) of a statement under EC-SIZE
-    /// checking; elsewhere a multiply stays a bare unchecked <c>*</c>. Being a method call (not a constant expression), a
-    /// constant product is checked at run time, never folded to a compile-time error. (Products beyond the long
-    /// range need the Int128 carrier; deferred — see the numeric design.)</summary>
+    /// <summary>Multiply two unscaled operands with overflow checking against the Int128 carrier: raises
+    /// <see cref="CobolSizeError"/> EC-SIZE-OVERFLOW (the size error condition, ISO §14.7.5 case 5) when the product
+    /// leaves it. ⛔ THE RENDERER EMITS IT WHENEVER THE OPERANDS' DIGIT BOUNDS DO NOT PROVE THE PRODUCT FITS (kb/Work
+    /// PB1143 — <c>NumericRenderer.Multiply</c>): a product whose bounds prove N+M ≤ 38 digits is a bare multiply, one
+    /// that may exceed 38 is formed on the SDIDI instead, and an unknown bound lands HERE in every statement — a
+    /// silent two's-complement wrap is no longer a possible outcome of a native product. Being a method call (not a
+    /// constant expression), a constant product is checked at run time, never folded to a compile-time error.</summary>
     public static Int128 MulChecked(Int128 a, Int128 b)
     {
         // kb/Work PB91: the overflow is the size error CONDITION (§14.7.5 case 5) wherever the checked kernel runs —
@@ -973,7 +973,8 @@ public static partial class CobolNum
     /// own scales (<c>a/10^aScale ÷ b/10^bScale</c> rendered at <paramref name="resultScale"/>). The radix alignment
     /// (<c>a × 10^exp</c>) runs in <see cref="Int128"/> — an 18-significant-digit dividend scaled by the receiver's
     /// fraction digits exceeds the long range MID-computation even though the QUOTIENT fits (ISO §8.8.1: arithmetic
-    /// operates on the algebraic values; intermediate width is the implementor's problem, not the program's).
+    /// operates on the algebraic values; intermediate width is the implementor's problem, not the program's) — and an
+    /// alignment that would leave Int128 is formed on the SDIDI instead (see the body; kb/Work PB1143).
     /// <para>A zero divisor raises <see cref="CobolSizeError.ZeroDivide"/> — §14.7.5 case 2 — checked or NOT: the
     /// condition exists either way, and checking decides only its disposition (the SIZE ERROR phrase, an EC-SIZE
     /// declarative or PERFORM WHEN, else abnormal termination — CONFORMANCE.md DOC-A.1-70's determination for the
@@ -984,6 +985,22 @@ public static partial class CobolNum
     {
         if (b == 0) throw CobolSizeError.ZeroDivide();
         int exp = bScale + resultScale - aScale;     // quotient_unscaled = round(a × 10^exp / b)
+        // ⛔ THE RADIX ALIGNMENT NEVER WRAPS (kb/Work PB1143's DIVIDE sibling). The alignment multiplies the
+        // dividend (or the divisor) by 10^|exp|, and a 31-digit dividend scaled by a receiver's fraction digits is
+        // past Int128 although the QUOTIENT is not — `PIC 9(10)` over a `PIC 9V9(20)` divisor into
+        // `PIC 9(10)V9(10)` needs 1.2e9 × 10^30. The unchecked multiply wrapped modulo 2^128 and the quotient of the
+        // WRAPPED value was stored silently. When the alignment fits the carrier (every ordinary shape) it is the
+        // Int128 divide it always was; when it does not, the quotient is formed on the SDIDI, which owns its exponent
+        // (the same carrier a product past 38 digits takes, NumericRenderer.Multiply): 34 significant digits by
+        // ROUND-TO-ODD (CobolDec.DivToOdd — an inexact quotient keeps an odd last digit, so the ONE rounding to the
+        // result scale below, in any mode, equals rounding the exact quotient; a receiver holds ≤ 31 digit positions,
+        // far inside the 34). A quotient the carrier cannot hold at that scale is the §14.7.5 case-5 size error, never
+        // a wrapped digit string.
+        if (a == 0) return 0;                        // 0 ÷ b at any scale (b ≠ 0, checked above)
+        bool fits = exp >= 0 ? WideningFits(a, exp) : WideningFits(b, -exp);
+        if (!fits)
+            return CobolDec.DivToOdd(CobolDec.From(a, aScale), CobolDec.From(b, bScale))
+                .ToUnscaledIntermediate(resultScale, mode);
         Int128 num = a, den = b;
         if (exp >= 0) num *= Pow10Wide(exp); else den *= Pow10Wide(-exp);
         if (den < 0) { num = -num; den = -den; }     // RoundDiv requires a positive divisor

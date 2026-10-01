@@ -63,23 +63,23 @@
            ELSE
                DISPLAY "SUM-R3-SIZE-ERROR=NO"
            END-IF
-      *> (2) THE DISJUNCTION. §15.76.4 r1's expression here is 1.7e30 - (-1.7e30) = 3.4e30, which
-      *>     FITS a 31-digit receiver — so rule 3 does not fire and exactly two outcomes conform:
-      *>     the value itself, or §14.7.5 rule 5's size error with W-R unchanged. The defect
-      *>     delivered a THIRD, a negative number, stored silently.
+      *> (2) THE VALUE (kb/Work PB621 moved this from a disjunction to the value). §15.76.4 r1's
+      *>     expression here is 1.7e30 - (-1.7e30) = 3.4e30, which FITS a 31-digit receiver, so rule 3
+      *>     does not fire and the receiver must hold it. §14.7.5 rule 5 would PERMIT a size error
+      *>     (the intermediate's range is the implementor's), and the aligned scale-8 intermediate
+      *>     3.4e38 does leave the Int128 carrier — which is exactly why the arm now moves to the
+      *>     SDIDI, whose exponent is carried at run time, instead of reporting a size error for a
+      *>     value the receiver holds. Case (1) above remains the control for the receiver-overflow
+      *>     size error (rule 3), which no carrier width can avoid.
            MOVE 0 TO W-SE
            MOVE 0 TO W-R
            COMPUTE W-R = FUNCTION RANGE (W-HI W-LO W-Q8)
                ON SIZE ERROR MOVE 1 TO W-SE
            END-COMPUTE
-           IF W-SE = 1 AND W-R = 0
-               DISPLAY "RANGE-CONFORMS=SIZE-ERROR"
+           IF W-SE = 0 AND W-R = 3400000000000000000000000000000
+               DISPLAY "RANGE-CONFORMS=VALUE"
            ELSE
-               IF W-SE = 0 AND W-R = 3400000000000000000000000000000
-                   DISPLAY "RANGE-CONFORMS=VALUE"
-               ELSE
-                   DISPLAY "RANGE-CONFORMS=NO"
-               END-IF
+               DISPLAY "RANGE-CONFORMS=NO"
            END-IF
       *> (3) A CONSEQUENCE OF THE RULES, in every arithmetic mode: §15.76.4 r1 is MAX - MIN, and
       *>     §15.59.4 r1 / §15.63.4 r1 select the greatest and the least of the SAME argument list,

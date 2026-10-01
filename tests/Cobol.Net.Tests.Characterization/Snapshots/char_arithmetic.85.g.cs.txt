@@ -54,7 +54,7 @@ internal sealed class _PRG_CHAR_ARITHMETIC : ICobolProgram
                     {
                         try
                         {
-                            if (!CobolNum.TryStore(CobolNum.MulChecked(A, B), 0, _P_3, CobolRounding.Truncation, out var __sv0)) __sizeErr0 = true;
+                            if (!CobolNum.TryStore(((Int128)(A) * (B)), 0, _P_3, CobolRounding.Truncation, out var __sv0)) __sizeErr0 = true;
                             else SMALL = (long)(__sv0);
                         }
                         catch (CobolSizeError) { __sizeErr0 = true; }

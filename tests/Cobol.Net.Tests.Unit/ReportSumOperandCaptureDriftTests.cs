@@ -122,7 +122,10 @@ public sealed class ReportSumOperandCaptureDriftTests
         string emitter = File.ReadAllText(
             TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Verbs", "ReportWriterEmitter.cs"));
         Assert.Contains("AddSumTerm(", emitter);
-        Assert.Contains("num.Render(v, ReceiverContext.None)", emitter);
+        // The bound addend EXPRESSIONS go through the ONE numeric renderer's ADD fold (kb/Work PB1686 — the same
+        // `Fold` ArithmeticEmitter.EmitInPlace evaluates an ADD's operands with), combined with the counter's content
+        // and stored once; never a resolved storage item and never a per-addend alignment.
+        Assert.Contains("num.Fold(addendExprs, rcv)", emitter);
         // The run-time loud that used to fire for EVERY table addend may survive only as the
         // already-diagnosed-at-bind backstop, never as the resolution path.
         Assert.DoesNotContain("SUM addend not resolvable to storage", emitter);

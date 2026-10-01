@@ -154,7 +154,38 @@ internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAlloca
 /// full [0, 2^128) range via the runtime's <c>UInt128</c> overloads; the ARITHMETIC paths funnel through
 /// <c>CobolNum.Widen</c> (loud beyond the documented Int128 intermediate — CONFORMANCE.md §4.2.16), never a
 /// silent wrap. Mutually exclusive with <see cref="Dec"/> and <see cref="Real"/>.</param>
-internal readonly record struct NumX(string Expr, int Scale, bool Dec = false, bool Real = false, bool U = false);
+/// <param name="Approximate">Only with <see cref="Real"/>: the binary64 is an implementor-defined APPROXIMATION the
+/// ENGINE produced — a floating-math function's returned value (§15.4.1: "the characteristics and representation of
+/// the returned value are defined by the implementor"), a non-integer native power (§8.8.1.3: under native arithmetic the method of evaluation is the implementor's) — and not the content
+/// of a floating-point data item or a floating-point carrier literal. The distinction is the lane's whole
+/// question (kb/Work PB1641): an operand "described with usage float-long" brings its expression into IEEE binary64
+/// (§14.9.2.4 GR4's exemption for ADD, §14.9.44.4 GR4's for SUBTRACT, numeric design D16 for the rest), but a returned value is described with no usage at all, so
+/// beside fixed-point operands nothing licenses binary64 (for ADD / SUBTRACT: "enough places shall be carried so as
+/// not to lose significant digits") and <c>NumericRenderer.CombineCore</c> lifts it to the SDIDI through the
+/// shortest-round-trip conversion (the implementor-defined float→SDIDI conversion of §8.8.1.5.1) instead of
+/// dragging <c>13.2</c> into binary64 (where it is 13.199999999999999 and a truncating store gives 17.1 for
+/// <c>13.2 + FUNCTION SQRT(16)</c>).</param>
+/// <param name="Digits">An UPPER BOUND on the decimal digits of the UNSCALED value of an exact (non-<see cref="Dec"/>,
+/// non-<see cref="Real"/>) operand, or 0 when it is not known (kb/Work PB1143 / PB621). The bound is what lets the
+/// renderer decide at COMPILE time whether an operation on scaled <see cref="Int128"/> values can leave the
+/// carrier — a product of an N-digit and an M-digit unscaled value is below 10^(N+M) — and fall to the SDIDI,
+/// whose exponent is carried at run time, exactly where it can and never otherwise. Producers that know it set it
+/// (a field read: the PICTURE's digit count; a literal: its digit count; the exact additive, multiplicative and
+/// aligned results derived from those); every other producer leaves it 0 and keeps the carrier's checked
+/// behaviour.</param>
+internal readonly record struct NumX(string Expr, int Scale, bool Dec = false, bool Real = false, bool U = false,
+    bool Approximate = false, int Digits = 0)
+{
+    /// <summary>WHICH carrier <see cref="Expr"/> is typed as — the one question every total-over-carriers dispatch
+    /// (<c>IntrinsicRenderer.IntegerIntake</c>, the landings, the stores) asks, answered once from the mutually
+    /// exclusive flags. <see cref="NumXCarrier"/> is the enumeration a drift test walks to prove such a dispatch
+    /// accepts every carrier the renderer can produce.</summary>
+    public NumXCarrier Carrier => U ? NumXCarrier.UnsignedWide : Dec ? NumXCarrier.Sdidi : Real ? NumXCarrier.Binary64 : NumXCarrier.Scaled;
+}
+
+/// <summary>The carriers a <see cref="NumX"/> expression can be typed as (see <see cref="NumX.Carrier"/>): the exact
+/// scaled <see cref="Int128"/>, the unsigned-wide <c>UInt128</c> lane, the <c>CobolDec</c> SDIDI, and binary64.</summary>
+internal enum NumXCarrier { Scaled, UnsignedWide, Sdidi, Binary64 }
 
 /// <summary>Small text utilities shared by every backend emitter: loud-failure guards, literal escaping, and the
 /// numeric-literal → unscaled-<c>long</c> conversions.</summary>
@@ -269,7 +300,9 @@ internal static class EmitText
         if (!TryUnscaledParts(text, out string digits, out int scale))
             return new NumX(text.Trim().TrimStart('+'), 0, Real: true);
         var (lit, u) = IntLiteralX(digits);
-        return new NumX(lit, scale, U: u);
+        // The literal's own digit count is the exact bound (leading zeros carry no magnitude): the sign is not a digit.
+        int significant = digits.TrimStart('-', '+').TrimStart('0').Length;
+        return new NumX(lit, scale, U: u, Digits: Math.Clamp(significant, 1, 39));   // a synthesized HIGHEST-ALGEBRAIC literal is 39 digits
     }
 
     /// <summary>The C# literal for an unscaled integer digit string: <c>…L</c> while it fits <see cref="long"/>

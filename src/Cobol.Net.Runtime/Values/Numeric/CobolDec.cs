@@ -81,6 +81,18 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return new CobolDec(neg ? -sig : sig, exp10 - frac);
     }
 
+    /// <summary>True when the VALUE has a nonzero digit right of the decimal point — the SDIDI spelling of
+    /// <see cref="CobolNum.HasFraction"/>, asked of the exact value (a trailing-zero significand is not a fraction:
+    /// <c>10 × 10⁻¹</c> is the integer 1). An exponent more than 38 places below the point can divide a nonzero
+    /// Int128 significand only when the significand is zero, so every nonzero such value is fractional.</summary>
+    public bool HasFraction =>
+        Sig != 0 && Exp < 0 && (-Exp > 38 || Sig % Pow10.AsWide(-Exp) != 0);
+
+    /// <summary>The value truncated to an integer on the native Int128 carrier — the INTERMEDIATE landing at scale 0
+    /// (a magnitude past the carrier is EC-SIZE-OVERFLOW, A.1 item 179), for a consumer that has already decided
+    /// the value is an integer (<see cref="HasFraction"/>) or that truncation is the documented continue.</summary>
+    public Int128 TruncatedInteger() => ToUnscaledIntermediate(0, CobolRounding.Truncation);
+
     /// <summary>The multiplicative identity (the §8.8.1.5.4 r1/r3 constant 1).</summary>
     private static readonly CobolDec One = new(1, 0);
 
@@ -482,25 +494,53 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         if (bSig == 0) return Round34(a.Sig, a.Exp, sticky: false, mode);
 
         // Align to the smaller exponent. Shift the higher-exponent significand UP while it fits the wide scratch
-        // (38 digits); if the gap is larger, shift the LOWER one DOWN capturing a sticky bit — its dropped digits
-        // can only influence the final rounding decision (they are below the result's 34-digit precision).
+        // (38 digits); if the gap is larger, shift the LOWER one DOWN and account for its dropped tail — which has
+        // the low operand's SIGN and so can pull the exact magnitude below the shifted sum as well as above it
+        // (kb/Work PB1510; see the residual arm below). The tail lies below the result's 34-digit precision.
         (Int128 hiSig, int hiExp, Int128 loSig, int loExp) =
             a.Exp >= b.Exp ? (a.Sig, a.Exp, bSig, b.Exp) : (bSig, b.Exp, a.Sig, a.Exp);
         int gap = hiExp - loExp;
-        bool sticky = false;
         int upRoom = 38 - DigitCount(Int128.Abs(hiSig));
         int up = Math.Min(gap, upRoom);
         hiSig *= Pow10.AsWide(up);
         int residual = gap - up;
         if (residual > 0)
         {
-            // Down-shift the low operand by the residual, keeping ONE guard digit beyond exactness; the dropped
-            // tail folds into sticky.
+            // Down-shift the low operand by the residual; the dropped tail is nonzero exactly when `dropped`, and it
+            // has the SIGN OF THE LOW OPERAND.
+            Int128 loOriginal = loSig;
             (loSig, bool dropped) = ShiftDownSticky(loSig, residual);
-            sticky = dropped;
             loExp += residual;
+            Int128 near = hiSig + loSig;
+            if (!dropped) return Round34(near, loExp, sticky: false, mode);
+            // ⛔ THE DROPPED TAIL IS A SIGNED QUANTITY, AND THE STICKY BIT IS NOT (kb/Work PB1510). C# division
+            // truncates toward zero, so the down-shifted low operand is always a little CLOSER TO ZERO than the
+            // exact one: the exact sum is `near + tail` with |tail| < 1 unit and sign(tail) = sign(loOriginal).
+            //   · tail and `near` of one sign — the exact magnitude is |near| + |tail|: `near` with sticky is the
+            //     exact "truncated result plus a positive remainder" Round34Wide rounds.
+            //   · tail and `near` of opposite signs (a SUBTRACTION, or an addition of opposite-signed operands) —
+            //     the exact magnitude is |near| − |tail|, i.e. one unit below |near| plus a positive remainder, so
+            //     the truncated magnitude is |near| − 1 and the remainder is (1 − |tail|) > 0. Folding the tail in as
+            //     a bare sticky bit read it as EXCESS in the result's direction, which over-stated the magnitude:
+            //     `1 − 1.0E−50` held 1.000…0 (and TRUNCATION kept it) where §11.9.11.2 GR3 e) owes the nearest SDIDI
+            //     value NEARER ZERO, 0.999…9 (34 nines).
+            // The jam is exact only while the digits that decide the rounding all come from `near`, i.e. while
+            // |near| − 1 still has ≥ 35 digits. That holds whenever the operands are the ≤ 34-digit results every
+            // operation returns (the shifted high operand alone is ≥ 10^37 and the shifted low one < 10^33); a
+            // 38-digit operand built by CobolDec.From can cancel `near` down to a few digits, where the tail's OWN
+            // digits are significant — that case is computed exactly instead: near·10^residual + (loOriginal mod
+            // 10^residual) is an Int128 whenever |near| < 10^35 (residual is 1 there: the shifted high operand alone is ≥ 10^37).
+            int tailSign = loOriginal < 0 ? -1 : 1;
+            if (near == 0 || Int128.Abs(near) < Pow10.AsWide(35))
+            {
+                Int128 scale = Pow10.AsWide(residual);
+                Int128 exact = near * scale + loOriginal % scale;
+                return Round34(exact, loExp - residual, sticky: false, mode);
+            }
+            if (Int128.Sign(near) != tailSign) near -= Int128.Sign(near);   // one unit toward zero; the remainder is positive
+            return Round34(near, loExp, sticky: true, mode);
         }
-        return Round34(hiSig + loSig, loExp, sticky, mode);
+        return Round34(hiSig + loSig, loExp, sticky: false, mode);
     }
 
     /// <summary>Multiply: the exact 256-bit product reduces to 34 significant digits (§8.8.1.5).</summary>
@@ -511,11 +551,36 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return Round34Wide(hi, lo, negative, a.Exp + b.Exp, mode);
     }
 
+    /// <summary>⛔ THE PRODUCT A NATIVE STATEMENT FORMS ON THE SDIDI WHEN ITS SCALED OPERANDS COULD LEAVE <c>Int128</c>
+    /// (kb/Work PB1143 — <c>NumericRenderer.Multiply</c>): the exact 256-bit product reduced to 34 significant digits
+    /// by ROUND-TO-ODD. Native arithmetic rounds ONCE, at the final transfer (§14.7 NOTE 1), and that transfer's mode
+    /// has to see whether anything lay beyond the 34th digit — a bare truncation hid it (a product 1 + 2e-30 + 1e-60
+    /// under ROUNDED AWAY-FROM-ZERO stored …002 where …003 is owed; a product above a NEAREST-EVEN tie became the tie;
+    /// PROHIBITED stored an inexact product silently). Round-to-odd keeps the truncated magnitude when its last digit is
+    /// odd and the next one up when it is even, whenever digits were dropped: the stored neighbour is never on a
+    /// rounding boundary of a coarser precision, so rounding THIS value to the receiver's ≤ 31 digit positions (a
+    /// margin of at least 3 digits, only 2 are needed) in ANY mode equals rounding the exact product once. A product
+    /// of ≤ 34 digits is exact and unchanged.</summary>
+    public static CobolDec MulToOdd(CobolDec a, CobolDec b)
+    {
+        bool negative = (a.Sig < 0) ^ (b.Sig < 0);
+        var (hi, lo) = Mul128(UAbs(a.Sig), UAbs(b.Sig));
+        return Round34Wide(hi, lo, negative, a.Exp + b.Exp, CobolRounding.Truncation, jam: true);
+    }
+
     /// <summary>Divide: the dividend pre-scales so the exact quotient carries ≥34 significant digits, the
     /// shift-subtract 256÷128 division yields quotient+remainder, and one rounding lands the SDIDI result.
     /// A zero divisor raises <see cref="CobolSizeError.ZeroDivide"/> (§14.7.5 case 2), checked or not — the SDIDI
     /// arm of the three value lanes' one zero-divisor rule.</summary>
-    public static CobolDec Div(CobolDec a, CobolDec b, CobolRounding mode)
+    public static CobolDec Div(CobolDec a, CobolDec b, CobolRounding mode) => Div(a, b, mode, jam: false);
+
+    /// <summary>The quotient, reduced to 34 significant digits by ROUND-TO-ODD — <see cref="MulToOdd"/>'s sibling for
+    /// <c>CobolNum.Divide</c>'s alignment-past-the-carrier path (kb/Work PB1143): the remainder of the division and any
+    /// digit dropped by the reduction make the result inexact, and an inexact result keeps an ODD last digit, so the
+    /// caller's single rounding to the result scale (any mode, ≥ 2 digits coarser) equals rounding the exact quotient.</summary>
+    public static CobolDec DivToOdd(CobolDec a, CobolDec b) => Div(a, b, CobolRounding.Truncation, jam: true);
+
+    private static CobolDec Div(CobolDec a, CobolDec b, CobolRounding mode, bool jam)
     {
         if (b.Sig == 0) throw CobolSizeError.ZeroDivide();
         if (a.Sig == 0) return new CobolDec(0, 0);
@@ -539,7 +604,7 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         var (q, rem) = DivRem256(hi, lo, den);
 
         // q < 10^37 by construction → fits Int128. Round to 34 digits, folding the division remainder into sticky.
-        return Round34Wide(0, q, negative, a.Exp - scaleUp - b.Exp, mode, extraSticky: rem != 0);
+        return Round34Wide(0, q, negative, a.Exp - scaleUp - b.Exp, mode, extraSticky: rem != 0, jam: jam);
     }
 
     /// <summary>Algebraic comparison (−1/0/+1) — exact: equal orders of magnitude align within the wide range;
@@ -680,7 +745,7 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     /// any earlier dropped digit was nonzero (sticky); then apply the INTERMEDIATE ROUNDING mode (§11.9.11 —
     /// PROHIBITED ⇒ size error when anything was dropped).</summary>
     private static CobolDec Round34Wide(UInt128 hi, UInt128 lo, bool negative, int exp, CobolRounding mode,
-        bool extraSticky = false)
+        bool extraSticky = false, bool jam = false)
     {
         bool sticky = extraSticky;
         int roundDigit = 0;
@@ -692,7 +757,15 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         }
         Int128 sig = (Int128)lo;
         bool inexact = roundDigit != 0 || sticky;
-        if (inexact)
+        if (inexact && jam)
+        {
+            // ROUND-TO-ODD (kb/Work PB1143 — see MulToOdd): keep the truncated magnitude if its last digit is odd, else the
+            // next one up. Neither neighbour lies ON a coarser rounding boundary (a multiple of 10 is even), so any later
+            // rounding to ≤ 32 digits, in any mode, sees the exact value on the same side of every boundary.
+            if (sig % 2 == 0) sig++;
+            if (sig == (Int128)Limit34) { sig /= 10; exp++; }
+        }
+        else if (inexact)
         {
             switch (mode)
             {

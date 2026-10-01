@@ -65,6 +65,7 @@ public static partial class CobolIntrinsics
     /// </summary>
     private static bool TryIntegerArg(double v, string fn, out long n)
     {
+        RequireIntegralReal(v);   // §15.3 type 6 — the ONE integrality test every carrier's intake shares (kb/Work PB1526)
         if (double.IsFinite(v) && v > -9.2e18 && v < 9.2e18) { n = (long)Math.Truncate(v); return true; }
         Exceptions.ExceptionState.ArgumentError(
             $"{fn}: the floating-point argument {v} is outside the integer-argument range (ISO §15.3)");
@@ -122,6 +123,7 @@ public static partial class CobolIntrinsics
     /// </remarks>
     private static bool TryTotalIntegerArg(double v, out Int128 n)
     {
+        RequireIntegralReal(v);   // §15.90.3 r1 / §15.91.3 r1 "shall be an integer" — a total argument is still an INTEGER (kb/Work PB1526)
         if (double.IsNaN(v)) { n = Int128.Zero; return false; }
         n = v >= 1.7e38 ? Int128.MaxValue
           : v <= -1.7e38 ? Int128.MinValue

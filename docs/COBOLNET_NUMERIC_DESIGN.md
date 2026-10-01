@@ -986,3 +986,55 @@ clause text and fails if a new member is silently exempted.
 **Pinned by** `85/pb426_alnum_sender_31_character_cap`, `2002/pb426_alnum_sender_31_digit_receiver`,
 `2002/pb426_alnum_sender_data_incompatible`, `negative/pb844-ec-data-incompatible-turn-below-2002`,
 `MoveAlphanumericSenderTests` and `SendingRefDriftTests`.
+
+### D26. The native lane is chosen from FACTS about the operands — their DIGIT BOUNDS and whether a float ITEM owns the expression — never from the carrier's width or from where a binary64 came from. (kb/Work PB1143 + PB621 + PB1641 + PB1510 + PB1686; rule 5 — the stated scope of each was "one clause", and the mechanism they share is this.)
+
+**The three questions the renderer used to answer by accident.**
+
+1. *Can this operation leave the `Int128` carrier?* `NumX.Digits` is an UPPER BOUND on the decimal digits of an exact
+   operand's unscaled value (0 = unknown): a field read states `PicInfo.UnscaledDigitBound` (the PICTURE's digits; a
+   COMP-5 / BINARY-CHAR… item owns its whole container range, §13.18.60.4 GR12), a literal its own digit count, and the
+   exact sum, difference, negation and product derive theirs. A product of N- and M-digit unscaled values is below
+   10^(N+M), so `NumericRenderer.Multiply` decides at COMPILE time: N+M ≤ 38 — a bare multiply (no check needed, none
+   emitted); N+M > 38 — the exact 256-bit product on the SDIDI (`CobolDec.MulToOdd`: 34 digits by ROUND-TO-ODD — an inexact
+   product keeps an odd last digit, so the receiver's ONE rounding, §14.7.4.3, in any mode, equals rounding the exact
+   product: a receiver holds ≤ 31 digit positions, a margin of 3 where 2 suffice); an unknown bound — `CobolNum.MulChecked` in EVERY statement (a native product never wraps). The old emitter
+   multiplied unchecked and `PIC 9V9(30)` × `PIC 9V9(30)` — a legal statement, §14.7.7 r2 a) caps the COMPOSITE — stored a
+   wrapped product. The same bound drives `IntrinsicRenderer.AlignmentMayLeaveCarrier`: SUM / RANGE / MEAN / MEDIAN /
+   MIDRANGE align every argument to the list's maximum scale, and when the aligned bound plus the function's
+   accumulation digits passes 38 the call goes to its SDIDI body (`SumDec` …) instead of raising for a value the receiver
+   holds (MOD / REM are deliberately NOT routed: their value is a difference of nearly equal magnitudes — MOD(9E30,
+   0.12345678) needs 39 digits of the dividend — so the 34-digit SDIDI body would answer an approximation silently where
+   the native arm refuses loudly). ⚠ The note's first proposal — align to the RECEIVER's scale, as MAX/MIN do — is unsound for arithmetic
+   (RANGE(0.6, −0.5) into a scale-0 receiver is 1.1 → 1, but arguments cut to scale 0 first give 0 − 0): the arguments keep
+   their own digits and the CARRIER is what changes. The DIVIDE kernel's radix alignment (`CobolNum.Divide`) never wraps for the
+   same reason: past the carrier the quotient is formed on the SDIDI (`CobolDec.DivToOdd`, round-to-odd) and rounded once at
+   the result scale; a quotient past the carrier is EC-SIZE-OVERFLOW.
+2. *Does a float operand own this lane?* D16 evaluates an expression in binary64 when an operand is "described with usage
+   float-…" (§14.9.2.4 GR4 and §14.9.44.4 GR4 — ADD and SUBTRACT, the other statements' native rule being the implementor's,
+   §8.8.1.3; §14.7.7 r2 lists an intrinsic function and the float / binary usages in separate bullets). A floating-math function's returned value and a non-integer native power are engine-produced approximations,
+   flagged `NumX.Approximate`; `CombineCore` lifts such an operand to the SDIDI (its shortest-round-trip decimal — the same
+   VALUE) unless a float ITEM, a float literal carrier or a float receiver is present (`FloatItemLane`). One value
+   across every channel, exact decimal arithmetic beside decimal operands: `13.2 + FUNCTION SQRT(16)` is 17.2, and the
+   receiver-less `0.1 + FUNCTION SQRT(0.04) = 0.3` is TRUE.
+3. *Whose sign is the dropped tail?* `CobolDec.AddSigned` shifts the smaller operand down; truncation toward zero makes the
+   shifted operand closer to zero than the exact one, so the dropped tail has the LOW OPERAND's sign. An opposite-sign tail
+   is one unit below `near` plus a positive remainder (`near − sign`, sticky), a same-sign tail is `near` plus a positive
+   remainder, and a cancellation down to the tail's own digits (only a 38-digit `CobolDec.From` operand can) is computed
+   exactly. §11.9.11.2 GR3 e): TRUNCATION delivers "the nearest value … nearer to zero".
+
+**Report SUM (PB1686).** §13.18.54.4 GR3 is literal: a term's addition is the ADD statement's — `Fold` the addends, `Combine`
+with the counter's content at the wider scale, `StoreExpr(raiseOnSizeError)` once through the counter's profile
+(`ReportWriterEmitter`; `ReportWriter.SumTerm` is `Func<Int128, Int128>`). **Integer arguments (PB1526 / PB638).** §15.3
+type 6 is a rule about the VALUE: `CobolIntrinsics.IntegerArg*` ask `CobolNum.HasFraction` / `CobolDec.HasFraction` / the
+binary64 truncation test on EVERY carrier (narrow and wide, `RuntimeApi.IntegerArgOf`) and raise EC-ARGUMENT-FUNCTION; the
+unsigned-wide carrier funnels through `DeU` first (`IntegerIntake` is total over `NumXCarrier`).
+**Time form (PB1379).** The seconds argument lands rounding toward NEGATIVE infinity (`CobolDate.SecondsOfReal` / `SecondsOfDec`)
+so the §7.3.17.4 floor sees a negative value as negative; `CobolDate.TimeOfDay` is the one hh:mm:ss reading (86 400 under
+ON is 23:59:60 in FORMATTED-TIME, FORMATTED-DATETIME and LOCALE-TIME-FROM-SECONDS alike).
+
+**Pinned by** `2023/pb1143_native_product_beyond_scaled_int128`, `2023/pb621_statistics_beyond_the_aligned_carrier`,
+`2002/pb252_native_carrier_boundary` (case 2 is now the VALUE), `2023/pb1641_function_result_beside_decimal_operands`,
+`2023/pb1510_intermediate_rounding_*`, `2023/pb1686_sum_counter_adds_like_add`, `2023/pb1526_integer_argument_has_integral_value`,
+`2023/pb638_unsigned_wide_item_as_integer_argument`, `2023/pb1379_time_form_floor_float_carriers_*`, `CobolDecSignedTailTests`,
+`CobolNumDivideAlignmentTests`, `CobolDateSecondsLandingTests` and `IntrinsicCarrierAgreementDriftTests`.

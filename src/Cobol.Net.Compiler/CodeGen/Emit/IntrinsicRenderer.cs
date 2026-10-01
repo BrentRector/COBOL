@@ -137,6 +137,22 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // (kb/Work PB273); the census is written out there.
         else if (AnyDecRaw(ic) && RenderDec(ic) is { } decNative)
             return decNative;
+        // ⛔ A CROSS-ALIGNING ARM WHOSE ALIGNED ARGUMENTS PROVABLY CANNOT STAY IN THE Int128 CARRIER TAKES THE SDIDI
+        // (kb/Work PB621; the Int128 half of the boundary PB252 made honest). SUM / RANGE / MEAN / MEDIAN / MIDRANGE
+        // align every argument to the LIST's maximum scale, and alignment multiplies: ±1.7e30 beside a
+        // PIC SV9(8) item needs 39 digits aligned, so the native arm answered EC-SIZE-OVERFLOW for RANGE = 3.4e30 —
+        // a value its PIC S9(31) receiver holds. The value is representable; only the carrier's width was the
+        // problem, and the SDIDI carries its exponent at run time (SumDec / RangeDec …: each argument converts
+        // exactly, §8.8.1.5.2 r1, and the equivalent arithmetic expression evaluates on 34 digits — more than any
+        // receiver can store, §13.18.40.3 SR14). ⚠ NOT "ALIGN TO THE RECEIVER'S SCALE", which the note proposed:
+        // RANGE(0.6, −0.5) into a scale-0 receiver is 1.1 → 1, but each argument cut to scale 0 first is 0 − 0 = 0 —
+        // no guard-digit count survives a carry (0.95 + 0.05), so the arguments must keep their own digits and the
+        // wider carrier must be the one that changes. The question is asked of the arguments' digit BOUNDS
+        // (NumX.Digits) so an ordinary list keeps its Int128 body unchanged and only a list that may leave the
+        // carrier moves; an argument whose bound is unknown keeps the escape-checked native arm.
+        if (CrossAlignedNativeArms.Contains(sig.RuntimeMethod) && AlignmentMayLeaveCarrier(ic)
+            && RenderDec(ic) is { } wideAligned)
+            return wideAligned;
         if (sig.Float) return RenderFloat(ic, sig.RuntimeMethod);
         // (The float lane's two preconditions are <see cref="FloatLaneExempt"/> — a numeric argument run whose
         // RESULT binary64 cannot carry — and IntrinsicArgumentRules.ArgumentRunIsAllNumeric — an argument run
@@ -401,7 +417,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                 // digit-for-digit; the binary64 route would land NUMVAL-F("1.5E-8") into V9(9) as 14 through
                 // ToScaled's multiply-then-truncate, and lose every digit past the 17th of a 20-digit argument).
                 if (num.Receiver.Real || (num.Receiver.Receiverless && !num.Receiver.MoveSender))
-                    return new NumX(RuntimeApi.Intrinsic("NumvalFDouble", $"{Str(ic.Args[0])}{CommaFlag}{DigitCapFlag}"), 0, Real: true);
+                    return new NumX(RuntimeApi.Intrinsic("NumvalFDouble", $"{Str(ic.Args[0])}{CommaFlag}{DigitCapFlag}"), 0, Real: true, Approximate: true);
                 int ws = num.Receiver.FloatWorkingScale;
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{Str(ic.Args[0])}, {ws}{CommaFlag}{DigitCapFlag}{CheckedFlag}"), ws);
             }
@@ -728,8 +744,14 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // and compared FALSE. RealResult restores the screen without re-quantizing — a function's returned value
         // must not depend on the SHAPE of its receiver (§15.4), and under EC-ARGUMENT-FUNCTION checking
         // §14.6.13.1 requires the condition be raised at all. (Found by the Phase-B §15.55 refuter.)
+        // ⛔ THE BINARY64 THAT STAYS IS AN APPROXIMATION THE ENGINE PRODUCED, NOT A FLOAT ITEM'S CONTENT (kb/Work
+        // PB1641). It is the SAME value a COMP-2 item holding it would carry, so every receiver-less channel (a
+        // relation, the text channel, a MOVE source) still reads one binary64; but as an OPERAND it is flagged
+        // Approximate, and NumericRenderer.CombineCore — the one place the lane is chosen — lifts it to the SDIDI
+        // (its shortest-round-trip decimal) beside fixed-point operands, so `13.2 + FUNCTION SQRT(16)` is 17.2 and not
+        // the 17.1 a truncating store of 13.199999999999999 + 4.0 gives.
         if (!landing.Quantize)
-            return new NumX(RuntimeApi.Intrinsic("RealResult", call), 0, Real: true);
+            return new NumX(RuntimeApi.Intrinsic("RealResult", call), 0, Real: true, Approximate: true);
         // ⛔ A BOUNDED CODOMAIN CLAMPS THE QUANTIZED VALUE (fix-queue PB65 / RV-15.75.4-1): the catalog row
         // carries the §15.x.4 bound and the quantizer refuses to round out of it — RANDOM's [0,1) reached
         // exactly 1.000000000 in a 9V9(9) receiver, ASIN(1) exceeded its closed-but-irrational π/2. The
@@ -957,6 +979,40 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded, so no value semantics apply.</remarks>
     private bool AnyDecOrRealRaw(BoundIntrinsicCall ic) =>
         ic.Args.Any(a => { var x = num.AsNum(a, num.Receiver); return x.Dec || x.Real; });
+
+    /// <summary>Can aligning this call's arguments to their common scale — and accumulating the aligned values —
+    /// leave the <see cref="Int128"/> carrier? True only when EVERY argument is an exact scaled operand with a KNOWN
+    /// digit bound (<see cref="NumX.Digits"/>) and the widest aligned bound, plus the digits the function's own
+    /// accumulation can add, exceeds the carrier's 38. An argument whose bound is unknown answers false: nothing is
+    /// provable, and the escape-checked native arm (PB252) keeps its documented behaviour for it.</summary>
+    /// <remarks>
+    /// <para>The accumulation allowance is a property of the FUNCTION: SUM and MEAN add n aligned values (the digits
+    /// of n, plus 9 for a table(ALL) argument whose run-time count is unknown); RANGE subtracts two; MEDIAN and
+    /// MIDRANGE add two and halve through ×10; MOD and REM align a pair and return one of them.</para>
+    /// <para>The aligned value's own digits are an UPPER bound by construction: an argument's unscaled digits plus
+    /// the scale gap it is shifted by.</para></remarks>
+    /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question — of the RAW operand: its carrier flags and its digit bound.</remarks>
+    private bool AlignmentMayLeaveCarrier(BoundIntrinsicCall ic)
+    {
+        // ⛔ MOD / REM ARE NOT ROUTED. Their value is a DIFFERENCE of nearly equal magnitudes: MOD(9E30, 0.12345678) is
+        // 0.1194939, which needs 39 digits of the dividend, and the SDIDI body keeps 34 — it would answer an
+        // approximation SILENTLY where the native arm refuses LOUDLY (EC-SIZE-OVERFLOW at the carrier). The summing
+        // family's value, in contrast, is as large as its arguments, so every digit a receiver can store (≤ 31) lies
+        // inside the SDIDI's 34. (PB621 names SUM, RANGE, MEAN, MEDIAN and MIDRANGE only.)
+        if (ic.Sig.RuntimeMethod is "ModScaled" or "RemScaled") return false;
+        var xs = ic.Args.Select(a => num.AsNum(a, num.Receiver)).ToList();
+        if (xs.Count == 0 || xs.Any(x => x.Dec || x.Real || x.Digits == 0)) return false;
+        int s = xs.Max(x => x.Scale);
+        int widest = xs.Max(x => x.Digits + (s - x.Scale));
+        bool tableAll = ic.Args.Any(a => a is BoundFieldOperand { Place: TableAllPlace });
+        int accumulation = ic.Sig.RuntimeMethod switch
+        {
+            "SumScaled" or "MeanScaled" => ic.Args.Count.ToString(System.Globalization.CultureInfo.InvariantCulture).Length + (tableAll ? 9 : 0),
+            "RangeScaled" => 1,
+            _ => 2,                                              // MEDIAN / MIDRANGE: two added, then halved through ×10
+        };
+        return widest + accumulation > ReceiverContext.IntermediateDigits;
+    }
 
     /// <summary>Does any argument arrive on the SDIDI carrier (a native integer power — kb/Work PB69)?</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded.</remarks>
@@ -1191,16 +1247,36 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// converts implicitly to both <c>Int128</c> and <c>double</c>, and an overload pair would turn
     /// <c>FUNCTION FACTORIAL(5)</c> into a CS0121 ambiguity — the collision that broke six corpus programs when
     /// the <c>…Real</c> bodies were first written.</para></summary>
-    private static string AsInt(NumX a) =>
-        a.Real ? RuntimeApi.IntegerArg(a.Expr, real: true)
-        // The Dec arm (kb/Work R24 — ledger F44): an SDIDI intermediate (a §15.3 type-6/type-10 expression
-        // under a standard mode) lands at scale 0 through its own exact conversion. ⛔ BEFORE the Scale == 0
-        // test — a Dec NumX carries Scale 0 BY CONVENTION (the PB14/PB32 lesson), so the scale test would pass
-        // the CobolDec expression through raw and hand Roslyn the CS1503 this arm exists to close. This was
-        // the one carrier-total dispatch in the renderer family still missing its Dec arm.
-        : a.Dec ? RuntimeApi.IntegerArg(RuntimeApi.DecToUnscaledIntermediate(a.Expr, "0", CobolRounding.Truncation))
-        : a.Scale == 0 ? RuntimeApi.IntegerArg(a.Expr)
-        : RuntimeApi.IntegerArg(RuntimeApi.NumRescale(a.Expr, a.Scale.ToString(), "0", CobolRounding.Truncation));
+    private static string AsInt(NumX a) => IntegerIntake(a, wide: false);
+
+    /// <summary>
+    /// ⛔ THE ONE §15.3 TYPE-6 INTAKE, TOTAL OVER EVERY CARRIER A <see cref="NumX"/> CAN BE, and the bounded
+    /// (<see cref="AsInt"/>) and total (<see cref="AsIntWide"/>) arms are this method's two widths — they were two
+    /// hand-copied four-arm dispatches, and the copies had drifted: the wide one had an unsigned-wide arm the
+    /// narrow one lacked (<c>USAGE COMP-5</c> over a 19+-digit unsigned PICTURE at INTEGER-OF-DATE / CHAR /
+    /// BASE-CONVERT reached Roslyn as a CS1503 — kb/Work PB638) and ignored the scale of such an operand; neither
+    /// asked the integrality question (kb/Work PB1526), which <see cref="RuntimeApi.IntegerArgOf"/> now asks on
+    /// the exact value on every carrier.
+    /// <list type="bullet">
+    ///   <item>the unsigned-wide lane funnels through <see cref="NumericRenderer.DeU"/> FIRST — the R10 Widen
+    ///         funnel, loud past the Int128 intermediate — and then rides the ordinary scaled arm, scale included;</item>
+    ///   <item>the Dec arm is BEFORE the scale test (kb/Work R24 — ledger F44): a Dec NumX carries Scale 0 BY
+    ///         CONVENTION (the PB14/PB32 lesson), so the scale test would pass the CobolDec expression through raw
+    ///         and hand Roslyn the CS1503 this arm exists to close; the float arm is the binary64 carrier.</item>
+    /// </list>
+    /// <c>IntrinsicCarrierAgreementDriftTests.EveryIntegerIntake_IsTotalOverTheNumXCarriers</c> derives the carrier
+    /// list from <see cref="NumX"/>'s own flags and proves both widths accept every one.</summary>
+    internal static string IntegerIntake(NumX a, bool wide)
+    {
+        a = NumericRenderer.DeU(a);
+        return a.Carrier switch
+        {
+            NumXCarrier.Binary64 => RuntimeApi.IntegerArgOf(RuntimeApi.IntegerArgCarrier.Real, a.Expr, 0, wide),
+            NumXCarrier.Sdidi => RuntimeApi.IntegerArgOf(RuntimeApi.IntegerArgCarrier.Dec, a.Expr, 0, wide),
+            NumXCarrier.Scaled => RuntimeApi.IntegerArgOf(RuntimeApi.IntegerArgCarrier.Scaled, a.Expr, a.Scale, wide),
+            _ => throw new InvalidOperationException($"unsigned-wide operand survived the Widen funnel ({a.Carrier})"),
+        };
+    }
 
     /// <summary>The variadic arguments aligned to their common scale (ISO §8.8.1 — alignment makes unscaled
     /// comparison/arithmetic equal value comparison/arithmetic), as a C# argument list + that scale.</summary>
@@ -1473,8 +1549,12 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     private static (string Expr, int Scale) SecondsArg(NumX x)
     {
         x = NumericRenderer.DeU(x);
-        if (x.Real) return (RuntimeApi.FloatToScaled(x.Expr, "9", CobolRounding.Truncation, checkedLanding: true), 9);
-        if (x.Dec) return (RuntimeApi.DecToUnscaledIntermediate(x.Expr, "18", CobolRounding.Truncation), 18);
+        // ⛔ BOTH LANDINGS ROUND TOWARD NEGATIVE INFINITY AND NEVER RAISE (kb/Work PB1379): the consumers screen the
+        // landed value against §7.3.17.4's [0, 86 400) / [0, 86 401), and a landing that truncated a tiny negative to
+        // zero (or raised a size error for a huge one) answered that screen before it could. CobolDate.SecondsOfReal
+        // / SecondsOfDec preserve membership in the form; the fixed-point arm below is exact at its own scale.
+        if (x.Real) return (RuntimeApi.SecondsLanding(x.Expr, dec: false), 9);
+        if (x.Dec) return (RuntimeApi.SecondsLanding(x.Expr, dec: true), 18);
         return (x.Expr, x.Scale);
     }
 
@@ -1559,12 +1639,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// by convention, the PB14/PB32 lesson; the unsigned-wide lane narrows through the R10
     /// <c>CobolNum.Widen</c> funnel, loud past the intermediate).</para>
     /// </remarks>
-    private static string AsIntWide(NumX a) =>
-        a.Real ? RuntimeApi.IntegerArgWide(a.Expr)
-        : a.Dec ? RuntimeApi.DecToUnscaledIntermediate(a.Expr, "0", CobolRounding.Truncation)
-        : a.U ? RuntimeApi.NumWiden(a.Expr)
-        : a.Scale == 0 ? a.Expr
-        : RuntimeApi.NumRescale(a.Expr, a.Scale.ToString(), "0", CobolRounding.Truncation);
+    private static string AsIntWide(NumX a) => IntegerIntake(a, wide: true);
 
     /// <summary>A string-kind argument (the §15.3 alphanumeric-argument shapes): literals, field display
     /// images, and nested alphanumeric intrinsics. A numeric-category operand in a string-argument position

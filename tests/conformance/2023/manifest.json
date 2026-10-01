@@ -745,7 +745,20 @@
   "pb1586_tab_in_literal",
   "pb1586_tab_free_form",
   "pb1496_lone_cr_is_a_character",
-  "pb1496_free_form_line_255"
+  "pb1496_free_form_line_255",
+  "pb1641_function_result_beside_decimal_operands",
+  "pb1526_integer_argument_has_integral_value",
+  "pb638_unsigned_wide_item_as_integer_argument",
+  "pb1379_time_form_floor_float_carriers_off",
+  "pb1379_time_form_floor_float_carriers_on",
+  "pb1510_intermediate_rounding_truncation_signed_tail",
+  "pb1510_intermediate_rounding_nearest_signed_tail",
+  "pb1510_intermediate_rounding_nearest_even_tie",
+  "pb1143_native_product_beyond_scaled_int128",
+  "pb621_statistics_beyond_the_aligned_carrier",
+  "pb1686_sum_counter_adds_like_add",
+  "pb1526_integer_argument_integrality_standard_decimal",
+  "pb1379_time_form_floor_sdidi_carrier"
  ],
  "pending": [
   "pb485_value_only_format1"

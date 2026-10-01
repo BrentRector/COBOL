@@ -365,11 +365,14 @@ public sealed class CobolReport(
         a == b || (a.Length == 8 ? FloatControlSingle(a) == FloatControlSingle(b) : FloatControlDouble(a) == FloatControlDouble(b));
 
     /// <summary>ONE <c>SUM … [UPON …]</c> GROUP of a SUM clause (ISO §13.18.54.3 SR1 — the SUM keyword may appear
-    /// more than once, and §13.18.54.4 GR1 still gives the ENTRY one counter): the group's addend total, already
-    /// at the counter's scale (GR9 sums a group's addends together), and the group's OWN UPON filter — GR7 c) 2)
+    /// more than once, and §13.18.54.4 GR1 still gives the ENTRY one counter): the group's ONE ADDITION as the
+    /// counter's new content — <paramref name="Apply"/> takes the counter's current content (unscaled, at its own
+    /// scale) and returns its content after adding the group's addends "consistent with the general rules of the
+    /// ADD statement" (GR3; GR9 sums a group's addends together), evaluated by the SAME arithmetic renderer and
+    /// store funnel an ADD statement uses (kb/Work PB1686) — and the group's OWN UPON filter — GR7 c) 2)
     /// accumulates "whenever any GENERATE statement is executed for a detail referenced by the UPON phrase", and
     /// the phrase belongs to its group. Null = no UPON phrase (GR7 c) 1) — every GENERATE for this report).</summary>
-    private readonly record struct SumTerm(Func<Int128> Addend, string[]? UponDetails)
+    private readonly record struct SumTerm(Func<Int128, Int128> Apply, string[]? UponDetails)
     {
         /// <summary>HOW MANY TIMES this term accumulates on a GENERATE of <paramref name="detailName"/> (GR7 c)):
         /// once with no UPON phrase (GR7 c) 1.), else once per appearance of the detail in the phrase — GR7: "It is
@@ -392,7 +395,7 @@ public sealed class CobolReport(
     /// digits derived from the entry's PICTURE), its SIZE ERROR INDICATOR, the clause's <see cref="Terms"/> over
     /// the program's typed storage, the RESET control level (GR2; −1 = reset where printed), and the group it
     /// prints in.</summary>
-    private sealed class SumEntry(int digits, int resetLevel, ReportGroup printedIn, int presentSlot)
+    private sealed class SumEntry(int resetLevel, ReportGroup printedIn, int presentSlot)
     {
         /// <summary>The counter's content, unscaled at its own scale. ⛔ THE CARRIER IS <see cref="Int128"/>, THE
         /// WIDEST NATIVE FIXED-POINT CARRIER THE COMPILER USES (the 19–38-digit tier of <c>PicInfo.ClrType</c>),
@@ -408,44 +411,23 @@ public sealed class CobolReport(
         /// with spaces (GR4).</summary>
         public bool SizeError;
 
-        /// <summary>The largest magnitude the counter holds, unscaled: 10^digits − 1, where digits is "the
-        /// corresponding number of digits, excluding insertion editing characters, in the PICTURE clause of the
-        /// entry" (GR1) — the counter is therefore NOT the carrier's 64-bit range, and an addition past it is the
-        /// GR3 size error. The <see cref="Int128"/> carrier holds every 38-digit value, which covers every
-        /// counter a numeric or numeric-edited PICTURE can describe (≤ 31 digits); only an alphanumeric or
-        /// national PICTURE of more than 38 character positions (an X(n) SUM entry counts one digit per position,
-        /// <c>DataBinder.SumCounterDigits</c>) is bounded by the carrier instead — the compiler registers such a
-        /// counter with 38 digits (<c>PicInfo.SumCounterItem</c>), so an addition past the carrier is still a size
-        /// error rather than a wrap.</summary>
-        public Int128 Max { get; } = MaxOfDigits(digits);
-
-        private static Int128 MaxOfDigits(int digits) => Pow10.AsWide(Math.Clamp(digits, 1, 38)) - 1;
-
-        /// <summary>ISO §13.18.54.4 GR3 — add <paramref name="addend"/> "consistent with the general rules of the
-        /// ADD statement with the ON SIZE ERROR phrase": when the sum's magnitude exceeds <see cref="Max"/> the
-        /// counter is left unchanged (§14.7.5 1) — with the phrase, "the values of all of the resultant data items
-        /// remain unchanged from the values they had at the start of the execution of the arithmetic statement")
-        /// and the size error indicator is set. Returns false on a size error.</summary>
-        public bool Add(Int128 addend)
+        /// <summary>ISO §13.18.54.4 GR3 — one addition "consistent with the general rules of the ADD statement with
+        /// the ON SIZE ERROR phrase": <paramref name="apply"/> is the compiler's own ADD evaluation of the group's
+        /// addends into THIS counter (the counter's content, then the addends, summed at the wider of their scales
+        /// and stored ONCE at the counter's scale with its ROUNDED mode and its GR1 capacity — the digit count of
+        /// the entry's PICTURE, enforced by the store through the counter's profile, kb/Work PB1130/PB1686). When
+        /// that evaluation or store is a size error — a sum past the capacity, an intermediate past the Int128
+        /// carrier, a PROHIBITED-inexact transfer — the counter is left unchanged (§14.7.5 1) — with the phrase,
+        /// "the values of all of the resultant data items remain unchanged from the values they had at the start
+        /// of the execution of the arithmetic statement") and the size error indicator is set. Returns false on a
+        /// size error.</summary>
+        public bool Add(Func<Int128, Int128> apply)
         {
-            // CHECKED: |Value| ≤ Max < 10^38 but the addend is any Int128, so the exact sum of a 38-digit counter
-            // and a large addend can pass Int128.MaxValue (≈ 1.70·10^38). Such a sum is past every capacity the
-            // counter can have, so the overflow IS the GR3 size error — never a wrap into range.
-            Int128 sum;
-            try { sum = checked(Value + addend); }
-            catch (OverflowException) { SizeError = true; return false; }
-            if (sum > Max || sum < -Max) { SizeError = true; return false; }
-            Value = sum;
+            Int128 next;
+            try { next = apply(Value); }
+            catch (Exception e) when (e is CobolSizeError or OverflowException) { SizeError = true; return false; }
+            Value = next;
             return true;
-        }
-
-        /// <summary>An addition whose addend could not be formed within the Int128 intermediate — a size error by
-        /// construction (see the accumulation in <c>GenerateCore</c>): the counter is unchanged and its indicator
-        /// set, exactly as <see cref="Add"/> leaves it. Always returns false.</summary>
-        public bool FailAdd()
-        {
-            SizeError = true;
-            return false;
         }
 
         /// <summary>GR2 / §14.9.21.4 GR1 a) — the counter set to zero and its size error indicator unset.</summary>
@@ -506,28 +488,30 @@ public sealed class CobolReport(
     /// <summary>Register a SUM counter (ISO §13.18.54.4 GR1 — one per ENTRY containing a SUM clause).
     /// <paramref name="resetLevel"/> is the RESET control level (GR2; −1 = reset at the end of the group it
     /// prints in); <paramref name="presentSlot"/> is the entry's slot in <paramref name="printedIn"/>'s presence
-    /// snapshot (§13.18.41.4 GR3 g) — absent suppresses the end-of-group reset; −1 = unconditional). <paramref name="digits"/> is GR1's digit count of
-    /// the entry's PICTURE — the counter's capacity, past which an addition is the GR3 size error (kb/Work PB1130).
+    /// snapshot (§13.18.41.4 GR3 g) — absent suppresses the end-of-group reset; −1 = unconditional). The counter's
+    /// capacity (GR1's digit count of the entry's PICTURE, past which an addition is the GR3 size error, kb/Work
+    /// PB1130) is enforced by the store each term's addition ends in, through the counter's own profile.
     /// The addends arrive through <see cref="AddSumTerm"/>, one call per <c>SUM … [UPON …]</c> group.
     /// <para><paramref name="id"/> is the ENTRY's ordinal within its report description (GR1 — the counter's
     /// identity is the entry, never its data-name; kb/Work PB882). The compiler emits the registrations in
     /// ordinal order, so the call APPENDS; a gap would mean the emitter and the model disagree about which
     /// entry a counter belongs to, which is exactly the confusion this keying exists to prevent.</para></summary>
-    public void AddSum(int id, int digits, int resetLevel, ReportGroup printedIn, int presentSlot = -1)
+    public void AddSum(int id, int resetLevel, ReportGroup printedIn, int presentSlot = -1)
     {
         if (id != _sums.Count)
             throw new InvalidOperationException(
                 $"report '{Name}': sum counter {id} registered out of order (expected {_sums.Count}) — the "
                 + "counter's identity is its entry's ordinal (ISO §13.18.54.4 GR1)");
-        _sums.Add(new SumEntry(digits, resetLevel, printedIn, presentSlot));
+        _sums.Add(new SumEntry(resetLevel, printedIn, presentSlot));
     }
 
     /// <summary>Register one <c>SUM … [UPON …]</c> group of the counter <paramref name="id"/> (ISO §13.18.54.3
-    /// SR1 — "the SUM keyword may appear more than once"). <paramref name="addend"/> yields that group's addend
-    /// total, already at the counter's scale (GR9); <paramref name="uponDetails"/> restricts its accumulation to
-    /// the named details (GR7 c) 2); null = every GENERATE for this report, GR7 c) 1).</summary>
-    public void AddSumTerm(int id, Func<Int128> addend, string[]? uponDetails) =>
-        _sums[id].Terms.Add(new SumTerm(addend, uponDetails));
+    /// SR1 — "the SUM keyword may appear more than once"). <paramref name="apply"/> is that group's ONE addition —
+    /// the counter's current content in, its content after the ADD-consistent addition of the group's addends out
+    /// (GR3, GR9); <paramref name="uponDetails"/> restricts its accumulation to the named details (GR7 c) 2); null =
+    /// every GENERATE for this report, GR7 c) 1).</summary>
+    public void AddSumTerm(int id, Func<Int128, Int128> apply, string[]? uponDetails) =>
+        _sums[id].Terms.Add(new SumTerm(apply, uponDetails));
 
     /// <summary>A SUM counter's current value (unscaled, at the counter's scale) — read by the generated compose
     /// of the printable item the counter is the source of (ISO §13.18.54.4 GR4), and by a procedure division
@@ -732,16 +716,13 @@ public sealed class CobolReport(
             {
                 int times = t.Fires(detailName);
                 if (times == 0) continue;
-                // The addend total at the counter's scale. Forming it can itself be the GR3 size error: an
-                // alignment to the counter's scale past the Int128 intermediate raises CobolSizeError (the
-                // checked NumericRenderer.Align), and a term's addends summed past it raise OverflowException
-                // (the emitted checked sum). Either value is past every counter capacity, so the addition is a
-                // size error — the counter keeps its content, as ADD … ON SIZE ERROR keeps it (§14.7.5 1)).
-                Int128? addend;
-                try { addend = t.Addend(); }
-                catch (Exception e) when (e is CobolSizeError or OverflowException) { addend = null; }
+                // Each addition is its OWN ADD (GR3 — "Each addition is tested for size error"): the term's
+                // addends are evaluated afresh against the counter's current content, summed at the wider of
+                // their scales and stored once at the counter's scale, so an addend finer than the counter loses
+                // its extra digits only when the SUM is stored — never one addend at a time (kb/Work PB1686). A
+                // size error anywhere in that evaluation leaves the counter unchanged (§14.7.5 1)).
                 for (int n = 0; n < times; n++)
-                    if (addend is not { } a ? !_sums[k].FailAdd() : !_sums[k].Add(a))
+                    if (!_sums[k].Add(t.Apply))
                         ExceptionState.ReportSumSizeError($"report {Name}: an addition into sum counter {k + 1} is a "
                             + "size error (ISO §13.18.54.4 GR3)");
             }

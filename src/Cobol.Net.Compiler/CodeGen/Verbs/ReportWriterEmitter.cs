@@ -537,7 +537,7 @@ internal sealed class ReportWriterEmitter(
                 string sumPresent = PresencePlan.SlotOf(PlanOf(r, sum.PrintedIn).Sums, sum) is var ss and >= 0 ? $", {ss}" : "";
                 // GR1's digit count rides the registration: it is the counter's capacity, and an addition past it is
                 // the GR3 size error that sets the entry's indicator (kb/Work PB1130).
-                w.Line($"__RPT_{r.CsIndex}.AddSum({sum.Id}, {sum.Register.Pic?.Digits ?? 18}, {sum.ResetLevel}, "
+                w.Line($"__RPT_{r.CsIndex}.AddSum({sum.Id}, {sum.ResetLevel}, "
                     + $"__rg{r.CsIndex}_{printedGi}{sumPresent});");
                 // ONE TERM PER `SUM … [UPON …]` GROUP (§13.18.54.3 SR1 + §13.18.54.4 GR1/GR7c2 — kb/Work
                 // PB482): the counter belongs to the ENTRY, the UPON filter belongs to its own group, and GR9
@@ -546,25 +546,30 @@ internal sealed class ReportWriterEmitter(
                 // rather than the run-time loud it used to be.
                 foreach (var term in sum.Terms)
                 {
-                    var addends = term.Addends
-                        .Select(a => a.Value is { } v
-                            // §13.18.54.4 GR3 — the addend is added into the counter at the COUNTER's scale
-                            // (GR1), and that alignment IS the transfer, so the clause's ROUNDED phrase governs
-                            // it (GR4: "the content of the sum counter is computed according to the general
-                            // rules for the COMPUTE statement with the ROUNDED phrase"; kb/Work PB852).
-                            ? "(Int128)(" + NumericRenderer.Align(num.Render(v, ReceiverContext.None), sum.Scale, sum.Rounding) + ")"
-                            : LoudValue("Int128", $"report {r.Name}: SUM addend '{a.Written}' was rejected at bind "
-                                + "(ISO §13.18.54.3 SR5)"))
-                        .ToList();
-                    // Each addend is widened to the engine's Int128 carrier BEFORE the term's addends are summed, and
-                    // the sum is CHECKED: two 18-digit long addends summed in long wrapped, and a sum past Int128 is
-                    // past every counter's capacity — the engine turns that OverflowException into the GR3 size error.
-                    string addend = addends.Count switch
-                    {
-                        0 => "(Int128)0",
-                        1 => addends[0],
-                        _ => $"checked({string.Join(" + ", addends)})",
-                    };
+                    // ⛔ THE ADDITION IS THE ADD STATEMENT'S, EVALUATED BY THE ADD STATEMENT'S MACHINERY (kb/Work
+                    // PB1686). §13.18.54.4 GR3: "The adding is consistent with the general rules of the ADD statement
+                    // with the ON SIZE ERROR phrase or, in the case of an arithmetic expression, the COMPUTE
+                    // statement with the ON SIZE ERROR phrase", and GR9 sums a group's addends together — so ONE
+                    // addition is `ADD addend-1 … addend-n TO counter`: the addends' sum is the one initial
+                    // evaluation (ArithmeticEmitter.EmitInPlace's Fold), it is combined with the counter's content
+                    // at the WIDER of the two scales, and the result is stored ONCE at the counter's scale with its
+                    // capacity, its ROUNDED mode and its size-error test (the receiver's profile — GR1). The counter's
+                    // content arrives as the closure's argument and the stored content is the closure's value. The
+                    // former form aligned EACH addend to the counter's scale (and rounded it there) BEFORE adding, so
+                    // an addend finer than the counter lost its extra digits one addend at a time: a 9V99 counter fed
+                    // 1.000 then −0.005 held 1.00, where ADD of the same two values gives 0.99 (1.000 − 0.005 =
+                    // 0.995, truncated). The SUM clause's own rounded-phrase (§13.18.54.2) is the mode of that store (kb/Work PB852's determination; GR4 speaks of the SOURCE clause's phrase).
+                    var rcv = new ReceiverContext(sum.Scale, Real: false, sum.Rounding, InSizeError: true,
+                        IntegerDigits: Math.Max(0, (sum.Register.Pic?.DigitPositions ?? 0) - sum.Scale));
+                    var addendExprs = term.Addends.Where(a => a.Value is not null).Select(a => a.Value!).ToList();
+                    string apply = term.Addends.Any(a => a.Value is null)
+                        ? LoudValue("Int128", $"report {r.Name}: SUM addend was rejected at bind (ISO §13.18.54.3 SR5)")
+                        : addendExprs.Count == 0
+                            ? "__c"
+                            : NumericRenderer.StoreExpr(
+                                num.Combine(new NumX("__c", sum.Scale), "+", num.Fold(addendExprs, rcv), rcv),
+                                sum.Scale, sum.Register.ProfileName, sum.Rounding, raiseOnSizeError: true);
+                    string addend = $"(Int128 __c) => {apply}";
                     // null = no UPON phrase (GR7 c) 1) — every GENERATE for this report). An UPON phrase whose
                     // operands were ALL rejected emits the EMPTY filter instead, so a suppressed COBOLNET2046
                     // accumulates on NOTHING rather than on everything: the absence of the phrase and the
@@ -575,7 +580,7 @@ internal sealed class ReportWriterEmitter(
                         : upon.Count == 0
                             ? "System.Array.Empty<string>()"
                             : "new[] { " + string.Join(", ", upon.Select(d => CsLiteral(d.Detail!.Name!))) + " }";
-                    w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, () => {addend}, {uponArg});");
+                    w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, {uponArg});");
                 }
             }
         }

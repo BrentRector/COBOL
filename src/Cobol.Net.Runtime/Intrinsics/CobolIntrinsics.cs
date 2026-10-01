@@ -152,28 +152,116 @@ public static partial class CobolIntrinsics
             : Exceptions.ExceptionState.ArgumentError(
                 $"the intrinsic integer argument {v} is outside the range the function can represent (ISO §15.3)");
 
+    // ── THE §15.3 TYPE-6 INTEGRALITY RULE — ONE PREDICATE, ONE RAISE SITE, EVERY CARRIER (kb/Work PB1526) ──────
+    // §15.3 type 6: "An arithmetic expression that will always result in an integer value or an integer data item
+    // shall be specified", and the closing paragraph of §15.3 makes a value the function's argument rules do not
+    // admit an "incorrect value for that argument": the EC-ARGUMENT-FUNCTION exception condition is set to exist,
+    // and "if … checking for EC-ARGUMENT-FUNCTION is not enabled, the implementor defines the result of the
+    // function reference". The compile-time screen (IntrinsicArgumentRules) can only refuse an argument that is
+    // PROVABLY not always integral and fails open on everything else, so the VALUE is the rule's real test: an
+    // argument that is an integer is an integer EXACTLY (docs/CONFORMANCE.md DOC-A.1-124 — the ONE definition the
+    // subscript, reference-modification and SET-index intakes use, CobolNum.HasFraction — except that a subscript or
+    // reference-modification bound that is an EXPRESSION or a float item still tests a copy truncated at 9 fraction
+    // digits, kb/Work PB1890), never a rounded or truncated copy. This intake used to truncate the fraction silently on every carrier, so
+    // FACTORIAL(X / 2 + 1) with X = 5 answered FACTORIAL(3) with no condition even under enabled checking.
+    // WiseOwl COBOL's determination for the unchecked result is the truncated integer (the lenient continue
+    // CobolNum.PositionOf documents for the same rule at a subscript), so checking off changes nothing a program
+    // could observe beyond the missing condition; checking on raises it, fatal, per Table 13.
+
+    /// <summary>The ONE raise site of the §15.3 type-6 integrality rule. <paramref name="fractional"/> is the
+    /// carrier's own exact test of "the value has a nonzero digit right of the decimal point"; the value is shown
+    /// as its plain decimal text, built only on the failing path.</summary>
+    private static void RequireIntegral(bool fractional, Func<string> shown)
+    {
+        if (fractional)
+            Exceptions.ExceptionState.ArgumentError(
+                $"the intrinsic integer argument {shown()} is not an integer (ISO §15.3 type 6 — an integer "
+                + "argument shall have an integral value; DOC-A.1-124)");
+    }
+
+    /// <summary>A scaled fixed-point integer argument's value, de-scaled to scale 0 with the §15.3 type-6
+    /// integrality test applied to the EXACT value (<see cref="CobolNum.HasFraction"/>). A negative scale is a
+    /// trailing-P item whose value is the stored digits times 10^|scale|; a product the Int128 carrier cannot
+    /// form is past every integer argument's range (the §15.3 incorrect-value path, default 0).</summary>
+    private static Int128 IntegerValue(Int128 unscaled, int scale)
+    {
+        if (scale > 0)
+        {
+            RequireIntegral(CobolNum.HasFraction(unscaled, scale), () => CobolNum.PlainValue(unscaled, scale));
+            return unscaled / Pow10.AsWide(scale);
+        }
+        if (scale < 0 && unscaled != 0)
+        {
+            if (!CobolNum.WideningFits(unscaled, -scale))
+            {
+                Exceptions.ExceptionState.ArgumentError(
+                    $"the intrinsic integer argument {unscaled}E{-scale} is outside the range the function can represent (ISO §15.3)");
+                return 0;
+            }
+            return unscaled * Pow10.AsWide(-scale);
+        }
+        return unscaled;
+    }
+
+    /// <summary>The SDIDI operand's value at scale 0 with the same integrality test (<see cref="CobolDec.HasFraction"/>);
+    /// a magnitude past the Int128 intermediate is EC-SIZE-OVERFLOW (A.1 item 179 — the landing's own answer).</summary>
+    private static Int128 IntegerValue(CobolDec v)
+    {
+        RequireIntegral(v.HasFraction, () => v.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return v.TruncatedInteger();
+    }
+
+    /// <summary>The binary64 operand's integrality test: a finite value is an integer exactly when it equals its
+    /// own truncation (COMP-2 <c>2.0</c> is, <c>2 + 1.0E-10</c> is not). ±∞ and NaN are not fractional — they are
+    /// out of every range, which each landing's own guard answers.</summary>
+    private static void RequireIntegralReal(double v) =>
+        RequireIntegral(double.IsFinite(v) && v != Math.Truncate(v),
+            () => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+
+    /// <summary>The scaled-operand intake for a BOUNDED (<c>long</c>) integer argument — <see cref="IntegerArg(Int128)"/>
+    /// behind the §15.3 type-6 integrality test. Scale 0 needs no test and takes <see cref="IntegerArg(Int128)"/> itself.</summary>
+    public static long IntegerArgScaled(Int128 unscaled, int scale) => IntegerArg(IntegerValue(unscaled, scale));
+
+    /// <summary>The SDIDI-operand intake for a BOUNDED integer argument (see <see cref="IntegerArgScaled"/>).</summary>
+    public static long IntegerArgDec(CobolDec v) => IntegerArg(IntegerValue(v));
+
+    /// <summary>The scaled-operand intake for a TOTAL (<c>Int128</c>) integer argument — no narrowing, therefore no
+    /// range raise point, but the same integrality test (§15.90.3 r1 / §15.91.3 r1 / §15.37.3 r3 / §15.75.3 r2 all
+    /// still require an INTEGER; they place no constraint on its magnitude).</summary>
+    public static Int128 IntegerArgWideScaled(Int128 unscaled, int scale) => IntegerValue(unscaled, scale);
+
+    /// <summary>The SDIDI-operand intake for a TOTAL integer argument (see <see cref="IntegerArgWideScaled"/>).</summary>
+    public static Int128 IntegerArgWideDec(CobolDec v) => IntegerValue(v);
+
     /// <summary>The <see cref="IntegerArg(Int128)"/> twin for a FLOATING-POINT argument — a distinct NAME rather
     /// than an overload, deliberately: an integer literal converts implicitly to BOTH <c>Int128</c> and
     /// <c>double</c>, so an overload pair would make <c>FUNCTION FACTORIAL(5)</c> a CS0121 ambiguity. That exact
     /// collision is documented in <c>CobolIntrinsics.RealArgs.cs</c> and it broke six corpus programs once.
-    /// <para>Reached only by FACTORIAL, the one arm PB21 routes to its exact body with a float argument.</para></summary>
-    public static long IntegerArgReal(double v) =>
-        double.IsFinite(v) && v > -9.2e18 && v < 9.2e18
+    /// <para>Reached by every bounded integer argument whose operand is floating-point — the §15.3 type-6
+    /// integrality test applies to it like any other carrier's (kb/Work PB1526).</para></summary>
+    public static long IntegerArgReal(double v)
+    {
+        RequireIntegralReal(v);
+        return double.IsFinite(v) && v > -9.2e18 && v < 9.2e18
             ? (long)Math.Truncate(v)
             : Exceptions.ExceptionState.ArgumentError(
                 $"the intrinsic integer argument {v} is outside the range the function can represent (ISO §15.3)");
+    }
 
     /// <summary>The WIDE floating-point twin of <see cref="IntegerArgReal"/> — the Int128-carrier intake for the
-    /// ONE §15 integer argument whose domain exceeds <c>long</c>: BOOLEAN-OF-INTEGER's argument-1 (§15.13.3 r1
+    /// §15 integer arguments whose domain exceeds <c>long</c>: BOOLEAN-OF-INTEGER's argument-1 (§15.13.3 r1
     /// admits any positive integer, and the bit configuration of a value at or above 2⁶³ is legal and
     /// representable, fix-queue PB65 / RV-15.13.4-1 D1). The range guard follows <see cref="FromDouble"/>'s
     /// saturation constant: 1.7e38 is BELOW <c>Int128.MaxValue</c>, so the boundary value cannot slip through
     /// the cast (the PB22 argument, at the wide carrier).</summary>
-    public static Int128 IntegerArgWideReal(double v) =>
-        double.IsFinite(v) && v > -1.7e38 && v < 1.7e38
+    public static Int128 IntegerArgWideReal(double v)
+    {
+        RequireIntegralReal(v);
+        return double.IsFinite(v) && v > -1.7e38 && v < 1.7e38
             ? (Int128)Math.Truncate(v)
             : Exceptions.ExceptionState.ArgumentError(
                 $"the intrinsic integer argument {v} is outside the range the function can represent (ISO §15.3)");
+    }
 
     public static double RealResult(double d) => double.IsNaN(d)
         ? Exceptions.ExceptionState.ArgumentError("floating-point intrinsic argument out of domain (NaN result)")

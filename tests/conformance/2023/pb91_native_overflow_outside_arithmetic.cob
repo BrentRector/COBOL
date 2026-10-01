@@ -7,6 +7,11 @@
       *> precedence (#1). Before PB91 the checked kernels were selected only by the arithmetic statement's phrase, so
       *> `IF A * A > 5` wrapped silently (item 179 (1) documents the wrap for the checking-OFF case only) and a
       *> zero divisor in a condition returned 0. A = 10^20 - 1: A * A is ~10^40, past the Int128 carrier's 1.7 x 10^38.
+      *> kb/Work PB1143: a product of two ITEMS whose digit bounds are known (here 20 + 20 > 38) no longer
+      *> raises - it is formed exactly on the SDIDI, whose range is 10^6144, and the condition below
+      *> (R7) is simply TRUE.  The checked Int128 kernel this golden pins is the one a product of operands whose
+      *> bound is UNKNOWN still takes (an intrinsic's value), so the overflowing products below are of
+      *> FUNCTION ABS(A) - 10^20 - 1 as an intrinsic result - and the SDIDI's own range is the true boundary.
        >>TURN EC-SIZE-OVERFLOW EC-SIZE-ZERO-DIVIDE CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB91NOVF.
@@ -26,23 +31,27 @@
        MAIN SECTION.
        MAIN-P.
            DISPLAY "R1".
-           IF A * A > 5 DISPLAY "GT" ELSE DISPLAY "LE" END-IF.
+           IF FUNCTION ABS(A) * FUNCTION ABS(A) > 5
+               DISPLAY "GT" ELSE DISPLAY "LE" END-IF.
            DISPLAY "R2".
            IF 5 / Z > 1 DISPLAY "GT2" ELSE DISPLAY "LE2" END-IF.
            DISPLAY "R3".
-           DISPLAY "V=" FUNCTION ABS(A * A).
+           DISPLAY "V=" FUNCTION ABS(FUNCTION ABS(A) * FUNCTION ABS(A)).
            DISPLAY "R4".
            PERFORM
-               IF A * A + 1 > 5 DISPLAY "GT3" END-IF
+               IF FUNCTION ABS(A) * FUNCTION ABS(A) + 1 > 5
+                   DISPLAY "GT3" END-IF
            WHEN EC-SIZE-OVERFLOW
                DISPLAY "WHEN=" FUNCTION EXCEPTION-STATUS
                RESUME AT NEXT STATEMENT
            END-PERFORM.
            DISPLAY "R5".
-           COMPUTE R = A * A
+           COMPUTE R = FUNCTION ABS(A) * FUNCTION ABS(A)
                ON SIZE ERROR DISPLAY "PHRASE=" FUNCTION EXCEPTION-STATUS
                NOT ON SIZE ERROR DISPLAY "NOSIZE"
            END-COMPUTE.
            DISPLAY "R6 R=" R.
            IF A - 1 > 5 DISPLAY "STILL-FINE" END-IF.
+           DISPLAY "R7".
+           IF A * A > 5 DISPLAY "EXACT-GT" ELSE DISPLAY "EXACT-LE" END-IF.
            STOP RUN.

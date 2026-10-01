@@ -457,14 +457,29 @@ internal static class RuntimeApi
     /// value outside the <c>long</c> range instead of letting an unchecked cast wrap it past the function's own
     /// range guard. <paramref name="real"/> selects the double-typed twin (distinct name, not an overload — an
     /// integer literal converts to both carriers and would be a CS0121 ambiguity).</summary>
-    public static string IntegerArg(string value, bool real = false) =>
-        $"{nameof(CobolIntrinsics)}.{(real ? nameof(CobolIntrinsics.IntegerArgReal) : nameof(CobolIntrinsics.IntegerArg))}({value})";
+    public static string IntegerArg(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArg)}({value})";
 
-    /// <summary>The WIDE (Int128) floating-point integer-argument intake — <c>CobolIntrinsics.IntegerArgWideReal</c>,
-    /// for the one §15 integer argument whose domain exceeds <c>long</c> (BOOLEAN-OF-INTEGER argument-1, PB65).
-    /// A non-float wide operand needs no intake at all — Int128 is the lane's own carrier.</summary>
-    public static string IntegerArgWide(string value) =>
-        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgWideReal)}({value})";
+    /// <summary>The §15.3 type-6 intake for a value on ONE of the operand carriers, keyed by carrier KIND — the ONE
+    /// family of landings the renderer's bounded (<c>long</c>) and total (<c>Int128</c>) integer arguments share,
+    /// so the integrality rule (kb/Work PB1526) is asked on every carrier and a new carrier is a compile error in
+    /// the one caller, not a missed arm. <paramref name="wide"/> is the body's declared <c>Int128</c> carrier
+    /// (kb/Work PB254); a scale-0 fixed-point operand is integral by construction, so the bounded lane narrows
+    /// it with <c>IntegerArg</c> and the wide lane passes it through raw.</summary>
+    public static string IntegerArgOf(IntegerArgCarrier carrier, string value, int scale, bool wide) => carrier switch
+    {
+        IntegerArgCarrier.Real => $"{nameof(CobolIntrinsics)}.{(wide ? nameof(CobolIntrinsics.IntegerArgWideReal) : nameof(CobolIntrinsics.IntegerArgReal))}({value})",
+        IntegerArgCarrier.Dec => $"{nameof(CobolIntrinsics)}.{(wide ? nameof(CobolIntrinsics.IntegerArgWideDec) : nameof(CobolIntrinsics.IntegerArgDec))}({value})",
+        IntegerArgCarrier.Scaled when scale != 0 =>
+            $"{nameof(CobolIntrinsics)}.{(wide ? nameof(CobolIntrinsics.IntegerArgWideScaled) : nameof(CobolIntrinsics.IntegerArgScaled))}({value}, {scale})",
+        IntegerArgCarrier.Scaled => wide ? value : IntegerArg(value),
+        _ => throw new ArgumentOutOfRangeException(nameof(carrier)),
+    };
+
+    /// <summary>The operand carriers an integer-argument intake is total over (<see cref="IntegerArgOf"/>): the
+    /// exact scaled <c>Int128</c>, the SDIDI, and binary64 — the unsigned-wide lane funnels into the first through
+    /// <c>NumericRenderer.DeU</c> before it reaches the intake.</summary>
+    public enum IntegerArgCarrier { Scaled, Dec, Real }
 
     /// <summary>The runtime scale-37 codomain-maximum constant for a bounded float-family function (PB65 /
     /// RV-15.75.4-1) — consumed by <c>CobolIntrinsics.FromDoubleBounded</c>'s clamp.</summary>
@@ -600,6 +615,11 @@ internal static class RuntimeApi
     /// is the pre-rendered INTERMEDIATE ROUNDING fragment (<c>CobolRounding.X</c>).</summary>
     public static string DecPow(string baseOperand, string expOperand, string mode) =>
         $"{nameof(CobolDec)}.{nameof(CobolDec.Pow)}({baseOperand}, {expOperand}, {mode})";
+
+    /// <summary>A NATIVE product past the Int128 carrier formed on the SDIDI — <c>CobolDec.MulToOdd</c> (kb/Work PB1143):
+    /// the exact product reduced to 34 digits by round-to-odd, so the receiver's one rounding sees any tail.</summary>
+    public static string DecMulToOdd(string leftOperand, string rightOperand) =>
+        $"{nameof(CobolDec)}.{nameof(CobolDec.MulToOdd)}({leftOperand}, {rightOperand})";
 
     /// <summary>The exact §15.27.3 r3 FUNCTION E constant under a standard mode — <c>CobolDec.E</c> (kb/Work R18).</summary>
     public static string DecE => $"{nameof(CobolDec)}.{nameof(CobolDec.E)}";
@@ -1932,6 +1952,12 @@ internal static class RuntimeApi
     /// <summary>A <c>CobolDate</c> call (the §15 date/time family — same catalog-name discipline).</summary>
     public static string DateFn(string method, string args) =>
         $"{nameof(CobolDate)}.{method}({args})";
+
+    /// <summary>The membership-preserving landing of a FLOAT or SDIDI seconds argument into the formatted-time
+    /// family's (unscaled, scale) pair — <c>CobolDate.SecondsOfReal</c> / <c>SecondsOfDec</c> (kb/Work PB1379): both
+    /// round toward negative infinity so the §7.3.17.4 floor screen sees a negative value as negative.</summary>
+    public static string SecondsLanding(string value, bool dec) =>
+        $"{nameof(CobolDate)}.{(dec ? nameof(CobolDate.SecondsOfDec) : nameof(CobolDate.SecondsOfReal))}({value})";
 
     /// <summary>A last-exception interrogation read (§15.28–15.33) — <c>EcFunctions.{method}(args)</c>.</summary>
     public static string EcFn(string method, string args = "") =>

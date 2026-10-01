@@ -603,6 +603,27 @@ public sealed record PicInfo(
     public bool IsUnsignedLongBinary => Category is PicCategory.Numeric && !Signed
         && Truncation == NumericTruncation.BinaryCapacity && StorageWidth == 8;
 
+    /// <summary>⛔ AN UPPER BOUND ON THE DECIMAL DIGITS OF THIS ITEM'S UNSCALED VALUE — the fact the native renderer's
+    /// carrier decisions are made on (<c>NumX.Digits</c>; kb/Work PB1143 / PB621). A DISPLAY / PACKED / plain
+    /// COMPUTATIONAL item holds at most <see cref="Digits"/>; a BinaryCapacity (COMP-5, BINARY-CHAR … -DOUBLE) item
+    /// owns its whole container range (§13.18.60.4 GR12) — values past the PICTURE's digits are legal — so its bound
+    /// is the container's: 2^(8w−1) &lt; 10^3 / 10^5 / 10^10 / 10^19 for the signed 1/2/4/8-byte widths, one more
+    /// digit unsigned at 8 bytes (2^64 &lt; 1.85·10^19), and the 16-byte container 39 digits (2^127 ≈ 1.7·10^38 — the
+    /// Int128 engine's own magnitude; its unsigned-wide lane funnels through <c>CobolNum.Widen</c>, loud beyond
+    /// that). Never smaller than the PICTURE and never smaller than the container: a bound that undershoots would
+    /// let an overflowing operation skip its check. (A bound over the carrier's 38 digits simply routes every
+    /// consumer to the checked or SDIDI form.)</summary>
+    public int UnscaledDigitBound
+    {
+        get
+        {
+            int pictured = Math.Max(Digits, DigitPositions);
+            if (Truncation != NumericTruncation.BinaryCapacity) return Math.Min(pictured, 39);
+            int container = StorageWidth switch { 1 => 3, 2 => 5, 4 => 10, 8 => Signed ? 19 : 20, _ => 39 };
+            return Math.Min(Math.Max(pictured, container), 39);
+        }
+    }
+
     private readonly int? _digitPositions;
     /// <summary>The ISO §13.18.40.3 SR14 DIGIT-POSITION count that the 1–31 (18 pre-2002) capacity cap is measured
     /// against: the '9'/Z/* positions, each 'P' (§13.18.40.4 — counted in the maximum digit positions though it stores

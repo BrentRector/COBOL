@@ -118,7 +118,11 @@ public static class CobolLocale
         Int128 pow = Pow10.AsWide(secScale);
         long whole = (long)(secUnscaled / pow);
         Int128 frac = secUnscaled % pow;
-        int hh = (int)(whole / 3600), mm = (int)(whole % 3600 / 60), ss = (int)(whole % 60);
+        // §15.54.4 r2 — "a character-string containing hours, minutes, and seconds of the time specified by
+        // argument-1" (§15.3.3.3: the seconds subfield is up to 60 under LEAP-SECOND ON): the ONE reading of a
+        // whole-seconds value as a time of day, which under LEAP-SECOND ON makes 86 400 the leap second 23:59:60
+        // (kb/Work PB1379 — it was 24:00:00, a time the day does not have, rendered "12:00:00 AM" in en-US).
+        var (hh, mm, ss) = CobolDate.TimeOfDay(whole, leapSecond);
         string? fraction = secScale > 0 ? frac.ToString().PadLeft(secScale, '0') : null;
         var facts = Facts(localeTag, LocaleCategory.Time, "LOCALE-TIME-FROM-SECONDS");
         return FormatTime(facts, hh, mm, ss, fraction);

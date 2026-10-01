@@ -32,8 +32,11 @@
            DISPLAY "MAX=" R
            COMPUTE R = FUNCTION MIN(P Q)
            DISPLAY "MIN=" R
-      *> MIDRANGE needs one decimal digit more than MAX/MIN and no longer has it: SIZE ERROR, receiver unchanged
-      *> (14.7.5 - on a size error the resultant identifier is not altered).
+      *> MIDRANGE needs one decimal digit more than MAX/MIN ON THE Int128 CARRIER and no longer had it, so it was a
+      *> SIZE ERROR here (14.7.5 - the intermediate's range is the implementor's, and the receiver was unchanged).
+      *> kb/Work PB621 moved that boundary: the aligned arguments' digit bounds (31 + 9 > 38) route the call to the
+      *> SDIDI body, which holds the value the receiver holds - (MAX + MIN) / 2 = 49999999999999999999999999999.99
+      *> truncated, exactly the hand-written 15.62.4 r1 expression below.  No size error is raised.
            MOVE 0 TO R
            COMPUTE R = FUNCTION MIDRANGE(P Q)
                ON SIZE ERROR DISPLAY "MIDRANGE-SIZE-ERROR"

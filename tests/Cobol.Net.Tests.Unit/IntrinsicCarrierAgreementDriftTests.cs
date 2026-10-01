@@ -379,6 +379,74 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             + "the §15.3 landing. Offenders: " + string.Join("; ", offenders));
     }
 
+    /// <summary>
+    /// ⛔ THE INTEGER INTAKE IS TOTAL OVER EVERY CARRIER A NumX CAN BE (kb/Work PB638 + PB1526). The bounded and the
+    /// total landing were two hand-copied dispatches; the narrow one had no unsigned-wide arm, so a COMP-5 item over
+    /// a 19+-digit unsigned PICTURE at INTEGER-OF-DATE / CHAR / BASE-CONVERT reached Roslyn as a CS1503. The carrier
+    /// list is NOT kept here: <see cref="CobolNet.CodeGen.Emit.NumXCarrier"/> is the compiler's own enumeration, so a
+    /// fifth carrier fails THIS test (the intake throws on a carrier it does not map) before it can reach a user.
+    /// Every (carrier × width) pair must render a call onto the runtime's integrality-checked intake family.
+    /// </summary>
+    [Fact]
+    public void EveryIntegerIntake_IsTotalOverTheNumXCarriers()
+    {
+        foreach (var carrier in Enum.GetValues<CobolNet.CodeGen.Emit.NumXCarrier>())
+        foreach (bool wide in new[] { false, true })
+        {
+            var x = carrier switch
+            {
+                CobolNet.CodeGen.Emit.NumXCarrier.Scaled => new CobolNet.CodeGen.Emit.NumX("e", 2),
+                CobolNet.CodeGen.Emit.NumXCarrier.UnsignedWide => new CobolNet.CodeGen.Emit.NumX("u", 2, U: true),
+                CobolNet.CodeGen.Emit.NumXCarrier.Sdidi => new CobolNet.CodeGen.Emit.NumX("d", 0, Dec: true),
+                CobolNet.CodeGen.Emit.NumXCarrier.Binary64 => new CobolNet.CodeGen.Emit.NumX("r", 0, Real: true),
+                _ => throw new InvalidOperationException($"the test builds no operand for the new carrier {carrier}"),
+            };
+            Assert.Equal(carrier, x.Carrier);
+            string call = CobolNet.CodeGen.Emit.IntrinsicRenderer.IntegerIntake(x, wide);
+            Assert.StartsWith("CobolIntrinsics.IntegerArg", call);
+            // A scaled operand (scale != 0) and every non-scaled carrier go through the integrality-checked family; a
+            // scale-0 operand is integral by construction and is the only shape that is not routed through it.
+            Assert.Contains(carrier == CobolNet.CodeGen.Emit.NumXCarrier.Scaled || carrier == CobolNet.CodeGen.Emit.NumXCarrier.UnsignedWide
+                ? "Scaled" : carrier == CobolNet.CodeGen.Emit.NumXCarrier.Sdidi ? "Dec" : "Real", call);
+        }
+    }
+
+    /// <summary>⛔ THE §15.3 TYPE-6 INTEGRALITY RULE, ASSERTED ON THE RUNTIME BODIES ON EVERY CARRIER (kb/Work PB1526):
+    /// a value with a nonzero fraction is an incorrect argument — EC-ARGUMENT-FUNCTION is raised under enabled
+    /// checking — while an integral value of the same carrier (a scale-1 <c>2.0</c>, a COMP-2 <c>3.0</c>, the SDIDI
+    /// <c>10 × 10⁻¹</c>) is accepted and is the integer it names; with checking off the truncated integer continues.</summary>
+    [Fact]
+    public void TheIntegerIntake_RaisesOnAFractionOnEveryCarrier_AndAcceptsAnIntegralValue()
+    {
+        // Integral values are integers on every carrier, narrow and wide.
+        Assert.Equal(2, CobolIntrinsics.IntegerArgScaled(20, 1));
+        Assert.Equal(3, CobolIntrinsics.IntegerArgReal(3.0));
+        Assert.Equal(1, CobolIntrinsics.IntegerArgDec(new CobolDec(10, -1)));
+        Assert.Equal((Int128)2, CobolIntrinsics.IntegerArgWideScaled(20, 1));
+        Assert.Equal((Int128)3, CobolIntrinsics.IntegerArgWideReal(3.0));
+        Assert.Equal((Int128)1, CobolIntrinsics.IntegerArgWideDec(new CobolDec(10, -1)));
+        // A trailing-P item (negative scale) is the stored digits times 10^|scale|.
+        Assert.Equal(200, CobolIntrinsics.IntegerArgScaled(2, -2));
+
+        // A fraction raises EC-ARGUMENT-FUNCTION when its checking is enabled (fatal, Table 13) ...
+        UnderChecking(() =>
+        {
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgScaled(35, 1));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgReal(2.5));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgDec(new CobolDec(35, -1)));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgWideScaled(35, 1));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgWideReal(2.5));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgWideDec(new CobolDec(35, -1)));
+            // ... a digit PAST the ninth fraction digit is still a fraction (the exact value, never a truncated copy).
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgScaled(Int128.Parse("20000000000000001"), 16));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgDec(new CobolDec(1, -50)));
+        });
+        // ... and with checking off the truncated integer is the result the implementor defines.
+        Assert.Equal(3, CobolIntrinsics.IntegerArgScaled(35, 1));
+        Assert.Equal(2, CobolIntrinsics.IntegerArgReal(2.5));
+        Assert.Equal(-3, CobolIntrinsics.IntegerArgScaled(-35, 1));
+    }
+
     /// <summary>The behaviour the carrier exists for, asserted end to end on the runtime bodies: the three total
     /// arguments answer their spec verdict past <c>long</c>, from BOTH carriers, and raise nothing even with
     /// EC-ARGUMENT-FUNCTION checking ENABLED — the leg that used to abort the run unit on conforming source.</summary>

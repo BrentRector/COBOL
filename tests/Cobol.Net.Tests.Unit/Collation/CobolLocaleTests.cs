@@ -106,7 +106,11 @@ public sealed class CobolLocaleTests
             // reaches it through a bool screening predicate that raised on its own, so the caller reads
             // ArgumentSubstitute.Spaces rather than spelling a literal.
             Assert.Equal(" ", CobolLocale.TimeFromSeconds(86400, 0, null));      // §7.3.17.4 GR5 — not standard form
-            Assert.Equal("24:00:00", CobolLocale.TimeFromSeconds(86400, 0, null, leapSecond: true));   // GR4 (LEAP-SECOND ON)
+            // GR4 (LEAP-SECOND ON): 86 400 IS the day's leap second, the time 23:59:60 (§15.54.4 r2 — "the hours,
+            // minutes, and seconds of the time specified by argument-1"; §15.3.3.3 lets the seconds subfield be 60),
+            // the same reading FORMATTED-TIME gives it. It was "24:00:00" — a time the day does not have (PB1379).
+            Assert.Equal("23:59:60", CobolLocale.TimeFromSeconds(86400, 0, null, leapSecond: true));
+            Assert.Equal("23:59:60.5", CobolLocale.TimeFromSeconds(864005, 1, null, leapSecond: true));
             Assert.Equal(" ", CobolLocale.TimeFromSeconds(-1, 0, null));         // GR5 — negative
             var fr = CultureInfo.GetCultureInfo("fr-FR");
             Assert.Equal("13:05:09" + fr.NumberFormat.NumberDecimalSeparator + "250", CobolLocale.TimeFromSeconds(47109250, 3, "fr-FR"));
