@@ -13,6 +13,16 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1829 — 2026-09-30 21:27 PDT — Everything pending is on main (d78fa8adb, CI green) and the repository is clean: one worktree, one branch, one remote branch
+
+**State.** `main` is `d78fa8adb` (landing run 36814155659, main run 36814913880, both green), merged from the PB1210 finisher (Entry 1827) on top of the prune tool (Entry 1828). The merged tree was gated before the merge commit: Windows 9,629/30,106/35, Linux GREEN. GAP 710, 292 actionable (310 at the start of the session). `git worktree list` shows only `main`, `git branch --list` only `main`, and `git ls-remote --heads origin` only `main`; the working tree is clean.
+
+**Last cleanup steps.** The preserved `wf_bf025bee-c67-9` branch was archived in its own bundle and removed once the finisher had reconciled it (the prune tool refuses an UNLANDED branch by design, so this one step was done by hand). Eleven directories under `.claude/worktrees` that git no longer tracked were deleted: nine empty husks from September, the finisher's own leftover, and the checkout of a wave-61 finisher whose STATUS.md said DONE with its notes landed. The language server `csharp-ls` was stopped twice because it held a worktree's compiler DLL open; it restarts on demand.
+
+**Slip, caught before it mattered.** A command chain staged `DEVLOG.md` while it still carried the merge's conflict markers (the resolving script had failed its own assertion and a `;` let the next command run); the file was re-resolved and re-staged before anything was committed, and no marker reached a commit.
+
+**Plan section 0** now names `d78fa8adb`, GAP 710 and the one-branch state.
+
 ## Entry 1828 — 2026-09-30 20:40 PDT — Why 43 branches and 19 worktrees piled up, what was actually stranded in them (one PB1210), and the content-based prune tool
 
 **Symptom.** After train w0930 landed the orchestrator removed only the worktrees whose heads were ancestors of main, left 19 older `wf_*` and `worktree-agent-*` worktrees "for review", and one directory (`agent-aad270c5c14b3bd4c`) that would not delete ("Invalid argument"). The owner: find out what is wrong; everything pertinent belongs in main and the cleanup must be total.
