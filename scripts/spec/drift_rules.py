@@ -123,6 +123,9 @@ def governing(rows, target):
 
 
 def main(argv):
+    # The rules quote <summary> text verbatim (⛔, §, em dashes); a Windows console's cp1252 stdout cannot encode
+    # them, and the first such rule crashed the per-file query mid-listing.
+    sys.stdout.reconfigure(encoding="utf-8")
     rows = index()
     text = render(rows)
     if argv[:1] == ["--check"]:
