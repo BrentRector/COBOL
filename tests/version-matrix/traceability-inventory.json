@@ -39007,12 +39007,12 @@
   "subject": "INSPECT statement",
   "rule-digest": "3421e0c42d37",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitBody; src/Cobol.Net.Compiler/Binding/Model/StorageOverlap.cs#MayShareStorage",
+  "test-ref": "conformance:85/pb1907_inspect_tally_overlap; conformance:85/pb1907_inspect_format3_counter_overlap",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule: identifier-1/3/4 overlapping identifier-2 -> 'the result of the execution of this statement is undefined' (cite.py --check 14.9.22.4 -> OK 13)). An undefined result imposes no requirement; the implementation is deterministic (identifier-1 and every operand image are snapshotted before any counter store, InspectEmitter.Emit) and neither crashes nor rejects the source. Conforms by construction; nothing to test. || editions as adjudicated: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "§14.9.22.4 GR13 (identifier-1/3/4 in the storage of the TALLYING counter: result undefined, Annex A.2 item 21 d)); §4.4 2) makes the run unit conforming. WiseOwl COBOL documents and pins its behavior (docs/CONFORMANCE.md D-INS1, D-INS2; kb/Work PB1907; owner 2026-10-01, GnuCOBOL 3.2 measured): each TALLYING operand counts from the state after the earlier operands stored their counters, and a format 3 replacing half (GR19) reads identifier-1 as the tallying half left it; a statement whose counters overlap nothing it reads stays the one shared GR8 cycle.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-14",
@@ -39082,12 +39082,12 @@
   "subject": "INSPECT statement",
   "rule-digest": "ec4cd5b95ebc",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitBody; src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Replace",
+  "test-ref": "conformance:85/pb1907_inspect_replacing_overlap",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule: identifier-3/4/5 overlapping identifier-1 -> result undefined (cite.py --check 14.9.22.4 'the result of the execution of this statement is undefined, even if they are defined by the same data description entry' -> OK, same wording as 13)/18)/21)). The runtime matches against the ORIGINAL image and writes a separate buffer, every operand image is read before the store, so an overlap gives a deterministic result and no crash. No requirement to test. || editions as adjudicated: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "§14.9.22.4 GR18 (identifier-3/4/5 in the storage of identifier-1: result undefined, Annex A.2 item 21 e)); §4.4 2). Documented and pinned (docs/CONFORMANCE.md D-INS3; kb/Work PB1907): operand values and the image are read when the REPLACING pass starts, the cycle matches that image, one store at the end; identical to GnuCOBOL 3.2 on every probe.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-19",
@@ -39127,12 +39127,12 @@
   "subject": "INSPECT statement",
   "rule-digest": "62cd01196696",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/Verbs/CobolInspect.cs#Convert; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitBody",
+  "test-ref": "conformance:85/pb1907_inspect_converting_overlap",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule: identifier-4/6/7 overlapping identifier-1 -> result undefined (same wording as 13)/18), cite.py OK). from/to/delimiter images are read before Convert runs and the conversion reads a snapshot, so the outcome is deterministic and nothing crashes. No requirement to test. || editions as adjudicated: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "§14.9.22.4 GR21 (identifier-4/6/7 in the storage of identifier-1: result undefined, Annex A.2 item 21 f)); §4.4 2). Documented and pinned (docs/CONFORMANCE.md D-INS4; kb/Work PB1907): the sets and delimiters are the values at the start of the statement, one store at the end; identical to GnuCOBOL 3.2 on every probe.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-22",

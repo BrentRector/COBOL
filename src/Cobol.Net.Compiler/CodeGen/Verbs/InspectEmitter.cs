@@ -21,7 +21,10 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     /// ONCE (GR6 item identification; GR4 — an edited/unsigned-numeric DISPLAY item inspects as its redefined
     /// character image, GR4d — a signed numeric item inspects de-signed); a format 3 then runs the tallying pass
     /// FOLLOWED by the replacing pass over that same image (GR19 — two successive statements; tallying never
-    /// writes identifier-1, so the one snapshot is exact). Tally counts ADD into their counters (GR11); a
+    /// writes identifier-1 UNLESS a counter shares its storage — GR13's undefined overlap, which docs/CONFORMANCE.md
+    /// D-INS1/D-INS2 define as: each later tallying operand, and the replacing pass, read identifier-1 and the
+    /// operand values again after the counters stored so far — so the one snapshot is exact whenever no counter can
+    /// overlap what the statement reads, and the statement is then the single shared cycle). Tally counts ADD into their counters (GR11); a
     /// REPLACING/CONVERTING result stores back through the target's <see cref="Place"/>, re-signing a signed
     /// numeric target with its retained original sign (GR4d).
     /// </summary>
@@ -39,7 +42,8 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         // identifier-1 is read as its character image whatever its SHAPE — a field, or (Format 1 only) a
         // function-identifier (PB10). AsString already dispatches on the operand kind, so admitting the function
         // case cost nothing here; it is the STORE below that the shape constrains.
-        w.Line($"string {img} = {OperandText.AsString(ins.Target, num, deSign: true)};");
+        string readImage = OperandText.AsString(ins.Target, num, deSign: true);
+        w.Line($"string {img} = {readImage};");
         // ⛔ GR2 — a ZERO-LENGTH identifier-1 (a dynamic-length item at length 0, an occurs-depending group at count
         // 0, a function returning a zero-length value — §8.5.4) leaves identifier-1 AND identifier-2 unchanged and
         // "control is immediately transferred to the end of the INSPECT statement" (kb/Work PB1128). Without the
@@ -47,7 +51,7 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         // re-encodes identifier-2, so a counter holding a non-canonical image ("7 " in a PIC 99) came back "07".
         // The one image read above is the whole of item identification this statement then owes (GR6).
         using (w.Block($"if ({img}.Length != 0)"))
-            EmitBody(ins, id, img);
+            EmitBody(ins, id, img, readImage);
     }
 
     /// <summary>§14.9.22.4 GR6 / §14.6.4 7): identify every identifier of the statement once, in SOURCE order —
@@ -98,7 +102,7 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     }
 
     /// <summary>The TALLYING / REPLACING / CONVERTING passes and the write-back, over the non-empty image.</summary>
-    private void EmitBody(BoundInspect ins, int id, string img)
+    private void EmitBody(BoundInspect ins, int id, string img, string readImage)
     {
         var w = ctx.Writer;
         string back = ins.Backward ? "true" : "false";
@@ -111,15 +115,37 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
             string pats = string.Join(", ", t.Select(x => OperandTextOf(x.Pattern, cat)));
             string befs = string.Join(", ", t.Select(x => OperandTextOf(x.Before, cat)));
             string afts = string.Join(", ", t.Select(x => OperandTextOf(x.After, cat)));
-            w.Line($"long[] __cnt{id} = {RuntimeApi.InspectTally(img, kinds, pats, befs, afts, back)};");
+            string tally = RuntimeApi.InspectTally(img, kinds, pats, befs, afts, back);
+            w.Line($"long[] __cnt{id} = {tally};");
             // One add per operand, in source order — the same counter may appear under several operands and
             // accumulates each count (GR11 — INSPECT adds, it never initializes).
+            // ⛔ A COUNTER THAT SHARES STORAGE WITH WHAT THE NEXT OPERAND READS (docs/CONFORMANCE.md D-INS1; the
+            // standard leaves it undefined, §14.9.22.4 GR13 / Annex A.2 item 21 d)) CHANGES THAT READ: each operand's
+            // count is taken from the statement's state AFTER the preceding operands stored theirs, so the image
+            // and every operand value are read again and the cycle re-run. When no counter can overlap anything the
+            // statement reads (the proof is conservative, StorageOverlap) the state never changes, the re-run would
+            // return the same counts, and the ONE shared cycle above is the whole statement.
             for (int k = 0; k < t.Count; k++)
+            {
+                if (k > 0 && CounterMayChangeInputs(ins, t[k - 1].Counter))
+                {
+                    w.Line($"{img} = {readImage};");
+                    w.Line($"__cnt{id} = {tally};");
+                }
                 arith.StoreArith(t[k].Counter,
                     num.Combine(num.FieldNum(t[k].Counter), "+", new NumX($"__cnt{id}[{k}]", 0), ReceiverContext.None),
                     CobolRounding.Truncation);
+            }
+            // ⛔ GR19: a format 3 is TWO SUCCESSIVE STATEMENTS, so the REPLACING half takes identifier-1 as the
+            // tallying half left it (D-INS2). The one snapshot is exact only while no counter overlaps identifier-1.
+            if (ins.Replacing.Count > 0 && ins.Tallying.Any(x => CounterMayOverlapTarget(ins, x.Counter)))
+                w.Line($"{img} = {readImage};");
         }
 
+        // REPLACING / CONVERTING over an operand that shares identifier-1's storage (§14.9.22.4 GR18 / GR21, Annex A.2
+        // item 21 e) / f), undefined): docs/CONFORMANCE.md D-INS3 / D-INS4 — every operand value is read as the call's
+        // arguments (the start of THIS pass), the cycle matches the pass's image, and the one write-back is the only
+        // store, so an operand never observes the replacement.
         bool mutated = false;
         if (ins.Replacing.Count > 0)
         {
@@ -161,6 +187,29 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
             EmitStore(fieldTarget.Place, img);
         }
     }
+
+    /// <summary>Can storing <paramref name="counter"/> change what identifier-1 reads (§14.9.22.4 GR13's identifier-1
+    /// overlap, GR19's format 3 hand-over)? A function-identifier identifier-1 is derived from its arguments at each
+    /// read, which this cannot see through, so it answers yes.</summary>
+    private static bool CounterMayOverlapTarget(BoundInspect ins, Place counter) => MayReadStorageOf(ins.Target, counter);
+
+    /// <summary>Can storing <paramref name="counter"/> change anything the TALLYING cycle reads — identifier-1 or any
+    /// operand's pattern or BEFORE/AFTER delimiter (§14.9.22.4 GR13: identifier-1, identifier-3 or identifier-4 in the
+    /// storage of identifier-2)?</summary>
+    private static bool CounterMayChangeInputs(BoundInspect ins, Place counter) =>
+        CounterMayOverlapTarget(ins, counter)
+        || ins.Tallying.Any(x => MayReadStorageOf(x.Pattern, counter) || MayReadStorageOf(x.Before, counter)
+                                 || MayReadStorageOf(x.After, counter));
+
+    /// <summary>Does reading <paramref name="op"/> possibly read the storage <paramref name="counter"/> names? A
+    /// literal or a figurative never does; a field does when <see cref="StorageOverlap"/> cannot prove it disjoint;
+    /// any other operand shape (a function-identifier's arguments) is not analysed and answers yes.</summary>
+    private static bool MayReadStorageOf(BoundOperand? op, Place counter) => op switch
+    {
+        null or BoundStringLiteral or BoundNumericLiteral or BoundFigurative or BoundAllLiteral => false,
+        BoundFieldOperand f => StorageOverlap.MayShareStorage(counter, f.Place),
+        _ => true,
+    };
 
     /// <summary>Store the replaced/converted image back into identifier-1 by its storage shape: a group through the
     /// ONE group value writer in the alphabet it was read in (a Tier-B view group splices its window); a string-stored elementary

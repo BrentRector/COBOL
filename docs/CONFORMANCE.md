@@ -1109,6 +1109,67 @@ of an unsupported facility.
   `{!numericLiteralIsLeftOperand()}?` on the literal arms), with the binders recovering the sole identifier;
   pinned by `conformance:2023/pb130_call_format2_bare` and `conformance:2023/pb1135_invoke_keywordless_expression_argument`.
 
+### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
+
+Annex A.2 lists situations whose results the standard leaves undefined, and §4.4 2) says that "A COBOL run unit that
+allows these situations to happen is a conforming run unit, although the resultant execution is not defined by
+standard COBOL" (`cite.py --check 4.4 "A COBOL run unit that allows these situations to happen is a conforming run
+unit"` → OK 2)). This is NOT a §8 "no observable obligation" derivation: for each case below the owner decided
+(2026-10-01) to DOCUMENT what WiseOwl COBOL does, align it with GnuCOBOL where GnuCOBOL measurably differs (CLAUDE.md
+rule 1: the standard where it controls, otherwise GnuCOBOL; IBM Enterprise COBOL and Micro Focus are consulted only
+where GnuCOBOL has nothing, and here GnuCOBOL 3.2 was built and run on every repro), and pin the documented behavior
+with a golden so it cannot drift. The documented behavior is a promise about THIS compiler, never a statement about
+what the standard requires.
+
+- **D-INS1 — an INSPECT TALLYING counter in the storage of identifier-1, a pattern or a delimiter (§14.9.22.4 GR13,
+  Annex A.2 item 21 d)).** `cite.py --check 14.9.22.4 "If identifier-1, identifier-3, or identifier-4 occupies the same
+  storage area as identifier-2, the result of the execution of this statement is undefined"` → OK 13); `cite.py --check
+  A.2 "occupies the same storage area as the TALLYING identifier"` → OK 21) d). **Determination:** the operands of
+  one TALLYING phrase list are taken in source order, and each operand's count is computed from the state of the
+  statement AFTER the operands before it have stored theirs (GR11 still ADDS each count to its counter). The counter's
+  new value is therefore visible to identifier-1's image, to a later operand's pattern and to its BEFORE/AFTER
+  delimiter: `INSPECT G TALLYING T FOR ALL "A" T FOR ALL "2"` with T inside G counts the "2" the first operand
+  stored (D2 = `31A1A1`, not `21A1A1`). A single-operand statement is unaffected (the counter is stored after the
+  scan). The mechanism is one rule in `InspectEmitter.EmitBody`: before each operand after the first, when the
+  previous counter MAY share storage with identifier-1 or any operand the cycle reads, the image is read again and
+  the one comparison cycle re-run (`StorageOverlap.MayShareStorage` is a conservative declaration-level proof of
+  disjointness: containment, REDEFINES, LINKAGE and BASED storage answer "may"; a false "may" costs one re-run and
+  changes no result). **A statement whose counters overlap nothing it reads is the single shared comparison cycle of
+  GR8, unchanged** — so two non-overlapping phrases still compete for characters in source order at each position
+  (`ALL "BC"` then `ALL "AB"` over "ABCABC" counts BC=0, AB=2, §14.9.22.4 GR8 a), b)); GnuCOBOL runs every phrase as
+  its own pass and counts BC=2, AB=0 there, a divergence from the standard on a case with no overlap, which this
+  compiler does not follow because the standard controls). Measured against GnuCOBOL 3.2: D2, D3, D5 and the
+  reference-modified case agree. Pinned by `conformance:85/pb1907_inspect_tally_overlap` (D1-D5, RM, and controls C1
+  and C2: C1 a statement that overlaps nothing, C2 one the compiler cannot prove disjoint although it is).
+- **D-INS2 — a FORMAT 3 INSPECT whose counter is in the storage of identifier-1 or of a REPLACING operand (§14.9.22.4
+  GR13 with GR19).** `cite.py --check 14.9.22.4 "A format 3 INSPECT statement is interpreted and executed as though two
+  successive INSPECT statements specifying the same identifier-1 had been written"` → OK 19). **Determination:** the
+  statement runs as GR19 words it: item identification once, then the whole tallying statement (counters stored), then
+  the whole replacing statement over identifier-1 and operand values as they stand when it starts. A counter inside
+  identifier-1 therefore keeps its tallied value (`INSPECT G5 TALLYING G5T FOR ALL "A" REPLACING ALL "A" BY "B"` over
+  `0AAA` gives `3BBB`; before this entry the replacing half wrote back the pre-tally image and the counter was lost,
+  `0BBB`), and a replacing operand that is the counter reads the counter's new value. The re-read is the same
+  `StorageOverlap` test as D-INS1, applied between the two halves. GnuCOBOL 3.2 emits the two statements separately
+  and gives the same lines. Pinned by `conformance:85/pb1907_inspect_format3_counter_overlap`.
+- **D-INS3 — an INSPECT REPLACING pattern, replacement or delimiter in the storage of identifier-1 (§14.9.22.4 GR18,
+  Annex A.2 item 21 e)).** `cite.py --check 14.9.22.4 "If identifier-3, identifier-4, or identifier-5 occupies the same
+  storage area as identifier-1, the result of the execution of this statement is undefined"` → OK 18); `cite.py
+  --check A.2 "occupies the same storage area as the INSPECT identifier"` → OK 21) e). **Determination:** every
+  operand value and identifier-1's image are read when the REPLACING pass starts (GR6, GR9), the comparison cycle
+  matches that image, and the single store at the end is the only write, so an operand never observes a replacement
+  of its own statement (`REPLACING ALL "Q" BY "R" ALL "S" BY X1(1:1)` over `QS` gives `RQ`). This was already the
+  behavior and GnuCOBOL 3.2 gives the same results on every probe; no code changed. Pinned by
+  `conformance:85/pb1907_inspect_replacing_overlap`.
+- **D-INS4 — an INSPECT CONVERTING from-set, to-set or delimiter in the storage of identifier-1 (§14.9.22.4 GR21,
+  Annex A.2 item 21 f)).** `cite.py --check 14.9.22.4 "If identifier-4, identifier-6, or identifier-7 occupies the same
+  storage area as identifier-1, the result of the execution of this statement is undefined"` → OK 21); `cite.py
+  --check A.2 "the CONVERTING identifier, TO identifier, AFTER identifier, or BEFORE identifier occupies the same
+  storage area as the INSPECT identifier"` → OK 21) f). **Determination:** as D-INS3 — the sets and the delimiters are
+  the values at the start of the statement, a repeated from-set character maps by its first occurrence (GR23, `cite.py
+  --check 14.9.22.4 "the first occurrence of the character is used for replacement"` → OK 23)), and the one store at
+  the end is the only write (`CONVERTING X5 TO "WXYZ"` over `ABCA` gives `WXYW`). Already the behavior; GnuCOBOL 3.2
+  agrees on every probe; no code changed. Pinned by `conformance:85/pb1907_inspect_converting_overlap`.
+
 ## 4. Documented non-support facilities (§4.2.6 / §4.2.7 / §4.2.13)
 
 The following whole facilities are **not implemented**, and every element of each is **recognized and refused or
