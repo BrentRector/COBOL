@@ -766,7 +766,12 @@
   "pb1686_sum_counter_adds_like_add",
   "pb1526_integer_argument_integrality_standard_decimal",
   "pb1379_time_form_floor_sdidi_carrier",
-  "pb1907_past_record_whole_record"
+  "pb1907_past_record_whole_record",
+  "pb1907_unstring_overlap_sender",
+  "pb1907_unstring_overlap_delimiter",
+  "pb1907_unstring_overlap_tallying",
+  "pb1907_unstring_overlap_pointer",
+  "pb1907_unstring_overlap_linkage"
  ],
  "pending": [
   "pb485_value_only_format1"

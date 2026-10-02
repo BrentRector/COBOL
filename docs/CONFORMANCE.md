@@ -1119,7 +1119,9 @@ unit"` → OK 2)). This is NOT a §8 "no observable obligation" derivation: for 
 rule 1: the standard where it controls, otherwise GnuCOBOL; IBM Enterprise COBOL and Micro Focus are consulted only
 where GnuCOBOL has nothing, and here GnuCOBOL 3.2 was built and run on every repro), and pin the documented behavior
 with a golden so it cannot drift. The documented behavior is a promise about THIS compiler, never a statement about
-what the standard requires.
+what the standard requires. For the overlapping-operand cases IBM Enterprise COBOL 6.4 calls the result
+"unpredictable" (Language Reference, "Overlapping operands") and Micro Focus calls it "undefined"; neither documents
+a result, so GnuCOBOL 3.2 (libcob, measured on every case below) is the comparator.
 
 - **D-INS1 — an INSPECT TALLYING counter in the storage of identifier-1, a pattern or a delimiter (§14.9.22.4 GR13,
   Annex A.2 item 21 d)).** `cite.py --check 14.9.22.4 "If identifier-1, identifier-3, or identifier-4 occupies the same
@@ -1282,6 +1284,67 @@ what the standard requires.
   `JUST-LEAD`, `NUM-MOVE`, `NUM-SELF`, `ALNUM-NUM`, `SLICE-NUM`, `NUM-NUM`, `NUM-SCALE`). Every line of that golden
   was also run through a GnuCOBOL 3.2.0 built from `tests/external/gnucobol-3.2.tar.xz`, and the two outputs are
   identical.
+- **D-UNS1 — UNSTRING runs in place: the SENDING item is read live (kb/Work PB1907, row `GR-14.9.48.4-18`).**
+  §14.9.48.4 GR18 — *"If identifier-1, identifier-2, or identifier-3, occupies the same storage area as identifier-4,
+  identifier-5, identifier-6, identifier-7, or identifier-8, … the result of the execution of this statement is
+  undefined, even if they are defined by the same data description entry"* (`cite.py --check 14.9.48.4 "the result of the
+  execution of this statement is undefined, even if they are defined by the same data description entry"` → OK, 18)) —
+  and Annex A.2 item 61 (`cite.py --check A.2 "UNSTRING statement. If the UNSTRING identifier, DELIMITED BY identifier,
+  or OR identifier, occupies the same storage area as the INTO identifier"` → OK, 61)) leave the case open; GR18 widens
+  §14.6.10 rule 2 (*"When the data items are described by the same data description entry, the result of the statement is
+  the same as if the data items shared no part of their respective storage areas"*, OK) so the overlap is undefined even
+  then. **WiseOwl COBOL examines identifier-1 as it stands before each receiving area:** the characters of the sending
+  item are read from storage again before every receiving area after the first, so an earlier area's INTO, DELIMITER IN
+  and COUNT IN stores into the sender's storage (the same record, a REDEFINES view, a level-66 alias, a BASED item or a
+  LINKAGE item passed twice by reference) change what the later areas see. Nothing is snapshotted at initiation except
+  the pointer's starting value and, for a fixed-length sender, its size; a variable-length sender is re-read at its current
+  extent, and a subscript or reference modifier inside the sender is evaluated again with the re-read. No diagnostic is
+  issued. This is libcob `cob_unstring_into`, which scans `unstring_src->data` on every call. Measured (cobc 3.2.0 and
+  this build agree): `UNSTRING REC DELIMITED BY "," INTO F2 B C TALLYING IN T`, with `F2` the second 4-byte field of
+  `REC = "AAA,BBB,CCC"`, gives `REC=[AAA,AAA CCC] B=[AAA CCC] C=[zzz] T=02` (a snapshot would give `B=[BBB    ] C=[CCC]
+  T=03`). The decision "does a store reach this operand" is `StorageSharing.MayShare`, a conservative storage-overlap
+  predicate (a false positive costs one redundant re-read and changes no result); an UNSTRING whose operands are
+  provably disjoint emits no re-read. Pinned by `conformance:2023/pb1907_unstring_overlap_sender` (same record,
+  COUNT IN, REDEFINES) and `conformance:2023/pb1907_unstring_overlap_linkage` (by-reference aliasing), and held by
+  `unit:UnstringLiveReadDriftTests`.
+- **D-UNS2 — UNSTRING: an identifier DELIMITER is read live and DELIMITER IN receives its live content (kb/Work PB1907,
+  row `GR-14.9.48.4-18`).** The same rule (§14.9.48.4 GR18, Annex A.2 item 61, §4.4 2)) covers identifier-2 and identifier-3
+  overlapping identifier-4 and identifier-5. **WiseOwl COBOL reads an identifier delimiter from storage before each
+  receiving area**, so an earlier area's store into it changes the delimiter for the later areas, and **DELIMITER IN
+  receives the matched delimiter item's content as it stands after that area's INTO store** (libcob
+  `cob_unstring_delimited` keeps the item's storage and `cob_unstring_into` copies from it after the move). A literal or
+  figurative delimiter is unaffected, and an examination that ended at the end of the sender leaves DELIMITER IN empty
+  (space-filled). Measured (cobc 3.2.0 and this build agree): `UNSTRING ";,a;b,c" DELIMITED BY DLM INTO DLM DELIMITER IN
+  D1 P2 DELIMITER IN D2 P3` with `DLM = ","` gives `DLM=[;] D1=[;] P2=[a  ] D2=[;] P3=[b,c]` (a snapshot gives `D1=[,]
+  P2=[a;b] D2=[,] P3=[c  ]`). **One documented difference from GnuCOBOL:** with `DELIMITED BY ALL`, WiseOwl COBOL's
+  examination consumes the whole run of repeated delimiters before the INTO store, whereas libcob consumes the repeats
+  after it, against the delimiter as the store left it. Reproducing that needs the examination split around the store; it
+  matters only for an `ALL` delimiter that the same statement overwrites, and the result here is pinned as ours
+  (`UNSTRING "a;;b;;;;c;" DELIMITED BY ALL D3 INTO D3 Y2 Y3` gives `D3=[a] Y2=[b;;;;c;  ]`; libcob gives
+  `Y2=[;b;;;;c; ]`). Pinned by `conformance:2023/pb1907_unstring_overlap_delimiter`.
+- **D-UNS3 — UNSTRING: the TALLYING item is incremented at the END, and the POINTER is stored last (kb/Work PB1907, row
+  `GR-14.9.48.4-18`).** GR14 gives *"its value at the beginning of the execution of the statement plus"* the count
+  (`cite.py --check 14.9.48.4 "a value equal to its value at the beginning of the execution of the statement plus"` → OK,
+  14)) for operands that share no storage; GR18 removes that guarantee when identifier-4, identifier-6 or identifier-7
+  occupies the same storage as identifier-8. **WiseOwl COBOL adds the number of receiving areas acted upon to the
+  TALLYING item's content as it stands after the last area**, so an INTO or COUNT IN store into the TALLYING item is part
+  of the sum, and **stores the TALLYING item before the POINTER item**, so when both name one item the pointer is the
+  last value stored (libcob `cob_unstring_tallying` then `cob_unstring_finish`, in the order `cb_emit_unstring` emits
+  them). With no overlap the value equals GR14's. Measured (cobc 3.2.0 and this build agree): COUNT IN storing 03 into the
+  TALLYING item over two areas gives `T=05`, INTO storing 07 gives `T=09`, and POINTER and TALLYING on one item starting at
+  1 over six examined characters gives `PT=07` (a start-value tally gives 02, 02 and 03). Pinned by
+  `conformance:2023/pb1907_unstring_overlap_tallying`.
+- **D-UNS4 — UNSTRING: the POINTER is read once at initiation and stored last (kb/Work PB1907, row `GR-14.9.48.4-18`).**
+  GR13 — *"the content of the data item referenced by identifier-7 will contain a value equal to the initial value plus
+  the number of characters examined"* (`cite.py --check 14.9.48.4 "will contain a value equal to the initial value plus
+  the number of characters examined"` → OK, 13)) — describes the non-overlapping case; GR18 (A.2 item 61) leaves
+  identifier-7 sharing storage with identifier-1, -4, -6 or -8 undefined. **WiseOwl COBOL reads the POINTER item once, at
+  initiation, and that value governs the whole examination**: INTO or COUNT IN stores into the pointer item do not move
+  it, and the final pointer value overwrites them. The POINTER and TALLYING items are stored only at the end of the
+  statement, so a sending item that contains either one is examined unchanged and holds the new value only afterwards
+  (libcob `cob_unstring_init` and `cob_unstring_finish`; this case already matched GnuCOBOL on every leg). Pinned by
+  `conformance:2023/pb1907_unstring_overlap_pointer`, which also guards D-UNS1 to D-UNS3 against re-reading the pointer
+  mid-statement.
 
 ## 4. Documented non-support facilities (§4.2.6 / §4.2.7 / §4.2.13)
 

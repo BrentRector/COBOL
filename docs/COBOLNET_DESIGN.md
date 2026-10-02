@@ -753,6 +753,10 @@ banned substrate.)* See §14.8 for the `CobolString` vs `CobolStrings` roster sp
   a C# `int` round-tripped via `CobolNum`; overflow when pointer<1 or >len before a char move (GR8).
 - **UNSTRING** uses a per-INTO `UnstringExtract` (earliest delimiter wins, tie→first-listed, ALL skips contiguous
   repeats; two contiguous delimiters → empty extract → space/zero fill via `CobolString.Store`/`CobolNum.Store`).
+  Overlapping operands (§14.9.48.4 GR18, Annex A.2 item 61) run IN PLACE, as libcob does (CONFORMANCE.md D-UNS1 to
+  D-UNS4): `StringEmitter` re-reads the sender and each identifier delimiter before every receiving area after the
+  first, but only where `StorageSharing.MayShare` says a store (INTO, DELIMITER IN, COUNT IN) can reach it; the TALLYING
+  item receives its content at the end plus the count, stored before the POINTER item.
 - **National (PIC N)** uses the IDENTICAL string helpers with NO surrogate-aware handling — one COBOL char = one
   UTF-16 code unit (ISO §8.5.1.4: "each two-octet code element of UTF-16 is treated as though it were itself a
   character"). C# string indexing IS per-code-unit, so .NET `string` is the exact COBOL national model.

@@ -48382,12 +48382,12 @@
   "subject": "UNSTRING statement",
   "rule-digest": "5d197e65e4b7",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitUnstring",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitUnstring; src/Cobol.Net.Compiler/Binding/Model/StorageSharing.cs#StorageSharing; src/Cobol.Net.Runtime/Verbs/CobolStringOps.cs#MatchedDelimiterIndex",
+  "test-ref": "conformance:2023/pb1907_unstring_overlap_sender; conformance:2023/pb1907_unstring_overlap_delimiter; conformance:2023/pb1907_unstring_overlap_tallying; conformance:2023/pb1907_unstring_overlap_pointer; conformance:2023/pb1907_unstring_overlap_linkage; unit:UnstringLiveReadDriftTests.TheEmitterAsksTheOnePredicate_AndWalksNoRecords; unit:UnstringLiveReadDriftTests.SubordinateReceiverOfTheSender_RereadsTheSenderOnly",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "GR18: overlapping identifier-1..-8 -> 'the result of the execution of this statement is undefined' (cite.py --check -> OK 14.9.48.4 18)). The rule imposes no requirement on the implementation; EmitUnstring reads the sender image and every delimiter value ONCE at initiation and the pointer/tally into locals, so any overlap yields a deterministic (undefined-by-spec) result and no crash. Nothing to test.",
-  "state": "GAP"
+  "notes": "GR18 / Annex A.2 item 61 leave overlapping UNSTRING operands undefined (cite.py --check -> OK 14.9.48.4 18), A.2 61), 4.4 2)). Owner decision 2026-10-01 (kb/Work PB1907): document the behavior, follow GnuCOBOL 3.2 where it measurably differs, pin it. docs/CONFORMANCE.md D-UNS1 to D-UNS4: the statement runs in place - sender and identifier delimiters are re-read before each later receiving area wherever a store (INTO, DELIMITER IN, COUNT IN) can reach them (StorageSharing.MayShare), DELIMITER IN receives the live delimiter content, TALLYING adds the count to its content at the end and is stored before the POINTER, which is read once and stored last. One documented difference from libcob: a DELIMITED BY ALL run is consumed before the INTO store.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.49.3-1",

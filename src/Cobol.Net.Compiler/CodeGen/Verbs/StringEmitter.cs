@@ -84,9 +84,11 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         EmitOverflow(ovf, "EC-OVERFLOW-STRING", s.OnOverflow, s.NotOnOverflow);   // GR8b
     }
 
-    /// <summary>UNSTRING (ISO §14.9.48): the sender's image and the delimiter values are read ONCE at initiation
-    /// (operand overlap is undefined, GR18), the pointer initializes from the POINTER item or 1 (GR11a) and the
-    /// tally from the TALLYING item's CURRENT value (GR14 — the statement ADDS to it). An initiation pointer
+    /// <summary>UNSTRING (ISO §14.9.48): the sender's image and the delimiter values are read at initiation and
+    /// AGAIN before each later receiving area wherever a store of the statement can reach them (operand overlap is
+    /// undefined, GR18 — the in-place model of docs/CONFORMANCE.md D-UNS1/D-UNS2, <see cref="LiveReads"/>), the
+    /// pointer initializes from the POINTER item or 1 (GR11a) and the TALLYING item receives its content AT THE
+    /// END plus the count of receiving areas acted upon (GR14 — the statement ADDS to it; D-UNS3). An initiation pointer
     /// outside [1, size(sender)] is the GR15a overflow and TERMINATES the operation before any transfer (GR16a — a
     /// check the legacy engine performed but did not honor with termination); otherwise each receiving area gets
     /// one <c>UnstringExtract</c> (GR11b–f), its result stored per the MOVE rules (GR11c — so two
@@ -102,7 +104,7 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         int id = ctx.Names.NextStrUnstr();
         string src = $"__unsSrc{id}", dels = $"__unsDel{id}", alls = $"__unsAll{id}",
                ptr = $"__unsPtr{id}", tly = $"__unsTly{id}", ovf = $"__unsOvf{id}";
-        w.Line($"string {src} = {OperandText.AsString(s.Source, num)};");   // DA4: an operand (may be a function)
+        w.Line($"string {src} = {SenderText(s)};");   // DA4: an operand (may be a function)
         // §14.9.48.4 GR2 (kb/Work PB1184): "If the data item referenced by identifier-1 is a zero-length item, execution
         // of the UNSTRING statement terminates immediately." — BEFORE any initiation test, so the GR15 a) overflow
         // (a pointer of 1 is past a zero-length sender) is never evaluated, EC-OVERFLOW-UNSTRING is never set, and
@@ -117,7 +119,7 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             // is the national sequence's (§8.3.3.6.4 GR6; kb/Work PB1185); a field delimiter is its FULL content —
             // trailing spaces included (GR9: the delimiter is the content of the item; the legacy's TrimEnd was a
             // deviation).
-            w.Line($"string[] {dels} = {{ {string.Join(", ", s.Delimiters.Select(d => OperandText.AsString(d.Value, num, characterCategory: s.CharacterCategory)))} }};");
+            w.Line($"string[] {dels} = {{ {string.Join(", ", s.Delimiters.Select(d => DelimiterText(s, d)))} }};");
             w.Line($"bool[] {alls} = {{ {string.Join(", ", s.Delimiters.Select(d => d.All ? "true" : "false"))} }};");
         }
         else
@@ -129,10 +131,12 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             ? $"long {ptr} = {RuntimeApi.HostInt64(NumericRenderer.Align(num.AsNum(new BoundFieldOperand(p0), ReceiverContext.None), 0))};"   // GR11a / GR12 — user-initialized (by VALUE — kb/Work PB86; saturating — PB1033)
             : $"long {ptr} = 1;");                                                    // GR11a — leftmost position
         w.Line($"long {ptr}__0 = {ptr};");
-        w.Line(s.Tallying is { } t0
-            ? $"Int128 {tly} = {NumericRenderer.Align(num.AsNum(new BoundFieldOperand(t0), ReceiverContext.None), 0)};"   // GR14 — adds to the current value (by VALUE — kb/Work PB86), EXACT: a count is summed, never narrowed (PB1033)
-            : $"Int128 {tly} = 0;");
+        // GR14: the receiving areas acted upon are COUNTED here (EXACT: a count is summed, never narrowed — PB1033) and
+        // added to the TALLYING item's content when the statement ends (D-UNS3), so an INTO or COUNT IN store into
+        // the TALLYING item is part of the sum — libcob's cob_unstring_tallying after the last cob_unstring_into.
+        w.Line($"Int128 {tly} = 0;");
         w.Line($"bool {ovf} = false;");
+        var live = LiveReads.Of(s);
         using (w.Block($"if ({ptr} < 1 || {ptr} > {src}.Length)"))
             w.Line($"{ovf} = true;");                                                 // GR15a; GR16a terminates — no transfer
         using (w.Block("else"))
@@ -152,9 +156,17 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
                 // receiving-size reader (kb/Work PB979: this was a binder integer, 1 for ANY LENGTH, and a
                 // reference-modified receiver was staged as not implemented).
                 string size = sizeCanGovern ? ReceivingStore.ExaminationSize(r.Target) : "0";
+                // D-UNS1 / D-UNS2 (GR18; A.2 item 61): an operand a store of THIS statement can reach is read again
+                // before every receiving area after the first, so it is seen as the previous area's INTO, DELIMITER IN
+                // and COUNT IN stores left it. The first area needs none: nothing has been stored yet.
+                if (k > 0) EmitReread(live, s, src, dels);
                 w.Line($"long {cnt} = {RuntimeApi.UnstringExtract(src, dels, alls, size, ptr, fld, dlm)};");
                 using (w.Block($"if ({cnt} >= 0)"))                                   // −1: not acted upon (GR11g)
                 {
+                    // The matched delimiter's POSITION in the list is taken now, over the array the examination used.
+                    string di = $"__unsDi{id}_{k}";
+                    if (r.DelimiterStore is not null && live.Delimiters.Count > 0)
+                        w.Line($"int {di} = {RuntimeApi.UnstringMatchedDelimiter(dels, dlm)};");
                     // GR11 c): the examined characters ARE the conceptual elementary item, moved "according to
                     // the rules for the MOVE statement" — by the bound MOVE, never a private copy of its rules.
                     w.Line(PlaceRenderer.Write(s.Examined, ReceivingStore.Characters(s.Examined.Item, fld, "")));
@@ -171,6 +183,8 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
                     {
                         // GR11 d): the delimiting characters, the same conceptual-item shape; an end-of-data
                         // delimiting condition leaves them empty, which the MOVE rules space-fill (GR1/GR2).
+                        // D-UNS2: an identifier delimiter an INTO store reached is moved as it NOW stands.
+                        EmitDelimiterReread(live, s, di, dlm);
                         w.Line(PlaceRenderer.Write(s.Delimiting!, ReceivingStore.Characters(s.Delimiting!.Item, dlm, "")));
                         move.Emit(ds);
                     }
@@ -180,13 +194,73 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             }
             w.Line($"if ({ptr} <= {src}.Length) {ovf} = true;   // unexamined characters remain (ISO §14.9.48.4 GR15b)");
         }
+        // GR14 / D-UNS3: the TALLYING item's content NOW (after every INTO and COUNT IN store) plus the count of areas
+        // acted upon; without an overlap that is "its value at the beginning plus the count". Stored BEFORE the pointer
+        // so that, when both name one item, the pointer is the last value stored (D-UNS3; libcob cob_unstring_finish).
+        if (s.Tallying is { } t)
+            arith.StoreArith(t, new NumX($"({NumericRenderer.Align(num.AsNum(new BoundFieldOperand(t), ReceiverContext.None), 0)} + {tly})", 0),
+                CobolRounding.Truncation);
         // GR13 — stored only when the pointer moved (the STRING twin's reason: kb/Work PB1033), so a pointer that
         // was out of range before any examination keeps its exact value.
         if (s.Pointer is { } p)
             using (w.Block($"if ({ptr} != {ptr}__0)"))
                 arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation);
-        if (s.Tallying is { } t) arith.StoreArith(t, new NumX(tly, 0), CobolRounding.Truncation);    // GR14
         EmitOverflow(ovf, "EC-OVERFLOW-UNSTRING", s.OnOverflow, s.NotOnOverflow);   // GR16b
+    }
+
+    /// <summary>The sender's character image (GR11 — a field's raw image; DA4: an operand, which may be a function).
+    /// The ONE rendering of identifier-1, used at initiation and at every re-read.</summary>
+    private string SenderText(BoundUnstringStmt s) => OperandText.AsString(s.Source, num);
+
+    /// <summary>One delimiter's value (GR7 / GR9 / GR10): a figurative takes the program collating sequence of
+    /// identifier-1's category (§8.3.3.6.4 GR6; kb/Work PB1185). The ONE rendering, as <see cref="SenderText"/>.</summary>
+    private string DelimiterText(BoundUnstringStmt s, BoundUnstringDelimiter d) =>
+        OperandText.AsString(d.Value, num, characterCategory: s.CharacterCategory);
+
+    /// <summary>⛔ WHICH OPERANDS OF AN UNSTRING ARE READ AGAIN WHILE IT RUNS (kb/Work PB1907; ISO §14.9.48.4 GR18,
+    /// Annex A.2 item 61; docs/CONFORMANCE.md D-UNS1 and D-UNS2). The standard leaves an UNSTRING whose identifier-1,
+    /// -2 or -3 shares storage with identifier-4, -5 or -6 undefined, and WiseOwl COBOL follows GnuCOBOL: the
+    /// statement runs in place. The operands a store of the statement can reach are exactly the sender and the
+    /// identifier delimiters; the stores are the receiving areas, the DELIMITER IN items and the COUNT IN items (the
+    /// POINTER and TALLYING items are stored after the last area and cannot steer it). A literal, a figurative or a
+    /// function result is never in a store's reach. <see cref="StorageSharing.MayShare"/> is the one decision, so an
+    /// UNSTRING whose operands are disjoint renders no re-read at all: the common path is the pre-overlap code.</summary>
+    /// <param name="Sender">identifier-1 is a field some store can reach.</param>
+    /// <param name="Delimiters">The positions, in the DELIMITED BY list, of the identifier delimiters some store can reach.</param>
+    private sealed record LiveReads(bool Sender, IReadOnlyList<int> Delimiters)
+    {
+        public static LiveReads Of(BoundUnstringStmt s)
+        {
+            var stores = s.Receivers.SelectMany(r => new[] { r.Target, r.DelimiterIn, r.CountIn })
+                .OfType<Place>().ToList();
+            bool Reached(BoundOperand o) =>
+                o is BoundFieldOperand f && stores.Any(t => StorageSharing.MayShare(f.Place, t));
+            return new LiveReads(
+                Reached(s.Source),
+                [.. Enumerable.Range(0, s.Delimiters.Count).Where(i => Reached(s.Delimiters[i].Value))]);
+        }
+    }
+
+    /// <summary>Re-read the reachable sender and identifier delimiters into the working locals the examination of
+    /// the next receiving area runs over (D-UNS1, D-UNS2). A fixed-length item re-reads at its initiation size; a
+    /// variable-length sender (OCCURS DEPENDING ON, dynamic length) is re-read at its CURRENT extent.</summary>
+    private void EmitReread(LiveReads live, BoundUnstringStmt s, string src, string dels)
+    {
+        var w = ctx.Writer;
+        if (live.Sender) w.Line($"{src} = {SenderText(s)};");
+        foreach (int i in live.Delimiters) w.Line($"{dels}[{i}] = {DelimiterText(s, s.Delimiters[i])};");
+    }
+
+    /// <summary>DELIMITER IN receives the matched identifier delimiter's content AFTER the INTO store (D-UNS2,
+    /// libcob <c>cob_unstring_into</c>: the delimiting characters are copied from the delimiter item's own storage
+    /// once the receiving area has been written), so when an INTO store reached it the live content replaces the
+    /// occurrence the examination matched. <paramref name="matchedIndex"/> names the local holding the matched
+    /// position (<c>CobolStringOps.MatchedDelimiterIndex</c>, −1 for an end-of-sender examination, which stays empty).</summary>
+    private void EmitDelimiterReread(LiveReads live, BoundUnstringStmt s, string matchedIndex, string dlm)
+    {
+        var w = ctx.Writer;
+        foreach (int i in live.Delimiters)
+            w.Line($"if ({matchedIndex} == {i}) {dlm} = {DelimiterText(s, s.Delimiters[i])};");
     }
 
     /// <summary>The shared ON / NOT ON OVERFLOW dispatch (STRING GR8c/8e/GR9; UNSTRING GR16c/16e/GR17): the ON

@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-251 drift tests.
+252 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -246,6 +246,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [TestPartitionCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/TestPartitionCoverageDriftTests.cs) | THE drift gate for this assembly's partitioned test families (TestPartitioning, plan §11 A13). | — |
 | [TestRepoDriftTests](../tests/Cobol.Net.Tests.Unit/TestRepoDriftTests.cs) | Keeps the repo-root locator collapsed to ONE implementation. | `tests`, `CobolSharp.sln`, `src/Cobol.Net.Compiler`, `tests/version-matrix/constructs.json`, `tests/nist/corpus.tsv`, `docs/COBOLNET_REARCHITECTURE_PLAN.md` … |
 | [TrailingInPhraseDriftTests](../tests/Cobol.Net.Tests.Unit/TrailingInPhraseDriftTests.cs) | ⛔ A TRAILING IN word AFTER AN OPERAND THAT CAN BE AN IDENTIFIER IS DECIDED BY SYMBOL, AND THIS TEST IS WHY EVERY SUCH PHRASE IS (kb/Work PB843). | `src` |
+| [UnstringLiveReadDriftTests](../tests/Cobol.Net.Tests.Unit/UnstringLiveReadDriftTests.cs) | ⛔ AN UNSTRING RE-READS AN OPERAND A STORE OF THE STATEMENT CAN REACH, AND ONLY THAT OPERAND, AND THE QUESTION "CAN A STORE REACH IT?" IS ANSWERED IN ONE PLACE (kb/Work PB1907). | `src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs`, `src/Cobol.Net.Compiler/Cobol.Net.Compiler.csproj` |
 | [UnstringMoveChainDriftTests](../tests/Cobol.Net.Tests.Unit/UnstringMoveChainDriftTests.cs) | kb/Work PB979 — UNSTRING's stores ARE moves. ISO §14.9.48.4 GR11 c): the examined characters "shall be treated as an elementary national data item if identifier-1 is of category national, and otherwise as an elementary alphanumeric data item, and shall be moved into the current receiving area according to the rules for the MOVE statement"; GR11 d) says the same of the delimiting characters. | `src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs` |
 | [UsageDeclarationPlacementDriftTests](../tests/Cobol.Net.Tests.Unit/UsageDeclarationPlacementDriftTests.cs) | The §13.18.60.3 declaration-placement screen's SHAPE, held against drift (kb/Work PB183). | — |
 | [UsageFloatFormatPhraseDriftTests](../tests/Cobol.Net.Tests.Unit/UsageFloatFormatPhraseDriftTests.cs) | ⛔ EVERY usage keyword the grammar admits must have DECIDED whether the USAGE clause's float FORMAT phrases (ISO §13.18.60.2's endianness-phrase and encoding-phrase) apply to it — and the decision is checked against the keyword inventory read out of the GRAMMAR, not out of a list somebody remembered. | `src/Cobol.Net.Frontend/Grammar` |

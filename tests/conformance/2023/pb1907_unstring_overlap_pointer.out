@@ -1,0 +1,4 @@
+P1 P2=[ab ] PT=05
+P2 P1=[abc] P2=[de ] PT=07
+E1 G=[8ab,cd,] P1=[b  ] P2=[cd ] T=2
+E2 K=[4,a,bc] P1=[1  ] P2=[a  ] P3=[bc ]

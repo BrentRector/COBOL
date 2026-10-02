@@ -50,6 +50,21 @@ public static class CobolStringOps
         return new string(chars);
     }
 
+    /// <summary>The position in <paramref name="delimiters"/> of the delimiter an examination matched, given the
+    /// occurrence <see cref="UnstringExtract"/> returned in its <c>delimiter</c> out-argument; −1 when that is empty
+    /// (the examination ended at the end of the sender, so nothing was matched). Exact, not a guess: the kernel
+    /// takes the earliest match and, on a same-position tie, the first listed, so an earlier entry holding the same
+    /// text would have matched at the same position and been chosen instead — the first entry equal to the matched
+    /// text IS the matched entry. Asked of the array the examination ran over, before anything overwrites it
+    /// (GR18, docs/CONFORMANCE.md D-UNS2).</summary>
+    public static int MatchedDelimiterIndex(string[] delimiters, string matched)
+    {
+        if (matched.Length == 0) return -1;
+        for (int d = 0; d < delimiters.Length; d++)
+            if (string.Equals(delimiters[d], matched, StringComparison.Ordinal)) return d;
+        return -1;
+    }
+
     /// <summary>
     /// Examine the UNSTRING sending field for ONE receiving area (§14.9.48.4 GR11) starting at the 1-based
     /// <paramref name="pointer"/> (GR11a; the caller has already established pointer ≥ 1 — the initiation
