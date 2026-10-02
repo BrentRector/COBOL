@@ -5,6 +5,7 @@
   "pb1907_inspect_replacing_overlap",
   "pb1907_inspect_converting_overlap",
   "pb1759_high_value_record_round_trip_85",
+  "pb1907_overlap_move",
   "pb1445_signed_literal_leftmost_sign",
   "pb1090_empty_special_names_two_periods",
   "pb1153_counter_register_character_image",

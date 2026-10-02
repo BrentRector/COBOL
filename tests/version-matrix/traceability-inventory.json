@@ -32362,12 +32362,12 @@
   "subject": "Execution",
   "rule-digest": "8cc8e0c0fea9",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/ArithmeticEmitter.cs",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/ArithmeticEmitter.cs; src/Cobol.Net.Compiler/Binding/Bound/MoveOverlap.cs#Classify; src/Cobol.Net.Compiler/Binding/Model/StorageExtent.cs#Of; src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs#EmitOverlapPrefill",
+  "test-ref": "conformance:85/pb1907_overlap_move",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule text: 'When the data items are not described by the same data description entry, the result of the statement is undefined.' (cite.py --check 14.6.10 -> OK, rule 1). The rule states NO required result, so every behavior conforms; there is no expected value to compute and no golden may pin one (cf. the owner-signed DRV-GR-14.9.20.4-9 treatment of the sibling INITIALIZE GR9 in CONFORMANCE.md §8). COBOL.NET's behavior is determinate (typed-native stores: the sending value is rendered then stored). CONFORMS-but-untested is the expected outcome for an undefined-result rule. || editions as adjudicated: 85, 2002, 2014, 2023 (§14.6.10 is not an Annex E change)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "§14.6.10 1) leaves the result of overlapping, differently described operands undefined (Annex A.2 item 36; §4.4 2) makes the run unit conforming), so every behavior conforms and the golden pins WiseOwl COBOL's DOCUMENTED choice, CONFORMANCE.md §3 D-OVL1/D-OVL2 (owner decision 2026-10-01, kb/Work/PB1907): a MOVE or ADD reads its sender in full before writing the receiver (snapshot), except two corners aligned with GnuCOBOL 3.2.0 (measured with a built cobc, all 21 golden lines identical): a JUSTIFIED RIGHT receiver's leading pad positions are space-filled before a shorter alphanumeric sender is read (JUST=[A A ]), and a numeric DISPLAY receiver is zero-filled before a differently described numeric DISPLAY or alphanumeric sender is read (NUM-MOVE=[0000]), both only where the overlap is a compile-time fact (StorageExtent).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.10-2",

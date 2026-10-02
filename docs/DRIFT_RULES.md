@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-250 drift tests.
+251 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -157,6 +157,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [MethodConformanceRuleSetDriftTests](../tests/Cobol.Net.Tests.Unit/MethodConformanceRuleSetDriftTests.cs) | ⛔ ISO §9.3.8.2.3's per-method conformance rules are written ONCE — OoConformance.MethodConformanceMismatches (plus its rule-9 helper RaisingMismatches) — and every asker CALLS it (kb/Work PB972). | `src/Cobol.Net.Compiler/Oo/OoConformance.cs` |
 | [MethodSelectionScopeDriftTests](../tests/Cobol.Net.Tests.Unit/MethodSelectionScopeDriftTests.cs) | kb/Work PB1010 — a METHOD is its own declarative-selection scope. | — |
 | [MoveOperandClassDriftTests](../tests/Cobol.Net.Tests.Unit/MoveOperandClassDriftTests.cs) | ⛔ THE TWO-ARM PIN FOR ISO §14.9.25.3 SR1 (kb/Work PB423). SR1 — "The class of identifier-1 or identifier-2 shall not be index, message-tag, object, or pointer" — is ONE sentence about BOTH operand positions, and the compiler implemented it as two arms of which only the sending one was ever widened. | — |
+| [MoveOverlapDriftTests](../tests/Cobol.Net.Tests.Unit/MoveOverlapDriftTests.cs) | ⛔ THE OVERLAPPING-MOVE RULE IS DECIDED ONCE, AT BIND TIME, AND RENDERED BY ONE SWITCH (kb/Work PB1907; docs/CONFORMANCE.md §3 D-OVL1/D-OVL2). | `src/Cobol.Net.Compiler` |
 | [MoveTable16AskerDriftTests](../tests/Cobol.Net.Tests.Unit/MoveTable16AskerDriftTests.cs) | ⛔ ONE QUESTION, ONE ENTRY (kb/Work PB878). ISO §14.9.25.3's MOVE-validity question — SR2, SR6/SR7/SR8, SR9 and SR10 (Table 16) — is asked by the written MOVE, by every implicit move MoveBinder.BindMoveOf binds, by §14.9.20.3 SR4 (INITIALIZE REPLACING's hypothetical MOVE), by §14.7.6 rule 2 (the CORRESPONDING pairing filter) and by §14.8.2.3.3 rule 2d (a BY CONTENT / BY VALUE argument). | `src/Cobol.Net.Compiler` |
 | [NestedStatementEcRegionDriftTests](../tests/Cobol.Net.Tests.Unit/NestedStatementEcRegionDriftTests.cs) | kb/Work PB441 — a nested source statement list is an EC REGION BOUNDARY. | `src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs`, `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs` |
 | [NoWallClockAssertionDriftTests](../tests/Cobol.Net.Tests.Unit/NoWallClockAssertionDriftTests.cs) | kb/Work PB1590: no test may assert on a stopwatch reading. A fixed wall-clock ceiling measures the host, not the code — hosted CI runners are shared and loaded, and `DeepNestingTests` went red TWICE on a 1-second compile that took 26 s there. | `tests` |

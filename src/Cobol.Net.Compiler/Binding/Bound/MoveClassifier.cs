@@ -38,7 +38,15 @@ public enum MoveKind
 /// substituted sender. The pair travels together on <see cref="BoundMove.Stores"/> so a per-(sender, receiver)
 /// rule is written ONCE, at construction, and every consumer — the emitter's renderer, the binder's storage
 /// marking — reads the same answer instead of re-deriving it (kb/Work PB425; feedback_one_rule_one_place).</summary>
-public readonly record struct MoveStore(BoundOperand Sender, MoveKind Kind, MoveSenderOrigin Origin);
+public readonly record struct MoveStore(BoundOperand Sender, MoveKind Kind, MoveSenderOrigin Origin)
+{
+    /// <summary>What the store does to the RECEIVER before it reads the sender, when the two STATICALLY overlap
+    /// (<see cref="MoveOverlap"/>, ISO §14.6.10 1) / Annex A.2 item 36 — undefined, so documented; kb/Work PB1907).
+    /// <see cref="OverlapPrefill.None"/> for every MOVE whose operands cannot be proven to overlap. An init-only
+    /// property, not a positional member, so the three-element deconstruction the emitter is pinned to
+    /// (<c>ZeroLengthSubstitutionDriftTests</c>) is unchanged.</summary>
+    public OverlapPrefill Prefill { get; init; }
+}
 
 /// <summary>Where one store's SENDING operand came from: the operand the programmer WROTE, or the figurative
 /// constant an ISO §14.9.25.4 substitution rule put in its place. A BIND-time fact, carried rather than
@@ -295,8 +303,12 @@ public static class MoveClassifier
         for (int i = 0; i < targets.Count; i++)
         {
             var sender = Sender(source, targets[i]);
-            stores[i] = new MoveStore(sender, Kind(sender, targets[i]),
-                ReferenceEquals(sender, source) ? MoveSenderOrigin.Written : MoveSenderOrigin.ZeroLengthLiteral);
+            var kind = Kind(sender, targets[i]);
+            stores[i] = new MoveStore(sender, kind,
+                ReferenceEquals(sender, source) ? MoveSenderOrigin.Written : MoveSenderOrigin.ZeroLengthLiteral)
+            {
+                Prefill = MoveOverlap.Classify(sender, targets[i], kind),
+            };
         }
         return stores;
     }

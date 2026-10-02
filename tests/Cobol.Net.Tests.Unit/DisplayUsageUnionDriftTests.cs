@@ -145,6 +145,14 @@ public sealed class DisplayUsageUnionDriftTests
             //      character cells, which is the promotion question and stays DISPLAY-only for the same reason.
             ["Binding/Procedure/Verbs/MoveBinder.cs"] = (2, 0),
 
+            // DISPLAY-ONLY (3) — KEEPER, SPEC-ALIGNED TO AN IMPLEMENTOR CHOICE (kb/Work PB1907, CONFORMANCE.md §3
+            //      D-OVL2). The overlapping-MOVE corners are about ZONED DISPLAY storage by nature: a numeric DISPLAY
+            //      receiver is zero-filled, and a JUSTIFIED RIGHT alphanumeric receiver space-padded, before the
+            //      sender's CHARACTERS are read. A BINARY or PACKED receiver has no characters to read back, and
+            //      GnuCOBOL (the measured authority) does not pre-fill those, so this is the DISPLAY-only question,
+            //      not the IMAGE-FORM one PicInfo.IsCharacterFormNumeric answers.
+            ["Binding/Bound/MoveOverlap.cs"] = (3, 0),
+
             // PAIR — SPEC-REQUIRED, verbatim. §14.9.48.3 SR4: "Identifier-4 shall be described implicitly or
             // explicitly as usage display and category alphabetic, alphanumeric, or numeric; or as usage
             // national and category national or numeric." A COMP/packed/COMP-5/index/float receiver is

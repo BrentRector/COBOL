@@ -60,11 +60,11 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 ctx.Writer.Line($"if ({len} == 0) {{");
                 EmitStore(target, fig, MoveClassifier.Kind(fig, target), MoveSenderOrigin.ZeroLengthItem);
                 ctx.Writer.Line("} else {");
-                EmitStore(target, source, kind, origin);
+                EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
                 ctx.Writer.Line("}");
                 continue;
             }
-            EmitStore(target, source, kind, origin);
+            EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
         }
     }
 
@@ -72,8 +72,10 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// <see cref="Emit"/> so §14.9.25.4 GR1's zero-length-item test can place the statement's REAL store in its
     /// else arm (kb/Work PB896). Every arm is the one it always was; the only change is that the dispatch has a
     /// name and two callers.</summary>
-    private void EmitStore(Place target, BoundOperand source, MoveKind kind, MoveSenderOrigin origin)
+    private void EmitStore(Place target, BoundOperand source, MoveKind kind, MoveSenderOrigin origin,
+        OverlapPrefill prefill = default)
     {
+        EmitOverlapPrefill(target, prefill);
         switch (kind)
         {
             case MoveKind.RefModSlice:
@@ -115,6 +117,34 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // provenance rides the STORE, because it is a bind-time fact and reading m.Source to recover
                 // it is the scalar read this shape exists to remove.
                 ctx.Writer.Line(ElementaryStore(target, source, origin));
+                break;
+        }
+    }
+
+    /// <summary>⛔ ISO §14.6.10 1) / Annex A.2 item 36 — operands that overlap have an UNDEFINED result, so what
+    /// WiseOwl COBOL does is documented (docs/CONFORMANCE.md §3 D-OVL1/D-OVL2, kb/Work PB1907): the receiver is
+    /// prepared BEFORE the sender is read, exactly as GnuCOBOL's <c>libcob</c> does. The decision was made at
+    /// bind time (<see cref="MoveOverlap"/>, carried on <see cref="MoveStore.Prefill"/>) and applies only where
+    /// the overlap is a compile-time fact, so every other MOVE emits nothing here and is unchanged. The store
+    /// that follows reads the sender AFTER this statement, which is the whole of the rule.</summary>
+    private void EmitOverlapPrefill(Place target, OverlapPrefill prefill)
+    {
+        switch (prefill.Kind)
+        {
+            case OverlapPrefillKind.LeadingSpaces:
+                // The leading `Positions` positions only: the sender may overlap the rest, which still holds its
+                // pre-move content when the store reads it.
+                ctx.Writer.Line(PlaceRenderer.Write(target, RuntimeApi.StrWindowInto(
+                    PlaceRenderer.Read(target), "1", $"{prefill.Positions}", CsLiteral(new string(' ', prefill.Positions)))));
+                break;
+            case OverlapPrefillKind.ZeroDigits:
+                // libcob's memset of the receiver to the character '0': every position, the sign position of a SIGN
+                // SEPARATE item included, and no operational sign on the last digit (an overpunch such as '{' would
+                // read as a non-digit when the overlapping sender is parsed). An image-backed receiver takes that
+                // image as it is; a native numeric field has no character image, and its zero is MOVE ZERO.
+                ctx.Writer.Line(target is RedefViewPlace || target.Item.StoreAsImage
+                    ? PlaceRenderer.Write(target, CsLiteral(new string('0', target.Item.ImageWidth)))
+                    : ElementaryStore(target, new BoundFigurative('Z'), MoveSenderOrigin.Written));
                 break;
         }
     }

@@ -1222,6 +1222,66 @@ what the standard requires.
   Pinned by `conformance:85/pb1907_write_past_record`, `conformance:85/pb1907_keyed_rewrite_past_record` (relative,
   indexed, REWRITE, WRITE FROM and REWRITE FROM) and `conformance:2023/pb1907_past_record_whole_record` (the cases
   above where nothing is left undefined).
+- **D-OVL1 — operands that overlap: a MOVE (and an arithmetic statement) reads its sender in full, then writes
+  its receiver** (kb/Work PB1907; Annex A.2 item 36; `GR-14.6.10-1`). §14.6.10 1): "When the data items are not
+  described by the same data description entry, the result of the statement is undefined" (`cite.py --check 14.6.10
+  "When the data items are not described by the same data description entry"` → OK, 1)); 2): "When the data items
+  are described by the same data description entry, the result of the statement is the same as if the data items
+  shared no part of their respective storage areas" (OK, 2)); Annex A.2 item 36 lists both the entries that do not
+  share a description (a) and "one or more of the operands is reference-modified" (b) (`cite.py --check A.2 "When
+  one or more of the operands is reference-modified"` → OK, 36) b)). **WiseOwl COBOL's behavior is the snapshot:**
+  the sending operand is evaluated completely before any part of the receiving operand changes, whatever the two
+  share, so `MOVE X(1:5) TO X(2:5)` of `ABCDEF` gives `AABCDE` (the characters 1 to 5 are copied as they stood),
+  the backward move `MOVE X(2:5) TO X(1:5)` gives `BCDEFF`, a REDEFINES view gives the same, and a group sent into
+  its own subordinate item, or the reverse, copies the image it held when the statement began. A shorter sender
+  space-fills the receiver after the copy (`MOVE Y(1:3) TO Y(2:5)` gives `AABC  `). `ADD M2 TO M1`, where `M2`
+  redefines the last three digits of `M1`, reads both operands before it stores: `1234 + 234` gives `1468`. This is
+  what GnuCOBOL does for every one of these shapes (GnuCOBOL 3.2.0 built and run on each; its `memmove`-based
+  alphanumeric moves and its digit-extracting numeric moves are snapshots). Witness: `conformance:85/pb1907_overlap_move` (the `RM-*`, `RD-*`, `GRP-SUB`, `SUB-GRP`,
+  `RM-PAD`, `NUM-ADD`, `JUST-EQ` and `NUM-SAME` lines).
+
+- **D-OVL2 — the two corners where the receiver is prepared before the sender is read** (kb/Work PB1907; Annex A.2
+  item 36; `GR-14.6.10-1`). GnuCOBOL's `libcob` differs from the snapshot in exactly two shapes, because it
+  prepares the receiver first, and the owner chose to follow it (2026-10-01). **(a) A JUSTIFIED RIGHT receiver with
+  a shorter alphanumeric sender:** §13.18.32.4 2) aligns the data "at the rightmost character position" of a
+  receiver "larger than the sending operand" (`cite.py --check 13.18.32.4 "the receiving data item is described
+  with the JUSTIFIED clause and it is larger than the sending operand"` → OK, 2)); WiseOwl COBOL writes the leading
+  pad positions (receiver size minus sender size, space-filled) FIRST, then moves the sender, so a sender that
+  overlaps those positions reads spaces: with `J1 PIC X(4)` holding `ABCD` and `J2 PIC X(3) JUSTIFIED RIGHT`
+  redefining its last three characters, `MOVE J1(1:2) TO J2` gives `A A ` (the snapshot `A AB` is not produced).
+  A sender of the same size or larger is a plain `memmove` and stays the snapshot (`JUST-EQ`, `AABC`). The sender
+  may be an alphanumeric or alphabetic item, a group, or a reference-modified slice; a numeric sender keeps the
+  snapshot. **(b) A numeric DISPLAY receiver:** WiseOwl COBOL sets every position of the receiver to the character
+  `0` FIRST, then converts the sender as it then reads, for a sending numeric DISPLAY item whose description
+  differs from the receiver's (GnuCOBOL's compiler copies identical descriptions byte for byte, and so does this: the
+  snapshot, `NUM-SAME`) and for an alphanumeric sending item or slice; a group sender is a group move (§14.9.25.4
+  GR4, `cite.py --check 14.9.25.4 "alphanumeric to alphanumeric elementary move"` → OK, 4)) and is not touched. With
+  `N1 PIC 9(4)` holding `1234` and `N2 PIC 9(3)` redefining its last three digits, `MOVE N2 TO N1` gives `0000`
+  (the snapshot `0234` is not produced); `MOVE C1 TO C2` with `C1 PIC X(5)` holding `12345` and `C2 PIC 9(3)` over
+  its first three characters gives `04545`. **Scope — only where the overlap is a compile-time fact.** The compiler
+  decides at bind time (`MoveOverlap.Classify`, carried on `MoveStore.Prefill`): both operands lie in one storage
+  area (a REDEFINES class, or one record) and every offset and length is a constant (`StorageExtent`). An operand
+  under OCCURS, a dynamic or variable-length item, a NATIONAL or BIT operand and a reference modification with a
+  run-time bound are not provably overlapping and keep the snapshot; a MOVE that cannot overlap emits exactly what it
+  always did, because it carries no pre-fill. A reference-modified RECEIVER is never pre-filled (§8.4.3.3.4 6), "the
+  unique data item is considered to be an elementary data item without the JUSTIFIED clause", `cite.py --check
+  8.4.3.3.4 "without the JUSTIFIED clause"` → OK, 6)), and a reference-modified numeric item is an alphanumeric one
+  (6) c), `cite.py --check 8.4.3.3.4 "numeric-edited are considered class and category national if the usage is
+  national; otherwise they are considered class and category alphanumeric"` → OK), so no numeric receiver is a
+  slice. Because Annex A.2 36 b) makes any reference-modified operand's overlap undefined, a slice of the receiver
+  itself counts: `MOVE JR(1:2) TO JR`, `JR PIC X(4) JUSTIFIED RIGHT` holding `ABCD`, gives four spaces.
+  **Measured GnuCOBOL differences not adopted:** (i) GnuCOBOL moves a numeric DISPLAY item into a shorter
+  JUSTIFIED RIGHT alphanumeric item keeping its LEFTMOST digits (`MOVE 1234 TO X(3) JUSTIFIED RIGHT` gives `123`),
+  which is not an overlap effect and contradicts §13.18.32.4's right alignment; WiseOwl COBOL keeps `234` (the ISO
+  text controls). (ii) For a SIGNED sender GnuCOBOL unpacks the sending item's sign in place and re-punches it
+  afterwards, so a receiver that overlaps the sign position can end as a negative zero (`100p`); WiseOwl COBOL
+  stores a positive zero (`1000`). The digits agree, only the sign position of a zero result differs, and the
+  default SIGN encodings differ anyway. Implemented in `MoveOverlap` (classification), `StorageExtent` (the overlap
+  fact, on `RecordLayout.OffsetInRecord`'s walk) and `MoveEmitter.EmitOverlapPrefill` (the one rendering), held by
+  `MoveOverlapDriftTests`. Witness: `conformance:85/pb1907_overlap_move` (`JUST`, `JUST-SELF`, `JUST-GRP`, `JUST-IN`,
+  `JUST-LEAD`, `NUM-MOVE`, `NUM-SELF`, `ALNUM-NUM`, `SLICE-NUM`, `NUM-NUM`, `NUM-SCALE`). Every line of that golden
+  was also run through a GnuCOBOL 3.2.0 built from `tests/external/gnucobol-3.2.tar.xz`, and the two outputs are
+  identical.
 
 ## 4. Documented non-support facilities (§4.2.6 / §4.2.7 / §4.2.13)
 
