@@ -256,7 +256,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         }
         int id = ctx.Names.NextKeyedSeq();
         string st = $"__kst{id}";
-        string wimg = OperandText.RecordAreaImage(wr.Record);   // THE ONE record-area channel (kb/Work PB327)
+        string wimg = SeqIo.SentRecordImage(file, wr.Record);   // THE ONE record-area channel (kb/Work PB327; D-WRT1, PB1907)
         // §9.1.16/§14.9.51 GR10-GR11 (P10 Step 8): EVERY keyed WRITE routes through the governed entry — single
         // locking releases the connector's prior lock, WITH LOCK locks the record written. Unconditional
         // (kb/Work PB683): only the runtime can see an OPEN's own SHARING phrase (§9.1.15), and it governs
@@ -302,7 +302,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         }
         int id = ctx.Names.NextKeyedSeq();
         string st = $"__kst{id}";
-        string rimg = OperandText.RecordAreaImage(rw.Record);   // THE ONE record-area channel (kb/Work PB327)
+        string rimg = SeqIo.SentRecordImage(file, rw.Record);   // THE ONE record-area channel (kb/Work PB327; D-WRT1, PB1907)
         // §9.1.16/§14.9.35 GR11-GR12 (P10 Step 8): EVERY keyed REWRITE routes through the governed entry —
         // another connector's lock on the target blocks it (RETRY re-checks, else 51; the record is unrewritten).
         // Unconditional (kb/Work PB683): the OPEN's own SHARING phrase (§9.1.15) is invisible here, and the

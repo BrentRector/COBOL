@@ -655,6 +655,25 @@ public sealed class FileModel
     public DataItem? AreaRecord => Records.Count == 0 ? null
         : Records.Where(r => !IsOutOfLineRecord(r)).MaxBy(Model.RecordLayout.PhysicalWidth) ?? Records[0];
 
+    /// <summary>⛔ DETERMINATION D-WRT1 (docs/CONFORMANCE.md §3, kb/Work PB1907) — THE ONE ANSWER to "does a WRITE or
+    /// REWRITE of <paramref name="record"/> transfer bytes that extend outside the end of record-name-1?", the
+    /// premise of §14.9.51.4 GR13 and §14.9.35.4 GR15 (Annex A.2 items 64 and 49), whose content those rules leave
+    /// undefined. WiseOwl COBOL's determination is that such a byte is the record AREA's content at its position
+    /// (§13.18.33.4 GR3: every level-1 entry is an implicit redefinition of the same area), so a statement that
+    /// transfers more than record-name-1 sends <see cref="AreaRecord"/>'s image instead of record-name-1's own.
+    /// <para>It transfers more exactly when ALL of these hold. (1) The number of bytes comes from somewhere other
+    /// than record-name-1: the DEPENDING ON item (§13.18.43.4 GR13 a)) or a fixed-length file, whose every record is
+    /// integer-1 bytes (GR6) — a variable-length file without DEPENDING transfers record-name-1 itself (GR13 b/c).
+    /// (2) The file is not LINE SEQUENTIAL, whose transfer is defined outright: a WRITE drops trailing spaces
+    /// (§14.9.51.4 GR21) or fills with spaces (GR22), and a REWRITE appends spaces (§14.9.35.4 GR17 c)).
+    /// (3) record-name-1 has a character window (<see cref="IsOutOfLineRecord"/> records do not overlay the area,
+    /// D-FRA), and (4) is narrower than the area, whose widest such record <see cref="AreaRecord"/> is.</para></summary>
+    public bool TransfersPastRecord(DataItem record) =>
+        Organization != FileOrganization.LineSequential && !IsOutOfLineRecord(record)
+        && AreaRecord is { } area && !ReferenceEquals(area, record)
+        && Model.RecordLayout.PhysicalWidth(area) > Model.RecordLayout.PhysicalWidth(record)
+        && (Varying?.DependingName is not null || !RecordSizeVaries);
+
     /// <summary>True for either sequential shape (the only organizations this slice can OPEN/READ/WRITE).</summary>
     public bool IsSequential => Organization is FileOrganization.Sequential or FileOrganization.LineSequential;
 }

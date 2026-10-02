@@ -43627,12 +43627,12 @@
   "subject": "REWRITE statement",
   "rule-digest": "950c3cb9a194",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Rewrite; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#TransfersPastRecord; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#SentRecordImage; src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs#EmitRewrite",
+  "test-ref": "conformance:85/pb1907_keyed_rewrite_past_record; conformance:2023/pb1907_past_record_whole_record",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "\"When record-name-1 is specified, if the number of bytes to be written to the file is greater than the number of bytes in record-name-1, the content of the bytes that extend outside the end of record-name-1 are undefined.\" The runtime pads a short image to the record width (Fit / FitRecord - spaces, or national-space pairs for a national area); any content satisfies 'undefined'. For the RECORD-SEQUENTIAL organization this rule is overridden by GR16 (a shorter record-name-1 is unsuccessful), which is where the fixed-length defect is recorded. cite.py --check 14.9.35.4 GR15 -> OK. [editions as adjudicated: 2023; ISO 1989:2023 Annex E lists no 2014->2023 change to this rule (E.3.3 item 41 touches GR10 only), so 2014 identically; the 1985/2002 wording is not derivable from the 2023 text]",
-  "state": "GAP"
+  "notes": "Annex A.2 item 49 (cite.py --check 14.9.35.4 'the content of the bytes that extend outside the end of record-name-1 are undefined' -> OK 15). The REWRITE twin of GR-14.9.51.4-13 under the same determination, docs/CONFORMANCE.md 3 D-WRT1: relative and indexed files and a record sequential DEPENDING ON REWRITE send the area content past record-name-1; a record sequential REWRITE of a shorter fixed record is '44' (GR16, PB1168) and a line sequential REWRITE appends spaces (GR17 c)). Pinned by the REWRITE and REWRITE FROM cases of the two goldens.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-16",
@@ -49627,12 +49627,12 @@
   "subject": "WRITE statement",
   "rule-digest": "950c3cb9a194",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#TransfersPastRecord; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#SentRecordImage; src/Cobol.Net.Compiler/CodeGen/Verbs/KeyedIoEmitter.cs#EmitWrite",
+  "test-ref": "conformance:85/pb1907_write_past_record; conformance:85/pb1907_keyed_rewrite_past_record; conformance:2023/pb1907_past_record_whole_record",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "GR13: 'the content of the bytes that extend outside the end of record-name-1 are undefined.' An undefined result imposes no observable requirement; the connector pads to the record width (Fit / FitRecord) and any content there is conforming. cite.py --check 14.9.51.4 'the content of the bytes that extend outside the end of record-name-1 are undefined' -> OK rule 13. Nothing to test.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "Annex A.2 item 64 (cite.py --check 14.9.51.4 'the content of the bytes that extend outside the end of record-name-1 are undefined' -> OK 13); 4.4 2) makes the run unit conforming. The content is a DOCUMENTED determination, docs/CONFORMANCE.md 3 D-WRT1 (owner decision 2026-10-01): a byte past record-name-1 is the record area's content at that position, a position no record description occupies is a space; the NUMBER of bytes stays ISO (13.18.43.4 GR13 a), GR6). Line sequential (GR21/GR22) and a varying file without DEPENDING (GR13 b) send record-name-1 itself. Pinned by the three goldens.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-14",

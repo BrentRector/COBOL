@@ -1,0 +1,9 @@
+L1 WRITE=00
+L2 WRITE=00
+L3 WRITE=00
+N1 WRITE=00
+L1 READ=00 [ABCDE               ]
+L2 READ=00 [ABCDE               ]
+N1 READ=00 [ABCDE               ]
+L3 REWRITE=00
+L3 READ=00 [klmno               ]

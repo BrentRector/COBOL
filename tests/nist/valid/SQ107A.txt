@@ -22,9 +22,15 @@ CCVS85 FSTC COPY, NOT FOR DISTRIBUTION.             TEST RESULTS SET-  SQ107A
  READ LONG RECORDS    PASS  READ-TEST-GF-04
  READ SHORT RECORDS   PASS  READ-TEST-GF-05
  VERIFY FILE SQ-VS7   PASS  SEQ-TEST-018
- READ SHORT RECORD          SEQ-INFO-004                  NO DEFINITE CONCLUSION POSSIBLE
- READ SHORT RECORD          SEQ-INFO-005                  NO DEFINITE CONCLUSION POSSIBLE
- READ SHORT RECORD          SEQ-INFO-006                  NO DEFINITE CONCLUSION POSSIBLE
+ READ SHORT RECORD          SEQ-INFO-004                  MAXIMUM RECORD SIZE WRITTEN
+        *** INFORMATION  ***                      RECORD READ =             000000000000000001
+
+ READ SHORT RECORD          SEQ-INFO-005                  MAXIMUM RECORD SIZE WRITTEN
+        *** INFORMATION  ***                      RECORD READ =             000000000000000004
+
+ READ SHORT RECORD          SEQ-INFO-006                  MAXIMUM RECORD SIZE WRITTEN
+        *** INFORMATION  ***                      RECORD READ =             000000000000000450
+
  ***********************************************************************************************************************
 
 

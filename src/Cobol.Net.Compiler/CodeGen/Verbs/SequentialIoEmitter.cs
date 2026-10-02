@@ -531,7 +531,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         if (wr.Unsupported is { } u) { w.Line(LoudStmt(u)); return; }
         if (wr.FromMove is { } fromMove) move.Emit(fromMove);   // §14.9.51.4 GR5 a) — the BOUND implicit MOVE
         string name = FileKeyExpr(wr.File);
-        string image = OperandText.RecordAreaImage(wr.Record);   // THE ONE record-area channel (kb/Work PB327)
+        string image = SentRecordImage(wr.File, wr.Record);   // THE ONE record-area channel (kb/Work PB327; D-WRT1, PB1907)
         // ⛔ ONE CALL FOR EVERY WRITE SHAPE (kb/Work PB683). §9.1.16/§14.9.51 GR10-GR11 (P10 Step 8): the governed
         // WRITE — single locking releases the connector's prior lock, WITH LOCK locks the record written — and
         // both are ALL FILES rules, so the ADVANCING phrases are the statement's PRESENTATION shape and travel
@@ -767,7 +767,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         var w = ctx.Writer;
         if (rw.Unsupported is { } u) { w.Line(LoudStmt(u)); return; }
         if (rw.FromMove is { } fromMove) move.Emit(fromMove);   // §14.9.35.4 GR7 a) — the BOUND implicit MOVE
-        string image = OperandText.RecordAreaImage(rw.Record);   // THE ONE record-area channel (kb/Work PB327)
+        string image = SentRecordImage(rw.File, rw.Record);   // THE ONE record-area channel (kb/Work PB327; D-WRT1, PB1907)
         // §9.1.16/§14.9.35 GR11-GR12 (P10 Step 8): EVERY sequential REWRITE routes through the governed runtime
         // entry — the pre-operation conflict check on the last-read record (51 leaves the record unrewritten)
         // and the GR12 lock discipline. Unconditional (kb/Work PB683), and the runtime body governs every
@@ -926,6 +926,20 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                 (widest, width) = (view, RecordLayout.PhysicalWidth(view.Item));
         return widest;
     }
+
+    /// <summary>⛔ THE IMAGE A WRITE / REWRITE SENDS (determination D-WRT1, docs/CONFORMANCE.md §3; kb/Work PB1907).
+    /// <see cref="OperandText.RecordAreaImage"/> of record-name-1, except where the statement transfers more bytes
+    /// than record-name-1 holds (<see cref="FileModel.TransfersPastRecord"/>): §14.9.51.4 GR13 and §14.9.35.4 GR15
+    /// leave the content of those bytes undefined (Annex A.2 items 64 and 49), and the compiler's determination is
+    /// the record area's content at those positions — so the statement sends the image of the area
+    /// (<c>ReferenceResolver.RecordArea</c>, the widest record's view over the one shared backing,
+    /// §13.18.33.4 GR3), whose leading positions ARE record-name-1. The runtime's <c>Stored</c> then cuts it to the
+    /// transferred length or pads it past the backing with spaces, unchanged. The FROM phrase needs no case of its
+    /// own: its implicit MOVE into record-name-1 has already run when this is asked (§14.9.51.4 GR5 a)).</summary>
+    internal string SentRecordImage(FileModel file, Place record) =>
+        file.TransfersPastRecord(record.Item) && refs.RecordArea(file) is { } area
+            ? OperandText.RecordAreaImage(area)
+            : OperandText.RecordAreaImage(record);
 
     /// <summary>⛔ DOES THE RECORD A STATEMENT JUST RELEASED HAVE ANYWHERE TO BE "ALSO AVAILABLE"? (§14.9.51.4 GR4
     /// for WRITE, §14.9.35.4 GR6 for REWRITE, §14.9.32.4 GR3 for RELEASE — one rule, three statements; kb/Work

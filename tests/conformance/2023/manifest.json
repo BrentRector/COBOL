@@ -765,7 +765,8 @@
   "pb621_statistics_beyond_the_aligned_carrier",
   "pb1686_sum_counter_adds_like_add",
   "pb1526_integer_argument_integrality_standard_decimal",
-  "pb1379_time_form_floor_sdidi_carrier"
+  "pb1379_time_form_floor_sdidi_carrier",
+  "pb1907_past_record_whole_record"
  ],
  "pending": [
   "pb485_value_only_format1"
