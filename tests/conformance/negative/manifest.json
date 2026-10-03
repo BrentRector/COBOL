@@ -2021,7 +2021,22 @@
   "pb1423-udf-argument-order-at-85",
   "pb1419-udf-float-returning-at-85",
   "pb1164-call-returning-superclass-into-subclass",
-  "pb1144-dyn-element-move-illegal"
+  "pb1144-dyn-element-move-illegal",
+  "pb1668-if-truth-word",
+  "pb1668-and-truth-word",
+  "pb1412-shift-only-condition-below-2023",
+  "pb1464-parenthesized-non-condition",
+  "pb1391-abbrev-not-equal-after-boolean-relation",
+  "pb1391-abbrev-equal-after-boolean-literal-relation",
+  "pb1391-abbrev-after-boolean-expression-relation",
+  "pb1391-evaluate-partial-after-boolean-relation",
+  "pb1034-not-gteq",
+  "pb1034-not-lteq",
+  "pb1034-not-greater-or-equal-words",
+  "pb1034-not-less-or-equal-words",
+  "pb1034-equal-than",
+  "pb1034-abbreviated-not-gteq",
+  "pb1034-directive-not-gteq"
  ],
  "pending": []
 }

@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
 using CobolNet.Editions;
+using CobolNet.Frontend.Expressions;
 
 namespace CobolNet.Frontend.Generated;
 
@@ -740,19 +741,14 @@ public abstract class CobolParserCoreBase : Parser
                 // §8.9 funnel already reserves them, so a leading occurrence is a name-slot error either way — never here.
                 // The four boolean SHIFT operators (§8.8.2 rule 8, 2023) are NEVER legal user words (absent from
                 // _dataNameTokens), so a shift token always IS the operator — detecting it here recognizes a shift-only
-                // boolean expression (e.g. `A B-SHIFT-L 2`), which no binary/unary B-op precedes.
-                case CobolLexer.B_AND:
-                case CobolLexer.B_OR:
-                case CobolLexer.B_XOR:
-                case CobolLexer.B_SHIFT_L:
-                case CobolLexer.B_SHIFT_R:
-                case CobolLexer.B_SHIFT_LC:
-                case CobolLexer.B_SHIFT_RC:
+                // boolean expression (e.g. `A B-SHIFT-L 2`), which no binary/unary B-op precedes. The token set is
+                // BooleanOperatorTokens, the ONE list the binder's discriminator reads too (kb/Work PB1412).
+                case int when BooleanOperatorTokens.IsInfix(t):
                     if (IsBoolOperandTerm(prev)) return true;
                     break;
                 // UNARY prefix B-NOT is genuine when a boolean operand can immediately FOLLOW (IF B-NOT A), not when it
                 // heads a comparison as a user data-name (IF B-NOT = 5).
-                case CobolLexer.B_NOT:
+                case int when BooleanOperatorTokens.IsPrefix(t):
                     if (IsBoolOperandStart(TokenStream.LA(i + 1))) return true;
                     break;
                 // An OPERATOR-FREE parenthesized boolean literal — `(B"101")` — is a boolean expression with no
@@ -888,16 +884,10 @@ public abstract class CobolParserCoreBase : Parser
                 case CobolLexer.COMMA:
                     if (depth == 0) return false;   // the next argument
                     break;
-                case CobolLexer.B_AND:
-                case CobolLexer.B_OR:
-                case CobolLexer.B_XOR:
-                case CobolLexer.B_SHIFT_L:
-                case CobolLexer.B_SHIFT_R:
-                case CobolLexer.B_SHIFT_LC:
-                case CobolLexer.B_SHIFT_RC:
+                case int when BooleanOperatorTokens.IsInfix(t):
                     if (IsBoolOperandTerm(prev)) return true;
                     break;
-                case CobolLexer.B_NOT:
+                case int when BooleanOperatorTokens.IsPrefix(t):
                     if (IsBoolOperandStart(TokenStream.LA(i + 1))) return true;
                     break;
                 case CobolLexer.DOT:
@@ -945,8 +935,8 @@ public abstract class CobolParserCoreBase : Parser
     /// PB124 — <see cref="boolArgAhead"/>'s space-separated argument boundary): an identifier, any literal,
     /// figurative ZERO, a unary B-NOT, or the FUNCTION keyword opening a nested call. Deliberately NOT
     /// LPAREN — a paren straight after a term is that term's subscript/ref-mod, the parser's own reading.</summary>
-    private static bool IsTermStartToken(int t) => t is
-        CobolLexer.IDENTIFIER or CobolLexer.B_NOT or CobolLexer.ZERO or CobolLexer.ZEROS or CobolLexer.ZEROES
+    private static bool IsTermStartToken(int t) => BooleanOperatorTokens.IsPrefix(t) || t is
+        CobolLexer.IDENTIFIER or CobolLexer.ZERO or CobolLexer.ZEROS or CobolLexer.ZEROES
         or CobolLexer.FUNCTION
         or CobolLexer.INTEGERLIT or CobolLexer.DECIMALLIT or CobolLexer.FLOATLIT or CobolLexer.COMMA_FLOATLIT
         or CobolLexer.STRINGLIT or CobolLexer.NATLIT or CobolLexer.HEXLIT or CobolLexer.BOOLLIT
@@ -957,8 +947,8 @@ public abstract class CobolParserCoreBase : Parser
     /// <remarks>GROUPING-PAREN-ONLY (fix-queue PB48): FNARG_LPAREN is deliberately absent. An operand that
     /// STARTS with a parenthesis is a parenthesized sub-expression, and that paren is always a plain LPAREN; a
     /// function operand starts with the FUNCTION keyword or its name, never with the argument-list '('.</remarks>
-    private static bool IsBoolOperandStart(int t) => t is
-        CobolLexer.IDENTIFIER or CobolLexer.LPAREN or CobolLexer.B_NOT
+    private static bool IsBoolOperandStart(int t) => BooleanOperatorTokens.IsPrefix(t) || t is
+        CobolLexer.IDENTIFIER or CobolLexer.LPAREN
         or CobolLexer.BOOLLIT or CobolLexer.ZERO or CobolLexer.ZEROS or CobolLexer.ZEROES;
 
     /// <summary>

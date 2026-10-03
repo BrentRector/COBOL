@@ -350,7 +350,10 @@
   "pb1662_index_name_against_function",
   "pb990_user_word_types_one_per_word",
   "pb1082_pcs_forward_alphabet",
-  "pb1403_letterless_words_by_type"
+  "pb1403_letterless_words_by_type",
+  "pb1668_evaluate_truth_word_pairs",
+  "pb1464_parenthesized_bare_conditions",
+  "pb1034_printed_relational_operator_set"
  ],
  "pending": []
 }

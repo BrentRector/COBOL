@@ -4,7 +4,7 @@
       *> Simple relation conditions, with the exception of the relational
       *> operators 'IS NOT EQUAL TO' or 'IS NOT='". 8.8.4.2.2 Format 1
       *> brackets [NOT] on GREATER THAN, >, LESS THAN, <, EQUAL TO and =
-      *> only. The screen that rejects NOT >= and its spellings must
+      *> only. The operator rule that rejects NOT >= and its spellings must
       *> still ACCEPT every alternative below; each positions exactly as
       *> 14.9.41.4 GR17 e) 1. says (the first record whose key satisfies
       *> the comparison), and READ NEXT then delivers that record.

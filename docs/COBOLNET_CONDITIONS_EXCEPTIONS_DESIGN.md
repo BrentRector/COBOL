@@ -942,6 +942,48 @@ compile time by `ConditionBinder.RefuseNonCondition` with COBOLNET2318, which na
 numeric-≠0 or alphanumeric-truthiness reading: the legacy engine's were non-ISO, and until kb/Work PB982 the
 greenfield binder compiled such a condition with no diagnostic and aborted the run unit when it was reached.
 
+**Parentheses around a simple condition change nothing (kb/Work PB1464).** §8.8.4.2.1: "The inclusion in parentheses
+of simple conditions does not change the simple condition truth value." The grammar reads `(X1)` as a parenthesized
+ARITHMETIC operand (`primaryCondition` tries `comparisonExpression` before `LPAREN condition RPAREN`, and reordering
+them is the DEVLOG-621 regression), so the classification seam looks through the enclosing parentheses:
+`ConditionBinder.ConditionOperandExpression` (over `SoleOperand.Unparenthesized`) is the ONE read, used by
+`AnalyzeBareOperand` (level-88, switch-status, boolean item), `IsBooleanValueOperand` / `BindBoolOperandValue` and
+the not-a-condition report. `SoleOperand.Primary` stays the OPPOSITE reading on purpose (§8.8.4.7.3 SR2's "not
+enclosed in parentheses"). A parenthesized boolean operand is also the boolean operand of a relation or an EVALUATE
+subject (`ConditionBinder.EnclosedBooleanOperand`, §8.8.2 "a boolean expression enclosed in parentheses"); a
+parenthesized NON-boolean operand stays an arithmetic expression (§8.8.1.1), and a parenthesized class-name is no
+class condition.
+
+**The truth words are no condition (kb/Work PB1668).** TRUE and FALSE are an EVALUATE selection subject or object
+(§14.9.13.3 SR7 b); `IF TRUE`, `A = 1 AND TRUE` and the like are COBOLNET2318 naming the word. EVALUATE decides a
+TRUE-or-FALSE × TRUE-or-FALSE pair by Table 15 and GR3 f) / GR4 a) 4. as a constant (`EvaluateBinder.Constant`) and
+never binds the object word as a condition.
+
+**One boolean-operator token list (kb/Work PB1412).** `BooleanOperatorTokens` (Frontend/Expressions) classifies the
+eight operator tokens — infix (B-AND, B-OR, B-XOR and the four 2023 shifts), prefix (B-NOT) — and is asked by the
+parser's `boolExprAhead` / `boolArgAhead`, `ConditionBinder.HasBoolOp` and `BooleanOperatorGate`; the binder's copy
+had omitted the shifts, so a shift-only boolean expression in an IF or a relation was refused.
+`BooleanOperatorTokenDriftTests` reads the lexer vocabulary and bars a second list. Still open under PB1412: EVALUATE
+with a boolean-expression subject or object that carries a B-operator (`EVALUATE A B-AND C WHEN B"1000"`) parses as a
+`condition`, so it is classified Condition and refused (COBOLNET1511 / 1634) — Table 15 has a Boolean-expression
+column the grammar and `EvaluateBinder` do not yet model for operator expressions.
+
+**The relational operator is the printed Format 1 set (kb/Work PB1034).** `comparisonOperator` holds exactly the
+alternatives §8.8.4.2.2 Format 1 prints (rendered page PDF p217): `[NOT]` on GREATER THAN, >, LESS THAN, <, EQUAL TO
+and = only, EQUAL's optional word TO. The five spellings it used to add (NOT >=, NOT <=, NOT GREATER [THAN] OR EQUAL
+[TO], NOT LESS [THAN] OR EQUAL [TO], EQUAL THAN) are now parse errors in every consumer — IF, EVALUATE, PERFORM UNTIL,
+SEARCH WHEN, the abbreviated tails and the `>>IF` relation, whose own `IS? NOT?` prefix was removed. START's
+membership screen (`InGeneralRelationFormat`) is gone with it; only the NOT EQUAL exclusion of §14.9.41.3 SR3 stays
+START's own. `RelationalOperatorFormatDriftTests` expands the rule into spellings and requires them to equal the
+printed set.
+
+**§8.8.4.12.3 SR1 is a property of the relation's class (kb/Work PB1391).** `AbbrevCarry.BooleanRelation` is set where
+the carry is seeded — `BindComparison` (either operand of class boolean, figurative ZERO excluded: boolean only by
+context), `BindPrimaryBoolean`'s relation arm, and `BindPartialComparison` (after the spliced relation, which is
+relation-condition-1) — and both consumers of the carry (`BindAbbreviatedRelation`, the bare object of
+`BindSoleOperandCondition`) refuse through `RefuseAbbreviationAfterBooleanRelation` (COBOLNET2723). It used to hold
+only where the boolean-operator parse path happened to reset the carry, and `B1 = B2 OR <> B3` was silently expanded.
+
 **One construction site for a condition error node (kb/Work PB982).** `BoundConditionError` is built ONLY by
 `ConditionBinder.Refused(feature)` (`EvaluateBinder` reaches it through `host.Cond`). A refusal reports the rule's
 own diagnostic first; `Refused` then fails the compile with the internal COBOLNET2319 if no failing diagnostic has

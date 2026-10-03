@@ -39,6 +39,22 @@ public static class SoleOperand
         return (Core.PrimaryExpressionContext)n;
     }
 
+    /// <summary>The expression INSIDE the enclosing parentheses of <paramref name="expr"/> — through any number of
+    /// them, <c>((X))</c> giving <c>X</c> — or <paramref name="expr"/> itself when it is not wholly enclosed. It is the
+    /// one reading of a parenthesized operand for a caller whose rule says the parentheses change nothing:
+    /// §8.8.4.2.1 — "The inclusion in parentheses of simple conditions does not change the simple condition truth
+    /// value" — makes <c>(X1)</c>, <c>(S1-OFF)</c> and <c>(BW)</c> the simple conditions <c>X1</c>, <c>S1-OFF</c> and
+    /// <c>BW</c> (kb/Work PB1464). <see cref="Primary"/> is deliberately the OPPOSITE reading (§8.8.4.7.3 SR2's "not
+    /// enclosed in parentheses"), so the two are separate members and a caller names the rule it asks.</summary>
+    public static Core.ArithmeticExpressionContext? Unparenthesized(Core.ArithmeticExpressionContext? expr)
+    {
+        // GROUPING-PAREN-ONLY: a primaryExpression parenthesis is always the arithmetic grouping one, never the
+        // §8.4.3.2.3 SR6 argument-list twin, which belongs to functionCall (its tokens are FNARG_LPAREN/RPAREN).
+        while (Primary(expr) is { } p && p.LPAREN() is not null && p.arithmeticExpression() is { } inner)
+            expr = inner;
+        return expr;
+    }
+
     /// <summary>The sole <c>dataReference</c> primary of <paramref name="expr"/>, or null.</summary>
     public static Core.DataReferenceContext? DataRef(Core.ArithmeticExpressionContext? expr) =>
         Primary(expr)?.dataReference();

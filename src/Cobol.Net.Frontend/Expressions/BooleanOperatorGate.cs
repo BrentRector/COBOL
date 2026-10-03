@@ -25,34 +25,18 @@ namespace CobolNet.Frontend.Expressions;
 public static class BooleanOperatorGate
 {
     /// <summary>Report each boolean-operator construct <paramref name="operands"/> use that
-    /// <paramref name="edition"/> has not introduced.</summary>
+    /// <paramref name="edition"/> has not introduced. The token classification is
+    /// <see cref="BooleanOperatorTokens"/>, the ONE list (kb/Work PB1412).</summary>
     /// <param name="edition">The targeted edition.</param>
     /// <param name="sink">The caller's positioned diagnostic sink.</param>
     /// <param name="operands">The site's operand subtree(s); a null entry (an absent optional operand) is skipped.</param>
     public static void Check(EditionInfo edition, IDiagnosticSink sink, params IParseTree?[] operands)
     {
-        if (operands.Any(t => t is not null && Contains(t, IsBinaryOrNot)))
+        if (operands.Any(t => t is not null && BooleanOperatorTokens.Contains(t, BooleanOperatorTokens.IsBinaryOrNot)))
             ConstructRegistry.Check(edition, sink, Constructs.BooleanOperators2002,
                 "the boolean operators (B-AND/B-OR/B-XOR/B-NOT)");
-        if (operands.Any(t => t is not null && Contains(t, IsShift)))
+        if (operands.Any(t => t is not null && BooleanOperatorTokens.Contains(t, BooleanOperatorTokens.IsShift)))
             ConstructRegistry.Check(edition, sink, Constructs.BooleanShiftOperators2023,
                 "the boolean shift operators (B-SHIFT-L/R/LC/RC)");
-    }
-
-    /// <summary>The COBOL-2002 operator tokens (§8.7.2).</summary>
-    private static bool IsBinaryOrNot(int type) =>
-        type is CobolLexer.B_AND or CobolLexer.B_OR or CobolLexer.B_XOR or CobolLexer.B_NOT;
-
-    /// <summary>The COBOL-2023 shift-operator tokens (§8.8.2 rule 8) — a DISTINCT construct from the 2002 set, so a
-    /// program using only shift operators at 2002 is told about the shift, not the 2002 operators.</summary>
-    private static bool IsShift(int type) =>
-        type is CobolLexer.B_SHIFT_L or CobolLexer.B_SHIFT_R or CobolLexer.B_SHIFT_LC or CobolLexer.B_SHIFT_RC;
-
-    private static bool Contains(IParseTree t, Func<int, bool> isOperator)
-    {
-        if (t is ITerminalNode term) return isOperator(term.Symbol.Type);
-        for (int i = 0; i < t.ChildCount; i++)
-            if (Contains(t.GetChild(i), isOperator)) return true;
-        return false;
     }
 }

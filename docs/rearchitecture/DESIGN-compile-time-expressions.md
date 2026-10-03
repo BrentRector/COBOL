@@ -120,7 +120,7 @@ ccePrimary : LPAREN constantConditionalExpression RPAREN
 definedCondition : cobolWord IS? NOT? DEFINED ;                       // DEFINED: primed-lexer token (below)
 cceRelationOrBoolean
     : {boolExprAhead()}? booleanExpression                            // §8.8.4.3 simple boolean condition (len-1)
-    | compileTimeOperand ( IS? NOT? comparisonOperator compileTimeOperand )? ;   // §8.8.4.2 relation
+    | compileTimeOperand ( comparisonOperator compileTimeOperand )? ;   // §8.8.4.2 relation
 ```
 
 * **Operand-kind disambiguation** uses the existing `boolExprAhead()` predicate (the mechanism the source
@@ -139,7 +139,9 @@ cceRelationOrBoolean
 * **`DEFINED`** is not reserved in the source language — a token only inside the fragment via a primed lexer flag
   `PrimeDirectiveExpr()` (`DEFINED : {_primeDirectiveExpr}? 'DEFINED' ;`), the `PrimeFunctionArgs()` pattern.
   Zero global blast radius.
-* **Relops** reuse `comparisonOperator`; the non-numeric `=`/`<>` restriction (§7.3.8.2 SR1a.2) is enforced in
+* **Relops** reuse `comparisonOperator` as it stands — the printed §8.8.4.2.2 Format 1 set, each NOT part of its
+  alternative (the rule used to write a free `IS? NOT?` before the operator, a second unscreened NOT that let
+  `>>IF X NOT >= 3` through; kb/Work PB1034). The non-numeric `=`/`<>` restriction (§7.3.8.2 SR1a.2) is enforced in
   the evaluator. Abbreviated combined relations are not admitted (§7.3.8.2 SR1d).
 
 ### 4.1 Fragment-parse mechanics (identical lexing to the main parse)

@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-256 drift tests.
+258 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -41,6 +41,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ArithmeticOperandRoleDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticOperandRoleDriftTests.cs) | ⛔ EVERY ARITHMETIC VERB ASKS ONE RECEIVER CLASSIFICATION, AND IT COVERS EVERY OPERAND ARM THE GRAMMAR WRITES (kb/Work PB1142, CLAUDE.md rule 5). | — |
 | [ArithmeticSendingOperandDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticSendingOperandDriftTests.cs) | ⛔ THE SENDING ARITHMETIC OPERAND IS ONE RULE WRITTEN FOUR TIMES, AND ALL FOUR WERE WRONG (fix-queue PB45). | — |
 | [BooleanExpressionGateSiteDriftTests](../tests/Cobol.Net.Tests.Unit/BooleanExpressionGateSiteDriftTests.cs) | ⛔ AN INTRODUCTION GATE IS ONLY AS COMPLETE AS ITS LIST OF GRAMMAR SITES, AND THAT LIST WAS HAND-MAINTAINED. | `src` |
+| [BooleanOperatorTokenDriftTests](../tests/Cobol.Net.Tests.Unit/BooleanOperatorTokenDriftTests.cs) | ⛔ THE BOOLEAN-OPERATOR TOKENS ARE ONE LIST, BooleanOperatorTokens, AND EVERY READER ASKS IT (kb/Work PB1412). | `src` |
 | [BoundDeferralDriftTests](../tests/Cobol.Net.Tests.Unit/BoundDeferralDriftTests.cs) | ⛔ kb/Work PB909 — BoundUnsupported's TWO JOBS, split into two TYPES. | `src/Cobol.Net.Compiler`, `tests/conformance/negative` |
 | [BoundIoPhraseConsumptionDriftTests](../tests/Cobol.Net.Tests.Unit/BoundIoPhraseConsumptionDriftTests.cs) | ⛔ A PHRASE THAT IS PARSED, BOUND AND EDITION-GATED AND THEN NEVER READ BY ITS EMITTER IS INVISIBLE TO EVERY OTHER GATE. | `src/Cobol.Net.Compiler/CodeGen/Verbs` |
 | [CallAbiNumericCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/CallAbiNumericCarrierDriftTests.cs) | ⛔ THE CALLER NAMES A CARRIER TYPE FROM DataItem.ElementType AND THE CALLEE READS IT BY A TYPE SWITCH — SO THE TWO SETS ARE ONE SET, AND NOTHING TELLS THEM APART AT COMPILE TIME (kb/Work PB238). | — |
@@ -207,6 +208,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [RefModCategoryDriftTests](../tests/Cobol.Net.Tests.Unit/RefModCategoryDriftTests.cs) | ⛔ REFERENCE MODIFICATION PRESERVES THE CATEGORY (ISO §8.4.3.3.4 GR6) — fix-queue PB20. | `src` |
 | [RefResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/RefResolutionDriftTests.cs) | kb/Work PB1030 — the reference resolver answers a CLOSED RefResolution (Place \| Reported \| Deferred), and a silent null is unrepresentable only while three things stay true: every deferred shape is in the DeferredShape census with a description, the resolver puts every deferral on the unbuilt ledger before a caller sees it, and a caller that gets no place builds its refusal FROM the answer instead… | `src/Cobol.Net.Compiler` |
 | [RefusalNodeDriftTests](../tests/Cobol.Net.Tests.Unit/RefusalNodeDriftTests.cs) | kb/Work PB1029 — a refusal must carry its diagnostic IN THE TYPE. | `src/Cobol.Net.Compiler` |
+| [RelationalOperatorFormatDriftTests](../tests/Cobol.Net.Tests.Unit/RelationalOperatorFormatDriftTests.cs) | ⛔ THE ONE RELATIONAL-OPERATOR RULE IS THE PRINTED SET OF ISO §8.8.4.2.2 FORMAT 1, AND NOTHING WIDER (kb/Work PB1034). | `src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4` |
 | [RenamesPlaceBuilderDriftTests](../tests/Cobol.Net.Tests.Unit/RenamesPlaceBuilderDriftTests.cs) | ⛔ A LEVEL-66 RENAMES ENTRY'S PLACE IS BUILT BY THE ONE ITEM→PLACE BUILDER, SO EVERY REFERENCE TO IT TAKES THE SAME TAIL AS EVERY OTHER ITEM (kb/Work PB1380). | — |
 | [ReportGroupResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/ReportGroupResolutionDriftTests.cs) | ⛔ A REPORT-GROUP REFERENCE RESOLVES THROUGH ONE FUNNEL (ReportGroupResolution — kb/Work PB365), AND THIS KEEPS IT TRUE. | `src/Cobol.Net.Compiler` |
 | [ReportOperandListDriftTests](../tests/Cobol.Net.Tests.Unit/ReportOperandListDriftTests.cs) | ⛔ A REPORT PRINTABLE ITEM'S VALUE/SOURCE OPERANDS ARE A LIST, CYCLED BY ONE READER, AND A VALUE IS NOT A MOVE (kb/Work PB506) — and this keeps all three true. | `src/Cobol.Net.Compiler` |

@@ -539,7 +539,7 @@ public sealed class CompileTimeExpressionEvaluator
         }
         var right = operands.Length > 1 ? EvaluateOperand(operands[1], where) : null;
         if (left is null || right is null) return null;
-        return CceRelation(left, right, opCtx, r.NOT() is not null, where);
+        return CceRelation(left, right, opCtx, where);
     }
 
     /// <summary>A simple boolean condition (§8.8.4.3): SR1 — the value shall be of length 1; GR1 — true iff the
@@ -555,13 +555,12 @@ public sealed class CompileTimeExpressionEvaluator
     /// <summary>A constant-conditional relation (§7.3.8.2 SR1a / §7.3.8.3 GR2): SR1a.1 both operands same category;
     /// SR1a.2 non-numeric operands admit only equal/unequal; numeric compared by value; non-numeric compared by
     /// binary character/bit value, LENGTH-SENSITIVE (unequal length ⇒ unequal, no collating). The relation-level
-    /// <c>NOT</c> negates the result.</summary>
-    private bool? CceRelation(CtValue left, CtValue right, Core.ComparisonOperatorContext opCtx, bool negate, string where)
+    /// <c>NOT</c> is part of the relational operator (§8.8.4.2.2), so <see cref="MapOperator"/> folds it.</summary>
+    private bool? CceRelation(CtValue left, CtValue right, Core.ComparisonOperatorContext opCtx, string where)
     {
         if (left.Category != right.Category)
         { ReportDirective(where, $"the operands of a constant-conditional relation shall be of the same category ('{left.Category}' vs '{right.Category}', ISO §7.3.8.2 SR1a.1)"); return null; }
         string op = MapOperator(opCtx.GetText());
-        if (negate) op = NegateOp(op);
         if (left.Category == CtCategory.Numeric)
         {
             int cmp = CobolDec.Compare(left.Number, right.Number);

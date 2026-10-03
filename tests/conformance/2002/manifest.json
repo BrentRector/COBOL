@@ -629,7 +629,11 @@
   "pb1398_length_of_function_result",
   "pb1095_class_in_also_group",
   "pb791_currency_literal_forms",
-  "pb1537_figurative_literal_clauses"
+  "pb1537_figurative_literal_clauses",
+  "pb1464_parenthesized_boolean_operands",
+  "pb1391_boolean_relations_stated_in_full",
+  "pb1034_cce_printed_relational_operators",
+  "pb1034_is_not_equal_symbol"
   ],
   "pending": []
 }

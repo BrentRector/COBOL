@@ -349,27 +349,37 @@ className
     | NEAREST_TO_ZERO               // GR3 m)
     ;
 
+// ⛔ THE PRINTED OPERATOR SET OF §8.8.4.2.2 FORMAT 1 (General-relation), NOT A SUPERSET OF IT (kb/Work PB1034),
+// read off the RENDERED page (PDF p217, printed folio 187) because the diagram's brackets and underlining decide it.
+// The brace group prints eleven alternatives, every one led by `IS` (not underlined, so optional) and with THAN / TO
+// not underlined either (optional words):
+//     IS [NOT] GREATER THAN · IS [NOT] > · IS [NOT] LESS THAN · IS [NOT] < · IS [NOT] EQUAL TO · IS [NOT] = · IS <>
+//     IS GREATER THAN OR EQUAL TO · IS >= · IS LESS THAN OR EQUAL TO · IS <=
+// `[NOT]` brackets the FIRST SIX ONLY, so NOT is not an alternative of the four OR-EQUAL operators (the standard's
+// own spelling of "not greater than or equal" is IS LESS THAN, and of "not less than or equal" IS GREATER THAN), and
+// EQUAL's optional word is TO, never THAN. §8.7.5.1 prints the same set (Format 1 plus Format 2's NOT LESS / NOT
+// GREATER / NOT EQUAL spellings). The rule used to admit five spellings no format prints — NOT >=, NOT <=, NOT
+// GREATER [THAN] OR EQUAL [TO], NOT LESS [THAN] OR EQUAL [TO], and EQUAL / NOT EQUAL THAN — and MapOperator folded each
+// into a valid operator, so `IF A NOT >= B` compiled and ran in every edition; the only screen was the START KEY
+// phrase's (ConditionBinder.InGeneralRelationFormat, PB333). The rule is the ONE operator rule of every condition,
+// the EVALUATE partial-expression and abbreviated tails, PERFORM UNTIL, SEARCH WHEN and the compile-time directive
+// relation (cceRelationOrBoolean), so narrowing it is the one screen for all of them. RelationalOperatorFormatDriftTests
+// pins the alternatives to the printed set.
 comparisonOperator
-    // Symbolic (with optional IS prefix per §8.8.4.2.2, the relation-condition general format)
+    // Format 1's symbolic and word forms, [NOT] being part of the printed alternative
     : IS? EQUALS
     | IS? NOTEQUAL
     | IS? LTEQUAL
     | IS? GTEQUAL
     | IS? LT
     | IS? GT
-    // Abbreviated NOT + symbolic (ISO §8.8.4.12)
     | IS? NOT EQUALS       // NOT =
-    | IS? NOT GT            // NOT >
-    | IS? NOT LT            // NOT <
-    | IS? NOT GTEQUAL       // NOT >=
-    | IS? NOT LTEQUAL       // NOT <=
-    // Word forms with optional IS and optional THAN
-    | IS? EQUAL (TO | THAN)?
-    | IS? NOT EQUAL (TO | THAN)?
+    | IS? NOT GT           // NOT >
+    | IS? NOT LT           // NOT <
+    | IS? EQUAL TO?
+    | IS? NOT EQUAL TO?
     | IS? GREATER THAN? OR EQUAL TO?
-    | IS? NOT GREATER THAN? OR EQUAL TO?
     | IS? LESS THAN? OR EQUAL TO?
-    | IS? NOT LESS THAN? OR EQUAL TO?
     | IS? GREATER THAN?
     | IS? NOT GREATER THAN?
     | IS? LESS THAN?
@@ -645,9 +655,13 @@ ccePrimary : LPAREN constantConditionalExpression RPAREN
 // §7.3.8.4.4 defined-condition. DEFINED is a token only under PrimeDirectiveExpr (a primed-lexer keyword). Listed
 // before cceRelationOrBoolean so a trailing DEFINED selects it; a cobolWord with no DEFINED falls through.
 definedCondition : cobolWord IS? NOT? DEFINED ;
+// ⛔ NO `IS? NOT?` BEFORE comparisonOperator (kb/Work PB1034): §7.3.8.2 SR1 a) makes the relation "formed according to
+// the rules in 8.8.4.2", whose operator set is comparisonOperator's alone — it carries its own IS and its own NOT. The
+// prefix this rule used to write was a second, unscreened way to say NOT, which let `>>IF X NOT >= 3` through the
+// narrowed operator rule and `X NOT NOT = 3` through at all.
 cceRelationOrBoolean
     : {boolExprAhead()}? booleanExpression                            // §8.8.4.3 simple boolean condition (length-1)
-    | compileTimeOperand ( IS? NOT? comparisonOperator compileTimeOperand )? ;   // §7.3.8.2 relation (or a bare operand)
+    | compileTimeOperand ( comparisonOperator compileTimeOperand )? ;   // §7.3.8.2 relation (or a bare operand)
 
 // ── The DISPLAY DIRECTIVE's operand list (ISO §7.3.12.2, kb/Work PB807): a REPEATED choice of arithmetic-expression-1 /
 // boolean-expression-1 / literal-1 / `PARAMETER compilation-variable-name-1`, then an optional UPON phrase whose braces

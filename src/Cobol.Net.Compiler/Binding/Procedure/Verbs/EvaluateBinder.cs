@@ -388,7 +388,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // reported §8.4.2.2 twice, and the two could disagree about what the operand IS with nothing to catch it.
         var pair = ClassifyPair(slot, item);
         ScreenPairing(pair, item);
-        if (item.ANY() is not null) return new BoundLogical("&&", []);   // renders as true
+        if (item.ANY() is not null) return Constant(true);   // GR4 a) 1. — the word ANY is true
 
         bool subjTrue = subject.booleanLiteral()?.TRUE_() is not null;
         bool subjFalse = subject.booleanLiteral()?.FALSE_() is not null;
@@ -443,6 +443,15 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             }
             return host.Cond.Refused($"EVALUATE condition-subject paired with non-boolean WHEN '{item.GetText()}'");
         }
+
+        // ⛔ TRUE-or-FALSE × TRUE-or-FALSE (Table 15's two 'Y' cells for the words) IS A CONSTANT, AND NO CONDITION
+        // IS BOUND FOR IT (kb/Work PB1668). §14.9.13.4 GR3 f) gives the subject word its truth value, GR4 a) 4. makes
+        // the pair "true" exactly when the two truth values match — so `EVALUATE TRUE WHEN TRUE` is true and
+        // `EVALUATE FALSE WHEN TRUE` is false. The object's word used to go through BindCondition, whose bare-word
+        // arm is not a condition (§8.8.4.2.1) and refused conforming source through the COBOLNET2319 net.
+        if (pair.Subject is EvaluateSubjectOperand.TrueOrFalse && item.condition() is { } wordObject
+            && SoleBooleanLiteral(wordObject) is { } objectWordTrue)
+            return Constant(subjTrue == objectWordTrue);
 
         // A `condition` the classifier re-read as SR5's partial-expression (a bare class-name leftmost — PB843) is
         // NOT condition-2: it falls through to the partial arm below, which splices the subject in.
@@ -659,6 +668,11 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         return slot.NeedsIntermediate ? host.SendingValue.MaterializeTruth(truth, "evaluate") : truth;
     }
 
+    /// <summary>A pair whose truth value is known at bind time: the empty conjunction is true (it renders as the
+    /// constant true), its negation false.</summary>
+    private static BoundCondition Constant(bool value) =>
+        value ? new BoundLogical("&&", []) : new BoundNot(new BoundLogical("&&", []));
+
     /// <summary>The boolean value of a condition that is a SOLE <c>TRUE</c>/<c>FALSE</c> literal, else null.</summary>
     private static bool? SoleBooleanLiteral(Core.ConditionContext cond)
     {
@@ -841,6 +855,9 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // accordance with 8.8.4.2", i.e. the pair is a relation condition — a §8.4.3.10.3 SR1 context — and the
         // relation checkpoint decides the class pairing.
         if (host.Expr.NullAdmittingOperand(vo.nonNumericLiteral()) is { } litOp) return litOp;
+        // A boolean operand enclosed in parentheses is that boolean operand (§8.8.2) — the relation side's reading
+        // (ConditionBinder.EnclosedBooleanOperand, kb/Work PB1464).
+        if (host.Cond.EnclosedBooleanOperand(vo) is { } enclosedBoolean) return enclosedBoolean;
         if (vo.arithmeticExpression() is { } expr)
             // ⛔ ARM FOR ARM IN THE SAME ORDER AS ConditionBinder.ComparisonOperandOf, DELIBERATELY (kb/Work
             // PB224). §14.9.13.4 GR2 makes an EVALUATE subject/object comparison "as if" the corresponding

@@ -5566,8 +5566,11 @@ public static class DiagnosticCatalog
         + "conditions\"; a complex condition combines them (§8.8.4.1). A data item that is not a one-position "
         + "boolean item, a literal, an arithmetic expression, a bare class-name or alphabet-name (which needs the "
         + "identifier it tests, §8.8.4.4.2) and a switch's mnemonic-name (a switch-status condition is written with "
-        + "its condition-name, §8.8.4.6.2) are none of them. Within an abbreviated combined relation condition the "
-        + "same operand is the object of the carried relation (§8.8.4.12) and is not refused.",
+        + "its condition-name, §8.8.4.6.2) are none of them, and neither are the words TRUE and FALSE, which are "
+        + "written only as an EVALUATE selection subject or selection object (§14.9.13.3 SR7 b). Parentheses "
+        + "around a simple condition change nothing (§8.8.4.2.1), and make nothing else one. Within an abbreviated "
+        + "combined relation condition the same operand is the object of the carried relation (§8.8.4.12) and is "
+        + "not refused.",
         "ISO §8.8.4.2.1; §8.8.4.1");
 
     // kb/Work PB1390 — the termination half of §8.8.4.12.4 GR1. An abbreviated relation (subject omitted) whose
@@ -5581,6 +5584,19 @@ public static class DiagnosticCatalog
         + "condition.\" So an abbreviated relation that follows a class, sign, condition-name, switch-status, boolean "
         + "or parenthesized condition, or that opens a parenthesized group, has no subject. Write the subject.",
         "ISO §8.8.4.12.1; §8.8.4.12.4 GR1");
+
+    // kb/Work PB1391 — the first syntax rule of §8.8.4.12.3, decided on the relation's CATEGORY where the abbreviation
+    // carry is seeded (it used to hold only where the boolean-operator parse path happened to bind the relation).
+    public static readonly DiagnosticDescriptor AbbreviatedRelationAfterBooleanRelation = new(
+        "COBOLNET2723", "abbreviated-relation-after-boolean-relation", EditionSeverity.Error,
+        "A relation condition is abbreviated after a boolean relation condition. ISO §8.8.4.12.3 SR1: "
+        + "\"Relation-condition-1 shall not be a boolean relation condition.\" "
+        + "§8.8.4.2.1: \"A relation condition involving operands of class boolean is a boolean relation condition\" "
+        + "— so a sequence whose first relation compares boolean "
+        + "items, boolean literals or boolean expressions (B1 = B2, B1 B-AND B2 = B\"0\") has no abbreviation: a "
+        + "succeeding relation that omits its subject, or its subject and relational operator, has nothing it may "
+        + "inherit. Write the subject and the operator in full.",
+        "ISO §8.8.4.12.3 SR1");
 
     /// <summary>The internal-error net under the ONE <c>BoundConditionError</c> construction site (kb/Work PB982):
     /// a condition refused with no failing diagnostic recorded would compile clean and throw at run time.</summary>

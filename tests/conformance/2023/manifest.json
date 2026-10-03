@@ -787,9 +787,11 @@
   "pb1907_unstring_overlap_linkage",
   "pb749_sort_implicit_statement_status",
   "pb1660_directive_nbsp_in_literal",
-  "pb807_display_directive_operands"
+  "pb807_display_directive_operands",
+  "pb1412_shift_only_boolean_conditions"
   ],
  "pending": [
-  "pb485_value_only_format1"
+  "pb485_value_only_format1",
+  "pb1412_evaluate_boolean_expression_subject"
  ]
 }

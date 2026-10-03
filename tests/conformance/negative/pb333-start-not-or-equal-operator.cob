@@ -4,7 +4,9 @@
 *> relational operators 'IS NOT EQUAL TO' or 'IS NOT='". 8.8.4.2.2 Format 1 prints the optional NOT
 *> on GREATER THAN, >, LESS THAN, <, EQUAL TO and = ONLY: IS LESS THAN OR EQUAL TO carries no NOT
 *> bracket, so NOT LESS THAN OR EQUAL TO is not an alternative of the format and SR3 forbids it in
-*> a START. The compiler used to accept it and fold it into '>' (kb/Work PB333).
+*> a START. The compiler used to accept it and fold it into '>' (kb/Work PB333). Since kb/Work PB1034 the
+*> operator rule every condition shares carries the printed alternatives only, so this spelling no longer
+*> parses (COBOL0001) in a START or anywhere else; the NOT EQUAL exclusion of SR3 stays START's own.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB333NEG.
        ENVIRONMENT DIVISION.
