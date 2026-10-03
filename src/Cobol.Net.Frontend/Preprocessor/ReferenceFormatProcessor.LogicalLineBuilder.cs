@@ -90,12 +90,12 @@ public static partial class ReferenceFormatProcessor
         {
             var state = LiteralState.Outside;
             string kept = Scan(text, 0, ref state, lineNo, column, fixedContinuation: false);
-            if (string.IsNullOrWhiteSpace(kept))
+            if (CobolSpace.IsBlank(kept))
             {
                 Discard(lineNo);
                 return;
             }
-            Emit(state.InLiteral ? kept : kept.TrimEnd(), lineNo, state);
+            Emit(state.InLiteral ? kept : kept.TrimSpacesEnd(), lineNo, state);
         }
 
         /// <summary>§6.5 8): the continuation line of a literal continued with a floating indicator. Its first nonblank
@@ -143,7 +143,7 @@ public static partial class ReferenceFormatProcessor
                         if (prev == token[0] && area.AsSpan(first).StartsWith(token.AsSpan(1), StringComparison.Ordinal))
                             gates.OnSplitSeparator(file, lineNo, token);
                 }
-                Join(head.TrimEnd(), area[first..], 0, LiteralState.Outside, lineNo, column + first, fixedContinuation: true);
+                Join(head.TrimSpacesEnd(), area[first..], 0, LiteralState.Outside, lineNo, column + first, fixedContinuation: true);
                 return;
             }
 
@@ -188,7 +188,7 @@ public static partial class ReferenceFormatProcessor
         {
             string kept = Scan(content, scanFrom, ref state, lineNo, column, fixedContinuation);
             string joined = head + kept;
-            _lines[_latest] = state.InLiteral ? joined : joined.TrimEnd();
+            _lines[_latest] = state.InLiteral ? joined : joined.TrimSpacesEnd();
             _literal = state;
         }
 

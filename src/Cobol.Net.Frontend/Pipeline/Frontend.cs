@@ -234,7 +234,7 @@ public sealed class Frontend
         for (int n = at.Line + 1; n <= physical.Count; n++)
         {
             string line = physical[n - 1];
-            if (nested.Contains(n) || line.TrimStart().StartsWith("*>", StringComparison.Ordinal)
+            if (nested.Contains(n) || line.TrimSpacesStart().StartsWith("*>", StringComparison.Ordinal)
                 || (line.Length > 6 && line[6] is '*' or '/') || !EndPerformWord.IsMatch(line))
                 continue;
             for (int r = 0; r < origins.Length; r++)
@@ -410,6 +410,9 @@ public sealed class Frontend
         var edition = EditionInfo.Of(DialectLevel, Permissive);
         retypes.PrimeLexer(lexer, edition);
         var tokens = new CommonTokenStream(lexer);
+        // FIRST: a fixed-form debugging line is source or comment per its unit's WITH DEBUGGING MODE clause (kb/Work PB1705);
+        // every reader after this one sees only the lines that are source.
+        DebuggingLineRewriter.Rewrite(tokens);
         ZeroTokenRewriter.Rewrite(tokens);
         // >>COBOL-WORDS (ISO §7.3.10.4) — retype tokens per the per-group override: synonyms (EQUATE/SUBSTITUTE)
         // become their canonical keyword, de-reserved words (UNDEFINE/SUBSTITUTE) become IDENTIFIERs. A no-op when

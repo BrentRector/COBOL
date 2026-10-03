@@ -175,7 +175,7 @@ public sealed class CopyProcessor(
                     "REPLACE statement: " + message + " (§7.2.4.2)", mapped.OriginAt(p).ToLocation(), default));
             // §7.2.4.3 SR2: "A REPLACE statement shall be preceded by a space except when it is the first statement in
             // a compilation group" — REPLACE directly after a parenthesis, a colon, a literal or a pseudo-text delimiter.
-            if (replaceIdx > 0 && !TextWordScanner.IsSeparatorSpace(text[replaceIdx - 1]))
+            if (replaceIdx > 0 && !CobolSpace.IsSeparator(text[replaceIdx - 1]))
                 statement.Error(replaceIdx, $"REPLACE is not preceded by a space (it follows '{text[replaceIdx - 1]}') — "
                     + "§7.2.4.3 SR2: \"A REPLACE statement shall be preceded by a space except when it is the first "
                     + "statement in a compilation group\"");
@@ -350,7 +350,7 @@ public sealed class CopyProcessor(
             if (rule.ForbidsReplaceStatement && w.IsWord("REPLACE")) return "a REPLACE statement";
             var span = w.Span;
             if (directiveNext && span.StartsWith("SOURCE", StringComparison.OrdinalIgnoreCase)
-                || span.StartsWith(">>") && span[2..].TrimStart(TextWordScanner.SeparatorSpaces)
+                || span.StartsWith(">>") && span[2..].TrimStart(CobolSpace.Separators)
                     .StartsWith("SOURCE", StringComparison.OrdinalIgnoreCase))
                 return "a SOURCE FORMAT directive";
             directiveNext = span.SequenceEqual(">>");
@@ -493,7 +493,7 @@ public sealed class CopyProcessor(
         // compilation group" — a COPY word directly after a parenthesis, a colon, a literal's closing delimiter or a
         // pseudo-text delimiter. (A COPY glued behind a period, comma or semicolon is not even a text-word of its
         // own — see FindStatementKeyword.)
-        if (copyIdx > 0 && !TextWordScanner.IsSeparatorSpace(text[copyIdx - 1]))
+        if (copyIdx > 0 && !CobolSpace.IsSeparator(text[copyIdx - 1]))
             ReportPlacement(at, $"COPY is not preceded by a space (it follows '{text[copyIdx - 1]}') — §7.2.3.3 SR2: "
                 + "\"A COPY statement shall be preceded by a space except when it is the first statement in a "
                 + "compilation group\"");
@@ -1037,7 +1037,7 @@ public sealed class CopyProcessor(
 
         if (w.Kind == TextWordKind.PseudoTextDelimiter)
         {
-            if (w.Start > 0 && !TextWordScanner.IsSeparatorSpace(c.Text[w.Start - 1]))
+            if (w.Start > 0 && !CobolSpace.IsSeparator(c.Text[w.Start - 1]))
                 screen.Delimiter(w.Start, $"the opening == follows '{c.Text[w.Start - 1]}' with no space");
             c.Advance(w);
             var elements = new List<TextWord>();
@@ -1046,9 +1046,9 @@ public sealed class CopyProcessor(
                 if (t.Kind == TextWordKind.PseudoTextDelimiter)
                 {
                     if (t.End < c.Text.Length && c.Text[t.End] is not (',' or ';' or '.')
-                        && !TextWordScanner.IsSeparatorSpace(c.Text[t.End]))
+                        && !CobolSpace.IsSeparator(c.Text[t.End]))
                         screen.Delimiter(t.Start, $"the closing == is followed by '{c.Text[t.End]}'");
-                    return new Operand(c.Text[w.End..t.Start].Trim(TextWordScanner.SeparatorSpaces), elements, w.Start,
+                    return new Operand(c.Text[w.End..t.Start].Trim(CobolSpace.Separators), elements, w.Start,
                         IsPseudoText: true);
                 }
                 if (t.IsWord("COPY")) nestedCopy?.Invoke(t.Start);

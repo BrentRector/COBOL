@@ -61,7 +61,7 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         if (i == wordStart) return false;                            // ">>" with no word heads no directive
 
         string word = s[wordStart..i].ToString().ToUpperInvariant();
-        string operand = StripInlineComment(s[i..].ToString()).Trim();
+        string operand = StripInlineComment(s[i..].ToString()).TrimSpaces();
         directive = new CompilerDirectiveLine(word, operand);
         return true;
     }

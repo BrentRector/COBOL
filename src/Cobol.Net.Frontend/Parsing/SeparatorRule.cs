@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
 using CobolNet.Common;
+using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
 
@@ -54,6 +55,7 @@ public static class SeparatorRule
         int reportedCloseStop = -2;   // a literal's closing-delimiter violation already covers the boundary after it
         foreach (var t in tokens)
         {
+            if (t.Channel == CobolLexer.ABSENT_DEBUG_LINE) continue;   // a debugging line that is a comment (kb/Work PB1705)
             switch (t.Type)
             {
                 case CobolLexer.COMMA or CobolLexer.SUB_COMMA or CobolLexer.SEMICOLON or CobolLexer.SUB_SEMICOLON:
@@ -95,7 +97,7 @@ public static class SeparatorRule
     /// <summary>The separator space as the lexer reads it — the characters of its skipped <c>WS</c> rule (the space and
     /// the line end: the line-entry stage leaves no tab or CR LF, kb/Work PB1800) — or the start or end of the text,
     /// which no character-string can extend past.</summary>
-    private static bool IsSeparatorSpace(int c) => c is ' ' or '\n' or -1;
+    private static bool IsSeparatorSpace(int c) => c == -1 || CobolSpace.IsSeparator((char)c);
 
     /// <summary>§8.3.5 5): space, left parenthesis, or the opening pseudo-text delimiter <c>==</c>.</summary>
     private static bool OpeningDelimiterSeparated(string text, int start)

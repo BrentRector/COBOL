@@ -84,7 +84,7 @@ public static class DirectiveSiteProcessor
             // trailing inline comment are its rules, not this stage's.
             if (!CompilerDirectiveLine.TryParse(lines[i], out var directive))
             {
-                if (!sawUnit && CompilationUnitStart.IsAt(lines[i].TrimStart())) sawUnit = true;
+                if (!sawUnit && CompilationUnitStart.IsAt(lines[i].TrimSpacesStart())) sawUnit = true;
                 continue;
             }
             if (!PositionRuled.Contains(directive.Word) && !PlacementRuled.Contains(directive.Word)) continue;

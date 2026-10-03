@@ -331,7 +331,11 @@
   "pb1494_remarks_paragraph_in_copybook",
   "pb1494_comment_entry_in_copybook",
   "pb1907_write_past_record",
-  "pb1907_keyed_rewrite_past_record"
+  "pb1907_keyed_rewrite_past_record",
+  "pb1705_debugging_lines_compiled",
+  "pb1705_debugging_lines_per_unit",
+  "pb1705_debugging_lines_copy_replacing",
+  "pb1705_debugging_line_paragraph"
  ],
  "pending": []
 }

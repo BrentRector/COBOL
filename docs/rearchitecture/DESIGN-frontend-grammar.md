@@ -698,7 +698,8 @@ is optional and the two clauses (`programCollatingSequenceClause | characterClas
 period in any order (each at most once, §5.2.6.4 — a duplicate is COBOLNET1652 in the binder). Two load-bearing
 decisions: (1) the X3.23-1985 clauses ISO 2002 deleted are MODELLED — `memorySizeClause` and `segmentLimitClause`
 are `objectComputerClause` alternatives, `debuggingModeClause` hangs off SOURCE-COMPUTER's name — and each is
-gated at its own node (`VisitMemorySizeClause` / `VisitSegmentLimitClause` / `VisitDebuggingModeClause`); both
+gated at its own node (`VisitMemorySizeClause` / `VisitSegmentLimitClause` / `VisitDebuggingModeClause`, the last one
+obsolete at 2002 and removed at 2014 — row `debugging-mode-removed-2014`, owner decision R61); both
 paragraphs end in the `unrecognizedClause` error production (§3.10; kb/Work PB830 replaced the `~DOT` sink that
 was there). (2) `characterClassificationClause :
 {classificationAhead()}? CHARACTER? formatWord (…)` — CLASSIFICATION is not a token (a plain word at '85), so the
@@ -866,9 +867,16 @@ reference formats, and the only place source comments are recognized. Its model:
   state is carried across a text's SOURCE FORMAT segments) — a `REMARKS.` paragraph copied into a PROCEDURE DIVISION is
   program text; and the `D` indicator is
   gated by the registry row `debugging-line-removed-2014` (accepted at 85, obsolete at 2002 — COBOLNET0903 — removed at
-  2014 — COBOLNET0902; the NIST S / Y letters are the CCVS dialect and never gated). ⚠ Still decided here: a `D` line is
-  always emitted as the debugging-line CARRIER, which the lexer reads as a comment, so it never compiles under WITH
-  DEBUGGING MODE (kb/Work PB1705; the carrier shape is an owner decision there).
+  2014 — COBOLNET0902; the NIST S / Y letters are the CCVS dialect, never gated, and excluded as comment lines). A `D`
+  line is NOT decided here (kb/Work PB1705, owner decision R56): the clause that makes it source is further down the text
+  than the line, so the converter CARRIES it — `ReferenceFormatProcessor.DebugLineCarrier` + its program text — and the
+  lexer reads the carrier as the hidden `DEBUG_LINE` marker and the text as ordinary tokens;
+  `Parsing/DebuggingLineRewriter` (first in `Frontend.LexAndParse`) keeps those tokens when the line's source unit, or a
+  unit containing it (§12.3.5.4 GR1), declares SOURCE-COMPUTER … WITH DEBUGGING MODE and moves them to the
+  `ABSENT_DEBUG_LINE` channel otherwise, so the parser, `SeparatorRule` and `PictureSeparatorPeriodRule` never read an
+  absent line. It reads the unit nesting (PROGRAM-ID … END PROGRAM) and the clause off the TOKENS, so a change to the
+  `sourceComputerParagraph` / `debuggingModeClause` rules is a change to its `DeclaresMode`. A debugging line inside an open
+  PICTURE clause or subscript region stays a comment (PICMODE and SUBSCRIPT keep their own comment skip).
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
 - **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
@@ -879,8 +887,9 @@ reference formats, and the only place source comments are recognized. Its model:
 - **Comments never leave this pass.** A comment line becomes an empty line and an inline comment is cut, in fixed
   AND free form, so no later stage (the lexer's picture mode, the COPY/REPLACE text-word scanner, the NIST
   substitutions) has a comment rule to get wrong. The lexer keeps `COMMENT_START` (and `PIC_COMMENT` /
-  `SUB_COMMENT` in its other modes) only for the INTERNAL `*>` carriers written after this pass: the debugging-line
-  carrier and the COPY stage's not-found notes.
+  `SUB_COMMENT` in its other modes) only for the INTERNAL `*>` carriers written after this pass: the COPY stage's
+  not-found notes, and the debugging-line carrier inside a PICTURE or subscript region (everywhere else the lexer reads it
+  as the `DEBUG_LINE` marker, kb/Work PB1705).
 - **The reference-format diagnostics live in ONE per-COMPILATION object** (kb/Work PB1640): `ReferenceFormatDiagnostics`
   (edition, strictness, the bag), created once per front-end pass and shared by the main source and EVERY copybook —
   library text is read by the same §6.5 walker (§6.5 applies to "lines of source text and library text"), so a rule

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
 using System.Text;
 
 namespace CobolNet.Frontend.Preprocessor;
@@ -85,7 +86,7 @@ public static class PhysicalLines
     private static bool IsArchiveMarker(ReadOnlySpan<char> line, bool ccvsIndicators)
     {
         if (!ccvsIndicators) return false;
-        var trimmed = line.TrimStart();
+        var trimmed = line.TrimSpacesStart();
         return trimmed.StartsWith("*HEADER,", StringComparison.Ordinal)
                || trimmed.StartsWith("*END-OF,", StringComparison.Ordinal);
     }

@@ -65,7 +65,7 @@ public static class TurnDirectiveProcessor
     private static TurnEvent? ParseTurn(string body, int line, int dialectLevel,
         DiagnosticBag diagnostics, SourceLocation loc)
     {
-        var words = body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var words = body.SplitSpaces();
         var names = new List<(string Ec, string? File)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         bool? on = null;

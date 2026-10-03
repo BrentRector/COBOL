@@ -668,7 +668,7 @@ routes it to category **LC_CTYPE**. §14.6.6 r2 (`--check` OK) restates it at ru
    `reserved-words.json` and is matched by text, like the LC_ words.
 2. ⛔ **Deleting the sink silently deletes three live edition gates unless they are moved first.**
    `VersionConformancePass.VisitComputerAttributes` (`:506`) is a **token-TEXT scan over the sink** and is the
-   only enforcement of `MemorySizeRemoved2002`, `SegmentLimitRemoved2002` and `DebuggingModeRemoved2002` — the
+   only enforcement of `MemorySizeRemoved2002`, `SegmentLimitRemoved2002` and `DebuggingModeRemoved2014` — the
    last of which also sets `_debuggingModeDeclared`, which drives the `--std 85` USE FOR DEBUGGING posture
    (VCR row 7.17). Note the sink is shared by **both** computer paragraphs (`sourceComputerParagraph` uses it
    too), and `WITH DEBUGGING MODE` is a SOURCE-COMPUTER clause — hence the `sourceComputerParagraph` rewrite

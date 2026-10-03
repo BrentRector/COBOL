@@ -1,4 +1,6 @@
-*> reject-at: 2002 2014 2023
+*> reject-at: 2014 2023
+*> kb/Work R61 (owner decision): WITH DEBUGGING MODE is accepted at 85, OBSOLETE at 2002 (the COBOLNET0903 warning,
+*> positive 2002/pb1705_debugging_mode_obsolete_2002) and removed at 2014 (row debugging-mode-removed-2014).
 IDENTIFICATION DIVISION.
 PROGRAM-ID. NEGDM01.
 ENVIRONMENT DIVISION.

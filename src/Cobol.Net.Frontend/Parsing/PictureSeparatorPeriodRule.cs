@@ -31,7 +31,8 @@ public static class PictureSeparatorPeriodRule
     {
         foreach (var t in tokens)
         {
-            if (t.Type != CobolLexer.PIC_STRING || t.Text is not { Length: > 0 } text) continue;
+            if (t.Type != CobolLexer.PIC_STRING || t.Channel == CobolLexer.ABSENT_DEBUG_LINE
+                || t.Text is not { Length: > 0 } text) continue;   // an absent debugging line is a comment (kb/Work PB1705)
             if (text[^1] is not (',' or '.')) continue;
             if (SeparatorRule.CharAt(source, t.StopIndex + 1) != '.') yield return t;
         }

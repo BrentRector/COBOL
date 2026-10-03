@@ -17,6 +17,10 @@ options {
 // (CobolKeywordTokens, CobolWordsDriftTests) — which, everywhere else, it does not.
 tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
 
+// The channel of a debugging line that is a COMMENT (kb/Work PB1705): DebuggingLineRewriter moves the tokens of a
+// fixed-form debugging line here when its source unit does not declare WITH DEBUGGING MODE. No lexer rule emits to it.
+channels { ABSENT_DEBUG_LINE }
+
 @members {
     // Track the types of the last TWO non-WS tokens emitted: one for subscript-mode detection, two for the
     // FUNCTION-argument suppression (P7 Step 12 — '(' after "FUNCTION name" opens an ARGUMENT list, ISO
@@ -244,7 +248,9 @@ tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
     public override Antlr4.Runtime.IToken NextToken()
     {
         var token = base.NextToken();
-        if (token.Type != WS && token.Type != SUB_WS && token.Type != Antlr4.Runtime.TokenConstants.EOF)
+        // DEBUG_LINE is a marker, not a word: like a comment it must not become the "previous token" of the next one.
+        if (token.Type != WS && token.Type != SUB_WS && token.Type != DEBUG_LINE
+            && token.Type != Antlr4.Runtime.TokenConstants.EOF)
         {
             TrackReportSection(token.Type);   // before the shift: it asks what PRECEDED this token
             _prevNonWsTokenType = _lastNonWsTokenType;
@@ -263,6 +269,16 @@ tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
 // already expanded every TAB and taken every CR LF to its LF, so neither has a rule here.
 WS           : [ \n]+ -> skip ;
 COMMENT_START: '*>' -> skip, pushMode(COMMENT_MODE) ;
+
+// A fixed-form DEBUGGING LINE's marker (the X3.23-1985 debug module; kb/Work PB1705, owner decision R56): the §6.5
+// logical conversion writes a `D` line as this carrier followed by the line's program text
+// (ReferenceFormatProcessor.DebugLineCarrier, held equal to this spelling by DebuggingLineDriftTests). The marker is a
+// HIDDEN token, and the line's text is lexed as ordinary tokens behind it: whether they are SOURCE or COMMENT is decided
+// per source unit, after lexing, by DebuggingLineRewriter (the unit's SOURCE-COMPUTER WITH DEBUGGING MODE clause is
+// further down the token stream than the line may be, so no earlier stage can know). Longer than COMMENT_START's `*>`, so
+// it wins; PICMODE and SUBSCRIPT keep their own comment skips, which swallow it (a debugging line inside an open PICTURE
+// or subscript region stays a comment — kb/Work PB1705).
+DEBUG_LINE   : '*>' '\u{FDD0}' 'DEBUG ' -> channel(HIDDEN) ;
 
 // ── END-xxx paired terminators (must precede END and IDENTIFIER) ──
 

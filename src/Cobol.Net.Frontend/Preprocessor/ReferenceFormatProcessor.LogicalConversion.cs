@@ -64,8 +64,7 @@ public static partial class ReferenceFormatProcessor
             '-' => LineKind.Continuation,
             'D' or 'd' => LineKind.Debugging,                   // COBOL-85's debugging line
             _ when !ccvsIndicators => LineKind.NotAnIndicator,
-            'S' or 's' or 'Y' or 'y' => LineKind.Debugging,
-            'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u' => LineKind.CcvsExcluded,
+            'S' or 's' or 'Y' or 'y' or 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u' => LineKind.CcvsExcluded,
             _ => LineKind.Source,                               // CCVS: a primary-configuration line
         };
 
@@ -97,12 +96,19 @@ public static partial class ReferenceFormatProcessor
 
                 case LineKind.Debugging:
                     // §6.2.2 lists no debugging indicator at COBOL-2023: the facility is obsolete at 2002 and removed at
-                    // 2014 (kb/Work R61, row debugging-line-removed-2014). The NIST S / Y debugging letters are the CCVS
-                    // dialect, not the D indicator.
-                    if (indicator is 'D' or 'd') gates?.OnDebuggingLine(file, lineNo);
-                    _builder.Emit(DebugLineCarrier + area.TrimEnd(), lineNo);
+                    // 2014 (kb/Work R61, row debugging-line-removed-2014). Whether the line is SOURCE or COMMENT is the
+                    // program's SOURCE-COMPUTER ... WITH DEBUGGING MODE clause's to say, and the clause is further down the
+                    // text than any stage that has read this line, so the line is CARRIED: DebuggingLineRewriter decides
+                    // per source unit after lexing (kb/Work PB1705, owner decision R56). Its tokens stay matchable by COPY
+                    // REPLACING / REPLACE as if the D were absent (TextWordScanner skips the carrier).
+                    gates?.OnDebuggingLine(file, lineNo);
+                    _builder.Emit(DebugLineCarrier + area.TrimEnd(' '), lineNo);
                     break;
 
+                // 'S' and 'Y' (the CCVS debug-suite letters, §6.2.2 lists neither) are excluded the same way: they are the
+                // --nist dialect, not the D indicator, so the WITH DEBUGGING MODE clause that keeps a D line (PB1705) never
+                // keeps them — they were comment lines before the D line's carrier became a rewritable one, and stay so.
+                //
                 // CCVS optional/alternate source lines: the file-I/O suites tag auxiliary or
                 // alternate-configuration lines in the indicator column — 'P' (an optional scratch
                 // file such as the INDEXED RAW-DATA member, assigned to an X-card the program's

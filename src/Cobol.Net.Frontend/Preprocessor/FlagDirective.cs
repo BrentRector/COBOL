@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>Which migration-flagging directive an option belongs to — <c>&gt;&gt;FLAG-02</c> (§7.3.14, the
@@ -161,7 +162,7 @@ public static class FlagDirectiveLine
         on = true;
         error = null;
 
-        var tokens = operand.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var tokens = operand.SplitSpaces();
         if (tokens.Length == 0) { error = "no option and no ON/OFF phrase"; return false; }
 
         // Trailing ON/OFF (FLAG-14 requires it; FLAG-02 defaults to ON when omitted).

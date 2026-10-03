@@ -103,9 +103,10 @@ word of its own; `==` is the pseudo-text delimiter. Its three consumers:
   determination; the source file's own directory is not searched, and a text not found is CBL3620 on every path
   (kb/Work PB1355).
 
-A fixed-form debugging line reaches the stage as `ReferenceFormatProcessor.DebugLineCarrier` (a `*>` comment
-carrying the Unicode noncharacter U+FDD0) + its text; the scanner skips only the carrier, so the line's text-words
-take part in matching (the COBOL-85 rule) while no comment a programmer writes can be mistaken for one.
+A fixed-form debugging line reaches the stage as `ReferenceFormatProcessor.DebugLineCarrier` (`*>` plus the Unicode
+noncharacter U+FDD0) + its text; the scanner skips only the carrier, so the line's text-words take part in matching (the
+COBOL-85 rule) while no comment a programmer writes can be mistaken for one. The lexer later reads the carrier as the
+hidden `DEBUG_LINE` marker and `DebuggingLineRewriter` keeps or hides the line's tokens (kb/Work PB1705).
 
 ### §3.3 The `leave*` flags + the collection stages
 

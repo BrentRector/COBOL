@@ -579,7 +579,10 @@ public abstract class CobolParserCoreBase : Parser
         if (tokenIndex <= 0) return true;
 
         var prevToken = TokenStream.Get(tokenIndex - 1);
-        return prevToken.Line < tokenLine;
+        // A debugging line that is source (kb/Work PB1705) begins with its hidden DEBUG_LINE marker, which stands on the
+        // line but is no program text: the token after it is the first token of the line, so a paragraph name written on a
+        // debugging line (DB101A's `DDEBUG-LINE-TEST-03-A.`) begins its paragraph.
+        return prevToken.Type == CobolLexer.DEBUG_LINE || prevToken.Line < tokenLine;
     }
 
     /// <summary>

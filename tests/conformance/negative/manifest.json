@@ -1907,7 +1907,9 @@
   "pb1359-floating-continuation-no-quotation-symbol",
   "pb1758-fixed-author-at-2014",
   "pb1758-fixed-remarks-at-2023",
-  "pb1494-debugging-line-at-2014"
+  "pb1494-debugging-line-at-2014",
+  "pb1660-define-nbsp-between-words",
+  "pb1660-nbsp-only-line-is-not-blank"
  ],
  "pending": []
 }

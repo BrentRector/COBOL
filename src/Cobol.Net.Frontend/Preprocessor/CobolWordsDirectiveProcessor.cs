@@ -48,7 +48,7 @@ public static class CobolWordsDirectiveProcessor
 
         for (int i = 0; i < lines.Length; i++)
         {
-            string trimmed = lines[i].TrimStart();
+            string trimmed = lines[i].TrimSpacesStart();
             // SR1 boundary: the FIRST IDENTIFICATION DIVISION ends the region where COBOL-WORDS is legal — and its
             // header is optional (§11.2.1), so the boundary is the ONE unit-start test (kb/Work PB829).
             if (!trimmed.StartsWith(">>", StringComparison.Ordinal))
@@ -232,7 +232,7 @@ public static class CobolWordsDirectiveProcessor
         int i = 0;
         while (i < s.Length)
         {
-            if (char.IsWhiteSpace(s[i])) { i++; continue; }
+            if (CobolSpace.IsSeparator(s[i])) { i++; continue; }
             if (s[i] is '"' or '\'')
             {
                 i = ReadQuoted(s, i, prefix: "", toks);
@@ -240,7 +240,7 @@ public static class CobolWordsDirectiveProcessor
             }
             // a bareword; if it butts directly against a quote, it is a literal prefix (X"…", N"…", …)
             int start = i;
-            while (i < s.Length && !char.IsWhiteSpace(s[i]) && s[i] is not ('"' or '\'')) i++;
+            while (i < s.Length && !CobolSpace.IsSeparator(s[i]) && s[i] is not ('"' or '\'')) i++;
             string word = s[start..i];
             if (i < s.Length && s[i] is '"' or '\'')
                 i = ReadQuoted(s, i, prefix: word, toks);

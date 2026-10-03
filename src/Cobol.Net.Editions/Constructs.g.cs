@@ -111,7 +111,7 @@ public static class Constructs
     public const string MultipleFileTapeRemoved2002 = "multiple-file-tape-removed-2002";
     public const string MemorySizeRemoved2002 = "memory-size-removed-2002";
     public const string SegmentLimitRemoved2002 = "segment-limit-removed-2002";
-    public const string DebuggingModeRemoved2002 = "debugging-mode-removed-2002";
+    public const string DebuggingModeRemoved2014 = "debugging-mode-removed-2014";
     public const string IdentificationCommentsRemoved2002 = "identification-comments-removed-2002";
     public const string RemarksRemoved2002 = "remarks-removed-2002";
     public const string StopLiteralRemoved2002 = "stop-literal-removed-2002";

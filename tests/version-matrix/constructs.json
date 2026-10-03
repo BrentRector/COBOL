@@ -1412,13 +1412,14 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. SL.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nOBJECT-COMPUTER. GENERIC-BOX\n    SEGMENT-LIMIT IS 20.\nPROCEDURE DIVISION.\nMAIN.\n    STOP RUN.\n"
   },
   {
-   "id": "debugging-mode-removed-2002",
-   "description": "WITH DEBUGGING MODE clause (SOURCE-COMPUTER) — the '85 debug facility deleted by ISO 2002; gated at the modelled debuggingModeClause (P2.6; kb/Work PB830).",
+   "id": "debugging-mode-removed-2014",
+   "description": "WITH DEBUGGING MODE clause (SOURCE-COMPUTER) — the '85 debug module's compile-time switch: it keeps the program's fixed-form debugging lines (indicator D) as source (DebuggingLineRewriter, kb/Work PB1705, owner decision R56). Owner decision kb/Work R61 (researched against GnuCOBOL's per-standard dialect files, debugging-mode: ok at 85, obsolete at 2002, unconformable at 2014): accepted at 85, OBSOLETE at 2002 (the obsolete-element warning COBOLNET0903), REMOVED at 2014 (COBOLNET0902, error strict / warning permissive). Medium confidence on the 2002/2014 edge (the ISO 2002 and 2014 texts are not in the repository). Gated at the modelled debuggingModeClause (P2.6; kb/Work PB830). Companion of debugging-line-removed-2014; USE FOR DEBUGGING keeps its own row.",
    "display": "the WITH DEBUGGING MODE clause (SOURCE-COMPUTER)",
    "diagnosticCode": "COBOLNET0902",
-   "citation": "the '85 debug facility deleted by ISO 2002; VCR Table 7",
+   "citation": "the '85 debug module's switch; kb/Work R61 (owner decision 2026-09-30): obsolete 2002, removed 2014; VCR Table 7 row 7.9",
    "introducedIn": 85,
-   "removedIn": 2002,
+   "removedIn": 2014,
+   "obsoleteIn": 2002,
    "expectDiagnostic": "COBOLNET0902",
    "vcr": "VCR Table 7",
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. DM.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nSOURCE-COMPUTER. GENERIC-BOX\n    WITH DEBUGGING MODE.\nPROCEDURE DIVISION.\nMAIN.\n    STOP RUN.\n"

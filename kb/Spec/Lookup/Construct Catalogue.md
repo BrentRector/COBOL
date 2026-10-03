@@ -42,7 +42,7 @@ construct id, a paraphrased summary, ISO § citation, `Introduced`/`Removed` edi
 | program-collating-national-2002 | PROGRAM COLLATING SEQUENCE national forms | §12.3.6.2 | 2002 | | 0900 | active |
 | memory-size-removed-2002 | OBJECT-COMPUTER MEMORY SIZE (deleted 2002) | VCR Table 7 | 85 | 2002 | 0902 | active |
 | segment-limit-removed-2002 | OBJECT-COMPUTER SEGMENT-LIMIT (deleted 2002) | VCR Table 7 | 85 | 2002 | 0902 | active |
-| debugging-mode-removed-2002 | SOURCE-COMPUTER WITH DEBUGGING MODE (deleted 2002) | VCR Table 7 | 85 | 2002 | 0902 | active |
+| debugging-mode-removed-2014 | SOURCE-COMPUTER WITH DEBUGGING MODE (obsolete 2002, removed 2014) | VCR Table 7 row 7.9; kb/Work R61 | 85 | 2014 | 0902 | active |
 | identification-comments-removed-2002 | AUTHOR/INSTALLATION/DATE-*/SECURITY paragraphs (deleted 2002) | VCR Table 7 | 85 | 2002 | 0902 | active |
 | remarks-removed-2002 | REMARKS paragraph ('74 carryover; deleted 2002) | VCR Table 7 | 85 | 2002 | 0902 | active |
 

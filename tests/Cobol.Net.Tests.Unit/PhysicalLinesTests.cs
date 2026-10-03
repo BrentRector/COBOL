@@ -197,7 +197,9 @@ public sealed class PhysicalLinesTests
     {
         var (text, bag) = Normalize("DISPLAY \"A\"\r>>SOURCE FORMAT FIXED\nX\n", InitialReferenceFormat.Free);
         // one line, the format NOT switched; the `>>` follows program text, so §7.3.3 SR2 names it (kb/Work PB1690)
-        Assert.Equal("DISPLAY \"A\"", text.Split('\n')[0]);
+        // The lone CR stays: it is no COBOL character space, so the cut before `>>` does not trim it (kb/Work PB1660; DOC-A.1-156
+        // takes a lone CR as a character of the line).
+        Assert.Equal("DISPLAY \"A\"\r", text.Split('\n')[0]);
         Assert.Equal("X", text.Split('\n')[1]);
         Assert.Contains(bag.Diagnostics, d => d.Code == "COBOLNET2691");
     }

@@ -211,7 +211,10 @@ public sealed class LogicalLineBuilderTests
             Assert.Equal(code, found[0].Code);
             Assert.Equal(isError, found[0].IsError);
         }
-        Assert.StartsWith(ReferenceFormatProcessor.DebugLineCarrier, m.Text.Split('\n')[0]);   // a debugging line stays a comment
+        // A D line is CARRIED (DebuggingLineRewriter keeps it or hides it per source unit, kb/Work PB1705); the NIST S / Y
+        // letters are excluded alternates: an empty line, whatever the SOURCE-COMPUTER paragraph says.
+        if (indicator is "D") Assert.StartsWith(ReferenceFormatProcessor.DebugLineCarrier, m.Text.Split('\n')[0]);
+        else Assert.Equal("", m.Text.Split('\n')[0]);
     }
 
     [Theory] // kb/Work PB1494 / PB1758: the comment-entry paragraph HEADER stays program text (with its terminating period

@@ -1121,6 +1121,32 @@ of an unsupported facility.
   `{!numericLiteralIsLeftOperand()}?` on the literal arms), with the binders recovering the sole identifier;
   pinned by `conformance:2023/pb130_call_format2_bare` and `conformance:2023/pb1135_invoke_keywordless_expression_argument`.
 
+- **D-DEBUG — the COBOL-85 debug facility's debugging lines (indicator `D`) and `WITH DEBUGGING MODE`** (kb/Work
+  PB1705, PB1802, PB1088; owner decisions R56 and R61). ISO/IEC 1989:2023 no longer carries the facility: §6.2.2 lists no
+  `D` fixed indicator (`cite.py --check 6.2.2 "The following are fixed indicators:"` → OK), so the earlier-edition
+  behavior is X3.23-1985's, taken as owner decisions and not from the 2023 text. **Determination:** a debugging line is
+  SOURCE — compiled as if the `D` were absent — when the program's SOURCE-COMPUTER paragraph says `WITH DEBUGGING MODE`,
+  and a COMMENT line otherwise. The clause is a SOURCE-COMPUTER clause, so it applies to the source unit that specifies
+  it and to every source unit contained in it (§12.3.5.4 GR1, `cite.py --check 12.3.5.4` → OK 1), and to nothing else: a
+  separate program in the same source does not inherit it. **Edition windows (R61, GnuCOBOL's per-standard dialect
+  files, medium confidence on the 2002/2014 edge — the ISO 2002 and 2014 texts are not in the repository):** accepted at
+  85; OBSOLETE at 2002 (COBOLNET0903 on the clause and on the first line); removed from 2014 (COBOLNET0902, an error
+  under strict, a warning under `--permissive`, where the pre-removal behavior above is kept). **Mechanism (R56, the
+  pre-parse token rewriter):** the §6.5 logical conversion cannot decide, because the clause is further down the text
+  than the line, so it writes the line as `ReferenceFormatProcessor.DebugLineCarrier` plus its program text; COPY
+  REPLACING and REPLACE match over that text as if the `D` were absent; the lexer reads the carrier as the hidden
+  `DEBUG_LINE` marker and the text as ordinary tokens; and `DebuggingLineRewriter` keeps the line's tokens or moves
+  them to the `ABSENT_DEBUG_LINE` channel, per source unit, before any other token pass runs. A continuation line of a
+  debugging line is part of it (§6.5 6) joins it to its latest logical line). The NIST `S` / `Y` letters are the
+  `--nist` dialect, not the `D` indicator: they stay comment lines whatever the clause says. ⚠ **Diverges today:** a
+  debugging line that stands inside an open PICTURE clause or an open subscript or reference-modification region is
+  always a comment (the lexer reads those regions in modes with their own comment skip); `USE FOR DEBUGGING` keeps its
+  own row (accepted at 85, rejected from 2002) and its `--std 85` posture is unchanged. Witnesses:
+  `conformance:85/pb1705_debugging_lines_compiled`, `conformance:85/pb1705_debugging_lines_per_unit`,
+  `conformance:85/pb1705_debugging_lines_copy_replacing`, `conformance:85/pb1494_debugging_line_85` (no clause: a
+  comment), `conformance:2002/pb1705_debugging_mode_obsolete_2002`, `conformance:negative/debugging-mode`,
+  `conformance:negative/pb1494-debugging-line-at-2014`, `unit:DebuggingLineRewriterTests`.
+
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 
 Annex A.2 lists situations whose results the standard leaves undefined, and §4.4 2) says that "A COBOL run unit that

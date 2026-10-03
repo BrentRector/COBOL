@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>What a <see cref="TextWord"/> is — the §7.2.2.5 classification the text-manipulation stage (COPY and
@@ -135,16 +136,8 @@ internal readonly record struct LiteralParts(string Prefix, char Quote, string C
 /// </summary>
 internal static class TextWordScanner
 {
-    /// <summary>The characters that separate as the COBOL character space does (§8.3.5 1) "The COBOL character space is
-    /// a separator") — the space and the line end, exactly the lexer's <c>WS</c> set (<c>CobolLexer.g4</c>:
-    /// <c>[ \n]</c>), so a text-word ends where the lexer's word ends. No tab and no CR LF reaches this stage: the
-    /// line-entry stage (<see cref="PhysicalLines"/>, DOC-A.1-157 / DOC-A.1-156) has expanded the one and taken the other
-    /// to its LF. Never Unicode White_Space: U+00A0, U+2000–U+200A, U+3000 and the rest only LOOK like a space and are
-    /// ordinary text-word characters (§7.2.2.5 3); kb/Work PB1543).</summary>
-    public static readonly char[] SeparatorSpaces = [' ', '\n'];
-
-    /// <summary>Whether <paramref name="c"/> is one of the <see cref="SeparatorSpaces"/>.</summary>
-    public static bool IsSeparatorSpace(char c) => c is ' ' or '\n';
+    // The separator space — §8.3.5 1) "The COBOL character space is a separator", the space and the line end and nothing
+    // Unicode calls white space — is CobolSpace's: a text-word ends where the lexer's word ends (kb/Work PB1543, PB1660).
 
     /// <summary>Every text-word of <paramref name="text"/>, in order.</summary>
     public static List<TextWord> Scan(string text)
@@ -175,7 +168,7 @@ internal static class TextWordScanner
         while (pos < n)
         {
             char c = text[pos];
-            if (IsSeparatorSpace(c)) { pos++; continue; }
+            if (CobolSpace.IsSeparator(c)) { pos++; continue; }
 
             if (IsDebugLineCarrierAt(text, pos))
             {
@@ -286,7 +279,7 @@ internal static class TextWordScanner
     /// so does a closing pseudo-text delimiter: §8.3.5 8) lets the separator space OPTIONALLY precede that separator,
     /// so <c>==STOP RUN.==</c> and <c>==STOP RUN. ==</c> must form the same text-words (⚠ determination, PB1350).</summary>
     private static bool SeparatorFollows(string text, int pos)
-        => pos + 1 >= text.Length || IsSeparatorSpace(text[pos + 1]) || IsPseudoTextDelimiter(text, pos + 1);
+        => pos + 1 >= text.Length || CobolSpace.IsSeparator(text[pos + 1]) || IsPseudoTextDelimiter(text, pos + 1);
 
     private static bool IsPseudoTextDelimiter(string text, int pos)
         => text[pos] == '=' && pos + 1 < text.Length && text[pos + 1] == '=';
@@ -314,7 +307,7 @@ internal static class TextWordScanner
     private static bool EndsCharacterString(string text, int pos)
     {
         char d = text[pos];
-        return IsSeparatorSpace(d)
+        return CobolSpace.IsSeparator(d)
             || d is '(' or ')' or ':' or '"' or '\'' or '&'
             || (d is '.' or ',' or ';' && SeparatorFollows(text, pos))
             || IsPseudoTextDelimiter(text, pos)

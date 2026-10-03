@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-252 drift tests.
+253 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -55,6 +55,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ClosesRowsBackLinkDriftTests](../tests/Cobol.Net.Tests.Unit/ClosesRowsBackLinkDriftTests.cs) | ⛔ THE BACK-LINK FROM A LANDED FIX TO THE INVENTORY ROWS IT CLOSED: every kind: defect note that has LANDED names those rows in closes_rows, or says why it closed none — and every row it names is one the inventory itself calls closed today. | `tests/version-matrix/work-frontmatter-parity-cases.json`, `scripts/spec/work.py` |
 | [CobolEditSimpleInsertionDriftTests](../tests/Cobol.Net.Tests.Unit/CobolEditSimpleInsertionDriftTests.cs) | ⛔ THE SIMPLE-INSERTION DRIFT PIN. ISO §13.18.40.5 rule 3 names the simple insertion editing symbols once — "the symbols 'B', '0', '/', ',' and, if literal=1 is specified, character-1 are used as the simple insertion editing symbols" — and rules 6 and 7 both spend that set again, in identical words: "Any of the simple insertion editing symbols embedded in this string or to the immediate right of th… | — |
 | [CobolLexerModeDriftTests](../tests/Cobol.Net.Tests.Unit/CobolLexerModeDriftTests.cs) | Pins WHICH LEXER MODE each parenthesised group lands in, for the shapes where the answer is load-bearing. | — |
+| [CobolSpaceDriftTests](../tests/Cobol.Net.Tests.Unit/CobolSpaceDriftTests.cs) | ⛔ A SPACE IN SOURCE TEXT IS CobolSpace'S, AND THE TEXT STAGES NEVER ASK .NET WHAT WHITE SPACE IS (kb/Work PB1543, PB1660). | `src/Cobol.Net.Frontend/Preprocessor`, `src/Cobol.Net.Frontend/Pipeline/Frontend.cs`, `src/Cobol.Net.Editions/CompilerDirectiveLine.cs`, `src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs`, `src` |
 | [CobolWordsDriftTests](../tests/Cobol.Net.Tests.Unit/CobolWordsDriftTests.cs) | The PHASE-04 Group-A drift check (parallel to ReservedWordsDriftTests): the context-sensitive word set is single-sourced from tests/version-matrix/cobol-words.json and GENERATED into two grammar artifacts by scripts/gen-cobol-words.ps1 — the parser cobolWord rule (Grammar/Core/CobolWords.g4, the nameSlot=true rows), and the lexer _dataNameTokens subscript-trigger set (Parsing/CobolLexerWordSet.g.c… | `tests/version-matrix/cobol-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4`, `docs/CONFORMANCE.md`, `tests/version-matrix/context-sensitive-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4`, `tests/version-matrix/reserved-words.json` |
 | [CobolWordsReachDriftTests](../tests/Cobol.Net.Tests.Unit/CobolWordsReachDriftTests.cs) | The >>COBOL-WORDS REACH invariant (ISO §7.3.10; kb/Work PB250). | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `tests/version-matrix/reserved-words.json`, `tests/version-matrix/context-sensitive-words.json` |
 | [CollatingComparisonClassDriftTests](../tests/Cobol.Net.Tests.Unit/CollatingComparisonClassDriftTests.cs) | ⛔ TWO QUESTIONS, TWO CLASSIFIERS — the guard that keeps them from being folded onto one again (kb/Work PB741). | — |

@@ -140,7 +140,7 @@ public static class CompilerDirectiveCatalog
     /// does. ONE place, because <see cref="TryOperandWord"/> (what the owning stage acts on) and
     /// <see cref="CheckWords"/> (what the diagnostic screens) shall never disagree about which words count.</summary>
     private static List<string> SignificantWords(DirectiveOperandSyntax syntax, string operand) =>
-        [.. operand.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        [.. operand.SplitSpaces()
                    .Where(w => !syntax.OptionalWords.Contains(w, StringComparer.OrdinalIgnoreCase))];
 
     /// <summary>The closed-word-set arm of <see cref="CheckOperand"/>: the optional words (§5.2.3) may be written

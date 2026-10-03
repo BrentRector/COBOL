@@ -305,8 +305,9 @@ ReservedWords drift test does the same one level up.
 85→2002 removals — `Removed` ≥2002 (VCR Table 7 grows a row per item): LABEL RECORDS (FD,
 Core/CobolData.g4:106; 0902) · VALUE OF (:118; 0902) · DATA RECORDS FD+SD (:111; **0873** — the DataBinder.cs:322
 SD gate MIGRATES into the validator, one enforcement site; Table 7 row 7.1's recorded follow-up) · MEMORY SIZE,
-SEGMENT-LIMIT, WITH DEBUGGING MODE (the modelled `memorySizeClause` / `segmentLimitClause` /
-`debuggingModeClause`, CobolParserCore.g4 — kb/Work PB830; 0902) · MULTIPLE FILE [TAPE] (CobolIO.g4:170; 0902) · the five identification comment
+SEGMENT-LIMIT (the modelled `memorySizeClause` / `segmentLimitClause`, CobolParserCore.g4 — kb/Work PB830; 0902) ·
+WITH DEBUGGING MODE (the modelled `debuggingModeClause`; NOT a 2002 removal — obsolete 2002 with 0903, removed 2014,
+owner decision kb/Work R61, row `debugging-mode-removed-2014`) · MULTIPLE FILE [TAPE] (CobolIO.g4:170; 0902) · the five identification comment
 paragraphs AUTHOR/INSTALLATION/DATE-WRITTEN/DATE-COMPILED/SECURITY (0902) · REMARKS (0902 ≥2002 ONLY — CCVS
 uses it; never flag at 85 until the FIPS-flagging strictness work) · STOP literal (CobolControlFlow.g4:222;
 0902) · OPEN REVERSED (CobolIO.g4:193; 0902).

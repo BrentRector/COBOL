@@ -707,7 +707,7 @@ internal sealed class VersionConformancePass
 
         public override object? VisitDebuggingModeClause(CobolParserCore.DebuggingModeClauseContext ctx)
         {
-            _p.Check(Constructs.DebuggingModeRemoved2002, "the SOURCE-COMPUTER WITH DEBUGGING MODE clause");
+            _p.Check(Constructs.DebuggingModeRemoved2014, "the SOURCE-COMPUTER WITH DEBUGGING MODE clause");
             // The switch also drives the USE FOR DEBUGGING posture (row 7.17): the configuration section precedes
             // the procedure division in the walk, so the flag is set before any declarative section is visited.
             _debuggingModeDeclared = true;

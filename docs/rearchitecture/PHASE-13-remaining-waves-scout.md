@@ -1232,7 +1232,7 @@ useDebugTarget
 
 ### Introduced edition & gate
 - **Introduced:** COBOL-85 (X3.23-1985 Debug module). **Removed:** COBOL-2002 (whole facility). **VCR Table 7 row 7.17.**
-- **Gate at ≥2002 (already correct, verified by probe):** `VersionConformancePass.cs:428` → `DebuggingModeRemoved2002` (COBOLNET0902) for `WITH DEBUGGING MODE`; `:586` → `UseForDebuggingRemoved2002` (COBOLNET0902) for the `USE FOR DEBUGGING` declarative. Registry rows: `Constructs.g.cs:125`, `ConstructRegistry.g.cs:127` (`introducedIn=85, removedIn=2002, code=COBOLNET0902`). **Probe confirmed** at `--std 2023`: both fire COBOLNET0902 (see As-built).
+- **Gate at ≥2002 (already correct, verified by probe):** `VersionConformancePass.cs:428` → `DebuggingModeRemoved2014` (COBOLNET0902) for `WITH DEBUGGING MODE`; `:586` → `UseForDebuggingRemoved2002` (COBOLNET0902) for the `USE FOR DEBUGGING` declarative. Registry rows: `Constructs.g.cs:125`, `ConstructRegistry.g.cs:127` (`introducedIn=85, removedIn=2002, code=COBOLNET0902`). **Probe confirmed** at `--std 2023`: both fire COBOLNET0902 (see As-built).
 - **Below-edition (i.e. at 85, the "introduction" leg is moot — this is a *removal* gate, so 85 is the ACCEPT edition).** The gate direction is inverted from the usual new-in-2023 case: 85 accepts, ≥2002 rejects.
 
 ### Semantics (GR-level, from X3.23-1985, each corroborated by a DB witness)
@@ -1316,7 +1316,7 @@ This is a **medium-large** feature (a special register + a cross-cutting trigger
 
 6. **'D'/'S'/'Y' debug-line conditional compilation (optional, same wave).** Make `ReferenceFormatProcessor.cs:333-334` emit debug lines as **live source** (not `*> DEBUG:` comments) when `WITH DEBUGGING MODE` is in effect. Requires the reference-format pass to know the switch — a two-pass or a deferred rewrite. If deferred, cover it by the COBOLNET1570 residual note. **This is the one item that could touch the shared preprocessor** — additive/conditional, no grammar restructure, so legacy-guard-clean, but run the full legacy guard because `ReferenceFormatProcessor` feeds both compilers.
 
-7. **constructs.json / registry:** no new *construct* row needed (the 0902 removal rows already exist); only the new **diagnostic** descriptor (COBOLNET1570). Keep `use-for-debugging-removed-2002` / `debugging-mode-removed-2002` rows unchanged.
+7. **constructs.json / registry:** no new *construct* row needed (the 0902 removal rows already exist); only the new **diagnostic** descriptor (COBOLNET1570). Keep `use-for-debugging-removed-2002` / `debugging-mode-removed-2014` rows unchanged.
 
 **Grammar verdict:** **NO grammar change** — everything parses today. All work is binder/emitter/runtime + one diagnostic + (optional) preprocessor. This means **no legacy-ANTLR-restructure risk**; the only legacy-guard trigger is step 6 (shared preprocessor), which is additive.
 

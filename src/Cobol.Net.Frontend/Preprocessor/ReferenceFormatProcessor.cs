@@ -16,10 +16,13 @@ namespace CobolNet.Frontend.Preprocessor;
 /// </summary>
 public static partial class ReferenceFormatProcessor
 {
-    /// <summary>How a fixed-form debugging line (indicator <c>D</c>) reaches the text-manipulation stage: as a comment
-    /// to the lexer, but one whose text COPY REPLACING and REPLACE still match over (the COPY rule of COBOL-85 —
-    /// text-words in a debugging line participate in matching as if the <c>D</c> were absent;
-    /// <see cref="TextWordScanner"/> skips only this carrier). The carrier holds U+FDD0, a Unicode NONCHARACTER —
+    /// <summary>How a fixed-form debugging line (indicator <c>D</c>) travels from the §6.5 logical conversion to the
+    /// lexer: the carrier, then the line's program text. COPY REPLACING and REPLACE match over that text as if the
+    /// <c>D</c> were absent (the COPY rule of COBOL-85; <see cref="TextWordScanner"/> skips only this carrier), and the
+    /// lexer reads the carrier as the hidden <c>DEBUG_LINE</c> marker (<c>CobolLexer.g4</c>, whose spelling this must
+    /// equal — <c>DebuggingLineDriftTests</c>) and the line's text as ordinary tokens, which
+    /// <c>DebuggingLineRewriter</c> then keeps (the unit's SOURCE-COMPUTER says WITH DEBUGGING MODE) or hides as a
+    /// comment (kb/Work PB1705). The carrier holds U+FDD0, a Unicode NONCHARACTER —
     /// reserved for process-internal use and never in interchanged text — so no comment a programmer writes can be
     /// mistaken for a debugging line (kb/Work PB1350: the printable <c>*&gt; DEBUG:</c> carrier made a genuine
     /// <c>*&gt; DEBUG: …</c> comment take part in matching).</summary>
@@ -368,7 +371,7 @@ public static partial class ReferenceFormatProcessor
         foreach (var physical in lines)
         {
             string line = physical.Text;
-            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (CobolSpace.IsBlank(line)) continue;
             totalLines++;
 
             // ⚠ A DETECTION HEURISTIC, not a spec rule — do not restate it as one.
@@ -383,7 +386,7 @@ public static partial class ReferenceFormatProcessor
             // card-image origin — it is far likelier to be free-form. NIST/CCVS fills 73-80 with its member tag
             // ("IX2164.2") and IS fixed-form, which is why a numeric sequence area overrides this signal.
             if (line.Length > SourceAreaStart + SourceAreaWidth
-                && line[(SourceAreaStart + SourceAreaWidth)..].Trim().Length > 0)
+                && !CobolSpace.IsBlank(line.AsSpan(SourceAreaStart + SourceAreaWidth)))
                 hasContentPastSourceArea = true;
 
             if (line.Length > IndicatorColumn)

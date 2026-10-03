@@ -74,5 +74,5 @@ public static class FlagDirectiveProcessor
     /// whitespace or end-of-line)?</summary>
     private static bool Matches(string body, string keyword) =>
         body.StartsWith(keyword, StringComparison.OrdinalIgnoreCase)
-        && (body.Length == keyword.Length || char.IsWhiteSpace(body[keyword.Length]));
+        && (body.Length == keyword.Length || CobolSpace.IsSeparator(body[keyword.Length]));
 }

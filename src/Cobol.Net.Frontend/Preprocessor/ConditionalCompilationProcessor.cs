@@ -230,7 +230,7 @@ public static class ConditionalCompilationProcessor
             {
                 string line = lines[i];
                 SourceOrigin origin = input.Lines[i];
-                string trimmed = line.TrimStart();
+                string trimmed = line.TrimSpacesStart();
                 _diag.At = origin;
 
                 if (!trimmed.StartsWith(">>", StringComparison.Ordinal))
@@ -329,7 +329,7 @@ public static class ConditionalCompilationProcessor
                         var f = new Frame { Kind = FrameKind.Evaluate, Phase = FramePhase.EvaluateBeforeWhen, TextId = _currentText,
                             ParentActive = parentActive, Emitting = false, BranchTaken = false,
                             Start = origin, EvaluateFlagOn = _flagScan.IsOn(FlagOption.Flag14Evaluate) };   // c anchor (§7.3.15.4 GR4 c)
-                        string subj = rest.Trim();
+                        string subj = rest.TrimSpaces();
                         if (subj.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) f.TruthForm = true;
                         else if (parentActive) f.Subject = EvaluateOperandText(subj, _evaluator, _diag, ">>EVALUATE");
                         _stack.Push(f);
@@ -338,13 +338,13 @@ public static class ConditionalCompilationProcessor
                     case "WHEN":
                         if (PhraseFrame(FrameKind.Evaluate, "WHEN", origin) is { } evalFrame)
                         {
-                            string obj = rest.Trim();
+                            string obj = rest.TrimSpaces();
                             // §7.3.13.3 SR5/SR6: `>>WHEN OTHER` is specified entirely on its line — OTHER and nothing else.
                             bool isOther = StartsWithWord(obj, "OTHER");
                             if (isOther)
                             {
                                 if (obj.Length > "OTHER".Length)
-                                    _diag.Structure($">>WHEN OTHER: '{obj["OTHER".Length..].Trim()}' follows OTHER on the directive line — "
+                                    _diag.Structure($">>WHEN OTHER: '{obj["OTHER".Length..].TrimSpaces()}' follows OTHER on the directive line — "
                                         + ">>WHEN OTHER shall be specified entirely on its line and text-2 shall begin on a new line "
                                         + "(ISO §7.3.13.3 SR5, SR6)");
                                 if (evalFrame.Phase == FramePhase.EvaluateOther)
@@ -561,11 +561,11 @@ public static class ConditionalCompilationProcessor
         out string complaint)
     {
         define = default;
-        string s = rest.Trim();
+        string s = rest.TrimSpaces();
         int sp = 0;
-        while (sp < s.Length && !char.IsWhiteSpace(s[sp])) sp++;
+        while (sp < s.Length && !CobolSpace.IsSeparator(s[sp])) sp++;
         string name = s[..sp];
-        string body = sp < s.Length ? s[sp..].Trim() : "";
+        string body = sp < s.Length ? s[sp..].TrimSpaces() : "";
         // §7.3.11.2: compilation-variable-name-1 is required, and is ONE word — not a literal, not an expression.
         if (name.Length == 0) { complaint = "no compilation-variable-name-1 is written"; return false; }
         if (!IsCompilationVariableNameShape(name))
@@ -573,14 +573,14 @@ public static class ConditionalCompilationProcessor
             complaint = $"'{name}' is not a COBOL word, so it cannot be compilation-variable-name-1";
             return false;
         }
-        if (StartsWithWord(body, "AS")) body = body["AS".Length..].TrimStart();   // AS is not underlined: an optional word (§5.2.3)
+        if (StartsWithWord(body, "AS")) body = body["AS".Length..].TrimSpacesStart();   // AS is not underlined: an optional word (§5.2.3)
 
         // { value-group [OVERRIDE] | OFF }: OFF is an alternative of the OUTER brace, so neither OVERRIDE nor any other
         // word may follow it (kb/Work PB1367 — the old trailing-OVERRIDE strip ran before the OFF test and took
         // `OFF OVERRIDE` for OFF).
         if (StartsWithWord(body, "OFF"))
         {
-            string after = body["OFF".Length..].Trim();
+            string after = body["OFF".Length..].TrimSpaces();
             if (after.Length == 0) { define = (name, DefineKind.Off, "", false); complaint = ""; return true; }
             complaint = StartsWithWord(after, "OVERRIDE") && after.Length == "OVERRIDE".Length
                 ? "the OVERRIDE phrase belongs to the value alternative — OFF is an alternative of its own and is not followed by OVERRIDE"
@@ -589,8 +589,8 @@ public static class ConditionalCompilationProcessor
         }
 
         bool over = EndsWithWord(body, "OVERRIDE");
-        if (over) body = body[..^"OVERRIDE".Length].TrimEnd();
-        body = body.Trim();
+        if (over) body = body[..^"OVERRIDE".Length].TrimSpacesEnd();
+        body = body.TrimSpaces();
         if (body.Length == 0)
         {
             complaint = over ? "OVERRIDE follows no operand" : "no operand follows the compilation-variable-name";
@@ -746,10 +746,10 @@ public static class ConditionalCompilationProcessor
     private static (string Lo, string? Hi) SplitRange(string text)
     {
         int idx = FindRangeWord(text);
-        if (idx < 0) return (text.Trim(), null);
+        if (idx < 0) return (text.TrimSpaces(), null);
         int end = idx;
-        while (end < text.Length && !char.IsWhiteSpace(text[end])) end++;
-        return (text[..idx].Trim(), text[end..].Trim());
+        while (end < text.Length && !CobolSpace.IsSeparator(text[end])) end++;
+        return (text[..idx].TrimSpaces(), text[end..].TrimSpaces());
     }
 
     private static int FindRangeWord(string text)
@@ -761,7 +761,7 @@ public static class ConditionalCompilationProcessor
             char c = text[i];
             if (inStr) { if (c == q) inStr = false; continue; }
             if (c is '"' or '\'') { inStr = true; q = c; continue; }
-            bool wordStart = i == 0 || char.IsWhiteSpace(text[i - 1]);
+            bool wordStart = i == 0 || CobolSpace.IsSeparator(text[i - 1]);
             if (wordStart && (MatchesWordAt(text, i, "THROUGH") || MatchesWordAt(text, i, "THRU"))) return i;
         }
         return -1;
@@ -772,7 +772,7 @@ public static class ConditionalCompilationProcessor
         if (i + word.Length > text.Length) return false;
         if (string.Compare(text, i, word, 0, word.Length, StringComparison.OrdinalIgnoreCase) != 0) return false;
         int after = i + word.Length;
-        return after == text.Length || char.IsWhiteSpace(text[after]);
+        return after == text.Length || CobolSpace.IsSeparator(text[after]);
     }
 
     // ── small directive-syntax helpers ────────────────────────────────────────────────────────────────────────
@@ -786,11 +786,11 @@ public static class ConditionalCompilationProcessor
 
     private static bool StartsWithWord(string s, string word) =>
         s.StartsWith(word, StringComparison.OrdinalIgnoreCase)
-        && (s.Length == word.Length || char.IsWhiteSpace(s[word.Length]));
+        && (s.Length == word.Length || CobolSpace.IsSeparator(s[word.Length]));
 
     private static bool EndsWithWord(string s, string word) =>
         s.EndsWith(word, StringComparison.OrdinalIgnoreCase)
-        && (s.Length == word.Length || char.IsWhiteSpace(s[s.Length - word.Length - 1]));
+        && (s.Length == word.Length || CobolSpace.IsSeparator(s[s.Length - word.Length - 1]));
 
     /// <summary>The frontend diagnostic gateway: the shared evaluator's code-preserving reports (any
     /// <see cref="CtDiagCode"/>) and a fragment syntax error both route to COBOLNET1619 (the directive-expression
