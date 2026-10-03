@@ -73,7 +73,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-INTRINSICS", "CHAR-INTRINSICS", null, false, false, false, static __o => new _PRG_CHAR_INTRINSICS());
+        ProgramRegistry.Register("CHAR-INTRINSICS", "CHAR-INTRINSICS", null, false, false, false, static __o => new _PRG_CHAR_INTRINSICS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

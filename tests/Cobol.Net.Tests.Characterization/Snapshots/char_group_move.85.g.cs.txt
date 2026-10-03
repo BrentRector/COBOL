@@ -87,7 +87,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-GROUP-MOVE", "CHAR-GROUP-MOVE", null, false, false, false, static __o => new _PRG_CHAR_GROUP_MOVE());
+        ProgramRegistry.Register("CHAR-GROUP-MOVE", "CHAR-GROUP-MOVE", null, false, false, false, static __o => new _PRG_CHAR_GROUP_MOVE(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

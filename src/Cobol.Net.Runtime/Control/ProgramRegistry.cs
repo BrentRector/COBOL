@@ -122,9 +122,9 @@ public static class ProgramRegistry
         Func<ICobolProgram?, ICobolProgram> factory,
         Action? staticReset = null,
         int formalCount = -1, int requiredCount = 0, bool argMismatchChecking = false,
-        bool isFunction = false, string? externalizedName = null)
+        bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null)
         => RunUnit.Current.Programs.Register(path, name, parentPath, initial, common, recursive, factory,
-            staticReset, formalCount, requiredCount, argMismatchChecking, isFunction, externalizedName);
+            staticReset, formalCount, requiredCount, argMismatchChecking, isFunction, externalizedName, returning);
 
     /// <inheritdoc cref="ProgramTable.RunMain"/>
     public static void RunMain(string path) => RunUnit.Current.Programs.RunMain(path);
@@ -191,11 +191,11 @@ public static class ProgramRegistry
 
     /// <inheritdoc cref="ProgramTable.CallPointer"/>
     public static void CallPointer(ProgramPointer target, string callerPath, CobolArg[] args,
-        CobolArg? returning)
-        => RunUnit.Current.Programs.CallPointer(target, callerPath, args, returning);
+        CobolArg? returning, bool siteArgMismatchChecking = false)
+        => RunUnit.Current.Programs.CallPointer(target, callerPath, args, returning, siteArgMismatchChecking);
 
     /// <inheritdoc cref="ProgramTable.CallFunctionPointer"/>
     public static void CallFunctionPointer(FunctionPointer target, string callerPath, CobolArg[] args,
-        CobolArg? returning)
-        => RunUnit.Current.Programs.CallFunctionPointer(target, callerPath, args, returning);
+        CobolArg? returning, bool siteArgMismatchChecking = false)
+        => RunUnit.Current.Programs.CallFunctionPointer(target, callerPath, args, returning, siteArgMismatchChecking);
 }

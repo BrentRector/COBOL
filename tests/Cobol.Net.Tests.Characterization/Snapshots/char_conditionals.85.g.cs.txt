@@ -84,7 +84,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-CONDITIONALS", "CHAR-CONDITIONALS", null, false, false, false, static __o => new _PRG_CHAR_CONDITIONALS());
+        ProgramRegistry.Register("CHAR-CONDITIONALS", "CHAR-CONDITIONALS", null, false, false, false, static __o => new _PRG_CHAR_CONDITIONALS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

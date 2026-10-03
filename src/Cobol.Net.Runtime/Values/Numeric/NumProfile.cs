@@ -198,4 +198,17 @@ public readonly record struct NumProfile
     /// runtime twin of the compiler's <c>PicInfo.IsUnsignedWideBinary</c>, stated over the image rather than the
     /// carrier: a narrower unsigned binary image fits Int128 whole, and a signed one is ordered by its sign.</summary>
     public bool ImageExceedsInt128 => ByteForm == NumericByteForm.Binary && !Signed && StorageLength >= 16;
+
+    /// <summary>⛔ THE RUN-TIME STATEMENT OF "THE SAME PICTURE, SIGN AND USAGE" for two numeric items (kb/Work PB1040):
+    /// §14.8.3.3 requires a RETURNING receiver to have "the same … PICTURE, SIGN, and USAGE clauses" as the sender and
+    /// §14.8.2.3.2 rule 2 the same for a BY REFERENCE formal; it is what a dynamic Format-1 CALL can compare, since
+    /// the two sides are compiled apart and the compile-time check (<c>PictureClauseIdentity</c>, over
+    /// <c>PicInfo</c>) has nothing to read. The profile states exactly those three: the digit positions and the
+    /// fraction (the PICTURE), the operational sign and where it sits (the SIGN, consulted only when signed) and the
+    /// capacity discipline, the byte form and a FLOAT-BINARY item's endianness (the USAGE). The over-punch convention is a property of the compiled
+    /// PROGRAM, not of the item (<see cref="SignEncoding"/>), so it is not a clause and is not compared.</summary>
+    public bool ConformsTo(in NumProfile other) =>
+        Digits == other.Digits && FractionDigits == other.FractionDigits
+        && Signed == other.Signed && (!Signed || SignKind == other.SignKind)
+        && Truncation == other.Truncation && ByteForm == other.ByteForm && FloatLittleEndian == other.FloatLittleEndian;
 }

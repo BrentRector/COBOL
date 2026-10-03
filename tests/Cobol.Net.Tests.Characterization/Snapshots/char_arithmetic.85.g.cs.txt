@@ -84,7 +84,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-ARITHMETIC", "CHAR-ARITHMETIC", null, false, false, false, static __o => new _PRG_CHAR_ARITHMETIC());
+        ProgramRegistry.Register("CHAR-ARITHMETIC", "CHAR-ARITHMETIC", null, false, false, false, static __o => new _PRG_CHAR_ARITHMETIC(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

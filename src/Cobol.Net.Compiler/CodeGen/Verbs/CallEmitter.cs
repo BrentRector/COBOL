@@ -251,16 +251,20 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     {
         string head = $"{CsLiteral(callState.SelfPath)}, {ArgsArrayText(c)}, "
             + $"{(c.Returning is { } rp ? ReturningArgText(rp) : "null")}";
+        // ⛔ GR3d's activating half rides EVERY arm (kb/Work PB1040's sweep): the two pointer arms used to drop it, so
+        // a CALL through a program-pointer or a function-pointer never raised the argument-count or RETURNING
+        // mismatch that the same CALL by name did.
+        string site = argMismatchChecking ? ", siteArgMismatchChecking: true" : "";
         if (c.IsPointerTarget && c.DynamicName is BoundFieldOperand pf)
             return c.IsFunction
-                ? $"ProgramRegistry.CallFunctionPointer({PlaceRenderer.Read(pf.Place)}, {head});"
-                : $"ProgramRegistry.CallPointer({PlaceRenderer.Read(pf.Place)}, {head});";
+                ? $"ProgramRegistry.CallFunctionPointer({PlaceRenderer.Read(pf.Place)}, {head}{site});"
+                : $"ProgramRegistry.CallPointer({PlaceRenderer.Read(pf.Place)}, {head}{site});";
         string nameExpr = c.LiteralName is { } literal
             ? CsLiteral(literal)
             : OperandText.AsString(c.DynamicName!, num);   // GR3b — the identifier's value at CALL time (GR3a: read once); ProgramTable forms the name
         return $"ProgramRegistry.CallProgram({nameExpr}, {head}"
             + $"{(c.IsFunction ? ", notFoundEc: \"EC-FUNCTION-NOT-FOUND\"" : "")}"   // §8.4.3.2.4 GR6b
-            + $"{(argMismatchChecking ? ", siteArgMismatchChecking: true" : "")});";
+            + $"{site});";
     }
 
     /// <summary>The current statement's enabled level-3 names that a <see cref="CobolCallException"/> can
@@ -453,10 +457,28 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// and the activated element reaches through a carrier.</summary>
     private string PlaceDescription(Place p)
     {
-        string meta = p.DenotedItem is { Pic: { Category: PicCategory.Numeric } pp } && pp.Usage is not Usage.Index
-            ? pp.ProfileInitializer(ctx.SignEncoding)
-            : "null";
+        string meta = BoundaryProfile(p, ctx.SignEncoding) ?? "null";
         return BoundaryLayout(p) is { } layout ? $"{meta}, {layout}" : meta;
+    }
+
+    /// <summary>The emitted <c>NumProfile</c> of an elementary NUMERIC place's storage, or null when it has none
+    /// (see <see cref="PlaceDescription"/>) — the ONE place that decides which items state a numeric profile, for the
+    /// activating element's <c>CobolArg</c> and the activated unit's registration alike (kb/Work PB1040).</summary>
+    private static string? BoundaryProfile(Place p, SignEncoding signEncoding) =>
+        p.DenotedItem is { Pic: { Category: PicCategory.Numeric } pp } && pp.Usage is not Usage.Index
+            ? pp.ProfileInitializer(signEncoding)
+            : null;
+
+    /// <summary>⛔ THE REGISTERED DESCRIPTION of a unit's RETURNING item (<c>BoundaryItem</c>, kb/Work PB1040): the same
+    /// two facts the activating element's <c>CobolArg</c> states for its receiver — <see cref="BoundaryProfile"/> and
+    /// <see cref="BoundaryLength"/> — emitted at the unit's <c>ProgramRegistry.Register</c>, so
+    /// §14.9.4.4 GR3 d) can compare the pair at call initiation. Null when it states neither.</summary>
+    internal static string? RegisteredReturning(Place p, SignEncoding signEncoding)
+    {
+        string? profile = BoundaryProfile(p, signEncoding);
+        int length = BoundaryLength(p);
+        return profile is null && length == RuntimeApi.UnstatedBoundaryLength ? null
+            : $"new BoundaryItem({profile ?? "null"}{(length == RuntimeApi.UnstatedBoundaryLength ? "" : $", {length}")})";
     }
 
     /// <summary>The emitted §8.5.1.12 layout of a group place that has a table or a variable-length member, or
@@ -477,9 +499,31 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// <summary>The RETURNING item's <c>CobolArg</c> (kb/Work PB962/PB965): the same BY REFERENCE carrier an
     /// argument gets (§14.2.3 GR6 NOTE 1 — "the storage for the returning item is allocated in the activating
     /// source unit") plus the same description, so the activated element's delivery can place the result by
-    /// the RECEIVER's shape.</summary>
+    /// the RECEIVER's shape.
+    /// <para>⛔ It also states the receiver's fixed CHARACTER LENGTH (<see cref="BoundaryLength"/>, kb/Work PB1040): the
+    /// delivery fits the result to it and the activation checks it against the callee's, §14.8.3.3's same-PICTURE
+    /// rule for the one boundary fact a string carrier does not carry itself.</para></summary>
     private string ReturningArgText(Place rp) =>
-        $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, {RefCarrier(rp)}, {PlaceDescription(rp)})";
+        BoundaryLength(rp) is var len && len != RuntimeApi.UnstatedBoundaryLength
+            ? $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, {RefCarrier(rp)}, {PlaceDescription(rp)}, Length: {len})"
+            : $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, {RefCarrier(rp)}, {PlaceDescription(rp)})";
+
+    /// <summary>⛔ THE FIXED CHARACTER LENGTH a place's text-carried storage has across the activation boundary
+    /// (<see cref="CobolArg.Length"/>; kb/Work PB1040), <see cref="CobolArg.Unstated"/> when it has none. ONE
+    /// answer for both ends of a RETURNING crossing — the activating element's receiver
+    /// (<see cref="ReturningArgText"/>) and the activated unit's registration (<c>ProgramEmitter</c>) — measured in
+    /// the unit <see cref="CallStringRead"/> measures the image in (<see cref="BoundaryImageWidth"/>), so the two
+    /// sides cannot disagree about what a "length" counts. Only the TEXT crossing has one: a native cell, a
+    /// managed slot and a variable-length group carry their own description. A DYNAMIC LENGTH item's length is a
+    /// run-time value and an ANY LENGTH item takes the other side's (§14.8.3.3 rules 4 and 5).</summary>
+    internal static int BoundaryLength(Place p) =>
+        // DenotedItem is null for a reference-modified view, which is an alphanumeric slice with no item length of
+        // its own (§8.4.3.3.4 GR5/GR6); the identity question is the model's, never re-derived here (kb/Work PB602).
+        CrossingOf(p) is CallCrossing.Text
+        && p.DenotedItem is { IsDynamicLength: false, IsAnyLength: false } item
+        && BoundaryImageWidth(item) is > 0 and var width
+            ? width
+            : RuntimeApi.UnstatedBoundaryLength;
 
     /// <summary>The C# <c>CobolArg</c> expression for one bound CALL argument BEFORE the §14.2.3 GR9/GR10
     /// landing <see cref="LandedForFormal"/> wraps around it.</summary>

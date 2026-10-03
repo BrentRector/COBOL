@@ -68,7 +68,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-MOVE-BASIC", "CHAR-MOVE-BASIC", null, false, false, false, static __o => new _PRG_CHAR_MOVE_BASIC());
+        ProgramRegistry.Register("CHAR-MOVE-BASIC", "CHAR-MOVE-BASIC", null, false, false, false, static __o => new _PRG_CHAR_MOVE_BASIC(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

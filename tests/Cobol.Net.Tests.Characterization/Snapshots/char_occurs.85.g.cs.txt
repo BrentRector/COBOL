@@ -106,7 +106,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-OCCURS", "CHAR-OCCURS", null, false, false, false, static __o => new _PRG_CHAR_OCCURS());
+        ProgramRegistry.Register("CHAR-OCCURS", "CHAR-OCCURS", null, false, false, false, static __o => new _PRG_CHAR_OCCURS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

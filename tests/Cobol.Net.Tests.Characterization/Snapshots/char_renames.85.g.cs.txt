@@ -72,7 +72,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-RENAMES", "CHAR-RENAMES", null, false, false, false, static __o => new _PRG_CHAR_RENAMES());
+        ProgramRegistry.Register("CHAR-RENAMES", "CHAR-RENAMES", null, false, false, false, static __o => new _PRG_CHAR_RENAMES(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

@@ -678,15 +678,20 @@ internal sealed class ProgramEmitter
                 // with RecordStructEmitter's emission so the pair cannot diverge (kb/Work PB168). The
                 // optional argument is OMITTED for every other unit, keeping their lines byte-identical.
                 string reset = u.Data.EmitsStaticReset ? $", {u.ClassRef}.__ResetStatics" : "";
-                // §14.8.2.1 / §14.9.4.4 GR3d (kb/Work PB133 wave C2b): a unit WITH formals registers its
-                // count facts and its ACTIVATED-half checking bit; the required count excludes the trailing
-                // OPTIONAL run (§14.8.2.1's omissible tail). Formal-less units' lines stay byte-identical.
+                // §14.8.2.1 / §14.9.4.4 GR3d (kb/Work PB133 wave C2b): EVERY unit registers its count facts and
+                // its ACTIVATED-half checking bit; the required count excludes the trailing OPTIONAL run
+                // (§14.8.2.1's omissible tail). A unit with NO formals is the case of zero formals, not of no
+                // facts: it used to register nothing, so `CALL "NOFORMALS" USING A` ran silently under enabled
+                // EC-PROGRAM-ARG-MISMATCH checking where §14.8.2.1 says the argument count shall equal the
+                // formal count (kb/Work PB1040's sweep). The RETURNING item's fixed character length rides the
+                // same registration (§14.8.3.3 via GR3d), when it has one.
                 int fc = u.Data.LinkageFormals.Count;
                 int rq = fc;
                 while (rq > 0 && u.Data.LinkageFormals[rq - 1].Optional) rq--;
-                string argMeta = fc > 0
-                    ? $", formalCount: {fc}, requiredCount: {rq}, argMismatchChecking: {CallEmitter.CallBool(u.Data.ArgMismatchChecking)}"
-                    : "";
+                string? retItem = u.Data.LinkageReturning is { } ri && u.Refs.ResolveItem(ri) is { } retPlace
+                    ? CallEmitter.RegisteredReturning(retPlace, Current.Ctx.SignEncoding) : null;
+                string argMeta = $", formalCount: {fc}, requiredCount: {rq}, argMismatchChecking: {CallEmitter.CallBool(u.Data.ArgMismatchChecking)}"
+                    + (retItem is null ? "" : $", returning: {retItem}");
                 string resetNamed = reset.Length > 0 && argMeta.Length > 0
                     ? reset.Replace(", ", ", staticReset: ") : reset;
                 // A FUNCTION-ID registers with its discriminator (kb/Work PB154 — §8.4.6.3's first paragraph:

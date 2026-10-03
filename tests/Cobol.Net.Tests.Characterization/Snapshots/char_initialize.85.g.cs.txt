@@ -72,7 +72,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-INITIALIZE", "CHAR-INITIALIZE", null, false, false, false, static __o => new _PRG_CHAR_INITIALIZE());
+        ProgramRegistry.Register("CHAR-INITIALIZE", "CHAR-INITIALIZE", null, false, false, false, static __o => new _PRG_CHAR_INITIALIZE(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

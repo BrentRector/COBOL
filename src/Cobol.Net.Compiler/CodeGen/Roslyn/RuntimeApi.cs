@@ -1787,6 +1787,10 @@ internal static class RuntimeApi
     /// <see cref="RoundingText"/>, so a member rename breaks HERE, never the generated text.</summary>
     public static string PassModeText(CobolPassMode mode) => $"{nameof(CobolPassMode)}.{mode}";
 
+    /// <summary><c>CobolArg.Unstated</c> — a boundary item with no fixed character length (kb/Work PB1040): the ONE
+    /// spelling the emitters compare a <c>CallEmitter.BoundaryLength</c> against.</summary>
+    public const int UnstatedBoundaryLength = CobolArg.Unstated;
+
     /// <summary>The carrier of the predefined NULL written as a CALL / function-activation argument (kb/Work PB1630;
     /// <see cref="PredefinedNullArgument"/> states the rule).</summary>
     public static string PredefinedNullArgumentCarrier =>

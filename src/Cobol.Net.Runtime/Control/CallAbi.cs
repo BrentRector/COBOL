@@ -43,18 +43,77 @@ public enum CobolPassMode
 /// sides of a CALL are compiled apart, so the layout travels with the storage exactly as <see cref="Num"/>
 /// does; null for every other carrier, and for a group with neither (whose correspondence with any
 /// variable-length group fails, which the null answers).</param>
+/// <param name="Length">⛔ The CHARACTER LENGTH of the carried storage (kb/Work PB1040): the width of the string
+/// image a text-carried item always holds, stated for an item whose length is FIXED at compile time. §14.8.2.3.2
+/// rule 1 and §14.8.3.3 give a conforming pair "the same … PICTURE" and so the same length, and a string carrier
+/// whose image is not exactly its item's width is a corrupt item — so the length travels with the carrier exactly as
+/// <see cref="Num"/> and <see cref="Layout"/> do, for the activating element to CHECK a result against (§14.9.4.4
+/// GR3 d)) and for the delivery to FIT one to (the unchecked store). <see cref="Unstated"/> for every item with no
+/// fixed character length: a native cell, a pointer, a DYNAMIC LENGTH or ANY LENGTH item (§8.5.1.10; §14.8.3.3 rule
+/// 5 — an ANY LENGTH sender "matches" whatever length the receiver has), and a variable-length group, whose
+/// description is its <see cref="Layout"/>. Only a RETURNING item states it today: a BY REFERENCE argument is fitted
+/// by the formal's own window on the activated side (kb/Work PB165 owns the argument-side check on the dynamic
+/// lane).</param>
 /// <remarks>⛔ A RETURNING ITEM CROSSES AS A <see cref="CobolArg"/> TOO (kb/Work PB962 + PB965). Its storage is
 /// the activating element's (§14.2.3 GR6 NOTE 1), so the delivery performed at the activated element's return
 /// needs the RECEIVER's description as much as an argument's adapter needs the argument's — a group receiver's
 /// layout to meet a compatible group of a different shape (§14.8.3.2), a numeric receiver's profile. A bare
 /// carrier could state neither.</remarks>
-public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrier, NumProfile? Num, int[]? Layout = null)
+public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrier, NumProfile? Num, int[]? Layout = null,
+    int Length = CobolArg.Unstated)
 {
+    /// <summary><see cref="Length"/> of an item with no fixed character length.</summary>
+    public const int Unstated = -1;
+
+    /// <summary>The description facts of this item that a dynamic CALL can compare with the activated unit's own
+    /// (<see cref="BoundaryItem"/>).</summary>
+    public BoundaryItem Item => new(Num, Length);
+
     /// <summary>The carried storage's digit count; 0 when <see cref="Num"/> is null.</summary>
     public int Digits => Num?.Digits ?? 0;
 
     /// <summary>The carried storage's net scale (§13.18.40 — may be negative); 0 when <see cref="Num"/> is null.</summary>
     public int Scale => Num?.FractionScale ?? 0;
+}
+
+/// <summary>
+/// ⛔ THE DESCRIPTION OF A BOUNDARY ITEM THAT BOTH SIDES OF A DYNAMIC CALL CAN STATE (kb/Work PB1040): the two facts
+/// <see cref="CobolArg"/> carries for the activating element's storage (<see cref="CobolArg.Num"/> — a numeric
+/// item's whole PICTURE, SIGN and USAGE — and <see cref="CobolArg.Length"/> — a text-carried item's character
+/// length) and the same two facts an activated unit REGISTERS for its own RETURNING item
+/// (<see cref="ProgramTable.Register"/>), so §14.9.4.4 GR3 d) has something to compare at call initiation when the
+/// callee is located by name at run time. ONE rule of "do these two descriptions conform", written over the pair
+/// of facts and nowhere else; kb/Work PB165's per-formal registry is the next consumer.
+/// </summary>
+/// <param name="Num">The numeric item's profile; null for an item that is not numeric (character, group, pointer).</param>
+/// <param name="Length">The fixed character length of a text-carried item; <see cref="CobolArg.Unstated"/> otherwise.</param>
+public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolArg.Unstated)
+{
+    /// <summary>True when the item states anything at all — a native cell of a category with no profile, a pointer, a
+    /// DYNAMIC LENGTH item and an ANY LENGTH item state nothing, and nothing is comparable against them.</summary>
+    public bool IsStated => Num is not null || Length != CobolArg.Unstated;
+
+    /// <summary>The item in the words of an EC-PROGRAM-ARG-MISMATCH message.</summary>
+    public string Describe() =>
+        (Num, Length) switch
+        {
+            ({ } n, var len) when len != CobolArg.Unstated =>
+                $"numeric, {n.Digits} digit(s), scale {n.FractionScale}, {len} character(s)",
+            ({ } n, _) => $"numeric, {n.Digits} digit(s), scale {n.FractionScale}",
+            (_, var len) when len != CobolArg.Unstated => $"{len} character(s)",
+            _ => "no stated description",
+        };
+
+    /// <summary>Whether a SENDING item and a RECEIVING item conform (§14.8.3.3: "the same … PICTURE, SIGN, and
+    /// USAGE clauses"; §14.8.2.3.2 rule 1: "the same length"), judged over what both state: an item with a numeric
+    /// profile never conforms to one without (category), two profiles conform when they state one PICTURE, SIGN and
+    /// USAGE (<see cref="NumProfile.ConformsTo"/>), and two character lengths conform when equal. An item that states
+    /// nothing is not compared — its conformance is a compile-time fact or another registry's.</summary>
+    public bool Conforms(in BoundaryItem other) =>
+        !IsStated || !other.IsStated
+        || ((Num is null) == (other.Num is null)
+            && (Num is not { } mine || mine.ConformsTo(other.Num!.Value))
+            && (Length == CobolArg.Unstated || other.Length == CobolArg.Unstated || Length == other.Length));
 }
 
 /// <summary>
@@ -890,7 +949,7 @@ public static class CobolArgAdapt
     /// exactly wrong for a character image.</remarks>
     public static void StoreReturn(CobolArg? ret, UInt128 value)
     {
-        if (ret?.Carrier is ManagedPointer<string> sp) { sp.Value = value.ToString(); return; }
+        if (ret is { Carrier: ManagedPointer<string> sp } r) { sp.Value = FitToReceiver(value.ToString(), r); return; }
         StoreReturnNum(ret, unchecked((Int128)value), null);
     }
 
@@ -910,7 +969,11 @@ public static class CobolArgAdapt
     {
         // A 16-byte unsigned container beyond Int128's range only arises from a COMP-5 capacity value; its
         // character representation is its own digits (the bits lane would read negative).
-        if (ret?.Carrier is ManagedPointer<string> sp && value > (UInt128)Int128.MaxValue) { sp.Value = CobolNum.FormatImage(value, sent); return; }
+        if (ret is { Carrier: ManagedPointer<string> sp } r && value > (UInt128)Int128.MaxValue)
+        {
+            sp.Value = FitToReceiver(CobolNum.FormatImage(value, sent), r);
+            return;
+        }
         StoreReturnNum(ret, unchecked((Int128)value), sent);
     }
 
@@ -928,14 +991,17 @@ public static class CobolArgAdapt
 
     private static void StoreReturnNum(CobolArg? ret, Int128 value, NumProfile? sent)
     {
-        if (ret is not { Carrier: var c }) return;
+        if (ret is not { Carrier: var c } r) return;
         if (WriteNumericCell(c, value)) return;
         if (WriteRealCell(c, sent is { } rs ? CobolFloat.ScaledToDouble(value, rs.FractionScale) : (double)value)) return;
         if (c is ManagedPointer<string> sp)
         {
             // An image-carried receiver's carrier is its STORAGE image (kb/Work PB970), so the content arrives
-            // in the sender's record representation — §14.8.3.3's conforming receiver has the same description.
-            sp.Value = sent is { } s ? CobolNum.FormatImage(value, s) : value.ToString();
+            // in a record representation — §14.8.3.3's conforming receiver has the SAME description as the sender,
+            // so the two are one. A non-conforming pair under unchecked GR3 d) is stored under the RECEIVER's own
+            // description (the value a native-cell receiver would take), never the sender's, so the item's image
+            // keeps its own width (kb/Work PB1040).
+            sp.Value = (r.Num ?? sent) is { } s ? CobolNum.FormatImage(value, s) : FitToReceiver(value.ToString(), r);
             return;
         }
         Undeliverable(c, $"the numeric result {value}");
@@ -958,8 +1024,8 @@ public static class CobolArgAdapt
     /// view of a native numeric cell has (a BY REFERENCE character formal's store, a group MOVE into it).</para></summary>
     public static void StoreReturn(CobolArg? ret, string text, NumProfile sent)
     {
-        if (ret is not { Carrier: var c }) return;
-        if (c is ManagedPointer<string> sp) { sp.Value = text; return; }
+        if (ret is not { Carrier: var c } r) return;
+        if (c is ManagedPointer<string> sp) { sp.Value = ImageForReceiver(text, sent, r); return; }
         // The text is the returning item's STORAGE image (kb/Work PB970), decoded by THE record-image codec
         // under its own description — the float lane on its own decode.
         if (sent.ByteForm is NumericByteForm.Ieee32 or NumericByteForm.Ieee64)
@@ -989,7 +1055,7 @@ public static class CobolArgAdapt
         // A CHARACTER receiver takes the text. A NUMERIC receiver on a character carrier (an image-stored item —
         // every usage-DISPLAY CALL RETURNING receiver is one, kb/Work PB992) is the non-conforming pair below,
         // and reads the same digit image a native cell does, written back in its own record representation.
-        if (c is ManagedPointer<string> sp && r.Num is null) { sp.Value = value; return; }
+        if (c is ManagedPointer<string> sp && r.Num is null) { sp.Value = FitToReceiver(value, r); return; }
         // A table-less fixed group into a variable-length receiver (kb/Work PB965): its one §8.5.1.12 fact is
         // its length (CobolVarGroup.FixedRun).
         if (c is ManagedPointer<CobolVarGroup> vp && r.Layout is { } rl
@@ -1018,7 +1084,7 @@ public static class CobolArgAdapt
     public static void StoreReturnGroup(CobolArg? ret, string image, int[] layout)
     {
         if (ret is not { Carrier: var c } r) return;
-        if (c is ManagedPointer<string> sp) { sp.Value = image; return; }
+        if (c is ManagedPointer<string> sp) { sp.Value = FitToReceiver(image, r); return; }
         if (c is ManagedPointer<CobolVarGroup> vp && r.Layout is { } rl
             && CobolVarGroup.CorrespondingSpans(layout, rl) is { } spans)
         {
@@ -1041,6 +1107,33 @@ public static class CobolArgAdapt
     private static int[]? VarGroupSpans(in CobolArg a, int[]? groupLayout, int width) =>
         groupLayout is null || a.Layout is not { } argLayout ? null
         : CobolVarGroup.CorrespondingSpans(groupLayout.Length == 0 ? CobolVarGroup.FixedRun(width) : groupLayout, argLayout);
+
+    /// <summary>⛔ THE UNCHECKED RETURNING STORE INTO A TEXT-CARRIED RECEIVER (kb/Work PB1040): <paramref name="image"/>
+    /// in the receiver's OWN width. §14.9.4.4 GR3 d) makes a result whose length does not conform an
+    /// EC-PROGRAM-ARG-MISMATCH "if checking for it is enabled in both the activated program and activating runtime
+    /// element" (<see cref="ProgramTable.CallProgram"/> raises it before the activation); with checking off the rule
+    /// leaves the content to the implementor, and the receiver's string carrier is its item's whole image, so an
+    /// image of any other length would corrupt the item (<c>FUNCTION LENGTH</c> says 5 while the image is 3). The
+    /// store is the alphanumeric receiving rule of §14.6.8.5 — "aligned at the leftmost character position in the data
+    /// item with space fill or truncation to the right" — which is what <see cref="CobolString.Store"/> states and
+    /// what every other fixed-width character store here does (a JUSTIFIED RIGHT receiver's differing alignment
+    /// belongs to the conforming pair, which the checked path guarantees and this one does not have).
+    /// A receiver that states no length (<see cref="CobolArg.Unstated"/>) takes the image as it stands.</summary>
+    private static string FitToReceiver(string image, in CobolArg receiver) =>
+        receiver.Length == CobolArg.Unstated ? image : CobolString.Store(image, receiver.Length);
+
+    /// <summary>A numeric sender's STORAGE image <paramref name="text"/> for a text-carried receiver
+    /// (<see cref="StoreReturn(CobolArg?, string, NumProfile)"/>): as it stands when it is the receiver's width — the
+    /// conforming pair, and the only one that may hold content that is not a valid numeric representation
+    /// (kb/Work PB962) — otherwise the unchecked GR3 d) store: the VALUE under the receiver's own description when it
+    /// has one (a numeric receiver reads as the number the sender held, as a native-cell receiver does), else the
+    /// alphanumeric fit of <see cref="FitToReceiver"/>. A floating-point sender's bytes have no digit reading and
+    /// take the fit.</summary>
+    private static string ImageForReceiver(string text, in NumProfile sent, in CobolArg receiver) =>
+        receiver.Length == CobolArg.Unstated || text.Length == receiver.Length ? text
+        : receiver.Num is { } rn && sent.ByteForm is not (NumericByteForm.Ieee32 or NumericByteForm.Ieee64)
+            ? CobolNum.FormatImage(CobolNum.ParseImage(text, sent), rn)
+            : CobolString.Store(text, receiver.Length);
 
     /// <summary>The RETURNING delivery has no leg for this (result shape, carrier) pair — §14.9.4.4 GR4's
     /// "placed into identifier-3" cannot be honoured, and §14.8.3's conformance rules are what such a pair

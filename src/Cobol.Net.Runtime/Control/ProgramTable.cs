@@ -47,6 +47,7 @@ public sealed class ProgramTable
         public int FormalCount = -1;        // §14.8.2.1 (kb/Work PB133 wave C2b): declared formals; -1 = not registered
         public int RequiredCount;           // formals minus the TRAILING OPTIONAL run (the omissible tail)
         public bool ArgMismatchChecking;    // the ACTIVATED half of GR3d's enabled-in-both gate (TURN at PD entry)
+        public BoundaryItem? Returning;     // §14.8.3.3 (kb/Work PB1040): the RETURNING item's registered description; null = none
         public List<Node> Children = [];    // contained programs, source order (GR4 cancels in REVERSE)
     }
 
@@ -68,19 +69,23 @@ public sealed class ProgramTable
     /// <param name="externalizedName">The PROGRAM-ID / FUNCTION-ID <c>AS literal-1</c> value (§11.10.4 GR1 /
     /// §11.5.4 GR1) — the name CALL, CANCEL and the program-address-identifier resolve. OMITTED (null) when the
     /// unit wrote no AS phrase, which §8.3.2.2 2) makes the declared name itself.</param>
+    /// <param name="returning">The unit's RETURNING item's description (<see cref="BoundaryItem"/>; kb/Work PB1040) —
+    /// what the activating CALL's receiver is checked against at §14.9.4.4 GR3 d); null for a unit with no RETURNING
+    /// item.</param>
     public void Register(
         string path, string name, string? parentPath,
         bool initial, bool common, bool recursive,
         Func<ICobolProgram?, ICobolProgram> factory,
         Action? staticReset = null,
         int formalCount = -1, int requiredCount = 0, bool argMismatchChecking = false,
-        bool isFunction = false, string? externalizedName = null)
+        bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null)
     {
         var node = new Node
         {
             Path = path, Name = name, CallName = ExternalizedNames.Form(externalizedName ?? name), ParentPath = parentPath,
             Initial = initial, Common = common, Recursive = recursive, Factory = factory,
             FormalCount = formalCount, RequiredCount = requiredCount, ArgMismatchChecking = argMismatchChecking,
+            Returning = returning,
             StaticReset = staticReset, IsFunction = isFunction,
         };
         _byPath[path] = node;
@@ -201,11 +206,23 @@ public sealed class ProgramTable
         // rides the call. Unchecked, the call proceeds LENIENTLY: a missing argument behaves as omitted, an
         // excess argument is ignored (the design doc's documented posture). The AS NESTED lane diagnoses the
         // same rule at BIND (COBOLNET1684) and never reaches this.
-        if (n.FormalCount >= 0 && (args.Length > n.FormalCount || args.Length < n.RequiredCount)
-            && siteArgMismatchChecking && n.ArgMismatchChecking)
+        bool mismatchChecked = siteArgMismatchChecking && n.ArgMismatchChecking;
+        if (n.FormalCount >= 0 && (args.Length > n.FormalCount || args.Length < n.RequiredCount) && mismatchChecked)
             throw new CobolCallException(
                 $"CALL '{n.Name}': {args.Length} argument(s) against {n.FormalCount} formal parameter(s) "
                 + $"({n.RequiredCount} required) — ISO §14.8.2.1 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
+                "EC-PROGRAM-ARG-MISMATCH");
+        // §14.8.3 via §14.9.4.4 GR3d (kb/Work PB1040): the RETURNING items' conformance, the same check at the same
+        // point — "the program call is not successful", so the callee never runs. §14.8.3.3 gives a conforming pair
+        // the same PICTURE, SIGN and USAGE, hence the same length, and a result a string carrier takes at the wrong
+        // length would otherwise corrupt the receiver's image. What a dynamic Format-1 CALL can compare is the two
+        // facts both sides state (BoundaryItem.Conforms: the numeric profile and the fixed character length); the
+        // other facets of the description are kb/Work PB165's registry. Unchecked, the call proceeds and the
+        // delivery stores into the receiver's own width (CobolArgAdapt.StoreReturn).
+        if (mismatchChecked && returning is { } rcv && n.Returning is { } sent && !rcv.Item.Conforms(sent))
+            throw new CobolCallException(
+                $"CALL '{n.Name}': the RETURNING item of the called program ({sent.Describe()}) and the receiving item "
+                + $"({rcv.Item.Describe()}) do not conform — ISO §14.8.3.3 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
                 "EC-PROGRAM-ARG-MISMATCH");
 
         ICobolProgram inst;
@@ -397,7 +414,8 @@ public sealed class ProgramTable
     /// this implementation defines it as the EC-PROGRAM-NOT-FOUND loud failure (never a silent no-op). The
     /// held name is an OUTERMOST program's identity, so the §8.4.6.3 rule-4 leg of the SAME
     /// <see cref="CallProgram"/> resolution finds it from any caller (the singular-pattern rule).</summary>
-    public void CallPointer(ProgramPointer target, string callerPath, CobolArg[] args, CobolArg? returning)
+    public void CallPointer(ProgramPointer target, string callerPath, CobolArg[] args, CobolArg? returning,
+        bool siteArgMismatchChecking = false)
     {
         // §14.9.4.4 GR3b names TWO DISTINCT conditions and the NULL case is the FIRST of them: "If the data item
         // referenced by identifier-1 contains the predefined address NULL, the EC-PROGRAM-PTR-NULL exception
@@ -412,7 +430,7 @@ public sealed class ProgramTable
                 "CALL through a NULL program-pointer: the pointer contains the predefined address NULL "
                 + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-PTR-NULL)", "EC-PROGRAM-PTR-NULL");
         }
-        CallProgram(target.Name!, callerPath, args, returning);
+        CallProgram(target.Name!, callerPath, args, returning, siteArgMismatchChecking: siteArgMismatchChecking);
     }
 
     /// <summary>Activate the function a FUNCTION-POINTER holds — a function-identifier written with
@@ -425,7 +443,7 @@ public sealed class ProgramTable
     /// EC-FUNCTION-NOT-FOUND as the locate-miss name — never a second lookup path. The program-pointer twin is
     /// <see cref="CallPointer"/>.</summary>
     public void CallFunctionPointer(FunctionPointer target, string callerPath, CobolArg[] args,
-        CobolArg? returning)
+        CobolArg? returning, bool siteArgMismatchChecking = false)
     {
         if (target.IsNull)
         {
@@ -434,7 +452,8 @@ public sealed class ProgramTable
                 + "NULL, so no function is activated (ISO §8.4.3.2.4 GR6c — EC-FUNCTION-PTR-NULL)",
                 "EC-FUNCTION-PTR-NULL");
         }
-        CallProgram(target.Name!, callerPath, args, returning, notFoundEc: "EC-FUNCTION-NOT-FOUND");
+        CallProgram(target.Name!, callerPath, args, returning, notFoundEc: "EC-FUNCTION-NOT-FOUND",
+            siteArgMismatchChecking: siteArgMismatchChecking);
     }
 
     /// <summary>

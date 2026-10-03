@@ -69,7 +69,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-SEQ-FILE", "CHAR-SEQ-FILE", null, false, false, false, static __o => new _PRG_CHAR_SEQ_FILE());
+        ProgramRegistry.Register("CHAR-SEQ-FILE", "CHAR-SEQ-FILE", null, false, false, false, static __o => new _PRG_CHAR_SEQ_FILE(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

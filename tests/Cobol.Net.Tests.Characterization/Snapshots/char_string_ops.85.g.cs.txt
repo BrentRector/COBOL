@@ -122,7 +122,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-STRING-OPS", "CHAR-STRING-OPS", null, false, false, false, static __o => new _PRG_CHAR_STRING_OPS());
+        ProgramRegistry.Register("CHAR-STRING-OPS", "CHAR-STRING-OPS", null, false, false, false, static __o => new _PRG_CHAR_STRING_OPS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

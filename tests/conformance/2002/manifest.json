@@ -406,6 +406,8 @@
     "pb725_directive_facility",
     "pb366_use_exception_object_factory",
     "pb165_returning_wide_carrier",
+    "pb1040_returning_length_conformance",
+    "pb1040_activation_mismatch_every_lane",
     "pb337_into_receiver_admissible",
     "pb640_call_argument_landing_checked",
     "pb640_invoke_argument_landing_checked",

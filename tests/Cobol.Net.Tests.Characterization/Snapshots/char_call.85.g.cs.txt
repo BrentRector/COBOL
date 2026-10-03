@@ -59,7 +59,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-CALL", "CHAR-CALL", null, false, false, false, static __o => new _PRG_CHAR_CALL());
+        ProgramRegistry.Register("CHAR-CALL", "CHAR-CALL", null, false, false, false, static __o => new _PRG_CHAR_CALL(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 

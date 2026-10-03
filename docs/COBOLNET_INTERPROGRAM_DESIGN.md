@@ -794,6 +794,27 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   read the result's digit image, loud when there is none. An image-carried item's boundary text IS its storage,
   of every byte form (kb/Work PB970), so `CallEmitter.CallStringWrite` stores it as it stands (fitted) rather than
   decoding and re-encoding it, which lost exactly the non-digit content (kb/Work PB962).
+- **⛔ The RETURNING pair's CONFORMANCE on the dynamic Format-1 lane (§14.9.4.4 GR3 d), §14.8.3.3; kb/Work PB1040).**
+  The AS NESTED lane checks the pair at bind (COBOLNET1736); a CALL located by name at run time has no bind-time
+  screen, so the check is a call-initiation one over facts BOTH sides state: `BoundaryItem(Num, Length)` — a numeric
+  item's `NumProfile` and a text-carried item's fixed character length — which the activating element sends on the
+  returning `CobolArg` (`CobolArg.Length` beside `Num`/`Layout`; `CallEmitter.BoundaryLength` is the one measure, in
+  `CallStringRead`'s unit) and the activated unit REGISTERS beside its formal counts (`ProgramRegistry.Register(…,
+  returning:)`, `CallEmitter.RegisteredReturning`). `ProgramTable.CallProgram` compares them with
+  `BoundaryItem.Conforms` before the activation — numeric-vs-character never conforms, two profiles conform when they
+  state one PICTURE, SIGN and USAGE (`NumProfile.ConformsTo`), two lengths when equal; an item that states nothing
+  (a pointer, a DYNAMIC LENGTH / ANY LENGTH item, a variable-length group) is not compared — and a violation is
+  EC-PROGRAM-ARG-MISMATCH "if checking for it is enabled in both the activated program and activating runtime
+  element" (`siteArgMismatchChecking && node.ArgMismatchChecking`, the same gate as the count check), with "the
+  program call is not successful": the callee never runs and the receiver is untouched. **Unchecked**, the standard
+  leaves the content to the implementor, and a text-carried receiver's string is its item's whole image, so every
+  `StoreReturn` text leg stores into the receiver's OWN width (`FitToReceiver`: §14.6.8.5's left-justified,
+  space-filled, right-truncated alphanumeric alignment; a numeric receiver reads the value the sender held under its
+  own description). Every unit registers its count facts, a unit with no formals included (zero formals is a count),
+  and every activation arm — by name, through a program-pointer, through a function-pointer — passes the activating
+  half of the gate. The facets of the description beyond these two (category among character classes, JUSTIFIED,
+  BLANK WHEN ZERO, the per-FORMAL description) are kb/Work PB165's registry, which extends `BoundaryItem` rather than
+  adding a second shape.
 - CALL to a NULL program-pointer → EC-PROGRAM-PTR-NULL; unresolvable name → EC-PROGRAM-NOT-FOUND; both are activation failures and take the GR3h partition below.
 - **The GR3h/GR3i partition of a failed activation, and the ACTIVATION BOUNDARY that makes it decidable.** §14.9.4.4 GR3h routes a failure on THREE independent facts, and the emitted CALL expresses each one separately (`CallEmitter.EmitCall`; kb/Work PB233):
   1. **Which phrase is written.** Only ON EXCEPTION diverts — GR3h item 1 names it, and §14.6.13.1.3 #1 admits only "a conditional phrase without the NOT phrase". A CALL carrying only NOT ON EXCEPTION is governed by item 2 or item 3 exactly as a phrase-free CALL is. (It formerly emitted the catch on *either* phrase and silently discarded the failure.)

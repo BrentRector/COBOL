@@ -63,7 +63,7 @@ public static class __CobolModule
 {
     public static void Register()
     {
-        ProgramRegistry.Register("CHAR-REDEFINES", "CHAR-REDEFINES", null, false, false, false, static __o => new _PRG_CHAR_REDEFINES());
+        ProgramRegistry.Register("CHAR-REDEFINES", "CHAR-REDEFINES", null, false, false, false, static __o => new _PRG_CHAR_REDEFINES(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
 }
 
