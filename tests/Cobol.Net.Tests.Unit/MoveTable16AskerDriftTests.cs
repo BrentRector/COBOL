@@ -52,7 +52,8 @@ public sealed class MoveTable16AskerDriftTests
         ["MoveBinder.cs"] = "SR10's --permissive re-reading, asked AFTER Validity has already cleared SR2/SR8/SR9 — "
             + "the lenient reading is defined against Table 16's cells alone",
         ["OoConformance.cs"] = "a NONNUMERIC LITERAL argument (§14.8.2.3.3 rule 2d), asked once per sender category "
-            + "the bound literal could be — a literal has no data item for SR2/SR8/SR9",
+            + "the bound literal could be, and a BOOLEAN-EXPRESSION argument (ContentValueMismatch, kb/Work PB1113) — "
+            + "neither has a data item for SR2/SR8/SR9",
         // ⛔ AcceptDisplayBinder is NOT here any more (kb/Work PB887): the §14.9.1.4 GR7–GR12 conceptual temporal
         // item used to be a bare Table16Operand "that is not a data item", so ACCEPT asked Table 16 alone. It is
         // now materialized as the data item GR7–GR12 describe, and ACCEPT asks Validity with it — see

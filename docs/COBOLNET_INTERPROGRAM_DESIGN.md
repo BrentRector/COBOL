@@ -406,7 +406,8 @@ The BY VALUE float formal needed nothing more: it is non-resident (a float forma
 existing copy-in / no-copy-out round trip over the detached cell carries it; the header's COBOLNET0899 refusal of
 it (a "value-copy carrier not yet implemented" that was not true of the program and function arms) is gone. The
 literal and arithmetic-expression arguments into a float formal, refused COBOLNET1688 as "a documented
-refinement", are conformant (`OoConformance.ContentNumericLiteralMismatch` / `ContentArithmeticMismatch`).
+refinement", are conformant (`OoConformance.ContentValueMismatch` — the ONE §14.8.2.3.3 verdict for a
+storage-less sending value: a numeric literal, an arithmetic expression or a boolean value, kb/Work PB1113).
 
 **The INVOKE lane is the same rule and was the same defect's other arm.** `OoEmitter`'s BY CONTENT arms already
 landed caller-side (§14.8.2.3.3 rule 2 a): *"If the formal parameter is numeric, the conformance rules are the

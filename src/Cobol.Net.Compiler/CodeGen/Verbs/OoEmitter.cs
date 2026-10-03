@@ -1334,7 +1334,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // no item width, so the receiver's store fits them). The same width §14.9.8.4 GR3 states for a
                 // boolean COMPUTE, carried at run time by the ONE renderer EmitComputeBoolean uses (kb/Work PB589).
                 string bv = BooleanRenderer.RenderAtItemWidth(cb, Num);
-                int bw = Math.Max(1, a.Formal.Pic!.Length);
+                int bw = Math.Max(1, a.Formal.Pic?.Length ?? 0);
                 // ⛔ ANY LENGTH IS TESTED FIRST, AND THE ORDER IS THE WHOLE POINT. §13.18.2.3 SR1 admits the
                 // picture symbol '1' as well as 'N' and 'X', so a category-BOOLEAN formal can carry ANY LENGTH
                 // — and §13.18.2.4 GR1b then makes n "the length of the corresponding argument", not the one
@@ -1345,8 +1345,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // Otherwise §14.8.2.3.3 rule 2d ⇒ the MOVE store for the formal's category: a BOOLEAN receiver
                 // pads and truncates in boolean ZEROS (§14.6.8.6), an ALPHANUMERIC one in spaces with the
                 // boolean characters moved as-is (§14.9.25.4 GR6a — "If the sending item is of class boolean,
-                // its boolean value shall be moved").
-                w.Line($"string {tmp} = " + (a.Formal.IsAnyLength ? bv
+                // its boolean value shall be moved"). A GROUP formal takes the characters as §14.9.25.4 GR4's group
+                // move does — an alphanumeric copy to the group's image width, space-filled (kb/Work PB1113: Table 16
+                // exempts a group receiver, so the value verdict admits it).
+                w.Line($"string {tmp} = " + (a.Formal.IsGroup ? RuntimeApi.StrStore(bv, $"{CallEmitter.BoundaryImageWidth(a.Formal)}")
+                    : a.Formal.IsAnyLength ? bv
                     : a.Formal.Pic!.Category is PicCategory.Boolean
                         ? RuntimeApi.StrStoreBoolean(bv, $"{bw}", a.Formal.Justified)
                     : ReceivingStore.Characters(a.Formal, bv, $"{bw}")) + ";");   // the ONE elementary character store (kb/Work PB871)
@@ -1425,10 +1428,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     : a.StringLiteral is { } slit
                     // An ANY LENGTH formal sees the literal AT ITS OWN length (§13.18.2 GR1) — no width-fit.
                     ? $"string {tmp} = {(a.Formal.IsAnyLength ? CsLiteral(slit) : RuntimeApi.StrStore(CsLiteral(slit), $"{CallEmitter.ElementaryFormalWindow(a.Formal)}"))};"
-                    // A numeric literal into an image-stored formal the arm above does not take (a non-numeric
-                    // category): compose the formal's STORAGE image (kb/Work PB970 — of its own byte form, not a
-                    // zoned digit run) through the OWNER's internal profile (qualified, never bare).
-                    : $"string {tmp} = {RuntimeApi.NumFormatImage(EmitText.UnscaledAtScale(a.NumericLiteral!, a.Formal.Pic!.Scale), qualProfile)};");
+                    // A numeric literal into a formal of ANOTHER category (alphanumeric, numeric-edited, national):
+                    // §14.8.2.3.3 rule 2d's MOVE, stored by the receiving category's ONE MOVE store — the store the
+                    // identifier arm reaches through OoStringReadOf (kb/Work PB1113: the sign is not moved into an
+                    // alphanumeric receiver, §14.9.25.4 GR6; a numeric-edited receiver edits).
+                    : $"string {tmp} = {U.Move.ConvertSource(new BoundNumericLiteral(a.NumericLiteral!), a.Formal)};");
             // The PICTURE-less carriers (object reference, data pointer, program pointer) cross VERBATIM: they
             // have no picture, no scale and no character image, so the crossing is a reference/handle copy and
             // never a numeric store. Pointer/ProgramPointer joined this arm with the §14.8.2.3.2 class-pointer

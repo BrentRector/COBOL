@@ -37,11 +37,13 @@ public sealed class OoNameResolutionDriftTests
                 + "that decide WHICH failure message to print (including whether the name is the standard class "
                 + "BASE, kb/Work PB1548)"),
         [Path.Combine("Oo", "OoConformance.cs")] =
-            (10, "§9.3.8.2.3 / §14.9.39.3 conformance over the recv/send names of an ALREADY-BUILT "
+            (12, "§9.3.8.2.3 / §14.9.39.3 conformance over the recv/send names of an ALREADY-BUILT "
                 + "ObjectRefDescriptor — scope-checked through this funnel at the data description entry "
                 + "that WROTE them, so these are symbol lookups on a validated name, not references; plus the "
                 + "two §9.3.8.2.3 rule 9 b)/c) lookups of a RAISING element's class / interface, scope-checked "
-                + "where the procedure division header WROTE it (RaisingPhrase.Partition, kb/Work PB972)"),
+                + "where the procedure division header WROTE it (RaisingPhrase.Partition, kb/Work PB972); plus the "
+                + "two node lookups of §9.3.8.2.3's closing-sentence reference walk (Reaches, kb/Work PB1498), whose "
+                + "nodes are the names of already-built returning-item descriptors and class/interface symbols"),
         [Path.Combine("Binding", "Procedure", "Verbs", "OoBinder.cs")] =
             (4, "re-lookup of a receiver's/target's declared ObjectClassName (scope-checked at its data "
                 + "description entry, COBOLNET0813)"),

@@ -14,6 +14,29 @@ namespace CobolNet.Compiler.Oo;
 public readonly record struct AdapterPair(
     OoInterfaceSymbol Iface, OoMethodSymbol Proto, OoMethodSymbol Impl, bool Factory);
 
+/// <summary>A BY CONTENT / BY VALUE argument that has NO STORAGE, described as the sending operand ISO §14.8.2.3.3
+/// rule 2 names — the input of <see cref="OoConformance.ContentValueMismatch"/> (kb/Work PB1113).</summary>
+/// <param name="Position">Its §14.9.25.3 Table 16 row.</param>
+/// <param name="Operand">The bound operand the whole MOVE question reads (SR6/SR7/SR8 shapes), or null for a value
+/// that has none (a boolean expression).</param>
+/// <param name="IsExpression">An arithmetic expression — rule 2 a)'s COMPUTE sender, which no MOVE statement takes.</param>
+/// <param name="Spelled">How a refusal names the argument.</param>
+public readonly record struct ContentValue(Table16Operand Position, BoundOperand? Operand, bool IsExpression, string Spelled)
+{
+    /// <summary>A numeric literal: Table 16's numeric row, integer or noninteger by its own digits
+    /// (<see cref="MoveTable16.SenderPosition"/> — the reader the written MOVE uses).</summary>
+    public static ContentValue Numeric(BoundNumericLiteral literal) =>
+        new(MoveTable16.SenderPosition(literal), literal, false, $"the numeric literal {literal.Text}");
+
+    /// <summary>An arithmetic expression (or a numeric intrinsic function's value, §15.4): a numeric COMPUTE sender.</summary>
+    public static ContentValue Arithmetic { get; } =
+        new(new Table16Operand(PicCategory.Numeric, IsNonInteger: true), null, true, "an arithmetic expression");
+
+    /// <summary>A boolean expression or a boolean literal: Table 16's boolean row (§8.8.2 — a boolean value).</summary>
+    public static ContentValue Boolean { get; } =
+        new(new Table16Operand(PicCategory.Boolean), null, false, "a boolean value");
+}
+
 /// <summary>
 /// The OO conformance SERVICE (P9 — R3: validation moved OFF the pass-1 symbol table, which stays a pure
 /// lookup structure): the §9.3.8.2 override-signature check, the §9.3.11 IMPLEMENTS pass (returning the
@@ -44,7 +67,7 @@ public static class OoConformance
                 using var atMethod = edition.At(m.Ctx);
                 string where = $"class '{cls.Name}', method '{m.Name}' overriding '{baseM.Owner.Name}'.'{baseM.Name}'";
                 foreach (var err in MethodConformanceMismatches(table, m, baseM,
-                             $"the overridden method of class '{baseM.Owner.Name}'"))
+                             $"the overridden method of class '{baseM.Owner.Name}'", cls.Name, baseM.Owner.Name))
                     edition.Error("COBOLNET0829", $"{where}: {err}; ISO §11.7.3 SR9");
             }
     }
@@ -127,7 +150,7 @@ public static class OoConformance
                     bool conforms = true;
                     using (edition.At(impl.Ctx))
                         foreach (var err in MethodConformanceMismatches(table, impl, proto,
-                                     $"the '{iface.Name}' prototype"))
+                                     $"the '{iface.Name}' prototype", cls.Name, iface.Name))
                         {
                             conforms = false;
                             edition.Error("COBOLNET0841", $"class '{cls.Name}', method '{impl.Name}': {err}");
@@ -164,7 +187,9 @@ public static class OoConformance
     /// with rule 5's closed ACTIVE-CLASS list); 6) identical non-object RETURNING descriptions; 7) strongly-typed
     /// groups of the same type (inside <see cref="DescriptionMismatch"/>, <c>StrongTypeMismatch</c>, for every
     /// formal and a non-object RETURNING); 8) the OPTIONAL phrase (<see cref="OptionalMismatch"/>); 9) the RAISING
-    /// phrase (<see cref="RaisingMismatches"/>).
+    /// phrase (<see cref="RaisingMismatches"/>); and the clause's closing sentence, the mutual-reference ban between
+    /// the two RETURNING descriptions (<see cref="ReturningCircularity"/>, kb/Work PB1498 — which is why the askers name
+    /// <paramref name="interface1"/> and <paramref name="interface2"/>).
     /// <para>Its three askers: §9.3.11 IMPLEMENTS (<see cref="ValidateImplements"/> — the class is interface-1),
     /// §11.7.3 SR9 overrides (<see cref="ValidateOverrideSignatures"/> — the override is interface-1), and the
     /// interface-to-interface relation (<see cref="InterfaceConformsTo"/>).</para>
@@ -173,9 +198,13 @@ public static class OoConformance
     /// (<see cref="InterfaceConformsTo"/>) run the SAME comparisons — two copies of one rule set is the shape
     /// under which one arm silently drifts.</para>
     /// </summary>
+    /// <param name="interface1">The name of the class or interface whose interface is interface-1 (the conforming side).</param>
+    /// <param name="interface2">The name of the class or interface whose interface is interface-2.</param>
     internal static IEnumerable<string> MethodConformanceMismatches(OoClassTable table, OoMethodSymbol m1,
-        OoMethodSymbol m2, string counterpart)
+        OoMethodSymbol m2, string counterpart, string interface1, string interface2)
     {
+        if (ReturningCircularity(table, m1, interface1, m2, interface2) is { } cerr)
+            yield return $"RETURNING: {cerr} vs {counterpart}";
         foreach (var rerr in RaisingMismatches(table, m1, m2, counterpart))
             yield return rerr;
         if (m1.Binding!.Formals.Count != m2.Binding!.Formals.Count)
@@ -200,7 +229,9 @@ public static class OoConformance
                 && pr.Pic is { Category: PicCategory.ObjectReference } prp)
             {
                 if (ObjectRefAssignmentMismatch(table, rp, prp, activeClassSenderAdmitted: false) is { } werr)
-                    yield return $"RETURNING: {werr} (ISO §9.3.8.2.3 rules 5a/5c2)";
+                    // Rule 5 d) governs interface-2's ACTIVE-CLASS returning item; 5 a)–c) every other description.
+                    yield return $"RETURNING: {werr} (ISO §9.3.8.2.3 "
+                        + $"{(prp.ObjectRef is { Kind: ObjectRefKind.ActiveClass } ? "rule 5 d)" : "rules 5a/5c2")})";
             }
             else if (DescriptionMismatch(pr, r) is { } rerr)
                 yield return $"RETURNING: {rerr} (ISO §9.3.8.2.3 rule 6)";
@@ -289,6 +320,72 @@ public static class OoConformance
     }
 
     /// <summary>
+    /// ⛔ ISO §9.3.8.2.3's CLOSING SENTENCE (kb/Work PB1498): "If the description of the returning item of a method in
+    /// interface-1 directly or indirectly references interface-2, the description of the returning item of the
+    /// corresponding method in interface-2 shall not directly or indirectly reference interface-1." Null when the pair
+    /// satisfies it. Nothing examined it before: a pair whose RETURNING descriptions referenced each other's interface
+    /// conformed.
+    /// <para>"Indirectly" is the TRANSITIVE CLOSURE (owner decision kb/Work R63 — the ordinary meaning of the text, which
+    /// defines it no further) over a reference graph whose nodes are classes and interfaces (<see cref="Reaches"/>): a
+    /// RETURNING item described as an object reference to Y is an edge to Y, and a class reaches the interfaces it
+    /// IMPLEMENTS and the class it INHERITS. Only DISTINCT interfaces are compared ("If two interfaces are of the same
+    /// interface, they conform to each other"), so a self-referencing returning type — <c>NEXT</c> returning its own
+    /// class — stays legal; the walk keeps a visited set, so a cycle in the graph terminates.</para>
+    /// <para>A class or an interface is a node by its NAME, the key the class table resolves both by; its instance and
+    /// factory sides are walked together, the same object being reachable from either.</para>
+    /// </summary>
+    internal static string? ReturningCircularity(OoClassTable table, OoMethodSymbol m1, string interface1,
+        OoMethodSymbol m2, string interface2)
+    {
+        if (string.Equals(interface1, interface2, StringComparison.OrdinalIgnoreCase)) return null;
+        if (ReturningReference(m1) is not { } r1 || ReturningReference(m2) is not { } r2) return null;
+        return Reaches(table, r1, interface2) && Reaches(table, r2, interface1)
+            ? $"the returning item of this method references '{interface2}' (through '{r1}') and the returning item of "
+              + $"the corresponding method references '{interface1}' (through '{r2}'), directly or indirectly (ISO "
+              + "§9.3.8.2.3: the description of the returning item of the corresponding method in interface-2 \"shall "
+              + "not directly or indirectly reference interface-1\")"
+            : null;
+    }
+
+    /// <summary>The class or interface a method's RETURNING item references — the name an object reference described
+    /// with an object-class-name, an interface-name or ACTIVE-CLASS (whose descriptor names the containing class)
+    /// carries; null for a universal reference or a returning item that is not an object reference.</summary>
+    private static string? ReturningReference(OoMethodSymbol m) =>
+        m.Binding?.Returning?.Pic is { Category: PicCategory.ObjectReference, ObjectRef: { Kind: not ObjectRefKind.Universal, Name: { } n } }
+            ? n : null;
+
+    /// <summary>Does the reference graph lead from <paramref name="start"/> to <paramref name="target"/> (the start
+    /// itself counting — a DIRECT reference)? Edges: every RETURNING item of a class's methods (instance and factory)
+    /// or an interface's prototypes (inherited ones included), a class's INHERITS and both IMPLEMENTS lists, an
+    /// interface's INHERITS. Breadth-first with a visited set (kb/Work R63 3.).</summary>
+    private static bool Reaches(OoClassTable table, string start, string target)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var queue = new Queue<string>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            string node = queue.Dequeue();
+            if (!seen.Add(node)) continue;
+            if (string.Equals(node, target, StringComparison.OrdinalIgnoreCase)) return true;
+            if (table.Find(node) is { } cls)
+            {
+                foreach (var m in cls.Methods.Concat(cls.FactoryMethods))
+                    if (ReturningReference(m) is { } r) queue.Enqueue(r);
+                if (cls.Base is { } b) queue.Enqueue(b.Name);
+                foreach (var i in cls.Implements.Concat(cls.FactoryImplements)) queue.Enqueue(i.Name);
+            }
+            else if (table.FindInterface(node) is { } iface)
+            {
+                foreach (var p in iface.AllPrototypes())
+                    if (ReturningReference(p) is { } r) queue.Enqueue(r);
+                foreach (var i in iface.Inherits) queue.Enqueue(i.Name);
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// ISO §9.3.8.2.3, the interface relation itself: "If two interfaces are of the same interface, they conform
     /// to each other. If interface-1 and interface-2 are different interfaces, interface-1 conforms to interface-2
     /// if and only if the entry conventions for interface-1 and interface-2 are the same and for every method in
@@ -308,7 +405,8 @@ public static class OoConformance
         foreach (var p in interface1.AllPrototypes()) mine.TryAdd(p.ExternalizedName, p);   // first declaration wins
         foreach (var m2 in interface2.AllPrototypes())
             if (!mine.TryGetValue(m2.ExternalizedName, out var m1)
-                || MethodConformanceMismatches(table, m1, m2, $"the '{interface2.Name}' prototype").Any())
+                || MethodConformanceMismatches(table, m1, m2, $"the '{interface2.Name}' prototype",
+                       interface1.Name, interface2.Name).Any())
                 return false;
         return true;
     }
@@ -961,6 +1059,14 @@ public static class OoConformance
             return MoveContentMismatch(formal, argPlace);
         }
         var f = formal.Pic!;
+        // ⛔ RULE 2b BEFORE RULE 2a (kb/Work PB1113). "If the formal parameter is an index data item, the conformance
+        // rules are the same as for a SET statement with the argument as the sending operand" — and an index data
+        // item carries PicCategory.Numeric, so the COMPUTE arm below used to answer for it and admitted a PIC 9(4)
+        // argument. SET Format 1 with a class-index receiver takes identifier-2 "of class index" (§14.9.39.3 SR2)
+        // and refuses arithmetic-expression-1 (SR3); an identifier argument is identifier-2.
+        if (f.Usage is Usage.Index)
+            return argCat is PicCategory.Numeric && arg.Pic is { Usage: Usage.Index } && !argIsGroup ? null
+                : IndexFormalRefusal("the argument");
         return f.Category switch
         {
             // The numeric/float/object arms key on the VIEW category — a ref-mod view is never numeric or an
@@ -1003,12 +1109,21 @@ public static class OoConformance
             // Identity is far narrower, so three pairings the standard admits were refused with a "category
             // mismatch" naming a rule that does not govern the crossing:
             //     boolean → national · alphanumeric → boolean · national → boolean
-            // ⚠ ANY LENGTH keeps its own answer FIRST: §14.8.2.3.3 rule 2c makes such a formal's length
-            // "considered to match", which is a statement about LENGTH and leaves the category pair to 2d.
-            _ => formal.IsAnyLength && !arg.IsAnyLength ? null
-                : MoveContentMismatch(formal, argPlace),
+            // ⛔ ANY LENGTH RELAXES LENGTH, AND ONLY LENGTH (kb/Work PB1113). §14.8.2.3.3 rule 2c makes such a
+            // formal's length "considered to match the length of the corresponding argument" — a statement about
+            // LENGTH that leaves the category pair to rule 2d's MOVE question, which never asks a length. This arm
+            // used to answer an ANY LENGTH formal with "conformant" outright, so a PIC 9V9 argument reached a
+            // PIC N ANY LENGTH formal (Table 16: numeric noninteger → national is "No") and printed its digits.
+            _ => MoveContentMismatch(formal, argPlace),
         };
     }
+
+    /// <summary>§14.8.2.3.3 rule 2b's refusal for a sender that is not an index data item — the ONE wording the
+    /// identifier lane (<see cref="ContentMismatch"/>) and the value lane (<see cref="ContentValueMismatch"/>) share.</summary>
+    private static string IndexFormalRefusal(string sender) =>
+        $"§14.8.2.3.3 rule 2b transfers a value into an index data item by the SET rules, and {sender} is not a data "
+        + "item of class index (ISO §14.9.39.3 SR2: \"Identifier-2 shall reference a data item of class index\"; SR3 "
+        + "refuses arithmetic-expression-1, a literal or an expression, into a class-index receiver)";
 
     /// <summary>ISO §14.8.2.3.3 rule 2d — "Otherwise, the conformance rules are the same as for a MOVE statement
     /// with the argument as the sending operand and the corresponding formal parameter as the receiving operand"
@@ -1030,29 +1145,47 @@ public static class OoConformance
             ?? MoveTable16.Validity(sender, Table16Operand.Of(formal), formal)?.Reason;
     }
 
-    /// <summary>ISO §14.8.2.3.3 rule 2a for an ARITHMETIC-EXPRESSION argument: "the conformance rules are the
-    /// same as for a COMPUTE statement", whose receiving operand is category numeric — so a non-numeric formal
-    /// has no conforming rule. A FLOATING-POINT formal is a numeric receiver like any other: a COMPUTE takes its
-    /// value into a float resultant identifier (§14.7.4.3), so the fixed-point→float CONTENT conversion is
-    /// conformant, not a refinement to defer (kb/Work PB1114). Null when conformant.</summary>
-    public static string? ContentArithmeticMismatch(DataItem formal) =>
-        formal.IsGroup || formal.Pic is not { Category: PicCategory.Numeric }
-            ? "§14.8.2.3.3 rule 2a transfers an expression by the COMPUTE rules, which requires a "
-              + "category-numeric formal parameter"
-            : null;
-
-    /// <summary>ISO §14.8.2.3.3 rule 2d for a BOOLEAN-EXPRESSION or boolean-literal argument: the MOVE rules,
-    /// i.e. §14.9.25.3 Table 16's BOOLEAN row, which admits a boolean or alphanumeric receiver and refuses
-    /// alphabetic, numeric and numeric-edited ones. Null when conformant.
-    /// <para>⚠ TABLE 16 ALSO ADMITS A NATIONAL RECEIVER, AND THIS RULE REFUSES IT ON PURPOSE — the IDENTIFIER
-    /// arm refuses the same pairing through <see cref="ContentMismatch"/>'s conservative strict gate, and two
-    /// arms of one rule disagreeing is worse than one named residue. Both are recorded together.</para></summary>
-    public static string? ContentBooleanMismatch(DataItem formal) =>
-        formal.IsGroup || formal.Pic is not { Category: PicCategory.Alphanumeric or PicCategory.Boolean }
-            || formal.Pic is { Category: PicCategory.Alphanumeric, IsAlphabetic: true }
-            ? "§14.8.2.3.3 rule 2d transfers it by the MOVE rules, and §14.9.25.3 Table 16 admits a boolean "
-              + "sending operand only to a boolean or alphanumeric receiver"
-            : null;
+    /// <summary>
+    /// ⛔ THE ONE ISO §14.8.2.3.3 VERDICT FOR A SENDING VALUE WITH NO STORAGE — a numeric literal, an arithmetic
+    /// expression, or a boolean expression or literal (kb/Work PB1113). Each shape is DESCRIBED as the sending operand
+    /// it is and asked the question rule 2 asks an identifier (<see cref="ContentMismatch"/>), in rule 2's order:
+    /// <list type="bullet">
+    /// <item>2 b) an index data item formal — the SET rules: "Identifier-2 shall reference a data item of class index"
+    /// (§14.9.39.3 SR2) and arithmetic-expression-1 is refused into a class-index receiver (SR3), so no value qualifies;</item>
+    /// <item>2 a) a numeric formal — the COMPUTE rules: any numeric sending operand, fixed-point or floating-point
+    /// (kb/Work PB1114), and nothing else (§8.8.1.1);</item>
+    /// <item>2 c) an ANY LENGTH formal — its length "is considered to match", which is about LENGTH only, so it falls
+    /// through to</item>
+    /// <item>2 d) the MOVE rules — the whole §14.9.25.3 question for an operand that has one
+    /// (<see cref="MoveTable16.Validity(BoundOperand, Table16Operand, DataItem)"/>), Table 16 itself for a boolean
+    /// value, which has no bound operand and no data item for SR2/SR8/SR9 to read.</item>
+    /// </list>
+    /// <para>⛔ IT REPLACED THREE HAND-WRITTEN ADMISSION LISTS, each narrower than the rule: the numeric-literal list
+    /// admitted only a numeric or an UNSIGNED-INTEGER-into-alphanumeric formal (so <c>12.5</c> into <c>PIC ZZ9.99</c>,
+    /// <c>12</c> into <c>PIC N(4)</c> and <c>-5</c> into <c>PIC X(4)</c> were refused, where Table 16 says Yes to each),
+    /// the boolean list refused a national formal "on purpose", and both admitted an index-data-item formal through the
+    /// numeric arm. One question asked of a described sender is what keeps the next category automatic.</para>
+    /// <para>An ARITHMETIC EXPRESSION into a formal rule 2 a) does not govern stays refused: rule 2 d) is "the same as
+    /// for a MOVE statement", whose sending operand is an identifier or a literal (§14.9.25.2), and an expression's
+    /// value carries no compile-time integer guarantee for Table 16's integer/noninteger split. Null when
+    /// conformant.</para>
+    /// </summary>
+    public static string? ContentValueMismatch(DataItem formal, ContentValue sender)
+    {
+        if (formal is { IsGroup: false, Pic.Usage: Usage.Index }) return IndexFormalRefusal(sender.Spelled);
+        if (formal is { IsGroup: false, Pic.Category: PicCategory.Numeric })
+            return sender.Position.Category is PicCategory.Numeric ? null
+                : $"§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and "
+                  + $"{sender.Spelled} is not a numeric sending operand (ISO §8.8.1.1)";
+        if (sender.IsExpression)
+            return "§14.8.2.3.3 rule 2a transfers an expression by the COMPUTE rules, which requires a category-numeric "
+                + "formal parameter, and rule 2d's MOVE takes an identifier or a literal as its sending operand (ISO §14.9.25.2)";
+        var receiver = Table16Operand.Of(formal);
+        string? why = sender.Operand is { } op
+            ? MoveTable16.Validity(op, receiver, formal)?.Reason
+            : MoveTable16.Refusal(sender.Position, receiver);
+        return why is null ? null : $"§14.8.2.3.3 rule 2d transfers {sender.Spelled} by the MOVE rules: {why}";
+    }
 
     /// <summary>The three sender categories a bound NONNUMERIC literal can actually be — §8.3.3.2 alphanumeric
     /// (including the hexadecimal format), §8.3.3.5 national and §8.3.3.4 boolean. ⛔ The bound tree renders all
@@ -1102,16 +1235,6 @@ public static class OoConformance
             : null;
     }
 
-    /// <summary>ISO §14.8.2.3.3 for a NUMERIC literal argument: rule 2a (COMPUTE) into a numeric formal —
-    /// fixed-point or floating-point alike (kb/Work PB1114) — and rule 2d's MOVE rules put an UNSIGNED INTEGER
-    /// literal into an alphanumeric receiver as its digit characters (§14.9.25). Null when conformant.</summary>
-    public static string? ContentNumericLiteralMismatch(DataItem formal, string raw) =>
-        formal.Pic is { Category: PicCategory.Numeric }
-        || (!formal.IsGroup && formal.Pic?.Category is PicCategory.Alphanumeric
-            && !raw.Contains('.') && !raw.StartsWith('-') && !raw.StartsWith('+'))
-            ? null
-            : $"numeric literal argument {raw} does not conform to the formal parameter "
-              + "(ISO §14.8.2.3.3 — no conforming COMPUTE/MOVE rule applies)";
 
     /// <summary>
     /// ⛔ THE ONE SENDER-INTO-RECEIVER TABLE FOR OBJECT REFERENCES — ISO §14.9.39.3 SR10 / SR12 / SR14 (SET
@@ -1223,8 +1346,8 @@ public static class OoConformance
                         // a)3. — the FACTORY axis is INVARIANT, checked first because it is independent of the
                         // class relation and its violation is the one the name comparison would hide.
                         if (send.Factory != recv.Factory)
-                            return $"the FACTORY phrase is {(recv.Factory ? "" : "not ")}specified in the "
-                                   + $"receiver's description and {(send.Factory ? "" : "not ")}in the sender's "
+                            return $"the FACTORY phrase is {FactoryPresence(recv.Factory)} in the receiver's "
+                                   + $"description but {FactoryPresence(send.Factory)} in the sender's "
                                    + "— its presence or absence shall be the same (ISO §14.9.39.3 SR12 a)3.)";
                         // a)1. — an ONLY receiver takes an ONLY sender naming the SAME class, exactly.
                         if (recv.Only)
@@ -1250,10 +1373,9 @@ public static class OoConformance
                                    + $"with object-class-name '{recv.Name}' (ISO §9.3.8.2.3 rule 5 c) — its "
                                    + "subject is an object-class-name description)";
                         if (send.Factory != recv.Factory)
-                            return $"the FACTORY phrase is {(recv.Factory ? "" : "not ")}specified in the "
-                                   + $"receiver's description and {(send.Factory ? "" : "not ")}in the "
-                                   + "ACTIVE-CLASS sender's — its presence or absence shall be the same "
-                                   + "(ISO §14.9.39.3 SR12 b)3.)";
+                            return $"the FACTORY phrase is {FactoryPresence(recv.Factory)} in the receiver's "
+                                   + $"description but {FactoryPresence(send.Factory)} in the ACTIVE-CLASS sender's "
+                                   + "— its presence or absence shall be the same (ISO §14.9.39.3 SR12 b)3.)";
                         if (recv.Only)
                             return "the receiver is described with the ONLY phrase, so an ACTIVE-CLASS sender is "
                                    + "not permitted (ISO §14.9.39.3 SR12 b)1.)";
@@ -1279,11 +1401,16 @@ public static class OoConformance
                            + "phrase (ISO §14.9.39.3 SR14 — its closed list of senders is an ACTIVE-CLASS "
                            + "reference, SELF and NULL)";
                 return send.Factory == recv.Factory ? null
-                    : $"the FACTORY phrase is {(recv.Factory ? "" : "not ")}specified in the receiver's "
-                      + $"ACTIVE-CLASS description and {(send.Factory ? "" : "not ")}in the sender's — its "
-                      + "presence or absence shall be the same (ISO §14.9.39.3 SR14 a))";
+                    : $"the FACTORY phrase is {FactoryPresence(recv.Factory)} in the receiver's ACTIVE-CLASS "
+                      + $"description but {FactoryPresence(send.Factory)} in the sender's — its presence or absence "
+                      + "shall be the same (ISO §14.9.39.3 SR14 a))";
         }
     }
+
+    /// <summary>How a FACTORY-axis refusal names one side's phrase. The three FACTORY arms above spliced "not " before
+    /// "specified" for the receiver only, so a sender WITH the phrase read "… not specified in the receiver's
+    /// description and in the sender's" — the reverse of the fact (kb/Work PB1498's row GR-9.3.8.2.3-L2.3, probe O5B).</summary>
+    private static string FactoryPresence(bool factory) => factory ? "specified" : "not specified";
 
     /// <summary>
     /// Which §14.9.39.3 syntax rule governs a SET format-5 statement whose sender is <b>object-class-name-1</b>

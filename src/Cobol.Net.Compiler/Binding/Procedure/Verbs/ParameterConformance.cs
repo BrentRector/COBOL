@@ -169,7 +169,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     internal string? ContentConformanceReason(DataItem formal, BoundCallArg arg)
     {
         if (arg.ContentBool is not null)
-            return CobolNet.Compiler.Oo.OoConformance.ContentBooleanMismatch(formal);
+            return CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Boolean);
         if (arg.Place is { } p)
             return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, formal, p);
         return arg.Value switch
@@ -235,15 +235,19 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             // (§8.3.2.1 / §8.3.3.6.4), so they take rule 2d's MOVE arm under any literal category.
             BoundAllLiteral or BoundFigurative =>
                 CobolNet.Compiler.Oo.OoConformance.ContentAlphanumericLiteralMismatch(formal),
+            // A numeric literal, an arithmetic expression and a boolean value (above) are DESCRIBED as the sending
+            // operand they are and asked the ONE value verdict (kb/Work PB1113).
             BoundNumericLiteral n =>
-                CobolNet.Compiler.Oo.OoConformance.ContentNumericLiteralMismatch(formal, n.Text),
+                CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Numeric(n)),
             // A BY VALUE argument binds as a computed operand even when §14.9.4.4 GR8 says it is "merely a single
             // identifier or literal" — the literal case is recovered so the two spellings of one value get ONE
             // verdict (the CallEmitter.ArgText discipline, applied to conformance).
             BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } ct =>
-                CobolNet.Compiler.Oo.OoConformance.ContentNumericLiteralMismatch(formal, ct),
+                CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal,
+                    CobolNet.Compiler.Oo.ContentValue.Numeric(new BoundNumericLiteral(ct))),
             BoundComputedOperand { Expr: BoundIntrinsicCall ic } ce2 => IntrinsicResultMismatch(formal, ce2, ic),
-            BoundComputedOperand => CobolNet.Compiler.Oo.OoConformance.ContentArithmeticMismatch(formal),
+            BoundComputedOperand =>
+                CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Arithmetic),
             // No bound value at all (a shape the arms above do not name) is not a conformance verdict to make:
             // the binder has already reported whatever refused to bind.
             _ => null,
@@ -262,7 +266,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     private static string? IntrinsicResultMismatch(DataItem formal, BoundComputedOperand sender, BoundIntrinsicCall ic)
     {
         if (ic.ResultCategory is PicCategory.Numeric)
-            return CobolNet.Compiler.Oo.OoConformance.ContentArithmeticMismatch(formal);
+            return CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Arithmetic);
         if (formal.Pic is { Category: PicCategory.Numeric })
             return "§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and "
                 + $"the function's {ic.ResultCategory.ToString().ToLowerInvariant()} value is not a numeric sending "

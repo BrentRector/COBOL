@@ -52,4 +52,16 @@ public sealed class MethodConformanceRuleSetDriftTests
         foreach (string arm in new[] { "RaisingTargetKind.ExceptionName", "RaisingTargetKind.ObjectClass", "rule 9 {arm}" })
             Assert.Contains(arm, rule9);
     }
+
+    /// <summary>§9.3.8.2.3's closing sentence — the mutual-reference ban between the two RETURNING descriptions (kb/Work
+    /// PB1498, owner decision R63) — is one of the rule set's rules, so every asker applies it, and every asker names
+    /// interface-1 and interface-2 for it.</summary>
+    [Fact]
+    public void TheRuleSet_CarriesTheReturningCircularitySentence()
+    {
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
+        string body = Body(text, "internal static IEnumerable<string> MethodConformanceMismatches(");
+        Assert.Contains("ReturningCircularity(", body);
+        Assert.Contains("string interface1, string interface2", body);
+    }
 }

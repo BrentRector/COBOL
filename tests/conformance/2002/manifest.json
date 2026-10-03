@@ -606,6 +606,8 @@
   "pb1234_report_control_float",
   "pb1115_prototype_group_description",
   "pb1112_active_class_invocation",
+  "pb1113_content_compute_move_regime",
+  "pb1498_self_referencing_returning",
   "pb1359_floating_continuation_fixed",
   "pb1359_floating_continuation_free",
   "pb1359_floating_continuation_copy_replacing",

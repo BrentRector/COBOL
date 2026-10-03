@@ -644,6 +644,19 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // (CallBinder's byValue arm goes through BindByValueExpr) — and the two arms used to derive a
             // carrier and a scale EACH. They disagreed, so ONE rule ("a numeric literal argument crosses with
             // its exact value") produced three different wrong answers depending on how it was spelled.
+            // ⛔ …EXCEPT INTO A KNOWN ELEMENTARY FORMAL OF ANOTHER CATEGORY (kb/Work PB1113). §14.2.3 GR9 fills the
+            // formal's allocated record by "a MOVE statement" when the formal is not numeric, so the literal crosses
+            // as that record — the receiving category's ONE MOVE store, the INVOKE lane's twin — and not as a numeric
+            // cell the callee's adapter would read as digits: `12.5` into PIC ZZ9.99 printed "125   " and `-5` into
+            // PIC X(4) the sign-overpunched "N   " (measured), where the MOVE edits and drops the sign (§14.9.25.4 GR6).
+            // A GROUP formal is §14.9.25.4 GR4's non-elementary move — "as if it were an alphanumeric to
+            // alphanumeric elementary move … no conversion": the literal's own characters, as the written
+            // `MOVE -12 TO G` and the INVOKE lane store them (the numeric cell crossed as the overpunched "1K").
+            case BoundNumericLiteral n when a.Formal is { IsGroup: true }:
+                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({CsLiteral(n.Text)}), null)";
+            case BoundNumericLiteral n when a.Formal is { Pic: { } fp }
+                                            && fp.Category is not PicCategory.Numeric && SlotWindow.CarriedBySlot(a.Formal) is false:
+                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({move.ConvertSource(n, a.Formal)}), null)";
             case BoundNumericLiteral n:
                 return NumericArgText(a.Mode, n.Text, ctx.SignEncoding);
             case BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } ct:

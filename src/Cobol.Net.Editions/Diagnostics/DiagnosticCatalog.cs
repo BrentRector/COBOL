@@ -6142,6 +6142,19 @@ public static class DiagnosticCatalog
         + "specified as the USING parameter of the set property method.\"",
         "ISO §8.4.3.9.3 SR7");
 
+    /// <summary>COBOLNET2728 — an INVOKE argument or RETURNING item is a group item with a subordinate object reference
+    /// described with the ACTIVE-CLASS phrase (kb/Work PB1116). ISO §14.9.23.3 SR13: "If Identifier-3, identifier-4,
+    /// or identifier-5 references a group item, there shall not be an item subordinate to that group item that is an
+    /// object reference described with the ACTIVE-CLASS phrase." Typed and universal receivers alike, both passing
+    /// modes and the RETURNING item.</summary>
+    public static readonly DiagnosticDescriptor InvokeActiveClassSubordinate = new(
+        "COBOLNET2728", "invoke-active-class-subordinate", EditionSeverity.Error,
+        "An INVOKE argument or RETURNING item is a group item with a subordinate object reference described with the "
+        + "ACTIVE-CLASS phrase. ISO §14.9.23.3 SR13: \"If Identifier-3, identifier-4, or identifier-5 references a "
+        + "group item, there shall not be an item subordinate to that group item that is an object reference described "
+        + "with the ACTIVE-CLASS phrase.\"",
+        "ISO §14.9.23.3 SR13");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

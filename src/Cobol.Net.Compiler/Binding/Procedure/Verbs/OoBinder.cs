@@ -600,7 +600,29 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             return false;
         if (BitLayout.IsBitItem(rp.Item))
             host.Params.ScreenBitAlignment(rp, DiagnosticCatalog.InvokeBitAlignment, subject, "§14.9.23.3 SR12");
-        return true;
+        return ActiveClassSubordinateAdmitted(rp, subject);
+    }
+
+    /// <summary>⛔ ISO §14.9.23.3 SR13, ITS OWN SCREEN (kb/Work PB1116): "If Identifier-3, identifier-4, or identifier-5
+    /// references a group item, there shall not be an item subordinate to that group item that is an object reference
+    /// described with the ACTIVE-CLASS phrase." Asked of every INVOKE operand the rule names — a BY REFERENCE
+    /// (identifier-3) or BY CONTENT (identifier-5) argument, typed or universal, and the RETURNING item (identifier-4,
+    /// through <see cref="OoScreenReturning"/>) — before any conformance question. Nothing asked it before: such a group
+    /// was refused only because the crossing has no character image for a group with an object leaf (the Tier-C
+    /// reason), which named the wrong rule and would have turned into a silent acceptance the moment the carrier learned
+    /// to cross a strongly-typed group (§13.18.60.3 confines a subordinate object reference to one). False having
+    /// reported.</summary>
+    private bool ActiveClassSubordinateAdmitted(Place p, string subject)
+    {
+        if (p.DenotedItem is not { IsGroup: true } g) return true;
+        if (DataItem.DescendantsOf(g).FirstOrDefault(d => d.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass })
+            is not { } leaf)
+            return true;
+        ctx.Edition.Error(DiagnosticCatalog.InvokeActiveClassSubordinate,
+            $"{subject} '{g.CobolName}' is a group item with the subordinate object reference '{leaf.CobolName}' "
+            + "described with the ACTIVE-CLASS phrase (ISO §14.9.23.3 SR13: \"there shall not be an item subordinate "
+            + "to that group item that is an object reference described with the ACTIVE-CLASS phrase\")");
+        return false;
     }
 
     /// <summary>A literal-2 argument as the shared §14.8.2.3.3 verdict reads one — a BY CONTENT value with no
@@ -897,6 +919,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                         $"{verb} \"{methodName}\" USING argument", "§14.9.23.3 SR12");
             }
 
+            // §14.9.23.3 SR13 over identifier-3 / identifier-5, before any conformance question (kb/Work PB1116).
+            if (!ActiveClassSubordinateAdmitted(place, $"{verb} \"{methodName}\" USING argument")) return null;
             // A reference-modified operand is a unique ELEMENTARY ALPHANUMERIC item of the window length
             // (§8.4.3.3.4 GR6): conformance goes against that effective description, never the whole inner item.
             if (place is RefModPlace rmp)
@@ -960,28 +984,19 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // The general format's BY CONTENT branch admits an arithmetic expression, and this arm is what makes
         // that true end to end. It is BY CONTENT by construction: §14.9.23.3 SR9 confines BY REFERENCE to an
         // identifier, and an expression has no storage to write back to.
-        // §14.8.2.3.3 rule 2a governs the crossing — "the value is transferred according to the rules of the
-        // COMPUTE statement" — which is exactly a numeric formal. A NON-numeric formal is not a gap here but a
-        // CONFORMANCE failure the standard requires be reported: §14.9.25.3 Table 16 admits a numeric sender to
-        // an alphanumeric receiver only for an INTEGER sender, and an arithmetic expression carries no
-        // compile-time guarantee of that, so the honest verdict is a cited diagnostic rather than silent
-        // truncation.
         // ── BY CONTENT boolean-expression-1 (ISO §14.9.23.2; fix-queue PB46) ────────────────────────────────
         // The third operand shape the BY CONTENT branch admits, and the ONE the BY VALUE branch does not — the
         // two phrases genuinely differ in the printed general format. It is its own VALUE channel (D-B1: a
         // '0'/'1' bit string, §8.8.2), never the numeric one, which is why it needs a slot of its own rather
         // than a second spelling of ContentExpr.
-        // §14.8.2.3.3 rule 2d governs the crossing: the formal is not numeric, not an index item and not
-        // ANY LENGTH, so "the conformance rules are the same as for a MOVE statement with the argument as the
-        // sending operand" — §14.9.25.3 Table 16's BOOLEAN row, which admits alphanumeric and boolean
-        // receivers and refuses alphabetic, numeric and numeric-edited ones.
-        // ⚠ TABLE 16 ALSO ADMITS A NATIONAL RECEIVER, AND THIS ARM REFUSES IT ON PURPOSE — the IDENTIFIER
-        // CONTENT arm above refuses the same pairing through OoConformance.ContentMismatch's conservative
-        // strict gate, and two arms of one rule disagreeing is worse than one named residue. Both are
-        // recorded together.
+        // ⛔ BOTH ASK THE ONE VALUE VERDICT (kb/Work PB1113): each is described as the sending operand it is — a
+        // numeric COMPUTE sender, a boolean value — and asked §14.8.2.3.3 rule 2's question in rule 2's order
+        // (OoConformance.ContentValueMismatch, the verdict the CALL and function lanes ask through
+        // ParameterConformance.ContentConformanceReason). The boolean arm used to refuse a NATIONAL formal "on purpose",
+        // where Table 16's boolean row says Yes.
         if (boolCtx is { } bx && (explicitContent || impliedContent))
         {
-            if (OoConformance.ContentBooleanMismatch(formal) is { } bErr)
+            if (OoConformance.ContentValueMismatch(formal, ContentValue.Boolean) is { } bErr)
             {
                 Err($"BY CONTENT boolean-expression argument '{bx.GetText()}' for formal "
                     + $"'{formal.CobolName}': {bErr}");
@@ -994,7 +1009,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
 
         if (arithCtx is { } ax && (explicitContent || impliedContent))   // a SOLE reference / numeric literal / inline invocation was taken above
         {
-            if (OoConformance.ContentArithmeticMismatch(formal) is { } aErr)
+            if (OoConformance.ContentValueMismatch(formal, ContentValue.Arithmetic) is { } aErr)
             {
                 Err($"BY CONTENT arithmetic-expression argument '{ax.GetText()}' for formal "
                     + $"'{formal.CobolName}': {aErr}");
@@ -1037,7 +1052,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // storage, so it rides the boolean channel — Table 16's BOOLEAN row (§14.8.2.3.3 rule 2d), the same
                 // receivers the boolean-expression arm takes, from the SAME rule. A LITERAL contributes no item width
                 // to §8.8.2 rule 10, so the value crosses at the formal's width (BooleanRenderer.RenderAtItemWidth).
-                if (OoConformance.ContentBooleanMismatch(formal) is { } blErr)
+                if (OoConformance.ContentValueMismatch(formal, ContentValue.Boolean) is { } blErr)
                 {
                     Err($"boolean literal argument {literalText} for formal '{formal.CobolName}': {blErr}");
                     return null;
@@ -1061,12 +1076,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     Err($"numeric literal argument {numLit.Text} for formal '{formal.CobolName}' — {nErr}");
                     return null;
                 }
-                // The CARRIER split the shared rule admits: rule 2a's COMPUTE lane for a numeric formal, and rule
-                // 2d's MOVE lane, which moves an unsigned integer literal to an alphanumeric receiver as its digit
-                // characters (§14.9.25).
-                return formal.Pic is { Category: PicCategory.Numeric }
-                    ? new BoundInvokeArg(formal, null, numLit.Text, null, WriteBack: false, ByContent: true)
-                    : new BoundInvokeArg(formal, null, null, numLit.Text, WriteBack: false, ByContent: true);
+                // The numeric literal crosses as ITSELF into an elementary formal: rule 2a's COMPUTE for a numeric
+                // formal, rule 2d's MOVE for any other — the emitter stores it through the receiving category's ONE
+                // MOVE store (kb/Work PB1113: it used to cross as its digit TEXT, which was right only for an
+                // unsigned integer into PIC X — `-5` keeps no sign there, §14.9.25.4 GR6, and `12.5` edits into a
+                // numeric-edited mask). A GROUP formal keeps the character copy §14.9.25.4 GR4 makes a group move.
+                return formal.IsGroup
+                    ? new BoundInvokeArg(formal, null, null, numLit.Text, WriteBack: false, ByContent: true)
+                    : new BoundInvokeArg(formal, null, numLit.Text, null, WriteBack: false, ByContent: true);
             case BoundPredefinedNull:
                 // ⛔ NULL IS AN IDENTIFIER, identifier-5 (kb/Work PB1137 + PB1630): §8.4.3.1.3 SR7 lists the
                 // predefined-object references among the identifier formats, §8.4.3.7.3 SR2 describes the NULL object
@@ -1182,6 +1199,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             if (BitLayout.IsBitItem(p.Item))
                 host.Params.ScreenBitAlignment(p, DiagnosticCatalog.InvokeBitAlignment, "INVOKE USING argument",
                     "§14.9.23.3 SR12");
+            if (!ActiveClassSubordinateAdmitted(p, "INVOKE USING argument")) return BoundRejected.Reported(ctx.Edition);
             if (ctx.Data.OoIsObjectData(p.Item))
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",

@@ -1220,6 +1220,22 @@ of an unsupported facility.
   comment), `conformance:2002/pb1705_debugging_mode_obsolete_2002`, `conformance:negative/debugging-mode`,
   `conformance:negative/pb1494-debugging-line-at-2014`, `unit:DebuggingLineRewriterTests`.
 
+- **D-OOCIRC — the reach of "directly or indirectly references" in §9.3.8.2.3's closing sentence** (kb/Work PB1498;
+  owner decision R63). §9.3.8.2.3: "If the description of the returning item of a method in interface-1 directly or
+  indirectly references interface-2, the description of the returning item of the corresponding method in interface-2
+  shall not directly or indirectly reference interface-1" (cite-checked). The standard defines "indirectly" no further,
+  so it carries its ordinary TRANSITIVE meaning. The reference graph: nodes are classes and interfaces, keyed by name;
+  a RETURNING item described as an object reference to Y (an object-class-name, an interface-name, or ACTIVE-CLASS —
+  the containing class) is an edge to Y, from the class whose methods (instance or factory) or the interface whose
+  prototypes (inherited ones included) declare it; a class has edges to the class it INHERITS and to every interface
+  in either IMPLEMENTS list; an interface to the interfaces it INHERITS. A universal reference is no edge. The walk is
+  breadth-first with a visited set. The sentence is asked only of two DISTINCT interfaces ("If two interfaces are of
+  the same interface, they conform to each other"), so a returning item that references its own class or interface is
+  legal. It is one of `OoConformance.MethodConformanceMismatches`' rules (`ReturningCircularity`), so every asker
+  applies it — IMPLEMENTS (COBOLNET0841), an override (COBOLNET0829) and the interface relation GOBACK / EXIT RAISING
+  asks. Witnesses: `conformance:2002/pb1498_self_referencing_returning`,
+  `conformance:negative/pb1498-returning-circularity-direct`, `conformance:negative/pb1498-returning-circularity-indirect`.
+
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 
 Annex A.2 lists situations whose results the standard leaves undefined, and §4.4 2) says that "A COBOL run unit that
