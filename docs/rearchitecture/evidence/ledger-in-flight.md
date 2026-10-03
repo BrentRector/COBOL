@@ -18,15 +18,19 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Saturday 2026-09-26, late evening</h3>
-    <p><strong>Landed today — four CI-proven landings.</strong> <span class="pill good">golden lane 2</span> witnessed 59 rows that were already correct but owed a spec-derived test. <span class="pill good">train 61</span> landed COPY/REPLACE text-words, runtime I-O boundaries with owner decision R47, one PICTURE-clause identity for OO and CALL conformance, record sizing from the RECORD clause, and floating-point ROUNDED MODE and size error. <span class="pill good">train 62</span> landed the file-control clause screens (SUPPRESS WHEN, COLLATING SEQUENCE, FILE STATUS), one literal screen for length and hexadecimal grouping, and one argument-conformance mechanism now shared by CALL, user-defined functions and INVOKE.</p>
-    <p><span class="pill good">train 63</span> landed compile-time arithmetic by edition (Standard Arithmetic at 2002/2014, System.Decimal at 2023), the unchecked zero divisor terminating on every lane (owner-confirmed), and concatenation word operands with the pairwise class fold.</p>
-    <p><strong>Next</strong> (after the weekly quota resets): the concatenation-operand half of the literal work (PB1406), the prototype-definition match left on PB1115, and a fresh fix wave; comprehensive battery #87 is owed.</p>
+    <h3>In flight — Saturday 2026-10-03, evening</h3>
+    <p><strong>Nothing is running.</strong> Seven trains landed since the last refresh, each CI-proven: <span class="pill good">1003</span> the DYNAMIC LENGTH STRUCTURE record image, SORT/MERGE short-record fill, RETURNING conformance and the preprocessor's COBOL separator set; <span class="pill good">1004</span> constant entries, the report-section grammar, conditional compilation and the SORT binder; <span class="pill good">1005</span> report binder clauses, the <span class="mono">&gt;&gt;COBOL-WORDS</span> retype at lex time and the reference resolver; <span class="pill good">1006</span> OO content-conformance, element-wise table MOVE and dynamic-length I-O limits; <span class="pill good">1007</span> one Annex C name fold for every word comparison, constant-entry forward references and the strongly typed group across INVOKE; <span class="pill good">1008</span> the condition binder and BY CONTENT arithmetic expressions into non-numeric formals; <span class="pill good">1009</span> SET senders, report SOURCE and VARYING operands, and intrinsic argument categories.</p>
+    <p><strong>Partly done, by design:</strong> report rolled totals (PB1294), sum-counter families, the OO universal-descriptor leg (PB480, PB1112), the EVALUATE operator-subject half of PB1412, and the OR PAGE heading against a lower-level control footing (PB1927, where two general rules disagree and the record is not yet settled).</p>
+    <p><strong>Next</strong> (after the weekly quota resets Sunday): a fresh fix wave from the computed clusters, a comprehensive battery (the last was #87), and the PB1527 goldens still sitting unlanded in an old worktree.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
       <h3>Owner decisions today</h3>
-      <p>R50: user documentation is docs-as-code published with Astro Starlight on wiseowlsoftware.com, distributed on NuGet under <span class="mono">WiseOwl.</span>. Contributions are accepted under a CLA; the GitHub community standards are in place.</p>
+      <p><span class="mono">&gt;&gt;CALL-CONVENTION</span> stays COBOL-only unless a .NET mapping is added, and one may not be required (PB1945). The weekly ceiling for tonight was raised to 99%. Local-model use is limited to leads, indexes and drafts: nothing a local model writes enters the register or a golden without a Claude or human check.</p>
+    </div>
+    <div class="card">
+      <h3>Measured today</h3>
+      <p>GnuCOBOL 3.2.0 is now built in WSL and answers latitude questions by running. A hybrid of keyword and embedding retrieval finds the governing clause of a note in its top 10 about 82% of the time, against 71% for keyword search alone; whether that saves implementer turns is unmeasured.</p>
     </div>
     <div class="card">
       <h3>History</h3>

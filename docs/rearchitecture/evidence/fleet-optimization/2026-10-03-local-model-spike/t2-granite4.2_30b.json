@@ -1,0 +1,602 @@
+{
+ "summary": {
+  "model": "granite4.2:30b",
+  "reports": 24,
+  "scored": 24,
+  "status_exact": 0.875,
+  "landed_f1": 0.992,
+  "lead_site_recall": 0.683,
+  "sec_per_report": 3.8
+ },
+ "per": [
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1003b-PB1140-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1140",
+     "PB749"
+    ],
+    [
+     "PB1140",
+     "PB749"
+    ]
+   ],
+   "n_leads": [
+    2,
+    1
+   ],
+   "sec": 13.9
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1003d-PB1660-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1660",
+     "PB1705",
+     "PB1802"
+    ],
+    [
+     "PB1660",
+     "PB1705"
+    ]
+   ],
+   "n_leads": [
+    3,
+    3
+   ],
+   "sec": 2.9
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1003c-PB1040-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1040"
+    ],
+    [
+     "PB1040"
+    ]
+   ],
+   "n_leads": [
+    3,
+    6
+   ],
+   "sec": 2.6
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1003a-PB1094-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1094"
+    ],
+    [
+     "PB1094"
+    ]
+   ],
+   "n_leads": [
+    0,
+    0
+   ],
+   "sec": 1.3
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1006b-PB1271-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1054",
+     "PB1890",
+     "PB1933",
+     "PB574"
+    ],
+    [
+     "PB1054",
+     "PB1890",
+     "PB1933",
+     "PB574"
+    ]
+   ],
+   "n_leads": [
+    1,
+    5
+   ],
+   "sec": 3.5
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1006a-PB480-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1113",
+     "PB1498"
+    ],
+    [
+     "PB1113",
+     "PB1498"
+    ]
+   ],
+   "n_leads": [
+    3,
+    6
+   ],
+   "sec": 3.7
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1006d-PB1144-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1118",
+     "PB1144"
+    ],
+    [
+     "PB1118",
+     "PB1144"
+    ]
+   ],
+   "n_leads": [
+    3,
+    12
+   ],
+   "sec": 4.7
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1006c-PB1368-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1227",
+     "PB1228",
+     "PB1232",
+     "PB1368"
+    ],
+    [
+     "PB1227",
+     "PB1228",
+     "PB1232",
+     "PB1368"
+    ]
+   ],
+   "n_leads": [
+    2,
+    6
+   ],
+   "sec": 3.4
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1008a-PB1668-report.md",
+   "status": [
+    "DONE",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1034",
+     "PB1391",
+     "PB1464",
+     "PB1668"
+    ],
+    [
+     "PB1034",
+     "PB1391",
+     "PB1464",
+     "PB1668"
+    ]
+   ],
+   "n_leads": [
+    2,
+    2
+   ],
+   "sec": 2.5
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1008b-PB1946-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1946"
+    ],
+    [
+     "PB1946"
+    ]
+   ],
+   "n_leads": [
+    0,
+    0
+   ],
+   "sec": 1.0
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1007b-PB480-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1063",
+     "PB1116",
+     "PB1383"
+    ],
+    [
+     "PB1063",
+     "PB1116",
+     "PB1383"
+    ]
+   ],
+   "n_leads": [
+    2,
+    12
+   ],
+   "sec": 6.1
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1007c-PB1231-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1225",
+     "PB1226",
+     "PB1231"
+    ],
+    [
+     "PB1225",
+     "PB1226",
+     "PB1231"
+    ]
+   ],
+   "n_leads": [
+    2,
+    7
+   ],
+   "sec": 3.0
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1007d-PB1402-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1402"
+    ],
+    [
+     "PB1402"
+    ]
+   ],
+   "n_leads": [
+    4,
+    10
+   ],
+   "sec": 4.2
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1007a-PB1271-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1271",
+     "PB1904"
+    ],
+    [
+     "PB1271",
+     "PB1904"
+    ]
+   ],
+   "n_leads": [
+    1,
+    11
+   ],
+   "sec": 3.7
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1005e-PB1271-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1279",
+     "PB1448",
+     "PB1450",
+     "PB1454"
+    ],
+    [
+     "PB1279",
+     "PB1448",
+     "PB1450",
+     "PB1454"
+    ]
+   ],
+   "n_leads": [
+    4,
+    8
+   ],
+   "sec": 3.6
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1005b-PB1372-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1372",
+     "PB1459",
+     "PB1669",
+     "PB1915"
+    ],
+    [
+     "PB1372",
+     "PB1459",
+     "PB1669",
+     "PB1915"
+    ]
+   ],
+   "n_leads": [
+    1,
+    1
+   ],
+   "sec": 1.6
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1005a-PB1706-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1050",
+     "PB1129",
+     "PB1220",
+     "PB1285",
+     "PB1706"
+    ],
+    [
+     "PB1050",
+     "PB1129",
+     "PB1220",
+     "PB1285",
+     "PB1706"
+    ]
+   ],
+   "n_leads": [
+    3,
+    2
+   ],
+   "sec": 2.1
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1005c-PB1423-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1164",
+     "PB1419",
+     "PB1423"
+    ],
+    [
+     "PB1164",
+     "PB1419",
+     "PB1423"
+    ]
+   ],
+   "n_leads": [
+    4,
+    4
+   ],
+   "sec": 4.4
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1005d-PB1668-report.md",
+   "status": [
+    "DONE",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1034",
+     "PB1391",
+     "PB1464",
+     "PB1668"
+    ],
+    [
+     "PB1034",
+     "PB1391",
+     "PB1464",
+     "PB1668"
+    ]
+   ],
+   "n_leads": [
+    2,
+    8
+   ],
+   "sec": 4.9
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1004d-PB1398-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1398",
+     "PB1472",
+     "PB1662",
+     "PB1913"
+    ],
+    [
+     "PB1398",
+     "PB1472",
+     "PB1662",
+     "PB1913"
+    ]
+   ],
+   "n_leads": [
+    2,
+    2
+   ],
+   "sec": 2.0
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1004e-PB1226-report.md",
+   "status": [
+    "DONE",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1059",
+     "PB1226",
+     "PB1248",
+     "PB1287",
+     "PB1298"
+    ],
+    [
+     "PB1059",
+     "PB1226",
+     "PB1248",
+     "PB1287",
+     "PB1298"
+    ]
+   ],
+   "n_leads": [
+    6,
+    4
+   ],
+   "sec": 4.1
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1004b-PB1368-report.md",
+   "status": [
+    "SPLIT",
+    "SPLIT"
+   ],
+   "landed": [
+    [
+     "PB1360",
+     "PB1384",
+     "PB1533",
+     "PB1538",
+     "PB807"
+    ],
+    [
+     "PB1360",
+     "PB1384",
+     "PB1533",
+     "PB1538",
+     "PB807"
+    ]
+   ],
+   "n_leads": [
+    4,
+    8
+   ],
+   "sec": 3.3
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1004a-PB1095-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1082",
+     "PB1095",
+     "PB1403",
+     "PB1537",
+     "PB791",
+     "PB990"
+    ],
+    [
+     "PB1082",
+     "PB1095",
+     "PB1403",
+     "PB1537",
+     "PB791",
+     "PB990"
+    ]
+   ],
+   "n_leads": [
+    2,
+    6
+   ],
+   "sec": 4.8
+  },
+  {
+   "report": "E:\\Temp\\claude\\E--COBOL\\5ab816c6-b0b3-41a8-b8b1-b35036522a97\\scratchpad\\reports\\w1004c-PB1175-report.md",
+   "status": [
+    "DONE",
+    "DONE"
+   ],
+   "landed": [
+    [
+     "PB1052",
+     "PB1055",
+     "PB1139",
+     "PB1173",
+     "PB1175",
+     "PB994"
+    ],
+    [
+     "PB1052",
+     "PB1055",
+     "PB1139",
+     "PB1173",
+     "PB1175",
+     "PB994"
+    ]
+   ],
+   "n_leads": [
+    5,
+    6
+   ],
+   "sec": 3.4
+  }
+ ]
+}
