@@ -127,9 +127,34 @@ public static class CobolTable
     private static long OccScaled(Int128 unscaled, int scale)
     {
         if (CobolNum.HasFraction(unscaled, scale))
-            ExceptionState.SubscriptError(
-                $"subscript value {CobolNum.PlainValue(unscaled, scale)} is not an integer (ISO 8.4.2.3.4 GR1b)");
+            NotAnInteger(CobolNum.PlainValue(unscaled, scale));
         return CobolNum.PositionOf(unscaled, scale);
+    }
+
+    private static void NotAnInteger(string shown) =>
+        ExceptionState.SubscriptError($"subscript value {shown} is not an integer (ISO 8.4.2.3.4 GR1b)");
+
+    /// <summary>A subscript that is an arithmetic EXPRESSION (or a floating-point item), as the occurrence number it
+    /// denotes — the statement pre-operation's intake, asked on the carrier the expression evaluated on (kb/Work
+    /// PB1890). §8.4.2.3.4 GR1b: "If the evaluation of arithmetic-expression-1 does not result in an integer, the
+    /// EC-BOUND-SUBSCRIPT exception condition is set to exist" — so the test reads the EXACT intermediate, never a
+    /// copy stored at a fixed fraction width, which made <c>T(IX + 0.0000000001)</c> an integer. The same lenient
+    /// continue as <see cref="Occ(long, in NumProfile)"/> with checking off: the position truncates toward zero.
+    /// Three carriers, three names (an integer literal converts to both <c>Int128</c> and <c>double</c>).</summary>
+    public static long OccValue(Int128 unscaled, int scale) => OccScaled(unscaled, scale);
+
+    /// <inheritdoc cref="OccValue(Int128, int)"/>
+    public static long OccValueDec(CobolDec value)
+    {
+        if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return CobolNum.PositionOf(value);
+    }
+
+    /// <inheritdoc cref="OccValue(Int128, int)"/>
+    public static long OccValueReal(double value)
+    {
+        if (CobolNum.HasFraction(value)) NotAnInteger(value.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return CobolNum.PositionOf(value);
     }
 
     /// <summary>The CURRENT character extent of an occurs-depending GROUP operand (ISO/IEC 1989:2023 §13.18.38

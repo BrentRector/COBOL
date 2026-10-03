@@ -126,10 +126,33 @@ public static class CobolString
     private static long RefModScaled(Int128 unscaled, int scale)
     {
         if (CobolNum.HasFraction(unscaled, scale))
-            ExceptionState.RefModViolation(
-                $"reference-modification position {CobolNum.PlainValue(unscaled, scale)} is not an integer "
-                + "(ISO §8.4.3.3.4 item 5c)");
+            NotAnInteger(CobolNum.PlainValue(unscaled, scale));
         return CobolNum.PositionOf(unscaled, scale);
+    }
+
+    private static void NotAnInteger(string shown) =>
+        ExceptionState.RefModViolation(
+            $"reference-modification position {shown} is not an integer (ISO §8.4.3.3.4 item 5c)");
+
+    /// <summary>A reference-modifier leftmost-position or length that is an arithmetic EXPRESSION (or a
+    /// floating-point item), as the position it denotes — the statement pre-operation's intake, the exact twin of
+    /// <c>CobolTable.OccValue</c> differing only in the Table 13 condition it names (kb/Work PB1890). §8.4.3.3.4
+    /// rule 5)c): a leftmost-position or length whose evaluation "results in a non-integer value" sets
+    /// EC-BOUND-REF-MOD, so the test reads the EXACT intermediate on its own carrier.</summary>
+    public static long RefModValue(Int128 unscaled, int scale) => RefModScaled(unscaled, scale);
+
+    /// <inheritdoc cref="RefModValue(Int128, int)"/>
+    public static long RefModValueDec(CobolDec value)
+    {
+        if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return CobolNum.PositionOf(value);
+    }
+
+    /// <inheritdoc cref="RefModValue(Int128, int)"/>
+    public static long RefModValueReal(double value)
+    {
+        if (CobolNum.HasFraction(value)) NotAnInteger(value.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return CobolNum.PositionOf(value);
     }
 
     /// <summary>

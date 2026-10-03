@@ -16,8 +16,8 @@
       *> specified the 15.4 temporary as Scale: 0; a scale-0 temp TRUNCATES on the
       *> way in, so FUNCTION SQRT(2) = 1.414... would have silently indexed
       *> occurrence 1 instead of raising, turning legal source into a wrong answer
-      *> by the temp's own description. The temp carries a fraction precisely so
-      *> the fact GR1b tests survives to the position read.
+      *> by the temp's own description. The function's value is tested on its own
+      *> carrier BEFORE the integer position is stored (kb/Work PB1890).
        >>TURN EC-BOUND-SUBSCRIPT CHECKING ON
        >>TURN EC-BOUND-REF-MOD CHECKING ON
        IDENTIFICATION DIVISION.

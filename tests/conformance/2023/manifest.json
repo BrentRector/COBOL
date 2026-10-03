@@ -2,6 +2,10 @@
  "_comment": "The 2023 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2023 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
  "enabled": [
   "pb1139_table_sort_legal_regions",
+  "pb1890_position_expression_exact",
+  "pb1890_position_expression_standard_decimal",
+  "pb1933_redefines_in_dynamic_table",
+  "pb574_typedef_dynamic_length_composes",
   "pb994_sort_giving_indexed_io_warning",
   "l1g4_leap_second_off_reported_seconds",
   "l1g4_leap_second_on_reported_seconds",

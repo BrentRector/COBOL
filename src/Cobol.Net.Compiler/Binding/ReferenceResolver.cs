@@ -1064,9 +1064,8 @@ public sealed class ReferenceResolver(DataBinder data)
 
     /// <summary>The place of a level-66 RENAMES entry (ISO §13.18.45) — the <see cref="PlaceForItem"/> arm for an
     /// item that owns no storage of its own. The no-THROUGH form forwards to data-name-2's place (GR1); the
-    /// THROUGH form composes a <see cref="RenamesPlace"/> over the spanned storage parts (GR2). This slice covers
-    /// STRING-VALUED leaves (X / edited / StoreAsImage) and character-form numeric leaves through their image; any
-    /// other typed-numeric leaf in the span is the <see cref="DeferredShape.RenamesNonCharacterLeaf"/> stage.</summary>
+    /// THROUGH form composes a <see cref="RenamesPlace"/> over the spanned storage parts (GR2): string-valued leaves
+    /// as they are and every numeric leaf through its storage image (<see cref="SpanLeafPlace"/>).</summary>
     private Place? PlaceForRenames(DataItem alias, RenamesInfo ren, IReadOnlyList<string> indexExprs, out PlaceGap gap)
     {
         gap = new(null, alias);
@@ -1120,21 +1119,25 @@ public sealed class ReferenceResolver(DataBinder data)
         return new RenamesPlace(leafPlaces, alias, widths);
     }
 
-    /// <summary>One spanned leaf cell of a RENAMES THROUGH alias, as the CHARACTER string the composed alias
-    /// concatenates: a string-valued leaf as it is, a typed NUMERIC-DISPLAY leaf through its character image (the
-    /// alias is an alphanumeric view of the span, §13.18.45.4 GR2 — NC252A's PIC 999 leaves under
-    /// RENAMES-TEST-1). Null with the gap when the cell has no place, or has no character form to take part
-    /// through.</summary>
+    /// <summary>One spanned leaf cell of a RENAMES THROUGH alias, as the STORAGE image the composed alias
+    /// concatenates: a string-valued leaf as it is, a typed NUMERIC leaf through its <see cref="NumericImagePlace"/>
+    /// — the bytes it occupies, zoned digits for usage DISPLAY, radix-2 / BCD bytes for BINARY / PACKED, the IEEE
+    /// window for a float (V59; the alias is an alphanumeric group item over the storage, §13.18.45.4 GR2 — NC252A's
+    /// PIC 999 leaves under RENAMES-TEST-1). Null with the gap when the cell has no place.
+    /// <para>⛔ EVERY NUMERIC USAGE, NOT ONLY THE CHARACTER FORMS (kb/Work PB1054). GR2 defines data-name-1 as "an
+    /// alphanumeric group item that includes all elementary items" of the range, so a COMP member contributes its
+    /// storage bytes exactly as it does to the record's own group image. This used to admit only
+    /// <see cref="PicInfo.IsCharacterFormNumeric"/> leaves and DEFER the rest (a COBOLNET1756 warning and a run-time
+    /// abort for <c>66 RN RENAMES RA THRU RC</c> over a <c>PIC 9(4) COMP</c> member), although the image place it
+    /// declined renders every numeric usage through the ONE storage codec (<c>NumFormatImage</c> /
+    /// <c>NumStoreImage</c>, and the float lane). Pointer, object and message-tag members never reach here: §13.18.45.3
+    /// SR8 refuses them in the range at the declaration (<c>DataBinder.RenamesRangeFault</c>).</para></summary>
     private Place? SpanLeafPlace(DataItem leaf, IReadOnlyList<string> indexExprs, out PlaceGap gap)
     {
         if (PlaceForItem(leaf, indexExprs, out gap) is not { } place) return null;
         bool stringValued = data.IsImageBackedEarly(leaf) || place is RedefViewPlace
-            || leaf.Pic?.Category is PicCategory.Alphanumeric or PicCategory.NumericEdited
-                or PicCategory.National or PicCategory.Boolean;
-        if (stringValued) return place;
-        if (leaf.Pic is { IsCharacterFormNumeric: true }) return new NumericImagePlace(place);   // THE ONE character-form predicate (kb/Work PB646)
-        gap = new(DeferredShape.RenamesNonCharacterLeaf, leaf);
-        return null;
+            || leaf.Pic?.Category is not PicCategory.Numeric;
+        return stringValued ? place : new NumericImagePlace(place);
     }
 
     /// <summary>A group whose subtree contains an occurs-depending table is an ODO operand (ISO §13.18.38 GR8): wrap
@@ -1626,14 +1629,13 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <see langword="null"/> when the containing path is unavailable. A canonical within a FIXED table is reached
     /// through the enclosing element — <paramref name="outerIndexExprs"/> are the subscripts of the canonical
     /// parent's own dimensions, outermost first (ISO §13.18.44.3 SR5, kb/Work PB1279). A canonical within an OCCURS
-    /// DYNAMIC table stays unavailable: its element is reached through the receiving / sending accessors a
-    /// <see cref="RedefViewPlace"/> does not carry.</summary>
+    /// DYNAMIC table is reached the same way (kb/Work PB1933): the path's <see cref="DynTableSegment"/> renders its
+    /// accessor from the direction <c>PlaceRenderer</c> renders the backing in — <c>RefSending</c> on a read,
+    /// <c>RefReceiving</c> (grow-and-seed, §8.5.1.9.3) on a store into the window.</summary>
     private AccessPath? BuildBackingPath(RedefinesClass cls, IReadOnlyList<string> outerIndexExprs)
     {
         if (cls.Canonical.Parent is not { } parent)
             return new AccessPath([new RootFieldSegment(cls.BackingCsName, OmittedFormalGuard.Of(cls.Canonical))]);
-        for (DataItem? p = parent; p is not null; p = p.Parent)
-            if (p.IsDynamicTable) return null;
         // The enclosing element carries the same §13.18.38.4 GR7 OCCURS DEPENDING check every other element path does.
         return BuildAccessPath(parent, outerIndexExprs, OdoReferenceCheckFor) is { } parentPath
             ? parentPath.Add(new MemberSegment(cls.BackingCsName)) : null;
@@ -2831,7 +2833,7 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <c>PositionCarrierOverloadDriftTests</c> can compare it to both runtime methods' ACTUAL overloads by
     /// reflection. Adding an overload without widening this list leaves the fast path routing a carrier it could
     /// now render; widening this list without the overload puts the CS1503 back. The test fails on either.
-    /// <c>Int128</c> must be here for a second reason: the D18 §15.4 segment temp is a 30-digit / scale-9 item —
+    /// <c>Int128</c> must be here for a second reason: the D18 segment temp is a 19-digit integer position item —
     /// the wide tier — and <see cref="MaterializeViaFragment"/> reads it back through <see cref="PositionRead"/>.</summary>
     internal static readonly string[] NumericPositionCarriers =
         ["long", "string", "Int128", "ulong", "UInt128"];

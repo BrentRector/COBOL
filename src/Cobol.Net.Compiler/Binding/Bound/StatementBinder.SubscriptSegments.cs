@@ -2,7 +2,6 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
-using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Bound;
 
@@ -48,28 +47,23 @@ namespace CobolNet.Binding.Bound;
 /// </summary>
 public sealed partial class StatementBinder
 {
-    /// <summary>The §15.4 temporary's description. §15.4 gives the returned value "a temporary elementary data
-    /// item", and §15.4.1 leaves its "characteristics and representation … defined by the implementor" when
-    /// native arithmetic is in effect — so this shape is a genuine implementor choice, and the ONE constraint on
-    /// it is that it must not destroy the fact §8.4.2.3.4 GR1b tests.
-    /// <para>⛔ <b>WHY IT CARRIES A FRACTION AT ALL.</b> The obvious choice is an integer temp — a subscript is an
-    /// occurrence number, after all. But GR1b says a subscript whose expression "does not result in an integer"
-    /// SETS EC-BOUND-SUBSCRIPT, and §8.4.3.3.4 item 5c says the same for a ref-mod position. A scale-0 temp
-    /// TRUNCATES the value on the way in, so <c>W-E(FUNCTION SQRT(2))</c> would silently index occurrence 1
-    /// instead of raising — legal source turned into a wrong answer by the temp's own description. Carrying the
-    /// fraction keeps the question answerable at the position read (<c>ReferenceResolver.PositionRead</c>), which
-    /// is the ONE place both this temp and an ordinary scaled data-name subscript resolve it (fix-queue PB41).</para>
-    /// <para>21 integer digits × 9 fraction digits — 30 total, so the item takes the <c>Int128</c> wide tier
-    /// (<c>PicInfo.IsWide</c>, &gt;18 digits) and no subscript a program can express overflows it. That matters:
-    /// high-order truncation could WRAP an out-of-range subscript into an in-range one, converting a detectable
-    /// error into a silent wrong answer. The temp is synthetic and never enters
-    /// <c>DataBinder.ConformanceForest</c>, so the edition digit-capacity gates (18 at COBOL-85) do not apply to
-    /// it — it is not a PICTURE the programmer wrote.</para>
-    /// <para>⛔ THE DESCRIPTION IS WRITTEN ONCE, in <see cref="Procedure.SendingValueTemp.FunctionValuePic"/>
-    /// (kb/Work PB394): the §14.9.25.4 GR1 / §14.9.13.4 GR3 sending-value materializer gives a NUMERIC
-    /// function-identifier's value the SAME §15.4 temporary, and two copies of one implementor choice is how a
-    /// later widening lands in one of them only.</para></summary>
-    private static PicInfo SegmentTempPic => Procedure.SendingValueTemp.FunctionValuePic;
+    /// <summary>The description of the temporary that holds a materialized segment's ORDINAL POSITION — an
+    /// integer, because the integrality rule has already been asked by the time anything is stored in it.
+    /// <para>⛔ <b>WHY THE TEST RUNS BEFORE THE STORE, NOT AT THE POSITION READ</b> (kb/Work PB1890). GR1b says a
+    /// subscript whose expression "does not result in an integer" SETS EC-BOUND-SUBSCRIPT, and §8.4.3.3.4 rule 5)c)
+    /// says the same for a ref-mod position. This temp used to be the §15.4 function-value item (21 integer + 9
+    /// fraction digits, TRUNCATION) with the test left to the position read, so a value whose fraction lay past the
+    /// 9th digit was an integer by the time it was asked: <c>T(IX + 0.0000000001)</c> and <c>T(F)</c> with
+    /// <c>F COMP-2 2.0000000001</c> selected occurrence 2 with checking on. No fixed fraction width is exact for an
+    /// arbitrary native intermediate, an SDIDI or a binary64, so <see cref="BoundPositionValue"/> asks the question
+    /// of the value on its own carrier (docs/CONFORMANCE.md DOC-A.1-124) and stores only the answer.</para>
+    /// <para>19 digits, signed: the position intakes SATURATE to <c>long</c> (<c>CobolNum.Position</c> — an
+    /// out-of-range position must stay out of range, never wrap back into 1..n), and <c>long</c>'s range fits 19
+    /// digits. The item takes the <c>Int128</c> wide tier (<c>PicInfo.IsWide</c>, &gt;18 digits), which the position
+    /// read accepts (<see cref="ReferenceResolver.NumericPositionCarriers"/>). The temp is synthetic and never enters
+    /// <c>DataBinder.ConformanceForest</c>, so the edition digit-capacity gates do not apply to it.</para></summary>
+    private static readonly PicInfo SegmentTempPic =
+        new(PicCategory.Numeric, Usage.Display, Length: 19, Digits: 19, Scale: 0, Signed: true);
 
     /// <summary>The COBOLNET2363 text for a segment that is not an arithmetic expression (kb/Work PB1030) — the
     /// word ALL in a subscript names §8.4.2.3.3 SR6's two contexts; anything else names the position's own rule.</summary>
@@ -94,10 +88,10 @@ public sealed partial class StatementBinder
     /// property UdfBinder relies on ("a nested call registers while its consumer's arguments bind, so it precedes
     /// the consumer in the sequence"). Deferring the bind to the drain would append them in the wrong order.</para>
     ///
-    /// <para><b>The store is a <c>BoundCompute</c>, not a bespoke node</b>, so the value crosses into the temp
-    /// through the ONE arithmetic store path — scale alignment, truncation mode, and the wide tier all behave as
-    /// they do for a COMPUTE the programmer wrote, and a future change to that path cannot forget this caller.
-    /// No ON SIZE ERROR phrase: the temp is 30 digits wide precisely so a size error is unreachable.</para></summary>
+    /// <para><b>The store is a <see cref="BoundPositionValue"/></b>: the expression renders through the ONE
+    /// numeric renderer and the ONE arithmetic store path, but the integrality question is asked of the value on
+    /// its own carrier BEFORE the store, which a <c>BoundCompute</c> into a fixed-scale temp could not do (kb/Work
+    /// PB1890). The temp is the saturated integer position, so a size error at the store is unreachable.</para></summary>
     private DataItem? MaterializeSubscriptSegment(string text, SegmentPosition position, int line)
     {
         if (Frontend.Parsing.SubscriptExpressionFragment.Parse(text, Ctx.Edition.Edition, Ctx.Retypes) is not { } frag)
@@ -141,7 +135,7 @@ public sealed partial class StatementBinder
         var temp = data.CreateCompilerTemp(model, "__SUBEXPR-", "__subexpr", $"L{line}");
         if (Ctx.Refs.ResolveItem(temp) is not { } place) return null;
 
-        data.PendingPreOps.Add(new BoundCompute(value, [new Receiver(place, CobolRounding.Truncation)], null));
+        data.PendingPreOps.Add(new BoundPositionValue(value, place, RefMod: position == SegmentPosition.RefMod));
         return temp;
     }
 }

@@ -32,15 +32,11 @@ public enum DeferredShape
     /// <summary>LINAGE-COUNTER / LINE-COUNTER / PAGE-COUNTER (§8.4.3.14 / §8.4.3.15) reached the resolver at a
     /// site that does not route the special register to its runtime source.</summary>
     UnroutedSpecialRegister,
-    /// <summary>A RENAMES … THROUGH span (§13.18.45.4 GR2) with a leaf that has no character image — a numeric
-    /// leaf that is neither usage display nor usage national.</summary>
-    RenamesNonCharacterLeaf,
     /// <summary>A whole (unsubscripted) OCCURS DYNAMIC table (data-model D9) outside the contexts that take one.</summary>
     DynamicWholeTable,
-    /// <summary>A string-canonical REDEFINES class whose backing is not reachable from the reference — its parent
-    /// struct is itself within an OCCURS DYNAMIC table, whose elements are reached through the receiving / sending
-    /// accessors a REDEFINES view place does not carry (a class within a FIXED or OCCURS DEPENDING table is reached
-    /// through the subscripted parent path; kb/Work PB1279).</summary>
+    /// <summary>A string-canonical REDEFINES class whose backing is not reachable from the reference — the access
+    /// path to the canonical's parent struct could not be built. A class within a FIXED, OCCURS DEPENDING or OCCURS
+    /// DYNAMIC table is reached through the subscripted parent path (kb/Work PB1279, PB1933).</summary>
     NestedClassBacking,
     /// <summary>An item the access-path builder has no path for (a whole-table reference outside a
     /// table-taking context, or an OCCURS level the path cannot address).</summary>
@@ -63,12 +59,10 @@ public static class DeferredShapes
     {
         DeferredShape.UnroutedSpecialRegister =>
             "a special register in a position that does not yet read it (ISO §8.4.3.14 / §8.4.3.15)",
-        DeferredShape.RenamesNonCharacterLeaf =>
-            "a RENAMES THROUGH span over a leaf with no character image (ISO §13.18.45)",
         DeferredShape.DynamicWholeTable =>
             "a whole OCCURS DYNAMIC table in this position (data-model D9)",
         DeferredShape.NestedClassBacking =>
-            "a REDEFINES view whose backing lies within an OCCURS DYNAMIC table",
+            "a REDEFINES view whose backing has no access path in this position",
         DeferredShape.UnbuiltAccessPath =>
             "a table reference with no access path in this position",
         DeferredShape.NumericRefModSubstrate =>

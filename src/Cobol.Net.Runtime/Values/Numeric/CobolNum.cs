@@ -572,6 +572,40 @@ public static partial class CobolNum
     public static long Position(UInt128 value) =>
         value > (UInt128)long.MaxValue ? long.MaxValue : (long)value;
 
+    // ── The position of an EXPRESSION, on the carrier the expression evaluated on (kb/Work PB1890) ─────────────
+    // A subscript or reference-modifier bound that is an arithmetic expression (or a floating-point item) is
+    // evaluated once, as a statement pre-operation, and these intakes ask the integrality question of the value the
+    // native or standard intermediate HOLDS — docs/CONFORMANCE.md DOC-A.1-124 — before anything stores it. The
+    // scaled carrier needs no new intake (HasFraction / PositionOf above); the SDIDI and binary64 carriers are below.
+
+    /// <summary>True when the binary64 value has a nonzero fraction: a finite value is an integer exactly when it
+    /// equals its own truncation (COMP-2 <c>2.0</c> is, <c>2 + 1.0E-10</c> is not). ±∞ and NaN are not fractional —
+    /// they are out of every range, which each consumer's range test answers. THE ONE binary64 integrality
+    /// predicate: the §15.3 type-6 intrinsic intake and the two position intakes ask it.</summary>
+    public static bool HasFraction(double value) => double.IsFinite(value) && value != Math.Truncate(value);
+
+    /// <summary>The integer ordinal position an SDIDI value denotes, truncated toward zero and SATURATED to
+    /// <c>long</c> (<see cref="Position(Int128)"/>'s reason: an out-of-range position must stay out of range). The
+    /// caller has already raised its position's condition for a fractional value (<see cref="CobolDec.HasFraction"/>).
+    /// A magnitude past the <c>long</c> range — which the Int128 truncation could not even form for a large exponent —
+    /// saturates by sign before it is truncated.</summary>
+    public static long PositionOf(CobolDec value)
+    {
+        double approx = value.ToDouble();
+        if (approx >= 9.2e18) return long.MaxValue;
+        if (approx <= -9.2e18) return long.MinValue;
+        return Position(value.TruncatedInteger());
+    }
+
+    /// <summary>The integer ordinal position a binary64 value denotes, truncated toward zero and saturated to
+    /// <c>long</c>; NaN denotes no position and reads as 0, which every table and every reference modification
+    /// rejects as "less than one" (§8.4.2.3.4 GR2, §8.4.3.3.4 rule 5)c)).</summary>
+    public static long PositionOf(double value) =>
+        double.IsNaN(value) ? 0
+        : value >= 9.2e18 ? long.MaxValue
+        : value <= -9.2e18 ? long.MinValue
+        : (long)Math.Truncate(value);
+
     /// <summary>The <see cref="Position(Int128)"/> narrowing to an <c>int</c> — for the consumers whose host
     /// parameter is an <c>int</c>: a reference-modifier position or length, a GO TO … DEPENDING selector, an
     /// ADVANCING or LINAGE line count, an OCCURS DEPENDING current count (kb/Work PB1033). The same rule, the same

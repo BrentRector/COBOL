@@ -160,9 +160,9 @@ public static partial class CobolIntrinsics
     // function reference". The compile-time screen (IntrinsicArgumentRules) can only refuse an argument that is
     // PROVABLY not always integral and fails open on everything else, so the VALUE is the rule's real test: an
     // argument that is an integer is an integer EXACTLY (docs/CONFORMANCE.md DOC-A.1-124 — the ONE definition the
-    // subscript, reference-modification and SET-index intakes use, CobolNum.HasFraction — except that a subscript or
-    // reference-modification bound that is an EXPRESSION or a float item still tests a copy truncated at 9 fraction
-    // digits, kb/Work PB1890), never a rounded or truncated copy. This intake used to truncate the fraction silently on every carrier, so
+    // subscript, reference-modification and SET-index intakes use, CobolNum.HasFraction — a subscript or
+    // reference-modification bound that is an EXPRESSION or a float item is tested on its own carrier before it is
+    // stored, CobolTable.OccValue / CobolString.RefModValue, kb/Work PB1890), never a rounded or truncated copy. This intake used to truncate the fraction silently on every carrier, so
     // FACTORIAL(X / 2 + 1) with X = 5 answered FACTORIAL(3) with no condition even under enabled checking.
     // WiseOwl COBOL's determination for the unchecked result is the truncated integer (the lenient continue
     // CobolNum.PositionOf documents for the same rule at a subscript), so checking off changes nothing a program
@@ -215,7 +215,7 @@ public static partial class CobolIntrinsics
     /// own truncation (COMP-2 <c>2.0</c> is, <c>2 + 1.0E-10</c> is not). ±∞ and NaN are not fractional — they are
     /// out of every range, which each landing's own guard answers.</summary>
     private static void RequireIntegralReal(double v) =>
-        RequireIntegral(double.IsFinite(v) && v != Math.Truncate(v),
+        RequireIntegral(CobolNum.HasFraction(v),
             () => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
 
     /// <summary>The scaled-operand intake for a BOUNDED (<c>long</c>) integer argument — <see cref="IntegerArg(Int128)"/>

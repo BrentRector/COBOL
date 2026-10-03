@@ -1304,14 +1304,8 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// list from <see cref="NumX"/>'s own flags and proves both widths accept every one.</summary>
     internal static string IntegerIntake(NumX a, bool wide)
     {
-        a = NumericRenderer.DeU(a);
-        return a.Carrier switch
-        {
-            NumXCarrier.Binary64 => RuntimeApi.IntegerArgOf(RuntimeApi.IntegerArgCarrier.Real, a.Expr, 0, wide),
-            NumXCarrier.Sdidi => RuntimeApi.IntegerArgOf(RuntimeApi.IntegerArgCarrier.Dec, a.Expr, 0, wide),
-            NumXCarrier.Scaled => RuntimeApi.IntegerArgOf(RuntimeApi.IntegerArgCarrier.Scaled, a.Expr, a.Scale, wide),
-            _ => throw new InvalidOperationException($"unsigned-wide operand survived the Widen funnel ({a.Carrier})"),
-        };
+        var (carrier, value) = NumericRenderer.IntakeCarrier(a);
+        return RuntimeApi.IntegerArgOf(carrier, value.Expr, value.Scale, wide);
     }
 
     /// <summary>The variadic arguments aligned to their common scale (ISO §8.8.1 — alignment makes unscaled

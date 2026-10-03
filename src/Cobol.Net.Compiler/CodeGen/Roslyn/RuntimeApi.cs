@@ -476,6 +476,23 @@ internal static class RuntimeApi
         _ => throw new ArgumentOutOfRangeException(nameof(carrier)),
     };
 
+    /// <summary>The position intake for a subscript or reference-modifier bound that is an arithmetic EXPRESSION —
+    /// <c>CobolTable.OccValue*</c> / <c>CobolString.RefModValue*</c> over the value on its OWN carrier, so
+    /// §8.4.2.3.4 GR1b / §8.4.3.3.4 rule 5)c)'s integrality test reads the exact intermediate (kb/Work PB1890).
+    /// Keyed by the same carrier kinds as <see cref="IntegerArgOf"/>; the result is the saturated <c>long</c>
+    /// position.</summary>
+    public static string PositionValueOf(IntegerArgCarrier carrier, string value, int scale, bool refMod) =>
+        (carrier, refMod) switch
+        {
+            (IntegerArgCarrier.Real, false) => $"{nameof(CobolTable)}.{nameof(CobolTable.OccValueReal)}({value})",
+            (IntegerArgCarrier.Dec, false) => $"{nameof(CobolTable)}.{nameof(CobolTable.OccValueDec)}({value})",
+            (IntegerArgCarrier.Scaled, false) => $"{nameof(CobolTable)}.{nameof(CobolTable.OccValue)}({value}, {scale})",
+            (IntegerArgCarrier.Real, true) => $"{nameof(CobolString)}.{nameof(CobolString.RefModValueReal)}({value})",
+            (IntegerArgCarrier.Dec, true) => $"{nameof(CobolString)}.{nameof(CobolString.RefModValueDec)}({value})",
+            (IntegerArgCarrier.Scaled, true) => $"{nameof(CobolString)}.{nameof(CobolString.RefModValue)}({value}, {scale})",
+            _ => throw new ArgumentOutOfRangeException(nameof(carrier)),
+        };
+
     /// <summary>The operand carriers an integer-argument intake is total over (<see cref="IntegerArgOf"/>): the
     /// exact scaled <c>Int128</c>, the SDIDI, and binary64 — the unsigned-wide lane funnels into the first through
     /// <c>NumericRenderer.DeU</c> before it reaches the intake.</summary>

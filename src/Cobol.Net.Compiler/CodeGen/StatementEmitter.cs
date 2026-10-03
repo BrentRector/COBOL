@@ -295,6 +295,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     public bool Visit(BoundDivideRemainder n) { _arith.EmitDivideRemainder(n); return false; }
     public bool Visit(BoundCompute n) { _arith.EmitCompute(n); return false; }
     public bool Visit(BoundComputeBoolean n) { _arith.EmitComputeBoolean(n); return false; }
+    public bool Visit(BoundPositionValue n) { _arith.EmitPositionValue(n); return false; }
 
     // ── Conditionals / loops / SEARCH / EVALUATE ─────────────────────────────────────────────────────────────
     public bool Visit(BoundIf n) { _controlFlow.EmitIf(n); return false; }

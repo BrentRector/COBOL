@@ -217,15 +217,15 @@ internal static class PlaceRenderer
         // same-level bit members at successive bit positions of the SAME byte, so a byte-granular store through
         // either would silently clobber the other. The value is first stored to exactly the member's boolean
         // position count with §14.6.8.6's boolean-ZERO fill.
-        RedefViewPlace { Coding: BitWindow b } v => $"{RenderPath(v.Backing, AccessDir.Sending)} = " +
-            $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Sending), $"(int)({b.OffsetExpr})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
+        RedefViewPlace { Coding: BitWindow b } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+            $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({b.OffsetExpr})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
         // Splice the member's NATIONAL positions back into the class's ONE backing as UTF-16BE byte pairs,
         // leaving every other byte untouched (kb/Work PB231; §13.18.44.4 GR1 — one storage area, so a write
         // through one view must not disturb another's bytes). The receiving twin of the national read arm; the
         // fit to exactly the member's position count happens in POSITIONS inside the runtime helper, because
         // padding the BYTES would manufacture U+2020 characters instead of national spaces.
-        RedefViewPlace { Coding: NationalWindow n } v => $"{RenderPath(v.Backing, AccessDir.Sending)} = " +
-            $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Sending), $"(int)({v.OffsetExpr})", n.Positions.ToString(), rhs)};",
+        RedefViewPlace { Coding: NationalWindow n } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+            $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({v.OffsetExpr})", n.Positions.ToString(), rhs)};",
         // Store a POINTER-CLASS member into the area's MANAGED SLOT (kb/Work PB231) — the receiving twin of the
         // slot read. The BYTE image is deliberately untouched: the member's bytes there are reserved
         // placeholders, so a write through one description cannot disturb another view's characters
@@ -310,10 +310,15 @@ internal static class PlaceRenderer
         RuntimeApi.StrWindow(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString());
 
     /// <summary>The receiving twin of <see cref="ByteWindowRead"/>: splice <paramref name="image"/> into the class's
-    /// ONE backing at the view's window, preserving its full width (§13.18.44).</summary>
+    /// ONE backing at the view's window, preserving its full width (§13.18.44).
+    /// <para>⛔ THE BACKING RENDERS RECEIVING ON BOTH SIDES of every window store — this one and the bit and national
+    /// arms of <see cref="Write"/> (kb/Work PB1933). A backing inside an OCCURS DYNAMIC element is reached through
+    /// the element's accessor, and only <c>RefReceiving</c> creates an occurrence past the current capacity
+    /// (§8.5.1.9.3); a <c>RefSending</c> target would splice into the benign scratch a read of a missing occurrence
+    /// returns, and the store would vanish. Every other path renders identically in both directions.</para></summary>
     private static string ByteWindowWrite(RedefViewPlace v, string image) =>
-        $"{RenderPath(v.Backing, AccessDir.Sending)} = " +
-        $"{RuntimeApi.StrWindowInto(RenderPath(v.Backing, AccessDir.Sending), RvOffset(v), v.Width.ToString(), image)};";
+        $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+        $"{RuntimeApi.StrWindowInto(RenderPath(v.Backing, AccessDir.Receiving),RvOffset(v), v.Width.ToString(), image)};";
 
     /// <summary>The contiguous image of a cell-backed variable-length group view (kb/Work PB1026).</summary>
     private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g) =>

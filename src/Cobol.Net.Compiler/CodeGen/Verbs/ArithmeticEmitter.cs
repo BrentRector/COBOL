@@ -253,6 +253,21 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                     StoreArith(r.Place, num.Render(c.Rhs, RcvFor(r, ise), outermost: true), r.Rounding));
         });
 
+    /// <summary>A subscript / reference-modifier bound's pre-operation (kb/Work PB1890): the expression renders
+    /// RECEIVER-LESS — no resultant scale truncates it, a nested quotient keeps its guard digits — and its value
+    /// reaches the position intake on its own carrier (<see cref="NumericRenderer.IntakeCarrier"/>), which raises
+    /// EC-BOUND-SUBSCRIPT / EC-BOUND-REF-MOD for a non-integer (§8.4.2.3.4 GR1b, §8.4.3.3.4 rule 5)c)) and yields the
+    /// saturated integer position the integer temporary stores. It rides <see cref="EmitArith"/> with no phrase, so
+    /// the expression's own size-error conditions (a zero divisor) keep the arithmetic statements' discipline.</summary>
+    public void EmitPositionValue(BoundPositionValue p)
+        => EmitArith(null, ise =>
+        {
+            var (carrier, value) = NumericRenderer.IntakeCarrier(
+                num.Render(p.Value, ReceiverContext.None with { InSizeError = ise }));
+            var position = new NumX(RuntimeApi.PositionValueOf(carrier, value.Expr, value.Scale, p.RefMod), 0);
+            GuardedStore(ise, () => StoreArith(p.Temp, position, CobolRounding.Truncation));
+        });
+
     /// <summary>The size-error catch pair (kb/Work PB129 — factored so the outer statement try and every
     /// per-receiver <see cref="GuardedStore"/> emit the identical discipline).</summary>
     private void WriteSizeCatches(string flag, string? ecnVar)

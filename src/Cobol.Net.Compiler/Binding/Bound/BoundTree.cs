@@ -1196,6 +1196,14 @@ public sealed record BoundDivideRemainder(
 /// <summary><c>COMPUTE targets = rhs</c>.</summary>
 public sealed record BoundCompute(BoundExpr Rhs, IReadOnlyList<Receiver> Targets, SizeErrorPhrase? SizeError) : BoundStatement, IArithmeticStatement;
 
+/// <summary>The statement pre-operation that evaluates a subscript or reference-modifier bound written as an
+/// arithmetic EXPRESSION (or a floating-point item) and stores the ORDINAL POSITION it denotes in
+/// <paramref name="Temp"/>, an integer compiler temporary the reference reads back (kb/Work PB1890). The
+/// integrality rule — §8.4.2.3.4 GR1b for a subscript (<paramref name="RefMod"/> false), §8.4.3.3.4 rule 5)c) for a
+/// leftmost-position or length — is asked of <paramref name="Value"/> on the carrier it evaluates on, BEFORE the
+/// store, so no fixed fraction width can turn a non-integer into an integer.</summary>
+public sealed record BoundPositionValue(BoundExpr Value, Place Temp, bool RefMod) : BoundStatement;
+
 /// <summary><c>COMPUTE boolean-targets = boolean-expression</c> (ISO §14.9.8 Format 2). Each receiver is an
 /// elementary boolean item; the stored value is taken at the number of boolean positions in the LARGEST boolean
 /// ITEM referenced in the expression (§14.9.8.4 GR3 — literal-only larger sides don't count), left-aligned /

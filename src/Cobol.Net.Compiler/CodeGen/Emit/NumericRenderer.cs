@@ -1086,6 +1086,23 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// CALL BY CONTENT computed-argument site funnels through the same rule).</summary>
     internal static NumX DeU(NumX x) => x.U ? new NumX(RuntimeApi.NumWiden(x.Expr), x.Scale, Digits: x.Digits) : x;
 
+    /// <summary>A value's intake carrier KIND — the exact scaled <c>Int128</c>, the SDIDI or binary64 — after the
+    /// unsigned-wide lane has funnelled through <see cref="DeU"/>: the ONE mapping both value-on-its-own-carrier
+    /// intakes key on, the §15.3 type-6 integer argument (<c>IntrinsicRenderer.IntegerIntake</c>) and the
+    /// subscript / reference-modifier position (<c>ArithmeticEmitter.EmitPositionValue</c>, kb/Work PB1890), so a new
+    /// carrier is one arm here rather than a missed arm in one of them.</summary>
+    internal static (RuntimeApi.IntegerArgCarrier Carrier, NumX Value) IntakeCarrier(NumX a)
+    {
+        a = DeU(a);
+        return a.Carrier switch
+        {
+            NumXCarrier.Binary64 => (RuntimeApi.IntegerArgCarrier.Real, a),
+            NumXCarrier.Sdidi => (RuntimeApi.IntegerArgCarrier.Dec, a),
+            NumXCarrier.Scaled => (RuntimeApi.IntegerArgCarrier.Scaled, a),
+            _ => throw new InvalidOperationException($"unsigned-wide operand survived the Widen funnel ({a.Carrier})"),
+        };
+    }
+
     /// <summary>
     /// Land a rendered intermediate into the exact <c>Int128</c> lane at the receiver's working scale — the ONE
     /// landing every value-semantics consumer of a <c>(Expr, Scale)</c> pair shares: an intrinsic argument, a CALL
