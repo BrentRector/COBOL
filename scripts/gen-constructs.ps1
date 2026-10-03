@@ -55,7 +55,11 @@ foreach ($r in $rows) {
         if ($r.directiveOperand.form -notin 'words','text','stage') { throw "row '$($r.id)': directiveOperand.form '$($r.directiveOperand.form)' is not words/text/stage" }
         if ([string]::IsNullOrWhiteSpace($r.directiveOperand.citation)) { throw "row '$($r.id)': directiveOperand needs a citation — an unchecked operand is a cited decision, never a silence" }
         if ($r.directiveOperand.form -eq 'stage' -and [string]::IsNullOrWhiteSpace($r.directiveOperand.owner)) { throw "row '$($r.id)': a stage-owned operand needs an owner" }
-        if ($r.directiveOperand.form -eq 'words' -and @($r.directiveOperand.choice).Count -eq 0 -and -not $r.directiveOperand.directiveName -and -not $r.directiveOperand.userWord) { throw "row '$($r.id)': a words operand needs a choice, a directiveName or a userWord alternative" }
+        if ($r.directiveOperand.form -eq 'words' -and @($r.directiveOperand.choice).Count -eq 0 -and -not $r.directiveOperand.directiveName) { throw "row '$($r.id)': a words operand needs a choice or a directiveName alternative" }
+        # An implementor-defined NAME position (§7.3.9.2's call-convention-name-1) is not a column: its admissible
+        # words are the names the implementor DEFINES, which belong in the row's choice (kb/Work PB1383 — a column
+        # admitting "any COBOL word" accepted names that select nothing).
+        if ($null -ne $r.directiveOperand.userWord) { throw "row '$($r.id)': directiveOperand.userWord is not a column — list the implementor-defined names in choice (kb/Work PB1383)" }
     }
     elseif ($null -ne $r.directiveOperand) { throw "row '$($r.id)' carries directiveOperand but no directiveWords" }
     # A directive's PLACEMENT rule (kb/Work PB1377/PB1378/PB1065) — where §7.3 says it may not be written — is data on
@@ -114,7 +118,6 @@ foreach ($r in $rows) {
         if ($null -ne $r.directiveOperand.noOperandWords -and @($r.directiveOperand.noOperandWords).Count -gt 0) {
             $init += ', NoOperandWords = [{0}]' -f ((@($r.directiveOperand.noOperandWords) | ForEach-Object { '"' + (Esc $_) + '"' }) -join ', ')
         }
-        if ($r.directiveOperand.userWord)        { $init += ', UserWord = true' }
         if ($r.directiveOperand.operandRequired) { $init += ', OperandRequired = true' }
         if (-not [string]::IsNullOrEmpty($r.directiveOperand.owner)) { $init += ', Owner = "{0}"' -f (Esc $r.directiveOperand.owner) }
         $init += ', Citation = "{0}" }}' -f (Esc $r.directiveOperand.citation)

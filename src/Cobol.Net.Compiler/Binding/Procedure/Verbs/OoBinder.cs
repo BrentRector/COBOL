@@ -967,7 +967,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
 
             // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category.
-            if (OoConformance.ContentMismatch(host.OoClasses, formal, place, invokedWith) is { } cerr)
+            if (OoConformance.ContentMismatch(host.OoClasses, host.Set.PointerAssignmentReason, formal, place, invokedWith) is { } cerr)
             {
                 Err($"BY CONTENT argument '{argText}' does not conform to formal "
                     + $"'{formal.CobolName}': {cerr} (ISO §14.8.2.3.3)");

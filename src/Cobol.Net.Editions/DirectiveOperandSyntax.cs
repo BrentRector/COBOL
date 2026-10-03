@@ -72,10 +72,6 @@ public sealed record DirectiveOperandSyntax
     /// DIRECTIVE, not the spelling.</summary>
     public IReadOnlyList<string> ExcludedDirectives { get; init; } = [];
 
-    /// <summary>True when a user-defined word is admissible as the operand — §7.3.9.2's
-    /// <c>call-convention-name-1</c>, whose meaning is implementor-defined (§7.3.9.3 GR2 b).</summary>
-    public bool UserWord { get; init; }
-
     /// <summary>For <see cref="DirectiveOperandForm.Text"/> and <see cref="DirectiveOperandForm.Stage"/>: whether SOME
     /// operand shall be present — checked centrally for both, so the owning stage of a Stage row never has to repeat it.
     /// PAGE's comment-text-1 is bracketed and optional (§7.3.19.2); DISPLAY's operand braces are not (§7.3.12.2).</summary>
@@ -106,7 +102,6 @@ public sealed record DirectiveOperandSyntax
         var parts = new List<string>(Choice);
         if (DirectiveName) parts.Add("a compiler-directive name" + (directiveNames is null
             ? "" : " (" + string.Join(", ", directiveNames.Order(StringComparer.Ordinal)) + ")"));
-        if (UserWord) parts.Add("an implementor-defined name");
         string set = parts.Count switch
         {
             0 => "no operand",

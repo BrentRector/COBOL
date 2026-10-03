@@ -203,7 +203,7 @@ public sealed class CompilerDirectiveCatalogDriftTests
             if (string.IsNullOrWhiteSpace(s.Citation)) bad.Add($"{row.Id}: directiveOperand has no citation");
             switch (s.Form)
             {
-                case DirectiveOperandForm.Words when s.Choice.Count == 0 && !s.DirectiveName && !s.UserWord:
+                case DirectiveOperandForm.Words when s.Choice.Count == 0 && !s.DirectiveName:
                     bad.Add($"{row.Id}: a words operand admits nothing"); break;
                 case DirectiveOperandForm.Stage when
                     typeof(ConditionalCompilationProcessor).Assembly.GetTypes()
@@ -237,7 +237,9 @@ public sealed class CompilerDirectiveCatalogDriftTests
             var s = row.DirectiveOperand!;
             string? malformed = s.Form switch
             {
-                DirectiveOperandForm.Words => s.UserWord ? "\"ZZBOGUS\"" : "ZZBOGUS",
+                // A word the set does not admit — for >>CALL-CONVENTION that is an undefined call-convention-name,
+                // which names no convention WiseOwl COBOL defines (kb/Work PB1383; DOC-A.1-68).
+                DirectiveOperandForm.Words => "ZZBOGUS",
                 _ when s.OperandRequired => "",
                 _ => null,   // PAGE's comment-text-1 (§7.3.19.3 SR2) and the two removed FLAG windows
             };
@@ -270,7 +272,6 @@ public sealed class CompilerDirectiveCatalogDriftTests
             {
                 DirectiveOperandForm.Words when s.Choice.Count > 0 => s.Choice[0],
                 DirectiveOperandForm.Words when s.DirectiveName => "LISTING",
-                DirectiveOperandForm.Words when s.UserWord => "ZQXNAME",
                 DirectiveOperandForm.Text when s.OperandRequired => "\"x\"",
                 _ => "",
             };

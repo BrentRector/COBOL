@@ -439,6 +439,15 @@ internal static class PlaceRenderer
     public static string WriteFullGroupImage(Place group, string image, string context) =>
         group is OdoGroupPlace o ? WriteFullGroupImage(o.Inner, image, context) : WriteGroupImage(group, image, context);
 
+    /// <summary>The LEAF VECTOR of a strongly-typed group that has no character image — the activation-boundary carrier
+    /// <c>OoClassTable.LeafCarried</c> selects (kb/Work PB1116): its record struct's generated <c>AsLeaves()</c>.</summary>
+    public static string GroupLeaves(Place group) => $"{Read(group)}.AsLeaves()";
+
+    /// <summary>The inverse of <see cref="GroupLeaves"/>: a NEW record struct of the place's own type, built field for field
+    /// from <paramref name="leaves"/> by its generated <c>OfLeaves</c>, stored through the ONE place writer.</summary>
+    public static string WriteGroupLeaves(Place group, string leaves) =>
+        Write(group, $"{group.Item.StructName}.OfLeaves({leaves})");
+
     public static string WriteGroupImage(Place group, string image, string context) => group switch
     {
         // A NATIONAL GROUP view's STORAGE image is its 2m-byte window; its Write is the m-position VALUE store

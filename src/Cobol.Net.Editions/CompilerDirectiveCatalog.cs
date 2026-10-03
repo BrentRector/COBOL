@@ -158,7 +158,6 @@ public static class CompilerDirectiveCatalog
         if (syntax.Choice.Contains(w, StringComparer.OrdinalIgnoreCase)) return null;
         if (syntax.DirectiveName && OperandDirectiveNames(syntax, edition).Contains(w, StringComparer.OrdinalIgnoreCase))
             return null;
-        if (syntax.UserWord && IsCobolWord(w)) return null;
         return $"'{w}' is not an admissible operand";
     }
 
@@ -178,15 +177,6 @@ public static class CompilerDirectiveCatalog
         return [.. Words.Where(w => !excluded.Contains(w)
                                     && Find(w)!.StatusAt(edition.Year) is not (ConstructAvailability.NotYetIntroduced
                                                                                or ConstructAvailability.Removed))];
-    }
-
-    /// <summary>A COBOL word (§8.3.2): basic letters, digits, hyphen and underscore, not a literal and not
-    /// punctuation. The operand positions that admit an implementor-defined name accept one of these and
-    /// nothing else — <c>&gt;&gt;CALL-CONVENTION "COBOL"</c> writes a literal where the format writes a name.</summary>
-    private static bool IsCobolWord(string w)
-    {
-        foreach (char c in w) if (!char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_') return false;
-        return w.Length > 0 && w[0] != '-' && w[^1] != '-';
     }
 
     /// <summary>The row ids of every directive whose STATE a <c>&gt;&gt;PUSH ALL</c> saves — ISO §7.3.22.4 GR2:

@@ -55,6 +55,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // A bit / national group hands back its ELEMENTARY value, an alphanumeric group its image — the CALL
         // boundary's ONE read (kb/Work PB1166), so the method ABI and the program ABI cannot speak two alphabets.
         : root.IsAsIfElementary ? CallEmitter.CallStringRead(MethodRootPlace(root))
+        // A strong group with no character image hands back its leaf vector (kb/Work PB1116).
+        : OoClassTable.LeafCarried(root) ? PlaceRenderer.GroupLeaves(MethodRootPlace(root))
         : root.IsGroup ? PlaceRenderer.GroupImage(MethodRootPlace(root), what)
         : root.CsName;
 
@@ -671,6 +673,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // spelled `(string)box!` into a `ref CobolVarGroup` parameter: CS1503 on a method merely DECLARED,
         // the PB177 arm-A shape exactly.
         OoVarGroupCarried(item) ? $"({RuntimeApi.VarGroupType}){box}!"
+        // A strong group's leaf vector (kb/Work PB1116) — its "T:!" descriptor matches no caller until kb/Work PB480's
+        // structured description carries a strong type through universal dispatch, but the case must compile.
+        : OoClassTable.LeafCarried(item) ? $"(object?[]){box}!"
         : OoUnivNativeBoxOverImage(item) ? NumericRenderer.ImageOfCarrier($"({item.Pic!.ClrType}){box}!", item)
         : OoStringCarried(item) ? $"(string){box}!"
         : OoUnivImageBridged(item) ? RuntimeApi.NumStoreDisplay($"(string){box}!", item.ProfileName, $"({item.ElementType})0")
@@ -982,6 +987,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         // A bit / national group receives its ELEMENTARY value through the CALL boundary's ONE
                         // write (kb/Work PB1166 — the twin of MethodBoundaryValue's arm).
                         : root.IsAsIfElementary ? CallEmitter.CallStringWrite(MethodRootPlace(root), formal.ParamName)
+                        // A strong group with no character image is rebuilt from its leaf vector (kb/Work PB1116).
+                        : OoClassTable.LeafCarried(root) ? PlaceRenderer.WriteGroupLeaves(MethodRootPlace(root), formal.ParamName)
                         : PlaceRenderer.WriteFullGroupImage(MethodRootPlace(root), formal.ParamName,
                             "OO method LINKAGE formal copy-in")) + " }");
                 }
@@ -1203,6 +1210,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// to a ternary spelled six times is how the two-arm defect gets made).</summary>
     private static string OoCrossingType(DataItem item) =>
         OoVarGroupCarried(item) ? RuntimeApi.VarGroupType
+        : OoClassTable.LeafCarried(item) ? "object?[]"   // the strong group's leaf vector (kb/Work PB1116)
         : OoStringCarried(item) ? "string"
         : item.ElementType;
 
@@ -1411,6 +1419,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                      && a.Formal.Pic is { Category: PicCategory.Numeric, IsFloat: false }
                      && MethodNumericContent(a, qualProfile) is { } imageValue)
                 w.Line($"string {tmp} = {RuntimeApi.NumFormatImage(imageValue, qualProfile)};");
+            // ⛔ A STRONG GROUP WITH NO CHARACTER IMAGE (kb/Work PB1116): the argument is of the formal's type (bind
+            // proved it), so it crosses as its leaf vector — a fresh vector, so BY CONTENT is a copy and BY REFERENCE
+            // is copied back below. FIRST among the group arms: StringCarried is true of every group.
+            else if (OoClassTable.LeafCarried(a.Formal))
+                w.Line($"object?[] {tmp} = {PlaceRenderer.GroupLeaves(a.Source!)};");
             else if (a.Formal.IsGroup || (stringCarried && a.Source?.Item.IsGroup == true))
             {
                 // The image crossing. BY REFERENCE allows a SMALLER formal (§14.8.2.2 rule 1 — a PREFIX of
@@ -1530,6 +1543,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     RuntimeApi.VarGroupOverlayFixedImage(PlaceRenderer.VarGroupImage(src, "INVOKE copy-out into"), tmp,
                         CallEmitter.LayoutArray(wv)),
                     "INVOKE copy-out into"));
+            else if (OoClassTable.LeafCarried(a.Formal))
+                Post(PlaceRenderer.WriteGroupLeaves(src, tmp));   // the leaf vector's copy-back (kb/Work PB1116)
             else if (a.Formal.IsGroup || src.Item.IsGroup)
             {
                 int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : CallEmitter.ElementaryFormalWindow(a.Formal);
@@ -1586,6 +1601,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             else if (ItemCategory.IsGroupItem(rs) && VarPlaceSpans(recv, rs) is { } fvs)
                 w.Line(PlaceRenderer.WriteVarGroupImage(inv.Returning,
                     RuntimeApi.VarGroupFromFixedImage(tmp, CallEmitter.LayoutArray(fvs)), "INVOKE RETURNING delivery into"));
+            else if (OoClassTable.LeafCarried(rs))
+                w.Line(PlaceRenderer.WriteGroupLeaves(inv.Returning, tmp));   // §14.8.3.2 same type — the leaf vector (kb/Work PB1116)
             else if (rs.IsGroup || recv.Item.IsGroup)
                 w.Line(CallEmitter.CallStringWrite(inv.Returning, tmp));
             else if (recv is RefModPlace)

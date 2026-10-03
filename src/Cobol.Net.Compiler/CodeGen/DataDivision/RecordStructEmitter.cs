@@ -174,6 +174,53 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
                 codec.EmitCurrentImageMethod(item, w);
                 codec.EmitVarImageMethods(item, w);
             }
+            // A strong group with no character image crosses an activation boundary as its LEAF VECTOR (kb/Work
+            // PB1116; OoClassTable.LeafCarried) — so it, and every group struct nested in it, gets the pair.
+            if (WithinLeafCarried(item)) EmitLeafMethods(item, w);
+        }
+    }
+
+    /// <summary>True when <paramref name="item"/> or a group it is subordinate to crosses as a leaf vector.</summary>
+    private static bool WithinLeafCarried(DataItem item)
+    {
+        for (DataItem? a = item; a is not null; a = a.Parent)
+            if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(a)) return true;
+        return false;
+    }
+
+    /// <summary>The leaf-vector pair of one record struct (kb/Work PB1116): <c>AsLeaves()</c> boxes each PHYSICAL field
+    /// in declaration order — an elementary field by value (an object reference as the reference), a fixed table of
+    /// elementary items as a copy of its array, a nested group by its own vector, a table of groups as an array of their
+    /// vectors — and the static <c>OfLeaves</c> builds a NEW struct from such a vector. Two record structs of one
+    /// strong type have corresponding physical fields (§8.5.3.1: the same elementary items at the same relative
+    /// positions with the same clauses), so a vector made by one is read by the other field for field — the copy-in
+    /// and copy-out of a BY REFERENCE crossing, the copy of a BY CONTENT one, and a RETURNING delivery.</summary>
+    private void EmitLeafMethods(DataItem item, CodeWriter w)
+    {
+        var fs = phys.PhysicalChildrenOf(item);
+        static string Elem(string arrayType) => arrayType.EndsWith("[]", StringComparison.Ordinal) ? arrayType[..^2] : arrayType;
+        string Out(PhysicalModel.Physical f) =>
+            (f.IsGroupStruct, f.Occurs > 0) switch
+            {
+                (false, false) => f.Name,
+                (false, true) => $"{f.Name}.Clone()",
+                (true, false) => $"{f.Name}.AsLeaves()",
+                (true, true) => $"System.Array.ConvertAll({f.Name}, __e => (object?)__e.AsLeaves())",
+            };
+        string In(PhysicalModel.Physical f, string v) =>
+            (f.IsGroupStruct, f.Occurs > 0) switch
+            {
+                (false, false) => $"__s.{f.Name} = ({f.Type}){v}!;",
+                (false, true) => $"__s.{f.Name} = ({f.Type})(({f.Type}){v}!).Clone();",
+                (true, false) => $"__s.{f.Name} = {f.Type}.OfLeaves((object?[]){v}!);",
+                (true, true) => $"__s.{f.Name} = System.Array.ConvertAll((object?[]){v}!, __e => {Elem(f.Type)}.OfLeaves((object?[])__e!));",
+            };
+        w.Line($"public readonly object?[] AsLeaves() => [{string.Join(", ", fs.Select(Out))}];   // kb/Work PB1116");
+        using (w.Block($"public static {item.StructName} OfLeaves(object?[] __l)"))
+        {
+            w.Line($"var __s = new {item.StructName}();");
+            for (int i = 0; i < fs.Count; i++) w.Line(In(fs[i], $"__l[{i}]"));
+            w.Line("return __s;");
         }
     }
 

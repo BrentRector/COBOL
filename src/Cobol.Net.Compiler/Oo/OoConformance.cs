@@ -665,6 +665,11 @@ public static class OoConformance
             // is BoundaryImageCapable, not IsImageCapable: a COMPATIBLE variable-length group crosses through
             // its current-extent codec (kb/Work PB204), so only a group with no boundary image at all — a
             // pointer/object-class leaf, or a variable-length shape outside the current-extent gate — is loud.
+            // ⛔ TWO STRONG GROUPS OF THE SAME TYPE ARE DECIDED (kb/Work PB1116): the strongly-typed sentence above is
+            // the whole rule for them, and the Tier-C island is a CARRIER question, not a conformance one — a strong
+            // group with an object-reference leaf crosses as its leaf vector (OoClassTable.LeafCarried). Before this
+            // arm the legal population (§13.18.60.3 confines object references in groups to strong types) was refused.
+            if (OoClassTable.LeafCarried(formal) && OoClassTable.LeafCarried(arg)) return null;
             if (arg.IsGroup && !arg.BoundaryImageCapable)
                 return TierCIsland.Reason(arg, "argument group");
             if (!formal.BoundaryImageCapable)
@@ -1015,10 +1020,13 @@ public static class OoConformance
     /// fixed-point or floating-point formal — kb/Work PB1114), SET for
     /// object references (widening — the argument's class shall be the receiver's class or a subclass), MOVE
     /// otherwise (§14.9.25.3 Table 16). Null when conformant.</summary>
+    /// <param name="pointerAssignment">The ONE §14.9.39.3 verdict for a pointer identifier SET into a pointer receiver of
+    /// its category (<c>SetBinder.PointerAssignmentReason</c>, receiver first): the class-pointer arm's SET question
+    /// beyond the category — restriction and prototype signature, which need the binder's prototype tables.</param>
     /// <param name="invokedWith">INVOKE only — see <see cref="DescriptionMismatch"/>: an ACTIVE-CLASS formal takes
     /// §14.8.2.3.3's two ACTIVE-CLASS alternatives, each a condition on the invocation AND a SET.</param>
-    public static string? ContentMismatch(OoClassTable? classes, DataItem formal, Place argPlace,
-        ObjectRefDescriptor? invokedWith = null)
+    public static string? ContentMismatch(OoClassTable? classes, Func<DataItem, DataItem, string?> pointerAssignment,
+        DataItem formal, Place argPlace, ObjectRefDescriptor? invokedWith = null)
     {
         DataItem arg = argPlace.Item;
         // §14.8.2.2's strongly-typed sentence carries NO passing-mode qualification — it follows rules 1 (BY
@@ -1051,7 +1059,9 @@ public static class OoConformance
                 // failure of the landed golden conformance:2023/pb204_vlg_boundary. The predicate is PB204's
                 // own, unchanged.
                 return VariableLengthCompatibility.Mismatch(formal, arg)
-                    ?? (arg.BoundaryImageCapable ? null : TierCIsland.Reason(arg, "argument group"));
+                    // Two strong groups of the same type (decided above) cross as their leaf vector (kb/Work PB1116).
+                    ?? (arg.BoundaryImageCapable || (OoClassTable.LeafCarried(formal) && OoClassTable.LeafCarried(arg))
+                        ? null : TierCIsland.Reason(arg, "argument group"));
             // ⛔ §14.8.2.3.3 rule 2d IS THE WHOLE MOVE QUESTION, ASKED OF THE ONE CHAIN (kb/Work PB878). This
             // arm was a hand list of sender categories — a fourth private copy of Table 16's alphanumeric column
             // that could not see the ALPHABETIC column (numeric-edited → PIC A is "No"), SR8 (a BINARY-LONG
@@ -1091,8 +1101,12 @@ public static class OoConformance
             // pointer is category-to-same-category (§14.9.39.3 SR17 data-pointer, SR20 function-pointer, SR21
             // program-pointer). This arm used to fall into the default MOVE arm, where Table 16 happened to admit the pair;
             // once that arm asks §14.9.25.3 SR1 (kb/Work PB970 arm 2) it would refuse every pointer argument.
+            // ⛔ AND THE WHOLE SET, NOT ITS CATEGORY SCREEN ALONE (kb/Work PB1063): SR19 refuses a restricted
+            // data-pointer stored into an unrestricted one (and the converse), SR22 an unrestricted or differently
+            // signed program-pointer into a restricted one, SR20 a function-pointer of another signature — the
+            // argument is the SENDER and the formal the RECEIVER, the same direction the SET binder asks.
             PicCategory.Pointer or PicCategory.ProgramPointer or PicCategory.FunctionPointer =>
-                argCat == f.Category ? null
+                argCat == f.Category ? pointerAssignment(formal, arg)
                 : $"a {f.Category} formal takes an argument of the same pointer category (SET rules, §14.8.2.3.3)",
             PicCategory.ObjectReference =>
                 argCat is not PicCategory.ObjectReference || arg.Pic is not { } ap

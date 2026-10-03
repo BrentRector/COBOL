@@ -572,29 +572,74 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // conditioned on the RECEIVER being restricted (unlike SR20, where every function-pointer is), which
             // is the only asymmetry between the two; the compare itself is the same one, so it is the same
             // helper. kb/Work PB817: "SR20 and SR22 are ONE rule over TWO carriers; write it once."
-            string? senderProto = sp.Item.Pic?.RestrictedPrototypeName;
             foreach (var t in targets)
-            {
-                string? targetProto = t.Item.Pic?.RestrictedPrototypeName;
-                if (targetProto is null) continue;   // an UNRESTRICTED receiver — SR22's condition is not met
+                if (PointerAssignmentReason(t.Item, sp.Item) is { } why)
+                    return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.PrototypePointerSignature,
+                        $"SET '{t.Item.CobolName}' TO '{sp.Item.CobolName}': {why}");
+        }
+        return new BoundSetProgramPointer(targets, source, toNull);
+    }
+
+    /// <summary>⛔ THE ONE §14.9.39.3 VERDICT FOR A POINTER IDENTIFIER STORED INTO A POINTER RECEIVER — the SET of one
+    /// (receiver, sender) pair whose two items are already of one pointer category. Asked by SET Format 9 itself and by
+    /// every BY CONTENT / BY VALUE argument into a pointer formal, because §14.8.2.3.3 makes that crossing "the same as if
+    /// a SET statement were performed in the activating runtime element with the argument as the sending operand and the
+    /// corresponding formal parameter as the receiving operand" (kb/Work PB1063: the argument lane compared the
+    /// CATEGORY alone, so a restricted data-pointer reached an unrestricted pointer formal, which SR19 refuses). Null
+    /// when the SET is valid.
+    /// <list type="bullet">
+    /// <item>data-pointer — SR19: "If identifier-5 references a restricted data-pointer, identifier-6 shall be the
+    /// predefined address NULL or shall reference a data-pointer restricted to the same type", and its third sentence
+    /// the converse (a restricted sender needs a receiver restricted to the same type) — both directions over the ONE
+    /// restriction model (<see cref="StrongTypeModel.PointerRestriction"/>), the pair
+    /// <c>PtrBinder.ScreenPointerReceiverRestriction</c> asks of a Format-7 sender of either spelling;</item>
+    /// <item>program-pointer — SR22: a RESTRICTED receiver needs a sender "restricted" to a program-prototype of the
+    /// same signature (an unrestricted sender is associated with none); an unrestricted receiver takes any
+    /// program-pointer (SR21);</item>
+    /// <item>function-pointer — SR20: "The function-prototypes associated with identifier-12 and identifier-13 shall
+    /// have the same signature".</item>
+    /// </list></summary>
+    internal string? PointerAssignmentReason(DataItem receiver, DataItem sender)
+    {
+        switch (receiver.Pic?.Category)
+        {
+            case PicCategory.Pointer:
+                var rr = StrongTypeModel.PointerRestriction(receiver);
+                var sr = StrongTypeModel.PointerRestriction(sender);
+                return (rr.IsRestricted || sr.IsRestricted) && !StrongTypeModel.SameRestriction(rr, sr)
+                    ? (rr.IsRestricted
+                        ? $"the receiving data-pointer is restricted to type '{rr}', so the sender shall be NULL or a "
+                          + $"data-pointer restricted to the same type, and it is {(sr.IsRestricted ? $"restricted to '{sr}'" : "unrestricted")} "
+                          + "(ISO §14.9.39.3 SR19)"
+                        : $"the sender is a RESTRICTED data-pointer of type '{sr}' (ISO §13.18.60.4 GR23), so the receiver "
+                          + "shall be a data-pointer restricted to the same type, and it is unrestricted (ISO §14.9.39.3 SR19, "
+                          + "third sentence)")
+                    : null;
+            case PicCategory.ProgramPointer:
+                string? targetProto = receiver.Pic.RestrictedPrototypeName;
+                if (targetProto is null) return null;   // an UNRESTRICTED receiver — SR22's condition is not met
                 // An UNRESTRICTED sender is a violation in its own right, not a vacuous pass: SR22 requires the
                 // prototypes "associated with identifier-7 and identifier-8" to have the same signature, and an
                 // unrestricted program-pointer is associated with none. (§14.8.2.3.2 says the same thing in the
                 // argument-passing direction and says it explicitly — "if either is a restricted pointer, both
                 // shall be restricted and of the same type".) This is DISTINCT from a prototype that names no
                 // compile-time signature, which PrototypeSignatures.Same deliberately lets through.
-                if (senderProto is null
-                    || !PrototypeSignatures.Same(ProgramSignatureOf(targetProto), ProgramSignatureOf(senderProto)))
-                {
-                    return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.PrototypePointerSignature,
-                        $"SET '{t.Item.CobolName}' TO '{sp.Item.CobolName}': the receiving program-pointer is "
-                        + $"restricted to program-prototype '{targetProto}' and the sender "
-                        + $"{(senderProto is null ? "is unrestricted" : $"to '{senderProto}'")}, so the associated "
-                        + "program-prototypes do not have the same signature (ISO §14.9.39.3 SR22; §13.18.60.4 GR25)");
-                }
-            }
+                string? senderProto = sender.Pic?.RestrictedPrototypeName;
+                return senderProto is null
+                       || !PrototypeSignatures.Same(ProgramSignatureOf(targetProto), ProgramSignatureOf(senderProto))
+                    ? $"the receiving program-pointer is restricted to program-prototype '{targetProto}' and the sender "
+                      + $"{(senderProto is null ? "is unrestricted" : $"to '{senderProto}'")}, so the associated "
+                      + "program-prototypes do not have the same signature (ISO §14.9.39.3 SR22; §13.18.60.4 GR25)"
+                    : null;
+            case PicCategory.FunctionPointer:
+                string? rp = receiver.Pic.RestrictedPrototypeName, sp = sender.Pic?.RestrictedPrototypeName;
+                return SameFunctionPrototypeSignature(rp, sp) ? null
+                    : $"the receiving function-pointer is restricted to function-prototype '{rp}' and the sender to "
+                      + $"'{sp}', which do not have the same signature — the function-prototypes associated with "
+                      + "identifier-12 and identifier-13 shall have the same signature (ISO §14.9.39.3 SR20; §13.18.60.4 GR26)";
+            default:
+                return null;
         }
-        return new BoundSetProgramPointer(targets, source, toNull);
     }
 
     /// <summary>A program-prototype-name's bound signature, through the §8.4.6.8 scope table the declaration was
@@ -661,17 +706,10 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // SR20's LAST sentence, over every receiver: the associated function-prototypes shall have the same
             // signature. §13.18.60.4 GR26 is what makes "associated" a compile-time fact — every function-pointer
             // carries the prototype its unbracketed TO phrase names.
-            string? senderProto = sp.Item.Pic?.RestrictedPrototypeName;
             foreach (var t in targets)
-                if (!SameFunctionPrototypeSignature(t.Item.Pic?.RestrictedPrototypeName, senderProto))
-                {
+                if (PointerAssignmentReason(t.Item, sp.Item) is { } why)
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.PrototypePointerSignature,
-                        $"SET '{t.Item.CobolName}' TO '{sp.Item.CobolName}': the receiving function-pointer is "
-                        + $"restricted to function-prototype '{t.Item.Pic?.RestrictedPrototypeName}' and the sender to "
-                        + $"'{senderProto}', which do not have the same signature — the function-prototypes "
-                        + "associated with identifier-12 and identifier-13 shall have the same signature "
-                        + "(ISO §14.9.39.3 SR20; §13.18.60.4 GR26)");
-                }
+                        $"SET '{t.Item.CobolName}' TO '{sp.Item.CobolName}': {why}");
         }
         return new BoundSetFunctionPointer(targets, source, toNull);
     }

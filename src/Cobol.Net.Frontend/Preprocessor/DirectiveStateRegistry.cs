@@ -66,8 +66,9 @@ public static class DirectiveStateRegistry
             + "LeapSecondState (§7.3.4 GR5; kb/Work PB1378) — §7.3.17.3 SR1 keeps the directive out of every unit, "
             + "so the fold at a unit's first line is the state its whole text reads."),
         new(Constructs.CallConventionDirective2002, [], [],
-            "NONE HELD: the directive is recognized and consumed and every name is processed under the §7.3.9.3 "
-            + "GR1 default (COBOL); no call-convention state exists for a PUSH to save."),
+            "NONE HELD: WiseOwl COBOL defines no call-convention-name (DOC-A.1-68), so COBOL — the §7.3.9.3 GR1 "
+            + "default — is the only operand the directive's row admits (any other word is COBOLNET1911, kb/Work "
+            + "PB1383), every name is processed under GR2 a), and no call-convention state exists for a PUSH to save."),
         new(Constructs.ListingDirective2002, [], [],
             "NONE HELD: §7.3.18.3 GR1 — \"If the compiler does not produce a source listing, the LISTING directive "
             + "shall be ignored\", and this compiler produces none."),

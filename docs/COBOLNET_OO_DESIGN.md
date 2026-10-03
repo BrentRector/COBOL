@@ -202,11 +202,27 @@ REDEFINES canonical root is the exception handled before that call: its storage 
 
 **§14.9.23.3 SR13 is its own screen, ahead of the Tier-C posture.** A group INVOKE operand (identifier-3, -4 or -5,
 typed or universal) with a subordinate ACTIVE-CLASS object reference is COBOLNET2728 (`OoBinder.ActiveClassSubordinateAdmitted`,
-kb/Work PB1116), so the rule — not the carrier limit below — refuses it, and lifting the carrier limit for strongly-typed
-groups (PB1116's open half) cannot turn it into an acceptance.
+kb/Work PB1116), so the rule — not a carrier — refuses it.
 
-**Tier-C posture at the method boundary.** A group with a pointer/object-class leaf, or a variable-length group
-(§8.5.1.12.1), has no character image (`DataItem.IsImageCapable`) and the crossing stages the documented Tier-C
+**The leaf-vector crossing: a strongly-typed group with no character image (kb/Work PB1116).** §13.18.60.3 confines
+a subordinate object reference to a strong type declaration, and §14.8.2.2 / §14.8.3.2 require the argument and the
+formal (the two returning items) to be "of the same type". Such a group crosses a typed INVOKE as `object?[]`, the
+vector of its record struct's PHYSICAL fields (`OoClassTable.LeafCarried` selects it, ahead of `StringCarried`, in
+`OoCrossingType`; `RecordStructEmitter.EmitLeafMethods` gives that struct and every struct nested in it `AsLeaves()` and
+a static `OfLeaves`; `PlaceRenderer.GroupLeaves` / `WriteGroupLeaves` are the one reader and writer): an elementary
+field by value (an object reference as the reference), a fixed table as a copy of its array, a nested group by its own
+vector. BY REFERENCE copies back, BY CONTENT does not, RETURNING delivers it. **Why a field-wise copy and not one
+emitted struct per type declaration:** every `TYPE T` clone has its own `private record struct`, and two EQUIVALENT
+type declarations in two source elements (§8.5.3.1 — the program's `T` and the class's `T`) are two C# types that cannot
+see each other, so a shared struct would serve only the same-element case and the cross-element case would still need a
+conversion; the vector is the one carrier that works between any two of them, and it changes no other emission.
+**Not yet carried:** the program ABI (CALL / user function, `CobolArg`): `ParameterConformance.CheckArgument` /
+`ReturningCarrierResidue` refuse it at compile time (COBOLNET1688 / the RETURNING code) naming the carrier, after the rule
+has admitted it; and universal dispatch, whose `T:!` descriptor matches nothing until kb/Work PB480's structured
+description carries a strong type.
+
+**Tier-C posture at the method boundary.** A NON-strong group with a pointer leaf, or a variable-length group
+(§8.5.1.12.1) outside the current-extent carrier, has no character image (`DataItem.IsImageCapable`) and the crossing stages the documented Tier-C
 loud (COBOLNET_DESIGN §4.2) — it is never a backend compile error. That distinction is load-bearing: the bind
 side (`DataBinder.Oo`) applies no image screen, and `OoConformance.DescriptionMismatch`'s `!formal.IsImageCapable`
 arm runs only when an INVOKE or an override/implements **pair** exists, so a method that is merely DECLARED must

@@ -55,6 +55,20 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     internal void CheckArgument(DataItem formal, BoundCallArg arg, int position, ActivationSite site)
     {
         if (arg.Omitted) return;
+        // ⛔ A CARRIER RESIDUE, NOT A CONFORMANCE RULE (kb/Work PB1116). Two strong groups of one type CONFORM
+        // (§14.8.2.2 — OoConformance decides it for every lane), and the INVOKE boundary carries one that has no
+        // character image as its leaf vector (OoClassTable.LeafCarried). The program ABI's CobolArg channel has no
+        // such carrier yet, so the CALL / function lanes still refuse it HERE, at compile time, naming the real reason —
+        // never at run time from a NotImplemented stand-in the emitter would otherwise plant.
+        if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(formal))
+        {
+            ctx.Edition.Error(site.Conformance,
+                $"{site.Callee} argument {position}: formal parameter '{formal.CobolName}' is a strongly-typed group with "
+                + "an object-reference or pointer leaf and so no character image; the argument conforms (ISO §14.8.2.2 — "
+                + "both of the same type), but this activation boundary does not yet carry such a group (it crosses an "
+                + "INVOKE as its leaf vector; COBOLNET_DESIGN §4.2)");
+            return;
+        }
         if (arg.DataAddress is not null || arg.ProgramAddress is not null)
         {
             if (host.Ptr.AddressConformanceReason(formal, arg.DataAddress, arg.ProgramAddress) is { } awhy)
@@ -141,6 +155,16 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         return CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(activated, receiving, anyLengthActivationRelax: true);
     }
 
+    /// <summary>The CALL / function lanes' twin of <see cref="CheckArgument"/>'s carrier residue for the RETURNING item
+    /// (kb/Work PB1116): a strong group with no character image conforms by §14.8.3.2 but the program ABI cannot yet
+    /// deliver it. Null when the item is carried. Not asked by INVOKE, whose boundary carries the leaf vector.</summary>
+    internal static string? ReturningCarrierResidue(DataItem activated) =>
+        CobolNet.Compiler.Oo.OoClassTable.LeafCarried(activated)
+            ? $"the returning item '{activated.CobolName}' is a strongly-typed group with an object-reference or pointer "
+              + "leaf and so no character image; this activation boundary does not yet carry such a group (it crosses an "
+              + "INVOKE as its leaf vector; COBOLNET_DESIGN §4.2)"
+            : null;
+
     /// <summary>⛔ THE ONE reading of a figurative ZERO argument into an elementary NUMERIC formal (kb/Work PB1617
     /// for INVOKE, PB1634 for CALL). §14.8.2.3.3 2) a): "If the formal parameter is numeric, the conformance rules
     /// are the same as for a COMPUTE statement with the argument as the sending operand", and a COMPUTE reads the
@@ -171,7 +195,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         if (arg.ContentBool is not null)
             return CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Boolean);
         if (arg.Place is { } p)
-            return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, formal, p);
+            return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, host.Set.PointerAssignmentReason, formal, p);
         return arg.Value switch
         {
             // ⛔ NULL IS AN IDENTIFIER OF CLASS POINTER OR OBJECT, NOT A FIGURATIVE LITERAL (kb/Work PB1630). §8.4.3.1.2
