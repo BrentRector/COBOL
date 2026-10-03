@@ -1313,7 +1313,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// emittable).</summary>
     public BoundStatement OoBindSetObjectRef(
         IReadOnlyList<Core.DataReferenceContext> targetRefs,
-        Core.DataReferenceContext? senderRef, bool senderNull, bool senderSelf, bool senderSuper,
+        SetSender? sender, bool senderNull, bool senderSelf, bool senderSuper,
         string? senderText = null)
     {
         // SET … TO object-reference (§14.9.39 Format 5) is a COBOL-2002 introduction; the edition gate moved to the
@@ -1400,17 +1400,24 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         {
             // ⛔ SR9 IS THE ANSWER FOR A SENDER THAT IS NOT A REFERENCE (kb/Work PB456). Format 5 is selected
             // from the RECEIVING list (§14.9.39.2; SetFormatSelection), so `SET U TO 5` and `SET U TO N + 1`
-            // reach this bind with senderRef null instead of silently declining a re-route and landing an
+            // reach this bind with no sender identifier instead of silently declining a re-route and landing an
             // object reference in the Format-1 arithmetic store — which is what made both COMPILE CLEAN and
             // abort at run time. Identifier-4 "shall be an object reference"; a literal is not one.
-            if (senderRef is null)
+            if (sender is not { IsIdentifierOperand: true })
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0867",
                     $"SET {SetFormatSelection.Written(targetRefs)} TO {senderText}: "
                     + "identifier-4 shall be an object reference — the sending operand of an object-reference "
-                    + "SET is an object-reference data item, object-class-name-1, NULL or SELF, never a literal "
+                    + "SET is an object-reference data item, a function-identifier or inline method invocation of "
+                    + "class object, object-class-name-1, NULL or SELF, never a literal "
                     + "or an arithmetic expression (ISO §14.9.39.2 Format 5, §14.9.39.3 SR9)");
             }
+            // ⛔ A FUNCTION-IDENTIFIER OR INLINE INVOCATION IS identifier-4 TOO (kb/Work PB1929): §8.4.3.2.1 and
+            // §8.4.3.4.4 GR1 make each a reference to a data item whose class and category are the result's, so a
+            // user function RETURNING USAGE OBJECT REFERENCE sends exactly as an object-reference data item does —
+            // through ITS returned temporary, bound once by the sender classifier. Only a Ref is subject to the
+            // register / class-name readings below, which are properties of a WRITTEN name.
+            var senderRef = sender.Ref;
             // ⛔ THE PREDEFINED REGISTER IS CLASSIFIED BEFORE THE GENERAL LOOKUP, and the ORDER is the rule
             // (kb/Work PB922; the same order SetFormatSelection.KindOf keeps on the receiving side). It used to
             // sit BELOW the resolved-sender arm and reach only because the resolver did not know the name — so
@@ -1418,31 +1425,37 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // screened it against §14.9.39.3 SR12's closed list, refusing `SET <typed> TO EXCEPTION-OBJECT` at
             // COMPILE time. That is a rejection of legal source: the register is implicitly UNIVERSAL, and a
             // typed receiver is answered by the RUN-TIME narrow check below, not by SR12.
-            if (ctx.Refs.IsExceptionObjectRegister(senderRef))
+            if (senderRef is not null && ctx.Refs.IsExceptionObjectRegister(senderRef))
                 // §8.4.3.6 — the predefined register (ONE per run unit, GR2; implicitly universal SR2):
                 // a universal target copies the reference; a TYPED target gets the RUNTIME narrow check
                 // in the emitter (§9.3.8.2 :12291 — EC-OO-UNIVERSAL on failure; the SR12 closed list is
                 // satisfied through the object-view-equivalent runtime conformance this register carries).
                 return new BoundSetObjectRef(targets, null, false, false) { FromExceptionObject = true };
             // Probe, then RESOLVE to commit, because a probe's Place is unscreened and must never enter the
-            // bound tree (kb/Work PB221).
-            var sniff = ctx.Refs.Probe(senderRef);
-            if (sniff is { Item.Pic: { Category: PicCategory.ObjectReference } spic } sn)
+            // bound tree (kb/Work PB221). A function-identifier / invocation sender has no probe to take: its
+            // temporary was committed when the classifier bound it, and that Place is what enters the tree.
+            Place? identifierPlace = senderRef is null ? sender.TemporaryItem : null;
+            var sniff = senderRef is not null ? ctx.Refs.Probe(senderRef) : null;
+            DataItem? senderItem = sniff?.Item ?? identifierPlace?.Item;
+            if (senderItem is { Pic: { Category: PicCategory.ObjectReference } spic })
             {
-                if (host.Expr.ResolveSending(senderRef).PlaceOrReported(ctx.Edition) is not { } sp)
-                    return BoundRejected.Reported(ctx.Edition);   // the committed answer (kb/Work PB1030)
+                Place? sp;
+                if (senderRef is null) sp = identifierPlace;
+                else if (host.Expr.ResolveSending(senderRef).PlaceOrReported(ctx.Edition) is { } resolved) sp = resolved;
+                else return BoundRejected.Reported(ctx.Edition);   // the committed answer (kb/Work PB1030)
                 // The receiver's description selects SR10 / SR12 / SR14 and the sender's answers it — ONE
                 // table, OoConformance.ObjectRefAssignmentMismatch. The former `ObjectClassName is not null`
                 // pre-guard is gone: the table returns null for a universal receiver itself (SR8), so the
                 // guard was a second, weaker copy of that rule.
+                string senderName = senderRef is null ? sender.Text : senderItem.CobolName ?? sender.Text;
                 foreach (var tp in targets)
                     if (OoConformance.ObjectRefAssignmentMismatch(host.OoClasses, spic, tp.Item.Pic!) is { } werr)
                         ctx.Edition.Error("COBOLNET0867",
-                            $"SET '{tp.Item.CobolName}' TO '{sn.Item.CobolName}': {werr}");
+                            $"SET '{tp.Item.CobolName}' TO '{senderName}': {werr}");
                 src = sp;
             }
             // SR13's class-name-1 sender is a source reference and takes the §8.4.6.4 scope (PB365).
-            else if (senderRef.cobolWord()?.GetText() is { } sname
+            else if (senderRef?.cobolWord()?.GetText() is { } sname
                      && Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, senderRef, sname,
                             Compiler.Oo.OoNameResolution.Want.Class).Class is { } scls)
             {
@@ -1486,8 +1499,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     // NAME THE RECEIVERS (kb/Work PB388): the renderer transliterates U+2026, so this read
                     // `SET . TO 'WX'` — a statement nobody wrote — and the receivers are in hand.
                     $"SET {SetFormatSelection.Written(targetRefs)} TO "
-                    + $"'{senderRef.GetText()}': the sending operand shall be an object-reference "
-                    + "data item, NULL, SELF, or a class-name (ISO §14.9.39.3 SR9/SR12/SR13)");
+                    + $"'{sender.Text}': the sending operand shall be an object-reference "
+                    + "data item, a function-identifier or inline method invocation of class object, NULL, SELF, "
+                    + "or a class-name (ISO §14.9.39.3 SR9/SR12/SR13)");
             }
         }
         return new BoundSetObjectRef(targets, src, senderNull, senderSelf) { SourceFactoryCs = srcFactoryClassCs };

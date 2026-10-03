@@ -61,11 +61,19 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
     {
         string nameExpr = pa.NameLiteral is { } lit
             ? CsLiteral(lit)
-            : PlaceRenderer.Read(pa.NamePlace!);   // §8.4.3.13.4 GR1a — the identifier's content
+            : NameImage(pa.NamePlace!);   // §8.4.3.13.4 GR1a — the identifier's content
         bool checkNotFound = ecState.Info?.Enabled.Any(e => e.Ec == "EC-PROGRAM-NOT-FOUND") == true;
         return $"ProgramRegistry.{(callArgument ? "EntryOfArgument" : "EntryOfOperand")}({nameExpr}, "
             + $"{(checkNotFound ? "true" : "false")})";
     }
+
+    /// <summary>⛔ THE ONE C# STRING THAT IS identifier-1's CONTENT, for every address-identifier that LOCATES a unit by
+    /// name (§8.4.3.12.4 GR1 a and §8.4.3.13.4 GR1 a — "the content of the data item referenced by identifier-1"; the
+    /// vendor <c>TO ENTRY</c> identifier reads it the same way; kb/Work PB1417 + PB1452). It is the operand's character
+    /// IMAGE (<see cref="OperandText.FieldImage"/>), never <see cref="PlaceRenderer.Read"/>: SR1 admits an alphanumeric
+    /// or national GROUP item (§8.5.2.1), whose <c>Read</c> is its record struct and not a string — the ref-modified
+    /// slice and an elementary item read as the same string either way.</summary>
+    private static string NameImage(Place name) => OperandText.FieldImage(name);
 
     /// <summary>The C# value expression of an address-identifier OPERAND (§8.4.3.1.2 identifier Format 9), either
     /// arm — a <c>ManagedPointer</c> for the data arm, a <c>ProgramPointer</c> for the program arm.</summary>
@@ -216,7 +224,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         var w = ctx.Writer;
         string nameExpr = s.NameLiteral is { } lit
             ? EmitText.CsLiteral(lit)
-            : PlaceRenderer.Read(s.NamePlace!);   // §8.4.3.13 GR1a — the identifier's value names the program
+            : NameImage(s.NamePlace!);   // §8.4.3.13 GR1a — the identifier's value names the program
         int id = ctx.Names.NextPtr();
         string nf = $"__ppNf{id}";
         w.Line($"bool {nf};");
@@ -258,9 +266,9 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         var w = ctx.Writer;
         // §8.4.3.12.4 GR1: a) the CONTENT of identifier-1, resolved at statement time; b) function-prototype-name-1,
         // whose externalized function-name the binder already resolved to a compile-time constant.
-        string nameExpr = s.PrototypeName is { } proto
-            ? CsLiteral(proto)
-            : PlaceRenderer.Read(s.NamePlace!);
+        string nameExpr = s.NameLiteral is { } name
+            ? CsLiteral(name)
+            : NameImage(s.NamePlace!);
         int id = ctx.Names.NextPtr();
         string nf = $"__fpNf{id}";
         w.Line($"bool {nf};");

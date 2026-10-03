@@ -1730,8 +1730,22 @@ dataAddressIdentifier
 // can never head a dataReference, so this rule cannot be claimed by setAddressStatement's sender arm.
 // ⚠ THERE IS NO literal-1 ARM, and that is measured, not an omission: §8.4.3.13's PROGRAM twin prints three
 // operands including literal-1 and §8.4.3.12's FUNCTION figure prints only two.
+// ⛔ identifier-1 IS ANY IDENTIFIER FORMAT (§8.4.3.1.3 SR1: "whenever the format for an identifier allows another
+// identifier to be specified, that other identifier may be any of the formats for an identifier"), so the operand
+// is its OWN rule, as the PROGRAM twin's is, and admits a function-identifier and an inline method invocation
+// beside the data reference (kb/Work PB1452) — the Format 1 and Format 4 pairing InlineMethodInvocationOperandDriftTests
+// holds. The keyword-omitted function form (§8.4.3.2.3 SR2) is already a dataReference and is told apart at bind.
+// A sending-only position: the receiving list is the `dataReference+` before TO, never this rule.
 setFunctionAddressStatement
-    : SET dataReference+ TO ADDRESS OF? FUNCTION dataReference
+    : SET dataReference+ TO functionAddressIdentifier
+    ;
+
+// §8.4.3.12.2 FUNCTION-ADDRESS-IDENTIFIER — `ADDRESS OF FUNCTION { function-prototype-name-1 | identifier-1 }`
+// (see setFunctionAddressStatement for the optional OF and the one-dataReference-covers-both-arms reading).
+// The function-identifier / inline-invocation alternatives PRECEDE dataReference because an inline invocation's own
+// first element IS a dataReference (ANTLR takes the first matching alternative — feedback_grammar_precedence).
+functionAddressIdentifier
+    : ADDRESS OF? FUNCTION (functionCall | inlineMethodInvocation | dataReference)
     ;
 
 // §8.4.3.13.2 PROGRAM-ADDRESS-IDENTIFIER — its OWN rule, because it is an IDENTIFIER format (§8.4.3), not a
@@ -1747,8 +1761,12 @@ setFunctionAddressStatement
 // the standard's, measured on both printed figures, not an omission.
 // ⛔ §8.4.3.13.3 SR4 ("This identifier format shall not be specified as a receiving operand") is why the rule
 // appears only in the SENDER slot below.
+// ⛔ identifier-1 IS ANY IDENTIFIER FORMAT (§8.4.3.1.3 SR1), so a function-identifier and an inline method
+// invocation stand beside the data reference (kb/Work PB1452) — both are references to a data item (§8.4.3.2.1,
+// §8.4.3.4.4 GR1) and §8.4.3.13.3 SR1 asks only its category. Ahead of dataReference, which an invocation's own first
+// element is; the nonNumericLiteral arm stays first and cannot overlap (a literal heads no identifier).
 programAddressIdentifier
-    : ADDRESS OF? PROGRAM (nonNumericLiteral | dataReference)
+    : ADDRESS OF? PROGRAM (nonNumericLiteral | functionCall | inlineMethodInvocation | dataReference)
     ;
 
 // SET { identifier-7 } … TO program-address-identifier — ISO §14.9.39.2 Format 9 (program-pointer-assignment)

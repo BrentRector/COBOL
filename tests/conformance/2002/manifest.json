@@ -634,7 +634,9 @@
   "pb1391_boolean_relations_stated_in_full",
   "pb1034_cce_printed_relational_operators",
   "pb1034_is_not_equal_symbol",
-  "pb1946_content_expression_move_regime"
+  "pb1946_content_expression_move_regime",
+  "pb1929_set_identifier_senders",
+  "pb1452_program_address_identifier_operands"
   ],
   "pending": []
 }

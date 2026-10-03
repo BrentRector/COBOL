@@ -2040,7 +2040,12 @@
  "pb1946-content-expression-into-alphanumeric",
  "pb1946-content-expression-into-national",
  "pb1946-content-expression-into-group",
- "pb1946-content-expression-into-pointer"
+ "pb1946-content-expression-into-pointer",
+ "pb1399-set-numeric-receiver-index-function",
+ "pb1929-set-object-from-numeric-function",
+ "pb1929-set-pointer-from-object-function",
+ "pb1417-function-address-alphabetic-operand",
+ "pb1452-program-address-alphabetic-operand"
  ],
  "pending": []
 }

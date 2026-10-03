@@ -1179,7 +1179,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// from <see cref="RefExpr"/>. Before, that third spelling of a function-identifier bypassed the screen in
     /// EVERY arithmetic position, COMPUTE included (kb/Work PB1142's sibling sweep: `COMPUTE C =
     /// UPPER-CASE("12") + 1` gave 13 under STRICT).</summary>
-    private BoundExpr ScreenIdentifierOperand(BoundExpr bound, Antlr4.Runtime.ParserRuleContext id, OperandContext context)
+    internal BoundExpr ScreenIdentifierOperand(BoundExpr bound, Antlr4.Runtime.ParserRuleContext id, OperandContext context)
     {
         if (!context.Rules().NumericClassScreen) return bound;
         var operand = IntrinsicBinder.OperandOf(bound);

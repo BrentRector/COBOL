@@ -353,7 +353,8 @@
   "pb1403_letterless_words_by_type",
   "pb1668_evaluate_truth_word_pairs",
   "pb1464_parenthesized_bare_conditions",
-  "pb1034_printed_relational_operator_set"
+  "pb1034_printed_relational_operator_set",
+  "pb1399_set_index_function_sender"
  ],
  "pending": []
 }

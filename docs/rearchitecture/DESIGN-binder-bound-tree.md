@@ -676,6 +676,35 @@ numeric operand" (§8.8.1.1) — true, and silent about §14.9.39.3 SR8, the rul
 Format 1 CAN send ever appears in it — otherwise the tie-break would take a legal Format-1 statement away from
 its own format.
 
+**The sender is an IDENTIFIER, of any of §8.4.3.1.2's formats — `SetSender` / `SetSenders.Classify` (kb/Work PB1399 +
+PB1929).** Every sending brace of the To-formats names an identifier (identifier-2, -4, -6, -8, -13) and §8.4.3.1.3
+SR1 makes that "any of the formats for an identifier". Three of them are not a data-name reference — a
+function-identifier, an inline method invocation, and the keyword-omitted function (§8.4.3.2.3 SR2, which parses as a
+subscripted data reference) — and each references a DATA ITEM (§8.4.3.2.1; §8.4.3.4.4 GR1), so the sender's class and
+category are the RETURNING item's. The classifier reads the parse shape once and binds a sole such identifier ONCE
+(its activation registers a statement pre-op, so a second bind would run a user function twice), returning one
+`SetSender`: a `Ref` (a data reference, still to be resolved by the format that takes it), a bound identifier (whose
+temporary data item — `TemporaryItem` — is what the carrier formats 5, 7, 8 and 9 read through
+`CarrierSenderPlace`/`OoBindSetObjectRef`, and whose CLASS — `IdentifierClass` — decides Format 1: class index is
+identifier-2, any other non-numeric class draws §8.8.1.1's screen through `ExpressionBinder.ScreenIdentifierOperand`),
+or neither (a literal or an expression, which each format's own rule refuses). The formats whose binder takes the
+amount as an expression of its own (14, 16) are decided from the receiving list BEFORE the sender is classified, for the
+same single-bind reason. The earlier classifier — `OoExtractBareReference`, "exactly one bare data reference" — answered
+null for all three shapes, so every format saw "no identifier" and refused `SET B TO FUNCTION FOBJ(1)` as a literal and
+`SET TX TO FUNCTION MAX(IA IB)` as an arithmetic expression: one sniff, one arm of the dispatch fixed (PB456), the other
+three shapes never reached.
+
+**The name operand of an address-identifier is one rule in one place (kb/Work PB1417 + PB1452).** §8.4.3.12.3 SR1 and
+§8.4.3.13.3 SR1 print the same sentence — "Identifier-1 shall be of category alphanumeric or national" — and
+`SetBinder.ScreenAddressName` asks it of the data item, through `ItemCategory.IsAlphanumericOrNational(Place)` (the
+`Place` form reads a reference-modified view's §8.4.3.3.4 GR6 category). Both sites used to test the raw
+`Item.Pic?.Category`: null for a GROUP (refused as "category (none)"), and equal to alphanumeric for a PIC A item
+(accepted). Identifier-1 is any identifier format too, so both grammar rules take `functionCall | inlineMethodInvocation
+| dataReference` (`functionAddressIdentifier` is its own rule, as `programAddressIdentifier` is);
+`AddressNameOfIdentifier` binds such an operand once and yields its returned temporary (an intrinsic's character result
+is materialized by `SendingValueTemp`; one folded to a literal is the compile-time name). The emitter reads every such
+name through `PtrEmitter.NameImage`, the operand's character image, because a group's `Read` is its record struct.
+
 **What this replaced, and why a table rather than a chain.** The nine formats each peeked at `receivers[0]` — and,
 in the TO direction, at the sender — in a fixed contract order, returning `null` to let the next candidate try.
 Three defects follow structurally from a scalar standing in for a set-valued question, and all three were

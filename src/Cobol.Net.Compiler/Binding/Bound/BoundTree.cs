@@ -1526,14 +1526,16 @@ public sealed record BoundSetFunctionPointer(IReadOnlyList<Place> Targets, Place
 /// <summary><c>SET function-pointer… TO ADDRESS OF FUNCTION {function-prototype-name-1 | identifier-1}</c>
 /// (ISO §14.9.39.2 Format 8 with the §8.4.3.12 function-address-identifier sender): resolve the named function
 /// through the run-unit ProgramTable at statement time (§8.4.3.12.4 GR2 — the externalized function-name).
-/// Exactly one of <paramref name="PrototypeName"/> (GR1 b, the compile-time prototype form) /
-/// <paramref name="NamePlace"/> (GR1 a, a run-time name read) is set. Not locatable → GR4: the targets take NULL
+/// Exactly one of <paramref name="NameLiteral"/> (the COMPILE-TIME name — GR1 b's prototype form, or a
+/// function-identifier identifier-1 the binder folded to its value) / <paramref name="NamePlace"/> (GR1 a, a
+/// run-time name read; a function-identifier or inline invocation identifier-1 arrives as its returned temporary)
+/// is set. Not locatable → GR4: the targets take NULL
 /// and EC-FUNCTION-NOT-FOUND is set to exist. A located function whose signature does not match
 /// <paramref name="ExpectedFormals"/> → §14.9.39.4 GR14: EC-FUNCTION-PTR-INVALID, "no data items are changed,
 /// and the execution of the SET statement is terminated". kb/Work PB452.</summary>
 /// <param name="ExpectedFormals">The receiving items' declared function-prototype's formal count — the run-time
 /// signature the located function is screened against. Every receiver carries the SAME one: SR20 requires it.</param>
-public sealed record BoundSetFunctionAddress(IReadOnlyList<Place> Targets, string? PrototypeName, Place? NamePlace,
+public sealed record BoundSetFunctionAddress(IReadOnlyList<Place> Targets, string? NameLiteral, Place? NamePlace,
     int ExpectedFormals) : BoundStatement;
 
 /// <summary><c>SET pointer… {UP|DOWN} BY integer</c> (ISO §14.9.39 Format 10; 2002+): the address moves by

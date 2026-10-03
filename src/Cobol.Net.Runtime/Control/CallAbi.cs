@@ -1182,6 +1182,18 @@ public static class CobolArgAdapt
         Undeliverable(c, "the program-pointer result");
     }
 
+    /// <summary>Function-pointer RETURNING delivery (§13.18.60.4 GR26's identity struct crosses by value, the
+    /// program-pointer twin above). Before this overload a FUNCTION-ID or program RETURNING a USAGE FUNCTION-POINTER item
+    /// generated <c>StoreReturn(__ret, L_RES)</c> that bound only to the object-reference generic and drew CS0315 — the
+    /// PB111 / PB133 shape (legal source refused by the backend because no overload matched the carrier type), one
+    /// pointer category after the two that were fixed.</summary>
+    public static void StoreReturn(CobolArg? ret, FunctionPointer value)
+    {
+        if (ret is not { Carrier: var c }) return;
+        if (c is ManagedPointer<FunctionPointer> fp) { fp.Value = value; return; }
+        Undeliverable(c, "the function-pointer result");
+    }
+
     /// <summary>Object-reference RETURNING delivery (kb/Work PB133 wave B). The CobolObject constraint keeps
     /// this overload away from every numeric/string carrier (a value type or string never derives it), so the
     /// specific lanes above stay untouched. An IDENTICALLY-described returning pair (the §14.8.3 conforming

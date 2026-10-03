@@ -203,7 +203,19 @@ public static class ItemCategory
 
     /// <summary>ONE walk for both predicates — the two rules differ only in whether category national is in the
     /// admitted set, and writing the walk twice is how the alphabetic and group arms would come to disagree.</summary>
-    private static bool Admits(DataItem item, bool national) => Table16Operand.Of(item) switch
+    private static bool Admits(DataItem item, bool national) => Admits(Table16Operand.Of(item), item, national);
+
+    /// <summary>⛔ THE PLACE FORM OF <see cref="IsAlphanumericOrNational(DataItem)"/> — what a rule worded "shall be
+    /// of category alphanumeric or national" asks of an operand that may be REFERENCE-MODIFIED (kb/Work PB1417).
+    /// §8.4.3.3.4 GR6 gives the unique data item a reference modifier creates "the same class, category, and usage as
+    /// that defined for identifier-1" with the lettered rewrites, so <c>GRP(7:6)</c> over an alphanumeric GROUP is an
+    /// elementary alphanumeric item and a view over a numeric or numeric-edited item is alphanumeric or national —
+    /// which only <see cref="Table16Operand.Of(Place)"/>, the ONE reader of that rule, can answer. Asking the INNER
+    /// item instead answers "group" for the slice of a group and refuses it as legal source.</summary>
+    public static bool IsAlphanumericOrNational(Place place) =>
+        Admits(Table16Operand.Of(place), place.Item, national: true);
+
+    private static bool Admits(Table16Operand operand, DataItem item, bool national) => operand switch
     {
         // §13.18.29.4 GR3's group arm, in its ONE spelling — never `item.IsGroup` alone (see IsAlphanumericGroup).
         { Category: PicCategory.Group } => IsAlphanumericGroup(item),

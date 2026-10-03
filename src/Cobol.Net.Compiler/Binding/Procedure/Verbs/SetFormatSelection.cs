@@ -235,23 +235,47 @@ internal sealed class SetFormatSelection(BinderContext ctx, StatementBinder host
         if (ctx.Refs.CapacityRegisterFor(dref) is not null) return SetOperandKind.CapacityRegister;   // SR29
         if (host.Expr.IndexFieldOf(dref) is not null) return SetOperandKind.IndexName;                // §13.18.38.3 SR7
         if (ctx.Refs.Probe(dref) is not { } sniff) return SetOperandKind.Unclassified;
-        if (sniff.Item.IsDynamicLength) return SetOperandKind.DynamicLength;                          // SR33
-        if (sniff.Item.Pic is { Usage: Usage.Index }) return SetOperandKind.IndexDataItem;            // §8.5.2.1 Table 2
+        return KindOfItem(sniff.Item, sniff.OperandCategory);
+    }
+
+    /// <summary>What a RESOLVED data item is, as §14.9.39.2's braces distinguish operands — the half of
+    /// <see cref="KindOf"/> that needs no reference, so a sender that IS an item without being written as a data
+    /// reference (the temporary a function-identifier or an inline invocation returns — §8.4.3.2.1, §8.4.3.4.4 GR1) is
+    /// classified by the SAME table as one that is (kb/Work PB1929).</summary>
+    private static SetOperandKind KindOfItem(DataItem item, PicCategory? operandCategory)
+    {
+        if (item.IsDynamicLength) return SetOperandKind.DynamicLength;                                // SR33
+        if (item.Pic is { Usage: Usage.Index }) return SetOperandKind.IndexDataItem;                  // §8.5.2.1 Table 2
         // ⛔ ASKED THROUGH THE USAGE, NOT THE CATEGORY (kb/Work PB453). MESSAGE-TAG is a DECLINED usage, so its
         // entry carries a recovery PicInfo whose CATEGORY is a placeholder — reading `OperandCategory` here
         // answers "alphanumeric" and the operand falls through to Format 1 / Format 5 and draws a rule that is
         // false about the program. ItemCategory.IsMessageTag reads the written clause AND the resolved usage,
         // which is the pair §13.18.60.3 SR14's own screen reads.
-        if (ItemCategory.IsMessageTag(sniff.Item)) return SetOperandKind.MessageTag;                  // SR35
-        return sniff.OperandCategory switch
+        if (ItemCategory.IsMessageTag(item)) return SetOperandKind.MessageTag;                        // SR35
+        return operandCategory switch
         {
             PicCategory.Pointer => SetOperandKind.DataPointer,                 // SR17 / SR23
             PicCategory.ProgramPointer => SetOperandKind.ProgramPointer,       // SR21
             PicCategory.FunctionPointer => SetOperandKind.FunctionPointer,     // SR20
             PicCategory.ObjectReference => SetOperandKind.ObjectReference,     // SR8
-            _ => sniff.Item.Pic is { IsIntegerDescription: true }
+            _ => item.Pic is { IsIntegerDescription: true }
                 ? SetOperandKind.IntegerItem : SetOperandKind.OtherDataItem,  // SR1
         };
+    }
+
+    /// <summary>What a SET SENDER is, as the sending braces distinguish operands (kb/Work PB1399 + PB1929). A data
+    /// reference is classified like a receiver; a function-identifier or inline invocation by the data item it
+    /// references — its returned temporary when it has one (a user function's RETURNING item, an invocation's
+    /// result), and class INDEX for an index intrinsic (§15.2 item 6), which has no item but is of class index just
+    /// as an index data item is. Anything else — a numeric or character intrinsic's computed value, a literal, an
+    /// expression — is <see cref="SetOperandKind.Unclassified"/>: it names no carrier format's sending brace, and
+    /// the format that takes it refuses it by its own rule.</summary>
+    public SetOperandKind KindOfSender(SetSender sender)
+    {
+        if (sender.Ref is { } dref) return KindOf(dref);
+        if (sender.TemporaryItem is { } temp)
+            return KindOfItem(temp.Item, Table16Operand.Of(temp).Category);
+        return sender.IdentifierClass is CobolClass.Index ? SetOperandKind.IndexDataItem : SetOperandKind.Unclassified;
     }
 
     /// <summary>Classify every receiving operand of one SET statement, in source order.</summary>
@@ -301,19 +325,18 @@ internal sealed class SetFormatSelection(BinderContext ctx, StatementBinder host
     /// rule is already the one that speaks, and only a receiving list carrying real category evidence is
     /// narrowed: an all-unclassified list still reaches the binder that reports the undefined NAME (R30), never
     /// a rule about a category nobody could read.</para></summary>
-    public SetFormat? SelectForTo(IReadOnlyList<SetOperandKind> kinds, Core.DataReferenceContext? senderDref,
-                                  out bool exact)
+    public SetFormat? SelectForTo(IReadOnlyList<SetOperandKind> kinds, SetSender sender, out bool exact)
     {
         var format = Select(kinds, SetDirections.To, out exact);
-        if (format != SetFormat.F1 || senderDref is null) return format;
+        if (format != SetFormat.F1 || !sender.IsIdentifierOperand) return format;
         bool anyEvidence = false;
         foreach (var k in kinds) anyEvidence |= k != SetOperandKind.Unclassified;
         if (!anyEvidence) return format;
-        // The sender is classified only here — one extra probe per `SET … TO <bare reference>` whose receiving
+        // The sender is classified only here — one extra probe per `SET … TO <identifier>` whose receiving
         // list is Format 1's, and none at all for the carrier and register formats.
-        uint sender = 1u << (int)KindOf(senderDref);
+        uint senderBit = 1u << (int)KindOfSender(sender);
         foreach (var row in Formats)
-            if ((row.Dir & SetDirections.To) != 0 && (row.SendsMask & sender) != 0)
+            if ((row.Dir & SetDirections.To) != 0 && (row.SendsMask & senderBit) != 0)
             {
                 exact = false;
                 return row.Format;
