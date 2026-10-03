@@ -1085,8 +1085,8 @@ public sealed partial class DataBinder
 
     /// <summary>⛔ THE REPORT SECTION'S ENTRIES IN SOURCE ORDER (ISO §13.8.2: <c>{ constant-entry |
     /// report-group-description-entry } …</c>; kb/Work PB1226). A constant entry binds into the compile-time
-    /// constant table at the point it stands, because a constant is read only by what FOLLOWS it
-    /// (§13.10.3 SR4/SR5 — definition precedes reference); the report group entries between two constants bind as
+    /// constant table at the point it stands, unless a reference bound it earlier on demand (a reference may precede
+    /// the entry it names, kb/Work PB1231, <see cref="FindConstant"/>); the report group entries between two constants bind as
     /// one run through <see cref="BindReportEntries"/>, which takes an index range for exactly this. A constant is a
     /// level-01 entry (§13.10.2), so it ends the group before it: the entries after it have no 01 entry to belong
     /// to, and the builder's group is dropped so <see cref="DiagnosticCatalog.ReportGroupBefore01"/> says so
@@ -1103,7 +1103,7 @@ public sealed partial class DataBinder
             BindReportEntries(entries, runStart, seen, model, st);
             runStart = seen;
             using var _ = Edition.At(constant);
-            BindConstantEntry(constant.levelNumber(), constant.dataName(), constant.constantEntryBody());
+            BindConstantEntry(constant, constant.levelNumber(), constant.dataName(), constant.constantEntryBody());
             st.Group = null;
         }
         BindReportEntries(entries, runStart, entries.Length, model, st);
@@ -1840,7 +1840,7 @@ public sealed partial class DataBinder
             if (clause.pictureClause()?.PIC_STRING() is { } pic)
                 // The SAME character-position count the print columns use (§13.18.14.4 GR9), through the ONE rule.
                 return PictureAnalyzer.Analyze(
-                    _constants.Count > 0 ? ExpandPicConstants(pic.GetText(), "", diagnose: false) : pic.GetText(),
+                    UnitHasConstants ? ExpandPicConstants(pic.GetText(), "", diagnose: false) : pic.GetText(),
                     Usage.Display, Edition,
                     $"RD '{model.Name}' repeating entry", null, currencies: CurrencySigns,
                     decimalPointIsComma: DecimalPointIsComma) is { } p ? DataItem.DisplayTextWidthOf(p) : null;
@@ -1864,6 +1864,7 @@ public sealed partial class DataBinder
     {
         {
             using var _ = Edition.At(ge);
+            _reportEntriesBound.Add(ge);   // a constant's length phrase may now measure it (§13.10.3 SR11, kb/Work PB1226)
             int.TryParse(ge.levelNumber().GetText(), out int level);
             string? entryName = ge.dataName().NameOrNull();
             if (level == 1)
@@ -2021,7 +2022,7 @@ public sealed partial class DataBinder
                     // §13.15.4 GR2 imports the PICTURE clause, and §13.10.3 SR2 lets an integer constant-name
                     // specify repetition in a picture character-string: expanded before the analyzer reads it,
                     // exactly as BindEntry does for a data description entry (kb/Work PB1226's sibling sweep).
-                    if (_constants.Count > 0)
+                    if (UnitHasConstants)
                         picText = ExpandPicConstants(picText, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'");
                     reportEditing = BuildEditingSpecs(clause.pictureClause(),
                         $"report group entry '{entryName ?? "FILLER"}'");
@@ -2299,6 +2300,9 @@ public sealed partial class DataBinder
                     BlankWhenZero = blankWhenZero,
                 };
                 item.Uid = _uidCounter++;
+                // The elementary report item a constant's LENGTH OF / BYTE-LENGTH OF measures (§13.10.3 SR11, kb/Work
+                // PB1226): the first repetition's item — every repetition of the entry shares its description.
+                _reportEntryItems.TryAdd(ge, item);
                 if (pic is { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display })
                     MarkImageForced(item);      // the collected image fact — compose wants the printable CHARACTER image
                 // THE OPERAND LIST (§13.18.63.2 format 4 / §13.18.53.2 — both clauses write `{ operand } …`).

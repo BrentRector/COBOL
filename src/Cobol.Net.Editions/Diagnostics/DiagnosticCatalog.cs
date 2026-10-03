@@ -197,6 +197,15 @@ public static class DiagnosticCatalog
         + "REDEFINES, and no ANY LENGTH / BASED / BLANK WHEN ZERO / SYNCHRONIZED / TYPEDEF on the record or any "
         + "subordinate (§13.16.3 SR3/SR6/SR13).", "ISO §13.18.15.3 / §13.16.3");
 
+    // ── COBOLNET0895 — a numeric literal's decimal separator against the DECIMAL-POINT mode (§12.3.7.4 GR14a). It
+    //    was a bare code at its three emit sites (the literal chokepoint and the constant-entry evaluator's router)
+    //    with no descriptor, so docs/DIAGNOSTICS.md never listed it (kb/Work PB1231's semgrep sweep).
+    public static readonly DiagnosticDescriptor NumericLiteralDecimalSeparator = new(
+        "COBOLNET0895", "numeric-literal-decimal-separator", EditionSeverity.Error,
+        "A numeric literal's decimal separator does not match the DECIMAL-POINT mode: under DECIMAL-POINT IS COMMA "
+        + "the decimal separator written in numeric literals shall be the comma, and without it only the period is "
+        + "a decimal point.", "ISO §12.3.7.4 GR14a / §8.3.3.3.2");
+
     // ── COBOLNET0899 — a file's IMPLICITLY shared record area of a shape the storage model cannot share (kb/Work PB836)
     /// <summary>An FD/SD's level-1 records (ISO §13.18.33.4 GR3) or a record-area SAME clause's files' records
     /// (§12.4.6.4.4 GR2) share ONE area, and the typed-native storage model cannot yet carry one of them in that
@@ -214,6 +223,21 @@ public static class DiagnosticCatalog
         + "cannot yet carry in that shared area: a shared record area of that shape is recognized but not yet "
         + "implemented.", "ISO §13.18.33.4 GR3 / §12.4.6.4.4 GR2",
         RecognizedNotImplemented);
+
+    // ── COBOLNET0899 — a constant's LENGTH OF / BYTE-LENGTH OF operand described later, whose description cannot be
+    //    bound ahead of the reference that needs the constant (kb/Work PB1231, PB1226)
+    /// <summary>A constant entry's length phrase may name a data item described after it (§13.10.3 SR4 forbids only a
+    /// length that depends on the constant). The binder serves that by binding the operand's RECORD out of source
+    /// order when the value is first needed. Two shapes it cannot bind ahead are recognized-not-implemented debt,
+    /// never a misreported undefined name: part of a record whose earlier entries are being bound
+    /// (<c>01 R. 05 A PIC X(K). 05 W PIC X(7).</c> with <c>01 K CONSTANT AS LENGTH OF W.</c>), and an elementary
+    /// report item of a report group the report binder has not reached (§13.10.3 SR11's operand).</summary>
+    public static readonly DiagnosticDescriptor ConstantLengthOperandBoundLater = new(
+        NotImplemented, "constant-length-operand-bound-later", EditionSeverity.Error,
+        "A constant entry's LENGTH OF / BYTE-LENGTH OF operand is described later, and the constant is referenced "
+        + "before that description can be bound (inside a record that is still being bound, or in a report group the "
+        + "REPORT SECTION has not reached): measuring it out of source order is recognized but not yet implemented.",
+        "ISO §13.10.3 SR4 / §13.10.4 GR5-GR6", RecognizedNotImplemented);
 
     // ⛔ The two 0899-staged constant-entry legs are GONE. ConstantFromCompilationVariable (kb/Work PB1368): the
     // >>DEFINE table now reaches the binder as a timeline (DirectiveResults.CompilationVariables), and an undefined

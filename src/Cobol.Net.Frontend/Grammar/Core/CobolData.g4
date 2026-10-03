@@ -292,8 +292,13 @@ dataDescriptionBody
 // separates it) and from renamesClause (RENAMES). The binder (DataBinder.Constants.cs) folds the entry into
 // the compile-time constant table — a constant occupies NO storage (§13.10.4 GR1/GR3: references substitute
 // the literal).
+// ⛔ IS, AS and OF are OPTIONAL words (kb/Work PB1225): the printed §13.10.2 format (PDF p.355, rendered) underlines
+// 1/01, CONSTANT, GLOBAL, BYTE-LENGTH, LENGTH and FROM and nothing else, so `01 K CONSTANT 8.`,
+// `01 K CONSTANT "AB".` and `01 K CONSTANT LENGTH W.` are the same entries as their AS / OF spellings (§5.2.3:
+// optional words are "shown in uppercase and not underlined in general formats" and "may be written to add clarity"). No alternative of constantValue begins with a word the clause list or FROM can
+// begin with (FROM and RECORD are reserved), so the bare operand stays LL-disjoint from `CONSTANT RECORD`.
 constantEntryBody
-    : CONSTANT (IS? GLOBAL)? (AS constantValue | FROM cobolWord)
+    : CONSTANT (IS? GLOBAL)? (AS? constantValue | FROM cobolWord)
     ;
 
 // The constant entry as a REPORT SECTION entry (kb/Work PB1226): §13.8.2's brace group
@@ -313,10 +318,12 @@ constantEntry
 // rides arithmeticExpression and is re-classified as a LITERAL by the binder (§13.10.3 SR1). Both length phrases
 // carry their operand as a dataReference, and DataBinder.BindConstantLength binds both (§13.10.4 GR5 / GR6;
 // kb/Work PB1227 — the BYTE-LENGTH form used to ride arithmeticExpression as the qualified reference
-// `BYTE-LENGTH OF x`, recognized by its spelling and staged loud).
+// `BYTE-LENGTH OF x`, recognized by its spelling and staged loud). OF is an optional word in both phrases (§13.10.2 does
+// not underline it, kb/Work PB1225): `LENGTH W` and `BYTE-LENGTH W` are no arithmetic expression, so the omission is
+// unambiguous.
 constantValue
-    : LENGTH OF dataReference
-    | constantByteLengthWord OF dataReference
+    : LENGTH OF? dataReference
+    | constantByteLengthWord OF? dataReference
     | nonNumericLiteral
     | arithmeticExpression
     ;

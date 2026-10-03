@@ -270,6 +270,9 @@ public sealed partial class DataBinder
         _bindingMethodScope = m.DataScope;   // M2-OO-1h step 4: route INDEXED BY index-names to the method scope
         if (dd is not null)
         {
+            // The method's constant entries are declared before its sections bind, so one may be referenced before
+            // the entry that defines it (kb/Work PB1231); BindRemainingConstants below binds what nothing needed.
+            DeclareDataEntries(dd);
             // FILE / REPORT / SCREEN sections may appear only in a factory or instance definition, never in a
             // method (§13.4.3 SR1 / §13.8.3 SR1 / §13.9.3 SR1). One error class (COBOLNET1519, "section not permitted
             // in a method"), split so the message names the offending section + its §. A method's own data division
@@ -322,6 +325,7 @@ public sealed partial class DataBinder
                 GateMethodGlobal(lkEntries);
                 m.Binding!.LinkageRoots.AddRange(BindEntries(lkEntries, _rootNames, EntrySection.Linkage));
             }
+            BindRemainingConstants();
         }
         _bindingMethodScope = null;
 

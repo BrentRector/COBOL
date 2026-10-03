@@ -426,6 +426,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// like program data).</summary>
     internal void BindDeclarations(Core.ProgramUnitContext program)
     {
+        // Every constant entry and every data description entry's place is DECLARED before anything binds, so a
+        // reference may name a constant entry that follows it — in SPECIAL-NAMES, in an earlier section, or earlier in
+        // the same one (kb/Work PB1231; §13.10.3 SR4/SR5 forbid only a circular dependence). FindConstant binds an
+        // entry on demand; BindRemainingConstants, after the last section, binds the rest.
+        DeclareDataEntries(program.dataDivision());
+
         // §11.9.4 GR1: a contained program's OPTIONS start from its container's model and override clause by
         // clause (InheritConfiguration set the baseline); an outermost unit starts from the all-defaults model.
         Options = OptionsBinder.Bind(program, Edition, _inheritedOptions);   // captured even when there is no WORKING-STORAGE
@@ -587,6 +593,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // LINKAGE SECTION roots + the PROCEDURE DIVISION header's USING/RETURNING formals (ISO §13.7 / §14.2.2;
         // COBOLNET_INTERPROGRAM_DESIGN D1/D3 — bound into the same forest so every verb works unchanged).
         CallBindLinkage(program, _rootNames);
+
+        // The constant entries nothing has needed yet — a length phrase waiting for an operand described after it
+        // binds here, with its operand bound (kb/Work PB1231).
+        BindRemainingConstants();
     }
 
     /// <summary>The C#-field-name scope at the class level, shared by FILE SECTION records, WORKING-STORAGE
@@ -790,9 +800,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// storage forest: a level-number stack attaches each entry under the nearest open item of a lower level; level-88
     /// becomes a condition-name and level-66 a RENAMES alias. Returns the new top-level (01/77) items, in order — the
     /// caller (an FD) needs them to model the shared record area. <paramref name="section"/> names the DATA DIVISION
-    /// section the run belongs to — consumed by the section-scoped placement rules (CONSTANT RECORD §13.18.15.3 SR1).</summary>
+    /// section the run belongs to — consumed by the section-scoped placement rules (CONSTANT RECORD §13.18.15.3 SR1).
+    /// <paramref name="outOfOrder"/> marks ONE record bound ahead of its section's walk because a constant's value
+    /// needed its length (<see cref="BindLaterRecords"/>, kb/Work PB1231): its roots are returned but not yet added
+    /// to the forest — the section walk places them at their source position (<see cref="TakePreboundRecord"/>).</summary>
     private List<DataItem> BindEntries(IEnumerable<Core.DataDescriptionEntryContext> entries, HashSet<string> rootNames,
-        EntrySection section = EntrySection.WorkingStorage)
+        EntrySection section = EntrySection.WorkingStorage, bool outOfOrder = false)
     {
         var newRoots = new List<DataItem>();
         var stack = new Stack<DataItem>();
@@ -807,6 +820,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         DataItem? lastDescribed = null;
         foreach (var entry in entries)
         {
+            // A record a constant's value already needed was bound ahead of this walk (kb/Work PB1231): its roots
+            // take their place HERE, in source order, and its entries are not bound twice.
+            if (TakePreboundRecord(entry, out var parked))
+            {
+                foreach (var root in parked ?? [])
+                {
+                    _roots.Add(root);
+                    newRoots.Add(root);
+                    _lastRoot = root;
+                }
+                stack.Clear();
+                lastDescribed = null;
+                continue;
+            }
+            _entriesBound.Add(entry);
             using var _ = Edition.At(entry);   // the entry cursor (kb/Work PB82): every diagnostic below names this entry
             // A CONSTANT entry (ISO §13.10; the constantEntryBody alternative) is a COMPILE-TIME substitution,
             // not storage: fold it into the constant table and produce NO DataItem. Checked BEFORE the 66/88
@@ -814,7 +842,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // condition-name misbind. (P10 Step 15; DataBinder.Constants.cs.)
             if (entry.dataDescriptionBody().constantEntryBody() is { } constBody)
             {
-                BindConstantEntry(entry.levelNumber(), entry.dataName(), constBody);
+                BindConstantEntry(entry, entry.levelNumber(), entry.dataName(), constBody);
                 // A constant entry describes NO data item, so a level-88 entry written after one has no
                 // conditional variable to associate with (ISO §13.16.3 SR24 — "the entry describing the item").
                 lastDescribed = null;
@@ -878,7 +906,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
             // A malformed entry describes no item (the level-number is unreadable — LevelNumberPass has already
             // reported it), so a following 88 has no conditional variable rather than the previous entry's.
-            if (BindEntry(entry, section) is not { } item) { lastDescribed = null; continue; }
+            // While BindEntry reads this entry, its own description and its ancestors' (the stack items of a lower
+            // level) are OPEN: a constant it references that measures one of them is the §13.10.3 SR4 cycle
+            // (kb/Work PB1231 — IsBeingDescribed / IsDescriptionOpen).
+            var description = new OpenDescription(entry, stack, lvl == 77 ? 1 : lvl);
+            _openDescriptions.Add(description);
+            DataItem? bound;
+            try
+            {
+                bound = BindEntry(entry, section);
+            }
+            finally
+            {
+                _openDescriptions.Remove(description);
+            }
+            if (bound is not { } item) { lastDescribed = null; continue; }
             item.Uid = _uidCounter++;
             if (item.Level is 1 or 77) item.RootSection = section;   // DataItem.Section — a subordinate reads its root's
 
@@ -905,7 +947,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // (FILE SECTION records and WORKING-STORAGE alike), so record it in the shared scope.
                     item.CsName = Unique(item.CsName, rootNames);
                     rootNames.Add(item.CsName);
-                    _roots.Add(item);
+                    if (!outOfOrder) _roots.Add(item);   // an out-of-order record joins the forest at its source position
                     newRoots.Add(item);
                     _lastRoot = item;
                 }
@@ -4911,7 +4953,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // An integer constant-name may specify repetition in a PICTURE character-string (ISO §13.10.3 SR2 second
         // sentence → §13.18.40): expand `PIC X(K)` to `PIC X(5)` BEFORE Analyze reads the string. Guarded on the
         // unit actually defining constants, so a constant-free program's PICTURE pipeline is untouched.
-        if (pictureText is not null && _constants.Count > 0)
+        if (pictureText is not null && UnitHasConstants)
             pictureText = ExpandPicConstants(pictureText, entryWhere);
         // The WRITTEN character-string, kept for the screens that cannot run until the forest is complete
         // (§13.18.60.4 GR1's inherited usage — DataItem.PictureText). Captured HERE, before the §13.16.3 SR8

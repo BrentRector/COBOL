@@ -378,11 +378,13 @@ public sealed partial class DataBinder
         switch (issue)
         {
             case Common.NumericSeparatorIssue.DecimalPointUnderCommaMode:
-                Edition.Error("COBOLNET0895", $"numeric literal '{text}': under DECIMAL-POINT IS COMMA the "
+                Edition.Error(DiagnosticCatalog.NumericLiteralDecimalSeparator,
+                    $"numeric literal '{text}': under DECIMAL-POINT IS COMMA the "
                     + "decimal separator is the comma (ISO §12.3.7.4 GR14a); '.' is not valid in a numeric literal");
                 break;
             case Common.NumericSeparatorIssue.CommaWithoutCommaMode:
-                Edition.Error("COBOLNET0895", $"numeric literal '{text}': a comma decimal separator requires "
+                Edition.Error(DiagnosticCatalog.NumericLiteralDecimalSeparator,
+                    $"numeric literal '{text}': a comma decimal separator requires "
                     + "DECIMAL-POINT IS COMMA (ISO §12.3.7.4 GR14a; §8.3.3.3.2 admits only '.' as the decimal point)");
                 break;
         }

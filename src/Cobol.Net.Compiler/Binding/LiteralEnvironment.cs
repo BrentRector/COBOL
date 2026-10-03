@@ -16,7 +16,9 @@ namespace CobolNet.Binding;
 /// <item><b>The words that stand for a literal.</b> §13.10.3 SR2 lets a constant-name stand wherever a format
 /// specifies a literal of its class and category, and §12.3.7.4 GR11 a) makes a symbolic-character a figurative
 /// constant — the §8.8.3.1 format writes literal-1 / literal-2, so both are operands. They resolve through the
-/// program's own tables, as those tables stand at the fold (definition precedes reference, §13.10.4 GR1).</item>
+/// program's own tables: a symbolic-character as the table stands at the fold, a constant-name through
+/// <c>DataBinder.FindConstant</c>, which binds a constant entry written LATER on demand (kb/Work PB1231 — no clause
+/// orders a constant entry before its references; §13.10.3 SR4/SR5 forbid only circular dependence).</item>
 /// </list>
 /// ⛔ The constructor is private: an environment is obtained from one of the three NAMED contexts below, so a
 /// fold site cannot forget the national table or the word tables — the PB1406 defect was six fold sites (two in

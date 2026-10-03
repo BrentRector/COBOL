@@ -51,9 +51,15 @@ using Core = CobolParserCore;
 /// The <b>FROM compilation-variable-name-1</b> form (GR1/GR2 — the &gt;&gt;DEFINE tie-in) reads the group's
 /// compilation-variable TIMELINE at the entry's own line (<see cref="BindConstantFrom"/>; §7.3.11.4 GR1, §13.10.3
 /// SR8 — kb/Work PB1368): the conditional-compilation driver records every DEFINE in the resultant line frame, PUSH/POP
-/// revoke as they do for every directive state, and the binder receives it through <c>DirectiveResults</c>.
-/// Definition-before-reference is required (the GR1 textual-substitution model — substitution happens as the
-/// source is bound, in order); a forward reference fails as an unknown constant-name.
+/// revoke as they do for every directive state, and the binder receives it through <c>DirectiveResults</c>. That
+/// timeline IS ordered: §7.3.11.4 GR1 scopes a definition to the text that follows the DEFINE.
+/// <para>⛔ THE CONSTANT ENTRIES THEMSELVES ARE NOT ORDERED (kb/Work PB1231). No clause of §13.10 or §8.4 makes a
+/// reference follow the constant entry it names, and §13.10.3 SR4/SR5 — a length or a value "shall not be dependent,
+/// directly or indirectly, upon the value of constant-name-1" — could not be broken if one had to. So every entry is
+/// DECLARED before anything binds (<see cref="DeclareDataEntries"/>), <see cref="FindConstant"/> binds one on demand,
+/// a re-entry is the reported cycle, and a length phrase may measure an item described later
+/// (<see cref="LengthOperandItem"/>; the record-order half is <c>DataBinder.EntryOrder.cs</c>). It used to be filled
+/// in declaration order, and every reference that preceded its entry was refused as undefined.</para>
 /// </summary>
 public sealed partial class DataBinder
 {
@@ -120,8 +126,228 @@ public sealed partial class DataBinder
             }
     }
 
-    /// <summary>The defined constant named <paramref name="name"/>, or null (§13.10.4 GR1 lookup).</summary>
-    internal ConstantDef? FindConstant(string name) => _constants.TryGetValue(name, out var d) ? d : null;
+    /// <summary>⛔ THE ONE CONSTANT LOOKUP (§13.10.4 GR1/GR3 substitution; kb/Work PB1231): the defined constant named
+    /// <paramref name="name"/>, or null. A constant entry of this unit that is DECLARED but not yet bound — it stands
+    /// later in the source than the reference, or in a section the binder walks later — is bound HERE, on demand,
+    /// through <see cref="BindDeclaredConstant"/>; so a reference may precede the entry it names (§13.10.3 SR4 and SR5
+    /// forbid only a CIRCULAR dependence, which that bind reports). Every reader goes through this method: the
+    /// arithmetic operand (<see cref="ResolveConstantName"/>), <see cref="ConstantOf"/>, <see cref="IsIntegerConstant"/>,
+    /// <see cref="OccursBoundValue"/>, <see cref="ExpandPicConstants"/> and <c>LiteralEnvironment.Constant</c>.</summary>
+    internal ConstantDef? FindConstant(string name)
+    {
+        if (_declaredConstants.TryGetValue(name, out var declared))
+            foreach (var d in declared)
+            {
+                if (_constants.ContainsKey(name)) break;
+                BindDeclaredConstant(d, demanded: true);
+            }
+        return _constants.TryGetValue(name, out var def) ? def : null;
+    }
+
+    /// <summary>Whether this unit has any constant, bound or still to bind — the guard the PICTURE expansion takes so a
+    /// constant-free program's PICTURE pipeline is untouched.</summary>
+    private bool UnitHasConstants => _constants.Count > 0 || _declaredConstants.Count > 0;
+
+    // ── Declaration before binding (kb/Work PB1231) ──────────────────────────────────────────────────────────────
+
+    /// <summary>Where a constant entry stands in its bind: not yet reached, being evaluated (a re-entry is a
+    /// circular dependence), waiting for the later data item its length phrase names, or finished (bound or
+    /// rejected).</summary>
+    private enum ConstantBindState { Declared, Evaluating, Postponed, Finished }
+
+    /// <summary>One constant entry of this unit, collected before anything binds (<see cref="DeclareDataEntries"/>).
+    /// <paramref name="Entry"/> is the host entry (the diagnostic anchor); the level-number, the optional name and the
+    /// body are the three parts both hosts spell (§13.10.2; kb/Work PB1226).</summary>
+    private sealed class DeclaredConstant(
+        Antlr4.Runtime.ParserRuleContext entry, Core.LevelNumberContext level, Core.DataNameContext? nameCtx,
+        Core.ConstantEntryBodyContext body)
+    {
+        public Antlr4.Runtime.ParserRuleContext Entry { get; } = entry;
+        public Core.LevelNumberContext Level { get; } = level;
+        public Core.DataNameContext? NameCtx { get; } = nameCtx;
+        public Core.ConstantEntryBodyContext Body { get; } = body;
+        public ConstantBindState State { get; set; }
+        /// <summary>The entry's §13.10.2 shape checks and its user-word declaration ran (once, whatever the order).</summary>
+        public bool Screened { get; set; }
+        /// <summary>The cycle through this entry was reported, so a second reader of it does not report it again.</summary>
+        public bool CycleReported { get; set; }
+        /// <summary>The entry is a length phrase (§13.10.2 BYTE-LENGTH OF / LENGTH OF) — its cycle is SR4's.</summary>
+        public bool IsLengthPhrase => Body.constantValue() is { } cv
+            && (cv.LENGTH() is not null || cv.constantByteLengthWord() is not null);
+    }
+
+    /// <summary>The unit's constant entries by name, in source order (a duplicated name, §13.10.3 SR9, has several).</summary>
+    private readonly Dictionary<string, List<DeclaredConstant>> _declaredConstants = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The same entries by their body — how an in-order walk finds the declaration it has reached.</summary>
+    private readonly Dictionary<Core.ConstantEntryBodyContext, DeclaredConstant> _constantByBody = [];
+
+    /// <summary>The constant entries being evaluated, outermost first: the demand chain a circular reference closes.</summary>
+    private readonly List<DeclaredConstant> _constantsInProgress = [];
+
+    /// <summary>Collect every constant entry under <paramref name="scope"/> (a DATA DIVISION, or a method's) BEFORE any
+    /// of it binds, and every data description entry's place in its section (<see cref="DeclareDataEntryRuns"/>), so a
+    /// reference can name an entry that follows it. A local declaration SHADOWS a container's GLOBAL constant of the
+    /// same name from here on (§8.4.6; kb/Work PB1009) — whether or not its own bind succeeds.</summary>
+    private void DeclareDataEntries(Core.DataDivisionContext? scope)
+    {
+        if (scope is null) return;
+        foreach (var node in Descendants(scope))
+        {
+            if (node is Core.ReportDescriptionEntryContext rd) DeclareReportEntries(rd);
+            var (level, nameCtx, body) = node switch
+            {
+                Core.DataDescriptionEntryContext e when e.dataDescriptionBody()?.constantEntryBody() is { } b
+                    => (e.levelNumber(), e.dataName(), b),
+                Core.ConstantEntryContext c => (c.levelNumber(), c.dataName(), c.constantEntryBody()),
+                _ => default,
+            };
+            if (body is null || _constantByBody.ContainsKey(body)) continue;
+            var d = new DeclaredConstant((Antlr4.Runtime.ParserRuleContext)node, level, nameCtx, body);
+            _constantByBody[body] = d;
+            if (nameCtx?.GetText() is not { } name || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!_declaredConstants.TryGetValue(name, out var list)) _declaredConstants[name] = list = [];
+            list.Add(d);
+            if (_inheritedConstants.Remove(name)) _constants.Remove(name);
+        }
+        DeclareDataEntryRuns(scope);
+    }
+
+    /// <summary>Every parse-tree descendant of <paramref name="node"/>, depth first in source order.</summary>
+    private static IEnumerable<IParseTree> Descendants(IParseTree node)
+    {
+        for (int i = 0; i < node.ChildCount; i++)
+        {
+            var child = node.GetChild(i);
+            yield return child;
+            foreach (var d in Descendants(child)) yield return d;
+        }
+    }
+
+    /// <summary>Bind every constant entry nothing has bound yet — the last step of the data division's bind, so the
+    /// procedure division and every contained program see a complete table. A length phrase still waiting for its
+    /// operand is decided now: its operand is bound by this point, or it is not defined.</summary>
+    private void BindRemainingConstants()
+    {
+        foreach (var d in _constantByBody.Values.ToList())
+            if (d.State is not ConstantBindState.Finished) BindDeclaredConstant(d, demanded: true);
+    }
+
+    /// <summary>Bind one declared constant entry, in source order (<paramref name="demanded"/> false — reached by the
+    /// section's walk) or on demand (a reference needs its value now). A re-entry while it is evaluating closes a
+    /// circular dependence: reported once, as §13.10.3 SR4 when a length phrase is on the cycle and SR5 otherwise. A
+    /// length phrase whose operand is described LATER waits (<see cref="ConstantBindState.Postponed"/>) when reached in
+    /// order, and is bound when first demanded or at <see cref="BindRemainingConstants"/>, whichever comes first.</summary>
+    private void BindDeclaredConstant(DeclaredConstant d, bool demanded)
+    {
+        switch (d.State)
+        {
+            case ConstantBindState.Finished:
+                return;
+            case ConstantBindState.Evaluating:
+                ReportConstantCycle(d);
+                return;
+            case ConstantBindState.Postponed when !demanded:
+                return;
+        }
+        using var _ = Edition.At(d.Entry);
+        string? name = d.NameCtx?.GetText();
+        string where = $"constant entry '{name ?? "?"}'";
+        if (!d.Screened)
+        {
+            d.Screened = true;
+            // §13.10.2: the general format admits level {1 | 01} only, and constant-name-1 is mandatory.
+            if (d.Level.GetText() is not ("1" or "01"))
+                Edition.Error(DiagnosticCatalog.ConstantEntryRule,
+                    $"{where}: a constant entry shall have level-number 1 or 01 (ISO §13.10.2)");
+            if (name is null || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase))
+            {
+                Edition.Error(DiagnosticCatalog.ConstantEntryRule,
+                    "a constant entry shall be named — constant-name-1 is required (ISO §13.10.2)");
+                d.State = ConstantBindState.Finished;
+                return;
+            }
+            DeclareUserWord(name, UserWordKind.ConstantName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
+        }
+        if (name is null) { d.State = ConstantBindState.Finished; return; }
+
+        d.State = ConstantBindState.Evaluating;
+        _constantsInProgress.Add(d);
+        ConstantDef? def;
+        bool waits = false;
+        try
+        {
+            def = EvaluateConstantEntry(d.Body, name, d.Level.Start.Line, where, demanded, out waits);
+        }
+        finally
+        {
+            _constantsInProgress.Remove(d);
+        }
+        if (waits)
+        {
+            d.State = ConstantBindState.Postponed;
+            return;
+        }
+        d.State = ConstantBindState.Finished;
+        if (def is null) return;
+
+        // §13.10.3 SR9: "If constant-name-1 duplicates another constant-name, the specification of
+        // arithmetic-expression-1, literal-1, data-name-1, data-name-2, or compilation-variable-name-1 shall be the
+        // same as specified in the other constant-name" — the SPECIFICATIONS, as written, not the values they fold to
+        // (kb/Work PB1230: `AS 5` then `AS 2 + 3`, and `AS LENGTH OF W` then `AS 7`, compared equal by value and
+        // compiled). ⚠ DETERMINATION: "the same" is text-word equality under the ONE matcher the standard itself
+        // defines for comparing written text (§7.2.3.4 9) c), COPY REPLACING — separators collapse to a space, COBOL
+        // words compare without regard to case), so `AS 5` / `AS 05` / `AS +5` are three specifications. The two
+        // entries are compared whichever binds first (an entry may now be bound on demand, out of source order).
+        // ⚠ DETERMINATION (kb/Work PB1009): SR9's "duplicates another constant-name" is read within one source element
+        // — a contained program's own declaration SHADOWS a container's GLOBAL constant of the same name
+        // (DeclareDataEntries drops the inherited one), never a cross-element obligation to repeat its specification.
+        if (_constants.TryGetValue(name, out var prior))
+        {
+            if (!CobolNet.Frontend.Preprocessor.TextWordSequence.Matches(prior.Specification, def.Specification))
+                Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: duplicates constant-name "
+                    + $"'{prior.Name}' with a different specification ('{def.Specification}', where the other entry "
+                    + $"specifies '{prior.Specification}') — a duplicated constant-name shall carry the same "
+                    + "specification (ISO §13.10.3 SR9)");
+            return;
+        }
+        _constants[name] = def;
+    }
+
+    /// <summary>Does a reference to <paramref name="word"/> close a circular dependence — it names a constant entry being
+    /// evaluated? Reported here (<see cref="ReportConstantCycle"/>), so the caller can recover silently.</summary>
+    private bool ClosesConstantCycle(string word)
+    {
+        if (!_declaredConstants.TryGetValue(word, out var declared)
+            || declared.FirstOrDefault(d => d.State == ConstantBindState.Evaluating) is not { } reentered)
+            return false;
+        ReportConstantCycle(reentered);
+        return true;
+    }
+
+    /// <summary>Does <paramref name="word"/> name a constant entry of this unit that yielded no value? Its own entry was
+    /// reported (a cycle, a bad operand), so a reader recovers without a second "not a constant-name" error.</summary>
+    private bool IsFailedConstant(string word) =>
+        _declaredConstants.ContainsKey(word) && FindConstant(word) is null;
+
+    /// <summary>Report the circular dependence <paramref name="reentered"/> closes, once, at that entry: the chain of
+    /// entries being evaluated from it back to itself. §13.10.3 SR4 when a length phrase is on the cycle (the length of
+    /// its data-name then depends on the constant), SR5 otherwise (the value of its literals does).</summary>
+    private void ReportConstantCycle(DeclaredConstant reentered)
+    {
+        if (reentered.CycleReported) return;
+        reentered.CycleReported = true;
+        int from = _constantsInProgress.IndexOf(reentered);
+        var cycle = _constantsInProgress.Skip(Math.Max(from, 0)).ToList();
+        string path = string.Join(" → ", cycle.Append(reentered).Select(c => c.NameCtx?.GetText() ?? "?"));
+        string name = reentered.NameCtx?.GetText() ?? "?";
+        using var _ = Edition.At(reentered.Entry);
+        Edition.Error(DiagnosticCatalog.ConstantEntryRule, cycle.Any(c => c.IsLengthPhrase)
+            ? $"constant entry '{name}': circular dependence ({path}) — the length of the LENGTH OF / BYTE-LENGTH OF "
+                + $"operand depends, directly or indirectly, on the value of '{name}' (ISO §13.10.3 SR4)"
+            : $"constant entry '{name}': circular dependence ({path}) — its value depends, directly or indirectly, on "
+                + $"the value of '{name}' itself (ISO §13.10.3 SR5)");
+    }
 
     /// <summary>Is <paramref name="name"/> an INTEGER constant-name — the shape §13.10.3 SR2 admits where a format
     /// specifies an integer literal ("If constant-name-1 is an integer, …"; GR3 for the expression and length
@@ -133,8 +359,7 @@ public sealed partial class DataBinder
     /// takes no qualifiers, subscripts, or reference-modification — it substitutes a literal (§13.10.4 GR1) —
     /// so any suffixed reference falls through to ordinary resolution.</summary>
     internal ConstantDef? ConstantOf(Core.DataReferenceContext dref) =>
-        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w
-        && _constants.TryGetValue(w.GetText(), out var def) ? def : null;
+        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w ? FindConstant(w.GetText()) : null;
 
     /// <summary>Whether <paramref name="item"/> is, or is subordinate to, a CONSTANT RECORD (ISO §13.18.15.3
     /// SR2 — "neither the data item described by the subject of the entry nor any data item subordinate to
@@ -172,78 +397,70 @@ public sealed partial class DataBinder
 
     // ── The constant-entry bind (§13.10) ─────────────────────────────────────────────────────────────────────
 
-    /// <summary>Bind one constant entry (§13.10.2 general format) into the constant table — the
+    /// <summary>The section walk has REACHED one constant entry (§13.10.2 general format) — the
     /// <c>constantEntryBody</c> of a <c>dataDescriptionBody</c> (a record area, WORKING-STORAGE, LOCAL-STORAGE,
     /// LINKAGE) or of a <c>constantEntry</c> standing in the REPORT SECTION (§13.8.2, kb/Work PB1226). Both spell
-    /// the same body, so the caller passes the entry's level-number, its optional name and the body, never the host
-    /// rule. Produces NO <see cref="DataItem"/> (§13.10.4 GR1/GR3 — a constant is a substitution, not storage). The
+    /// the same body, so the caller passes the host entry (the diagnostic anchor), the entry's level-number, its
+    /// optional name and the body. The entry binds here unless a reference bound it already, or it waits for an
+    /// operand described later (<see cref="BindDeclaredConstant"/>, kb/Work PB1231). Produces NO <see cref="DataItem"/> (§13.10.4 GR1/GR3 — a constant is a substitution, not storage). The
     /// COBOL-2002 introduction gate is the VersionConformancePass parse arm (<c>VisitConstantEntryBody</c> →
     /// constant-entry-2002 → COBOLNET0900 below 2002), NOT here (the binder stays edition-agnostic — Step E).</summary>
     private void BindConstantEntry(
-        Core.LevelNumberContext level, Core.DataNameContext? nameCtx, Core.ConstantEntryBodyContext body)
+        Antlr4.Runtime.ParserRuleContext entry, Core.LevelNumberContext level, Core.DataNameContext? nameCtx,
+        Core.ConstantEntryBodyContext body)
     {
-        string? name = nameCtx?.GetText();
-        string where = $"constant entry '{name ?? "?"}'";
-        // §13.10.2: the general format admits level {1 | 01} only, and constant-name-1 is mandatory.
-        if (level.GetText() is not ("1" or "01"))
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule,
-                $"{where}: a constant entry shall have level-number 1 or 01 (ISO §13.10.2)");
-        if (name is null || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase))
+        // The entry was declared before anything bound (DeclareDataEntries); a host the declaration walk did not
+        // reach is declared here, so the in-order walk never depends on that walk's coverage.
+        if (!_constantByBody.TryGetValue(body, out var d))
         {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule,
-                "a constant entry shall be named — constant-name-1 is required (ISO §13.10.2)");
-            return;
+            _constantByBody[body] = d = new DeclaredConstant(entry, level, nameCtx, body);
+            if (nameCtx?.GetText() is { } name && !name.Equals("FILLER", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!_declaredConstants.TryGetValue(name, out var list)) _declaredConstants[name] = list = [];
+                list.Add(d);
+                if (_inheritedConstants.Remove(name)) _constants.Remove(name);
+            }
         }
-        DeclareUserWord(name, UserWordKind.ConstantName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
+        BindDeclaredConstant(d, demanded: false);
+    }
+
+    /// <summary>The value of one constant entry's operand (§13.10.2's AS / FROM alternatives). <paramref name="waits"/>
+    /// is set when a length phrase names a data item described LATER and the entry was reached in order
+    /// (<paramref name="demanded"/> false): the entry waits rather than reorder the data division for a value nothing
+    /// has asked for yet.</summary>
+    private ConstantDef? EvaluateConstantEntry(
+        Core.ConstantEntryBodyContext body, string name, int entryLine, string where, bool demanded, out bool waits)
+    {
+        waits = false;
         bool isGlobal = body.GLOBAL() is not null;
-
-        ConstantDef? def;
         if (body.cobolWord() is { } variable)   // FROM compilation-variable-name-1 (§13.10.2)
-            def = BindConstantFrom(name, isGlobal, variable, level.Start.Line, where);
-        else
-        {
-            var cv = body.constantValue();
-            string spec = WrittenSpecification(cv);
-            def = cv.LENGTH() is not null ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: false)
-                : cv.constantByteLengthWord() is not null ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: true)
-                : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
-                : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
-        }
-        if (def is null) return;
-
-        // A container's GLOBAL constant of the same name is SHADOWED by this local entry (§8.4.6 scope of names;
-        // kb/Work PB1009). ⚠ DETERMINATION: SR9's "duplicates another constant-name" is read within one source
-        // element — the contained program's own declaration is the one its references mean, as for any global
-        // data-name it redeclares — not as a cross-element obligation to repeat the container's specification.
-        if (_inheritedConstants.Remove(name)) _constants.Remove(name);
-        // §13.10.3 SR9: "If constant-name-1 duplicates another constant-name, the specification of
-        // arithmetic-expression-1, literal-1, data-name-1, data-name-2, or compilation-variable-name-1 shall be the
-        // same as specified in the other constant-name" — the SPECIFICATIONS, as written, not the values they fold to
-        // (kb/Work PB1230: `AS 5` then `AS 2 + 3`, and `AS LENGTH OF W` then `AS 7`, compared equal by value and
-        // compiled). ⚠ DETERMINATION: "the same" is text-word equality under the ONE matcher the standard itself
-        // defines for comparing written text (§7.2.3.4 9) c), COPY REPLACING — separators collapse to a space, COBOL
-        // words compare without regard to case), so `AS 5` / `AS 05` / `AS +5` are three specifications.
-        if (_constants.TryGetValue(name, out var prior))
-        {
-            if (!CobolNet.Frontend.Preprocessor.TextWordSequence.Matches(prior.Specification, def.Specification))
-                Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: duplicates constant-name "
-                    + $"'{prior.Name}' with a different specification ('{def.Specification}', where the other entry "
-                    + $"specifies '{prior.Specification}') — a duplicated constant-name shall carry the same "
-                    + "specification (ISO §13.10.3 SR9)");
-            return;
-        }
-        _constants[name] = def;
+            return BindConstantFrom(name, isGlobal, variable, entryLine, where);
+        var cv = body.constantValue();
+        string spec = WrittenSpecification(cv);
+        return cv.LENGTH() is not null
+                ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: false, demanded, out waits)
+            : cv.constantByteLengthWord() is not null
+                ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: true, demanded, out waits)
+            : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
+            : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
     }
 
     /// <summary>The AS operand's specification as written (§13.10.3 SR9's subject): its tokens' texts, one space
     /// apart. Built from the parse tree's TOKENS, not the source span, so a comment written inside a multi-line
     /// operand (<c>AS 2 *&gt; two</c> / <c>+ 3</c>) is not part of it — joined into one line, the comment would
-    /// have swallowed the rest of the operand and made unequal specifications compare equal.</summary>
+    /// have swallowed the rest of the operand and made unequal specifications compare equal.
+    /// <para>A length phrase's specification is its KEYWORD and its operand, never the optional word OF (§13.10.2 does
+    /// not underline it, §5.2.3; kb/Work PB1225): SR9 compares "the specification of … data-name-1, data-name-2", so
+    /// <c>LENGTH W</c> and <c>LENGTH OF W</c> specify the same data-name-2 and are spelled the same here, while
+    /// <c>BYTE-LENGTH OF W</c> (data-name-1) stays a different specification.</para></summary>
     private static string WrittenSpecification(Core.ConstantValueContext cv)
     {
         var tokens = new List<Antlr4.Runtime.IToken>();
-        ReferenceResolver.CollectLeafTokens(cv, tokens);
-        return string.Join(' ', tokens.Select(t => t.Text));
+        ReferenceResolver.CollectLeafTokens(cv.dataReference() ?? (IParseTree)cv, tokens);
+        string written = string.Join(' ', tokens.Select(t => t.Text));
+        return cv.LENGTH() is not null ? "LENGTH OF " + written
+            : cv.constantByteLengthWord() is not null ? "BYTE-LENGTH OF " + written
+            : written;
     }
 
     /// <summary>FROM compilation-variable-name-1 (kb/Work PB1368, PB1228). The name is read in the &gt;&gt;DEFINE
@@ -344,7 +561,7 @@ public sealed partial class DataBinder
     {
         // §7.3.6 evaluation via the ONE shared evaluator — §7.3.11.4 GR5 (single-literal reclassification, so
         // AS 0.25 keeps 0.25) and §7.3.6.3 GR3 (integer truncation of an expression's final result) are applied at
-        // its public boundary. The binder supplies numeric-name resolution (a prior numeric constant substitutes
+        // its public boundary. The binder supplies numeric-name resolution (a numeric constant substitutes
         // its literal, §13.10.3 SR2/GR1), routes the evaluator's diagnostics to its own codes, and names the
         // operand source per §13.10.3.
         var evaluator = new CompileTimeExpressionEvaluator(
@@ -352,7 +569,7 @@ public sealed partial class DataBinder
             resolveName: ResolveConstantName,
             diag: new ConstantEvaluatorDiagnostics(this),
             vocab: new CtOperandVocabulary(
-                "previously defined numeric constant-names substituting them", "ISO §13.10.3 SR7 / §7.3.6.2 SR1b"),
+                "numeric constant-names substituting them", "ISO §13.10.3 SR7 / §7.3.6.2 SR1b"),
             decimalPointIsComma: DecimalPointIsComma);
         if (evaluator.EvaluateArithmeticOperand(expr, where) is not { } n) return null;
         // The constant carries the literal AS WRITTEN (§13.10.4 GR1 — kb/Work PB1230), never a normalized form; its
@@ -370,11 +587,23 @@ public sealed partial class DataBinder
     /// normalizer in this program's DECIMAL-POINT mode (§12.3.7.4 GR14a — already screened when the constant was
     /// bound, so no issue can arise here) and the ONE literal parser; it enters the expression in the edition's
     /// arithmetic mode at the evaluator.</summary>
-    private CtValue? ResolveConstantName(string word) =>
-        _constants.TryGetValue(word, out var d) && d.Category == PicCategory.Numeric
-        && NumericLiteral.Normalize(d.Text, DecimalPointIsComma, out _) is var canonical
-        && !NumericLiteral.IsFloatingPointForm(canonical)
-        && CtNumeric.TryParseLiteral(canonical, out var v) ? CtValue.Numeric(v, d.Text) : null;
+    private CtValue? ResolveConstantName(string word)
+    {
+        // A constant that closes a circular dependence (§13.10.3 SR4/SR5, reported by ReportConstantCycle) or whose
+        // own entry failed reads 1 (never 0: a recovered PICTURE repetition or divisor stays legal), so the evaluator
+        // adds no second "not a constant-name" error for the same mistake (the compile has already failed — the
+        // ExpandPicConstants "(1)" recovery precedent; kb/Work PB1231).
+        if (ClosesConstantCycle(word)) return FailedConstantOperand;
+        if (FindConstant(word) is { Category: PicCategory.Numeric } d
+            && NumericLiteral.Normalize(d.Text, DecimalPointIsComma, out _) is var canonical
+            && !NumericLiteral.IsFloatingPointForm(canonical)
+            && CtNumeric.TryParseLiteral(canonical, out var v))
+            return CtValue.Numeric(v, d.Text);
+        return IsFailedConstant(word) ? FailedConstantOperand : null;
+    }
+
+    /// <summary>The recovery operand of a constant whose own entry was reported.</summary>
+    private static readonly CtValue FailedConstantOperand = CtValue.Numeric(new CobolNet.Runtime.CobolDec(1, 0), "1");
 
     /// <summary>Routes the shared compile-time evaluator's diagnostics to the CONSTANT-entry binder's own codes: an
     /// arithmetic rule → the <c>ConstantEntryRule</c> descriptor; a §12.3.7 GR14a separator violation →
@@ -384,7 +613,7 @@ public sealed partial class DataBinder
         public void Report(CobolNet.Frontend.Expressions.CtDiagCode code, string message)
         {
             if (code == CobolNet.Frontend.Expressions.CtDiagCode.NumericSeparator)
-                owner.Edition.Error("COBOLNET0895", message);
+                owner.Edition.Error(DiagnosticCatalog.NumericLiteralDecimalSeparator, message);
             else
                 owner.Edition.Error(DiagnosticCatalog.ConstantEntryRule, message);
         }
@@ -400,12 +629,17 @@ public sealed partial class DataBinder
     /// SR2/SR3/SR5 the subscript count against the item's OCCURS depth, through
     /// <see cref="ReferenceResolver.ScreenSubscriptArity"/> (kb/Work PB1016); SR10 no ANY LENGTH operand; SR12 no
     /// dynamic-length elementary item or variable-length group operand, through
-    /// <see cref="VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup"/>. The operand must already be bound
-    /// (definition-before-reference — SR4 rules out the reverse dependence).</summary>
+    /// <see cref="VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup"/>. The operand may be described AFTER
+    /// the entry (kb/Work PB1231 — §13.10.3 SR4 forbids only a length that depends on the constant): see
+    /// <see cref="LengthOperandItem"/>.</summary>
     /// <param name="bytes">True for BYTE-LENGTH OF data-name-1 (GR5), false for LENGTH OF data-name-2 (GR6).</param>
+    /// <param name="demanded">False when the section walk reached the entry; true when a reference needs its value.</param>
+    /// <param name="waits">Set when the operand is described later and nothing needs the value yet.</param>
     private ConstantDef? BindConstantLength(
-        string name, bool isGlobal, string spec, Core.DataReferenceContext dref, string where, bool bytes)
+        string name, bool isGlobal, string spec, Core.DataReferenceContext dref, string where, bool bytes,
+        bool demanded, out bool waits)
     {
+        waits = false;
         string? baseName = dref.cobolWord()?.GetText();
         if (baseName is null) return null;
         // The phrase and operand as §13.10.2 names them, for every diagnostic below.
@@ -451,14 +685,9 @@ public sealed partial class DataBinder
             }
             subscripts = resolver.SubscriptSegments(dref)?.Count ?? 0;
         }
-        DataItem? item = resolver.FindItem(baseName, w.Qualifiers);
-        if (item is null)
-        {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — the "
-                + "data-name is not defined at this point (a constant entry reads only PRECEDING declarations; "
-                + "ISO §13.10.3 SR4 rules out the reverse dependence)");
+        if (LengthOperandItem(resolver, baseName, w.Qualifiers, name, phrase, written, where, demanded, out waits)
+            is not { } item)
             return null;
-        }
         // ⛔ §8.4.2.3.3 SR2/SR3/SR5 — THE SUBSCRIPTS AGAINST THE ITEM'S DIMENSIONS, through the ONE screen every
         // procedure-division reference takes (kb/Work PB1016). §13.10.3 SR3 above constrains only the FORM of a
         // subscript ("All subscripts of data-name-1 and data-name-2 shall be literals"); whether one may be
@@ -500,6 +729,101 @@ public sealed partial class DataBinder
         return new ConstantDef(name, PicCategory.Numeric, text, text, isGlobal, text, spec);
     }
 
+    /// <summary>The data item a length phrase's operand names (kb/Work PB1231). No clause of §13.10 orders a constant
+    /// entry after the item it measures, and §13.10.3 SR4 — "The length of data-name-1 or data-name-2 shall not be
+    /// dependent, directly or indirectly, upon the value of constant-name-1" — could not be broken if it had to, so
+    /// the operand may be described later:
+    /// <list type="bullet">
+    /// <item>already bound and COMPLETE → it. An item whose description is still open (a group whose subordinates are
+    /// being described, <see cref="IsDescriptionOpen"/>) is measured only through its own description, which is what
+    /// referenced this constant: the SR4 cycle.</item>
+    /// <item>described later, entry reached in order → <paramref name="waits"/>: nothing needs the value yet.</item>
+    /// <item>described later, value demanded now → its record is bound now, out of source order
+    /// (<see cref="BindLaterRecords"/>; the records keep their source order in the forest), then measured.</item>
+    /// <item>being described by the entry whose own description demanded the constant → the SR4 cycle.</item>
+    /// </list></summary>
+    private DataItem? LengthOperandItem(
+        ReferenceResolver resolver, string baseName, IReadOnlyList<string> qualifiers, string constantName,
+        string phrase, string written, string where, bool demanded, out bool waits)
+    {
+        waits = false;
+        DataItem? item = resolver.FindItem(baseName, qualifiers);
+        if (item is null && ReportEntryCandidates(baseName, qualifiers) is { Count: > 0 } reportEntries)
+            return ReportLengthOperand(reportEntries, baseName, phrase, written, where, demanded, out waits);
+        if (item is null && IsDescribedLater(baseName))
+        {
+            if (!demanded) { waits = true; return null; }
+            if (BindLaterRecords(baseName)) item = resolver.FindItem(baseName, qualifiers);
+        }
+        if ((item is not null && IsDescriptionOpen(item)) || (item is null && IsBeingDescribed(baseName)))
+        {
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — the description of "
+                + $"'{baseName}' is not complete where it references '{constantName}', so the length of the operand "
+                + $"depends on the value of '{constantName}' (ISO §13.10.3 SR4: the length of data-name-1 or data-name-2 "
+                + "shall not be dependent, directly or indirectly, upon the value of constant-name-1)");
+            return null;
+        }
+        if (item is null && IsDescribedLater(baseName))
+        {
+            Edition.Error(DiagnosticCatalog.ConstantLengthOperandBoundLater, $"{where}: {phrase} '{written}' — "
+                + $"'{baseName}' is described later in a record whose description is still being bound where "
+                + $"'{constantName}' is referenced; measuring part of an open record out of source order is recognized "
+                + "but not yet implemented");
+            return null;
+        }
+        if (item is null)
+        {
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — the data-name is not "
+                + "defined (ISO §13.10.2: data-name-1 and data-name-2 name data items)");
+            return null;
+        }
+        return item;
+    }
+
+    /// <summary>A length phrase's operand that names a REPORT SECTION entry (kb/Work PB1226). §13.10.3 SR11: "Data-name-1
+    /// and data-name-2, if defined in the report section, shall reference elementary report items" — so a report
+    /// group (an entry with subordinates) is refused by that rule, and an elementary report item is measured as its
+    /// printable item's description (§15.50 / §15.14 over its PICTURE). A report entry is not a <see cref="DataItem"/>
+    /// <see cref="ReferenceResolver.FindItem"/> sees; <see cref="ReportEntryCandidates"/> resolves it, and more than
+    /// one candidate is §8.4.2.2.3 SR1's ambiguity. The report binder reaches the REPORT SECTION's groups in source
+    /// order, so an entry reached in order before the item waits, and one whose value is needed sooner is
+    /// <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>.</summary>
+    private DataItem? ReportLengthOperand(
+        List<ReportEntryLocation> candidates, string baseName, string phrase,
+        string written, string where, bool demanded, out bool waits)
+    {
+        waits = false;
+        if (candidates is not [var entry])
+        {
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — '{baseName}' names "
+                + $"{candidates.Count} report group description entries; a data-name shall be qualified until it is "
+                + "unique (ISO §8.4.2.2.3 SR1)");
+            return null;
+        }
+        if (!entry.IsElementary)
+        {
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — '{baseName}' is a "
+                + $"report group description entry of report '{entry.ReportName}' with subordinate entries; data-name-1 "
+                + "and data-name-2, if defined in the report section, shall reference elementary report items (ISO "
+                + "§13.10.3 SR11)");
+            return null;
+        }
+        if (_reportEntryItems.TryGetValue(entry.Entry, out var item)) return item;
+        if (!_reportEntriesBound.Contains(entry.Entry))
+        {
+            if (!demanded) { waits = true; return null; }
+            Edition.Error(DiagnosticCatalog.ConstantLengthOperandBoundLater, $"{where}: {phrase} '{written}' — the "
+                + $"elementary report item '{baseName}' of report '{entry.ReportName}' is described in a report group "
+                + "the REPORT SECTION has not reached where the constant is referenced; measuring it out of source order "
+                + "is recognized but not yet implemented");
+            return null;
+        }
+        // Bound, yet no printable item: its own entry was refused (§13.15.3 SR10/SR12 — reported there).
+        Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the length of '{written}' is not computable — the "
+            + "elementary report item describes no printable item (ISO §13.10.4 GR5/GR6)");
+        return null;
+    }
+
     // ── The data-division substitution chokepoints (§13.10.3 SR2) ────────────────────────────────────────────
 
     /// <summary>The value of one OCCURS fixed bound (the <c>occursBound</c> grammar alternative): integer-1/
@@ -511,7 +835,7 @@ public sealed partial class DataBinder
         if (bound.integerLiteral() is { } il)
             return CobolNet.Validation.IntegerOperandRules.HostValue(il);
         string word = bound.cobolWord().GetText();
-        if (_constants.TryGetValue(word, out var k))
+        if (FindConstant(word) is { } k)
         {
             // THE ONE integer-literal reader (kb/Work PB1579): an integer constant beyond the host range is still an
             // INTEGER constant-name — a TryParse here refused it as "not an INTEGER constant-name". Substituted for
@@ -532,6 +856,7 @@ public sealed partial class DataBinder
                 + "integer position)");
             return null;
         }
+        if (IsFailedConstant(word)) return null;   // its own entry was reported
         Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the OCCURS bound '{word}' is not a "
             + "defined constant-name — the OCCURS integer positions admit an integer literal or an integer "
             + "constant-name (ISO §13.18.38 / §13.10.3 SR2)");
@@ -555,7 +880,7 @@ public sealed partial class DataBinder
             m =>
             {
                 string word = m.Groups[1].Value;
-                if (_constants.TryGetValue(word, out var k))
+                if (FindConstant(word) is { } k)
                 {
                     if (k is { Category: PicCategory.Numeric, IntegerText: { } it }) return "(" + it + ")";
                     if (diagnose)
@@ -563,7 +888,7 @@ public sealed partial class DataBinder
                             + "repetition position shall be an INTEGER constant-name (ISO §13.10.3 SR2)");
                     return "(1)";   // recovery shape — the compile has already failed
                 }
-                if (diagnose)
+                if (diagnose && !IsFailedConstant(word))
                     Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: '{word}' in the PICTURE "
                         + "repetition position is not a defined constant-name (ISO §13.18.40.2 — a repetition "
                         + "count is an unsigned integer or an integer constant-name, §13.10.3 SR2)");

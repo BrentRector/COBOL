@@ -489,8 +489,11 @@ COBOLNET2197 beside it.
 
 **The REPORT SECTION entry grammar and the PAGE clause are the printed ones** (kb/Work PB1226, PB1059):
 `reportDescriptionEntry` is `RD … { constantEntry | reportGroupEntry } …` (§13.8.2; the constant entry rides the
-data description entry's own `constantEntryBody` and `DataBinder.BindConstantEntry`, bound in source order by
-`BindReportSectionEntries`, and `ScreenReportDescriptionHasGroup` reports an RD with no group entry, COBOLNET2708,
+data description entry's own `constantEntryBody` and `DataBinder.BindConstantEntry`, reached in source order by
+`BindReportSectionEntries` and bound earlier on demand when a reference needs it (kb/Work PB1231). A constant's
+`LENGTH OF` / `BYTE-LENGTH OF` may name a report entry: `DeclareReportEntries` records every named entry before
+binding, `ReportLengthOperand` refuses a report group (§13.10.3 SR11 — elementary report items only, kb/Work PB1226)
+and measures an elementary one as its printable item; and `ScreenReportDescriptionHasGroup` reports an RD with no group entry, COBOLNET2708,
 §13.8.4); the report group entry's name slot is the data description entry's `dataName` (FILLER included,
 §13.18.20.3 SR3), read through `CstExtensions.NameOrNull`; and `reportPageClause` carries the page-width operand
 (`integer-2 {COLS | COLUMNS}`, `ReportModel.PageWidth`, default 999 by §13.18.39.4 GR5 → `CobolReport`'s page
