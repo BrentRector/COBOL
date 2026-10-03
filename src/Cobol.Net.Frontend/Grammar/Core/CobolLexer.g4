@@ -609,6 +609,7 @@ BY          : 'BY' ;
 // supported edition — was refused as an unrecognized FD clause (COBOLNET1970). §8.10 context-sensitive ("RECORD
 // clause"), never §8.9-reserved, so it stays a legal user word at every edition through cobolWord.
 BYTES       : 'BYTES' ;
+CENTER      : 'CENTER' ;   // COLUMN clause alignment (ISO §13.18.14.2 Format 1) — §8.10 context-sensitive (user word at every edition; kb/Work PB1220)
 CF          : 'CF' ;
 CH          : 'CH' ;
 CHARACTER   : 'CHARACTER' ;

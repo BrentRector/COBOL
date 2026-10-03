@@ -43,6 +43,7 @@ public partial class CobolLexer
         B_SHIFT_RC,
         B_XOR,
         CAPACITY,
+        CENTER,
         CHANNEL,
         CLASS_ID,
         CLOCK_UNITS,

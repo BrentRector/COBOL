@@ -178,7 +178,7 @@ internal sealed class ReportWriterEmitter(
     {
         if (!needsHc && f.Columns.Count == 1 && presentSlot < 0 && !f.GroupIndicate && f.Varyings.Count == 0)
         {
-            w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", f.Column, FieldImage(r, f, 0))};");
+            w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", f.Columns[0].AbsoluteLeftmost(f.PrintItem.DisplayTextWidth), FieldImage(r, f, 0))};");
             return;
         }
         // The placement's presence — ALL THREE suppressors §13.18.63.4 GR22 names ("a GROUP INDICATE, PRESENT
@@ -223,8 +223,10 @@ internal sealed class ReportWriterEmitter(
             switch (spec.Kind)
             {
                 case ReportColumnKindModel.Absolute:
-                    w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", spec.Value, image)};");
-                    if (needsHc) w.Line($"__hc = {spec.Value + f.PrintItem.DisplayTextWidth - 1};   // §13.18.14.4 GR9");
+                    // GR6 b)-d): LEFT, RIGHT or CENTER fixes the leftmost column from integer-1 and the printable-size
+                    // (ReportColumnSpec.AbsoluteLeftmost — the ONE computation the bind-time width walk uses too).
+                    w.Line($"{RuntimeApi.ReportPlace(r.CsIndex, "__ln", spec.AbsoluteLeftmost(f.PrintItem.DisplayTextWidth), image)};");
+                    if (needsHc) w.Line($"__hc = {spec.AbsoluteRightmost(f.PrintItem.DisplayTextWidth)};   // §13.18.14.4 GR9");
                     break;
                 case ReportColumnKindModel.Relative:
                     w.Line($"__hc += {spec.Value};   // §13.18.14.4 GR8 — leftmost = horizontal counter + integer-2");
@@ -412,6 +414,19 @@ internal sealed class ReportWriterEmitter(
             w.Line($"__RPT_{r.CsIndex} = new CobolReport({CsLiteral(r.Name)}, {FileKeyExpr(r.File)}, "
                 + $"{r.LineWidth}, {r.PageWidth}, {(r.Paged ? "true" : "false")}, {r.PageLimit}, {r.Heading}, {r.FirstDetail}, "
                 + $"{r.LastControlHeading}, {r.LastDetail}, {r.Footing});");
+            // The CODE clause (§13.18.12): the characters every logical record of this report begins with (GR1). A
+            // literal is a constant; an identifier is READ by the engine at each body group (GR3 — the value is used
+            // until the next evaluation), through the one string-carrier read the CONTROL operands use.
+            if (r.Code is { } code)
+            {
+                if (code.Literal is { } literal)
+                    w.Line($"__RPT_{r.CsIndex}.SetCode(static () => {CsLiteral(literal)});   // CODE literal-1 (§13.18.12.4 GR1)");
+                else if (code.Item is { } codeItem && refs.ResolveItem(codeItem) is { } codePlace)
+                    w.Line($"__RPT_{r.CsIndex}.SetCode(() => {CallEmitter.CallStringRead(codePlace)});   // CODE identifier-1 (§13.18.12.4 GR3)");
+                else
+                    w.Line(LoudStmt($"report {r.Name}: CODE identifier '{code.Written}' does not resolve to a place this "
+                        + "backend can read (ISO §13.18.12.4 GR3)"));
+            }
             foreach (var (group, gi) in r.Groups.Select((g, i) => (g, i)))
             {
                 // A conditioned line carries its slot in the group's presence snapshot, which the engine takes

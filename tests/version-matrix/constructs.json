@@ -3185,7 +3185,7 @@
   {
    "id": "report-multi-column-2002",
    "status": "active",
-   "description": "The multiple/relative COLUMN clause forms (§13.18.14 Format 1) — more than one operand defines a repeating printable item at possibly-unequal horizontal intervals (GR12, the SR10 'multiple COLUMN clause'); PLUS integer-2 positions relative to the line's horizontal counter (GR7/GR8/GR9); COL/COLS/COLUMNS/NUMBERS/ARE are the 2002 spellings (SR1). LIVE (P10 Step 13): compose-time horizontal-counter placement; an absent (PRESENT WHEN) item does not advance the counter (§13.18.41.4 GR3f). The COBOL-85 form was the single absolute 'COLUMN NUMBER IS integer-1' — everything else gates 2002.",
+   "description": "The multiple/relative COLUMN clause forms (§13.18.14 Format 1) — more than one operand defines a repeating printable item at possibly-unequal horizontal intervals (GR12, the SR10 'multiple COLUMN clause'); PLUS integer-2 positions relative to the line's horizontal counter (GR7/GR8/GR9); COL/COLS/COLUMNS/NUMBERS/ARE are the 2002 spellings (SR1); the LEFT/CENTER/RIGHT alignment phrase (GR6 b)-d), SR9; kb/Work PB1220) gates with them. LIVE (P10 Step 13): compose-time horizontal-counter placement; an absent (PRESENT WHEN) item does not advance the counter (§13.18.41.4 GR3f). The COBOL-85 form was the single absolute 'COLUMN NUMBER IS integer-1' — everything else gates 2002.",
    "display": "multiple/relative COLUMN (report group description)",
    "diagnosticCode": "COBOLNET0900",
    "citation": "ISO §13.18.14 Format 1 (§13.18.14.3 SR10 / §13.18.14.4 GR7–GR12); introduction gate = VersionConformancePass ParseArm.VisitReportColumnClause",

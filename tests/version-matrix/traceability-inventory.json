@@ -18486,13 +18486,13 @@
   "ordinal": 1,
   "subject": "Report description entry",
   "rule-digest": "99ab2cc9aa5b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportClauseNames; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportClauseNameRule",
+  "test-ref": "conformance:negative/pb1285-report-in-two-clauses; conformance:negative/pb1285-report-in-no-clause",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1285. Rule (cite.py --check 13.14.3 OK): 'There shall be one and only one REPORT clause specifying report-name-1 in a given file description entry.' Sibling §13.18.46.3 SR2 'Each report-name-1 may appear in only one REPORT clause.' ResolveReports takes Files.FirstOrDefault(f => f.ReportNames contains name): ZERO is diagnosed (COBOLNET0899 ReportNotInFile — arguably a syntax-rule violation mis-banded as not-implemented), but TWO or more REPORT clauses naming the same report are never counted. Probe RDS1: `FD RPT REPORT IS R-1.` + `FD RPT2 REPORT IS R-1.` compiles with no diagnostic and runs (DONE), the report silently bound to the first FD = under-rejects. The within-one-FD duplicate (`REPORTS ARE R-1 R-1`) is refused only by the multiple-reports stage owned by open PB1050.",
-  "state": "GAP"
+  "notes": "(kb/Work PB1285, wave 1005 A). 'There shall be one and only one REPORT clause specifying report-name-1 in a given file description entry' (cite.py --check 13.14.3 OK 1)): zero clauses is ResolveReports (the arm that carried the not-implemented code ReportNotInFile, now COBOLNET2714 ReportClauseNameRule), more than one is ScreenReportClauseNames.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.14.3-2",
@@ -20181,13 +20181,13 @@
   "ordinal": 1,
   "subject": "CODE clause",
   "rule-digest": "b93bde5d0ce6",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindCodeClause; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClauseRule",
+  "test-ref": "conformance:negative/pb1129-code-literal-numeric; conformance:85/pb1129_rd_code_literal",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). \"Literal-1 shall be an alphanumeric literal.\" cite.py --check 13.18.12.3 OK (§13.18.12.3 1)). Grammar admits any `literal` (numeric, national, figurative); no category screen exists. The blanket COBOLNET0899 stage refuses conforming and non-conforming operands alike, which is not enforcement of this rule. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). 'Literal-1 shall be an alphanumeric literal' (cite.py --check 13.18.12.3 OK 1)): BindCodeClause asks the one literal classifier (OperandLiteralClass) - a numeric, national or boolean literal and a figurative constant are COBOLNET2713; an alphanumeric one decodes through LiteralCharsOf (a concatenation folds, a hexadecimal format decodes). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.12.3-2",
@@ -20196,13 +20196,13 @@
   "ordinal": 2,
   "subject": "CODE clause",
   "rule-digest": "7d66aca5fae9",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReportCode; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClauseRule",
+  "test-ref": "conformance:negative/pb1129-code-identifier-numeric; conformance:negative/pb1129-code-identifier-odo-group; conformance:2023/pb1129_rd_code_identifier",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). \"Identifier-1 shall reference an alphanumeric data item that shall not be an occurs-depending-on group item, a variable-length group, or a dynamic-length elementary item.\" cite.py --check 13.18.12.3 OK (§13.18.12.3 2)). The only src citation (DataBinder.ConditionName.cs:206) quotes this rule to distinguish ODO from variable-length group for §13.18.4 condition-name letter h) - a different question. No screen of the CODE operand exists; blanket stage only. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). 'Identifier-1 shall reference an alphanumeric data item that shall not be an occurs-depending-on group item, a variable-length group, or a dynamic-length elementary item' (cite.py --check 13.18.12.3 OK 2)): ResolveReportCode classifies the item through the ONE Table-2 classifier (IntrinsicArgumentRules.ClassOfItem / TableTwoClass), then refuses an OCCURS-subject item that is not subscripted, an ODO-bearing group, a variable-length group and a dynamic-length item (COBOLNET2713). A subscripted or reference-modified identifier stages with SOURCE's (kb/Work PB1292). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.12.3-3",
@@ -20211,13 +20211,13 @@
   "ordinal": 3,
   "subject": "CODE clause",
   "rule-digest": "71dec7dba021",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportCodeAgreement; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClauseRule",
+  "test-ref": "conformance:negative/pb1129-code-not-on-every-report; conformance:85/pb1050_reports_share_file",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). \"If the CODE clause is specified for any report, it shall be specified for each report associated with the same report file.\" cite.py --check 13.18.12.3 OK (§13.18.12.3 3)). No cross-RD check over the FD REPORT(S) clause exists; blanket stage only. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). 'If the CODE clause is specified for any report, it shall be specified for each report associated with the same report file' (cite.py --check 13.18.12.3 OK 3)): ScreenReportCodeAgreement asks each FD's REPORT clause names (the clause can only matter once several reports share a file, kb/Work PB1050) over what was WRITTEN, and names the reports with and without the clause (COBOLNET2713). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.12.4-1",
@@ -20226,13 +20226,13 @@
   "ordinal": 1,
   "subject": "CODE clause",
   "rule-digest": "4094117271a0",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitReportConstruction",
+  "test-ref": "conformance:85/pb1129_rd_code_literal; conformance:2023/pb1129_rd_code_identifier; conformance:85/pb1050_reports_share_file",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). \"When the CODE clause is specified, literal-1 or identifier-1 is automatically placed in the first characters of each logical record written to the report file for this report.\" cite.py --check 13.18.12.4 OK (§13.18.12.4 1)). No emitter/runtime code writes a CODE prefix (only the legacy oracle SemanticBuilder.cs:986 captures CodeValue). Expected: CODE \"A1\" + detail 'HELLO' writes the record 'A1HELLO'. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). The code is the first characters of each logical record: CobolReport.PresentLine writes _code + the composed line. Witness: CODE IS \"A1\" + detail HELLO writes the record A1HELLO 1 (pb1129_rd_code_literal); an identifier CODE prefixes the page heading, the details and the page footing (pb1129_rd_code_identifier); two reports on one file are told apart by their codes (pb1050_reports_share_file). cite.py --check 13.18.12.4 OK 1). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.12.4-2",
@@ -20241,13 +20241,13 @@
   "ordinal": 2,
   "subject": "CODE clause",
   "rule-digest": "4e7b136c18ad",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReportCode",
+  "test-ref": "conformance:85/pb1129_rd_code_literal",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). \"The characters occupied by literal-1 or identifier-1 are not included in the descriptions of the lines in the report, but are included in the logical record size.\" cite.py --check 13.18.12.4 OK (§13.18.12.4 2)). No record-size accounting for a CODE prefix exists; construct refused at bind. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). The code is outside the line description (COLUMN 1 is the first character after it) but inside the logical record size: ReportModel.LineWidth is RECORD CONTAINS minus the code's length (ResolveReports). Witness: with RECORD CONTAINS 10 CHARACTERS and CODE \"A1\", an item at line columns 9-10 lies past the record and does not print (A1HELLO 1, not A1HELLO 1 ZZ). cite.py --check 13.18.12.4 OK 2). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.12.4-3",
@@ -20256,13 +20256,13 @@
   "ordinal": 3,
   "subject": "CODE clause",
   "rule-digest": "99163c753ad4",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#EvaluateCode; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AdvancePage",
+  "test-ref": "conformance:2023/pb1129_rd_code_identifier",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). \"If identifier-1 is specified, it is evaluated at the start of the processing for each body group ... The resultant value is used until the next evaluation.\" cite.py --check 13.18.12.4 OK (§13.18.12.4 3)); companion §14.9.16.4 6) c) \"If the associated report description entry contains a CODE clause with an identifier operand, the identifier is evaluated.\" cite.py OK. The design doc's page-advance sequence says 'CODE re-eval (staged)'; no evaluation code exists. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). identifier-1 is evaluated at the start of each body group - at the page advance's step c) when one is performed, else in PresentBody after the page-fit test found none (and at the first GENERATE, before its report and page headings) - and 'the resultant value is used until the next evaluation'. pb1129_rd_code_identifier derives A (first GENERATE), B (a body group that fits: no advance), C (the advance, after a footing written with B) and CPF at TERMINATE (no body group, so no re-evaluation although WS-CD holds D). cite.py --check 13.18.12.4 OK 3). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.13.3-1",
@@ -20541,13 +20541,13 @@
   "ordinal": 9,
   "subject": "COLUMN clause",
   "rule-digest": "d3a2686e0a4e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportColumnAlignmentNotAbsolute",
+  "test-ref": "conformance:2002/pb1220_column_alignment; conformance:negative/pb1220-column-alignment-relative",
   "derivation": "",
-  "editions": "85",
-  "notes": "(kb/Work PB1220, 14d). cite.py --check 13.18.14.3 \"If LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute\" -> OK SR9. Sentence 2 (LEFT assumed for an absolute operand with no alignment word) CONFORMS: an absolute operand places the leftmost character at integer-1 (§13.18.14.4 GR6b) — witnessed by conformance:2023/pb792_report_value_then_column (AB@20 CD@30, derived from GR1/GR2). Sentence 1 cannot be honored because LEFT/CENTER/RIGHT have no grammar surface: `COLUMN RIGHT PLUS 5` (the illegal shape SR9 exists to refuse) and `COLUMN RIGHT 5` (legal) are both COBOL0001 parse errors (out13/probe/column-clause-p1/sr9_right_rel, sr9_right) — the illegal one is refused only by accident, not by this rule, and the legal one is refused. Two halves, one verified and one rejecting legal source -> DIVERGES (finding F1). || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "(kb/Work PB1220, wave 1005 A). Sentence 1 ('If LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute') is COBOLNET2711 at bind: COLUMN RIGHT PLUS 5 is refused by the rule itself. Sentence 2 (LEFT assumed for an absolute operand with no alignment word) is ReportColumnSpec's default Left, witnessed by the bare COLUMN 33 item of pb1220_column_alignment. cite.py --check 13.18.14.3 OK 9).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-10",
@@ -20691,13 +20691,13 @@
   "ordinal": 6,
   "subject": "COLUMN clause",
   "rule-digest": "16e6422fe15f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportColumnSpec; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements",
+  "test-ref": "conformance:2002/pb1220_column_alignment; conformance:negative/pb1220-column-alignment-left-of-line",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1220, 14d). Rule: a) integer-1 is absolute; b) LEFT: leftmost = integer-1; c) RIGHT: rightmost = integer-1, leftmost = integer-1 - size + 1; d) CENTER odd/even formulas (cite.py --check 13.18.14.4 'If RIGHT is specified, integer-' -> OK 6) c)). a) and the b) placement are implemented (Absolute kind places the leftmost at integer-1 - probes p1/p6), and SR9's LEFT default applies (cite.py --check 13.18.14.3 'If any of the operands is absolute and neither LEFT, CENTER, nor RIGHT is specified, LEFT is assumed' -> OK 9)). But the alignment phrase has NO grammar surface (grammar comment at reportColumnClause; design doc §5; CONFORMANCE A.4.11 'NO grammar surface yet ... COLUMN LEFT/CENTER/RIGHT'). Probe p2.cob (2023): `COLUMN RIGHT 10 PIC XXX` -> COBOL0001 unexpected 'RIGHT'; `COLUMN CENTER 10 PIC XXXX` -> COBOL0309 unexpected 'CENTER'; `COLUMN LEFT 10` -> COBOL0001 unexpected 'LEFT'. So b) with the keyword written, c) and d) reject legal source. Expected: RIGHT 10 PIC XXX occupies 8-10; CENTER 10 PIC XXXX (even) occupies (10-2)+1=9 .. 10+2=12; CENTER 10 PIC XXX (odd) occupies 10-1=9 .. 10+1=11. No kb/Work note owns this (PB1059 says its fixer 'files them'). See finding F-ALIGN. || Editions (adjudicator): 2002, 2014, 2023 (Format 1 multiple/relative/alignment forms); the absolute single-operand COLUMN NUMBER IS integer-1 form also 85. Annex E records no 2023 change to the clause. The LEFT/CENTER/RIGHT phrase belongs to the 2002+ Format 1.",
-  "state": "GAP"
+  "notes": "(kb/Work PB1220, wave 1005 A). ReportColumnSpec.AbsoluteLeftmost is the ONE computation of GR6 b)-d): LEFT integer-1; RIGHT integer-1 - size + 1; CENTER integer-1 - (size - 1) / 2 (odd and even formulas agree in truncating integer arithmetic). The golden derives RIGHT 10 x3 -> 8-10, CENTER 15 x3 -> 14-16, CENTER 20 x4 -> 19-22 from the quoted formulas before the run. A leftmost column before column 1 is a case the standard states no outcome for: COBOLNET2712, CONFORMANCE section 3 'COLUMN alignment'. cite.py --check 13.18.14.4 OK 6) c) and 6) d).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.14.4-7",
@@ -20736,13 +20736,13 @@
   "ordinal": 9,
   "subject": "COLUMN clause",
   "rule-digest": "b8159e65c90e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements",
-  "test-ref": "conformance:2002/pb951_relative_sign_synonyms",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportColumnSpec",
+  "test-ref": "conformance:2002/pb951_relative_sign_synonyms; conformance:2002/pb1220_column_alignment",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1220, 14d). Rule: 'The rightmost column position of each printable item becomes the new value of the horizontal counter.' (cite.py --check 13.18.14.4 -> OK 9)). Absolute arm: `__hc = integer-1 + width - 1` (set, not max - so an absolute item left of the counter resets it, as 'becomes' requires); Relative: `__hc += width - 1`; AnchorSeed/AnchorStep likewise. Probe p1 line 5: absolute C at 12 then PLUS 1 -> D at 13 (counter became 12); p5 boundaries exact for every picture kind. Absent items (PRESENT WHEN) not advancing the counter is §13.18.41.4 GR3f, not this rule. || REFUTED: PARTIAL — GR9 applies to EVERY printable item. The emitter always takes an absolute item's rightmost column as integer-1 + printable-size - 1, the LEFT formula (GR6b). The alignment phrase that GR6c/GR6d give a different rightmost (RIGHT: integer-1; CENTER: integer-1 + size/2) has no grammar surface. CobolReportWriter.g4 reportColumnClause is `(COLUMN|COLUMNS|COL|COLS) (NUMBER|NUMBERS)? (IS|ARE)? reportColumnOperand+`, with no LEFT/CENTER/RIGHT. So legal source such as `COLUMN RIGHT 10 PIC XXX` followed by `COLUMN PLUS 1` cannot be compiled, and the counter update for right- or center-aligned items is not implemented. The left-aligned and relative halves are verified. The 13.18.14.3 SR9 legality of the phrase was checked. PB1059's body records the missing LEFT/CENTER/RIGHT surface with 'no note', so a register note is needed. || Editions (adjudicator): 2002, 2014, 2023 (Format 1 multiple/relative/alignment forms); the absolute single-operand COLUMN NUMBER IS integer-1 form also 85. Annex E records no 2023 change to the clause. || Code sites (adjudicator detail): src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements (all four arms set __hc to the rightmost column)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1220, wave 1005 A). The counter takes the item's rightmost column for every alignment: ReportColumnSpec.AbsoluteRightmost (GR6 b) integer-1 + size - 1, c) integer-1, d) integer-1 + size / 2). Witness: pb1220_column_alignment line 2 places a relative item after a RIGHT item (counter 10 -> P at 12), after an even CENTER item (counter 22 -> Q at 23) and after an odd CENTER item (counter 31 -> S at 34). cite.py --check 13.18.14.4 OK 9).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.14.4-10",
@@ -26901,13 +26901,13 @@
   "ordinal": 1,
   "subject": "REPORT clause",
   "rule-digest": "4e322e825282",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/DataBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportClauseNames; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportClauseNameRule",
+  "test-ref": "conformance:negative/pb1285-report-clause-undefined-name",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1285. SR1: 'Each report-name-1 shall be the subject of a report description entry in the report section of the same source element.' (cite.py --check 13.18.46.3 OK). ResolveReports iterates Reports (RDs) and diagnoses an RD not named by any FD (COBOLNET0899 ReportNotInFile - the converse direction), but NEVER walks FileModel.ReportNames to check each name has an RD. Probe probe/report-clause/sr1b.cob: `FD RPT2 REPORT IS R-NONE.` with no RD R-NONE compiles clean and runs (prints OK). Under-rejects. The 'order not significant' second sentence conforms (names are used only for membership). New finding F1. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer optional module), 2002, 2014, 2023 - clause text unchanged in substance; no Annex E change entry for the REPORT clause || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileDescription (reportClause arm) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileDescription (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1285, wave 1005 A). 'Each report-name-1 shall be the subject of a report description entry in the report section of the same source element' (cite.py --check 13.18.46.3 OK 1)): ScreenReportClauseNames walks every FD's REPORT clause names against the RDs (the walk ResolveReports never made), COBOLNET2714.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.46.3-2",
@@ -26916,13 +26916,13 @@
   "ordinal": 2,
   "subject": "REPORT clause",
   "rule-digest": "18ae91ec379d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportClauseNames; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportClauseNameRule",
+  "test-ref": "conformance:negative/pb1285-report-in-two-clauses",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1285. SR2: 'Each report-name-1 may appear in only one REPORT clause.' (cite.py --check 13.18.46.3 OK). ResolveReports binds the owning file with Files.FirstOrDefault(f => f.ReportNames.Any(...)) - a second FD naming the same report is silently ignored; no diagnostic. The code comment even states each report-name must be named in exactly one REPORT clause, yet does not check it. Probe probe/report-clause/sr2.cob: `FD RPT REPORT IS R-1.` + `FD RPT2 REPORTS ARE R-1.` compiles and runs clean (OK). Under-rejects. New finding F1 (same mechanism as SR1). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer optional module), 2002, 2014, 2023 - clause text unchanged in substance; no Annex E change entry for the REPORT clause",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1285, wave 1005 A). 'Each report-name-1 may appear in only one REPORT clause' (cite.py --check 13.18.46.3 OK 2)): ScreenReportClauseNames names the first clause a repeated report-name appeared in (another FD, or the same clause written twice), COBOLNET2714; before this the second FD was silently ignored.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.46.3-3",
@@ -26946,13 +26946,13 @@
   "ordinal": 1,
   "subject": "REPORT clause",
   "rule-digest": "49e5634f6c6d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportMultipleOnFile",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitReportConstruction",
+  "test-ref": "conformance:85/pb1050_reports_share_file",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1050. GR1: 'The presence of more than one report-name-1 indicates that more than one report may be written to the file.' (cite.py --check 13.18.46.4 OK). ResolveReports: `else if (model.File.ReportNames.Count > 1) Edition.Error(ReportMultipleOnFile, ... not yet implemented)` - every legal multi-report FD is refused COBOLNET0899 (probe probe/report-clause/sr1.cob). Rejects legal source. Already owned by OPEN kb/Work PB1050 (inventory_rows GR-13.18.46.4-1) - not re-reported as a new finding. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer optional module), 2002, 2014, 2023 - clause text unchanged in substance; no Annex E change entry for the REPORT clause",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1050, wave 1005 A). 'The presence of more than one report-name-1 indicates that more than one report may be written to the file' (cite.py --check 13.18.46.4 OK 1)). A multi-report FD is no longer refused: ResolveReports binds each report to its FD (model.File) and EmitReportConstruction gives each its own CobolReport engine over the one connector (the held-back-line claim of kb/Work PB1247 orders the records). pb1050_reports_share_file interleaves GENERATEs of two reports and asserts the records in GENERATE order, told apart by their CODE characters. retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportMultipleOnFile (the descriptor was deleted: a file description entry may name several reports and each has its own engine)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.46.4-2",
@@ -26961,13 +26961,13 @@
   "ordinal": 2,
   "subject": "REPORT clause",
   "rule-digest": "c96f77fb34c9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs",
+  "test-ref": "conformance:2023/pb1050_close_with_active_report_of_two",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1050. GR2: 'After execution of an INITIATE statement and before the execution of a TERMINATE statement for the same report, no OPEN or CLOSE statements shall be executed that reference the report file.' (cite.py --check 13.18.46.4 OK). A prohibition on the program whose consequences are specified elsewhere: CLOSE -> CLOSE GR5 (CLOSE completes, EC-REPORT-NOT-TERMINATED) covered by conformance:2023/pb141_report_not_terminated; OPEN on the already-open report file -> probe probe/report-clause/gr2.cob OPEN OUTPUT during an active report gives status 41 and the report continues (CLOSE=00), consistent with OPEN's already-open rule. Verified only for a single-report file: the multi-report reading ('for the same report' while another report on the file is active) is unreachable because multi-report FDs are refused (PB1050, which claims this row). One half verified -> PARTIAL. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer optional module), 2002, 2014, 2023 - clause text unchanged in substance; no Annex E change entry for the REPORT clause",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1050, wave 1005 A). 'After execution of an INITIATE statement and before the execution of a TERMINATE statement for the same report, no OPEN or CLOSE statements shall be executed that reference the report file' (cite.py --check 13.18.46.4 OK 2)) is a prohibition on the program whose consequences are specified elsewhere: CLOSE -> 14.9.6.4 GR5 (completes, EC-REPORT-NOT-TERMINATED) and OPEN of the already-open file -> status 41 with the report continuing. The multi-report reading - another report on the file still active - is witnessed by pb1050_close_with_active_report_of_two: R-A terminated, R-B active, CLOSE RPT completes 00 and sets the EC, because the emitted CLOSE asks EVERY report associated with the file.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.47.3-1",
@@ -37641,13 +37641,13 @@
   "ordinal": 6,
   "subject": "GENERATE statement",
   "rule-digest": "ad9b8779833d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AdvancePage; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PageFeed; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.PageAdvance_Gr6a_PfThenNewPage_TerminatePfRf; conformance-test:ReportWriterConformanceTests.PageFit_Gr4c_TrialSumOverflow_AdvancesAndResets; conformance:85/pb957_next_group_forms",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#AdvancePage; src/Cobol.Net.Runtime/IO/ReportWriter.cs#EvaluateCode",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.PageAdvance_Gr6a_PfThenNewPage_TerminatePfRf; conformance-test:ReportWriterConformanceTests.PageFit_Gr4c_TrialSumOverflow_AdvancesAndResets; conformance:85/pb957_next_group_forms; conformance:2023/pb1129_rd_code_identifier",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1129 (open). GR6 requires a page heading before the first body group and a page-fit test before every later body group. A failed test causes a page advance: a) PF, b) physical advance, c) \"If the associated report description entry contains a CODE clause with an identifier operand, the identifier is evaluated.\", d) PAGE-COUNTER set to 1 after a NEXT GROUP NEXT PAGE WITH RESET group, otherwise +1, e) LINE-COUNTER set to 0, f) PH (cite.py --check 14.9.16.4 OK, 6) c)). PresentBody skips the fit test for _firstBodySinceInitiate and runs it only on a paged report. AdvancePage does a) PresentPageFooting, then PageFeed (b) form feed, d) _resetPageCounterAtAdvance ? 1 : +1, e) LineCounter = 0), then f) PresentPageHeading. Tests and goldens cover a, b, d, e and f. c) is NOT implemented. AdvancePage's own doc calls step c) 'a cited no-op' because BindReportDescriptionClauses rejects EVERY CODE clause with COBOLNET0899 ('the CODE clause (ISO §13.18.12) is not yet implemented'). Probe out/probe/generate/g3.cob (RD R-1 CODE IS WS-CD ...) confirmed the rejection. §13.18.12.2 admits identifier-1 (cite.py OK), and §13.18.12.4 GR3 makes the identifier evaluated 'at the start of the processing for each body group, either during page advance processing, as detailed in the GENERATE statement' (cite.py OK). One step of the six is missing, so the verdict is PARTIAL. No open kb/Work note owns the CODE-clause stage; see the finding. || editions as adjudicated: 85, 2002, 2014, 2023 (Report Writer is present in every edition; the 2023 Annex E lists no change to GENERATE); step c) only applies where the CODE clause accepts an identifier operand",
-  "state": "GAP"
+  "notes": "(kb/Work PB1129, wave 1005 A). Step c) of the page advance - 'If the associated report description entry contains a CODE clause with an identifier operand, the identifier is evaluated' (cite.py --check 14.9.16.4 OK 6) c)) - is CobolReport.EvaluateCode, called from AdvancePage after the physical advance (b) and before PAGE-COUNTER (d), LINE-COUNTER (e) and the page heading (f). Steps a, b, d, e, f were already witnessed. pb1129_rd_code_identifier pins the order: the page footing printed by the advance carries the code in force BEFORE the evaluation (BPF while WS-CD already holds C), and the new page's heading and detail carry the value evaluated at c) (CPH, CD3).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.16.4-7",
@@ -58656,13 +58656,13 @@
   "ordinal": 0,
   "subject": "Report description entry",
   "rule-digest": "ea5cb9d68278",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportDescriptionClause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb1129_rd_code_literal; conformance:2023/pb1129_rd_code_identifier",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1286. Format: `RD report-name-1 [ IS GLOBAL ] [ code-clause ] [ control-clause ] [ page-clause ] .` (cite.py --check 13.14.2 \"RD\" -> OK). Grammar `RD reportName reportDescriptionClause* DOT` with the four alternatives; IS optional (not underlined) matches. TWO defects: (1) the CODE clause (a printed alternative) is refused at every edition: BindReportDescriptionClauses -> COBOLNET0899 ReportCodeClause 'the CODE clause (ISO §13.18.12) is not yet implemented' (probe RDF3: `RD R-1 CODE 'AB' PAGE 20.` -> error) = rejects legal source; no kb/Work note owns it (the CONFORMANCE.md A.4.11 row lists 'cross-program CODE' as staged loud; PB1056 is the census of owner-less COBOLNET0899 descriptors). (2) Each clause is printed ONCE inside brackets (§5.2.6.2 Brackets: 'the syntax element contained within the brackets ... may be explicitly specified', cite.py --check 5.2.6.2 OK) with no ellipsis (§5.2.7), yet `reportDescriptionClause*` plus the binder loop accept repetition silently: probe RDF1 `RD R-1 PAGE LIMIT 2 LINES PAGE LIMIT 20 LINES.` compiles and runs (last PAGE wins, PageLimit overwritten); RDF2 `CONTROL FINAL CONTROLS ARE FINAL` compiles (two FINAL levels appended); RDF4 `IS GLOBAL GLOBAL` compiles. Same mechanism as open kb/Work PB917 (repetition where the format prints a bracket), which claims only FMT-13.16.2 — this row is a sibling instance. Probes under E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out13\\probe\\rd. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (RD with IS GLOBAL / CODE / CONTROL / PAGE is the COBOL-85 Report Writer format carried unchanged)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A; PB1286's two defects). (1) The CODE clause, a printed alternative of the RD format, is accepted and bound (BindCodeClause; pb1129_rd_code_literal / pb1129_rd_code_identifier). (2) Each clause is printed once in its bracket with no ellipsis (5.2.6.2, 5.2.7): UnrepeatedElements.AtMostOnce in BindReportDescriptionClauses refuses a repeated GLOBAL, CODE, CONTROL or PAGE clause (COBOLNET2423, landed earlier). cite.py --check 13.14.2 OK.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.15.2",
@@ -58881,13 +58881,13 @@
   "ordinal": 0,
   "subject": "CODE clause",
   "rule-digest": "665ed7681078",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportCodeClause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportCodeClause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindCodeClause",
+  "test-ref": "conformance:85/pb1129_rd_code_literal; conformance:2023/pb1129_rd_code_identifier",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1218, 14d). FMT: CODE IS {literal-1 | identifier-1}. cite.py --check 13.18.12.2 \"CODE\" OK. Grammar `CODE IS? (literal | dataReference)` matches the diagram (CODE required, IS optional, exactly one operand). But the binder refuses every parsed CODE clause (DataBinder.Reports.cs:741-743, Edition.Error COBOLNET0899), so the syntax half conforms while every conforming use is rejected as legal source. Probe (pinned cobol.exe, --std 2023 and --std 85; out13/probe/code-clause/): RD RPT1 CODE \"A1\" and RD RPT1 CODE IS WS-CD (WS-CD PIC XX) both fail with 'error COBOLNET0899: RD RPT1: the CODE clause (ISO §13.18.12) is not yet implemented'; the same program without CODE compiles and writes 'HELLO'. No kb/Work note owns this staging (grep for 13.18.12 / ReportCodeClause / COBOLNET0899 finds none); CONFORMANCE.md A.4.11 is Partial and lists only 'cross-program CODE' among loud stages; docs/COBOLNET_REPORT_WRITER_DESIGN.md §4 lists CODE (§13.18.12) staged loud. ReportWriterEmitter.cs has no CODE path. || Editions (adjudicator): 1985/2002/2014/2023 (Report Writer module A.4.11; 2023 Annex E records no change to 13.18.12; the introducing edition of the identifier-1 operand is not derivable from the 2023 text)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1129, wave 1005 A). FMT: CODE IS {literal-1 | identifier-1}. cite.py --check 13.18.12.2 OK. Grammar `CODE IS? (literal | dataReference)` matches the diagram; BindCodeClause now binds both operands. The clause is not edition-gated: the 2023 text does not say which edition introduced the identifier form, and an unverified gate would reject legal source (docs/CONFORMANCE.md A.4.11). retired-witness: src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#ReportCodeClause (the descriptor was deleted: the CODE clause is implemented and its syntax rules are COBOLNET2713 (ReportCodeClauseRule))",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.13.2",
@@ -58911,13 +58911,13 @@
   "ordinal": 0,
   "subject": "COLUMN clause",
   "rule-digest": "8fe52441514a",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnOperand; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportColumnClause; src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4#screenColumnClause",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1220_column_alignment; conformance:negative/pb1220-column-alignment-at-85",
   "derivation": "",
-  "editions": "85",
-  "notes": "(kb/Work PB1220, 14d). Format 1 prints `{COLUMN NUMBER|COLUMN NUMBERS|COLUMNS|COL NUMBER|COL NUMBERS|COLS} [LEFT|CENTER|RIGHT] [IS|ARE] {integer-1 | {PLUS|+} integer-2}...`. The grammar is `(COLUMN|COLUMNS|COL|COLS) (NUMBER|NUMBERS)? (IS|ARE)? reportColumnOperand+` — the LEFT/CENTER/RIGHT brace has NO grammar surface (the grammar's own comment and COBOLNET_REPORT_WRITER_DESIGN §5 admit it; CONFORMANCE A.4.11 says 'tracked' but no kb/Work note owns it — PB1059 says its fixer should FILE it, so it is unfiled). Probes (pinned cobol.exe, --std 2023, out13/probe/column-clause-p1/sr9_left|sr9_center|sr9_right): `03 COLUMN LEFT 5 PIC X(3) VALUE \"ABC\".` -> COBOL0001 unexpected 'LEFT'; `COLUMN CENTER 5` -> COBOL0309; `COLUMN RIGHT 5` -> COBOL0001. The rest of Format 1 parses: COL/COLS/COLUMNS/COL NUMBER IS/COLUMNS ARE/COLUMN NUMBERS ARE, multiple and PLUS/+ operands all compile and print correctly (syn_* probes). The grammar is also more permissive than the diagram (bare COLUMNS NUMBER etc.) — screened (or not) by SR4/SR5, see those rows. Format 2 (screen item): the screen module is declined (CONFORMANCE §5 A.4.2 Not claimed); PB260 (landed) refuses the whole screen data surface by name (COBOLNET1560) and owns that witness debt. cite.py --check 13.18.14.4 \"If CENTER is specified, the printable item is centered\" -> OK §13.18.14.4 6) d). Verdict DIVERGES: legal Format 1 source is rejected (finding F1). || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text); Format 2 (screen) belongs to A.4.2 screen handling",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1220, wave 1005 A). Format 1 rendered from the PDF (printed p386): {COLUMN NUMBER|COLUMN NUMBERS|COLUMNS|COL NUMBER|COL NUMBERS|COLS} [LEFT|CENTER|RIGHT] [IS|ARE] {integer-1 | {PLUS|+} integer-2}... The grammar is now (COLUMN|COLUMNS|COL|COLS) (NUMBER|NUMBERS)? (LEFT|CENTER|RIGHT)? (IS|ARE)? reportColumnOperand+, CENTER a context-sensitive token (8.10, a user word elsewhere). The alignment brace is OPTIONAL in the grammar though the diagram prints a brace, because SR9 states 'If any of the operands is absolute and neither LEFT, CENTER, nor RIGHT is specified, LEFT is assumed' (cite.py --check 13.18.14.3 OK 9)). The alignment phrase gates 2002 with the other COLUMN forms (construct report-multi-column-2002; the 85 form is COLUMN NUMBER IS integer-1 alone).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.15.2",
@@ -59391,13 +59391,13 @@
   "ordinal": 0,
   "subject": "REPORT clause",
   "rule-digest": "b20316e2c2f5",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#reportClause; src/Cobol.Net.Compiler/Binding/DataBinder.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb1050_reports_share_file",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1050. Format: {REPORT IS | REPORTS ARE} {report-name-1}... (REPORT/REPORTS underlined, IS/ARE optional). Grammar `(REPORT IS? | REPORTS ARE?) reportName+` matches the diagram exactly, including either keyword with one or many names; probe probe/report-clause/fmt.cob (`FD RPT REPORTS R-1.`) compiles and runs (OK 00). But the ellipsis half is refused at bind: ResolveReports raises COBOLNET0899 ReportMultipleOnFile 'not yet implemented' whenever ReportNames.Count>1 (probe probe/report-clause/sr1.cob: `REPORT IS R-1 R-NONE` -> COBOLNET0899 multiple reports). Syntax accepted, the repeated operand rejected -> PARTIAL. Owned by open kb/Work PB1050 (multi-report). cite.py --check 13.18.46.4 'The presence of more than one report-name-1 indicates...' OK. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer optional module), 2002, 2014, 2023 - clause text unchanged in substance; no Annex E change entry for the REPORT clause || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileDescription (reportClause arm, file.ReportNames) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileDescription (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "(kb/Work PB1050, wave 1005 A). Format: {REPORT IS | REPORTS ARE} {report-name-1}... Grammar `(REPORT IS? | REPORTS ARE?) reportName+` matches the diagram and the ellipsis half - REPORTS ARE R-A R-B - now binds (pb1050_reports_share_file). cite.py --check 13.18.46.3 OK 1).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.47.2",

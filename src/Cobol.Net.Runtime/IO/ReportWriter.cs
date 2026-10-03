@@ -275,6 +275,23 @@ public sealed class CobolReport(
     private bool _hookSuppressed;
     private int _physLine;                 // physical line position on the current page (0 = top, nothing printed)
 
+    // ── The CODE clause (ISO §13.18.12) ──────────────────────────────────────────────────────────────────────
+    private Func<string>? _codeRead;       // literal-1 (a constant) or identifier-1 (read at each evaluation); null = no CODE clause
+    private string _code = "";             // the characters in force — "used until the next evaluation" (GR3)
+
+    /// <summary>Register the report's CODE clause (§13.18.12.2): <paramref name="read"/> yields literal-1, or the
+    /// character image of identifier-1 each time it is called. The engine calls it at the points GR3 names
+    /// (<see cref="EvaluateCode"/>); until the first evaluation the code is empty.</summary>
+    public void SetCode(Func<string> read) => _codeRead = read;
+
+    /// <summary>⛔ THE ONE EVALUATION OF THE CODE CLAUSE (§13.18.12.4 GR3 — "If identifier-1 is specified, it is evaluated
+    /// at the start of the processing for each body group, either during page advance processing, as detailed in the
+    /// GENERATE statement, or whenever page advance processing is not performed. The resultant value is used until the
+    /// next evaluation."). It is called from exactly two places: <see cref="AdvancePage"/> at §14.9.16.4 GR6 c), and
+    /// <see cref="PresentBody"/> for a body group whose presentation took NO page advance — plus the first GENERATE,
+    /// whose report heading and page heading precede its first body group. A literal re-reads as the same constant.</summary>
+    private void EvaluateCode() => _code = _codeRead?.Invoke() ?? "";
+
     /// <summary>The NEXT GROUP SAVE LOCATION (ISO §13.18.37.4 GR4a): integer-1 of a body group's absolute NEXT
     /// GROUP clause that LINE-COUNTER had already reached; 0 = empty (an absolute integer-1 is ≥ FIRST DETAIL ≥ 1,
     /// SR6b). While it is set, LINE-COUNTER holds the FOOTING integer and the next non-dummy body group is placed
@@ -682,6 +699,7 @@ public sealed class CobolReport(
         if (!_started)
         {
             _started = true;
+            EvaluateCode();   // §13.18.12.4 GR3 — the first body group's processing opens here: no page advance precedes it
             // GR4a: the report heading, exactly once. An RH whose NEXT GROUP clause is NEXT PAGE is on a page by
             // itself, and its page advance happens inside the presentation (ApplyNextGroup, §13.18.37.4 GR3c).
             if (_reportHeading is { } rh) PresentHeadingFooting(rh);
@@ -949,8 +967,12 @@ public sealed class CobolReport(
         // The first line's position when the preceding body group's absolute NEXT GROUP filled the save location
         // (§13.18.37.4 GR4a 3) — the ordinary GR5 placement otherwise.
         long? firstTarget = null;
+        bool advanced = false;   // a page advance was processed for THIS group (its §14.9.16.4 GR6 c) evaluated the CODE)
         if (_nextGroupSave != 0)
-            firstTarget = PlaceAfterSavedNextGroup(group, first, LowerLimit(group));
+        {
+            firstTarget = PlaceAfterSavedNextGroup(group, first, LowerLimit(group));   // always advances first (GR4a)
+            advanced = true;
+        }
         else if (_paged && !_firstBodySinceInitiate && !reprint)
         {
             // §13.18.35.4 GR4b (absolute): fit iff integer-1 > LINE-COUNTER. GR4c (relative): trial =
@@ -976,8 +998,16 @@ public sealed class CobolReport(
                         trial += lines[i].TrialInterval;
                 fit = trial <= LowerLimit(group);
             }
-            if (!fit) AdvancePage(group);   // §13.18.35.4 GR4 tail → the §14.9.16.4 GR6 sequence
+            if (!fit)
+            {
+                AdvancePage(group);   // §13.18.35.4 GR4 tail → the §14.9.16.4 GR6 sequence
+                advanced = true;
+            }
         }
+        // §13.18.12.4 GR3 — the CODE identifier is evaluated "either during page advance processing … or whenever page
+        // advance processing is not performed": this is the second arm. (An OR PAGE reprint is the first body group of
+        // a page whose advance just evaluated it.)
+        if (!advanced && !reprint) EvaluateCode();
 
         GroupIndicatePresent = group.GroupIndicatePending;   // §13.18.28.4 GR1 — read AFTER this group's own page advance
         // §13.18.35.4 GR5 for the first PRESENT line — unless the preceding body group's absolute NEXT GROUP placed
@@ -1184,8 +1214,8 @@ public sealed class CobolReport(
     };
 
     /// <summary>The §14.9.16.4 GR6 page advance, in the GR's order: (a) the page footing, (b) the physical
-    /// advance to the next page, (c) CODE re-evaluation — the CODE clause is staged loud at bind, so this point
-    /// is a cited no-op — (d) PAGE-COUNTER + 1, or 1 after a NEXT GROUP NEXT PAGE WITH RESET, (e) LINE-COUNTER ←
+    /// advance to the next page, (c) CODE evaluation (<see cref="EvaluateCode"/> — the new page's records carry
+    /// the new value, and the page footing of step (a) was written with the old one), (d) PAGE-COUNTER + 1, or 1 after a NEXT GROUP NEXT PAGE WITH RESET, (e) LINE-COUNTER ←
     /// 0, (f) the page heading — and then the control headings written with OR PAGE (§13.18.57.4 GR6 c), see
     /// <see cref="PresentOrPageHeadings"/>). <paramref name="causing"/> is the body group whose presentation needed
     /// the advance: the headings reprinted depend on it.</summary>
@@ -1193,6 +1223,7 @@ public sealed class CobolReport(
     {
         if (_pageFooting is not null) PresentPageFooting();                  // GR6a
         PageFeed();                                                          // GR6b–e
+        EvaluateCode();                                                      // GR6c — §13.18.12.4 GR3
         if (_pageHeading is not null) PresentPageHeading();                  // GR6f
         PresentOrPageHeadings(causing);                                      // §13.18.57.4 GR6 c)
     }
@@ -1423,7 +1454,9 @@ public sealed class CobolReport(
             overprint = target == device;
         }
         LineCounter = target;                     // §13.18.35.4 GR6 — BEFORE the compose
-        string image = line.Compose();            // §13.18.53.4 GR1/GR3 — evaluated at presentation time
+        // §13.18.12.4 GR1 — the CODE characters stand "in the first characters of each logical record written to the
+        // report file for this report" (the line the compose returns is the report line alone, GR2).
+        string image = _code + line.Compose();    // §13.18.53.4 GR1/GR3 — evaluated at presentation time
         if (overprint && _pendingImage is { } under)
         {
             _pendingImage = Overprint(under, image);   // GR3 — the non-space characters overwrite

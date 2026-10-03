@@ -206,6 +206,12 @@
    "note": "ISO 8.10 context-sensitive word (context: OCCURS clause) with no 8.9 row at any edition: a keyword only in that context and a legal user-defined word everywhere else (8.3.2.1 3) - admitted so the lexer token no longer costs the user the word (kb/Work PB655)."
   },
   {
+   "token": "CENTER",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "COLUMN clause alignment phrase (13.18.14.2 Format 1): 8.10 context-sensitive, a user word at every edition (kb/Work PB1220)"
+  },
+  {
    "token": "CLASS_ID",
    "nameSlot": true,
    "subscriptTrigger": true,

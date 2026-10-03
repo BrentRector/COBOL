@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Common;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Cst;
 using CobolNet.Frontend.Generated;
@@ -75,6 +76,14 @@ public sealed class ReportModel
     /// a record length). Computed post-build.</summary>
     public int LineWidth { get; set; } = 1;
 
+    /// <summary>The RD's CODE clause (ISO §13.18.12), or null — the characters every logical record this report
+    /// writes begins with (GR1).</summary>
+    public ReportCodeModel? Code { get; set; }
+
+    /// <summary>The RD wrote a CODE clause — true even when its operand was refused, so §13.18.12.3 SR3's "specified
+    /// for each report" is asked of what was WRITTEN and never double-reports a refused operand.</summary>
+    public bool CodeWritten { get; set; }
+
     /// <summary>The CONTROL hierarchy in major→minor order (ISO §13.18.16.4 GR1; FINAL, if present, first — GR2).</summary>
     public List<ReportControlModel> Controls { get; } = [];
 
@@ -105,6 +114,31 @@ public sealed class ReportModel
     /// engine's, so it allocates no storage. LINE-COUNTER has no such register: SR3 bars it from the receiving
     /// side, and the sending side of both counters is <c>BoundReportCounterRef</c>.</summary>
     public required DataItem PageCounterRegister { get; init; }
+}
+
+/// <summary>The RD CODE clause (ISO §13.18.12.2 — <c>CODE IS {literal-1 | identifier-1}</c>): the characters "automatically
+/// placed in the first characters of each logical record written to the report file for this report" (GR1), which are
+/// "not included in the descriptions of the lines in the report, but are included in the logical record size" (GR2).
+/// Exactly one of <see cref="Literal"/> (an alphanumeric literal's characters) and <see cref="Operand"/> (an
+/// identifier, evaluated by the engine at each body group — GR3) is set.</summary>
+public sealed class ReportCodeModel
+{
+    /// <summary>literal-1's characters, decoded (concatenation folded, hexadecimal format decoded); null for identifier-1.</summary>
+    public string? Literal { get; init; }
+
+    /// <summary>identifier-1, captured as base + qualifiers and resolved post-build to <see cref="FieldDataSource.Item"/>
+    /// (the SOURCE operand's own capture — one identifier arm for both clauses, kb/Work PB1129); null for literal-1.</summary>
+    public FieldDataSource? Operand { get; init; }
+
+    /// <summary>The clause's operand as written, for diagnostics.</summary>
+    public required string Written { get; init; }
+
+    /// <summary>How many character positions the code occupies at the start of every logical record — literal-1's
+    /// length, or identifier-1's (fixed: SR2 excludes every variable-length shape). 0 until resolved.</summary>
+    public int Length { get; set; }
+
+    /// <summary>The resolved identifier-1 item; null for literal-1 or an unresolved operand.</summary>
+    public DataItem? Item => Operand?.Item;
 }
 
 /// <summary>One CONTROL clause operand (ISO §13.18.16): FINAL or a (possibly qualified) data-name resolved
@@ -278,16 +312,41 @@ public enum ReportColumnKindModel
     AnchorStep,
 }
 
+/// <summary>The COLUMN clause's alignment word (ISO §13.18.14.2 Format 1, §13.18.14.4 GR6 b)–d)): which edge of the
+/// printable item integer-1 names. LEFT is assumed when none is written and an operand is absolute (§13.18.14.3 SR9).</summary>
+public enum ReportColumnAlignment { Left, Center, Right }
+
 /// <summary>One placement of a printable item: a COLUMN clause operand (ISO §13.18.14 Format 1) or, for a
 /// repetition of a STEP'd repeating entry, its step-anchor placement (§13.18.38.4 GR12).</summary>
 /// <param name="Kind">Which datum fixes the leftmost column.</param>
 /// <param name="Value">integer-1 / integer-2 / integer-3, per <paramref name="Kind"/>.</param>
 /// <param name="AnchorId">The step anchor's compose-local register id; 0 for the two COLUMN-clause kinds.</param>
-public readonly record struct ReportColumnSpec(ReportColumnKindModel Kind, int Value, int AnchorId = 0)
+/// <param name="Alignment">Which edge of the item <paramref name="Value"/> names (§13.18.14.4 GR6 b)–d)); only an
+/// <see cref="ReportColumnKindModel.Absolute"/> operand can carry anything but the default (§13.18.14.3 SR9).</param>
+public readonly record struct ReportColumnSpec(
+    ReportColumnKindModel Kind, int Value, int AnchorId = 0, ReportColumnAlignment Alignment = ReportColumnAlignment.Left)
 {
-    /// <summary>A COLUMN clause operand as written: absolute, or relative (PLUS).</summary>
-    public ReportColumnSpec(bool relative, int value)
-        : this(relative ? ReportColumnKindModel.Relative : ReportColumnKindModel.Absolute, value) { }
+    /// <summary>A COLUMN clause operand as written: absolute, or relative (PLUS), with the clause's alignment word
+    /// (<see cref="ReportColumnAlignment.Left"/> when none is written — §13.18.14.3 SR9).</summary>
+    public ReportColumnSpec(bool relative, int value, ReportColumnAlignment alignment = ReportColumnAlignment.Left)
+        : this(relative ? ReportColumnKindModel.Relative : ReportColumnKindModel.Absolute, value, 0, alignment) { }
+
+    /// <summary>⛔ THE ONE LEFTMOST-COLUMN COMPUTATION of an ABSOLUTE operand (ISO §13.18.14.4 GR6 b)–d)), read by
+    /// the compose emitter's placement and by the bind-time line-width walk, so the two cannot place an item in
+    /// different columns (kb/Work PB1220). LEFT: integer-1. RIGHT: integer-1 − printable-size + 1. CENTER, odd
+    /// printable-size: integer-1 − ((printable-size − 1) / 2); even: (integer-1 − (printable-size / 2)) + 1 — both
+    /// are integer-1 − (printable-size − 1) / 2 in truncating integer arithmetic.</summary>
+    public int AbsoluteLeftmost(int printableSize) => Alignment switch
+    {
+        ReportColumnAlignment.Right => Value - printableSize + 1,
+        ReportColumnAlignment.Center => Value - (printableSize - 1) / 2,
+        _ => Value,
+    };
+
+    /// <summary>The rightmost column of an ABSOLUTE operand — GR6 b) integer-1 + printable-size − 1 for LEFT,
+    /// integer-1 for RIGHT, integer-1 + (printable-size / 2) for CENTER — which GR9 makes the horizontal counter.
+    /// It is the leftmost column plus the item's extent in every case (checked against GR6 d) 1. and 2.).</summary>
+    public int AbsoluteRightmost(int printableSize) => AbsoluteLeftmost(printableSize) + printableSize - 1;
 
     /// <summary>True when the placement is NOT a fixed column number — i.e. the line needs the §13.18.14.4 GR7
     /// horizontal counter. <see cref="ReportColumnKindModel.AnchorSeed"/> reads the counter; its
@@ -398,9 +457,6 @@ public sealed class ReportFieldModel
     /// ORDINAL, never a count of the items actually placed, so a PRESENT WHEN that suppresses the entry cannot
     /// shift the assignment.</summary>
     public ReportFieldSource SourceAt(int rep) => Sources[rep % Sources.Count];
-
-    /// <summary>The first column operand's value — the single-absolute fast path and diagnostics anchor.</summary>
-    public int Column => Columns[0].Value;
 
     /// <summary>PRESENT WHEN conditions strictly below the line entry, down to this entry (§13.18.41.4 GR2b).</summary>
     public List<CobolParserCore.ConditionContext> PresentWhenCtxs { get; } = [];
@@ -783,9 +839,11 @@ public sealed partial class DataBinder
             // BinderDriver's inheritance walk and the emitter's GR4 selector (kb/Work PB369).
             if (clause.reportGlobalClause() is not null)
                 model.IsGlobal = true;
-            else if (clause.reportCodeClause() is not null)
-                Edition.Error(DiagnosticCatalog.ReportCodeClause, $"RD '{model.Name}': the CODE clause (ISO §13.18.12) is not yet "
-                    + "implemented");
+            else if (clause.reportCodeClause() is { } code)
+            {
+                model.CodeWritten = true;
+                model.Code = BindCodeClause(code, model);
+            }
             else if (clause.reportControlClause() is { } ctl)
             {
                 // Operand order IS the hierarchy, major→minor (§13.18.16.4 GR1); FINAL is the highest level (GR2).
@@ -887,6 +945,83 @@ public sealed partial class DataBinder
             model.LastControlHeading = lastDetail ? model.LastDetail
                 : footing ? model.Footing : model.PageLimit;
         if (!footing) model.Footing = lastDetail ? model.LastDetail : model.PageLimit;   // GR3e
+    }
+
+    /// <summary>Capture the RD's CODE clause (ISO §13.18.12.2 — <c>CODE IS {literal-1 | identifier-1}</c>; kb/Work
+    /// PB1129). literal-1 is screened here (SR1 — "Literal-1 shall be an alphanumeric literal": a numeric, national or
+    /// boolean literal and a figurative constant are not one) and decoded through the ONE literal readers
+    /// (<see cref="OperandLiteralClass"/> / <see cref="LiteralCharsOf"/> — a §8.8.3.3 concatenation folds, a
+    /// hexadecimal format decodes). identifier-1 is captured as the SOURCE clause's identifier operand
+    /// (<see cref="BindSourceReference"/>) and resolved, with SR2's shape rules, post-build
+    /// (<see cref="ResolveReportCode"/>). Returns null for an operand that was refused, so no code is emitted for it.</summary>
+    private ReportCodeModel? BindCodeClause(Core.ReportCodeClauseContext cc, ReportModel model)
+    {
+        string where = $"RD '{model.Name}': the CODE clause";
+        if (cc.literal() is { } lit)
+        {
+            if (OperandLiteralClass(lit) != LiteralClass.Alphanumeric)
+            {
+                Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names {lit.GetText()}, which is not an "
+                    + "alphanumeric literal: literal-1 shall be an alphanumeric literal (ISO §13.18.12.3 SR1)");
+                return null;
+            }
+            return new ReportCodeModel { Literal = LiteralCharsOf(lit, sr11: false), Written = lit.GetText() };
+        }
+        var dref = cc.dataReference();
+        if (BindSourceReference(dref, model, "CODE", "§13.18.12") is not { } bound) return null;
+        if (bound is not FieldDataSource data)
+        {
+            // LINE-COUNTER / PAGE-COUNTER — the report's registers, numeric: never an alphanumeric data item.
+            Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names {DataBinder.WrittenText(dref)}, a report "
+                + "counter, which is numeric: identifier-1 shall reference an alphanumeric data item (ISO §13.18.12.3 SR2)");
+            return null;
+        }
+        return new ReportCodeModel { Operand = data, Written = DataBinder.WrittenText(dref) };
+    }
+
+    /// <summary>Resolve the CODE clause's identifier-1 to its item and screen §13.18.12.3 SR2 over it — "Identifier-1 shall
+    /// reference an alphanumeric data item that shall not be an occurs-depending-on group item, a variable-length group,
+    /// or a dynamic-length elementary item" — then fix the code's length (the item's character positions, which SR2's
+    /// exclusions make FIXED). literal-1's length is its characters'. Either way the length is what GR2 charges to the
+    /// logical record size, so the report's line width gives it up (<c>RECORD CONTAINS</c>, in <see cref="ResolveReports"/>).</summary>
+    private void ResolveReportCode(ReportModel model)
+    {
+        if (model.Code is not { } code) return;
+        if (code.Literal is { } literal)
+        {
+            code.Length = literal.Length;
+            return;
+        }
+        var ds = code.Operand!;
+        string where = $"RD '{model.Name}': the CODE clause";
+        ds.Item = LookupQualified(ds.Name, ds.Qualifiers, where, out bool ambiguous);
+        if (ds.Item is not { } item)
+        {
+            if (!ambiguous)
+                Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names '{code.Written}', which does not resolve "
+                    + "to a data item (ISO §8.4.2.1; identifier-1 of §13.18.12.2)");
+            return;
+        }
+        var itemClass = IntrinsicArgumentRules.ClassOfItem(item);
+        string? why = itemClass is not { } cls || IntrinsicArgumentRules.TableTwoClass(cls) != CobolClass.Alphanumeric
+                ? $"is not an alphanumeric data item (it is of {itemClass?.ToString().ToLowerInvariant() ?? "unknown"} class)"
+            : item.SubscriptLevels() is [.., var innermost]
+                ? $"is subject to the OCCURS clause on '{innermost.CobolName ?? innermost.CsName}' and shall be subscripted"
+            : OdoModel.TableUnder(item) is { } odo
+                ? $"is a group with the occurs-depending-on table '{odo.CobolName ?? odo.CsName}' subordinate to it"
+            : item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(item)
+                ? "is a variable-length group"
+            : item.IsDynamicLength || item.IsDynamicTable
+                ? "is a dynamic-length elementary item"
+            : null;
+        if (why is not null)
+        {
+            Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names '{code.Written}', which {why}: identifier-1 "
+                + "shall reference an alphanumeric data item that is not an occurs-depending-on group item, a "
+                + "variable-length group, or a dynamic-length elementary item (ISO §13.18.12.3 SR2)");
+            return;
+        }
+        code.Length = item.DisplayTextWidth;
     }
 
     /// <summary>The five trailing phrases of the PAGE clause (§13.18.39.2), each in its own bracket — what
@@ -1810,6 +1945,18 @@ public sealed partial class DataBinder
                     if (level == 1) group.NextGroupClause = ngc;
                 }
                 else if (clause.reportColumnClause() is { } cc)
+                {
+                    // §13.18.14.3 SR9 — the alignment word (LEFT assumed when none is written) and its absolute-only
+                    // rule: "If LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute." The word
+                    // belongs to the clause, so every operand of a multiple COLUMN clause carries it.
+                    var alignment = cc.CENTER() is not null ? ReportColumnAlignment.Center
+                        : cc.RIGHT() is not null ? ReportColumnAlignment.Right : ReportColumnAlignment.Left;
+                    if ((cc.LEFT() is not null || cc.CENTER() is not null || cc.RIGHT() is not null)
+                        && cc.reportColumnOperand().Any(o => o.reportRelativeSign() is not null))
+                        Edition.Error(DiagnosticCatalog.ReportColumnAlignmentNotAbsolute, $"RD '{model.Name}' entry "
+                            + $"'{entryName ?? "FILLER"}': the COLUMN clause writes "
+                            + $"{(cc.CENTER() ?? cc.RIGHT() ?? cc.LEFT()).GetText().ToUpperInvariant()} and a relative (PLUS) operand; "
+                            + "if LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute (ISO §13.18.14.3 SR9)");
                     foreach (var op in cc.reportColumnOperand())
                     {
                         bool relative = op.reportRelativeSign() is not null;
@@ -1823,8 +1970,9 @@ public sealed partial class DataBinder
                                 + $"{column} exceeds the page width {model.PageWidth}"
                                 + (model.PageWidthWritten ? "" : " (assumed 999, §13.18.39.4 GR5)")
                                 + " (ISO §13.18.14.3 SR6)");
-                        columns.Add(new ReportColumnSpec(relative, column));
+                        columns.Add(new ReportColumnSpec(relative, column, alignment));
                     }
+                }
                 else if (clause.reportSourceClause() is { } sc)
                 {
                     // Every written operand of the clause (§13.18.53.2's ellipsis) — the SR6 count below reads
@@ -2590,8 +2738,11 @@ public sealed partial class DataBinder
         return BindSourceReference(dref, model);
     }
 
-    /// <summary>The identifier-1 arm of <see cref="BindSourceOperand"/> — §13.18.53.4 GR1's implicit MOVE.</summary>
-    private ReportFieldSource? BindSourceReference(Core.DataReferenceContext dref, ReportModel model)
+    /// <summary>The identifier-1 arm of <see cref="BindSourceOperand"/> — §13.18.53.4 GR1's implicit MOVE. The RD
+    /// CODE clause's identifier-1 (§13.18.12.2) is read by this same arm (kb/Work PB1129), so a subscripted or
+    /// reference-modified identifier stages through the one residue (kb/Work PB1292) for both clauses.</summary>
+    private ReportFieldSource? BindSourceReference(Core.DataReferenceContext dref, ReportModel model,
+        string clause = "SOURCE", string clauseCite = "§13.18.53")
     {
         if (dref.LINE_COUNTER() is not null || dref.PAGE_COUNTER() is not null)
         {
@@ -2604,8 +2755,8 @@ public sealed partial class DataBinder
         foreach (var sfx in dref.dataReferenceSuffix())
             if (sfx.subscriptPart() is not null || sfx.refModPart() is not null)
             {
-                Edition.Error(DiagnosticCatalog.ReportSourceSubscripted, $"RD '{model.Name}': SOURCE {DataBinder.WrittenText(dref)} — a subscripted or "
-                    + "reference-modified SOURCE operand (ISO §13.18.53) is not yet implemented");
+                Edition.Error(DiagnosticCatalog.ReportSourceSubscripted, $"RD '{model.Name}': {clause} {DataBinder.WrittenText(dref)} — a subscripted or "
+                    + $"reference-modified {clause} operand (ISO {clauseCite}) is not yet implemented");
                 return null;
             }
         var (b, qls) = KeyReference(dref);
@@ -2819,23 +2970,70 @@ public sealed partial class DataBinder
         return new ReportDetailRef(name, quals.Count == 1 ? quals[0] : null);
     }
 
+    /// <summary>⛔ THE FD SIDE OF THE report-name ↔ REPORT-clause CORRESPONDENCE (kb/Work PB1285). The binding below walks
+    /// the RDs and takes the first FD that names each, so the rules about the FDs' own REPORT clauses were never asked:
+    /// §13.18.46.3 SR1 — "Each report-name-1 shall be the subject of a report description entry in the report
+    /// section of the same source element" (a REPORT clause naming no RD), and §13.18.46.3 SR2 — "Each report-name-1
+    /// may appear in only one REPORT clause" (with §13.14.3 SR1, "one and only one REPORT clause specifying
+    /// report-name-1": a name repeated inside one clause is the same violation). The RD named by NO clause is the
+    /// third arm of §13.14.3 SR1 and is reported where the file is resolved.</summary>
+    private void ScreenReportClauseNames()
+    {
+        var rdNames = new HashSet<string>(Reports.Select(r => r.Name), StringComparer.OrdinalIgnoreCase);
+        var firstClause = new Dictionary<string, FileModel>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in Files)
+            foreach (var name in file.ReportNames)
+            {
+                if (!rdNames.Contains(name))
+                    Edition.Error(DiagnosticCatalog.ReportClauseNameRule, $"file '{file.CobolName}': the REPORT clause names "
+                        + $"'{name}', which is not the subject of a report description entry in the report section: each "
+                        + "report-name-1 shall be (ISO §13.18.46.3 SR1)");
+                else if (firstClause.TryGetValue(name, out var first))
+                    Edition.Error(DiagnosticCatalog.ReportClauseNameRule, $"file '{file.CobolName}': the REPORT clause names "
+                        + $"'{name}', which is already named by the REPORT clause of file '{first.CobolName}': each "
+                        + "report-name-1 may appear in only one REPORT clause (ISO §13.18.46.3 SR2; §13.14.3 SR1)");
+                else
+                    firstClause[name] = file;
+            }
+    }
+
+    /// <summary>ISO §13.18.12.3 SR3 — "If the CODE clause is specified for any report, it shall be specified for each
+    /// report associated with the same report file." The code is what tells one report's records from another's on a
+    /// shared file (§13.18.12.1), so a file whose reports disagree about having one has records that cannot be told
+    /// apart. Asked of the reports each FD's REPORT clause names (§13.18.46), over what was WRITTEN.</summary>
+    private void ScreenReportCodeAgreement()
+    {
+        foreach (var file in Files)
+        {
+            if (file.ReportNames.Count < 2) continue;
+            var members = Reports.Where(r => file.ReportNames.Any(n => n.Equals(r.Name, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (members.Any(r => r.CodeWritten) && members.Any(r => !r.CodeWritten))
+                Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"file '{file.CobolName}': the CODE clause is specified for "
+                    + $"{string.Join(", ", members.Where(r => r.CodeWritten).Select(r => $"'{r.Name}'"))} but not for "
+                    + $"{string.Join(", ", members.Where(r => !r.CodeWritten).Select(r => $"'{r.Name}'"))}: if the CODE clause is "
+                    + "specified for any report, it shall be specified for each report associated with the same report file "
+                    + "(ISO §13.18.12.3 SR3)");
+        }
+    }
+
     /// <summary>Post-build resolution for every report (the <c>ResolveFiles</c> pattern — runs after the storage
     /// forest is complete): the owning FILE (§13.18.46), SOURCE / CONTROL / SUM-addend data items, CH/CF control
     /// levels (§13.18.57.3 SR10/SR11), RESET levels, and the report's line width.</summary>
     internal void ResolveReports()
     {
+        ScreenReportClauseNames();
+        ScreenReportCodeAgreement();
         foreach (var model in Reports)
         {
-            // The owning file: the FD whose REPORT(S) clause names this report (ISO §13.18.46.4 GR1; §13.14
-            // requires each report-name be named in exactly one REPORT clause of an FD).
+            // The owning file: the FD whose REPORT(S) clause names this report (§13.14.3 SR1 — one and only one such
+            // clause; a name in none is reported here, a name in several by ScreenReportClauseNames). A report may
+            // share its file with others (§13.18.46.4 GR1 — each has its own engine over the one connector).
             model.File = Files.FirstOrDefault(f =>
                 f.ReportNames.Any(rn => rn.Equals(model.Name, StringComparison.OrdinalIgnoreCase)));
             if (model.File is null)
-                Edition.Error(DiagnosticCatalog.ReportNotInFile, $"RD '{model.Name}' is not named in any file description entry's "
-                    + "REPORT clause (ISO §13.18.46 / §13.14)");
-            else if (model.File.ReportNames.Count > 1)
-                Edition.Error(DiagnosticCatalog.ReportMultipleOnFile, $"file '{model.File.CobolName}': multiple reports on one file "
-                    + "(REPORTS ARE …, ISO §13.18.46) are not yet implemented");
+                Edition.Error(DiagnosticCatalog.ReportClauseNameRule, $"RD '{model.Name}' is not named in any file description "
+                    + "entry's REPORT clause: there shall be one and only one REPORT clause specifying report-name-1 "
+                    + "(ISO §13.14.3 SR1)");
 
             foreach (var ctl in model.Controls)
                 if (!ctl.IsFinal && ctl.Operand is { } op)
@@ -2876,6 +3074,8 @@ public sealed partial class DataBinder
                         Edition.Error(DiagnosticCatalog.RefModLiteralOutOfRange,
                             $"RD '{model.Name}': CONTROL operand '{op}': {outOfRange}");
                 }
+
+            ResolveReportCode(model);   // §13.18.12.3 SR2 / GR2 — the CODE clause's identifier and length
 
             var seenOccurs = new HashSet<ReportOccursSpec>(ReferenceEqualityComparer.Instance);
             foreach (var group in model.Groups)
@@ -2974,18 +3174,29 @@ public sealed partial class DataBinder
                     foreach (var f in ln.Fields)
                         foreach (var spec in f.Columns)
                         {
+                            int size = f.PrintItem.DisplayTextWidth;   // the printable-size (§13.18.14.4 GR3)
                             int left = spec.Kind switch
                             {
-                                ReportColumnKindModel.Absolute => spec.Value,
+                                ReportColumnKindModel.Absolute => spec.AbsoluteLeftmost(size),   // GR6 b)-d), the ONE computation
                                 ReportColumnKindModel.Relative => hc + spec.Value,
                                 ReportColumnKindModel.AnchorSeed => anchors[spec.AnchorId] = hc + spec.Value,
                                 _ => anchors.GetValueOrDefault(spec.AnchorId) + spec.Value,
                             };
-                            hc = left + f.PrintItem.DisplayTextWidth - 1;   // GR9 — the rightmost column becomes the counter
+                            // GR6 c)/d): integer-1 and the printable-size fix the leftmost column, and a line has no
+                            // column before 1 — the standard states no outcome for it, so it is refused here (COBOLNET2712).
+                            if (left < 1 && spec.Kind == ReportColumnKindModel.Absolute && spec.Alignment != ReportColumnAlignment.Left)
+                                Edition.Error(DiagnosticCatalog.ReportColumnLeftOfLine, $"RD '{model.Name}' entry "
+                                    + $"'{f.PrintItem.CobolName ?? "FILLER"}': COLUMN {spec.Alignment.ToString().ToUpperInvariant()} "
+                                    + $"{spec.Value} with a printable-size of {size} puts the item's leftmost column at {left}, "
+                                    + "before column 1 (ISO §13.18.14.4 GR6 c)/d))");
+                            hc = left + size - 1;   // GR9 — the rightmost column becomes the counter
                             widest = Math.Max(widest, hc);
                         }
                 }
-            model.LineWidth = model.File?.RecordContains ?? widest;
+            // §13.18.12.4 GR2 — the CODE characters "are not included in the descriptions of the lines in the report,
+            // but are included in the logical record size": a fixed RECORD CONTAINS is the code PLUS the line.
+            model.LineWidth = model.File?.RecordContains is { } record
+                ? Math.Max(1, record - (model.Code?.Length ?? 0)) : widest;
         }
     }
 

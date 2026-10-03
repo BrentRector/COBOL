@@ -94,7 +94,7 @@ RD → ReportModel                 INITIATE/GENERATE/TERMINATE →        engine
 | `Initiate` | §14.9.21.4 GR1a–c (sums←0, LC←0, PC←1), GR2 (active re-INITIATE **raises EC-REPORT-ACTIVE**, no other effect), GR3 (the file is NOT opened here — it shall ALREADY be open OUTPUT/EXTEND, else **EC-REPORT-FILE-MODE** and no action is taken on the report; the detection half of §14.9.27.4 GR7), GR4 (→active). §14.9.49.4 GR10 outranks all three — see the RANGE row |
 | `Generate(detail?)` | GR4 first-GENERATE sequence (RH once → PH → CHs major→minor → detail); GR5 subsequent (break: CFs minor→break with PRIOR control values per §13.18.16.4 GR4a, then CHs break→minor); GR2 summary (null detail); GR7 inactive **raises EC-REPORT-INACTIVE** and does nothing; SUM accumulation per §13.18.54.4 GR7c (after break processing) |
 | page fit | §13.18.35.4 GR4b absolute (integer-1 > LC) / GR4c relative (trial = LC + Σ relative values ≤ the §13.18.57.4 GR8 lower limit: DE→LAST DETAIL, CH→LAST CH, CF→FOOTING); the chronologically FIRST body group since INITIATE is exempt (GR4); only body groups test (§13.18.57.3 SR15); a first PRESENT line carrying the NEXT PAGE phrase takes no test and the fit is unsuccessful (GR4a — see the LINE NEXT PAGE row) |
-| page advance | §14.9.16.4 GR6 in order: PF → physical advance (form feed) → CODE re-eval (staged) → PC+1, or PC←1 after a NEXT GROUP NEXT PAGE WITH RESET (GR6d / §13.18.37.4 GR6) → LC←0 → PH. The feed itself (b–e) is `PageFeed`, shared with the report heading that stands on a page by itself |
+| page advance | §14.9.16.4 GR6 in order: PF → physical advance (form feed) → CODE evaluation (`EvaluateCode`, PB1129) → PC+1, or PC←1 after a NEXT GROUP NEXT PAGE WITH RESET (GR6d / §13.18.37.4 GR6) → LC←0 → PH. The feed itself (b–e) is `PageFeed`, shared with the report heading that stands on a page by itself |
 | NEXT GROUP | §13.18.37 (kb/Work PB957) — the bound clause is the runtime's own `ReportNextGroup` record on `ReportGroup.NextGroup`, applied by the ONE method `ApplyNextGroup` after a group's last line (GR2). RH (GR3): absolute LC←integer-1, relative LC+=integer-2, NEXT PAGE → the RH is alone on page 1 and `PageFeed` runs with no PF (§13.18.57.4 GR6f 1) and PC←1 when WITH RESET (§14.9.16.4 GR4a). Body (GR4): absolute LC←integer-1 when LC is below it, else integer-1 goes to the SAVE LOCATION with LC←FOOTING, and the next non-dummy body group takes the forced advance then GR4a 1 (absolute first line: LC←saved, fit re-applied) or GR4a 3 (relative: first line at saved+1 unless the group would pass its lower limit — then a second advance and FIRST DETAIL); a TERMINATE next discards the save and restores LC ("no effect at all"); relative adds integer-2 below FOOTING else LC←FOOTING (an unpaged report has no FOOTING — the distance is added); NEXT PAGE LC←FOOTING and arms the GR6 reset. CF (GR1): only the footing AT the break level applies its clause — at TERMINATE the most major one (§14.9.46.4 GR3b). PF (GR5): absolute/relative move LC, which places a relative RF (§13.18.35.4 GR5b5). A dummy or SUPPRESSed group never reaches it (§8.4.3.15.4 GR5, §14.9.45.4 GR3). GR4a 2 (a next group opening with an absolute LINE … NEXT PAGE) IS GR4a 1: the advance it names is the one the save location already forces, never a second (docs/CONFORMANCE.md, the LINE NEXT PAGE block) |
 | LINE NEXT PAGE | §13.18.35.2 Format 1 (kb/Work PB1001) — `integer-1 ON NEXT PAGE` and the bare `ON NEXT PAGE` operand. ⛔ **A FLAG, NOT A KIND**: `ReportLineModel.NextPage` / `ReportGroupLine.NextPage`, set by `DataBinder.Reports.RepeatedLine` on the group's FIRST report line only (SR7), on an Absolute line (integer-1) or a Relative one (the bare operand), so every phrase-less placement rule stays the one rule. The engine reads it on the group's first PRESENT line (GR4/GR5 — PRESENT WHEN decides which line is first): a body group declares the fit unsuccessful without a test (GR4a) — the chronologically first body group since INITIATE takes no fit test at all, so the phrase does not advance it — and then places by GR5a (integer-1) or GR5b3 (the bare form, the first body group on its page → FIRST DETAIL); a report footing is on a page by itself (GR5a) — `PresentHeadingFooting` takes the bare `PageFeed` (no PH before it, §13.18.57.4 GR6b; no PF after it, GR6f 2) and places at integer-1, or at the HEADING integer for the bare form (§13.18.57.4 GR7f — a DETERMINATION). Syntax rules on COBOLNET2199, screened once per WRITTEN clause over the flat entry array by `ScreenReportLineClauses` (with SR3/SR5 — kb/Work PB1002): SR3 (integer ≤ the page limit, or 9999 unpaged), SR5 (unpaged → relative only; the bare operand is not the relative form, as §13.18.37.3 SR3 reads NEXT GROUP NEXT PAGE), SR7 (only the first LINE clause), SR8 (body group or report footing only). SR10a keeps the phrase to a multiple LINE clause's first operand. Pinned by `2002/pb1001_line_next_page` and four negatives |
 | line placement | §13.18.35.4 GR5a (absolute → integer-1), GR5b1 RH (HEADING+n−1), GR5b2 PH (RH-on-page aware), **GR5b3 body (FIRST body group on page → FIRST DETAIL, relative value IGNORED; else LC+n)**, GR5b4 PF (FOOTING+n), GR5b5 RF (PF-on-page aware), **GR5c (a report NOT divided into pages: every relative first line, RH and RF included, → LC+n)** — the whole GR5 rule is ONE method, `FirstLineTarget`, asked by all four presentation paths (kb/Work PB1247: the unpaged arm used to live only in the body-group copy), GR7 subsequent lines, GR6 LC-before-compose, GR8 final LC = last line printed. **GR3 overlap / overprint (kb/Work PB1247, PB1130)**: the engine HOLDS each composed line back until the next line proves it is not an overprint; a relative line with integer-2 zero on the held line MERGES its non-space characters into it (one physical line, LC still names it — GR1, §8.4.3.15.4 GR4); any other line on or above the device's line sets EC-REPORT-LINE-OVERLAP — raised (checking on) it abandons that line and LC is untouched (§14.9.16.4 GR8 / §14.9.46.4 GR5 resume at the next line), unchecked it prints on the next physical line and `_physLine` records where it really went. The held line belongs to the FILE CONNECTOR (`FileConnector.HeldLineDrain`, one holder per connector, claimed through `CobolFile.HoldLine` before every write, drained by the next line, a page feed, the end of TERMINATE and every CLOSE path) |
@@ -442,11 +442,31 @@ COL/COLS/COLUMNS/NUMBERS/ARE spellings and the GR7–GR9 horizontal counter); **
 (§13.18.35.3 SR10, bound as §13.18.35.4 GR9's simple OCCURS, SR4 and SR10 a/b/c/d screened on COBOLNET2199) —
 all three §13.15.4 GR3 vehicles live, edition-gated 2002.
 
-**Staged LOUD at bind (`COBOLNET0899`, Edition.Error — legal-but-unimplemented, never silent):** CODE
-(§13.18.12);
+**The RD CODE clause is LIVE (§13.18.12; kb/Work PB1129).** `ReportModel.Code` (`ReportCodeModel`: literal-1's characters, or
+identifier-1 as the SOURCE clause's own identifier capture — one arm for both clauses, so a subscripted or
+reference-modified identifier stages through the same residue, kb/Work PB1292) is registered on the engine with
+`CobolReport.SetCode(Func<string>)`, and the engine prefixes every line it writes with the characters in force (GR1; the
+compose returns the line alone, GR2, so `RECORD CONTAINS` is the code PLUS the line — `ReportModel.LineWidth` gives the
+code's length up). The one evaluation is `CobolReport.EvaluateCode` (GR3 — "at the start of the processing for each body
+group, either during page advance processing … or whenever page advance processing is not performed"): from
+`AdvancePage` at §14.9.16.4 GR6 c) — after the page footing, which is therefore written with the OLD value — from
+`PresentBody` for a body group that took no advance, and from the first GENERATE (whose report and page headings precede
+its first body group). SR1/SR2/SR3 are COBOLNET2713 (`ResolveReportCode`, `ScreenReportCodeAgreement`); the clause is not
+edition-gated, because the 2023 text does not say which edition introduced the identifier form and an unverified gate
+would reject legal source (docs/CONFORMANCE.md A.4.11).
+
+**SEVERAL REPORTS ON ONE FILE are LIVE (§13.18.46; kb/Work PB1050, PB1285).** An FD's `REPORTS ARE r1 r2 …` gives each report
+its OWN `CobolReport` engine over the one file connector: each keeps its own LINE-COUNTER, page model and held-back line, and
+the connector's one held-back line (`CobolFile.HoldLine` / `ClaimDevice`, kb/Work PB1247) makes the records reach the medium
+in GENERATE order, so the codes of §13.18.12 separate the reports' records. `CLOSE` asks every associated report whether it is
+still active (§14.9.6.4 GR5, the `||` over the file's reports in `SequentialIoEmitter`). The REPORT clause's three
+correspondence rules — a name with no RD (§13.18.46.3 SR1), a name in two REPORT clauses (SR2) and an RD named by no clause
+(§13.14.3 SR1) — are COBOLNET2714 (`ScreenReportClauseNames`, the file resolution in `ResolveReports`).
+
+**Staged LOUD at bind (`COBOLNET0899`, Edition.Error — legal-but-unimplemented, never silent):**
 **a VARYING counter inside a FROM/BY expression (the §13.18.64.3 SR3-legal BY
 self-reference; `report-varying-counter-in-expression`)**; **FUNCTION inside a PRESENT WHEN condition
-(`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; multi-report FDs (`REPORTS ARE r1 r2`); subscripted/ref-modified
+(`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; subscripted/ref-modified
 SOURCE; SOURCE of another report's counter; rolled SUM totals (§13.18.54.3 SR4 / §13.18.54.4 GR6 — a
 report-section addend); cross-report SUM (a SUM addend qualified by a report-name, SR4 g); a cross-report
 `UPON` detail (GR7 c 2); an arithmetic-expression-1 SUM addend written with a LEADING PARENTHESIS
@@ -484,7 +504,14 @@ with `PresentOrPageHeadings` (§13.18.57.4 GR6 c): every OR PAGE heading, major 
 new page via `PresentBody(reprint: true)` — no page-fit test, NEXT GROUP or SUM reset; the page advance of a control
 heading reprints only the headings above it, and the proviso for a control footing is applied as written). The GR7 d)
 upper limits are realised by placement, not modelled as limits. **The COLUMN LEFT/CENTER/RIGHT alignment
-phrase (§13.18.14 F1 — the SR9 LEFT default is what the grammar parses)** has no grammar surface. The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings and the
+phrase (§13.18.14 F1, kb/Work PB1220)** is `reportColumnClause : … (NUMBER | NUMBERS)? (LEFT | CENTER | RIGHT)? (IS | ARE)?
+reportColumnOperand+` — optional in the grammar although the printed diagram shows a brace, because SR9 licenses its
+omission ("LEFT is assumed") — with CENTER a context-sensitive token (§8.10; cobol-words.json). The word rides
+`ReportColumnSpec.Alignment`, and ONE function, `ReportColumnSpec.AbsoluteLeftmost(printable-size)` (GR6 b)–d)), feeds both
+the emitter's placement and GR9's horizontal counter (`AbsoluteRightmost`) AND the bind-time line-width walk; SR9's
+absolute-only rule is COBOLNET2711, and an aligned item whose leftmost column falls before column 1 — a case the
+standard states no outcome for — is COBOLNET2712 (CONFORMANCE §3). The phrase gates with the other 2002 COLUMN forms
+(`report-multi-column-2002`). The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings and the
 SR7/SR8/SR10b operand-order-vs-PRESENT-WHEN arrangement rules are not enforced (over-acceptance; the runtime
 overlap conditions are EC-REPORT-COLUMN-OVERLAP/-LINE-OVERLAP, default-off). EC-REPORT-* checking is default-off
 (SSOT §18.16). The engine raises, each bound PRECISELY to GENERATE and TERMINATE (`EcBinder`'s report-production

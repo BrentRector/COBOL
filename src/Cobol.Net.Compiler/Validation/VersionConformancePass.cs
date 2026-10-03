@@ -1204,13 +1204,15 @@ internal sealed class VersionConformancePass
         }
 
         /// <summary>The 2002 COLUMN-clause forms (ISO §13.18.14 Format 1; P10 Step 13): more than one operand
-        /// (the SR10 "multiple COLUMN clause"), a relative PLUS operand, or the COL/COLS/COLUMNS/NUMBERS/ARE
-        /// spellings — the COBOL-85 form was exactly <c>COLUMN NUMBER IS integer-1</c>. Fires at most once per
+        /// (the SR10 "multiple COLUMN clause"), a relative PLUS operand, the COL/COLS/COLUMNS/NUMBERS/ARE
+        /// spellings, or the LEFT/CENTER/RIGHT alignment phrase (§13.18.14.4 GR6; kb/Work PB1220) — the COBOL-85
+        /// form was exactly <c>COLUMN NUMBER IS integer-1</c>. Fires at most once per
         /// written clause; report-section-exclusive rule.</summary>
         public override object? VisitReportColumnClause(CobolParserCore.ReportColumnClauseContext ctx)
         {
             if (ctx.COL() is not null || ctx.COLS() is not null || ctx.COLUMNS() is not null
                 || ctx.NUMBERS() is not null || ctx.ARE() is not null
+                || ctx.LEFT() is not null || ctx.CENTER() is not null || ctx.RIGHT() is not null   // the §13.18.14.4 GR6 alignment phrase
                 || ctx.reportColumnOperand().Length > 1
                 || ctx.reportColumnOperand().Any(o => o.reportRelativeSign() is not null))
                 _p.Check(Constructs.ReportMultiColumn2002, "the multiple/relative COLUMN clause forms (report group description)");

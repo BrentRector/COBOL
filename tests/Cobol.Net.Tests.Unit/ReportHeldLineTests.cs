@@ -12,8 +12,9 @@ namespace CobolNet.Tests.Unit;
 /// The connector holds at most ONE such line (<see cref="FileConnector.HeldLineDrain"/>): a producer that is about to
 /// write claims the device first (<see cref="FileRegistry.HoldLine"/>), which writes out a DIFFERENT holder's line —
 /// produced earlier, so it must reach the medium first — and every CLOSE writes the holder's line before the file
-/// closes. These facts reach the arms no golden can today: a second producer on one file (several reports on one
-/// file, §13.4.5 REPORTS ARE, is not yet supported) and the re-claim by the same holder.
+/// closes. These facts reach the arms a golden barely can: a second producer on one file (several reports on one
+/// file, §13.18.46 REPORTS ARE — conformance:85/pb1050_reports_share_file drives it end to end, kb/Work PB1050) and
+/// the re-claim by the same holder.
 /// </summary>
 public sealed class ReportHeldLineTests
 {

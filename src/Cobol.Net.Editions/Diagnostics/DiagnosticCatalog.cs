@@ -984,6 +984,29 @@ public static class DiagnosticCatalog
         + "`PAGE … integer-2 COLUMNS`.",
         "ISO §13.18.14.3 SR6");
 
+    /// <summary>COBOLNET2711 — a COLUMN clause that writes LEFT, CENTER or RIGHT and also a relative operand. ISO
+    /// §13.18.14.3 SR9: "If LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute." (kb/Work
+    /// PB1220.)</summary>
+    public static readonly DiagnosticDescriptor ReportColumnAlignmentNotAbsolute = new(
+        "COBOLNET2711", "report-column-alignment-not-absolute", EditionSeverity.Error,
+        "A COLUMN clause writes LEFT, CENTER or RIGHT and a relative (PLUS) operand. ISO §13.18.14.3 SR9: \"If LEFT, "
+        + "CENTER, or RIGHT is specified, all the operands shall be absolute.\" Write absolute column numbers, or drop "
+        + "the alignment word (LEFT is then assumed for an absolute operand).",
+        "ISO §13.18.14.3 SR9");
+
+    /// <summary>COBOLNET2712 — a RIGHT or CENTER aligned absolute operand whose leftmost column falls before column
+    /// 1. ISO §13.18.14.4 GR6 c)/d) derive the leftmost column from integer-1 and the printable-size, and a report
+    /// line has no column before 1 (GR6 a: "Integer-1 specifies an absolute column number"; a column number is a
+    /// positive integer, GR2's correspondence between a column and a character). The standard states no outcome
+    /// for it, so it is a compile-time error rather than a clamp that would make GR9's horizontal counter lie
+    /// (docs/CONFORMANCE.md §3 "COLUMN alignment").</summary>
+    public static readonly DiagnosticDescriptor ReportColumnLeftOfLine = new(
+        "COBOLNET2712", "report-column-left-of-line", EditionSeverity.Error,
+        "A RIGHT or CENTER aligned COLUMN operand places the printable item's leftmost column before column 1. ISO "
+        + "§13.18.14.4 GR6 c)/d) derive the leftmost column from integer-1 and the printable-size, and the line "
+        + "starts at column 1. Raise the column number or shorten the item.",
+        "ISO §13.18.14.4 GR6 c)/d)");
+
     public static readonly DiagnosticDescriptor ExternalTypeRule = new(
         "COBOLNET1558", "external-type-rule", EditionSeverity.Error,
         "An EXTERNAL type declaration is misused: a data description containing an EXTERNAL type shall be at "
@@ -1035,9 +1058,20 @@ public static class DiagnosticCatalog
     // ⛔ `ReportGlobalClause` (`report-global-clause`) LIVED HERE AND IS GONE (kb/Work PB369): the GLOBAL clause on
     // a report description entry (§13.18.27.3 SR1 e)) is implemented — contained-program visibility of the
     // report-name, its groups and its sum counters, and the §14.9.49.4 GR4 Format-2 declarative selection.
-    public static readonly DiagnosticDescriptor ReportCodeClause = new(
-        NotImplemented, "report-code-clause", EditionSeverity.Error,
-        "The CODE clause on a report description is not yet implemented.", "ISO §13.18.12", RecognizedNotImplemented);
+    // ⛔ `ReportCodeClause` (`report-code-clause`) LIVED HERE AND IS GONE (kb/Work PB1129): the RD CODE clause
+    // (§13.18.12) is implemented — the code prefixes every logical record the report writes, an identifier is
+    // evaluated per body group, and its three syntax rules report as `ReportCodeClauseRule` (COBOLNET2713).
+    /// <summary>COBOLNET2713 — an RD CODE clause that breaks one of its three syntax rules (ISO §13.18.12.3): SR1 literal-1
+    /// shall be an alphanumeric literal; SR2 identifier-1 shall reference an alphanumeric data item that is not an
+    /// occurs-depending-on group, a variable-length group or a dynamic-length elementary item; SR3 the clause is
+    /// specified for every report of a report file or for none. The message names the rule.</summary>
+    public static readonly DiagnosticDescriptor ReportCodeClauseRule = new(
+        "COBOLNET2713", "report-code-clause-rule", EditionSeverity.Error,
+        "A CODE clause breaks a syntax rule of ISO §13.18.12.3: literal-1 shall be an alphanumeric literal (SR1); "
+        + "identifier-1 shall reference an alphanumeric data item that is not an occurs-depending-on group item, a "
+        + "variable-length group, or a dynamic-length elementary item (SR2); and if the CODE clause is specified for "
+        + "any report it shall be specified for each report associated with the same report file (SR3).",
+        "ISO §13.18.12.3 SR1–SR3");
     // ⛔ `ReportLineNextPage` (`report-line-next-page`) LIVED HERE AND IS GONE (kb/Work PB1001), and this comment
     // stands where it did so it is not re-added. It refused the LINE clause's NEXT PAGE phrase (§13.18.35.2 Format
     // 1 — `integer-1 ON NEXT PAGE` and the bare `ON NEXT PAGE` operand) at every edition, and orphaned the
@@ -1215,9 +1249,9 @@ public static class DiagnosticCatalog
         "An UPON operand naming a detail of another report description entry is not yet implemented: the "
         + "accumulation fires on a GENERATE executed against that report's engine.",
         "ISO §13.18.54.4 GR7 c) 2)", RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor ReportMultipleOnFile = new(
-        NotImplemented, "report-multiple-on-file", EditionSeverity.Error,
-        "Multiple reports on one file (REPORTS ARE …) are not yet implemented.", "ISO §13.18.46", RecognizedNotImplemented);
+    // ⛔ `ReportMultipleOnFile` (`report-multiple-on-file`) LIVED HERE AND IS GONE (kb/Work PB1050): a file description
+    // entry may name several reports (§13.18.46.2 `REPORTS ARE report-name-1 …`; GR1 "more than one report may be
+    // written to the file"); each report has its own engine over the one file connector.
     // ⛔ `ReportPageCounterReceiving` LIVED HERE AND IS GONE (kb/Work PB429). PAGE-COUNTER as a receiving
     // operand is ISO §8.4.3.15.3 SR1's plain reading — the descriptor's own text said "legal" — and it is now
     // implemented as a receiving-capable place (`Model.ReportPageCounterPlace`), so there is nothing left to
@@ -1237,9 +1271,16 @@ public static class DiagnosticCatalog
         NotImplemented, "report-page-type-requires-page", EditionSeverity.Error,
         "A PAGE HEADING/FOOTING group, or a control heading with the OR PAGE phrase, requires a PAGE clause defining "
         + "the page limit.", "ISO §13.18.57.3 SR12");
-    public static readonly DiagnosticDescriptor ReportNotInFile = new(
-        NotImplemented, "report-not-in-file", EditionSeverity.Error,
-        "A report is not named in any file description entry's REPORT clause.", "ISO §13.18.46 / §13.14");
+    /// <summary>COBOLNET2714 — the report-name ↔ REPORT-clause correspondence is broken (kb/Work PB1285): a REPORT clause
+    /// names a report with no report description entry (ISO §13.18.46.3 SR1), a report is named in more than one
+    /// REPORT clause (§13.18.46.3 SR2), or a report description entry is named in none (§13.14.3 SR1 — "one and only
+    /// one REPORT clause"). It replaces `report-not-in-file`, which carried the not-implemented code for the third arm.</summary>
+    public static readonly DiagnosticDescriptor ReportClauseNameRule = new(
+        "COBOLNET2714", "report-clause-name-rule", EditionSeverity.Error,
+        "A REPORT clause and the report description entries disagree: each report-name-1 of a REPORT clause shall be the "
+        + "subject of a report description entry (ISO §13.18.46.3 SR1), may appear in only one REPORT clause (SR2), and "
+        + "every report description entry shall be named by one and only one REPORT clause (§13.14.3 SR1).",
+        "ISO §13.18.46.3 SR1/SR2; §13.14.3 SR1");
     // ⛔ CITATION REPAIRED (kb/Work PB177 arm C). This descriptor and its two message sites all cited
     // "ISO §13.18.16.3 SR3" for an UNRESOLVABLE CONTROL operand — a REAL clause answering a DIFFERENT
     // question: SR3 is "Data-name-1 shall not be subject to any OCCURS clauses." Nothing in §13.18.16.3

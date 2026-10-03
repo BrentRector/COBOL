@@ -195,13 +195,17 @@ reportNextGroupClause
     : NEXT GROUP IS? (reportRelativeSign integerLiteral | integerLiteral | NEXT PAGE (WITH? RESET)?)
     ;
 
-// {COLUMN|COLUMNS|COL|COLS} [NUMBER|NUMBERS] [IS|ARE] {integer | {PLUS|+} integer}...  (§13.18.14 F1)
-// The multi-operand form (a "multiple COLUMN clause", §13.18.14.3 SR10), the relative PLUS operand, and the
-// COL/COLS/COLUMNS/NUMBERS/ARE spellings are COBOL-2002 — introduction-gated post-bind by VersionConformancePass
-// ParseArm.VisitReportColumnClause. The LEFT/CENTER/RIGHT alignment phrase has no grammar surface
-// (COBOLNET_REPORT_WRITER_DESIGN §5 — the SR9 LEFT default applies).
+// {COLUMN|COLUMNS|COL|COLS} [NUMBER|NUMBERS] [LEFT|CENTER|RIGHT] [IS|ARE] {integer | {PLUS|+} integer}...  (§13.18.14 F1)
+// The multi-operand form (a "multiple COLUMN clause", §13.18.14.3 SR10), the relative PLUS operand, the
+// COL/COLS/COLUMNS/NUMBERS/ARE spellings and the alignment phrase are COBOL-2002 — introduction-gated post-bind by
+// VersionConformancePass ParseArm.VisitReportColumnClause.
+// ⛔ THE ALIGNMENT BRACE IS OPTIONAL HERE although the PDF diagram (p386, rendered) prints it as a brace: §13.18.14.3
+// SR9 — "If any of the operands is absolute and neither LEFT, CENTER, nor RIGHT is specified, LEFT is assumed" —
+// licenses its omission, and `COLUMN 5` is the form every report program writes. The phrase sits BEFORE IS/ARE and
+// once per clause (the ellipsis closes only the operand brace); SR9's "all the operands shall be absolute" is
+// bound, not parsed (DataBinder.Reports, kb/Work PB1220).
 reportColumnClause
-    : (COLUMN | COLUMNS | COL | COLS) (NUMBER | NUMBERS)? (IS | ARE)? reportColumnOperand+
+    : (COLUMN | COLUMNS | COL | COLS) (NUMBER | NUMBERS)? (LEFT | CENTER | RIGHT)? (IS | ARE)? reportColumnOperand+
     ;
 
 reportColumnOperand
