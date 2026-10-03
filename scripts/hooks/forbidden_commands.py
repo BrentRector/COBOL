@@ -5,7 +5,7 @@ Owner decision 2026-09-25 (tooling recommendation 2): prose rules are forgotten,
 fires inside subagents and Workflow agents too. Each rule below was written in a skill or memory AND broken anyway:
 
   git stash / --autostash   the stash stack is SHARED by every linked worktree (common git dir); PB713's implementer
-                            popped the registrar's stash. WIP goes into a commit (workstream §3).
+                            popped the registrar's stash. WIP goes into a commit (workstream skill, references/landing.md).
   bare push to main         main requires the ci-gate check; the only route is `bash scripts/push-main.sh`
                             (owner decision Q23, 2026-09-06). A push to ci/<sha> or any other branch is fine.
   escapes in a heredoc      heredoc bodies with backslash escapes were mangled or mis-escaped in six sessions (and the

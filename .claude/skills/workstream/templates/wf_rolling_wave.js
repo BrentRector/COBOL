@@ -1,7 +1,7 @@
 export const meta = {
   name: 'rolling-wave',
   description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), and a lander train starts whenever enough branches are ready',
-  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2-§3): fill a freed slot the moment it frees; land in trains of 4-6 as branches finish.',
+  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; land in trains of 4-6 as branches finish.',
   phases: [
     { title: 'Implement', detail: 'cobol-implementer per group, isolated worktrees, rolling pool' },
     { title: 'Land', detail: 'cobol-lander trains, serialized, each over 4-6 ready branches' },
