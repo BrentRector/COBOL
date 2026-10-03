@@ -7740,19 +7740,41 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// name; <paramref name="member"/> locates the record for the file-name qualifier.</summary>
     private bool QualifierChainMatchesFrom(DataItem? firstQualifiable, DataItem member, IReadOnlyList<string> qualifiers)
     {
-        DataItem cand = member;
-        DataItem? anc = firstQualifiable;
+        if (qualifiers.Count == 0) return true;
+        return QualifierWalk(NamesFrom(firstQualifiable), qualifiers, q =>
+        {
+            // Data ancestors exhausted: the OUTERMOST remaining qualifier may be the file name.
+            if (!FilesByName.TryGetValue(q, out var file)) return false;
+            DataItem root = member;
+            while (root.Parent is { } p) root = p;
+            return file.Records.Contains(root);
+        });
+
+        static IEnumerable<string?> NamesFrom(DataItem? anc)
+        {
+            for (; anc is not null; anc = anc.Parent) yield return anc.CobolName;
+        }
+    }
+
+    /// <summary>⛔ THE ONE §8.4.2.2.3 SR4 QUALIFIER WALK — the written qualifiers are consumed INNER → OUTER against
+    /// <paramref name="ancestorNames"/> (the names of the successively more inclusive levels above the item,
+    /// innermost first; a level with no name is a null), with gaps allowed, and when the ancestors are exhausted the
+    /// OUTERMOST remaining qualifier may instead be the container <paramref name="isOutermostContainer"/> accepts —
+    /// §8.4.2.2.2 Format 1's <i>file-report-qualifier</i>: the owning FILE of a data record, the owning REPORT of a
+    /// report-section sum counter (kb/Work PB1454). The hierarchy differs by item kind; the rule does not, so it is
+    /// written once and each kind supplies its own ancestors and its own outermost container.</summary>
+    internal static bool QualifierWalk(
+        IEnumerable<string?> ancestorNames, IReadOnlyList<string> qualifiers, Func<string, bool> isOutermostContainer)
+    {
+        using var ancestors = ancestorNames.GetEnumerator();
         for (int qi = 0; qi < qualifiers.Count; qi++)
         {
             string q = qualifiers[qi];
-            while (anc is not null && !string.Equals(anc.CobolName, q, StringComparison.OrdinalIgnoreCase))
-                anc = anc.Parent;
-            if (anc is not null) { anc = anc.Parent; continue; }
-            // Data ancestors exhausted: only the OUTERMOST remaining qualifier may be the file name.
-            if (qi != qualifiers.Count - 1 || !FilesByName.TryGetValue(q, out var file)) return false;
-            DataItem root = cand;
-            while (root.Parent is { } p) root = p;
-            return file.Records.Contains(root);
+            bool found = false;
+            while (!found && ancestors.MoveNext())
+                found = string.Equals(ancestors.Current, q, StringComparison.OrdinalIgnoreCase);
+            if (found) continue;
+            return qi == qualifiers.Count - 1 && isOutermostContainer(q);
         }
         return true;
     }

@@ -92,7 +92,7 @@ serves as the diagnostic→phase map). See [[kb/Semantics/Validation Rules]] and
 ## The `COBOLNET0899` family — recognized-but-not-implemented (staged loud)
 One code, **~40 stable Ids**, all sharing suppress key `recognized-not-implemented` (mute as a group). Raised at
 **Bind** as a loud stage marker (never a silent no-op — D8). Spans: national data (`national-data`,
-`national-through-range`), OO residue (`oo-based-in-class`, `oo-factory-object-reference`, `oo-group-valued-property`,
+`national-through-range`), OO residue (`oo-based-in-class`, `oo-factory-object-reference`,
 `oo-interface-property-prototype`, `oo-method-declaratives`, `oo-method-raising-last`,
 `oo-external-method-working-storage`), pointers (`usage-function-pointer`, `program-pointer-restricted`), linkage
 (`any-length-returning`, `by-value-formal-carrier`, `optional-formal`), constants

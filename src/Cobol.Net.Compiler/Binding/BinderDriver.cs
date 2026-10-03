@@ -134,6 +134,7 @@ internal sealed class BinderDriver
         }
 
         OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
+        OoConformance.ValidatePropertyAccessorPairs(table, edition);   // §8.4.3.9.3 SR7 — get RETURNING = set USING, over the formals just resolved
         var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
         // TWO-PHASE binding (M2-UDF-1 key enabler): EVERY unit's DATA division binds before ANY procedure body
         // binds — a class's method bodies (below) as well as a program unit's (the ProcedureBinding group pass) —

@@ -38,7 +38,9 @@ public enum DeferredShape
     /// <summary>A whole (unsubscripted) OCCURS DYNAMIC table (data-model D9) outside the contexts that take one.</summary>
     DynamicWholeTable,
     /// <summary>A string-canonical REDEFINES class whose backing is not reachable from the reference — its parent
-    /// struct is itself within an OCCURS.</summary>
+    /// struct is itself within an OCCURS DYNAMIC table, whose elements are reached through the receiving / sending
+    /// accessors a REDEFINES view place does not carry (a class within a FIXED or OCCURS DEPENDING table is reached
+    /// through the subscripted parent path; kb/Work PB1279).</summary>
     NestedClassBacking,
     /// <summary>An item the access-path builder has no path for (a whole-table reference outside a
     /// table-taking context, or an OCCURS level the path cannot address).</summary>
@@ -66,7 +68,7 @@ public static class DeferredShapes
         DeferredShape.DynamicWholeTable =>
             "a whole OCCURS DYNAMIC table in this position (data-model D9)",
         DeferredShape.NestedClassBacking =>
-            "a REDEFINES view whose backing lies within an OCCURS",
+            "a REDEFINES view whose backing lies within an OCCURS DYNAMIC table",
         DeferredShape.UnbuiltAccessPath =>
             "a table reference with no access path in this position",
         DeferredShape.NumericRefModSubstrate =>

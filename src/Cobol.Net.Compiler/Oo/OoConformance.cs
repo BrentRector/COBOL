@@ -3,6 +3,7 @@
 using CobolNet.Binding;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Editions.Diagnostics;
 
 namespace CobolNet.Compiler.Oo;
 
@@ -46,6 +47,45 @@ public static class OoConformance
                              $"the overridden method of class '{baseM.Owner.Name}'"))
                     edition.Error("COBOLNET0829", $"{where}: {err}; ISO §11.7.3 SR9");
             }
+    }
+
+    /// <summary>⛔ ISO §8.4.3.9.3 SR7 — THE TWO ACCESSORS OF ONE PROPERTY DESCRIBE IT THE SAME (kb/Work PB1450): "The
+    /// data description of the item specified in the RETURNING phrase of the get property method shall be the same as
+    /// the data description of the item specified as the USING parameter of the set property method." Nothing
+    /// compared them, so a GET RETURNING PIC 9(5) with a SET USING PIC X(3) compiled and the §8.4.3.9.4 temp (modelled
+    /// on the GET's item) crossed a SET formal of another description. The comparison is the ONE strict
+    /// identical-description check (<see cref="DescriptionMismatch"/>, pair mode — the relation the override and
+    /// IMPLEMENTS signatures use, §9.3.8.2.3 rules 2/3 and 6), asked of each (GET, SET) pair AS THE CLASS SEES IT:
+    /// the roster lookup walks INHERITS (§9.3.6), so a GET inherited from a superclass and a SET written in the
+    /// subclass form a pair at the subclass, and a pair already complete in a superclass is the superclass's own.
+    /// Runs AFTER every class's data has bound (the formals resolve at data-bind time). The instance and the
+    /// FACTORY roster are separate interfaces (§11.4), so each is its own pairing.</summary>
+    public static void ValidatePropertyAccessorPairs(OoClassTable table, EditionContext edition)
+    {
+        foreach (var cls in table.Classes)
+        {
+            Check(cls, cls.Methods, cls.FindMethod);
+            Check(cls, cls.FactoryMethods, cls.FindFactoryMethod);
+        }
+
+        void Check(OoClassSymbol cls, IReadOnlyList<OoMethodSymbol> declared, Func<string, OoMethodSymbol?> find)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var accessor in declared)
+            {
+                if (accessor.PropertyName is not { } prop || !seen.Add(prop)) continue;
+                if (find(NamingConvention.GetAccessorName(prop)) is not { Binding.Returning: { } returning } get
+                    || find(NamingConvention.SetAccessorName(prop)) is not { Binding.Formals: [{ } setFormal] } set)
+                    continue;   // a missing accessor is §8.4.3.9.3 SR3/SR4's, decided where the polarity is known
+                if (DescriptionMismatch(setFormal.Item, returning) is not { } why) continue;
+                // The diagnostic stands at the accessor THIS class wrote, the later of the pair when it wrote both.
+                using var at = edition.At((set.Owner == cls ? set : get).Ctx ?? accessor.Ctx);
+                edition.Error(DiagnosticCatalog.PropertyAccessorDescriptionMismatch,
+                    $"class '{cls.Name}', property '{prop}': the RETURNING item of the get property method "
+                    + $"('{get.Owner.Name}') and the USING parameter of the set property method ('{set.Owner.Name}') are "
+                    + $"not described the same — {why} (ISO §8.4.3.9.3 SR7)");
+            }
+        }
     }
 
     /// <summary>The §9.3.11 IMPLEMENTS conformance pass (via §9.3.8.2.3 — D-I1: the BINDER is the authority;

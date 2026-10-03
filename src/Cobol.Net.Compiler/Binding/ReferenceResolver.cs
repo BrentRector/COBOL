@@ -148,21 +148,20 @@ public sealed class ReferenceResolver(DataBinder data)
         // diagnostics. The committing resolution that follows does all three exactly once. (The orphan
         // op a probing registration left behind classified as StoreKind.None and made OoWrapPropertyOps
         // prepend a GET that §8.4.3.9.4 GR2 says a write-only occurrence must not invoke.)
-        if (_probing) return model.IsGroup ? null : model;
+        if (_probing) return model;
 
         if (!data.OoRepositoryProperties.ContainsKey(name))
             data.Edition.Error("COBOLNET0843",
                 $"the object-property reference '{name}' OF '{recv}' requires a PROPERTY specifier in the "
                 + "REPOSITORY paragraph (ISO §8.4.3.9.3 SR1; §12.3.8)");
 
-        if (model.IsGroup)
-        {
-            data.Edition.Error(DiagnosticCatalog.OoGroupValuedProperty,
-                $"the object-property reference '{name}' OF '{recv}': a GROUP-valued property reference "
-                + "(the §8.4.3.9.4 temps over a group description) is a later refinement of the OO wave");
-            return null;
-        }
-
+        // ⛔ THE TEMP TAKES THE ACCESSOR'S WHOLE DESCRIPTION, A GROUP INCLUDED (kb/Work PB1448). §8.4.3.9.4 GR1: "The
+        // data description of temp-1 is the same as the data description of the item specified in the RETURNING
+        // phrase of the get property method", GR2 gives temp-2 the USING parameter's, and §8.4.3.9.3 SR5/SR6 admit
+        // the property "wherever a data item with that description would be valid" as a sending / receiving item —
+        // a group is valid in all three of MOVE's, INSPECT's and DISPLAY's operand positions. The ONE temp
+        // constructor already deep-clones a group model (the §8.4.3.2.4 GR1 group RETURNING result), so no category
+        // is staged here.
         var temp = data.OoCreatePropertyTemp(model, name);
         data.OoPendingPropertyOps.Add(new DataBinder.OoPendingPropertyOp(
             temp,
@@ -504,8 +503,8 @@ public sealed class ReferenceResolver(DataBinder data)
         // COUNTER, not the printable item; GR12 permits procedure division statements to read and alter it): an
         // IMPLICITLY-defined VIEW over the report engine's counter, not in ByName, so it is resolved HERE — the
         // CAPACITY-register pattern — to a ReportSumCounterPlace whose read/write are SumValue/SetSumValue
-        // (kb/Work PB840). Qualification is by REPORT-NAME (§8.4.2.2.2 Format 1's file-report-qualifier), which
-        // is what distinguishes two reports' same-named counters.
+        // (kb/Work PB840). Its qualifiers are the report group entries above it and, outermost, its REPORT-NAME
+        // (§8.4.2.2.3 SR4; §8.4.2.2.2 Format 1's file-report-qualifier — kb/Work PB1454).
         if (SumCounterFor(dref, name, report) is { } sumReg) return Resolved(sumReg);
 
         // The reference AS WRITTEN, read by the ONE decomposition (kb/Work PB443 — see WrittenReference).
@@ -986,9 +985,15 @@ public sealed class ReferenceResolver(DataBinder data)
         {
             // The backing is emitted in the canonical's containing struct (FieldEmitter.PhysicalFields), so a NESTED
             // class's backing must be reached through that struct's access path — a bare `_redef_X` resolves only for a
-            // top-level (static-field) class. Fail loud if the parent path is unavailable (e.g. it is itself within an
-            // OCCURS), rather than emit an unqualified reference that does not exist in scope.
-            if (BuildBackingPath(sc) is not { } backing) { gap = new(DeferredShape.NestedClassBacking, item); return null; }
+            // top-level (static-field) class.
+            // ⛔ A CLASS WHOSE CANONICAL LIES WITHIN AN OCCURS IS REACHED THROUGH THE SUBSCRIPTED PARENT PATH (kb/Work
+            // PB1279). ISO §13.18.44.3 SR5 sentence 2 — "However, data-name-2 may be subordinate to an item whose
+            // data description entry contains an OCCURS clause" — and §13.18.44.4 GR1 associates the redefining
+            // item's storage with the first bit of the redefined item IN EACH OCCURRENCE, so every occurrence of the
+            // enclosing table holds its own backing, in that element's struct. §8.4.2.3.3 SR3 gives the reference one
+            // subscript per OCCURS clause: the LEADING ones select the enclosing element (they are the canonical
+            // parent's own dimensions), the trailing ones are the in-class levels below.
+            int outerCount = sc.Canonical.Parent?.SubscriptArity ?? 0;
             // A SUBSCRIPTED view: each OCCURS level on the item's path WITHIN the class displaces the window by
             // (occurrence − 1) × that level's per-occurrence width — the redefined table lays its occurrences
             // end-to-end in the ONE backing (ISO §13.18.44). ClassOffset is the occurrence-1 position; subscripts
@@ -997,7 +1002,9 @@ public sealed class ReferenceResolver(DataBinder data)
             for (DataItem? n = item; n is not null && ReferenceEquals(n.Class, sc); n = n.Parent)
                 if (n.Occurs is not null) occursLevels.Add(n);
             occursLevels.Reverse();
-            if (occursLevels.Count != indexExprs.Count) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }   // an item-path caller's count
+            if (indexExprs.Count != outerCount + occursLevels.Count) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }   // an item-path caller's count
+            if (BuildBackingPath(sc, [.. indexExprs.Take(outerCount)]) is not { } backing) { gap = new(DeferredShape.NestedClassBacking, item); return null; }
+            indexExprs = [.. indexExprs.Skip(outerCount)];
             string offset = item.ClassOffset.ToString();
             // The BIT twin of the same displacement, for a USAGE BIT member (kb/Work PB203): a bit item's
             // occurrences lie at successive BIT positions (§8.5.1.6.3's "next bit position in storage"; the same
@@ -1616,11 +1623,21 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <see cref="RedefViewPlace"/> twin of the old string <c>BackingPath</c>). The backing is emitted in the
     /// canonical's containing struct, so a NESTED class reaches it through that struct's path
     /// (<c>OUTER.GROUP._redef_X</c>); a top-level class's backing is the bare static field (<c>_redef_X</c>). Returns
-    /// <see langword="null"/> when the containing path is unavailable (the canonical is within an OCCURS table).</summary>
-    private static AccessPath? BuildBackingPath(RedefinesClass cls) =>
-        cls.Canonical.Parent is not { } parent
-            ? new AccessPath([new RootFieldSegment(cls.BackingCsName, OmittedFormalGuard.Of(cls.Canonical))])
-            : BuildAccessPath(parent, []) is { } parentPath ? parentPath.Add(new MemberSegment(cls.BackingCsName)) : null;
+    /// <see langword="null"/> when the containing path is unavailable. A canonical within a FIXED table is reached
+    /// through the enclosing element — <paramref name="outerIndexExprs"/> are the subscripts of the canonical
+    /// parent's own dimensions, outermost first (ISO §13.18.44.3 SR5, kb/Work PB1279). A canonical within an OCCURS
+    /// DYNAMIC table stays unavailable: its element is reached through the receiving / sending accessors a
+    /// <see cref="RedefViewPlace"/> does not carry.</summary>
+    private AccessPath? BuildBackingPath(RedefinesClass cls, IReadOnlyList<string> outerIndexExprs)
+    {
+        if (cls.Canonical.Parent is not { } parent)
+            return new AccessPath([new RootFieldSegment(cls.BackingCsName, OmittedFormalGuard.Of(cls.Canonical))]);
+        for (DataItem? p = parent; p is not null; p = p.Parent)
+            if (p.IsDynamicTable) return null;
+        // The enclosing element carries the same §13.18.38.4 GR7 OCCURS DEPENDING check every other element path does.
+        return BuildAccessPath(parent, outerIndexExprs, OdoReferenceCheckFor) is { } parentPath
+            ? parentPath.Add(new MemberSegment(cls.BackingCsName)) : null;
+    }
 
     /// <summary>The STRUCTURAL access path to the <c>StorageCell</c> behind a CELL-BACKED class's backing —
     /// the second half of the one storage area, holding the MANAGED SLOTS a pointer-class member rides
@@ -1911,36 +1928,43 @@ public sealed class ReferenceResolver(DataBinder data)
     /// name of the sum counter, not the name of the associated printable item"; GR12 — "It is permissible for
     /// procedure division statements to alter the content of sum counters"), or null when the name is not a sum
     /// counter. kb/Work PB840.
-    /// <para>The covered spelling is the whole one a general format admits here: the bare name, or the name with
-    /// ONE report-name qualifier (§8.4.2.2.2 Format 1's file-report-qualifier — a sum counter is a level-01-free
-    /// report-section item whose only available qualifier is its report). A sum counter is never an OCCURS item
-    /// in this compiler's model and GR1 makes it a numeric conceptual item, so a subscript or reference
-    /// modification on it is not a sum-counter reference at all — the name falls through to ordinary resolution,
-    /// which names the rule it breaks.</para>
+    /// <para>⛔ A SUM COUNTER HAS ITS REAL HIERARCHY (kb/Work PB1454). §8.4.2.2.3 SR4 — "Each data-name-2 shall be the
+    /// name associated with a level number to which the item being qualified is subordinate" — and a SUM entry is
+    /// always subordinate to its 01 report group (and to any group entry between), so the covered spelling is
+    /// <c>counter [ OF group-entry ]… [ OF report-name ]</c>: every named level above the entry, inner → outer
+    /// with gaps allowed, the report-name last as §8.4.2.2.2 Format 1's file-report-qualifier. The walk is the ONE
+    /// <see cref="DataBinder.QualifierWalk"/> a data item's own ancestors go through, over
+    /// <see cref="ReportSumModel.Qualification"/>. (The model it replaced — "a level-01-free item whose only
+    /// available qualifier is its report" — was false, so `TOT OF CF1` was refused and two same-named counters
+    /// of one report could not be told apart.) A reference with a subscript or a reference modification is not
+    /// a counter reference here: the name falls through to ordinary resolution, which names the rule it breaks.</para>
     /// <para>⛔ TWO ENTRIES MAY LEGALLY CARRY ONE NAME (GR1, kb/Work PB882): §8.4.2.2.1's uniqueness requirement
     /// is about a REFERENCE, so the collision is diagnosed HERE, where a reference exists, and never by dropping
     /// a declaration.</para></summary>
     private ReportSumCounterPlace? SumCounterFor(Core.DataReferenceContext dref, string name, bool report)
     {
-        var suffixes = dref.dataReferenceSuffix();
-        if (suffixes.Any(s => s.qualification() is null)) return null;   // subscripted / reference-modified
-        if (suffixes.Length > 1) return null;                            // more than one qualifier — not a counter reference
         if (!data.SumCounters.TryGetValue(name, out var homonyms)) return null;
-        string? qualifier = suffixes.Length == 1 ? suffixes[0].qualification().cobolWord().GetText() : null;
+        var written = ReadWritten(dref);
+        if (written.SubscriptGroup is not null || written.RefModCount > 0) return null;   // subscripted / reference-modified
+        var qualifiers = written.Qualifiers;
         // §8.4.6.2.1 rule 3 — a counter of a report this source element declares hides a same-named counter of a
         // container's GLOBAL report; only candidates of the NEAREST declaring element can be ambiguous.
-        var matches = data.NearestInScope(qualifier is null
-            ? homonyms
-            : homonyms.Where(h => h.Report.Name.Equals(qualifier, StringComparison.OrdinalIgnoreCase)), h => h.Report);
+        var matches = data.NearestInScope(
+            homonyms.Where(h => DataBinder.QualifierWalk(h.Sum.Qualification, qualifiers,
+                q => q.Equals(h.Report.Name, StringComparison.OrdinalIgnoreCase))),
+            h => h.Report);
         if (matches.Count == 0)
         {
-            // A qualifier that names no report carrying this counter: the name IS a sum counter, so the ordinary
-            // resolver would only report "not defined". Name the real rule instead (§8.4.2.2.2 / §8.4.2.2.3 SR1).
+            // The qualifiers reach no counter of this name. When an ORDINARY item of the name does answer them
+            // (`TOT OF WS-GROUP`, the counter's name reused as a data item), the reference is that item's and
+            // resolution carries on; otherwise the name IS a sum counter and the ordinary resolver would only say
+            // "not defined", so name the real rule (§8.4.2.2.2 / §8.4.2.2.3 SR4).
+            if (ResolveQualified(name, qualifiers) is not null) return null;
             if (report && _diagnosed.Add(dref))
                 data.Edition.Error(DiagnosticCatalog.ReportSumCounterReference, $"'{DataBinder.WrittenText(dref)}': '{name}' is a sum counter "
-                    + $"(ISO §13.18.54.4 GR5), but no report description entry named '{qualifier}' contains one — a "
-                    + "sum counter may be qualified only by the report-name of the report that defines it "
-                    + "(ISO §8.4.2.2.2 Format 1).");
+                    + $"(ISO §13.18.54.4 GR5), but none is subordinate to the qualifiers written — a sum counter is "
+                    + "qualified by the data-names of the report group description entries above it, innermost "
+                    + "first, and by the report-name last (ISO §8.4.2.2.3 SR4, §8.4.2.2.2 Format 1).");
             return null;
         }
         if (matches.Count > 1)
@@ -1949,7 +1973,7 @@ public sealed class ReferenceResolver(DataBinder data)
                 data.Edition.Error(DiagnosticCatalog.ReportSumCounterReference, $"'{DataBinder.WrittenText(dref)}': the reference is ambiguous — "
                     + $"{matches.Count} entries establish a sum counter named '{name}' (ISO §13.18.54.4 GR1 gives "
                     + "each entry its own counter). A reference shall uniquely identify one resource (ISO "
-                    + "§8.4.2.2.1); qualify it by report-name, or give the entries distinct data-names.");
+                    + "§8.4.2.2.1); qualify it by report group entry or report-name, or give the entries distinct data-names.");
             return null;
         }
         var (rep, sum) = matches[0];

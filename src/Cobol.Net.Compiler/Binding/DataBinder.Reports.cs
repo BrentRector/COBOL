@@ -610,6 +610,16 @@ public sealed class ReportSumModel
     public int ResetLevel { get; set; } = -1;
     /// <summary>The group whose processing end resets the counter when no RESET phrase is given (GR2).</summary>
     public required ReportGroupModel PrintedIn { get; init; }
+
+    /// <summary>⛔ THE COUNTER'S QUALIFICATION HIERARCHY (kb/Work PB1454): the data-names of the report group
+    /// description entries the SUM entry is subordinate to, INNERMOST FIRST and ending at the 01 report group, a
+    /// null for an entry without a data-name (FILLER). ISO §8.4.2.2.3 SR4 — "Each data-name-2 shall be the name
+    /// associated with a level number to which the item being qualified is subordinate" — so a counter is
+    /// qualifiable by every named level above it, and by its REPORT as the outermost container
+    /// (§8.4.2.2.2 Format 1's file-report-qualifier). Read by <see cref="DataBinder.QualifierWalk"/>, the ONE
+    /// qualifier walk a data item's own ancestors go through.</summary>
+    public IReadOnlyList<string?> Qualification { get; set; } = [];
+
     /// <summary>The COBOL-2002 PICTURE-shape introduction gate (a <c>Constructs.*</c> id) this counter's PICTURE
     /// carries — a floating-point numeric-edited (symbol E) or national-edited picture, from the ONE
     /// <c>VersionConformancePass.PictureConstructId</c>. The SUM-counter scale-derivation <c>Analyze</c> (GR1) is a
@@ -1314,7 +1324,7 @@ public sealed partial class DataBinder
         /// clause is specified or implied at a group level, it applies only to each elementary item in the
         /// group"), so a printable item inherits the usage written on a group entry above it instead of the
         /// clause being discarded (kb/Work PB541).</para>
-        public readonly List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage)> Chain = [];
+        public readonly List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> Chain = [];
         /// <summary>Stack frames whose conditions the CURRENT line already carries.</summary>
         public int LineChainDepth;
         /// <summary>The repeating entries enclosing the entry being bound, outermost first (§13.18.38 Format 3).</summary>
@@ -1996,7 +2006,7 @@ public sealed partial class DataBinder
                 st.Line = opened;
                 group.Lines.Add(opened);
                 // The line's PRESENT WHEN chain: every ancestor condition + this entry's own (§13.18.41.4 GR2b).
-                foreach (var (_, c, _, _) in chain) if (c is not null) opened.PresentWhenCtxs.Add(c);
+                foreach (var (_, c, _, _, _) in chain) if (c is not null) opened.PresentWhenCtxs.Add(c);
                 if (ownCond is not null) opened.PresentWhenCtxs.Add(ownCond);
                 // §13.18.38.4 GR13 on the VERTICAL axis: a repetition the DEPENDING count excludes has no line.
                 opened.RepetitionGuards.AddRange(st.GuardsHere());
@@ -2010,7 +2020,9 @@ public sealed partial class DataBinder
             if (sumClauses.Count > 0)
             {
                 sum = BindSumClause(sumClauses, entryName, picText, group, model, columns.Count > 0);
-                foreach (var (_, c, _, _) in chain) if (c is not null) sum.PresentWhenCtxs.Add(c);
+                // §8.4.2.2.3 SR4 — the counter is subordinate to every level above its entry (PB1454).
+                sum.Qualification = [.. Enumerable.Reverse(chain).Select(f => f.Name)];
+                foreach (var (_, c, _, _, _) in chain) if (c is not null) sum.PresentWhenCtxs.Add(c);
                 if (ownCond is not null) sum.PresentWhenCtxs.Add(ownCond);
             }
 
@@ -2021,7 +2033,7 @@ public sealed partial class DataBinder
                 {
                     Edition.Error(DiagnosticCatalog.ReportColumnWithoutLine, $"RD '{model.Name}': a COLUMN clause with no LINE clause in "
                         + "effect (ISO §13.18.14 — a printable item belongs to a report line)");
-                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage));
+                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
                     return;
                 }
                 // ⛔ NO OPERAND, NO PRINTABLE ITEM (kb/Work PB853). An entry with a COLUMN clause and no SOURCE,
@@ -2031,7 +2043,7 @@ public sealed partial class DataBinder
                 // compiler inventing source the programmer did not write — which printed `000` under PIC 999.
                 if (sumClauses.Count == 0 && sourceOps.Count == 0 && valueRaws.Count == 0)
                 {
-                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage));
+                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
                     return;
                 }
                 // The printable item (§13.18.14): a SYNTHETIC DataItem carrying the PICTURE so the emitter's ONE
@@ -2072,7 +2084,7 @@ public sealed partial class DataBinder
                         + "PICTURE clause — one shall be specified in every elementary entry that has a SOURCE or "
                         + "SUM clause (ISO §13.15.3 SR12), and SR14 implies one only from a VALUE clause supplying "
                         + "an alphanumeric, boolean or national literal that is not a zero-length literal");
-                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage));
+                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
                     return;
                 }
                 // §13.18.60.3 SR7 over a usage NO clause ever stated — one IMPLIED by the picture
@@ -2173,7 +2185,7 @@ public sealed partial class DataBinder
                 line.Fields.Add(field);
             }
 
-            chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage));
+            chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
         }
     }
 
@@ -2466,7 +2478,7 @@ public sealed partial class DataBinder
     /// the number of repetitions of any number of successive repeating entries at higher levels" straight off
     /// the scope stack.</summary>
     private static List<int> RepetitionChain(List<ReportColumnSpec> columns, ReportOccursSpec? occurs,
-        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage)> chain)
+        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> chain)
     {
         var reps = new List<int>(chain.Count + 1) { EntryRepetitions(columns, occurs) };
         for (int i = chain.Count - 1; i >= 0; i--) reps.Add(chain[i].Reps);

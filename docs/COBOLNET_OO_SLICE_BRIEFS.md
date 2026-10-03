@@ -1098,7 +1098,9 @@ identity. Checks: §11.7.3 SR6 (:13250) GET = no USING + exactly one RETURNING, 
 SET = exactly one USING + no RETURNING; §11.7.3 SR5 (:13248) a WS data-name that is a property-name must not
 ALSO carry the PROPERTY clause (duplicate accessor → 0838); §13.18.42.3 SR4 (:21159) the subject's data-name
 must not collide with a superclass property (walk `Base` chain rosters); §8.4.3.9.3 SR7 (:7388) when both
-accessors exist, GET's returning description == SET's using description (`DescriptionMismatch` again → 0838).
+accessors exist, GET's returning description == SET's using description (`OoConformance.DescriptionMismatch` in pair mode,
+asked by `OoConformance.ValidatePropertyAccessorPairs` over each pair AS THE CLASS SEES IT, inheritance included → COBOLNET2727,
+kb/Work PB1450).
 
 **The subject, and where each §13.18.42.3 rule lives (kb/Work PB1273).** `BindEntry` records the written clause
 on the ITEM (`DataItem.Property`, a `PropertyClauseSpec`), and `OoBindPropertyClauses` synthesizes from the object
@@ -1186,7 +1188,8 @@ and subscripts reject on the OCCURS-less temp);
 mark-on-entry/drain-own-suffix discipline (a reference in an IF condition belongs to the IF, not an arm);
 (5) `prop OF Class-name` → the FACTORY accessors via the Factory call form (LIVE);
 (6) the temp joins `DataBinder.Roots` post-resolve (FieldEmitter declares it; uid from the unit band;
-`__prop<uid>_<PROP>`); GROUP-valued properties stage 0899 (temps over a group description — later);
+`__prop<uid>_<PROP>`); a GROUP-valued property's temp is the accessor's whole group description, deep-cloned by
+`CreateCompilerTemp` (kb/Work PB1448);
 (7) invocation-count semantics are GOLDEN-proven: oo_property_explicit_ref's side-effecting accessors
 print exactly SET-CALLED then GET-CALLED for a receive-then-send pair (GR2 no-get / GR1 no-set);
 oo_property_ref exercises all three GR forms over synthesized accessors (the first RUNTIME exercise);

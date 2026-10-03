@@ -1650,9 +1650,9 @@ public static class DiagnosticCatalog
     // §14.9.18.3 SR5 at all — it asks the same PlacementRules screen the program arm asks, so RAISING LAST in a
     // method's PERFORM WHEN phrase is ACCEPTED and one outside either admitted position is refused by
     // COBOLNET2103, with the same ordinal, whichever arm bound it.
-    public static readonly DiagnosticDescriptor OoGroupValuedProperty = new(
-        NotImplemented, "oo-group-valued-property", EditionSeverity.Error,
-        "A group-valued object-property reference is not yet implemented.", "ISO §8.4.3.9.4", RecognizedNotImplemented);
+    // ⛔ `oo-group-valued-property` is DELETED, not disabled (kb/Work PB1448): §8.4.3.9.4 GR1-GR3 give the property's
+    // temp the accessor's whole data description, and a group description is one — the temp is now built over it,
+    // so no site can raise the name. Never reallocate the id.
     public static readonly DiagnosticDescriptor AnyLengthReturning = new(
         NotImplemented, "any-length-returning", EditionSeverity.Error,
         "ANY LENGTH on a RETURNING item (legal per §13.18.2.3 SR3b) is recognized but not yet implemented — the "
@@ -4798,10 +4798,11 @@ public static class DiagnosticCatalog
         "ISO §13.18.53.3 / §13.18.54.3");
 
     /// <summary>COBOLNET2145 — a procedure division reference to a SUM COUNTER that identifies no single counter:
-    /// the report-name qualifier names no report defining one, or the bare name is established by more than one
-    /// entry. ISO §13.18.54.4 GR5 makes the data-name the counter's name and GR12 permits statements to read and
-    /// alter it, but GR1 gives EVERY entry its own counter, so a name two entries share identifies none of them
-    /// (§8.4.2.2.1) until a report-name qualifier (§8.4.2.2.2 Format 1) picks one.</summary>
+    /// the qualifiers written reach no counter of the name, or the name with its qualifiers is established by more
+    /// than one entry. ISO §13.18.54.4 GR5 makes the data-name the counter's name and GR12 permits statements to
+    /// read and alter it, but GR1 gives EVERY entry its own counter, so a name two entries share identifies none of
+    /// them (§8.4.2.2.1) until qualification (§8.4.2.2.2 Format 1; §8.4.2.2.3 SR4 — the report group entries the
+    /// SUM entry is subordinate to, then its report-name) picks one.</summary>
     public static readonly DiagnosticDescriptor ReportSumCounterReference = new(
         "COBOLNET2145", "report-sum-counter-reference", EditionSeverity.Error,
         "A reference to a sum counter does not identify exactly one counter. §13.18.54.4 GR5: \"If a data-name "
@@ -4809,8 +4810,9 @@ public static class DiagnosticCatalog
         + "name of the sum counter, not the name of the associated printable item, if any\", and GR12: \"It is "
         + "permissible for procedure division statements to alter the content of sum counters.\" GR1 establishes "
         + "an independent counter for EACH such entry, so two entries may carry one data-name legally; it is the "
-        + "REFERENCE that §8.4.2.2.1 requires to identify one resource uniquely, and a sum counter's only "
-        + "available qualifier is the report-name of §8.4.2.2.2 Format 1.",
+        + "REFERENCE that §8.4.2.2.1 requires to identify one resource uniquely, and a sum counter is qualified "
+        + "by the data-names of the report group description entries it is subordinate to (§8.4.2.2.3 SR4) and "
+        + "by its report-name (§8.4.2.2.2 Format 1).",
         "ISO §13.18.54.4 / §8.4.2.2.1 / §8.4.2.2.2");
     /// <summary>An inline method invocation's receiver (ISO §8.4.3.4.2's <c>{object-class-name-1 |
     /// identifier-1}</c>) or its method-name literal-1 is one the construct's own syntax rules exclude.
@@ -6083,6 +6085,21 @@ public static class DiagnosticCatalog
         + "outside the item (ISO §8.4.3.3.4 5) b)/c)). Checking for EC-BOUND-REF-MOD is enabled at this statement, so "
         + "the program compiles and every execution of the statement raises the fatal EC-BOUND-REF-MOD.",
         "ISO §8.4.3.3.4 5) b)/c) / §14.6.13.1.3 8)");
+
+    /// <summary>COBOLNET2727 — the get and set property methods of ONE property disagree about the property's data
+    /// description (kb/Work PB1450). ISO §8.4.3.9.3 SR7: "The data description of the item specified in the RETURNING
+    /// phrase of the get property method shall be the same as the data description of the item specified as the USING
+    /// parameter of the set property method." The pair is read as the class sees it, so a GET inherited from a
+    /// superclass and a SET written in the subclass (or the reverse) is compared like two accessors of one class.
+    /// Rejected at bind — the §8.4.3.9.4 temp is modelled on ONE description, and with two it would cross a formal
+    /// of another.</summary>
+    public static readonly DiagnosticDescriptor PropertyAccessorDescriptionMismatch = new(
+        "COBOLNET2727", "property-accessor-description-mismatch", EditionSeverity.Error,
+        "The RETURNING item of a property's get property method and the USING parameter of its set property method "
+        + "are not described identically. ISO §8.4.3.9.3 SR7: \"The data description of the item specified in the "
+        + "RETURNING phrase of the get property method shall be the same as the data description of the item "
+        + "specified as the USING parameter of the set property method.\"",
+        "ISO §8.4.3.9.3 SR7");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

@@ -5481,13 +5481,13 @@
   "ordinal": 2,
   "subject": "Qualification",
   "rule-digest": "007b37ad4caf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#QualifiedCandidates; src/Cobol.Net.Compiler/Binding/DataBinder.cs#QualifierChainMatchesFrom; src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs#ResolveProcedureWord; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor",
-  "test-ref": "conformance:85/pb567_condition_name_qualification; conformance:85/qualified_unique_match",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/DataBinder.cs#QualifierWalk",
+  "test-ref": "conformance:85/pb567_condition_name_qualification; conformance:85/qualified_unique_match; conformance:85/pb1454_sum_counter_group_qualifier",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1454 (registrar 15c). cite.py --check 8.4.2.2.3 \"A name may be qualified even though it does not need qualification\" -> OK §8.4.2.2.3 2). QualifierChainMatchesFrom consumes qualifiers inner -> outer with GAPS allowed and a trailing file-name, and QualifiedCandidates counts survivors, so any written combination that names superordinate levels resolves, needed or not. VERIFIED (pinned cobol.exe, --run, 85 and 2023), all on UNIQUE names: probe e1 `X OF M OF G`, `X OF G`, `X OF M`, `X IN M OF G` -> X; `FC OF FR OF FA`, `FC OF FA` -> F; `SET IX OF T OF G`, `IX IN G`; `PERFORM P2 OF S1` / `P2 IN S1` (unique paragraph, section qualifier not needed); `GO TO P3 OF S2`; condition-name `X-ON OF X OF M OF G` / `X-ON OF G`; probe g1 `PAGE-COUNTER IN R1` with one RD. DIVERGENT: a REPORT SECTION SUM COUNTER accepts only the bare name or ONE report-name qualifier - ReferenceResolver.SumCounterFor returns null for more than one qualifier and diagnoses any single qualifier that is not a report-name. Probe f3/f4 (unique sum counter TOT1 at level 03 under 01 CF1 TYPE CF FINAL of RD R1): `TOT1` and `TOT1 IN R1` -> 14 14, but `TOT1 OF CF1` -> error COBOLNET2145 \"a sum counter may be qualified only by the report-name of the report that defines it (ISO §8.4.2.2.2 Format 1)\"; probe f1 `TOT OF CF2 OF R2` -> COBOLNET1639 'not defined'. Spec-derived expected: both compile and read the counter (14), because Format 1 is `data-name-1 [ data-qualifier ] ... [ file-report-qualifier ]`, a report group's entry name is a data-name (§13.18.20 entry-name clause, 'data-name-1 or FILLER' in a report group description entry), and the SUM entry is subordinate to its 01 group - see findings. No kb/Work note owns it (PB840, landed, introduced the one-qualifier model). [editions as adjudicated: 85, 2002, 2014, 2023 (the rule is edition-invariant; the sum-counter leg exists wherever the report writer does)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1454 landed (w1005e): the one divergence (a report-section sum counter accepted only a report-name qualifier) is closed. A SUM entry is subordinate to its report group entries, which are qualifiers (SR4) with the report-name outermost, so any combination naming levels above the counter resolves whether or not it is needed: TOT1 OF CF1, TOT1 OF CF1 OF R1, TOT2 IN R1 in the golden.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.2.3-3",
@@ -5511,13 +5511,13 @@
   "ordinal": 4,
   "subject": "Qualification",
   "rule-digest": "605a18790ec2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#QualifierChainMatchesFrom; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ConditionQualifierChainMatches; src/Cobol.Net.Compiler/Binding/DataBinder.cs#IndexQualifierChainMatches; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor",
-  "test-ref": "conformance:85/pb567_condition_name_qualification; conformance:negative/pb567-condition-name-misqualified; conformance:negative/qualified-ambiguous-match",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/DataBinder.cs#QualifierWalk",
+  "test-ref": "conformance:85/pb567_condition_name_qualification; conformance:negative/pb567-condition-name-misqualified; conformance:negative/qualified-ambiguous-match; conformance:85/pb1454_sum_counter_group_qualifier; conformance:negative/pb1454-sum-counter-qualifier-not-above",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1454 (registrar 15c). cite.py --check 8.4.2.2.3 \"Qualifiers shall be specified in the order of successively more inclusive levels in the hierarchy\" -> OK §8.4.2.2.3 4). The rule has three parts: (a) each data-name-2 names a level to which the item is subordinate; (b) qualifiers in successively more inclusive order; (c) a level-88 item's hierarchy includes its conditional variable. QualifierChainMatchesFrom walks ancestors inner -> outer, each qualifier consumed at the first matching ancestor ABOVE the previous one, with only the outermost remaining qualifier allowed to be the owning file. VERIFIED by probe n1 (--std 2023), each refused COBOLNET1639: `X OF G OF M` (reversed order, (b)); `X OF T` (a sibling group, (a)); `X OF X-ON` (a condition-name as qualifier - not a level to which X is subordinate); `FC OF FA OF FR` (file not outermost); `X OF M OF G OF FA` (WS item qualified by a file); `W77 OF G` (level-77 has no superordinate); `X OF FA`. Part (c): ConditionQualifierChainMatches starts at the conditional variable - pb567 golden Q1/Q2/Q5 and probe e1 `X-ON OF X OF M OF G` -> T. DIVERGENT on part (a)'s permission side: a report-section SUM COUNTER may not be qualified by the report group (data-name) to which its entry is subordinate - `TOT1 OF CF1` refused COBOLNET2145, `TOT OF CF2 OF R2` refused COBOLNET1639 (probes f1/f3), where the rule makes CF1 exactly 'the name associated with a level number to which the item being qualified is subordinate' - see findings (same mechanism as SR-8.4.2.2.3-2). [editions as adjudicated: 85, 2002, 2014, 2023 (edition-invariant qualification rule)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1454 landed (w1005e): part (a)'s permission side for a sum counter (its report group is a level it is subordinate to) is closed. DataBinder.QualifierWalk is now the ONE inner-to-outer walk, over a data item's ancestors and over ReportSumModel.Qualification alike; TOT2 OF RF1 (a group the counter is not under) is refused COBOLNET2145.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.2.3-5",
@@ -7041,13 +7041,13 @@
   "ordinal": 7,
   "subject": "Object property",
   "rule-digest": "dfc66c64dd59",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidatePropertyAccessorPairs; src/Cobol.Net.Compiler/Binding/BinderDriver.cs",
+  "test-ref": "conformance:negative/pb1450-property-accessor-descriptions-differ; conformance:negative/pb1450-property-accessors-split-across-inheritance; conformance:2002/oo_property_explicit_ref",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1450 (registrar 15c). cite.py --check 8.4.3.9.3 'shall be the same as the data description of the item specified as the USING parameter of the set property method' OK. No code compares the GET accessor's RETURNING description with the SET accessor's USING description: OoClassTable checks only the §11.7.3 SR6/SR7 header SHAPES (cite.py --check 11.7.3 SR7 OK). Probe p11: METHOD-ID GET PROPERTY BAL RETURNING LK-R PIC 9(5) and SET PROPERTY BAL USING LK-V PIC X(3), then `MOVE 5 TO BAL OF A. DISPLAY BAL OF A.` — compiles clean and prints 00005. Expected per SR7: a compile-time diagnostic (the two descriptions differ). Under-rejects -> DIVERGES. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1450 landed (w1005e): each (GET, SET) pair the class sees (the roster lookup walks INHERITS) is compared with the ONE identical-description check, OoConformance.DescriptionMismatch in pair mode, once every class's formals have bound; a mismatch is COBOLNET2727 at the accessor the class wrote. The identical explicit pair in oo_property_explicit_ref still compiles and runs.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.9.4-1",
@@ -7056,13 +7056,13 @@
   "ordinal": 1,
   "subject": "Object property",
   "rule-digest": "b8b4f78abf3e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#PropertyGet; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoDrainPropertyGets; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp",
+  "test-ref": "conformance:2002/pb1448_group_valued_property",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1448 (registrar 15c). cite.py --check 8.4.3.9.4 'The data description of temp-1 is the same as the data description of the item specified in the RETURNING phrase of the get property method' OK. For an ELEMENTARY returning item the desugar is right: a sending-only occurrence gets a pre-statement GET invoke into a temp modelled on the GET RETURNING item (oo_property_explicit_ref.out: `MOVE BAL OF A TO W` prints only GET-CALLED, W=00007), per-evaluation in conditions (PB987). But temp-1 over a GROUP returning item is refused COBOLNET0899 (ReferenceResolver.cs:152, probe p10) — GR1 gives the temp exactly that description, so the rule is unimplemented for every group-valued property -> DIVERGES (rejects-legal-source). Elementary half covered by conformance:2002/oo_property_explicit_ref (does not close a defective row). [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1448 landed (w1005e): temp-1 takes the get method's RETURNING description whatever its category. OoTryBindPropertyReference no longer refuses a group and CreateCompilerTemp deep-clones the group; the golden's GET returns a group (R1 PIC 9(3), R2 PIC X(3)) and the sending-only MOVE prints it after exactly one GET-CALLED. The elementary half stays witnessed by oo_property_explicit_ref.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.9.4-2",
@@ -7071,13 +7071,13 @@
   "ordinal": 2,
   "subject": "Object property",
   "rule-digest": "5619c4046135",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidatePropertyAccessorPairs",
+  "test-ref": "conformance:2002/pb1448_group_valued_property; conformance:negative/pb1450-property-accessor-descriptions-differ; conformance:negative/pb1450-property-accessors-split-across-inheritance",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1448 (also PB1450) (registrar 15c). cite.py --check 8.4.3.9.4 'The value of the property is assigned as though the associated set property method were invoked' OK. Receiving-only (StoreKind.Write) occurrences append only the SET invoke passing the temp, GET not invoked (oo_property_explicit_ref.out: `MOVE 7 TO BAL OF A` prints only SET-CALLED). Defects: temp-2 over a group USING parameter refused 0899 (p10 mechanism), and temp-2 is described from the GET RETURNING item whenever a GET exists rather than from the SET USING parameter GR2 names (moot only when SR7 holds, which is unenforced — p11). DIVERGES. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1448 + PB1450 landed (w1005e): temp-2 over a group USING parameter binds (the golden's MOVE of a literal to the group property runs only the SET). The temp is modelled on the GET's description where GR2 names the SET's USING parameter, and the two are identical because SR7 is enforced (COBOLNET2727) for every pair a class sees, inherited accessors included.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.9.4-3",
@@ -7086,13 +7086,13 @@
   "ordinal": 3,
   "subject": "Object property",
   "rule-digest": "34d4697843d0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps",
+  "test-ref": "conformance:2002/pb1448_group_valued_property",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1448 (registrar 15c). cite.py --check 8.4.3.9.4 'temp-1 and temp-2 are the same temporary data item, where temp-2 redefines temp-1' OK. ReadWrite occurrences wrap ONE temp (described from the GET RETURNING item, as GR3 says) with GET before and SET after: `ADD 20 TO BAL OF A` -> 00575 (conformance:2002/oo_property_ref), INSPECT REPLACING / STRING-style read-modify-write correct (p9). The group-valued case is refused 0899 (p10 mechanism) -> DIVERGES (rejects-legal-source). [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1448 landed (w1005e): a read-modify-write occurrence wraps ONE temp with the GET before and the SET after; the golden's INSPECT over the group property prints GET-CALLED then SET-CALLED with the replaced content.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.10.3-1",
@@ -26661,13 +26661,13 @@
   "ordinal": 1,
   "subject": "REDEFINES clause",
   "rule-digest": "042580633b30",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ClassifyRedefinesClasses; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs; src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#PlaceForItem",
-  "test-ref": "conformance:2023/pb178_convert_any_redefines_group",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#PlaceForItem; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#BuildBackingPath",
+  "test-ref": "conformance:2023/pb178_convert_any_redefines_group; conformance:85/pb1279_redefines_within_occurs",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1279. GR1 (cite.py --check 13.18.44.4 'Storage association for the subject of the entry starts at the first bit...' OK; '...The size used for references to the data item referenced by data-name-2 is not changed.' OK). VERIFIED: one backing per class, the redefiner at its target's first position - gr1_gr2_run `05 A PIC X(4) VALUE \"0042\". 05 B REDEFINES A PIC 9(4). 05 C PIC X VALUE \"Z\".` ADD 1 TO B -> A=0043, G=0043Z; the level-1 larger redefiner (sr8_lvl1_larger_ok) gives A=1234, B=12345678, LENGTH(A)=4, LENGTH(B)=8 (area = the subject's bits, data-name-2's size unchanged); nested REDEFINES (sr11_nested_ok) ABCD1234 -> ABCD1235; bit windows by pb203. UNVERIFIED/DEFECTIVE EDGE: a Tier-B class whose canonical lies WITHIN an OCCURS (the shape SR5 sentence 2 permits) is DeferredShape.NestedClassBacking - sr5_occ_grp `05 E OCCURS 3. 10 A PIC X(4). 10 B REDEFINES A. 15 B1 PIC X(2). 15 B2 PIC 99.` draws COBOLNET0899 on MOVE ... TO A(2) and COBOLNET1756 on B1(2) (finding: nested-class-backing). The Tier-A same-PIC shape inside OCCURS works (sr5_occ_tierA -> 12). Two halves, one defective -> PARTIAL. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (the REDEFINES clause is in the base language of every edition; the 2023 Annex E lists no change to this rule)",
-  "state": "GAP"
+  "notes": "kb/Work PB1279 landed (w1005e): the edge the adjudicator left unverified, a Tier-B class whose canonical lies within an OCCURS, is built. Each occurrence of the enclosing table holds its own backing in that element's struct, reached through the subscripted parent path; the golden seeds, reads and writes six elements (two levels of OCCURS), a table inside the redefined group, and an OCCURS DEPENDING table.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.44.4-2",
@@ -26676,13 +26676,13 @@
   "ordinal": 2,
   "subject": "REDEFINES clause",
   "rule-digest": "a2e120fc819d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#PlaceForItem; src/Cobol.Net.Compiler/Binding/Model/Place.cs; src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs",
-  "test-ref": "conformance:2023/pb203_redefines_bit_window",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#PlaceForItem; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#BuildBackingPath",
+  "test-ref": "conformance:2023/pb203_redefines_bit_window; conformance:85/pb1279_redefines_within_occurs",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1279. GR2 (cite.py --check 13.18.44.4 'the data-name associated with any of those data description entries may be used to reference that storage area.' OK). Verified for top-level and group-nested classes: every member name reads/writes the one area (gr1_gr2_run, sr11_nested_ok, sr3_fd05_ok FD-record subordinate `X2 REDEFINES X1` -> 1234, sr9_88_ok level-88 under a redefiner -> Y). NOT verified - refused: a reference to a member of a Tier-B class nested inside an OCCURS (sr5_occ_grp: MOVE TO A(2) -> COBOLNET0899 'reference shape COBOL.NET does not yet implement'; DISPLAY B1(2) -> COBOLNET1756 run-time abort) - the same NestedClassBacking mechanism as GR1. -> PARTIAL. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (the REDEFINES clause is in the base language of every edition; the 2023 Annex E lists no change to this rule)",
-  "state": "GAP"
+  "notes": "kb/Work PB1279 landed (w1005e): every member name of a class nested inside an OCCURS reads and writes the occurrence's one storage area (MOVE to A(2,3) seen through B1/B2(2,3); GB1(2) over the table GA(2,*); VB(2) over VA(2)).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.44.4-3",

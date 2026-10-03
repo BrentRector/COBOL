@@ -16,6 +16,7 @@
   "pb1308_method_storage_is_local_or_object",
   "pb1075_collating_qualified_key",
   "pb1273_property_subject",
+  "pb1448_group_valued_property",
   "pb1233_constant_record_initialize_content",
   "pb1665_group_image_national_leaf",
   "pb244_strong_group_equality_and_string",
