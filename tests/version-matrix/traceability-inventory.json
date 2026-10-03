@@ -6171,13 +6171,13 @@
   "ordinal": 1,
   "subject": "Function-identifier",
   "rule-digest": "9467205b4218",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfReturningResidue; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsBooleanUserFunction; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore",
+  "test-ref": "conformance:2002/udf_returning_every_category; conformance-test:UdfInvocationTests.ReturningCategories_AreAllCarried",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1419 (registrar 15b). GR1 (cite.py --check 8.4.3.2.4 'the description, class, and category of the temporary data item is that specified by the description in the linkage section of the item specified in the RETURNING phrase' -> OK §8.4.3.2.4 1)). The prototype/pointer half clones the RETURNING description into a caller temp (CreateCompilerTemp), but UdfReturningResidue REFUSES whole categories with COBOLNET1510: probe out/probe/function-identifier/p5_gr1_float.cob (RETURNING FLOAT-LONG) -> 'COBOLNET1510 ... a FLOAT RETURNING item ... is not yet carried'; p5b_gr1_bool.cob (RETURNING PIC 1(4)) -> 'COBOLNET1510 ... a BOOLEAN RETURNING item is not yet carried'. Pointer, object-reference, index, strongly-typed/REDEFINES/variable-length group RETURNING items are refused the same way (read in UdfReturningResidue). GR1 gives the temp the RETURNING item's description with no category limit, so these are legal programs rejected. The refusal is PINNED GREEN by conformance-test UdfInvocationTests.ReturningCategories_CarriedVsStaged1510, and no kb/Work note owns it (PB164/PB199/PB200 are the group-leaf history; PB200 is about drift tests, not this). COBOLNET1510 has no DIAGNOSTICS.md row. Intrinsic half (Clause 15 per-function descriptions) not re-verified function by function here. Expected: p5 prints R=0001.50, p5b prints R=1010. || editions as written by the adjudicator: intrinsic form 1985 (Amendment 1) onward; function-prototype-name form 2002, 2014, 2023; function-pointer-name form 2014, 2023. Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1419 (wave 1005 C). GR1 (cite.py --check 8.4.3.2.4 'the description, class, and category of the temporary data item is that specified by the description in the linkage section of the item specified in the RETURNING phrase' -> OK 8.4.3.2.4 1)). UdfReturningResidue and its per-shape COBOLNET1510 refusals are deleted; FLOAT, BOOLEAN, INDEX, data pointer, object reference, strongly typed / REDEFINES / OCCURS DEPENDING groups are carried and read by their natural consumers (golden udf_returning_every_category); the boolean-expression channel reads a boolean-returning user function. A function-identifier of class pointer / object / index as a SET sender or a CALL USING argument is a separate consumer-routing gap (SET and CALL operand classifiers), not the temporary's description. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfReturningResidue (UdfReturningResidue was deleted by kb/Work PB1419: the residue list it held refused legal RETURNING categories and no longer exists.)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.2.4-2",
@@ -6186,13 +6186,13 @@
   "ordinal": 2,
   "subject": "Function-identifier",
   "rule-digest": "2b4feebb414b",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#DrainPending; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindArgOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ArgumentOrder.cs#Freeze; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#DrainPending; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindArgOperand",
+  "test-ref": "conformance:2002/udf_arg_order; unit:ArgumentOrderDriftTests.TheIntrinsicCallPoint_OpensAndSettlesTheWindow",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1423 (registrar 15b). GR2 (cite.py --check 8.4.3.2.4 'its arguments are evaluated individually in the order specified in the list of arguments, from left to right' -> OK §8.4.3.2.4 2)). Arguments bind in list order and each nested activation registers on the shared PendingPreOps list while its consumer's arguments bind, so it is hoisted before the consumer. Probe out/probe/function-identifier/p6_gr2_order.cob: FIP6F(FIP6G(1), FIP6G(2), FIP6G(3)) prints G0001 G0002 G0003 then R=0123; the intrinsic MAX(FIP6G(4) FIP6G(5)) prints G0004 G0005, M=0005; the same function as its own argument FIP6G(FIP6G(6)) prints G0006 G0006, S=0006. All match the spec. conformance:2002/udf_nested_args covers nesting, but its output (sums) cannot observe evaluation ORDER, so no test is named and a test is still needed. || REFUTED: PARTIAL — Left-to-right holds only among function-identifier arguments. Hoisting every nested activation to a pre-op, ahead of the consumer, evaluates a later function argument BEFORE an earlier non-function argument (identifier expression / nested intrinsic). A side-effecting user function in position 2 is observed by the expression in position 1. Wrong answer. || editions as written by the adjudicator: 1985 (Amendment 1), 2002, 2014, 2023 - applies to every function-identifier. Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1423 (wave 1005 C). GR2 (cite.py --check 8.4.3.2.4 'its arguments are evaluated individually in the order specified in the list of arguments, from left to right' -> OK 8.4.3.2.4 2)). One ArgumentOrder window per function argument list (intrinsic: BindIntrinsicCore; user-defined: UdfActivate) stores every earlier argument that a later argument's activation would overtake into the SendingValueTemp intermediate at its own position. Golden udf_arg_order legs EXPR/INTR/NEST/REF/VAL/SUB/ORD/BOOL. Residual (not a divergence of the printed rule): a boolean expression of run-time length is left in place; object-property GET order against argument order is a separate mechanism (lead).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.2.4-3",
@@ -33696,13 +33696,13 @@
   "ordinal": 1,
   "subject": "Returning items",
   "rule-digest": "4a78ab7036e7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall; src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfReturningResidue",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#ReturningConformanceReason; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall; src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch",
+  "test-ref": "conformance:2002/pb1164_call_returning_set_rule; conformance:negative/pb1164-call-returning-superclass-into-subclass; unit:ActivationConformanceDriftTests.CallAndInvoke_AskTheOneReturningConformance",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1164 (registrar 14c). Rule: 'If the returning item in the activated element is not described with an ACTIVE-CLASS phrase, the conformance rules are the same as if a SET statement were performed in the activated runtime element with the returning item in the activated element as the sending operand and the corresponding returning item in the activating element as the receiving operand.' (cite.py --check 14.8.3.3 -> OK §14.8.3.3 1)). THREE activation lanes, only one follows the rule. (a) INVOKE: OoBindResolvedInvoke routes an object-reference pair to OoConformance.ObjectRefAssignmentMismatch (the §14.9.39.3 SR8/SR10/SR12/SR14 table) - CONFORMS; pinned by conformance-test:OoSpineTests.ReturningWidening_SubclassIntoBaseAndUniversalReceivers (subclass into base and universal receivers). (b) Format-2 CALL (AS NESTED / program prototype): CallBinder.BindCall runs OoConformance.DescriptionMismatch(cr, rr.Item, anyLengthActivationRelax:true), whose ObjectReference arm demands SameDescriptionAs (the §9.3.8.2.3 rule-2 IDENTITY rule), not the SET rules. Probe probe/returning-items/p5.cob: nested MKR5 'PROCEDURE DIVISION RETURNING L-O' with L-O 'USAGE OBJECT REFERENCE RID5' (RID5 INHERITS FROM RIB5), caller 'CALL \"MKR5\" AS NESTED RETURNING B' with B 'OBJECT REFERENCE RIB5' and again RETURNING U (universal): both refused COBOLNET1736 'object-reference description mismatch ... §9.3.8.2.3 rule 2'. Spec: SET B TO <RID5-typed> is §14.9.39.3 SR12 a)2. (same class or a subclass - cite OK) and a universal receiver constrains nothing (SR8), so both compile and the run prints DERIVED then U-SET. (c) FUNCTION-ID: UdfReturningResidue refuses an object-reference RETURNING item outright (COBOLNET1510 'not yet carried ... a named residue') - no register note owns it. Two-arm dispatch: the INVOKE arm was fixed (DEVLOG 603 adversarial review), the CALL arm was not. Rejects legal source. test-ref left empty: the OoSpine test covers the INVOKE half only. [editions as adjudicated: 2002, 2014, 2023 (clause 14.8.3 Returning items exists from ISO/IEC 1989:2002, where RETURNING on CALL/INVOKE/functions was introduced; not applicable to 1985)]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1164 (wave 1005 C). Rule 1 (cite.py --check 14.8.3.3 'the conformance rules are the same as if a SET statement were performed in the activated runtime element with the returning item in the activated element as the sending operand' -> OK 14.8.3.3 1)). ParameterConformance.ReturningConformanceReason is the one returning-item half of 14.8.3 for CALL and INVOKE: two object references conform as a SET from the activated returning item (subclass into class-typed or universal receiver legal, superclass into subclass refused); CobolArgAdapt.StoreReturn stores the widened result. The FUNCTION-ID object-reference RETURNING refusal went with PB1419. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfReturningResidue (UdfReturningResidue was deleted by kb/Work PB1419 (its object-reference refusal was the function lane of this row).)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.8.3.3-2",

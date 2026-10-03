@@ -12,6 +12,13 @@ public abstract class ManagedPointer
     /// <summary>The NULL carrier (OMITTED argument / NULL pointer — ISO §14.9.4.4 GR11–12).</summary>
     public static readonly ManagedPointer Null = new NullManagedPointer();
 
+    /// <summary>Store <paramref name="value"/> into the referenced storage when the carried type can hold it — the
+    /// type-erased face of <see cref="ManagedPointer{T}.Value"/>, for a delivery whose sender and receiver are
+    /// described differently but conform (kb/Work PB1164: §14.8.3.3 rule 1 — an object reference of a class conforms
+    /// to a receiver of a superclass or a universal one "as if a SET statement were performed", so the sender's
+    /// carrier type is a SUBCLASS of the receiver's). False when it cannot — a pair no conformance rule admits.</summary>
+    internal virtual bool TryAssign(object? value) => false;
+
     /// <summary>True for the NULL carrier.</summary>
     public virtual bool IsNull => false;
 
@@ -81,6 +88,13 @@ public sealed class ManagedPointer<T> : ManagedPointer
     {
         var box = new T[1] { initial };
         return new(() => box[0], v => box[0] = v);
+    }
+
+    internal override bool TryAssign(object? value)
+    {
+        if (value is T typed) { Value = typed; return true; }
+        if (value is null && default(T) is null) { Value = default!; return true; }
+        return false;
     }
 
     /// <summary>The referenced storage's current value (get) / store into the referenced storage (set).</summary>

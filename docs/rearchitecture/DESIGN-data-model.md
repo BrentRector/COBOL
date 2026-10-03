@@ -263,8 +263,8 @@ build; there was a predicate that stopped short.
     context-specific messages by design. ⚠ The scout's risk-3 note recorded one such variant as deliberate —
     *"UDF rejects Binary/Packed too"* — and that is NO LONGER TRUE: it was a hand-rolled DISPLAY-only usage
     union, not a decision, and PB164's F8 replaced it with the derived `DataItem.ElementImageCapable`
-    predicate (§14.2.2 SR5 imposes no usage restriction on a RETURNING item). `UdfReturningResidue`'s only
-    surviving LEAF screen is the pointer/object class (kb/Work PB199).
+    predicate (§14.2.2 SR5 imposes no usage restriction on a RETURNING item). Its one surviving LEAF screen, the
+    pointer/object class (kb/Work PB199), went with the whole RETURNING screen (kb/Work PB1419).
 - **Step D — RE-BASED 2026-08-30 (the four-reader design scout; kb/Work PB164's last codegen half). THE
   PREMISE INVERTED: there is NO byte codec to build.** The earlier sketch ("a confined `byte[]` codec,
   `CobolByteImage`, `TierCWindow.Read/Write`") described a world V59 already dissolved: a Tier-B class's
@@ -330,7 +330,7 @@ build; there was a predicate that stopped short.
   4. **The SECOND gate deliberately** (`ForceStringCanonical` — EXTERNAL/BASED/ADDRESS-OF classes reject
      every non-DISPLAY leaf, stricter than `ComputeTier`; the two-arm shape's eighth instance): widen it in
      the same wave or record its narrower posture as an explicit staged residue — never leave the pair
-     silently divergent. The UDF RETURNING screen (`UdfBinder`, COBOLNET1510) and the
+     silently divergent. The UDF RETURNING screen (`UdfBinder`; deleted by kb/Work PB1419) and the
      `{ Category: Numeric, IsFloat: false }` copies the scout catalogued are the same sweep.
      ⛔ **AS BUILT, THE PAIR NO LONGER EXISTS** (kb/Work PB231, 2026-09-04). "Widen it in the same wave"
      was the right instruction and it was still not enough — PB203 widened `ComputeTier` to USAGE BIT

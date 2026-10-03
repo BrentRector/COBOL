@@ -388,9 +388,8 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   image-form-group results (every leaf `DataItem.ElementImageCapable` — character-stored or a pinned numeric
   byte form: zoned DISPLAY, binary, packed, COMP-5, IEEE float, INDEX) (§8.4.3.2.4 GR1; golden
   `udf_returning_categories`, greenfield-only — the frozen legacy carries only numeric results);
-  float/boolean/pointer-class + strong-typed/REDEFINES/variable-length groups and a group with a
-  pointer/object-class LEAF stay staged loud per-shape (COBOLNET1510, `UdfBinder.UdfReturningResidue`).
-  A binary-leaf group was listed among those residues until PB164's F8 widening (kb/Work PB199).
+  every other RETURNING category — float, boolean, index, data-pointer, object-reference and strong-typed /
+  REDEFINES / variable-length groups — is carried too (kb/Work PB1419 deleted the per-shape COBOLNET1510 residues).
 - ☐ **M2-UDF-3 — Separate-compilation user functions (prototypes).** Caller + function in different translation
   units. *Medium.* §8.13 external repository + function-prototype. *Current:* caller and function must share one
   compilation group. *Recipe:* function-prototype definitions in the caller (or an external repository registry).

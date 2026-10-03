@@ -676,6 +676,17 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   binds `FUNCTION f(… OMITTED …)` to an `Omitted` `BoundCallArg` (the null carrier above) when the formal is OPTIONAL —
   `COBOLNET2238` otherwise — and admits fewer arguments than formals when every trailing formal is OPTIONAL
   (§14.8.2.1), the callee's adapters answering a missing slot as omitted exactly as for CALL.
+- **A function-identifier's arguments evaluate LEFT TO RIGHT (§8.4.3.2.4 GR2; kb/Work PB1423).** A user-defined
+  activation is a statement-scoped PRE-op, hoisted ahead of the statement that reads its result, so an earlier argument
+  that merely reads state (an identifier, an arithmetic expression, an intrinsic result, a subscripted item) used to be
+  rendered AFTER a later argument's activation had changed it. ONE mechanism orders both function kinds:
+  `ArgumentOrder.Window` is opened around an argument list by `IntrinsicBinder.BindIntrinsicCore` (the one point every
+  intrinsic result passes) and by `UdfBinder.UdfActivate`, `IntrinsicBinder.BindArgOperand` records each operand with
+  the pending pre-op range it registered, and when a LATER argument registered pre-ops every earlier argument whose
+  value is read at the activation is stored into the §14.9.25.4 GR1 intermediate result item
+  (`SendingValueTemp.Materialize`) at the position its own argument finished binding. A literal, a compiler temporary
+  and a BY REFERENCE identifier of a user function (§8.4.3.2.4 GR6a: values are "made available … at the time control is
+  transferred") are not frozen. `ArgumentOrderDriftTests` pins the two entries and the one argument binder.
 - Argument/parameter count mismatch → EC-PROGRAM-ARG-MISMATCH (when checking enabled) or diagnostic; a missing parameter behaves as omitted.
 - **Argument DESCRIPTION conformance is ONE rule set, written once, for CALL, the function-identifier and INVOKE
   (§14.9.4.3 SR25 / §8.4.3.2.3 SR13 → §14.8.2; kb/Work PB133 → PB204 → PB165 → PB1418).** Wherever the activated
@@ -767,7 +778,8 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   `CallStringWrite`'s as-if arm (AsBits/FromBits, AsNat/FromNat over the full allocation), which the program ABI,
   the method ABI (`OoEmitter.MethodBoundaryValue` and the formal copy-in) and every INVOKE copy route through;
   `CallEmitter.BoundaryImageWidth` is its text width and it carries no §8.5.1.12 layout.
-- RETURNING a group item: an **image-form** group — every leaf `DataItem.ElementImageCapable`, i.e. character-stored OR any pinned numeric byte form (zoned DISPLAY, binary, packed, COMP-5, IEEE float, INDEX) — is carried; the caller temp deep-clones the description and the image crosses via AsImage/FromImage (§8.4.3.2.4 GR1; §14.2.2 SR5 places no category restriction, and none on usage either). Only the strong-typed / internal-REDEFINES / variable-length shapes and a **pointer- or object-class LEAF** stage loud (the per-shape COBOLNET1510 residues in `UdfBinder.UdfReturningResidue`). A byte-form numeric leaf was listed here as a residue until PB164's F8 widened the screen off its hand-rolled DISPLAY-only usage union onto the derived predicate (kb/Work PB199).
+- RETURNING a group item: an **image-form** group — every leaf `DataItem.ElementImageCapable`, i.e. character-stored OR any pinned numeric byte form (zoned DISPLAY, binary, packed, COMP-5, IEEE float, INDEX) — is carried; the caller temp deep-clones the description and the image crosses via AsImage/FromImage (§8.4.3.2.4 GR1; §14.2.2 SR5 places no category restriction, and none on usage either). **A function's result temporary has NO category restriction at all (kb/Work PB1419):** FLOAT, BOOLEAN, INDEX, data-pointer, object-reference and every group shape (strongly typed, internal REDEFINES, variable length) are carried by the receiver's own crossing form (`CallEmitter.CrossingOf`), and `UdfBinder.UdfReturningResidue` with its per-shape COBOLNET1510 refusals is deleted. The boolean-expression channel reads a boolean-returning user function through `ConditionBinder` (a `BoundBoolRef` over the result temp) beside the intrinsic `BoundBoolCall`. What is NOT yet accepted is a function-identifier of class pointer / object / index as the SENDER of a SET statement or as a CALL USING argument (those binders classify a function-identifier as an arithmetic expression), which is a consumer routing matter of its own and not a property of the result temp.
+- **A CALL's RETURNING item conforms by §14.8.3.3, not §9.3.8.2.3 (kb/Work PB1164).** `ParameterConformance.ReturningConformanceReason` is the ONE returning-item half of the returning-items clause, asked by the Format-2 CALL and by INVOKE: two object references conform "as if a SET statement were performed" (§14.8.3.3 rule 1) from the activated returning item into the activating one (a subclass-typed sender into a class-typed or universal receiver is legal; the superclass-into-subclass direction is refused), everything else keeps the description comparison. The run-time delivery (`CobolArgAdapt.StoreReturn<T>` over `ManagedPointer.TryAssign`) stores a subclass-typed result into a superclass-typed or universal carrier.
 - **RETURNING delivery is TOTAL (§14.9.4.4 GR4; kb/Work PB165).** With no caller target the value is discarded —
   GR4 has no receiver. With one, `CobolArgAdapt.StoreReturn` **stores or raises**, never no-ops: legs exist for
   every `ElementType` the compiler emits (`long`/`ulong`/`Int128`/`UInt128`, `double`, `string`,

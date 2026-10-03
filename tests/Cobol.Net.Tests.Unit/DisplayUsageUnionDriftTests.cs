@@ -17,7 +17,8 @@ namespace CobolNet.Tests.Unit;
 /// (V59 pinned BINARY/PACKED, PB164 wave 1 COMP-5/BINARY-*, wave 2 the IEEE float family, R40 USAGE INDEX).
 /// </para>
 /// <para>
-/// The drift instance that motivated this test: <c>UdfBinder.UdfReturningResidue</c> screened a GROUP RETURNING
+/// The drift instance that motivated this test: the UDF binder's RETURNING screen (deleted by kb/Work PB1419)
+/// screened a GROUP RETURNING
 /// item's leaves with this union and rejected a COMP-5 leaf as having "no shared character image across the
 /// activation boundary" — years after the group codec started emitting exactly that image. It rejected
 /// conforming source (ISO §14.2.2 SR5 places NO category restriction on a RETURNING item), and nothing failed,
@@ -199,20 +200,18 @@ public sealed class DisplayUsageUnionDriftTests
         Assert.Equal(Render(expected), Render(actual));
     }
 
-    /// <summary>The drift instance itself, pinned so it cannot come back: the UDF group-RETURNING screen must
-    /// ask the DERIVED image predicate. Its elementary arms keep their own spec-required rejections
-    /// (§13.18.60.3 SR10 permits an index item in a USING phrase but not as a RETURNING item; the
-    /// pointer/object refusals), which is why this pins the GROUP screen specifically.</summary>
+    /// <summary>The drift instance itself, pinned so it cannot come back — and it cannot come back at all, because the
+    /// screen that held it is gone (kb/Work PB1419): the UDF binder has NO RETURNING category screen. ISO §14.2.2 SR5
+    /// places no category restriction on a RETURNING item and §8.4.3.2.4 GR1 clones its description, so a union of
+    /// usages (or any other category list) in <c>UdfBinder</c> would be a second statement of a rule the standard
+    /// does not have. The unit still pins that the file holds no DISPLAY-only union.</summary>
     [Fact]
-    public void UdfReturningResidue_GroupScreen_UsesTheDerivedImagePredicate()
+    public void UdfBinder_HasNoReturningCategoryScreen()
     {
         string src = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "Binding", "Procedure", "Verbs",
                                                   "UdfBinder.cs"));
         Assert.Equal(0, CodeOccurrences(src, "Usage: Usage.Display"));
-        Assert.True(CodeOccurrences(src, "ElementImageCapable") >= 1,
-            "UdfReturningResidue's group-leaf screen must ask DataItem.ElementImageCapable — a group RETURNING "
-            + "item whose leaves all have a byte image crosses the activation boundary through the group codec "
-            + "(ISO §14.2.2 SR5 places no category restriction on a RETURNING item). A hand-rolled usage union "
-            + "here rejected conforming source once already.");
+        Assert.Equal(0, CodeOccurrences(src, "UdfReturningResidue"));
+        Assert.Equal(0, CodeOccurrences(src, "COBOLNET1510"));
     }
 }

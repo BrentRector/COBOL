@@ -1960,7 +1960,7 @@ result. Run the long legs ONE AT A TIME.
   PB199 itself.
   ⚠ **BATTERY #38's FIRST RUN (tree `a3053400`, artifacts `scratchpad/battery-38`) was NOT green, and the
   catch is the point.** One Conformance failure out of 5124:
-  `UdfInvocationTests.ReturningCategories_CarriedVsStaged1510(tag: "BIN")` asserted `COBOLNET1510` for a group
+  `UdfInvocationTests.ReturningCategories_CarriedVsStaged1510(tag: "BIN")` (now `ReturningCategories_AreAllCarried`) asserted `COBOLNET1510` for a group
   RETURNING item with a `PIC 9(4) USAGE BINARY` leaf — a reject PB164's F8 had deliberately DELETED. **The
   compiler was right and the TEST was the stale record** (§14.2.2 SR5 places no usage or category restriction
   on a RETURNING item; §8.4.3.2.4 GR1 clones the description without narrowing it). [[PB199]] landed the flip
@@ -3106,7 +3106,7 @@ already-derivable coverage; none change the pipeline.
 
 ## §8 CONSOLIDATED FORWARD-RESIDUE LEDGER (absorbed from the retired phase docs; every named residue lives HERE now)
 
-- **P10 residues (by name):** per-shape 1510 UDF RETURNING (float/boolean/pointer-class + group shapes) ·
+- **P10 residues (by name):** ~~per-shape 1510 UDF RETURNING~~ (DISCHARGED, kb/Work PB1419 — every RETURNING category is carried) ·
   ~~OPTIONAL formals (0899 `optional-formal`)~~ (DISCHARGED 2026-09-22, kb/Work PB757 — the method arm carries OPTIONAL through the `(ref T, bool)` ABI pair; the descriptor is deleted) · the recursive-WS stage (0899 `recursive-contained-working-
   storage`; its twin `recursive-working-storage-pointer-backed` DISCHARGED 2026-09-22, kb/Work PB234 — static
   addressable cells, the descriptor is deleted) · ~~OO class-unit BASED (`OoBasedInClass`)~~ (DISCHARGED 2026-09-22, kb/Work PB956 — the OO type-halves render the program path's cell/bridge members; the descriptor is deleted) ·

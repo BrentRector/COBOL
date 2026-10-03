@@ -23,9 +23,10 @@ using Core = CobolParserCore;
 /// chokepoint into a <see cref="BoundSequence"/> that HOISTS each activation before the carrying
 /// statement — always a PRE-op, because a function-identifier is never a receiving operand
 /// (§8.4.3.2.3 SR1), so no store-polarity classification is needed (unlike property references).
-/// Argument evaluation order (§8.4.3.2.4 GR2 — left to right, nested function-identifiers allowed) falls
-/// out of registration order: a nested call registers while its consumer's arguments bind, so it
-/// precedes the consumer in the sequence. A hoist is EXACT only where the reference is unconditionally
+/// Argument evaluation order (§8.4.3.2.4 GR2 — left to right, nested function-identifiers allowed): a nested
+/// call registers while its consumer's arguments bind, so it precedes the consumer in the sequence, and an
+/// EARLIER argument that only reads state is stored into an intermediate result item before a later argument's
+/// activation can change it (<see cref="ArgumentOrder"/>, kb/Work PB1423). A hoist is EXACT only where the reference is unconditionally
 /// evaluated exactly once per statement execution; every conditionally- or repeatedly-evaluated CONDITION
 /// window (a PERFORM UNTIL/VARYING UNTIL condition, a SEARCH WHEN, an EVALUATE object term, a non-first
 /// AND/OR operand) instead drains its suffix into a per-evaluation <see cref="BoundUdfEvaluated"/> wrapper
@@ -144,22 +145,18 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
             // Ill-formed function definition — COBOLNET1507 already reported once at the unit.
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} RETURNING");
 
-        // The category-carrying result channel (§8.4.3.2.4 GR1 — the temp's "description, class, and
-        // category" ARE the RETURNING item's; §14.2.2 SR5 places NO category restriction on a function's
-        // RETURNING item): elementary fixed-point numeric, alphanumeric/alphabetic, numeric-edited, and
-        // national results — and a character-form GROUP (its full subtree cloned into the temp, the image
-        // crossing the boundary via AsImage/FromImage) — are carried end-to-end: the temp clones the full
-        // description, every operand chokepoint maps the read to a BoundFieldOperand (category drives
-        // MOVE Table-16 legality, relation class dispatch, DISPLAY rendering, and the LENGTH fold), and
-        // the CALL-ABI RETURNING delivery ships strings through CobolArgAdapt.StoreReturn(string). The
-        // remaining shapes stay STAGED by name (§1.4 — loud, never silently wrong): see UdfReturningResidue.
-        if (UdfReturningResidue(fn.Returning) is { } residue)
-        {
-            ctx.Edition.Error("COBOLNET1510",
-                $"FUNCTION {name.ToUpperInvariant()}: {residue} (the result temporary's category channel, "
-                + "ISO §8.4.3.2.4 GR1 / §14.8.3)");
-            return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} RETURNING category");
-        }
+        // ⛔ THE RESULT TEMPORARY HAS NO CATEGORY RESTRICTION (§8.4.3.2.4 GR1 — the temp's "description, class, and
+        // category" ARE the RETURNING item's; §14.2.2 SR5 places NO category restriction on a function's RETURNING
+        // item; kb/Work PB1419). Every category the data model can describe — fixed-point and floating-point
+        // numeric, alphanumeric/alphabetic, numeric-edited, national, boolean, index, data pointer, object
+        // reference, and a group of any shape (character image, binary / packed / float leaves, strongly typed,
+        // internal REDEFINES, variable length) — is carried: the temp clones the full description, every operand
+        // chokepoint maps the read to a BoundFieldOperand (category drives MOVE Table-16 legality, relation class
+        // dispatch, DISPLAY rendering, the boolean-expression channel and the LENGTH fold), and the CALL-ABI
+        // RETURNING delivery (CallEmitter.CrossingOf / CobolArgAdapt.StoreReturn) places the value by the
+        // receiver's own crossing form. A list of "named residues" stood here until PB1419 and refused whole
+        // categories of legal source as COBOLNET1510; the CALL path the activation shares had long since
+        // learned every one of them.
 
         // Arguments: one typed operand per argument parse tree, through the SAME BindArgOperand the intrinsic
         // path uses (the ONE argument pipeline). NO table(ALL) expansion here — §9.4 (:12529): "arguments and
@@ -167,6 +164,10 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         // fails resolution and stays a loud named operand). An OMITTED argument (kb/Work PB757 — the third arm of
         // the omitted-argument model, beside CALL's and INVOKE's) is a null operand here, checked against
         // §8.4.3.2.3 SR9 below where the formal is known.
+        // ⛔ §8.4.3.2.4 GR2 — the arguments evaluate "individually in the order specified in the list of arguments, from
+        // left to right": the window records each operand and the pre-ops it registered, and Freeze below stores an
+        // earlier argument's value before a later argument's activation can change it (kb/Work PB1423, ArgumentOrder).
+        using var order = host.ArgOrder.Open();
         var operands = new List<BoundOperand?>();
         foreach (var a in argCtxs)
             operands.Add(a.OMITTED() is not null ? null : host.Intrinsic.BindArgOperand(a, nullAdmitting: true));
@@ -253,6 +254,18 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
             callArgs.Add(arg);
         }
 
+        // GR2's order for the arguments whose VALUE is read at the activation (BY CONTENT / BY VALUE): a BY REFERENCE
+        // identifier designates the caller's storage, and GR6a hands the activated function "the values of argument-1
+        // … at the time control is transferred", so it is never frozen. The conformance above ran on the operands as
+        // written; the crossing carries the intermediate result item (a data item BY CONTENT / BY VALUE).
+        var frozen = order.Freeze(operands.Where((o, i) => o is not null
+            && callArgs[i] is { Omitted: false, Mode: not CobolPassMode.Reference }).Select(o => o!));
+        if (frozen.Count > 0)
+            for (int i = 0; i < operands.Count; i++)
+                if (operands[i] is { } written && frozen.TryGetValue(written, out var snapshot)
+                    && snapshot is BoundFieldOperand { Place: var held })
+                    callArgs[i] = callArgs[i] with { Place = held, Value = null, ContentBool = null };
+
         // The caller-side result temporary (§8.4.3.2.4 GR1 :6963 — "the description, class, and category of
         // the temporary data item is that specified by the description in the linkage section of the item
         // specified in the RETURNING phrase"), declared like any other item via the Roots pipeline. A GROUP
@@ -277,85 +290,6 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         // the temp behaves exactly like a same-category data item — the §14.9.25.4 GR6 unsigned-integer
         // decode for alphanumeric/national, the GR5 de-edit for numeric-edited (NumericRenderer.FieldNum).
         return new BoundNumRef(tempPlace);
-    }
-
-    /// <summary>The staged-loud RETURNING shapes (COBOLNET1510) — null when the category-carrying result
-    /// channel handles the description end-to-end. ISO §14.2.2 SR5 places NO category restriction on a
-    /// function's RETURNING item (any level-01/77 LINKAGE entry without BASED/REDEFINES), and §8.4.3.2.4 GR1
-    /// clones its description into the caller temp — so every shape named here is an IMPLEMENTATION residue
-    /// staged loud (§1.4), never a conformance rule. Supported: elementary fixed-point numeric,
-    /// alphanumeric/alphabetic, numeric-edited, national; image-form groups (every leaf
-    /// <see cref="DataItem.ElementImageCapable"/> — character-stored, or any pinned numeric byte form:
-    /// zoned DISPLAY, binary, packed, COMP-5, IEEE float, INDEX). Staged: FLOAT
-    /// (the CALL-boundary string carrier has no float write half — CallEmitter.CallStringWrite renders a raw
-    /// string store into the double field), BOOLEAN (the §8.8.2 boolean-expression channel has no
-    /// function-result arm — admitting it would half-wire: MOVE/relations would work while IF f(x) and
-    /// COMPUTE Format 2 would not), pointer/object/index classes (§8.8.4-restricted reference sets), and the
-    /// group residues (strongly-typed identity, internal REDEFINES, variable-length, and a pointer- or
-    /// object-class LEAF — the only leaf form with no character image under either axis). ⛔ A byte-form
-    /// numeric leaf (binary/packed/COMP-5/float/INDEX) is NOT a residue: it is carried by the
-    /// <c>ElementImageCapable</c> arm above, and this sentence said otherwise until kb/Work PB199.</summary>
-    private static string? UdfReturningResidue(DataItem ret)
-    {
-        if (ret.IsGroup)
-        {
-            for (var stack = new Stack<DataItem>([ret]); stack.Count > 0;)
-            {
-                var d = stack.Pop();
-                if (d.StrongType)
-                    return "a strongly-typed group RETURNING item is not yet carried — the §8.5.3.3 same-type "
-                        + "identity does not survive the caller-side temp clone (ISO §14.8.3.2; a named residue)";
-                if (!ReferenceEquals(d, ret) && d.RedefinesTargetName is not null)
-                    return "a group RETURNING item containing an internal REDEFINES is not yet carried — the "
-                        + "temp clone precedes no REDEFINES re-classification (ISO §13.18.44; a named residue)";
-                if (d.OccursSpec is { } os && (os.DependingName is not null || os.IsDynamic))
-                    return "a variable-length (OCCURS DEPENDING/DYNAMIC CAPACITY) group RETURNING item is not "
-                        + "yet carried (ISO §8.5.1.12 / §14.8.3.2 variable-length-group conformance; a named residue)";
-                // ⛔ THE DERIVED IMAGE PREDICATE, never a hand-rolled usage union. This screen asks exactly one
-                // question — does the leaf have a character image the group codec can carry across the
-                // activation boundary? — and DataItem.ElementImageCapable is where that question is answered
-                // for every consumer (the group codec, the REDEFINES backing, the record window). It read
-                // `{ Numeric, IsFloat: false, Usage: Display }` — the DISPLAY-only union from before V59 — so it
-                // went on rejecting binary / packed / COMP-5 / float / INDEX group leaves years after those
-                // forms got their pinned bytes (V59, kb/Work PB164 waves 1–2, R40). What is genuinely left is
-                // the pointer/object class, which has no character image under EITHER axis.
-                if (d.IsElementary && !d.ElementImageCapable)
-                    return $"a group RETURNING item with a pointer- or object-class leaf ('{d.CobolName ?? "FILLER"}') "
-                        + "is not yet carried — a data-pointer, program-pointer, function-pointer or "
-                        + "object-reference leaf has no character image to cross the activation boundary "
-                        + "(ISO §8.5.2.6 / §13.18.60.4 GR23 reference restrictions; a named residue)";
-                foreach (var c in d.Children) stack.Push(c);
-            }
-            return null;   // a character-form group — the implemented group leg
-        }
-        return ret.Pic switch
-        {
-            null => "an undescribed RETURNING item",   // childless, PICTURE-less — already diagnosed at the entry
-            { Category: PicCategory.Numeric, IsFloat: true } =>
-                "a FLOAT RETURNING item (COMP-1/COMP-2/FLOAT-SHORT/-LONG/-EXTENDED) is not yet carried — the "
-                + "CALL-boundary string carrier has no float write half (ISO §14.8.3.3 usage-identical "
-                + "conformance; the float-RETURNING descriptor, a named residue)",
-            { Category: PicCategory.Numeric, Usage: Usage.Index } =>
-                "an index RETURNING item is not a carried result category (ISO §13.18.60.3 SR10 — only a "
-                + "SEARCH or SET statement, a relation condition, an intrinsic-function or inline-method "
-                + "argument, or a procedure-division / CALL / INVOKE USING phrase references class index; "
-                + "a named residue)",
-            { Category: PicCategory.Numeric } => null,                 // the original fixed-point leg
-            { Category: PicCategory.Alphanumeric } => null,           // alphanumeric + alphabetic (§8.4.2 class alphanumeric)
-            { Category: PicCategory.NumericEdited } => null,          // the edited image carries as its mask'd string
-            { Category: PicCategory.National } => null,               // rides the Step-5 national category channel
-            { Category: PicCategory.Boolean } =>
-                "a BOOLEAN RETURNING item is not yet carried — the §8.8.2 boolean-expression channel "
-                + "(IF simple-boolean-condition, COMPUTE Format 2) has no function-result arm; carrying only "
-                + "the MOVE/relation legs would half-wire the category (a named residue)",
-            { Category: PicCategory.Pointer } =>
-                "a data-pointer RETURNING item is not yet carried across the function-activation boundary "
-                + "(ISO §8.5.2.6 / §13.18.60.4 GR23 reference restrictions; a named residue)",
-            { Category: PicCategory.ObjectReference } =>
-                "an object-reference RETURNING item for a FUNCTION-ID is not yet carried (the §14.8.3.3 "
-                + "object-reference conformance legs; a named residue)",
-            _ => "this RETURNING item's category is not yet carried (a named residue)",
-        };
     }
 
     /// <summary>One bound argument in its ISO §8.4.3.2.4 GR5 manner, for every argument FORM §8.4.3.2.3 SR8 names:

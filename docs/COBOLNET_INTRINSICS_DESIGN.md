@@ -261,7 +261,11 @@ reserved-word funnel skips a BARE argument word (a §15 phrase-word position is 
 The keyword-omitted reference form (D2 — no grammar alternative) re-parses its captured argument text through the
 SAME `functionArgList` rule (`Frontend.Parsing.FunctionArgFragment`, lexer primed via `PrimeFunctionArgs`), and
 `UdfBinder.UdfBindCall` binds its arguments through the same `BindArgOperand` — ONE argument pipeline; the former
-hand-rolled per-segment recursive-descent parser is deleted.
+hand-rolled per-segment recursive-descent parser is deleted. That pipeline is also where §8.4.3.2.4 GR2's LEFT-TO-RIGHT
+argument order is settled for every function (kb/Work PB1423): `BindArgOperand` records each bound operand into the
+`ArgumentOrder` window `BindIntrinsicCore` opened, and `Settle` stores an earlier argument into an intermediate result
+item when a later argument's user-function activation would otherwise be evaluated first (see
+COBOLNET_INTERPROGRAM_DESIGN.md).
 
 **The §15.3 argument-rule SCREEN (`IntrinsicArgumentRules`, driven from `IntrinsicBinder.CheckArgumentClasses` after
 arity and before every per-function arm) is a per-position SCHEMA, not a class column** (PB1 → PB12 → PB31 →

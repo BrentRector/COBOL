@@ -1185,13 +1185,16 @@ public static class CobolArgAdapt
     /// <summary>Object-reference RETURNING delivery (kb/Work PB133 wave B). The CobolObject constraint keeps
     /// this overload away from every numeric/string carrier (a value type or string never derives it), so the
     /// specific lanes above stay untouched. An IDENTICALLY-described returning pair (the §14.8.3 conforming
-    /// case a prototype-less CALL can realize today) matches the typed carrier exactly; the cross-class
-    /// described relationship rides the §14.8.2/§14.8.3 conformance campaign (PB133 wave C).</summary>
+    /// case a prototype-less CALL can realize today) matches the typed carrier exactly. A DIFFERENTLY-described
+    /// pair that conforms — §14.8.3.3 rule 1: "as if a SET statement were performed" with the activated returning
+    /// item as the sender, so a subclass-typed sender into a superclass-typed or universal receiver — stores through
+    /// the carrier's own type (<see cref="ManagedPointer.TryAssign"/>, kb/Work PB1164); the bind-time conformance
+    /// (<c>ParameterConformance.ReturningConformanceReason</c>) has already refused the other direction.</summary>
     public static void StoreReturn<T>(CobolArg? ret, T? value) where T : CobolObject
     {
         if (ret is not { Carrier: var c }) return;
         if (c is ManagedPointer<T?> tp) { tp.Value = value; return; }
-        if (c is ManagedPointer<CobolObject?> op) { op.Value = value; return; }
+        if (c.TryAssign(value)) return;
         Undeliverable(c, "the object-reference result");
     }
 

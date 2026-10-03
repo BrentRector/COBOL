@@ -571,19 +571,11 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "resolvable to storage");
             }
             if (!OoScreenReturning(rp, retRef, m.Name)) return BoundRejected.Reported(ctx.Edition);
-            // §14.8.3.3 rule 1: the RETURNING delivery conforms "as if a SET statement were performed" —
-            // for object references that is the WIDENING direction (universal receiver accepts anything; a
-            // typed receiver accepts the same class or a subclass — SET SR12a2), NOT the §14.8.2.3.2
-            // identity rule. Everything else keeps the strict description check. Rule 2: an ACTIVE-CLASS
-            // returning item sends the description the INVOCATION gives it (OoConformance.ReturningSender).
-            string? rerr = m.Binding!.Returning!.Pic is { Category: PicCategory.ObjectReference } sendPic
-                    && rp.Item.Pic is { Category: PicCategory.ObjectReference } recvPic
-                ? host.OoClasses is { } oo
-                    ? OoConformance.ObjectRefAssignmentMismatch(oo,
-                        OoConformance.ReturningSender(sendPic.ObjectRef ?? ObjectRefDescriptor.Universal, invokedWith),
-                        recvPic.ObjectRef ?? ObjectRefDescriptor.Universal)
-                    : null
-                : OoConformanceError(m.Binding!.Returning!, rp.Item);
+            // §14.8.3.3 — the ONE returning-item half of §14.8.3, shared with the Format-2 CALL
+            // (ParameterConformance.ReturningConformanceReason, kb/Work PB1164): an object reference conforms "as if
+            // a SET statement were performed" (rule 1; rule 2's ACTIVE-CLASS sender is described by the INVOCATION),
+            // everything else keeps the strict description check.
+            string? rerr = host.Params.ReturningConformanceReason(m.Binding!.Returning!, rp.Item, invokedWith);
             if (rerr is not null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0828",

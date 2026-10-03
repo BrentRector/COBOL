@@ -112,4 +112,37 @@ public sealed class ActivationConformanceDriftTests
             "A verb binder calls the §14.8.2 argument comparators directly instead of through "
             + "ParameterConformance.CheckArgument (kb/Work PB1418): " + string.Join(", ", offenders));
     }
+
+    /// <summary>⛔ THE RETURNING-ITEM HALF OF §14.8.3 IS ONE ENTRY TOO (kb/Work PB1164). §14.8.3.3 rule 1 makes two
+    /// object references conform "as if a SET statement were performed" from the activated returning item into the
+    /// activating one, while the Format-2 CALL asked §9.3.8.2.3's IDENTITY comparison and refused every legal
+    /// widening (a subclass-typed sender into a class-typed or universal receiver) that INVOKE — which had been
+    /// given the SET rule — accepted: the repo's most reproducible defect, a two-arm dispatch with one arm fixed.
+    /// <c>ParameterConformance.ReturningConformanceReason</c> is the one entry; CALL and INVOKE both ask it, and
+    /// neither may hold its own object-reference returning comparison.</summary>
+    [Theory]
+    [InlineData("CallBinder.cs")]
+    [InlineData("OoBinder.cs")]
+    public void CallAndInvoke_AskTheOneReturningConformance(string file)
+    {
+        string code = Verb(file);
+        Assert.True(code.Contains("Params.ReturningConformanceReason(", System.StringComparison.Ordinal),
+            $"{file} no longer asks ParameterConformance.ReturningConformanceReason — its RETURNING item would be "
+            + "checked by a private copy of §14.8.3.3 that the other activating statement does not share.");
+    }
+
+    [Fact]
+    public void NoOtherVerbBinder_ComparesAReturningItemItself()
+    {
+        var returningComparator = new Regex(
+            @"OoConformance\s*\.\s*(ReturningSender|ObjectRefAssignmentMismatch\s*\([^;]*Returning)");
+        var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f) is not ("ParameterConformance.cs"))
+            .Where(f => returningComparator.IsMatch(CodeOf(f)))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "A verb binder applies §14.8.3.3's returning-item sender rule itself instead of asking "
+            + "ParameterConformance.ReturningConformanceReason (kb/Work PB1164): " + string.Join(", ", offenders));
+    }
 }

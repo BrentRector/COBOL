@@ -191,6 +191,26 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         static BoundStatement StoreBit(Place p, string bit) => new BoundComputeBoolean(new BoundBoolLiteral(bit), [p]);
     }
 
+    /// <summary>The BOOLEAN-EXPRESSION arm (kb/Work PB1423): store a boolean expression's value, of
+    /// <paramref name="positions"/> boolean positions (§8.8.2 rule 10 — "the number of boolean positions of the
+    /// larger item referenced"), into an intermediate boolean item, as a PRE-op on the same
+    /// <c>DataBinder.PendingPreOps</c> — so a function argument that IS a boolean expression is evaluated at its place
+    /// in the argument list (§8.4.3.2.4 GR2) and not after a later argument's activation changed an item it reads.
+    /// The store is COMPUTE Format 2's own (<see cref="BoundComputeBoolean"/>), the channel a boolean expression has
+    /// and <see cref="Materialize"/> deliberately does not reach. Null when the item cannot be resolved.</summary>
+    internal Place? MaterializeBoolean(BoundBoolExpr expr, int positions, string tag)
+    {
+        var model = new DataItem
+        {
+            Level = 1, CobolName = "__SENDBOOL", CsName = "__sendbool",
+            Pic = new PicInfo(PicCategory.Boolean, Usage.Display, Length: positions, Digits: 0, Scale: 0, Signed: false),
+        };
+        var temp = ctx.Data.CreateCompilerTemp(model, "__SENDBOOL-", "__sendbool", tag);
+        if (ctx.Refs.ResolveItem(temp) is not { } place) return null;
+        ctx.Data.PendingPreOps.Add(new BoundComputeBoolean(expr, [place]));
+        return place;
+    }
+
     /// <summary>
     /// ⛔ <b>THE EXTENT FREEZE</b> — §14.9.25.4 GR1's "The length of the data item referenced by identifier-1 is
     /// evaluated only once, immediately before the data is moved to the first of the receiving operands", for the

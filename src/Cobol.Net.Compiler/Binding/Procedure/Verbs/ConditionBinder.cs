@@ -151,6 +151,11 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         {
             var bound = host.Intrinsic.BindIntrinsic(fc);
             if (bound is BoundIntrinsicCall { ResultCategory: PicCategory.Boolean } bic) return new BoundBoolCall(bic);
+            // A USER-DEFINED function is the same identifier: §8.4.3.2.4 GR1 gives its temporary the description,
+            // class and category of the RETURNING item, so a boolean RETURNING item is a boolean data item here
+            // exactly as a declared one is (kb/Work PB1419 — the refusal that kept this channel from half-wiring).
+            if (bound is BoundNumRef { Place: var resultTemp } && resultTemp.Item.OperandPic?.Category is PicCategory.Boolean)
+                return new BoundBoolRef(resultTemp);
             if (bound is BoundExprError err) return BoundBoolError.Carry(err.Feature, err.IsUnbuilt);   // already loud
             ctx.Edition.Error("COBOLNET1511", $"operand '{fc.GetText()}' in a boolean expression is not a "
                 + "boolean function — its result is not class boolean (ISO §8.8.2 — boolean operands only)");
@@ -194,8 +199,22 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         if (vo.arithmeticExpression() is { } fx && SoleFunctionCall(fx) is { } sfc && sfc.functionName() is { } fn
             && IntrinsicCatalog.TryGet(fn.GetText(), out var fsig) && fsig.Type == IntrinsicType.Boolean)
             return true;
-        return false;
+        // …and a sole reference to a USER-DEFINED function whose RETURNING item is category boolean (§8.4.3.2.4 GR1:
+        // the temporary's category IS the RETURNING item's; kb/Work PB1419), asked from the same definition the
+        // activation binds from, diagnostic-free.
+        return vo.arithmeticExpression() is { } ux && SoleFunctionCall(ux)?.functionName() is { } un
+            && IsBooleanUserFunction(un.GetText());
     }
+
+    /// <summary>True when <paramref name="written"/> names a REPOSITORY-declared user-defined function (or the
+    /// containing function itself) whose RETURNING item is category boolean — the one answer the routing predicate
+    /// <see cref="IsBooleanValueOperand"/> reads, from the definition <c>UdfBinder.UdfActivate</c> clones.</summary>
+    private bool IsBooleanUserFunction(string written) =>
+        ctx.CobolWords.Resolve(written) is { } name
+        && (ctx.Data.UserFunctionNames.Contains(name)
+            || name.Equals(host.UdfSelfName, System.StringComparison.OrdinalIgnoreCase))
+        && host.UserFunctions is { } functions && functions.TryGetValue(name, out var fn)
+        && fn.Returning?.OperandPic?.Category is PicCategory.Boolean;
 
     /// <summary>The sole <c>functionCall</c> primary of an arithmetic expression (no operators, signs or
     /// parentheses around it), or null — the function-identifier twin of <see cref="SoleDataRef"/>, over the ONE

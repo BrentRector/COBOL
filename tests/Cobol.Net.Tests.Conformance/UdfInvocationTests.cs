@@ -453,31 +453,32 @@ public sealed class UdfInvocationTests
     }
 
     /// <summary>The RETURNING category channel (§8.4.3.2.4 GR1 / §14.2.2 SR5 — NO category restriction on a
-    /// function's RETURNING item; P10 Step 9): the CARRIED categories — elementary fixed-point numeric,
-    /// alphanumeric, numeric-edited, national, and IMAGE-FORM groups (every leaf
-    /// <c>DataItem.ElementImageCapable</c>: character-stored, or any pinned numeric byte form — zoned DISPLAY,
-    /// binary, packed, COMP-5, IEEE float, INDEX) — compile end-to-end (the runtime behavior is the
-    /// udf_returning_categories golden, and for the binary-leaf group the byte-true
-    /// <see cref="ReturningGroup_BinaryLeaf_CarriesValuesAcrossTheActivation"/> below); the STAGED residues —
-    /// FLOAT (no CALL-boundary float write half), BOOLEAN (no §8.8.2 boolean-expression function-result arm) —
-    /// stay loud COBOLNET1510 by name. ⚠ The BIN row was pinned `false` until battery #38 caught it
-    /// (kb/Work PB199): PB164's F8 widened the screen from a hand-rolled DISPLAY-only usage union to the
-    /// derived <c>ElementImageCapable</c> predicate, and §14.2.2 SR5 imposes no usage restriction at all, so the
-    /// surviving GROUP residues are strongly-typed identity, internal REDEFINES, variable-length, and a
-    /// pointer/object-class leaf — never a byte-form numeric one.</summary>
+    /// function's RETURNING item): EVERY category compiles end-to-end — elementary fixed-point numeric,
+    /// alphanumeric, numeric-edited, national, FLOAT, BOOLEAN, INDEX, data POINTER, and groups of every shape
+    /// (character image, binary leaf, internal REDEFINES, OCCURS DEPENDING, strongly typed). The runtime
+    /// behavior is the udf_returning_categories and udf_returning_every_category goldens; this theory pins that no
+    /// category is refused (kb/Work PB1419 deleted the per-shape COBOLNET1510 residue list this test used to pin
+    /// GREEN — a green test holding a gap open). <paramref name="consumer"/> is the one statement that reads the
+    /// result in the way its class admits (DISPLAY is not a reader of a pointer or an index).</summary>
     [Theory]
-    [InlineData("ALN", "01 L-R PIC X(4).", true)]
-    [InlineData("GRP", "01 L-R.\n               05 L-R-A PIC 9(2).\n               05 L-R-B PIC 9(2).", true)]
-    [InlineData("EDT", "01 L-R PIC ZZ9.", true)]
-    [InlineData("NAT", "01 L-R PIC N(3).", true)]
-    [InlineData("FLT", "01 L-R USAGE FLOAT-LONG.", false)]
-    [InlineData("BOL", "01 L-R PIC 1(4).", false)]
-    [InlineData("BIN", "01 L-R.\n               05 L-R-A PIC X(2).\n               05 L-R-B PIC 9(4) USAGE BINARY.", true)]
-    public void ReturningCategories_CarriedVsStaged1510(string tag, string returningDecl, bool carried)
+    [InlineData("ALN", "01 L-R PIC X(4).", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("GRP", "01 L-R.\n               05 L-R-A PIC 9(2).\n               05 L-R-B PIC 9(2).", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("EDT", "01 L-R PIC ZZ9.", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("NAT", "01 L-R PIC N(3).", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("FLT", "01 L-R USAGE FLOAT-LONG.", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("BOL", "01 L-R PIC 1(4).", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("BIN", "01 L-R.\n               05 L-R-A PIC X(2).\n               05 L-R-B PIC 9(4) USAGE BINARY.", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("PTR", "01 L-R USAGE POINTER.", "IF FUNCTION UDFXTAGP10UR(1) = NULL DISPLAY \"N\"")]
+    [InlineData("IDX", "01 L-R USAGE INDEX.", "IF FUNCTION UDFXTAGP10UR(1) = WS-IX DISPLAY \"N\"")]
+    [InlineData("RED", "01 L-R.\n               05 L-R-A PIC X(4).\n               05 L-R-B REDEFINES L-R-A PIC 9(4).", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("ODO", "01 L-R.\n               05 L-R-N PIC 9.\n               05 L-R-T PIC X OCCURS 1 TO 5 DEPENDING ON L-R-N.", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    [InlineData("STR", "01 L-T TYPEDEF STRONG.\n               05 L-T-A PIC 9(2).\n            01 L-R TYPE L-T.", "DISPLAY FUNCTION UDFXTAGP10UR(1)")]
+    public void ReturningCategories_AreAllCarried(string tag, string returningDecl, string consumer)
     {
         // DISPLAY is the category-neutral reference site (a MOVE receiver would entangle Table-16 legality —
         // e.g. national→alphanumeric is a "No" cell); unique PROGRAM-IDs per fact (P10UR wave).
         string pid = $"UDFT14{tag}P10UR";
+        string read = consumer.Replace("TAG", tag);
         string src = $$"""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. {{pid}}.
@@ -488,9 +489,10 @@ public sealed class UdfInvocationTests
             DATA DIVISION.
             WORKING-STORAGE SECTION.
             01 WS-D PIC X(1).
+            01 WS-IX USAGE INDEX.
             PROCEDURE DIVISION.
             MAIN.
-                DISPLAY FUNCTION UDFX{{tag}}P10UR(1).
+                {{read}}.
                 STOP RUN.
             END PROGRAM {{pid}}.
             IDENTIFICATION DIVISION.
@@ -505,13 +507,7 @@ public sealed class UdfInvocationTests
             END FUNCTION UDFX{{tag}}P10UR.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
-        if (carried)
-            Assert.True(ok, string.Join("\n", errors));
-        else
-        {
-            Assert.False(ok);
-            EditionHarness.AssertHasDiagnostic(errors, "COBOLNET1510");
-        }
+        Assert.True(ok, $"{tag}: " + string.Join("\n", errors));
     }
 
     /// <summary>The BIN row's DISCRIMINATING evidence (kb/Work PB199): a group RETURNING item with a

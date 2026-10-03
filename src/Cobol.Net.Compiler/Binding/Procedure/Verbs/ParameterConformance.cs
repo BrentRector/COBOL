@@ -104,6 +104,43 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                 + $"(ISO §14.8.2 via {site.ImportingRule})");
     }
 
+    /// <summary>⛔ THE ONE RETURNING-ITEM HALF OF ISO §14.8.3 — for every activation whose activated element's returning
+    /// item is known when the activating statement binds (kb/Work PB1164): a Format-2 CALL (§14.9.4.3 SR25) and an
+    /// INVOKE (§14.9.23.4 GR7 c)). §14.8.3.1 makes "the returning item in the activated element the sending
+    /// operand, the corresponding returning item in the activating element the receiving operand".
+    /// <list type="bullet">
+    /// <item>Both OBJECT REFERENCES — §14.8.3.3 rule 1: "the conformance rules are the same as if a SET statement were
+    /// performed in the activated runtime element with the returning item in the activated element as the sending
+    /// operand and the corresponding returning item in the activating element as the receiving operand", so a
+    /// subclass-typed sender conforms to a class-typed or universal receiver (§14.9.39.3 SR12 a)2., SR8) and a
+    /// superclass sender does not; rule 2: an ACTIVE-CLASS returning item sends the description the INVOCATION gives
+    /// it (<see cref="CobolNet.Compiler.Oo.OoConformance.ReturningSender"/>, <paramref name="invokedWith"/>) — a CALL
+    /// has no invocation, and a program's returning item cannot be ACTIVE-CLASS, so rule 1 is its whole rule.
+    /// This is NOT §9.3.8.2.3's identity comparison, which CALL used to ask here and which refused every legal
+    /// widening.</item>
+    /// <item>Everything else — the description comparison (§14.8.3.2 groups, §14.8.3.3 elementary items), in
+    /// ACTIVATION mode (rules 4/5, the ANY LENGTH relaxation). No prefix latitude: §14.8.3.2 asks for "the same
+    /// length".</item>
+    /// </list>
+    /// A function-identifier asks nothing: its result temporary IS a clone of the RETURNING item (§8.4.3.2.4 GR1), so
+    /// the pair conforms by construction. Null when conformant.</summary>
+    internal string? ReturningConformanceReason(DataItem activated, DataItem receiving,
+        ObjectRefDescriptor? invokedWith = null)
+    {
+        if (activated.Pic is { Category: PicCategory.ObjectReference } sendPic
+            && receiving.Pic is { Category: PicCategory.ObjectReference } recvPic)
+            return host.OoClasses is { } classes
+                ? CobolNet.Compiler.Oo.OoConformance.ObjectRefAssignmentMismatch(classes,
+                    CobolNet.Compiler.Oo.OoConformance.ReturningSender(
+                        sendPic.ObjectRef ?? ObjectRefDescriptor.Universal, invokedWith ?? ObjectRefDescriptor.Universal),
+                    recvPic.ObjectRef ?? ObjectRefDescriptor.Universal) is { } setReason
+                    ? $"{setReason} (§14.8.3.3 rule 1 — the conformance of a SET statement from the activated returning "
+                      + "item into the activating one)"
+                    : null
+                : null;
+        return CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(activated, receiving, anyLengthActivationRelax: true);
+    }
+
     /// <summary>⛔ THE ONE reading of a figurative ZERO argument into an elementary NUMERIC formal (kb/Work PB1617
     /// for INVOKE, PB1634 for CALL). §14.8.2.3.3 2) a): "If the formal parameter is numeric, the conformance rules
     /// are the same as for a COMPUTE statement with the argument as the sending operand", and a COMPUTE reads the

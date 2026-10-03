@@ -498,7 +498,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // ⛔ THE ONE POINT EVERY BOUND FUNCTION RESULT PASSES (the FUNCTION-keyword entry, the reserved-name and the
         // keyword-omitted forms all call this): a result the binder FOLDED to a literal says so (kb/Work PB1398,
         // PB1662), because the written operand is a function-identifier and the syntax rules judge what was written.
-        var result = BindFunctionResult(word, argCtxs);
+        // ⛔ AND THE ONE POINT WHERE §8.4.3.2.4 GR2's LEFT-TO-RIGHT ARGUMENT ORDER IS SETTLED (kb/Work PB1423): the window
+        // records every argument operand bound while the call binds, and Settle freezes each one that a later
+        // argument's function activation would otherwise overtake (ArgumentOrder).
+        using var window = host.ArgOrder.Open();
+        var result = window.Settle(BindFunctionResult(word, argCtxs));
         return result is BoundNumLiteral folded ? folded with { FunctionValue = true } : result;
     }
 
@@ -2681,6 +2685,14 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// intrinsic-function argument is no such context (§8.4.3.2.2 distinguishes intrinsic-function-name-1 from
     /// function-prototype-name-1), so every intrinsic keeps the ONE SR1 refusal, COBOLNET2576 (kb/Work PB1427).</para></summary>
     internal BoundOperand BindArgOperand(Core.FunctionArgumentContext a, bool nullAdmitting = false)
+    {
+        int before = host.ArgOrder.Mark;
+        var operand = BindArgOperandCore(a, nullAdmitting);
+        host.ArgOrder.Record(operand, before);   // §8.4.3.2.4 GR2 — the window settles the order (ArgumentOrder)
+        return operand;
+    }
+
+    private BoundOperand BindArgOperandCore(Core.FunctionArgumentContext a, bool nullAdmitting)
     {
         if (a.OMITTED() is not null)
         {
