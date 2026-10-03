@@ -581,7 +581,7 @@ internal sealed class SortEmitter(EmitContext ctx,
         var w = ctx.Writer;
         if (rl.FromMove is { } fromMove) move.Emit(fromMove);   // GR4 a) — the BOUND implicit MOVE (PB348)
         string sd = FileKeyExpr(rl.File);
-        string image = OperandText.RecordAreaImage(rl.Record);   // THE ONE record-area channel (kb/Work PB327)
+        string image = OperandText.RecordSendImage(rl.Record);   // THE ONE record-area channel (kb/Work PB327)
         // §13.18.43.4 GR14 b) / GR19 b): a size outside the record range is EC-SORT-MERGE-RELEASE and the RELEASE
         // is unsuccessful — the runtime's test, before the release (kb/Work PB1036).
         var (min, max) = RecordRange(rl.Varying, rl.RecordWidth);
@@ -604,13 +604,13 @@ internal sealed class SortEmitter(EmitContext ctx,
             // variable-length group (D-FRA (v); kb/Work PB1053; the DEPENDING arm above sends a record cut to another
             // length, which no table describes). The STATEMENT entry: §14.9.32.4 GR1's phase test.
             length = "-1";
-            call = RuntimeApi.SortReleaseStatement(sd, image, min, max, extents: OperandText.RecordAreaExtents(rl.Record));
+            call = RuntimeApi.SortReleaseStatement(sd, image, min, max, extents: OperandText.RecordSendExtents(rl.Record));
         }
         if (released is null) { w.Line($"{call};"); return; }
         // The statement's own success (it returns whether the record reached the sort file) gates the store.
         using (w.Block($"if ({call})"))
             seqIo.EmitReleasedRecordAlsoAvailable(rl.File, rl.Record, RuntimeApi.FileReleasedRecord(released, length),
-                OperandText.RecordAreaExtents(rl.Record));
+                OperandText.RecordSendExtents(rl.Record));
     }
 
     /// <summary>The record range the EC-SORT-MERGE-RELEASE tests use (kb/Work PB1036): a variable-length

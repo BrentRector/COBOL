@@ -425,12 +425,14 @@ public sealed record DynSlotWindow(AccessPath Cell, int Ordinal) : CellWindowCod
 /// class with dynamic-length items under it. Its fixed run is <see cref="RedefViewPlace.Width"/> bytes of the
 /// backing from the window's offset; its dynamic-length items are the cell's dynamic slots <paramref name="DynBase"/>
 /// onward, sitting at fixed-run positions <paramref name="DynFixedAt"/> (relative to the group) with maximum sizes
-/// <paramref name="DynMax"/>. ISO §8.5.1.11.2 — "a variable-length data item behaves in all respects as though it
+/// <paramref name="DynMax"/>, each laid out in a record image by its <paramref name="DynStructure"/>
+/// (<c>CobolDynStructure.Code</c>, 0 for none — ISO §12.3.7.4 GR18/GR19; kb/Work PB1094).
+/// ISO §8.5.1.11.2 — "a variable-length data item behaves in all respects as though it
 /// were in fact contiguous with its neighbors whenever a procedural operation is applied to a group containing it"
 /// — is why its read is the CONTIGUOUS image (<c>StorageCell.ContiguousAt</c>), exactly what a declared group's
 /// generated <c>CurrentImage()</c> composes.</summary>
 public sealed record VarGroupWindow(AccessPath Cell, int DynBase, IReadOnlyList<int> DynFixedAt,
-                                    IReadOnlyList<int> DynMax) : CellWindowCoding(Cell)
+                                    IReadOnlyList<int> DynMax, IReadOnlyList<int> DynStructure) : CellWindowCoding(Cell)
 {
     /// <summary>The coding for <paramref name="group"/> when it has dynamic-length items under it, else null.
     /// The layout is read off the class walk (<see cref="DataItem.ClassOffset"/> /
@@ -442,7 +444,8 @@ public sealed record VarGroupWindow(AccessPath Cell, int DynBase, IReadOnlyList<
         var dyn = DataItem.DescendantsOf(group).Where(DynSlotWindow.CarriedBySlot).ToList();
         return dyn.Count == 0 ? null
             : new VarGroupWindow(cell, dyn[0].ClassDynOrdinal,
-                dyn.Select(d => d.ClassOffset - group.ClassOffset).ToList(), dyn.Select(d => d.DynMaxSize).ToList());
+                dyn.Select(d => d.ClassOffset - group.ClassOffset).ToList(), dyn.Select(d => d.DynMaxSize).ToList(),
+                dyn.Select(d => FileModel.StructureOf(d)?.Code ?? 0).ToList());
     }
 
     /// <summary>True when <paramref name="group"/> would take this coding.</summary>

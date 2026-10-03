@@ -420,14 +420,16 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // (§8.5.1.11.2 — what CurrentImage() wrote) is decomposed into this same carrier by the ONE split rule,
         // CobolVarGroup.FromContiguous, over the component layout below — the flattened VarParts walk, so a
         // nested variable-length group's components are located exactly where FromVarImage's Slice expects them.
-        var layout = new List<(int FixedAt, int Unit, long MaxUnits)>();
+        var layout = new List<(int FixedAt, int Unit, long MaxUnits, int Structure)>();
         ContiguousLayout(group, 0, layout);
         // ⛔ ONE LAYOUT OBJECT PER RECORD TYPE (kb/Work PB1025): the same layout locates a key a variable-length
         // member precedes (CobolContiguousLayout.Position, read through __Contiguous by the SORT/MERGE key and the
-        // indexed key registrations), so the decomposition and the key window cannot disagree.
+        // indexed key registrations), so the decomposition and the key window cannot disagree. It also carries each
+        // component's DYNAMIC LENGTH STRUCTURE (kb/Work PB1094), so the same object frames the record on the way out
+        // (MediumImage) and unframes it on the way in (Decompose).
         w.Line($"private static readonly CobolContiguousLayout {RuntimeApi.ContiguousLayoutField} = "
             + RuntimeApi.ContiguousLayoutNew(totalFixed, layout.Select(l => l.FixedAt),
-                layout.Select(l => l.Unit), layout.Select(l => l.MaxUnits)) + ";");
+                layout.Select(l => l.Unit), layout.Select(l => l.MaxUnits), layout.Select(l => l.Structure)) + ";");
         w.Line($"public readonly CobolContiguousLayout {RuntimeApi.ContiguousLayoutProperty} => "
             + $"{RuntimeApi.ContiguousLayoutField};");
         // ⛔ THE EXTENT TABLE (D-FRA (v); kb/Work PB1053): the WRITE / REWRITE / RELEASE side sends where each
@@ -488,16 +490,18 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// dynamic-length item — <see cref="CurrentMemberImage"/> contributes its content character for character —
     /// the element width for a dynamic-capacity table), and its maximum size in those units (§8.5.1.10.1's
     /// maximum size; the table's maximum capacity). Nested scalar variable-length groups flatten in place, the
-    /// same flattening <see cref="VarParts"/> gives the carrier.</summary>
-    private void ContiguousLayout(DataItem group, int baseAt, List<(int FixedAt, int Unit, long MaxUnits)> layout)
+    /// same flattening <see cref="VarParts"/> gives the carrier. The fourth element is the component's DYNAMIC LENGTH
+    /// STRUCTURE (<c>CobolDynStructure.Code</c>, 0 for none — ISO §12.3.7.4 GR18/GR19; kb/Work PB1094), read through
+    /// <see cref="FileModel.StructureOf"/>, the one reader of what a structured item occupies in a record.</summary>
+    private void ContiguousLayout(DataItem group, int baseAt, List<(int FixedAt, int Unit, long MaxUnits, int Structure)> layout)
     {
         int off = baseAt;
         foreach (var p in VarParts(group))
             switch (p.Kind)
             {
                 case VarPartKind.Fixed: off += p.Field.Width; break;
-                case VarPartKind.DynLeaf: layout.Add((off, 1, p.Item!.DynMaxSize)); break;
-                case VarPartKind.DynTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0)); break;
+                case VarPartKind.DynLeaf: layout.Add((off, 1, p.Item!.DynMaxSize, FileModel.StructureOf(p.Item)?.Code ?? 0)); break;
+                case VarPartKind.DynTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0, 0)); break;
                 case VarPartKind.Nested: ContiguousLayout(p.Item!, off, layout); off += p.FixedWidth; break;
             }
     }

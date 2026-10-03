@@ -77,7 +77,7 @@ public sealed class StartTemporaryKeyAreaDriftTests
             StringComparison.Ordinal);
 
     /// <summary>True when the emitter hands <c>FileStartIndexed</c> the RECORD AREA (through
-    /// <c>ReferenceResolver.RecordArea</c> and the ONE <c>OperandText.RecordAreaImage</c> channel) rather than a
+    /// <c>ReferenceResolver.RecordArea</c> and the ONE <c>OperandText.RecordSendImage</c> channel) rather than a
     /// rendering of the START operand.</summary>
     internal static bool EmitStartSendsTheRecordArea(string source)
     {
@@ -89,7 +89,7 @@ public sealed class StartTemporaryKeyAreaDriftTests
         return !site.Contains("OperandText.AsStorageImage", StringComparison.Ordinal)
             && !site.Contains("OperandText.AsString", StringComparison.Ordinal)
             && source.Contains("refs.RecordArea(file) is { } ar", StringComparison.Ordinal)
-            && source.Contains("OperandText.RecordAreaImage(ar)", StringComparison.Ordinal);
+            && source.Contains("OperandText.RecordSendImage(ar)", StringComparison.Ordinal);
     }
 
     /// <summary>The body of the KEY-phrase START, matched by signature PREFIX so a later parameter rename cannot
@@ -126,7 +126,7 @@ public sealed class StartTemporaryKeyAreaDriftTests
     public void EmitStart_SendsTheRecordArea_NotTheOperand()
     {
         Assert.True(EmitStartSendsTheRecordArea(KeyedIoEmitterSource()),
-            "KeyedIoEmitter.EmitStart must pass OperandText.RecordAreaImage of ReferenceResolver.RecordArea(file) "
+            "KeyedIoEmitter.EmitStart must pass OperandText.RecordSendImage of ReferenceResolver.RecordArea(file) "
             + "to RuntimeApi.FileStartIndexed. Sending OperandText.AsStorageImage(sta.Operand) makes the record-area "
             + "slice §14.9.41.4 GR17 a) names unavailable to the connector at all (kb/Work PB355).");
     }

@@ -1663,10 +1663,22 @@ internal static class RuntimeApi
     /// a variable-length member precedes (D-KWV; kb/Work PB1025). Emitted once per record type as the static
     /// field <see cref="ContiguousLayoutField"/>.</summary>
     public static string ContiguousLayoutNew(int fixedTotal, IEnumerable<int> fixedAt,
-        IEnumerable<int> unit, IEnumerable<long> maxUnits) =>
+        IEnumerable<int> unit, IEnumerable<long> maxUnits, IEnumerable<int> structure) =>
         $"new {nameof(CobolContiguousLayout)}({fixedTotal}, "
         + $"new int[] {{ {string.Join(", ", fixedAt)} }}, new int[] {{ {string.Join(", ", unit)} }}, "
-        + $"new long[] {{ {string.Join(", ", maxUnits.Select(m => $"{m}L"))} }})";
+        + $"new long[] {{ {string.Join(", ", maxUnits.Select(m => $"{m}L"))} }}"
+        + (structure.Any(c => c != 0) ? $", new int[] {{ {string.Join(", ", structure)} }}" : "") + ")";
+
+    /// <summary>A dynamic-length ELEMENTARY RECORD's image framed by its DYNAMIC LENGTH STRUCTURE — ISO §12.3.7.4 GR18
+    /// length field, data, GR19 delimiter (<c>CobolDynStructure.FrameWith</c>; kb/Work PB1094). A group record frames
+    /// each member through its layout (<c>RecordExtents.MediumImage</c>) instead.</summary>
+    public static string DynStructureFrame(int code, string contentExpr) =>
+        $"{nameof(CobolDynStructure)}.{nameof(CobolDynStructure.FrameWith)}({code}, {contentExpr})";
+
+    /// <summary>The inverse of <see cref="DynStructureFrame"/> — the data of the READ record
+    /// (<c>CobolDynStructure.UnframeWith</c>).</summary>
+    public static string DynStructureUnframe(int code, string recordExpr) =>
+        $"{nameof(CobolDynStructure)}.{nameof(CobolDynStructure.UnframeWith)}({code}, {recordExpr})";
 
     /// <summary>The static field of a variable-length group's record struct that holds its
     /// <see cref="ContiguousLayoutNew"/> layout.</summary>
@@ -1850,16 +1862,19 @@ internal static class RuntimeApi
 
     /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>.</summary>
     public static string CellVarStoreContiguous(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase,
-                                                IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax, string imageExpr,
+                                                IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
+                                                IEnumerable<int> dynStructure, string imageExpr,
                                                 string? extentsExpr = null, bool fixedForm = false) =>
         $"{cellExpr}.{nameof(StorageCell.StoreContiguousAt)}({fixedAtExpr}, {fixedWidth}, {dynBase}, "
-        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
+        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
 
     /// <summary>A cell-backed variable-length group's EXTENT TABLE — <c>StorageCell.ContiguousExtentsAt</c>
-    /// (determination D-FRA (v); kb/Work PB1053).</summary>
+    /// (determination D-FRA (v); kb/Work PB1053). <paramref name="dynStructure"/> is each dynamic-length member's
+    /// DYNAMIC LENGTH STRUCTURE code (<c>CobolDynStructure.Code</c>; kb/Work PB1094), 0 for none.</summary>
     public static string CellVarContiguousExtents(string cellExpr, int fixedWidth, int dynBase,
-                                                  IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({fixedWidth}, {dynBase}, {IntSpan(dynFixedAt)}, {IntSpan(dynMax)})";
+                                                  IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
+                                                  IEnumerable<int> dynStructure) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({fixedWidth}, {dynBase}, {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)})";
 
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>.</summary>
     public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase, int dynCount) =>

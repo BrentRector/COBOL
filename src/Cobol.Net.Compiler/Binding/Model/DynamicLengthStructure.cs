@@ -28,12 +28,14 @@ public enum DynamicLengthPrefix
 /// (§13.18.19.3 SR2) and visible in contained source elements (§8.4.6.1).
 /// <para><b>What the layout decides, in a typed-native compiler.</b> A dynamic-length item IS a native .NET
 /// <c>string</c> (§8.5.1.10.3 leaves its location to the implementor), so the layout's bytes exist nowhere a
-/// program can address. What the declaration DOES decide is observable and is carried here: the item's MAXIMUM
-/// SIZE, whose second §8.5.1.10.1 candidate is "the largest integer that can be stored in an item of the usage
-/// specified in the PREFIXED phrase" (<see cref="PrefixedMaximum"/>), and with it the bound §13.18.19.3 SR4 puts on
-/// the LIMIT phrase (<see cref="MaximumLength"/>). The layout itself (<see cref="Prefix"/>,
-/// <see cref="Delimited"/>) is recorded as declared, so a byte image of the item — should one ever be materialized
-/// at a file boundary — has exactly one place to read it from.</para>
+/// program can address — a procedural operation sees the data alone (§8.5.1.11.2). The declaration decides two things
+/// that ARE observable. (1) The item's MAXIMUM SIZE, whose second §8.5.1.10.1 candidate is "the largest integer that can
+/// be stored in an item of the usage specified in the PREFIXED phrase" (<see cref="PrefixedMaximum"/>), and with it the
+/// bound §13.18.19.3 SR4 puts on the LIMIT phrase (<see cref="MaximumLength"/>). (2) The item's PHYSICAL form in the
+/// record a file carries — its data prefixed by the length field and followed by the delimiter
+/// (<see cref="Layout"/>, §12.3.7.4 GR18 / GR19; docs/CONFORMANCE.md §3 D-DL3; kb/Work PB1094), realized once on the
+/// way out and once on the way in by the record-image codec (<c>CobolContiguousLayout</c>), and counted by every record
+/// size the file's RECORD clause states (<c>FileModel.MaxDynamicExtent</c>).</para>
 /// </summary>
 /// <param name="Name">dynamic-length-structure-name-1, as written.</param>
 /// <param name="Prefix">The PREFIXED phrase's length field, or <see cref="DynamicLengthPrefix.None"/>.</param>
@@ -56,6 +58,28 @@ public sealed record DynamicLengthStructure(
         DynamicLengthPrefix.Signed16 => short.MaxValue,       // SIGNED SHORT PREFIXED         32767
         _ => null,
     };
+
+    /// <summary>The width, in characters, of the PREFIXED phrase's length field — GR18's binary field: four for
+    /// PREFIXED and SIGNED PREFIXED, two for SHORT PREFIXED and SIGNED SHORT PREFIXED, zero when there is no PREFIXED
+    /// phrase. SIGNED changes the field's range (<see cref="PrefixedMaximum"/>), never its width.</summary>
+    public int PrefixBytes => Prefix switch
+    {
+        DynamicLengthPrefix.Unsigned32 or DynamicLengthPrefix.Signed32 => 4,
+        DynamicLengthPrefix.Unsigned16 or DynamicLengthPrefix.Signed16 => 2,
+        _ => 0,
+    };
+
+    /// <summary>Does the declaration lay the item out at all — a PREFIXED length field, a DELIMITED delimiter or both
+    /// (§12.3.7.4 GR18/GR19). False only for a physical-structure-name, which is refused (COBOLNET2257), so no item
+    /// that reaches code generation names one.</summary>
+    public bool HasLayout => PrefixBytes > 0 || Delimited;
+
+    /// <summary>⛔ THE LAYOUT AS THE RUNTIME APPLIES IT (<see cref="CobolDynStructure"/>; kb/Work PB1094), over data
+    /// that occupies <paramref name="unit"/> image characters per character position — null when the declaration lays
+    /// nothing out. The ONE place the compiler turns a declaration into the runtime's layout: the record image
+    /// codec's component table, the record-size accounting (<see cref="CobolDynStructure.Overhead"/>) and the
+    /// elementary-record arm all read it through here, so they cannot disagree about what a structured item occupies.</summary>
+    public CobolDynStructure? Layout(int unit) => HasLayout ? new CobolDynStructure(PrefixBytes, Delimited, unit) : null;
 
     /// <summary>"The maximum length associated with dynamic-length-structure-name-1" (§13.18.19.3 SR4): the most
     /// characters an item described with this structure can ever contain — the smaller of the length field's

@@ -238,7 +238,7 @@ internal static class PlaceRenderer
         // A VARIABLE-LENGTH GROUP of a cell-backed class receiving a character value (kb/Work PB1026): the value is
         // a contiguous image (§8.5.1.11.2), decomposed by the ONE take step determination D-FRA states.
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Sending),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, rhs)};",
+            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynFixedAt.Select(_ => 0), rhs)};",
         // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
         RedefViewPlace v => ByteWindowWrite(v, rhs),
         // Unreachable: SET Format 14 routes to BoundSetCapacity, and any other store into the CAPACITY register is
@@ -574,7 +574,7 @@ internal static class PlaceRenderer
     {
         OdoGroupPlace o => VarGroupCurrentExtents(o.Inner),
         RedefViewPlace { Coding: VarGroupWindow g } v => RuntimeApi.CellVarContiguousExtents(
-            RenderPath(g.Cell, AccessDir.Sending), v.Width, g.DynBase, g.DynFixedAt, g.DynMax),
+            RenderPath(g.Cell, AccessDir.Sending), v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynStructure),
         _ when !group.Item.CurrentExtentImageCapable => "null",
         _ => $"{Read(group)}.CurrentExtents()",
     };
@@ -591,7 +591,7 @@ internal static class PlaceRenderer
         OdoGroupPlace o => WriteVarGroupContiguous(o.Inner, record, extents, context, fixedForm),
         // the cell decomposition (kb/Work PB1026) — the same rule, over the cell's dynamic slots
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Sending),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, record, extents, fixedForm)};",
+            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynStructure, record, extents, fixedForm)};",
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
         _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents}{(fixedForm ? ", true" : "")});",
     };

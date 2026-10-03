@@ -98,9 +98,11 @@ operation is applied to a group containing it"* (§8.5.1.11.2).
   exact inverse of the composer for one variable-length member, the earlier component taking the excess for
   several when the record carries no extent table); a dynamic-length record takes the record as its content
   (§8.5.1.10.4); a pointer record is not reached.
-- **WRITE / REWRITE / RELEASE** send `OperandText.RecordAreaImage`, whose out-of-line arms are the contiguous
-  `CurrentImage()` of a variable-length group (`PlaceRenderer.VarGroupCurrentImage`), a dynamic-length record's
-  content, and the zero-length image of a pointer record.
+- **WRITE / REWRITE / RELEASE** send `OperandText.RecordSendImage`, which is `OperandText.RecordAreaImage` — whose
+  out-of-line arms are the contiguous `CurrentImage()` of a variable-length group
+  (`PlaceRenderer.VarGroupCurrentImage`), a dynamic-length record's content, and the zero-length image of a pointer
+  record — except that a record holding a member that names a DYNAMIC LENGTH STRUCTURE is sent in its MEDIUM form
+  (below).
 - **THE EXTENT TABLE** (kb/Work PB1053; CONFORMANCE.md §3 D-FRA (v)). With two or more variable-length components
   the contiguous image cannot be inverted, so a variable-length group record is sent beside
   `OperandText.RecordAreaExtents` — the generated `CurrentExtents()` (`CobolContiguousLayout.ExtentsOf` over
@@ -119,6 +121,32 @@ operation is applied to a group containing it"* (§8.5.1.11.2).
   `IndexedConnector.KeyOf` / `AreaKey` and `CobolSort.Key.At` find a key where the decomposition puts it. A
   sequential in-place REWRITE keeps the frame's size (§14.9.35.4 GR16): it replaces a table of the same component
   count and otherwise writes `RecordFraming.VoidExtents` (offsets -1, corresponding to no layout).
+- **THE MEDIUM FORM — a DYNAMIC LENGTH STRUCTURE** (kb/Work PB1094; CONFORMANCE.md §3 D-DL3). A dynamic-length member
+  whose DYNAMIC LENGTH clause NAMES a structure (§13.18.19.3 SR2) occupies, in the record a file holds, its data
+  prefixed by the length field and followed by the delimiter (§12.3.7.4 GR18, GR19): `[length field][data][delimiter]`.
+  The record therefore has TWO FORMS — the *contiguous* image (the data alone: what `CurrentImage()`, a MOVE, a
+  comparison and READ … INTO see, §8.5.1.11.2) and the *medium* image (what a connector or the sort store holds, each
+  structured member framed). `CobolContiguousLayout` is the one place both are made: `MediumImage` + `MediumExtents`
+  turn a sent record's `(CurrentImage(), CurrentExtents())` into the medium pair, and `Decompose` reads the medium image
+  back — the frame's extent table keeps describing the STORED image, so `Describes`, `Position` (a key behind a
+  structured member), the sort store, `ToFixedForm` (each member at its maximum EXTENT, length field and delimiter
+  included) and the READ landing need no second rule. The layout of each member is a `CobolDynStructure`
+  (`FileModel.StructureOf` is the one reader that turns a declaration into it), carried by the record type's layout as
+  `Structure` codes. **The send channel** is `OperandText.RecordSendImage` / `RecordSendExtents` (WRITE, REWRITE, RELEASE,
+  and the keyed READ / START / DELETE whose key is read out of the same image) — `RecordAreaImage` stays the procedural
+  contiguous view and is what READ INTO sends; a record with no structured member (`FileModel.CarriesStructure`)
+  answers the same strings as before, so nothing else renders differently. A dynamic-length ELEMENTARY record has no
+  extent table (its image is its one component), so its structure alone says where the data ends on a READ
+  (`CobolDynStructure.UnframeWith`, in `EmitOutOfLineInto`). **Sizes include the structure:** `FileModel.MaxDynamicExtent`
+  and `MinExtent` add each structured member's length field and delimiter (the record on the medium physically
+  contains them, §13.18.43.4 GR8), so GR9 / GR10, `RecordMax`, `VaryMin` / `VaryMax`, the key windows
+  (`RecordLayout.KeyWindowOf`) and the §13.18.43.3 SR3 / SR4 comparisons all count them from that one place; the
+  DEPENDING ON item holds the medium length. **LINE SEQUENTIAL** cannot hold the structure at all (DOC-A.1-115: the
+  characters below U+0020 are outside its character set, and the length field's first byte and the delimiter are
+  such characters), so a WRITE of a structured record to a LINE SEQUENTIAL file is the '71' of §14.9.51.4 GR23.
+  Reading with NO table (a file another program wrote, or a Format 1 file) takes the structured members apart by their
+  own structure (`CobolVarGroup.ComponentTake` is the one step of the walk, read by `FromContiguous` and `Position`);
+  an UNSTRUCTURED member then takes what is left beyond the fixed material and the later structured members' minimum.
 - **The implied RECORD clause** (§13.18.43.4 GR5, implementor-defined) is Format 2 exactly when a record is
   variable-length (`FileModel.ImpliesVariableFormat`; `RecordSizeVaries` is the one question every registration
   and `SortBinder.SortVaryingOf` ask). `MaxRecordSize` counts a dynamic-length item at its maximum size (GR8 b) —
@@ -153,10 +181,11 @@ operation is applied to a group containing it"* (§8.5.1.11.2).
 
 **Rejected alternatives.** Stage the shapes loud (the PB836 posture — rejects legal source); make the record area a
 cell with managed slots for a pointer record (the pointer still has no character image to send, and a dynamic
-member still has no fixed window); give a dynamic-length member a length prefix in the record (that is the
-DYNAMIC LENGTH STRUCTURE clause's job, §8.5.1.10.2, which is not claimed — COBOLNET1562 — and the contiguous
-procedural view of §8.5.1.11.2 would then not be what the file holds; the extent table carries the same lengths in
-the FRAME instead, outside the record); refuse at bind a record whose layout the take step cannot invert (legal
+member still has no fixed window); give an UNSTRUCTURED dynamic-length member a length prefix in the record (the
+prefix is the DYNAMIC LENGTH STRUCTURE clause's representation, §8.5.1.10.2, and a member whose clause names no
+structure has not asked for it; the extent table carries the same lengths in the FRAME instead, outside the record.
+A member that NAMES a structure is given exactly that form in the medium image — the bullet "THE MEDIUM FORM" above —
+while the contiguous procedural view of §8.5.1.11.2 stays the data alone); refuse at bind a record whose layout the take step cannot invert (legal
 source); the take step alone for every record (not invertible with two or more variable-length components — kb/Work
 PB1053).
 
@@ -2175,7 +2204,7 @@ A process-wide registry keyed by external name (with an Area discriminator for r
   the key of reference"*), the KEY. data-name-1's whole role is to name that key and, through GR17 b) (*"the
   length specified in the LENGTH clause, if specified, or else the length of record-key-name-1, if specified, or
   else the length of data-name-1"*), to supply a default length; it is never itself the source. So
-  `KeyedIoEmitter.EmitStart` sends `OperandText.RecordAreaImage` of `ReferenceResolver.RecordArea(file)` and
+  `KeyedIoEmitter.EmitStart` sends `OperandText.RecordSendImage` of `ReferenceResolver.RecordArea(file)` and
   `IndexedConnector.Start` slices the key of reference out of it with `KeyOf(Fit(image), keyIndex)` truncated to
   the GR17 b) count — **the same extraction the random READ (14.9.30.4 GR32) and DELETE (14.9.10.4 GR3) already
   make from the same image**, which is what makes a SOURCE-phrase key's several *parts* (12.4.5.12.4 GR2) fall

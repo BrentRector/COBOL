@@ -189,6 +189,31 @@ internal static class OperandText
     public static string? RecordAreaExtents(Place record) =>
         IsVarGroupRecord(record) ? PlaceRenderer.VarGroupCurrentExtents(record) : null;
 
+    /// <summary>⛔ THE IMAGE A RECORD IS SENT AS — the record the FILE (or the sort store) holds, which is
+    /// <see cref="RecordAreaImage"/> (the procedural, contiguous view, §8.5.1.11.2) except where a DYNAMIC LENGTH
+    /// STRUCTURE lays a member out (ISO §12.3.7.4 GR18, GR19; docs/CONFORMANCE.md §3 D-DL3; kb/Work PB1094): each
+    /// structured member then carries its length field and delimiter around its data in the MEDIUM image
+    /// (<c>CobolContiguousLayout.MediumImage</c>). Every emitter that hands a record to a connector or the sort store —
+    /// WRITE, REWRITE, RELEASE, and the keyed READ / START / DELETE whose key is read out of the same image — asks
+    /// THIS, never <see cref="RecordAreaImage"/>, and the READ / RETURN landing
+    /// (<c>SequentialIoEmitter.EmitOutOfLineInto</c>) is its exact inverse. A record with no structured member answers
+    /// <see cref="RecordAreaImage"/> and renders as before (<see cref="FileModel.CarriesStructure"/> is the gate). The
+    /// READ INTO sender (<see cref="CurrentRecordImage"/>) is a procedural operation and keeps the contiguous view.</summary>
+    public static string RecordSendImage(Place record) =>
+        !FileModel.CarriesStructure(record.Item) ? RecordAreaImage(record)
+        : IsVarGroupRecord(record)
+            ? $"{PlaceRenderer.VarGroupCurrentExtents(record)}.MediumImage({RecordAreaImage(record)})"
+            : RuntimeApi.DynStructureFrame(FileModel.StructureOf(record.Item)!.Code, RecordAreaImage(record));
+
+    /// <summary>The extent table that travels beside <see cref="RecordSendImage"/> — <see cref="RecordAreaExtents"/>,
+    /// widened to describe the MEDIUM image where a DYNAMIC LENGTH STRUCTURE lays a member out (kb/Work PB1094). A
+    /// structured dynamic-length elementary record sends none: its image is its one component and the structure
+    /// itself says where its data ends.</summary>
+    public static string? RecordSendExtents(Place record) =>
+        FileModel.CarriesStructure(record.Item) && IsVarGroupRecord(record)
+            ? $"{RecordAreaExtents(record)}.Medium()"
+            : RecordAreaExtents(record);
+
     /// <summary>Is <paramref name="record"/> a variable-length GROUP record — the one arm of
     /// <see cref="RecordAreaImage"/> and <see cref="RecordAreaExtents"/> whose image is a contiguous composition.</summary>
     private static bool IsVarGroupRecord(Place record) =>

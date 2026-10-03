@@ -274,7 +274,7 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     /// the right as necessary").</para></summary>
     public static CobolVarGroup FromContiguous(string record, int fixedTotal, IReadOnlyList<int> fixedAt,
         IReadOnlyList<int> unit, IReadOnlyList<long> maxUnits, IReadOnlyList<int>? recorded = null,
-        bool fixedForm = false)
+        bool fixedForm = false, IReadOnlyList<CobolDynStructure?>? structure = null)
     {
         var dyn = new string[fixedAt.Count];
         var fixedRun = new System.Text.StringBuilder(fixedTotal);
@@ -286,27 +286,74 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
             fixedRun.Append(Slice(record, pos, lead));
             pos += lead;
             fpos = fixedAt[k];
-            int take = recorded is not null ? recorded[k] : ContiguousTake(ref excess, unit[k], maxUnits[k]);
-            dyn[k] = Slice(record, pos, take);
+            int take = ComponentTake(k, record, pos, ref excess, recorded, fixedForm, unit[k], maxUnits[k], structure, out string? data);
+            dyn[k] = data ?? Slice(record, pos, take);
             pos += take;
             // THE FIXED FORM (D-FRA (vi); CobolContiguousLayout.ToFixedForm): the member filled its whole field, and
             // a space in a fixed-size field is padding, never data. ISO's own LINE SEQUENTIAL record does the same
             // (§14.9.51.4 GR21 — spaces to the right of the rightmost non-space are not transferred). Every component
             // of a FILE record is a dynamic-length ELEMENTARY item — a dynamic-capacity table "may be defined in any
             // place, other than the file section" (§8.5.1.9.1 3), COBOLNET1526 — so the trim never meets a table whose
-            // blank elements are data; `fixedForm` is passed for a file record and nothing else.
-            if (fixedForm) dyn[k] = dyn[k].TrimEnd(' ');
+            // blank elements are data; `fixedForm` is passed for a file record and nothing else. A STRUCTURED
+            // component (§12.3.7.4 GR18/GR19) is never trimmed: its length field or delimiter says where its data ends,
+            // so a trailing space is data, not padding (`data` is non-null for it).
+            if (fixedForm && data is null) dyn[k] = dyn[k].TrimEnd(' ');
         }
         fixedRun.Append(Slice(record, pos, fixedTotal - fpos));
         return new CobolVarGroup(fixedRun.ToString(), dyn);
+    }
+
+    /// <summary>⛔ THE ONE STEP OF THE RECORD WALK (kb/Work PB981, PB1025, PB1094): how many characters component
+    /// <paramref name="k"/> occupies in <paramref name="record"/> at <paramref name="pos"/>, and — for a component
+    /// laid out by a DYNAMIC LENGTH STRUCTURE (<paramref name="structure"/>[k], §12.3.7.4 GR18/GR19) — its DATA in
+    /// <paramref name="data"/> (null for a plain component, whose data IS the characters). Three sources, in order:
+    /// the record's own extent table (<paramref name="recorded"/>); for a structured component in the fixed form of a
+    /// fixed-length file, its whole maximum extent; for one with no table, the structure itself
+    /// (<see cref="CobolDynStructure.TakeAt"/>); and for a plain component with no table the take step
+    /// (<see cref="ContiguousTake"/>), which leaves the later STRUCTURED components their minimum (their length field
+    /// and delimiter) so the earlier plain one cannot swallow them. <see cref="FromContiguous"/> and
+    /// <see cref="CobolContiguousLayout.Position"/> both walk with it, so a key located after a dynamic member lands
+    /// exactly where the decomposition puts that member's end. <paramref name="excess"/> is the record's length beyond
+    /// its fixed run, less what earlier components took; this charges it.</summary>
+    internal static int ComponentTake(int k, string record, int pos, ref long excess, IReadOnlyList<int>? recorded,
+        bool fixedForm, int unit, long maxUnits, IReadOnlyList<CobolDynStructure?>? structure, out string? data)
+    {
+        data = null;
+        var st = structure?[k];
+        int take;
+        if (recorded is not null)
+        {
+            take = recorded[k];
+            if (st is not null) data = st.ContentOf(Slice(record, pos, take));
+        }
+        else if (st is not null)
+        {
+            if (fixedForm)
+            {
+                take = (int)Math.Min(int.MaxValue, st.Overhead + (unit <= 0 ? 0 : maxUnits * unit));
+                data = st.ContentOf(Slice(record, pos, take));
+                take = Math.Min(take, Math.Max(0, record.Length - pos));
+            }
+            else take = st.TakeAt(record, pos, out data);
+            excess -= take;
+        }
+        else
+        {
+            long later = 0;
+            if (structure is not null)
+                for (int j = k + 1; j < structure.Count; j++) later += structure[j]?.Overhead ?? 0;
+            long available = Math.Max(0, excess - later);
+            take = ContiguousTake(ref available, unit, maxUnits);
+            excess -= take;
+        }
+        return take;
     }
 
     /// <summary>⛔ THE ONE TAKE STEP of a contiguous record image (kb/Work PB981, PB1025): how many characters the
     /// next variable-length component takes — whole units of <paramref name="unit"/> characters, as many as the
     /// remaining <paramref name="excess"/> (the record's length beyond its FIXED run, less what earlier components
     /// took) holds, up to <paramref name="maxUnits"/> — charged to <paramref name="excess"/>.
-    /// <see cref="FromContiguous"/> and <see cref="CobolContiguousLayout.Position"/> both walk with it, so a key
-    /// located after a dynamic member lands exactly where the decomposition puts that member's end.</summary>
+    /// <see cref="ComponentTake"/> asks it for a plain component.</summary>
     internal static int ContiguousTake(ref long excess, int unit, long maxUnits)
     {
         long units = unit <= 0 ? 0 : Math.Min(excess / unit, maxUnits);

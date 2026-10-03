@@ -27,8 +27,70 @@ namespace CobolNet.Runtime;
 /// <param name="FixedAt">Component k's offset in the FIXED run.</param>
 /// <param name="Unit">Component k's unit width in characters.</param>
 /// <param name="MaxUnits">Component k's maximum size in units (§8.5.1.10.1 / the table's maximum capacity).</param>
-public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] Unit, long[] MaxUnits)
+/// <param name="StructureCodes">Component k's DYNAMIC LENGTH STRUCTURE layout (§12.3.7.4 GR18/GR19) as
+/// <see cref="CobolDynStructure.Code"/>, 0 for a component the clause names no structure for (§13.18.19.3 SR3 —
+/// the implementor's structure, which is the bare data and the extent table), or null when no component has one.
+/// <para>⛔ THE LAYOUT HAS TWO FORMS OF THE ONE RECORD (kb/Work PB1094). The CONTIGUOUS image is what a procedural
+/// operation on the group sees (§8.5.1.11.2) — the data alone. The MEDIUM image is what a file or a sort store holds:
+/// the contiguous image with each structured component replaced by its length field, data and delimiter
+/// (<see cref="CobolDynStructure.Frame"/>). A WRITE / REWRITE / RELEASE converts once on the way out
+/// (<see cref="MediumImage"/> + <see cref="MediumExtents"/>); a READ / RETURN converts back once in
+/// <see cref="Decompose"/>. An unstructured layout's two forms are the same string, so nothing else changes.</para></param>
+public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] Unit, long[] MaxUnits,
+    IReadOnlyList<int>? StructureCodes = null)
 {
+    private readonly CobolDynStructure?[]? _structure = CobolDynStructure.FromCodes(StructureCodes);
+
+    /// <summary>Component k's DYNAMIC LENGTH STRUCTURE, or null when it has none (see the type summary).</summary>
+    public CobolDynStructure? StructureOf(int k) => _structure?[k];
+
+    /// <summary>Does any component of this layout have a DYNAMIC LENGTH STRUCTURE — is its MEDIUM image different
+    /// from its contiguous one.</summary>
+    public bool HasStructure => _structure is not null;
+
+    /// <summary>The most characters component k can occupy in the MEDIUM image — its maximum data
+    /// (§8.5.1.10.1) plus its length field and delimiter. What the fixed form (<see cref="ToFixedForm"/>) pads it to.</summary>
+    private long MaxExtent(int k) => MaxUnits[k] * Unit[k] + (_structure?[k]?.Overhead ?? 0);
+
+    /// <summary>⛔ THE MEDIUM IMAGE of a record this layout's type sent — the contiguous <paramref name="image"/> with
+    /// each structured component framed by its DYNAMIC LENGTH STRUCTURE (§12.3.7.4 GR18 length field before the data,
+    /// GR19 delimiter after it). <paramref name="extents"/> is the table that was built over the same image
+    /// (<see cref="ExtentsOf"/>); an unstructured layout returns the image itself.</summary>
+    /// <exception cref="InvalidOperationException">The table does not describe the image — a record sent through its
+    /// own layout always does, so this is a compiler defect, never a program's.</exception>
+    public string MediumImage(string image, RecordExtents extents)
+    {
+        if (_structure is null) return image;
+        var lengths = Recorded(image, extents)
+            ?? throw new InvalidOperationException("the extent table does not describe the record it was built over");
+        var sb = new System.Text.StringBuilder(image.Length + 16);
+        int at = 0, fixedDone = 0;
+        for (int k = 0; k < FixedAt.Length; k++)
+        {
+            int lead = FixedAt[k] - fixedDone;
+            sb.Append(image, at, lead);
+            at += lead;
+            fixedDone = FixedAt[k];
+            string data = image.Substring(at, lengths[k]);
+            sb.Append(_structure[k] is { } st ? st.Frame(data) : data);
+            at += lengths[k];
+        }
+        sb.Append(image, at, image.Length - at);
+        return sb.ToString();
+    }
+
+    /// <summary>The extent table of the MEDIUM image: <paramref name="extents"/> with each structured component's
+    /// length increased by its length field and delimiter, so the table describes the characters a file holds
+    /// (<see cref="RecordExtents.Describes"/>) and a key behind a structured member is found where it really is
+    /// (<see cref="Position"/>). An unstructured layout returns the table itself.</summary>
+    public RecordExtents MediumExtents(RecordExtents extents)
+    {
+        if (_structure is null) return extents;
+        var lengths = new int[extents.Count];
+        for (int k = 0; k < lengths.Length; k++) lengths[k] = extents.Lengths[k] + (_structure[k]?.Overhead ?? 0);
+        return new RecordExtents(FixedAt, lengths, this);
+    }
+
     /// <summary>Each variable-length component's offset in the FIXED run, in the carrier's flattened order — where
     /// <see cref="CobolVarGroup.Compare"/> interleaves the components with the fixed material (ISO §8.8.4.2.17).</summary>
     public IReadOnlyList<int> ComponentOffsets => FixedAt;
@@ -71,7 +133,7 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
             sb.Append(image, at, lead + lengths[k]);
             at += lead + lengths[k];
             fixedDone = FixedAt[k];
-            sb.Append(' ', (int)Math.Min(Math.Max(0, MaxUnits[k] * Unit[k] - lengths[k]), int.MaxValue));
+            sb.Append(' ', (int)Math.Min(Math.Max(0, MaxExtent(k) - lengths[k]), int.MaxValue));
         }
         sb.Append(image, at, image.Length - at);
         return sb.ToString();
@@ -83,22 +145,26 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
     /// FIXED-LENGTH records (<see cref="ToFixedForm"/>): the members then take their maximum widths and each drops
     /// the space padding that fills its field.</summary>
     public CobolVarGroup Decompose(string record, RecordExtents? extents = null, bool fixedForm = false) =>
-        CobolVarGroup.FromContiguous(record, FixedTotal, FixedAt, Unit, MaxUnits, Recorded(record, extents), fixedForm);
+        CobolVarGroup.FromContiguous(record, FixedTotal, FixedAt, Unit, MaxUnits, Recorded(record, extents), fixedForm,
+            _structure);
 
-    /// <summary>The character position, in <paramref name="record"/>, of the fixed material at
-    /// <paramref name="fixedOffset"/> of the FIXED run: that offset plus what every variable-length component
-    /// PRECEDING it took from this record — its recorded length when <paramref name="extents"/> describe the record,
-    /// the take step's share otherwise, the same two sources <see cref="Decompose"/> reads, so a key is found
+    /// <summary>The character position, in <paramref name="record"/> (the MEDIUM image — the record as the file holds
+    /// it), of the fixed material at <paramref name="fixedOffset"/> of the FIXED run: that offset plus what every
+    /// variable-length component PRECEDING it occupies in this record — its recorded extent when
+    /// <paramref name="extents"/> describe the record, the take step's share (or its own structure's) otherwise, the
+    /// same sources <see cref="Decompose"/> reads through <see cref="CobolVarGroup.ComponentTake"/>, so a key is found
     /// exactly where the decomposition puts it. A component at <c>FixedAt[k] ≤ fixedOffset</c> precedes the
     /// member — a fixed member cannot start where a following component starts, because it occupies at least one
     /// position of the fixed run first.</summary>
     public int Position(string record, int fixedOffset, RecordExtents? extents = null)
     {
+        record ??= "";
         var recorded = Recorded(record, extents);
-        long excess = Math.Max(0, (record?.Length ?? 0) - FixedTotal);
+        long excess = Math.Max(0, record.Length - FixedTotal);
         long at = fixedOffset;
         for (int k = 0; k < FixedAt.Length && FixedAt[k] <= fixedOffset; k++)
-            at += recorded is not null ? recorded[k] : CobolVarGroup.ContiguousTake(ref excess, Unit[k], MaxUnits[k]);
+            at += CobolVarGroup.ComponentTake(k, record, (int)Math.Min(int.MaxValue, at - fixedOffset + FixedAt[k]), ref excess,
+                recorded, fixedForm: false, Unit[k], MaxUnits[k], _structure, out _);
         return (int)Math.Min(int.MaxValue, at);
     }
 

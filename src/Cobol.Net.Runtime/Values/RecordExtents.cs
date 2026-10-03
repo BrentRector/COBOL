@@ -44,6 +44,17 @@ public sealed class RecordExtents
     /// (see the constructor).</summary>
     public CobolContiguousLayout? Layout { get; }
 
+    /// <summary>⛔ THE MEDIUM IMAGE of the record this table was built over (<see cref="CobolContiguousLayout.MediumImage"/>;
+    /// kb/Work PB1094): <paramref name="image"/> — the contiguous <c>CurrentImage()</c> — with each component a
+    /// DYNAMIC LENGTH STRUCTURE lays out framed by its length field and delimiter (ISO §12.3.7.4 GR18, GR19), which is
+    /// what a WRITE / REWRITE / RELEASE hands the file or sort store. A table with no layout, or whose layout has no
+    /// structured component, answers the image itself.</summary>
+    public string MediumImage(string image) => Layout is { HasStructure: true } layout ? layout.MediumImage(image, this) : image;
+
+    /// <summary>The table of that medium image (<see cref="CobolContiguousLayout.MediumExtents"/>) — each structured
+    /// component's length widened by its length field and delimiter; this table itself when nothing is structured.</summary>
+    public RecordExtents Medium() => Layout is { HasStructure: true } layout ? layout.MediumExtents(this) : this;
+
     /// <summary>Component k's offset in the record's FIXED run.</summary>
     public IReadOnlyList<int> FixedAt { get; }
 

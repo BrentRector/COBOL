@@ -523,9 +523,47 @@ public sealed class FileModel
     /// (§8.5.1.9.1, DOC-A.1-60), never its TO phrase, which is only the EXPECTED capacity and "may be exceeded
     /// with a nonfatal exception".</para></summary>
     internal static long MaxDynamicExtent(DataItem item) =>
-        item.IsDynamicLength ? (long)item.DynMaxSize * (item.Pic?.Category is PicCategory.National ? 2 : 1)
+        item.IsDynamicLength ? (long)item.DynMaxSize * (item.Pic?.Category is PicCategory.National ? 2 : 1) + StructureOverhead(item)
         : item.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(item) ? (long)item.ByteWidth * (item.Occurs ?? 1)
         : item.Children.Where(c => c.RedefinesTargetName is null).Sum(MaxDynamicExtent) * (item.Occurs ?? 1);
+
+    /// <summary>⛔ THE ONE READER OF THE DYNAMIC LENGTH STRUCTURE A DYNAMIC-LENGTH ITEM OCCUPIES IN A RECORD IMAGE
+    /// (ISO §12.3.7.4 GR18 length field, GR19 delimiter; docs/CONFORMANCE.md §3 D-DL3; kb/Work PB1094): the runtime
+    /// layout of <paramref name="item"/>'s named structure over the item's image unit, or null for an item that names
+    /// none (§13.18.19.3 SR3 — the implementor's structure, which is the bare data and the frame's extent table) or
+    /// is not dynamic-length. The record-image codec's component table, the size accounting
+    /// (<see cref="StructureOverhead"/>) and the elementary-record WRITE / READ arms all ask it, so what an item
+    /// occupies is written once.</summary>
+    internal static CobolNet.Runtime.CobolDynStructure? StructureOf(DataItem item) =>
+        item is { IsDynamicLength: true, DynStructure: { } s } ? s.Layout(RecordImageUnit(item)) : null;
+
+    /// <summary>Image characters per character position of a dynamic-length item's data in a record image: one for
+    /// an alphanumeric item and for a national MEMBER of a group (it contributes its content character for character,
+    /// DOC-A.1-63), two for a national item that IS the record, whose image is its UTF-16BE byte pairs (D-N1, the
+    /// <c>AsStorageImage</c> arm of the record-area channel).</summary>
+    internal static int RecordImageUnit(DataItem item) => item.Parent is null && item.Pic?.Category is PicCategory.National ? 2 : 1;
+
+    /// <summary>The characters <paramref name="item"/>'s DYNAMIC LENGTH STRUCTURE adds around its data in a record
+    /// (length field + delimiter) — 0 for an item with none. Counted by <see cref="MaxDynamicExtent"/> and
+    /// <see cref="MinExtent"/>, because the record on the medium physically contains them (§12.3.7.4 GR18: "data
+    /// described with dynamic-length-structure-name-1 is prefixed by a length field"), so §13.18.43.4 GR8's size of
+    /// the record, and every bound derived from it, includes them.</summary>
+    internal static int StructureOverhead(DataItem item) => StructureOf(item)?.Overhead ?? 0;
+
+    /// <summary>Is any component of <paramref name="record"/>'s image laid out by a DYNAMIC LENGTH STRUCTURE — so its
+    /// MEDIUM image (what a file holds) is not its contiguous one (kb/Work PB1094)? The record itself when it is a
+    /// structured dynamic-length item, else a group with such a member that is not a redefinition (the members the
+    /// record-image layout lists). THE compile-time gate for every medium-form emit: a record that answers false
+    /// renders exactly as before.</summary>
+    internal static bool CarriesStructure(DataItem record) =>
+        record.IsDynamicLength ? StructureOf(record) is not null
+        : record.IsGroup && record.Children.Any(c => c.RedefinesTargetName is null && CarriesStructure(c));
+
+    /// <summary>The structure overhead of every dynamic-length item at or beneath <paramref name="item"/> that is
+    /// not a redefinition — the minimum-size twin of <see cref="MaxDynamicExtent"/>'s per-leaf term.</summary>
+    private static long StructureOverheadBeneath(DataItem item) =>
+        item.IsElementary ? StructureOverhead(item)
+        : item.Children.Where(c => c.RedefinesTargetName is null).Sum(StructureOverheadBeneath);
 
     /// <summary>⛔ THE ONE "does this record have a fixed character window?" predicate — D-FRA
     /// (docs/CONFORMANCE.md §3, kb/Work PB981). A record description that is a dynamic-length elementary item,
@@ -603,7 +641,7 @@ public sealed class FileModel
     ///   <item>otherwise the sum over the non-redefining children, each at its minimum occurrence count.</item>
     /// </list></summary>
     private static long MinExtent(DataItem item) =>
-        item.IsElementary || !HasVaryingTableBeneath(item) ? item.ByteWidth
+        item.IsElementary || !HasVaryingTableBeneath(item) ? item.ByteWidth + StructureOverheadBeneath(item)
         : item.HasBitDescendant && OdoModel.TableUnder(item) is { OccursSpec: { } os } table
                 && BitLayout.StartBitOf(item, table) is >= 0 and var start
             ? BitLayout.Characters(start

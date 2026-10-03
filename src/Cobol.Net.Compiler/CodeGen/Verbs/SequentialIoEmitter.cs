@@ -547,7 +547,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // §14.9.51.4 GR4 — the released record is also available as a record of the other files of a SAME RECORD AREA
         // clause (kb/Work PB1195): held in a local so the statement and the store after it see the SAME record.
         string? released = BeginReleasedRecord(wr.File, wr.Record, ref image);
-        w.Line($"{RuntimeApi.FileWriteShared(name, image, lenArg, RuntimeRecordLock(wr.Lock), retryKind, retryAmount, LinageArg(wr.File), AdvanceArg(wr), OperandText.RecordAreaExtents(wr.Record))};");
+        w.Line($"{RuntimeApi.FileWriteShared(name, image, lenArg, RuntimeRecordLock(wr.Lock), retryKind, retryAmount, LinageArg(wr.File), AdvanceArg(wr), OperandText.RecordSendExtents(wr.Record))};");
         EndReleasedRecord(wr.File, wr.Record, released, lenArg, RuntimeApi.FileStatus(name));
         // The §9.1.14 status SNAPSHOT for a --permissive INVALID KEY phrase (kb/Work PB691). Taken HERE, before
         // the FILE STATUS store and the USE hook, for the same reason the end-of-page flag is read in the `if`
@@ -777,7 +777,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // §14.9.35.4 GR6 — the released record is also available as a record of the other files of a SAME RECORD AREA
         // clause: held in a local so the statement and the store after it see the SAME record (kb/Work PB1195).
         string? released = BeginReleasedRecord(rw.File, rw.Record, ref image);
-        w.Line($"{RuntimeApi.FileRewriteShared(FileKeyExpr(rw.File), image, rwLenArg, RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordAreaExtents(rw.Record))};");
+        w.Line($"{RuntimeApi.FileRewriteShared(FileKeyExpr(rw.File), image, rwLenArg, RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordSendExtents(rw.Record))};");
         EndReleasedRecord(rw.File, rw.Record, released, rwLenArg, RuntimeApi.FileStatus(FileKeyExpr(rw.File)));
         // The §9.1.14 status snapshot for a --permissive INVALID KEY phrase, taken before the status store and
         // the USE hook — the WRITE arm above carries the full reasoning (kb/Work PB691).
@@ -827,7 +827,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     }
 
     /// <summary>Make the current record available in ONE out-of-line record (D-FRA; kb/Work PB981) — the
-    /// receiving inverse of <see cref="OperandText.RecordAreaImage"/>'s out-of-line arms, arm for arm: a
+    /// receiving inverse of <see cref="OperandText.RecordSendImage"/>'s out-of-line arms, arm for arm: a
     /// variable-length group decomposes the contiguous record (§8.5.1.11.2) through its generated
     /// <c>FromContiguousImage</c>; a dynamic-length record takes the record as its new content (§8.5.1.10.4 —
     /// "the new value becomes the content of the item", truncated on the right at its maximum; a NATIONAL one
@@ -845,12 +845,24 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         }
         if (item.IsDynamicLength)
         {
+            // §12.3.7.4 GR18 / GR19 (kb/Work PB1094): a record that names a DYNAMIC LENGTH STRUCTURE holds its data
+            // between its length field and its delimiter, and the structure itself says where the data ends — the
+            // exact inverse of OperandText.RecordSendImage's elementary arm. The data is then the item's image.
+            var structure = FileModel.StructureOf(item);
+            string data = currentRecord;
+            if (structure is not null)
+            {
+                data = $"__dyn{ctx.Names.NextKeyedSeq()}";
+                w.Line($"string {data} = {RuntimeApi.DynStructureUnframe(structure.Code, currentRecord)};");
+            }
             string content = item.Pic?.Category is PicCategory.National
-                ? RuntimeApi.NatReadWindow(currentRecord, "0", $"{currentRecord}.Length / 2")
-                : currentRecord;
+                ? RuntimeApi.NatReadWindow(data, "0", $"{data}.Length / 2")
+                : data;
             // D-FRA (vi): the fixed form of a dynamic-length record fills its whole field with the content and spaces;
-            // the spaces are padding, never data (the group arm drops them member by member, in Decompose).
-            if (fixedForm) content = $"({content}).TrimEnd(' ')";
+            // the spaces are padding, never data (the group arm drops them member by member, in Decompose). A
+            // STRUCTURED record's data is already exact — its length field or delimiter ended it — so a trailing space
+            // of the data is data, never padding.
+            if (fixedForm && structure is null) content = $"({content}).TrimEnd(' ')";
             w.Line(PlaceRenderer.Write(record, ReceivingStore.Characters(item, content, "0")));   // the ONE elementary character store (PB871)
             return;
         }
@@ -928,7 +940,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     }
 
     /// <summary>⛔ THE IMAGE A WRITE / REWRITE SENDS (determination D-WRT1, docs/CONFORMANCE.md §3; kb/Work PB1907).
-    /// <see cref="OperandText.RecordAreaImage"/> of record-name-1, except where the statement transfers more bytes
+    /// <see cref="OperandText.RecordSendImage"/> of record-name-1, except where the statement transfers more bytes
     /// than record-name-1 holds (<see cref="FileModel.TransfersPastRecord"/>): §14.9.51.4 GR13 and §14.9.35.4 GR15
     /// leave the content of those bytes undefined (Annex A.2 items 64 and 49), and the compiler's determination is
     /// the record area's content at those positions — so the statement sends the image of the area
@@ -938,8 +950,8 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// own: its implicit MOVE into record-name-1 has already run when this is asked (§14.9.51.4 GR5 a)).</summary>
     internal string SentRecordImage(FileModel file, Place record) =>
         file.TransfersPastRecord(record.Item) && refs.RecordArea(file) is { } area
-            ? OperandText.RecordAreaImage(area)
-            : OperandText.RecordAreaImage(record);
+            ? OperandText.RecordSendImage(area)
+            : OperandText.RecordSendImage(record);
 
     /// <summary>⛔ DOES THE RECORD A STATEMENT JUST RELEASED HAVE ANYWHERE TO BE "ALSO AVAILABLE"? (§14.9.51.4 GR4
     /// for WRITE, §14.9.35.4 GR6 for REWRITE, §14.9.32.4 GR3 for RELEASE — one rule, three statements; kb/Work
@@ -978,7 +990,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         if (released is null) return;
         using (ctx.Writer.Block($"if ({IoStatusClass.Successful(statusExpr)})"))
             EmitReleasedRecordAlsoAvailable(file, record, RuntimeApi.FileReleasedRecord(released, lengthArg),
-                OperandText.RecordAreaExtents(record));
+                OperandText.RecordSendExtents(record));
     }
 
     /// <summary>⛔ THE ONE "ALSO AVAILABLE" STORE of a released record — the WRITE / REWRITE / RELEASE twin of

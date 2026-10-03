@@ -203,8 +203,9 @@ of an unsupported facility.
   (`ReceivingStore.ExaminationSize`, kb/Work PB979); witnessed by `conformance:2014/pb871_dynamic_length_receivers`
   (STRING into an empty item, into a longer one, through a grown gap and past the maximum; UNSTRING with and
   without DELIMITED BY).
-- **D-DL3 — the DYNAMIC LENGTH STRUCTURE clause: the PREFIXED length field bounds the item, the layout is
-  recorded, and no physical-structure-name is supported** (kb/Work PB829; rows `FMT-12.3.7.2`). §12.3.7.4 GR18
+- **D-DL3 — the DYNAMIC LENGTH STRUCTURE clause: the PREFIXED length field bounds the item, the layout is the
+  item's form in the record a file holds, and no physical-structure-name is supported** (kb/Work PB829, PB1094;
+  rows `FMT-12.3.7.2`, `GR-12.3.7.4-19`). §12.3.7.4 GR18
   sizes the PREFIXED length field ("If SIGNED is specified, the length field is a signed binary field"; SHORT the
   shorter one) and GR19 puts a binary-zero delimiter after DELIMITED data. WiseOwl COBOL's length fields are exactly
   those binary fields (32-bit, or 16-bit with SHORT), so §8.5.1.10.1's candidate "the largest integer that can be
@@ -212,14 +213,64 @@ of an unsupported facility.
   PREFIXED, 32767 for SIGNED SHORT PREFIXED; 4294967295 and 2147483647 exceed the implementor maximum (item 62)
   and bound nothing. "The maximum length associated with dynamic-length-structure-name-1" (§13.18.19.3 SR4) is
   that capacity bounded by the implementor maximum (a DELIMITED-only structure: the implementor maximum); a larger
-  LIMIT is COBOLNET2258. The LAYOUT itself is recorded on the model (`Model/DynamicLengthStructure`) but never
-  materialized: §8.5.1.10.3 leaves the item's physical location to the implementor, a dynamic-length item IS a
-  native `string`, and no operation gives it an addressable byte image. §12.3.7.3 SR32 ("The implementor shall
+  LIMIT is COBOLNET2258. **The LAYOUT is realized in the record image** (kb/Work PB1094, which refuted this
+  determination's earlier premise that "no operation gives the item an addressable byte image": a WRITE does).
+  §8.5.1.10.3 lets a dynamic-length item sit "within the record they are subordinate to", which is what a record on
+  a medium is, and §12.3.7.4 GR18 / GR19 then say what the item looks like there: *"data described with
+  dynamic-length-structure-name-1 is prefixed by a length field"* and *"a delimiter shall directly follow the data"*.
+  So a structured item occupies **`[length field][data][delimiter]`** in a record a file or a sort store holds, the
+  length field present for PREFIXED and the delimiter for DELIMITED, in that order whichever order the clause wrote
+  them (a structure with both has both). **Representation** (the standard leaves it implementor-defined, GR18's
+  "capable of supporting" and GR19's "data of the length of an alphanumeric character"): the length field is the
+  item's current length in CHARACTER POSITIONS as a binary integer **most significant byte first** (the
+  implementation's binary byte order, A.1 item 205), **four characters** for PREFIXED / SIGNED PREFIXED and **two**
+  for SHORT PREFIXED / SIGNED SHORT PREFIXED (SIGNED changes the range, never the bytes: a length is never
+  negative), one image character per byte; the delimiter is **one character position of zero bits** — one
+  character for an alphanumeric item and for a national member of a group (a dynamic-length item contributes its
+  content character for character, A.1 item 63), **two** for a national item that is itself the record (its image
+  is its UTF-16BE byte pairs, D-N1). **The program never sees these characters:** §8.5.1.11.2 makes a
+  variable-length item behave "as though it were in fact contiguous with its neighbors whenever a procedural
+  operation is applied to a group containing it", so a MOVE, a comparison, DISPLAY or READ … INTO of the record is
+  over the data alone. A record has TWO FORMS: the *contiguous* image (the data alone, what the procedural
+  view is) and the *medium* image (what the file holds: each structured member framed). They are produced and
+  consumed in ONE place, `CobolContiguousLayout` (`MediumImage` / `MediumExtents` on a WRITE, REWRITE or RELEASE;
+  `Decompose` on a READ or RETURN), over the per-member layout `CobolDynStructure`, and the frame's extent table
+  (D-FRA (v)) keeps describing the stored image, so a key behind a structured member, the sort store and the fixed
+  form (D-FRA (vi)) need no second rule. **Sizes include the structure**: the record on the medium physically
+  contains the length field and delimiter, so §13.18.43.4 GR8's size of a record description, GR9 / GR10's
+  minimum and maximum, every RECORD clause integer a syntax rule compares against them (§13.18.43.3 SR3 / SR4), the
+  bytes a RECORD VARYING … DEPENDING ON item holds (GR13 a), GR15) and the fixed length a Format 1 file's records
+  have (GR6 — each member then at its MAXIMUM extent, length field + maximum size + delimiter, blank padded)
+  all count them; `FileModel.MaxDynamicExtent` / `MinExtent` are the one place. **Reading**: the frame's extent table
+  says where each member's extent ends and the structure says what is inside it (length field first, else up to the
+  delimiter; an extent that ends in its delimiter is exactly the data before it, so data that itself holds a binary
+  zero survives); a record that carries NO table (a file another program wrote, a Format 1 file) is taken
+  apart by the structures themselves, and a member with no structure takes what is left beyond the fixed material and
+  the minimum (length field + delimiter) of the structured members after it — so with NO table a plain member
+  followed by a structured one is read as the take step reads it (D-FRA), and data that holds the delimiter of a
+  DELIMITED-only member ends there. A length field larger than the record holds is clamped to what is there (a record
+  that ends inside its own structure gives what is left) and no condition is set: §14.6.13.2 rule 5's
+  EC-DATA-INCOMPATIBLE speaks of a dynamic-length item's own internal format, which here is a native string and is
+  always well formed, and the standard defines no status for a medium record that disagrees with its structure.
+  **LINE SEQUENTIAL**: the characters below U+0020 are outside a line sequential
+  file's character set (A.1 item 115), and a length field (whose first byte is zero) and a delimiter are such
+  characters, so a WRITE of a record that holds a structured member to a LINE SEQUENTIAL file is the status '71' of
+  §14.9.51.4 GR23, exactly as for any record holding a binary field — an unstructured dynamic-length member
+  (§13.18.19.3 SR3) is unaffected. **Rejected readings:** keeping the structure off the medium because the item is
+  a native `string` outside the record (§8.5.1.10.3's other option — it makes GR18 and GR19 unobservable, and the
+  clause's purpose is the layout a second program reading the file sees); putting the structure in the
+  contiguous image (it would break §8.5.1.11.2's procedural view, which is why the two forms are separate);
+  counting the structure bytes against nothing (a record of maximum content then exceeded the RECORD clause's own
+  bound and the WRITE failed '44'). §12.3.7.3 SR32 ("The implementor shall
   specify the names supported for physical-structure-name-1") is answered with the EMPTY set: every layout the
   carrier could honour is already expressible with PREFIXED / DELIMITED, so a physical-structure-name is refused by
   name (COBOLNET2257) rather than silently mapped to one of them. Witnessed by `conformance:2014/pb829_dynamic_length_structure`
-  (a 70000-character sender stores 65535 / 32767 / 70000 / 70000 / LIMIT 10) and
-  `conformance:negative/pb829-dynamic-length-structure-limit`.
+  (a 70000-character sender stores 65535 / 32767 / 70000 / 70000 / LIMIT 10), `conformance:negative/pb829-dynamic-length-structure-limit`
+  and, for the layout in the record, `conformance:2014/pb1094_dynamic_length_structure_record_image` (every
+  PREFIXED / SIGNED / SHORT / DELIMITED form and a plain member, read back as the characters the file holds),
+  `…_elementary_record` (a record that is the item: alphanumeric and national), `…_organizations` (indexed
+  variable and Format 1, relative, SORT USING / GIVING and procedures) and `…_record_size` (the Format 1 fixed form
+  and RECORD VARYING … DEPENDING ON).
 - **D-UN3 — which side of UNSTRING's all-national rule a NUMERIC receiver stands on** (2026-09-22; kb/Work
   PB980, row `SR-14.9.48.3-3`). §14.9.48.3 SR3 is category-worded: *"If any of identifier-1, identifier-2,
   identifier-3, identifier-4, identifier-5, literal-1, or literal-2 are of category national, then all shall be of
@@ -313,8 +364,10 @@ of an unsupported facility.
   every length pair of two dynamic members and their content). **Rejected readings of the whole:** refusing the source (the
   previous staged-loud posture; no rule forbids it); treating the file's character bytes as the dynamic item's
   storage (the item's content would be bounded by the area and padded by it, contradicting §8.5.1.10.4's "the new
-  value becomes the content of the item"); a length-prefixed record image (that is the DYNAMIC LENGTH STRUCTURE
-  clause's representation, §8.5.1.10.2, not claimed — COBOLNET1562 — and it would put the lengths INSIDE the record
+  value becomes the content of the item"); a length-prefixed record image FOR AN ITEM THAT NAMES NO STRUCTURE (the
+  length field is the representation a DYNAMIC LENGTH STRUCTURE clause names, §8.5.1.10.2, and an item whose clause
+  names none has not asked for it — a NAMED structure is given exactly that form in the record, D-DL3 — and for the
+  unstructured item it would put the lengths INSIDE the record
   a character record of the same area, a RECORD VARYING DEPENDING item and a key position all read, where (v) keeps
   them in the frame); refusing at bind a record the take step cannot invert (legal source, and the physical form
   is the implementor's to choose); the take step alone for every record (the previous posture — PB1053 measured
@@ -334,7 +387,7 @@ of an unsupported facility.
   compile time so a program with no out-of-line record in the area renders as before. The READ side is completed
   alike: a file whose every record is out of line has no character window of its own, and its READ now reaches the
   character window of a clause peer (`SequentialIoEmitter.EmitRecordAreaStore`). Implemented once — `FileModel.IsOutOfLineRecord`,
-  `DataBinder.LinkImplicitRecordArea`, `SequentialIoEmitter.EmitRecordAreaStore`, `OperandText.RecordAreaImage`,
+  `DataBinder.LinkImplicitRecordArea`, `SequentialIoEmitter.EmitRecordAreaStore`, `OperandText.RecordSendImage`,
   `CobolVarGroup.FromContiguous`, and for (v) `RecordExtents`, `CobolContiguousLayout.ExtentsOf` / `Decompose`,
   `RecordFraming` (the frame's extent table), `OperandText.RecordAreaExtents` (COBOLNET_FILES_DESIGN D27); witnessed
   by `conformance:2014/pb981_fd_variable_length_records`, `conformance:2002/pb981_fd_pointer_record`,
