@@ -410,7 +410,7 @@ internal sealed class ReportWriterEmitter(
         {
             if (r.File is null) continue;   // diagnosed at bind (§13.18.46) — compile already failed
             w.Line($"__RPT_{r.CsIndex} = new CobolReport({CsLiteral(r.Name)}, {FileKeyExpr(r.File)}, "
-                + $"{r.LineWidth}, {(r.Paged ? "true" : "false")}, {r.PageLimit}, {r.Heading}, {r.FirstDetail}, "
+                + $"{r.LineWidth}, {r.PageWidth}, {(r.Paged ? "true" : "false")}, {r.PageLimit}, {r.Heading}, {r.FirstDetail}, "
                 + $"{r.LastControlHeading}, {r.LastDetail}, {r.Footing});");
             foreach (var (group, gi) in r.Groups.Select((g, i) => (g, i)))
             {
@@ -433,6 +433,10 @@ internal sealed class ReportWriterEmitter(
                     + $"{CsLiteral(group.Name ?? "")}, {group.ControlLevel}, {lines});");
                 if (plan.Tests.Count > 0)
                     w.Line($"__rg{r.CsIndex}_{gi}.SetPresence({plan.Tests.Count}, __RPT_P_{r.CsIndex}_{gi});");
+                // The OR PAGE phrase of a control heading (§13.18.57.2; kb/Work PB1298) — the engine reprints the
+                // heading after each page advance (§13.18.57.4 GR6 c)).
+                if (group.OrPage)
+                    w.Line($"__rg{r.CsIndex}_{gi}.OrPage = true;");
                 // The NEXT GROUP clause (§13.18.37; kb/Work PB957) — the bound runtime record, written verbatim; the
                 // engine applies it after the group's last line (GR2).
                 if (group.NextGroup is { } ng)

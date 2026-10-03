@@ -799,7 +799,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // condition-name misbind. (P10 Step 15; DataBinder.Constants.cs.)
             if (entry.dataDescriptionBody().constantEntryBody() is { } constBody)
             {
-                BindConstantEntry(entry, constBody);
+                BindConstantEntry(entry.levelNumber(), entry.dataName(), constBody);
                 // A constant entry describes NO data item, so a level-88 entry written after one has no
                 // conditional variable to associate with (ISO §13.16.3 SR24 — "the entry describing the item").
                 lastDescribed = null;

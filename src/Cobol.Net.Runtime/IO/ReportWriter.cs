@@ -175,6 +175,11 @@ public sealed class ReportGroup(ReportGroupKind kind, string name, int controlLe
     /// <summary>The group's NEXT GROUP clause (ISO §13.18.37; §13.15.3 SR6 — level 1 only), null when none.</summary>
     public ReportNextGroup? NextGroup { get; set; }
 
+    /// <summary>A control heading written with the OR PAGE phrase (ISO §13.18.57.2): "The OR PAGE phrase causes the
+    /// associated control heading to be printed in addition after each page advance, following any page heading"
+    /// (§13.18.57.4 GR6 c)). Read by <see cref="CobolReport"/>'s page advance only; false for every other group.</summary>
+    public bool OrPage { get; set; }
+
     /// <summary>⛔ ONE PRESENCE SNAPSHOT PER GROUP PRESENTATION (kb/Work PB1272). ISO §13.18.41.4 GR2: "condition-1
     /// of each PRESENT WHEN clause is evaluated before the processing of any LINE clauses for the report group",
     /// and §13.18.38.4 GR13 evaluates an OCCURS … DEPENDING data-name-1 "just before the processing for the first
@@ -213,7 +218,7 @@ public sealed class ReportGroup(ReportGroupKind kind, string name, int controlLe
 /// LINE-COUNTER, because a NEXT GROUP clause moves LINE-COUNTER without printing (§8.4.3.15.4 GR4, §13.18.37.4).
 /// </summary>
 public sealed class CobolReport(
-    string name, string fileName, int lineWidth, bool paged,
+    string name, string fileName, int lineWidth, int pageWidth, bool paged,
     int pageLimit, int heading, int firstDetail, int lastControlHeading, int lastDetail, int footing)
 {
     /// <summary>The report-name (the RD entry's name).</summary>
@@ -221,6 +226,10 @@ public sealed class CobolReport(
 
     private readonly string _fileName = fileName;   // the emit-qualified connector name ("PROG::FILE")
     private readonly int _lineWidth = lineWidth;
+
+    /// <summary>The page width (ISO §13.18.39.4 GR2b/GR5 — the PAGE clause's integer-2, else 999), supplied by the
+    /// binder: THE width §13.18.14.4 GR5 measures a printable item against, in one place.</summary>
+    private readonly int _pageWidth = pageWidth;
     private readonly bool _paged = paged;           // PAGE clause present (§13.18.39.4 GR2a — absent ⇒ one page of indefinite length)
 
     // Page regions (§13.18.39.4 GR2, binder-supplied GR3 defaults).
@@ -928,8 +937,11 @@ public sealed class CobolReport(
 
     /// <summary>Present a BODY group (detail / CH / CF — §13.18.57.3 SR15): the §13.18.35.4 GR4 page-fit test
     /// (skipped for the chronologically first body group since INITIATE), a failed fit's §14.9.16.4 GR6 page
-    /// advance, then each line per GR5 (first line) / GR7 (subsequent lines).</summary>
-    private void PresentBody(ReportGroup group, bool applyNextGroup = true)
+    /// advance, then each line per GR5 (first line) / GR7 (subsequent lines). <paramref name="reprint"/> is the
+    /// OR PAGE reprint of a control heading (<see cref="PresentOrPageHeadings"/>): the first body group of a
+    /// fresh page, so it takes no page-fit test, and it is not the heading's first printing, so it neither applies
+    /// its NEXT GROUP clause nor resets the SUM counters it prints.</summary>
+    private void PresentBody(ReportGroup group, bool applyNextGroup = true, bool reprint = false)
     {
         if (!BeginGroup(group, out int first)) return;
         var lines = group.Lines;
@@ -939,7 +951,7 @@ public sealed class CobolReport(
         long? firstTarget = null;
         if (_nextGroupSave != 0)
             firstTarget = PlaceAfterSavedNextGroup(group, first, LowerLimit(group));
-        else if (_paged && !_firstBodySinceInitiate)
+        else if (_paged && !_firstBodySinceInitiate && !reprint)
         {
             // §13.18.35.4 GR4b (absolute): fit iff integer-1 > LINE-COUNTER. GR4c (relative): trial =
             // LINE-COUNTER + Σ integer-2 over the group's relative LINE clauses; fit iff trial ≤ the group's
@@ -964,7 +976,7 @@ public sealed class CobolReport(
                         trial += lines[i].TrialInterval;
                 fit = trial <= LowerLimit(group);
             }
-            if (!fit) AdvancePage();   // §13.18.35.4 GR4 tail → the §14.9.16.4 GR6 sequence
+            if (!fit) AdvancePage(group);   // §13.18.35.4 GR4 tail → the §14.9.16.4 GR6 sequence
         }
 
         GroupIndicatePresent = group.GroupIndicatePending;   // §13.18.28.4 GR1 — read AFTER this group's own page advance
@@ -974,6 +986,7 @@ public sealed class CobolReport(
         _firstBodySinceInitiate = false;
         _firstBodyOnPage = false;
         if (!whole) return;   // a raised EC-REPORT-PAGE-LIMIT — resume at the next report group (PresentLine)
+        if (reprint) return;
         if (applyNextGroup) ApplyNextGroup(group);   // §13.18.37.4 GR2 — after the group's last line is printed
         EndOfGroupSumReset(group);
     }
@@ -1007,11 +1020,11 @@ public sealed class CobolReport(
         var lines = group.Lines;
         long saved = _nextGroupSave;
         _nextGroupSave = 0;
-        AdvancePage();
+        AdvancePage(group);
         if (lines[first].Kind == ReportLineKind.Absolute)
         {
             LineCounter = saved;                                             // GR4a 1 (and GR4a 2 — see above)
-            if (lines[first].Value <= LineCounter) AdvancePage();            // the re-applied §13.18.35.4 GR4b test
+            if (lines[first].Value <= LineCounter) AdvancePage(group);            // the re-applied §13.18.35.4 GR4b test
             return null;
         }
         // GR4a 3 — the first line at saved + 1; every later present line adds what it adds to a GR4c trial sum.
@@ -1019,7 +1032,7 @@ public sealed class CobolReport(
         for (int i = first + 1; i < lines.Length; i++)
             if (group.IsPresent(lines[i].PresentSlot)) last += lines[i].TrialInterval;
         if (last <= lowerLimit) return saved + 1;
-        AdvancePage();                                                       // the page devoid of body groups
+        AdvancePage(group);                                                       // the page devoid of body groups
         return null;                                                         // FIRST DETAIL, no save reference
     }
 
@@ -1173,12 +1186,46 @@ public sealed class CobolReport(
     /// <summary>The §14.9.16.4 GR6 page advance, in the GR's order: (a) the page footing, (b) the physical
     /// advance to the next page, (c) CODE re-evaluation — the CODE clause is staged loud at bind, so this point
     /// is a cited no-op — (d) PAGE-COUNTER + 1, or 1 after a NEXT GROUP NEXT PAGE WITH RESET, (e) LINE-COUNTER ←
-    /// 0, (f) the page heading.</summary>
-    private void AdvancePage()
+    /// 0, (f) the page heading — and then the control headings written with OR PAGE (§13.18.57.4 GR6 c), see
+    /// <see cref="PresentOrPageHeadings"/>). <paramref name="causing"/> is the body group whose presentation needed
+    /// the advance: the headings reprinted depend on it.</summary>
+    private void AdvancePage(ReportGroup causing)
     {
         if (_pageFooting is not null) PresentPageFooting();                  // GR6a
         PageFeed();                                                          // GR6b–e
         if (_pageHeading is not null) PresentPageHeading();                  // GR6f
+        PresentOrPageHeadings(causing);                                      // §13.18.57.4 GR6 c)
+    }
+
+    /// <summary>⛔ ISO §13.18.57.4 GR6 c) — "The OR PAGE phrase causes the associated control heading to be printed
+    /// in addition after each page advance, following any page heading, provided that the page advance did not
+    /// take place just before the printing of a control footing at a lower control level." (kb/Work PB1298.)
+    /// The headings are presented major → minor, like every run of control headings (GR6 c) 1.), each as the FIRST
+    /// body group of the new page: no page-fit test (nothing fits better than the top of a page), no NEXT GROUP
+    /// and no SUM reset (the heading is not being printed for the first time).
+    /// <list type="bullet">
+    /// <item>causing a CONTROL HEADING at level j: that heading prints itself on the new page, as does every
+    /// heading below it in the same break, so only the headings ABOVE j (more major) are the "in addition" ones.</item>
+    /// <item>causing a CONTROL FOOTING at level j: the proviso — a heading that is more major than the footing's
+    /// level is skipped (the footing is at a LOWER control level than the heading), so only a heading at the
+    /// footing's level or below it (more minor) is reprinted. ⚠ The proviso is applied as written; §13.18.57.4 GR7 d) 4.
+    /// gives such a footing an upper limit after the headings at its own level or higher, a rule about line
+    /// placement that this engine does not model (docs/CONFORMANCE.md A.4.11).</item>
+    /// <item>causing a detail (or any other body group): every OR PAGE heading.</item>
+    /// </list></summary>
+    private void PresentOrPageHeadings(ReportGroup causing)
+    {
+        foreach (var ch in _controlHeadings.Values)
+        {
+            if (!ch.OrPage) continue;
+            bool skip = causing.Kind switch
+            {
+                ReportGroupKind.ControlHeading => ch.ControlLevel >= causing.ControlLevel,
+                ReportGroupKind.ControlFooting => ch.ControlLevel < causing.ControlLevel,
+                _ => false,
+            };
+            if (!skip) PresentBody(ch, reprint: true);
+        }
     }
 
     /// <summary>The PAGE FEED itself — §14.9.16.4 GR6 b) to e), shared by the body-group page advance above and
@@ -1461,11 +1508,6 @@ public sealed class CobolReport(
 
     // ── Line-composition helpers (used by the generated compose methods) ──────────────────────────────────────
 
-    /// <summary>The page width (ISO §13.18.39.4 GR5 — "If integer-2 is omitted, a value of 999 is assumed for the
-    /// page width"). The PAGE clause's integer-2 COLUMNS operand has no grammar surface yet (kb/Work PB1059), so
-    /// every report has the default; the width §13.18.14.4 GR5 measures against lives here, in one place.</summary>
-    private const int PageWidth = 999;
-
     /// <summary>A fresh, empty report line of the report's width, for one line's generated compose.</summary>
     public ReportLineImage NewLine() => new(_lineWidth);
 
@@ -1491,10 +1533,10 @@ public sealed class CobolReport(
             && ExceptionState.ReportColumnOverlapError($"report {Name}: the printable item at column {column} uses a "
                 + "column position another printable item of the line already uses (ISO §13.18.14.4 GR4)"))
             return;                               // §14.9.16.4 GR8 / §14.9.46.4 GR5 — resume at the next report item
-        if (start + image.Length > PageWidth)
+        if (start + image.Length > _pageWidth)
             ExceptionState.ReportPageWidthError($"report {Name}: the printable item at column {column} ends at column "
-                + $"{start + image.Length}, past the page width {PageWidth} (ISO §13.18.14.4 GR5)");
-        line.Write(start, image, PageWidth);
+                + $"{start + image.Length}, past the page width {_pageWidth} (ISO §13.18.14.4 GR5)");
+        line.Write(start, image, _pageWidth);
     }
 }
 

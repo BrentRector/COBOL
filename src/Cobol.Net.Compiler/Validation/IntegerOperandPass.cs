@@ -140,6 +140,7 @@ internal static class IntegerOperandRules
 
         // ── REPORT WRITER ───────────────────────────────────────────────────────────────────────────────────
         [typeof(Core.ReportPageClauseContext)] = Nonzero,      // §13.18.39.3 SR6 — "shall be greater than zero"
+        [typeof(Core.ReportPageWidthContext)] = Nonzero,       // integer-2 COLUMNS — §5.5 1) NONZERO default (SR6 lists integer-1 and 3–7)
         [typeof(Core.ReportPageSubclauseContext)] = Nonzero,   // ditto
         [typeof(Core.ReportLineOperandContext)] = ReportLine,
         [typeof(Core.ReportNextGroupClauseContext)] = Nonzero, // §13.18.37 NEXT GROUP integer-1 / PLUS integer-2

@@ -296,6 +296,17 @@ constantEntryBody
     : CONSTANT (IS? GLOBAL)? (AS constantValue | FROM cobolWord)
     ;
 
+// The constant entry as a REPORT SECTION entry (kb/Work PB1226): §13.8.2's brace group
+// `{ constant-entry | report-group-description-entry } …` lets a constant entry stand between the report
+// description entry's report groups, and §13.10.2 gives it the same format wherever it stands. It is the
+// dataDescriptionEntry arm's constantEntryBody under its own entry rule because the report section's entry
+// list is a choice between two entry KINDS, not a data description entry (§13.16) with a report group body.
+// ONE body rule (constantEntryBody), ONE binder (DataBinder.BindConstantEntry), ONE version gate
+// (VersionConformancePass.VisitConstantEntryBody): the report section adds a host, never a second constant form.
+constantEntry
+    : levelNumber dataName? constantEntryBody DOT
+    ;
+
 // The AS operand (§13.10.2). LENGTH OF is listed FIRST so it wins over arithmeticExpression's qualified-
 // dataReference reading of the same tokens (`LENGTH OF X` — LENGTH is a cobolWord). A single numeric literal
 // rides arithmeticExpression and is re-classified as a LITERAL by the binder (§13.10.3 SR1); the BYTE-LENGTH

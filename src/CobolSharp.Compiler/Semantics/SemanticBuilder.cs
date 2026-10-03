@@ -996,9 +996,9 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
                 foreach (var sub in pc.reportPageSubclause())
                 {
                     if (sub.integerLiteral() is not { } si || !int.TryParse(si.GetText(), out int v)) continue;
-                    if (sub.HEADING() != null) report.HeadingLine = v;
+                    if (sub.HEADING() != null && sub.LAST() == null) report.HeadingLine = v;
                     else if (sub.FIRST() != null) report.FirstDetailLine = v;
-                    else if (sub.LAST() != null) report.LastDetailLine = v;
+                    else if (sub.LAST() != null && sub.CONTROL() == null && sub.CH() == null) report.LastDetailLine = v;
                     else if (sub.FOOTING() != null) report.FootingLine = v;
                 }
             }
@@ -1026,7 +1026,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
             || !int.TryParse(ctx.levelNumber().GetText(), out int level))
             return base.VisitReportGroupEntry(ctx);
 
-        string name = ctx.reportGroupName()?.GetText() ?? $"FILLER${_fillerCounter++}";
+        string name = CobolNet.Frontend.Cst.CstExtensions.NameOrNull(ctx.dataName()) ?? $"FILLER${_fillerCounter++}";
         var group = new ReportGroupSymbol(name, level, ctx.levelNumber().Start.Line) { OwningReport = _currentReport };
 
         foreach (var clause in ctx.reportGroupClause())
@@ -1036,8 +1036,8 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
             if (clause.reportTypeClause()?.reportGroupType() is { } gt)
             {
                 group.GroupKind = ReportGroupTypeOf(gt);
-                if (gt.dataReference() is { } cf) group.ControlField = cf.GetText();
-                else if (gt.FINAL() != null) group.ControlField = "FINAL";
+                if (gt.reportControlName()?.dataReference() is { } cf) group.ControlField = cf.GetText();
+                else if (gt.reportControlName()?.FINAL() != null) group.ControlField = "FINAL";
             }
             if (clause.reportLineClause() is { } lc)
             {
@@ -1093,7 +1093,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
         _reportGroupStack.Push(group);
 
         // Report group names are referenceable by GENERATE; declare them so name resolution sees them.
-        if (ctx.reportGroupName() != null)
+        if (CobolNet.Frontend.Cst.CstExtensions.NameOrNull(ctx.dataName()) != null)
             _symbols.Program.DataDivisionScope.TryDeclare(group, out _);
 
         return base.VisitReportGroupEntry(ctx);
@@ -1102,8 +1102,9 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
     private static ReportGroupKind ReportGroupTypeOf(CobolParserCore.ReportGroupTypeContext gt)
     {
         if (gt.RH() != null || gt.REPORT() != null && gt.HEADING() != null) return ReportGroupKind.ReportHeading;
-        if (gt.PH() != null || gt.PAGE() != null && gt.HEADING() != null) return ReportGroupKind.PageHeading;
+        // The control heading is tested BEFORE the page heading: its OR PAGE phrase makes PAGE a terminal of it too.
         if (gt.CH() != null || gt.CONTROL() != null && gt.HEADING() != null) return ReportGroupKind.ControlHeading;
+        if (gt.PH() != null || gt.PAGE() != null && gt.HEADING() != null) return ReportGroupKind.PageHeading;
         if (gt.DE() != null || gt.DETAIL() != null) return ReportGroupKind.Detail;
         if (gt.CF() != null || gt.CONTROL() != null && gt.FOOTING() != null) return ReportGroupKind.ControlFooting;
         if (gt.PF() != null || gt.PAGE() != null && gt.FOOTING() != null) return ReportGroupKind.PageFooting;

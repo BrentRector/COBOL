@@ -945,6 +945,45 @@ public static class DiagnosticCatalog
         + "integers shall lie within the bounds SR6 and SR7 set for a report heading, a body group and a page "
         + "footing.", "ISO §13.18.37.3 SR1/SR3–SR7; §13.15.3 SR6");
 
+    /// <summary>COBOLNET2708 — a report description entry followed by no report group description entry. ISO
+    /// §13.8.4: "An RD entry shall be followed by one or more report group description entries." The general
+    /// format (§13.8.2) prints the entries after an RD as the brace group <c>{ constant-entry |
+    /// report-group-description-entry } …</c>, and a constant entry describes no report, so a constant entry alone
+    /// does not satisfy the rule. The sort-merge file description's "one or more record description entries"
+    /// (§13.4.6.3 SR2) is the same shape and reports COBOLNET1837.</summary>
+    public static readonly DiagnosticDescriptor ReportDescriptionWithoutGroup = new(
+        "COBOLNET2708", "report-description-without-group", EditionSeverity.Error,
+        "A report description (RD) entry is followed by no report group description entry. ISO §13.8.4: \"An RD "
+        + "entry shall be followed by one or more report group description entries. The RD entry and the report "
+        + "group description entries that follow fully describe one report.\" A constant entry written after the RD "
+        + "(§13.8.2) describes no report group, so it does not satisfy the rule. Describe at least one report "
+        + "group (a level-01 entry with a TYPE clause) under the RD.",
+        "ISO §13.8.4");
+
+    /// <summary>COBOLNET2709 — a PAGE clause that writes one of its five subdividing phrases (HEADING, FIRST
+    /// DETAIL, LAST CONTROL HEADING, LAST DETAIL, FOOTING) without integer-1, the page limit. ISO §13.18.39.3 SR3;
+    /// the phrases divide the page (§13.18.39.4 GR2c–GR2g) and a report with no page limit has no page.</summary>
+    public static readonly DiagnosticDescriptor ReportPagePhraseWithoutLimit = new(
+        "COBOLNET2709", "report-page-phrase-without-limit", EditionSeverity.Error,
+        "A PAGE clause writes a HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL or FOOTING phrase but not "
+        + "integer-1. ISO §13.18.39.3 SR3: \"The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, or "
+        + "FOOTING phrase may be specified only if integer-1 is specified.\" Integer-1 is the page limit "
+        + "(§13.18.39.4 GR2a) and the phrases subdivide the page it bounds, so a PAGE clause that gives only the "
+        + "page width (integer-2 COLUMNS) cannot carry them. Write the page limit, or drop the phrases.",
+        "ISO §13.18.39.3 SR3");
+
+    /// <summary>COBOLNET2710 — a COLUMN clause operand larger than the page width. ISO §13.18.14.3 SR6: "Neither
+    /// integer-1 nor integer-2 shall exceed the page width." The page width is the PAGE clause's integer-2, or 999
+    /// when it is omitted (§13.18.39.4 GR5). The run-time twin for a printed item whose FINAL column passes the
+    /// width is EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5).</summary>
+    public static readonly DiagnosticDescriptor ReportColumnBeyondPageWidth = new(
+        "COBOLNET2710", "report-column-beyond-page-width", EditionSeverity.Error,
+        "A COLUMN clause operand exceeds the page width. ISO §13.18.14.3 SR6: \"Neither integer-1 nor integer-2 "
+        + "shall exceed the page width.\" The page width is integer-2 of the PAGE clause (§13.18.39.2, \"COLUMNS\") "
+        + "or, when that is omitted, 999 (§13.18.39.4 GR5). Lower the column, or widen the page with "
+        + "`PAGE … integer-2 COLUMNS`.",
+        "ISO §13.18.14.3 SR6");
+
     public static readonly DiagnosticDescriptor ExternalTypeRule = new(
         "COBOLNET1558", "external-type-rule", EditionSeverity.Error,
         "An EXTERNAL type declaration is misused: a data description containing an EXTERNAL type shall be at "
@@ -1196,7 +1235,8 @@ public static class DiagnosticCatalog
         "A printable report item has no PICTURE clause and SR14 implies none.", "ISO §13.15.3 SR12/SR14");
     public static readonly DiagnosticDescriptor ReportPageTypeRequiresPage = new(
         NotImplemented, "report-page-type-requires-page", EditionSeverity.Error,
-        "A PAGE HEADING/FOOTING group requires a PAGE clause defining the page limit.", "ISO §13.18.57.3 SR12");
+        "A PAGE HEADING/FOOTING group, or a control heading with the OR PAGE phrase, requires a PAGE clause defining "
+        + "the page limit.", "ISO §13.18.57.3 SR12");
     public static readonly DiagnosticDescriptor ReportNotInFile = new(
         NotImplemented, "report-not-in-file", EditionSeverity.Error,
         "A report is not named in any file description entry's REPORT clause.", "ISO §13.18.46 / §13.14");

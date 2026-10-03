@@ -164,17 +164,20 @@ public sealed partial class DataBinder
 
     // ── The constant-entry bind (§13.10) ─────────────────────────────────────────────────────────────────────
 
-    /// <summary>Bind one constant entry (§13.10.2 general format — the <c>constantEntryBody</c> alternative of
-    /// <c>dataDescriptionBody</c>) into the constant table. Produces NO <see cref="DataItem"/> (§13.10.4
-    /// GR1/GR3 — a constant is a substitution, not storage). The COBOL-2002 introduction gate is the
-    /// VersionConformancePass parse arm (<c>VisitConstantEntryBody</c> → constant-entry-2002 → COBOLNET0900
-    /// below 2002), NOT here (the binder stays edition-agnostic — Step E).</summary>
-    private void BindConstantEntry(Core.DataDescriptionEntryContext entry, Core.ConstantEntryBodyContext body)
+    /// <summary>Bind one constant entry (§13.10.2 general format) into the constant table — the
+    /// <c>constantEntryBody</c> of a <c>dataDescriptionBody</c> (a record area, WORKING-STORAGE, LOCAL-STORAGE,
+    /// LINKAGE) or of a <c>constantEntry</c> standing in the REPORT SECTION (§13.8.2, kb/Work PB1226). Both spell
+    /// the same body, so the caller passes the entry's level-number, its optional name and the body, never the host
+    /// rule. Produces NO <see cref="DataItem"/> (§13.10.4 GR1/GR3 — a constant is a substitution, not storage). The
+    /// COBOL-2002 introduction gate is the VersionConformancePass parse arm (<c>VisitConstantEntryBody</c> →
+    /// constant-entry-2002 → COBOLNET0900 below 2002), NOT here (the binder stays edition-agnostic — Step E).</summary>
+    private void BindConstantEntry(
+        Core.LevelNumberContext level, Core.DataNameContext? nameCtx, Core.ConstantEntryBodyContext body)
     {
-        string? name = entry.dataName()?.GetText();
+        string? name = nameCtx?.GetText();
         string where = $"constant entry '{name ?? "?"}'";
         // §13.10.2: the general format admits level {1 | 01} only, and constant-name-1 is mandatory.
-        if (entry.levelNumber().GetText() is not ("1" or "01"))
+        if (level.GetText() is not ("1" or "01"))
             Edition.Error(DiagnosticCatalog.ConstantEntryRule,
                 $"{where}: a constant entry shall have level-number 1 or 01 (ISO §13.10.2)");
         if (name is null || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase))
@@ -487,7 +490,11 @@ public sealed partial class DataBinder
     /// repetition position is otherwise an unsigned integer, §13.18.40.2) is replaced by its constant's
     /// value. Called only when the unit defines constants, so a constant-free program's PICTURE pipeline is
     /// byte-identical to before.</summary>
-    private string ExpandPicConstants(string pictureText, string where)
+    /// <param name="pictureText">The PICTURE character-string as written.</param>
+    /// <param name="where">The entry named in a diagnostic.</param>
+    /// <param name="diagnose">False for a MEASURING caller that reads the expanded string only for its width and
+    /// leaves the diagnosis to the binder of the same entry, so one bad repetition word is reported once.</param>
+    private string ExpandPicConstants(string pictureText, string where, bool diagnose = true)
     {
         return System.Text.RegularExpressions.Regex.Replace(pictureText,
             @"\(\s*([A-Za-z][A-Za-z0-9-]*)\s*\)",
@@ -497,13 +504,15 @@ public sealed partial class DataBinder
                 if (_constants.TryGetValue(word, out var k))
                 {
                     if (k is { Category: PicCategory.Numeric, IntegerText: { } it }) return "(" + it + ")";
-                    Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: '{word}' in the PICTURE "
-                        + "repetition position shall be an INTEGER constant-name (ISO §13.10.3 SR2)");
+                    if (diagnose)
+                        Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: '{word}' in the PICTURE "
+                            + "repetition position shall be an INTEGER constant-name (ISO §13.10.3 SR2)");
                     return "(1)";   // recovery shape — the compile has already failed
                 }
-                Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: '{word}' in the PICTURE "
-                    + "repetition position is not a defined constant-name (ISO §13.18.40.2 — a repetition "
-                    + "count is an unsigned integer or an integer constant-name, §13.10.3 SR2)");
+                if (diagnose)
+                    Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: '{word}' in the PICTURE "
+                        + "repetition position is not a defined constant-name (ISO §13.18.40.2 — a repetition "
+                        + "count is an unsigned integer or an integer constant-name, §13.10.3 SR2)");
                 return "(1)";
             });
     }

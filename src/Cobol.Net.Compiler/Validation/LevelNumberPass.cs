@@ -120,6 +120,11 @@ internal static class LevelNumberRules
         },
         CobolParserCore.LinkageProcedureParameterContext => LevelNumberArm.NoncontiguousCapable,
         CobolParserCore.ReportGroupEntryContext => LevelNumberArm.ReportGroup,
+        // A constant entry standing in the REPORT SECTION (§13.8.2, kb/Work PB1226) is a §13.10 entry, not a
+        // report group description entry, so §13.18.33.3 SR4 does not speak about it; its level rule is §13.10.2's
+        // `{1 | 01}` and is reported where the constant is bound (DataBinder.BindConstantEntry), exactly as for a
+        // constant in any other section (CheckEntryFormat's Constant arm).
+        CobolParserCore.ConstantEntryContext => null,
         CobolParserCore.ScreenDescriptionEntryContext => LevelNumberArm.ScreenItem,
         _ => null,
     };
@@ -207,7 +212,8 @@ internal static class LevelNumberRules
     {
         CobolParserCore.DataDescriptionEntryContext e => e.dataName()?.GetText() ?? "FILLER",
         CobolParserCore.LinkageProcedureParameterContext p => p.dataName()?.GetText() ?? "FILLER",
-        CobolParserCore.ReportGroupEntryContext r => r.reportGroupName()?.GetText() ?? "FILLER",
+        CobolParserCore.ReportGroupEntryContext r => r.dataName()?.GetText() ?? "FILLER",
+        CobolParserCore.ConstantEntryContext c => c.dataName()?.GetText() ?? "FILLER",
         CobolParserCore.ScreenDescriptionEntryContext s => s.screenName()?.GetText() ?? "FILLER",
         _ => "FILLER",
     };

@@ -390,7 +390,7 @@ decision.
 > cobolWord-admitted keyword can legally occupy — the data/parameter entry-name (`dataName` under
 > `dataDescriptionEntry`/`linkageProcedureParameter`), paragraph/section DEFINITIONS, the SELECT file-name, and
 > the three `programName` sites (`VersionConformancePass.IsProvableUserWordPosition`, grammar-proved per slot). The
-> mis-parse-prone optional entry-name slots (`reportGroupName` — the RW104A COLUMN hazard — and `screenName`)
+> mis-parse-prone optional entry-name slots (`dataName` under `reportGroupEntry` — the RW104A COLUMN hazard — and `screenName`)
 > and all reference positions stay unchecked (conservative false-negative, never false-positive). Of the 34
 > excluded band tokens only 7 have §8.9 table rows (2 continuous-since-85
 > incl. COLUMN, 5 added-2002); the other 27 are §8.10 context-sensitive words with no reservation to enforce —

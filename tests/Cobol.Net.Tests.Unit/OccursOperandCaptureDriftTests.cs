@@ -103,7 +103,9 @@ public sealed class OccursOperandCaptureDriftTests
         Assert.Contains("new FieldValueSource(r)", src, StringComparison.Ordinal);
         Assert.DoesNotMatch(new Regex(@"new\s+FieldValueSource\(\s*""", RegexOptions.None), src);
         int screen = src.IndexOf("ScreenReportEntryClausePresence(entries, model);", StringComparison.Ordinal);
-        int walk = src.IndexOf("BindReportEntries(entries, 0, entries.Length", StringComparison.Ordinal);
+        // The walk is one call per RD (BindReportSectionEntries binds the report group runs between the RD's constant
+        // entries, §13.8.2): the screens above it run once, before the first run and every replay inside it.
+        int walk = src.IndexOf("BindReportSectionEntries(rd, entries, model);", StringComparison.Ordinal);
         Assert.True(screen > 0 && walk > screen, "the §13.15.3 clause-presence screen must run once per RD, "
             + "before the entry walk and its replays");
     }

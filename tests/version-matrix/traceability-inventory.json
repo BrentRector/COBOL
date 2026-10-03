@@ -18546,13 +18546,13 @@
   "ordinal": 2,
   "subject": "Report group description entry",
   "rule-digest": "4576583b44a7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName",
+  "test-ref": "conformance:85/pb1226_report_filler_entry_name",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1287. SR2 has three sentences. (a) 'If the entry-name clause is specified, the data-name format or filler format shall be specified.' The filler format is not parseable: `reportGroupName : cobolWord` and FILLER is not a cobolWord, so `05 FILLER COLUMN 1 PIC X SOURCE WA.` gives COBOL0307 at 85/2002/2023 (probe/rgde/filler). That rejects legal source. (b) 'The entry-name clause shall immediately follow the level-number.' Holds by grammar position: `05 COLUMN 1 PX PIC X ...` gives COBOL0307 (probe sr2order). (c) 'All other clauses may be written in any order.' Holds via `reportGroupClause*`, pinned by conformance:2023/pb792_report_value_then_column (orders A and B) and probe fmtorder. Two halves conform and the filler half diverges, so DIVERGES. cite.py --check 13.15.3 'If the entry-name clause is specified, the data-name format or filler format shall be specified' -> OK §13.15.3 2). Mechanism: finding 'report-group-entry-filler-format'. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the report group description entry is Report Writer nucleus syntax at every edition; no Annex E item changes §13.15 between 2014 and 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1287: sentence (a), the filler format of the entry-name clause, is admitted by the shared dataName rule; (b) and (c) held before. retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName (the hand-written reportGroupName rule no longer exists: the report group entry's name slot is the data description entry's dataName rule (kb/Work PB1226))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.15.3-3",
@@ -20496,13 +20496,13 @@
   "ordinal": 6,
   "subject": "COLUMN clause",
   "rule-digest": "257ee18df50f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
+  "test-ref": "conformance:negative/pb1059-column-beyond-page-width; conformance:negative/pb1059-column-beyond-assumed-page-width",
   "derivation": "",
   "editions": "85",
-  "notes": "(kb/Work PB1059, 14d). cite.py --check 13.18.14.3 \"Neither integer-1 nor integer-2 shall exceed the page width\" -> OK SR6. OWNED by open note PB1059 (inventory row SR-13.18.14.3-6): the PAGE clause's integer-2 COLUMNS operand has no grammar surface (probe out13/probe/column-clause-p1/sr6_page_cols: `RD RR PAGE LIMIT 20 LINES 10 COLUMNS.` -> COBOL0307). ADDITION FOR PB1059: the screen is enforceable even WITHOUT that surface, because §13.18.39.4 GR5 (cite.py OK §13.18.39.4 5)) says \"If integer-2 is omitted, a value of 999 is assumed for the page width\" — probe sr6_huge: `RD RR.` + `03 COLUMN 9999 PIC X(5) VALUE \"A\".` compiles clean and writes a ~10000-character line. No PageWidth symbol exists anywhere in src/Cobol.Net.Compiler or Runtime. Also PB1058 (open): an operand past Int32 crashes int.Parse at the same bind site. Harm under-rejects (finding F5). || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry (no page-width model on ReportModel); src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: COBOLNET2710 refuses a COLUMN operand (absolute column or relative offset) greater than the page width, written or assumed.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-7",
@@ -20676,13 +20676,13 @@
   "ordinal": 5,
   "subject": "COLUMN clause",
   "rule-digest": "064bd2150b46",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#LineWidth",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#PageWidth",
+  "test-ref": "conformance:2002/pb1059_page_columns_width; conformance:2002/pb1059_page_width_only; conformance:2002/pb1188_report_nonfatal_raise",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1059, 14d). Rule: 'If this rule is violated the EC-REPORT-PAGE-WIDTH exception condition is set to exist, the report line is truncated, and the report line is printed.' (cite.py --check 13.18.14.4 -> OK 5)). Page width = PAGE integer-2, 999 when omitted (cite.py --check 13.18.39.4 'If integer‑2 is omitted, a value of 999 is assumed for the page width' -> OK 5)). The compiler has no page-width model (PB1059: PAGE ... COLUMNS has no grammar surface); the line buffer width is RECORD CONTAINS or the WIDEST composed line, so a line is never truncated at the page width, and EC-REPORT-PAGE-WIDTH has no raise site (catalog only; design doc §5 names it a seam). Probe p3.cob (2023, no PAGE clause, EC-ALL checking on): `COLUMN 997 PIC X(5) VALUE \"WXYZQ\"` produced a 1001-column record with WXYZQ in columns 997-1001 and EXCEPTION-STATUS spaces. Expected: the line truncated to 999 columns (WXY in 997-999), printed, and EC-REPORT-PAGE-WIDTH set. The SR8b compile-time screen that would forbid the absolute case is part-1's row and also unenforced, so the program reaches this general rule. See finding F-PAGE-WIDTH and F-EC-SEAMS. || Editions (adjudicator): 2002, 2014, 2023 (Format 1 multiple/relative/alignment forms); the absolute single-operand COLUMN NUMBER IS integer-1 form also 85. Annex E records no 2023 change to the clause. || Code sites (adjudicator detail): src/Cobol.Net.Runtime/IO/ReportWriter.cs#Place; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#LineWidth (model.LineWidth = File.RecordContains ?? widest)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059 + PB1188: the page width Place measures is the PAGE clause's integer-2 (or 999): a printable item ending past it sets EC-REPORT-PAGE-WIDTH, the line is truncated and printed.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.14.4-6",
@@ -21471,13 +21471,13 @@
   "ordinal": 2,
   "subject": "Entry-name clause",
   "rule-digest": "986eb68e704c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#EntryName; src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4#screenName; src/Cobol.Net.Compiler/Binding/ScreenFacility.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#EntryName",
+  "test-ref": "conformance:85/pb1226_report_filler_entry_name",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1226, 14d). \"If the entry-name clause is not specified in a data description entry, a report group description entry, or a screen description entry, the word FILLER is assumed.\" (--check 13.18.20.3 rule 2 OK). Data description: dataName? optional; probe/entry-name-clause/p1.cob `05 PIC X(2) VALUE \"DE\".` inside a group behaves as a filler (DISPLAY G -> ABCDEF) at 2023 and 85; LevelNumberPass.EntryName maps a missing name to FILLER. Report group: reportGroupName? optional; probe/entry-name-clause/p10.cob `05 COLUMN 1 PIC X(5) VALUE \"HELLO\".` prints HELLO in the report line. PARTIAL only because the screen-description third of the rule is in the declined screen module. The screen-description half belongs to the screen-handling module (§13.9, Annex A.4.2), which docs/CONFORMANCE.md §5 item 4 declares Not claimed and REFUSES (COBOLNET1560 from ScreenFacility.cs); its witness debt is owned by kb/Work PB260 — not re-reported here. || Editions (adjudicator): 85, 2002, 2014, 2023 (the clause's own text; Annex E records no change to the entry-name clause)",
-  "state": "GAP"
+  "notes": "kb/Work PB1226: an omitted entry-name clause is FILLER in a data description entry and in a report group description entry (an unnamed report entry binds as FILLER, the same as the FILLER spelling). The screen-description third of the rule belongs to the screen-handling module (Annex A.4.2, docs/CONFORMANCE.md section 5 item 4: not claimed, refused COBOLNET1560); its witness debt is owned by kb/Work PB260. retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName (the hand-written reportGroupName rule no longer exists: the report group entry's name slot is the data description entry's dataName rule (kb/Work PB1226))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.20.3-3",
@@ -21486,13 +21486,13 @@
   "ordinal": 3,
   "subject": "Entry-name clause",
   "rule-digest": "b83b36b6555d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry",
+  "test-ref": "conformance:85/pb1226_report_filler_entry_name",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1226, 14d). \"If the entry-name clause is specified in a data description entry or a report group description entry, either data-name-1 or FILLER shall be specified.\" (--check 13.18.20.3 rule 3 OK), echoed by §13.15.3 SR2 \"If the entry-name clause is specified, the data-name format or filler format shall be specified.\" (--check 13.15.3 rule 2 OK). Data description entry: FILLER and data-name both accepted (p1). Report group description entry: reportGroupName : cobolWord ; — FILLER is a lexer token (CobolLexer.g4 FILLER) that no cobolWord admits, so `05 FILLER COLUMN 7 PIC X(5) VALUE \"WORLD\".` (probe/entry-name-clause/p9.cob) and `01 FILLER TYPE DETAIL LINE 1.` (p8.cob) fail with COBOL0307 \"unexpected 'FILLER'. A period may be missing…\" at --std 85/2002/2014/2023. Expected: compiles; the entry is an unnamed report item exactly as the omitted form (p10.cob, which prints 'HELLO WORLD'). Rejects legal source. Finding F1. || Editions (adjudicator): 85, 2002, 2014, 2023 (the clause's own text; Annex E records no change to the entry-name clause)",
-  "state": "GAP"
+  "notes": "kb/Work PB1226: either data-name-1 or FILLER may be specified in a data description entry or a report group description entry - one dataName rule serves both. The screen-description third of the rule belongs to the screen-handling module (Annex A.4.2, docs/CONFORMANCE.md section 5 item 4: not claimed, refused COBOLNET1560); its witness debt is owned by kb/Work PB260. retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName (the hand-written reportGroupName rule no longer exists: the report group entry's name slot is the data description entry's dataName rule (kb/Work PB1226))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.20.4-1",
@@ -21501,13 +21501,13 @@
   "ordinal": 1,
   "subject": "Entry-name clause",
   "rule-digest": "aba83a0a35b1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry",
+  "test-ref": "conformance:85/pb1226_report_filler_entry_name",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1226, 14d). \"The word FILLER may be used to name a data, report, or screen item. Under no circumstances shall a FILLER item be referred to explicitly.\" (--check 13.18.20.4 rule 1 OK). Second sentence CONFORMS: the dataName rule is used only in declarations (grep of the grammar: dataDescriptionEntry and linkage parameter only), so FILLER never parses as a reference — probe/entry-name-clause/p2 `MOVE FILLER TO X` COBOL0001, p3 `MOVE X TO FILLER OF G` COBOL0001, p6 `REDEFINES FILLER` COBOL0001, p7 `66 R RENAMES FILLER THRU C` COBOL0001. First sentence: data item yes; REPORT item NO — reportGroupName admits no FILLER (p9, finding F1); screen item is the declined module (PB260). Two halves, the 'report' leg defective => DIVERGES. || Editions (adjudicator): 85, 2002, 2014, 2023 (the clause's own text; Annex E records no change to the entry-name clause)",
-  "state": "GAP"
+  "notes": "kb/Work PB1226: FILLER names a data item (dataDescriptionEntry) and a report item (reportGroupEntry) through the same rule; its second sentence (never referred to explicitly) held already: dataName is a declaration slot only. The screen-description third of the rule belongs to the screen-handling module (Annex A.4.2, docs/CONFORMANCE.md section 5 item 4: not claimed, refused COBOLNET1560); its witness debt is owned by kb/Work PB260. retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName (the hand-written reportGroupName rule no longer exists: the report group entry's name slot is the data description entry's dataName rule (kb/Work PB1226))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.21.3-1",
@@ -23211,13 +23211,13 @@
   "ordinal": 9,
   "subject": "LINE clause",
   "rule-digest": "1f5bb8515c7f",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportLineClauses",
+  "test-ref": "conformance:negative/pb1248-or-page-heading-absolute-line",
   "derivation": "",
   "editions": "2023",
-  "notes": "(kb/Work PB1248, 14d). cite.py --check 13.18.35.3 \"If the current report group is a control heading with the OR PAGE phrase, all the LINE clauses in the report group description shall be relative.\" OK (13.18.35.3 9)). The OR PAGE phrase belongs to TYPE Format 2, `CH [ [ON|FOR] {data-name-1|FINAL} [OR PAGE] ]` (cite.py --check 13.18.57.2 \"OR PAGE\" OK, figure notes). The grammar has no OR PAGE surface - reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?` (CobolReportWriter.g4) - and 'OR PAGE' occurs nowhere in src. Probe g9x.cob: the LEGAL `01 CH-A TYPE CH WS-A OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; the SR9 violation `CH WS-A OR PAGE LINE 5` draws the same parse error, never the rule. The rule is unreachable until the phrase exists; that gap (and the 13.18.57.4 GR6/GR7 d) upper-limit arms it drives) is the TYPE clause's row family. No kb/Work note or CONFORMANCE.md determination mentions OR PAGE (grep). || Editions (adjudicator): The rule stands in the 2023 text; the OR PAGE phrase's introducing edition is not derivable from the 2023 text (flagged).",
-  "state": "GAP"
+  "notes": "kb/Work PB1248: COBOLNET2199 refuses an absolute LINE (or a bare NEXT PAGE operand) in a control heading written with OR PAGE.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.35.3-10",
@@ -24486,13 +24486,13 @@
   "ordinal": 1,
   "subject": "PAGE clause",
   "rule-digest": "552d8921c908",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#PagePhraseOf",
+  "test-ref": "conformance:2002/pb1059_page_last_control_heading",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1059. SR1 (cite.py --check 13.18.39.3 \"FIRST DE is synonymous with FIRST DETAIL, LAST CH is synonymous with LAST CONTROL HEADING\" -> OK, rule 1). The lexer has DE (CobolLexer.g4:549) and CH (:511) tokens but reportPageSubclause has no FIRST DE, LAST DE, LAST CH (nor LAST CONTROL HEADING) alternative. Probe: `FIRST DE 3 LAST DE 8` -> COBOL0001 unexpected 'DE' twice; `LAST CH 5` -> COBOL0001 unexpected 'CH'. Rejects legal source. Expected: each abbreviation binds exactly as its full phrase (FIRST DE 3 == FIRST DETAIL 3 -> integer-4 = 3). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: FIRST DE, LAST CH and LAST DE are written in the grammar as the synonyms SR1 names; LAST CH IS 3 sets integer-5 exactly as LAST CONTROL HEADING IS 3.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.39.3-2",
@@ -24501,13 +24501,13 @@
   "ordinal": 2,
   "subject": "PAGE clause",
   "rule-digest": "91c585bac0ca",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause",
+  "test-ref": "conformance:2002/pb1059_page_width_only",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1059. SR2 (cite.py --check 13.18.39.3 \"Either integer-1 or integer-2 or both shall be specified\" -> OK, rule 2). The 'neither' case is rejected structurally because the grammar makes integer-1 mandatory, but that same shape rejects the legal integer-2-only form (`PAGE 132 COLUMNS`) and integer-1+integer-2 -- the COLS surface is missing entirely. Owned by open kb/Work PB1059; the screen SR2 describes has to exist once integer-1 becomes optional. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: the brace group has no empty alternative, so a PAGE clause with neither integer-1 nor integer-2 is a parse error and integer-2 alone (`PAGE 8 COLS`) is legal.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.39.3-3",
@@ -24516,13 +24516,13 @@
   "ordinal": 3,
   "subject": "PAGE clause",
   "rule-digest": "9cd18dabb0db",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
+  "test-ref": "conformance:negative/pb1059-page-phrase-without-limit",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1059. SR3 (cite.py --check 13.18.39.3 \"may be specified only if integer-1 is specified\" -> OK, rule 3). Holds today only vacuously: integer-1 is grammatically mandatory, so a HEADING/FIRST DETAIL/... phrase can never appear without it. No screen exists; the rule becomes live the moment PB1059 admits the integer-2-only form (`PAGE 132 COLUMNS HEADING 2` must then be rejected). Not independently verifiable against legal-source coverage -> PARTIAL; PB1059's fixer owns the screen. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: COBOLNET2709 refuses a HEADING / FIRST DETAIL / LAST CONTROL HEADING / LAST DETAIL / FOOTING phrase written without integer-1 (`PAGE 80 COLUMNS HEADING 2`).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.39.3-4",
@@ -24531,13 +24531,13 @@
   "ordinal": 4,
   "subject": "PAGE clause",
   "rule-digest": "40b56b148532",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
+  "test-ref": "conformance:2002/pb1059_page_last_control_heading; conformance:negative/pb1059-page-phrase-without-limit",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1059. SR4 (cite.py --check 13.18.39.3 \"may be written in any order\" -> OK, rule 4). `reportPageSubclause*` admits the four phrases it knows in any order: probe order.cob `PAGE LIMITS ARE 10 LINE FOOTING 9 LAST DETAIL 8 FIRST DETAIL 2 HEADING 1.` compiles rc=0 and binds each by keyword. The fifth phrase (LAST CONTROL HEADING) cannot be written at all (FMT/SR1 finding), so SR4 is verified for four of five phrases -> PARTIAL. The same `*` also admits a phrase twice (FMT finding). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: the five phrases (LAST CONTROL HEADING included) take any order and each once; PagePhraseOf classifies them from the first token.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.39.3-5",
@@ -24636,13 +24636,13 @@
   "ordinal": 5,
   "subject": "PAGE clause",
   "rule-digest": "ea41c0b3badd",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Runtime/IO/ReportWriter.cs#CobolReport",
+  "test-ref": "conformance:2002/pb1059_page_columns_width; conformance:2002/pb1059_page_width_only; conformance:negative/pb1059-column-beyond-assumed-page-width",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1059. GR5 (cite.py --check 13.18.39.4 \"a value of 999 is assumed for the page width\" -> OK, 5)). There is no page-width model: ReportModel has only LineWidth (record length, whose doc comment cites GR5 but uses no 999), and nothing in src/Cobol.Net.Compiler or the runtime reads a width of 999 (grep). Probe gr5.cob `PAGE LIMIT 10 LINES.` with `03 COLUMN 1200 PIC X(4)` compiles rc=0 where §13.18.14.3 SR6 against the assumed width 999 requires rejection; EC-REPORT-PAGE-WIDTH is catalogued but never raised. Owned by open kb/Work PB1059 ('the page-width model on ReportModel'). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: ReportModel.PageWidth is integer-2 when written, else the assumed 999; it reaches the engine through the CobolReport constructor (the width Place truncates at and EC-REPORT-PAGE-WIDTH measures).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.40.3-1",
@@ -28641,13 +28641,13 @@
   "ordinal": 12,
   "subject": "TYPE clause",
   "rule-digest": "a37249bee499",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindGroupType",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1298-or-page-without-page-limit",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1298. 'PAGE HEADING and PAGE FOOTING and the OR PAGE phrase are allowed only if a PAGE clause that defines the page limit is specified in the report description entry.' Three legs. PH and PF legs CONFORM: BindGroupType rejects PH/PF when !model.Paged (COBOLNET0899 report-page-type-requires-page); probes sr12_ph_nopage / sr12_pf_nopage rejected. The OR PAGE leg is unreachable: the grammar has no OR PAGE phrase at all (see FMT-13.18.57.2 finding), so `TYPE CH CX OR PAGE` in an unpaged report is rejected by the PARSER (COBOL0307 unexpected 'OR') for the wrong reason, and once the phrase is added no screen exists for it. PARTIAL until the OR PAGE arm is implemented and screened. No negative test for either leg located. cite.py --check OK. probes under out13/probe/type-clause-p1/ (pinned adj-d1 cobol.exe, --std 2023) || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): Format 2 (report writer): COBOL-85 optional Report Writer module; ISO 2023 optional language element A.4.11; 2002/2014 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d); Annex E lists no 2014->2023 change to the TYPE clause",
-  "state": "GAP"
+  "notes": "kb/Work PB1298: the PAGE HEADING, PAGE FOOTING and OR PAGE legs are screened by one condition (report-page-type-requires-page).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.57.3-13",
@@ -28791,13 +28791,13 @@
   "ordinal": 6,
   "subject": "TYPE clause",
   "rule-digest": "60b5eeb0db8d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#GenerateCore; src/Cobol.Net.Runtime/IO/ReportWriter.cs#TerminateCore; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AdvancePage; src/Cobol.Net.Runtime/IO/ReportWriter.cs#ApplyNextGroup; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentHeadingFooting",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.FirstGenerate_Gr4_RhOncePhPerPage",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentOrPageHeadings; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AdvancePage",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.FirstGenerate_Gr4_RhOncePhPerPage; conformance:2002/pb1298_control_heading_or_page",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1298. Rule GR6 a)-g) (cite.py --check 13.18.57.4 \"on the first page, if it is occupied only by a report heading group\" -> OK 6) f) 1.; \"The OR PAGE phrase causes the associated control heading to be printed in addition after each page advance\" -> OK 6) c)). Implemented and verified: a) RH once at the first GENERATE (GenerateCore !_started); b) PH before the first body group and after every AdvancePage, skipped before an RF on a page by itself (PresentHeadingFooting ownPage feeds with no PH); c) 1./2. CHs major->minor on the first GENERATE and break-level->minor after a break; d) DETAIL on its GENERATE; e) 1. CFs minor->break-level before CH/DETAIL, 2. at TERMINATE minor->major only when _started; f) PF at every AdvancePage and at TERMINATE, not after an RH with NEXT GROUP NEXT PAGE (f 1.), not after an own-page RF (f 2.), PF immediately followed by RF; g) RF at TERMINATE only if a GENERATE ran since INITIATE. Probe r3 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r3.cob, --std 2002, PAGE LIMIT 12 HEADING 1 FIRST DETAIL 3 LAST DETAIL 6 FOOTING 8, CONTROL FINAL K) printed: page1 RH alone (no PF); page2 PH@1 CHF@3 CHK 1@4 DE@5 DE@6 CFK 1@7 PF 2@10; page3 PH@1 CHK 2@3 DE@4 DE@5 CFK 2@6 CFF@7 PF 3@10 RF@11 -- exactly the spec-computed sequence. NOT IMPLEMENTED: c)'s OR PAGE sentence (a CH with OR PAGE reprinted after each page advance following the PH, unless the advance preceded a lower-level CF). The OR PAGE phrase (and the optional ON/FOR words) of TYPE CONTROL HEADING has NO grammar surface: CobolReportWriter.g4 reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?`; probe r1 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r1.cob, --std 2002) `01 CH1 TYPE CH K OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; r1b `TYPE CONTROL HEADING ON K` -> COBOL0307 unexpected 'ON'. No kb/Work note owns OR PAGE (grep of kb/Work finds none); the FMT row belongs to sibling part type-clause-p1. One half verified, one half unimplemented -> PARTIAL. Existing spec-derived tests cover a/b/f/g and the CF/CH break order (FirstGenerate_Gr4_RhOncePhPerPage, PageAdvance_Gr6a_PfThenNewPage_TerminatePfRf, ControlBreak_Gr4a_CfSeesPriorValue_ChSeesNew). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1298: GR6 c) the OR PAGE heading is reprinted after every page advance, following the page heading, major to minor, as the first body group of the page. The proviso (not when the advance preceded a control footing at a lower control level) is applied as written; GR7 d) 4. reads the other way for such a footing, which is recorded in docs/CONFORMANCE.md A.4.11.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.57.4-7",
@@ -28821,13 +28821,13 @@
   "ordinal": 1,
   "subject": "TYPE clause",
   "rule-digest": "1ecdff931f27",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentOrPageHeadings",
+  "test-ref": "conformance:2002/pb1298_control_heading_or_page",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1298. Rule 7) d) 1. (cite.py --check 13.18.57.4 \"The upper limit for a body group, if there is no control heading defined in the report with the OR PAGE phrase\" -> OK 7)). The whole sub-rule is conditioned on a control heading written with OR PAGE, and no such heading can be written. The OR PAGE phrase (and the optional ON/FOR words) of TYPE CONTROL HEADING has NO grammar surface: CobolReportWriter.g4 reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?`; probe r1 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r1.cob, --std 2002) `01 CH1 TYPE CH K OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; r1b `TYPE CONTROL HEADING ON K` -> COBOL0307 unexpected 'ON'. No kb/Work note owns OR PAGE (grep of kb/Work finds none); the FMT row belongs to sibling part type-clause-p1. Searched src/ for OrPage / 'OR PAGE' (Runtime ReportWriter.cs, Compiler DataBinder.Reports.cs, grammar): no hits, so no upper-limit logic keyed on an OR PAGE heading exists. Harm: rejects legal source (the construct that would exercise the rule). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1298: a control heading at or above the highest OR PAGE level starts the page at FIRST DETAIL (it is the first body group of the page, GR5 b) 3.). The upper limit is realised by placement, not modelled as a limit.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.57.4-L2.2",
@@ -28836,13 +28836,13 @@
   "ordinal": 2,
   "subject": "TYPE clause",
   "rule-digest": "28f0bbc07a8e",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentOrPageHeadings",
+  "test-ref": "conformance:2002/pb1298_control_heading_or_page",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1298. Rule 7) d) 2. (control heading below the highest-level OR PAGE heading -> upper limit is the line after the next higher-level control heading). Conditioned on OR PAGE; The OR PAGE phrase (and the optional ON/FOR words) of TYPE CONTROL HEADING has NO grammar surface: CobolReportWriter.g4 reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?`; probe r1 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r1.cob, --std 2002) `01 CH1 TYPE CH K OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; r1b `TYPE CONTROL HEADING ON K` -> COBOL0307 unexpected 'ON'. No kb/Work note owns OR PAGE (grep of kb/Work finds none); the FMT row belongs to sibling part type-clause-p1. No code computes a control heading's upper limit from a higher-level heading's last line (PresentBody places every first body group on a page at FIRST DETAIL). NOT-IMPLEMENTED. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1298: a heading below the highest OR PAGE heading follows the next higher heading's last line (relative placement from LINE-COUNTER after the reprinted headings). Realised by placement.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.57.4-L2.3",
@@ -28851,13 +28851,13 @@
   "ordinal": 3,
   "subject": "TYPE clause",
   "rule-digest": "8cc52252419d",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentOrPageHeadings; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody",
+  "test-ref": "conformance:2002/pb1298_control_heading_or_page",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1298. Rule 7) d) 3. (cite.py --check 13.18.57.4 \"If the body group is a detail, the upper limit is the line following the last line of the lowest-level control heading that has an OR PAGE phrase\" -> OK 7)). Conditioned on OR PAGE; The OR PAGE phrase (and the optional ON/FOR words) of TYPE CONTROL HEADING has NO grammar surface: CobolReportWriter.g4 reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?`; probe r1 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r1.cob, --std 2002) `01 CH1 TYPE CH K OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; r1b `TYPE CONTROL HEADING ON K` -> COBOL0307 unexpected 'ON'. No kb/Work note owns OR PAGE (grep of kb/Work finds none); the FMT row belongs to sibling part type-clause-p1. NOT-IMPLEMENTED. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1298: a detail follows the last line of the lowest-level OR PAGE heading (the reprinted heading prints first: detail 7 at line 3 under H=A at line 2). Realised by placement.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.57.4-L2.4",
@@ -58506,13 +58506,13 @@
   "ordinal": 0,
   "subject": "Data division structure",
   "rule-digest": "dc03a1a88d48",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDivision; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#fileSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#workingStorageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#localStorageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSection; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4#screenSection",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#constantEntry",
+  "test-ref": "conformance:2002/pb1226_report_section_constant; conformance:negative/pb1226-rd-without-report-group; conformance:negative/pb1226-rd-constant-entry-only",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1226, 14d). FMT §13.2.1 (--check OK) with §13.1 ('The data division is optional.' / 'defines the order of their presentation in the source element', --check OK). Grammar dataDivision = DATA DIVISION DOT then fileSection? workingStorageSection? localStorageSection? linkageSection? reportSection? screenSection? - order and per-section optionality match; each section header admits zero entries as the outer brackets allow. Probes (pinned cobol.exe, E:/Temp/.../out13/probe/data-division-structure/DDS*.cob, default --std 2023): DDS01 WS 77 + constant + record, LS 77 + constant -> runs '156' (correct); DDS02 LS before WS -> COBOL0001 (correct, order); DDS16 duplicate WS header -> COBOL0001 (correct); DDS12 empty FILE SECTION, DDS13 DATA DIVISION with no sections -> run OK (correct); DDS05 77 under FD -> COBOLNET1746 (correct: FILE SECTION list has no 77-level-description-entry); DDS06 constant-entry after FD -> runs 7; DDS14 SD then constant + record -> runs 2; DDS10 type-declaration-entry (TYPEDEF) in FILE, WS, LS, LINKAGE -> runs '012'; DDS11 constant-entry in LINKAGE -> runs 9 (all correct). DDS03 SD with no entries -> COBOLNET1837 citing §13.4.6.3 SR2 (the brace '{...}...' after sort-merge-file-description-entry requires >=1; correct). DDS04 FD with no entries parses (bracket group, correct) and is refused only by the separate §13.4.5.3 SR3 a RECORD-clause rule. Editions: DDS01 --std 85 -> COBOLNET0900 on LOCAL-STORAGE and each constant entry (correct gating). DEFECT A (rejects-legal-source): REPORT SECTION's list after report-description-entry is the BRACE group {constant-entry | report-group-description-entry}... (§13.2.1, repeated in §13.8.2 --check OK), but reportDescriptionEntry is `RD reportName reportDescriptionClause* DOT reportGroupEntry*` and reportGroupEntry has no constant arm: DDS08 `RD RP. 01 RK CONSTANT AS 4.` -> COBOLNET0901 \"'CONSTANT' is a reserved word\" at 2023 and 2002; expected to compile and DISPLAY RK print 4. DEFECT B (under-rejects): the same brace group requires at least one entry after the RD, and §13.8.4 says 'An RD entry shall be followed by one or more report group description entries.' (--check OK); DDS09 `REPORT SECTION. RD RP.` with no group compiles and runs 'OK' at 2023 and 85 with zero diagnostics; expected a compile-time error. Report Writer is A.4.11 Partial (claimed) in docs/CONFORMANCE.md, so both are this rule's defects. No kb/Work note owns either (searched kb/Work for report-section + constant and 13.8.4). SCREEN SECTION leg ({constant-entry | screen-description-entry}...): DDS07 constant-entry in SCREEN SECTION -> COBOLNET0901 'CONSTANT' reserved (screenDescriptionEntry has no constant arm) rather than the COBOLNET1560 section refusal; the SCREEN facility is A.4.2 Not claimed and its rows are owned by derived-verdicts.screen-handling-only / kb/Work PB260 - noted only, not a finding here. Verdict DIVERGES on defect A (legal source refused) plus defect B. || Editions (adjudicator): DATA DIVISION with FILE / WORKING-STORAGE / LINKAGE / REPORT sections: 85, 2002, 2014, 2023; LOCAL-STORAGE SECTION, SCREEN SECTION, constant-entry and type-declaration-entry: 2002, 2014, 2023 (introduced at COBOL-2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1226: the REPORT SECTION is `REPORT SECTION. [ report-description-entry { constant-entry | report-group-description-entry } ... ] ...`. reportDescriptionEntry is `RD ... DOT (constantEntry | reportGroupEntry)*`; the constant entry shares constantEntryBody and DataBinder.BindConstantEntry with the data description entry and binds in source order (BindReportSectionEntries), so DISPLAY K prints 7 and K substitutes in VALUE and in PIC X(K). The brace group's one-or-more is 13.8.4's COBOLNET2708 at bind time (an RD with no report group entry; a constant alone does not satisfy it).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.4.2",
@@ -58611,13 +58611,13 @@
   "ordinal": 0,
   "subject": "Report section",
   "rule-digest": "dc7b76b90b03",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSection; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#constantEntry",
+  "test-ref": "conformance:2002/pb1226_report_section_constant; conformance:negative/pb1226-rd-without-report-group; conformance:negative/pb1226-rd-constant-entry-only; conformance:negative/pb1226-report-section-constant-below-2002",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1287. §13.8.2 prints REPORT SECTION. [ report-description-entry { constant-entry | report-group-description-entry } ... ] ... (cite.py --check 13.8.2 \"constant-entry\" OK; --check 13.8.2 \"report-description-entry\" OK). The grammar is `reportSection : REPORT SECTION DOT reportDescriptionEntry*` with `reportDescriptionEntry : RD reportName reportDescriptionClause* DOT reportGroupEntry*` and `reportGroupEntry : levelNumber reportGroupName? reportGroupClause* DOT` — no constantEntryBody arm. Two defects: (a) REJECTS LEGAL SOURCE: probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out13\\probe\\report-section\\c1.cob (RD R-1 … `01 KC CONSTANT AS 7.` then a DETAIL group) fails at --std 2023 and 2002 with COBOLNET0901 \\\"'CONSTANT' is a reserved word\\\" — spec expects a clean compile, KC=7. Same mechanism the constant-entry adjudication filed as F-REPORT-SECTION. (b) UNDER-REJECTS: the inner brace group carries an ellipsis (one or more), and §13.8.4 says \\\"An RD entry shall be followed by one or more report group description entries\\\" (cite.py --check 13.8.4 OK); probe c3.cob (RD with no following entry) compiles clean and runs at 2023 and 85. The REPORT/SECTION words, the optional repeating RD group, and the dataDivision section order are correct. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (REPORT SECTION itself is in 1985 too; the constant-entry arm exists from 2002, when the constant entry §13.10 was introduced)",
-  "state": "GAP"
+  "notes": "kb/Work PB1287 (duplicate of PB1226): constant-entry arm and the one-or-more rule, see FMT-13.2.1. The constant entry is a COBOL-2002 introduction, so below 2002 it draws COBOLNET0900 through the same constantEntryBody gate as a data-division constant.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.9.2",
@@ -58671,13 +58671,13 @@
   "ordinal": 0,
   "subject": "Report group description entry",
   "rule-digest": "d2104b4e3f18",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName",
+  "test-ref": "conformance:85/pb1226_report_filler_entry_name",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1287. The general format is `level-number [ entry-name-clause ] [type-clause] ... [varying-clause] .`, and entry-name-clause is §13.18.20, whose Format 3 is FILLER (§13.18.20.3 SR3: 'If the entry-name clause is specified in a data description entry or a report group description entry, either data-name-1 or FILLER shall be specified'). The grammar writes `reportGroupEntry : levelNumber reportGroupName? reportGroupClause* DOT` with `reportGroupName : cobolWord`, and FILLER is a reserved token that cobolWord does not admit. So the filler format has no parse path: probe/rgde/filler (`05 FILLER COLUMN 1 PIC X SOURCE WA.`) fails with COBOL0307 \"unexpected 'FILLER'\" at --std 85, 2002 and 2023. The clause set is otherwise complete. TYPE, NEXT GROUP, LINE, PICTURE, USAGE (SR7 of §13.18.60 limits it to DISPLAY/NATIONAL, screened by ScreenReportUsage), SIGN, JUSTIFIED, COLUMN, BLANK WHEN ZERO, SOURCE/SUM/VALUE, PRESENT WHEN, GROUP [INDICATE], the Format-3 OCCURS (DYNAMIC/KEY/INDEXED refused by ReportOccursOf) and VARYING all parse, in any order (probe fmtorder: `SOURCE WS PIC S9 SIGN LEADING SEPARATE COLUMN 1 USAGE IS DISPLAY` printed `-3`). cite.py --check 13.18.20.3 'either data-name-1 or FILLER shall be specified' -> OK §13.18.20.3 3). Rejects legal source, so DIVERGES; see the finding 'report-group-entry-filler-format'. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the report group description entry is Report Writer nucleus syntax at every edition; no Annex E item changes §13.15 between 2014 and 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1287: the report group entry's entry-name slot is the data description entry's own dataName rule (data-name or FILLER, optional), read through CstExtensions.NameOrNull. `05 FILLER COLUMN 1 PIC X SOURCE WA` and `01 FILLER TYPE PAGE HEADING` parse and bind as unnamed items. retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName (the hand-written reportGroupName rule no longer exists: the report group entry's name slot is the data description entry's dataName rule (kb/Work PB1226))",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.16.2",
@@ -59001,13 +59001,13 @@
   "ordinal": 0,
   "subject": "Entry-name clause",
   "rule-digest": "68e170c93da0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName; src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4#screenName; src/Cobol.Net.Compiler/Binding/ScreenFacility.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataName; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupEntry",
+  "test-ref": "conformance:85/pb1226_report_filler_entry_name",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1226, 14d). §13.18.20.2 prints three formats: data-name-1, screen-name-1, FILLER (cite.py --check 13.18.20.2 \"Format 3 (filler)\" OK). dataDescriptionEntry is `levelNumber dataName? dataDescriptionBody DOT` with dataName = cobolWord | FILLER | (gated words): formats 1 and 3 parse in a data description entry at 85 and 2023 (probe/entry-name-clause/p1.cob prints ABCDEF). Format 2 is screenName = cobolWord | FILLER, then refused as a declined module. BUT the report group description entry (§13.15.2 `level-number [ entry-name-clause ]`, --check OK) uses reportGroupName = cobolWord ONLY, so format 3 (FILLER) is not admitted there: probe/entry-name-clause/p9.cob `05 FILLER COLUMN 7 PIC X(5) VALUE \"WORLD\".` -> COBOL0307 \"unexpected 'FILLER'\" at every --std. The format itself is implemented; its use in report groups is the defect owned by SR-13.18.20.3-3. The screen-description half belongs to the screen-handling module (§13.9, Annex A.4.2), which docs/CONFORMANCE.md §5 item 4 declares Not claimed and REFUSES (COBOLNET1560 from ScreenFacility.cs); its witness debt is owned by kb/Work PB260 — not re-reported here. || Editions (adjudicator): 85, 2002, 2014, 2023 (the clause's own text; Annex E records no change to the entry-name clause)",
-  "state": "GAP"
+  "notes": "kb/Work PB1226: Format 1 (data-name) and Format 3 (filler) now parse in a report group description entry as in a data description entry (one rule, dataName). Format 2 (screen-name) is the declined screen module. The screen-description third of the rule belongs to the screen-handling module (Annex A.4.2, docs/CONFORMANCE.md section 5 item 4: not claimed, refused COBOLNET1560); its witness debt is owned by kb/Work PB260. retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupName (the hand-written reportGroupName rule no longer exists: the report group entry's name slot is the data description entry's dataName rule (kb/Work PB1226))",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.21.2",
@@ -59286,13 +59286,13 @@
   "ordinal": 0,
   "subject": "PAGE clause",
   "rule-digest": "4da3b209ef18",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageWidth; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportPageSubclause",
+  "test-ref": "conformance:2002/pb1059_page_columns_width; conformance:2002/pb1059_page_width_only; conformance:2002/pb1059_page_last_control_heading; conformance:negative/pb1059-page-phrase-without-limit",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1059. General format (cite.py --check 13.18.39.2 \"COLUMNS\" -> OK): PAGE [LIMIT IS|LIMITS ARE] {integer-1 [LINE|LINES]} {integer-2 COLS|COLUMNS} then FIVE separate optional brackets HEADING / FIRST {DETAIL|DE} / LAST {CONTROL HEADING|CH} / LAST {DETAIL|DE} / FOOTING. Grammar: `PAGE (LIMIT IS? | LIMITS ARE?)? integerLiteral (LINE|LINES)? reportPageSubclause*` with subclauses HEADING | FIRST DETAIL | LAST DETAIL | FOOTING. Three divergences, all probed (probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/page-clause (pinned adj-d1 cobol.exe, --std 2023)): (1) REJECTS LEGAL: `PAGE LIMIT 10 LINES LAST CONTROL HEADING 5.` -> COBOL0001 unexpected 'CONTROL'; `LAST CH 5` -> unexpected 'CH'; `FIRST DE 3 LAST DE 8` -> unexpected 'DE' (lch.cob, lchab.cob, fde.cob). (2) REJECTS LEGAL: integer-2 COLS/COLUMNS has no surface and integer-1 is mandatory, so `PAGE 132 COLUMNS` and `PAGE LIMIT 20 LINES 10 COLUMNS` are parse errors -- owned by open kb/Work PB1059 (inventory_rows includes FMT-13.18.39.2). (3) UNDER-REJECTS: `reportPageSubclause*` admits a phrase twice -- `PAGE LIMIT 10 LINES HEADING 2 HEADING 3.` compiles rc=0 (dup.cob) and the binder silently keeps the last value, where each phrase is a single optional bracket in the format. Base `PAGE LIMIT 10 LINES HEADING 1 FIRST DETAIL 2 LAST DETAIL 8 FOOTING 9.` and LIMITS ARE/LINE spelling compile (base.cob, order.cob). docs/CONFORMANCE.md A.4.11 already says 'NO grammar surface yet: ... PAGE COLS, LAST CONTROL HEADING' but no kb/Work note owns LAST CONTROL HEADING/CH/DE (PB1059's body tells its fixer to file it). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1059: reportPageClause is the rendered diagram (PDF p468): `PAGE [LIMIT IS|LIMITS ARE] { integer-1 | [integer-1 {LINE|LINES}] [integer-2 {COLS|COLUMNS}] }` as three alternatives, then the five phrases HEADING / FIRST {DETAIL|DE} / LAST {CONTROL HEADING|CH} / LAST {DETAIL|DE} / FOOTING, each at most once (COBOLNET2423) in any order. Not edition-gated: no gate is derivable from the spec (row 130d).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.40.2",
@@ -59556,13 +59556,13 @@
   "ordinal": 0,
   "subject": "TYPE clause",
   "rule-digest": "511d91dc15cb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#typeClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportTypeClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupType",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupType; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportControlName",
+  "test-ref": "conformance:2002/pb1298_control_heading_or_page; conformance:negative/pb1298-control-footing-or-page-not-in-format",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1298. Rendered PDF p524 (folio 494): Format 1 `TYPE TO type-name-1` (TYPE underlined, TO optional); Format 2 `TYPE IS { {REPORT HEADING|RH} | {PAGE HEADING|PH} | {CONTROL HEADING|CH} [[ON|FOR] {data-name-1|FINAL} [OR PAGE]] | {DETAIL|DE} | {CONTROL FOOTING|CF} [[ON|FOR] {data-name-2|FINAL}] | {PAGE FOOTING|PF} | {REPORT FOOTING|RF} }`. Format 1 CONFORMS: `TYPE TO? IDENTIFIER` (PB889 landed; conformance:2002/pb889_type_to_optional_word). Format 2 DIVERGES: reportGroupType is `(CONTROL HEADING|CH) (FINAL|dataReference)?` / `(CONTROL FOOTING|CF) (FINAL|dataReference)?` — the optional words ON/FOR and the whole OR PAGE phrase are absent. Probes: `TYPE IS CONTROL HEADING ON CX OR PAGE` -> COBOL0307 unexpected 'ON'; `TYPE CH FOR FINAL` -> COBOL0307 unexpected 'FOR'; `TYPE CF ON CX` -> unexpected 'ON'; `TYPE CH OR PAGE` -> unexpected 'OR'. All seven group types in full and abbreviated spellings compile and present (fmt_abbrev_all / fmt_fullwords_all). OR PAGE is normative, not decorative: §13.18.57.4 GR6c/GR7d (part 2 of this subject) give it semantics, so the fix is grammar + binder + runtime, not grammar alone. NOTE: specs/ISO_COBOL.md §13.18.57.2 carries NEITHER diagram (heading 'Format 1 (type-name):' then the SR anchor) — a transcription loss. cite.py --check 13.18.57.2 'TYPE TO type-name-1' FAILS for that reason (diagram absent from the Markdown); authority is the rendered page. probes under out13/probe/type-clause-p1/ (pinned adj-d1 cobol.exe, --std 2023) || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): Format 1: COBOL-2002, 2014, 2023 (TYPEDEF family; constructs.json type-clause-2002). Format 2 (report writer): COBOL-85 optional Report Writer module; ISO 2023 optional language element A.4.11; 2002/2014 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d); Annex E lists no 2014->2023 change to the TYPE clause; the edition at which ON/FOR and OR PAGE entered is not derivable from the 2023 text.",
-  "state": "GAP"
+  "notes": "kb/Work PB1298: Format 2 as rendered (PDF p524): `{CONTROL HEADING|CH} [ [ON|FOR] {data-name-1|FINAL} [OR PAGE] ]`, `{CONTROL FOOTING|CF} [ [ON|FOR] {data-name-2|FINAL} ]`: ON/FOR optional, OR PAGE inside the one optional bracket and on the heading only (a footing with OR PAGE is a parse error).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.58.2",

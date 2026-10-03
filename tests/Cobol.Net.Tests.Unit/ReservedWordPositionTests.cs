@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// grammar position that is unambiguously a user-defined-word use (§8.3.2.2) — the data/parameter entry-name
 /// slot (§13.16), a paragraph/section definition (§14.4.2/§14.4.3), the SELECT file-name (§12.4.5.1), and the
 /// program-name sites (§11.10.2/§11.5/§10.6.1). Mis-parse-prone optional entry-name slots (the RW104A hazard:
-/// the report-group COLUMN clause keyword, §13.18.14, binds into the <c>reportGroupName?</c> slot under the
+/// the report-group COLUMN clause keyword, §13.18.14, binds into the <c>dataName?</c> slot of <c>reportGroupEntry</c> under the
 /// permissive grammar) and every reference position classify FALSE. Each fact feeds REAL parse trees through
 /// the frontend — no hand-built contexts.
 /// </summary>

@@ -508,7 +508,7 @@ internal sealed class VersionConformancePass
     /// user-defined words"; restated §8.3.2.4.1) the 0901 band enforces. CONSERVATIVE by design (P2.8 W2 —
     /// the RW104A adversarial review): a slot qualifies only when NO clause/statement keyword admitted by
     /// <c>cobolWord</c> can legally occupy it, proven against the grammar rule by rule below. Mis-parse-prone
-    /// OPTIONAL entry-name slots stay UNCHECKED — the report-group entry-name (<c>reportGroupName?</c>
+    /// OPTIONAL entry-name slots stay UNCHECKED — the report-group entry-name (<c>dataName?</c> under <c>reportGroupEntry</c>
     /// swallows the keyword of RW102A/103A/104A's report COLUMN clause, §13.18.14) and the screen entry-name
     /// (<c>screenName?</c> would swallow a screen attribute keyword) — as does every REFERENCE position
     /// (dataReference, qualification, procedure-name refs, DISPLAY UPON, SPECIAL-NAMES operands, …), keeping
@@ -528,13 +528,16 @@ internal sealed class VersionConformancePass
         // DataNameContext only when the whole entry parses with it as the name — and a program whose entry
         // parses that way IS naming something with the word, which is the §8.3.2.1 violation the 0901 band
         // reports. The mis-parse worry that keeps the report-group and screen entry-name slots UNCHECKED (a
-        // greedy `reportGroupName?` swallowing a COLUMN keyword) does not arise: each validation-clause
+        // greedy `dataName?` under `reportGroupEntry` swallowing a COLUMN keyword) does not arise: each validation-clause
         // alternative diverges from the name reading within one or two tokens. The witness that it stays true
         // is `conformance:negative/declined-validate-entry-name-still-0901`.
         CobolParserCore.DataNameContext
         {
             Parent: CobolParserCore.DataDescriptionEntryContext
                 or CobolParserCore.LinkageProcedureParameterContext
+                // A report-section constant entry (§13.8.2): the only token that may follow the name slot is
+                // CONSTANT, so a cobolWord there is always the constant's NAME (kb/Work PB1226).
+                or CobolParserCore.ConstantEntryContext
         } => true,
         // A paragraph/section DEFINITION (§14.4.2/§14.4.3: section-name SECTION. / paragraph-name.): the name
         // stands at a procedure-unit boundary followed by [SECTION] DOT — no statement in cobolWord's token
@@ -1083,8 +1086,15 @@ internal sealed class VersionConformancePass
         /// (DataBinder.Constants.cs, COBOLNET1547).</summary>
         public override object? VisitConstantEntryBody(CobolParserCore.ConstantEntryBodyContext ctx)
         {
-            string name = (ctx.Parent as CobolParserCore.DataDescriptionBodyContext)?.Parent
-                is CobolParserCore.DataDescriptionEntryContext e ? e.dataName()?.GetText() ?? "?" : "?";
+            // The body has two hosts: a data description entry (through its body rule) and a report-section
+            // constant entry (§13.8.2, kb/Work PB1226) — the same entry, spelled under its own rule.
+            CobolParserCore.DataNameContext? nameCtx = ctx.Parent switch
+            {
+                CobolParserCore.DataDescriptionBodyContext { Parent: CobolParserCore.DataDescriptionEntryContext e } => e.dataName(),
+                CobolParserCore.ConstantEntryContext c => c.dataName(),
+                _ => null,
+            };
+            string name = nameCtx?.GetText() ?? "?";
             _p.Check(Constructs.ConstantEntry2002, $"the constant entry '{name}' (01 … CONSTANT)");
             return base.VisitChildren(ctx);
         }

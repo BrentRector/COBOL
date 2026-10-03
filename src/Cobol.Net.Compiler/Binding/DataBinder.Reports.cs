@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Editions.Diagnostics;
+using CobolNet.Frontend.Cst;
 using CobolNet.Frontend.Generated;
 
 using CobolNet.Binding.Bound;
@@ -55,6 +56,19 @@ public sealed class ReportModel
     public int LastControlHeading { get; set; }
     public int LastDetail { get; set; }
     public int Footing { get; set; }
+
+    /// <summary>The page width — integer-2 of the PAGE clause (ISO §13.18.39.4 GR2b, "the maximum number of print
+    /// columns that may be accommodated in any line of the report"), or 999 when it is omitted (GR5, "a value of
+    /// 999 is assumed for the page width"). It is the bound of the COLUMN clause's own operands (§13.18.14.3 SR6,
+    /// COBOLNET2710) and of the line the engine places printable items in (§13.18.14.4 GR5, EC-REPORT-PAGE-WIDTH).
+    /// Independent of <see cref="Paged"/>: a PAGE clause may give the width alone.</summary>
+    public int PageWidth { get; set; } = DefaultPageWidth;
+
+    /// <summary>The PAGE clause wrote integer-2 (so <see cref="PageWidth"/> is the program's, not GR5's default).</summary>
+    public bool PageWidthWritten { get; set; }
+
+    /// <summary>§13.18.39.4 GR5's assumed page width.</summary>
+    public const int DefaultPageWidth = 999;
 
     /// <summary>The report line width: the FD's fixed RECORD CONTAINS when present, else the widest field extent
     /// (column + image width − 1) over the report (the §13.18.39.4 GR5 page-width default 999 is a MAXIMUM, not
@@ -172,6 +186,10 @@ public sealed class ReportGroupModel
     /// group.</summary>
     public ReportControlRef? ControlOperand { get; set; }
     public bool ControlFinal { get; set; }
+
+    /// <summary>A control heading written with the OR PAGE phrase (§13.18.57.2): it is printed "in addition after each
+    /// page advance, following any page heading" (§13.18.57.4 GR6 c)) — the engine's <c>ReportGroup.OrPage</c>.</summary>
+    public bool OrPage { get; set; }
 
     /// <summary>The resolved control LEVEL (the index into <see cref="ReportModel.Controls"/>); −1 until
     /// resolved / for non-control groups.</summary>
@@ -735,7 +753,7 @@ public sealed partial class DataBinder
     /// CONTROL (§13.18.16), GLOBAL (§13.18.27 on an RD); CODE (§13.18.12) stages loud.</summary>
     private void BindReportDescriptionClauses(Core.ReportDescriptionEntryContext rd, ReportModel model)
     {
-        bool heading = false, firstDetail = false, lastDetail = false, footing = false;
+        bool heading = false, firstDetail = false, lastControlHeading = false, lastDetail = false, footing = false;
         // §13.14.2 prints each clause in its own bracket with no ellipsis; §13.14.3 SR2 licenses any ORDER, never a
         // repeat (COBOLNET2423 — the grammar's `reportDescriptionClause*` admits both).
         var rdClauses = rd.reportDescriptionClause();
@@ -808,38 +826,83 @@ public sealed partial class DataBinder
             }
             else if (clause.reportPageClause() is { } page)
             {
-                model.Paged = true;
-                model.PageLimit = CobolNet.Validation.IntegerOperandRules.HostValue(page.integerLiteral());
+                // §13.18.39.4 GR2a — integer-1 is the page limit, and "If integer-1 is not specified, the report
+                // consists of a single page of indefinite length": a PAGE clause that gives only integer-2 (the page
+                // width, GR2b) leaves the report UNPAGED. GR5 — "If integer-2 is omitted, a value of 999 is assumed
+                // for the page width": ReportModel.PageWidth already holds that default.
+                if (page.integerLiteral() is { } limit)
+                {
+                    model.Paged = true;
+                    model.PageLimit = CobolNet.Validation.IntegerOperandRules.HostValue(limit);
+                }
+                if (page.reportPageWidth() is { } width)
+                {
+                    model.PageWidth = CobolNet.Validation.IntegerOperandRules.HostValue(width.integerLiteral());
+                    model.PageWidthWritten = true;
+                }
                 // §13.18.39.2 prints each phrase in its own bracket with no ellipsis; SR4 licenses any ORDER,
-                // never a repeat — `HEADING 1 HEADING 2` used to keep the last value silently (COBOLNET2423).
+                // never a repeat (COBOLNET2423).
                 var subs = page.reportPageSubclause();
-                UnrepeatedElements.AtMostOnce(Edition, subs.Count(s => s.HEADING() is not null), rdWhere,
-                    "the PAGE clause's HEADING phrase", "13.18.39.2");
-                UnrepeatedElements.AtMostOnce(Edition, subs.Count(s => s.FIRST() is not null), rdWhere,
-                    "the PAGE clause's FIRST DETAIL phrase", "13.18.39.2");
-                UnrepeatedElements.AtMostOnce(Edition, subs.Count(s => s.LAST() is not null), rdWhere,
-                    "the PAGE clause's LAST DETAIL phrase", "13.18.39.2");
-                UnrepeatedElements.AtMostOnce(Edition, subs.Count(s => s.FOOTING() is not null), rdWhere,
-                    "the PAGE clause's FOOTING phrase", "13.18.39.2");
+                foreach (var phrase in Enum.GetValues<PagePhrase>())
+                    UnrepeatedElements.AtMostOnce(Edition, subs.Count(s => PagePhraseOf(s) == phrase), rdWhere,
+                        $"the PAGE clause's {PagePhraseWords(phrase)} phrase", "13.18.39.2");
+                // §13.18.39.3 SR3 — "The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, or FOOTING
+                // phrase may be specified only if integer-1 is specified." Each phrase subdivides the page
+                // (GR2c–GR2g) and a report with no page limit has no page to subdivide.
+                if (page.integerLiteral() is null && subs.Length > 0)
+                    Edition.Error(DiagnosticCatalog.ReportPagePhraseWithoutLimit, $"{rdWhere}: the PAGE clause "
+                        + $"specifies {string.Join(", ", subs.Select(s => PagePhraseWords(PagePhraseOf(s))).Distinct())} "
+                        + "but no integer-1 (the page limit): those phrases may be specified only if integer-1 is "
+                        + "specified (ISO §13.18.39.3 SR3)");
                 foreach (var sub in subs)
                 {
                     int v = CobolNet.Validation.IntegerOperandRules.HostValue(sub.integerLiteral());
-                    if (sub.HEADING() is not null) { model.Heading = v; heading = true; }
-                    else if (sub.FIRST() is not null) { model.FirstDetail = v; firstDetail = true; }
-                    else if (sub.LAST() is not null) { model.LastDetail = v; lastDetail = true; }
-                    else if (sub.FOOTING() is not null) { model.Footing = v; footing = true; }
+                    switch (PagePhraseOf(sub))
+                    {
+                        case PagePhrase.Heading: model.Heading = v; heading = true; break;
+                        case PagePhrase.FirstDetail: model.FirstDetail = v; firstDetail = true; break;
+                        case PagePhrase.LastControlHeading: model.LastControlHeading = v; lastControlHeading = true; break;
+                        case PagePhrase.LastDetail: model.LastDetail = v; lastDetail = true; break;
+                        case PagePhrase.Footing: model.Footing = v; footing = true; break;
+                    }
                 }
             }
         }
         if (!model.Paged) return;
-        // The §13.18.39.4 GR3 defaults (the grammar has no LAST CONTROL HEADING phrase, so GR3c always defaults):
+        // The §13.18.39.4 GR3 defaults:
         if (!heading) model.Heading = 1;                                              // GR3a
         if (!firstDetail) model.FirstDetail = model.Heading;                          // GR3b
         if (!lastDetail) model.LastDetail = footing ? model.Footing : model.PageLimit;   // GR3d
-        model.LastControlHeading = lastDetail ? model.LastDetail
-            : footing ? model.Footing : model.PageLimit;                              // GR3c
+        if (!lastControlHeading)                                                      // GR3c
+            model.LastControlHeading = lastDetail ? model.LastDetail
+                : footing ? model.Footing : model.PageLimit;
         if (!footing) model.Footing = lastDetail ? model.LastDetail : model.PageLimit;   // GR3e
     }
+
+    /// <summary>The five trailing phrases of the PAGE clause (§13.18.39.2), each in its own bracket — what
+    /// <see cref="PagePhraseOf"/> decides, so the once-only screen, the SR3 screen and the binding read one
+    /// classification and the next phrase is one more member here.</summary>
+    private enum PagePhrase { Heading, FirstDetail, LastControlHeading, LastDetail, Footing }
+
+    /// <summary>Which §13.18.39.2 phrase a <c>reportPageSubclause</c> is. Read from the phrase's first token and,
+    /// for LAST, the word after it — never from <c>HEADING()</c>, which is also a terminal of LAST CONTROL HEADING
+    /// (§13.18.39.3 SR1 makes the abbreviations CH and DE synonyms, so the second word may be either spelling).</summary>
+    private static PagePhrase PagePhraseOf(Core.ReportPageSubclauseContext sub) => sub.Start.Type switch
+    {
+        CobolLexer.HEADING => PagePhrase.Heading,
+        CobolLexer.FIRST => PagePhrase.FirstDetail,
+        CobolLexer.FOOTING => PagePhrase.Footing,
+        _ => sub.CONTROL() is not null || sub.CH() is not null ? PagePhrase.LastControlHeading : PagePhrase.LastDetail,
+    };
+
+    private static string PagePhraseWords(PagePhrase phrase) => phrase switch
+    {
+        PagePhrase.Heading => "HEADING",
+        PagePhrase.FirstDetail => "FIRST DETAIL",
+        PagePhrase.LastControlHeading => "LAST CONTROL HEADING",
+        PagePhrase.LastDetail => "LAST DETAIL",
+        _ => "FOOTING",
+    };
 
     /// <summary>Build one RD's report groups from its (flat, level-numbered) group entries. The line-building
     /// rule (ISO §13.15 / COBOLNET_REPORT_WRITER_DESIGN §3.3): walking the entries in declaration order, a
@@ -853,11 +916,52 @@ public sealed partial class DataBinder
     private void BindReportGroups(Core.ReportDescriptionEntryContext rd, ReportModel model)
     {
         var entries = rd.reportGroupEntry();
+        ScreenReportDescriptionHasGroup(entries, model);
         ScreenReportLineNesting(entries, model);
         ScreenReportLineClauses(entries, model);
         ScreenReportEntryClausePresence(entries, model);
-        BindReportEntries(entries, 0, entries.Length, model, new ReportGroupBuild());
+        BindReportSectionEntries(rd, entries, model);
         BindNextGroupClauses(entries, model);
+    }
+
+    /// <summary>⛔ ISO §13.8.4 — "An RD entry shall be followed by one or more report group description entries"
+    /// (kb/Work PB1226). §13.8.2 prints the entries after a report description entry as the brace group
+    /// <c>{ constant-entry | report-group-description-entry } …</c>, and §13.8.4 narrows the one-or-more to the
+    /// report group kind: constant entries alone describe no report. The grammar admits the list empty (a
+    /// bind-time rule, like the sort-merge twin's COBOLNET1837, so the diagnostic names the rule rather than a
+    /// parse position).</summary>
+    private void ScreenReportDescriptionHasGroup(Core.ReportGroupEntryContext[] entries, ReportModel model)
+    {
+        if (entries.Length > 0) return;
+        Edition.Error(DiagnosticCatalog.ReportDescriptionWithoutGroup, $"RD '{model.Name}' is followed by no report "
+            + "group description entry (ISO §13.8.4: an RD entry shall be followed by one or more report group "
+            + "description entries)");
+    }
+
+    /// <summary>⛔ THE REPORT SECTION'S ENTRIES IN SOURCE ORDER (ISO §13.8.2: <c>{ constant-entry |
+    /// report-group-description-entry } …</c>; kb/Work PB1226). A constant entry binds into the compile-time
+    /// constant table at the point it stands, because a constant is read only by what FOLLOWS it
+    /// (§13.10.3 SR4/SR5 — definition precedes reference); the report group entries between two constants bind as
+    /// one run through <see cref="BindReportEntries"/>, which takes an index range for exactly this. A constant is a
+    /// level-01 entry (§13.10.2), so it ends the group before it: the entries after it have no 01 entry to belong
+    /// to, and the builder's group is dropped so <see cref="DiagnosticCatalog.ReportGroupBefore01"/> says so
+    /// instead of attaching them to the group the constant interrupted.</summary>
+    private void BindReportSectionEntries(
+        Core.ReportDescriptionEntryContext rd, Core.ReportGroupEntryContext[] entries, ReportModel model)
+    {
+        var st = new ReportGroupBuild();
+        int runStart = 0, seen = 0;
+        foreach (var child in rd.children)
+        {
+            if (child is Core.ReportGroupEntryContext) { seen++; continue; }
+            if (child is not Core.ConstantEntryContext constant) continue;
+            BindReportEntries(entries, runStart, seen, model, st);
+            runStart = seen;
+            using var _ = Edition.At(constant);
+            BindConstantEntry(constant.levelNumber(), constant.dataName(), constant.constantEntryBody());
+            st.Group = null;
+        }
+        BindReportEntries(entries, runStart, entries.Length, model, st);
     }
 
     /// <summary>⛔ THE NEXT GROUP CLAUSE (ISO §13.18.37; kb/Work PB957), bound once per RD after every group is
@@ -892,7 +996,7 @@ public sealed partial class DataBinder
                 {
                     using var _ = Edition.At(misplaced);
                     Edition.Error(DiagnosticCatalog.ReportNextGroupClauseRule, $"RD '{model.Name}' entry "
-                        + $"'{ge.reportGroupName()?.GetText() ?? "FILLER"}' is a level {level} entry; the NEXT GROUP "
+                        + $"'{ge.dataName().NameOrNull() ?? "FILLER"}' is a level {level} entry; the NEXT GROUP "
                         + "clause may be specified only in a level 1 entry (ISO §13.15.3 SR6)");
                 }
         }
@@ -1017,12 +1121,13 @@ public sealed partial class DataBinder
     private void ScreenReportLineClauses(Core.ReportGroupEntryContext[] entries, ReportModel model)
     {
         var kind = ReportGroupKindModel.Detail;
-        bool firstLineClause = true;
+        bool firstLineClause = true, orPageHeading = false;
         foreach (var ge in entries)
         {
             if (int.TryParse(ge.levelNumber().GetText(), out int level) && level == 1)
             {
                 kind = WrittenGroupKind(ge);
+                orPageHeading = kind == ReportGroupKindModel.ControlHeading && WrittenGroupType(ge)?.OR() is not null;
                 firstLineClause = true;
             }
             foreach (var clause in ge.reportGroupClause())
@@ -1048,6 +1153,14 @@ public sealed partial class DataBinder
                             + (absolute ? $"LINE {op.integerLiteral()!.GetText()}{(op.NEXT() is not null ? " ON NEXT PAGE" : "")} is absolute"
                                         : "the ON NEXT PAGE operand is not the relative form {PLUS|+} integer-2")
                             + " (ISO §13.18.35.3 SR5)");
+                    // SR9 — "If the current report group is a control heading with the OR PAGE phrase, all the LINE
+                    // clauses in the report group description shall be relative." A bare NEXT PAGE operand is no
+                    // relative form either, exactly as SR5 reads it (kb/Work PB1248).
+                    if (orPageHeading && (absolute || op.NEXT() is not null))
+                        Violation("a control heading with the OR PAGE phrase shall have only relative LINE clauses — "
+                            + (absolute ? $"LINE {op.integerLiteral()!.GetText()}{(op.NEXT() is not null ? " ON NEXT PAGE" : "")} is absolute"
+                                        : "the ON NEXT PAGE operand is not the relative form {PLUS|+} integer-2")
+                            + " (ISO §13.18.35.3 SR9)");
                     if (op.NEXT() is null) continue;
                     if (k == 0 && !firstLineClause)
                         Violation("a NEXT PAGE phrase, if present, shall be specified only in the first LINE clause of "
@@ -1133,7 +1246,7 @@ public sealed partial class DataBinder
                 groupIndicate |= c.reportGroupIndicateClause() is not null;
                 justifiedOrBwz |= c.justifiedClause() is not null || c.blankWhenZeroClause() is not null;
             }
-            string where = $"RD '{model.Name}' entry '{ge.reportGroupName()?.GetText() ?? "FILLER"}'";
+            string where = $"RD '{model.Name}' entry '{ge.dataName().NameOrNull() ?? "FILLER"}'";
             using var _ = Edition.At(ge);
             if (!elementary)
             {
@@ -1408,7 +1521,7 @@ public sealed partial class DataBinder
         if (oc is null) return null;
 
         using var _ = Edition.At(ge);
-        string name = ge.reportGroupName()?.GetText() ?? "FILLER";
+        string name = ge.dataName().NameOrNull() ?? "FILLER";
         string where = $"RD '{model.Name}' entry '{name}'";
         int.TryParse(ge.levelNumber().GetText(), out int level);
 
@@ -1581,7 +1694,9 @@ public sealed partial class DataBinder
         foreach (var clause in ge.reportGroupClause())
             if (clause.pictureClause()?.PIC_STRING() is { } pic)
                 // The SAME character-position count the print columns use (§13.18.14.4 GR9), through the ONE rule.
-                return PictureAnalyzer.Analyze(pic.GetText(), Usage.Display, Edition,
+                return PictureAnalyzer.Analyze(
+                    _constants.Count > 0 ? ExpandPicConstants(pic.GetText(), "", diagnose: false) : pic.GetText(),
+                    Usage.Display, Edition,
                     $"RD '{model.Name}' repeating entry", null, currencies: CurrencySigns,
                     decimalPointIsComma: DecimalPointIsComma) is { } p ? DataItem.DisplayTextWidthOf(p) : null;
         return null;
@@ -1605,7 +1720,7 @@ public sealed partial class DataBinder
         {
             using var _ = Edition.At(ge);
             int.TryParse(ge.levelNumber().GetText(), out int level);
-            string? entryName = ge.reportGroupName()?.GetText();
+            string? entryName = ge.dataName().NameOrNull();
             if (level == 1)
             {
                 st.Group = new ReportGroupModel { Name = entryName };
@@ -1686,7 +1801,20 @@ public sealed partial class DataBinder
                 }
                 else if (clause.reportColumnClause() is { } cc)
                     foreach (var op in cc.reportColumnOperand())
-                        columns.Add(new ReportColumnSpec(op.reportRelativeSign() is not null, CobolNet.Validation.IntegerOperandRules.HostValue(op.integerLiteral())));
+                    {
+                        bool relative = op.reportRelativeSign() is not null;
+                        int column = CobolNet.Validation.IntegerOperandRules.HostValue(op.integerLiteral());
+                        // §13.18.14.3 SR6 — "Neither integer-1 nor integer-2 shall exceed the page width": the
+                        // absolute column and the relative offset are both written integers, so the rule is
+                        // decidable here against ReportModel.PageWidth (the PAGE clause's integer-2, else GR5's 999).
+                        if (column > model.PageWidth)
+                            Edition.Error(DiagnosticCatalog.ReportColumnBeyondPageWidth, $"RD '{model.Name}' entry "
+                                + $"'{entryName ?? "FILLER"}': the COLUMN clause's {(relative ? "relative offset" : "column")} "
+                                + $"{column} exceeds the page width {model.PageWidth}"
+                                + (model.PageWidthWritten ? "" : " (assumed 999, §13.18.39.4 GR5)")
+                                + " (ISO §13.18.14.3 SR6)");
+                        columns.Add(new ReportColumnSpec(relative, column));
+                    }
                 else if (clause.reportSourceClause() is { } sc)
                 {
                     // Every written operand of the clause (§13.18.53.2's ellipsis) — the SR6 count below reads
@@ -1732,6 +1860,11 @@ public sealed partial class DataBinder
                 else if (clause.pictureClause()?.PIC_STRING() is { } pic)
                 {
                     picText = pic.GetText();
+                    // §13.15.4 GR2 imports the PICTURE clause, and §13.10.3 SR2 lets an integer constant-name
+                    // specify repetition in a picture character-string: expanded before the analyzer reads it,
+                    // exactly as BindEntry does for a data description entry (kb/Work PB1226's sibling sweep).
+                    if (_constants.Count > 0)
+                        picText = ExpandPicConstants(picText, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'");
                     reportEditing = BuildEditingSpecs(clause.pictureClause(),
                         $"report group entry '{entryName ?? "FILLER"}'");
                     // PICTURE format 2 in a REPORT GROUP entry (§13.15.4 GR2 imports the PICTURE clause's own
@@ -2256,22 +2389,34 @@ public sealed partial class DataBinder
     /// <summary>THE ONE TYPE READER: the report group type a TYPE clause names (ISO §13.18.57 Format 2 + the SR9
     /// abbreviations). <see cref="BindGroupType"/> and the flat-entry screens that need the TYPE before the group is
     /// built (<see cref="ScreenReportLineClauses"/>) both read it here.</summary>
-    private static ReportGroupKindModel GroupKindOf(Core.ReportGroupTypeContext t) =>
-        t.RH() is not null || (t.REPORT() is not null && t.HEADING() is not null) ? ReportGroupKindModel.ReportHeading
-        : t.PH() is not null || (t.PAGE() is not null && t.HEADING() is not null) ? ReportGroupKindModel.PageHeading
-        : t.CH() is not null || (t.CONTROL() is not null && t.HEADING() is not null) ? ReportGroupKindModel.ControlHeading
-        : t.DE() is not null || t.DETAIL() is not null ? ReportGroupKindModel.Detail
-        : t.CF() is not null || (t.CONTROL() is not null && t.FOOTING() is not null) ? ReportGroupKindModel.ControlFooting
-        : t.PF() is not null || (t.PAGE() is not null && t.FOOTING() is not null) ? ReportGroupKindModel.PageFooting
-        : ReportGroupKindModel.ReportFooting;
+    private static ReportGroupKindModel GroupKindOf(Core.ReportGroupTypeContext t) => t.Start.Type switch
+    {
+        // Decided by the phrase's FIRST token (and the word after REPORT / PAGE / CONTROL): `PAGE` is also a
+        // terminal of a control heading's OR PAGE phrase (§13.18.57.2), so a test on `t.PAGE()` would classify
+        // `CONTROL HEADING CX OR PAGE` as a page heading.
+        CobolLexer.RH => ReportGroupKindModel.ReportHeading,
+        CobolLexer.PH => ReportGroupKindModel.PageHeading,
+        CobolLexer.CH => ReportGroupKindModel.ControlHeading,
+        CobolLexer.DE or CobolLexer.DETAIL => ReportGroupKindModel.Detail,
+        CobolLexer.CF => ReportGroupKindModel.ControlFooting,
+        CobolLexer.PF => ReportGroupKindModel.PageFooting,
+        CobolLexer.REPORT => t.HEADING() is not null ? ReportGroupKindModel.ReportHeading : ReportGroupKindModel.ReportFooting,
+        CobolLexer.PAGE => t.HEADING() is not null ? ReportGroupKindModel.PageHeading : ReportGroupKindModel.PageFooting,
+        CobolLexer.CONTROL => t.HEADING() is not null ? ReportGroupKindModel.ControlHeading : ReportGroupKindModel.ControlFooting,
+        _ => ReportGroupKindModel.ReportFooting,   // RF — the last of the seven alternatives
+    };
 
     /// <summary>The group type a level-01 entry's written TYPE clause names, for the flat-entry screens that run
     /// before the group is built (<see cref="ScreenReportLineClauses"/>, <see cref="ScreenReportEntryClausePresence"/>):
     /// through <see cref="GroupKindOf"/>, and <see cref="ReportGroupKindModel.Detail"/> — the group model's own
     /// default — when the entry writes none.</summary>
     private static ReportGroupKindModel WrittenGroupKind(Core.ReportGroupEntryContext ge) =>
-        ge.reportGroupClause().Select(c => c.reportTypeClause()?.reportGroupType())
-            .LastOrDefault(t => t is not null) is { } t ? GroupKindOf(t) : ReportGroupKindModel.Detail;
+        WrittenGroupType(ge) is { } t ? GroupKindOf(t) : ReportGroupKindModel.Detail;
+
+    /// <summary>The TYPE phrase an entry writes (the last one when a repeated clause was written — §13.18.57 has no
+    /// ellipsis and <see cref="UnrepeatedElements"/> diagnoses it elsewhere), or null.</summary>
+    private static Core.ReportGroupTypeContext? WrittenGroupType(Core.ReportGroupEntryContext ge) =>
+        ge.reportGroupClause().Select(c => c.reportTypeClause()?.reportGroupType()).LastOrDefault(t => t is not null);
 
     /// <summary>Map a TYPE clause (ISO §13.18.57 Format 2 + the SR9 abbreviations) onto the group model,
     /// capturing the CH/CF control operand.</summary>
@@ -2281,17 +2426,24 @@ public sealed partial class DataBinder
 
         if (group.Kind is ReportGroupKindModel.ControlHeading or ReportGroupKindModel.ControlFooting)
         {
-            if (t.FINAL() is not null) group.ControlFinal = true;
-            else if (t.dataReference() is { } dref)
-                group.ControlOperand = ControlOperandRef(dref, DiagnosticCatalog.ReportControlTypeOperand,
-                    $"RD '{model.Name}': TYPE {(group.Kind == ReportGroupKindModel.ControlHeading ? "CH" : "CF")} operand",
-                    "ISO §13.18.57.3 SR10");
+            if (t.reportControlName() is { } name)
+            {
+                if (name.FINAL() is not null) group.ControlFinal = true;
+                else if (name.dataReference() is { } dref)
+                    group.ControlOperand = ControlOperandRef(dref, DiagnosticCatalog.ReportControlTypeOperand,
+                        $"RD '{model.Name}': TYPE {(group.Kind == ReportGroupKindModel.ControlHeading ? "CH" : "CF")} operand",
+                        "ISO §13.18.57.3 SR10");
+            }
             // Omitted operand: legal only with a one-operand CONTROL clause (§13.18.57.3 SR11) — resolved later.
+            // §13.18.57.2: the OR PAGE phrase belongs to the control HEADING (the grammar writes it nowhere else).
+            group.OrPage = t.OR() is not null;
         }
-        // PH/PF require a PAGE clause (§13.18.57.3 SR12).
-        if (group.Kind is ReportGroupKindModel.PageHeading or ReportGroupKindModel.PageFooting && !model.Paged)
-            Edition.Error(DiagnosticCatalog.ReportPageTypeRequiresPage, $"RD '{model.Name}': TYPE {group.Kind} requires a PAGE clause that "
-                + "defines the page limit (ISO §13.18.57.3 SR12)");
+        // PH/PF and the OR PAGE phrase require a PAGE clause that defines the page limit (§13.18.57.3 SR12).
+        if ((group.Kind is ReportGroupKindModel.PageHeading or ReportGroupKindModel.PageFooting || group.OrPage)
+            && !model.Paged)
+            Edition.Error(DiagnosticCatalog.ReportPageTypeRequiresPage, $"RD '{model.Name}': "
+                + (group.OrPage ? "the OR PAGE phrase of TYPE CONTROL HEADING" : $"TYPE {group.Kind}")
+                + " requires a PAGE clause that defines the page limit (ISO §13.18.57.3 SR12)");
     }
 
     /// <summary>THE §13.15.4 GR3 REPETITION COUNT of one report group description entry: "An entry that contains

@@ -23,9 +23,13 @@ reportSection
     : REPORT SECTION DOT reportDescriptionEntry*
     ;
 
-// RD report-name [report-description-clause]... .  [report-group-entry]...
+// RD report-name [report-description-clause]... .  { constant-entry | report-group-description-entry } ...
+// (§13.8.2). The brace group's ellipsis is "one or more", and §13.8.4 says "An RD entry shall be followed by one
+// or more report group description entries": the grammar admits the list EMPTY and DataBinder.BindReportSection
+// reports the RD with no report group entry (COBOLNET2708), exactly as the sort-merge twin's "one or more record
+// description entries" is a bind-time rule (COBOLNET1837) — a rule-named diagnostic, not a parse error.
 reportDescriptionEntry
-    : RD reportName reportDescriptionClause* DOT reportGroupEntry*
+    : RD reportName reportDescriptionClause* DOT (constantEntry | reportGroupEntry)*
     ;
 
 reportName
@@ -66,16 +70,37 @@ reportControlClause
     : (CONTROL IS? | CONTROLS ARE?) (FINAL | dataReference)+
     ;
 
-// PAGE LIMIT IS n LINES [HEADING n] [FIRST DETAIL n] [LAST DETAIL n] [FOOTING n] (§13.18.39)
+// PAGE [LIMIT IS | LIMITS ARE] { integer-1 | [integer-1 {LINE | LINES}] [integer-2 {COLS | COLUMNS}] }
+//      [HEADING IS integer-3] [FIRST {DETAIL | DE} IS integer-4] [LAST {CONTROL HEADING | CH} IS integer-5]
+//      [LAST {DETAIL | DE} IS integer-6] [FOOTING IS integer-7]    (§13.18.39.2, the PDF diagram rendered)
+// The brace group is a CHOICE between integer-1 alone and the two optional brackets: so the LINE/LINES word belongs
+// with integer-1 (it cannot follow an integer-1 that is followed by integer-2), and integer-2 may stand alone — the
+// three alternatives below are exactly those shapes, and SR2's "either integer-1 or integer-2 or both" is the
+// grammar's own (an empty brace group has no alternative). SR3 — the five trailing phrases "may be specified only
+// if integer-1 is specified" — is a bind-time rule (COBOLNET2709), because the grammar cannot see which
+// alternative preceded a repeated phrase list without duplicating it.
 reportPageClause
-    : PAGE (LIMIT IS? | LIMITS ARE?)? integerLiteral (LINE | LINES)?
+    : PAGE (LIMIT IS? | LIMITS ARE?)?
+      ( integerLiteral (LINE | LINES) reportPageWidth?
+      | integerLiteral
+      | reportPageWidth )
       reportPageSubclause*
     ;
 
+// integer-2 {COLS | COLUMNS} — the page width (§13.18.39.4 GR2b).
+reportPageWidth
+    : integerLiteral (COLS | COLUMNS)
+    ;
+
+// The five trailing phrases, each its own bracket with no ellipsis (SR4 gives the order licence; §5.2.7 the
+// at-most-once). SR1: FIRST DE = FIRST DETAIL, LAST CH = LAST CONTROL HEADING, LAST DE = LAST DETAIL.
+// ⚠ HEADING is a terminal of TWO alternatives (the HEADING phrase and LAST CONTROL HEADING): a reader classifies
+// a phrase by DataBinder.PagePhraseOf (its first token and the one after it), never by `HEADING()`.
 reportPageSubclause
     : HEADING IS? integerLiteral
-    | FIRST DETAIL IS? integerLiteral
-    | LAST DETAIL IS? integerLiteral
+    | FIRST (DETAIL | DE) IS? integerLiteral
+    | LAST (CONTROL HEADING | CH) IS? integerLiteral
+    | LAST (DETAIL | DE) IS? integerLiteral
     | FOOTING IS? integerLiteral
     ;
 
@@ -83,12 +108,15 @@ reportPageSubclause
 // REPORT GROUP DESCRIPTION ENTRY (§13.15)
 // ==========================================
 
+// level-number [entry-name-clause] [clause]... .  (§13.15.2). The entry-name clause is §13.18.20, THE SAME RULE
+// as the data description entry's: data-name-1 or FILLER (§13.18.20.3 SR3 — "either data-name-1 or FILLER shall
+// be specified" in a data description entry or a report group description entry; §13.18.20.4 GR1 — "The word
+// FILLER may be used to name a data, report, or screen item"). The report arm reads `dataName` rather than a
+// hand-written name rule of its own (kb/Work PB1226/PB1287): two arms with two name lists is the shape in which
+// one of them forgets FILLER, and one entry-name rule makes the next word it admits automatic here too.
+// DataBinder reads the name through CstExtensions.NameOrNull (null for the omitted and the FILLER forms).
 reportGroupEntry
-    : levelNumber reportGroupName? reportGroupClause* DOT
-    ;
-
-reportGroupName
-    : cobolWord
+    : levelNumber dataName? reportGroupClause* DOT
     ;
 
 reportGroupClause
@@ -119,11 +147,21 @@ reportTypeClause
 reportGroupType
     : (REPORT HEADING | RH)
     | (PAGE HEADING | PH)
-    | (CONTROL HEADING | CH) (FINAL | dataReference)?
+    | (CONTROL HEADING | CH) (reportControlName (OR PAGE)?)?
     | (DETAIL | DE)
-    | (CONTROL FOOTING | CF) (FINAL | dataReference)?
+    | (CONTROL FOOTING | CF) reportControlName?
     | (PAGE FOOTING | PF)
     | (REPORT FOOTING | RF)
+    ;
+
+// §13.18.57.2 Format 2, rendered: `{CONTROL HEADING | CH} [ [ON | FOR] {data-name-1 | FINAL} [OR PAGE] ]` and
+// `{CONTROL FOOTING | CF} [ [ON | FOR] {data-name-2 | FINAL} ]` — ON and FOR are not underlined (optional words,
+// §5.2.3), the whole operand phrase is ONE optional bracket (so OR PAGE needs a control operand; SR11's omission is
+// of the operand), and OR PAGE exists on the heading only. The group kind is read by GroupKindOf from the phrase's
+// FIRST token: `PAGE` is also a terminal of OR PAGE, so a reader keyed on PAGE() would take a control heading for a
+// page heading.
+reportControlName
+    : (ON | FOR)? (FINAL | dataReference)
     ;
 
 // {LINE|LINES} [NUMBER|NUMBERS] [IS|ARE] {integer [ON NEXT PAGE] | {PLUS|+} integer | [ON] NEXT PAGE}...  (§13.18.35 F1)

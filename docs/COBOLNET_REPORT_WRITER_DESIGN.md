@@ -467,9 +467,24 @@ wherever §8.4.3.15.3 SR1 admits an integer data item — `Model.ReportPageCount
 receiving chokepoint, never a per-verb arm (kb/Work PB429) — and SR3's LINE-COUNTER prohibition is
 COBOLNET2197 beside it.
 
-PAGE
-`COLS`/width, LAST CONTROL HEADING (the GR3c default applies), and **the COLUMN LEFT/CENTER/RIGHT alignment
-phrase (§13.18.14 F1 — the SR9 LEFT default is what the grammar parses)** have no grammar surface. The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings and the
+**The REPORT SECTION entry grammar and the PAGE clause are the printed ones** (kb/Work PB1226, PB1059):
+`reportDescriptionEntry` is `RD … { constantEntry | reportGroupEntry } …` (§13.8.2; the constant entry rides the
+data description entry's own `constantEntryBody` and `DataBinder.BindConstantEntry`, bound in source order by
+`BindReportSectionEntries`, and `ScreenReportDescriptionHasGroup` reports an RD with no group entry, COBOLNET2708,
+§13.8.4); the report group entry's name slot is the data description entry's `dataName` (FILLER included,
+§13.18.20.3 SR3), read through `CstExtensions.NameOrNull`; and `reportPageClause` carries the page-width operand
+(`integer-2 {COLS | COLUMNS}`, `ReportModel.PageWidth`, default 999 by §13.18.39.4 GR5 → `CobolReport`'s page
+width, the one the `Place` truncation and EC-REPORT-PAGE-WIDTH measure; §13.18.14.3 SR6 screens each written COLUMN
+operand against it, COBOLNET2710), `LAST {CONTROL HEADING | CH} IS integer-5` (`ReportModel.LastControlHeading`,
+the control headings' lower limit, GR8 d)) and the `FIRST DE`/`LAST DE` synonyms; §13.18.39.3 SR3 (a phrase
+without integer-1) is COBOLNET2709. The TYPE clause's control rows are `{CONTROL HEADING | CH} (reportControlName
+(OR PAGE)?)?` and `{CONTROL FOOTING | CF} reportControlName?` (`reportControlName : (ON | FOR)? (FINAL | dataReference)`,
+§13.18.57.2): `ReportGroupModel.OrPage` → the engine's `ReportGroup.OrPage`, and `CobolReport.AdvancePage(causing)` ends
+with `PresentOrPageHeadings` (§13.18.57.4 GR6 c): every OR PAGE heading, major → minor, as the first body group of the
+new page via `PresentBody(reprint: true)` — no page-fit test, NEXT GROUP or SUM reset; the page advance of a control
+heading reprints only the headings above it, and the proviso for a control footing is applied as written). The GR7 d)
+upper limits are realised by placement, not modelled as limits. **The COLUMN LEFT/CENTER/RIGHT alignment
+phrase (§13.18.14 F1 — the SR9 LEFT default is what the grammar parses)** has no grammar surface. The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings and the
 SR7/SR8/SR10b operand-order-vs-PRESENT-WHEN arrangement rules are not enforced (over-acceptance; the runtime
 overlap conditions are EC-REPORT-COLUMN-OVERLAP/-LINE-OVERLAP, default-off). EC-REPORT-* checking is default-off
 (SSOT §18.16). The engine raises, each bound PRECISELY to GENERATE and TERMINATE (`EcBinder`'s report-production
@@ -482,8 +497,8 @@ group, whichever follows in logical order":
 - EC-REPORT-COLUMN-OVERLAP (§13.18.14.4 GR4 — `CobolReport.Place` over the `ReportLineImage` occupancy; the
   overlapping ITEM is not placed, kb/Work PB1188);
 - EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5 — `Place`; the line is truncated at the page width and printed, the
-  outcome GR5 states, raised or not; the page width is §13.18.39.4 GR5's default 999 because the PAGE clause's
-  COLUMNS operand has no grammar surface, kb/Work PB1059).
+  outcome GR5 states, raised or not; the page width is the PAGE clause's integer-2 COLUMNS operand, else
+  §13.18.39.4 GR5's default 999 — `ReportModel.PageWidth` → the `CobolReport` constructor, kb/Work PB1059).
 - EC-REPORT-VARYING (§13.18.64.4 GR5, fatal — `CobolReport.VaryingInteger`, called by the compose of the line
   carrying the counter; a declarative with RESUME AT NEXT STATEMENT continues after the unsuccessful statement,
   and with checking off the counter takes the value's integer part, kb/Work PB1305).

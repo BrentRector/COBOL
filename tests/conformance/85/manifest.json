@@ -1,5 +1,6 @@
 {
  "enabled": [
+ "pb1226_report_filler_entry_name",
   "pb1907_inspect_tally_overlap",
   "pb1907_inspect_format3_counter_overlap",
   "pb1907_inspect_replacing_overlap",
