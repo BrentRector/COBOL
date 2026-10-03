@@ -170,22 +170,34 @@ internal sealed class VersionConformancePass
         foreach (var para in prog.Paragraphs)
             foreach (var stmt in para.Statements)
                 WalkStatement(stmt);
-        GateMergeInSortMergeProc(prog);
+        GateSortMergeProcedures(prog);
     }
 
-    /// <summary>VCR 27 (ISO §14.9.24; Annex E.2 item 20): at COBOL-2023 a MERGE statement is PROHIBITED in the
-    /// output procedure of another MERGE or the input/output procedure of a file-format SORT (the prior standard
-    /// allowed it with conflicting rules; SORT already disallowed it). A bind-time cross-pass over the paragraph-pc
-    /// ranges — a paragraph's pc IS its index in <see cref="BoundProgram.Paragraphs"/>, the same pc space as the
-    /// SORT/MERGE procedure ranges (<c>SortRange</c> → the ProcedureTable). Below 2023 the runtime
-    /// EC-SORT-MERGE-ACTIVE raise (CobolSort.Init, when checking is enabled — kb/Work PB1036) is the dynamic net,
-    /// so this fires only at ≥2023.</summary>
-    private void GateMergeInSortMergeProc(BoundProgram prog)
+    /// <summary>⛔ THE SORT/MERGE-PROCEDURE LEG OF THE PLACEMENT RULES — ONE region and ONE membership test for every
+    /// statement that is barred from it (kb/Work PB1139). The region is the input and output procedures of every
+    /// file-format SORT and the output procedure of every MERGE (a SORT/MERGE with only USING/GIVING files contributes
+    /// none), and four arms ask whether a statement lies in it:
+    /// <list type="bullet">
+    ///   <item>a file-format SORT — "shall not appear … in an input or output procedure" (§14.9.40.3 SR3), at EVERY
+    ///     edition ("SORT already disallowed it", Annex E.2 item 20) — COBOLNET2700, an error always;</item>
+    ///   <item>a MERGE — "in an output procedure of another MERGE statement, or an input or output procedure of a file
+    ///     format SORT statement" (§14.9.24.3 SR1). VCR 27 (Annex E.2 item 20): the 2014 standard allowed it with
+    ///     conflicting rules, so at COBOL-2023 it is a REMOVAL — COBOLNET1572, an Error under strict and a Warning under
+    ///     --permissive (EditionSeverityPolicy), matching the version matrix's RemovedConstruct_CompilesPermissive
+    ///     contract. Below 2023 the runtime EC-SORT-MERGE-ACTIVE raise (CobolSort.Init, when checking is enabled —
+    ///     kb/Work PB1036) is the dynamic net;</item>
+    ///   <item>COMMIT and ROLLBACK — §14.9.7.3 SR2 / §14.9.36.3 SR2 (kb/Work PB137), from 2023 as before.</item>
+    /// </list>
+    /// A bind-time cross-pass over the paragraph-pc ranges — a paragraph's pc IS its index in
+    /// <see cref="BoundProgram.Paragraphs"/>, the same pc space as the SORT/MERGE procedure ranges
+    /// (<c>SortRange</c> → the ProcedureTable). The membership test is <see cref="PcRange.Spans"/>, the LEXICAL reading
+    /// the SYNTAX rule asks ("shall not appear in"), written once so the four arms cannot disagree — and so the
+    /// reachability model kb/Work PB812 asks for (control that reaches a statement through a PERFORM out and back)
+    /// replaces one function, not four. The other two regions of the same rules are the exception-checking PERFORM's
+    /// (<c>EcBinder.CheckCrossStatementBans</c>) and the declarative procedure's (<c>SortBinder.ScreenDeclarativePlacement</c>).</summary>
+    private void GateSortMergeProcedures(BoundProgram prog)
     {
-        if (_edition.Year < 2023) return;
-
-        // Pass A — the prohibited paragraph-pc ranges: every file-format SORT's input/output procedure + every
-        // MERGE's output procedure (a SORT/MERGE with only USING/GIVING files contributes no procedure range).
+        // Pass A — the prohibited paragraph-pc ranges.
         var prohibited = new List<PcRange>();
         void Collect(BoundStatement s)
         {
@@ -198,29 +210,36 @@ internal sealed class VersionConformancePass
             foreach (var stmt in para.Statements) Collect(stmt);
         if (prohibited.Count == 0) return;
 
-        // Pass B — flag every MERGE whose ENCLOSING paragraph pc falls within a prohibited range (a MERGE nested in
-        // an IF/inline-PERFORM is still in that paragraph). The owning MERGE's own paragraph is never in its own
-        // output-proc range (a distinct named procedure), so a MERGE never false-flags itself.
-        // The 2023 prohibition is a REMOVAL of a prior-edition capability, so its severity follows the removal
-        // policy — an Error under strict, downgraded to a Warning (compile succeeds) under --permissive migration
-        // mode (EditionSeverityPolicy), matching the version matrix's RemovedConstruct_CompilesPermissive contract.
-        var severity = EditionSeverityPolicy.For(ConstructAvailability.Removed, _edition);
+        // Pass B — flag every barred statement whose ENCLOSING paragraph pc falls within a prohibited range (a statement
+        // nested in an IF/inline-PERFORM is still in that paragraph). The owning SORT/MERGE's own paragraph is never in
+        // its own procedure range (a distinct named procedure), so a statement never false-flags itself.
+        var mergeSeverity = EditionSeverityPolicy.For(ConstructAvailability.Removed, _edition);
+        bool InProcedure(int paraPc) => prohibited.Any(r => r.Spans(paraPc));
         void Flag(BoundStatement s, int paraPc)
         {
-            if (s is BoundMerge m && prohibited.Any(r => paraPc >= r.Start && paraPc <= r.End))
-                _sink.Report(new EditionDiagnostic("COBOLNET1572", severity, "merge-in-sort-merge-proc",
-                    $"MERGE '{m.File.CobolName}' is prohibited in the output procedure of another MERGE or the input "
-                    + "or output procedure of a file SORT (ISO §14.9.24; COBOL-2023, Annex E.2 item 20)",
-                    $"MERGE '{m.File.CobolName}'", "ISO §14.9.24; Annex E.2 item 20"));
-            // kb/Work PB137 — the batch-8 finding verbatim: this pass implemented exactly the SR2 ban with a
-            // MERGE-only predicate; COMMIT (§14.9.7.3 SR2) and ROLLBACK (§14.9.36.3 SR2) are its siblings,
-            // reachable only now that the bind produces an identity-bearing node.
-            if (s is BoundCommitRollback cr && prohibited.Any(r => paraPc >= r.Start && paraPc <= r.End))
-                _sink.Report(new EditionDiagnostic(DiagnosticCatalog.CommitRollbackContext.Code,
-                    EditionSeverity.Error, "commit-rollback-context",
-                    $"{(cr.IsCommit ? "COMMIT" : "ROLLBACK")} shall not be specified in the input or output "
-                    + $"procedure of a MERGE or file SORT statement (ISO {(cr.IsCommit ? "§14.9.7.3" : "§14.9.36.3")} SR2)",
-                    cr.IsCommit ? "COMMIT" : "ROLLBACK", "ISO §14.9.7.3 SR2 / §14.9.36.3 SR2"));
+            if (s is BoundSort so && InProcedure(paraPc))
+                _sink.Report(new EditionDiagnostic(DiagnosticCatalog.SortMergePlacement.Code, EditionSeverity.Error,
+                    "sort-merge-placement",
+                    $"a file SORT of '{so.File.CobolName}' shall not appear in an input or output procedure of a SORT or "
+                    + "MERGE statement (ISO §14.9.40.3 SR3)",
+                    $"SORT '{so.File.CobolName}'", "ISO §14.9.40.3 SR3"));
+            if (_edition.Year >= 2023)
+            {
+                if (s is BoundMerge m && InProcedure(paraPc))
+                    _sink.Report(new EditionDiagnostic("COBOLNET1572", mergeSeverity, "merge-in-sort-merge-proc",
+                        $"MERGE '{m.File.CobolName}' is prohibited in the output procedure of another MERGE or the input "
+                        + "or output procedure of a file SORT (ISO §14.9.24; COBOL-2023, Annex E.2 item 20)",
+                        $"MERGE '{m.File.CobolName}'", "ISO §14.9.24; Annex E.2 item 20"));
+                // kb/Work PB137 — the batch-8 finding verbatim: this pass implemented exactly the SR2 ban with a
+                // MERGE-only predicate; COMMIT (§14.9.7.3 SR2) and ROLLBACK (§14.9.36.3 SR2) are its siblings,
+                // reachable only now that the bind produces an identity-bearing node.
+                if (s is BoundCommitRollback cr && InProcedure(paraPc))
+                    _sink.Report(new EditionDiagnostic(DiagnosticCatalog.CommitRollbackContext.Code,
+                        EditionSeverity.Error, "commit-rollback-context",
+                        $"{(cr.IsCommit ? "COMMIT" : "ROLLBACK")} shall not be specified in the input or output "
+                        + $"procedure of a MERGE or file SORT statement (ISO {(cr.IsCommit ? "§14.9.7.3" : "§14.9.36.3")} SR2)",
+                        cr.IsCommit ? "COMMIT" : "ROLLBACK", "ISO §14.9.7.3 SR2 / §14.9.36.3 SR2"));
+            }
             foreach (var c in s.StatementChildren()) Flag(c, paraPc);
         }
         for (int i = 0; i < prog.Paragraphs.Count; i++)

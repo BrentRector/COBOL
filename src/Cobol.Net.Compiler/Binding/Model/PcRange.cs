@@ -77,5 +77,16 @@ public readonly record struct PcRange
     /// containing a single GO TO), so a section name (a multi-pc range) and an empty section are both excluded.</summary>
     public bool IsParagraph => !IsEmpty && Start == End;
 
+    /// <summary>⛔ DOES A PARAGRAPH LIE LEXICALLY WITHIN THIS PROCEDURE? — the question a SYNTAX rule asks of a range
+    /// ("shall not appear in an input or output procedure", §14.9.40.3 SR3), asked of the TEXT: every paragraph from
+    /// the first named procedure to the last, in whichever physical order the two stand. Never <c>Start &lt;= pc &lt;=
+    /// End</c> read as a numeric interval — for a legal INVERTED THRU range (§14.9.28.4 GR6, <see cref="End"/> physically
+    /// before <see cref="Start"/>) that interval is the empty set, which is how a MERGE written inside an inverted
+    /// SORT input procedure escaped its prohibition (kb/Work PB812). The EMPTY range has no paragraph.
+    /// <para>This is the LEXICAL model, not the executed one: GR10 defines the range of a sort procedure by the
+    /// statements EXECUTED as the result of a transfer of control, which a PERFORM out of the range and back extends
+    /// beyond any span of the text. A reachability walk would replace this one method (kb/Work PB812).</para></summary>
+    public bool Spans(int pc) => !IsEmpty && pc >= Math.Min(Start, End) && pc <= Math.Max(Start, End);
+
     public override string ToString() => IsEmpty ? $"[empty @{Start}]" : $"[{Start}..{End}]";
 }

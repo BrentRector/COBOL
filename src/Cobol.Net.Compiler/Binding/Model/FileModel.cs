@@ -19,6 +19,14 @@ public enum SharingMode { None, AllOther, NoOther, ReadOnly }
 public enum LockKind { None, Manual, Automatic }
 public sealed record LockModeInfo(LockKind Kind, bool Multiple);
 
+/// <summary>Which I-O-CONTROL SAME clause format (ISO §12.4.6.2): Format 1 <c>SAME AREA</c>, Format 2
+/// <c>SAME RECORD AREA</c>, Format 3 <c>SAME SORT AREA</c> / <c>SAME SORT-MERGE AREA</c>.</summary>
+public enum SameClauseKind { Area, RecordArea, SortArea, SortMergeArea }
+
+/// <summary>One SAME clause: its format and the files it names (those that resolve to a declared file; a name that
+/// does not is the clause's own error, reported where the clause is bound).</summary>
+public sealed record SameClause(SameClauseKind Kind, IReadOnlyList<FileModel> Members);
+
 /// <summary>One ALTERNATE RECORD KEY clause of a file control entry, AS WRITTEN (ISO §12.4.5.6.2 — data-name-1,
 /// its IN/OF qualifiers, the WITH DUPLICATES and SUPPRESS WHEN phrases), plus the item data-name-1 resolved to
 /// and the source position its syntax rules report at.
@@ -609,9 +617,18 @@ public sealed class FileModel
         AreaFiles.SelectMany(f => f.Records)
             .Where(r => IsOutOfLineRecord(r) && !ReferenceEquals(r, except)).Distinct();
 
-    /// <summary>The OTHER files named with this one in a record-area SAME clause (§12.4.6.4.4 GR2), set by
-    /// <c>DataBinder</c> when it links their records into one area.</summary>
-    public List<FileModel> SameRecordAreaPeers { get; } = [];
+    /// <summary>Every I-O-CONTROL SAME clause that names this file, in source order — the ONE model of the clause's
+    /// membership (§12.4.6.2 Formats 1-3: SAME AREA, SAME RECORD AREA, SAME SORT AREA, SAME SORT-MERGE AREA), recorded
+    /// by <c>DataBinder.BindIoControl</c> for every format. It used to keep the RECORD AREA format alone, as a peer
+    /// list, so the other three formats were parsed and discarded and the SORT/MERGE rules that read them had nothing
+    /// to look at (§14.9.40.3 SR10, §14.9.24.3 SR11; kb/Work PB1139).</summary>
+    public List<SameClause> SameClauses { get; } = [];
+
+    /// <summary>The OTHER files named with this one in a record-area SAME clause that give the area a record
+    /// (§12.4.6.4.4 GR2) — derived from <see cref="SameClauses"/>, so there is no second membership model.</summary>
+    public IEnumerable<FileModel> SameRecordAreaPeers =>
+        SameClauses.Where(c => c.Kind == SameClauseKind.RecordArea).SelectMany(c => c.Members)
+            .Where(o => !ReferenceEquals(o, this) && o.Records.Count > 0).Distinct();
 
     /// <summary>The first record of this file that has a character window — the anchor every other
     /// character-window record implicitly redefines (§13.18.33.4 GR3), or null when every record is out of

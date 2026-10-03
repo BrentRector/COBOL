@@ -194,6 +194,12 @@ internal static class RecordLayout
     /// (← <c>SortOffsetInRecord</c>/<c>SortPlainOffset</c>, on the ONE <see cref="OffsetOf"/> walk.)</summary>
     public static int? OffsetInRecord(DataItem root, DataItem target)
     {
+        // ⛔ THE OCCURS BAIL IS ASKED OF THE DATA DESCRIPTION, AHEAD OF BOTH BRANCHES (kb/Work PB1173). It lived in
+        // the plain walk (OffsetOf) only, so the class branch below — taken by EVERY 01 of a multi-record SD/FD,
+        // which is a member of the synthesized REDEFINES class (PB836) — returned the FIRST occurrence's position
+        // for an item under OCCURS and a key under a table was accepted with its occurrence discarded. An item
+        // subject to OCCURS has no one position in the record whatever its storage form.
+        if (target.IsTableElement) return null;   // §8.4.2.3.3 SR2's own-or-ancestor question, asked of DataItem (PB877)
         if (target.Class is { } cls)
         {
             if (ReferenceEquals(cls.Canonical, root)) return target.ClassOffset;

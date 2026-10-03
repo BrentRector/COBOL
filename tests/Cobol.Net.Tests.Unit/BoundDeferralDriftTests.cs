@@ -203,7 +203,8 @@ PROCEDURE DIVISION.
     }
 
     /// <summary>And the other half, which a compiler that refused everything would fail: legal source the
-    /// compiler has not built still COMPILES and still announces itself (a table SORT over a REDEFINES view).</summary>
+    /// compiler has not built still COMPILES and still announces itself (a table SORT keyed on a REDEFINES view
+    /// inside the element — kb/Work PB599; the table SORT over a REDEFINES view itself is built, kb/Work PB1175).</summary>
     [Fact]
     public void GenuineDeferral_StillCompiles_AndAnnounces()
     {
@@ -212,13 +213,14 @@ IDENTIFICATION DIVISION.
 PROGRAM-ID. PB909DEF.
 DATA DIVISION.
 WORKING-STORAGE SECTION.
-01 RAW PIC X(9) VALUE "312".
-01 VIEW REDEFINES RAW.
-   05 T PIC 9 OCCURS 9.
+01 TBL.
+   05 TE OCCURS 3.
+      10 TK PIC 99.
+      10 TKR REDEFINES TK PIC XX.
 PROCEDURE DIVISION.
 MAIN.
     GO TO SKIPPER.
-    SORT T ASCENDING KEY T.
+    SORT TE ASCENDING KEY TKR.
 SKIPPER.
     STOP RUN.
 """;

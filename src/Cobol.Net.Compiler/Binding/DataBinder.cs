@@ -2049,9 +2049,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// other arm that is not a no-op here: the facility is declined (COBOLNET1709) but the clause still records
     /// WHICH FILES the source made "subject to an APPLY COMMIT clause" on <see cref="FileModel.SubjectToApplyCommit"/>,
     /// because §14.9.27.3 SR8's leading conjunct keys on exactly that and is reachable under <c>--permissive</c>
-    /// (kb/Work PB319). The SR2–SR11 static
-    /// legality checks (report/sort/file-area cross-membership consistency) are the diagnose-correctly track —
-    /// staged with the version-conformance pass phase, not silently absent by oversight.</summary>
+    /// (kb/Work PB319). EVERY SAME format also records its MEMBERSHIP on its files
+    /// (<see cref="FileModel.SameClauses"/>, kb/Work PB1139), which the SORT and MERGE statements read for
+    /// §14.9.40.3 SR10 / §14.9.24.3 SR11 (<c>SortBinder.ScreenSameClauses</c>). The remaining SR2–SR11 static
+    /// legality checks of the clause itself (report/sort/file-area cross-membership consistency) are the
+    /// diagnose-correctly track — staged with the version-conformance pass phase, not silently absent by oversight.</summary>
     private void BindIoControl(Core.ProgramUnitContext program)
     {
         foreach (var env in EnvDivisions(program)) BindIoControl(env);
@@ -2079,8 +2081,23 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         subject.SubjectToApplyCommit = true;
                 continue;
             }
-            // Format 2 only — SAME RECORD AREA (the RECORD word distinguishes it; SORT/SORT-MERGE are Format 3).
-            if (clause.sameClause() is not { } same || same.RECORD() is null) continue;
+            if (clause.sameClause() is not { } same) continue;
+            // ⛔ EVERY SAME FORMAT IS RECORDED ON ITS FILES (kb/Work PB1139): the clause's membership is what
+            // §14.9.40.3 SR10 and §14.9.24.3 SR11 ask the SORT and MERGE statements about — "No pair of file-names in
+            // the same SORT statement may be specified in the same SAME SORT AREA or SAME SORT-MERGE AREA clause" —
+            // and until now only the RECORD AREA format was modelled (as a peer list), so those rules had nothing to read.
+            var kind = same.RECORD() is not null ? SameClauseKind.RecordArea
+                : same.SORT_MERGE() is not null ? SameClauseKind.SortMergeArea
+                : same.SORT() is not null ? SameClauseKind.SortArea
+                : SameClauseKind.Area;
+            var members = same.fileName()
+                .Select(fn => FilesByName.TryGetValue(fn.GetText(), out var named) ? named : null)
+                .OfType<FileModel>().Distinct().ToList();
+            var recorded = new SameClause(kind, members);
+            foreach (var m in members) m.SameClauses.Add(recorded);
+            // Only SAME RECORD AREA shares storage (Format 2) — SORT/SORT-MERGE AREA is Format 3, and SAME AREA
+            // (Format 1) gives no record-area effect either (docs/CONFORMANCE.md §7, A.1 items 168-169).
+            if (kind != SameClauseKind.RecordArea) continue;
             // ⛔ THE GROUP IS ONE STORAGE AREA FOR THE WHOLE RUNTIME ELEMENT, and that is also §14.9.6.4 GR7's
             // answer for CLOSE. GR7: "If file-name-1 is specified in a SAME RECORD AREA clause, the record area
             // is available to the runtime element if any of the file connectors referenced by the other
@@ -2093,14 +2110,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // makes the unsuccessful case outright undefined), so WiseOwl COBOL's determination is that the storage
             // KEEPS ITS LAST CONTENT, documented at docs/CONFORMANCE.md §7, A.1 item 24 (kb/Work PB235).
             DataItem? anchor = null;
-            var sharing = new List<FileModel>();
-            foreach (var fn in same.fileName())
+            foreach (var f in members)
             {
-                if (!FilesByName.TryGetValue(fn.GetText(), out var f) || f.Records.Count == 0) continue;
-                sharing.Add(f);
+                if (f.Records.Count == 0) continue;
                 // The area's CHARACTER half is linked here; an out-of-line record (FileModel.IsOutOfLineRecord —
                 // D-FRA, kb/Work PB981) has no window over it and reaches the shared area through
-                // FileModel.OutOfLineRecords, which is why every sharing file learns its peers below.
+                // FileModel.OutOfLineRecords, which is why every sharing file knows its peers
+                // (FileModel.SameRecordAreaPeers, derived from the clause just recorded).
                 if (f.CharacterAnchor is not { } fAnchor) continue;
                 if (anchor is null) { anchor = fAnchor; continue; }
                 // §12.4.6.4.4 GR2: "equivalent to an implicit redefinition of the area with records aligned on the
@@ -2108,8 +2124,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 if (!ReferenceEquals(fAnchor, anchor) && fAnchor.RedefinesTarget is null)
                     fAnchor.SetRedefinition(anchor, RedefinitionKind.SameRecordArea);
             }
-            foreach (var f in sharing)
-                f.SameRecordAreaPeers.AddRange(sharing.Where(o => !ReferenceEquals(o, f) && !f.SameRecordAreaPeers.Contains(o)));
         }
     }
 

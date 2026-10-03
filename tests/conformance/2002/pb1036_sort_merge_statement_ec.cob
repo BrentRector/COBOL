@@ -26,9 +26,14 @@
       *>   B
       *>   SM=EC-SORT-MERGE-SEQUENCE   C: M-A holds BBB then AAA; OUT-C never runs.
       *>   C
-      *>   SM=EC-SORT-MERGE-ACTIVE     E: FEED-E executes a SORT; the inner SORT
-      *>                               is terminated (FEED-2 never runs) and the
-      *>                               declarative completes normally.
+      *>   SM=EC-SORT-MERGE-ACTIVE     E: FEED-E PERFORMs INNER-E, which executes a
+      *>                               SORT (GR10's range is the EXECUTED one - a
+      *>                               SORT WRITTEN in the input procedure is
+      *>                               refused at compile time, 14.9.40.3 SR3, so
+      *>                               the inner SORT lives in a paragraph outside
+      *>                               it); the inner SORT is terminated (FEED-2
+      *>                               never runs) and the declarative completes
+      *>                               normally.
       *>   E-IN                        FEED-E continues and releases AAA.
       *>   R=AAA / R=BBB               the OUTER sort is intact.
       *>   E
@@ -162,8 +167,7 @@
        FEED-E.
            MOVE "BBB" TO SF-REC.
            RELEASE SF-REC.
-           SORT S2 ON ASCENDING KEY S2-REC
-               INPUT PROCEDURE IS FEED-2 OUTPUT PROCEDURE IS OUT-C.
+           PERFORM INNER-E.
            DISPLAY "E-IN".
            MOVE "AAA" TO SF-REC.
            RELEASE SF-REC.
@@ -178,3 +182,6 @@
            END-PERFORM.
        OUT-C.
            DISPLAY "OUT-C MUST NOT RUN".
+       INNER-E.
+           SORT S2 ON ASCENDING KEY S2-REC
+               INPUT PROCEDURE IS FEED-2 OUTPUT PROCEDURE IS OUT-C.

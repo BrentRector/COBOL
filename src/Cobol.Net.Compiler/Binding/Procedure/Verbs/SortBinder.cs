@@ -38,10 +38,43 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     public BoundStatement BindSort(Core.SortStatementContext s)
     {
         var operand = s.sortFileName().dataReference();
-        string name = operand.cobolWord()?.GetText() ?? operand.GetText();
+        string name = SubjectName(s);
         return ctx.Data.FilesByName.TryGetValue(name, out var file)
             ? SortBindFile(s, file)
             : SortBindTable(s, operand, name);
+    }
+
+    /// <summary>The base word of the SORT's first operand — the name the file / table split is decided by.</summary>
+    private static string SubjectName(Core.SortStatementContext s)
+    {
+        var operand = s.sortFileName().dataReference();
+        return operand.cobolWord()?.GetText() ?? operand.GetText();
+    }
+
+    /// <summary>Is this SORT the FILE format (Format 1)? The parse node is shared by both formats and the split is
+    /// semantic — a name declared in FILE-CONTROL / an SD is the file format — so every rule written about "a SORT
+    /// statement" under the FORMAT 1 heading (§14.9.40.3 SR3-SR12) asks THIS, never the node type: §14.9.40.3 SR3's
+    /// exception-checking-PERFORM ban bound a legal Format-2 table SORT until kb/Work PB1139.</summary>
+    internal static bool IsFileFormat(BinderContext ctx, Core.SortStatementContext s) =>
+        ctx.Data.FilesByName.ContainsKey(SubjectName(s));
+
+    /// <summary>⛔ THE DECLARATIVE LEG OF THE SORT/MERGE PLACEMENT RULES (kb/Work PB1139): "A SORT statement shall not
+    /// appear in … a declarative procedure" (§14.9.40.3 SR3, FORMAT 1) and a MERGE statement "may appear anywhere in
+    /// the procedure division except … in a declarative procedure" (§14.9.24.3 SR1). Asked ONCE here for both verbs,
+    /// from the bind position's own <see cref="EnclosingContext.InDeclarative"/>; it holds at every edition (Annex
+    /// E.2 item 20 changed only the SORT/MERGE-procedure half of MERGE's rule, at 2023). The statement is reported
+    /// and the bind continues, so one compile reports every violation it can see. The other two regions are the
+    /// exception-checking PERFORM's (<c>EcBinder.CheckCrossStatementBans</c>, parse-tree) and the sort-merge
+    /// procedures' (<c>VersionConformancePass.GateSortMergeProcedures</c>, over the bound paragraphs).</summary>
+    private void ScreenDeclarativePlacement(bool merge)
+    {
+        if (!ctx.Enclosing.InDeclarative) return;
+        ctx.Edition.Error(DiagnosticCatalog.SortMergePlacement, merge
+            ? "a MERGE statement shall not appear in a declarative procedure (ISO §14.9.24.3 SR1: \"A MERGE statement may "
+                + "appear anywhere in the procedure division except … in a declarative procedure\")"
+            : "a SORT statement shall not appear in a declarative procedure (ISO §14.9.40.3 SR3: \"A SORT statement shall "
+                + "not appear in imperative-statement-1 of an exception-checking PERFORM statement, in an input or output "
+                + "procedure, or in a declarative procedure\")");
     }
 
     /// <summary>Bind the Format-1 file sort: SD operand (SR4), keys (SR6 + GR1/GR2), DUPLICATES (GR3),
@@ -49,6 +82,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// the general format requires one of each pair).</summary>
     private BoundStatement SortBindFile(Core.SortStatementContext s, FileModel file)
     {
+        ScreenDeclarativePlacement(merge: false);   // §14.9.40.3 SR3, the declarative leg (kb/Work PB1139)
         // SR4 is a SYNTAX RULE, so it is decided here and not by a run-time loud (kb/Work PB236).
         if (!file.IsSortMerge)
         {
@@ -57,10 +91,6 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Reported(ctx.Edition);
         }
         if (RecordLessSd(file)) return new BoundNop();
-        if (SortRecordOf(file) is null)
-            // The MECHANISM is derived from the record itself (the R40 fleet: a fixed "VARIABLE-LENGTH"
-            // string misdiagnosed a pointer-leafed record — the same wrong-cause defect twice removed).
-            return new BoundUnsupported(TierCIsland.Reason(file.Records[0], "SORT SD record of"));
 
         // Format 1 prints the KEY phrase in BRACES with an ellipsis (§14.9.40.2) — at least one is required, and
         // its data-name-1 is required too (braces, not the Format-2 brackets). The grammar's `sortKeyPhrase*` is
@@ -75,15 +105,22 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         }
         var keys = new List<BoundSortMergeKey>();
         foreach (var phrase in s.sortKeyPhrase())
-            if (!SortAddFileKeys(phrase.DESCENDING() is not null, phrase.dataReferenceList(), file, keys))
+            if (!SortAddFileKeys(phrase.DESCENDING() is not null, phrase.dataReferenceList(), file, keys, SortKeyRules.FileSort))
                 return BoundRejected.Reported(ctx.Edition);   // reported by SortAddFileKeys (PB236, PB1030)
+        // ⛔ THE KEYS ARE SCREENED BEFORE THE RECORD'S IMAGE IS ASKED ABOUT (kb/Work PB1173): a record with a pointer or
+        // object leaf has no image the store can hold, which is the compiler's gap, while a key of class pointer is the
+        // SOURCE's error (§14.9.40.3 SR6 c)) — and the gap used to answer first, so the source's error was never told.
+        if (SortRecordOf(file) is null)
+            // The MECHANISM is derived from the record itself (the R40 fleet: a fixed "VARIABLE-LENGTH"
+            // string misdiagnosed a pointer-leafed record — the same wrong-cause defect twice removed).
+            return new BoundUnsupported(TierCIsland.Reason(file.Records[0], "SORT SD record of"));
 
         var (collating, collErr) = SortBindCollating(s.sortCollatingPhrase());
         if (collErr is { } ce) return ce;
 
         // Release phase source (ISO §14.9.40 GR9a): USING file list or INPUT PROCEDURE pc range.
         var usingFiles = new List<FileModel>();
-        if (s.sortUsingPhrase() is { } up && !SortMapIoFiles(up.dataReferenceList(), usingFiles, merge: false))
+        if (s.sortUsingPhrase() is { } up && !SortMapIoFiles(up.dataReferenceList(), usingFiles, merge: false, giving: false))
             return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         PcRange? inputProc = null;
         if (s.sortInputProcedurePhrase() is { } ipp)
@@ -94,7 +131,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         }
         // Return phase target (GR9c): GIVING file list or OUTPUT PROCEDURE pc range.
         var givingFiles = new List<FileModel>();
-        if (s.sortGivingPhrase() is { } gp && !SortMapIoFiles(gp.dataReferenceList(), givingFiles, merge: false))
+        if (s.sortGivingPhrase() is { } gp && !SortMapIoFiles(gp.dataReferenceList(), givingFiles, merge: false, giving: true))
             return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         PcRange? outputProc = null;
         if (s.sortOutputProcedurePhrase() is { } opp)
@@ -109,6 +146,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 + "{OUTPUT PROCEDURE | GIVING} (ISO §14.9.40.2 general format)");   // PB236
             return BoundRejected.Reported(ctx.Edition);
         }
+        if (!ScreenSameClauses(file, usingFiles, givingFiles, merge: false)) return BoundRejected.Reported(ctx.Edition);   // SR10
+        if (!ScreenIndexedGivingKey(keys, givingFiles, merge: false)) return BoundRejected.Reported(ctx.Edition);         // SR9
 
         return new BoundSort(file, keys, s.sortDuplicatesPhrase() is not null, collating,
             usingFiles, inputProc, givingFiles, outputProc, SortVaryingOf(file));
@@ -147,15 +186,40 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 + "described with an OCCURS clause (SR13)");   // PB236
             return BoundRejected.Reported(ctx.Edition);
         }
+        // §14.9.40.3 SR13's second sentence — "Subscripting shall be specified in accordance with 8.4.2.3" — for the
+        // subject of a table SORT (§8.4.2.3.3 SR3, SR5 e), SR6): one subscript for each ENCLOSING table, none for the
+        // table the statement sorts (a rightmost ALL says the same). Read ONCE here, so `SORT E(2)` over a table inside
+        // `ROW OCCURS 2` sorts ROW(2)'s E and an omitted or surplus subscript is the SOURCE's error, named (kb/Work
+        // PB1055 — the written list used to be discarded unread, and both spellings drew one deferral).
+        if (ctx.Refs.ReadTableSubjectSubscripts(operand, table, out var outer) is { } subjectAnswer)
+            return subjectAnswer.Refusal(ctx.Edition);
+        // WHERE the elements live (kb/Work PB1175 / PB1055): a table inside a REDEFINES class, a record area shared by
+        // several 01s, or a BASED / EXTERNAL record has NO element array — its elements are windows over the one
+        // backing — while every other table (nested or not) is a typed array reached by its whole-table path.
+        TableSortStorage storage;
         if (table.Class is not null)
-            return new BoundUnsupported($"SORT of table '{name}' inside a REDEFINES class (typed-array Format-2 "
-                + "sort over a shared-storage view — deferred)");
-        if (SortArrayPath(table) is not { } arrayPath)
-            return new BoundUnsupported($"SORT of table '{name}' nested under another OCCURS (deferred)");
+        {
+            // A subject whose class backing is not reachable from the statement (a class inside an OCCURS) is a
+            // shape the ONE place builder has not built — the resolver's own deferral, never a second answer here.
+            if (ctx.Refs.ResolveItemAt(table, [.. outer, "1"]) is null)
+                return new BoundUnsupported($"SORT of table '{name}': "
+                    + DeferredShapes.Describe(DeferredShape.NestedClassBacking));
+            // A pointer-class member's VALUE rides the area's managed slot, not its bytes (§14.9.3.4 GR9; kb/Work
+            // PB231), and the elements move as byte images: this shape is the one the window move does not carry.
+            if (SlotWindow.CarriedBySlot(table) || DataItem.DescendantsOf(table).Any(SlotWindow.CarriedBySlot))
+                return new BoundUnsupported($"SORT of table '{name}' in shared storage whose element holds a "
+                    + "pointer-class item (its managed slot is not part of the element's byte image)");
+            storage = new TableSortStorage.SharedArea(outer);
+        }
+        else if (ReferenceResolver.BuildTablePath(table, outer) is { } arrayPath)
+            storage = new TableSortStorage.TypedArray(arrayPath);
+        else
+            return new BoundUnsupported($"SORT of table '{name}': "
+                + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
         // §14.9.40.4 GR20 — "The number of occurrences of table elements referenced by data-name-2 is determined by
         // the rules in the OCCURS clause": the CURRENT count (§13.18.38.4 GR7 for OCCURS DEPENDING, the current
         // capacity for a dynamic-capacity table), never the physical array (kb/Work PB1174).
-        if (ctx.Refs.CurrentOccurrenceCount(table, []) is not { } count)
+        if (ctx.Refs.CurrentOccurrenceCount(table, outer) is not { } count)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
                 $"SORT of table '{name}': its current number of occurrences cannot be addressed (ISO §14.9.40.4 GR20)");
 
@@ -185,7 +249,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 // An unresolvable OCCURS KEY data-name is the data description's own error (§13.18.38.3 SR3),
                 // reported where the OCCURS clause is bound; nothing further to say here.
                 if (keyItems[i] is not { } tk) return BoundRejected.Reported(ctx.Edition);
-                if (TableSortKey(table, specKeys[i].Descending, tk) is not { } k)
+                if (Inadmissible(tk) is { } tkRefusal) return tkRefusal;
+                if (TableSortKey(table, storage, specKeys[i].Descending, tk) is not { } k)
                     return TableSortKeyUnsupported(specKeys[i].Written);
                 keys.Add(k);
             }
@@ -197,6 +262,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             if (drefs.Length == 0)
             {
                 // GR23: data-name-1 omitted — the table ELEMENT itself is the key data item.
+                if (Inadmissible(table) is { } elementRefusal) return elementRefusal;
                 keys.Add(new BoundTableSortKey(desc, "", table));
                 continue;
             }
@@ -233,6 +299,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                         + "data-name is subordinate to data-name-2, it shall not be described with an OCCURS clause, and "
                         + "it shall not be subordinate to an entry that is also subordinate to data-name-2 and contains "
                         + "an OCCURS clause\" (ISO §14.9.40.3 SR14 e)");
+                if (Inadmissible(key) is { } keyRefusal) return keyRefusal;   // SR14 c), d) — the ONE predicate (kb/Work PB1173)
                 // A key of class national orders under the NATIONAL collating sequence — the GR5 lead-in
                 // ("the national collating sequence that applies to the comparison of key data items of class
                 // national"), resolved by GR5a/GR5b like its alphanumeric twin. It used to stage LOUD here, with
@@ -240,14 +307,31 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 // claiming the file sort was "separately blocked by the D-N2 FD/SD record gate" — a gate PB327
                 // removed. The comparator now selects on the key's class (kb/Work PB678), so both formats sort a
                 // national key under the national sequence and nothing is staged.
-                if (TableSortKey(table, desc, key) is not { } k) return TableSortKeyUnsupported(kn);
+                if (TableSortKey(table, storage, desc, key) is not { } k) return TableSortKeyUnsupported(kn);
                 keys.Add(k);
             }
         }
 
+        // A shared-area key is read through its own window, which the ONE place builder positions (the same
+        // question the subject asked above): a key it cannot place is the resolver's deferral, never a guess here.
+        if (storage is TableSortStorage.SharedArea shared)
+            foreach (var k in keys)
+                if (ctx.Refs.ResolveItemAt(k.Key, [.. shared.OuterIndexExprs, "1"]) is null)
+                    return new BoundUnsupported($"SORT table key '{k.Key.CobolName}': "
+                        + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
+
         var (collating, collErr) = SortBindCollating(s.sortCollatingPhrase());
         if (collErr is { } ce) return ce;
-        return new BoundTableSort(arrayPath, table, count, keys, s.sortDuplicatesPhrase() is not null, collating);
+        return new BoundTableSort(storage, table, count, keys, s.sortDuplicatesPhrase() is not null, collating);
+
+        // §14.9.40.3 SR14 c) and d) for one key, through the ONE key-admissibility predicate shared with SORT Format 1
+        // and MERGE (kb/Work PB1173): the refusal node when the key may not be one, else null.
+        BoundStatement? Inadmissible(DataItem key)
+        {
+            if (SortKeyAdmission.Violation(key, SortKeyRules.TableSort) is not { } violation) return null;
+            ctx.Validation.RejectStatementOperand(violation);
+            return BoundRejected.Reported(ctx.Edition);
+        }
     }
 
     // ── MERGE (ISO §14.9.24) ───────────────────────────────────────────────────────────────────────────────
@@ -260,6 +344,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     {
         var operand = m.mergeFileName().dataReference();
         string name = operand.cobolWord()?.GetText() ?? operand.GetText();
+        ScreenDeclarativePlacement(merge: true);   // §14.9.24.3 SR1, the declarative leg (kb/Work PB1139)
         // TWO verdicts, not one (kb/Work PB236): "no such file-name" is §8.4.2.1, "declared but under an FD"
         // is §14.9.24.3 — and both used to be answered by the same run-time loud.
         if (!ctx.Validation.ResolveFile(name, "MERGE", out var file)) return BoundRejected.Reported(ctx.Edition);
@@ -270,19 +355,19 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Reported(ctx.Edition);
         }
         if (RecordLessSd(file)) return new BoundNop();
-        if (SortRecordOf(file) is null)
-            return new BoundUnsupported($"MERGE '{file.CobolName}' without a usable SD record (Tier-C byte island, deferred)");
 
         var keys = new List<BoundSortMergeKey>();
         foreach (var phrase in m.mergeKeyPhrase())
-            if (!SortAddFileKeys(phrase.DESCENDING() is not null, phrase.dataReferenceList(), file, keys))
+            if (!SortAddFileKeys(phrase.DESCENDING() is not null, phrase.dataReferenceList(), file, keys, SortKeyRules.Merge))
                 return BoundRejected.Reported(ctx.Edition);   // reported by SortAddFileKeys (PB236, PB1030)
+        if (SortRecordOf(file) is null)   // after the keys, for the reason BindSort gives (kb/Work PB1173)
+            return new BoundUnsupported($"MERGE '{file.CobolName}' without a usable SD record (Tier-C byte island, deferred)");
 
         var (collating, collErr) = SortBindCollating(m.sortCollatingPhrase());
         if (collErr is { } ce) return ce;
 
         var usingFiles = new List<FileModel>();
-        if (!SortMapIoFiles(m.mergeUsingPhrase().dataReferenceList(), usingFiles, merge: true))
+        if (!SortMapIoFiles(m.mergeUsingPhrase().dataReferenceList(), usingFiles, merge: true, giving: false))
             return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         if (usingFiles.Count < 2)
         {
@@ -292,7 +377,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         }
 
         var givingFiles = new List<FileModel>();
-        if (m.mergeGivingPhrase() is { } gp && !SortMapIoFiles(gp.dataReferenceList(), givingFiles, merge: true))
+        if (m.mergeGivingPhrase() is { } gp && !SortMapIoFiles(gp.dataReferenceList(), givingFiles, merge: true, giving: true))
             return BoundRejected.Reported(ctx.Edition);   // SortMapIoFiles REPORTED (PB236, PB1171)
         PcRange? outputProc = null;
         if (m.mergeOutputProcedurePhrase() is { } opp)
@@ -307,9 +392,22 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 + "(ISO §14.9.24.2 general format)");   // PB236
             return BoundRejected.Reported(ctx.Edition);
         }
+        // SR7 — "File-names shall not be repeated within the MERGE statement" (kb/Work PB1139): over file-name-1 (an SD,
+        // which SortMapIoFiles has already barred from USING / GIVING), file-name-2/3 and file-name-4 together, by FILE
+        // — `USING F1 F1`, `USING F1 F2 GIVING F1` and `GIVING F3 F3` are each one name written twice.
+        var written = new HashSet<FileModel>(ReferenceEqualityComparer.Instance);
+        foreach (var f in usingFiles.Concat(givingFiles))
+            if (!written.Add(f))
+            {
+                ctx.Validation.RejectStatementOperand($"MERGE file '{f.CobolName}' is repeated: \"File-names shall not be "
+                    + "repeated within the MERGE statement\" (ISO §14.9.24.3 SR7)");
+                return BoundRejected.Reported(ctx.Edition);
+            }
+        if (!ScreenSameClauses(file, usingFiles, givingFiles, merge: true)) return BoundRejected.Reported(ctx.Edition);   // SR11
+        if (!ScreenIndexedGivingKey(keys, givingFiles, merge: true)) return BoundRejected.Reported(ctx.Edition);         // SR10
         // VCR 27 (2014→2023): a MERGE newly PROHIBITED inside another MERGE's output procedure / a file-SORT's input
         // or output procedure (§14.9.24; Annex E.2 item 20) is the ≥2023 static diagnostic COBOLNET1572 — a
-        // procedure-range cross-pass in VersionConformancePass.GateMergeInSortMergeProc (the paragraph-pc ranges are
+        // procedure-range cross-pass in VersionConformancePass.GateSortMergeProcedures (the paragraph-pc ranges are
         // available on this BoundMerge/BoundSort). Below 2023 the runtime EC-SORT-MERGE-ACTIVE raise in
         // CobolSort.Init covers the dynamic case when checking is enabled (kb/Work PB1036).
         return new BoundMerge(file, keys, collating, usingFiles, givingFiles, outputProc, SortVaryingOf(file));
@@ -445,7 +543,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// begins with its own ASCENDING|DESCENDING, so per-phrase application IS GR1 — and GR2: significance is
     /// statement order, which the appended list preserves). Returns false when the phrase was REFUSED and reported.</summary>
     private bool SortAddFileKeys(bool descending, Core.DataReferenceListContext? list, FileModel file,
-        List<BoundSortMergeKey> keys)
+        List<BoundSortMergeKey> keys, SortKeyRules rules)
     {
         var drefs = list?.dataReference() ?? [];
         if (drefs.Length == 0)
@@ -458,6 +556,12 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             // data-name-n screen refuses both BEFORE the resolver, which would otherwise hand back the base item
             // with the modifier dropped and key the file on the whole field (kb/Work PB481).
             if (!DataBinder.ScreenDataNameShape(dref, "SORT/MERGE key", ctx.Edition)) return false;
+            // ⛔ WHICH ITEMS MAY BE A KEY is the ONE admissibility predicate's (kb/Work PB1173, PB1052): §14.9.40.3 SR6 b)
+            // c) d) f) / §14.9.24.3 SR4, asked of the NAMED item before any occurrence is resolved — the resolver's own
+            // SR5 screen would answer a key under an OCCURS with "a table element needs a subscript", which is true
+            // and is not the rule this statement breaks (SR6 b): no subscript would make it legal either).
+            if (ctx.Refs.ResolveTableOperand(dref) is { } named && SortKeyAdmission.Violation(named.Item, rules) is { } violation)
+                return Reject(violation);
             // Qualification supported (e.g. ST139A's `KEY-1 OF DATA-NAME-1`) via the one reference resolver.
             // A key that did not resolve carries the resolver's diagnostic, never a second "unresolvable" one
             // (kb/Work PB1030).
@@ -529,8 +633,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// national, and a NATIVE/STANDARD-1/STANDARD-2 alphabet there FORCES the native order over any PCS; b) the
     /// program collating sequences. Null in either half = that class's native order, and a phrase naming only one
     /// class leaves the OTHER on its program collating sequence (GR5b, per class). The COLLATING keyword itself may
-    /// be omitted in the source (CCVS leniency L5 — ST139A writes <c>SEQUENCE alphabet-name</c>; the grammar's
-    /// permissive superset, flagged under strict dialects when that channel lands). Alphabet-name-2 / the FOR
+    /// be omitted in the source — it is an OPTIONAL word (§5.2.3: the printed formats underline only SEQUENCE), so
+    /// `SEQUENCE IS alphabet-name` (ST139A's spelling) is standard and nothing flags it (kb/Work PB1139). Alphabet-name-2 / the FOR
     /// NATIONAL form are CLASS-VALIDATED here by the one test every COLLATING SEQUENCE operand shares
     /// (<c>DataBinder.CollatingAlphabetFault</c>; §14.9.40.3 SR1/SR2 — a UTF-8/UTF-16 alphabet references NO
     /// collating sequence, §12.3.7 Table 6), and since kb/Work PB678 the
@@ -579,14 +683,16 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>Map a USING/GIVING file list to <see cref="FileModel"/>s. Each shall be an FD file — never an SD
-    /// (ISO §14.9.40.3 SR8) — and, in this slice, sequential (the implicit OPEN/READ/WRITE/CLOSE of GR12/GR15 go
-    /// through the sequential connector; relative GIVING key-numbering 1..n is the G5 relative slice).</summary>
+    /// (ISO §14.9.40.3 SR8) — of ANY organization: the implicit OPEN/READ/WRITE/CLOSE of GR12/GR15 run through the
+    /// runtime file facade, which dispatches to the sequential, relative and indexed connectors alike
+    /// (<c>SortEmitter</c>; kb/Work PB994). A relative or indexed file is admitted when its access mode is not
+    /// RANDOM (§12.4.5.5.2 SR1 for USING and GIVING; §14.9.40.3 SR12 / §14.9.24.3 SR13 for USING).</summary>
     /// <remarks>The name resolves through the ONE statement file-name resolution, <c>ResolveFile</c>, which also
     /// refuses a REPORT file with the statement's own restatement of §13.4.5.3 SR9 — SORT §14.9.40.3 SR8 / MERGE
     /// §14.9.24.3 SR9, "described in a file description entry that is not for a report file" (kb/Work PB1171; this
     /// method used to look the name up privately and asked only the sort-merge half). A failure there is REPORTED
     /// and answers false; so does every other refusal here, each reported once.</remarks>
-    private bool SortMapIoFiles(Core.DataReferenceListContext? list, List<FileModel> files, bool merge)
+    private bool SortMapIoFiles(Core.DataReferenceListContext? list, List<FileModel> files, bool merge, bool giving)
     {
         string verb = merge ? "MERGE USING/GIVING" : "SORT USING/GIVING";
         string reportRule = merge
@@ -602,11 +708,88 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             if (f.IsSortMerge)
                 return ctx.Validation.RejectStatementOperand(
                     $"{verb} file '{name}' shall not be a sort-merge file ({(merge ? "ISO §14.9.24.3 SR9" : "ISO §14.9.40.3 SR8")})");
-            if (!f.IsSequential)
+            // ⛔ THE ACCESS-MODE RULE, BY NAME (kb/Work PB994). §12.4.5.5.2 SR1 — "The RANDOM clause shall not be
+            // specified for file-names specified in the USING or GIVING phrase of a SORT or MERGE statement" — holds for
+            // both phrases; §14.9.40.3 SR12 / §14.9.24.3 SR13 restate it for USING ("If file-name-2 references a
+            // relative or an indexed file, its access mode shall be sequential or dynamic"). The refusal used to say
+            // the keyed organizations were "the G5 slice" — a statement about the compiler — for every such file.
+            if (f.AccessMode == FileAccessMode.Random)
                 return ctx.Validation.RejectStatementOperand(
-                    $"SORT/MERGE USING/GIVING on {f.Organization} file '{name}' (sequential slice; "
-                    + "relative/indexed USING-GIVING — incl. the GR15b relative key 1..n — are the G5 keyed slice)");
+                    $"{verb} file '{name}' is described with ACCESS MODE IS RANDOM: \"The RANDOM clause shall not be specified "
+                    + "for file-names specified in the USING or GIVING phrase of a SORT or MERGE statement\" (ISO §12.4.5.5.2 SR1"
+                    + (giving ? ")" : merge ? "; §14.9.24.3 SR13)" : "; §14.9.40.3 SR12)"));
             files.Add(f);
+        }
+        return true;
+    }
+
+    /// <summary>⛔ THE INDEXED-GIVING KEY RULE, ONE SCREEN FOR BOTH VERBS (kb/Work PB994). §14.9.40.3 SR9: "If file-name-3
+    /// references an indexed file, the first specification of data-name-1 shall be associated with an ASCENDING phrase
+    /// and the data item referenced by that data-name-1 shall begin at the same byte location within its record and
+    /// occupy the same number of bytes as the prime record key for that file"; §14.9.24.3 SR10 is the MERGE twin ("shall
+    /// occupy the same byte positions in its record as the data item associated with the prime record key"). The records
+    /// reach an indexed file in the sort's order, so only an ascending first key on the prime key's bytes writes them
+    /// in the prime key's order — without this screen, lifting the keyed-file refusal would turn an over-rejection into
+    /// an under-rejection. Returns false when a violation was REPORTED.</summary>
+    private bool ScreenIndexedGivingKey(IReadOnlyList<BoundSortMergeKey> keys, IReadOnlyList<FileModel> givingFiles, bool merge)
+    {
+        if (keys.Count == 0) return true;
+        var first = keys[0];
+        foreach (var g in givingFiles)
+        {
+            if (g.Organization != FileOrganization.Indexed || g.RecordKeyItem is not { } prime) continue;
+            string? why = null;
+            if (first.Descending)
+                why = "the first specification of data-name-1 is associated with a DESCENDING phrase";
+            else if (Model.RecordLayout.KeyWindowOf(SortRootOf(prime), prime, prime.ByteWidth) is { } pw
+                     && (pw.Offset != first.Offset || pw.Bytes != first.Length))
+                why = $"the first key occupies bytes {first.Offset + 1}..{first.Offset + first.Length} of its record but the "
+                    + $"prime record key '{prime.CobolName}' occupies bytes {pw.Offset + 1}..{pw.Offset + pw.Bytes}";
+            if (why is null) continue;
+            return ctx.Validation.RejectStatementOperand($"{(merge ? "MERGE" : "SORT")} GIVING file '{g.CobolName}' is an indexed file, "
+                + $"so the first key shall be ASCENDING and lie at the prime record key's byte location and size: {why} "
+                + $"({(merge ? "ISO §14.9.24.3 SR10" : "ISO §14.9.40.3 SR9")})");
+        }
+        return true;
+    }
+
+    /// <summary>⛔ THE SAME-CLAUSE RULES OF THE SORT AND MERGE STATEMENTS, ONE SCREEN (kb/Work PB1139), over the I-O-CONTROL
+    /// membership <see cref="FileModel.SameClauses"/> records for every SAME format. §14.9.40.3 SR10: "No pair of
+    /// file-names in the same SORT statement may be specified in the same SAME SORT AREA or SAME SORT-MERGE AREA
+    /// clause. File-names associated with the GIVING phrase shall not be specified in the same SAME AREA clause."
+    /// §14.9.24.3 SR11: "No pair of file-names in a MERGE statement may be specified in the same SAME AREA, SAME SORT
+    /// AREA, or SAME SORT-MERGE AREA clause. The only file-names in a MERGE statement that may be specified in the same
+    /// SAME RECORD AREA clause are those associated with the GIVING phrase." — a pair of the statement's files (file-name-1
+    /// included) in one barred clause, whatever else the clause names. Returns false when a violation was REPORTED.</summary>
+    private bool ScreenSameClauses(FileModel sd, IReadOnlyList<FileModel> usingFiles, IReadOnlyList<FileModel> givingFiles,
+        bool merge)
+    {
+        var statement = new List<FileModel> { sd };
+        statement.AddRange(usingFiles.Concat(givingFiles).Where(f => !ReferenceEquals(f, sd)).Distinct().ToList());
+        string verb = merge ? "MERGE" : "SORT";
+        string rule = merge ? "ISO §14.9.24.3 SR11" : "ISO §14.9.40.3 SR10";
+        foreach (var clause in statement.SelectMany(f => f.SameClauses).Distinct())
+        {
+            var named = statement.Where(clause.Members.Contains).ToList();
+            if (named.Count < 2) continue;
+            string? why = clause.Kind switch
+            {
+                SameClauseKind.SortArea or SameClauseKind.SortMergeArea =>
+                    $"no pair of file-names in the {verb} statement may be specified in the same "
+                    + (clause.Kind == SameClauseKind.SortArea ? "SAME SORT AREA" : "SAME SORT-MERGE AREA") + " clause",
+                SameClauseKind.Area when merge =>
+                    "no pair of file-names in the MERGE statement may be specified in the same SAME AREA clause",
+                SameClauseKind.Area when named.Count(givingFiles.Contains) > 1 =>
+                    "file-names associated with the GIVING phrase shall not be specified in the same SAME AREA clause",
+                SameClauseKind.RecordArea when merge && named.Any(f => !givingFiles.Contains(f)) =>
+                    "the only file-names in a MERGE statement that may be specified in the same SAME RECORD AREA clause "
+                    + "are those associated with the GIVING phrase",
+                _ => null,
+            };
+            if (why is null) continue;
+            ctx.Validation.RejectStatementOperand($"{verb} files {string.Join(", ", named.Select(f => $"'{f.CobolName}'"))} "
+                + $"are named in one SAME clause: {why} ({rule})");
+            return false;
         }
         return true;
     }
@@ -651,28 +834,19 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>One Format-2 key over <paramref name="key"/> — the ONE construction both key sources share (the
     /// statement's KEY phrase, §14.9.40.4 GR2, and the table's own OCCURS KEY phrase, GR21), so the member-path
-    /// rule cannot drift between them. <see langword="null"/> when the key sits under an inner OCCURS or behind a
-    /// REDEFINES view (see <see cref="TableSortKeyUnsupported"/>).</summary>
-    private static BoundTableSortKey? TableSortKey(DataItem table, bool descending, DataItem key) =>
-        SortMemberPath(table, key) is { } path ? new BoundTableSortKey(descending, path, key) : null;
+    /// rule cannot drift between them. A key of a <see cref="TableSortStorage.SharedArea"/> table is the item itself,
+    /// addressed through the class's window law, so it must lie in the SAME class as the table; a typed-array key is
+    /// a member path over the element struct. <see langword="null"/> when the key sits behind a REDEFINES view the
+    /// table is not in (see <see cref="TableSortKeyUnsupported"/>; kb/Work PB599).</summary>
+    private static BoundTableSortKey? TableSortKey(DataItem table, TableSortStorage storage, bool descending, DataItem key) =>
+        storage is TableSortStorage.SharedArea
+            ? (ReferenceEquals(key.Class, table.Class) ? new BoundTableSortKey(descending, "", key) : null)
+            : SortMemberPath(table, key) is { } path ? new BoundTableSortKey(descending, path, key) : null;
 
     private static BoundUnsupported TableSortKeyUnsupported(string keyName) =>
-        new($"SORT table key '{keyName}' — keys shall not be described with / subordinate to an inner OCCURS "
-            + "(ISO §14.9.40.3 SR14e), and a REDEFINES-view key in the typed-array path is deferred");
-
-    /// <summary>The C# access path of a table's ARRAY field (no subscripting — the whole-array operand the
-    /// Format-2 sort consumes), or null when the table is itself inside another OCCURS (deferred).</summary>
-    private static string? SortArrayPath(DataItem table)
-    {
-        var segs = new List<string>();
-        for (DataItem? n = table; n is not null; n = n.Parent)
-        {
-            if (!ReferenceEquals(n, table) && n.Occurs is not null) return null;
-            segs.Add(n.CsName);
-        }
-        segs.Reverse();
-        return string.Join(".", segs);
-    }
+        new($"SORT table key '{keyName}': a key reached through a REDEFINES view (or, on the table's own KEY phrase, "
+            + "under an inner OCCURS) has no stored field on the element struct — the typed-array table sort has not "
+            + "built it (kb/Work PB599; an inner OCCURS between a written key and data-name-2 is refused before this, SR14 e))");
 
     /// <summary>§14.9.40.3 SR14 e): the key, or an entry between it and data-name-2, carries an OCCURS clause.
     /// A predicate over the DATA DESCRIPTION alone — the member path below answers a storage question and returns

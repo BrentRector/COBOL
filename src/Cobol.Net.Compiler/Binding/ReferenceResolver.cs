@@ -1147,6 +1147,15 @@ public sealed class ReferenceResolver(DataBinder data)
     /// item is within an OCCURS table (a subscripted reference is then required) or is an unhandled view form.</summary>
     public Place? ResolveItem(DataItem item) => PlaceForItem(item, []);
 
+    /// <summary>The <see cref="Place"/> of ONE OCCURRENCE of an already-resolved <paramref name="item"/> — one
+    /// rendered index expression per OCCURS level of its path, outermost first (the D10 transitional carrier) —
+    /// through the same view-aware builder every verb operand uses. The caller states the occurrence; nothing is
+    /// read from source. The Format-2 table SORT of a table in a shared-storage (REDEFINES) class sorts through
+    /// these (kb/Work PB1175): each element and each key is a window the class's own offset law positions.
+    /// <see langword="null"/> when the count does not match the item's <see cref="DataItem.SubscriptArity"/> or the
+    /// item has no built place.</summary>
+    internal Place? ResolveItemAt(DataItem item, IReadOnlyList<string> indexExprs) => PlaceForItem(item, indexExprs);
+
     /// <summary>⛔ THE ONE RESOLUTION OF AN FD/SD's RECORD AREA (kb/Work PB355). ISO §13.18.33.4 GR3 — "Multiple
     /// level 1 entries subordinate to a FD or SD entry represent implicit redefinitions of the same area" — so
     /// the area is ONE place, and it is the LARGEST description's view (<see cref="FileModel.AreaRecord"/>): a
@@ -1185,25 +1194,63 @@ public sealed class ReferenceResolver(DataBinder data)
     /// PB1030): §8.4.2.3.2's empty-parentheses screen, the segment renderer, §8.4.2.3.3 SR4's index-name
     /// association and the SR2/SR3/SR5 arity screen. Null when the list is acceptable (<paramref name="indexExprs"/>
     /// then holds the rendered subscripts); otherwise the non-place answer.</summary>
+    /// <param name="tableSubject">True for the subject of a Format-2 table SORT (kb/Work PB1055): the table's OWN
+    /// level is the one sorted and takes no subscript, so the reference writes the subscripts of the ENCLOSING
+    /// tables only — <see cref="ScreenTableSubjectArity"/> — and §8.4.2.3.3 SR6's rightmost ALL, "equivalent to
+    /// omitting the rightmost or only subscript in this context", is admitted and dropped.</param>
     private RefResolution? ReadSubscripts(Core.DataReferenceContext dref, DataItem item,
-        Core.SubscriptOrRefModContext? subCtx, out List<string> indexExprs)
+        Core.SubscriptOrRefModContext? subCtx, out List<string> indexExprs, bool tableSubject = false)
     {
         indexExprs = [];
         if (subCtx is null)
-            return ScreenSubscriptArity(dref, item, 0)   // §8.4.2.3.3 SR5 — none written (kb/Work PB681)
+            return (tableSubject ? ScreenTableSubjectArity(dref, item, 0) : ScreenSubscriptArity(dref, item, 0))   // §8.4.2.3.3 SR5 — none written (kb/Work PB681)
                 ? RefResolution.Refused(DataBinder.WrittenText(dref)) : null;
         if (ScreenEmptyParentheses(dref, subCtx))   // §8.4.2.3.2 / §8.4.3.3.2 (kb/Work PB969)
             return RefResolution.Refused(DataBinder.WrittenText(dref));
         List<IndexUse> ixNames = [];
         // A subscript group never carries a depth-0 colon (WrittenReference), so the ref-mod arm is not reachable.
-        var (e, _) = InterpretSubscripts(subCtx, ixNames);
+        var (e, _) = InterpretSubscripts(subCtx, ixNames, tableSubject);
         if (e is null) return SegmentFailure(DataBinder.WrittenText(dref));   // a segment the materializer refused or deferred
         ScreenIndexNameAssociation(item, ixNames);   // §8.4.2.3.3 SR4 (kb/Work PB459)
-        if (ScreenSubscriptArity(dref, item, e.Count))   // §8.4.2.3.3 SR2/SR3 (kb/Work PB877)
+        if (tableSubject ? ScreenTableSubjectArity(dref, item, e.Count) : ScreenSubscriptArity(dref, item, e.Count))   // §8.4.2.3.3 SR2/SR3 (kb/Work PB877)
             return RefResolution.Refused(DataBinder.WrittenText(dref));
         indexExprs = e;
         return null;
     }
+
+    /// <summary>⛔ §8.4.2.3.3 SR3 / SR5 e) / SR6 FOR THE SUBJECT OF A FORMAT-2 TABLE SORT (kb/Work PB1055) — the
+    /// written subscripts against the table's ENCLOSING levels. SR5 e) lets "the subject of a SORT statement that
+    /// references a table" omit its subscripting, and SR6 spells the omission "ALL … as the rightmost or only
+    /// subscript of a table in the table format of a SORT statement. This is equivalent to omitting the rightmost
+    /// or only subscript in this context": what is omitted is the TABLE'S OWN level (the one the statement sorts),
+    /// so the reference still writes one subscript for each enclosing table (SR3 — "the number of subscripts shall
+    /// equal the number of OCCURS clauses", less the one SR5 e) lets go). Returns <see langword="true"/> when the
+    /// reference is rejected. Before this screen the subscripts of the subject were never read at all, so
+    /// <c>SORT E(2)</c> over a table inside <c>ROW OCCURS 2</c> bound to a deferral and an unsubscripted
+    /// <c>SORT E</c> drew the same one: the legal and the illegal spelling were indistinguishable.</summary>
+    private bool ScreenTableSubjectArity(Core.DataReferenceContext dref, DataItem table, int written)
+    {
+        int enclosing = table.SubscriptArity - 1;
+        if (written == enclosing) return false;
+        if (_probing) return true;   // R30 purity: a probe never diagnoses (kb/Work PB157)
+        if (!_diagnosed.Add(dref)) return true;
+        string subject = table.CobolName ?? table.CsName;
+        data.Edition.Error(DiagnosticCatalog.SubscriptCountMismatch,
+            $"'{DataBinder.WrittenText(dref)}': the table '{subject}' sits inside {enclosing} enclosing OCCURS "
+            + $"clause{(enclosing == 1 ? "" : "s")}, so the SORT subject writes {enclosing} subscript"
+            + $"{(enclosing == 1 ? "" : "s")}, outermost first, and none for '{subject}' itself — the level the "
+            + $"statement sorts; ALL may stand as the rightmost one; {written} written (ISO §8.4.2.3.3 SR3, SR5 e), "
+            + "SR6; §14.9.40.3 SR13).");
+        return true;
+    }
+
+    /// <summary>The subscripts a Format-2 table SORT's data-name-2 writes for its ENCLOSING tables, one rendered
+    /// index expression per level, outermost first (empty for a table that lies in no other table) — or the
+    /// refusal. ISO §14.9.40.3 SR13: "Subscripting shall be specified in accordance with 8.4.2.3"; the rule that
+    /// shape takes for a table subject is <see cref="ScreenTableSubjectArity"/>.</summary>
+    internal RefResolution? ReadTableSubjectSubscripts(Core.DataReferenceContext dref, DataItem table,
+        out List<string> outerIndexExprs) =>
+        ReadSubscripts(dref, table, SubscriptGroupOf(dref), out outerIndexExprs, tableSubject: true);
 
     /// <summary>⛔ A DATA REFERENCE FOLLOWED BY EMPTY PARENTHESES — <c>WS-X()</c> or <c>WS-X( )</c> — is neither
     /// form a parenthesis after a data-name can take (kb/Work PB969): §8.4.2.3.2 writes a subscript list as
@@ -1476,7 +1523,9 @@ public sealed class ReferenceResolver(DataBinder data)
     public readonly record struct TableOperand(DataItem Item, int SubscriptCount, bool IsReferenceModified);
 
     /// <summary>⛔ THE ONE RESOLUTION OF A REFERENCE WRITTEN WHERE A GENERAL FORMAT PRINTS A <b>TABLE</b> OPERAND
-    /// (kb/Work PB443) — SEARCH's and SEARCH ALL's identifier-1. It is deliberately NOT <see cref="Resolve"/>: a
+    /// (kb/Work PB443) — SEARCH's and SEARCH ALL's identifier-1, the Format-2 SORT's data-name-2 and, for the same
+    /// reason, a SORT/MERGE KEY (kb/Work PB1173): a statement whose rule is about the NAMED ITEM — whether it may be a
+    /// key at all — asks what the name denotes before any occurrence of it is resolved. It is deliberately NOT <see cref="Resolve"/>: a
     /// table operand names the TABLE, not one occurrence of it, and ISO §14.9.37.3 SR2 says identifier-1 "shall
     /// not be subscripted at the level for which the SEARCH is applicable" — so there is no subscript for the
     /// searched level and therefore no <see cref="Place"/> to build. What such a statement needs is the data item
@@ -2034,6 +2083,19 @@ public sealed class ReferenceResolver(DataBinder data)
     /// each comma- or multi-space-separated segment is rendered to a C# <c>long</c> index expression; a segment that
     /// cannot be rendered yields a null list (→ the caller fails loud).
     /// </summary>
+    /// <summary>True when one subscript segment is the bare word <c>ALL</c> (§8.4.2.3.3 SR6).</summary>
+    private static bool IsAllSegment(List<IToken> segment)
+    {
+        IToken? only = null;
+        foreach (var t in segment)
+        {
+            if (t.Type == Core.SUB_WS) continue;
+            if (only is not null) return false;
+            only = t;
+        }
+        return only is { Type: Core.SUB_ALL };
+    }
+
     /// <summary>True if the flat token stream has a depth-0 <c>SUB_COLON</c> — i.e. it is a reference modification
     /// (<c>start:length</c>) rather than a subscript list. Internal because the keyword-omitted FUNCTION path
     /// asks the SAME question of a captured group (fix-queue PB8): with the FUNCTION keyword omitted,
@@ -2055,8 +2117,11 @@ public sealed class ReferenceResolver(DataBinder data)
 
     /// <param name="indexNames">§8.4.2.3.3 SR4's collector — the index-names used as subscripts, for
     /// <see cref="ScreenIndexNameAssociation"/> at the caller, which knows the table being referenced.</param>
+    /// <param name="admitRightmostAll">True only for a Format-2 SORT table subject (§8.4.2.3.3 SR6): a rightmost
+    /// <c>ALL</c> is "equivalent to omitting the rightmost or only subscript", so the segment is dropped from the
+    /// result rather than rendered (<see cref="ReadSubscripts"/>).</param>
     private (List<string>? Exprs, bool IsRefMod) InterpretSubscripts(
-        Core.SubscriptOrRefModContext ctx, List<IndexUse>? indexNames = null)
+        Core.SubscriptOrRefModContext ctx, List<IndexUse>? indexNames = null, bool admitRightmostAll = false)
     {
         var tokens = new List<IToken>();
         CollectLeafTokens(ctx, tokens);
@@ -2088,7 +2153,9 @@ public sealed class ReferenceResolver(DataBinder data)
         // inline `IsTable` lambda stood here and answered only §8.4.2.3.3 SR2's FIRST half, so a name SUBORDINATE
         // to an OCCURS — legally subscripted, and a legal arithmetic-expression-1 subscript under §8.4.2.3.2 +
         // §8.8.1.1 + §8.4.3.1.2 Format 2 — had its own '(' split off as an EXTRA subscript.
-        foreach (var seg in SplitSubscriptTokens(tokens, CannotBeSubscripted))
+        var segments = SplitSubscriptTokens(tokens, CannotBeSubscripted);
+        if (admitRightmostAll && segments.Count > 0 && IsAllSegment(segments[^1])) segments.RemoveAt(segments.Count - 1);
+        foreach (var seg in segments)
         {
             if (RenderSegment(seg, SegmentPosition.Subscript, indexNames) is not { } e) return (null, false);
             exprs.Add(e);

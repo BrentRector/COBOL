@@ -15921,13 +15921,13 @@
   "ordinal": 1,
   "subject": "General",
   "rule-digest": "43849fce9c1e",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb994-sort-using-random-access; conformance:negative/pb994-sort-giving-random-access; conformance:negative/pb994-merge-using-random-access",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB994: Rule: \"The RANDOM clause shall not be specified for file-names specified in the USING or GIVING phrase of a SORT or MERGE statement.\" (cite.py --check 12.4.5.5.2 -> OK §12.4.5.5.2 1)). No site enforces or cites this rule anywhere under src (searched SortBinder, DataBinder, StatementValidation, DiagnosticCatalog). The illegal source is currently rejected only INCIDENTALLY: a sequential-organization RANDOM file dies at the SELECT on §12.4.5.5.2 SR2 (COBOLNET1858, PB692), and a relative/indexed RANDOM file dies in SortBinder.SortMapIoFiles on the '!f.IsSequential' slice refusal -- probe gC.cob (SORT ... USING RR where RR is RELATIVE ACCESS RANDOM) and gD.cob (GIVING RR) both give 'COBOLNET1757: SORT/MERGE USING/GIVING on Relative file 'RR' (sequential slice; ... G5 keyed slice)', a diagnostic that names an implementation slice, not the rule. That same refusal also rejects LEGAL relative/indexed SEQUENTIAL/DYNAMIC USING/GIVING files, which is open kb/Work PB994 (claims SR-14.9.40.3-12, GR-14.9.40.4-15); the moment PB994 lifts the slice, a RANDOM relative/indexed USING/GIVING file will compile with no check at all. §14.9.40.3 SR12 (cite.py OK: 'If file-name-2 references a relative or an indexed file, its access mode shall be sequential or dynamic') covers only the SORT USING side; this rule also covers GIVING and MERGE. PB773's residue section names this rule 'Also unowned' -- no open note claims SR-12.4.5.5.2-1. PARTIAL: rejection happens, but for the wrong reason and only while an unrelated defect stands. [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023 (Annex E lists no substantive change to the ACCESS MODE clause)]",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB994 landed: 12.4.5.5.2 SR1 has its own enforcement site, SortMapIoFiles (the one USING/GIVING mapper of SORT and MERGE): a file with ACCESS MODE IS RANDOM in either phrase is refused by name for both verbs (the sequential-organization RANDOM file is refused earlier by SR2, COBOLNET1858).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.5.2-2",
@@ -35842,11 +35842,11 @@
   "subject": "COMMIT statement",
   "rule-digest": "cba133df0d63",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc",
+  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
   "test-ref": "conformance:negative/pb137-commit-in-sort-proc",
   "derivation": "",
   "editions": "2023",
-  "notes": "LANDED (kb/Work PB137): the batch-8 finding verbatim - the cross-pass implemented exactly this SR's ban with a MERGE-only predicate; the identity node makes COMMIT (and ROLLBACK, 14.9.36.3 SR2) its reachable siblings over the SAME prohibited-range machinery (COBOLNET1690).",
+  "notes": "LANDED (kb/Work PB137): the batch-8 finding verbatim - the cross-pass implemented exactly this SR's ban with a MERGE-only predicate; the identity node makes COMMIT (and ROLLBACK, 14.9.36.3 SR2) its reachable siblings over the SAME prohibited-range machinery (COBOLNET1690). retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
   "state": "OK"
  },
  {
@@ -39681,13 +39681,13 @@
   "ordinal": 1,
   "subject": "MERGE statement",
   "rule-digest": "af374726cb04",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs#CheckCrossStatementBans; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenDeclarativePlacement; src/Cobol.Net.Compiler/Binding/Model/PcRange.cs#Spans",
+  "test-ref": "conformance:negative/pb1139-merge-in-declarative; conformance:negative/pb1139-merge-in-sort-procedure; conformance:negative/pb1139-merge-in-exception-perform; conformance:2014/pb1139_merge_in_sort_procedure_allowed",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1139 (open). cite.py --check 14.9.24.3 \"or in a declarative procedure\" -> OK §14.9.24.3 1); --check E.2 \"A MERGE statement is now prohibited in an output procedure of another MERGE statement\" -> OK §E.2 20). Four halves. (a) exception-checking PERFORM imperative-statement-1: COBOLNET1615 fires (probe mecp) — verified. (b)/(c) MERGE in another MERGE's output procedure / a SORT input procedure: COBOLNET1572 at 2023 (mnest, msortin), accepted at 2014 (mnest --std 2014) as E.2 item 20 requires; the inverted-THRU-range escape is kb/Work PB812 (open) — not re-reported. (d) DEFECT: MERGE inside a DECLARATIVES USE section (probe mdecl: `D1 SECTION. USE AFTER STANDARD ERROR PROCEDURE ON F3. D1P. MERGE S ON ASCENDING KEY SK USING F1 F2 GIVING F3.`) compiles clean with rc=0 at --std 2023 AND --std 85; no binder asks ctx.Enclosing.InDeclarative for MERGE (grep of SortBinder.BindMerge / VersionConformancePass). Expected: a syntax-rule diagnostic at every edition. Sibling confirmed: SORT in a declarative procedure (§14.9.40.3 SR3 'or in a declarative procedure', --check OK) also compiles clean (probe sdecl). [code-location note: A MERGE ban, COBOLNET1615)] || editions as adjudicated: 85/2002/2014/2023 for the declarative-procedure ban (clause text; Annex E lists no change to it); exception-checking PERFORM ban 2023 (the construct is new at 2023, Annex E.3 item 36); ban in another MERGE's output procedure or a file-SORT's input/output procedure 2023 only (Annex E.2 item 20: 'now prohibited')",
-  "state": "GAP"
+  "notes": "kb/Work PB1139 landed: MERGE's three regions are all asked. Exception-checking PERFORM imperative-statement-1 (COBOLNET1615, parse-tree, 2023 - the construct is new there); another MERGE's output procedure / a file SORT's input or output procedure (COBOLNET1572, 2023 only - Annex E.2 item 20 'now prohibited'; 2014 accepts, golden 2014/pb1139_merge_in_sort_procedure_allowed), through ONE lexical membership test PcRange.Spans shared with the SORT/COMMIT/ROLLBACK arms so an inverted THRU range no longer escapes; a declarative procedure (COBOLNET2700, every edition, SortBinder.ScreenDeclarativePlacement from EnclosingContext.InDeclarative). The executed (PERFORM out-and-back) reach of GR10 stays kb/Work PB812's.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-2",
@@ -39726,13 +39726,13 @@
   "ordinal": 4,
   "subject": "MERGE statement",
   "rule-digest": "3104e7c1aa7b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortAddFileKeys; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#KeyWindowOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortKeyAdmission.cs#Violation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortAddFileKeys; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#KeyWindowOf",
+  "test-ref": "conformance:negative/pb1173-merge-key-pointer; conformance:negative/pb1173-merge-key-occurs; conformance:negative/pb1173-sort-file-key-boolean; conformance:negative/pb1173-sort-file-key-odo-group; conformance:negative/pb1173-sort-file-key-dynamic-length; conformance:negative/pb1173-sort-file-key-not-in-record; conformance:85/pb1173_sort_key_second_record; conformance:negative/pb1025-sort-key-after-dynamic-beyond-minimum",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1052 (open). cite.py --check 14.9.24.3 \"Key data items shall not be of the class boolean, message-tag, object, or pointer\" -> OK (item 4 c); --check 14.9.24.3 \"A key data item shall not be a variable-length group\" -> OK (item 4 d). Sub-rules: a) VERIFIED — msr4a key W in WORKING-STORAGE -> COBOLNET1757 'not described in a record of S'. b)/f) VERIFIED — msr4b2 `KEY SKO(1)` under OCCURS -> COBOLNET1757; unsubscripted forms rejected by §8.4.2.3.3 (COBOLNET2270). e) VERIFIED at run time — msr4e/mrt4e key SK2 declared only in the SD's second 01 compiles, and the merged output orders on byte 1 of every record: A02.. B01.. B02.. C02.. D01.. (GR4 tie order F1 before F2 also held). g) VERIFIED — msr4g (SD VARYING 3..10, key at 4..5) -> COBOLNET0874; msr4g2 key at 1..3 accepted. c) DEFECT: msr4c1 `05 SB PIC 1(8)` boolean key rc=0, msr4c4 `PIC 1(8) USAGE BIT` rc=0, msr4c3 `01 SP USAGE POINTER` (second SD record) key rc=0 — no class screen in SortAddFileKeys (CollatingSelection.Of classifies, nothing refuses). d) DEFECT: msr4d key SG, a variable-length group containing `OCCURS 1 TO 5 DEPENDING ON SN`, rc=0. A dynamic-length elementary key is refused, but by the wrong rule's message — kb/Work PB1052 (open, process-only) — not re-reported. Two sub-rules defective -> DIVERGES. PB1025 explicitly left this row open. || editions as adjudicated: 85/2002/2014/2023 (clause text); sub-rule c) classes boolean/object/pointer and message-tag, and d) dynamic-length/dynamic-capacity items, only have a population at the editions that introduced those constructs",
-  "state": "GAP"
+  "notes": "kb/Work PB1173 + PB1052 landed: MERGE's key rules are SORT Format 1's through the SAME function - SortAddFileKeys (key resolution, SR4 a) record test, window, e) same byte positions, g) minimum-size bound) and SortKeyAdmission.Violation with the Merge arm (b/f OCCURS, c class, d shape; messages cite 14.9.24.3 SR4). The MERGE-specific witnesses are the pointer and OCCURS keys; the rest are shared code paths witnessed through the SORT statement.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-5",
@@ -39771,13 +39771,13 @@
   "ordinal": 7,
   "subject": "MERGE statement",
   "rule-digest": "a2d17decfa92",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindMerge",
+  "test-ref": "conformance:negative/pb1139-merge-file-repeated; conformance:negative/pb1139-merge-file-in-using-and-giving",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1139 (open). cite.py --check 14.9.24.3 \"File-names shall not be repeated within the MERGE statement\" -> OK §14.9.24.3 7). No repetition check anywhere in BindMerge / SortMapIoFiles (grep). Probes at --std 2023: mrep1 `USING F1 F1 GIVING F3` rc=0; mrep2 `USING F1 F2 GIVING F1` rc=0; mrep3 `GIVING F3 F3` rc=0. Expected: each rejected at compile time. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1139 landed: BindMerge keeps the set of file-name-2/3/4 FileModels (file-name-1, an SD, is already barred from USING/GIVING) and refuses a repeat by file with COBOLNET1757 naming SR7 - USING F1 F1, USING F1 F2 GIVING F1 and GIVING F3 F3 alike.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-8",
@@ -39816,13 +39816,13 @@
   "ordinal": 10,
   "subject": "MERGE statement",
   "rule-digest": "6cbcb9489667",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenIndexedGivingKey; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles",
+  "test-ref": "conformance:negative/pb994-merge-giving-indexed-first-key-descending",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB994 (open). cite.py --check 14.9.24.3 \"the first specification of data-name-1 shall be associated with an ASCENDING phrase\" -> OK §14.9.24.3 10). The rule's constraint has no code; instead SortMapIoFiles refuses EVERY non-sequential USING/GIVING file ('sequential slice ... G5 keyed slice', COBOLNET1757), so a MERGE GIVING an indexed file is rejected whether it satisfies this rule or not (probe msr10 with DESCENDING; the legal ASCENDING-on-prime-key case takes the same branch per the code). Rejects legal source — kb/Work PB994 (open) owns the mechanism; this row belongs in its inventory_rows. When PB994 lands, this rule's screen (first key ASCENDING, same byte positions as the prime record key) must be written with it. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "notes": "kb/Work PB994 landed: MERGE's twin of SR9 is the same screen (ScreenIndexedGivingKey, merge: true), citing 14.9.24.3 SR10; the key-byte arm shares code with the SORT arm witnessed by negative/pb994-sort-giving-indexed-key-not-prime-bytes.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-11",
@@ -39831,13 +39831,13 @@
   "ordinal": 11,
   "subject": "MERGE statement",
   "rule-digest": "e0256bc919dc",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenSameClauses; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindIoControl; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#SameClauses",
+  "test-ref": "conformance:negative/pb1139-merge-same-area; conformance:negative/pb1139-merge-same-record-area; conformance:negative/pb1139-sort-same-sort-area; conformance:85/pb1139_same_clauses_legal",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1139 (open). cite.py --check 14.9.24.3 \"No pair of file-names in a MERGE statement may be specified in the same SAME AREA, SAME SORT AREA, or SAME SORT-MERGE AREA clause\" -> OK §14.9.24.3 11). The SAME RECORD AREA clause is modelled (FileModel.SameRecordAreaPeers) but no code consults any SAME clause for SORT/MERGE (grep src/Cobol.Net.*). Probes at 2023, each rc=0: msr11a SAME AREA FOR F1 F2 (two USING files); msr11b SAME SORT AREA FOR S F1; msr11c SAME SORT-MERGE AREA FOR S F3; msr11d SAME RECORD AREA FOR F1 F3 (a USING and a GIVING file — only GIVING files may share). Expected: all four rejected. Sibling: SORT's §14.9.40.3 SR10 (--check OK) is the same shape. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1139 landed: BindIoControl records EVERY SAME format's membership on its files (FileModel.SameClauses; SameRecordAreaPeers is now derived from it), and ScreenSameClauses refuses a pair of the MERGE's files (file-name-1 included) in one SAME AREA / SAME SORT AREA / SAME SORT-MERGE AREA clause, and in a SAME RECORD AREA clause unless every statement file it names is a GIVING file (COBOLNET1757 naming SR11).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-12",
@@ -39861,13 +39861,13 @@
   "ordinal": 13,
   "subject": "MERGE statement",
   "rule-digest": "499198515439",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb994_sort_merge_keyed_using_giving; conformance:negative/pb994-merge-using-random-access",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB994 (open). cite.py --check 14.9.24.3 \"its access mode shall be sequential or dynamic\" -> OK §14.9.24.3 13). The constraint is not written; SortMapIoFiles refuses every relative/indexed USING file regardless of ACCESS MODE (probe msr13 indexed ACCESS RANDOM and msr13b relative -> COBOLNET1757 'sequential slice'), so the legal ACCESS SEQUENTIAL/DYNAMIC keyed USING file is rejected by the same branch. Rejects legal source — kb/Work PB994 (open) owns it; add this row to its inventory_rows and write the access-mode screen when the keyed slice lands. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "notes": "kb/Work PB994 landed: MERGE shares SortMapIoFiles with SORT, so file-name-2 / file-name-3 of a MERGE may be a sequential- or dynamic-access relative or indexed file (the golden's MERGE reads an indexed USING pair) and ACCESS RANDOM is refused by name (negative/pb994-merge-using-random-access).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-1",
@@ -40012,11 +40012,11 @@
   "subject": "MERGE statement",
   "rule-digest": "89428c1df43c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitMerge; src/Cobol.Net.Runtime/IO/CobolSort.cs#ReleaseStatement; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc; src/Cobol.Net.Runtime/IO/CobolSort.cs#Init",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitMerge; src/Cobol.Net.Runtime/IO/CobolSort.cs#ReleaseStatement; src/Cobol.Net.Runtime/IO/CobolSort.cs#Init; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
   "test-ref": "conformance:2002/pb1036_sort_merge_statement_ec; unit:SortMergeStatementEcTests.Release_InAnOutputProcedure_RaisesActive_BeforeFlowRelease_AndReleasesNothing; unit:SortMergeStatementEcTests.Init_WhileAProcedureRuns_RaisesActive_AndLeavesTheEnclosingStoreIntact",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "cite.py --check 14.9.24.4 \"The range of the output procedure shall not cause the execution of any MERGE, RELEASE, or the file format of the SORT statement\" -> OK 8). The range half CONFORMS as adjudicated. The EC half now CONFORMS: CobolSort.Init raises EC-SORT-MERGE-ACTIVE while ANY store is in a procedure phase (a MERGE or format 1 SORT from the range - the phase is dynamic, so a declarative run from the range counts), before touching a store; ReleaseStatement raises it while any store is in the output phase, AHEAD of EC-FLOW-RELEASE (docs/CONFORMANCE.md §3 D-SMA (a)). At 2023 COBOLNET1572 also rejects a MERGE lexically in the range. Wired by kb/Work PB1036 (w59c): FatalAmbientGates row + CheckingFlags field + ExceptionEngine helper; EcBinder.QueryFor asks the name at the SORT/MERGE/RELEASE/RETURN node; the golden raises it under >>TURN ... CHECKING ON with a USE AFTER EXCEPTION CONDITION declarative; checking off keeps the pre-PB1036 lenient behaviour (docs/CONFORMANCE.md §3 D-SMA (c)).",
+  "notes": "cite.py --check 14.9.24.4 \"The range of the output procedure shall not cause the execution of any MERGE, RELEASE, or the file format of the SORT statement\" -> OK 8). The range half CONFORMS as adjudicated. The EC half now CONFORMS: CobolSort.Init raises EC-SORT-MERGE-ACTIVE while ANY store is in a procedure phase (a MERGE or format 1 SORT from the range - the phase is dynamic, so a declarative run from the range counts), before touching a store; ReleaseStatement raises it while any store is in the output phase, AHEAD of EC-FLOW-RELEASE (docs/CONFORMANCE.md §3 D-SMA (a)). At 2023 COBOLNET1572 also rejects a MERGE lexically in the range. Wired by kb/Work PB1036 (w59c): FatalAmbientGates row + CheckingFlags field + ExceptionEngine helper; EcBinder.QueryFor asks the name at the SORT/MERGE/RELEASE/RETURN node; the golden raises it under >>TURN ... CHECKING ON with a USE AFTER EXCEPTION CONDITION declarative; checking off keeps the pre-PB1036 lenient behaviour (docs/CONFORMANCE.md §3 D-SMA (c)). retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
   "state": "OK"
  },
  {
@@ -40071,13 +40071,13 @@
   "ordinal": 12,
   "subject": "MERGE statement",
   "rule-digest": "35599ecced8e",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitMerge; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#RuleFor; src/Cobol.Net.Runtime/IO/CobolSort.cs#FileNotOpen",
-  "test-ref": "conformance:2002/pb993_sort_merge_transfer_termination; conformance:2023/pb714_merge_using_sharing_read_only; conformance:2002/pb1036_sort_merge_statement_ec",
+  "test-ref": "conformance:2002/pb993_sort_merge_transfer_termination; conformance:2023/pb714_merge_using_sharing_read_only; conformance:2002/pb1036_sort_merge_statement_ec; conformance:85/pb994_sort_merge_keyed_using_giving",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "PB993/PB714 legs as adjudicated (w55c). The EC-SORT-MERGE-FILE-OPEN sentence is closed by kb/Work PB1036: CobolSort.FileNotOpen is emitted for every GIVING file at the start of the MERGE and raises before any implicit OPEN (golden case B shape; the SORT twin, case A, prints A GS=00 - the program's own connector untouched). RESIDUAL, NOT PB1036's: a RELATIVE GIVING file is refused, so b)'s relative-key sequence is unimplemented (kb/Work PB994).",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB994 landed: MERGE shares EmitGivingFile with SORT, so a RELATIVE GIVING file receives relative records 1..n and the key item indicates the last record returned (golden leg 3: MERGE ... GIVING RLH, RK3 = 05); the PB993/PB714/PB1036 legs stand.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-13",
@@ -43867,11 +43867,11 @@
   "subject": "ROLLBACK statement",
   "rule-digest": "e2a87715e6e6",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc",
+  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB812 (registrar 14c). cite.py --check 14.9.36.3 \"This statement shall not be specified in the input or output procedure of a MERGE or SORT statement.\" -> OK §14.9.36.3 2). Implemented by the BoundCommitRollback arm of GateMergeInSortMergeProc over the same prohibited PcRange set as the COBOLNET1572 MERGE ban. VERIFIED: out/probe/rollback/rb3_sort_output_section.cob (ROLLBACK inside IF in the 2nd paragraph of a SORT OUTPUT PROCEDURE section) and rb4_merge_output_thru.cob (MERGE OUTPUT PROCEDURE D1 THRU D2) both -> COBOLNET1690. DEFECT (under-rejects): out/probe/rollback/rb10_inverted.cob - INPUT PROCEDURE IS IN-B THRU IN-A with IN-A physically first; ROLLBACK written in IN-B (procedure-name-1 itself, unarguably inside the input procedure) compiles with only the COBOLNET1579 warning, no COBOLNET1690. Mechanism = the numeric-span region test that open kb/Work PB812 owns for the MERGE arm (its inventory_rows name only GR-14.9.40.4-10); this row and its COMMIT twin SR-14.9.7.3-2 (recorded CONFORMS) share it. Secondary: the SR2 COBOLNET1690 is reported with NO source location ('error COBOLNET1690: ...' with no file(line,col)), unlike the SR1 site. No ROLLBACK-specific negative golden exists (pb137-commit-in-sort-proc exercises the COMMIT arm only) - test-needed.",
+  "notes": "kb/Work PB812 (registrar 14c). cite.py --check 14.9.36.3 \"This statement shall not be specified in the input or output procedure of a MERGE or SORT statement.\" -> OK §14.9.36.3 2). Implemented by the BoundCommitRollback arm of GateMergeInSortMergeProc over the same prohibited PcRange set as the COBOLNET1572 MERGE ban. VERIFIED: out/probe/rollback/rb3_sort_output_section.cob (ROLLBACK inside IF in the 2nd paragraph of a SORT OUTPUT PROCEDURE section) and rb4_merge_output_thru.cob (MERGE OUTPUT PROCEDURE D1 THRU D2) both -> COBOLNET1690. DEFECT (under-rejects): out/probe/rollback/rb10_inverted.cob - INPUT PROCEDURE IS IN-B THRU IN-A with IN-A physically first; ROLLBACK written in IN-B (procedure-name-1 itself, unarguably inside the input procedure) compiles with only the COBOLNET1579 warning, no COBOLNET1690. Mechanism = the numeric-span region test that open kb/Work PB812 owns for the MERGE arm (its inventory_rows name only GR-14.9.40.4-10); this row and its COMMIT twin SR-14.9.7.3-2 (recorded CONFORMS) share it. Secondary: the SR2 COBOLNET1690 is reported with NO source location ('error COBOLNET1690: ...' with no file(line,col)), unlike the SR1 site. No ROLLBACK-specific negative golden exists (pb137-commit-in-sort-proc exercises the COMMIT arm only) - test-needed. retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
   "state": "GAP"
  },
  {
@@ -43897,11 +43897,11 @@
   "subject": "ROLLBACK statement",
   "rule-digest": "373cffc24578",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindCommitRollback; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc; src/Cobol.Net.Compiler/Binding/EcNameResolution.cs",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindCommitRollback; src/Cobol.Net.Compiler/Binding/EcNameResolution.cs; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
   "test-ref": "",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB259 (registrar 14c). cite.py --check 14.9.36.4 \"the exception condition EC-FLOW-ROLLBACK is set to exist\" -> OK §14.9.36.4 2) ('If this statement is attempted to be executed under the control of a recursive runtime element or a file SORT or MERGE statement ...'). STATIC reach: the SR1/SR2 bind-time COBOLNET1690 rejections (see those rows) make the textual cases unreachable. DYNAMIC half not implemented: out/probe/rollback/rb8_performed_from_sort.cob - ROLLBACK in a paragraph PERFORMed from a SORT INPUT PROCEDURE (outside the static range) compiles, and at run time prints HELPER / SORTED with no EC-FLOW-ROLLBACK; EcNameResolution registers EC-FLOW-ROLLBACK as a DeclinedModuleExceptionName with zero setting sites. Licence in play: §14.6.13.1.1 (--check \"The implementor is not required to raise any exception conditions for level-3 exception-names\" -> OK) excuses level-3 ECs of unimplemented optional elements, and CONFORMANCE.md §5 A.4.3 declines commit/rollback incl. EC-FLOW-ROLLBACK - but the derived selector commit-and-rollback-only EXCLUDES this row by its EC-FLOW-(COMMIT|ROLLBACK) arm, handing the decision to kb/Work PB259, which holds the exact COMMIT twin GR-14.9.7.4-2 (PARTIAL) open as a genuine adjudication yet does not list this row in inventory_rows. Verdict mirrors the twin; the row belongs to PB259's decision, not to a new defect.",
+  "notes": "kb/Work PB259 (registrar 14c). cite.py --check 14.9.36.4 \"the exception condition EC-FLOW-ROLLBACK is set to exist\" -> OK §14.9.36.4 2) ('If this statement is attempted to be executed under the control of a recursive runtime element or a file SORT or MERGE statement ...'). STATIC reach: the SR1/SR2 bind-time COBOLNET1690 rejections (see those rows) make the textual cases unreachable. DYNAMIC half not implemented: out/probe/rollback/rb8_performed_from_sort.cob - ROLLBACK in a paragraph PERFORMed from a SORT INPUT PROCEDURE (outside the static range) compiles, and at run time prints HELPER / SORTED with no EC-FLOW-ROLLBACK; EcNameResolution registers EC-FLOW-ROLLBACK as a DeclinedModuleExceptionName with zero setting sites. Licence in play: §14.6.13.1.1 (--check \"The implementor is not required to raise any exception conditions for level-3 exception-names\" -> OK) excuses level-3 ECs of unimplemented optional elements, and CONFORMANCE.md §5 A.4.3 declines commit/rollback incl. EC-FLOW-ROLLBACK - but the derived selector commit-and-rollback-only EXCLUDES this row by its EC-FLOW-(COMMIT|ROLLBACK) arm, handing the decision to kb/Work PB259, which holds the exact COMMIT twin GR-14.9.7.4-2 (PARTIAL) open as a genuine adjudication yet does not list this row in inventory_rows. Verdict mirrors the twin; the row belongs to PB259's decision, not to a new defect. retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
   "state": "GAP"
  },
  {
@@ -46041,13 +46041,13 @@
   "ordinal": 3,
   "subject": "SORT statement",
   "rule-digest": "5709f0849363",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs#CheckCrossStatementBans; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs#CheckCrossStatementBans; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#IsFileFormat; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenDeclarativePlacement; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
+  "test-ref": "conformance:negative/pb1139-sort-in-declarative; conformance:negative/pb1139-sort-in-sort-procedure; conformance:negative/pb1139-sort-in-inverted-sort-procedure; conformance:2023/pb1139_table_sort_legal_regions; conformance-test:PerformFormat3Tests.SortInImp1_Rejected1617",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1139 (registrar 14c). cite.py --check 14.9.40.3 \"A SORT statement shall not appear in imperative-statement-1 of an exception-checking PERFORM statement, in an input or output procedure, or in a declarative procedure\" OK — and the rule is printed under the 'FORMAT 1' sub-heading of §14.9.40.3 (SR3-SR12 are Format 1, SR13-SR15 Format 2). Three halves, two defective. (a) exception-checking PERFORM: EcBinder.ExceptionPerform flags EVERY SortStatementContext in imperative-statement-1 with COBOLNET1617 — correct for Format 1 (probe sr3fileperf rc 70 COBOLNET1617) but it ALSO rejects the Format-2 table SORT, which SR3 does not restrict (probe sr3tblperf: `PERFORM SORT TE ASCENDING TK WHEN EC-ALL DISPLAY \"EXC\" END-PERFORM` -> rc 70 COBOLNET1617) — rejects legal source. (b) input/output procedure: NOTHING flags a file SORT there — probe sr3ip (SORT SW2 ... USING IN1 GIVING OU1 inside SORT SW's INPUT PROCEDURE IP-1) rc 0; probe sr3op (same inside an OUTPUT PROCEDURE) rc 0; GateMergeInSortMergeProc collects exactly these ranges but flags only BoundMerge and BoundCommitRollback. (c) declarative procedure: probe sr3decl (a file SORT inside a USE AFTER STANDARD ERROR procedure) rc 0 — nothing flags it. Harms: under-rejects (b, c) and rejects-legal-source (a). No kb/Work note owns SR3 (searched kb/Work for 'SR-14.9.40.3-3', '14.9.40.3 SR3', 'COBOLNET1617': none). Control: a table SORT inside an input procedure (probe sr3tblip) rc 0 — correct, SR3 is Format 1 only. [editions as adjudicated: 85, 2002, 2014, 2023 for the input/output-procedure and declarative halves; the exception-checking PERFORM half from 2002 (the PERFORM Format 3 is a 2002 introduction). SR3 sits under the FORMAT 1 heading, so it binds the FILE sort only.]",
-  "state": "GAP"
+  "notes": "kb/Work PB1139 landed: SR3 binds the FILE format only (printed under the FORMAT 1 heading): the exception-checking PERFORM leg now asks SortBinder.IsFileFormat (a legal table SORT there no longer draws COBOLNET1617), the input/output-procedure leg is GateSortMergeProcedures' BoundSort arm (COBOLNET2700, every edition, over PcRange.Spans) and the declarative leg is SortBinder.ScreenDeclarativePlacement (COBOLNET2700). A table SORT is legal in all three regions (golden 2023/pb1139_table_sort_legal_regions).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-4",
@@ -46086,13 +46086,13 @@
   "ordinal": 6,
   "subject": "SORT statement",
   "rule-digest": "983633d179cd",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortAddFileKeys; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#OffsetInRecord; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#KeyWindowOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortRecordOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortKeyAdmission.cs#Violation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortAddFileKeys; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#OffsetInRecord; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#KeyWindowOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortRecordOf",
+  "test-ref": "conformance:negative/pb1173-sort-file-key-not-in-record; conformance:negative/pb1173-sort-file-key-occurs; conformance:negative/pb1173-sort-file-key-boolean; conformance:negative/pb1173-sort-file-key-pointer; conformance:negative/pb1173-sort-file-key-odo-group; conformance:negative/pb1173-sort-file-key-dynamic-length; conformance:85/pb1173_sort_key_second_record; conformance:negative/pb1025-sort-key-after-dynamic-beyond-minimum",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1173 (registrar 14c). cite.py --check 14.9.40.3 OK for b) \"Key data names shall not be subject to any OCCURS clauses\", c) \"Key data items shall not be of the class boolean, message-tag, object, or pointer\", d) \"A key data item shall not be a variable-length group, an occurs-depending-on data item, a dynamic-length elementary item or an item subordinate to a dynamic-capacity table\", e) \"The same byte positions that are referenced by a key data-name in one record description entry are taken as the key in all records of the file\" (cite.py labels e) under '6) d)' — transcription layout). Seven arms, measured --std 2023 over SortAddFileKeys: a) CONFORMS — probe k6a (key WK in WORKING-STORAGE) rc 70 COBOLNET1757 'SR6a'. b)/f) CONFORM for a SINGLE-record SD (probe k6simp `SORT SW ASCENDING KOCC(2)` rc 70 COBOLNET1757 'SR6b/SR6f'; k6nosr2 KOCC(1) rc 70) but DIVERGE whenever the SD has a second 01: RecordLayout.OffsetInRecord takes its `target.Class is { } cls` branch (every 01 of a multi-record SD is a member of the synthesized REDEFINES class) and returns target.ClassOffset WITHOUT OffsetOf's OCCURS bail — probes k6sKOCC1 (KOCC(1)), k6sKSUB2 (KSUB(2), subordinate to an OCCURS group) rc 0; probe k6multi (SD 01 SR {K1 X, KOCC X OCCURS 2} + 01 SR2 X(3), `SORT SW ASCENDING KOCC(2)`, records a19/b21/c35) RAN and printed a19,b21,c35 — sorted on KOCC(1), the subscript silently discarded (by KOCC(2) the order would be b21,c35,a19). Unsubscripted OCCURS keys (k6b, k6f) are rejected, but by the general subscript rule COBOLNET2270, not SR6. c) DIVERGES — probe k6oneKB (single-record SD, key `KB PIC 1 USAGE BIT`, class boolean) rc 0; probe k6p01 (`SD SW. 01 SP USAGE POINTER.`, `SORT SW ASCENDING SP`) rc 0 — no class screen exists (CollatingSelection.Of classifies, never refuses). d) DIVERGES — probe k6oneKODO (key KODO, a group containing `KODE OCCURS 1 TO 3 DEPENDING ON CNT` = an occurs-depending group item per §13.18.38.4 GR8, cite OK) rc 0; a dynamic-length elementary key (k6dyn) and a true variable-length group key (k6vlg; §8.5.1.12.1 definition, cite OK) are rejected but only as 'COBOLNET1757 ... has no character image' — the kb/Work PB1052 (open) shape, which OWNS this row; PB1052's body believes every d) arm is at least refused, and the ODO-group arm is in fact ACCEPTED. e) CONFORMS — probe k6e (key K2 described only in the second 01) rc 0, keyed on the shared byte positions via the class offset. g) CONFORMS — COBOLNET0874 in SortAddFileKeys, pinned by conformance:negative/pb1025-sort-key-after-dynamic-beyond-minimum (g only). Harms: under-rejects (b/f multi-record, c, d-ODO), with a silent wrong key in the b/f case. See findings. [editions as adjudicated: 85, 2002, 2014, 2023 (Format 1). Arms naming later constructs apply from their introduction: boolean/object/pointer classes and message-tag 2002+, dynamic-length items and dynamic-capacity tables 2014+ (per their own clauses); a), b), e), f), g) at every edition.]",
-  "state": "GAP"
+  "notes": "kb/Work PB1173 + PB1052 landed: SR6 a) is SortAddFileKeys' record test; b) and f) (OCCURS on the entry or any entry above it), c) (boolean / object / pointer), and d) (dynamic-length elementary item, variable-length group, occurs-depending group) are ONE predicate, SortKeyAdmission.Violation, asked of the named item before any occurrence is resolved and before the record's image is (so a pointer record's key is the source's error, not the Tier-C deferral); e) is the key window's same-byte-positions law (golden 85/pb1173_sort_key_second_record); g) is KeyWindowOf with COBOLNET0874 (pb1025). RecordLayout.OffsetInRecord bails on OCCURS ahead of its REDEFINES-class branch, so a key under a table in a multi-01 SD is no longer placed at its first occurrence. SR6 d)'s \"occurs-depending-on data item\" is read as including the occurs-depending GROUP (13.18.38.4 GR8): a varying window cannot be the same byte positions of SR6 e); there is no message-tag representation to screen yet.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-7",
@@ -46131,13 +46131,13 @@
   "ordinal": 9,
   "subject": "SORT statement",
   "rule-digest": "9858337bd079",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenIndexedGivingKey",
+  "test-ref": "conformance:85/pb994_sort_merge_keyed_using_giving; conformance:negative/pb994-sort-giving-indexed-descending-first-key; conformance:negative/pb994-sort-giving-indexed-key-not-prime-bytes",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB994 (registrar 14c). cite.py --check 14.9.40.3 \"the first specification of data-name-1 shall be associated with an ASCENDING phrase\" OK (SR9). No code screens the first key's direction or its byte location/length against an indexed GIVING file's prime RECORD KEY. The rule is currently UNREACHABLE only because SortMapIoFiles refuses every non-sequential USING/GIVING file (COBOLNET1757 'the G5 keyed slice'): PROBE s9idxg `SORT SW ASCENDING SK USING OU1 GIVING KFL` (KFL INDEXED, RECORD KEY RK at the same bytes as SK — a CONFORMING program) -> rc 70 COBOLNET1757. So today every indexed GIVING, legal or not, is refused; the legal half is kb/Work PB994's harm (open, rejects-legal-source), but PB994's inventory_rows are GR-14.9.40.4-15 and SR-14.9.40.3-12 only and its title does not mention SR9 — when PB994 lifts the blanket refusal, SR9 must land in the same change or DESCENDING-first / misaligned keys will be accepted. See findings. [editions as adjudicated: 85, 2002, 2014, 2023 (Format 1; no Annex E change recorded).]",
-  "state": "GAP"
+  "notes": "kb/Work PB994 landed: SortBinder.ScreenIndexedGivingKey - the first key shall be ASCENDING and lie at the byte location and size of the indexed GIVING file's prime record key (RecordLayout.KeyWindowOf of both), refused with COBOLNET1757 naming SR9; screened together with the lift of the keyed-file refusal so the over-rejection did not become an under-rejection.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-10",
@@ -46146,13 +46146,13 @@
   "ordinal": 10,
   "subject": "SORT statement",
   "rule-digest": "872838d78808",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenSameClauses; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindIoControl; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#SameClauses",
+  "test-ref": "conformance:negative/pb1139-sort-same-sort-area; conformance:negative/pb1139-sort-giving-same-area; conformance:85/pb1139_same_clauses_legal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1139 (registrar 14c). cite.py --check 14.9.40.3 \"No pair of file-names in the same SORT statement may be specified in the same SAME SORT AREA or SAME SORT-MERGE AREA clause\" OK and \"File-names associated with the GIVING phrase shall not be specified in the same SAME AREA clause\" OK (SR10). DataBinder.BindIoControl binds only APPLY COMMIT and SAME RECORD AREA ('if (clause.sameClause() is not { } same || same.RECORD() is null) continue;' — Format 1 SAME AREA and Format 3 SAME SORT/SORT-MERGE AREA are parsed and dropped), and no SORT-side code reads SAME membership (searched src/Cobol.Net.Compiler for SameArea/SAME SORT: nothing). PROBES --std 2023, `SORT SW ASCENDING SR USING IN1 GIVING OU1 OU2`: s10sort (SAME SORT AREA FOR SW IN1) rc 0; s10sm (SAME SORT-MERGE AREA FOR SW OU1) rc 0; s10area (SAME AREA FOR OU1 OU2 — two GIVING files) rc 0 — three violations compiled clean; control s10ok (SAME RECORD AREA FOR OU1 OU2, legal) rc 0. Harm: under-rejects. MERGE's §14.9.24.3 SR11 is the same mechanism (not adjudicated here). No kb/Work note owns it. [editions as adjudicated: 85, 2002, 2014, 2023 (SAME SORT AREA exists at 85; SAME SORT-MERGE AREA is its equivalent spelling, §12.4.6 Format 3).]",
-  "state": "GAP"
+  "notes": "kb/Work PB1139 landed: ScreenSameClauses refuses a pair of the SORT's file-names (file-name-1 included) in one SAME SORT AREA or SAME SORT-MERGE AREA clause, and two GIVING files in one SAME AREA clause (COBOLNET1757 naming SR10); SAME RECORD AREA is not restricted by SR10 (golden 85/pb1139_same_clauses_legal).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-11",
@@ -46176,13 +46176,13 @@
   "ordinal": 12,
   "subject": "SORT statement",
   "rule-digest": "0dc882c3d9bf",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMapIoFiles",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb994_sort_merge_keyed_using_giving; conformance:negative/pb994-sort-using-random-access",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB994 (registrar 14c). cite.py --check 14.9.40.3 \"If file-name-2 references a relative or an indexed file, its access mode shall be sequential or dynamic\" OK (SR12). OWNED by kb/Work PB994 (open, rejects_legal_source, inventory_rows [GR-14.9.40.4-15, SR-14.9.40.3-12]) — re-measured at the pin: SortMapIoFiles `if (!f.IsSequential) return \"SORT/MERGE USING/GIVING on {org} file ... the G5 keyed slice\"` refuses EVERY relative/indexed USING file. PROBES --std 2023: s12relseq (RELATIVE, ACCESS SEQUENTIAL — legal) rc 70 COBOLNET1757; s12idxdyn (INDEXED, ACCESS DYNAMIC — legal) rc 70 COBOLNET1757; s12relran / s12idxran (ACCESS RANDOM — the SR12 violation) rc 70 with the SAME 'G5 keyed slice' deferral text, i.e. rejected for the wrong reason (the diagnostic never names SR12). No code distinguishes the access mode. Harm: rejects-legal-source (owned). [editions as adjudicated: 85, 2002, 2014, 2023 (Format 1; no Annex E change recorded).]",
-  "state": "GAP"
+  "notes": "kb/Work PB994 landed: a relative or indexed USING file is a legal operand when its access mode is SEQUENTIAL or DYNAMIC (golden 85/pb994_sort_merge_keyed_using_giving: a sequential relative, a dynamic indexed USING file); ACCESS RANDOM is refused by name, citing 12.4.5.5.2 SR1 and this rule, in SortMapIoFiles - the 'G5 keyed slice' refusal that rejected every keyed file is gone.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-13",
@@ -46191,13 +46191,13 @@
   "ordinal": 13,
   "subject": "SORT statement",
   "rule-digest": "11ee78605001",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortArrayPath",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReadTableSubjectSubscripts",
+  "test-ref": "conformance:2002/pb1055_table_sort_nested_subject; conformance:negative/pb1055-table-sort-subject-subscripts",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1055 (registrar 14c). cite.py --check 14.9.40.3 \"Data-name-2 shall have an OCCURS clause in its data description entry. Subscripting shall be specified in accordance with 8.4.2.3, Subscripts\" OK (SR13); §8.4.2.3.3 5) e) \"As the subject of a SORT statement that references a table\" OK and 6) \"This is equivalent to omitting the rightmost or only subscript in this context\" OK. Two halves. (1) OCCURS required: SortBindTable resolves the written reference (ReferenceResolver.ResolveTableOperand) and `table?.Occurs is null` -> COBOLNET1757 naming SR13 — probe t13plain (`SORT PLAIN ASCENDING PLAIN`, no OCCURS) rc 70; control t13ok rc 0 and ran (TK 3,1,2 -> 123). (2) subscripting per §8.4.2.3: the single-level forms conform — t13ok (unsubscripted) and t13all (`SORT TE(ALL)`, SR6's equivalent of omission) both ran -> 123. But a data-name-2 nested under another OCCURS, which §8.4.2.3 requires to be subscripted for its outer dimension, is DEFERRED: SortArrayPath returns null for any OCCURS ancestor and the binder emits BoundUnsupported -> COBOLNET1756 warning + run-time abort — probe t13nestsub (`SORT E(2) ASCENDING EK`, E OCCURS 3 under ROW OCCURS 2) rc 0 with the warning; t13nestall (`SORT E(2, ALL)`) compiled and ABORTED at run time with NotImplementedCobolFeatureException. This half is OWNED by kb/Work PB1055 (open, inventory_rows [SR-14.9.40.3-13]) — not re-reported. Edge left unadjudicated: t13nestnosub (`SORT E` with its outer subscript OMITTED — too few subscripts for §8.4.2.3.3 SR3/SR5e) gets the same deferral warning instead of a rejection, so the illegal and legal nested spellings are indistinguishable today (noted for PB1055's fixer); t13oversub (`SORT TE(1)`, a full-count subscript on a one-level table) compiles and sorts the whole table — whether that reference is legal is not settled by SR5e's text, so no verdict is drawn on it. [editions as adjudicated: 2002, 2014, 2023 (Format 2 is a 2002 introduction; gated table-sort-2002 COBOLNET0870).]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1055 landed: SR13's OCCURS requirement was already screened (COBOLNET1757); its second sentence is now the one subscript screen for a table subject (ReferenceResolver.ScreenTableSubjectArity, COBOLNET2097): one subscript per ENCLOSING table, none for the sorted level, a rightmost ALL standing for the omission (8.4.2.3.3 SR3, SR5 e), SR6). An omitted outer subscript, a surplus subscript and a subscript on a one-level table are refused by name.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-14",
@@ -46206,13 +46206,13 @@
   "ordinal": 14,
   "subject": "SORT statement",
   "rule-digest": "37a25364c205",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#KeyUnderInnerOccurs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#TableSortKey; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMemberPath",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortKeyAdmission.cs#Violation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#KeyUnderInnerOccurs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#TableSortKey; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortMemberPath",
+  "test-ref": "conformance:negative/pb1173-sort-table-key-outside-table; conformance:negative/pb1173-sort-table-key-subscripted; conformance:negative/pb1173-sort-table-key-boolean; conformance:negative/pb1173-sort-table-key-variable-group; conformance:negative/pb1173-sort-table-key-inner-occurs; conformance:2002/pb1018_table_sort_qualified_keys",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1173 (registrar 14c). cite.py --check 14.9.40.3 OK for a) \"The data item identified by a key data-name shall be the same as, or subordinate to, the data item referenced by data-name-2\", b) \"Key data names shall not be subscripted\", c) \"Key data items shall not be of class boolean, object, or pointer\", d) \"A key data item shall not reference a variable-length group or an occurs-depending group item\". Five arms, measured --std 2023 over SortBindTable: a) CONFORMS — SubtreeCandidates(table, base, quals) + COBOLNET1757 'SR14a'; probe t14a (`SORT TE ASCENDING OTHER-K`) rc 70. b) DIVERGES — the key reference is reduced to DataBinder.KeyReference (base name + qualifiers) and any subscript is DROPPED without a diagnostic: probe t14b `SORT TE ASCENDING TK(1)` rc 0 and ran -> 123, identical to the unsubscripted key. c) DIVERGES — no class screen: probe t14cbool (`SORT TE ASCENDING TB`, TB PIC 1 USAGE BIT, class boolean) rc 0. d) DIVERGES — probe t14vg (`SORT VE ASCENDING VG`, VG a group whose only child is `VD PIC X DYNAMIC LENGTH` — a variable-length group per §8.5.1.12.1, cite OK) rc 0. (Control: t14d, a dynamic-length ELEMENTARY key, rc 0 — correct, SR14 d) names only groups.) e) CONFORMS on the explicit-key path — KeyUnderInnerOccurs -> COBOLNET1757 quoting SR14 e); probe t14e (`SORT TE ASCENDING TIN`, TIN OCCURS 2 under TE) rc 70. On the GR21 path (KEY phrase omitted, keys from the table's OCCURS KEY phrase) an unbuildable key still returns TableSortKeyUnsupported (a deferral), the conflation kb/Work PB599 (open) owns; PB996 (open) owns that message's stale 'SR14e' cite. Harms: under-rejects (b, c, d); b) also silently ignores the written subscript. See findings. [editions as adjudicated: 2002, 2014, 2023 (Format 2). The d) variable-length-group arm applies from 2014 (dynamic-length items / dynamic-capacity tables).]",
-  "state": "GAP"
+  "notes": "kb/Work PB1173 landed: SR14 a) is SortBindTable's subtree walk (SubtreeCandidates); b) the one data-name-n shape screen (COBOLNET2024 - the written subscript is refused, no longer dropped); c) boolean / object / pointer and d) variable-length group / occurs-depending group are SortKeyAdmission.Violation with the TableSort arm, applied to the KEY phrase's keys, the OCCURS KEY phrase's keys and the table element itself (GR23); e) is KeyUnderInnerOccurs. A dynamic-length ELEMENTARY key is admitted (SR14 d) names groups only); no table element can hold a dynamic-length item (COBOLNET1563). A key behind a REDEFINES view the table is not in remains the typed-array deferral kb/Work PB599 owns.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-15",
@@ -46372,11 +46372,11 @@
   "subject": "SORT statement",
   "rule-digest": "8c09d12806d9",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitSort; src/Cobol.Net.Runtime/IO/CobolSort.cs#ReturnStatement; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc; src/Cobol.Net.Runtime/IO/CobolSort.cs#Init",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitSort; src/Cobol.Net.Runtime/IO/CobolSort.cs#ReturnStatement; src/Cobol.Net.Runtime/IO/CobolSort.cs#Init; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
   "test-ref": "conformance:2002/pb1036_sort_merge_statement_ec; unit:SortMergeStatementEcTests.Return_InAnInputProcedure_RaisesActive_BeforeFlowReturn; unit:SortMergeStatementEcTests.Init_WhileAProcedureRuns_RaisesActive_AndLeavesTheEnclosingStoreIntact",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "cite.py --check 14.9.40.4 \"If the range of the input procedure causes the execution of any MERGE, RETURN, or format 1 SORT statements\" -> OK 10). The range half CONFORMS as adjudicated. The EC half now CONFORMS: CobolSort.Init raises EC-SORT-MERGE-ACTIVE for a MERGE or format 1 SORT executed while a procedure phase runs (before touching a store, so the enclosing SORT survives - golden case E: SM=EC-SORT-MERGE-ACTIVE, E-IN, then R=AAA R=BBB from the outer sort), and ReturnStatement raises it while any store is in the INPUT phase, ahead of EC-FLOW-RETURN (D-SMA (a); unit Return_InAnInputProcedure_RaisesActive_BeforeFlowReturn). Wired by kb/Work PB1036 (w59c): FatalAmbientGates row + CheckingFlags field + ExceptionEngine helper; EcBinder.QueryFor asks the name at the SORT/MERGE/RELEASE/RETURN node; the golden raises it under >>TURN ... CHECKING ON with a USE AFTER EXCEPTION CONDITION declarative; checking off keeps the pre-PB1036 lenient behaviour (docs/CONFORMANCE.md §3 D-SMA (c)).",
+  "notes": "cite.py --check 14.9.40.4 \"If the range of the input procedure causes the execution of any MERGE, RETURN, or format 1 SORT statements\" -> OK 10). The range half CONFORMS as adjudicated. The EC half now CONFORMS: CobolSort.Init raises EC-SORT-MERGE-ACTIVE for a MERGE or format 1 SORT executed while a procedure phase runs (before touching a store, so the enclosing SORT survives - golden case E: SM=EC-SORT-MERGE-ACTIVE, E-IN, then R=AAA R=BBB from the outer sort), and ReturnStatement raises it while any store is in the INPUT phase, ahead of EC-FLOW-RETURN (D-SMA (a); unit Return_InAnInputProcedure_RaisesActive_BeforeFlowReturn). Wired by kb/Work PB1036 (w59c): FatalAmbientGates row + CheckingFlags field + ExceptionEngine helper; EcBinder.QueryFor asks the name at the SORT/MERGE/RELEASE/RETURN node; the golden raises it under >>TURN ... CHECKING ON with a USE AFTER EXCEPTION CONDITION declarative; checking off keeps the pre-PB1036 lenient behaviour (docs/CONFORMANCE.md §3 D-SMA (c)). retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
   "state": "OK"
  },
  {
@@ -46446,13 +46446,13 @@
   "ordinal": 15,
   "subject": "SORT statement",
   "rule-digest": "0e1bf34f38f1",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#RuleFor; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitDisposition",
-  "test-ref": "conformance:2002/pb993_sort_merge_transfer_termination; conformance:2023/pb714_sort_giving_open_status; conformance:2023/pb837_sort_implicit_io_status",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#RuleFor; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitDisposition; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitRelativeKeyStore",
+  "test-ref": "conformance:2002/pb993_sort_merge_transfer_termination; conformance:2023/pb714_sort_giving_open_status; conformance:2023/pb837_sort_implicit_io_status; conformance:85/pb994_sort_merge_keyed_using_giving; conformance:2023/pb994_sort_giving_indexed_io_warning",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "PARTIAL (kb/Work PB993, w55c). SORT GIVING: a) as-if OPEN OUTPUT SHARING WITH NO OTHER after the input procedure (PB714); 'If a fatal exception condition exists for file-name-3 as a result of the implicit OPEN during file initiation, the SORT is terminated' and the nonfatal half continues with or without a USE procedure (SortEmitter.RuleFor, witnessed by pb993 legs 1, 2, 9 and pb714_sort_giving_open_status); b) each record written by the governed as-if WRITE, its failure offered to the USE procedure (PB837), the boundary condition ('24'/'34') closing the file as in c), any other fatal WRITE terminating the SORT by 9.1.13.1's transfer to the end of the statement; c) the as-if CLOSE. RESIDUAL: a RELATIVE or INDEXED GIVING file is refused (COBOLNET1757), so b)'s relative-key sequence 1..n is unimplemented - kb/Work PB994.",
-  "state": "GAP"
+  "notes": "kb/Work PB994 landed: the residual (a relative or indexed GIVING file was refused) is closed. EmitGivingFile writes a relative file's records as relative records 1..n - the connector numbers them under sequential access, a running count is stored in the RELATIVE KEY item and handed to the connector under DYNAMIC access - and stores the record number after every successful write, so the item 'indicates the last record returned' (golden 2: RK2 = 03); an indexed GIVING file takes the same governed WRITE, and the successful nonzero status 02 of a duplicate alternate key reaches the EC-I-O-WARNING declarative during the SORT (golden 2023/pb994_sort_giving_indexed_io_warning - the executed witness of the PB749 hook).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.40.4-16",
@@ -46491,13 +46491,13 @@
   "ordinal": 18,
   "subject": "SORT statement",
   "rule-digest": "016d7b649b76",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitTableSort",
-  "test-ref": "conformance:2002/pb846_sort_table_occurs_keys; conformance:2002/w70c_pb1174_table_sort_odo_count; conformance:2023/w70c_pb1174_table_sort_dynamic_capacity",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitTableSort; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitSharedAreaTableSort",
+  "test-ref": "conformance:2002/pb846_sort_table_occurs_keys; conformance:2002/w70c_pb1174_table_sort_odo_count; conformance:2023/w70c_pb1174_table_sort_dynamic_capacity; conformance:2002/pb1175_table_sort_shared_storage; conformance:2002/pb1055_table_sort_nested_subject; conformance:2014/pb1055_table_sort_nested_dynamic",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1175 (REDEFINES-group subject) and PB1055 (nested subject). Rule: 'The SORT statement sorts the table referenced by data-name-2 and presents the sorted table in data-name-2 either in the order determined by the ASCENDING or DESCENDING phrases, if specified, or in the order determined by the KEY phrase associated with data-name-2.' Verified for a fixed top-level table (pb846 legs S/M/X), and since w70c (kb/Work PB1174 landed) for an OCCURS DEPENDING table (its current occurrences only, golden 2002/w70c_pb1174_table_sort_odo_count) and a dynamic-capacity table (2023/w70c_pb1174_table_sort_dynamic_capacity). Still not met: a subject in a REDEFINES group binds to BoundUnsupported (SortBindTable, table.Class not null; PB1175) and a subject nested under another OCCURS is deferred (SortArrayPath null; PB1055).",
-  "state": "GAP"
+  "notes": "kb/Work PB1175 + PB1055 landed: the subject may lie in a REDEFINES class, a shared record area or a BASED record (TableSortStorage.SharedArea, sorted through the class's windows) and may be nested under other tables (TableSortStorage.TypedArray over ReferenceResolver.BuildTablePath, the enclosing tables' subscripts read once by ReadTableSubjectSubscripts).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.40.4-19",
@@ -46581,13 +46581,13 @@
   "ordinal": 24,
   "subject": "SORT statement",
   "rule-digest": "d11a759d8105",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitTableSort; src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs#SortInPlace",
-  "test-ref": "conformance:2002/sort_table_format2; conformance:2002/w70c_pb1174_table_sort_odo_count",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitTableSort; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitSharedAreaTableSort; src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs#SortInPlace",
+  "test-ref": "conformance:2002/sort_table_format2; conformance:2002/w70c_pb1174_table_sort_odo_count; conformance:2002/pb1175_table_sort_shared_storage; conformance:2002/pb1055_table_sort_nested_subject; conformance:2014/pb1055_table_sort_nested_dynamic",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1175 (REDEFINES-group subject) and PB1055 (nested subject). Rule: 'The sorted table elements of the table referenced by data-name-2 are placed in the table referenced by data-name-2.' Since w70c (kb/Work PB1174 landed) CobolTable.SortInPlace places the sorted CURRENT occurrences back into the same span of the table's own storage (no copy of the physical array): an OCCURS DEPENDING table's occurrences beyond data-name-1 are no longer sorted into it (golden 2002/w70c_pb1174_table_sort_odo_count). Still not met: the REDEFINES-group and nested-table subjects place nothing (deferred; PB1175, PB1055).",
-  "state": "GAP"
+  "notes": "kb/Work PB1175 + PB1055 landed: the sorted elements are placed back in data-name-2 for every storage form: the typed array in place, a shared-storage table through the class's element windows (every element image read before the first is written), a nested table at its enclosing occurrences.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.41.3-1",
@@ -60051,13 +60051,13 @@
   "ordinal": 0,
   "subject": "MERGE statement",
   "rule-digest": "0e03355cfa77",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#mergeStatement; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#sortCollatingPhrase; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindMerge",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1139_sort_collating_word_optional",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1139 (open). Every printed form verified by probe at --std 2023 (probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/merge-statement-p1 (pinned adj-d1 cobol.exe)): ON and KEY optional (mnokw), repeated ASC/DESC phrases, COLLATING SEQUENCE IS a1 [a2] and FOR ALPHANUMERIC/FOR NATIONAL (mcoll1-3; 85 rejects a2/FOR forms COBOLNET0872, 2002+ accepts), USING >=2 files (mone -> COBOLNET1757 for one file), OUTPUT PROCEDURE IS p1 THRU/THROUGH p2 (mthru/mthrough), GIVING {file-name-4}... (mgiv2), {OUTPUT PROCEDURE|GIVING} required (mnog -> COBOLNET1757), no INPUT PROCEDURE (minp parse error), not both (mboth), KEY phrase required (mnokey), no DUPLICATES (mdup). DEFECT (why PARTIAL, not CONFORMS): COLLATING is UNDERLINED (required) in the format, but `MERGE S ON ASCENDING KEY SK SEQUENCE AA USING F1 F2 GIVING F3` (ml5) compiles with NO diagnostic at 2023 and 85 — the grammar's `COLLATING?` leniency L5 claims to be 'flagged under strict modes' but CBL3617/CBL3618 exist only as descriptors in Cobol.Net.Frontend/Diagnostics/DiagnosticDescriptors.cs:700-706 and are emitted nowhere in src/Cobol.Net.* (only the legacy DialectStrictnessChecks), and docs/CONFORMANCE.md does not list it as a nonstandard extension. cite.py --check 4.2.10 \"An implementation shall provide a warning mechanism that optionally may be invoked by the user at compile time to indicate use of a nonstandard extension\" -> OK §4.2.10 3); --check 4.2.10 \"Documentation associated with an implementation shall identify nonstandard extensions for which support is claimed\" -> OK. END-MERGE (not in the format) is accepted too, but that reserved word is documented under D-RW1 (docs/CONFORMANCE.md), so only the COLLATING omission is the defect. Unverified edge: whether COBOL-85's format admitted more than one GIVING file (mgiv2 accepts it at --std 85); the 2023 text cannot decide it. || editions as adjudicated: 85/2002/2014/2023 (clause 14.9.24.2; the FOR ALPHANUMERIC/FOR NATIONAL forms and alphabet-name-2 are the national-class surface, gated below 2002 by COBOLNET0872)",
-  "state": "GAP"
+  "notes": "kb/Work PB1139 landed: the one defect the adjudicator recorded - COLLATING 'UNDERLINED (required)' so a COLLATING-less SEQUENCE IS phrase is an unflagged nonstandard extension (leniency L5) - was a MISREADING of the figure: the printed page (ISO/IEC 1989:2023 p.745, rendered) underlines only SEQUENCE in COLLATING SEQUENCE; COLLATING is an optional word (5.2.3), so the short form is standard and there is nothing to flag or document. The grammar and binder comments that claimed otherwise are corrected. END-MERGE stays documented under D-RW1. Every other printed form was verified conforming by the adjudicator.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-14.9.25.2",
@@ -60291,13 +60291,13 @@
   "ordinal": 0,
   "subject": "SORT statement",
   "rule-digest": "615df9827cab",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#sortStatement; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#sortKeyPhrase; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#sortCollatingPhrase; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#collatingForPhrase; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindFile; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindCollating",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1175_table_sort_shared_storage; conformance:2002/pb1055_table_sort_nested_subject; conformance:85/pb994_sort_merge_keyed_using_giving; conformance:2002/pb1139_sort_collating_word_optional",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1175 (registrar 14c). cite.py --check 14.9.40.2 \"Format 2 (table)\" OK; --check 14.9.40.2 \"may BOTH appear, in either order\" OK (figure note: FOR ALPHANUMERIC / FOR NATIONAL are a choice-indicator brace, one or more, each once, any order); required words per the measured figure note: SORT, ASCENDING, DESCENDING, DUPLICATES, SEQUENCE, ALPHANUMERIC, NATIONAL, INPUT, PROCEDURE, USING, THROUGH, THRU, OUTPUT, GIVING (COLLATING, ON, KEY, WITH, IN, ORDER, IS, FOR are optional). Grammar: sortStatement = SORT sortFileName sortKeyPhrase* sortDuplicatesPhrase? sortCollatingPhrase? ((USING|INPUT PROCEDURE)(GIVING|OUTPUT PROCEDURE))? END_SORT?; the Format-1 arity (>=1 key phrase, key data-names required, both legs required) and the Format-2 exclusion of USING/GIVING/procedures are screened in SortBinder once the operand's format is known (SortBindFile lines 70-118, SortBindTable 132-138); duplicate FOR ALPHANUMERIC / FOR NATIONAL -> COBOLNET0898 (probe c_dupfor). PROBE fmt1.cob at --std 2023 (multi-phrase keys with ON/KEY present and absent, DUPLICATES, COLLATING SEQUENCE FOR NATIONAL ... FOR ALPHANUMERIC in REVERSED order, USING two files, GIVING two files; second SORT with SEQUENCE IS (COLLATING omitted), INPUT PROCEDURE IS .. THROUGH .., OUTPUT PROCEDURE .. THRU ..) compiled and ran: OU1/OU2 = C1w,B2y,A2z,A1x (REV-A \"Z\" THRU \"A\" puts C<B<A; numeric K2 DESCENDING algebraic), OP = R7r,Q5q — the spec-derived order. Edges noted, not defects of this row: (1) END-SORT is not an ISO word; its acceptance is the documented nonstandard extension D-RW1 (docs/CONFORMANCE.md, PB655) — but no §4.2.10 3) warning mechanism flags its use (cite.py --check 4.2.10 \"An implementation shall provide a warning mechanism\" OK), a compiler-wide gap not specific to SORT; (2) the sortCollatingPhrase grammar comment and DiagnosticDescriptors CBL3617/3618 claim COLLATING is REQUIRED (leniency L5) — the measured figure note says it is NOT underlined, so COLLATING? is correct and the comment is the error (CBL3617/3618 are wired nowhere in Cobol.Net.*, which is therefore right). No spec-derived golden exercises the whole format (pb704_sort_duplicates_in_order covers only the DUPLICATES phrase), so test-ref is left empty. || REFUTED: PARTIAL — The general format admits Format 2 with any table data-name-2 that has an OCCURS clause, and Format 1 USING/GIVING of any FD file. Two legal operand shapes do not compile to working code. (1) SortBindTable returns BoundUnsupported for a table inside a REDEFINES (SortBinder.cs, 'SORT of table ... inside a REDEFINES class ... deferred'). The source compiles with warning COBOLNET1756 and aborts at run time with NotImplementedCobolFeatureException. SortArrayPath also defers a data-name-2 nested under another OCCURS (the SR13 half). (2) SortMapIoFiles refuses every relative or indexed USING/GIVING file ('sequential slice'), which rejects legal Format-1 source (owned by PB994 under SR12). The syntax surface itself checks out: phrase order is enforced (COLLATING before DUPLICATES gives COBOL0307), a Format-1 KEY with no data-name is rejected, Format 2 is gated below 2002 (COBOLNET0870), FOR forms are gated at 85 (COBOLNET0872), DUPLICATES is accepted at 85, and a Format-2 SORT with no key phrase uses the table's OCCURS KEY. But one verified half plus one staged-loud half makes this PARTIAL. [editions as adjudicated: Format 1: 85, 2002, 2014, 2023. Format 2 (table) and the national collating surface (alphabet-name-2 / FOR ALPHANUMERIC / FOR NATIONAL): 2002, 2014, 2023 (ISO/IEC 1989:2002 introductions; 2023 Annex E records no SORT format change).]",
-  "state": "GAP"
+  "notes": "kb/Work PB994 + PB1175 landed: the two legal operand shapes the refuter named as not compiling to working code now do - a Format-2 table inside a REDEFINES view / a nested table (PB1175, PB1055) and a relative or indexed USING/GIVING file (this note); the syntax surface the adjudicator measured stands (phrase order, Format-1 KEY arity, the 2002 gate of Format 2, the FOR forms, DUPLICATES, the OCCURS KEY default), and COLLATING is an optional word (printed page 745; PB1139).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-14.9.41.2",

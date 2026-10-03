@@ -853,13 +853,36 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   typed array directly (the one place the two SORT forms diverge — a typed comparer), over the table's CURRENT
   occurrences only (§14.9.40.4 GR20): `CobolTable.SortInPlace` receives the span the one
   `ReferenceResolver.CurrentOccurrenceCount` model names — an OCCURS DEPENDING data-name-1's count, a
-  dynamic-capacity table's `CurrentOccurrences`, a fixed table's whole array (kb/Work PB1174). **A key's COMPARATOR is
+  dynamic-capacity table's `CurrentOccurrences`, a fixed table's whole array (kb/Work PB1174). **The subject's
+  STORAGE FORM is decided once, by the binder, as `BoundTableSort.Storage`** (kb/Work PB1175, PB1055): a table with
+  its own element array is `TableSortStorage.TypedArray` (the structural whole-table path `BuildTablePath(table,
+  outer)`, one index for each ENCLOSING table — §14.9.40.3 SR13 with §8.4.2.3.3 SR3, SR5 e), SR6: the subject writes
+  the enclosing tables' subscripts, a rightmost ALL standing for its own level; `ReadTableSubjectSubscripts`), and a
+  table whose storage is a shared byte area — a REDEFINES class, a record area shared by several 01s, a BASED or
+  EXTERNAL record — is `TableSortStorage.SharedArea`: it has no array, so the statement sorts the element NUMBERS
+  with the same key comparer (`EmitKeyComparer`, every key read through its own window, `ResolveItemAt`) and places
+  the element images back through the class's windows, every image read before the first write (§14.9.40.4 GR24;
+  §13.18.44.4 GR1). **WHICH items may be a key is ONE predicate** — `SortKeyAdmission.Violation(key, rules)`
+  (kb/Work PB1173, PB1052), asked of the data description by all three key-naming statements (SORT Format 1 §14.9.40.3
+  SR6, Format 2 SR14, MERGE §14.9.24.3 SR4): a key subject to OCCURS (file verbs; Format 2's own is SR14 e) over the walk
+  to data-name-2), of class boolean / object / pointer (message-tag has no representation yet), a dynamic-length
+  elementary item, a variable-length group or an occurs-depending group item is refused BY NAME, COBOLNET1757, before
+  the record's image or the key's window is asked about. The file verbs read SR6 d)'s "occurs-depending-on data item" as
+  including the occurs-depending GROUP (§13.18.38.4 GR8): a key whose length varies cannot be "the same byte positions"
+  of SR6 e). `RecordLayout.OffsetInRecord` bails on OCCURS ahead of its REDEFINES-class branch, so a multi-01 SD no
+  longer places a table key at its first occurrence. **The USING and GIVING files are of ANY organization**
+  (kb/Work PB994): the as-if OPEN / READ NEXT / WRITE / CLOSE of §14.9.40.4 GR12 / GR15 and §14.9.24.4 GR7 / GR12 run
+  through the one runtime file facade, which dispatches to the sequential, relative and indexed connectors, so
+  `SortMapIoFiles` admits a relative or indexed file unless its access mode is RANDOM (§12.4.5.5.2 SR1, §14.9.40.3 SR12 /
+  §14.9.24.3 SR13). A relative GIVING file's records are relative records 1..n and its RELATIVE KEY item indicates the last
+  one returned (GR15 b); an indexed GIVING file is written in the sort's order, which `ScreenIndexedGivingKey` makes the
+  prime-key order (§14.9.40.3 SR9 / §14.9.24.3 SR10: first key ASCENDING, on the prime key's bytes). **A key's COMPARATOR is
   selected by the key's CLASS, never by the statement** (§14.9.40.4 GR5 / §14.9.24.4 GR5 resolve TWO sequences and
   each key takes the one its class names): the bound key carries a `CollatingClass`, the file sort passes it to the
   runtime as `CobolSort.KeyClass` and the table sort picks the comparer's carrier argument from it. A NATIONAL key
   decodes its UTF-16BE byte pairs back to national POSITIONS before comparing (§8.8.4.2.9 compares national
-  character positions), a BOOLEAN key compares by value with boolean-zero extension and no sequence (§8.8.4.2.8),
-  and a NUMERIC key decodes algebraically through its own profile (§8.8.4.2.4).
+  character positions), and a NUMERIC key decodes algebraically through its own profile (§8.8.4.2.4); a BOOLEAN key
+  does not exist — §14.9.40.3 SR6 c) / SR14 c) / §14.9.24.3 SR4 c) refuse it (`SortKeyAdmission`).
 - **The SORT/MERGE procedure PHASE lives in the sort store (kb/Work PB349).** A store exists only while its
   SORT/MERGE statement executes (`Init` → `Close`); the emitter marks the INPUT and OUTPUT procedure ranges with
   `CobolSort.EnterProcedure`, `Sort` ends the input phase, and an output-procedure at-end sets the GR3 latch. The

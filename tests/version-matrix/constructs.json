@@ -743,7 +743,7 @@
   },
   {
    "id": "merge-in-sort-merge-proc-removed-2023",
-   "description": "A MERGE statement in the output procedure of another MERGE, or the input/output procedure of a file-format SORT, is PROHIBITED as of COBOL-2023 (ISO §14.9.24; Annex E.2 item 20 — the prior standard allowed it with conflicting rules, and SORT already disallowed it). A bind-time procedure-range cross-pass (VersionConformancePass.GateMergeInSortMergeProc) rejects it at >=2023 with COBOLNET1572; below 2023 the runtime EC-SORT-MERGE-ACTIVE seam is the (checking-off) dynamic net. Modeled as a removedIn=2023 construct (compiles at 85/2002/2014, rejects at 2023).",
+   "description": "A MERGE statement in the output procedure of another MERGE, or the input/output procedure of a file-format SORT, is PROHIBITED as of COBOL-2023 (ISO §14.9.24; Annex E.2 item 20 — the prior standard allowed it with conflicting rules, and SORT already disallowed it). A bind-time procedure-range cross-pass (VersionConformancePass.GateSortMergeProcedures) rejects it at >=2023 with COBOLNET1572; below 2023 the runtime EC-SORT-MERGE-ACTIVE seam is the (checking-off) dynamic net. Modeled as a removedIn=2023 construct (compiles at 85/2002/2014, rejects at 2023).",
    "display": "MERGE in a SORT/MERGE input or output procedure",
    "diagnosticCode": "COBOLNET1572",
    "citation": "ISO §14.9.24; Annex E.2 item 20",

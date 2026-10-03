@@ -24,7 +24,7 @@ namespace CobolNet.Binding.Bound;
 /// Scope facts that keep this walk small and honest:
 /// - Only PLACE stores can hit a property temp. Non-Place stores (generated index/ALTER fields, external
 ///   switches, FILE STATUS via <c>FileModel</c>, report-engine counters, run-unit exception state,
-///   <c>BoundTableSort.ArrayPath</c>) can never target the temp — a temp is a synthesized simple local
+///   <c>BoundTableSort.Storage</c>) can never target the temp — a temp is a synthesized simple local
 ///   (and a property subject cannot carry OCCURS, COBOLNET0842), so those arms are <c>None</c> here.
 /// - <see cref="Place.Item"/> is identity-compared: every Place wrapper (RefMod/alias/view) forwards
 ///   <c>Item</c> to the underlying item, so a windowed write through <c>RefModPlace</c> still classifies.

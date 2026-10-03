@@ -3210,6 +3210,29 @@ public static class DiagnosticCatalog
         + "bind — the statement is not run.",
         "ISO §14.9.2.3 / §14.9.16.3 / §14.9.21.3 / §14.9.25.3 / §14.9.32.3 / §14.9.34.3 / §14.9.35.3 / "
         + "§14.9.40.3 / §14.9.44.3 / §14.9.46.3 / §14.9.51.3");
+    /// <summary>COBOLNET2700 — a SORT or MERGE statement written where its syntax rules bar it (kb/Work PB1139). The
+    /// FILE-format SORT "shall not appear in imperative-statement-1 of an exception-checking PERFORM statement, in an
+    /// input or output procedure, or in a declarative procedure" (§14.9.40.3 SR3, FORMAT 1 — a table SORT is not
+    /// covered), and a MERGE "may appear anywhere in the procedure division except … in a declarative procedure"
+    /// (§14.9.24.3 SR1). This code names two of the three regions for the two verbs together — a DECLARATIVE
+    /// procedure (both verbs, every edition) and a SORT inside an INPUT or OUTPUT procedure of another file SORT or of
+    /// a MERGE (every edition). The third region has its own codes: the exception-checking PERFORM is COBOLNET1615
+    /// (MERGE) and COBOLNET1617 (SORT), and MERGE inside a sort-merge procedure is the COBOL-2023 removal
+    /// COBOLNET1572 (Annex E.2 item 20), which the prior editions allowed. Rejected at bind.</summary>
+    public static readonly DiagnosticDescriptor SortMergePlacement = new(
+        "COBOLNET2700", "sort-merge-placement", EditionSeverity.Error,
+        "A SORT or MERGE statement appears where its syntax rules do not allow it. ISO §14.9.40.3 SR3 (SORT Format 1): "
+        + "\"A SORT statement shall not appear in imperative-statement-1 of an exception-checking PERFORM statement, in "
+        + "an input or output procedure, or in a declarative procedure.\" ISO §14.9.24.3 SR1 (MERGE): \"A MERGE "
+        + "statement may appear anywhere in the procedure division except in imperative-statement-1 of an "
+        + "exception-checking PERFORM statement, or in an output procedure of another MERGE statement, or an input or "
+        + "output procedure of a file format SORT statement, or in a declarative procedure.\" This diagnostic covers a "
+        + "declarative procedure (SORT Format 1 and MERGE, every edition) and a file SORT inside an input or output "
+        + "procedure of another SORT or MERGE; the exception-checking PERFORM has COBOLNET1615/1617 and MERGE in a "
+        + "sort-merge procedure is the COBOL-2023 removal COBOLNET1572. A Format-2 table SORT is not subject to SR3. "
+        + "Move the statement out of the region, or perform it from outside.",
+        "ISO §14.9.40.3 SR3 / §14.9.24.3 SR1");
+
     /// <summary>COBOLNET1756 — the DEFERRAL announcing itself. A statement the grammar accepted but this
     /// compiler binds to <c>BoundUnsupported</c> is staged to a loud run-time refusal (COBOLNET_DESIGN §1.4);
     /// before kb/Work PB236 that staging was invisible at compile time, so a program carrying an unimplemented
@@ -4376,7 +4399,10 @@ public static class DiagnosticCatalog
         + "and write one subscript for each, outermost first. ⚠ SR5 admits an OMITTED subscript list in seven "
         + "contexts — a SEARCH subject, a REDEFINES clause, an OCCURS KEY IS phrase, a SORT key or table subject, "
         + "a screen entry's FROM/TO/USING phrase and a report SUM addend — and this diagnostic is never raised for "
-        + "a reference that writes none; writing too many has no such exception.",
+        + "a reference that writes none; writing too many has no such exception. ⚠ The SUBJECT of a Format-2 table "
+        + "SORT omits only its OWN level (SR5 e), SR6 — a rightmost ALL says the same): it writes one subscript for "
+        + "each ENCLOSING table, so this diagnostic is raised for a subject that writes more or fewer than that "
+        + "(kb/Work PB1055).",
         "ISO §8.4.2.3.3 SR3");
 
     /// <summary>COBOLNET2270 — §8.4.2.3.3 SR5: a table element referenced with NO subscript outside the seven

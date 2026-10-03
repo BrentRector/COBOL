@@ -888,9 +888,11 @@ sortDuplicatesPhrase
     ;
 
 sortCollatingPhrase
-    // COLLATING is required by the ISO SORT/MERGE format; the CCVS suite (ST139A) writes the phrase as
-    // `SEQUENCE alphabet-name` with COLLATING omitted, so the keyword is OPTIONAL in the permissive
-    // superset and the omission is flagged under strict modes (leniency L5, docs/dialect-strictness.md).
+    // COLLATING is an OPTIONAL word (kb/Work PB1139): the printed formats (§14.9.40.2, §14.9.24.2) underline only
+    // SEQUENCE in `COLLATING SEQUENCE`, and §5.2.2 / §5.2.3 make the underlining — not the absence of brackets — what
+    // requires a word. `SEQUENCE alphabet-name` (the CCVS85 suite's ST139A spelling) is therefore the standard's own
+    // form, not a leniency to flag; the legacy oracle's CBL3617/CBL3618 premise ("unbracketed so required") was the
+    // misreading.
     // COLLATING SEQUENCE {IS alphabet-name-1 [alphabet-name-2] | {FOR ALPHANUMERIC IS alphabet-name-1 |
     // FOR NATIONAL IS alphabet-name-2}…} (ISO §14.9.40.2 / §14.9.24.2). alphabet-name-2 + the FOR forms
     // are the 2002 national class — gated on recognition (VisitSortCollatingPhrase).

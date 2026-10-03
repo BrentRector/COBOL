@@ -20,7 +20,7 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// IS the GR11/GR14 compiler-inserted return mechanism. Format 2 sorts the typed element array in place with a
 /// typed comparer (COBOLNET_DESIGN §8.2).
 /// </summary>
-internal sealed class SortEmitter(EmitContext ctx,
+internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     SequentialIoEmitter seqIo, MoveEmitter move, ArithmeticEmitter arith, EcEmitter ec)
 {
     /// <summary>The statement dispatcher — property-wired by <see cref="UnitEmitters"/> (the RETURN AT END /
@@ -237,6 +237,10 @@ internal sealed class SortEmitter(EmitContext ctx,
                     w.Line("break;");
                 }
             }
+            // §14.9.30.4 GR25 — a sequential READ of a RELATIVE file MOVEs the relative record number of the record made
+            // available into the RELATIVE KEY data item, and the as-if READ NEXT does the same (kb/Work PB994; after the
+            // statement the item is undefined, §14.9.40.4 GR12 c), so the per-record store is within the rule).
+            EmitRelativeKeyStore(input);
             // ⛔ A SUCCESSFUL as-if READ IS A READ TOO (kb/Work PB749). §9.1.13.1 sets the I-O status "during the
             // execution of a CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK or WRITE statement", §12.4.5.8.4 GR1
             // carries it into the FILE STATUS item, and "Any I-O status associated with an unsuccessful completion or
@@ -275,6 +279,17 @@ internal sealed class SortEmitter(EmitContext ctx,
         EmitTransferHook(input, RuntimeApi.FileStatus(f), TransferIo.UsingRead, tx, atEndHandled: true);
     }
 
+    /// <summary>The RELATIVE KEY data item receives the relative record number the connector just read or wrote — the
+    /// store a sequential READ (§14.9.30.4 GR25) and a sequential WRITE (§14.9.51.4 GR29 a)) make through the MOVE rules,
+    /// here for the as-if READ NEXT / WRITE of a USING / GIVING relative file. Nothing for any other organization or a
+    /// relative file with no RELATIVE KEY clause (optional for sequential access).</summary>
+    private void EmitRelativeKeyStore(FileModel file)
+    {
+        if (file.Organization == FileOrganization.Relative && file.RelativeKeyItem is { } rk
+            && refs.ResolveItem(rk) is { } rkPlace)
+            arith.StoreArith(rkPlace, new NumX(RuntimeApi.FileRelativeSlot(FileKeyExpr(file)), 0), CobolRounding.Truncation);
+    }
+
     /// <summary>The as-if CLOSE that ends one USING file's processing (SORT GR12 c) / MERGE GR7 c)) — its own step so
     /// MERGE can place it after the output procedure (kb/Work PB1141), and offered to its own USE hook.</summary>
     private void EmitInputClose(FileModel input, Transfer tx)
@@ -292,7 +307,9 @@ internal sealed class SortEmitter(EmitContext ctx,
     /// cursor (EACH file receives the full result), OPEN OUTPUT, RETURN→WRITE loop, CLOSE. A fixed-length GIVING
     /// file space-fills a shorter returned record to its record width (§14.9.40.4 GR16 / §14.9.24.4 GR13 — national
     /// or alphanumeric space by <see cref="FileModel.ShortRecordFillNational"/>, kb/Work PB1140); a relative GIVING
-    /// file's key sequence 1..n (GR15b) is the G5 relative slice.</summary>
+    /// file's records are relative records 1..n (GR15 b) and an indexed one takes the same governed WRITE in the
+    /// sort's order (SR9 makes that the prime-key order) — every organization goes through the one runtime file
+    /// facade (kb/Work PB994).</summary>
     private void EmitGivingFile(FileModel output, string sdLit, Transfer tx)
     {
         var w = ctx.Writer;
@@ -309,8 +326,23 @@ internal sealed class SortEmitter(EmitContext ctx,
         tx.Bypassed = false;
         EmitImplicitOpen(output, BoundOpenMode.Output, SharingMode.NoOther,
             "implicit OPEN OUTPUT (ISO §14.9.40.4 GR15a / §14.9.24.4 GR12a)", TransferIo.GivingOpen, tx);
+        // ⛔ A RELATIVE GIVING FILE'S KEY SEQUENCE IS 1..n (§14.9.40.4 GR15 b) / §14.9.24.4 GR12 b)): "the relative key data
+        // item for the first record returned has the value 1; for the second record returned, the value 2; etc." Under
+        // sequential access the connector numbers the records itself (§14.9.51.4 GR29 a)); under DYNAMIC access the
+        // as-if WRITE names its slot through the RELATIVE KEY item (GR29 b)), so the running count is stored there and
+        // handed to the connector. RANDOM is barred (§12.4.5.5.2 SR1). (kb/Work PB994)
+        string? rn = output.Organization == FileOrganization.Relative && output.AccessMode != FileAccessMode.Sequential
+            ? $"__srn{ctx.Names.NextSort()}" : null;
+        if (rn is not null) w.Line($"long {rn} = 0;");
         using (w.Block($"while ({RuntimeApi.SortReturn(sdLit, tmp)})"))
         {
+            if (rn is not null)
+            {
+                w.Line($"{rn}++;   // GR15 b) — the n-th record returned is relative record n");
+                if (output.RelativeKeyItem is { } rkn && refs.ResolveItem(rkn) is { } rknPlace)
+                    arith.StoreArith(rknPlace, new NumX(rn, 0), CobolRounding.Truncation);
+                w.Line($"{RuntimeApi.FileSetRelativeKey(f, rn)};");
+            }
             // "Each record is written as if a WRITE statement without any optional phrases had been executed"
             // (GR15 b) / MERGE GR12 b) — through the ONE governed WRITE entry, like every other emitted WRITE
             // (kb/Work PB683). GR15 a) opens the file SHARING WITH NO OTHER, under which §9.1.15 1) ignores
@@ -337,6 +369,12 @@ internal sealed class SortEmitter(EmitContext ctx,
             // does (a file with no FILE STATUS clause emits nothing). A single hook after the CLOSE read the CLOSE's
             // status for every failed write; a successful write with a status that is not '00' is EC-I-O-WARNING.
             seqIo.EmitStoreFileStatus(output);
+            // GR15 b): "After execution of the SORT statement, the content of the relative key data item indicates the last
+            // record returned to the file" — so the record number the connector assigned (or accepted) lands in the item
+            // after every successful write (§14.9.51.4 GR29 a)).
+            if (output.Organization == FileOrganization.Relative)
+                using (w.Block($"if ({IoStatusClass.Successful(ws)})"))
+                    EmitRelativeKeyStore(output);
             using (w.Block($"if ({IoStatusClass.Unsuccessful(ws)})"))
             {
                 string? used = EmitTransferUse(output, TransferIo.GivingWrite, tx);
@@ -658,18 +696,20 @@ internal sealed class SortEmitter(EmitContext ctx,
         }
     }
 
-    /// <summary>SORT Format 2 — the in-place TABLE sort (ISO §14.9.40 GR18–GR24): a stable
-    /// (<c>Enumerable.OrderBy</c>) typed-comparer sort over the element array, copied back into the table (GR24).
-    /// Stability preserves the pre-sort relative order of equal keys (GR3c DUPLICATES IN ORDER; without the phrase
-    /// the order is undefined, GR4 — stable is conformant). Numeric keys compare by value (GR19 → the relation-
-    /// condition rules, §8.8.4.2 — never collated); character keys compare under the §14.9.40.4 GR5-resolved sequence.</summary>
+    /// <summary>SORT Format 2 — the in-place TABLE sort (ISO §14.9.40 GR18–GR24): a stable typed-comparer sort over
+    /// the table's CURRENT occurrences, the sorted elements placed back in data-name-2 (GR24). Stability preserves
+    /// the pre-sort relative order of equal keys (GR3c DUPLICATES IN ORDER; without the phrase the order is
+    /// undefined, GR4 — stable is conformant). Numeric keys compare by value (GR19 → the relation-condition rules,
+    /// §8.8.4.2 — never collated); character keys compare under the §14.9.40.4 GR5-resolved sequence.
+    /// <para>⛔ THE KEY COMPARISON IS ONE (<see cref="EmitKeyComparer"/>) AND THE STORAGE FORM IS THE ONLY THING THAT
+    /// DIFFERS (kb/Work PB1175): a table with its own element array sorts that array
+    /// (<see cref="EmitArrayTableSort"/>); a table inside a REDEFINES class, a shared record area or a BASED /
+    /// EXTERNAL record has no array, so its element ORDER is sorted and the element images are then placed back
+    /// through the class's windows (<see cref="EmitSharedAreaTableSort"/>). Both read their operands through the
+    /// rules a relation condition applies (GR19), so SORT and `IF a &gt; b` agree about the same two operands.</para></summary>
     public void EmitTableSort(BoundTableSort ts)
     {
-        var w = ctx.Writer;
         int id = ctx.Names.NextSort();
-        // The element's STORAGE type is final only after the post-bind whole-group analysis (StoreAsImage) —
-        // read it now, at emit time, never at bind time.
-        string elem = ts.Table.ElementType;
         // The GR5 carriers are materialized BEFORE the comparer lambda (a local declared inside it would be
         // rebuilt on every comparison) and only for the classes this statement's keys actually use. `declared`
         // is scoped to THIS statement: two keys of one class share the one carrier, and the next statement's
@@ -678,20 +718,26 @@ internal sealed class SortEmitter(EmitContext ctx,
         var weightsArg = ts.Keys
             .Select(k => TableWeightsArg(ts.Collating, CollatingSelection.Of(k.Key.OperandPic), id, declared))
             .ToList();
-        w.Line($"var __ta{id} = {ts.ArrayPath};   // SORT table (ISO §14.9.40.4 Format 2 — in place, GR18/GR24)");        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
-        w.Line("{");
-        w.Indent();
-        w.Line("int __c;");
-        for (int i = 0; i < ts.Keys.Count; i++)
+        switch (ts.Storage)
         {
-            var key = ts.Keys[i];
-            // GR2: key significance = statement order; GR19a/b: DESCENDING inverts the per-key result.
-            w.Line($"__c = {TableCompare(key, "__a", "__b", weightsArg[i])};");
-            w.Line($"if (__c != 0) return {(key.Descending ? "-__c" : "__c")};");
+            case TableSortStorage.TypedArray typed: EmitArrayTableSort(ts, typed, id, weightsArg); break;
+            case TableSortStorage.SharedArea shared: EmitSharedAreaTableSort(ts, shared, id, weightsArg); break;
+            default: throw new InvalidOperationException($"unknown table-sort storage {ts.Storage.GetType().Name}");
         }
-        w.Line("return 0;   // GR19c — equal on every key; OrderBy stability keeps the pre-sort order (GR3c)");
-        w.Outdent();
-        w.Line("};");
+    }
+
+    /// <summary>The table's own typed element array, sorted in place (GR18, GR24).</summary>
+    private void EmitArrayTableSort(BoundTableSort ts, TableSortStorage.TypedArray typed, int id, List<string> weightsArg)
+    {
+        var w = ctx.Writer;
+        // The element's STORAGE type is final only after the post-bind whole-group analysis (StoreAsImage) —
+        // read it now, at emit time, never at bind time.
+        string elem = ts.Table.ElementType;
+        // The WHOLE-TABLE path, an index for each ENCLOSING table (§8.4.2.3.3 SR5 e); the sort writes the table, so an
+        // enclosing dynamic-capacity level is reached through its receiving accessor.
+        w.Line($"var __ta{id} = {PlaceRenderer.RenderPath(typed.Array, AccessDir.Receiving)};   // SORT table (ISO §14.9.40.4 Format 2 — in place, GR18/GR24)");
+        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
+        EmitKeyComparer(ts, weightsArg, (key, v) => key.MemberPath.Length == 0 ? v : $"{v}.{key.MemberPath}", shared: false);
         // Through CobolTable.SortInPlace, never a bare Enumerable.OrderBy: the framework's array sort re-throws a
         // comparer's exception as InvalidOperationException, which would hide a key comparison's fatal COBOL
         // exception condition from the statement guard (kb/Work PB230 — measured, not deduced).
@@ -704,38 +750,85 @@ internal sealed class SortEmitter(EmitContext ctx,
         w.Line($"{RuntimeApi.TableSortInPlace(occurrences, $"__tc{id}")};   // GR24 — placed back in data-name-2");
     }
 
-    /// <summary>The shorter-operand extension a BOOLEAN comparison takes (ISO §8.8.4.2.8 rule 2 — "as though the
-    /// shorter operand were extended on the right by sufficient boolean zeros"), spelled exactly as the
-    /// relation-condition renderer spells it. Never combined with a collating sequence: GR5 names no sequence for
-    /// class boolean, so the two arguments are mutually exclusive by construction.</summary>
-    private const string BooleanPad = ", pad: '0'";
+    /// <summary>A table whose storage is a shared byte area (kb/Work PB1175): there is no element array, so the
+    /// statement sorts the element NUMBERS by the same key comparison — each key read through its own window at the
+    /// occurrence the number names — and then places the elements back in that order (GR24). Every element's image
+    /// is read BEFORE the first is written, so the placing back cannot disturb an element still to be read; a write
+    /// through one view is visible through every other view of the class because it IS the class's one backing
+    /// (§13.18.44.4 GR1). Each element moves as the window that holds it: its bytes, in the member's own coding.</summary>
+    private void EmitSharedAreaTableSort(BoundTableSort ts, TableSortStorage.SharedArea shared, int id, List<string> weightsArg)
+    {
+        var w = ctx.Writer;
+        // One window per element or key: the item at a 1-based occurrence, an index expression for each enclosing
+        // table and then the element's own — through the ONE place builder, so the offset law is the class's.
+        Place At(DataItem item, string occurrence) =>
+            refs.ResolveItemAt(item, [.. shared.OuterIndexExprs, occurrence])
+                ?? throw new InvalidOperationException(
+                    $"SORT table '{ts.Table.CobolName}': no window for '{item.CobolName}' — the binder checked it (kb/Work PB1175)");
+        string n = $"__n{id}", ix = $"__ix{id}", im = $"__im{id}", at = $"__e{id}";
+        w.Line($"int {n} = (int)({PlaceRenderer.OccurrenceCount(ts.Count)});   // SORT table over a shared-storage area (ISO §14.9.40.4 Format 2 — GR18/GR20/GR24; §13.18.44.4 GR1)");
+        w.Line($"var {ix} = new int[{n}];");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {ix}[{at}] = {at};");
+        w.Line($"System.Comparison<int> __tc{id} = (__a, __b) =>");
+        EmitKeyComparer(ts, weightsArg,
+            (key, v) => PlaceRenderer.Read(At(key.Key, $"({v} + 1)")), shared: true);
+        w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
+        w.Line($"var {im} = new string[{n}];");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {im}[{at}] = {PlaceRenderer.Read(At(ts.Table, $"({at} + 1)"))};");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(ts.Table, $"({at} + 1)"), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
+    }
 
-    /// <summary>One table-sort key's <c>int</c> comparison expression over element variables <paramref name="a"/>
-    /// and <paramref name="b"/>, dispatched on the key's CLASS (ISO §14.9.40 GR19 → the relation-condition rules):
+    /// <summary>The table sort's key comparer BODY — the lambda's block, one compare per key in significance order
+    /// (GR2), DESCENDING inverting the per-key result (GR19a/b), equal on every key returning 0 so the stable sort
+    /// keeps the pre-sort order (GR19c, GR3c). <paramref name="operand"/> renders a key's value over one of the two
+    /// element variables (<c>__a</c>, <c>__b</c>): a member of an element struct for an array table, a window read
+    /// for a shared-area table.</summary>
+    private void EmitKeyComparer(BoundTableSort ts, List<string> weightsArg,
+        Func<BoundTableSortKey, string, string> operand, bool shared)
+    {
+        var w = ctx.Writer;
+        w.Line("{");
+        w.Indent();
+        w.Line("int __c;");
+        for (int i = 0; i < ts.Keys.Count; i++)
+        {
+            var key = ts.Keys[i];
+            // GR2: key significance = statement order; GR19a/b: DESCENDING inverts the per-key result.
+            w.Line($"__c = {TableCompare(key, operand(key, "__a"), operand(key, "__b"), weightsArg[i], shared)};");
+            w.Line($"if (__c != 0) return {(key.Descending ? "-__c" : "__c")};");
+        }
+        w.Line("return 0;   // GR19c — equal on every key; the stable sort keeps the pre-sort order (GR3c)");
+        w.Outdent();
+        w.Line("};");
+    }
+
+    /// <summary>One table-sort key's <c>int</c> comparison expression over the key's two operands
+    /// <paramref name="pa"/> and <paramref name="pb"/> (a member of an element struct, or — when
+    /// <paramref name="shared"/> — the value a window read yields), dispatched on the key's CLASS (ISO §14.9.40 GR19 → the relation-condition rules):
     /// numeric keys compare by VALUE (§8.8.4.2.4 — never through a collating sequence; an image-stored zoned leaf
     /// decodes via its profile), national keys compare their national character positions under the GR5 national
-    /// sequence (§8.8.4.2.9), boolean keys compare by boolean value with the shorter operand extended by boolean
-    /// ZEROS and no sequence (§8.8.4.2.8), and alphanumeric/ordinary-group keys compare as characters under the GR5
-    /// alphanumeric sequence (§8.8.4.2.7). <paramref name="weightsArg"/> already carries that choice.</summary>
-    private static string TableCompare(BoundTableSortKey key, string a, string b, string weightsArg)
+    /// sequence (§8.8.4.2.9), and alphanumeric/ordinary-group keys compare as characters under the GR5
+    /// alphanumeric sequence (§8.8.4.2.7); a boolean key does not exist — §14.9.40.3 SR14 c) refuses it.
+    /// <paramref name="weightsArg"/> already carries that choice.</summary>
+    private static string TableCompare(BoundTableSortKey key, string pa, string pb, string weightsArg, bool shared)
     {
-        string pa = key.MemberPath.Length == 0 ? a : $"{a}.{key.MemberPath}";
-        string pb = key.MemberPath.Length == 0 ? b : $"{b}.{key.MemberPath}";
         DataItem k = key.Key;
-        // ⛔ A GROUP-USAGE GROUP IS AN ELEMENTARY OPERAND (§13.18.29.4 GR1b/GR2b; D20/PB79) AND MUST NOT TAKE THE
-        // AsImage() ARM BELOW (kb/Work PB678, the shape kb/Work PB327 fixed one channel over): a NATIONAL group's
-        // operand value is its m national POSITIONS — the generated AsNat() — never AsImage()'s 2m UTF-16BE bytes;
-        // a BIT group's is its boolean positions — AsBits() — never the packed bytes. Reading those through
-        // AsImage() would compare a national group against the ALPHANUMERIC weights of its byte pairs, which is
-        // exactly the defect this dispatch removes, one category over.
-        if (k.IsAsIfElementary)
-            return k.GroupUsage is GroupUsage.National
-                ? RuntimeApi.StrCompare($"{pa}.AsNat()", $"{pb}.AsNat()", weightsArg)
-                : RuntimeApi.StrCompare($"{pa}.AsBits()", $"{pb}.AsBits()", BooleanPad + weightsArg);
-        // §8.8.4.2.8 — a boolean comparison extends the shorter operand on the RIGHT with boolean zeros, and
-        // takes no collating sequence (weightsArg is empty for the boolean class).
+        // ⛔ NO KEY IS OF CLASS BOOLEAN (§14.9.40.3 SR14 c): "Key data items shall not be of class boolean, object, or
+        // pointer", and SortKeyAdmission refuses it at bind (an elementary bit item and a BIT GROUP alike — §13.18.29.4
+        // GR1b makes the group a boolean operand). The boolean comparison arms this method used to carry (§8.8.4.2.8's
+        // boolean-zero extension) answered a key no program may name; their golden sorted on one against the rule
+        // (kb/Work PB1173). The invariant keeps the arm from being silently re-needed.
         if (k.OperandPic is { Category: PicCategory.Boolean })
-            return RuntimeApi.StrCompare(pa, pb, BooleanPad + weightsArg);
+            throw new InvalidOperationException(
+                $"table-sort key '{k.CobolName}' is of class boolean; SortKeyAdmission refuses it before emission (ISO §14.9.40.3 SR14 c))");
+        // ⛔ A GROUP-USAGE GROUP IS AN ELEMENTARY OPERAND (§13.18.29.4 GR2b; D20/PB79) AND MUST NOT TAKE THE
+        // AsImage() ARM BELOW (kb/Work PB678, the shape kb/Work PB327 fixed one channel over): a NATIONAL group's
+        // operand value is its m national POSITIONS — the generated AsNat() — never AsImage()'s 2m UTF-16BE bytes.
+        // Reading it through AsImage() would compare a national group against the ALPHANUMERIC weights of its byte
+        // pairs, which is exactly the defect this dispatch removes, one category over. (The BIT group, the other
+        // group-usage group, is a boolean operand and refused above.)
+        if (k.IsAsIfElementary)
+            return RuntimeApi.StrCompare(shared ? pa : $"{pa}.AsNat()", shared ? pb : $"{pb}.AsNat()", weightsArg);
         // ⛔ V59 RESIDUE FIX (DA5): IsImageCapable, not the pre-V59 IsCharacterImage. §14.9.40.4 GR8
         // (`cite.py`-verified) makes a key comparison IDENTICAL to a relation condition — key data items are
         // "compared according to the rules for comparison of operands in a relation condition" — and a GROUP
@@ -754,8 +847,8 @@ internal sealed class SortEmitter(EmitContext ctx,
         // (Reaching here the group is an ORDINARY one — the GROUP-USAGE arms above own the national and bit
         // groups, which are elementary operands of their own class rather than alphanumeric byte images.)
         if (k.IsGroup)
-            return k.IsImageCapable
-                ? RuntimeApi.StrCompare($"{pa}.AsImage()", $"{pb}.AsImage()", weightsArg)
+            return shared || k.IsImageCapable   // a shared-area window read IS the group's byte image
+                ? RuntimeApi.StrCompare(shared ? pa : $"{pa}.AsImage()", shared ? pb : $"{pb}.AsImage()", weightsArg)
                 : LoudValue("int", TierCIsland.Reason($"table-sort key '{k.CobolName}' over a mixed-usage group"));
         return k.Pic switch
         {

@@ -56,11 +56,12 @@ public sealed class BoundaryImageChannelTests
         // SortEmitter.TableCompare renders `a.{MemberPath}` STRUCT RVALUES (the sort comparer's two element
         // parameters), never a Place — so no window, ODO or Tier-C shape can reach it and there is no Place to
         // hand PlaceRenderer. Its own IsImageCapable guard sits one line above. Self-spelled by NECESSITY.
-        // The count is SIX because §14.9.40.4 GR5 gives a key of each CLASS its own operand face and the
-        // comparer must read all three: AsImage() for an ordinary group (§8.8.4.2.1 — "an alphanumeric group item shall be treated as an elementary alphanumeric data item"; NOT §8.8.4.2.3 SR2, the identifier-CLASS syntax rule — kb/Work PB741),
-        // AsNat() for a GROUP-USAGE NATIONAL group (§13.18.29.4 GR2b) and AsBits() for a GROUP-USAGE BIT one
-        // (GR1b), each spelled twice (the two element parameters). kb/Work PB678.
-        ["CodeGen/Verbs/SortEmitter.cs"] = (6, "TableCompare compares struct rvalues, not Places"),
+        // The count is FOUR because §14.9.40.4 GR5 gives a key of each CLASS its own operand face and the
+        // comparer must read both a key may have: AsImage() for an ordinary group (§8.8.4.2.1 — "an alphanumeric group item shall be treated as an elementary alphanumeric data item"; NOT §8.8.4.2.3 SR2, the identifier-CLASS syntax rule — kb/Work PB741)
+        // and AsNat() for a GROUP-USAGE NATIONAL group (§13.18.29.4 GR2b), each spelled twice (the two element
+        // parameters). kb/Work PB678. (It was six while a GROUP-USAGE BIT group's AsBits() was a third face; a bit
+        // group is a boolean operand and §14.9.40.3 SR14 c) refuses boolean keys, kb/Work PB1173.)
+        ["CodeGen/Verbs/SortEmitter.cs"] = (4, "TableCompare compares struct rvalues, not Places"),
         // ⛔ OperandText.FieldAsString's bit-group row IS GONE — routed, not re-justified. It read
         // `Read(p).AsBits()` for itself and was exempted on the promise "kb/Work PB173 gives the bit channel its
         // own Place subtype; when that lands this row is the next one to route". PB173 landed and the row was

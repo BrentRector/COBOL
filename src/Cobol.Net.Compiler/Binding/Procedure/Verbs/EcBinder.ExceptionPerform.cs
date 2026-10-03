@@ -318,7 +318,10 @@ internal sealed partial class EcBinder
                      .Where(s => s.openClause().Sum(oc => oc.openFileSpec().Length) > 1))
             ctx.Edition.Error("COBOLNET1616", "an OPEN naming more than one file-name shall not appear in "
                 + "imperative-statement-1 of an exception-checking PERFORM (ISO §14.9.27.3 SR3)");
-        foreach (var _ in regionA.SelectMany(Descendants<Core.SortStatementContext>))
+        // ⛔ SR3 IS PRINTED UNDER THE `FORMAT 1` HEADING (§14.9.40.3: SR3-SR12 are Format 1, SR13-SR15 Format 2), so the
+        // ban is on the FILE-format SORT; a table SORT is legal here and no other rule restricts where it may appear.
+        // The parse node is shared by both formats and the split is semantic (SortBinder.IsFileFormat, kb/Work PB1139).
+        foreach (var _ in regionA.SelectMany(Descendants<Core.SortStatementContext>).Where(s => SortBinder.IsFileFormat(ctx, s)))
             ctx.Edition.Error("COBOLNET1617", "SORT shall not appear in imperative-statement-1 of an "
                 + "exception-checking PERFORM (ISO §14.9.40.3 SR3)");
 

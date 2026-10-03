@@ -29,9 +29,12 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class StatementDeferralAnnounceDriftTests
 {
-    /// <summary>A table SORT over a REDEFINES view is a pure job-1 deferral: legal COBOL-2014+ source (§14.9.40
-    /// Format 2) that the typed-array sort path has not built. It sits behind a GO TO so the RUN never reaches
-    /// it — before PB236 that made the staged loud unobservable at EVERY stage.
+    /// <summary>A table SORT whose KEY is a REDEFINES view inside the table element is a pure job-1 deferral: legal
+    /// COBOL-2002+ source (§14.9.40 Format 2) that the typed-array sort path has not built (kb/Work PB599 — the
+    /// key has no stored field on the element struct). It sits behind a GO TO so the RUN never reaches
+    /// it — before PB236 that made the staged loud unobservable at EVERY stage. (Until kb/Work PB1175 this row was a
+    /// table SORT over a REDEFINES view itself, which is built now: the subject's storage form is a decision of the
+    /// binder, TableSortStorage.)
     /// <para>⚠ This row used ENTRY until kb/Work PB909, and that was a PIN OF THE WRONG KIND (kb/Work PB938): ISO/IEC
     /// 1989 defines no ENTRY statement, so the test was asserting that a vendor extension is a gap in WiseOwl COBOL
     /// rather than source the standard does not contain. ENTRY is now refused (COBOLNET2269).</para></summary>
@@ -40,13 +43,14 @@ IDENTIFICATION DIVISION.
 PROGRAM-ID. PB236ANNOUNCE.
 DATA DIVISION.
 WORKING-STORAGE SECTION.
-01 RAW PIC X(9) VALUE "312".
-01 VIEW REDEFINES RAW.
-   05 T PIC 9 OCCURS 9.
+01 TBL.
+   05 TE OCCURS 3.
+      10 TK PIC 99.
+      10 TKR REDEFINES TK PIC XX.
 PROCEDURE DIVISION.
 MAIN.
     GO TO SKIPPER.
-    SORT T ASCENDING KEY T.
+    SORT TE ASCENDING KEY TKR.
 SKIPPER.
     DISPLAY "DONE".
     STOP RUN.
@@ -85,7 +89,7 @@ MAIN.
     {
         var (_, _, warnings) = Compile(DeferralProgram);
         string w = warnings.Single(x => x.Contains("COBOLNET1756", StringComparison.Ordinal));
-        Assert.Contains("pb236.cob(11,", w, StringComparison.Ordinal);   // the SORT line, not the program
+        Assert.Contains("pb236.cob(12,", w, StringComparison.Ordinal);   // the SORT line, not the program
         Assert.Contains("SORT", w, StringComparison.Ordinal);
     }
 

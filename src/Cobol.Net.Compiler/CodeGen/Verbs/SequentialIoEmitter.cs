@@ -963,7 +963,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// record of the area is (<see cref="FileModel.OutOfLineRecordsOfArea"/>). Decided at compile time, so a
     /// program with no such pair renders byte-for-byte as before.</summary>
     internal bool ReleasedRecordNeedsAlsoAvailable(FileModel file, Place released) =>
-        file.SameRecordAreaPeers.Count > 0
+        file.SameRecordAreaPeers.Any()
         && (AreaCharacterViewFor(file, released.Item) is not null
             || file.OutOfLineRecordsOfArea(released.Item).Any());
 

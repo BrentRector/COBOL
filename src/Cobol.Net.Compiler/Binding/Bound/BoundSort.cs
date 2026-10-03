@@ -15,8 +15,8 @@ namespace CobolNet.Binding.Bound;
 /// <paramref name="Class"/>, which selects the comparator: a NUMERIC key compares algebraically by decoded value
 /// (GR8 → §8.8.4.2.4 — never through a collating sequence, and <paramref name="Item"/> carries the leaf whose
 /// profile decodes the window), a NATIONAL key decodes its byte pairs and compares under the GR5 national sequence
-/// (§8.8.4.2.9), a BOOLEAN key compares by boolean value with no sequence (§8.8.4.2.8), and an alphanumeric or
-/// ordinary group key compares as characters under the GR5 alphanumeric sequence (§8.8.4.2.7).
+/// (§8.8.4.2.9), and an alphanumeric or ordinary group key compares as characters under the GR5 alphanumeric
+/// sequence (§8.8.4.2.7). (A BOOLEAN key is not a legal key — §14.9.40.3 SR6 c), SR14 c); §14.9.24.3 SR4 c).)
 /// <para><paramref name="LayoutRecord"/> is the place of the key's record when a variable-length member precedes
 /// the key (kb/Work PB1025; docs/CONFORMANCE.md §3 D-KWV): <paramref name="Offset"/> is then the key's offset in
 /// that record's FIXED run, and the runtime locates it in each record through the record type's layout. Null for
@@ -56,13 +56,35 @@ public sealed record BoundSort(
 /// (GR20 — "determined by the rules in the OCCURS clause": the fixed integer, an OCCURS DEPENDING data-name-1, or a
 /// dynamic-capacity table's current capacity), and only those occurrences are sorted and placed back (GR24; kb/Work
 /// PB1174). <paramref name="Table"/> is carried (not its type name) because the element's storage type is finalized
-/// by the POST-bind whole-group analysis (StoreAsImage) — the emitter reads <c>Table.ElementType</c> then.</summary>
+/// by the POST-bind whole-group analysis (StoreAsImage) — the emitter reads <c>Table.ElementType</c> then.
+/// <para><paramref name="Storage"/> is WHERE the table's elements live (<see cref="TableSortStorage"/>): the typed
+/// element array a plain table is, or the byte area a table inside a REDEFINES class shares with the other views
+/// (§13.18.44.4 GR1). The statement's two halves — §14.9.40.4 GR19's key comparison and GR24's placing back — are the same
+/// for both; only how an element is reached differs (kb/Work PB1175, PB1055).</para></summary>
 public sealed record BoundTableSort(
-    string ArrayPath, DataItem Table, AllCount Count,
+    TableSortStorage Storage, DataItem Table, AllCount Count,
     IReadOnlyList<BoundTableSortKey> Keys, bool DuplicatesInOrder, SortCollation Collating) : BoundStatement;
 
-/// <summary>One Format-2 table-sort key: the C# member path RELATIVE to an element variable (empty = the element
-/// itself, ISO §14.9.40 GR23) and the key's <see cref="DataItem"/> (category/profile drive the typed compare).</summary>
+/// <summary>Where a Format-2 table SORT's elements are stored — the closed answer the binder reads off the table's
+/// data description (§14.9.40.3 SR13, §13.18.44.4 GR1). The data-name-2 reference's own subscripts are the ENCLOSING
+/// tables' occurrences (§8.4.2.3.3 SR3, SR5 e), SR6), read once at the statement and carried here as structure.</summary>
+public abstract record TableSortStorage
+{
+    /// <summary>A table with its own typed element array, reached by <paramref name="Array"/> — the whole-table
+    /// access path, with an index for each enclosing table (<c>ReferenceResolver.BuildTablePath</c>).</summary>
+    public sealed record TypedArray(AccessPath Array) : TableSortStorage;
+
+    /// <summary>A table whose storage is a shared byte area — a REDEFINES class, a record area shared by several
+    /// 01s, a BASED or EXTERNAL record. It has no element array: each element and each key is a window the class's
+    /// own offset law places (<c>ReferenceResolver.ResolveItemAt</c>), one rendered index expression per OCCURS
+    /// level — <paramref name="OuterIndexExprs"/> for the enclosing tables, then the element's own.</summary>
+    public sealed record SharedArea(IReadOnlyList<string> OuterIndexExprs) : TableSortStorage;
+}
+
+/// <summary>One Format-2 table-sort key: the C# member path RELATIVE to an element variable of a
+/// <see cref="TableSortStorage.TypedArray"/> table (empty = the element itself, ISO §14.9.40 GR23) and the key's
+/// <see cref="DataItem"/> (category/profile drive the typed compare). For a <see cref="TableSortStorage.SharedArea"/>
+/// table the member path is unused — the key item is addressed through the class's window law.</summary>
 public sealed record BoundTableSortKey(bool Descending, string MemberPath, DataItem Key);
 
 /// <summary><c>MERGE file-name-1 …</c> (ISO §14.9.24): a k-way merge of the pre-sorted <paramref name="Using"/>
