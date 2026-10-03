@@ -63,6 +63,15 @@ multi-line), resolve, normalize, apply REPLACING — and returns the copybook te
 merged driver recurses so nested COPY *and* nested CC both process). `alreadyIncluded` + `depth` thread through
 for the GR12 circular / depth-20 guards.
 
+### §3.2b A directive never stands inside a COPY or REPLACE statement (kb/Work PB1384, §7.3.3 SR8 b)
+
+The driver ends its text block at every directive line, which is also the only place it can SEE the violation: before it
+flushes, `Render` asks `CopyProcessor.OpenStatementAt` whether the text since a COPY or REPLACE keyword has reached its
+separator period (the §3.2a words, pseudo-text delimiters toggling, so a period inside pseudo-text ends nothing). The open
+statement's text is carried from its keyword across further directive lines, so a statement split by several is reported at
+each (COBOLNET2697, `DirectiveDiag.WithinStatement`). The directive then takes effect like any other (superset-continue),
+and a truncated COPY still draws its own COBOLNET2449 after it.
+
 ### §3.2a Text-words — the one scanner under COPY and REPLACE (kb/Work PB1350 / PB1351 / PB1354)
 
 Everything the text-manipulation stage does is decided over §7.2.2.5 TEXT-WORDS, and ONE type forms them:

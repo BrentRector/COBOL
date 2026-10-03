@@ -124,6 +124,14 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
             "a compiler directive shall be preceded only by zero, one, or more space characters; write it on a line of "
             + "its own (ISO §7.3.3 SR2)", At(file, line, column), default);
 
+    /// <summary>§7.3.3 SR1 — COBOLNET2696: a continuation line (a fixed-form hyphen in column 7, or the line after a
+    /// floating literal continuation indicator) follows a compiler directive line. It is not joined: the directive
+    /// stays what its own line says, and the continuation line is dropped (kb/Work PB1360).</summary>
+    public void OnDirectiveContinued(string file, int line, int column)
+        => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.DirectiveContinued.Code,
+            "this line continues the compiler directive on the line above; a compiler directive shall be specified on "
+            + "one line (ISO §7.3.3 SR1)", At(file, line, column), default);
+
     /// <summary>§6.1 3) a) — COBOLNET2653: a free-form line of more than 255 character positions (kb/Work PB1496).
     /// Every such line is reported, at the first position past the limit; it is then read in full.</summary>
     public void OnFreeFormLineTooLong(string file, int line, int positions)

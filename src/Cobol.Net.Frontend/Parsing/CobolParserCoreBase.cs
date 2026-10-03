@@ -698,6 +698,17 @@ public abstract class CobolParserCoreBase : Parser
     }
 
     /// <summary>
+    /// The DISPLAY directive's <c>PARAMETER compilation-variable-name-1</c> operand (ISO §7.3.12.2, kb/Work PB807): the
+    /// word PARAMETER followed by a word. PARAMETER is a word of the lexer (a compiler-directive word, §8.12, so never a
+    /// compilation-variable-name, §7.3.11.3 SR1), told apart here by its text. Read-only over the token stream
+    /// (<see cref="Antlr4.Runtime.ITokenStream.LA"/>).
+    /// </summary>
+    protected bool parameterPhraseAhead()
+        => TokenStream.LT(1) is { Type: CobolLexer.IDENTIFIER } word
+           && word.Text.Equals("PARAMETER", StringComparison.OrdinalIgnoreCase)
+           && TokenStream.LA(2) == CobolLexer.IDENTIFIER;
+
+    /// <summary>
     /// COBOL-2002 boolean-condition discriminator (ISO §8.8.4.2.2 / §8.8.4.3): true when a boolean OPERATOR
     /// (B-AND / B-OR / B-XOR / B-NOT / a B-SHIFT-*) appears in the CURRENT condition ahead of the parse position,
     /// before any condition boundary — or a parenthesized boolean LITERAL, the one operator-free boolean expression

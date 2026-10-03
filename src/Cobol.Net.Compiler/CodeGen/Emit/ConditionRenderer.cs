@@ -4,6 +4,7 @@ using CobolNet.Common;
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Binding.Bound;
+using CobolNet.Editions;
 
 namespace CobolNet.CodeGen.Emit;
 

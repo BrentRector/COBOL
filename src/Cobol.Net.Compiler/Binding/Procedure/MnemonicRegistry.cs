@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime.Tree;
 using CobolNet.Frontend.Generated;
+using CobolNet.Editions;
 
 namespace CobolNet.Binding.Procedure;
 

@@ -228,15 +228,17 @@ public sealed class CompilerDirectiveCatalogDriftTests
         var silent = new List<string>();
         var exempt = new List<string>();
         // Stage-owned operands are a different mechanism with their own per-stage codes (0718 TURN, 1622 FLAG,
-        // 1623 COBOL-WORDS, 1619 the conditional-compilation expressions) — not this producer's subject.
+        // 1623 COBOL-WORDS, 1619 the conditional-compilation expressions) — not this producer's subject, EXCEPT for
+        // PRESENCE: a row that requires an operand (DISPLAY's, §7.3.12.2) has it checked here whoever reads the
+        // content (kb/Work PB807).
         foreach (var row in ConstructRegistry.Entries
-                     .Where(e => e.DirectiveOperand is { Form: not DirectiveOperandForm.Stage }))
+                     .Where(e => e.DirectiveOperand is { } o && (o.Form != DirectiveOperandForm.Stage || o.OperandRequired)))
         {
             var s = row.DirectiveOperand!;
             string? malformed = s.Form switch
             {
                 DirectiveOperandForm.Words => s.UserWord ? "\"ZZBOGUS\"" : "ZZBOGUS",
-                DirectiveOperandForm.Text when s.OperandRequired => "",
+                _ when s.OperandRequired => "",
                 _ => null,   // PAGE's comment-text-1 (§7.3.19.3 SR2) and the two removed FLAG windows
             };
             if (malformed is null) { exempt.Add(row.Id); continue; }

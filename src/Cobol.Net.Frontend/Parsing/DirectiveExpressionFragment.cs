@@ -35,6 +35,12 @@ public static class DirectiveExpressionFragment
     public static CobolParserCore.ConstantConditionalExpressionFragmentContext? ParseCce(string text) =>
         Parse(text, static p => p.constantConditionalExpressionFragment());
 
+    /// <summary>Parse the operand list of a <c>&gt;&gt;DISPLAY</c> directive (ISO §7.3.12.2) — the repeated
+    /// operands and the UPON phrase's words — or <see langword="null"/> on any syntax error. Each operand is the SAME
+    /// <c>compileTimeOperand</c> a DEFINE value is, or a <c>PARAMETER</c> phrase.</summary>
+    public static CobolParserCore.DisplayDirectiveFragmentContext? ParseDisplay(string text) =>
+        Parse(text, static p => p.displayDirectiveFragment());
+
     private static T? Parse<T>(string text, System.Func<CobolParserCore, T> rule) where T : class =>
         FragmentParse.Parse(text, EditionInfo.Latest, TokenRetypes.None, static l => l.PrimeDirectiveExpr(), rewriteZero: true, rule);
 }

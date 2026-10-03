@@ -206,6 +206,12 @@ internal static class Program
             options.SourcePath, options.OutputPath, options.NistTestName, options.DialectLevel, options.CopyPaths,
             options.Permissive, SignEncoding: options.SignEncoding, SourceFormat: options.SourceFormat));
 
+        // What the compilation itself transferred — the lines of its DISPLAY directives (ISO §7.3.12.4 GR1, DOC-A.1-53,
+        // kb/Work PB1538) — each to the compiler stream it names, in the order the directives were met.
+        foreach (var transfer in result.CompileOutput)
+            (transfer.Stream == CobolNet.Frontend.Diagnostics.CompileOutputStream.Error ? Console.Error : Console.Out)
+                .WriteLine(transfer.Text);
+
         // Edition warnings (obsolete/archaic 0903 flags; removed constructs under --permissive) print to stderr
         // ALWAYS — success or failure — so migration users see them without a failing build (P2.1).
         foreach (string w in result.Warnings)

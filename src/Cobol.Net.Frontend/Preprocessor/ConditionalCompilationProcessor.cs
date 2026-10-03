@@ -40,9 +40,14 @@ namespace CobolNet.Frontend.Preprocessor;
 /// the sole exception and gates in <see cref="ReferenceFormatProcessor"/>, which consumes its line before this
 /// driver runs — same row, same COBOLNET0900 producer, one stage earlier.
 ///
+/// A FOURTH job, the one thing a directive does here that is not a change to the text or to a table: (4) THE DISPLAY
+/// DIRECTIVE (§7.3.12, kb/Work PB807 / PB1538 — <c>ConditionalCompilationProcessor.Display.cs</c>). Its operands are read
+/// by the one directive-expression grammar and evaluated by the shared evaluator like every other directive's, and what it
+/// transfers is the compilation's compile-time output (<see cref="DiagnosticBag.CompileOutput"/>), not a diagnostic.
+///
 /// Blast radius is essentially nil: a source with no <c>&gt;&gt;</c> lines is reproduced byte-for-byte.
 /// </summary>
-public static class ConditionalCompilationProcessor
+public static partial class ConditionalCompilationProcessor
 {
     /// <param name="text">The free-form-normalized source text.</param>
     /// <param name="leaveDirectives">The ISO §7.3 directive keywords whose emitting-branch lines are LEFT IN the
@@ -211,6 +216,7 @@ public static class ConditionalCompilationProcessor
             var outputOrigins = new List<SourceOrigin>(lines.Length);
             var block = new List<string>();
             var blockOrigins = new List<SourceOrigin>();
+            string openStatementText = "";   // the text of a COPY / REPLACE statement still open at a directive line (§7.3.3 SR8 b)
 
             void Flush()
             {
@@ -249,6 +255,19 @@ public static class ConditionalCompilationProcessor
                     else { Flush(); output.Add(""); outputOrigins.Add(origin); }                                     // omitted ordinary line
                     continue;
                 }
+
+                // §7.3.3 SR8 b) (kb/Work PB1384): a compiler directive is not specified "within a source text manipulation
+                // statement". The block flushed below ends at this line, so a COPY or REPLACE statement still open at the
+                // end of it (no separator period yet) has this directive inside it. The question is asked of the text
+                // since the statement began — carried across directive lines, so a statement split by several is
+                // reported at each — and the directive then takes effect like any other (superset-continue).
+                openStatementText = string.Concat(openStatementText, openStatementText.Length > 0 ? "\n" : "", string.Join('\n', block));
+                if (CopyProcessor.OpenStatementAt(openStatementText) is { } open)
+                {
+                    _diag.WithinStatement(open.Keyword);
+                    openStatementText = openStatementText[open.Start..];
+                }
+                else openStatementText = "";
 
                 // A directive ends the current emitting block (a COPY can never span a directive line). Flush FIRST
                 // so the block's copybooks' own directives (a copybook >>DEFINE / >>IF) have already run — the
@@ -394,6 +413,11 @@ public static class ConditionalCompilationProcessor
                     case "DEFINE":
                         if (emitting) ApplyDefine(rest, _defines, _evaluator, _diag, _dialectLevel, _inputs);   // a DEFINE in an omitted branch has no effect
                         changesState = emitting;
+                        break;
+                    case "DISPLAY":
+                        // §7.3.12.4 GR1: the operands are transferred when the directive is processed — in an emitting branch
+                        // only, like every directive (an omitted branch is not compiled). The line itself is consumed.
+                        if (emitting) ApplyDisplay(rest, _evaluator, _diag, _inputs, _bag);
                         break;
                     default:
                         // A >> directive other than the conditional-compilation set handled above. Its edition
@@ -645,7 +669,7 @@ public static class ConditionalCompilationProcessor
                 // its canonical upper-case spelling — a COBOL word is case-insensitive (§8.3.1), so two spellings of
                 // one name read ONE variable (kb/Work PB1533). A value that parses as a fixed-point numeric literal is
                 // numeric, else alphanumeric. Unavailable ⇒ NOT defined.
-                string? env = inputs.GetEnvironmentVariable(name.ToUpperInvariant());
+                string? env = ParameterText(name, inputs);
                 CtValue? pv = env is null ? null
                     : decimal.TryParse(env, NumberStyles.Number, CultureInfo.InvariantCulture, out var num)
                         ? CtValue.Numeric(CtNumeric.FromDecimal(num), env) : CtValue.Alphanumeric(env);
@@ -849,6 +873,19 @@ public static class ConditionalCompilationProcessor
             Emit(Editions.Diagnostics.DiagnosticCatalog.DefineDirectiveMalformed.Code,
                 $">>DEFINE is malformed: {complaint} — the general format is "
                 + ">>DEFINE compilation-variable-name-1 [AS] { { arithmetic-expression | boolean-expression | literal | PARAMETER } [OVERRIDE] | OFF } (ISO §7.3.11.2)");
+
+        /// <summary>COBOLNET2698 — a DISPLAY directive's UPON phrase names no available compile-time device, or breaks the
+        /// choice-indicator discipline of its format (kb/Work PB807).</summary>
+        public void DisplayUpon(string complaint) =>
+            Emit(Editions.Diagnostics.DiagnosticCatalog.DisplayDirectiveUpon.Code,
+                $">>DISPLAY UPON: {complaint} (ISO §7.3.12.2, §7.3.12.4 GR5)");
+
+        /// <summary>COBOLNET2697 — the directive at <see cref="At"/> stands within an unfinished COPY or REPLACE
+        /// statement (kb/Work PB1384).</summary>
+        public void WithinStatement(string statementKeyword) =>
+            Emit(Editions.Diagnostics.DiagnosticCatalog.DirectiveWithinTextManipulationStatement.Code,
+                $"a compiler directive is specified within a {statementKeyword} statement — the statement has no separator "
+                + "period before this line (ISO §7.3.3 SR8 b)");
 
         public void Report1618(string name) => Emit("COBOLNET1618",
             $">>DEFINE: compilation variable '{name}' is redefined to a different value without the OVERRIDE "

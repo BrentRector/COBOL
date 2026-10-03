@@ -41,6 +41,11 @@ public static partial class ReferenceFormatProcessor
         /// <summary>The literal state at the end of the latest logical line (carried across discarded lines).</summary>
         private LiteralState _literal;
 
+        /// <summary>Whether the latest logical line is a COMPILER DIRECTIVE line — the §7.3.3 SR2 indicator, then a
+        /// compiler-directive word the catalog knows (the SAME recognition every directive stage uses). §7.3.3 SR1: a
+        /// directive is specified on ONE line, so such a line is never a join target (kb/Work PB1360).</summary>
+        private bool _latestIsDirective;
+
         /// <summary>The resultant lines and, per line, the 1-based physical source line it came from (kb/Work PB82): a
         /// continuation line joins its latest logical line, which keeps the number of the line that began it.</summary>
         public (List<string> Lines, List<int> Origins) Result => (_lines, _origins);
@@ -55,7 +60,7 @@ public static partial class ReferenceFormatProcessor
 
         /// <summary>A new logical line the classifier built itself (a fixed-form debugging line's carrier): the §6.5 6)
         /// join target from now on, outside any literal.</summary>
-        public void Emit(string text, int lineNo) => Emit(text, lineNo, LiteralState.Outside);
+        public void Emit(string text, int lineNo) => Emit(text, lineNo, LiteralState.Outside, isDirective: false);
 
         /// <summary>One line of program text. <paramref name="text"/> is the program-text area — characters 8 through
         /// margin R of a fixed-form line, space-filled to margin R (DOC-A.1-157), or a whole free-form line — and
@@ -78,9 +83,22 @@ public static partial class ReferenceFormatProcessor
                 Discard(lineNo);                           // a comment line (§6.2.3.1 1)): discarded, never a join
                 return;
             }
-            if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, lineNo, column, fixedContinuation);
+            if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
+                DropDirectiveContinuation(lineNo, column + first);
+            else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, lineNo, column, fixedContinuation);
             else if (_latest >= 0 && fixedContinuation) ContinueFixed(text, first, lineNo, column);
             else NewLine(text, lineNo, column);
+        }
+
+        /// <summary>§7.3.3 SR1: a line that would continue a compiler directive line — a fixed-form hyphen in column 7, or
+        /// the line after a floating literal continuation indicator that ended the directive — is diagnosed and NOT
+        /// joined, so the directive keeps exactly what its own line says; the line takes its discarded slot, like a
+        /// comment. A literal the directive left open is closed with it.</summary>
+        private void DropDirectiveContinuation(int lineNo, int column)
+        {
+            gates?.OnDirectiveContinued(file, lineNo, column);
+            _literal = LiteralState.Outside;
+            Discard(lineNo);
         }
 
         /// <summary>§6.5 5) / 7): the program text is copied to the resultant group as a NEW logical line — after §6.5 3)
@@ -95,8 +113,13 @@ public static partial class ReferenceFormatProcessor
                 Discard(lineNo);
                 return;
             }
-            Emit(state.InLiteral ? kept : kept.TrimSpacesEnd(), lineNo, state);
+            Emit(state.InLiteral ? kept : kept.TrimSpacesEnd(), lineNo, state, IsDirectiveLine(kept));
         }
+
+        /// <summary>Whether program text is a compiler directive line (§7.3.3 SR2): the indicator preceded only by
+        /// spaces, then a compiler-directive word.</summary>
+        private static bool IsDirectiveLine(string text)
+            => CompilerDirectiveLine.TryParse(text, out var directive) && CompilerDirectiveCatalog.IsDirective(directive.Word);
 
         /// <summary>§6.5 8): the continuation line of a literal continued with a floating indicator. Its first nonblank
         /// character shall be the quotation symbol of the opening delimiter (§6.2.3.2 SR6); the content after it is
@@ -251,12 +274,13 @@ public static partial class ReferenceFormatProcessor
         }
 
         /// <summary>A new logical line: the §6.5 6) / 8) join target from now on.</summary>
-        private void Emit(string text, int lineNo, LiteralState state)
+        private void Emit(string text, int lineNo, LiteralState state, bool isDirective)
         {
             _lines.Add(text);
             _origins.Add(lineNo);
             _latest = _lines.Count - 1;
             _literal = state;
+            _latestIsDirective = isDirective;
         }
     }
 

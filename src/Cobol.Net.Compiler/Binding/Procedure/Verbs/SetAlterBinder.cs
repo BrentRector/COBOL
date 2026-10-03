@@ -5,6 +5,7 @@ using CobolNet.Editions.Diagnostics;
 using CobolNet.Binding.Bound;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
+using CobolNet.Editions;
 
 namespace CobolNet.Binding.Procedure;
 

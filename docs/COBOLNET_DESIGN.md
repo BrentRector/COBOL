@@ -1229,7 +1229,7 @@ result does not feed it — decision 20.
 - **ACCEPT/DISPLAY system sources** = a `CobolSystem` runtime with an INJECTABLE clock (DATE/DAY/TIME/DAY-OF-WEEK/
   YYYYMMDD/YYYYDDD; DAY-OF-WEEK remap `((int)DayOfWeek + 6) % 7 + 1` = 1=Mon..7=Sun) + console UPON SYSOUT/SYSERR.
 - **SPECIAL-NAMES implementor system-names** (§12.3.7.3 SR8; A.1 items 189/190/191) = ONE table,
-  `Binding/ImplementorNames.cs` (kb/Work PB862): each row is a name, its ONE type (§8.3.2.3.1 — device / feature /
+  `Cobol.Net.Editions/ImplementorNames.cs` (kb/Work PB862): each row is a name, its ONE type (§8.3.2.3.1 — device / feature /
   switch), a device's input/output capability and a feature's WRITE ADVANCING rule. Both walkers of the
   switch-name/feature-name/device-name entry — `DataBinder.BindImplementorNameEntry` (switch mnemonics + status
   condition-names) and `Procedure.MnemonicRegistry` (the per-unit mnemonic map, OO scopes included) — classify

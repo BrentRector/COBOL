@@ -155,7 +155,7 @@ dynamicLengthDelimitedPhrase
 // switchOnClause? switchOffClause?` had a one-word minimum spelling, and inside the unbounded `specialNameEntry*`
 // loop every word left over after a clause became a complete, silent entry (`CLASS DIGITS IS "0" ZOTZOT.` ran).
 // Which system-name the first word IS — and so which arm it may be written in — is §12.3.7.3 SR8's implementor
-// table (Binding/ImplementorNames.cs, COBOLNET2241), a semantic rule the grammar cannot decide: the three arms
+// table (Cobol.Net.Editions/ImplementorNames.cs, COBOLNET2241), a semantic rule the grammar cannot decide: the three arms
 // share one shape here and the NAME picks the arm.
 implementorSwitchEntry
     : cobolWord ( IS? cobolWord switchStatusPhrases?

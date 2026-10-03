@@ -568,15 +568,16 @@
   },
   {
    "id": "display-directive-2023",
-   "description": "The >>DISPLAY { arithmetic-expression | boolean-expression | literal | PARAMETER compilation-variable-name }... [UPON { compile-time-device | LISTING }] compiler directive (ISO §7.3.12) - a COBOL-2023 addition: Annex E.3.3 item 16 ('The DISPLAY directive allows the display of compile-time information during the compilation of COBOL source') and Annex E.2 item 5, which lists DISPLAY among the compiler-directive words added in 2023. §7.3.12.1 makes the destination the source listing or an implementor-defined compile-time device and lets the implementor define the stage of processing; WiseOwl COBOL produces no listing and defines no compile-time device, so the directive is recognized and consumed. The introduction gate rejects the directive word below 2023.",
+   "description": "The >>DISPLAY { arithmetic-expression | boolean-expression | literal | PARAMETER compilation-variable-name }... [UPON { compile-time-device ... | LISTING }] compiler directive (ISO §7.3.12) - a COBOL-2023 addition: Annex E.3.3 item 16 ('The DISPLAY directive allows the display of compile-time information during the compilation of COBOL source') and Annex E.2 item 5, which lists DISPLAY among the compiler-directive words added in 2023. §7.3.12.1 makes the destination the source listing or an implementor-defined compile-time device; WiseOwl COBOL produces no listing, so (§7.3.12.4 GR2, DOC-A.1-53 to DOC-A.1-55) each operand is evaluated by the shared compile-time evaluator - or, for PARAMETER, read from the environment - and the operands of one directive are written as ONE line to the compiler's standard output (UPON SYSERR: standard error), at compile time, by the conditional-compilation driver. The introduction gate rejects the directive word below 2023.",
    "display": ">>DISPLAY directive",
    "diagnosticCode": "COBOLNET0900",
    "citation": "ISO §7.3.12; Annex E.2 item 5 + Annex E.3.3 item 16 (compiler-directive words added in 2023)",
    "directiveWords": ["DISPLAY"],
    "directiveOperand": {
-     "form": "text",
+     "form": "stage",
+     "owner": "ConditionalCompilationProcessor",
      "operandRequired": true,
-     "citation": "ISO §7.3.12.2 general format: the operand braces are not bracketed, so at least one operand is written. ⚠ The operand's OWN syntax (arithmetic-expression-1, boolean-expression-1, literal-1, PARAMETER compilation-variable-name-1, and the UPON phrase) is NOT validated here: §7.3.12.1 sends the directive to a source listing or an implementor-defined compile-time device, this implementation produces neither, and the expression grammar is unbuilt residue — recorded, not silent (kb/Work PB794)."
+     "citation": "ISO §7.3.12.2 general format: the operand braces are not bracketed, so at least one operand is written (checked centrally as COBOLNET1911). The operands themselves - arithmetic-expression-1, boolean-expression-1, literal-1, PARAMETER compilation-variable-name-1, repeated, then the UPON phrase - are parsed by the directive-expression grammar and evaluated by the conditional-compilation driver, which diagnoses them as COBOLNET1619 and the UPON phrase as COBOLNET2698."
    },
    "introducedIn": 2023,
    "removedIn": null,

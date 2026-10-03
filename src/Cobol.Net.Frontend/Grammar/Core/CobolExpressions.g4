@@ -649,6 +649,24 @@ cceRelationOrBoolean
     : {boolExprAhead()}? booleanExpression                            // §8.8.4.3 simple boolean condition (length-1)
     | compileTimeOperand ( IS? NOT? comparisonOperator compileTimeOperand )? ;   // §7.3.8.2 relation (or a bare operand)
 
+// ── The DISPLAY DIRECTIVE's operand list (ISO §7.3.12.2, kb/Work PB807): a REPEATED choice of arithmetic-expression-1 /
+// boolean-expression-1 / literal-1 / `PARAMETER compilation-variable-name-1`, then an optional UPON phrase whose braces
+// carry §5.2.6.4 CHOICE INDICATORS — ONE OR MORE of `compile-time-device-1 …` and LISTING, each at most once, in any
+// order. The operand alternatives are `compileTimeOperand` (the SAME rule a DEFINE value reads, so §7.3.12.3 SR2/SR3
+// "formed in accordance with 7.3.6 / 7.3.7" is one grammar, not a third spelling); PARAMETER and LISTING are not
+// lexer tokens, so they are read here as words, PARAMETER told apart by `parameterPhraseAhead` and LISTING by the
+// stage (a §8.12 compiler-directive word is never a compilation-variable-name, so neither can be mistaken). The UPON words
+// are plain words: which of them are devices, and the choice-indicator discipline (each alternative at most once), are
+// the stage's semantic rules (§5.2.6.4, §7.3.12.4 GR5), checked against the ONE implementor-name table. Juxtaposed
+// operands are separated as an arithmetic expression ends — `1 - 2` is one subtraction (§7.3.6 has no argument
+// juxtaposition), `1 "A"` two operands. Reached ONLY from the directive-expression re-parse, like every fragment here.
+displayDirectiveFragment : displayDirectiveOperand+ displayUponPhrase? EOF ;
+displayDirectiveOperand
+    : {parameterPhraseAhead()}? cobolWord cobolWord        // PARAMETER compilation-variable-name-1
+    | compileTimeOperand
+    ;
+displayUponPhrase : UPON cobolWord+ ;
+
 // Function names are normally IDENTIFIERs, but several intrinsic function names
 // collide with reserved words (lexer tokens). List them explicitly so the parser
 // accepts them after FUNCTION.

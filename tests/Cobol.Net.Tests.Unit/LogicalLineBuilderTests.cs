@@ -252,6 +252,43 @@ public sealed class LogicalLineBuilderTests
         Assert.Equal(body, lines[1].Trim());
     }
 
+    [Theory] // §7.3.3 1) (kb/Work PB1360): a compiler directive is specified on ONE line, so a continuation line after a
+             // directive line — fixed hyphen, or the line after a floating literal indicator — is diagnosed (COBOLNET2696),
+             // NOT joined: the directive keeps what its own line says and the line takes a discarded slot.
+    [InlineData(true, ">>DEFINE XX AS \"AB\"-", "    \"CD\"")]
+    [InlineData(false, ">>DEFINE XX AS \"AB\"-", "    \"CD\"")]
+    [InlineData(true, ">>DISPLAY \"AB\"-", "    \"CD\"")]
+    [InlineData(false, ">>IF XX = \"AB\"-", "    \"CD\"")]
+    [InlineData(false, ">>EVALUATE \"AB\"-", "    \"CD\"")]
+    public void FloatingContinuation_AfterADirectiveLine_IsDiagnosedAndNotJoined(bool fixedForm, string directive, string next)
+    {
+        var (m, bag) = Normalize(Lines(fixedForm, directive, next, "DISPLAY X."), Format(fixedForm), std: 2023);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal(directive[..^2], lines[0].Trim());   // §6.5 4): the program text ends before the indicator ("-)
+        Assert.Equal("", lines[1]);                       // the continuation line took a discarded slot
+        Assert.Equal("DISPLAY X.", lines[2].Trim());
+        Assert.Single(bag.Diagnostics, d => d.Code == "COBOLNET2696" && d.Location.Line == 1);
+    }
+
+    [Theory] // the fixed-form hyphen in column 7, with an interspersed comment line (never a join target), and a
+             // directive that is not the latest logical line any more (a hyphen after PROGRAM TEXT is still joined).
+    [InlineData(">>DEFINE XX AS \"AB\"", "      -    \"CD\"", true)]
+    [InlineData(">>DISPLAY \"A\"", "      -    ZZZ QQQ", true)]
+    [InlineData("DISPLAY \"AB", "      -    \"CD\".", false)]
+    public void FixedContinuation_AfterADirectiveLine_IsDiagnosedAndNotJoined(string head, string continuation, bool directive)
+    {
+        string src = "000100 " + head + "\n000200* between\n" + continuation + "\n000400     STOP RUN.\n";
+        var (m, bag) = Normalize(src, InitialReferenceFormat.Fixed, std: 2023);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal(directive, bag.Diagnostics.Any(d => d.Code == "COBOLNET2696"));
+        if (directive) Assert.Equal(head, lines[0].Trim());   // not extended
+        else
+        {
+            Assert.StartsWith("DISPLAY \"AB", lines[0].Trim());   // §6.5 6) a): joined, the continued line space-filled to margin R
+            Assert.EndsWith("CD\".", lines[0].Trim());
+        }
+    }
+
     [Fact] // the division state crosses a SOURCE FORMAT segment boundary: a fixed segment that follows a free one is read
            // in the division the text had reached, not reset to the identification division
     public void DivisionState_IsCarriedAcrossFixedSegments()

@@ -96,13 +96,13 @@ public static class CompilerDirectiveCatalog
                 row.Display, syntax.Citation));
             return;
         }
-        if (syntax.Form == DirectiveOperandForm.Stage) return;
-
-        string? complaint = syntax.Form == DirectiveOperandForm.Text
-            ? syntax.OperandRequired && operand.Length == 0
+        // PRESENCE is the format's own fact and is checked here whoever reads the content (kb/Work PB807): a Text row
+        // checks nothing more, a Stage row's owner checks the rest, a Words row checks the closed set.
+        string? complaint = syntax.Form == DirectiveOperandForm.Words
+            ? CheckWords(syntax, operand, edition)
+            : syntax.OperandRequired && operand.Length == 0
                 ? "the operand is required and none is written"
-                : null
-            : CheckWords(syntax, operand, edition);
+                : null;
         if (complaint is null) return;
 
         sink.Report(new EditionDiagnostic(

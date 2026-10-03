@@ -1920,7 +1920,17 @@
   "pb1660-define-nbsp-between-words",
   "pb1660-nbsp-only-line-is-not-blank",
   "pb1472-all-subscript-index-name-other-table",
-  "pb1398-length-of-arithmetic-expression"
+  "pb1398-length-of-arithmetic-expression",
+  "pb1360-define-directive-continued-fixed",
+  "pb1360-display-directive-continued-fixed",
+  "pb1360-evaluate-operand-continued",
+  "pb1384-directive-within-copy",
+  "pb1384-directive-within-replace",
+  "pb807-display-directive-junk-operand",
+  "pb807-display-directive-concatenation",
+  "pb807-display-directive-upon-input-device",
+  "pb807-display-directive-upon-listing-twice",
+  "pb1368-display-name-after-define-off"
  ],
  "pending": []
 }

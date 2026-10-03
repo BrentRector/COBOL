@@ -850,7 +850,13 @@ reference formats, and the only place source comments are recognized. Its model:
   or in free form is found where it is broken. Pseudo-text continues by these rules for free (§7.2.3.3 SR8, §7.2.4.3 8)):
   the join precedes text manipulation.
 - **The join target is the LATEST LOGICAL line** (§6.5 6) a)/b) "appended immediately to the right of the last
-  character in the latest logical line of the resultant compilation group"), tracked by index.
+  character in the latest logical line of the resultant compilation group"), tracked by index. **A compiler directive
+  line is never a join target** (§7.3.3 1) "specified on one line", kb/Work PB1360): the builder records whether the
+  latest logical line is a directive line (`_latestIsDirective`, set where the line is emitted by the SAME
+  `CompilerDirectiveLine.TryParse` + `CompilerDirectiveCatalog.IsDirective` recognition every directive stage uses), and
+  a fixed-form hyphen line or the line after a floating literal continuation indicator that follows one is
+  COBOLNET2696 and takes a discarded slot instead of extending the directive's operand — in both formats, IF and
+  EVALUATE lines included (§7.3.16.3 1), §7.3.13.3 2) each put the operand entirely on its line).
 - **The indicator area holds a §6.2.2 fixed indicator or it is diagnosed** (kb/Work PB1494): `*` `/` `-` space, and
   COBOL-85's debugging `D`; anything else is COBOLNET2616 and the line is read as source. The NIST CCVS column-7
   conventions (S/Y debugging, P/J/H/E/U excluded alternates, any other letter a primary-configuration line) are a
@@ -1202,7 +1208,7 @@ newly-closed format as the standing witness that the rendering was right.
   un-underlined in the printed format, so a two-word entry is shape-legal as `device-name-1 [IS]
   mnemonic-name-3`. What refuses it is §12.3.7.3 SR8 ("The implementor shall specify the names that are available
   for switch-name-1, feature-name-1, and device-name-1") — a semantic rule over the implementor's name table,
-  `Binding/ImplementorNames.cs`, refused at bind as COBOLNET2241 (kb/Work PB862).
+  `Cobol.Net.Editions/ImplementorNames.cs`, refused at bind as COBOLNET2241 (kb/Work PB862).
 - **The §11.2.1 header is BRACKETED, and the grammar now says so for every unit kind.** The OO units always had
   `(IDENTIFICATION DIVISION DOT)?`; the program and function units required the header, so `PROGRAM-ID. X.` as a
   unit's first line was COBOL0001 at every edition. `identificationDivision` now takes the header optionally,

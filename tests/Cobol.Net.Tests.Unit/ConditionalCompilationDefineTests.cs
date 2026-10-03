@@ -93,6 +93,30 @@ public sealed class ConditionalCompilationDefineTests
         finally { Environment.SetEnvironmentVariable("CN-CC-TEST-SPELLING", null); }
     }
 
+    [Theory] // DOC-A.1-49 (kb/Work PB1533): the value's CATEGORY — NUMERIC when the whole text parses as an invariant-culture
+             // decimal number (surrounding white space, a sign, '.' as the decimal point and ',' as a group separator are
+             // accepted), otherwise ALPHANUMERIC with the text exactly as given. §7.3.8.2 SR1 a): a relation's operands are of
+             // the same category, so the literal the relation compares against names the category the value has.
+    [InlineData("7", "7")]
+    [InlineData(" -2.5 ", "-2.5")]
+    [InlineData("1,000", "1000")]
+    [InlineData("007", "7")]
+    [InlineData("abc", "\"abc\"")]
+    [InlineData("7x", "\"7x\"")]
+    [InlineData("1,5", "15")]   // the comma is a GROUP separator, never a decimal comma
+    public void Parameter_ValueCategory_FollowsTheDocumentedTyping(string value, string literal)
+    {
+        const string name = "CN-CC-TEST-TYPING";
+        Environment.SetEnvironmentVariable(name, value);
+        try
+        {
+            var (text, diags) = Run($">>DEFINE {name} AS PARAMETER\n>>IF {name} = {literal}\nKEEP\n>>END-IF\n");
+            Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
+            Assert.Contains("KEEP", text);
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
+    }
+
     [Fact] // kb/Work PB1367 — §7.3.11.3 SR2 reaches the PARAMETER alternative: without OVERRIDE, a name already defined
            // may be redefined only to the SAME value, and "no value from the environment" is not the same value.
     public void Parameter_NoValue_RedefiningADefinedName_WithoutOverride_Rejected1618()

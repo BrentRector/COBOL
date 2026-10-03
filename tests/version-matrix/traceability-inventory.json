@@ -1386,13 +1386,13 @@
   "ordinal": 1,
   "subject": "Compiler directives",
   "rule-digest": "49908ccadba6",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#DirectiveText",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#DropDirectiveContinuation; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#IsDirectiveLine; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatDiagnostics.cs#OnDirectiveContinued",
+  "test-ref": "conformance:negative/pb1360-define-directive-continued-fixed; conformance:negative/pb1360-display-directive-continued-fixed; conformance:negative/pb1360-evaluate-operand-continued; unit:LogicalLineBuilderTests.FloatingContinuation_AfterADirectiveLine_IsDiagnosedAndNotJoined; unit:LogicalLineBuilderTests.FixedContinuation_AfterADirectiveLine_IsDiagnosedAndNotJoined",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1360 (registrar 15a). §7.3.3 SR1 'A compiler directive shall be specified on one line, except for the EVALUATE and the IF directives for which specific rules are specified.' (cite.py --check 7.3.3 OK). Every stage reads a directive as one line, so a directive whose words run onto a following ordinary line is rejected: S1A (>>DEFINE VV AS / 1) COBOLNET1619, S1B (>>IF 1 = / 1) COBOLNET1619, S1C (>>TURN EC-ALL / CHECKING OFF) COBOLNET0718, S1D (>>PROPAGATE / ON) COBOL0001; the IF/EVALUATE phrase-per-line rules (§7.3.13.3 SR2-7) behave the same way. UNVERIFIED-AND-FAILING EDGE: the fixed-form reference-format normalizer joins a column-7 continuation line onto a directive line BEFORE directive recognition, so a directive written on two physical lines via a continued literal is accepted as if it were one: S1H '>>DEFINE XX AS \"AB' + '      -    \"CD\"' compiles (only the COBOLNET0903 obsolescence warning) and '>>IF XX = \"ABCD\"' takes the TRUE branch; S1G '>>DISPLAY \"AB' + continuation compiles clean. SR1 says one line; the continued directive is two. (S1E, a WORD continuation, is rejected only because the join yields 'AS1'.) See finding 'directive-continuation-join'. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ConvertFixedToFree (ConvertFixedToFree was deleted by PB1800; DirectiveText is the stage's program-text-area reading of a directive line)",
-  "state": "GAP"
+  "notes": "kb/Work PB1360 landed (w1004b). A directive line is never a join target: the logical-line builder records whether the latest logical line is a directive line and a fixed-form hyphen line, or the line after a floating literal continuation indicator, that follows one is COBOLNET2696 and is not joined, in both reference formats. A directive whose words run onto a following ordinary line was already rejected by every directive stage (S1A-S1D); IF and EVALUATE lines are directive lines like the rest (7.3.16.3 SR1, 7.3.13.3 SR2).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-2",
@@ -1491,13 +1491,13 @@
   "ordinal": 8,
   "subject": "Compiler directives",
   "rule-digest": "838503efc54d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#OpenStatementAt; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#WithinStatement",
+  "test-ref": "conformance:negative/pb1384-directive-within-copy; conformance:negative/pb1384-directive-within-replace; unit:DirectiveWithinStatementTests.DirectiveInsideAStatement_IsDiagnosedByName; unit:DirectiveWithinStatementTests.DirectiveOutsideAStatement_IsNotDiagnosed; unit:DirectiveWithinStatementTests.TheStatementTheTextEndsInside_IsNamedByTheDirectiveThatInterruptsIt",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1384 (registrar 15a). §7.3.3 SR8 'A compiler directive may be specified anywhere in a compilation group, in source text or in library text, except a) as restricted by the rules for the specific compiler directive, b) within a source text manipulation statement, c) between the lines of a continued character-string.' (cite.py --check 7.3.3 OK for b and c). Positive half CONFORMS: W6 a >>DEFINE and a >>TURN between the words of one DISPLAY statement compile and run ('W6 SPLIT!'); W7 a >>DEFINE inside a data description entry runs; copybook directives work (cb1/cb2/cb4/cb5 probes). (c) W5, a directive between the lines of a continued literal, is rejected (garbled COBOLNET1619 + COBOL0001, but rejected). (a) is each directive's own row (PUSH/POP ALL placement PB1005 landed; FLAG-02/14 placement PB1065 open). (b) FAILS: the CC+COPY driver flushes a COPY block at every directive line on the stated assumption 'a COPY can never span a directive line' (ConditionalCompilationProcessor.Render comment) and never diagnoses it: W4C 'COPY' / '>>DEFINE VV AS 1' / 'cb3.' and W4 (same with >>TURN) compile clean and the copybook is SILENTLY not incorporated (the COPY with no text-name falls into the non-strict not-found comment fallback and 'cb3.' becomes a paragraph-name); W4D with a nonexistent copybook name is equally silent; W2, a >>DEFINE inside a REPLACE statement, compiles clean. W1 and W3 are rejected only incidentally. Finding 'directive-inside-text-manipulation-statement'. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1384 landed (w1004b). b) within a source text manipulation statement: the merged driver asks, at each directive line and before it flushes its block, whether the text since a COPY or REPLACE keyword has reached its separator period (CopyProcessor.OpenStatementAt, pseudo-text aware) and reports COBOLNET2697 at the directive; a COPY or REPLACE split by one or several directives is reported at each. The truncated COPY still draws its own COBOLNET2449 after the new diagnostic (superset-continue). a) is each directive's own row; c) a directive between the lines of a continued literal was already rejected.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-9",
@@ -1521,13 +1521,13 @@
   "ordinal": 10,
   "subject": "Compiler directives",
   "rule-digest": "a242996b78c2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateOperand; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay",
+  "test-ref": "conformance:negative/pb807-display-directive-concatenation; unit:DisplayDirectiveTests.AMalformedOperand_IsDiagnosedAndTransfersNothing",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB807 (registrar 15a). §7.3.3 SR10 'A literal in a compiler directive shall not be specified as a concatenation expression, a figurative constant, or a floating-point numeric literal.' (cite.py --check 7.3.3 OK). The directive-context operand dispatch in CompileTimeExpressionEvaluator enforces all three bars for DEFINE, IF, EVALUATE and WHEN: L1 concatenation, L2 ZERO, L3 1.5E2, L4 IF = ZEROS, L5 WHEN \"A\" & \"B\", L6 ALL \"A\", L7 SPACE, L8 IF = 1.0E0, L11 HIGH-VALUE, L12 QUOTE, L13 NULL all COBOLNET1619 naming SR10; a fixed-point 1.5 is correctly accepted (L15). COBOL-WORDS literals are screened by its own SR2 (L9/L10 rejected). FAILS for the DISPLAY directive: L14 '>>DISPLAY \"A\" & \"B\"', '>>DISPLAY ZERO', '>>DISPLAY 1.0E3' compile clean - kb/Work PB807 (open) owns the unimplemented §7.3.12.2 operand syntax and so this residue; no new finding. Unit tests pin the evaluator half (CompileTimeBooleanCceTests.Operand_SoleFloatLiteral_Rejected / Operand_FigurativeZero_Rejected / Cce_FigurativeOperand_Rejected, ConditionalCompilationDefineTests.Define_FloatLiteral_Rejected1619) but the row is PARTIAL, so test-ref is left empty. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB807 landed (w1004b). The DISPLAY directive's operands are read by the directive-context dispatch like DEFINE, IF, EVALUATE and WHEN, so a concatenation expression, a figurative constant and a floating-point literal are COBOLNET1619 naming 7.3.3 SR10 there too; COBOL-WORDS literals are screened by its own SR2.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.4-1",
@@ -2226,13 +2226,13 @@
   "ordinal": 1,
   "subject": "DISPLAY directive",
   "rule-digest": "72e55ce43834",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#DropDirectiveContinuation; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#ScanProgramText",
+  "test-ref": "conformance:negative/pb1360-display-directive-continued-fixed; conformance:negative/pb1690-directive-after-program-text-fixed",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1360 (registrar 15a). cite.py --check 7.3.12.3 \"shall be specified entirely on that line\" -> OK §7.3.12.3 1); sibling cite.py --check 7.3.3 \"A compiler directive shall be specified on one line\" -> OK §7.3.3 1). Half 1 (begin on a new line): dd7 'DISPLAY \"RUN\". >>DISPLAY \"X\"' is rejected, but only by raw COBOL0001 \"unexpected '>'\", not a named diagnostic. Half 2 (entirely on that line): dd8 '>>DISPLAY \"AAAA' plus a fixed-form '-' continuation line '\"BBB\"' compiles clean (only the COBOLNET0903 obsolete-continuation warning); dd11 '>>DISPLAY \"A\"' followed by '-    ZZZ QQQ' compiles clean. Sibling dd10: '>>DEFINE XX AS \"AAAA' continued with '\"BBB\"' is joined and '>>IF XX = \"AAAABBB\"' takes the true branch, proving the continuation is merged into directive lines generally. Under-rejects. No kb/Work note owns directive continuation (searched kb/Work for directive + continuation; PB807 does not cover it). Probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/display-directive/ || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014 || code-location detail: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs (continuation join ahead of directive recognition); src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine",
-  "state": "GAP"
+  "notes": "kb/Work PB1360 landed (w1004b). Both halves are named diagnostics: a DISPLAY directive after program text on its line is COBOLNET2691 (7.3.3 SR2, PB1690) and a continuation line after a >>DISPLAY line is COBOLNET2696 (7.3.3 SR1) and does not extend the operand.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.12.3-2",
@@ -2241,13 +2241,13 @@
   "ordinal": 2,
   "subject": "DISPLAY directive",
   "rule-digest": "bce9e99ae35a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateOperand",
+  "test-ref": "conformance:negative/pb807-display-directive-junk-operand; unit:DisplayDirectiveTests.AMalformedOperand_IsDiagnosedAndTransfersNothing; unit:DisplayDirectiveTests.ConversionOfData_FollowsTheDeterminedImages",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB807 (registrar 15a). cite.py --check 7.3.12.3 \"shall be formed in accordance with 7.3.6\" -> OK §7.3.12.3 2). The operand text is never parsed (Form=Text); dd2 '>>DISPLAY )( 3 +' is not a §7.3.6 arithmetic expression nor any other alternative, and compiles clean. The existing compile-time evaluator (Expressions/CompileTimeExpressionEvaluator.cs, used by >>IF/>>EVALUATE) is never reached. Under-rejects. Owned by open kb/Work PB807 (its body lists SR2/SR3). || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB807 landed (w1004b). An arithmetic-expression operand of the DISPLAY directive goes through the shared compile-time evaluator (7.3.6) exactly as a DEFINE value does; )( 3 + is COBOLNET1619.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.12.3-3",
@@ -2256,13 +2256,13 @@
   "ordinal": 3,
   "subject": "DISPLAY directive",
   "rule-digest": "32e1b116bae9",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateBoolean",
+  "test-ref": "unit:DisplayDirectiveTests.ConversionOfData_FollowsTheDeterminedImages; unit:DisplayDirectiveTests.AMalformedOperand_IsDiagnosedAndTransfersNothing",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB807 (registrar 15a). cite.py --check 7.3.12.3 \"shall be formed in accordance with 7.3.7\" -> OK §7.3.12.3 3). Boolean-expression-1 is never parsed; dd9 '>>DISPLAY B\"1\" AND B\"0\"' is accepted, and so is any junk (dd2), so no §7.3.7 check exists. Under-rejects. Owned by open kb/Work PB807. || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB807 landed (w1004b). A boolean-expression operand goes through the shared compile-time boolean fold (7.3.7), the B-AND of two boolean literals included; a boolean operator over a non-boolean operand is COBOLNET1619.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.12.4-1",
@@ -2271,13 +2271,13 @@
   "ordinal": 1,
   "subject": "DISPLAY directive",
   "rule-digest": "600f04fdbe65",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#DisplayDirective2023; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023",
-  "test-ref": "conformance:2023/pb725_push_pop_display",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#DisplayImage; src/Cobol.Net.Frontend/Diagnostics/DiagnosticBag.cs#Transfer; src/Cobol.Net.Compiler/CompilerDriver.cs#Compile",
+  "test-ref": "conformance:2023/pb725_push_pop_display; unit:DisplayDirectiveTests.OperandsAreTransferredInOrderAsOneLine; unit:DisplayDirectiveTests.ConversionOfData_FollowsTheDeterminedImages; unit:DisplayDirectiveTests.CompilerDriverResult_CarriesTheTransferredLines",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1369 (registrar 15a). cite.py --check 7.3.12.4 \"Any conversion of data required is defined by the implementor\" -> OK §7.3.12.4 1). GR1 transfers each operand to the source listing or compile-time-device-1. This compiler produces no source listing, so GR2 (OK §7.3.12.4 2)) makes the result implementor-defined; the directive is consumed with no transfer and no state (DirectiveStateRegistry: 'NONE HELD ... nothing persists past its own line'). Disposition: docs/CONFORMANCE.md (Recognized-and-ignored compiler directives, line 526) records that >>DISPLAY is recognized and consumed because no source listing and no compile-time device exist; the directive is edition-gated (dd1 at --std 2014 -> COBOLNET0900). The golden pb725_push_pop_display derives from 7.3.12.1 that >>DISPLAY contributes nothing to the run unit's output. Operand evaluation is not performed at all, so malformed operands are not diagnosed -- that is the FMT/SR2/SR3 defect owned by PB807, not a GR1 divergence. || REFUTED: PARTIAL — GR1 carries its own implementor-defined item, Annex A.1 item 53 (conversion of data transferred), which is REQUIRED and SHALL BE DOCUMENTED. The GR2 no-listing latitude covers the run-time behaviour (nothing transferred, verified), but docs/CONFORMANCE.md in the pin has no DOC-A.1-53 row (rows exist for 50, 56-59 only); the one sentence at line 526 says the directive is consumed and does not define the conversion. The cited golden pb725_push_pop_display pins only that the run unit prints nothing, which is the GR2 half, not GR1. || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB1538 landed (w1004b). The directive transfers its operands when it is processed: one line per destination to the compiler's standard output or standard error, through DiagnosticBag.Transfer, CompilerDriver.Result.CompileOutput and the CLI. The conversion of data is the implementor's (GR1) and is documented as DOC-A.1-53.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.12.4-2",
@@ -2288,7 +2288,7 @@
   "rule-digest": "2fb0e3951264",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023",
-  "test-ref": "conformance:2023/pb725_push_pop_display",
+  "test-ref": "conformance:2023/pb725_push_pop_display; unit:DisplayDirectiveTests.NoUponPhrase_IsAsIfUponListing_WhichIsStandardOutput; unit:DisplayDirectiveTests.OperandsAreTransferredInOrderAsOneLine",
   "derivation": "",
   "editions": "2023",
   "notes": "cite.py --check 7.3.12.4 \"If the compiler does not produce a source listing, the result of the DISPLAY directive is defined by the implementor\" -> OK §7.3.12.4 2). COBOL.NET produces no source listing (same CONFORMANCE.md determination as >>LISTING/>>PAGE), so the implementor-defined result applies: recognized and consumed, nothing transferred. Disposition: docs/CONFORMANCE.md (Recognized-and-ignored compiler directives, line 526) records that >>DISPLAY is recognized and consumed because no source listing and no compile-time device exist; the directive is edition-gated (dd1 at --std 2014 -> COBOLNET0900). The 'otherwise ... irrespective of the LISTING directive' half is inapplicable (no listing). Probe dd1 '>>DISPLAY \"HELLO\"' at 2023 compiles and runs printing only RUN. || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
@@ -2301,13 +2301,13 @@
   "ordinal": 3,
   "subject": "DISPLAY directive",
   "rule-digest": "811eb84c4a77",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ParameterText",
+  "test-ref": "unit:DisplayDirectiveTests.Parameter_IsReadFromTheEnvironment_ByTheUpperCaseName; unit:DisplayDirectiveTests.AbsentParameter_TransfersNothingAtAll",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1369 (registrar 15a). cite.py --check 7.3.12.4 \"If no value is made available from the operating environment no transfer shall take place\" -> OK §7.3.12.4 3). No transfer ever takes place under the GR2 no-listing disposition, so the no-value/no-transfer requirement is met and the implementor-defined value source is moot. Probe dd9 '>>DISPLAY PARAMETER XYZ' compiles clean. The PARAMETER phrase's own syntax is not checked -- owned by PB807 (FMT). || REFUTED: PARTIAL — The rule has two halves. The 'no value, no transfer' half is met vacuously, because nothing is ever transferred. The other half, the implementor-defined mechanism for obtaining compilation-variable-name-1's value from the operating environment, is Annex A.1 item 55, which is REQUIRED and SHALL BE DOCUMENTED. It is neither defined nor documented anywhere in the pin's docs (line 526 never mentions PARAMETER). A required, documented element that is missing makes this PARTIAL, not CONFORMS. || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB1538 landed (w1004b). A PARAMETER operand is the environment variable named by the name in upper case (the DEFINE PARAMETER lookup, DOC-A.1-55); when none is made available that directive transfers nothing at all and the name is not defined.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.12.4-4",
@@ -2317,12 +2317,12 @@
   "subject": "DISPLAY directive",
   "rule-digest": "1dcf526f268e",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay",
+  "test-ref": "unit:DisplayDirectiveTests.OperandsAreTransferredInOrderAsOneLine; unit:DisplayDirectiveTests.SeveralDirectives_TransferInTheOrderMet; unit:DisplayDirectiveTests.ACompilationVariableName_IsAnOperand",
   "derivation": "",
   "editions": "2023",
-  "notes": "cite.py --check 7.3.12.4 \"transferred in the sequence in which the operands are encountered\" -> OK §7.3.12.4 4). Transfer order is vacuous under the GR2 no-listing disposition (nothing is transferred). Multi-operand syntax recognition belongs to PB807 (FMT). || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB1538 landed (w1004b). Operands are evaluated and transferred in the order written (one line per directive, images joined by one space) and directives in the order encountered.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.12.4-5",
@@ -2331,13 +2331,13 @@
   "ordinal": 5,
   "subject": "DISPLAY directive",
   "rule-digest": "d2c6bff1d9ed",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#DisplayDestinations; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
+  "test-ref": "unit:DisplayDirectiveTests.Upon_NamesTheDestinations; unit:DisplayDirectiveTests.Upon_BreakingItsFormat_IsDiagnosedAndTransfersNothing; conformance:negative/pb807-display-directive-upon-input-device",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1369 (registrar 15a). cite.py --check 7.3.12.4 \"data is transferred to the device defined by the implementor for receiving that data\" -> OK §7.3.12.4 5) b). a) UPON LISTING: no listing device exists; b) compile-time-device-1: the implementor defines none (CONFORMANCE.md: 'transfers text to the (absent) source listing / compile-time device'). Both fall within the GR2 implementor-defined result. Probe dd9 '>>DISPLAY \"A\" UPON CONSOLE LISTING' compiles clean. Whether an undefined compile-time-device-1 name is diagnosed, and the §5.2.6.4 once-each rule (dd6), are syntax matters owned by PB807. || REFUTED: PARTIAL — GR5 b) sends data to 'the device defined by the implementor', and Annex A.1 item 54 (meaning of compile-time-device-1) is REQUIRED ('shall be provided by the implementor') and SHALL BE DOCUMENTED. The pin provides no such definition: CONFORMANCE.md:526 only calls the compile-time device '(absent)', and any word in that position is accepted silently. GR5 a) (LISTING) is discharged by GR2, but the b) half's required, documented item is missing. Two halves with one verified makes this PARTIAL. || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB807 landed (w1004b). UPON LISTING goes to the device used for source listings (none is produced: the compiler's standard output); UPON compile-time-device-1 goes to the output device-name's stream (CONSOLE and SYSOUT standard output, SYSERR standard error); an input-only or unknown word is COBOLNET2698.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.12.4-6",
@@ -2347,12 +2347,12 @@
   "subject": "DISPLAY directive",
   "rule-digest": "0dc31792047a",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine; src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#DisplayDestinations",
+  "test-ref": "unit:DisplayDirectiveTests.NoUponPhrase_IsAsIfUponListing_WhichIsStandardOutput",
   "derivation": "",
   "editions": "2023",
-  "notes": "cite.py --check 7.3.12.4 \"the default is as if UPON LISTING were specified\" -> OK §7.3.12.4 6). The default destination is the source listing, which this compiler does not produce; per GR2 the result is implementor-defined and is the documented recognize-and-consume (probe dd1). Vacuous under the disposition. || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB1538 landed (w1004b). Without an UPON phrase the directive behaves as UPON LISTING and, with no listing produced, writes to the compiler's standard output; nothing goes to standard error.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-1",
@@ -2376,13 +2376,13 @@
   "ordinal": 2,
   "subject": "EVALUATE directive",
   "rule-digest": "8dd21c3e4732",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#SplitDirective",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalLineBuilder.cs#DropDirectiveContinuation",
+  "test-ref": "conformance:negative/pb1360-evaluate-operand-continued; unit:LogicalLineBuilderTests.FloatingContinuation_AfterADirectiveLine_IsDiagnosedAndNotJoined",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1360 (registrar 15a). cite.py --check 7.3.13.3 \"EVALUATE operand-1 shall begin on a new line and shall be specified entirely on that line.\" OK. The processor recognizes a directive only when the TRIMMED LINE starts with `>>`, and the operand is the rest of that one line. Probes: `DISPLAY \"A\" >>EVALUATE 1` mid-line -> not a directive, rejected downstream (COBOL0307 at 5,24); `>>EVALUATE 1 +` continued on the next line -> COBOLNET1619 malformed '1 +'. No existing negative golden. || REFUTED: PARTIAL — Only the half where the split leaves an unparsable first line is detected. When the first line is itself a complete operand, the continuation line is silently swallowed as an omitted pre-WHEN text line: `>>EVALUATE 1` / `+ 1` compiles clean, takes subject 1 and selects WHEN 1 (the writer meant 1 + 1 = 2) -- the SR2 violation is undiagnosed AND the wrong branch is compiled. Also the subject is parsed only when parentActive, so an EVALUATE in an omitted enclosing branch is never checked. Non-directive lines between >>EVALUATE and the first >>WHEN are not admitted by the general format at all, yet the frame (Emitting=false) drops them without diagnostic. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "notes": "kb/Work PB1360 landed (w1004b). The refuter's edge (>>EVALUATE 1 then + 1 swallowed as an omitted pre-WHEN text line) no longer reproduces: PB1363's frame phase reports program text between >>EVALUATE and its first >>WHEN as COBOLNET2649 whether or not the enclosing branch is active. A fixed or floating continuation of the EVALUATE line is COBOLNET2696.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-3",
@@ -4057,11 +4057,11 @@
   "subject": "COBOL character repertoire",
   "rule-digest": "502f7c3300d1",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#caseInsensitive; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SubscriptNamesIndex; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#caseInsensitive; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SubscriptNamesIndex; src/Cobol.Net.Editions/ImplementorNames.cs",
   "test-ref": "",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1402 (registrar 15b). Rule a): 'COBOL basic letters, when specified in the non-hexadecimal formats of alphanumeric and national literals, are treated in a case-sensitive manner, unless specific rules require otherwise. COBOL basic letters appearing elsewhere within the compilation group are treated in a case-insensitive manner.' (cite.py --check 8.1.3.2 -> OK 8.1.3.2 3) a)). Code: the lexer is caseInsensitive=true; STR_BODY/NAT_BODY capture literal text verbatim; binder name tables compare with StringComparer.OrdinalIgnoreCase (63 sites under Binding/). Probes (pinned cobol.exe, --std 2023): rcase.cob -- data-name declared Abc-Def, referenced aBC-dEF / abc-def / ABC-DEF: one item; MOVE \"xY z\" displays 'xY z' and IF = \"XY Z\" takes ELSE (literal case kept); rcase2.cob -- mixed-case paragraph-name PERFORM/GO TO, condition-name SET/IF, index-name, OF-qualified name, lowercase verbs, FUNCTION upper-case all resolve; rlit.cob -- N\"aB\" and an accented alphanumeric literal keep their case. Half a) VERIFIED. Half b): basic letters/digits/special characters in the alphanumeric set are equivalent to the national ones -- vacuously true on the single UTF-16 set (NOTE 1); basic-letter folding per Annex C is the identity A-Z -> a-z that OrdinalIgnoreCase realizes. The EXTENDED-letter leg of b) cannot be verified because extended letters do not lex at all (GR-8.1.3.2-4 finding) -> two halves, one verified -> PARTIAL. Note for the fixer: OrdinalIgnoreCase is invariant UPPER-casing, not Annex C lower-folding; identical on basic letters, not on extended ones (e.g. U+0130, U+212A), and it is spread over 63 call sites rather than one folding function. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (Annex E.2 item 14 / E.3.3 item 6 change only the Annex C table 2014->2023)",
+  "notes": "kb/Work PB1402 (registrar 15b). Rule a): 'COBOL basic letters, when specified in the non-hexadecimal formats of alphanumeric and national literals, are treated in a case-sensitive manner, unless specific rules require otherwise. COBOL basic letters appearing elsewhere within the compilation group are treated in a case-insensitive manner.' (cite.py --check 8.1.3.2 -> OK 8.1.3.2 3) a)). Code: the lexer is caseInsensitive=true; STR_BODY/NAT_BODY capture literal text verbatim; binder name tables compare with StringComparer.OrdinalIgnoreCase (63 sites under Binding/). Probes (pinned cobol.exe, --std 2023): rcase.cob -- data-name declared Abc-Def, referenced aBC-dEF / abc-def / ABC-DEF: one item; MOVE \"xY z\" displays 'xY z' and IF = \"XY Z\" takes ELSE (literal case kept); rcase2.cob -- mixed-case paragraph-name PERFORM/GO TO, condition-name SET/IF, index-name, OF-qualified name, lowercase verbs, FUNCTION upper-case all resolve; rlit.cob -- N\"aB\" and an accented alphanumeric literal keep their case. Half a) VERIFIED. Half b): basic letters/digits/special characters in the alphanumeric set are equivalent to the national ones -- vacuously true on the single UTF-16 set (NOTE 1); basic-letter folding per Annex C is the identity A-Z -> a-z that OrdinalIgnoreCase realizes. The EXTENDED-letter leg of b) cannot be verified because extended letters do not lex at all (GR-8.1.3.2-4 finding) -> two halves, one verified -> PARTIAL. Note for the fixer: OrdinalIgnoreCase is invariant UPPER-casing, not Annex C lower-folding; identical on basic letters, not on extended ones (e.g. U+0130, U+212A), and it is spread over 63 call sites rather than one folding function. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (Annex E.2 item 14 / E.3.3 item 6 change only the Annex C table 2014->2023) retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "GAP"
  },
  {
@@ -4147,11 +4147,11 @@
   "subject": "COBOL words",
   "rule-digest": "2c92f3955402",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/Procedure/MnemonicRegistry.cs#MnemonicRegistry; src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4#cobolWord",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/MnemonicRegistry.cs#MnemonicRegistry; src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4#cobolWord; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance:85/l1c03_system_name_as_user_word",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "Rule: `OK  §8.3.2.1 4)` \"A given word may be used as a system-name and as a user-defined word, subject to the rules specified in 8.3.2.2, User-defined words, and 8.3.2.3, System-names.\" System-names are held apart from user-defined words by construction: implementor names live in the ONE table ImplementorNames (a SPECIAL-NAMES entry's system-name position), computer-names are read by text in the configuration paragraphs, and none of them is entered into the data-name / procedure-name / mnemonic namespaces, so a data-name, paragraph-name or mnemonic-name spelled like a system-name never collides. PROBE (pinned cobol.exe, out/probe/sysuser/su1.cob) at 85 and 2023: SOURCE-COMPUTER. MYBOX. + 01 MYBOX (computer-name = data-name), CONSOLE IS CONSOLE (device-name = its own mnemonic-name), SYSOUT IS OUTDEV + 01 SYSOUT (device-name = data-name), SWITCH-1 IS SW1 + 01 SWITCH-1 (switch-name = data-name), 01 C01 (feature-name = data-name), paragraph SYSERR (device-name = paragraph-name) -> compiles and prints MSWC / K at both editions (DISPLAY UPON OUTDEV and UPON CONSOLE route to the device, the data-names read their own values). The 'subject to 8.3.2.3' half: §8.3.2.3.1's one-type rule for device/feature/switch names holds by construction — ImplementorName carries exactly ONE SystemNameKind per name (ImplementorNamesDriftTests). The 'subject to 8.3.2.2' half defers to §8.3.2.2's own rows; its one-type-of-user-defined-word restriction is unenforced and owned by open kb/Work PB990 (rows SR-8.3.2.2-1/-2/-3), which concerns two USER-DEFINED types and not the system-name/user-word sharing this row permits. No spec-derived test names this row (the dossier's §8.3.2.1 test citations are all rule 1 / rule 3 / rule 5 / word length), so test-ref is empty. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (the permission is unchanged across editions; the §8.3.2.3 system-name types it references grew — call-convention-name, entry-convention-name, external-locale-name — but the sharing permission applies to whichever types an edition has)",
+  "notes": "Rule: `OK  §8.3.2.1 4)` \"A given word may be used as a system-name and as a user-defined word, subject to the rules specified in 8.3.2.2, User-defined words, and 8.3.2.3, System-names.\" System-names are held apart from user-defined words by construction: implementor names live in the ONE table ImplementorNames (a SPECIAL-NAMES entry's system-name position), computer-names are read by text in the configuration paragraphs, and none of them is entered into the data-name / procedure-name / mnemonic namespaces, so a data-name, paragraph-name or mnemonic-name spelled like a system-name never collides. PROBE (pinned cobol.exe, out/probe/sysuser/su1.cob) at 85 and 2023: SOURCE-COMPUTER. MYBOX. + 01 MYBOX (computer-name = data-name), CONSOLE IS CONSOLE (device-name = its own mnemonic-name), SYSOUT IS OUTDEV + 01 SYSOUT (device-name = data-name), SWITCH-1 IS SW1 + 01 SWITCH-1 (switch-name = data-name), 01 C01 (feature-name = data-name), paragraph SYSERR (device-name = paragraph-name) -> compiles and prints MSWC / K at both editions (DISPLAY UPON OUTDEV and UPON CONSOLE route to the device, the data-names read their own values). The 'subject to 8.3.2.3' half: §8.3.2.3.1's one-type rule for device/feature/switch names holds by construction — ImplementorName carries exactly ONE SystemNameKind per name (ImplementorNamesDriftTests). The 'subject to 8.3.2.2' half defers to §8.3.2.2's own rows; its one-type-of-user-defined-word restriction is unenforced and owned by open kb/Work PB990 (rows SR-8.3.2.2-1/-2/-3), which concerns two USER-DEFINED types and not the system-name/user-word sharing this row permits. No spec-derived test names this row (the dossier's §8.3.2.1 test citations are all rule 1 / rule 3 / rule 5 / word length), so test-ref is empty. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (the permission is unchanged across editions; the §8.3.2.3 system-name types it references grew — call-convention-name, entry-convention-name, external-locale-name — but the sharing permission applies to whichever types an edition has) retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -14032,11 +14032,11 @@
   "subject": "SPECIAL-NAMES paragraph",
   "rule-digest": "b19987de9228",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNameEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#BindImplementorNameEntry",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#BindImplementorNameEntry; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/ImplementorNameEntry.cs#ImplementorNameEntry",
   "test-ref": "conformance:negative/pb862-unavailable-device-name; conformance:85/pb862_implementor_names; unit:ImplementorNamesDriftTests.EntryShapeAndName_Refused; unit:ImplementorNamesDriftTests.EveryTableName_IsAccepted_InTheArmItsKindAllows",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "SR8 - the implementor shall specify the names available for switch-name-1, feature-name-1 and device-name-1. Specified as ONE table (ImplementorNames; docs/CONFORMANCE.md DOC-A.1-189/190/191); a name outside it, or ON/OFF STATUS on a non-switch name, is COBOLNET2241 at every edition. `SPECIAL-NAMES. WIBBLE WOBBLE.` used to compile and register a mnemonic naming nothing (kb/Work PB862).",
+  "notes": "SR8 - the implementor shall specify the names available for switch-name-1, feature-name-1 and device-name-1. Specified as ONE table (ImplementorNames; docs/CONFORMANCE.md DOC-A.1-189/190/191); a name outside it, or ON/OFF STATUS on a non-switch name, is COBOLNET2241 at every edition. `SPECIAL-NAMES. WIBBLE WOBBLE.` used to compile and register a mnemonic naming nothing (kb/Work PB862). retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNameEntry (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs) retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -49342,11 +49342,11 @@
   "subject": "WRITE statement",
   "rule-digest": "ec691222c6cd",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#FeatureAdvancing; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#FeatureAdvancing; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance:negative/pb862-write-advancing-device-mnemonic; conformance-test:FileIoDifferentialTests.WriteAdvancingC01_IsThePageAdvance",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "SR16 - WRITE's mnemonic-name-1 is associated with a feature-name specified by the implementor (C01, CSP - DOC-A.1-190); any other mnemonic is COBOLNET2243. It used to bind every SPECIAL-NAMES mnemonic as a zero-line advance (kb/Work PB862).",
+  "notes": "SR16 - WRITE's mnemonic-name-1 is associated with a feature-name specified by the implementor (C01, CSP - DOC-A.1-190); any other mnemonic is COBOLNET2243. It used to bind every SPECIAL-NAMES mnemonic as a zero-line advance (kb/Work PB862). retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -57171,13 +57171,13 @@
   "ordinal": 0,
   "subject": "DISPLAY directive",
   "rule-digest": "df09c5ac6bbe",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Editions/ConstructRegistry.g.cs#display-directive-2023; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#displayDirectiveFragment; src/Cobol.Net.Frontend/Parsing/DirectiveExpressionFragment.cs#ParseDisplay; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#DisplayDestinations",
+  "test-ref": "conformance:2023/pb807_display_directive_operands; conformance:negative/pb807-display-directive-junk-operand; conformance:negative/pb807-display-directive-upon-input-device; conformance:negative/pb807-display-directive-upon-listing-twice; unit:DisplayDirectiveTests.AMalformedOperand_IsDiagnosedAndTransfersNothing; unit:DisplayDirectiveTests.Upon_BreakingItsFormat_IsDiagnosedAndTransfersNothing; unit:DisplayDirectiveTests.Upon_NamesTheDestinations; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB807 (registrar 15a). cite.py --check 7.3.12.2 \"PARAMETER\" -> OK §7.3.12.2 (General format); cite.py --check 5.2.6.4 \"Choice indicators\" -> OK. Format: a REPEATED choice of arithmetic-expression-1 | boolean-expression-1 | literal-1 | PARAMETER compilation-variable-name-1, then an optional UPON phrase whose braces carry §5.2.6.4 choice indicators (compile-time-device-1 and/or LISTING, each at most once). Code: the row is {Form=Text, OperandRequired=true}; CheckOperand only tests operand.Length==0. Probes (pinned cobol.exe, 2023): dd4 '>>DISPLAY' -> COBOLNET1911 (presence half correct); dd2 '>>DISPLAY )( 3 +' -> exit 0, no diagnostic; dd5 '>>DISPLAY \"A\" UPON' -> clean; dd6 '>>DISPLAY \"A\" UPON LISTING LISTING' (LISTING twice, §5.2.6.4 at most once) -> clean. Presence half verified, operand grammar unimplemented -> under-rejects. Also the COBOLNET1911 text for the bare case says 'the general format admits no operand' (Admissible() over an empty Choice list) -- self-contradictory. Owned by open kb/Work PB807 (inventory_rows FMT-7.3.12.2). Probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/display-directive/ || editions (adjudicator): 2023 only (Foreword list of 2023 additions: 'Additional compiler directives were added: ... DISPLAY directive'); absent 1985/2002/2014",
-  "state": "GAP"
+  "notes": "kb/Work PB807 landed (w1004b). The operand list is a grammar: displayDirectiveFragment is displayDirectiveOperand+ displayUponPhrase?, each operand the compileTimeOperand a DEFINE value reads or PARAMETER plus a word; the UPON words are resolved by the stage against the ONE implementor-name table, with the 5.2.6.4 choice-indicator discipline (the device group and LISTING each at most once, any order). A phrase that matches no alternative is COBOLNET1619, an UPON violation COBOLNET2698, a missing operand COBOLNET1911 (presence is checked centrally for stage rows too).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.13.2",
@@ -61897,11 +61897,11 @@
   "subject": "ACCEPT statement (device used when FROM is unspecified)",
   "rule-digest": "97909ab91462",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-2; src/Cobol.Net.Compiler/CodeGen/Verbs/AcceptDisplayEmitter.cs#EmitAcceptDevice; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#MnemonicDevice",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-2; src/Cobol.Net.Compiler/CodeGen/Verbs/AcceptDisplayEmitter.cs#EmitAcceptDevice; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#MnemonicDevice; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance-test:AcceptDifferentialTests.Device_ShortLine_StoresLeftAlignedSpaceFilled",
   "derivation": "",
   "editions": "",
-  "notes": "§14.9.1.4 GR5 - the FROM-omitted device is the process standard input (docs/CONFORMANCE.md DOC-A.1-2); the test pipes \"ABC\" to stdin, ACCEPTs with NO FROM phrase and asserts the GR4a left-aligned store, which only standard input can produce. A .cob/.out golden cannot witness it: the corpus runner passes no stdin and AcceptSource.Device returns spaces at EOF. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#AcceptInputDevices (kb/Work PB862 deleted the private AcceptInputDevices set; the device capability is now a column of the one implementor-name table (ImplementorNames) read through AcceptDisplayBinder.MnemonicDevice, both already witnesses of this row)",
+  "notes": "§14.9.1.4 GR5 - the FROM-omitted device is the process standard input (docs/CONFORMANCE.md DOC-A.1-2); the test pipes \"ABC\" to stdin, ACCEPTs with NO FROM phrase and asserts the GR4a left-aligned store, which only standard input can produce. A .cob/.out golden cannot witness it: the corpus runner passes no stdin and AcceptSource.Device returns spaces at EOF. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#AcceptInputDevices (kb/Work PB862 deleted the private AcceptInputDevices set; the device capability is now a column of the one implementor-name table (ImplementorNames) read through AcceptDisplayBinder.MnemonicDevice, both already witnesses of this row) retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -62601,13 +62601,13 @@
   "ordinal": 49,
   "subject": "DEFINE directive (mechanism for providing value of a compilation-variable-name from the operating environment)",
   "rule-digest": "8e2a6ef34483",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-49; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#GetEnvironmentVariable",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-49; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ParameterText; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#GetEnvironmentVariable",
+  "test-ref": "unit:ConditionalCompilationDefineTests.Parameter_TwoSpellingsOfOneName_ReadOneVariable; unit:ConditionalCompilationDefineTests.Parameter_ValueCategory_FollowsTheDocumentedTyping; unit:ConditionalCompilationDefineTests.Parameter_Unavailable_NotDefined; unit:ConditionalCompilationDefineTests.Parameter_SourcesFromEnvironment",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "A.1 item 49 (7.3.11 GR4): required, documented. cite.py --check 7.3.11.4 'is obtained from the operating environment by an implementor-defined method' -> OK §7.3.11.4 4) (General rules). The method is implementor latitude; the row documents the method owning note kb/Work/PB1533 decides ('Normalize the looked-up name (the canonical upper-case COBOL word), document the method (name mapping, typing, absent-variable behaviour)'), because a compilation-variable-name is one case-insensitive COBOL word and a spelling-dependent value source is a wrong answer. DIVERGES: ConditionalCompilationProcessor.ApplyDefine's DefineKind.Parameter arm (pin 80de60472, ~line 484) calls inputs.GetEnvironmentVariable(name) with the name AS SPELLED — no upper-casing — so on a case-sensitive host (Linux) '>>DEFINE MyVar AS PARAMETER' with MYVAR=x is NOT DEFINED (PB1533 repro, adjudicator adj-a1-w1-s2, Linux). Windows probe d2def.cob cannot show it (Windows environment names are case-insensitive): no env -> NOT-DEFINED; MYVAR=x NUMV=7 -> DEFINED + NUMV-GT5; NUMV='1,000' -> NUMV-GT5 (typing = decimal.TryParse NumberStyles.Number, invariant culture — matches the row). Typing and absent-variable arms already hold; only the name mapping diverges. Witness owed: a golden (or unit test over CompilationInputs with an injected environment) defining MyVar AS PARAMETER with only MYVAR set, expecting DEFINED, plus the numeric/alphanumeric typing. Adjacent: PB1367 (SR2 bypass on the PARAMETER arm, different defect).",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1533 landed (w1004b). The method is documented in docs/CONFORMANCE.md (DOC-A.1-49): the environment variable named by the compilation-variable-name in its canonical upper-case spelling (so every spelling of one name reads one variable), numeric when the whole text parses as an invariant-culture decimal number and alphanumeric otherwise, an absent variable meaning not defined. The same lookup serves the DISPLAY directive's PARAMETER phrase (ParameterText, one rule).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-50",
@@ -62661,13 +62661,13 @@
   "ordinal": 53,
   "subject": "DISPLAY directive (conversion of data transferred)",
   "rule-digest": "32b10241f868",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-53; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#DirectiveStateRegistry; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CompilerDirectiveLine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-53; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#DisplayImage; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay",
+  "test-ref": "unit:DisplayDirectiveTests.ConversionOfData_FollowsTheDeterminedImages; unit:DisplayDirectiveTests.OperandsAreTransferredInOrderAsOneLine; conformance:2023/pb807_display_directive_operands",
   "derivation": "",
   "editions": "2023",
-  "notes": "A.1 item 53 (7.3.12 GR1): required, documented. cite.py --check 7.3.12.4 'Any conversion of data required is defined by the implementor' -> OK §7.3.12.4 1) (General rules); 7.3.12.4 'If the compiler does not produce a source listing, the result of the DISPLAY directive is defined by the implementor' -> OK §7.3.12.4 2); 7.3.12.4 'the default is as if UPON LISTING were specified' -> OK §7.3.12.4 6); 7.3.12.1 'transfers data to the source listing or an implementor defined compile-time-device' -> OK §7.3.12.1 (General). Latitude settled by rule-1 precedence -> GnuCOBOL 3.2 (cobc/pplex.l display_finish puts() the collected operands to compile-time stdout; testsuite syn_misc.at '>>DISPLAY \"OK\"' prints OK) — the precedent and disposition already decided in kb/Work/PB1538 ('Transfer the operands to the compiler's standard output'). ISO controls the CONTENT (GR1 'the contents of each operand', GR4 order), so the row evaluates expressions rather than echoing their text; the single-space separator follows PB1538's expected 'HELLO-COMPILE 42'. DIVERGES: probe d2dd.cob (pin 80de60472, --std 2023, XYZ=abc): compile stdout and stderr EMPTY, rc 0; run prints only RUN — the directive is consumed with no transfer (DirectiveStateRegistry 'NONE HELD'). Owning note kb/Work/PB1538 (open; claims DOC-A.1-53/-55); the row text is PB1369's deliverable (PB1369 also claims it). Witness owed: a conformance test capturing the compiler's stdout for >>DISPLAY with literal, arithmetic, boolean operands. Editions: the directive is 2023-only (COBOLNET0900 below).",
-  "state": "GAP"
+  "notes": "kb/Work PB1538 landed (w1004b). The conversion of data transferred matches the documented determination: alphanumeric and national values as their characters, boolean values as 0 and 1, numeric values in the shortest decimal form, images of one directive joined by one space on ONE line.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-54",
@@ -62676,13 +62676,13 @@
   "ordinal": 54,
   "subject": "DISPLAY directive (meaning of compile-time-device-1)",
   "rule-digest": "ea877bbb976b",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-54; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#DirectiveStateRegistry; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-54; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#DisplayDestinations; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
+  "test-ref": "unit:DisplayDirectiveTests.Upon_NamesTheDestinations; unit:DisplayDirectiveTests.Upon_BreakingItsFormat_IsDiagnosedAndTransfersNothing; conformance:negative/pb807-display-directive-upon-input-device; conformance:negative/pb807-display-directive-upon-listing-twice",
   "derivation": "",
   "editions": "2023",
-  "notes": "A.1 item 54 (7.3.12 GR5): required, documented. cite.py --check 7.3.12.4 'data is transferred to the device defined by the implementor for receiving that data' -> OK §7.3.12.4 5) (General rules); 7.3.12.4 'the default is as if UPON LISTING were specified' -> OK §7.3.12.4 6). No precedent: GnuCOBOL 3.2's >>DISPLAY has no UPON device (its lexer collects the words as text, per doc-rows-1's reading of cobc/pplex.l); IBM Enterprise COBOL and Micro Focus have no ISO DISPLAY directive. The determination therefore reuses the implementation's own device-name table (DOC-A.1-189: CONSOLE/SYSOUT = stdout, SYSERR = stderr, SYSIN input-only) — one rule written in one place — and diagnoses any other word, which is the fix kb/Work/PB807 owes (its title: 'ANY operand is then accepted'; its A.1-54 paragraph: 'accepts any word although the implementation defines no device'). The choice has no significant consequence beyond which stream receives a compile-time message, so it is not an owner question. DIVERGES: probe d2dd.cob (pin 80de60472 --std 2023): '>>DISPLAY \"DEV\" UPON NOSUCHDEVICE' and '>>DISPLAY \"ERR\" UPON SYSERR' both compile clean (rc 0), nothing on compiler stdout or stderr — no device is defined, any word is accepted, nothing is transferred. Owning note kb/Work/PB807 (open; operand/UPON syntax and the undiagnosed device name); the transfer itself is kb/Work/PB1538; the row text is PB1369's deliverable. Witness owed: a negative golden for an undefined device name and a stderr-capturing test for UPON SYSERR.",
-  "state": "GAP"
+  "notes": "kb/Work PB807 landed (w1004b). compile-time-device-1 is an OUTPUT-capable device-name of the one implementor-name table (CONSOLE, SYSOUT: standard output; SYSERR: standard error); SYSIN and any other word are COBOLNET2698 naming the devices; several destinations write the line once to each in the order written, with LISTING and the device group each at most once.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-55",
@@ -62691,13 +62691,13 @@
   "ordinal": 55,
   "subject": "DISPLAY directive (mechanism for providing the value of a compilation-variable-name from the operating environment)",
   "rule-digest": "d1e523e806fe",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-55; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#DirectiveStateRegistry; src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#GetEnvironmentVariable",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-55; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ParameterText; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.Display.cs#ApplyDisplay",
+  "test-ref": "unit:DisplayDirectiveTests.Parameter_IsReadFromTheEnvironment_ByTheUpperCaseName; unit:DisplayDirectiveTests.AbsentParameter_TransfersNothingAtAll",
   "derivation": "",
   "editions": "2023",
-  "notes": "A.1 item 55 (7.3.12 GR3): required, documented. cite.py --check 7.3.12.4 'If no value is made available from the operating environment no transfer shall take place' -> OK §7.3.12.4 3) (General rules). The method is implementor latitude; GnuCOBOL 3.2 has no PARAMETER form for >>DISPLAY (doc-rows-1: '>>DISPLAY PARAMETER XYZ' prints 'PARAMETER XYZ'), so the precedence gives no answer and kb/Work/PB1538's 'To close' decides it: 'decide the PARAMETER lookup with kb/Work PB1533 (the >>DEFINE PARAMETER environment lookup)' — one lookup for both directives, documented as DOC-A.1-49 (upper-cased name, PB1533's fix). The absent-variable arm reads GR3's 'no transfer shall take place' as the whole directive (the literal reading: GR3 names the transfer, not the operand). DIVERGES: probe d2dd.cob (pin 80de60472 --std 2023, XYZ=abc): '>>DISPLAY PARAMETER XYZ' compiles clean and writes nothing — the environment is never consulted and the directive never transfers (the no-value/no-transfer half holds only vacuously). Owning note kb/Work/PB1538 (open; claims DOC-A.1-55) with PB1533 (name mapping) and PB1369 (row text). Witness owed: a compile-stdout test with the variable set (value appears) and unset (no line).",
-  "state": "GAP"
+  "notes": "kb/Work PB1538 landed (w1004b). The DISPLAY directive's PARAMETER phrase reads the same environment variable the DEFINE PARAMETER phrase does (upper-cased name), transfers its text unchanged, and an absent variable makes that directive transfer nothing at all.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-56",
@@ -62752,11 +62752,11 @@
   "subject": "DISPLAY statement (standard display device)",
   "rule-digest": "40f46ae42d79",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-59; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#BindDisplayUpon; src/Cobol.Net.Compiler/CodeGen/Verbs/AcceptDisplayEmitter.cs#EmitDisplay; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#MnemonicDevice",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-59; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#BindDisplayUpon; src/Cobol.Net.Compiler/CodeGen/Verbs/AcceptDisplayEmitter.cs#EmitDisplay; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#MnemonicDevice; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance:2023/l1_display_standard_device; conformance:negative/l1-display-upon-input-only-device",
   "derivation": "",
   "editions": "",
-  "notes": "§14.9.11.4 GR8's standard display device = standard output, with CONSOLE/SYSOUT on it and SYSERR demonstrably off it (its line is absent from the golden), and §14.9.11.3 SR2's input-only complement rejected at all four editions. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#DisplayOutputDevices (kb/Work PB862 deleted the private DisplayOutputDevices set; the device capability is now a column of the one implementor-name table (ImplementorNames) read through AcceptDisplayBinder.MnemonicDevice, both already witnesses of this row)",
+  "notes": "§14.9.11.4 GR8's standard display device = standard output, with CONSOLE/SYSOUT on it and SYSERR demonstrably off it (its line is absent from the golden), and §14.9.11.3 SR2's input-only complement rejected at all four editions. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#DisplayOutputDevices (kb/Work PB862 deleted the private DisplayOutputDevices set; the device capability is now a column of the one implementor-name table (ImplementorNames) read through AcceptDisplayBinder.MnemonicDevice, both already witnesses of this row) retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -64702,11 +64702,11 @@
   "subject": "SPECIAL-NAMES paragraph, device-name (names available, restrictions on use)",
   "rule-digest": "044e744c34a3",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-189; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#MnemonicDevice",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-189; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AcceptDisplayBinder.cs#MnemonicDevice; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance:85/pb862_implementor_names; conformance:negative/pb862-unavailable-device-name; unit:ImplementorNamesDriftTests.EveryTableName_IsDocumented_AndNamedByTheDiagnostic",
   "derivation": "",
   "editions": "",
-  "notes": "A.1 item 189 (device-name: names available, restrictions on use), optional and documented-if-provided: PROVIDED - CONSOLE, SYSIN, SYSOUT, SYSERR with their input/output capabilities, as ONE table (ImplementorNames) that the SPECIAL-NAMES binder refuses every other name against (COBOLNET2241) and ACCEPT/DISPLAY read the capability from (COBOLNET0817). kb/Work PB862.",
+  "notes": "A.1 item 189 (device-name: names available, restrictions on use), optional and documented-if-provided: PROVIDED - CONSOLE, SYSIN, SYSOUT, SYSERR with their input/output capabilities, as ONE table (ImplementorNames) that the SPECIAL-NAMES binder refuses every other name against (COBOLNET2241) and ACCEPT/DISPLAY read the capability from (COBOLNET0817). kb/Work PB862. retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -64717,11 +64717,11 @@
   "subject": "SPECIAL-NAMES paragraph, feature-name (names available, any positioning rules, any restrictions on use)",
   "rule-digest": "c064b2bb8e0d",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-190; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#FeatureAdvancing",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-190; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SequentialIoBinder.cs#FeatureAdvancing; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance-test:FileIoDifferentialTests.WriteAdvancingC01_IsThePageAdvance; conformance-test:FileIoDifferentialTests.WriteAdvancingMnemonic_ZeroLineAdvance_RecordAlwaysReleased; conformance:negative/pb862-write-advancing-device-mnemonic",
   "derivation": "",
   "editions": "",
-  "notes": "A.1 item 190 (feature-name: names, positioning rules, restrictions), optional: PROVIDED - C01 (the ADVANCING PAGE advance) and CSP (a zero-line advance), surveyed across IBM / Micro Focus / GnuCOBOL; C02-C12 not provided (no forms-control tape model). The NIST SQ207M placeholder XXXXX073 is supplied as CSP. kb/Work PB862.",
+  "notes": "A.1 item 190 (feature-name: names, positioning rules, restrictions), optional: PROVIDED - C01 (the ADVANCING PAGE advance) and CSP (a zero-line advance), surveyed across IBM / Micro Focus / GnuCOBOL; C02-C12 not provided (no forms-control tape model). The NIST SQ207M placeholder XXXXX073 is supplied as CSP. kb/Work PB862. retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -64732,11 +64732,11 @@
   "subject": "SPECIAL-NAMES paragraph, switch-name (names available, which switches may be referenced by the SET statement, scope of, ",
   "rule-digest": "493331dad4d4",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-191; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#BindImplementorNameEntry; src/Cobol.Net.Runtime/Control/SwitchStore.cs#SwitchStore",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-191; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#BindImplementorNameEntry; src/Cobol.Net.Runtime/Control/SwitchStore.cs#SwitchStore; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance:85/pb862_implementor_names; conformance-test:AlterSwitchesDifferentialTests.Switch_EnvironmentVariableSuppliesInitialState; unit:ImplementorNamesDriftTests.EveryTableName_IsAccepted_InTheArmItsKindAllows",
   "derivation": "",
   "editions": "",
-  "notes": "A.1 item 191 (switch-name: names, SET-able switches, scope, external facility), optional: PROVIDED - SWITCH-0..SWITCH-36 and UPSI-0..UPSI-7, every one SET-able, run-unit scope, initial status from the COBOL_<SWITCH-NAME> environment variable. Before kb/Work PB862 any word was a switch-name, which cannot stand beside a device-name set (8.3.2.3.1).",
+  "notes": "A.1 item 191 (switch-name: names, SET-able switches, scope, external facility), optional: PROVIDED - SWITCH-0..SWITCH-36 and UPSI-0..UPSI-7, every one SET-able, run-unit scope, initial status from the COBOL_<SWITCH-NAME> environment variable. Before kb/Work PB862 any word was a switch-name, which cannot stand beside a device-name set (8.3.2.3.1). retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {
@@ -64837,11 +64837,11 @@
   "subject": "System-names (rules for formation of a system-name)",
   "rule-digest": "ff3e2f39a3b9",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-198; src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-198; src/Cobol.Net.Editions/ImplementorNames.cs#ImplementorNames",
   "test-ref": "conformance:85/l1c32_system_name_formation; conformance:negative/l1c32-system-name-all-digits",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Optional item PROVIDED (one restriction), not 'not provided': §8.3.2.3.1 lets the implementor add restrictions to COBOL-word formation, and an all-digit system-name - a legal COBOL word, since §8.3.2.2's 'at least one basic letter' binds user-defined words only - is rejected (the lexer reads it as an integer literal). cite.py --check 8.3.2.3.1 'The implementor may define rules for the formation of a system-name that add restrictions to the rules for formation of a COBOL word' -> OK. Probes refute-probe/p198: sn3.cob OBJECT-COMPUTER. 12345. -> COBOL0001 unexpected '12345'; d1.cob OBJECT-COMPUTER. 1-2. -> OK (no letter needed); sn.cob 123ABC / MY_BOX-9-... -> OK at 2023; sn4.cob ABC- -> COBOL0001; sn5.cob 31/32 chars -> COBOLNET1567 limit 30 at 85, 31 at 2002/2014; sn2.cob 64 chars -> COBOLNET1567 limit 63 at 2023; dv.cob unknown device FOO-DEVICE -> COBOLNET2241. Owning note: kb/Work/PB1534, PB280.",
+  "notes": "Optional item PROVIDED (one restriction), not 'not provided': §8.3.2.3.1 lets the implementor add restrictions to COBOL-word formation, and an all-digit system-name - a legal COBOL word, since §8.3.2.2's 'at least one basic letter' binds user-defined words only - is rejected (the lexer reads it as an integer literal). cite.py --check 8.3.2.3.1 'The implementor may define rules for the formation of a system-name that add restrictions to the rules for formation of a COBOL word' -> OK. Probes refute-probe/p198: sn3.cob OBJECT-COMPUTER. 12345. -> COBOL0001 unexpected '12345'; d1.cob OBJECT-COMPUTER. 1-2. -> OK (no letter needed); sn.cob 123ABC / MY_BOX-9-... -> OK at 2023; sn4.cob ABC- -> COBOL0001; sn5.cob 31/32 chars -> COBOLNET1567 limit 30 at 85, 31 at 2002/2014; sn2.cob 64 chars -> COBOLNET1567 limit 63 at 2023; dv.cob unknown device FOO-DEVICE -> COBOLNET2241. Owning note: kb/Work/PB1534, PB280. retired-witness: src/Cobol.Net.Compiler/Binding/ImplementorNames.cs#ImplementorNames (the pure-data implementor-name table moved to Cobol.Net.Editions so the front end's DISPLAY directive reads the same device-names as SPECIAL-NAMES (kb/Work PB807); ImplementorNameEntry stayed in the compiler as ImplementorNameEntry.cs)",
   "state": "OK"
  },
  {

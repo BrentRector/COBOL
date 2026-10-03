@@ -33,7 +33,7 @@ expression evaluated by the compiler, never at run time. Admitted in:
 | `>>DEFINE cv AS …` | §7.3.11 | arithmetic-expr, boolean-expr, literal, PARAMETER, OFF |
 | `>>EVALUATE …` / `>>WHEN …` | §7.3.13 | arithmetic-expr, boolean-expr, literal (subject/object/THRU range) |
 | `>>IF cce` / `>>ELSE` / `>>END-IF` | §7.3.16 → §7.3.8 | constant-conditional-expression |
-| `>>DISPLAY …` | §7.3.12 | arithmetic-expr, boolean-expr, literal, PARAMETER (listing sink) |
+| `>>DISPLAY …` | §7.3.12 | arithmetic-expr, boolean-expr, literal, PARAMETER, repeated, then UPON (§8a) |
 | `01 c CONSTANT AS arithmetic-expr` | §13.10.4 GR4 | arithmetic-expr (numeric only) |
 
 **The defect (ledger C2, MAJOR — silent wrong value).** Two unrelated code paths: the **binder**
@@ -329,6 +329,23 @@ both in the directive fragment (`compileTimeOperand`) and, as a latent-gap fix, 
 enforced: **SR11** all subjects/objects same category; **SR12** THROUGH ⇒ every subject/object numeric; **GR4**
 selection — without THRU `subject = object`, with THRU the inclusive numeric range `[object, object3]` (GR4b);
 Format 2 evaluates each WHEN's cce (§7.3.8). Single-numeric-literal reclassification (GR2) is automatic (§5).
+
+## 8a. DISPLAY directive (§7.3.12; kb/Work PB807, PB1538)
+
+The directive's operand list is a fragment of the SAME grammar (`displayDirectiveFragment` in `CobolExpressions.g4`):
+`displayDirectiveOperand+ displayUponPhrase? EOF`, each operand a `compileTimeOperand` — so §7.3.12.3 SR2/SR3 ("formed in
+accordance with 7.3.6 / 7.3.7") and §7.3.3 SR10 are the evaluator's, not a third copy — or `PARAMETER` + a word
+(`parameterPhraseAhead()` in `CobolParserCoreBase`: PARAMETER is no lexer token, so it is told apart by its text). `ConditionalCompilationProcessor.Display.cs` evaluates the operands in order (GR4), looks a PARAMETER up through the
+ONE environment lookup the DEFINE PARAMETER phrase uses (`ParameterText`, DOC-A.1-49 / DOC-A.1-55), resolves the UPON words,
+and **transfers** (GR1): `DiagnosticBag.Transfer(stream, line)`, one line per destination — the images of the operands joined
+by one space (DOC-A.1-53) — which `CompilerDriver.Result.CompileOutput` hands to the CLI, which writes each line to the compiler
+stream it names, before the diagnostics. UPON (GR5, GR6; DOC-A.1-54): no phrase is as if UPON LISTING; LISTING and the
+output device-names CONSOLE and SYSOUT are the compiler's standard output, SYSERR its standard error; a device-name is a row of
+the ONE `ImplementorNames` table (which therefore lives in `Cobol.Net.Editions`, beside the directive catalog, where the
+front end and the binder both read it); §5.2.6.4's choice indicators — the device group and LISTING each at most once, in any
+order — are checked once per phrase (COBOLNET2698). A PARAMETER value that the environment does not supply makes the whole
+directive transfer nothing (GR3). A violation reports and transfers nothing; a directive in an omitted branch does not run.
+Presence of an operand is the catalog's (`directiveOperand.operandRequired`, COBOLNET1911), content is the stage's.
 
 ## 9. Compilation-variable value model
 

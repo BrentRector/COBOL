@@ -82,6 +82,11 @@ public static class CompilerDriver
         /// <summary>Every file this compilation WROTE, as full paths (the <c>.g.cs</c>, the assembly, the packaged
         /// runtime config and runtime) — empty when it wrote nothing.</summary>
         public IReadOnlyList<string> OutputFiles { get; init; } = [];
+
+        /// <summary>What the compilation itself transferred to its operator, in order — the lines of every DISPLAY directive
+        /// it processed (ISO §7.3.12.4 GR1, kb/Work PB1538), each with the compiler stream it is written to. Present on
+        /// every outcome the front end ran for; the CLI writes them before the diagnostics.</summary>
+        public IReadOnlyList<Frontend.Diagnostics.CompileOutputLine> CompileOutput { get; init; } = [];
     }
 
     /// <summary>Compile <paramref name="options"/> to a runnable console assembly.</summary>
@@ -126,7 +131,7 @@ public static class CompilerDriver
         if (tree is null || diagnostics.HasErrors)
             return new Result(Outcome.FrontendError, "", null,
                 diagnostics.Diagnostics.Where(d => d.IsError).Select(d => d.ToString()!).ToList(), feWarnings)
-                { Inputs = inputs };
+                { Inputs = inputs, CompileOutput = diagnostics.CompileOutput };
 
         // Phase 2 — BIND under the targeted EDITION, then emit typed-native C#. The Binder phase
         // (BinderDriver.Bind behind emitter.Bind, P6) runs the DECLARED manifest whose NAMED TERMINAL pass is the
@@ -154,7 +159,7 @@ public static class CompilerDriver
         var bound = emitter.Bind(tree, edition, frontend.Directives);   // Phase 2a — BIND (terminal = conformance pass)
         if (edition.Diagnostics.Count > 0)
             return new Result(Outcome.BindError, "", null, edition.Diagnostics, [.. feWarnings, .. edition.Warnings])
-                { Inputs = inputs };
+                { Inputs = inputs, CompileOutput = diagnostics.CompileOutput };
 
         // Check-only: every edition-gating diagnostic is now produced (parse + the bind manifest incl. its
         // terminal conformance pass), so the compile VERDICT is settled — the verdict already includes the pass's
@@ -162,7 +167,7 @@ public static class CompilerDriver
         // backend + the dll/g.cs writes) — the dominant cost — since no runnable assembly is wanted (the INV-1
         // continuity sweep / CLI `check-batch`).
         if (options.CheckOnly)
-            return new Result(Outcome.Success, "", null, [], [.. feWarnings, .. edition.Warnings]) { Inputs = inputs };
+            return new Result(Outcome.Success, "", null, [], [.. feWarnings, .. edition.Warnings]) { Inputs = inputs, CompileOutput = diagnostics.CompileOutput };
 
         // Phases 2b + 3 — the BACKEND (the ICodeGenBackend seam, P7 Step 1): render the bound tree and compile
         // the result. Everything after Bind sits behind the seam so a second backend (direct CIL, PHASE 16) is a
@@ -177,9 +182,9 @@ public static class CompilerDriver
                     .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
                     .Select(d => d.ToString())
                     .ToList(), [.. feWarnings, .. edition.Warnings])
-                { Inputs = inputs, OutputFiles = artifact.OutputFiles };
+                { Inputs = inputs, CompileOutput = diagnostics.CompileOutput, OutputFiles = artifact.OutputFiles };
 
         return new Result(Outcome.Success, outputDll, artifact.GeneratedSourcePath, [],
-            [.. feWarnings, .. edition.Warnings]) { Inputs = inputs, OutputFiles = artifact.OutputFiles };
+            [.. feWarnings, .. edition.Warnings]) { Inputs = inputs, CompileOutput = diagnostics.CompileOutput, OutputFiles = artifact.OutputFiles };
     }
 }

@@ -76,8 +76,9 @@ public sealed record DirectiveOperandSyntax
     /// <c>call-convention-name-1</c>, whose meaning is implementor-defined (§7.3.9.3 GR2 b).</summary>
     public bool UserWord { get; init; }
 
-    /// <summary>For <see cref="DirectiveOperandForm.Text"/>: whether SOME operand shall be present. PAGE's
-    /// comment-text-1 is bracketed and optional (§7.3.19.2); DISPLAY's operand braces are not (§7.3.12.2).</summary>
+    /// <summary>For <see cref="DirectiveOperandForm.Text"/> and <see cref="DirectiveOperandForm.Stage"/>: whether SOME
+    /// operand shall be present — checked centrally for both, so the owning stage of a Stage row never has to repeat it.
+    /// PAGE's comment-text-1 is bracketed and optional (§7.3.19.2); DISPLAY's operand braces are not (§7.3.12.2).</summary>
     public bool OperandRequired { get; init; }
 
     /// <summary>The directive words of THIS row whose own general format writes NO operand at all, whatever the row's

@@ -839,6 +839,32 @@ public sealed class CopyProcessor(
         return -1;
     }
 
+    /// <summary>The COPY or REPLACE statement that <paramref name="text"/> ENDS INSIDE — its keyword and its position —
+    /// or null when every statement the text starts is finished. A statement ends at its separator period (§7.2.3.4 GR6,
+    /// the REPLACE general formats of §7.2.4.2 both end with their period), and a period inside pseudo-text is a text-word of the operand and ends nothing (kb/Work PB1354), so
+    /// the walk is the statements' own: the same <see cref="TextWordScanner"/> words, a statement opened by the keyword
+    /// <see cref="FindStatementKeyword"/> finds, the pseudo-text delimiters toggling. The merged driver asks it of the
+    /// text before each compiler directive line (§7.3.3 SR8 b): "within a source text manipulation statement",
+    /// kb/Work PB1384), so the question has ONE answer for COPY and REPLACE alike.</summary>
+    internal static (string Keyword, int Start)? OpenStatementAt(string text)
+    {
+        int pos = 0;
+        string? keyword = null;
+        int start = -1;
+        bool inPseudoText = false;
+        while (TextWordScanner.TryNext(text, ref pos, out var word))
+        {
+            if (keyword is null)
+            {
+                if (word.IsWord("COPY")) (keyword, start) = ("COPY", word.Start);
+                else if (word.IsWord("REPLACE")) (keyword, start) = ("REPLACE", word.Start);
+            }
+            else if (word.Kind == TextWordKind.PseudoTextDelimiter) inPseudoText = !inPseudoText;
+            else if (!inPseudoText && word.IsSeparatorPeriod) keyword = null;
+        }
+        return keyword is null ? null : (keyword, start);
+    }
+
     /// <summary>A cursor over the text-words of ONE COPY or REPLACE statement — the parser of their general formats
     /// (§7.2.3.2 / §7.2.4.2) reads through it. Separator commas and semicolons "may be used anywhere the separator
     /// space is used" (§8.3.5 2)), so <see cref="TryPeek"/> steps over them. Only a statement's FIRST syntax error is

@@ -174,6 +174,7 @@ public sealed class Frontend
                 }
                 var (finalDiagnostics, finalDirectives, finalLineMap) = firstFailure ?? (passDiagnostics, directives, passLineMap);
                 foreach (var d in finalDiagnostics.Diagnostics) diagnostics.Add(d);
+                diagnostics.AddCompileOutput(finalDiagnostics.CompileOutput);   // a DISPLAY directive's lines belong to the pass whose result this is (kb/Work PB1538)
                 LineMap = finalLineMap;
                 Directives = finalDirectives.WithStackOps([]);
                 return null;
@@ -181,6 +182,7 @@ public sealed class Frontend
             if (settled)
             {
                 foreach (var d in passDiagnostics.Diagnostics) diagnostics.Add(d);
+                diagnostics.AddCompileOutput(passDiagnostics.CompileOutput);
                 Directives = directives.WithStackOps(ops);
                 return tree;
             }

@@ -6,6 +6,7 @@ using CobolNet.Editions.Diagnostics;
 using CobolNet.Tests.Shared;
 using Xunit;
 using CobolNet.Frontend.Preprocessor;
+using CobolNet.Editions;
 
 namespace CobolNet.Tests.Unit;
 

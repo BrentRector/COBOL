@@ -2598,6 +2598,40 @@ public static class DiagnosticCatalog
         + "shall be preceded only by zero, one, or more space characters.\" Write the directive on a line of its own.",
         "ISO §7.3.3 SR2");
 
+    /// <summary>COBOLNET2696 — a compiler directive continued onto a following line (kb/Work PB1360). §7.3.3 SR1: every
+    /// directive is specified on ONE line (the IF and EVALUATE directives' own lines too, §7.3.16.3 SR1 / §7.3.13.3 SR2),
+    /// so a fixed continuation line or a floating-continued literal that follows a directive line is not part of it.
+    /// Before, the §6.5 join appended the line to the directive and its operand grew past what the author wrote.</summary>
+    public static readonly DiagnosticDescriptor DirectiveContinued = new(
+        "COBOLNET2696", "directive-continued", EditionSeverity.Error,
+        "A compiler directive is continued onto a following line. ISO §7.3.3 SR1: \"A compiler directive shall be "
+        + "specified on one line, except for the EVALUATE and the IF directives for which specific rules are specified\" "
+        + "(and each of those is itself specified entirely on its line). Write the whole directive on one line.",
+        "ISO §7.3.3 SR1");
+
+    /// <summary>COBOLNET2697 — a compiler directive written within a COPY or REPLACE statement (kb/Work PB1384).
+    /// §7.3.3 SR8 b). The merged text-manipulation driver ends its text block at every directive line, so the
+    /// statement's later words used to reach COPY resolution truncated (no text-name, or a missing period) or the REPLACE
+    /// scan unseen; the directive itself was accepted.</summary>
+    public static readonly DiagnosticDescriptor DirectiveWithinTextManipulationStatement = new(
+        "COBOLNET2697", "directive-within-text-manipulation-statement", EditionSeverity.Error,
+        "A compiler directive is specified within a COPY or REPLACE statement. ISO §7.3.3 SR8: \"A compiler directive "
+        + "may be specified anywhere in a compilation group, in source text or in library text, except ... b) within "
+        + "a source text manipulation statement\". Finish the statement with its separator period first, or move "
+        + "the directive before it.", "ISO §7.3.3 SR8 b)");
+
+    /// <summary>COBOLNET2698 — a DISPLAY directive's UPON phrase (kb/Work PB807): a word that is no OUTPUT-capable
+    /// device-name of the implementor-name table and is not LISTING (§7.3.12.4 GR5 b), DOC-A.1-54), or an UPON phrase
+    /// that writes LISTING twice or two separate runs of devices (§7.3.12.2's braces carry §5.2.6.4 choice indicators:
+    /// each alternative at most once).</summary>
+    public static readonly DiagnosticDescriptor DisplayDirectiveUpon = new(
+        "COBOLNET2698", "display-directive-upon", EditionSeverity.Error,
+        "The UPON phrase of a DISPLAY directive names a device this implementation does not make available as "
+        + "compile-time-device-1, or repeats an alternative. ISO §7.3.12.4 GR5: data is transferred to the same device as "
+        + "source listings (LISTING) or to the device the implementor defines for compile-time-device-1 (an output "
+        + "device-name: CONSOLE, SYSOUT or SYSERR); §5.2.6.4 admits each choice-indicator alternative at most once.",
+        "ISO §7.3.12.2 / §7.3.12.4 GR5");
+
     /// <summary>COBOLNET2450 — COPY literal-1 / literal-2 that is not a plain alphanumeric literal (kb/Work PB1354):
     /// a concatenation expression or figurative constant (§7.2.3.3 SR4), or a national or boolean literal (SR5
     /// "Literal-1 and literal-2 shall be alphanumeric literals").</summary>
@@ -5255,7 +5289,7 @@ public static class DiagnosticCatalog
 
     /// <summary>A SPECIAL-NAMES switch-name / feature-name / device-name entry names a system-name this
     /// implementation does not make available, or writes ON/OFF STATUS on a name that is not a switch-name
-    /// (kb/Work PB862). The available names are ONE table, <c>Binding/ImplementorNames.cs</c>, documented as
+    /// (kb/Work PB862). The available names are ONE table, <c>Cobol.Net.Editions/ImplementorNames.cs</c>, documented as
     /// Annex A.1 items 189/190/191 in docs/CONFORMANCE.md §7. <c>SPECIAL-NAMES. WIBBLE WOBBLE.</c> used to
     /// compile and register a mnemonic that named nothing.</summary>
     public static readonly DiagnosticDescriptor UnavailableImplementorName = new(

@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
+
 namespace CobolNet.Binding.Bound;
 
 // The ALTER / external-switch bound nodes (P7 Step 10n: the binder half moved to

@@ -774,7 +774,8 @@
   "pb1907_unstring_overlap_pointer",
   "pb1907_unstring_overlap_linkage",
   "pb749_sort_implicit_statement_status",
-  "pb1660_directive_nbsp_in_literal"
+  "pb1660_directive_nbsp_in_literal",
+  "pb807_display_directive_operands"
   ],
  "pending": [
   "pb485_value_only_format1"
