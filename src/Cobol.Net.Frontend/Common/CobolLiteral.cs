@@ -101,6 +101,13 @@ public static class CobolLiteral
         _ => LiteralClass.Alphanumeric,
     };
 
+    /// <summary>True when <paramref name="raw"/> is written in a HEXADECIMAL FORMAT — <c>X"…"</c> (§8.3.3.2 Format 2),
+    /// <c>NX"…"</c> (§8.3.3.5.2 Format 2) or <c>BX"…"</c> (§8.3.3.4.2 Format 2). ⛔ THE ONE hexadecimal-format question,
+    /// asked of the parsed PREFIX (the classifier's own) and never of a second <c>text[0] is 'X'</c> test: the rules
+    /// that treat a hexadecimal literal apart from its decoded characters (§12.3.7.3 SR19 and SR26 — a currency literal
+    /// "in hexadecimal format") need the FORM, which the decoded characters cannot tell (kb/Work PB791).</summary>
+    public static bool IsHexadecimalFormat(string raw) => SplitLiteral(raw) is { Prefix: "X" or "NX" or "BX" };
+
     /// <summary>If <paramref name="raw"/> is the figurative <c>ALL literal</c> form (a VALUE / level-88 operand
     /// text), the RAW literal after ALL — still prefixed, so <see cref="ClassOf"/> and <see cref="Decode"/> apply
     /// to it; otherwise <see langword="null"/>.</summary>

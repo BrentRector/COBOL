@@ -604,7 +604,10 @@
   "pb1494_debugging_line_obsolete_2002",
   "pb1140_sort_merge_short_record_fill",
   "pb1705_debugging_mode_obsolete_2002",
-  "pb1398_length_of_function_result"
+  "pb1398_length_of_function_result",
+  "pb1095_class_in_also_group",
+  "pb791_currency_literal_forms",
+  "pb1537_figurative_literal_clauses"
   ],
   "pending": []
 }

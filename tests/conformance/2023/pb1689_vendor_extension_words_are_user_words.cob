@@ -1,6 +1,7 @@
       *> PB1689 (owner 2026-09-29: follow ISO) - ISO 8.9 reserves none of CHANNEL, GENERIC, PACKED,
       *>   END-INVOKE, END-MERGE, END-METHOD, END-SORT and GnuCOBOL 3.2 has no entry for them, so
-      *>   each is a legal user-defined word (data-name and paragraph-name).
+      *>   each is a legal user-defined word (data-name or paragraph-name; END-METHOD is the paragraph, because
+      *>   8.3.2.2 allows a word only ONE type of user-defined word per source element).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1689U.
        DATA DIVISION.
@@ -10,11 +11,11 @@
        01  PACKED  PIC 9 VALUE 3.
        01  END-INVOKE PIC 9 VALUE 4.
        01  END-MERGE  PIC 9 VALUE 5.
-       01  END-METHOD PIC 9 VALUE 6.
+       01  SIX        PIC 9 VALUE 6.
        01  END-SORT   PIC 9 VALUE 7.
        PROCEDURE DIVISION.
            DISPLAY CHANNEL GENERIC PACKED END-INVOKE END-MERGE
-                   END-METHOD END-SORT
+                   SIX END-SORT
            ADD CHANNEL GENERIC PACKED END-SORT TO END-MERGE
            DISPLAY END-MERGE
            PERFORM END-METHOD

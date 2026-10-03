@@ -16,6 +16,10 @@ namespace CobolNet.Tests.Unit;
 /// its <see cref="UserWordKind"/>, and this test keeps that total: the enum carries exactly the types §8.3.2.2 lists
 /// (parsed from <c>specs/ISO_COBOL.md</c>, never copied by hand), and every type is declared at some call site or
 /// carried below as a type this compiler never declares in a bound source element, with the reason.</para>
+/// <para>The same funnel asks §8.3.2.2's other two rules about a word AS DECLARED (kb/Work PB990, PB1403): one TYPE per
+/// word within a source element, except as the standard's three exceptions say, and a letter in every word but a
+/// section-name, paragraph-name or level-number. Both rule tables are DATA (<c>UserWordKinds</c>) rebuilt below from the
+/// standard's own text, so an edit to either, or to the standard's wording, cannot drift silently.</para>
 /// </summary>
 public sealed class UserWordDeclarationDriftTests
 {
@@ -40,6 +44,99 @@ public sealed class UserWordDeclarationDriftTests
         int end = spec.IndexOf("Within a source element, a given user-defined word", start, StringComparison.Ordinal);
         Assert.True(end > start, "§8.3.2.2's list end moved in specs/ISO_COBOL.md — re-derive this guard");
         return [.. Regex.Matches(spec[start..end], @"^— ([a-z-]+)\s*$", RegexOptions.Multiline).Select(m => m.Groups[1].Value)];
+    }
+
+    /// <summary>§8.3.2.2's text after the type list, up to the sentence that ends the exceptions.</summary>
+    private static string ExceptionsText()
+    {
+        string spec = File.ReadAllText(Path.Combine(TestRepo.Root, "specs", "ISO_COBOL.md"));
+        int start = spec.IndexOf("Within a source element, a given user-defined word", StringComparison.Ordinal);
+        Assert.True(start >= 0, "§8.3.2.2's exceptions moved in specs/ISO_COBOL.md — re-derive this guard");
+        int end = spec.IndexOf("Further rules for uniqueness", start, StringComparison.Ordinal);
+        Assert.True(end > start, "§8.3.2.2's exceptions end moved in specs/ISO_COBOL.md — re-derive this guard");
+        return spec[start..end];
+    }
+
+    private static UserWordKind KindOfSpelling(string spelling) =>
+        Enum.GetValues<UserWordKind>().Single(k => k.Spelling() == spelling);
+
+    /// <summary>⛔ THE ONE-TYPE-PER-WORD CENSUS IS THE STANDARD'S, NOT OURS (kb/Work PB990): which types may share a
+    /// word is written ONCE (<see cref="UserWordKinds.MayBeOneWord"/>) and this test rebuilds the whole 31 x 31 relation
+    /// from §8.3.2.2's own exceptions, parsed from <c>specs/ISO_COBOL.md</c>, and fails on the first pair the two
+    /// disagree about — so an edit to the sets, or to the standard's text, cannot drift silently.</summary>
+    [Fact]
+    public void TheSharingRelation_IsRebuiltFromTheStandardsExceptions()
+    {
+        string text = ExceptionsText();
+        Assert.Contains("1\\) a compilation-variable-name may be the same as any other type of user-defined word", text);
+        var levelNumberMatch = Regex.Match(text, @"2\\\) a level-number may be the same as a ([a-z-]+) or a ([a-z-]+)");
+        Assert.True(levelNumberMatch.Success, "exception 2 moved — re-derive this guard");
+        var withLevelNumber = new HashSet<UserWordKind>
+            { KindOfSpelling(levelNumberMatch.Groups[1].Value), KindOfSpelling(levelNumberMatch.Groups[2].Value) };
+        int three = text.IndexOf("3\\) the same name may be used as any of the following", StringComparison.Ordinal);
+        Assert.True(three >= 0, "exception 3 moved — re-derive this guard");
+        var oneName = Regex.Matches(text[three..], @"^— ([a-z-]+)\s*$", RegexOptions.Multiline)
+            .Select(m => KindOfSpelling(m.Groups[1].Value)).ToHashSet();
+        Assert.True(oneName.Count >= 5, $"parsed only {oneName.Count} types from exception 3 — re-derive this guard");
+
+        foreach (var a in Enum.GetValues<UserWordKind>())
+            foreach (var b in Enum.GetValues<UserWordKind>())
+            {
+                bool expected = a == b
+                    || a == UserWordKind.CompilationVariableName || b == UserWordKind.CompilationVariableName
+                    || (a == UserWordKind.LevelNumber && withLevelNumber.Contains(b))
+                    || (b == UserWordKind.LevelNumber && withLevelNumber.Contains(a))
+                    || (oneName.Contains(a) && oneName.Contains(b));
+                Assert.True(expected == UserWordKinds.MayBeOneWord(a, b),
+                    $"§8.3.2.2 says a {a.Spelling()} and a {b.Spelling()} {(expected ? "MAY" : "may NOT")} share a word; "
+                    + $"UserWordKinds.MayBeOneWord says the opposite");
+            }
+    }
+
+    /// <summary>⛔ THE LETTERLESS TYPES ARE THE STANDARD'S (kb/Work PB1403): §8.3.2.2 — "<i>With the exception of
+    /// section-names, paragraph-names, and level-numbers, each user-defined word shall contain at least one basic
+    /// letter or extended letter</i>". <see cref="UserWordKinds.MayBeLetterless"/> is rebuilt from that sentence.</summary>
+    [Fact]
+    public void TheLetterlessTypes_AreTheStandardsExceptionList()
+    {
+        string spec = File.ReadAllText(Path.Combine(TestRepo.Root, "specs", "ISO_COBOL.md"));
+        var m = Regex.Match(spec, @"With the exception of ([a-z-]+), ([a-z-]+), and ([a-z-]+), each user-defined word shall contain at least one basic letter");
+        Assert.True(m.Success, "§8.3.2.2's letter rule moved in specs/ISO_COBOL.md — re-derive this guard");
+        Assert.Equal(
+            new[] { m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value }.Select(s => s.TrimEnd('s')).Order(),
+            UserWordKinds.MayBeLetterless.Select(k => k.Spelling()).Order());
+    }
+
+    /// <summary>The census runs at the ONE declaration funnel and nowhere else: a second caller would be a second
+    /// place the rule is asked, and a declaring construct that reached only the second would escape the first.</summary>
+    [Fact]
+    public void TheCensus_IsAskedOnlyByTheOneDeclarationFunnel()
+    {
+        var callers = Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Select(f => (File: f, Text: File.ReadAllText(f)))
+            .Where(s => Regex.IsMatch(s.Text, @"(?<!void )CheckOneTypePerWord\("))
+            .Select(s => Path.GetFileName(s.File)).ToList();
+        Assert.Equal(["DataBinder.cs"], callers);
+        string binder = File.ReadAllText(Path.Combine(TestRepo.Src("Cobol.Net.Compiler"), "Binding", "DataBinder.cs"));
+        int declare = binder.IndexOf("internal bool DeclareUserWord(", StringComparison.Ordinal);
+        Assert.True(declare >= 0);
+        string head = binder[declare..(declare + 260)];
+        Assert.Contains("CheckOneTypePerWord(word, kind);", head);
+        Assert.Contains("CheckLetter(word, kind);", head);   // §8.3.2.2's letter rule, kb/Work PB1403 — the same funnel
+    }
+
+    /// <summary>⛔ A PARAGRAPH-NAME-OMITTED PARAGRAPH IS NAMED NOWHERE (ISO §14.4.3; kb/Work PB990): the procedure table
+    /// registered a declarative section's leading sentences, and its empty-section no-op pc, as a paragraph named like
+    /// the SECTION — a paragraph the source never wrote, which §8.3.2.2's one-type-per-word census found declared
+    /// as both and which made a legal reference to the section ambiguous. They go through the anonymous-paragraph
+    /// entry points, so no call of <c>AddParagraph</c> passes a section's name.</summary>
+    [Fact]
+    public void NoSectionNameIsRegisteredAsAParagraph()
+    {
+        string builder = File.ReadAllText(Path.Combine(TestRepo.Src("Cobol.Net.Compiler"), "Binding", "Procedure",
+            "ProcedureTableBuilder.cs"));
+        Assert.DoesNotMatch(new Regex(@"\bAddParagraph\(\s*name\b"), builder);
     }
 
     /// <summary>The enum is §8.3.2.2's list: one member per listed type, no member the list does not name.</summary>

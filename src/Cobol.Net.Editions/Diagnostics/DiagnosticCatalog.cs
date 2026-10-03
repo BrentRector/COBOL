@@ -2598,6 +2598,34 @@ public static class DiagnosticCatalog
         + "shall be preceded only by zero, one, or more space characters.\" Write the directive on a line of its own.",
         "ISO §7.3.3 SR2");
 
+    /// <summary>COBOLNET2692 — one user-defined word used as two TYPES of user-defined word within a source element
+    /// (kb/Work PB990). §8.3.2.2: "Within a source element, a given user-defined word may be used as only one type
+    /// of user-defined word" — with three exceptions the compiler holds as data (<c>UserWordKinds.MayBeOneWord</c>): a
+    /// compilation-variable-name, a level-number beside a paragraph- or section-name, and the constant-name /
+    /// data-name / property-name / record-key-name / record-name group. Decided at the ONE declaration funnel
+    /// (<c>DataBinder.DeclareUserWord</c>), so every declaring construct is covered.</summary>
+    public static readonly DiagnosticDescriptor UserWordTypeConflict = new(
+        "COBOLNET2692", "user-word-type-conflict", EditionSeverity.Error,
+        "A user-defined word is used as two different types of user-defined word in one source element — for example "
+        + "an alphabet-name that is also a data-name, a paragraph-name that is also a file-name, or a section-name "
+        + "that is also a condition-name. ISO §8.3.2.2: \"Within a source element, a given user-defined word may be "
+        + "used as only one type of user-defined word\"; the exceptions are a compilation-variable-name, a "
+        + "level-number that matches a paragraph-name or section-name, and the one group of constant-name, "
+        + "data-name, property-name, record-key-name and record-name. Rename one of the declarations.",
+        "ISO §8.3.2.2");
+
+    /// <summary>COBOLNET2693 — a user-defined word with no letter (kb/Work PB1403). §8.3.2.2: "With the exception of
+    /// section-names, paragraph-names, and level-numbers, each user-defined word shall contain at least one basic
+    /// letter or extended letter." The lexer must admit a letterless token (<c>1-2</c> is a legal paragraph-name), so
+    /// the rule is asked at the ONE declaration funnel (<c>DataBinder.DeclareUserWord</c>), for every type but
+    /// those three.</summary>
+    public static readonly DiagnosticDescriptor UserWordWithoutLetter = new(
+        "COBOLNET2693", "user-word-without-letter", EditionSeverity.Error,
+        "A user-defined word that is not a section-name, paragraph-name or level-number contains no letter — for "
+        + "example the data-name 1-2. ISO §8.3.2.2: \"With the exception of section-names, paragraph-names, and "
+        + "level-numbers, each user-defined word shall contain at least one basic letter or extended letter.\" "
+        + "Add a letter to the name.", "ISO §8.3.2.2");
+
     /// <summary>COBOLNET2696 — a compiler directive continued onto a following line (kb/Work PB1360). §7.3.3 SR1: every
     /// directive is specified on ONE line (the IF and EVALUATE directives' own lines too, §7.3.16.3 SR1 / §7.3.13.3 SR2),
     /// so a fixed continuation line or a floating-continued literal that follows a directive line is not part of it.

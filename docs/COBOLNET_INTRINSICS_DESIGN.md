@@ -666,6 +666,19 @@ an UNDEFINE'd or SUBSTITUTE'd-away name leaves the ALL list, a SUBSTITUTE litera
 and its function's D8 window (`IntrinsicSig.IsDefinedAt` — Annex E.2 item 13's seven names are prohibited under ALL
 only from 2023). Golden `2023/pb1083_repository_all_cobol_words`; negatives `pb1083-*`.
 
+**The same funnel is the one-type-per-word census (kb/Work PB990, §8.3.2.2).** "*Within a source element, a given
+user-defined word may be used as only one type of user-defined word*" is asked at `DeclareUserWord` too
+(`CheckOneTypePerWord`): the binder keeps `word → the type it was first declared as` for ITS source element (one
+`DataBinder` is one element; a name a containing element passes down is inherited, not declared, and a contained
+element may re-declare it, §8.4.6.1), and a later declaration of another type is **COBOLNET2692** unless
+`UserWordKinds.MayBeOneWord` allows it — the standard's three exceptions as DATA (a compilation-variable-name; a
+level-number beside a paragraph- or section-name; the constant-name / data-name / property-name / record-key-name /
+record-name group), which `UserWordDeclarationDriftTests.TheSharingRelation_IsRebuiltFromTheStandardsExceptions`
+rebuilds from the text of `specs/ISO_COBOL.md`. Two declarations that are not declarations of a name the source
+wrote do NOT reach it: a REPOSITORY specifier naming the unit itself is ignored (§12.3.8.3 SR11 / SR15), and a
+declarative section's paragraph-name-OMITTED paragraph is registered anonymously (§14.4.3) rather than under the
+section's own name. Goldens `85/pb990_user_word_types_one_per_word`, negatives `pb990-*`.
+
 ### A boolean EXPRESSION is an intrinsic argument (PB65, FMT-15.45.2 / §8.4.3.2.3 SR8).
 
 `functionArgument` gained its `booleanExpression` alternative behind the ARGUMENT-scoped `boolArgAhead()` predicate

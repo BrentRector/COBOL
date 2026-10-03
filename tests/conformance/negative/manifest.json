@@ -1930,7 +1930,25 @@
   "pb807-display-directive-concatenation",
   "pb807-display-directive-upon-input-device",
   "pb807-display-directive-upon-listing-twice",
-  "pb1368-display-name-after-define-off"
+  "pb1368-display-name-after-define-off",
+  "pb1095-class-in-also-group-through",
+  "pb791-currency-figurative-literal-7-bare",
+  "pb791-currency-figurative-literal-7-picture-symbol",
+  "pb791-currency-figurative-literal-8",
+  "pb791-currency-hexadecimal-literal-8",
+  "pb791-currency-null-literal-7",
+  "pb791-currency-boolean-literal-7",
+  "pb990-alphabet-name-and-data-name",
+  "pb990-class-name-and-paragraph-name",
+  "pb990-file-name-and-record-name",
+  "pb990-data-name-and-condition-name",
+  "pb990-section-name-and-paragraph-name",
+  "pb1082-pcs-undeclared-alphabet",
+  "pb1082-pcs-class-name-is-no-alphabet",
+  "pb1537-order-table-symbolic-character-figurative",
+  "pb1537-locale-null-literal",
+  "pb1403-letterless-data-name",
+  "pb791-currency-hexadecimal-literal-7-without-picture-symbol"
  ],
  "pending": []
 }

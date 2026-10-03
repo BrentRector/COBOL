@@ -63,12 +63,12 @@
            IS GLOBAL.
        01 QF-REC PIC X(4).
        FD L1FDO-R
-           REPORT IS L1FDO-R
+           REPORT IS L1FDO-RPT
            IS GLOBAL.
        WORKING-STORAGE SECTION.
        01 WS-LC PIC 9(4).
        REPORT SECTION.
-       RD L1FDO-R.
+       RD L1FDO-RPT.
        01 L1FDO-D TYPE DETAIL.
           02 LINE PLUS 1 COLUMN 1 PIC X(4) VALUE "RPT1".
        PROCEDURE DIVISION.
@@ -100,9 +100,9 @@
            DISPLAY "Q1=" QF-REC.
            CLOSE QF.
            OPEN OUTPUT L1FDO-R.
-           INITIATE L1FDO-R.
+           INITIATE L1FDO-RPT.
            GENERATE L1FDO-D.
-           TERMINATE L1FDO-R.
+           TERMINATE L1FDO-RPT.
            CLOSE L1FDO-R.
            DISPLAY "RPT-DONE".
            STOP RUN.

@@ -532,8 +532,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 }
             }
         }
+        // ⛔ A specifier that names THIS unit is IGNORED (§12.3.8.3 SR11 for a function-specifier, SR15 for a
+        // program-specifier — "references … are to the named … definition and this … specifier is ignored"), so it
+        // declares nothing: the unit's own PROGRAM-ID / FUNCTION-ID word is the one declaration of that name
+        // (kb/Work PB990 — declaring both made one word a program-prototype-name AND a program-name).
+        string? ownName = UnitOwnName(program)?.Word;
         foreach (var (at, word, kind) in specifierWords)
+        {
+            if (kind is UserWordKind.ProgramPrototypeName or UserWordKind.FunctionPrototypeName
+                && ownName is not null && ownName.Equals(word, StringComparison.OrdinalIgnoreCase)) continue;
             using (Edition.At(at)) DeclareUserWord(word, kind);
+        }
         DeclareUnitName(program);
 
         SwitchBindSpecialNames(program);           // SPECIAL-NAMES switch clauses → the external-switch registry (ISO §12.3.7)
@@ -1372,9 +1381,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// of §12.4.5.7.3 (SR1 alphabet-name-1 alphanumeric, SR2 alphabet-name-2 national, SR7 alphabet-name-3 of the
     /// key's class). The two alphabet domains are disjoint (§12.3.7: an ALPHABET clause defines one class), so the
     /// lookup IS the class test; a national alphabet naming a coded character set only (UTF-8 / UTF-16 — §12.3.7.4
-    /// Table 6's empty collating-sequence column) defines no sequence at all.</summary>
-    private string? CollatingAlphabetFault(string alphabet, bool national)
+    /// Table 6's empty collating-sequence column) defines no sequence at all.
+    /// <para>⛔ ASKED BY EVERY SITE THAT NAMES AN ALPHABET AS A COLLATING SEQUENCE (kb/Work PB1082, PB1074): the
+    /// file-control COLLATING SEQUENCE clause, the OBJECT-COMPUTER PROGRAM COLLATING SEQUENCE clause
+    /// (<c>ResolveProgramCollating</c>) and the SORT/MERGE COLLATING SEQUENCE phrase (<c>SortBinder</c>). The program
+    /// collating sequence kept its own copy of this test and made alphabet-name-1's undeclared arm inert — its
+    /// alphabet-name-2 slot refused the same shapes (the two-arm dispatch).</para>
+    /// <para>A word whose ALPHABET clause DID declare it but failed its own screens has no fault of its own: that
+    /// clause reported already, and a second "not declared" would be false about the source (one fault, one
+    /// verdict) — the caller then finds no definition to apply and continues on the native order, in a compilation
+    /// that cannot produce a program.</para></summary>
+    internal string? CollatingAlphabetFault(string alphabet, bool national)
     {
+        if (!Alphabets.ContainsKey(alphabet) && !NationalAlphabets.ContainsKey(alphabet)
+            && _wordTypes.TryGetValue(alphabet, out var declaredAs) && declaredAs == UserWordKind.AlphabetName)
+            return null;
         if (national)
             return NationalAlphabets.TryGetValue(alphabet, out var nd)
                 ? nd.HasCollatingSequence ? null
@@ -1385,6 +1406,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             : NationalAlphabets.ContainsKey(alphabet) ? $"'{alphabet}' is defined FOR NATIONAL"
             : $"'{alphabet}' is not an alphabet declared in SPECIAL-NAMES";
     }
+
+    /// <summary>The message of a COLLATING SEQUENCE alphabet that does not define the class its slot asks for —
+    /// one text for the two statement-level sites that share <see cref="CollatingAlphabetFault"/> (PROGRAM COLLATING
+    /// SEQUENCE and the SORT/MERGE phrase), alphabet-name-1 being the alphanumeric slot and alphabet-name-2 the
+    /// national one. <paramref name="rule"/> names the slot's own syntax rule, never its sibling's.</summary>
+    internal static string CollatingAlphabetViolation(string site, string name, bool national, string fault, string rule) =>
+        $"{site} '{name}': alphabet-name-{(national ? 2 : 1)} shall reference an alphabet that defines "
+        + $"{(national ? "a NATIONAL" : "an ALPHANUMERIC")} collating sequence — {fault} ({rule})";
 
     /// <summary>A record key's CLASS for §12.4.5.7 — national when the key is category national (a PIC N item or a
     /// GROUP-USAGE NATIONAL group), alphanumeric otherwise. Only keys §12.4.5.12.3 SR2 / §12.4.5.6.3 SR2 admit
@@ -3091,6 +3120,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// </summary>
     internal bool DeclareUserWord(string word, UserWordKind kind)
     {
+        CheckOneTypePerWord(word, kind);
+        CheckLetter(word, kind);
         if (RepositoryIntrinsicSpecifier(word) is not { } specifier) return false;
         bool named = specifier != AllIntrinsics;   // SR12 (a named specifier) or SR13 (ALL)
         if (_repositoryNameReported.Add(word))
@@ -3099,6 +3130,56 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 + $"REPOSITORY paragraph (FUNCTION {specifier} INTRINSIC), so it shall not be used as a user-defined "
                 + $"word within the scope of that paragraph (ISO §8.3.2.1 rule 5; §12.3.8.3 SR{(named ? "12" : "13")})");
         return true;
+    }
+
+    /// <summary>The TYPE each user-defined word of THIS source element was first declared as — the census behind
+    /// §8.3.2.2's "<i>a given user-defined word may be used as only one type of user-defined word</i>" (kb/Work
+    /// PB990). One instance of the binder is one source element, so the map is per element by construction; a name a
+    /// containing element's SPECIAL-NAMES passes down is inherited, not declared here, and a contained source element
+    /// may re-declare it as another type (§8.4.6.1: each element "may use identical user-defined words"). Keyed
+    /// case-insensitively, like every COBOL word.</summary>
+    private readonly Dictionary<string, UserWordKind> _wordTypes = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The words already reported as two types, so a third declaration does not repeat the refusal.</summary>
+    private readonly HashSet<string> _wordTypeConflictReported = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>⛔ §8.3.2.2: "<i>Within a source element, a given user-defined word may be used as only one type of
+    /// user-defined word</i>", except as <see cref="UserWordKinds.MayBeOneWord"/> says. Asked at the ONE declaration funnel
+    /// (<see cref="DeclareUserWord"/>), the second declaration being the one reported — the first type stands.
+    /// Before kb/Work PB990 each declaring construct kept its own registry and nothing crossed them, so
+    /// <c>ALPHABET ZQ IS NATIVE</c> beside <c>01 ZQ PIC X</c> compiled and ran. The same TYPE declared twice is no
+    /// conflict here (a TYPE expansion re-registers a clone of its template's words); whether two declarations of
+    /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is.</summary>
+    private void CheckOneTypePerWord(string word, UserWordKind kind)
+    {
+        if (_wordTypes.TryAdd(word, kind)) return;
+        var first = _wordTypes[word];
+        if (UserWordKinds.MayBeOneWord(first, kind) || !_wordTypeConflictReported.Add(word)) return;
+        Edition.Error(DiagnosticCatalog.UserWordTypeConflict,
+            $"'{word}' names two types of user-defined word in this source element ({first.Spelling()} and "
+            + $"{kind.Spelling()}) — a given user-defined word may be used as only one type of user-defined word "
+            + "(ISO §8.3.2.2); the "
+            + "exceptions are a compilation-variable-name, a level-number that matches a paragraph-name or "
+            + "section-name, and the constant-name / data-name / property-name / record-key-name / record-name group");
+    }
+
+    /// <summary>The letterless words already reported, so a repeated declaration of one (a TYPE expansion re-registers
+    /// a clone of its template's words) draws one refusal.</summary>
+    private readonly HashSet<string> _letterlessReported = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>⛔ §8.3.2.2: "<i>With the exception of section-names, paragraph-names, and level-numbers, each
+    /// user-defined word shall contain at least one basic letter or extended letter</i>" (kb/Work PB1403). The lexer
+    /// cannot ask it — a paragraph-name <c>1-2</c> is legal and a letterless word is the same IDENTIFIER token — so it
+    /// is asked here, at the ONE declaration funnel, for every type not in <see cref="UserWordKinds.MayBeLetterless"/>:
+    /// <c>01 1-2 PIC X</c> compiled and ran. A letter is any Unicode letter: the basic letters, and the extended
+    /// letters the implementor admits (§8.3.2.2 leaves them to the implementor; Annex A.1).</summary>
+    private void CheckLetter(string word, UserWordKind kind)
+    {
+        if (UserWordKinds.MayBeLetterless.Contains(kind) || word.Any(char.IsLetter) || !_letterlessReported.Add(word)) return;
+        Edition.Error(DiagnosticCatalog.UserWordWithoutLetter,
+            $"the {kind.Spelling()} '{word}' contains no letter — with the exception of section-names, paragraph-names "
+            + "and level-numbers, each user-defined word shall contain at least one basic letter or extended letter "
+            + "(ISO §8.3.2.2)");
     }
 
     /// <summary>Declare the unit's OWN name — the program-name of a PROGRAM-ID paragraph or the user-function-name of
@@ -3110,16 +3191,26 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// division.</summary>
     private void DeclareUnitName(Core.ProgramUnitContext program)
     {
-        // The IS PROTOTYPE format declares a prototype-name instead (§11.10.2 Format 2, §11.5.2 Format 2).
+        if (UnitOwnName(program) is not var (at, word, kind)) return;
+        using (Edition.At(at)) DeclareUserWord(word, kind);
+    }
+
+    /// <summary>The user-defined word a unit's own identification paragraph declares, and its type — null for a
+    /// unit with no PROGRAM-ID / FUNCTION-ID paragraph (a class, interface or method reaches this binder as a synthetic
+    /// context; the OO driver declares those). The IS PROTOTYPE format declares a prototype-name instead (§11.10.2
+    /// Format 2, §11.5.2 Format 2). ONE reading, asked by <see cref="DeclareUnitName"/> and by the REPOSITORY
+    /// walk, which must not declare a specifier that names the unit itself (§12.3.8.3 SR11 / SR15: "this specifier
+    /// is ignored").</summary>
+    private static (Antlr4.Runtime.ParserRuleContext At, string Word, UserWordKind Kind)? UnitOwnName(Core.ProgramUnitContext program)
+    {
         var id = program.identificationDivision()?.identificationBody();
         if (id?.programIdParagraph() is { } pid && pid.programName() is { } pgm)
-            using (Edition.At(pgm))
-                DeclareUserWord(pgm.GetText(), pid.prototypePhrase() is null
-                    ? UserWordKind.ProgramName : UserWordKind.ProgramPrototypeName);
-        else if (id?.functionIdParagraph() is { } fid && fid.programName() is { } fn)
-            using (Edition.At(fn))
-                DeclareUserWord(fn.GetText(), fid.prototypePhrase() is null
-                    ? UserWordKind.UserFunctionName : UserWordKind.FunctionPrototypeName);
+            return (pgm, pgm.GetText(), pid.prototypePhrase() is null
+                ? UserWordKind.ProgramName : UserWordKind.ProgramPrototypeName);
+        if (id?.functionIdParagraph() is { } fid && fid.programName() is { } fn)
+            return (fn, fn.GetText(), fid.prototypePhrase() is null
+                ? UserWordKind.UserFunctionName : UserWordKind.FunctionPrototypeName);
+        return null;
     }
 
     /// <summary>⛔ THE ONE ANSWER to "does the REPOSITORY paragraph in scope identify this word as an

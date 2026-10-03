@@ -47,11 +47,12 @@
        01 SECURE           PIC X(3) VALUE "W14".
        01 W-TAB.
            05 UNDERLINE    PIC X(3) OCCURS 3 TIMES.
-      *> ISO 8.9 - reserved from 2002 only, so legal COBOL-85 user-defined words.
+      *> ISO 8.9 - reserved from 2002 only, so legal COBOL-85 user-defined words. CRT is the sixth: it is declared
+      *> as the MNEMONIC-NAME above and REFERENCED by the DISPLAY ... UPON CRT below - never also as a data-name,
+      *> because 8.3.2.2 allows a word only ONE type of user-defined word in a source element.
        01 COL              PIC X(3) VALUE "W16".
        01 COLS             PIC X(3) VALUE "W17".
        01 COLUMNS          PIC X(3) VALUE "W18".
-       01 CRT              PIC X(3) VALUE "W19".
        01 CURSOR           PIC X(3) VALUE "W20".
        01 SCREEN           PIC X(3) VALUE "W21".
        PROCEDURE DIVISION.
@@ -60,5 +61,6 @@
            DISPLAY AUTO BACKGROUND-COLOR BELL BLINK EOL.
            DISPLAY EOS ERASE FOREGROUND-COLOR FULL HIGHLIGHT.
            DISPLAY LOWLIGHT REQUIRED REVERSE-VIDEO SECURE UNDERLINE (2).
-           DISPLAY COL COLS COLUMNS CRT CURSOR SCREEN.
+           DISPLAY COL COLS COLUMNS CURSOR SCREEN.
+           DISPLAY "W19" UPON CRT.
            STOP RUN.

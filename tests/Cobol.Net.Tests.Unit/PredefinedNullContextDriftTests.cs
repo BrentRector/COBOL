@@ -122,9 +122,6 @@ public sealed class PredefinedNullContextDriftTests
     /// and stored LOW-VALUE (kb/Work PB1427).</summary>
     private static readonly Dictionary<string, string> LiteralDecodersExempt = new()
     {
-        ["DataBinder.Switches.cs"] = "the SPECIAL-NAMES literals (CLASS, ALPHABET, CURRENCY, ORDER TABLE, LOCALE) are "
-            + "classified by CobolLiteral.ClassOf on the token text, which gives NULL no class, so each clause's own "
-            + "class rule refuses it",
         ["OptionsBinder.cs"] = "the INITIALIZE fill literal must be a one-byte X\"nn\" (§11.9.10.3 SR1); NULL is not one",
         ["SearchAllFormat2Rules.cs"] = "a PROCEDURE DIVISION operand: the WHEN relation binds NULL through the relation "
             + "checkpoint (COBOLNET0869), and this file only asks whether a literal is zero-length",

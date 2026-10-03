@@ -74,11 +74,24 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     public void AddAnonymousParagraph(Core.SentenceContext[] sentences, SectionInfo? section, HashSet<string> used)
     {
         if (sentences.Length == 0) return;
+        AddUnnamedParagraph(sentences, section, used);
+    }
+
+    /// <summary>The ONE pc a declarative section with ZERO paragraphs owns (§14.9.49.3 SR1: "zero, one, or more
+    /// procedural paragraphs" — the section is still SELECTED, §14.9.49.4 GR3, so it needs a pc to dispatch to). It
+    /// is a paragraph-name-OMITTED paragraph with no sentences: like <see cref="AddAnonymousParagraph"/> it is named
+    /// nowhere (kb/Work PB990 — it used to be registered under the SECTION's own name, so every such section declared
+    /// a paragraph its source never wrote, and <c>PERFORM</c> of the section was ambiguous with it).</summary>
+    public void AddEmptyAnonymousParagraph(SectionInfo section, HashSet<string> used) =>
+        AddUnnamedParagraph([], section, used);
+
+    private void AddUnnamedParagraph(Core.SentenceContext[] sentences, SectionInfo? section, HashSet<string> used)
+    {
         string method = "P__Anon";
         for (int n = 2; !used.Add(method); n++) method = $"P__Anon_{n}";
         _paraSection.Add(section);
         _paraMethod.Add(ctx.CurrentMethodScope);
-        _paraLine.Add(ctx.SourceLine(sentences[0]));
+        _paraLine.Add(sentences.Length > 0 ? ctx.SourceLine(sentences[0]) : 0);
         // The paragraph-name-OMITTED paragraph (§14.4.3) has NO name — the empty string, never a display
         // placeholder (kb/Work PB63 / RV-15.30.3-2: EXCEPTION-LOCATION's r2b2 field printed the placeholder where
         // the standard defines an empty procedure field or the bare section-name).
@@ -473,9 +486,12 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
         }
 
         // Leading sentences past the USE form an anonymous paragraph at the section start (handler bodies that
-        // CCVS writes directly under the section header).
-        if (leading.Length > 1)
-            AddParagraph(name, leading.Skip(1).ToArray(), info, used);
+        // CCVS writes directly under the section header) — §14.4.3's paragraph-name-OMITTED paragraph, named
+        // NOWHERE. ⛔ It used to be registered through AddParagraph under the SECTION's own name (kb/Work PB990), which
+        // declared a paragraph the source never wrote: a legal `PERFORM handler-section` drew COBOLNET2121 "declared 2
+        // times (paragraph 'H' in section 'H'; section 'H')", and §8.3.2.2's one-type-per-word census found the section
+        // name used as a paragraph-name.
+        AddAnonymousParagraph(leading.Skip(1).ToArray(), info, used);
         foreach (var p in sec.declarativeParagraph())
             AddParagraph(p.paragraphName().GetText(), p.sentence(), info, used);
         // A declarative section with ZERO paragraphs is legal (§14.9.49.3 SR1 — "zero, one, or more procedural
@@ -486,7 +502,7 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
         // refuses an empty PcRange. Relax this and the SELECTOR ARMS, not the renderer, are what must learn to
         // say "selected, ran nothing".
         if (_paras.Count == info.StartPc)
-            AddParagraph(name, [], info, used);
+            AddEmptyAnonymousParagraph(info, used);
 
         info.CloseAt(_paras.Count - 1);
         // A METHOD's declarative section is a name in the METHOD's procedure division (§8.3.2.2.28 — "A section-name

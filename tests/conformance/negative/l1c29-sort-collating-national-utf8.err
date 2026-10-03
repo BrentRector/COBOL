@@ -1,1 +1,1 @@
-COBOLNET0898: SORT/MERGE COLLATING SEQUENCE 'N-U8': a UTF-8 alphabet references a coded character set but NOT a collating sequence
+'N-U8' (UTF-8) names a national coded character set only

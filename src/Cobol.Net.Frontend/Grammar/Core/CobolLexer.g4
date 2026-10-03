@@ -1052,8 +1052,10 @@ FN_SIGNED_INTEGERLIT : [+-] INT_BODY { OnSignedLiteral(SIGNED_INTEGERLIT); } ;
 DECIMALLIT  : DEC_BODY ;
 
 // ── IDENTIFIER (must come BEFORE INTEGERLIT) ──
-// COBOL-85 user-defined words: 1-30 chars from {A-Z, a-z, 0-9, hyphen},
-// must contain at least one letter, no leading/trailing hyphen.
+// COBOL-85 user-defined words: 1-30 chars from {A-Z, a-z, 0-9, hyphen}, no leading/trailing hyphen.
+// §8.3.2.2's "at least one basic letter or extended letter" is NOT checked here, and cannot be: a paragraph-name or
+// section-name may be letterless (`1-2`), so the token must admit it. The rule is asked at every other word's
+// DECLARATION, by DataBinder.DeclareUserWord (kb/Work PB1403).
 // Digit-start forms: 42-DATANAMES (hyphen), 11A/25COUNT/80PARTS (letter).
 // Pure digits remain INTEGERLIT (level numbers, paragraph numbers, etc.).
 // The action is the ONE place a word that is a keyword only in a primed region is retyped: DEFINED, the §7.3.8.4.4

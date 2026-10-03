@@ -318,10 +318,13 @@ public sealed record CodedCharacterSet(string Phrase, bool National, CollatingTa
               ? Enumerable.Range(0, OrdinalCount).Select(unit => (char)unit).ToArray()
               : null);
 
-    /// <summary>The character at 1-based <paramref name="ordinal"/> (GR11 b/c — SYMBOLIC CHARACTERS; GR12 a —
-    /// a numeric CLASS literal under IN), as a native STRING (a UCS-4/UTF-8 supplementary character is its UTF-16
-    /// surrogate pair — one character, two code units). Null when the ordinal is outside the set (the caller's
-    /// range diagnostic).</summary>
+    /// <summary>⛔ THE CHARACTER an ordinal names where the reference needs ONE character — SYMBOLIC CHARACTERS
+    /// (GR11 b/c: the figurative constant is a single character, so for an ALSO group "<i>only literal-1 is used to
+    /// represent the character in the native character set</i>", GR7 k6's last sentence). As a native STRING (a
+    /// UCS-4/UTF-8 supplementary character is its UTF-16 surrogate pair — one character, two code units). Null when
+    /// the ordinal is outside the set (the caller's range diagnostic). A reference that names a SET of characters
+    /// (a CLASS numeric literal, GR12 a) asks <see cref="CharactersAt"/> instead — never this, which would apply
+    /// GR7 k6's SYMBOLIC-CHARACTERS-only exception to every reference (kb/Work PB1095).</summary>
     public string? CharAt(int ordinal)
     {
         if (ordinal < 1 || ordinal > OrdinalCount) return null;
@@ -350,6 +353,28 @@ public sealed record CodedCharacterSet(string Phrase, bool National, CollatingTa
             return char.ConvertFromUtf32(scalar);
         }
         return ((char)(ordinal - 1)).ToString();                                   // the native / STANDARD / UTF-16 identity
+    }
+
+    /// <summary>⛔ EVERY CHARACTER an ordinal names, for a reference that names a SET of characters — a CLASS numeric
+    /// literal under IN (GR12 a: "<i>the ordinal number of a character within … the character set referenced by
+    /// alphabet-name-4</i>"; the class "<i>consists of</i>" the characters the literals specify). GR7 k6 gives an
+    /// ALSO group ONE ordinal position in the coded character set — "<i>the characters of the native character set
+    /// specified by the value of literal-1 and literal-3 are assigned to the same ordinal position … in the character
+    /// code set</i>" — and restricts a reference to literal-1 ALONE only for SYMBOLIC CHARACTERS, so every other
+    /// reference sees all of them: the ordinal of <c>"B" ALSO "A" ALSO "Z"</c> names B, A and Z. Literal-1 (the
+    /// group's first character, <see cref="CharAt"/>) comes first, the rest follow in code order; a position nobody
+    /// shares answers its one character. Null when the ordinal is outside the set. This is the reading the singular
+    /// "a character" of GR12 a leaves open: the other reading makes GR7 k6's exception sentence redundant.</summary>
+    public IReadOnlyList<string>? CharactersAt(int ordinal)
+    {
+        if (CharAt(ordinal) is not { } first) return null;
+        if (Table is not { } t || ordinal > t.NextFree) return [first];
+        int position = ordinal - 1;
+        var members = new List<string> { first };
+        for (int i = 0; i < t.Codes.Length; i++)
+            if (t.Positions[i] == position && t.Codes[i] != t.RepByPos[position])
+                members.Add(((char)t.Codes[i]).ToString());
+        return members;
     }
 }
 
