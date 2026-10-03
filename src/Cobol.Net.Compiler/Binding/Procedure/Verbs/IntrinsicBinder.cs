@@ -220,7 +220,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
     public static BoundOperand OperandOf(BoundExpr e) => e switch
     {
-        BoundNumLiteral l => new BoundNumericLiteral(l.Text),       // a folded LENGTH
+        BoundNumLiteral l => new BoundNumericLiteral(l.Text) { FunctionValue = l.FunctionValue },   // a folded function (LENGTH …) keeps saying so
         BoundNumRef r => new BoundFieldOperand(r.Place),            // a user-function result temp (M2-UDF-1)
         BoundExprError err => BoundOperandError.Carry(err.Feature, err.IsUnbuilt),
         _ => new BoundComputedOperand(e),
@@ -489,6 +489,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// entry, the keyword-omitted re-parse, and — through <c>BindExpr</c>'s <c>BindPrimary</c> — every nested
     /// FUNCTION recursion).</summary>
     private BoundExpr BindIntrinsicCore(string name, IReadOnlyList<Core.FunctionArgumentContext> argCtxs)
+    {
+        // ⛔ THE ONE POINT EVERY BOUND FUNCTION RESULT PASSES (the FUNCTION-keyword entry, the reserved-name and the
+        // keyword-omitted forms all call this): a result the binder FOLDED to a literal says so (kb/Work PB1398,
+        // PB1662), because the written operand is a function-identifier and the syntax rules judge what was written.
+        var result = BindFunctionResult(name, argCtxs);
+        return result is BoundNumLiteral folded ? folded with { FunctionValue = true } : result;
+    }
+
+    private BoundExpr BindFunctionResult(string name, IReadOnlyList<Core.FunctionArgumentContext> argCtxs)
     {
         // >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4): an intrinsic-function-name synonym (EQUATE literal-2 /
         // SUBSTITUTE literal-5 whose canonical is an intrinsic) resolves to the canonical name; an intrinsic that
@@ -2042,11 +2051,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // Math.Max(1, ImageWidth) answered 1 for every carrier (a POINTER is 8) and undercounted a group holding a
         // national or carrier child (X(3)+N(2) is 7, not 5).
         BoundFieldOperand f => new BoundNumLiteral(ItemLength.Positions(f.Place.Item).ToString()),
-        // A nested string-result intrinsic (alphanumeric OR national — one UTF-16 char per national position,
-        // D-N1, so .Length IS the §15.50.4 character-position count for both; and BOOLEAN — r1's boolean
-        // positions ARE the '0'/'1' image's length, kb/Work PB68) keeps a runtime .Length.
-        BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean } } =>
-            new BoundIntrinsicCall(sig, args, PicCategory.Numeric),   // runtime .Length over the nested result image
+        // A FUNCTION-IDENTIFIER IS THE DATA ITEM ITS §15.2 TYPE DESCRIBES, WHATEVER THAT TYPE IS (kb/Work PB1398):
+        // §15.50.3 r1's "a data item of any class or category" admits it (§8.4.3.2.1). This arm used to cover only the
+        // three string types and let every other result — integer, numeric, index — fall to the catch-all below, which
+        // called it "a numeric literal".
+        BoundComputedOperand { Expr: BoundIntrinsicCall } or BoundNumericLiteral { FunctionValue: true } =>
+            FunctionResultLength(sig, args, bytes: false),
         // ⛔ A FIGURATIVE CONSTANT IS A LEGAL LENGTH ARGUMENT, AND THE ARM BELOW USED TO REFUSE IT ALONGSIDE THE
         // NUMERIC LITERAL IT CORRECTLY REFUSES (fix-queue PB25). One arm standing for TWO rules enforced neither:
         // §15.50.3 r1 restricts a LITERAL argument to "an alphanumeric, national, or boolean literal", which
@@ -2082,10 +2092,55 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             + "boolean LITERAL, a based entry, a type-name, or a DATA ITEM of any class (write the expression's "
             + "result to a boolean item and take its LENGTH)", "§15.50.3 r1"),
         _ => InadmissibleArgument(sig,
-            "is a numeric literal, which §15.50.3 r1 does not admit — it takes an alphanumeric, national or "
+            $"is {WrittenForm(args[0])}, which §15.50.3 r1 does not admit — it takes an alphanumeric, national or "
             + "boolean literal, a based entry, a type-name, or a DATA ITEM of any class (a numeric ITEM is fine)",
             "§15.50.3 r1"),
     };
+
+    /// <summary>What a LENGTH / BYTE-LENGTH argument that reached the catch-all WAS, in the words the diagnostic
+    /// names it with — the catch-all used to say "a numeric literal" for everything it received, so an arithmetic
+    /// expression (<c>FUNCTION LENGTH(A + B)</c>) drew a message about a literal nobody wrote (kb/Work PB1398).
+    /// Only these two shapes can get there: every data item, function-identifier, figurative, ALL literal, boolean
+    /// expression and string literal has an arm above.</summary>
+    private static string WrittenForm(BoundOperand arg) =>
+        arg is BoundNumericLiteral { FunctionValue: false } ? "a numeric literal" : "an arithmetic expression";
+
+    /// <summary>⛔ THE ONE ARM FOR A FUNCTION-IDENTIFIER ARGUMENT OF LENGTH AND BYTE-LENGTH (kb/Work PB1398). §8.4.3.2.1:
+    /// "A function-identifier references the unique data item that results from the evaluation of a function", and
+    /// §15.4 places the returned value in "a temporary elementary data item" of the §15.2 type's class and category —
+    /// so §15.50.3 r1 / §15.14.3 r1's "a data item of any class or category" admits EVERY function result, and its
+    /// length is that item's, by the type:
+    /// <list type="bullet">
+    /// <item>ALPHANUMERIC (§15.2 item 1, implicit usage display), NATIONAL (item 3, implicit usage national) and
+    /// BOOLEAN (item 2, implicit usage bit): a RUNTIME length — the result's string image. LENGTH counts its
+    /// positions (§15.50.4 r1 boolean positions, r2 national positions, r3 alphanumeric positions); BYTE-LENGTH counts
+    /// its bytes, which the renderer's ByteLength arm turns into 1 per alphanumeric position, 2 per national position
+    /// (D-N1) and ceil(positions / 8) per boolean (§15.14.4 r4 — the item "does not occupy an integral number of
+    /// bytes").</item>
+    /// <item>INTEGER (item 5), NUMERIC (item 4): a compile-time constant — the length of the §15.4 temporary
+    /// (<see cref="SendingValueTemp.NumericReturnedValuePic"/>), the item a statement stores the value in
+    /// (§15.4.1 leaves "the characteristics and representation of the returned value" to the implementor under native
+    /// arithmetic; docs/CONFORMANCE.md DOC-A.1-92). Its length is §15.50.4 r3's alphanumeric positions / §15.14.4 r1's
+    /// bytes, the same number for a DISPLAY item.</item>
+    /// <item>INDEX (item 6): a class-index item (§8.5.2.8 item 2), whose length is the index carrier's — the same
+    /// <see cref="PicInfo.IndexItem"/> a USAGE INDEX data item has.</item>
+    /// </list></summary>
+    /// <remarks>The argument is a <see cref="BoundComputedOperand"/> over the call, or the literal the binder FOLDED a
+    /// constant function to (<see cref="BoundNumericLiteral.FunctionValue"/> — <c>FUNCTION LENGTH(FUNCTION LENGTH(X))</c>);
+    /// the fold's value is an integer or numeric one, so it takes the numeric arm.</remarks>
+    private BoundExpr FunctionResultLength(IntrinsicSig sig, List<BoundOperand> args, bool bytes)
+    {
+        var fnOperand = args[0];
+        if (fnOperand is BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric
+                or PicCategory.National or PicCategory.Boolean } })
+            return new BoundIntrinsicCall(sig, args, PicCategory.Numeric);   // runtime length over the nested result image
+        var pic = fnOperand is BoundComputedOperand { Expr: BoundIntrinsicCall fn }
+                  && IntrinsicResultType.Resolve(fn.Sig, fn.Args) is IntrinsicType.Index
+            ? PicInfo.IndexItem
+            : SendingValueTemp.NumericReturnedValuePic(fnOperand);
+        var item = new DataItem { Level = 1, CobolName = "__FN-RESULT", CsName = "__fnResult", Pic = pic };
+        return new BoundNumLiteral((bytes ? item.ByteWidth : ItemLength.Positions(item)).ToString());
+    }
 
     /// <summary>A bare-word argument that names a TYPE (§15.50.3 r1 / §15.14.3 r1: "… a based entry, a type-name,
     /// or a data item of any class or category") — a level-1 TYPEDEF lives in <c>DataBinder.TypeDecls</c>, off the
@@ -2368,6 +2423,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         BoundFieldOperand { Place.Item.IsAnyLength: true } => new BoundIntrinsicCall(sig, args, PicCategory.Numeric),
         BoundFieldOperand { Place.Item.IsDynamicLength: true } => new BoundIntrinsicCall(sig, args, PicCategory.Numeric),
         BoundFieldOperand f => new BoundNumLiteral(f.Place.Item.ByteWidth.ToString()),
+        // A FUNCTION-IDENTIFIER is a data item of its §15.2 type (§8.4.3.2.1), admitted by §15.14.3 r1's "a data item
+        // of any class or category" — the LENGTH twin's arm, ONE builder for both (kb/Work PB1398). BYTE-LENGTH had
+        // NO arm for it, so every function argument fell to the catch-all below and was called "a numeric literal".
+        BoundComputedOperand { Expr: BoundIntrinsicCall } or BoundNumericLiteral { FunctionValue: true } =>
+            FunctionResultLength(sig, args, bytes: true),
         // A COUNTER REGISTER is a data item (§8.4.3.14.4 GR1 / §8.4.3.15.4 GR1), admitted by §15.14.3 r1's
         // "a data item of any class or category"; its implicit PIC 9(d) USAGE DISPLAY occupies d bytes (the
         // LENGTH twin above — kb/Work PB1153).
@@ -2394,7 +2454,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             "is a boolean expression, which §15.14.3 r1 does not admit — it takes an alphanumeric or national "
             + "LITERAL, a based entry, a type-name, or a DATA ITEM of any class", "§15.14.3 r1"),   // kb/Work PB65
         _ => InadmissibleArgument(sig,
-            "is a numeric literal, which §15.14.3 r1 does not admit — it takes an alphanumeric or national "
+            $"is {WrittenForm(args[0])}, which §15.14.3 r1 does not admit — it takes an alphanumeric or national "
             + "literal, a based entry, a type-name, or a DATA ITEM of any class (a numeric ITEM is fine)",
             "§15.14.3 r1"),
     };
@@ -2805,6 +2865,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         var exprs = new string[innerSegs.Count];
         var counts = new List<AllCount>();
         var outerExprs = new List<string>();   // the rendered index of every level ABOVE the current one
+        List<ReferenceResolver.IndexUse> indexNames = [];   // §8.4.2.3.3 SR4's collector — see below the loop
         for (int i = 0; i < innerSegs.Count; i++)
         {
             DataItem level = levels[i];
@@ -2821,7 +2882,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 }
                 counts.Add(count);
             }
-            else if (ctx.Refs.RenderIndexSegment(innerSegs[i]) is { } rendered)
+            else if (ctx.Refs.RenderIndexSegment(innerSegs[i], indexNames) is { } rendered)
                 exprs[i] = rendered;
             else
             {
@@ -2830,6 +2891,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             }
             outerExprs.Add(exprs[i]);
         }
+        // §8.4.2.3.3 SR4 — "Index-name-1 shall correspond to a data description entry in the hierarchy of the table
+        // being referenced that contains an INDEXED BY phrase specifying that index-name" — through THE ONE screen the
+        // ordinary subscript reading asks (ReferenceResolver.ReadSubscripts), over the index-names the written
+        // non-ALL segments carried (kb/Work PB1472). The ALL segments name none.
+        ctx.Refs.ScreenIndexNameAssociation(item, indexNames);
         if (ctx.Refs.ResolveByName(name, quals, exprs) is not { } element)
         {
             args.Add(BoundOperandError.Unbuilt(ctx.Edition, $"table(ALL) occurrence of '{name}'"));

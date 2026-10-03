@@ -401,18 +401,27 @@ public sealed class Frontend
     private (CobolParserCore.CompilationUnitContext Tree, bool Parsed) LexAndParse(string text, string sourcePath, CobolWordsMap cobolWordsMap,
         DiagnosticBag diagnostics)
     {
-        var lexer = new CobolLexer(new AntlrInputStream(text));
         // >>COBOL-WORDS (ISO §7.3.10.4 GR3/GR4): a de-reserved word (UNDEFINE/SUBSTITUTE) may be used as a
         // SUBSCRIPTED data name; the lexer must open SUBSCRIPT mode at its following '(' even though the word is
         // still lexed as its keyword token (the retype below runs post-lex, after the '(' decision is frozen).
         // Set BEFORE any tokenization (ZeroTokenRewriter.Fill). A no-op when no de-reserved word is a keyword token.
         var retypes = TokenRetypes.None with { CobolWords = cobolWordsMap };
         var edition = EditionInfo.Of(DialectLevel, Permissive);
-        retypes.PrimeLexer(lexer, edition);
-        var tokens = new CommonTokenStream(lexer);
         // FIRST: a fixed-form debugging line is source or comment per its unit's WITH DEBUGGING MODE clause (kb/Work PB1705);
-        // every reader after this one sees only the lines that are source.
-        DebuggingLineRewriter.Rewrite(tokens);
+        // every reader after this one sees only the lines that are source. A line inside an open PICTURE or subscript
+        // region is the exception the rewriter cannot settle on tokens (the lexer skipped its text in that mode), so
+        // each such line that IS source has its carrier blanked and the text is lexed again (kb/Work PB1913); the loop
+        // ends when none is left, at most once per debugging line. `text` then IS the text every later reader
+        // offsets into (the §8.3.5 / §13.18.40.3 rules below, the fragment re-parses of the tree's regions).
+        CommonTokenStream tokens;
+        while (true)
+        {
+            var lexer = new CobolLexer(new AntlrInputStream(text));
+            retypes.PrimeLexer(lexer, edition);
+            tokens = new CommonTokenStream(lexer);
+            if (DebuggingLineRewriter.Rewrite(tokens) is not { } sourceRegionLine) break;
+            text = DebuggingLineRewriter.WithCarrierBlanked(text, sourceRegionLine);
+        }
         ZeroTokenRewriter.Rewrite(tokens);
         // >>COBOL-WORDS (ISO §7.3.10.4) — retype tokens per the per-group override: synonyms (EQUATE/SUBSTITUTE)
         // become their canonical keyword, de-reserved words (UNDEFINE/SUBSTITUTE) become IDENTIFIERs. A no-op when

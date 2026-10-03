@@ -5661,13 +5661,13 @@
   "ordinal": 4,
   "subject": "Subscripts",
   "rule-digest": "c8c488c4c055",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ScreenIndexNameAssociation; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReadSubscripts; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#TryBindAllArgument; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RenderIndexSegment",
-  "test-ref": "conformance:negative/pb459-index-name-not-in-table",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#TryBindAllArgument; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RenderIndexSegment; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ScreenIndexNameAssociation; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReadSubscripts",
+  "test-ref": "conformance:negative/pb459-index-name-not-in-table; conformance:negative/pb1472-all-subscript-index-name-other-table",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1472 (registrar 15c). Rule (cite.py --check 8.4.2.3.3 'Index-name-1 shall correspond to a data description entry in the hierarchy of the table being referenced that contains an INDEXED BY phrase specifying that index-name.' -> OK §8.4.2.3.3 4)). The ordinary resolver arm conforms: ReadSubscripts collects every index-name the subscript interpreter resolves and ScreenIndexNameAssociation refuses one declared outside the item's own hierarchy (by declaration identity, PB919) as COBOLNET1961 - measured on MOVE receiver `E2(IXA + 1)`, SEARCH WHEN `E2(IXA)`, condition-name `C2(IXA)`, `ADDRESS OF E2(IXA)`, `FUNCTION LENGTH(E2(IXA))` (scratchpad/adj-d2/out/probe/subscripts/sr4b/sr4c/sr4d.cob) - all COBOLNET1961. ⛔ The SECOND ARM does not: IntrinsicBinder.TryBindAllArgument renders each non-ALL subscript of a table(ALL) intrinsic argument through ReferenceResolver.RenderIndexSegment, which calls RenderSegment with NO index-name collector, and never calls ScreenIndexNameAssociation. Repro scratchpad/adj-d2/out/probe/subscripts/sr4a.cob: `01 T1. 05 E1 PIC 9 OCCURS 3 INDEXED BY IXA.` / `01 T2. 05 R2 OCCURS 3 INDEXED BY IXB. 10 E2 PIC 9 OCCURS 3.` / `SET IXA TO 2. DISPLAY FUNCTION SUM(E2(IXA, ALL)).` compiles clean and prints `0` at 2023; spec-derived expected: a compile-time SR4 diagnostic (COBOLNET1961), IXA is in T1's INDEXED BY, not in E2's hierarchy. Two-arm dispatch (feedback_two_arm_dispatch). Existing witness pb459 covers the resolver arm only.",
-  "state": "GAP"
+  "notes": "kb/Work PB1472 landed (wave 1004 D). The table(ALL) intrinsic argument (the second arm of the subscript reading) now collects the index-names its non-ALL subscripts write (ReferenceResolver.RenderIndexSegment takes the collector, no default) and asks ScreenIndexNameAssociation, the screen ReadSubscripts asks for every other reference: FUNCTION SUM(E2(IXA, ALL)) with IXA on another table is COBOLNET1961 (cite.py --check 8.4.2.3.3 'Index-name-1 shall correspond to a data description entry in the hierarchy of the table being referenced' OK). Valid E2(IXB, ALL) compiles unchanged.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.3.3-5",
@@ -8211,13 +8211,13 @@
   "ordinal": 4,
   "subject": "Class and category of data items and literals",
   "rule-digest": "e6ca7bd65347",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindByteLengthFold; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindLengthFold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#FunctionResultLength",
+  "test-ref": "conformance:2002/pb1398_length_of_function_result",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1398 (registrar 15b). Rule: '4) An alphanumeric function. Such an item is referred to as an alphanumeric data item.' (cite.py OK; §15.2 item 1 types it). Verified: UPPER-CASE result displays and moves as alphanumeric (p2.cob UC=[AB]); LENGTH(FUNCTION UPPER-CASE(X)) accepted. DEFECT (mechanism F1, see findings): FUNCTION BYTE-LENGTH(FUNCTION UPPER-CASE(X)) / BYTE-LENGTH(FUNCTION NATIONAL-OF(X)) / BYTE-LENGTH(FUNCTION BOOLEAN-OF-INTEGER(5, 16)) are REJECTED COBOLNET1627 'argument-1 is a numeric literal' (probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d2\\out\\probe\\cat1\\p3.cob, --std 2023). §15.14.3 r1 admits 'a data item of any class or category' (cite.py --check 15.14.3 OK) and §8.4.3.2.1 'A function-identifier references the unique data item that results from the evaluation of a function' (cite.py --check 8.4.3.2.1 OK), so these are legal source; BindByteLengthFold has no BoundComputedOperand arm (its LENGTH twin BindLengthFold has one for Alphanumeric/National/Boolean results, which is why LENGTH(FUNCTION UPPER-CASE(X)) works: L2=3 over NATIONAL-OF of a 3-char item, L3=16 over BOOLEAN-OF-INTEGER(5,16), probe p7.cob). kb/Work PB1068 (open) records the same repro but asserts 'The refusals are right; the words are wrong' -- that premise is FALSE by §15.14.3 r1 + this rule; PB1068 should be re-flagged rejects_legal_source. || editions as written by the adjudicator: 85 (intrinsic functions, 1989 amendment), 2002, 2014, 2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1398 landed (wave 1004 D). An alphanumeric function result is the data item of category alphanumeric (cite.py --check 8.5.2.3 'an item is referred to as an alphanumeric' OK; 15.2 item 1; 8.4.3.2.1), so FUNCTION LENGTH and FUNCTION BYTE-LENGTH admit it (15.50.3 r1 / 15.14.3 r1): ONE arm, IntrinsicBinder.FunctionResultLength, keyed on the function's 15.2 type for both folds. LENGTH and BYTE-LENGTH of UPPER-CASE(X) over a 3-character item are 3 and 3 (golden 2002/pb1398_length_of_function_result).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.5-1",
@@ -8271,13 +8271,13 @@
   "ordinal": 4,
   "subject": "Class and category of data items and literals",
   "rule-digest": "d46c37d2c052",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindByteLengthFold; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindLengthFold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#FunctionResultLength",
+  "test-ref": "conformance:2002/pb1398_length_of_function_result",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1398 (registrar 15b). Rule: '4) A boolean function. Such an item is referred to as a boolean data item.' (cite.py OK; §15.2 item 2). Verified: BOOLEAN-OF-INTEGER(5, 4) displays 0101 (p2.cob); LENGTH(FUNCTION BOOLEAN-OF-INTEGER(5,16)) = 16 boolean positions (p7.cob). DEFECT (mechanism F1, see findings): FUNCTION BYTE-LENGTH(FUNCTION UPPER-CASE(X)) / BYTE-LENGTH(FUNCTION NATIONAL-OF(X)) / BYTE-LENGTH(FUNCTION BOOLEAN-OF-INTEGER(5, 16)) are REJECTED COBOLNET1627 'argument-1 is a numeric literal' (probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d2\\out\\probe\\cat1\\p3.cob, --std 2023). §15.14.3 r1 admits 'a data item of any class or category' (cite.py --check 15.14.3 OK) and §8.4.3.2.1 'A function-identifier references the unique data item that results from the evaluation of a function' (cite.py --check 8.4.3.2.1 OK), so these are legal source; BindByteLengthFold has no BoundComputedOperand arm (its LENGTH twin BindLengthFold has one for Alphanumeric/National/Boolean results, which is why LENGTH(FUNCTION UPPER-CASE(X)) works: L2=3 over NATIONAL-OF of a 3-char item, L3=16 over BOOLEAN-OF-INTEGER(5,16), probe p7.cob). kb/Work PB1068 (open) records the same repro but asserts 'The refusals are right; the words are wrong' -- that premise is FALSE by §15.14.3 r1 + this rule; PB1068 should be re-flagged rejects_legal_source.",
-  "state": "GAP"
+  "notes": "kb/Work PB1398 landed (wave 1004 D). A boolean function result is the data item of category boolean with an implicit usage bit (cite.py --check 8.5.2.5 'an item is referred to as a boolean' OK; 15.2 item 2), admitted by 15.50.3 r1 / 15.14.3 r1 through 8.4.3.2.1. LENGTH counts boolean positions (15.50.4 r1): BOOLEAN-OF-INTEGER(5, 16) is 16. BYTE-LENGTH packs 8 positions to the byte and rounds up (15.14.4 r4): 16 -> 2, 9 -> 2, 8 -> 1 (IntrinsicRenderer ByteLength arm over CobolIntrinsics.ByteLengthBoolean).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.8-1",
@@ -8301,13 +8301,13 @@
   "ordinal": 2,
   "subject": "Class and category of data items and literals",
   "rule-digest": "e5e05a5ab4e6",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindByteLengthFold; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindLengthFold; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs#IndexAssignmentSenderOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#FunctionResultLength",
+  "test-ref": "conformance:2023/pb1398_length_of_index_function_result",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1398, PB1399 (registrar 15b). Rule: '2) An index function. Such an item is referred to as an index data item.' (cite.py --check 8.5.2.8 OK); §15.2 item 6 'Index functions. These are of the class and category index' and §15.2 'may be used anywhere a sending data item of that class and category may be specified' (both cite.py OK). IntrinsicResultType.UniformArgumentType types MAX/MIN over index args as IntrinsicType.Index; relation condition works (conformance:2023/pb124_index_function REL OK / MIN OK) and MOVE is rejected (negative/pb124-move-index-function). DEFECT (mechanism F2): SET TX TO FUNCTION MAX(IA IB) -> COBOLNET0844 and SET IC TO FUNCTION MIN(IA IB) -> COBOLNET2326 SR3 (probe p8.cob, 2023 and 85). §14.9.39.3 SR2 'Identifier-2 shall reference a data item of class index' (cite.py OK) is satisfied by the index function (§8.4.3.2.1), so both statements are legal; expected output MAX->G, MIN->C. IndexAssignmentSenderOf returns ArithmeticExpression whenever the sender is not a bare data reference, so a function-identifier never reaches the identifier-2 alternative. DEFECT (mechanism F1): FUNCTION LENGTH(FUNCTION MAX(IA IB)) -> COBOLNET1627 'argument-1 is a numeric literal' (§15.50.3 r1 'a data item of any class or category'). PB124's golden header claims an index function participates in 'a relation condition ... and nowhere else' -- the SET identifier-2 position is missed. || editions as written by the adjudicator: 2023 text (MAX/MIN §15.59.1/§15.63.1 Index row); introducing edition of index-typed MAX/MIN not derivable from the 2023 Annex E",
-  "state": "GAP"
+  "notes": "kb/Work PB1398 landed (wave 1004 D). An index function result (15.2 item 6) is an index data item (8.5.2.8 item 2, cite.py --check 8.5.2.8 OK), the data item its function-identifier references (8.4.3.2.1), so FUNCTION LENGTH and BYTE-LENGTH admit it (15.50.3 r1 / 15.14.3 r1) and measure the index carrier a USAGE INDEX data item has: 8 positions, 8 bytes. LENGTH(FUNCTION MAX(IA IB)) = LENGTH(IA) = 8 (golden 2023/pb1398_length_of_index_function_result).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.10-1",
@@ -8361,13 +8361,13 @@
   "ordinal": 4,
   "subject": "Class and category of data items and literals",
   "rule-digest": "d3ea253db61a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindByteLengthFold; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindLengthFold",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicResultType.cs#Resolve; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#FunctionResultLength",
+  "test-ref": "conformance:2002/pb1398_length_of_function_result",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1398 (registrar 15b). Rule: '4) A national function. Such an item is referred to as a national data item.' (cite.py OK; §15.2 item 3). Verified: MOVE FUNCTION NATIONAL-OF(X) TO PIC N(2) works; LENGTH(FUNCTION NATIONAL-OF(X)) = 3 national positions for a 3-char X (p7.cob). DEFECT (mechanism F1, see findings): FUNCTION BYTE-LENGTH(FUNCTION UPPER-CASE(X)) / BYTE-LENGTH(FUNCTION NATIONAL-OF(X)) / BYTE-LENGTH(FUNCTION BOOLEAN-OF-INTEGER(5, 16)) are REJECTED COBOLNET1627 'argument-1 is a numeric literal' (probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d2\\out\\probe\\cat1\\p3.cob, --std 2023). §15.14.3 r1 admits 'a data item of any class or category' (cite.py --check 15.14.3 OK) and §8.4.3.2.1 'A function-identifier references the unique data item that results from the evaluation of a function' (cite.py --check 8.4.3.2.1 OK), so these are legal source; BindByteLengthFold has no BoundComputedOperand arm (its LENGTH twin BindLengthFold has one for Alphanumeric/National/Boolean results, which is why LENGTH(FUNCTION UPPER-CASE(X)) works: L2=3 over NATIONAL-OF of a 3-char item, L3=16 over BOOLEAN-OF-INTEGER(5,16), probe p7.cob). kb/Work PB1068 (open) records the same repro but asserts 'The refusals are right; the words are wrong' -- that premise is FALSE by §15.14.3 r1 + this rule; PB1068 should be re-flagged rejects_legal_source.",
-  "state": "GAP"
+  "notes": "kb/Work PB1398 landed (wave 1004 D). A national function result is the data item of category national with an implicit usage national (cite.py --check 8.5.2.10 'an item is referred to as a national' OK; 15.2 item 3), admitted by 15.50.3 r1 / 15.14.3 r1 through 8.4.3.2.1. LENGTH counts national positions (15.50.4 r2): NATIONAL-OF(X) over a 3-character item is 3; BYTE-LENGTH is 2 bytes per national position (D-N1), 6 (CobolIntrinsics.ByteLengthNational).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.12-1",

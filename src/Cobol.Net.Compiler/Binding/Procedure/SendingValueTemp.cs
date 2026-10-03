@@ -95,6 +95,17 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     internal static readonly PicInfo IntegerFunctionValuePic =
         new(PicCategory.Numeric, Usage.Display, Length: 30, Digits: 30, Scale: 0, Signed: true);
 
+    /// <summary>⛔ THE ONE DESCRIPTION OF A NUMERIC OR INTEGER FUNCTION-IDENTIFIER'S RETURNED-VALUE ITEM (§15.4 — "a
+    /// temporary elementary data item"; §8.4.3.2.1 — the function-identifier "references the unique data item that
+    /// results from the evaluation of a function"): <see cref="IntegerFunctionValuePic"/> for an INTEGER function
+    /// (§15.2 item 5, resolved per call by the ONE <see cref="IntrinsicResultType"/> reader), otherwise
+    /// <see cref="FunctionValuePic"/>. The statement hoist that stores the value (<see cref="OfComputed"/>) and the
+    /// LENGTH / BYTE-LENGTH folds that measure it (<c>IntrinsicBinder.FunctionResultLength</c>, kb/Work PB1398) both
+    /// read it here, so the item a function's value is STORED in and the item its length is ASKED OF cannot be two
+    /// different items.</summary>
+    internal static PicInfo NumericReturnedValuePic(BoundOperand c) =>
+        IntrinsicResultType.IsIntegerOperand(c) ? IntegerFunctionValuePic : FunctionValuePic;
+
     /// <summary>Materialize <paramref name="op"/>'s value into the implementor's intermediate result item and
     /// return the <see cref="Place"/> holding it, or <see langword="null"/> when the operand needs no
     /// materialization (a literal / figurative constant) or carries a description this clone cannot freeze (a
@@ -316,11 +327,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // `MOVE FUNCTION INTEGER(N) TO A B` stored 0000 in both where `MOVE FUNCTION INTEGER(N) TO A` stores 3.
         if (cat is PicCategory.Numeric)
             return new TempModel(
-                new DataItem
-                {
-                    Level = 1, CobolName = "__SENDVAL-FN", CsName = "__sendvalFn",
-                    Pic = IntrinsicResultType.IsIntegerOperand(c) ? IntegerFunctionValuePic : FunctionValuePic,
-                },
+                new DataItem { Level = 1, CobolName = "__SENDVAL-FN", CsName = "__sendvalFn", Pic = NumericReturnedValuePic(c) },
                 DynLimit: 0, FunctionValue: true);
         return CharacterCarrier("__SENDVAL-FNS", "__sendvalFns", cat, CharacterUsage(cat), FunctionTextLimit);
     }

@@ -91,13 +91,25 @@ internal static class RelationComparability
     /// every pair of two class-index operands and are answered by the caller. The figurative ZERO opposite an
     /// index-name is "the numeric value '0'" (§8.3.3.6.4 GR4 — a figurative constant stands where a literal may),
     /// so it is row 2's numeric literal; opposite an index DATA item it is not, because row 3 admits nothing
-    /// but an index-name or another index data item there.</summary>
+    /// but an index-name or another index data item there.
+    /// <para>⛔ A NUMERIC OR INTEGER FUNCTION-IDENTIFIER IS ROW 2'S "NUMERIC DATA ITEM", FOLDED OR NOT (kb/Work PB1662).
+    /// §8.4.3.2.1: "A function-identifier references the unique data item that results from the evaluation of a
+    /// function", and §15.2 items 4 and 5 give that item class and category numeric — the item §8.5.2.12 items 6–7
+    /// call category numeric. The screen used to admit the function the compiler happened to FOLD (a
+    /// <c>FUNCTION LENGTH</c> of a fixed item reaches here as a literal-shaped operand) and refuse the one it did not
+    /// (<c>FUNCTION ABS(3)</c>), so one rule drew two answers by what the optimizer could compute. The fold keeps its
+    /// origin (<see cref="BoundNumericLiteral.FunctionValue"/>) and BOTH are the data item the function references.
+    /// An ARITHMETIC EXPRESSION is none of row 2's forms (a data item or a literal), and stays refused. A COUNTER
+    /// REGISTER references "a temporary unsigned integer data item of class and category numeric" (§8.4.3.14.4 GR1;
+    /// §8.4.3.15.4 GR1 says the same of PAGE-COUNTER and LINE-COUNTER), a numeric data item likewise.</para></summary>
     private static bool IndexNameAgainstNumeric(BoundOperand index, BoundOperand other) =>
         index is BoundComputedOperand { Expr: BoundIndexRef }
         && other switch
         {
             BoundNumericLiteral or BoundFigurative { Kind: 'Z' } => true,
-            BoundFieldOperand => IntrinsicArgumentRules.ClassOf(other) is CobolClass.Numeric,
+            BoundFieldOperand or BoundComputedOperand { Expr: BoundIntrinsicCall } =>
+                IntrinsicArgumentRules.ClassOf(other) is CobolClass.Numeric,
+            BoundComputedOperand { Expr: var register } => AlgebraicRanges.IsCounterRegister(register),
             _ => false,
         };
 

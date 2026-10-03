@@ -335,7 +335,10 @@
   "pb1705_debugging_lines_compiled",
   "pb1705_debugging_lines_per_unit",
   "pb1705_debugging_lines_copy_replacing",
-  "pb1705_debugging_line_paragraph"
+  "pb1705_debugging_line_paragraph",
+  "pb1913_debugging_lines_in_open_regions",
+  "pb1913_debugging_lines_in_open_regions_comment",
+  "pb1662_index_name_against_function"
  ],
  "pending": []
 }

@@ -526,6 +526,7 @@
   "l1_implicit_continue_zero",
   "l1_integer_date_form_returned",
   "l1_integer_family_notes",
+  "pb1398_length_of_index_function_result",
   "l1_length_bit_group_positions",
   "l1_log10_format",
   "l1_log_domain_ec",

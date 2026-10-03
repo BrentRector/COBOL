@@ -66,7 +66,9 @@ public static class FragmentParse
         lexer.RemoveErrorListeners();
         lexer.AddErrorListener(flag);
         var tokens = new CommonTokenStream(lexer);
-        DebuggingLineRewriter.HideAll(tokens);   // the main lexer skipped a debugging line in this region as a comment (kb/Work PB1705)
+        // A debugging line that is SOURCE had its carrier blanked before the main lex (kb/Work PB1913), so a carrier left in
+        // this slice of that text is a COMMENT line: hide it, exactly as the main lexer's region skip did (kb/Work PB1705).
+        DebuggingLineRewriter.HideAll(tokens);
         if (rewriteZero) ZeroTokenRewriter.Rewrite(tokens);
         retypes.Rewrite(tokens);
         var parser = new CobolParserCore(tokens) { Edition = edition, CobolWords = retypes.CobolWords };

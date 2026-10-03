@@ -347,7 +347,17 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             case "ByteLength":                                                  // §15.14 runtime shapes (kb/Work PB61)
                 if (ic.Args[0] is BoundFieldOperand { Place: { } bp })
                     return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, OperandText.AsStorageImage(bp)), 0);
-                return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, Str(ic.Args[0])), 0);
+                // A nested function result is not storage the renderer can slice; its string image is the value's
+                // characters, and the BYTES those occupy follow its §15.2 category (kb/Work PB1398): a national
+                // result is 2 bytes per position (D-N1), a boolean result (implicit usage bit, §15.2 item 2) packs 8
+                // positions per byte and rounds up (§15.14.4 r4), an alphanumeric one is 1 byte per position.
+                return new NumX(RuntimeApi.Intrinsic(
+                    IntrinsicResultType.OperandCategory(ic.Args[0]) switch
+                    {
+                        PicCategory.National => "ByteLengthNational",
+                        PicCategory.Boolean => "ByteLengthBoolean",
+                        _ => sig.RuntimeMethod,
+                    }, Str(ic.Args[0])), 0);
 
             // Date/time conversions (§15.22/24/46/47; integer date form §15.5.2). These four keep the NARROW
             // §15.3 landing: §15.5.2 BOUNDS the integer date form (1601-01-01 onward), so an argument the body

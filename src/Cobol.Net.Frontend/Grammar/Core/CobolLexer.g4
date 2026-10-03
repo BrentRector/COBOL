@@ -15,7 +15,10 @@ options {
 // expression, so IDENTIFIER's action retypes the word there (see IDENTIFIER). A rule spelling 'DEFINED' would publish
 // that literal in the vocabulary, whose literal names are read as "the lexer makes this word a keyword token"
 // (CobolKeywordTokens, CobolWordsDriftTests) — which, everywhere else, it does not.
-tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED }
+// DEBUG_LINE_IN_REGION is virtual for the same reason: the two region modes (PICMODE, SUBSCRIPT) retype their debugging-line
+// carrier rule to it (kb/Work PB1913), so a debugging line inside an open PICTURE or subscript region reaches
+// DebuggingLineRewriter as a marker that says its text was SKIPPED, not lexed.
+tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED, DEBUG_LINE_IN_REGION }
 
 // The channel of a debugging line that is a COMMENT (kb/Work PB1705): DebuggingLineRewriter moves the tokens of a
 // fixed-form debugging line here when its source unit does not declare WITH DEBUGGING MODE. No lexer rule emits to it.
@@ -249,7 +252,7 @@ channels { ABSENT_DEBUG_LINE }
     {
         var token = base.NextToken();
         // DEBUG_LINE is a marker, not a word: like a comment it must not become the "previous token" of the next one.
-        if (token.Type != WS && token.Type != SUB_WS && token.Type != DEBUG_LINE
+        if (token.Type != WS && token.Type != SUB_WS && token.Type != DEBUG_LINE && token.Type != DEBUG_LINE_IN_REGION
             && token.Type != Antlr4.Runtime.TokenConstants.EOF)
         {
             TrackReportSection(token.Type);   // before the shift: it asks what PRECEDED this token
@@ -276,8 +279,10 @@ COMMENT_START: '*>' -> skip, pushMode(COMMENT_MODE) ;
 // HIDDEN token, and the line's text is lexed as ordinary tokens behind it: whether they are SOURCE or COMMENT is decided
 // per source unit, after lexing, by DebuggingLineRewriter (the unit's SOURCE-COMPUTER WITH DEBUGGING MODE clause is
 // further down the token stream than the line may be, so no earlier stage can know). Longer than COMMENT_START's `*>`, so
-// it wins; PICMODE and SUBSCRIPT keep their own comment skips, which swallow it (a debugging line inside an open PICTURE
-// or subscript region stays a comment — kb/Work PB1705).
+// it wins. PICMODE and SUBSCRIPT cannot lex the line's text on the strength of a decision not yet made — which of the
+// two the text is changes the lexer's own mode — so they SKIP the line as a comment and leave a DEBUG_LINE_IN_REGION marker
+// (PIC_DEBUG_LINE / SUB_DEBUG_LINE below); when the rewriter finds such a line is SOURCE (its unit declares the mode), the
+// frontend blanks that line's carrier and lexes the text again, now with the line as plain source (kb/Work PB1913).
 DEBUG_LINE   : '*>' '\u{FDD0}' 'DEBUG ' -> channel(HIDDEN) ;
 
 // ── END-xxx paired terminators (must precede END and IDENTIFIER) ──
@@ -1159,6 +1164,9 @@ PIC_WS      : [ \n]+ -> skip ;       // skip whitespace
 // reference-format stage (ISO §6.5 2) / 3)) before the lexer runs, but the fixed-form DEBUGGING-line carrier
 // (ReferenceFormatProcessor.DebugLineCarrier) still reaches it as a *> line — and *> never begins a picture
 // character-string (> is no PICTURE symbol). Longest match: it always reaches at least as far as PIC_STRING would.
+// A fixed-form DEBUGGING line inside the open region (kb/Work PB1913): skipped whole, like a comment, but as a marker
+// DebuggingLineRewriter can find. It precedes PIC_COMMENT because the two match the same text and the first rule wins.
+PIC_DEBUG_LINE : '*>' '\u{FDD0}' 'DEBUG ' ~[\n]* -> type(DEBUG_LINE_IN_REGION), channel(HIDDEN) ;
 PIC_COMMENT : '*>' ~[\n]* -> skip ;
 PIC_STRING  : ( ~[ \n.] | '.' ~[ \n] )+
     {
@@ -1207,6 +1215,8 @@ mode SUBSCRIPT;
 
 SUB_WS              : [ \n]+ ;
 // The same comment carrier inside a subscript or reference-modifier (see PIC_COMMENT): *> is no operator there.
+// A fixed-form DEBUGGING line inside the region (kb/Work PB1913) — see PIC_DEBUG_LINE; it precedes SUB_COMMENT for the same reason.
+SUB_DEBUG_LINE      : '*>' '\u{FDD0}' 'DEBUG ' ~[\n]* -> type(DEBUG_LINE_IN_REGION), channel(HIDDEN) ;
 SUB_COMMENT         : '*>' ~[\n]* -> skip ;
 
 // Keywords must precede SUB_IDENTIFIER (same length → first rule wins)

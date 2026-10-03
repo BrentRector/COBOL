@@ -1518,9 +1518,14 @@ public sealed class ReferenceResolver(DataBinder data)
         FindItem(name, qualifiers) is { } item ? PlaceForItem(item, indexExprs) : null;
 
     /// <summary>Render one subscript token segment to a C# index expression (the private
-    /// <see cref="RenderSegment"/>), or null when the segment uses an unhandled form (caller fails loud).</summary>
-    internal string? RenderIndexSegment(List<IToken> tokens) =>
-        RenderSegment(tokens, SegmentPosition.Subscript);
+    /// <see cref="RenderSegment"/>), or null when the segment uses an unhandled form (caller fails loud).
+    /// <para>⛔ <paramref name="indexNames"/> IS NOT OPTIONAL (kb/Work PB1472): a caller that renders a subscript
+    /// owes §8.4.2.3.3 SR4's association screen (<see cref="ScreenIndexNameAssociation"/>) for the index-names it
+    /// wrote, and the collector is how the screen sees them. The only caller outside the resolver, the table(ALL)
+    /// intrinsic argument, passed none, so `FUNCTION SUM(E2(IXA, ALL))` with IXA declared on another table compiled
+    /// clean while `E2(IXA, 1)` was refused — the second arm of one subscript reading.</para></summary>
+    internal string? RenderIndexSegment(List<IToken> tokens, List<IndexUse> indexNames) =>
+        RenderSegment(tokens, SegmentPosition.Subscript, indexNames);
 
     /// <summary>Resolve an <c>ADDRESS OF</c> operand (ISO §8.4.3.11) to its item plus the OCCURS displacement
     /// of its subscripts — <c>(idx − 1) × width [+ …]</c> character positions within the item's storage class,
@@ -2354,7 +2359,7 @@ public sealed class ReferenceResolver(DataBinder data)
     /// admits.</para>
     /// <para>A REDEFINES / RENAMES view resolves to its own entry, and an index-name declared on the redefining
     /// entry is found through that entry's own hierarchy — no special case.</para></summary>
-    private void ScreenIndexNameAssociation(DataItem item, List<IndexUse> indexNames)
+    internal void ScreenIndexNameAssociation(DataItem item, List<IndexUse> indexNames)
     {
         if (indexNames.Count == 0 || _probing) return;   // R30 purity: a probe never diagnoses (kb/Work PB157)
         foreach (var (t, decl) in indexNames)

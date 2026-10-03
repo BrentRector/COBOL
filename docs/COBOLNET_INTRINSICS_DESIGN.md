@@ -355,6 +355,22 @@ per-usage widths are on `ByteWidth`'s doc and CONFORMANCE.md). A type-name argum
 template already holds); a bit group / national group (GROUP-USAGE, §13.18.29) is not yet modelled — kb/Work PB79 —
 so every group is r3's alphanumeric group here.
 
+**A FUNCTION-IDENTIFIER argument is ONE arm for both folds, keyed on the function's §15.2 type (`FunctionResultLength`,
+kb/Work PB1398).** §8.4.3.2.1 — "A function-identifier references the unique data item that results from the
+evaluation of a function" — makes every function result "a data item of any class or category" (§15.50.3 r1 / §15.14.3
+r1), so the arm is the item the TYPE describes, never a list of the three string types the LENGTH twin once matched
+(and BYTE-LENGTH did not match at all, so every function argument was refused as "a numeric literal"): an alphanumeric,
+national or boolean result keeps a RUNTIME length over its string image (BYTE-LENGTH: 1 byte per alphanumeric position,
+2 per national position — D-N1 — and ceil(positions / 8) per boolean, §15.14.4 r4, the renderer's `ByteLength` arm over
+`ByteLengthNational` / `ByteLengthBoolean`); an integer or numeric result is the §15.4 temporary
+(`SendingValueTemp.NumericReturnedValuePic` — the ONE description the statement hoist stores the value in, so the item a
+value is stored in and the item its length is asked of cannot differ), S9(30) DISPLAY, 30 positions and 30 bytes
+(DOC-A.1-92); an index result is the index carrier, 8. A result the binder FOLDED to a literal (`FUNCTION
+LENGTH(FUNCTION LENGTH(X))`) is not a literal the source wrote: `BoundNumLiteral.FunctionValue` /
+`BoundNumericLiteral.FunctionValue` carry that origin from the ONE point every bound function result passes
+(`BindIntrinsicCore`) to every syntax rule that asks "is this operand a literal" (kb/Work PB1662). What the catch-all
+refuses is named for what was WRITTEN — `WrittenForm`: a numeric literal, or an arithmetic expression.
+
 **`VariableLengthGroupSum` is one expression, in BYTES, from ONE width walk corrected for what it cannot know:**
 `ByteWidth` counts an ODO table at its MAXIMUM, a dynamic-capacity table as ONE occurrence and a dynamic-length leaf
 as zero, so the builder subtracts the first two and adds the runtime term for each — the ODO table's current extent

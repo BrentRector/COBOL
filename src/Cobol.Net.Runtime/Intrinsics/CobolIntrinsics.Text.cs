@@ -148,6 +148,15 @@ public static partial class CobolIntrinsics
     /// FUNCTION LENGTH's §15.50.4 r6 (a dynamic-length item's current length in BYTES) rides the same body.</summary>
     public static long ByteLength(string storage) => storage.Length;
 
+    /// <summary>BYTE-LENGTH (§15.14.4 r1) of a NATIONAL function result: the result's string image holds one UTF-16
+    /// code unit per national position, and a national position is 2 bytes (D-N1) — kb/Work PB1398.</summary>
+    public static long ByteLengthNational(string image) => 2L * image.Length;
+
+    /// <summary>BYTE-LENGTH (§15.14.4 r1, r4) of a BOOLEAN function result: the result's string image holds one
+    /// '0'/'1' character per boolean position, and a boolean function's implicit usage is BIT (§15.2 item 2), 8
+    /// positions to the byte — "rounded to the next larger integer value" when they do not fill one (kb/Work PB1398).</summary>
+    public static long ByteLengthBoolean(string image) => (image.Length + 7L) / 8;
+
     /// <summary>CONCAT (§15.18.4, 2023): the characters of all arguments in order — argument-1 followed by each
     /// argument-2 (rules 1 &amp; 4). Each argument arrives as its fixed-width display IMAGE (trailing padding
     /// included — §15.18.4 rule 1 "all of the characters"), so the result length is the sum of the argument

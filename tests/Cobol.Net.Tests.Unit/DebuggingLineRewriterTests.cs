@@ -135,13 +135,50 @@ public sealed class DebuggingLineRewriterTests
         Assert.True(before.SequenceEqual(stream.GetTokens()), "no token object may be replaced when no line is carried");
     }
 
-    [Fact]
-    public void ADebuggingLineInsideASubscript_StaysAComment_ForEveryReader()
+    /// <summary>kb/Work PB1913: a debugging line inside an open subscript or PICTURE region has its text SKIPPED by the
+    /// lexer (the region modes), leaving a <see cref="CobolLexer.DEBUG_LINE_IN_REGION"/> marker; the rewriter does not move
+    /// tokens for it but names it when it is source, for the frontend to blank its carrier and lex again.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ADebuggingLineInsideASubscript_IsNamedWhenItIsSource_AndLeftAlone_WhenItIsAComment(bool clause)
     {
-        // SUBSCRIPT mode keeps its own comment skip: the carrier never becomes a marker there, and the fragment re-parse of the
-        // captured text (which hides every line) reads the same.
-        var tokens = Rewritten(["MOVE A(1", D("+ 2"), ") TO B."]);
-        Assert.DoesNotContain(tokens, t => t.Type == CobolLexer.DEBUG_LINE);
+        string[] lines = ["PROGRAM-ID. P.", clause ? "SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE." : "SOURCE-COMPUTER. IBM-PC.",
+            "MOVE A(1", D("+ 2"), ") TO B."];
+        var stream = new CommonTokenStream(new CobolLexer(new AntlrInputStream(string.Join("\n", lines) + "\n")));
+        var named = DebuggingLineRewriter.Rewrite(stream);
+        var tokens = stream.GetTokens();
+        Assert.DoesNotContain(tokens, t => t.Type == CobolLexer.DEBUG_LINE);            // the region skipped the text: no line marker
+        Assert.Single(tokens, t => t.Type == CobolLexer.DEBUG_LINE_IN_REGION);
+        Assert.Equal(clause, named is not null);
+        Assert.True(named is null || named.Type == CobolLexer.DEBUG_LINE_IN_REGION);
+    }
+
+    [Fact]
+    public void WithCarrierBlanked_MakesTheLineSourceAtTheSameColumns_AndTheSecondLexSeesNoMarker()
+    {
+        string text = string.Join("\n", ["PROGRAM-ID. P.", "SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE.",
+            "MOVE A(1", D("+ 2"), ") TO B."]) + "\n";
+        var first = new CommonTokenStream(new CobolLexer(new AntlrInputStream(text)));
+        string blanked = DebuggingLineRewriter.WithCarrierBlanked(text, DebuggingLineRewriter.Rewrite(first)!);
+        Assert.Equal(text.Length, blanked.Length);
+        Assert.Equal(text.Count(c => c == '\n'), blanked.Count(c => c == '\n'));
+
+        var second = new CommonTokenStream(new CobolLexer(new AntlrInputStream(blanked)));
+        Assert.Null(DebuggingLineRewriter.Rewrite(second));
+        var plus = second.GetTokens().Single(t => t.Text == "+");                         // lexed as source this time
+        Assert.Equal(D("").Length, plus.Column);                                           // the text keeps its column
+        Assert.DoesNotContain(second.GetTokens(), t => t.Type is CobolLexer.DEBUG_LINE or CobolLexer.DEBUG_LINE_IN_REGION);
+    }
+
+    [Fact]
+    public void ADebuggingLineInsideAPicture_IsRegionLine_TooAndItsTextIsNotLexedAsThePictureString()
+    {
+        var stream = new CommonTokenStream(new CobolLexer(new AntlrInputStream(
+            string.Join("\n", ["01 X PIC", D("X(5)."), "   VALUE 'A'."]) + "\n")));
+        stream.Fill();
+        Assert.Single(stream.GetTokens(), t => t.Type == CobolLexer.DEBUG_LINE_IN_REGION);
+        Assert.DoesNotContain(stream.GetTokens(), t => t.Text == "X(5).");   // PICMODE skipped the line; it still waits for its string
     }
 
     /// <summary>The carrier the logical conversion writes IS the spelling of the lexer's marker rule — one value, two

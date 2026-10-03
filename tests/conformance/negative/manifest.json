@@ -1909,7 +1909,9 @@
   "pb1758-fixed-remarks-at-2023",
   "pb1494-debugging-line-at-2014",
   "pb1660-define-nbsp-between-words",
-  "pb1660-nbsp-only-line-is-not-blank"
+  "pb1660-nbsp-only-line-is-not-blank",
+  "pb1472-all-subscript-index-name-other-table",
+  "pb1398-length-of-arithmetic-expression"
  ],
  "pending": []
 }

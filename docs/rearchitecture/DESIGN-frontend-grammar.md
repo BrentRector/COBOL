@@ -876,7 +876,16 @@ reference formats, and the only place source comments are recognized. Its model:
   `ABSENT_DEBUG_LINE` channel otherwise, so the parser, `SeparatorRule` and `PictureSeparatorPeriodRule` never read an
   absent line. It reads the unit nesting (PROGRAM-ID … END PROGRAM) and the clause off the TOKENS, so a change to the
   `sourceComputerParagraph` / `debuggingModeClause` rules is a change to its `DeclaresMode`. A debugging line inside an open
-  PICTURE clause or subscript region stays a comment (PICMODE and SUBSCRIPT keep their own comment skip).
+  PICTURE clause or subscript region is the one shape it cannot settle on tokens (kb/Work PB1913): which of "source" and
+  "comment" the line's text is decides whether the text moves the LEXER's own mode (a `)` that closes the subscript,
+  the picture string that ends PICMODE). PICMODE and SUBSCRIPT therefore skip the line's text and leave a
+  `DEBUG_LINE_IN_REGION` marker (`PIC_DEBUG_LINE` / `SUB_DEBUG_LINE`); `Rewrite` returns the FIRST such line whose unit
+  declares the mode, `Frontend.LexAndParse` blanks that line's carrier (`WithCarrierBlanked`: same columns, same
+  offsets) and lexes the text again, and the loop ends when no region line is source. Only the first per pass,
+  because the tokens after a skipped source line were lexed without its text; the tokens up to and including it are
+  exact, and a region sits after the unit's SOURCE-COMPUTER paragraph. The fragment re-parses
+  (`FragmentParse`, `ReparseArgs`) read a slice of THAT text, in which every carrier left is a comment line, so
+  `HideAll` is exactly right for them.
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
 - **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
@@ -888,8 +897,9 @@ reference formats, and the only place source comments are recognized. Its model:
   AND free form, so no later stage (the lexer's picture mode, the COPY/REPLACE text-word scanner, the NIST
   substitutions) has a comment rule to get wrong. The lexer keeps `COMMENT_START` (and `PIC_COMMENT` /
   `SUB_COMMENT` in its other modes) only for the INTERNAL `*>` carriers written after this pass: the COPY stage's
-  not-found notes, and the debugging-line carrier inside a PICTURE or subscript region (everywhere else the lexer reads it
-  as the `DEBUG_LINE` marker, kb/Work PB1705).
+  not-found notes. The debugging-line carrier is read as the `DEBUG_LINE` marker (kb/Work PB1705) — and inside a
+  PICTURE or subscript region as `DEBUG_LINE_IN_REGION`, which the frontend turns into plain source or leaves a
+  skipped comment (kb/Work PB1913).
 - **The reference-format diagnostics live in ONE per-COMPILATION object** (kb/Work PB1640): `ReferenceFormatDiagnostics`
   (edition, strictness, the bag), created once per front-end pass and shared by the main source and EVERY copybook —
   library text is read by the same §6.5 walker (§6.5 applies to "lines of source text and library text"), so a rule

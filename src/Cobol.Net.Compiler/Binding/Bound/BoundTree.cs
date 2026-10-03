@@ -185,7 +185,17 @@ public abstract record BoundExpr;
 /// the SDIDI carries 34), which round-to-nearest recovers and a directed §14.7.4.3 mode does not: stored into a
 /// COMP-2 under the implied TRUNCATION, <c>1.7976931348623157E+308</c> lands one ulp below the maximum it names.
 /// The backend therefore hands a floating-point resultant the carrier value itself.</summary>
-public sealed record BoundNumLiteral(string Text, BinaryFloatCarrier? Carrier = null) : BoundExpr;
+public sealed record BoundNumLiteral(string Text, BinaryFloatCarrier? Carrier = null) : BoundExpr
+{
+    /// <summary>True when this literal is a FUNCTION-IDENTIFIER's value folded at bind time (a LENGTH of a fixed item,
+    /// an algebraic extreme, a constant function) rather than a literal the source wrote. The fold keeps its origin
+    /// because every syntax rule that asks "is this operand a literal?" is about the operand AS WRITTEN: a
+    /// function-identifier references "the unique data item that results from the evaluation of a function"
+    /// (§8.4.3.2.1), never a literal, whatever the compiler can compute of its value. Set once, where every bound
+    /// function result passes (<c>IntrinsicBinder.BindIntrinsicCore</c>), and carried to the operand by
+    /// <c>IntrinsicBinder.OperandOf</c> (kb/Work PB1398, PB1662).</summary>
+    public bool FunctionValue { get; init; }
+}
 
 /// <summary>The ISO/IEC 60559 binary interchange format a <see cref="BoundNumLiteral"/>'s value is exactly a value
 /// of (binary32: COMP-1 / FLOAT-SHORT / FLOAT-BINARY-32; binary64: the other binary float usages).</summary>
@@ -455,7 +465,13 @@ public sealed record BoundStringLiteral(string Value) : BoundOperand
 }
 
 /// <summary>A numeric literal operand, kept as raw source text.</summary>
-public sealed record BoundNumericLiteral(string Text) : BoundOperand;
+public sealed record BoundNumericLiteral(string Text) : BoundOperand
+{
+    /// <summary>True when the operand is a FUNCTION-IDENTIFIER's value folded at bind time, not a literal the source
+    /// wrote — see <see cref="BoundNumLiteral.FunctionValue"/>. Value-wise it IS the literal (every renderer reads
+    /// <see cref="Text"/>); only the syntax rules that name a literal, or a data item, tell the two apart.</summary>
+    public bool FunctionValue { get; init; }
+}
 
 /// <summary>A reference to a data item (its category decides string-vs-numeric rendering).</summary>
 public sealed record BoundFieldOperand(Place Place) : BoundOperand;

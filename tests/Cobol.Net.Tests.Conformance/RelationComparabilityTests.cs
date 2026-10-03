@@ -57,8 +57,11 @@ public sealed class RelationComparabilityTests
         new("SP", "SPACE", Cls.Character, Literal: true),
         new("ZR", "ZERO", Cls.Zero, Literal: true),
         new("EX", "ND + 1", Cls.Numeric),                                                 // arithmetic expression
-        new("FI", "FUNCTION INTEGER(NF)", Cls.Numeric, NumericInteger: true),              // INTEGER function (§15.2 item 5)
-        new("FN", "FUNCTION SQRT(ND)", Cls.Numeric),                                      // NUMERIC function (§15.2 item 4)
+        // A function-identifier references "the unique data item that results from the evaluation of a function"
+        // (§8.4.3.2.1), numeric by §15.2 items 4 and 5, so it is row 2's "numeric data item" (kb/Work PB1662).
+        new("FI", "FUNCTION INTEGER(NF)", Cls.Numeric, NumericInteger: true, NumericItemOrLiteral: true),   // INTEGER function (§15.2 item 5)
+        new("FN", "FUNCTION SQRT(ND)", Cls.Numeric, NumericItemOrLiteral: true),                           // NUMERIC function (§15.2 item 4)
+        new("FL", "FUNCTION LENGTH(XA)", Cls.Numeric, NumericInteger: true, NumericItemOrLiteral: true),   // an INTEGER function the binder FOLDS (kb/Work PB1662)
         new("IX", "I1", Cls.Index, IndexName: true),
         new("IY", "I2", Cls.Index, IndexName: true),
         new("ID", "IDA", Cls.Index),
