@@ -1445,6 +1445,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     // §14.8.2.3.3 rule 2d's MOVE, stored by the receiving category's ONE MOVE store — the store the
                     // identifier arm reaches through OoStringReadOf (kb/Work PB1113: the sign is not moved into an
                     // alphanumeric receiver, §14.9.25.4 GR6; a numeric-edited receiver edits).
+                    : a.ContentExpr is { } cexpr
+                    // An arithmetic expression likewise: its VALUE is the numeric sender (kb/Work PB1946, verdict PB1936),
+                    // so it crosses through the same receiving-category MOVE store, never as a digit image of its own.
+                    ? $"string {tmp} = {U.Move.ConvertSource(new BoundComputedOperand(cexpr), a.Formal)};"
                     : $"string {tmp} = {U.Move.ConvertSource(new BoundNumericLiteral(a.NumericLiteral!), a.Formal)};");
             // The PICTURE-less carriers (object reference, data pointer, program pointer) cross VERBATIM: they
             // have no picture, no scale and no character image, so the crossing is a reference/handle copy and

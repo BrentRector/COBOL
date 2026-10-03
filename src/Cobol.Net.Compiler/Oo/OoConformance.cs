@@ -19,7 +19,10 @@ public readonly record struct AdapterPair(
 /// <param name="Position">Its §14.9.25.3 Table 16 row.</param>
 /// <param name="Operand">The bound operand the whole MOVE question reads (SR6/SR7/SR8 shapes), or null for a value
 /// that has none (a boolean expression).</param>
-/// <param name="IsExpression">An arithmetic expression — rule 2 a)'s COMPUTE sender, which no MOVE statement takes.</param>
+/// <param name="IsExpression">An arithmetic expression — rule 2 a)'s COMPUTE sender. Its VALUE is a numeric sender
+/// judged by Table 16 exactly like a numeric literal (<paramref name="Position"/>: noninteger, because an expression's
+/// value carries no compile-time integer guarantee), but it has no character image, so a GROUP formal's §14.9.25.4 GR4
+/// character copy has nothing to copy.</param>
 /// <param name="Spelled">How a refusal names the argument.</param>
 public readonly record struct ContentValue(Table16Operand Position, BoundOperand? Operand, bool IsExpression, string Spelled)
 {
@@ -1179,21 +1182,34 @@ public static class OoConformance
     /// <c>12</c> into <c>PIC N(4)</c> and <c>-5</c> into <c>PIC X(4)</c> were refused, where Table 16 says Yes to each),
     /// the boolean list refused a national formal "on purpose", and both admitted an index-data-item formal through the
     /// numeric arm. One question asked of a described sender is what keeps the next category automatic.</para>
-    /// <para>An ARITHMETIC EXPRESSION into a formal rule 2 a) does not govern stays refused: rule 2 d) is "the same as
-    /// for a MOVE statement", whose sending operand is an identifier or a literal (§14.9.25.2), and an expression's
-    /// value carries no compile-time integer guarantee for Table 16's integer/noninteger split. Null when
-    /// conformant.</para>
+    /// <para>⛔ AN ARITHMETIC EXPRESSION IS A NUMERIC SENDER, ASKED RULE 2 d)'S QUESTION OF ITS VALUE (kb/Work PB1946,
+    /// verdict kb/Work PB1936). Rule 2 d) applies the MOVE rules "with the argument as the sending operand" — the
+    /// clause's own words for an ARGUMENT, which §14.9.4.3 SR17 says includes "any identifier specified in
+    /// arithmetic-expression-1" — so the expression's value is the sender, the numeric category a numeric literal is.
+    /// An expression into a numeric-edited formal is therefore Table 16's "Yes" and edits, and into an alphanumeric or
+    /// national formal it takes the NONINTEGER numeric row's "No" (an expression's value carries no compile-time integer
+    /// guarantee, the principle §15.2 gives a NUMERIC function, <see cref="MoveTable16.SenderPosition"/>). It used to be
+    /// refused for EVERY non-numeric formal on the reading that a MOVE's sending operand is an identifier or a literal
+    /// (§14.9.25.2), which is MOVE's own syntax and not the clause's argument. Null when conformant.</para>
     /// </summary>
     public static string? ContentValueMismatch(DataItem formal, ContentValue sender)
     {
+        // §14.8.2.3.3's SET paragraph: no SET format sends a numeric, boolean or arithmetic VALUE into a class-pointer or
+        // object-reference formal. ONE refusal for every value shape, whichever lane asks.
+        if (SlotWindow.CarriedBySlot(formal))
+            return "§14.8.2.3.3 transfers a value into a formal parameter of class pointer or object reference by the SET "
+                + $"rules, and {sender.Spelled} is not a sending operand of any SET format";
         if (formal is { IsGroup: false, Pic.Usage: Usage.Index }) return IndexFormalRefusal(sender.Spelled);
         if (formal is { IsGroup: false, Pic.Category: PicCategory.Numeric })
             return sender.Position.Category is PicCategory.Numeric ? null
                 : $"§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and "
                   + $"{sender.Spelled} is not a numeric sending operand (ISO §8.8.1.1)";
-        if (sender.IsExpression)
-            return "§14.8.2.3.3 rule 2a transfers an expression by the COMPUTE rules, which requires a category-numeric "
-                + "formal parameter, and rule 2d's MOVE takes an identifier or a literal as its sending operand (ISO §14.9.25.2)";
+        // A group formal takes §14.9.25.4 GR4's character copy "with no conversion", and an expression has no description
+        // whose characters could be copied (a numeric literal has its own digits, a boolean value its bit string).
+        if (formal.IsGroup && sender.IsExpression)
+            return $"§14.8.2.2 rule 2 transfers {sender.Spelled} into a group formal parameter by the MOVE rules, whose "
+                + "group move copies the sending operand's characters (ISO §14.9.25.4 GR4), and an arithmetic expression "
+                + "has no character image";
         var receiver = Table16Operand.Of(formal);
         string? why = sender.Operand is { } op
             ? MoveTable16.Validity(op, receiver, formal)?.Reason

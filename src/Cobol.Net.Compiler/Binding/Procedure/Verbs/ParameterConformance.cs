@@ -185,7 +185,8 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// <para>Each shape takes the clause the standard names for it: an identifier the per-formal-category rule
     /// (2a COMPUTE / 2b SET / 2c ANY LENGTH / 2d MOVE, plus the class-pointer and object-reference SET paragraph);
     /// a boolean expression or boolean literal Table 16's BOOLEAN row (rule 2d); an arithmetic expression rule
-    /// 2a's COMPUTE; an alphanumeric literal rule 2d's MOVE; a numeric literal whichever of 2a/2d its value can
+    /// 2a's COMPUTE into a numeric formal and, into any other, rule 2d's MOVE asked of its numeric VALUE (kb/Work PB1946);
+    /// an alphanumeric literal rule 2d's MOVE; a numeric literal whichever of 2a/2d its value can
     /// satisfy; an intrinsic function-identifier the rule for a data item of its RESULT category (§15.4 — "The
     /// evaluation of a function produces a returned value in a temporary elementary data item"). A CONSTANT-NAME
     /// argument arrives already substituted as its literal (§13.10.4 GR1), so it needs no arm of its own.</para>
@@ -289,7 +290,14 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// sender, whose Table-16 row is its §15.2 TYPE (kb/Work PB73).</summary>
     private static string? IntrinsicResultMismatch(DataItem formal, BoundComputedOperand sender, BoundIntrinsicCall ic)
     {
-        if (ic.ResultCategory is PicCategory.Numeric)
+        // A NUMERIC result is a numeric sender. Into a numeric, index, group, pointer or object-reference formal the one
+        // value verdict answers (rules 2a/2b, the group and SET refusals); into any other formal rule 2d's MOVE question
+        // is asked of the function-identifier itself below, whose Table-16 row is its §15.2 type — an INTEGER function
+        // (MAX over integers, INTEGER, ORD) is the Integer row, exactly as the INVOKE lane's identifier arm reads it
+        // (kb/Work PB1946: this arm answered with the expression's conservative noninteger row, so `CALL … BY CONTENT
+        // FUNCTION MAX(A B)` into a PIC X(4) formal was refused where the INVOKE of the same pair compiled).
+        if (ic.ResultCategory is PicCategory.Numeric
+            && (formal.IsGroup || SlotWindow.CarriedBySlot(formal) || formal.Pic is { Category: PicCategory.Numeric }))
             return CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Arithmetic);
         if (formal.Pic is { Category: PicCategory.Numeric })
             return "§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and "

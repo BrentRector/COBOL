@@ -701,7 +701,10 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   §14.9.25.3 Table 16, plus the class-pointer / object-reference SET paragraph).
   `ParameterConformance.ContentConformanceReason` dispatches on the BOUND argument's shape — identifier, boolean
   expression, arithmetic expression, alphanumeric literal, numeric literal, and an intrinsic function-identifier
-  by its RESULT category (§15.4) — and a constant-name needs no arm
+  by its RESULT category (§15.4) — and an arithmetic expression into a formal that is not numeric is asked rule 2 d)'s
+  MOVE question of its VALUE (a numeric sender on Table 16's noninteger row: edited into a numeric-edited formal,
+  refused into an alphanumeric, national, group, pointer or object-reference one; kb/Work PB1946, verdict PB1936;
+  `ArgText` crosses it through `ConvertSource`, the numeric literal's twin) — and a constant-name needs no arm
   because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688 for a CALL and its twin
   COBOLNET2470 for a function-identifier, the same code the BY REFERENCE arm uses, because it is the same
   obligation. The same collaborator owns the bit-alignment proof (§14.9.4.3 SR6/SR8 and §8.4.3.2.3 SR14 —

@@ -2036,7 +2036,11 @@
   "pb1034-not-less-or-equal-words",
   "pb1034-equal-than",
   "pb1034-abbreviated-not-gteq",
-  "pb1034-directive-not-gteq"
+  "pb1034-directive-not-gteq",
+ "pb1946-content-expression-into-alphanumeric",
+ "pb1946-content-expression-into-national",
+ "pb1946-content-expression-into-group",
+ "pb1946-content-expression-into-pointer"
  ],
  "pending": []
 }

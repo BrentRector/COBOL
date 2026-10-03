@@ -669,6 +669,15 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // that category does: its character image, through the ONE string channel (OperandText.AsString).
             case BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean } } sc:
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({OperandText.AsString(sc, num)}), null)";
+            // ⛔ AN ARITHMETIC EXPRESSION INTO A KNOWN ELEMENTARY FORMAL OF ANOTHER CATEGORY (kb/Work PB1946, verdict
+            // PB1936) crosses as that formal's allocated record, exactly as the numeric literal above does: §14.2.3 GR9
+            // fills it by "a MOVE statement" when the formal is not numeric, and §14.8.2.3.3 rule 2 d) takes the
+            // expression's VALUE as the MOVE's sending operand. The receiving category's ONE MOVE store edits it into a
+            // numeric-edited mask; a numeric cell would be read by the callee's adapter as digits ("12.50" as "125").
+            case BoundComputedOperand moved when a.Formal is { IsGroup: false, Pic: { } mp }
+                                                 && mp.Category is not PicCategory.Numeric
+                                                 && SlotWindow.CarriedBySlot(a.Formal) is false:
+                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({move.ConvertSource(moved, a.Formal)}), null)";
             case BoundComputedOperand expr:
             {
                 // A GENUINE runtime expression snapshots its computed value (§14.2.3 GR9/GR10 — the CALL BY
