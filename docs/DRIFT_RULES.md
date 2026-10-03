@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-254 drift tests.
+255 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
