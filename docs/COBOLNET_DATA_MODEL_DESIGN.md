@@ -1221,6 +1221,24 @@ PB1267). **EC-BOUND-SET** (kb/Work
 PB460): `SetCapacity` raises it on EVERY SET Format 14 whose new capacity exceeds the expected maximum capacity
 (§14.9.39.4 GR30's second arm — no first-crossing exemption), BEFORE the change, through `BoundSetChecking`, which
 the EC binder enables precisely on `BoundSetCapacity`. `docs/CONFORMANCE.md` A.4.4 records the two determinations.
+
+**The ELEMENTS of a moved table go through the MOVE statement, not the carrier (kb/Work PB1144).** The §14.9.25.4 GR9
+transfer (`CobolVarGroup`, `FromCurrentImage`) moves each corresponding table as element IMAGES, which is right for a
+group element pair (GR4: a fixed-length group move is an alphanumeric move "without conversion") and for two
+identically described elementary elements, and wrong for every other elementary pair: §14.6.9.2 ends "Correspondingly
+numbered elements are moved according to the rules of the MOVE statement", and §8.5.1.12.3 admits any pair of equal
+element byte length, so `9(4)` 1234 into `99V99` is 34.00, not the image 12.34. The binder owes the rest, at
+`MoveBinder.BindMoveOf` — the one method every explicit and implicit MOVE passes through — as
+`BoundMove.ElementMoves`: per receiving operand that GR9 governs (`MoveClassifier.VariableLengthGroupSender`, the
+antecedent the emitter's transfer asks too) and per corresponding table pair (`VariableLengthCompatibility
+.CorrespondingTables`, the walk that matched them) whose elementary elements differ (`OoConformance
+.DescriptionMismatch`), one `TableElementMove`: the elementary MOVE bound by `BindMoveOf` itself over the two element
+places at a loop-local occurrence number (reached from each group's resolved place through `PlaceCursor`), so its
+§14.9.25.3 legality is asked of the element pair (a refusal is a diagnostic at the MOVE), plus the two §14.6.9.1
+current counts (`OccurrenceCounts.Current`, shared with INITIALIZE). `MoveEmitter` renders, after the group transfer
+into that receiver, a loop to the smaller count: §14.6.9.2 rule 1's superfluous sending elements are not moved, and
+rule 2's remaining receiving elements stay space filled. Golden `tests/conformance/2014/pb1144_dyn_move_elements`;
+negative `pb1144-dyn-element-move-illegal`.
 Resolved open questions: the VALUE-derived capacity is §13.18.63.4 GR16's, implemented over the whole FORMAT 2
 surface by `DataBinder.ResolveTableValues` and reaching no FORMAT 1 VALUE (the band-scoping paragraph above);
 EC-FLOW-SEARCH in CORE.

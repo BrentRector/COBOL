@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Compiler.Oo;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Runtime;
@@ -92,6 +93,8 @@ internal sealed record FromPhraseRules(
 
 internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, CorrespondingBinder corr)
 {
+    private int _elementLoopVar;   // program-unique §14.6.9.2 element-loop counter (__vlmN — `__` cannot occur in COBOL names)
+
     public BoundStatement Bind(Core.MoveStatementContext move)
     {
         if (move.CORRESPONDING() is not null || move.CORR() is not null)   // Format 2 — BOTH tokens (§14.9.25.3 SR11)
@@ -187,12 +190,95 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets))
             && host.SendingValue.Materialize(source, "move") is { } frozen)
             source = new BoundFieldOperand(frozen);
-        var move = new BoundMove(source, targets) { ImplicitOf = implicitOf };
+        // ⛔ §14.6.9.2's element moves are bound HERE, beside the group move they follow (kb/Work PB1144), so every
+        // GR9 move — the written MOVE and each implicit phrase move alike — carries them, and each is a MOVE this
+        // method screened and storage-marked rather than one the emitter synthesizes.
+        var move = new BoundMove(source, targets) { ImplicitOf = implicitOf, ElementMoves = ElementMovesOf(source, targets) };
         // The fill's STORAGE fact is collected off the CONSTRUCTED node, so it is asked of the same per-target
         // store the emitter renders — including the sender §14.9.25.4 GR2 substitutes (kb/Work PB425).
         MarkFillImageStorage(move);
         return move;
     }
+
+    // ── ISO §14.6.9.2's element moves of a §14.9.25.4 GR9 group move (kb/Work PB1144) ─────────────────────────
+
+    /// <summary>⛔ THE §14.6.9.2 ELEMENT MOVES OF A VARIABLE-LENGTH GROUP MOVE — "Correspondingly numbered elements
+    /// are moved according to the rules of the MOVE statement specified in 14.9.25, MOVE statement" — one
+    /// <see cref="TableElementMove"/> per receiving operand GR9 governs (<see cref="MoveClassifier.VariableLengthGroupSender"/>,
+    /// the antecedent the emitter's group transfer asks) and per corresponding table pair of that operand pair
+    /// (<see cref="VariableLengthCompatibility.CorrespondingTables"/>, the same walk §14.9.25.3 SR9 matched them by).
+    /// <para>The group transfer (<c>CobolVarGroup</c>) moves each table as element IMAGES, and an image IS the
+    /// MOVE's result for exactly two shapes, which take no element move:</para>
+    /// <list type="bullet">
+    ///   <item>a GROUP element pair — §14.9.25.4 GR4 makes a fixed-length group move an alphanumeric move
+    ///     "without conversion", and §8.5.1.12.3's matching made the two elements the same byte length;</item>
+    ///   <item>an elementary pair with IDENTICAL descriptions (<see cref="OoConformance.DescriptionMismatch"/>, the
+    ///     ONE identical-description check) — the conversion is then the identity.</item>
+    /// </list>
+    /// <para>Every other elementary pair — any category pair §14.9.25.3 admits, since §8.5.1.12.3 compares only
+    /// the elements' byte lengths ("Two corresponding tables match when the byte length of their elements is equal
+    /// and their elements are compatible", and compatibility is defined for groups) — gets the real elementary MOVE,
+    /// bound by <see cref="BindMoveOf"/> over the two element places at a loop-local occurrence number, so its
+    /// Table-16 legality is asked of the ELEMENT pair (a refusal is a diagnostic at the MOVE the program wrote) and
+    /// GR6's conversion is the one every MOVE uses.</para></summary>
+    private IReadOnlyList<TableElementMove> ElementMovesOf(BoundOperand source, IReadOnlyList<Place> targets)
+    {
+        List<TableElementMove>? moves = null;
+        for (int t = 0; t < targets.Count; t++)
+        {
+            if (MoveClassifier.VariableLengthGroupSender(source, targets[t]) is not { } send) continue;
+            foreach (var (sTable, rTable) in VariableLengthCompatibility.CorrespondingTables(send.Item, targets[t].Item))
+            {
+                if (sTable.IsGroup || rTable.IsGroup) continue;                         // GR4: the image IS the move
+                if (OoConformance.DescriptionMismatch(sTable, rTable) is null) continue;  // identity conversion
+                (moves ??= []).Add(ElementMove(t, send, sTable, targets[t], rTable));
+            }
+        }
+        return moves ?? [];
+    }
+
+    /// <summary>One corresponding pair's element move: the sending and receiving element places at the loop's
+    /// occurrence number, each reached from its OWN group's resolved place through the ONE bind-time cursor
+    /// (<see cref="PlaceCursor"/> — so a subscripted or qualified group keeps its subscripts), and the two current
+    /// counts of §14.6.9.1 (<see cref="OccurrenceCounts.Current"/>).</summary>
+    private TableElementMove ElementMove(int target, Place send, DataItem sTable, Place recv, DataItem rTable)
+    {
+        string v = $"__vlm{_elementLoopVar++}";
+        var sCur = TableCursor(send, sTable);
+        var rCur = TableCursor(recv, rTable);
+        var sCount = sCur is null ? null : OccurrenceCounts.Current(sTable, sCur.StoragePath, ctx.Refs);
+        var rCount = rCur is null ? null : OccurrenceCounts.Current(rTable, rCur.StoragePath, ctx.Refs);
+        if (sCur is null || rCur is null || sCount is null || rCount is null)
+            return new TableElementMove(target, v, sCount, rCount, null,
+                $"the element moves of the corresponding tables '{sTable.CobolName ?? "FILLER"}' and "
+                + $"'{rTable.CobolName ?? "FILLER"}' of a variable-length group MOVE: a table reached through a storage "
+                + "form whose element places this implementation does not build (ISO §14.6.9.2)");
+        var elementMove = BindMoveOf(new BoundFieldOperand(ElementPlace(sCur, sTable, v)),
+            [ElementPlace(rCur, rTable, v)], ImplicitMovePhrase.TableElement);
+        return new TableElementMove(target, v, sCount, rCount, elementMove, null);
+    }
+
+    /// <summary>The cursor at <paramref name="table"/> inside the resolved group <paramref name="group"/>: down the
+    /// table's ancestor chain from the group (§8.5.1.12's atoms flatten only scalar subordinate groups, so no OCCURS
+    /// level lies between them). Null when the table is not a subordinate of the group's item (a level-66 alias,
+    /// whose atoms are its span's leaves) or a storage form on the way has no cursor.</summary>
+    private static PlaceCursor? TableCursor(Place group, DataItem table)
+    {
+        var chain = new Stack<DataItem>();
+        DataItem? n = table;
+        for (; n is not null && !ReferenceEquals(n, group.Item); n = n.Parent) chain.Push(n);
+        PlaceCursor? cur = n is null ? null : PlaceCursor.Over(group);
+        while (cur is not null && chain.Count > 0) cur = cur.Child(chain.Pop());
+        return cur;
+    }
+
+    /// <summary>Occurrence <paramref name="v"/> of <paramref name="table"/> at its cursor: a dynamic-capacity
+    /// table's element through its direction-specific accessor (data-model D9 — a read is RefSending, a store
+    /// RefReceiving, which within the current capacity never grows it), any other table through its OCCURS index.</summary>
+    private static Place ElementPlace(PlaceCursor tableCursor, DataItem table, string v) =>
+        table.IsDynamicTable && tableCursor.StoragePath is { } path
+            ? new DynElementCursor(path.Add(new DynTableSegment(v)), table).ToPlace()
+            : tableCursor.Indexed(v).ToPlace();
 
     // ── The … FROM and … INTO phrases (kb/Work PB348) ───────────────────────────────────────────────────────
 

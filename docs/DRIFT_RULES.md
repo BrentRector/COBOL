@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-255 drift tests.
+256 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -90,6 +90,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [DispatchResultProtocolDriftTests](../tests/Cobol.Net.Tests.Unit/DispatchResultProtocolDriftTests.cs) | kb/Work PB1122 Task A / PB1761 — THE DECLARATIVE DISPATCH-RESULT PROTOCOL IS ONE NAMED TYPE. | `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs`, `src/Cobol.Net.Compiler`, `src/Cobol.Net.Runtime`, `src/Cobol.Net.Runtime/Exceptions/DispatchResult.cs` |
 | [DispatcherTransferIdiomDriftTests](../tests/Cobol.Net.Tests.Unit/DispatcherTransferIdiomDriftTests.cs) | kb/Work PB405 + PB414 — the invariant that keeps every transfer of control OUT of a paragraph correct as the emitter grows new containers: a statement leaves the paragraph body only through the planted dispatcher label (__pc = t; goto __xfer;), never through a bare C# break;. | — |
 | [DisplayUsageUnionDriftTests](../tests/Cobol.Net.Tests.Unit/DisplayUsageUnionDriftTests.cs) | ⛔ THE HAND-ROLLED DISPLAY-ONLY UNION INVENTORY (kb/Work PB164, the Step D review). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs` |
+| [DynamicCapacityAgreementDriftTests](../tests/Cobol.Net.Tests.Unit/DynamicCapacityAgreementDriftTests.cs) | ⛔ A DYNAMIC-CAPACITY TABLE IS ONLY EVER BUILT BY THE DESCRIPTION THAT READS IT, WHICH IS WHY ISO §14.6.13.2 RULE 6 HAS NO RAISE SITE (kb/Work PB1118; docs/CONFORMANCE.md A.4.4). | `src/Cobol.Net.Compiler` |
 | [EcArgumentFunctionGateDriftTests](../tests/Cobol.Net.Tests.Unit/EcArgumentFunctionGateDriftTests.cs) | ⛔ THE EC-ARGUMENT-FUNCTION AMBIENT GATE MUST NOT DEPEND ON WHICH STATEMENT ENCLOSES THE FUNCTION REFERENCE (fix-queue PB26). | — |
 | [EcCheckingProfileDriftTests](../tests/Cobol.Net.Tests.Unit/EcCheckingProfileDriftTests.cs) | ⛔ §14.9.18.4 GR1 b)'s ENABLEMENT QUESTION IS ASKED IN THE ACTIVATING RUNTIME ELEMENT, AND ONLY THERE (kb/Work PB408). | `src/Cobol.Net.Compiler` |
 | [EcNameResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/EcNameResolutionDriftTests.cs) | ⛔ WRITTEN EXCEPTION-NAMES RESOLVE THROUGH ONE FUNNEL (EcNameResolution — kb/Work R05), AND THIS KEEPS IT TRUE. | `src/Cobol.Net.Compiler` |

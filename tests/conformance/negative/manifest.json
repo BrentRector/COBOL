@@ -2004,7 +2004,8 @@
   "pb791-currency-hexadecimal-literal-7-without-picture-symbol",
   "pb1423-udf-argument-order-at-85",
   "pb1419-udf-float-returning-at-85",
-  "pb1164-call-returning-superclass-into-subclass"
+  "pb1164-call-returning-superclass-into-subclass",
+  "pb1144-dyn-element-move-illegal"
  ],
  "pending": []
 }

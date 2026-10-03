@@ -10,7 +10,9 @@ namespace CobolNet.Runtime;
 /// runtime and is NEVER space-padded to a fixed width (the difference from <see cref="CobolString"/>). Typed-native:
 /// the item IS a native .NET <see cref="string"/> field; this helper carries only the receiving-store rule. A
 /// dynamic-length item read as a SENDER, in a comparison, under reference modification, or in FUNCTION
-/// LENGTH/BYTE-LENGTH uses the plain string at its current length — no helper needed (§8.5.1.10.4).
+/// LENGTH/BYTE-LENGTH uses the plain string at its current length (§8.5.1.10.4) — through <see cref="Agree"/> when
+/// the read's description does not own the storage (a LINKAGE formal, a shared cell-backed member), whose
+/// DYNAMIC LENGTH clause the content may not agree with (§14.6.13.2 rule 5, kb/Work PB1118).
 /// <para>⛔ EVERY entry point takes the item's MAXIMUM SIZE (§8.5.1.10.1), never "the LIMIT phrase or a sentinel".
 /// <see cref="MaxSizeOf"/> is the ONE place that rule is written, and <see cref="MaxLength"/> is the implementor
 /// maximum it falls back to — so a dynamic-length item ALWAYS has a real bound and the <c>(int)</c> narrowings
@@ -61,6 +63,31 @@ public static class CobolDynString
     {
         value ??= "";
         return value.Length > maxSize ? value[..maxSize] : value;
+    }
+
+    /// <summary>
+    /// The SENDING read of a dynamic-length item whose storage another description may have written (ISO
+    /// §14.6.13.2 rule 5, kb/Work PB1118): "When the internal format of a dynamic-length elementary item is not
+    /// correctly formed or does not agree with the corresponding DYNAMIC LENGTH clause an EC-DATA-INCOMPATIBLE
+    /// exception condition is set to exist." <paramref name="maxSize"/> is THIS description's §8.5.1.10.1 maximum
+    /// size; content longer than it does not agree, and with EC-DATA-INCOMPATIBLE checking enabled the fatal
+    /// condition is raised through the one raise helper (with checking off the content stands — the result is
+    /// undefined, §14.6.13.1.1). The content is returned unchanged either way.
+    /// <para>Length is the ONLY agreement fact the carrier can violate: the item IS a managed
+    /// <see cref="string"/>, so its "internal format" — a length and that many characters — is always correctly
+    /// formed, and the minimum length is zero (§13.18.19.4 GR1), so no content is too short. Content stored
+    /// through the SAME description always agrees, because every store truncates to the maximum
+    /// (<see cref="Store"/>), which is why only a read through a description that does not own the storage — a
+    /// LINKAGE formal, a member of a shared cell-backed area — renders through here.</para>
+    /// </summary>
+    public static string Agree(string? value, int maxSize)
+    {
+        value ??= "";
+        if (value.Length > maxSize && ExceptionState.DataIncompatibleChecking)
+            ExceptionState.DataIncompatibleError(
+                $"a dynamic-length item holds {value.Length} characters and its DYNAMIC LENGTH clause allows at most "
+                + $"{maxSize} (ISO §14.6.13.2 rule 5)");
+        return value;
     }
 
     /// <summary>

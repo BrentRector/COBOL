@@ -1208,7 +1208,7 @@ result does not feed it — decision 20.
   syntax rule reaches CORRESPONDING without an edit. Its two constituents are each written once and read twice:
   `ShapeRefusal` has an item-keyed overload that the bound-operand entry DELEGATES to (SR7/SR6 stay at the bound
   entry, since a data item can never be a figurative constant), and `VariableLengthRefusal` is SR9's relation,
-  moved out of `StatementValidation.CheckVariableLengthMove` — which keeps only the MOVE statement's framing
+  framed for the written MOVE by `MoveBinder.MoveCategoryLegality` — which keeps only the MOVE statement's framing
   (which operand shapes unwrap to a data item, and COBOLNET1931) and still reads the ONE
   `VariableLengthCompatibility` module. Asking Table 16 ALONE was measurably wrong, because SR10 governs only
   "all other cases not described in Syntax rules 8 and 9": a `BINARY-LONG` namesake paired with a `PIC X(5)` one

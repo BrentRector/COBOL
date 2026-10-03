@@ -79,6 +79,13 @@ internal static class PlaceRenderer
             : "(" + string.Join(" + ", n.Leaves.Select(ReadRenamesLeaf)) + ")",
         // An ODO group operand read plainly (not as a GR8 slice) is the struct lvalue — the inner member place.
         OdoGroupPlace o => Read(o.Inner),
+        // ⛔ A DYNAMIC-LENGTH LINKAGE item is read through a description that does not own its storage (kb/Work
+        // PB1118): §14.2.3 GR8 makes a formal occupy "the same storage area as the argument", which the caller wrote
+        // through ITS DYNAMIC LENGTH clause, so §14.6.13.2 rule 5's agreement with THIS one is asked at every sending
+        // read. Every other dynamic-length item was stored only through its own description, whose store truncates
+        // to the maximum, so it always agrees and renders the plain field (no scaffolding).
+        MemberPlace m when ReadsForeignDynamicLength(m.Item) =>
+            RuntimeApi.DynAgree(RenderPath(m.Path, AccessDir.Sending), m.Item.DynMaxSize),
         // A direct member/fixed-table access — the structural path rendered as a C# lvalue.
         MemberPlace m => RenderPath(m.Path, AccessDir.Sending),
         // A subscripted OCCURS DYNAMIC element read — the trailing DynTableSegment renders RefSending (§8.5.1.9.2).
@@ -109,8 +116,12 @@ internal static class PlaceRenderer
             RenderPath(s.Cell, AccessDir.Sending), $"(int)({v.OffsetExpr})",
             v.ViewItem.ElementType, v.ViewItem.Pic!.DefaultInitializer),
         // A DYNAMIC-LENGTH member of a cell-backed class (kb/Work PB1026): its content rides the cell's dynamic
-        // slot (§8.5.1.10.3 — "located elsewhere"), so every description sharing the cell reads the same content.
-        RedefViewPlace { Coding: DynSlotWindow d } => RuntimeApi.CellDynRead(RenderPath(d.Cell, AccessDir.Sending), d.Ordinal),
+        // slot (§8.5.1.10.3 — "located elsewhere"), so every description sharing the cell reads the same content —
+        // and any of them may have written it, so the read asks §14.6.13.2 rule 5's agreement with THIS member's
+        // DYNAMIC LENGTH clause (kb/Work PB1118: an EXTERNAL record described LIMIT 20 in one program and LIMIT 5 in
+        // another).
+        RedefViewPlace { Coding: DynSlotWindow d } v => RuntimeApi.DynAgree(
+            RuntimeApi.CellDynRead(RenderPath(d.Cell, AccessDir.Sending), d.Ordinal), v.ViewItem.DynMaxSize),
         // A VARIABLE-LENGTH GROUP of a cell-backed class (kb/Work PB1026): read as its contiguous image at its
         // current extent — §8.5.1.11.2, the same composition a declared group's CurrentImage() performs.
         RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g),
@@ -797,6 +808,14 @@ internal static class PlaceRenderer
         RuntimeApi.TableOdoExtentChars(CountRead(p.Depending), p.MinOccurs, p.MaxOccurs,
             p.FixedUnits, p.ElemUnits, p.PositionsPerCharacter);
 
+    /// <summary>True for an elementary DYNAMIC-LENGTH item described in the LINKAGE SECTION — whose storage the
+    /// activating element owns and wrote through its own DYNAMIC LENGTH clause (ISO §14.2.3 GR8), so a sending read
+    /// asks §14.6.13.2 rule 5's agreement (kb/Work PB1118). A dynamic-length item cannot be BASED (§13.18.5.3 SR2)
+    /// or redefined (§13.18.44.3 SR17), so a LINKAGE one is a formal parameter's storage; the cell-backed twin is
+    /// the <c>DynSlotWindow</c> read arm.</summary>
+    private static bool ReadsForeignDynamicLength(DataItem item) =>
+        item is { IsDynamicLength: true, IsGroup: false, Section: EntrySection.Linkage };
+
     /// <summary>⛔ THE ONE RENDERER OF A TABLE'S OCCURRENCE COUNT (the <see cref="AllCount"/> model): the fixed
     /// OCCURS count (ISO §13.18.38.4 GR4); an occurs-depending table's data-name-1 value CLAMPED to
     /// [integer-1, integer-2] with EC-BOUND-ODO outside (GR7 — <c>CobolTable.OdoExtent</c> over a unit element,
@@ -804,7 +823,7 @@ internal static class PlaceRenderer
     /// <para>Promoted here from <c>IntrinsicRenderer</c> when INITIALIZE's per-occurrence loop became the second
     /// consumer (kb/Work PB393): a <c>table(ALL)</c> argument's range and an INITIALIZE loop bound are the SAME
     /// question about the SAME model, and the second spelling is what this repo's one-rule-one-place rule
-    /// forbids.</para></summary>
+    /// forbids. The §14.6.9.2 element moves of a variable-length group MOVE are the third (kb/Work PB1144).</para></summary>
     public static string OccurrenceCount(AllCount c) => c switch
     {
         AllCount.Fixed f => f.Occurs.ToString(),

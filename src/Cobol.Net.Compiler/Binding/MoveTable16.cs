@@ -110,8 +110,8 @@ public readonly record struct MoveRefusal(MoveRule Rule, string Reason);
 /// data item and the resulting move is valid according to the rules for the MOVE statement" — makes MOVE / ADD /
 /// SUBTRACT CORRESPONDING's pairing decision the MOVE statement's own validity question, over two DATA ITEMS and
 /// no bound operands. <see cref="DataItemRefusal"/> is that question in SR order; <see cref="VariableLengthRefusal"/>
-/// is SR9's relation moved out of <c>StatementValidation.CheckVariableLengthMove</c>, which keeps its COBOLNET1931
-/// framing. Rule 2 asked only <see cref="Refusal"/>, so SR8 and SR9 — the two rules SR10 explicitly defers to —
+/// is SR9's relation, which <c>MoveBinder.MoveCategoryLegality</c> frames as COBOLNET1931 for the MOVE the
+/// program wrote. Rule 2 asked only <see cref="Refusal"/>, so SR8 and SR9 — the two rules SR10 explicitly defers to —
 /// were unasked under CORRESPONDING: a BINARY-LONG namesake paired with a PIC X(5) one, and a variable-length-group
 /// namesake paired with an elementary one and reached the run time.
 /// </para>
@@ -349,8 +349,8 @@ public static class MoveTable16
     /// operation, in either direction, explicitly or otherwise, unless the other operand is a compatible
     /// group"</i> — so such an operand is a violation, not a fall-through.</para>
     /// <para>⛔ IT IS A READER RATHER THAN A CHECK because its two askers frame it differently (kb/Work PB391),
-    /// the same shape <see cref="SenderClassRefusal"/> already has: <c>StatementValidation</c>
-    /// <c>.CheckVariableLengthMove</c> reports it as COBOLNET1931 about the MOVE the programmer wrote, and
+    /// the same shape <see cref="SenderClassRefusal"/> already has: <c>MoveBinder</c>
+    /// <c>.MoveCategoryLegality</c> reports it as COBOLNET1931 about the MOVE the programmer wrote, and
     /// <see cref="DataItemRefusal"/> reads it SILENTLY, because §14.7.6 rule 2 makes an invalid move a pair that
     /// does not correspond rather than a diagnostic. Before this, CORRESPONDING did not ask it at all and a
     /// variable-length-group namesake paired with an elementary one, reaching the run time as a
@@ -436,8 +436,8 @@ public static class MoveTable16
     /// item, and a GROUP one (§13.18.45.4 GR2): its place's Item is the ALIAS itself, never the record behind it,
     /// and §8.5.1.12 walks the alias's own span (<c>VariableLengthCompatibility.AliasAtoms</c>) — treating it as a
     /// null operand told the user "the sending operand is not a group item" about a group item (kb/Work PB907).
-    /// A non-THROUGH alias forwards its attributes to the renamed item (GR1). ONE reader, moved here from
-    /// <c>StatementValidation.CheckVariableLengthMove</c> so the rules and their operand vocabulary live together.</summary>
+    /// A non-THROUGH alias forwards its attributes to the renamed item (GR1). ONE reader, kept here beside
+    /// <see cref="Validity"/> so the rules and their operand vocabulary live together.</summary>
     public static DataItem? OperandItem(BoundOperand operand) => operand switch
     {
         BoundFieldOperand { Place: var p } => OperandItem(p),

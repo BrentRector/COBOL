@@ -1027,6 +1027,24 @@ of an unsupported facility.
   §14.7.6's last paragraph requires. Pinned by `2002/pb230_incompatible_sending_sweep`,
   `2023/pb230_incompatible_corresponding` and `85/pb230_class_numeric_image`.
 
+- **Incompatible dynamic-length and dynamic-capacity data (§14.6.13.2 rules 5 and 6; kb/Work PB1118).** A
+  dynamic-length item IS a managed string, so its internal format — a length and that many characters — is always
+  correctly formed, and the one way its content can disagree with "the corresponding DYNAMIC LENGTH clause" is to be
+  longer than THAT clause's maximum size (§8.5.1.10.1; the minimum length is zero). Content stored through a
+  description always agrees with it, because every store truncates to the maximum (§8.5.1.10.4), so a disagreement
+  arises only when the item is READ through a description other than the one that stored it: a LINKAGE formal
+  (§14.2.3 GR8 — "as if the formal parameter occupies the same storage area as the argument") and a member of a shared
+  cell-backed area such as an EXTERNAL record described in two programs. **Those reads, and only those, ask the
+  question** (`CobolDynString.Agree`): under EC-DATA-INCOMPATIBLE checking content past the maximum is the fatal
+  condition at the sending reference (a USE declarative may RESUME, abandoning the statement); with checking off the
+  content is read as it is, whole. A receiving-only reference is not a reference to the content (rule 5's closing
+  paragraph, NOTE 2) and asks nothing. **Rule 6 is unreachable by construction:** the implementor's internal format of
+  a dynamic-capacity table is one `CobolDynTable` object, and every one a program reads was constructed from that
+  program's own OCCURS clause or recreated into it by a variable-length group transfer at the receiving description
+  (§14.6.9.2); no storage form shares one across descriptions (an EXTERNAL record holding one is COBOLNET0899, a file
+  record cannot hold one, §8.5.1.9.1 3), and a LINKAGE one crosses through that same recreation).
+  `DynamicCapacityAgreementDriftTests` pins those construction paths. Pinned by `2014/pb1118_dyn_length_agreement`.
+
 - **USAGE BIT — alignment and representation of data (§13.18.60.4 GR5 · §8.5.1.6.3).** Annex A.1 has NO item for USAGE BIT — it runs 208 (COMPUTATIONAL, GR6) straight to 209 (DISPLAY, GR7), and §8.5.1.6.3 is cross-referenced only by item 195 (SYNCHRONIZED) — so this determination is recorded here under §4.2.6 rather than in the A.1 register, where it sat under item 209’s number until 2026-09-03. A `USAGE BIT` item **occupies bits**, as GR5 requires. Bits per character position is **8** — §8.1.2 leaves it implementor-specified, and 8 is what makes it agree with DISPLAY's one byte per character position. Alignment follows §8.5.1.6.3 exactly: a bit item immediately following an elementary bit item **of the same level** takes the next bit position (they share a byte); any other bit item starts at the first bit of the next available byte; implicit filler advances to the next item's natural boundary and fills a trailing partial byte to an integral number of characters, and §15.50.4 r5 counts that filler. In a record image a bit run is **packed high-order bit first** — §8.5.1.6.3 numbers positions from "the first bit position" — with trailing filler bits zero. ⚠ The item's VALUE CARRIER is a `'0'`/`'1'` string, which is not observable to a COBOL program and is not a conformance claim; what is claimed is the SIZE, ALIGNMENT and IMAGE above. A boolean item with **no** USAGE clause is a different case: §13.18.60.3 SR13(b) implies DISPLAY and GR7 makes it one alphanumeric character per boolean position.
 
 - **NUMVAL-F — a space may not SPLIT the exponent's `n` (§15.69.3 r1/r5 · §15.95.4 r1 b) 1; kb/Work PB256).**

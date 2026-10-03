@@ -311,7 +311,22 @@ internal static class VariableLengthCompatibility
         if (!oneGroup || !otherGroup)
             return $"'{(oneGroup ? other : one).CobolName}' is not a group: a variable-length group is "
                 + "compatible only with a group (ISO §8.5.1.12.1)";
-        return Walk(AtomsOf(one), AtomsOf(other), one, other, null);
+        return Walk(AtomsOf(one), AtomsOf(other), one, other, null, null);
+    }
+
+    /// <summary>The CORRESPONDING TABLE PAIRS of a compatible group pair, in left-to-right order — each pair
+    /// §8.5.1.12.2 sentence 2 makes correspond ("at least one of them is a dynamic-capacity table and they occupy
+    /// the same relative byte positions within their groups"), as (<paramref name="one"/>'s table,
+    /// <paramref name="other"/>'s table). It is the SAME walk that decides compatibility, so a pair is listed exactly
+    /// when the relation matched it. A table beyond the shorter group's last character corresponds only to "a
+    /// space-filled fixed-length table" (§8.5.1.12.2's last sentence) — no table of the other group — and is not
+    /// listed. Consumer: the §14.9.25.4 GR9 MOVE, whose §14.6.9.2 element moves are per corresponding pair (kb/Work
+    /// PB1144). Empty when the pair is not compatible or either side is not a group.</summary>
+    public static IReadOnlyList<(DataItem One, DataItem Other)> CorrespondingTables(DataItem one, DataItem other)
+    {
+        if (!ItemCategory.IsGroupItem(one) || !ItemCategory.IsGroupItem(other)) return [];
+        var tables = new List<(DataItem, DataItem)>();
+        return Walk(AtomsOf(one), AtomsOf(other), one, other, null, tables) is null ? tables : [];
     }
 
     /// <summary>⛔ THE PAIR-RELATIVE LENGTHS of two groups at least one of which is a variable-length group, in
@@ -330,7 +345,7 @@ internal static class VariableLengthCompatibility
     {
         if (!ItemCategory.IsGroupItem(one) || !ItemCategory.IsGroupItem(other)) return null;
         var tally = new CharTally();
-        return Walk(AtomsOf(one), AtomsOf(other), one, other, tally) is null ? (tally.A, tally.B) : null;
+        return Walk(AtomsOf(one), AtomsOf(other), one, other, tally, null) is null ? (tally.A, tally.B) : null;
     }
 
     /// <summary>The per-side character-position accumulator <see cref="PairCharWidths"/> threads through the
@@ -340,7 +355,10 @@ internal static class VariableLengthCompatibility
         public long A, B;
     }
 
-    private static string? Walk(List<Atom> a, List<Atom> b, DataItem ga, DataItem gb, CharTally? tally)
+    /// <param name="tables">When not null, receives each corresponding table pair the walk matches (rules 1 and 2),
+    /// as (<paramref name="ga"/>'s table, <paramref name="gb"/>'s table) — <see cref="CorrespondingTables"/>.</param>
+    private static string? Walk(List<Atom> a, List<Atom> b, DataItem ga, DataItem gb, CharTally? tally,
+        List<(DataItem, DataItem)>? tables)
     {
         int ia = 0, ib = 0;
         long pa = 0, pb = 0;
@@ -411,6 +429,7 @@ internal static class VariableLengthCompatibility
                     tally.A += both || !x.DynamicCapacity ? x.ImageChars : y.ImageChars;
                     tally.B += both || !y.DynamicCapacity ? y.ImageChars : x.ImageChars;
                 }
+                tables?.Add((x.Item, y.Item));
                 pa += len; pb += len; ia++; ib++;
                 continue;
             }
@@ -467,7 +486,7 @@ internal static class VariableLengthCompatibility
     /// recurses into the SAME relation (a table of variable-length groups is exactly the shape rule 2 exists
     /// for); an elementary element has no atoms of its own and its byte length was compared by the caller.</summary>
     private static string? Elements(DataItem x, DataItem y) =>
-        x.IsGroup && y.IsGroup ? Walk(AtomsOf(x), AtomsOf(y), x, y, null)
+        x.IsGroup && y.IsGroup ? Walk(AtomsOf(x), AtomsOf(y), x, y, null, null)
         : x.IsGroup != y.IsGroup
             ? $"'{(x.IsGroup ? y : x).CobolName}' is elementary and '{(x.IsGroup ? x : y).CobolName}' is a group"
             : null;

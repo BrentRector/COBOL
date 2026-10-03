@@ -211,7 +211,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             // enters is the whole occurrence key a Format-2 VALUE on the element is looked up by.
             ExpandInitialize(new DynElementCursor(tblPath.Add(new DynTableSegment(v)), dtbl),
                 spec, body, dtbl, [new OccurrenceDim(v, null)], identifier1: true);
-            if (body.Count > 0 && DynCapacity(dtbl, tblPath) is { } cap) actions.Add(new InitializeLoop(v, cap, body));
+            if (body.Count > 0 && OccurrenceCounts.Capacity(dtbl, tblPath) is { } cap) actions.Add(new InitializeLoop(v, cap, body));
             else if (body.Count > 0) actions.Add(new InitializeErrorAction(
                 $"INITIALIZE of the dynamic-capacity table '{dtbl.CobolName ?? dtp}' (no capacity register)"));
             return;
@@ -349,19 +349,10 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     /// <see langword="null"/> when the count cannot be modelled (a dynamic table with no reachable capacity
     /// register, or an unresolvable data-name-1) — the caller stages the named loud.</summary>
     private AllCount? TableCount(DataItem table, DataItem? identifier1, AccessPath? tablePath) =>
-        table.IsDynamicTable ? (tablePath is null ? null : DynCapacity(table, tablePath))
-        : table.OccursSpec is { DependingName: not null, Depending: { } dep } odo
-            && identifier1 is not null && !OdoModel.IsWithin(dep, identifier1)          // GR8a
-            ? (ctx.Refs.ResolveItem(dep) is { } depPlace
-                ? new AllCount.Odo(depPlace, odo.Min, table.Occurs ?? odo.Max) : null)
-        : table.Occurs is { } n ? new AllCount.Fixed(n)                                  // GR4 / GR8b
-        : null;
-
-    /// <summary>A dynamic-capacity table's current-capacity count (ISO §13.18.38.4 GR15 — the register is minted
-    /// for every Format-4 table whether or not CAPACITY IN names it).</summary>
-    private static AllCount? DynCapacity(DataItem table, AccessPath tablePath) =>
-        table.OccursSpec?.CapacityRegister is { } reg
-            ? new AllCount.Capacity(new CapacityRegisterPlace(tablePath, reg)) : null;
+        !table.IsDynamicTable && table.OccursSpec is { DependingName: not null, Depending: { } dep }
+            && (identifier1 is null || OdoModel.IsWithin(dep, identifier1))
+            ? (table.Occurs is { } max ? new AllCount.Fixed(max) : null)                // GR8b — the maximum
+            : OccurrenceCounts.Current(table, tablePath, ctx.Refs);                      // GR4 / GR8a / GR10
 
     /// <summary>The recursive receiver walk (ISO §14.9.20 GR5), in definition order (GR8). Exclusions: GR5a2 —
     /// an explicit-or-implicit FILLER elementary item (a null <see cref="DataItem.CobolName"/>) unless WITH FILLER

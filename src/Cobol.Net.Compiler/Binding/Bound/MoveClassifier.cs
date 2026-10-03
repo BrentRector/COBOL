@@ -197,12 +197,27 @@ public static class MoveClassifier
     /// items and one or both is a variable-length group" — asked of a sending PLACE, for
     /// <see cref="ZeroLengthItemRoute"/>'s determination. A level-66 THROUGH alias is a group item
     /// (§13.18.45.4 GR2), so the CATEGORY question is asked, never the structural one — the same predicate
-    /// <c>MoveEmitter.VariableLengthGroupMove</c> and <c>StatementValidation.CheckVariableLengthMove</c> ask.</summary>
+    /// <see cref="VariableLengthGroupSender"/> answers for the emitter and the binder.</summary>
     private static bool IsVariableLengthGroupMove(Place sender, Place target) =>
         target.DenotedItem is not null
         && ItemCategory.IsGroupItem(sender.Item) && ItemCategory.IsGroupItem(target.Item)
         && (VariableLengthCompatibility.IsVariableLength(sender.Item)
             || VariableLengthCompatibility.IsVariableLength(target.Item));
+
+    /// <summary>⛔ THE ONE §14.9.25.4 GR9 ANTECEDENT OVER A MOVE'S OPERANDS — the sending group's place when "both the
+    /// sending operand and the receiving data item are group items and one or both is a variable-length group",
+    /// else null. Asked by <c>MoveEmitter.VariableLengthGroupMove</c> (the character-position transfer) and by
+    /// <c>MoveBinder</c> (the §14.6.9.2 element moves that follow it, kb/Work PB1144), so the two halves of one
+    /// move cannot disagree about whether GR9 governs it. Only a data item or a current record can be a group
+    /// sender; the identity question is <see cref="Place.DenotedItem"/>'s (kb/Work PB602) — null for a
+    /// reference-modified view, which §8.4.3.3.4 GR6 makes an ELEMENTARY alphanumeric item.</summary>
+    public static Place? VariableLengthGroupSender(BoundOperand source, Place target) =>
+        (source switch
+        {
+            BoundFieldOperand { Place.DenotedItem: not null } f => f.Place,
+            BoundCurrentRecord { Area.DenotedItem: not null } cr => cr.Area,
+            _ => null,
+        }) is { } send && IsVariableLengthGroupMove(send, target) ? send : null;
 
     /// <summary>The figurative constant GR1's route substitutes for a zero-length SENDING ITEM — GR2's SPACE for
     /// an alphanumeric or national item, GR3's ZERO for a boolean one, read off the sending item's own category

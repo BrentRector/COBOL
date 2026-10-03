@@ -65,6 +65,33 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 continue;
             }
             EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
+            EmitElementMoves(m, i);
+        }
+    }
+
+    /// <summary>ISO §14.6.9.2's last sentence, after a §14.9.25.4 GR9 group transfer into receiver
+    /// <paramref name="target"/>: "Correspondingly numbered elements are moved according to the rules of the MOVE
+    /// statement" (kb/Work PB1144). The group transfer moved each corresponding table as element IMAGES and fixed
+    /// the receiving table's capacity (recreated from the sender, raised to its minimum, §14.6.9.2); each pair whose
+    /// elementary elements differ in description then has its elements re-moved by the BOUND element MOVE — the
+    /// ONE MOVE path, so the conversion is §14.9.25.4 GR6's and never a second copy of it. The loop runs over
+    /// §14.6.9.1's current capacities read after the transfer, to the smaller of the two: rule 1's superfluous
+    /// sending elements are not moved, and rule 2's receiving elements past the sender stay space filled. Reached
+    /// only from the GR9 arm (the zero-length-item route excludes it, so the two arms never interleave).</summary>
+    private void EmitElementMoves(BoundMove m, int target)
+    {
+        var w = ctx.Writer;
+        foreach (var e in m.ElementMoves)
+        {
+            if (e.Target != target) continue;
+            if (e is not { Move: { } move, SendingCount: { } sc, ReceivingCount: { } rc })
+            {
+                w.Line(LoudStmt(e.Unsupported ?? "the element moves of a variable-length group MOVE (ISO §14.6.9.2)"));
+                continue;
+            }
+            using (w.Block($"for (long {e.Var} = 1, {e.Var}n = System.Math.Min((long)({PlaceRenderer.OccurrenceCount(sc)}), "
+                    + $"(long)({PlaceRenderer.OccurrenceCount(rc)})); {e.Var} <= {e.Var}n; {e.Var}++)"))
+                Emit(move);
         }
     }
 
@@ -369,7 +396,10 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     ///   <item>GR9a's "the table in the sending group is moved to the corresponding table in the receiving group,
     ///     as specified in 14.6.9.2" — the component store (<c>FromCurrentImage</c>: recreate the receiving table
     ///     from the sending capacity; a non-dynamic receiver fits to its own occurrence count, §14.6.9.2 rules 1
-    ///     and 2).</item>
+    ///     and 2). The store moves element IMAGES; §14.6.9.2's "Correspondingly numbered elements are moved
+    ///     according to the rules of the MOVE statement" is completed by the bound element moves
+    ///     <see cref="EmitElementMoves"/> renders after it, for every elementary pair the image does not already
+    ///     answer (kb/Work PB1144).</item>
     ///   <item>GR9b's excess part — the fixed run is width-fitted, which IGNORES a longer sender's excess and
     ///     SPACE-FILLS a shorter one's (step 3, "all other character positions are filled with space
     ///     characters"); step 1 ("if the data item to be space-filled is a dynamic-length elementary item, the
@@ -385,7 +415,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// count, so this is the standard's own conversion rather than an adapter invented here.</para>
     ///
     /// <para>The pair reached emit only after §14.9.25.3 SR9 passed at bind
-    /// (<c>StatementValidation.CheckVariableLengthMove</c>), so the two component sequences correspond one for
+    /// (<c>MoveTable16.Validity</c>, framed by <c>MoveBinder.MoveCategoryLegality</c>), so the two component sequences correspond one for
     /// one by construction — which is why an ordinal carrier is faithful here for the same reason it is at the
     /// activation boundary.</para></summary>
     private bool VariableLengthGroupMove(Place target, BoundOperand source)
@@ -395,20 +425,11 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // ⛔ A level-66 THROUGH alias IS a group item (§13.18.45.4 GR2), so it meets §14.9.25.4 GR9's first conjunct and is
         // asked as ItemCategory.IsGroupItem — the CATEGORY question — never the structural IsGroup, which it
         // fails for want of subordinate entries (kb/Work PB907; the bind-side twin is
-        // StatementValidation.CheckVariableLengthMove, and the two must ask the same predicate). It is never
+        // MoveClassifier.VariableLengthGroupSender, which this method asks). It is never
         // VARIABLE-LENGTH (§13.18.45.3 SR8), so it takes the FIXED-group arm of PlaceRenderer.VarGroupCarrier / VarCarrierWrite:
         // its layout is its span (VariableLengthCompatibility.Layout), and its image is the composed RenamesPlace string (PlaceRenderer).
-        Place? send = source switch
-        {
-            // The identity question is Place.DenotedItem's (kb/Work PB602): null for a reference-modified view.
-            BoundFieldOperand { Place.DenotedItem: not null } f => f.Place,
-            BoundCurrentRecord { Area.DenotedItem: not null } cr => cr.Area,
-            _ => null,
-        };
-        if (send is null || target.DenotedItem is null
-            || !ItemCategory.IsGroupItem(send.Item) || !ItemCategory.IsGroupItem(target.Item)) return false;
-        if (!VariableLengthCompatibility.IsVariableLength(send.Item)
-            && !VariableLengthCompatibility.IsVariableLength(target.Item)) return false;
+        // The antecedent is MoveClassifier's ONE reading, which the binder's §14.6.9.2 element moves ask too (kb/Work PB1144).
+        if (MoveClassifier.VariableLengthGroupSender(source, target) is not { } send) return false;
         ctx.Writer.Line(PlaceRenderer.VarGroupCarrier(send, target.Item, "the sending variable-length group",
                 "the sending group of a variable-length group MOVE") is not { } carrier
             ? LoudStmt(VarShapeReason(send.Item, "the sending operand of a variable-length group MOVE"))

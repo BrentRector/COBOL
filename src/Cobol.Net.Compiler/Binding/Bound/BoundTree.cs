@@ -1014,6 +1014,13 @@ public sealed record ImplicitMovePhrase(string Statement, string Cite)
     public static readonly ImplicitMovePhrase UnstringDelimiterIn =
         new("UNSTRING … DELIMITER IN", "ISO §14.9.48.4 GR11 d)") { ValidityAskedByStatement = true };
 
+    /// <summary>The element moves of a §14.9.25.4 GR9 variable-length group MOVE — ISO §14.6.9.2, "Correspondingly
+    /// numbered elements are moved according to the rules of the MOVE statement specified in 14.9.25, MOVE
+    /// statement" (kb/Work PB1144). The element pair is screened like any other MOVE: §14.6.9.2 names the MOVE
+    /// statement's rules, and no statement rule asks the pair's validity on its behalf.</summary>
+    public static readonly ImplicitMovePhrase TableElement =
+        new("a corresponding table element of a variable-length group", "ISO §14.6.9.2");
+
     /// <summary>How ONE receiver of this move names itself in a diagnostic. The name is nullable because a
     /// receiver may be FILLER or an unnamed record area.</summary>
     public string Where(string? receiver) =>
@@ -1140,7 +1147,31 @@ public sealed record BoundMove(BoundOperand Source, IReadOnlyList<Place> Targets
     /// the node so a later consumer — a diagnostic, an edition gate — can name the statement without asking its
     /// parent, which a generic bound-tree walk cannot see.</summary>
     public ImplicitMovePhrase? ImplicitOf { get; init; }
+
+    /// <summary>The element moves a §14.9.25.4 GR9 group move owes after its character-position transfer — ISO
+    /// §14.6.9.2's last sentence, "Correspondingly numbered elements are moved according to the rules of the MOVE
+    /// statement" (kb/Work PB1144) — one per corresponding table pair whose ELEMENTARY elements are not identically
+    /// described, in the receivers' order. Empty for every other move.
+    /// <para>⛔ ON THE MOVE, NOT ON A WRAPPING STATEMENT: GR9 is reached by the explicit MOVE AND by every implicit
+    /// move <c>MoveBinder.BindMoveOf</c> binds (READ / RETURN … INTO, WRITE / REWRITE / RELEASE … FROM, GOBACK …
+    /// RETURNING), so a wrapper only the MOVE verb returned would leave those arms moving element images.</para></summary>
+    public IReadOnlyList<TableElementMove> ElementMoves { get; init; } = [];
 }
+
+/// <summary>ONE corresponding table pair's element moves (ISO §14.6.9.2, kb/Work PB1144): for <see cref="Var"/> =
+/// 1‥min(<see cref="SendingCount"/>, <see cref="ReceivingCount"/>), the bound elementary <see cref="Move"/> of
+/// sending element <c>Var</c> to receiving element <c>Var</c>, after the group transfer has recreated or
+/// overwritten the receiving table (§14.6.9.2 rules 1 and 2: superfluous sending elements are not moved; the
+/// receiving elements past the sender's capacity stay space filled, as does a dynamic receiver's tail up to its
+/// minimum capacity). Both counts are §14.6.9.1's current capacities — a fixed table's occurrence count, an
+/// occurs-depending table's DEPENDING value, a dynamic-capacity table's current capacity — read after the group
+/// transfer, so the receiver's is the recreated one.
+/// <para><see cref="Move"/> is null exactly when <see cref="Unsupported"/> names a shape whose element places this
+/// implementation cannot build (a table reached through a storage form the bind-time cursor does not walk); the
+/// backend renders that loud rather than leave the element images unconverted.</para></summary>
+/// <param name="Target">The index of the receiving operand in <see cref="BoundMove.Targets"/>.</param>
+public sealed record TableElementMove(
+    int Target, string Var, AllCount? SendingCount, AllCount? ReceivingCount, BoundMove? Move, string? Unsupported);
 
 // The arithmetic verbs, each a small explicit node: the source operands are bound numeric expressions, the
 // receivers are resolved Places paired with a rounding mode (the ROUNDED phrase, ISO §14.7.4). The in-place forms

@@ -168,4 +168,16 @@ public sealed class CobolDynStringTests
     [Fact]
     public void SetSize_StorageNotAvailable_LeavesTheSizeUnchanged()
         => Assert.Equal("AB", CobolDynString.SetSize("AB", 2_000_000_000d, int.MaxValue));
+
+    /// <summary>ISO §14.6.13.2 rule 5 (kb/Work PB1118): content within THIS description's maximum agrees and is
+    /// read unchanged; with EC-DATA-INCOMPATIBLE checking off (the default) over-long content is read whole — the
+    /// condition does not exist (§14.6.13.1.1) — and is never truncated by the read, which is not a store. The
+    /// checked raise is pinned end to end by conformance:2014/pb1118_dyn_length_agreement.</summary>
+    [Theory]
+    [InlineData("ABCD", 4, "ABCD")]
+    [InlineData("", 0, "")]
+    [InlineData(null, 3, "")]
+    [InlineData("ABCDEFGH", 4, "ABCDEFGH")]
+    public void Agree_ReadsTheContentUnchanged(string? content, int maxSize, string expected)
+        => Assert.Equal(expected, CobolDynString.Agree(content, maxSize));
 }

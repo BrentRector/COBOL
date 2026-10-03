@@ -1863,6 +1863,12 @@ internal static class RuntimeApi
     public static string CellDynRead(string cellExpr, int ordinal) =>
         $"{cellExpr}.{nameof(StorageCell.DynAt)}({ordinal})";
 
+    /// <summary>The SENDING read of a dynamic-length item through a description that does not own its storage —
+    /// <c>CobolDynString.Agree</c>, ISO §14.6.13.2 rule 5's agreement with THIS description's maximum size (kb/Work
+    /// PB1118). <paramref name="valueExpr"/> is the plain read; the result is the same content.</summary>
+    public static string DynAgree(string valueExpr, int maxSize) =>
+        $"{nameof(CobolDynString)}.{nameof(CobolDynString.Agree)}({valueExpr}, {maxSize})";
+
     /// <summary>Store a dynamic-length member's new content — <c>StorageCell.SetDynAt</c>, the receiving twin of
     /// <see cref="CellDynRead"/>. <paramref name="valueExpr"/> already carries §8.5.1.10.4's receiving rule.</summary>
     public static string CellDynWrite(string cellExpr, int ordinal, string valueExpr) =>

@@ -171,6 +171,8 @@
   "w59_numeric_category_usages",
   "w59h_vlg_override_signature",
   "pb1144_dyn_move_recreate",
+  "pb1144_dyn_move_elements",
+  "pb1118_dyn_length_agreement",
   "pb1267_dyn_initialized_seed",
   "pb1269_dyn_overflow_resume_next",
   "pb1411_dyn_vargroup_element_receiver",
