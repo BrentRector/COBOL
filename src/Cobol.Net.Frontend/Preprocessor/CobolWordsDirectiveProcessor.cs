@@ -15,7 +15,7 @@ namespace CobolNet.Frontend.Preprocessor;
 /// FINAL preprocessed text into a <see cref="CobolWordsOp"/>, edition-gates the directive word (a COBOL-2023
 /// addition — the introduction gate routed through the ONE <see cref="ConstructRegistry"/>), enforces the
 /// text-stage syntax rules SR1/SR2/SR5, and blanks the line (line-count preserving — the <c>&gt;&gt;TURN</c> H3
-/// discipline). The resulting <see cref="CobolWordsMap"/> is the per-group override layer the post-lex
+/// discipline). The resulting <see cref="CobolWordsMap"/> is the per-group override layer the lexer-applied
 /// <c>CobolWordsRewriter</c> and the compiler's <see cref="ReservedWordSet"/> / intrinsic
 /// resolution consult. SR3/SR4 (the reserved/context/intrinsic CATEGORY of each word) are validated later in the
 /// compiler, where all three registries are reachable. Design SSOT:

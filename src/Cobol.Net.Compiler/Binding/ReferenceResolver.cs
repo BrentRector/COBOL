@@ -2561,7 +2561,10 @@ public sealed class ReferenceResolver(DataBinder data)
             if (data.Symbols.TryResolve(w, data.ActiveScope, out _)) continue;   // a declared item wins
             // The REPOSITORY half is the ONE membership the declaration screen and KeywordOmittedFunction ask
             // (DataBinder.IsRepositoryIntrinsic — >>COBOL-WORDS and the edition window included; kb/Work PB1083).
-            if (data.UserFunctionNames.Contains(w) || data.IsRepositoryIntrinsic(w))
+            // An IDENTIFIER / SUB_IDENTIFIER keeps its WRITTEN word (the lexer retypes only keyword-token words), so the
+            // directive is applied to it once, here.
+            if (data.UserFunctionNames.Contains(w)
+                || data.IsRepositoryIntrinsic(FunctionWord.OfWrittenWord(w, data.CobolWords)))
                 return true;
         }
         return false;

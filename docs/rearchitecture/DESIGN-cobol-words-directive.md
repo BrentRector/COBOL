@@ -38,7 +38,7 @@ special-character word); lit2/lit5/lit6 are fresh **user-defined words** (SR4, p
 an **alphanumeric literal, non-hex, space-free, case-insensitive** (SR2). A COBOL word may appear in a literal
 of **at most one** `>>COBOL-WORDS` directive in the group (SR5).
 
-## §2 Mechanism decision — post-lex token rewriter + composed ReservedWordSet (owner-directed)
+## §2 Mechanism decision — a token retype applied BY THE LEXER + composed ReservedWordSet (owner-directed)
 
 The compiler uses a **static, generated ANTLR lexer**: reserved and context-sensitive words are fixed token
 types (`MOVE : 'MOVE'`, `caseInsensitive=true`), and intrinsic-function-names reach the parser as `IDENTIFIER`
@@ -46,10 +46,20 @@ after `FUNCTION` (except nine reserved-word collisions listed explicitly in the 
 scouts concluded EQUATE was doable as pre-lex text substitution but SUBSTITUTE / general UNDEFINE were "not
 faithfully implementable on the static lexer" and proposed a not-supported warning.
 
-**The owner superseded that (plan §0): "ONE runtime override layer = `CobolWordsMap` → post-lex token
-rewriter + composed `ReservedWordSet`; never regen the grammar per group."** A post-lex token rewriter (the
-established `ZeroTokenRewriter` pattern, `Frontend.LexAndParse`) is **strictly more capable** than text
-substitution and faithfully realizes all four options **without** per-group grammar regeneration:
+**The owner superseded that (plan §0): "ONE runtime override layer = `CobolWordsMap` → token retype +
+composed `ReservedWordSet`; never regen the grammar per group."** A token retype is **strictly more capable** than
+text substitution and faithfully realizes all four options **without** per-group grammar regeneration.
+
+⛔ **The retype is applied BY THE LEXER, to each token as it is emitted (kb/Work PB1372), not by a pass over the
+filled stream.** It started life as a post-lex pass (the `ZeroTokenRewriter` pattern), and that could reach none of
+the decisions the lexer takes from a keyword and freezes at lex time: PIC's switch to PICMODE, the FUNCTION
+argument region, the SUBSCRIPT trigger. A synonym of PIC/PICTURE never entered PICMODE; a synonym of FUNCTION never
+opened an argument region; a de-reserved PICTURE still swallowed the next word as a picture string; and every
+later reader of the filled stream (`DebuggingLineRewriter`'s source-unit boundaries, kb/Work PB1915) saw the words
+the DIRECTIVE had changed. `CobolLexer.NextToken` now applies `CobolWordsRewriter.Plan` (one per group, built from
+the map, memoized) FIRST, then records the EFFECTIVE type as the previous token and acts on it (PIC pushes PICMODE
+there, not as a rule command). Nothing is retyped a second time downstream. `CobolLexerWordRetypeDriftTests` holds
+that no DEFAULT-mode keyword rule carries a mode command.
 
 | Option | Token action (Frontend) | Reserved-set action (Compiler) | Intrinsic action (Compiler) |
 |---|---|---|---|
@@ -83,7 +93,7 @@ The design is therefore **two mechanisms over one rule**:
 
 | | reaches | how |
 |---|---|---|
-| **token retype** — `CobolWordsRewriter.Rewrite` | a word the lexer makes a keyword TOKEN | retype + re-spell canonically, before parsing |
+| **token retype** — `CobolWordsRewriter.Plan.Apply`, called by `CobolLexer.NextToken` | a word the lexer makes a keyword TOKEN | retype + re-spell canonically, as the token is emitted |
 | **name resolution** — `CobolWordsMap.Resolve` / `.Is` | a word that lexes as a bare `IDENTIFIER` | at each point that classifies a word BY NAME |
 
 `CobolWordsMap.Resolve` is the ONE reading of GR2/GR3/GR4 (canonical for a synonym, `null` for a de-reserved
@@ -97,6 +107,13 @@ taken from a non-`IDENTIFIER` token has been resolved and must be compared RAW; 
 SUBSTITUTE'd literal-4 — canonical and de-reserved at once — as "not a keyword" and loses the synonym the user
 wrote. `CobolWordsRewriter.CanonicalWordOf` / `.TokenIs` are the token-aware pair that knows this;
 `CobolWordsMap.Is` takes a word as WRITTEN and is for the words the lexer does not tokenize.
+The binder's intrinsic-function-name sites hold the answer in ONE value, `FunctionWord` (the written word and its
+canonical word, null when the directive removed it), made only by `FunctionWord.OfToken` (a word read off a token,
+through `CanonicalWordOf`) or `FunctionWord.OfWrittenWord` (source text no lexer token carries); `DefinitionPermitsArguments`,
+`BindIntrinsicCore`, `DataBinder.TryIntrinsicOfThisCompilation` and `IsRepositoryIntrinsic` take it, so none can
+resolve a name twice (kb/Work PB1372: `SUBSTITUTE "SUM" BY "TOTAL"` made `FUNCTION TOTAL(1 2 3)` — and the
+REPOSITORY specifier and the keyword-omitted `TOTAL(1 2 3)` — "not an intrinsic function", because the second
+resolution read the canonical literal-4 as removed).
 
 **Where the name resolution is called** (each is a §8.9/§8.10 word the lexer does not tokenize):
 `IntrinsicBinder.KeywordWordOf` — the single funnel every §15 phrase word is read through, so TRIM, FIND-STRING,
@@ -126,11 +143,12 @@ like `FlagState`/`RefModZeroLengthState`.
   `CobolWordsDirectiveInvalid` = **COBOLNET1623**.
 - **`Cobol.Net.Frontend`** — `CobolWordsDirectiveProcessor` (text stage): parse the four options into a
   `CobolWordsMap`, validate SR1/SR2/SR5, edition-gate (0900 via `ConstructRegistry.Check`), blank the directive
-  lines (line-count preserving, the H3 discipline). `CobolWordsRewriter` (post-lex, beside `ZeroTokenRewriter`):
-  retype tokens using `CobolLexer.DefaultVocabulary` (the reverse word→type map). The lexer's
-  `PreviousTokenCouldBeDataName()` is made **map-aware** so a de-reserved word (UNDEFINE lit3 / SUBSTITUTE lit4)
-  triggers SUBSCRIPT mode when later subscripted (resolves the frozen-lex hazard, §6). `Frontend` exposes
-  `CobolWordsMap` and applies the rewriter in `LexAndParse`.
+  lines (line-count preserving, the H3 discipline). `CobolWordsRewriter.Plan` (applied by the lexer's `NextToken`,
+  primed by `TokenRetypes.PrimeLexer`): retype tokens using `CobolLexer.DefaultVocabulary` (the reverse word→type
+  map) as they are emitted, so every lexer decision keyed on a keyword — PIC's mode switch, the FUNCTION argument
+  region, the SUBSCRIPT trigger — reads the word the directive made of it (resolves the frozen-lex hazards, §6).
+  `Frontend` exposes `CobolWordsMap` and primes every lexer of the group (the main parse and every fragment
+  re-parse) with it.
 - **`Cobol.Net.Compiler`** — `BinderDriver.Bind` receives the map; `VersionConformancePass` consults a
   **composed** `ReservedWordSet` (replacing the hard-coded `ReservedWordSet.Default` at `ParseArm._reservedWords`)
   so RESERVE rejects (COBOLNET0901) and UNDEFINE/SUBSTITUTE-lit4 no longer reject. `VersionConformancePass.Run`
@@ -188,15 +206,16 @@ is the user-word token type.
 
 ## §6 Hazards & resolutions
 
-The lexer freezes three decisions before the post-lex rewriter runs; each is addressed:
+The lexer freezes three decisions at lex time; because the retype is applied by the lexer itself (§2), each reads
+the EFFECTIVE word:
 
-1. **SUBSCRIPT-mode entry** (`_dataNameTokens` at `(`). For IDENTIFIER→keyword (EQUATE lit2 / SUBSTITUTE lit5)
-   the source token is already `IDENTIFIER` (in the set), so the decision matches. For keyword→identifier
-   (UNDEFINE lit3 / SUBSTITUTE lit4) a later `lit3(sub)` must have entered SUBSCRIPT at lex time — resolved by
-   making `PreviousTokenCouldBeDataName()` also true for the map's de-reserved words (the map exists pre-lex).
-2. **FUNCTION-argument region** (`PreviousIsFunctionName`). Affects only the intrinsic-synonym path with the
-   keyword-omitted `name(args)` form; the `FUNCTION synonym(args)` form is unaffected. The keyword-omitted
-   synonym is a documented narrow advisory (rare; the FUNCTION form is the faithful path).
+1. **SUBSCRIPT-mode entry** (`_dataNameTokens` at `(`). The previous token's type is its EFFECTIVE type: a
+   de-reserved keyword (UNDEFINE lit3 / SUBSTITUTE lit4) is an `IDENTIFIER` by the time `(` is lexed, so a later
+   `lit3(sub)` enters SUBSCRIPT; a synonym is the keyword's type, so `lit2 (` follows the keyword's own rule. (This
+   used to be a separate set of de-reserved types the lexer consulted; the retype made it redundant and it is gone.)
+2. **PIC / FUNCTION** (`PicMode` push, `PreviousIsFunctionName`). A synonym of PIC/PICTURE enters PICMODE and a
+   synonym of FUNCTION opens the argument region, because the token IS the keyword when the lexer acts on it; a
+   de-reserved PICTURE/PIC/FUNCTION is a data-name and does neither (kb/Work PB1372).
 3. **Token boundaries / maximal munch.** SR2 forbids spaces in a literal, so lit2/lit5 lex as a single
    `IDENTIFIER`; no munch issue.
 
@@ -222,7 +241,7 @@ a no-op and output is byte-identical (the zero-overhead invariant).
   `constructs.json` row + regen, COBOLNET1623 descriptor. Unit tests (parser) + below-2023 negative golden.
 - **Incr B — RESERVE + UNDEFINE (reserved-word semantics).** `ReservedWordSet` overlay + thread into
   `VersionConformancePass`; SR3/SR4 semantic validation. RESERVE (0901) + UNDEFINE goldens.
-- **Incr C — token rewriter (EQUATE / UNDEFINE / SUBSTITUTE).** `CobolWordsRewriter` + map-aware lexer
+- **Incr C — token retype (EQUATE / UNDEFINE / SUBSTITUTE).** `CobolWordsRewriter.Plan` applied by the lexer
   data-name set. EQUATE + SUBSTITUTE goldens (observable stdout).
 - **Incr D — intrinsic-function-name synonyms.** `IntrinsicBinder` map consultation. Intrinsic EQUATE/SUBSTITUTE
   goldens.

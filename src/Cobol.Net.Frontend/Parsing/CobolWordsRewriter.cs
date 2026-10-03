@@ -7,18 +7,14 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Frontend.Parsing;
 
 /// <summary>
-/// The post-lex <c>&gt;&gt;COBOL-WORDS</c> token rewriter (ISO §7.3.10.4 GR2/GR3/GR4) — runs between lexing and
-/// parsing (beside <see cref="ZeroTokenRewriter"/> in <c>Frontend.LexAndParse</c>), retyping tokens per the
-/// <see cref="CobolWordsMap"/> so the static ANTLR lexer needs no per-group regeneration (the owner's recorded
-/// direction). Two disjoint retypes:
-/// <list type="bullet">
-/// <item>SYNONYM (EQUATE literal-2 / SUBSTITUTE literal-5): an <c>IDENTIFIER</c> whose text is a synonym is
-/// retyped to the canonical reserved/context word's token type — so it matches wherever that keyword is required.</item>
-/// <item>DE-RESERVED (UNDEFINE literal-3 / SUBSTITUTE literal-4): every token of the de-reserved word's keyword
-/// type is retyped to <c>IDENTIFIER</c> — so the word drops out of its keyword syntax and is usable as a user
-/// word.</item>
-/// </list>
-/// <para><b>This rewriter is HALF the mechanism, and it cannot be the other half</b> (kb/Work PB250). It can only
+/// The <c>&gt;&gt;COBOL-WORDS</c> token retype (ISO §7.3.10.4 GR2/GR3/GR4), applied by the lexer to each token as it
+/// is emitted (<see cref="Plan"/>, kb/Work PB1372) per the <see cref="CobolWordsMap"/>, so the static ANTLR lexer
+/// needs no per-group regeneration (the owner's recorded direction) and every lexer decision keyed on a keyword —
+/// PIC's mode switch, the FUNCTION argument region, the SUBSCRIPT trigger — reads the word the DIRECTIVE made of it.
+/// Two disjoint retypes: a synonym (EQUATE literal-2 / SUBSTITUTE literal-5) becomes its canonical keyword's token
+/// type, and a de-reserved word (UNDEFINE literal-3 / SUBSTITUTE literal-4) becomes an <c>IDENTIFIER</c>, so it
+/// drops out of its keyword syntax and is usable as a user word.
+/// <para><b>This retype is HALF the mechanism, and it cannot be the other half</b> (kb/Work PB250). It can only
 /// reach a word the lexer makes a keyword TOKEN; a word that lexes as a plain IDENTIFIER has no token type to
 /// retype, so the retype is a silent no-op for it in BOTH directions. Measured against ISO §8.9 ∪ §8.10, 88 words
 /// are in that class — ANYCASE and LOCALE among them, which is why <c>&gt;&gt;COBOL-WORDS EQUATE "LOCALE" …</c>
@@ -30,8 +26,8 @@ namespace CobolNet.Frontend.Parsing;
 public static class CobolWordsRewriter
 {
     /// <summary>The KEYWORD token types the directive DE-RESERVES (UNDEFINE literal-3 / SUBSTITUTE literal-4) — the
-    /// set the lexer must treat as a data-name trigger (so a following <c>(</c> opens a SUBSCRIPT before the
-    /// post-lex retype runs). Empty when no de-reserved word is a keyword lexer token.</summary>
+    /// types <see cref="Plan.Apply"/> retypes to <c>IDENTIFIER</c> when the token's text is the de-reserved word.
+    /// Empty when no de-reserved word is a keyword lexer token.</summary>
     public static IReadOnlySet<int> DeReservedTokenTypes(CobolWordsMap map)
     {
         var types = new HashSet<int>();
@@ -47,7 +43,7 @@ public static class CobolWordsRewriter
     /// when the directive de-reserved it and it is a user-defined word now.
     /// <para>⛔ THE ONE PLACE THAT KNOWS WHICH WORDS THIS REWRITER ALREADY RESOLVED, and the reason a bare
     /// <see cref="CobolWordsMap.Resolve"/> on token text is WRONG. <see cref="Rewrite"/> applies the directive to
-    /// every word it can reach and RE-SPELLS it canonically, so a token that is not an <c>IDENTIFIER</c> has been
+    /// every word it can reach (as the lexer emits it) and RE-SPELLS it canonically, so a token that is not an <c>IDENTIFIER</c> has been
     /// resolved already: resolving it a second time reads a SUBSTITUTE'd literal-4 — which is canonical AND
     /// de-reserved — as "not a keyword", and loses the synonym literal-5 the user legally wrote (measured:
     /// <c>SUBSTITUTE "LEADING" BY "LEFTMOST"</c> then <c>FUNCTION TRIM(X LEFTMOST)</c>). Only an IDENTIFIER can
@@ -71,57 +67,90 @@ public static class CobolWordsRewriter
         return map.Is(tok.Text, keyword);
     }
 
-    /// <summary>Retype the filled token stream per <paramref name="map"/>. Must run after
-    /// <see cref="CommonTokenStream.Fill"/> and before parsing.</summary>
-    public static void Rewrite(CommonTokenStream tokenStream, CobolWordsMap map)
+    /// <summary>
+    /// ⛔ THE ONE RETYPE OF A GROUP'S WORDS, APPLIED BY THE LEXER AS IT EMITS EACH TOKEN (kb/Work PB1372, PB1915) —
+    /// <see cref="CobolLexer"/> holds one (<c>SetCobolWords</c>, handed in by <see cref="TokenRetypes.PrimeLexer"/>)
+    /// and calls <see cref="Apply"/> in <c>NextToken</c>, BEFORE it records the token as the "previous token" its
+    /// context actions read and BEFORE it acts on the token's own mode. A retype that ran after lexing (the shape this
+    /// replaced) could reach nothing the lexer had already acted on: a synonym of PIC/PICTURE never entered PICMODE, a
+    /// synonym of FUNCTION never opened an argument region, a de-reserved PICTURE still swallowed the next word as a
+    /// picture string, and every later reader of the filled stream (<c>DebuggingLineRewriter</c>'s unit boundaries)
+    /// saw the words the DIRECTIVE had changed. One retype, applied where the decisions are made, leaves no later
+    /// stage to forget it. Two disjoint retypes, both ISO §7.3.10.4:
+    /// <list type="bullet">
+    /// <item>SYNONYM (GR2 EQUATE literal-2 / GR4 SUBSTITUTE literal-5): an <c>IDENTIFIER</c> whose text is a synonym
+    /// becomes the canonical reserved/context word's token type, spelled canonically.</item>
+    /// <item>DE-RESERVED (GR3 UNDEFINE literal-3 / GR4 SUBSTITUTE literal-4): a token of the de-reserved word's keyword
+    /// type whose TEXT is that word becomes an <c>IDENTIFIER</c> keeping its source spelling. The text test is
+    /// load-bearing (kb/Work PB250): one token type can carry several COBOL words (<c>PIC : 'PICTURE' | 'PIC'</c>),
+    /// while GR3/GR4 de-reserve exactly the one word the literal names.</item>
+    /// </list>
+    /// <see cref="Empty"/> is the no-directive plan: <see cref="Apply"/> is a no-op.</summary>
+    public sealed class Plan
     {
-        if (map.IsEmpty) return;
+        /// <summary>The no-directive plan — every token passes through unchanged.</summary>
+        public static readonly Plan Empty = new(new Dictionary<string, (int, string)>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<int>(), CobolWordsMap.Empty);
 
-        // SYNONYM: the synonym IDENTIFIER text → the canonical word's token type (only when the canonical is a
-        // reserved/context keyword; a canonical intrinsic-function name has no token type and is handled in the binder).
-        var synonymToType = new Dictionary<string, (int Type, string Canonical)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (synonym, canonical) in map.Synonyms)
-            if (CobolKeywordTokens.TryTokenType(canonical, out int kt))
-                synonymToType[synonym] = (kt, canonical);
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CobolWordsMap, Plan> Cache = new();
 
-        // DE-RESERVED: every token of one of these keyword types → IDENTIFIER (the word is a user word now).
-        var deReservedTypes = DeReservedTokenTypes(map);
+        private readonly Dictionary<string, (int Type, string Canonical)> _synonymToType;
+        private readonly HashSet<int> _deReservedTypes;
+        private readonly CobolWordsMap _map;
 
-        if (synonymToType.Count == 0 && deReservedTypes.Count == 0) return;
-
-        tokenStream.Fill();
-        var tokens = tokenStream.GetTokens();
-        if (tokens is null || tokens.Count == 0) return;
-        int idType = CobolKeywordTokens.IdentifierType;
-
-        for (int i = 0; i < tokens.Count; i++)
+        private Plan(Dictionary<string, (int Type, string Canonical)> synonymToType, HashSet<int> deReservedTypes,
+            CobolWordsMap map)
         {
-            var tok = tokens[i];
-            if (tok.Channel != Lexer.DefaultTokenChannel) continue;   // never touch hidden/whitespace tokens
-            if (tok.Type == idType)
+            _synonymToType = synonymToType;
+            _deReservedTypes = deReservedTypes;
+            _map = map;
+        }
+
+        /// <summary>The plan for <paramref name="map"/> (memoized per map; <see cref="Empty"/> when the map reaches no
+        /// word the lexer makes a keyword token — the intrinsic-name and phrase-word half is the by-name resolution of
+        /// <see cref="CobolWordsMap.Resolve"/>).</summary>
+        public static Plan For(CobolWordsMap map)
+        {
+            if (map.IsEmpty) return Empty;
+            return Cache.GetValue(map, static m =>
             {
-                // A synonym written as a user word takes over its canonical keyword — spell it canonically so any
+                // SYNONYM: the synonym text → the canonical word's token type (only when the canonical is a
+                // reserved/context keyword; a canonical intrinsic-function name has no token type and is handled by
+                // the binder's by-name resolution).
+                var synonymToType = new Dictionary<string, (int Type, string Canonical)>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (synonym, canonical) in m.Synonyms)
+                    if (CobolKeywordTokens.TryTokenType(canonical, out int kt))
+                        synonymToType[synonym] = (kt, canonical);
+                var deReservedTypes = new HashSet<int>(DeReservedTokenTypes(m));
+                return synonymToType.Count == 0 && deReservedTypes.Count == 0
+                    ? Empty
+                    : new Plan(synonymToType, deReservedTypes, m);
+            });
+        }
+
+        /// <summary>True when the plan retypes nothing.</summary>
+        public bool IsEmpty => _synonymToType.Count == 0 && _deReservedTypes.Count == 0;
+
+        /// <summary>Retype <paramref name="tok"/> in place when the directive changes it. Only a token on the default
+        /// channel is touched (hidden markers and whitespace never are).</summary>
+        public void Apply(CommonToken tok)
+        {
+            if (tok.Channel != Lexer.DefaultTokenChannel) return;
+            if (tok.Type == CobolKeywordTokens.IdentifierType)
+            {
+                // A synonym written as a user word takes over its canonical keyword — spelled canonically so any
                 // downstream GetText() sees the real keyword (the parser matches by type; text is for fidelity).
-                if (synonymToType.TryGetValue(tok.Text, out var target))
-                    Retype(tokens, i, target.Type, target.Canonical);
+                if (_synonymToType.Count != 0 && _synonymToType.TryGetValue(tok.Text, out var target))
+                {
+                    tok.Type = target.Type;
+                    tok.Text = target.Canonical;
+                }
             }
-            else if (deReservedTypes.Contains(tok.Type) && map.DeReserved.Contains(tok.Text))
+            else if (_deReservedTypes.Contains(tok.Type) && _map.DeReserved.Contains(tok.Text))
             {
-                // A de-reserved keyword becomes a user word — keep the source spelling (it is now the data-name).
-                // ⛔ THE TEXT TEST IS LOAD-BEARING, NOT BELT-AND-BRACES (kb/Work PB250). One token type can carry
-                // SEVERAL COBOL words (`PIC : 'PICTURE' | 'PIC'` — the one multi-spelling keyword rule left since
-                // kb/Work PB510 split the figurative spellings, KeywordSpellingDriftTests), while GR3/GR4 de-reserve
-                // exactly the ONE word literal-3/literal-4 names — so retyping by TYPE alone would strip PICTURE of
-                // its reservation on an `UNDEFINE "PIC"`. Invisible until CobolKeywordTokens learned to resolve multi-spelling rules.
-                Retype(tokens, i, idType, tok.Text);
+                // A de-reserved keyword becomes a user word — keep the source spelling (it is the data-name now).
+                tok.Type = CobolKeywordTokens.IdentifierType;
             }
         }
-        tokenStream.Seek(0);
-    }
-
-    private static void Retype(IList<IToken> tokens, int i, int newType, string text)
-    {
-        var original = tokens[i];
-        tokens[i] = new CommonToken(original) { Type = newType, Text = text };
     }
 }

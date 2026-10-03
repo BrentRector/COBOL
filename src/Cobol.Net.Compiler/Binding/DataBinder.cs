@@ -528,7 +528,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                             inf.GetText());
                     // The CANONICAL name (an EQUATE / SUBSTITUTE synonym names its intrinsic), so every spelling of
                     // the function is a member (RepositoryIntrinsicSpecifier; kb/Work PB1083).
-                    RepositoryIntrinsics.Add(CanonicalIntrinsicWord(inf.GetText()) ?? inf.GetText());
+                    RepositoryIntrinsics.Add(FunctionWord.OfToken(inf.Start, CobolWords).Name);
                 }
             }
         }
@@ -3136,7 +3136,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         CheckOneTypePerWord(word, kind);
         CheckLetter(word, kind);
-        if (RepositoryIntrinsicSpecifier(word) is not { } specifier) return false;
+        if (RepositoryIntrinsicSpecifier(FunctionWord.OfWrittenWord(word, CobolWords)) is not { } specifier) return false;
         bool named = specifier != AllIntrinsics;   // SR12 (a named specifier) or SR13 (ALL)
         if (_repositoryNameReported.Add(word))
             Edition.Error(DiagnosticCatalog.RepositoryIntrinsicNameAsUserWord,
@@ -3242,7 +3242,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// intrinsic-function-name there (Annex E.2 item 13: BASECONVERT, CONCAT, … are prohibited under ALL only from
     /// 2023).</item>
     /// </list></summary>
-    internal bool IsRepositoryIntrinsic(string word) => RepositoryIntrinsicSpecifier(word) is not null;
+    internal bool IsRepositoryIntrinsic(FunctionWord word) => RepositoryIntrinsicSpecifier(word) is not null;
 
     private const string AllIntrinsics = "ALL";
 
@@ -3251,7 +3251,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// specifier identifies it (§12.3.8.3 SR12), <see cref="AllIntrinsics"/> when only <c>FUNCTION ALL INTRINSIC</c>
     /// does (SR13), null when neither. <see cref="RepositoryIntrinsics"/> holds each named specifier's CANONICAL
     /// name, so every spelling of one function answers alike.</summary>
-    private string? RepositoryIntrinsicSpecifier(string word)
+    private string? RepositoryIntrinsicSpecifier(FunctionWord word)
     {
         if (!RepositoryAllIntrinsic && RepositoryIntrinsics.Count == 0) return null;   // no intrinsic specifier in scope
         if (!TryIntrinsicOfThisCompilation(word, out var sig)) return null;
@@ -3264,17 +3264,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// none: §7.3.10.4 GR2-GR4) and inside its function's D8 edition window (the §8.11 list is the targeted
     /// edition's)? The one answer the REPOSITORY membership and <c>IntrinsicBinder.KeywordOmittedFunction</c> both
     /// ask (kb/Work PB1083).</summary>
-    internal bool TryIntrinsicOfThisCompilation(string word, out IntrinsicSig sig)
+    internal bool TryIntrinsicOfThisCompilation(FunctionWord word, out IntrinsicSig sig)
     {
         sig = default;
-        return CanonicalIntrinsicWord(word) is { } canonical
+        return word.Canonical is { } canonical
             && IntrinsicCatalog.TryGet(canonical, out sig) && sig.IsDefinedAt(Edition.DialectLevel);
     }
-
-    /// <summary>The word through &gt;&gt;COBOL-WORDS (§7.3.10.4 GR2-GR4, <c>CobolWordsMap.Resolve</c>): its canonical
-    /// word, or null when the directive removed it. Allocation-free when no directive is present.</summary>
-    private string? CanonicalIntrinsicWord(string word) =>
-        CobolWords.IsEmpty ? word : CobolWords.Resolve(word.ToUpperInvariant());
 
     // ── TYPEDEF / the TYPE clause (ISO §13.18.58 / §13.18.57; data-model D17) ──────────────────────────────────
 

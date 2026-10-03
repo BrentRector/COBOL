@@ -60,7 +60,9 @@ public static class ReservationGateRewriter
         CommonTokenStream tokens, TokenRetypes retypes, DiagnosticBag diagnostics,
         Func<DiagnosticBag, IAntlrErrorListener<IToken>, CobolParserCore.CompilationUnitContext> parsePass)
     {
-        var freed = new HashSet<string>(StringComparer.Ordinal);
+        // Seeded with the words an earlier attempt already found declared (the caller's retypes; kb/Work PB1669), so a
+        // later round's decisions ADD to them instead of replacing them.
+        var freed = new HashSet<string>(retypes.FreedReservedWords, StringComparer.Ordinal);
         var passDiagnostics = new DiagnosticBag();
         var tree = parsePass(passDiagnostics, GatedOffenderWitness.Instance);
         while (parser.FreeGatedDeclarations.Where(freed.Add).ToList() is { Count: > 0 })

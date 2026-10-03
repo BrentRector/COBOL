@@ -2367,6 +2367,18 @@ internal sealed class VersionConformancePass
             return base.VisitChildren(ctx);
         }
 
+        /// <summary>The relational operator <c>&lt;&gt;</c> — "an abbreviation for NOT EQUAL" (ISO §8.7.5.2 SR11), a special
+        /// character word of §8.3.2.4.2 2) — is a COBOL-2002 introduction (not-equal-operator-2002, kb/Work PB1459): the
+        /// COBOL-85 operators are the GREATER / LESS / EQUAL forms, their symbols and NOT. The one arm that answers for
+        /// every relation condition, because <c>comparisonOperator</c> is the only rule that spells the NOTEQUAL token.
+        /// One Check per operator written; the word forms (<c>NOT EQUAL TO</c>, <c>NOT =</c>) are COBOL-85 and never reach it.</summary>
+        public override object? VisitComparisonOperator(CobolParserCore.ComparisonOperatorContext ctx)
+        {
+            if (ctx.NOTEQUAL() is not null)
+                _p.Check(Constructs.NotEqualOperator2002, "the relational operator <>");
+            return base.VisitChildren(ctx);
+        }
+
         /// <summary>Whether <paramref name="ctx"/> sits inside a procedure-division statement (a StatementContext
         /// ancestor) — the scope that reaches the binder's literal-operand gates, excluding data-division VALUE.</summary>
         private static bool InStatement(Antlr4.Runtime.RuleContext ctx)

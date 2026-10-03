@@ -88,7 +88,7 @@ public sealed class Frontend
     public DirectiveTimeline<FlagEvent> FlagEvents => Directives.FlagEvents;
 
     /// <summary>The frontend's <c>&gt;&gt;COBOL-WORDS</c> override layer (ISO §7.3.10) — the per-group
-    /// reserved/context-sensitive/intrinsic word-table modification the post-lex <c>CobolWordsRewriter</c>
+    /// reserved/context-sensitive/intrinsic word-table modification the lexer's <c>CobolWordsRewriter.Plan</c>
     /// applies to the token stream and the compiler's composed <c>ReservedWordSet</c> / intrinsic resolution
     /// consult. <see cref="CobolWordsMap.Empty"/> when the source has no COBOL-WORDS directive.</summary>
     public CobolWordsMap CobolWordsMap => Directives.CobolWordsMap;
@@ -350,7 +350,7 @@ public sealed class Frontend
                 "FlagDirectiveProcessor changed the line count (hazard H3)");
 
         // >>COBOL-WORDS (ISO §7.3.10): parse the per-group reserved/context/intrinsic word-table modification into
-        // the CobolWordsMap (the post-lex rewriter + composed ReservedWordSet consume it), edition-gate the
+        // the CobolWordsMap (the lexer retype + composed ReservedWordSet consume it), edition-gate the
         // directive word, and enforce SR1/SR2/SR5. Line-count preserving like the stages above.
         (text, var cobolWordsMap) = CobolWordsDirectiveProcessor.Process(text, diagnostics, sourcePath, lineMap, stackOps);
         if (CountLines(text) != linesBefore)
@@ -403,12 +403,40 @@ public sealed class Frontend
     private (CobolParserCore.CompilationUnitContext Tree, bool Parsed) LexAndParse(string text, string sourcePath, CobolWordsMap cobolWordsMap,
         DiagnosticBag diagnostics)
     {
-        // >>COBOL-WORDS (ISO §7.3.10.4 GR3/GR4): a de-reserved word (UNDEFINE/SUBSTITUTE) may be used as a
-        // SUBSCRIPTED data name; the lexer must open SUBSCRIPT mode at its following '(' even though the word is
-        // still lexed as its keyword token (the retype below runs post-lex, after the '(' decision is frozen).
-        // Set BEFORE any tokenization (ZeroTokenRewriter.Fill). A no-op when no de-reserved word is a keyword token.
+        // >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4): the LEXER applies the group's synonyms and de-reserved words to each
+        // token as it emits it (TokenRetypes.PrimeLexer, kb/Work PB1372), so PIC's mode switch, the FUNCTION argument
+        // region, the SUBSCRIPT trigger and every reader of the filled stream (DebuggingLineRewriter's source-unit
+        // boundaries, kb/Work PB1915) see the words the directive made. Primed BEFORE any tokenization. A no-op when the
+        // group has no directive.
         var retypes = TokenRetypes.None with { CobolWords = cobolWordsMap };
         var edition = EditionInfo.Of(DialectLevel, Permissive);
+        // ⛔ A '(' AFTER A RESERVED WORD IS A SUBSCRIPT ONLY IF THE PROGRAM DECLARES THE WORD (kb/Work PB1669): the lexer
+        // decides it at lex time, and under --permissive the only thing that tells the legacy table `B-OR (1)` from the
+        // operator in `IF BZ B-OR (BW)` is whether the program declares B-OR — a finding of the PARSE. So the first
+        // attempt lexes with no word declared; a parse that finds a declaration that changes which '(' open a SUBSCRIPT
+        // (TokenRetypes.LexesDifferentlyFrom) is run again with those words declared. Each attempt declares at least one
+        // more word of a finite set, so it ends; nearly every program parses once. Only the last attempt's diagnostics
+        // describe the source.
+        while (true)
+        {
+            var attemptDiagnostics = new DiagnosticBag();
+            var (tree, parsed) = LexAndParseOnce(text, sourcePath, cobolWordsMap, retypes, edition, attemptDiagnostics);
+            if (tree.TokenRetypes.LexesDifferentlyFrom(retypes, edition))
+            {
+                retypes = tree.TokenRetypes;
+                continue;
+            }
+            foreach (var d in attemptDiagnostics.Diagnostics) diagnostics.Add(d);
+            diagnostics.AddCompileOutput(attemptDiagnostics.CompileOutput);
+            return (tree, parsed);
+        }
+    }
+
+    /// <summary>One lex + parse of <paramref name="text"/> with <paramref name="retypes"/> priming the lexer (see
+    /// <see cref="LexAndParse"/>), reporting into <paramref name="diagnostics"/>.</summary>
+    private (CobolParserCore.CompilationUnitContext Tree, bool Parsed) LexAndParseOnce(string text, string sourcePath,
+        CobolWordsMap cobolWordsMap, TokenRetypes retypes, EditionInfo edition, DiagnosticBag diagnostics)
+    {
         // FIRST: a fixed-form debugging line is source or comment per its unit's WITH DEBUGGING MODE clause (kb/Work PB1705);
         // every reader after this one sees only the lines that are source. A line inside an open PICTURE or subscript
         // region is the exception the rewriter cannot settle on tokens (the lexer skipped its text in that mode), so
@@ -425,9 +453,8 @@ public sealed class Frontend
             text = DebuggingLineRewriter.WithCarrierBlanked(text, sourceRegionLine);
         }
         ZeroTokenRewriter.Rewrite(tokens);
-        // >>COBOL-WORDS (ISO §7.3.10.4) — retype tokens per the per-group override: synonyms (EQUATE/SUBSTITUTE)
-        // become their canonical keyword, de-reserved words (UNDEFINE/SUBSTITUTE) become IDENTIFIERs. A no-op when
-        // the source has no directive (byte-identical).
+        // The §8.9 reservation gate's retype of the words the program declares where the edition frees them (kb/Work PB655).
+        // (The >>COBOL-WORDS retype was applied by the lexer itself.) A no-op when no such word is declared.
         retypes.Rewrite(tokens);
 
         // ISO §13.18.40.3 SR7 — decided from the characters PICMODE delimited, once per PICTURE clause of every

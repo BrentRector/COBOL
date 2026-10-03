@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
+using CobolNet.Editions;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
 using CobolNet.Frontend.Preprocessor;
@@ -24,9 +25,11 @@ public sealed class DebuggingLineRewriterTests
     /// <summary>A debugging line as the logical conversion writes it.</summary>
     private static string D(string text) => Carrier + text;
 
-    private static List<IToken> Rewritten(string[] lines, bool hideAll = false)
+    private static List<IToken> Rewritten(string[] lines, bool hideAll = false, CobolWordsMap? words = null)
     {
-        var stream = new CommonTokenStream(new CobolLexer(new AntlrInputStream(string.Join("\n", lines) + "\n")));
+        var lexer = new CobolLexer(new AntlrInputStream(string.Join("\n", lines) + "\n"));
+        if (words is not null) (TokenRetypes.None with { CobolWords = words }).PrimeLexer(lexer, EditionInfo.Latest);
+        var stream = new CommonTokenStream(lexer);
         if (hideAll) DebuggingLineRewriter.HideAll(stream);
         else DebuggingLineRewriter.Rewrite(stream);
         return [.. stream.GetTokens()];
@@ -116,6 +119,30 @@ public sealed class DebuggingLineRewriterTests
         // §12.3.5.3 SR1 lets the second period go with no computer-name: the scan ends at the next header word.
         var tokens = Rewritten(["PROGRAM-ID. P.", "SOURCE-COMPUTER.", "OBJECT-COMPUTER. IBM-PC DEBUGGING MODE.", D("DISPLAY SPILL.")]);
         AssertComment(tokens, "SPILL");
+    }
+
+    /// <summary>kb/Work PB1915: the rewriter finds a unit's boundaries and its SOURCE-COMPUTER clause by token TYPE, so it must
+    /// see the words ISO §7.3.10.4 made of them — a SUBSTITUTE literal-5 for SOURCE-COMPUTER is that paragraph header
+    /// (GR4), and a unit headed by a synonym of PROGRAM-ID is a unit. The lexer applies the directive as it emits each token,
+    /// so the filled stream the rewriter reads already carries the effective types.</summary>
+    [Fact]
+    public void ASynonymOfSourceComputer_StillDeclaresTheMode()
+    {
+        var words = new CobolWordsMap([new CobolWordsOp(CobolWordsAction.Substitute, "SOURCE-COMPUTER", "MACHINE", 0)]);
+        var tokens = Rewritten(["PROGRAM-ID. P.", "MACHINE. IBM-PC WITH DEBUGGING MODE.", D("DISPLAY VIAMACHINE."), "STOP RUN."],
+            words: words);
+        AssertSource(tokens, "VIAMACHINE");
+    }
+
+    [Fact]
+    public void ASynonymOfProgramId_BoundsTheSourceUnit_SoASiblingDoesNotInheritTheClause()
+    {
+        var words = new CobolWordsMap([new CobolWordsOp(CobolWordsAction.Substitute, "PROGRAM-ID", "PGM-NAME", 0)]);
+        var tokens = Rewritten([
+            "PGM-NAME. FIRST.", "SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE.", D("DISPLAY FIRSTLINE."), "END PROGRAM FIRST.",
+            "PGM-NAME. SECOND.", D("DISPLAY SECONDLINE."), "END PROGRAM SECOND."], words: words);
+        AssertSource(tokens, "FIRSTLINE");
+        AssertComment(tokens, "SECONDLINE");     // a separate unit names no clause
     }
 
     [Fact]

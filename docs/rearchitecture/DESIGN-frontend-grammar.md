@@ -614,12 +614,15 @@ both the DEFAULT tokens and the `SUB_*` tokens, so `"-15.6"` / `N"AB"` tokenizat
 removes the "keep SUB_* in sync with DEFAULT" hazard without touching the mode-switch strategy.
 **The trigger is narrowed per compile (kb/Work PB1465).** `_dataNameTokens` is edition-blind — every word that
 is a user-defined word in SOME edition — so `TokenRetypes.PrimeLexer(lexer, edition)` hands the lexer the
-trigger tokens this compile does NOT admit as user-defined words (`ReservedWordSet.AdmitsAsUserWord`, the one
-decision the parser's `userWordHere` gate and the §8.9 funnel make; §8.3.2.1 rule 1), minus the parser's
+trigger tokens whose word the edition RESERVES (§8.9 at the edition's year, `--permissive` off) and the program
+has not DECLARED (`ReservedWordSet.AdmitsAsUserWord` for the strict edition, §8.3.2.1 rule 1), minus the parser's
 `functionName` first-set (a keyword-omitted intrinsic call keeps its capture, §8.4.3.2.3 SR2). A '(' after such
-a word groups: `IF BZ B-OR (BW B-AND BW)` at 2002+ parses by §8.8.2 Table 4. Under `--permissive` a word §8.9
-added keeps its user-word reading and so its trigger (the migration mode cannot tell the operator from the
-legacy name at lex time). The
+a word groups: `IF BZ B-OR (BW B-AND BW)` at 2002+ parses by §8.8.2 Table 4. Under `--permissive` the word's
+legacy reading is the PROGRAM's declaration of it (kb/Work PB1669): the parse finds declarations (the §8.9
+gate's `FreedReservedWords`, which `--permissive` also fills for a reserved word it admits), and when a found
+declaration changes which '(' open a SUBSCRIPT (`TokenRetypes.LexesDifferentlyFrom`) `Frontend.LexAndParse` lexes
+and parses the text again with the word declared — so a legacy table `B-OR (1)` still subscripts beside an
+undeclared B-AND operator that takes a parenthesis. A program that declares no reserved word parses once. The
 binder-side subscript re-parse (`ReferenceResolver.SplitSubscriptTokens`) is addressed by the binder
 rearchitecture (structured `Place` path segments), not here; the frontend's contribution is to preserve the
 captured token run faithfully.

@@ -31,7 +31,7 @@ public sealed record CobolWordsOp(CobolWordsAction Action, string? Existing, str
 /// <summary>
 /// The per-compilation-group <c>&gt;&gt;COBOL-WORDS</c> override layer (ISO §7.3.10; Annex D.12; Annex E.3.3
 /// item 12) — the ONE runtime carrier the owner's recorded direction names: built in the Frontend
-/// (<c>CobolWordsDirectiveProcessor</c>) from the directive text, then consulted by the post-lex
+/// (<c>CobolWordsDirectiveProcessor</c>) from the directive text, then consulted by the lexer-applied
 /// <c>CobolWordsRewriter</c> (token retyping), the map-aware lexer data-name gate, the composed
 /// <see cref="ReservedWordSet"/> (RESERVE/UNDEFINE/SUBSTITUTE), and the binder's intrinsic-function-name
 /// resolution. A pure-string data carrier so it crosses the frontend→compiler boundary like
@@ -96,7 +96,7 @@ public sealed class CobolWordsMap
     /// <summary>
     /// The canonical COBOL word that a word WRITTEN in the source denotes under this compilation group's
     /// directives (ISO §7.3.10.4 GR2/GR3/GR4) — <b>the ONE resolution</b> every consumer that classifies a word
-    /// BY NAME calls. The post-lex <c>CobolWordsRewriter</c> can only reach words the lexer makes a keyword
+    /// BY NAME calls. The lexer's <c>CobolWordsRewriter.Plan</c> retype can only reach words the lexer makes a keyword
     /// TOKEN; a word the binder classifies from its TEXT (the §15 phrase words ANYCASE/LOCALE/HEX/NAT/…, the
     /// SET-statement LC_ categories, the ALPHABET coded-set names) is reached ONLY here, so a site that compares
     /// raw text without calling this is inert to the directive in both directions (kb/Work PB250).
@@ -139,7 +139,7 @@ public sealed class CobolWordsMap
     /// </summary>
     /// <remarks>⛔ Give this a word AS WRITTEN, and only for a word the LEXER does not tokenize (the
     /// §8.9/§8.10 words that arrive as bare IDENTIFIERs). For a word that may arrive as a keyword TOKEN use
-    /// <c>CobolWordsRewriter.TokenIs</c> instead: the post-lex rewriter already resolved those, and resolving
+    /// <c>CobolWordsRewriter.TokenIs</c> instead: the lexer's retype already resolved those, and resolving
     /// them again loses the synonym the user wrote.</remarks>
     public bool Is(string? written, string keyword)
         => written is not null

@@ -46,8 +46,7 @@ channels { ABSENT_DEBUG_LINE }
     // used to instruct. Do NOT hand-add a token here: edit cobol-words.json and re-run the generator.
 
     private bool PreviousTokenCouldBeDataName()
-        => (_dataNameTokens.Contains(_lastNonWsTokenType) && !_reservedNonNames.Contains(_lastNonWsTokenType))
-           || IsCobolWordsDataName(_lastNonWsTokenType);
+        => _dataNameTokens.Contains(_lastNonWsTokenType) && !_reservedNonNames.Contains(_lastNonWsTokenType);
 
     // ⛔ A WORD THIS COMPILE RESERVES IS NEVER A DATA-NAME, SO A '(' AFTER IT IS NEVER A SUBSCRIPT (kb/Work PB1465).
     // _dataNameTokens is edition-blind: it holds every word that is a user-defined word in SOME edition, because
@@ -97,19 +96,19 @@ channels { ABSENT_DEBUG_LINE }
         else if (type == DIVISION) _inReportSection = false;
     }
 
-    // >>COBOL-WORDS (ISO §7.3.10.4 GR3/GR4): the per-compilation-group set of KEYWORD token types the directive
-    // de-reserves (UNDEFINE/SUBSTITUTE) — a following '(' must open a SUBSCRIPT even though the word is still lexed
-    // as its keyword token here (the post-lex CobolWordsRewriter retypes it to IDENTIFIER afterwards, but the
-    // SUBSCRIPT-mode decision at '(' is frozen at lex time and cannot be repaired later). Null by default: the
-    // legacy pipeline never sets it, so the '(' decision stays byte-identical.
-    private readonly System.Collections.Generic.HashSet<int> _cobolWordsDataNames =
-        new System.Collections.Generic.HashSet<int>();
-    public void SetCobolWordsDataNames(System.Collections.Generic.IReadOnlySet<int> types)
-    {
-        _cobolWordsDataNames.Clear();
-        foreach (int t in types) _cobolWordsDataNames.Add(t);
-    }
-    private bool IsCobolWordsDataName(int t) => _cobolWordsDataNames.Contains(t);
+    // ⛔ >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4) IS APPLIED HERE, TO EACH TOKEN AS IT IS EMITTED (kb/Work PB1372).
+    // Every decision this lexer takes from a keyword — PIC's mode switch, the FUNCTION argument region, the
+    // SUBSCRIPT trigger, the REPORT SECTION region — is frozen at lex time, so a retype that ran after lexing could
+    // reach none of them: a synonym of PIC/PICTURE never entered PICMODE, a synonym of FUNCTION never opened an
+    // argument region, a de-reserved PICTURE still swallowed the next word as a picture string, and the one seam that
+    // existed (a set of de-reserved types that made '(' subscript) covered only the last of them. NextToken retypes
+    // the token FIRST (CobolWordsRewriter.Plan.Apply — synonym → its keyword's type, de-reserved word → IDENTIFIER),
+    // then records the EFFECTIVE type as the previous token and acts on it, so every one of those decisions reads the
+    // word the directive made of it, and no later stage re-applies the directive to a token. The default plan is
+    // empty: nothing is retyped and the lexer is byte-identical to one that knows no directive.
+    private CobolNet.Frontend.Parsing.CobolWordsRewriter.Plan _cobolWords =
+        CobolNet.Frontend.Parsing.CobolWordsRewriter.Plan.Empty;
+    public void SetCobolWords(CobolNet.Frontend.Parsing.CobolWordsRewriter.Plan plan) => _cobolWords = plan;
 
     // FUNCTION-ARGUMENT REGION (P7 Step 12). '(' after "FUNCTION functionName" is the function's argument-list
     // paren (ISO §8.4.3.2 SR6) — it stays in DEFAULT mode so the arguments parse through the ONE
@@ -251,6 +250,12 @@ channels { ABSENT_DEBUG_LINE }
     public override Antlr4.Runtime.IToken NextToken()
     {
         var token = base.NextToken();
+        // The group's >>COBOL-WORDS first, so everything below reads the EFFECTIVE word (see SetCobolWords).
+        if (!_cobolWords.IsEmpty && token is Antlr4.Runtime.CommonToken word) _cobolWords.Apply(word);
+        // PIC / PICTURE opens PICMODE (the picture character-string is lexed as ONE token) — here, not as a lexer command
+        // of the PIC rule, because whether this token IS the PIC keyword is the directive's answer (UNDEFINE "PICTURE"
+        // makes a data-name of it; EQUATE "PIC" WITH "PX" makes PX the keyword).
+        if (token.Type == PIC) PushMode(PICMODE);
         // DEBUG_LINE is a marker, not a word: like a comment it must not become the "previous token" of the next one.
         if (token.Type != WS && token.Type != SUB_WS && token.Type != DEBUG_LINE && token.Type != DEBUG_LINE_IN_REGION
             && token.Type != Antlr4.Runtime.TokenConstants.EOF)
@@ -808,9 +813,10 @@ PARSE       : 'PARSE' ;        // JSON/XML PARSE (2014+); usable as a user word 
 PROCESSING  : 'PROCESSING' ;   // XML PARSE … PROCESSING PROCEDURE (2014+); usable as a user word via cobolWord
 PF          : 'PF' ;
 PH          : 'PH' ;
-// PIC/PICTURE → push into PICMODE to capture the PIC string as one token.
-// Handles: PIC X(120), PIC IS S9(18), PICTURE $$$,$$9.99CR, etc.
-PIC         : ('PIC' | 'PICTURE') -> pushMode(PICMODE) ;
+// PIC/PICTURE → PICMODE captures the PIC string as one token. The mode is pushed by NextToken, AFTER the >>COBOL-WORDS
+// retype (kb/Work PB1372): a rule command could not tell the keyword from a data-name the directive made of it, nor a
+// synonym the directive made the keyword. Handles: PIC X(120), PIC IS S9(18), PICTURE $$$,$$9.99CR, etc.
+PIC         : ('PIC' | 'PICTURE') ;
 POINTER     : 'POINTER' ;
 PLUSWORD    : 'PLUS' ;       // the reserved WORD PLUS (LINE/NEXT GROUP relative); distinct from PLUS ('+')
 PRESENT     : 'PRESENT' ;   // PRESENT WHEN clause (ISO §13.18.41, 2002+); usable as a user word via cobolWord (§8.9 funnel gates ≥2002)

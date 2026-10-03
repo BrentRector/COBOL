@@ -265,9 +265,9 @@ public sealed class CobolWordsDirectiveTests
         Assert.Contains(errors, e => e.Contains("COBOLNET1623") && e.Contains("SR4"));
     }
 
-    // ── Increment C — the token rewriter's de-reserved token-type set (the lexer subscript-mode input) ─────────
+    // ── Increment C — the lexer retype's de-reserved token-type set (CobolWordsRewriter.Plan) ──────────────────
 
-    [Fact] // UNDEFINE of a keyword contributes its token type to the lexer's data-name trigger set.
+    [Fact] // UNDEFINE of a keyword contributes its token type to the types the lexer retypes to IDENTIFIER.
     public void DeReservedTokenTypes_IncludesTheUndefinedKeyword()
     {
         var map = new CobolWordsMap([new CobolWordsOp(CobolWordsAction.Undefine, "MOVE", null, 0)]);

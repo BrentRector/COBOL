@@ -6,7 +6,7 @@ namespace CobolNet.Frontend.Parsing;
 
 /// <summary>
 /// The reverse map <c>keyword word → ANTLR lexer token type</c> — the question "what token does the lexer make
-/// of this word?", answered for the <c>&gt;&gt;COBOL-WORDS</c> post-lex rewriter (retype IDENTIFIER→keyword for
+/// of this word?", answered for the <c>&gt;&gt;COBOL-WORDS</c> lexer retype (retype IDENTIFIER→keyword for
 /// EQUATE/SUBSTITUTE, keyword→IDENTIFIER for UNDEFINE/SUBSTITUTE) and for the compiler's SR3/SR4 category
 /// validation. Intrinsic function names are NOT here — they are IDENTIFIERs (see <c>IntrinsicCatalog</c>), a
 /// separate category.

@@ -34,7 +34,7 @@ public abstract class CobolParserCoreBase : Parser
     /// The compilation group's <c>&gt;&gt;COBOL-WORDS</c> overrides (ISO §7.3.10), set by the frontend beside
     /// <see cref="DialectLevel"/>. <b>The parser needs it because several of its predicates classify a word by
     /// TEXT</b> — LOCALE, ORDER, CLASSIFICATION, ATTRIBUTE and the LC_ categories are §8.9/§8.10 words that are
-    /// deliberately NOT lexer tokens, so the post-lex <c>CobolWordsRewriter</c> cannot reach them and a raw text
+    /// deliberately NOT lexer tokens, so the lexer's <c>CobolWordsRewriter.Plan</c> retype cannot reach them and a raw text
     /// comparison here is inert to the directive in both directions: an EQUATEd synonym would not steer the
     /// prediction (legal source rejected) and an UNDEFINE'd word would still steer it (the user's data-name
     /// silently eaten). Every such comparison goes through <see cref="Canonical"/>; kb/Work PB250.
@@ -48,7 +48,7 @@ public abstract class CobolParserCoreBase : Parser
     /// no-directive path, because these run inside ANTLR's speculative prediction.</summary>
     /// <remarks>Takes a word the caller already knows is a plain spelling (a keyword literal passed by the
     /// grammar, never token text) - token text goes through <see cref="Word"/>, which knows whether the
-    /// post-lex rewriter already resolved it.</remarks>
+    /// lexer's retype already resolved it.</remarks>
     private string? Canonical(string? written)
         => written is null ? null
          : CobolWords.IsEmpty ? written

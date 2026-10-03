@@ -1293,6 +1293,18 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. CC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W PIC X(6).\nPROCEDURE DIVISION.\nMAIN.\n    MOVE \"ABC\" & \"DEF\" TO W.\n    DISPLAY W.\n    STOP RUN.\n"
   },
   {
+   "id": "not-equal-operator-2002",
+   "description": "The relational operator <> (ISO §8.7.5.2 SR11: \"<> is an abbreviation for NOT EQUAL\"; a special character word of §8.3.2.4.2 2)). COBOL-85's relational operators are the six GREATER / LESS / EQUAL forms with their symbols and NOT (no <>), so <> in a COBOL-85 source is not a relational operator - the same posture as its §8.3.2.4.2 siblings & (concat-operator-2002), >> (the directive rows) and :: (inline-method-invocation-2002), which gate at 2002, and *> (floating-comment-indicator-2002), which kb/Work PB1493 gated. THE EDGE IS DERIVED, NOT QUOTED (VCR rows 7.21/7.23's discipline - the repo holds no 2002 or 2014 text, ratified decision #1, the same provisional edge concat-operator-2002 carries): <> is not a COBOL-85 operator and Annex E, which itemizes the 2014->2023 delta, does not list it, so it predates 2023; its 2002-versus-2014 split is not separately derivable in-repo and is stated here so it can be overturned in one line. Gated in ONE place, the VersionConformancePass parse arm on comparisonOperator (kb/Work PB1459): the NOTEQUAL token appears in no other rule.",
+   "display": "the relational operator <>",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §8.3.2.4.2 2) (special character word '<>'), §8.7.5.2 SR11; a COBOL-2002 introduction (derived: VCR row 7.21 discipline)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "special character words (§8.3.2.4.2) - 2002 introduction",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. NEQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 A PIC 9 VALUE 7.\nPROCEDURE DIVISION.\nMAIN.\n    IF A <> 3 DISPLAY \"NE\".\n    STOP RUN.\n"
+  },
+  {
    "id": "label-records-removed-2002",
    "description": "LABEL RECORDS clause (FD) — obsolete '85 element DELETED by ISO/IEC 1989:2002; the 2023 FD clause set (§13.18) has no LABEL clause. The FIRST removal gate, shipped with the permissive flip (every NIST FD writes this clause).",
    "display": "the LABEL RECORDS clause",
