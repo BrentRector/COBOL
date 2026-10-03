@@ -1107,10 +1107,12 @@ public static class DiagnosticCatalog
     // one, GR12's integer-3 displaces on the entry's own axis, and the syntax rules each report through the
     // family code that owns them (COBOLNET2021 for the OCCURS clause, COBOLNET2199 for the LINE clause). The
     // ids are retired, never reallocated.
-    public static readonly DiagnosticDescriptor ReportVaryingCounterInExpression = new(
-        NotImplemented, "report-varying-counter-in-expression", EditionSeverity.Error,
-        "A report VARYING counter referenced inside a FROM/BY expression of a VARYING clause is not yet "
-        + "implemented (legal in arithmetic-expression-2 per §13.18.64.3 SR3).", "ISO §13.18.64.3 SR3", RecognizedNotImplemented);
+    // ⛔ `ReportVaryingCounterInExpression` (`report-varying-counter-in-expression`) LIVED HERE AND IS GONE (kb/Work
+    // PB1306), and this comment stands where it did so it is not re-added. It staged the §13.18.64.3 SR3-legal
+    // reference to a VARYING counter in arithmetic-expression-2 of its own clause. A counter is now a named, scoped
+    // data item — one compose-local variable per counter, in scope within its entry and every subordinate entry
+    // (SR2) — so a FROM, a BY, a SOURCE and a subscript all resolve it through the ONE expression binder, and a BY
+    // that names a counter of its own entry is the running recurrence GR3 b) describes.
     public static readonly DiagnosticDescriptor ReportConditionFunction = new(
         NotImplemented, "report-condition-function", EditionSeverity.Error,
         "A FUNCTION reference inside a report PRESENT WHEN condition is not yet implemented.",
@@ -1246,12 +1248,12 @@ public static class DiagnosticCatalog
         + "context-sensitive / intrinsic-function word (SR3), or a new word that is not a valid user-defined word "
         + "or is itself reserved/context/intrinsic (SR4). The message names the specific rule.",
         "ISO §7.3.10.2 / §7.3.10.3");
-    public static readonly DiagnosticDescriptor ReportSourceOtherReportCounter = new(
-        NotImplemented, "report-source-other-report-counter", EditionSeverity.Error,
-        "A SOURCE referencing another report's counter is not yet implemented.", "ISO §8.4.3.15.3 SR2", RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor ReportSourceSubscripted = new(
-        NotImplemented, "report-source-subscripted", EditionSeverity.Error,
-        "A subscripted or reference-modified SOURCE operand is not yet implemented.", "ISO §13.18.53", RecognizedNotImplemented);
+    // ⛔ `ReportSourceOtherReportCounter` (`report-source-other-report-counter`) AND `ReportSourceSubscripted`
+    // (`report-source-subscripted`) LIVED HERE AND ARE GONE (kb/Work PB1456, PB1292), and this comment stands where
+    // they did so neither is re-added. They staged two shapes of a SOURCE identifier-1 — another report's LINE-COUNTER
+    // / PAGE-COUNTER (§8.4.2.2.3 SR9/SR10) and a subscripted or reference-modified identifier (§8.4.3.1.2) — because
+    // the identifier arm looked a NAME up in storage. identifier-1 is now bound in the procedure phase by the one
+    // operand binder a MOVE's sending operand takes, which knows both.
     public static readonly DiagnosticDescriptor ReportSumCrossReport = new(
         NotImplemented, "report-sum-cross-report", EditionSeverity.Error,
         "SUM … OF report-name (a cross-report sum) is not yet implemented.", "ISO §13.18.54.3 SR4g", RecognizedNotImplemented);
@@ -1626,9 +1628,9 @@ public static class DiagnosticCatalog
         NotImplemented, "report-control-type-operand", EditionSeverity.Error,
         "A TYPE CH/CF operand is not the same as one of the operands of the CONTROL clause, or its reference "
         + "modification is not written with integer literals.", "ISO §13.18.57.3 SR10/SR11");
-    public static readonly DiagnosticDescriptor ReportSourceOperandUnresolved = new(
-        NotImplemented, "report-source-operand-unresolved", EditionSeverity.Error,
-        "A SOURCE operand does not resolve to a data item.", "ISO §13.18.53.3 SR4");
+    // ⛔ `ReportSourceOperandUnresolved` (`report-source-operand-unresolved`) LIVED HERE AND IS GONE (kb/Work PB1292). A
+    // SOURCE identifier-1 that names nothing is the ordinary unresolved-name diagnostic of the one operand binder now,
+    // and one that names a report section item which is no counter is `ReportExpressionOperandSection` (§13.18.53.3 SR4).
     public static readonly DiagnosticDescriptor ReportSumAddendUnresolved = new(
         NotImplemented, "report-sum-addend-unresolved", EditionSeverity.Error,
         "A SUM addend does not resolve to a data item outside the report section.", "ISO §13.18.54.3 SR5");
@@ -1646,12 +1648,23 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor ReportLineCounterReceiving = new(
         "COBOLNET2197", "report-line-counter-receiving", EditionSeverity.Error,
         "LINE-COUNTER shall not be referenced as a receiving operand.", "ISO §8.4.3.15.3 SR3");
-    public static readonly DiagnosticDescriptor ReportCounterQualifierNotReport = new(
-        NotImplemented, "report-counter-qualifier-not-report", EditionSeverity.Error,
-        "A LINE/PAGE-COUNTER qualifier shall name a report description entry.", "ISO §8.4.3.15.3 SR2 / §8.4.2.2");
-    public static readonly DiagnosticDescriptor ReportCounterNoReport = new(
-        NotImplemented, "report-counter-no-report", EditionSeverity.Error,
-        "A LINE/PAGE-COUNTER reference has no report, or is ambiguous across reports.", "ISO §8.4.3.15");
+    // ⛔ `ReportCounterQualifierNotReport` (`report-counter-qualifier-not-report`) AND `ReportCounterNoReport`
+    // (`report-counter-no-report`) LIVED HERE AND ARE GONE (kb/Work PB1049, PB1456), and this comment stands where
+    // they did so neither is re-added. Both reported a PROGRAM that breaks a qualification rule under the
+    // recognized-but-not-implemented code (COBOLNET0899), which tells the reader a legal program is unsupported when
+    // it is illegal by the standard. They are ONE rule — which report a LINE-COUNTER / PAGE-COUNTER names — and ONE
+    // code, `ReportCounterQualification`, written beside the one resolution of a counter to its report.
+    /// <summary>COBOLNET2729 — a LINE-COUNTER or PAGE-COUNTER reference breaks the qualification rules, or names no
+    /// report (ISO §8.4.2.2.3 SR9/SR10, §8.4.3.15.3 SR2, §8.4.3.15.1): the qualifier shall name a report description
+    /// entry; a counter shall be qualified in the procedure division when the source element has more than one RD;
+    /// the counters exist only for a report that is described. In the report section an unqualified counter is
+    /// qualified implicitly by the enclosing RD, so it never draws this diagnostic there. The message names the rule.</summary>
+    public static readonly DiagnosticDescriptor ReportCounterQualification = new(
+        "COBOLNET2729", "report-counter-qualification", EditionSeverity.Error,
+        "A LINE-COUNTER or PAGE-COUNTER reference breaks the qualification rules of ISO §8.4.2.2.3 SR9/SR10 — the "
+        + "qualifier shall name a report description entry, and a counter shall be qualified in the procedure "
+        + "division when the source element has more than one report description entry — or the source element "
+        + "describes no report at all (§8.4.3.15.1).", "ISO §8.4.2.2.3 SR9/SR10; §8.4.3.15.3 SR2");
     public static readonly DiagnosticDescriptor ReportGenerateNeedsControl = new(
         NotImplemented, "report-generate-needs-control", EditionSeverity.Error,
         "GENERATE report-name requires a CONTROL clause in the report description.", "ISO §14.9.16.3 SR2");

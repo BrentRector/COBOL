@@ -2052,7 +2052,15 @@
  "pb1420-baseconvert-integer-function-unsigned-position",
  "pb1420-random-numeric-function-seed",
  "pb1420-combined-datetime-numeric-function-date",
- "pb1901-strong-group-numeric-argument"
+ "pb1901-strong-group-numeric-argument",
+ "pb1306-varying-name-reused-in-subordinate",
+ "pb1306-varying-name-defined-twice-in-entry",
+ "pb1306-varying-counter-referenced-outside-its-entry",
+ "pb1306-varying-from-names-its-own-counter",
+ "pb1456-counter-qualified-by-report-group",
+ "pb1049-unqualified-counter-two-reports",
+ "pb1292-source-names-report-section-item",
+ "pb1316-source-alphanumeric-constant"
  ],
  "pending": []
 }

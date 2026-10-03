@@ -99,6 +99,16 @@ public sealed class ReportModel
     /// (ISO §13.18.54.4 GR1), in the order their counter-id blocks were reserved.</summary>
     public List<ReportSumFamily> SumFamilies { get; } = [];
 
+    /// <summary>The data-names the report's VARYING clauses define (§13.18.64.3 SR2), once per WRITTEN entry — a
+    /// repeating entry's replays share one declaration. Filled by <c>ScreenReportVaryingClauses</c>, which asks SR2's
+    /// "not defined elsewhere in the source element" of each name once the whole source element is described;
+    /// <see cref="HasVarying"/> is what the FLAG-02 pass asks.</summary>
+    public List<string> VaryingNames { get; } = [];
+
+    /// <summary>The report writes a VARYING clause somewhere (§13.18.64) — including a group entry's, which no
+    /// printable field of its own carries.</summary>
+    public bool HasVarying => VaryingNames.Count > 0;
+
     /// <summary>This report's index within its program unit — backs the emitted engine field name
     /// (<c>__RPT_{CsIndex}</c>).</summary>
     public int CsIndex { get; set; }
@@ -132,9 +142,11 @@ public sealed class ReportCodeModel
     /// <summary>literal-1's characters, decoded (concatenation folded, hexadecimal format decoded); null for identifier-1.</summary>
     public string? Literal { get; init; }
 
-    /// <summary>identifier-1, captured as base + qualifiers and resolved post-build to <see cref="FieldDataSource.Item"/>
-    /// (the SOURCE operand's own capture — one identifier arm for both clauses, kb/Work PB1129); null for literal-1.</summary>
-    public FieldDataSource? Operand { get; init; }
+    /// <summary>identifier-1 AS WRITTEN — base word, qualifiers, subscripts and reference modification (§13.18.12.2) —
+    /// the SOURCE clause's own written-reference form (kb/Work PB1129 × PB1292); null for literal-1. The BASE item it
+    /// names is <see cref="Item"/> (the data-phase SR2 screen's subject) and the value the engine reads is
+    /// <see cref="Value"/> (procedure phase, the ONE sending-operand resolution).</summary>
+    public Core.DataReferenceContext? Reference { get; init; }
 
     /// <summary>The clause's operand as written, for diagnostics.</summary>
     public required string Written { get; init; }
@@ -143,8 +155,12 @@ public sealed class ReportCodeModel
     /// length, or identifier-1's (fixed: SR2 excludes every variable-length shape). 0 until resolved.</summary>
     public int Length { get; set; }
 
-    /// <summary>The resolved identifier-1 item; null for literal-1 or an unresolved operand.</summary>
-    public DataItem? Item => Operand?.Item;
+    /// <summary>The resolved base item of identifier-1 (data bind); null for literal-1 or an unresolved operand.</summary>
+    public DataItem? Item { get; set; }
+
+    /// <summary>identifier-1 as the place the engine reads at each evaluation (§13.18.12.4 GR3), resolved in the
+    /// procedure phase; null for literal-1 or a refused operand.</summary>
+    public Place? Value { get; set; }
 }
 
 /// <summary>One CONTROL clause operand (ISO §13.18.16): FINAL or a (possibly qualified) data-name resolved
@@ -417,9 +433,16 @@ public enum ReportRepetitionAxis { Horizontal, Vertical }
 /// <param name="Ordinal">This repetition's zero-based ordinal within that entry.</param>
 public sealed record ReportRepetitionGuard(ReportOccursSpec Spec, int Ordinal);
 
-/// <summary>One report VARYING counter (ISO §13.18.64): the counter name, the FROM/BY expressions as captured
-/// parse contexts (bound to <see cref="From"/>/<see cref="By"/> in the procedure phase; null = the GR3 default 1),
-/// stepping once per repetition of the entry's multiple COLUMN clause (GR3a/GR3b).</summary>
+/// <summary>One report VARYING counter (ISO §13.18.64) — the temporary integer data item an ENTRY containing a
+/// VARYING clause establishes (GR1). It is declared by its ENTRY, not by the printable leaf that happens to sit
+/// under it, so a group entry's counter exists and a subordinate entry can name it (§13.18.64.3 SR2: "This
+/// definition of data-name-1 may be referenced only within the current entry or a subordinate entry"; SR3 lets a
+/// subordinate entry's FROM and BY name it too). One instance is made per WRITTEN entry per enclosing repetition,
+/// because GR3's "first occurrence" restarts with every occurrence of an enclosing repeating entry
+/// (kb/Work PB1306): its occurrences are the repetitions of the declaring entry within ONE enclosing occurrence.
+/// <para>The counter name, the FROM/BY expressions as captured parse contexts (bound to <see cref="From"/>/
+/// <see cref="By"/> in the procedure phase through the ONE expression binder, with <see cref="Enclosing"/> and
+/// <see cref="Group"/> in scope; null = the GR3 default 1).</para></summary>
 public sealed class ReportVaryingModel
 {
     public required string Name { get; init; }
@@ -427,7 +450,39 @@ public sealed class ReportVaryingModel
     public CobolParserCore.ArithmeticExpressionContext? ByCtx { get; init; }
     public BoundExpr? From { get; set; }
     public BoundExpr? By { get; set; }
+
+    /// <summary>The compilation-unique identity that names the compose-local variable holding the counter.</summary>
+    public required int Uid { get; init; }
+
+    /// <summary>The compose-local variable (<see cref="BoundReportVaryingRef.CsName"/>) a reference to this counter reads.</summary>
+    public string CsName => $"__kv{Uid}";
+
+    /// <summary>The report group description entry whose VARYING clause declares the counter.</summary>
+    public required CobolParserCore.ReportGroupEntryContext Entry { get; init; }
+
+    /// <summary>Every counter of the declaring entry, in clause order (§13.18.64.2 — one clause names several).</summary>
+    public IReadOnlyList<ReportVaryingModel> Group { get; set; } = [];
+
+    /// <summary>The counters of the entries ENCLOSING the declaring entry, outermost first — the names §13.18.64.3 SR3
+    /// lets this counter's FROM and BY reference ("arithmetic-expression-1 or arithmetic-expression-2 of a VARYING
+    /// clause in a subordinate entry").</summary>
+    public IReadOnlyList<ReportVaryingModel> Enclosing { get; init; } = [];
+
+    /// <summary>The BY expression names a counter of the SAME entry (§13.18.64.3 SR3: "may be referenced in
+    /// arithmetic-expression-2 of the same VARYING clause"), so occurrence n is not FROM + n × BY: each step adds a
+    /// BY evaluated against the counters as the previous step left them (GR3 b), a running recurrence.</summary>
+    public bool Recurrent { get; init; }
+
+    /// <summary>The FROM/BY expressions have been bound (they are shared by every field the counter reaches).</summary>
+    public bool Bound { get; set; }
 }
+
+/// <summary>A VARYING counter as one printable field sees it: the counter, and the occurrence number of its DECLARING
+/// entry this field's placement lies in (§13.18.64.4 GR3 — the first occurrence takes FROM, each later one adds BY).
+/// <paramref name="PerPlacement"/> is set when the field's OWN entry declares the counter and repeats through a
+/// multiple COLUMN clause: placement <c>j</c> of the field is then occurrence <c>Ordinal + j</c>. Every other use is
+/// one fixed occurrence — the field lies inside ONE occurrence of the declaring entry.</summary>
+public sealed record ReportVaryingUse(ReportVaryingModel Counter, int Ordinal, bool PerPlacement);
 
 /// <summary>One PRINTABLE item (an entry with a COLUMN clause, ISO §13.18.14): its column operands (one per
 /// repetition — a multiple COLUMN clause is a repeating entry, §13.15.4 GR3), the synthetic
@@ -468,8 +523,10 @@ public sealed class ReportFieldModel
     public List<CobolParserCore.ConditionContext> PresentWhenCtxs { get; } = [];
     public List<BoundCondition> PresentWhen { get; } = [];
 
-    /// <summary>The entry's VARYING counters (§13.18.64) — empty for a non-VARYING entry.</summary>
-    public List<ReportVaryingModel> Varyings { get; } = [];
+    /// <summary>The VARYING counters in scope at this field (§13.18.64.3 SR2) — those of its own entry and of every
+    /// entry above it, outermost first, each with the occurrence of its declaring entry the field lies in. Empty
+    /// outside any VARYING entry.</summary>
+    public List<ReportVaryingUse> Varyings { get; } = [];
 
     /// <summary>The OCCURS … DEPENDING presence tests this placement inherits, outermost repeating entry first
     /// (ISO §13.18.38.4 GR13 / §13.18.63.4 GR22) — empty unless the item lies inside a repeating entry with the
@@ -498,11 +555,24 @@ public abstract record ReportFieldSource;
 /// <see cref="ReportFieldModel.Sources"/> — the raw text of the operands is never glued together.</summary>
 public sealed record FieldValueSource(string Raw) : ReportFieldSource;
 
-/// <summary>A SOURCE clause data reference (ISO §13.18.53), captured as base word + IN/OF qualifiers (the FILE
-/// STATUS capture pattern) and resolved post-build to <see cref="Item"/>.</summary>
-public sealed record FieldDataSource(string Name, IReadOnlyList<string> Qualifiers) : ReportFieldSource
+/// <summary>A SOURCE clause <b>identifier-1</b> (ISO §13.18.53.2), kept as the WRITTEN REFERENCE and bound in the
+/// PROCEDURE phase through the ONE operand binder a MOVE's sending operand takes (<c>ExpressionBinder.FieldOperand</c>)
+/// — which is §13.18.53.4 GR1's "sending operand of an implicit MOVE statement" said as code. That one binder is the
+/// only place that knows every shape an identifier-1 can have: a subscript, a reference-modification, a LINE-COUNTER
+/// or PAGE-COUNTER of this or another report (§8.4.2.2.3 SR9/SR10), a sum counter of the current report (§13.18.53.3
+/// SR4), a VARYING counter in scope (§13.18.64.3 SR2) and a constant-name (§13.10.3 SR2). (kb/Work PB1292 × PB1306 ×
+/// PB1316 × PB1456 — before it the identifier arm captured name + qualifiers at data bind and looked the name up in
+/// ordinary storage, so each of those shapes was a separate staged refusal of legal source.)
+/// <para><see cref="Value"/> is null until that bind; a screen that already named its rule sets
+/// <see cref="Rejected"/>, so the rejected words are never bound or reported twice (the
+/// <see cref="FieldComputeSource.Rejected"/> discipline).</para></summary>
+public sealed record FieldReferenceSource(Core.DataReferenceContext Ref, string Written) : ReportFieldSource
 {
-    public DataItem? Item { get; set; }
+    /// <summary>The bound sending operand (procedure phase).</summary>
+    public BoundOperand? Value { get; set; }
+
+    /// <summary>A screen has already rejected this operand and named its rule.</summary>
+    public bool Rejected { get; set; }
 }
 
 /// <summary>A SOURCE clause operand that is an <b>arithmetic-expression-1</b> (ISO §13.18.53.2), or an
@@ -532,20 +602,10 @@ public sealed record FieldComputeSource(Core.ReportValueOperandContext Ctx, stri
     public CobolNet.Runtime.CobolRounding Rounding { get; set; } = CobolNet.Runtime.CobolRounding.Truncation;
 }
 
-/// <summary>A <c>SOURCE IS LINE-COUNTER / PAGE-COUNTER</c> reference (ISO §8.4.3.15 SR1 — referable in the
-/// report section only in SOURCE). The counter is the OWN report's (a report-name qualifier naming another
-/// report is staged loud — no corpus surface).</summary>
-public sealed record FieldCounterSource(bool IsPage) : ReportFieldSource;
-
 /// <summary>The printable face of a SUM entry (ISO §13.18.54.4 GR4 — the sum counter acts as the source item).
 /// <paramref name="CounterId"/> is the counter's ENTRY ORDINAL (GR1; <see cref="ReportSumModel.Id"/>), never a
 /// data-name — two entries may legally carry the same one (kb/Work PB882).</summary>
 public sealed record FieldSumSource(int CounterId) : ReportFieldSource;
-
-/// <summary>A SOURCE naming the entry's own VARYING counter (ISO §13.18.64.4 GR4 NOTE — the counter is usable as
-/// a source data item); <paramref name="Index"/> indexes <see cref="ReportFieldModel.Varyings"/>. Renders as the
-/// compose-local counter, re-read per repetition.</summary>
-public sealed record FieldVaryingSource(int Index) : ReportFieldSource;
 
 /// <summary>ONE SUM addend written as <c>identifier-1</c> (ISO §13.18.54.3 SR1 — "Each data-name-1,
 /// identifier-1 or arithmetic-expression-1 is an addend"), kept as the WRITTEN REFERENCE rather than a resolved
@@ -1031,9 +1091,10 @@ public sealed partial class DataBinder
     /// PB1129). literal-1 is screened here (SR1 — "Literal-1 shall be an alphanumeric literal": a numeric, national or
     /// boolean literal and a figurative constant are not one) and decoded through the ONE literal readers
     /// (<see cref="OperandLiteralClass"/> / <see cref="LiteralCharsOf"/> — a §8.8.3.3 concatenation folds, a
-    /// hexadecimal format decodes). identifier-1 is captured as the SOURCE clause's identifier operand
-    /// (<see cref="BindSourceReference"/>) and resolved, with SR2's shape rules, post-build
-    /// (<see cref="ResolveReportCode"/>). Returns null for an operand that was refused, so no code is emitted for it.</summary>
+    /// hexadecimal format decodes). identifier-1 is kept as the WRITTEN reference, exactly as the SOURCE clause's
+    /// identifier operand is (<see cref="FieldReferenceSource"/>): its base item is screened post-build with SR2's shape
+    /// rules (<see cref="ResolveReportCode"/>) and its value is bound in the procedure phase. Returns null for an
+    /// operand that was refused, so no code is emitted for it.</summary>
     private ReportCodeModel? BindCodeClause(Core.ReportCodeClauseContext cc, ReportModel model)
     {
         string where = $"RD '{model.Name}': the CODE clause";
@@ -1048,15 +1109,16 @@ public sealed partial class DataBinder
             return new ReportCodeModel { Literal = LiteralCharsOf(lit, sr11: false), Written = lit.GetText() };
         }
         var dref = cc.dataReference();
-        if (BindSourceReference(dref, model, "CODE", "§13.18.12") is not { } bound) return null;
-        if (bound is not FieldDataSource data)
+        if (dref.LINE_COUNTER() is not null || dref.PAGE_COUNTER() is not null)
         {
             // LINE-COUNTER / PAGE-COUNTER — the report's registers, numeric: never an alphanumeric data item.
             Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names {DataBinder.WrittenText(dref)}, a report "
                 + "counter, which is numeric: identifier-1 shall reference an alphanumeric data item (ISO §13.18.12.3 SR2)");
             return null;
         }
-        return new ReportCodeModel { Operand = data, Written = DataBinder.WrittenText(dref) };
+        // The WHOLE written reference rides on the model — a subscript and a reference modification are part of an
+        // identifier (§8.4.3.1.2) and bind in the procedure phase, exactly as the SOURCE clause's identifier-1 does.
+        return new ReportCodeModel { Reference = dref, Written = DataBinder.WrittenText(dref) };
     }
 
     /// <summary>Resolve the CODE clause's identifier-1 to its item and screen §13.18.12.3 SR2 over it — "Identifier-1 shall
@@ -1072,21 +1134,33 @@ public sealed partial class DataBinder
             code.Length = literal.Length;
             return;
         }
-        var ds = code.Operand!;
+        // ⛔ THE BASE ITEM is looked up here (the SR2 screen is over the item's DESCRIPTION), and nothing else of the written
+        // reference is dropped: a subscript and a reference modification are part of identifier-1 (§8.4.3.1.2) and bind
+        // in the procedure phase through the ONE sending-operand resolution (`ReportCodeModel.Value`), where the
+        // resolver also asks §8.4.2.3.3 SR3's subscript count — so an unsubscripted reference to a table element is
+        // refused THERE (SR5), and a subscripted one is legal source (kb/Work PB1292).
+        var (codeName, codeQuals) = KeyReference(code.Reference!);
         string where = $"RD '{model.Name}': the CODE clause";
-        ds.Item = LookupQualified(ds.Name, ds.Qualifiers, where, out bool ambiguous);
-        if (ds.Item is not { } item)
+        code.Item = LookupQualified(codeName, codeQuals, where, out bool ambiguous);
+        if (code.Item is not { } item)
         {
             if (!ambiguous)
                 Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names '{code.Written}', which does not resolve "
                     + "to a data item (ISO §8.4.2.1; identifier-1 of §13.18.12.2)");
             return;
         }
+        // A reference-modified identifier-1 references the §8.4.3.3.4 GR5 unique data item, which GR6 c) makes alphanumeric
+        // whatever the base's category — so the CLASS half of SR2 is asked of the base item only when no
+        // reference-modification is written, and the length is the slice's, which the logical record size needs FIXED
+        // (GR2) — an integer-literal position and length, as the CONTROL operand's ref-mod requires.
+        var codeSfx = ReferenceResolver.ReadOperandSuffixes(code.Reference!);
+        bool codeRefMod = codeSfx.RefMods > 0;
         var itemClass = IntrinsicArgumentRules.ClassOfItem(item);
-        string? why = itemClass is not { } cls || IntrinsicArgumentRules.TableTwoClass(cls) != CobolClass.Alphanumeric
+        string? why = !codeRefMod && (itemClass is not { } cls || IntrinsicArgumentRules.TableTwoClass(cls) != CobolClass.Alphanumeric)
                 ? $"is not an alphanumeric data item (it is of {itemClass?.ToString().ToLowerInvariant() ?? "unknown"} class)"
-            : item.SubscriptLevels() is [.., var innermost]
-                ? $"is subject to the OCCURS clause on '{innermost.CobolName ?? innermost.CsName}' and shall be subscripted"
+            : codeRefMod && (codeSfx.RefMods > 1 || codeSfx.NonLiteral || codeSfx.BeyondHostLimit || codeSfx.Start is null)
+                ? "is reference-modified with a leftmost-position or length that is not a single integer literal, so the "
+                  + "characters it occupies in every logical record (§13.18.12.4 GR2) are not a fixed number"
             : OdoModel.TableUnder(item) is { } odo
                 ? $"is a group with the occurs-depending-on table '{odo.CobolName ?? odo.CsName}' subordinate to it"
             : item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(item)
@@ -1101,7 +1175,9 @@ public sealed partial class DataBinder
                 + "variable-length group, or a dynamic-length elementary item (ISO §13.18.12.3 SR2)");
             return;
         }
-        code.Length = item.DisplayTextWidth;
+        code.Length = codeRefMod
+            ? Math.Max(0, codeSfx.Length ?? item.DisplayTextWidth - codeSfx.Start!.Value + 1)
+            : item.DisplayTextWidth;
     }
 
     /// <summary>The five trailing phrases of the PAGE clause (§13.18.39.2), each in its own bracket — what
@@ -1145,8 +1221,70 @@ public sealed partial class DataBinder
         ScreenReportLineNesting(entries, model);
         ScreenReportLineClauses(entries, model);
         ScreenReportEntryClausePresence(entries, model);
+        ScreenReportVaryingClauses(entries, model);
         BindReportSectionEntries(rd, entries, model);
         BindNextGroupClauses(entries, model);
+    }
+
+    /// <summary>⛔ THE VARYING CLAUSE'S SYNTAX RULES, asked ONCE per WRITTEN entry over the flat entry array (kb/Work
+    /// PB1306) — the <see cref="ScreenReportLineNesting"/> shape, so a §13.18.38 subtree replay cannot multiply them.
+    /// <list type="bullet">
+    /// <item>§13.18.64.3 SR1 — "The entry containing the VARYING clause shall also contain an OCCURS clause or, if the
+    /// VARYING clause appears in a report group description entry, a multiple LINE or multiple COLUMN clause."</item>
+    /// <item>SR2 — "Data-name-1 shall not be defined elsewhere in the source element, except as data-name-1 in another
+    /// VARYING clause of an entry not subordinate to the subject of the current entry." Three arms: a name given twice
+    /// in ONE entry; a name an ENCLOSING entry's VARYING clause already defines (that entry is not "not subordinate": the
+    /// current entry is subordinate to it); and a name defined by anything else — a data item, or a report section
+    /// entry or sum counter (the latter arm asked once the source element is complete, in <c>ResolveReports</c>, from
+    /// <see cref="ReportModel.VaryingNames"/>). A reuse in a sibling or unrelated entry is legal and "refers to a
+    /// completely independent data item".</item>
+    /// <item>SR3 — "Data-name-1 shall not be referenced in arithmetic-expression-1 of the same VARYING clause, but may
+    /// be referenced in arithmetic-expression-2 of the same VARYING clause or in arithmetic-expression-1 or
+    /// arithmetic-expression-2 of a VARYING clause in a subordinate entry." Only the first half is a prohibition: a
+    /// FROM naming a counter the same entry defines.</item>
+    /// </list></summary>
+    private void ScreenReportVaryingClauses(Core.ReportGroupEntryContext[] entries, ReportModel model)
+    {
+        var enclosing = new List<(int Level, string Name)>();
+        foreach (var ge in entries)
+        {
+            int.TryParse(ge.levelNumber().GetText(), out int level);
+            enclosing.RemoveAll(c => c.Level >= level);
+            var specs = ge.reportGroupClause().Select(c => c.reportVaryingClause()).OfType<Core.ReportVaryingClauseContext>()
+                .SelectMany(vc => vc.reportVaryingSpec()).ToList();
+            if (specs.Count == 0) continue;
+            using var _ = Edition.At(ge);
+            string where = $"RD '{model.Name}' entry '{ge.dataName().NameOrNull() ?? "FILLER"}'";
+            bool repeating = ge.reportGroupClause().Any(c => c.occursClause() is not null
+                || (c.reportLineClause()?.reportLineOperand().Length ?? 0) > 1
+                || (c.reportColumnClause()?.reportColumnOperand().Length ?? 0) > 1);
+            if (!repeating)
+                Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where}: a VARYING clause requires the entry to also "
+                    + "contain an OCCURS clause or a multiple LINE or multiple COLUMN clause (ISO §13.18.64.3 SR1)");
+            var own = new List<string>();
+            foreach (var spec in specs)
+            {
+                string name = spec.cobolWord().GetText();
+                if (own.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where} VARYING '{name}': the counter is defined twice in "
+                        + "this entry; data-name-1 shall not be defined elsewhere in the source element, except as "
+                        + "data-name-1 in another VARYING clause of an entry not subordinate to the subject of the "
+                        + "current entry (ISO §13.18.64.3 SR2)");
+                else if (enclosing.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                    Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where} VARYING '{name}': an entry above this one already "
+                        + "defines the counter in its VARYING clause; a reuse of the name is permitted only in an entry "
+                        + "not subordinate to the subject of the current entry (ISO §13.18.64.3 SR2)");
+                else if (!model.VaryingNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    model.VaryingNames.Add(name);
+                own.Add(name);
+            }
+            foreach (var spec in specs)
+                if (spec.FROM() is not null && own.FirstOrDefault(n => HasWord(spec.arithmeticExpression(0), n)) is { } hit)
+                    Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where} VARYING '{spec.cobolWord().GetText()}': the "
+                        + $"counter '{hit}' shall not be referenced in arithmetic-expression-1 of the same VARYING clause (ISO "
+                        + "§13.18.64.3 SR3)");
+            enclosing.AddRange(own.Select(n => (level, n)));
+        }
     }
 
     /// <summary>⛔ ISO §13.8.4 — "An RD entry shall be followed by one or more report group description entries"
@@ -1563,6 +1701,12 @@ public sealed partial class DataBinder
         public int LineChainDepth;
         /// <summary>The repeating entries enclosing the entry being bound, outermost first (§13.18.38 Format 3).</summary>
         public readonly List<ReportRepetitionFrame> Repetitions = [];
+        /// <summary>The VARYING declarations in scope for the entry being bound (§13.18.64.3 SR2 — "only within the
+        /// current entry or a subordinate entry"), outermost first: the declaring entry, its counters, and the
+        /// repetition frame whose ordinal is the occurrence being bound (null for a leaf that repeats only through
+        /// a multiple COLUMN clause, whose occurrences are its placements).</summary>
+        public readonly List<(Core.ReportGroupEntryContext Entry, IReadOnlyList<ReportVaryingModel> Counters,
+            ReportRepetitionFrame? Frame)> Varying = [];
         /// <summary>The step-anchor register ids, keyed by (entry, COLUMN-operand index) — one per PRINTABLE
         /// PLACEMENT of a repeating entry whose base column is relative (see <see cref="ReportColumnKindModel"/>).</summary>
         public readonly Dictionary<(Core.ReportGroupEntryContext Entry, int Operand, string Undisplaced), int> Anchors = [];
@@ -1663,22 +1807,60 @@ public sealed partial class DataBinder
             while (subtreeEnd < end && int.TryParse(entries[subtreeEnd].levelNumber().GetText(), out int lv)
                    && lv > entryLevel) subtreeEnd++;
 
+            // The entry's VARYING counters (§13.18.64.1): made ONCE for this entry within the enclosing occurrence being
+            // bound, and in scope for the entry and its subtree — which a repeating entry's replay encloses, so
+            // every repetition shares the counter and GR3's occurrence number is the repetition's ordinal.
+            var counters = VaryingCountersOf(ge, st);
             if (ReportRepetitionOf(ge, entries, i, subtreeEnd, model, st) is { } occurs)
             {
                 var frame = new ReportRepetitionFrame(occurs);
                 st.Repetitions.Add(frame);
+                if (counters.Count > 0) st.Varying.Add((ge, counters, frame));
                 for (int rep = 0; rep < occurs.Max; rep++)
                 {
                     frame.Ordinal = rep;
                     BindReportEntry(ge, entries[i], model, st, occurs, rep);
                     BindReportEntries(entries, i + 1, subtreeEnd, model, st);
                 }
+                if (counters.Count > 0) st.Varying.RemoveAt(st.Varying.Count - 1);
                 st.Repetitions.RemoveAt(st.Repetitions.Count - 1);
                 i = subtreeEnd - 1;
                 continue;
             }
+            if (counters.Count > 0) st.Varying.Add((ge, counters, null));
             BindReportEntry(ge, ge, model, st);
+            if (counters.Count > 0) st.Varying.RemoveAt(st.Varying.Count - 1);
         }
+    }
+
+    /// <summary>The VARYING counters the entry <paramref name="ge"/> declares (ISO §13.18.64.2 — <c>VARYING { data-name-1
+    /// [FROM arithmetic-expression-1] [BY arithmetic-expression-2] } …</c>), empty for an entry with no VARYING
+    /// clause. The rules over the WRITTEN clause (SR1–SR3) are asked once per written entry by
+    /// <see cref="ScreenReportVaryingClauses"/>, not here, so a replay cannot multiply them.</summary>
+    private List<ReportVaryingModel> VaryingCountersOf(Core.ReportGroupEntryContext ge, ReportGroupBuild st)
+    {
+        var specs = ge.reportGroupClause().Select(c => c.reportVaryingClause()).OfType<Core.ReportVaryingClauseContext>()
+            .SelectMany(vc => vc.reportVaryingSpec()).ToList();
+        if (specs.Count == 0) return [];
+        var enclosing = st.Varying.SelectMany(v => v.Counters).ToList();
+        var names = specs.Select(s => s.cobolWord().GetText()).ToList();
+        var group = new List<ReportVaryingModel>(specs.Count);
+        foreach (var spec in specs)
+        {
+            var byCtx = spec.BY() is not null ? spec.arithmeticExpression(spec.FROM() is not null ? 1 : 0) : null;
+            group.Add(new ReportVaryingModel
+            {
+                Name = spec.cobolWord().GetText(),
+                FromCtx = spec.FROM() is not null ? spec.arithmeticExpression(0) : null,
+                ByCtx = byCtx,
+                Uid = _uidCounter++,
+                Entry = ge,
+                Enclosing = enclosing,
+                Recurrent = byCtx is not null && names.Any(n => HasWord(byCtx, n)),
+            });
+        }
+        foreach (var v in group) v.Group = group;
+        return group;
     }
 
     /// <summary>
@@ -1998,7 +2180,7 @@ public sealed partial class DataBinder
             List<EditingPhraseSpec>? reportEditing = null;   // PICTURE EDITING phrases (§13.18.40.2)
             LocaleEditSpec? reportLocale = null;             // PICTURE format 2 — the LOCALE phrase (PB113 / PB64 T6)
             SignSpec? ownSign = null;
-            bool justified = false, blankWhenZero = false, groupIndicate = false, repeatingEntry = false;
+            bool justified = false, blankWhenZero = false, groupIndicate = false;
             // A repetition VEHICLE that was REFUSED (an OCCURS clause a §13.18.38.3 syntax rule rejected):
             // the entry's §13.15.4 GR3 repetition count is then not knowable, so the operand-count screen
             // below stands down rather than emitting a second diagnostic about it (kb/Work PB506).
@@ -2022,7 +2204,6 @@ public sealed partial class DataBinder
             // `SUM WS-A UPON DET SUM WS-B UPON DET2` totalled WS-B alone.
             var sumClauses = new List<Core.ReportSumClauseContext>();
             Core.ConditionContext? ownCond = null;
-            var varyings = new List<ReportVaryingModel>();
 
             foreach (var clause in ge.reportGroupClause())
             {
@@ -2037,7 +2218,6 @@ public sealed partial class DataBinder
                     // own ORDINAL names and the entry opens one report line per repetition. The modulo is the
                     // SR10d recovery path only (an entry carrying BOTH vehicles is diagnosed, not guessed at).
                     var ops = lc.reportLineOperand();
-                    if (ops.Length > 1) repeatingEntry = true;
                     lineOperand = ops.Length > 1 ? ops[ordinal % ops.Length] : ops[0];
                     lineOperandIndex = ops.Length > 1 ? ordinal % ops.Length : 0;
                 }
@@ -2088,10 +2268,9 @@ public sealed partial class DataBinder
                     // ENTRY to define a numeric or numeric-edited item. The entry's PICTURE is analyzed below
                     // (it needs the COLUMN block's usage/editing context), so the obligation is recorded here
                     // and discharged there, where `pic` exists.
-                    if (sc.roundedPhrase() is not null || sops.Any(o => BareReferenceOf(o) is null))
+                    if (sc.roundedPhrase() is not null || sops.Any(o => IdentifierOperandOf(o) is null))
                         sourceNeedsNumericEntry = true;
-                    foreach (var op in sops)
-                        if (BindSourceOperand(op, sc.roundedPhrase(), model) is { } so) sourceOps.Add(so);
+                    foreach (var op in sops) sourceOps.Add(BindSourceOperand(op, sc.roundedPhrase()));
                 }
                 else if (clause.reportSumClause() is { } sm)
                     sumClauses.Add(sm);
@@ -2109,15 +2288,11 @@ public sealed partial class DataBinder
                         ownCond = null;
                     }
                 }
-                else if (clause.reportVaryingClause() is { } vy)
-                    foreach (var spec in vy.reportVaryingSpec())
-                        varyings.Add(new ReportVaryingModel
-                        {
-                            Name = spec.cobolWord().GetText(),
-                            FromCtx = spec.FROM() is not null ? spec.arithmeticExpression(0) : null,
-                            ByCtx = spec.BY() is not null
-                                ? spec.arithmeticExpression(spec.FROM() is not null ? 1 : 0) : null,
-                        });
+                else if (clause.reportVaryingClause() is not null)
+                {
+                    // The counters are made by the walk (VaryingCountersOf), once per entry per enclosing occurrence,
+                    // and reach this entry's printable item through ReportGroupBuild.Varying (§13.18.64.3 SR2).
+                }
                 else if (clause.pictureClause()?.PIC_STRING() is { } pic)
                 {
                     picText = pic.GetText();
@@ -2170,10 +2345,8 @@ public sealed partial class DataBinder
                 {
                     // The repeating entry itself (ISO §13.18.38 Format 3) is read by ReportOccursOf BEFORE this
                     // entry is bound — it drives the REPLAY, so there is nothing to capture per repetition.
-                    // `repeatingEntry` records the §13.18.64.3 SR1 vehicle either way; a clause ReportOccursOf
-                    // REFUSED (a syntax rule, or the still-staged vertical axis) leaves ownOccurs null and the
-                    // entry's repetition count unknowable.
-                    repeatingEntry = true;
+                    // A clause ReportOccursOf REFUSED (a syntax rule) leaves ownOccurs null and the entry's
+                    // repetition count unknowable.
                     if (ownOccurs is null) staysLoud = true;
                 }
                 else if (clause.valueClause() is { } value)
@@ -2196,31 +2369,6 @@ public sealed partial class DataBinder
                 Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': the GROUP "
                     + "INDICATE clause shall not be specified in an entry in which the PRESENT WHEN clause is "
                     + "specified (ISO §13.15.3 SR17)");
-
-            // VARYING (§13.18.64): SR1 — the entry shall also contain OCCURS or a multiple LINE or multiple
-            // COLUMN clause. All three vehicles set `repeatingEntry`/`columns`: OCCURS is LIVE on the horizontal
-            // axis (§13.18.38 Format 3, the replay), the multiple LINE clause still stages loud.
-            if (varyings.Count > 0)
-            {
-                if (!repeatingEntry && columns.Count <= 1)
-                    Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': a VARYING "
-                        + "clause requires the entry to also contain an OCCURS clause or a multiple LINE or "
-                        + "multiple COLUMN clause (ISO §13.18.64.3 SR1)");
-                foreach (var v in varyings)
-                {
-                    // SR3: data-name-1 shall not be referenced in arithmetic-expression-1 of the same clause.
-                    if (v.FromCtx is not null && varyings.Any(o => HasWord(v.FromCtx, o.Name)))
-                        Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}' VARYING '{v.Name}': the counter shall "
-                            + "not be referenced in the FROM expression of the same VARYING clause (ISO "
-                            + "§13.18.64.3 SR3)");
-                    // SR3 permits the counter in arithmetic-expression-2 — that leg is staged loud (the
-                    // expression would need to bind against the compose-local counter).
-                    if (v.ByCtx is not null && varyings.Any(o => HasWord(v.ByCtx, o.Name)))
-                        Edition.Error(DiagnosticCatalog.ReportVaryingCounterInExpression, $"RD '{model.Name}' VARYING '{v.Name}': a "
-                            + "VARYING counter referenced inside the BY expression (ISO §13.18.64.3 SR3) is not "
-                            + "yet implemented");
-                }
-            }
 
             // ⛔ THE MULTI-OPERAND REPETITION RULE, ONE READER FOR BOTH CLAUSES (kb/Work PB506). ISO
             // §13.18.63.3 SR35 (VALUE) and §13.18.53.3 SR6 (SOURCE) are the SAME rule written twice, and their
@@ -2431,12 +2579,6 @@ public sealed partial class DataBinder
                     sums.Count > 0 ? [.. sums.Select(s => (ReportFieldSource)new FieldSumSource(s.Id))]
                     : sourceOps.Count > 0 ? sourceOps
                     : [.. valueRaws.Select(r => (ReportFieldSource)new FieldValueSource(r))];
-                // SOURCE naming the entry's own VARYING counter (§13.18.64.4 GR4 NOTE — a counter is a source
-                // item). Per OPERAND: a multi-operand SOURCE may name a counter in any of its positions.
-                for (int si = 0; si < srcs.Count; si++)
-                    if (srcs[si] is FieldDataSource { Qualifiers.Count: 0 } fd
-                        && varyings.FindIndex(v => v.Name.Equals(fd.Name, StringComparison.OrdinalIgnoreCase)) is var vi and >= 0)
-                        srcs[si] = new FieldVaryingSource(vi);
                 var field = new ReportFieldModel
                 {
                     Columns = RepeatedPlacements(columns, anchorKey, st),
@@ -2450,7 +2592,18 @@ public sealed partial class DataBinder
                 for (int ci = Math.Min(st.LineChainDepth, chain.Count); ci < chain.Count; ci++)
                     if (chain[ci].Cond is { } c) field.PresentWhenCtxs.Add(c);
                 if (ownCond is not null && opened is null) field.PresentWhenCtxs.Add(ownCond);
-                field.Varyings.AddRange(varyings);
+                // The VARYING counters in scope (§13.18.64.3 SR2): this entry's own and every enclosing entry's, each with the
+                // occurrence of its declaring entry this placement lies in (GR3). An enclosing entry's occurrence is its
+                // replay's ordinal; this entry's own, when it repeats through a multiple COLUMN clause as well, is
+                // counted per placement (the emitter adds the placement index), after the replay ordinal's columns.
+                foreach (var (declaring, counters, frame) in st.Varying)
+                {
+                    bool own = ReferenceEquals(declaring, ge);
+                    int perReplay = own ? Math.Max(columns.Count, 1) : 1;
+                    foreach (var counter in counters)
+                        field.Varyings.Add(new ReportVaryingUse(counter, (frame?.Ordinal ?? 0) * perReplay,
+                            PerPlacement: own && columns.Count > 1));
+                }
                 field.RepetitionGuards.AddRange(st.GuardsHere());
                 line.Fields.Add(field);
             }
@@ -2836,53 +2989,40 @@ public sealed partial class DataBinder
     private void ScreenSourceOperandParens(Core.ReportValueOperandContext[] ops, string where)
     {
         if (ops.Length <= 1) return;
-        if (!ops.Any(o => BareReferenceOf(o) is null)) return;   // every operand is identifier-1 — SR7 is silent
+        if (!ops.Any(o => IdentifierOperandOf(o) is null)) return;   // every operand is identifier-1 — SR7 is silent
         foreach (var o in ops.Where(o => !IsParenthesized(o)))
             Edition.Error(DiagnosticCatalog.ReportSourceOperandParens, $"{where}: the SOURCE clause has "
                 + $"{ops.Length} operands of which at least one is an arithmetic-expression, so each operand "
                 + $"shall be enclosed in parentheses (ISO §13.18.53.3 SR7); '{o.GetText()}' is not.");
     }
 
+    /// <summary>⛔ THE ONE FORM CLASSIFIER OF A REPORT VALUE-CLAUSE OPERAND (kb/Work PB852 × PB883 × PB1316): the bare
+    /// <c>dataReference</c> an operand IS when it is written as identifier-1 / data-name-1 — else null, meaning
+    /// arithmetic-expression-1. <see cref="BareReferenceOf"/> is the SYNTACTIC walk; this adds the one semantic fact
+    /// the syntax cannot say: a bare word that names a CONSTANT is no identifier. §13.10.3 SR2 lets a constant-name
+    /// "be used anywhere that a format specifies a literal of the class and category of constant-name-1", the
+    /// operand brace of §13.18.53.2 / §13.18.54.2 specifies an arithmetic-expression, and an arithmetic-expression's
+    /// operand may be a numeric literal — so `SOURCE KC` is arithmetic-expression-1 whose one operand is the constant
+    /// (SR3 then asks the entry for a numeric item, a non-numeric constant is §8.8.1.1's refusal), never an
+    /// identifier that fails to resolve in storage. SOURCE and SUM both ask it here, so neither can drift.</summary>
+    private Core.DataReferenceContext? IdentifierOperandOf(Core.ReportValueOperandContext op) =>
+        BareReferenceOf(op) is { } dref && ConstantOf(dref) is null ? dref : null;
+
     /// <summary>Bind ONE SOURCE clause operand (ISO §13.18.53.2 — the clause writes
-    /// `{ identifier-1 | arithmetic-expression-1 } …`): a LINE-COUNTER/PAGE-COUNTER register (§8.4.3.15 SR1 — the
-    /// only report-section reference position), a data reference captured as base + qualifiers (GR1's implicit
-    /// MOVE), or — for an expression operand, or an identifier under the clause's ROUNDED phrase (SR5) — a
-    /// <see cref="FieldComputeSource"/> carrying GR2's implicit COMPUTE. Subscripted / reference-modified
-    /// IDENTIFIER operands stage loud (no corpus surface); inside an expression they are ordinary identifiers and
-    /// the one expression binder resolves them.</summary>
-    private ReportFieldSource? BindSourceOperand(Core.ReportValueOperandContext op,
-        Core.RoundedPhraseContext? rounded, ReportModel model)
+    /// `{ identifier-1 | arithmetic-expression-1 } …`). identifier-1 is §13.18.53.4 GR1's implicit MOVE sender; an
+    /// arithmetic-expression-1 operand, an identifier under the clause's ROUNDED phrase (SR5) and a constant-name
+    /// are <see cref="FieldComputeSource"/>, GR2's implicit COMPUTE. BOTH arms keep the operand as its parse tree
+    /// and bind it in the PROCEDURE phase through the ONE host binder (the kb/Work PB482 argument: a subscript may
+    /// be an index-name or an expression and has no value at data bind), so every shape an operand can take — a
+    /// subscript, a reference-modification, a counter of this or another report, a sum counter of the current
+    /// report, a VARYING counter in scope — is bound by the machinery that already knows it.</summary>
+    private ReportFieldSource BindSourceOperand(Core.ReportValueOperandContext op, Core.RoundedPhraseContext? rounded)
     {
         // §13.18.53.3 SR5 makes an identifier-1 written WITH the ROUNDED phrase an arithmetic-expression, so the
         // two forms merge here and GR2's COMPUTE governs both (kb/Work PB852).
-        if (BareReferenceOf(op) is not { } dref || rounded is not null)
+        if (IdentifierOperandOf(op) is not { } dref || rounded is not null)
             return new FieldComputeSource(op, AsWritten(op)) { Rounded = rounded };
-        return BindSourceReference(dref, model);
-    }
-
-    /// <summary>The identifier-1 arm of <see cref="BindSourceOperand"/> — §13.18.53.4 GR1's implicit MOVE. The RD
-    /// CODE clause's identifier-1 (§13.18.12.2) is read by this same arm (kb/Work PB1129), so a subscripted or
-    /// reference-modified identifier stages through the one residue (kb/Work PB1292) for both clauses.</summary>
-    private ReportFieldSource? BindSourceReference(Core.DataReferenceContext dref, ReportModel model,
-        string clause = "SOURCE", string clauseCite = "§13.18.53")
-    {
-        if (dref.LINE_COUNTER() is not null || dref.PAGE_COUNTER() is not null)
-        {
-            // A report-name qualifier naming a DIFFERENT report's counter is legal (§8.4.3.15 SR2) — staged.
-            if (dref.cobolWord() is { } q && !q.GetText().Equals(model.Name, StringComparison.OrdinalIgnoreCase))
-                Edition.Error(DiagnosticCatalog.ReportSourceOtherReportCounter, $"RD '{model.Name}': SOURCE {DataBinder.WrittenText(dref)} — a counter of "
-                    + "another report (ISO §8.4.3.15.3 SR2) is not yet implemented");
-            return new FieldCounterSource(dref.PAGE_COUNTER() is not null);
-        }
-        foreach (var sfx in dref.dataReferenceSuffix())
-            if (sfx.subscriptPart() is not null || sfx.refModPart() is not null)
-            {
-                Edition.Error(DiagnosticCatalog.ReportSourceSubscripted, $"RD '{model.Name}': {clause} {DataBinder.WrittenText(dref)} — a subscripted or "
-                    + $"reference-modified {clause} operand (ISO {clauseCite}) is not yet implemented");
-                return null;
-            }
-        var (b, qls) = KeyReference(dref);
-        return new FieldDataSource(b, qls);
+        return new FieldReferenceSource(dref, AsWritten(op));
     }
 
     /// <summary>⛔ ISO §13.18.54.4 GR1 — the sum counter's digit count, "derived from the corresponding number of
@@ -3095,7 +3235,7 @@ public sealed partial class DataBinder
     private ReportSumAddend SumAddendRef(Core.ReportValueOperandContext op, ReportModel model)
     {
         string written = AsWritten(op);
-        if (BareReferenceOf(op) is not { } dref)
+        if (IdentifierOperandOf(op) is not { } dref)
             return new ReportSumAddend { Ctx = op, Reference = null, Name = "", Qualifiers = [], Written = written };
         var (name, quals) = KeyReference(dref);
         var addend = new ReportSumAddend
@@ -3278,11 +3418,17 @@ public sealed partial class DataBinder
                         foreach (var fs in f.Sources)   // EVERY operand of a multi-operand SOURCE clause (§13.18.53.2)
                             switch (fs)
                             {
-                                case FieldDataSource ds:
-                                    ds.Item = LookupQualified(ds.Name, ds.Qualifiers, $"RD '{model.Name}': SOURCE", out bool srcAmbiguous);
-                                    if (ds.Item is null && !srcAmbiguous)
-                                        Edition.Error(DiagnosticCatalog.ReportSourceOperandUnresolved, $"RD '{model.Name}': SOURCE '{ds.Name}' does not "
-                                            + "resolve to a data item (ISO §13.18.53.3 SR4)");
+                                // §13.18.53.3 SR4 — "If identifier-1 specifies a report section item, it shall be a report
+                                // counter identifier or a sum counter defined in the current report." identifier-1 is
+                                // screened by the SAME walk the expression arm is (below), and resolved by the same
+                                // host binder in the procedure phase (kb/Work PB1292).
+                                case FieldReferenceSource rs when ReportSectionNameIn(rs.Ref, model) is { } badRef:
+                                    Edition.Error(DiagnosticCatalog.ReportExpressionOperandSection, $"RD '{model.Name}': SOURCE "
+                                        + $"'{rs.Written}' names the report section item '{badRef}', which is neither a "
+                                        + "report counter nor a sum counter of this report. If identifier-1 specifies a "
+                                        + "report section item, it shall be a report counter identifier or a sum counter "
+                                        + "defined in the current report (ISO §13.18.53.3 SR4).");
+                                    rs.Rejected = true;
                                     break;
                                 // §13.18.53.3 SR4, last sentence — "This same Syntax rule applies to any
                                 // identifier appearing in arithmetic-expression-1": a report-section identifier
@@ -3332,15 +3478,14 @@ public sealed partial class DataBinder
             // (an entry's condition appears in every subordinate chain) against this RD's report-section names.
             CheckConditionOperands(model);
 
-            // VARYING SR2 (§13.18.64.3): data-name-1 shall not be defined elsewhere in the source element.
-            foreach (var g in model.Groups)
-                foreach (var ln in g.Lines)
-                    foreach (var f in ln.Fields)
-                        foreach (var v in f.Varyings)
-                            if (ByName.ContainsKey(v.Name))
-                                Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}' VARYING '{v.Name}': the counter "
-                                    + "data-name shall not be defined elsewhere in the source element (ISO "
-                                    + "§13.18.64.3 SR2)");
+            // VARYING SR2 (§13.18.64.3): data-name-1 shall not be defined elsewhere in the source element — the arm over
+            // what ELSE defines the name (the two over other VARYING clauses are ScreenReportVaryingClauses'). A data
+            // item or constant is in ByName; a report group entry, printable item or sum counter is a report section
+            // name of some report of the source element, all of which are described by now.
+            foreach (var name in model.VaryingNames)
+                if (ByName.ContainsKey(name) || IsReportSectionOnlyName(name))
+                    Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}' VARYING '{name}': the counter "
+                        + "data-name shall not be defined elsewhere in the source element (ISO §13.18.64.3 SR2)");
 
             // Line width: the FD's fixed RECORD CONTAINS, else the widest NOMINAL field extent — absolute
             // operands at column + width − 1; relative (PLUS) operands walked against the line's horizontal
@@ -3591,12 +3736,16 @@ public sealed partial class DataBinder
         if (node is Core.DataReferenceContext dref)
         {
             if (dref.LINE_COUNTER() is not null || dref.PAGE_COUNTER() is not null)
-                // A report counter is admissible only in a SOURCE clause, and only the CURRENT report's
-                // (§8.4.3.15.3 SR1/SR2 — an unqualified counter is the own report's).
-                return countersOf is not null
-                    && (dref.cobolWord() is not { } q
-                        || q.GetText().Equals(countersOf.Name, StringComparison.OrdinalIgnoreCase))
-                    ? null : dref.GetText();
+            {
+                // A report counter is admissible only in a SOURCE clause (§8.4.3.15.3 SR1), and — "report counter
+                // identifier", SR4's first admitted item — of ANY report: §8.4.2.2.3 SR9/SR10's third sentence says
+                // how the counter of a DIFFERENT report is referenced ("shall be qualified explicitly by the
+                // report-name associated with the different report"), so that spelling is legal. A qualifier that
+                // names no report is the qualification rule's own error, reported where the counter is bound
+                // (kb/Work PB1456); it is not a report section NAME and is not flagged here.
+                if (countersOf is null) return dref.GetText();
+                return null;
+            }
             if (dref.cobolWord()?.GetText() is { } w && IsReportSectionOnlyName(w))
             {
                 // A sum counter of the CURRENT report is SR4's other admitted report-section item.
@@ -3604,6 +3753,10 @@ public sealed partial class DataBinder
                     && countersOf.SumFamilies.Any(s => s.Name is { } sn && sn.Equals(w, StringComparison.OrdinalIgnoreCase));
                 return ownCounter ? null : dref.GetText();
             }
+            // identifier-1 is a qualified-data-name-with-subscripts (§8.4.3.1.2): a name inside a SUBSCRIPT or a
+            // reference-modification is an identifier of the clause too (SR4's "any identifier appearing in…").
+            for (int i = 0; i < dref.ChildCount; i++)
+                if (ReportSectionNameIn(dref.GetChild(i), countersOf) is { } inner) return inner;
             return null;
         }
         for (int i = 0; i < node.ChildCount; i++)

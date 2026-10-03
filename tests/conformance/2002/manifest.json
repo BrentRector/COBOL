@@ -638,7 +638,10 @@
   "pb1929_set_identifier_senders",
   "pb1452_program_address_identifier_operands",
   "pb658_numval_category_positions",
-  "pb1901_strong_group_pointer_leaf_string_argument"
+  "pb1901_strong_group_pointer_leaf_string_argument",
+  "pb1306_varying_scope",
+  "pb1292_source_operand_forms",
+  "pb1456_counter_in_source_expression"
   ],
   "pending": []
 }

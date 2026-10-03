@@ -34,57 +34,134 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
             if (!memo.TryGetValue(c, out var b)) memo[c] = b = host.Cond.BindCondition(c);
             return b;
         }
-        foreach (var r in ctx.Data.Reports)
+        try
         {
-            foreach (var g in r.Groups)
-                foreach (var ln in g.Lines)
-                {
-                    foreach (var c in ln.PresentWhenCtxs) ln.PresentWhen.Add(Bind(c));
-                    foreach (var f in ln.Fields)
-                    {
-                        foreach (var c in f.PresentWhenCtxs) f.PresentWhen.Add(Bind(c));
-                        // A SOURCE operand written as arithmetic-expression-1, or as identifier-1 under the
-                        // clause's ROUNDED phrase (§13.18.53.3 SR5) — §13.18.53.4 GR2's implicit COMPUTE. The
-                        // expression binds HERE through the same BindExpr a procedure-division reference takes
-                        // (the kb/Work PB482 argument: a subscript may be an index-name or an expression and has
-                        // no value at data bind), and the ROUNDED phrase resolves through the ONE §14.7.4
-                        // rounding-mode reader (kb/Work PB852).
-                        foreach (var cs in f.Sources.OfType<FieldComputeSource>())
-                        {
-                            if (cs.Rejected) continue;
-                            cs.Value = host.Expr.BindExpr(cs.Ctx);
-                            cs.Rounding = host.Expr.RoundingOf(cs.Rounded);
-                        }
-                        foreach (var v in f.Varyings)
-                        {
-                            // §13.18.64.2 writes FROM/BY as plain arithmetic-expression-1/-2, and the RW VARYING is
-                            // on NEITHER index clause's list (§13.18.38.3 r7 names only PERFORM's and SEARCH's
-                            // VARYING; §13.18.60.3 SR10 names no VARYING) — so both screens apply (kb/Work PB215).
-                            if (v.FromCtx is { } fc) v.From = host.Expr.BindExpr(fc);
-                            if (v.ByCtx is { } bc) v.By = host.Expr.BindExpr(bc);
-                        }
-                    }
-                }
-            foreach (var s in r.Sums)
-            {
-                foreach (var c in s.PresentWhenCtxs) s.PresentWhen.Add(Bind(c));
-                // SUM addends (§13.18.54.3 SR5 — kb/Work PB482). An addend written as identifier-1 is an
-                // ORDINARY IDENTIFIER (§8.4.3.1.2 Format 2, qualified-data-name-with-subscripts), so its VALUE
-                // is bound HERE, through the same `BindExpr` a procedure-division reference takes — which is
-                // what makes `SUM WS-CELL(2)`, `SUM WS-CELL(IX)` and `SUM WS-CELL(IX + 1)` resolve at all: a
-                // subscript may be an arithmetic expression or an index-name, and neither has a value at data
-                // bind. A REJECTED addend is skipped: its rule has already been named, and re-binding it would
-                // report the same words twice under a second clause.
-                foreach (var t in s.Terms)
-                    foreach (var a in t.Addends)
-                        if (!a.Rejected) a.Value = host.Expr.BindExpr(a.Ctx);
-                // The SUM clause's own ROUNDED phrase (§13.18.54.2's trailing rounded-phrase) — §13.18.54.4 GR4
-                // computes the counter's delivery to the printable item "according to the general rules for the
-                // COMPUTE statement with the ROUNDED phrase". Same §14.7.4 reader as SOURCE's (kb/Work PB852).
-                s.Rounding = host.Expr.RoundingOf(s.Rounded);
-            }
+            foreach (var r in ctx.Data.Reports)
+                BindReportClauses(r, Bind);
+        }
+        finally
+        {
+            ctx.Refs.VaryingScope = null;
+            ctx.Refs.ReportScope = null;
         }
     }
+
+    /// <summary>One report's clause expressions, bound with the scope the REPORT SECTION gives them: the RD in whose
+    /// description they are written (§8.4.2.2.3 SR9/SR10 — "In the report section, an unqualified reference to the
+    /// PAGE-COUNTER is qualified implicitly by the name of the report in whose report description entry the reference
+    /// is made"; §13.18.53.3 SR4 — a sum counter "defined in the current report") and the VARYING counters of the
+    /// entry being bound (§13.18.64.3 SR2 — "only within the current entry or a subordinate entry").</summary>
+    private void BindReportClauses(ReportModel r, Func<Core.ConditionContext, BoundCondition> Bind)
+    {
+        ctx.Refs.ReportScope = r;
+        ctx.Refs.VaryingScope = null;
+        // The RD CODE clause's identifier-1 (§13.18.12.2): the place the engine reads at each body group (GR3), through
+        // the same ONE sending-operand resolution a SOURCE identifier takes.
+        if (r.Code is { Reference: { } codeRef } code)
+        {
+            using var at = ctx.Edition.At(codeRef);
+            if (host.Expr.FieldOperand(codeRef) is BoundFieldOperand { Place: { } codePlace }) code.Value = codePlace;
+        }
+        foreach (var g in r.Groups)
+            foreach (var ln in g.Lines)
+            {
+                foreach (var c in ln.PresentWhenCtxs) ln.PresentWhen.Add(Bind(c));
+                foreach (var f in ln.Fields)
+                {
+                    foreach (var c in f.PresentWhenCtxs) f.PresentWhen.Add(Bind(c));
+                    // §13.18.64.2 writes FROM/BY as plain arithmetic-expression-1/-2, and the RW VARYING is on NEITHER
+                    // index clause's list (§13.18.38.3 r7 names only PERFORM's and SEARCH's VARYING; §13.18.60.3 SR10
+                    // names no VARYING) — so both screens apply (kb/Work PB215). A counter's expressions may name the
+                    // counters of the entries above it, and its BY the counters of its own entry (§13.18.64.3 SR3),
+                    // so each binds with exactly those in scope — once, whichever field reaches the counter first.
+                    foreach (var use in f.Varyings)
+                    {
+                        var v = use.Counter;
+                        if (v.Bound) continue;
+                        v.Bound = true;
+                        using var at = ctx.Edition.At(v.Entry);
+                        // (A FROM naming a counter of its own clause is §13.18.64.3 SR3's prohibition, reported ONCE per
+                        // written entry by ScreenReportVaryingClauses; it binds in the same scope so the refusal is
+                        // not followed by a second, misleading "not defined".)
+                        ctx.Refs.VaryingScope = ScopeOf(v.Enclosing.Concat(v.Group));
+                        if (v.FromCtx is { } fc) v.From = host.Expr.BindExpr(fc);
+                        if (v.ByCtx is { } bc) v.By = host.Expr.BindExpr(bc);
+                    }
+                    // The field's operands see every counter in scope at the field (SR2).
+                    ctx.Refs.VaryingScope = ScopeOf(f.Varyings.Select(u => u.Counter));
+                    // A SOURCE identifier-1 is §13.18.53.4 GR1's implicit MOVE sender: bound HERE through the ONE operand
+                    // binder a MOVE's sending operand takes, which is what knows a subscript, a reference modification,
+                    // a counter of this or another report, a sum counter of the current report, a VARYING counter and a
+                    // constant-name (kb/Work PB1292 × PB1306 × PB1316 × PB1456).
+                    foreach (var rs in f.Sources.OfType<FieldReferenceSource>())
+                    {
+                        if (rs.Rejected) continue;
+                        using var at = ctx.Edition.At(rs.Ref);
+                        var operand = host.Expr.FieldOperand(rs.Ref);
+                        // identifier-1 is a data item, so an index-name is no sender (§13.18.53.3 SR2 — a MOVE shall be
+                        // valid, and §13.18.38.3 r7 admits an index-name in no MOVE).
+                        if (host.Expr.ScreenIndexNameOperand(operand, rs.Written, $"RD '{r.Name}': SOURCE")) rs.Rejected = true;
+                        else rs.Value = operand;
+                    }
+                    // A SOURCE operand written as arithmetic-expression-1, or as identifier-1 under the
+                    // clause's ROUNDED phrase (§13.18.53.3 SR5) — §13.18.53.4 GR2's implicit COMPUTE. The
+                    // expression binds HERE through the same BindExpr a procedure-division reference takes
+                    // (the kb/Work PB482 argument: a subscript may be an index-name or an expression and has
+                    // no value at data bind), and the ROUNDED phrase resolves through the ONE §14.7.4
+                    // rounding-mode reader (kb/Work PB852).
+                    foreach (var cs in f.Sources.OfType<FieldComputeSource>())
+                    {
+                        if (cs.Rejected) continue;
+                        using var at = ctx.Edition.At(cs.Ctx);
+                        cs.Value = host.Expr.BindExpr(cs.Ctx);
+                        cs.Rounding = host.Expr.RoundingOf(cs.Rounded);
+                    }
+                    ctx.Refs.VaryingScope = null;
+                }
+            }
+        foreach (var s in r.Sums)
+        {
+            foreach (var c in s.PresentWhenCtxs) s.PresentWhen.Add(Bind(c));
+            // SUM addends (§13.18.54.3 SR5 — kb/Work PB482). An addend written as identifier-1 is an
+            // ORDINARY IDENTIFIER (§8.4.3.1.2 Format 2, qualified-data-name-with-subscripts), so its VALUE
+            // is bound HERE, through the same `BindExpr` a procedure-division reference takes — which is
+            // what makes `SUM WS-CELL(2)`, `SUM WS-CELL(IX)` and `SUM WS-CELL(IX + 1)` resolve at all: a
+            // subscript may be an arithmetic expression or an index-name, and neither has a value at data
+            // bind. A REJECTED addend is skipped: its rule has already been named, and re-binding it would
+            // report the same words twice under a second clause.
+            foreach (var t in s.Terms)
+                foreach (var a in t.Addends)
+                    if (!a.Rejected)
+                    {
+                        using var at = ctx.Edition.At(a.Ctx);
+                        a.Value = host.Expr.BindExpr(a.Ctx);
+                    }
+            // The SUM clause's own ROUNDED phrase (§13.18.54.2's trailing rounded-phrase) — §13.18.54.4 GR4
+            // computes the counter's delivery to the printable item "according to the general rules for the
+            // COMPUTE statement with the ROUNDED phrase". Same §14.7.4 reader as SOURCE's (kb/Work PB852).
+            s.Rounding = host.Expr.RoundingOf(s.Rounded);
+        }
+    }
+
+    /// <summary>The scope a report entry's clause expression binds in (<see cref="ReferenceResolver.VaryingScope"/>).</summary>
+    private static Dictionary<string, ReportVaryingModel> ScopeOf(IEnumerable<ReportVaryingModel> counters)
+    {
+        var scope = new Dictionary<string, ReportVaryingModel>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in counters) scope[c.Name] = c;
+        return scope;
+    }
+
+    /// <summary>A bare reference to a VARYING counter in scope (ISO §13.18.64.4 GR3/GR4 — "this allows data-name-1 to be
+    /// used as a source data item, as a subscript to a source data item …"): the compose-local integer the placement
+    /// declares. Null for any other reference, and always outside a report entry's clause (§13.18.64.3 SR2 — a counter
+    /// may be referenced only within its entry or a subordinate entry). Asked by the operand and expression binders
+    /// right after the report counters, ahead of name resolution: a counter is "not defined elsewhere in the source
+    /// element" (SR2), so no ordinary name can answer the word.</summary>
+    public BoundExpr? VaryingExpr(Core.DataReferenceContext dref) =>
+        ctx.Refs.VaryingScope is { } scope && dref.dataReferenceSuffix().Length == 0
+            && dref.cobolWord() is { } w && scope.TryGetValue(w.GetText(), out var counter)
+            ? new BoundReportVaryingRef(counter.CsName) : null;
+
     /// <summary><c>INITIATE report-name…</c> (ISO §14.9.21): each name shall be an RD entry (SR1); a multi-name
     /// statement IS a separate INITIATE statement per report-name in written order (§14.9.21.4 GR5) — one
     /// <see cref="BoundInitiate"/> per name inside a <see cref="BoundImplicitSeries"/>, so GR5's second sentence
@@ -294,18 +371,31 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
         if (dref.cobolWord() is { } q)   // qualified: COUNTER OF/IN report-name
         {
             if (RwFindReport(q.GetText()) is { } named) return named;
-            ctx.Edition.Error(DiagnosticCatalog.ReportCounterQualifierNotReport, $"{reg} OF '{q.GetText()}': the qualifier shall name a report "
-                + "description entry (ISO §8.4.3.15.3 SR2 / §8.4.2.2)");
+            ctx.Edition.Error(DiagnosticCatalog.ReportCounterQualification, $"{reg} OF '{q.GetText()}': the qualifier shall name a report "
+                + $"description entry — a counter of a DIFFERENT report is referenced \"qualified explicitly by the report-name "
+                + $"associated with the different report\" (ISO {CounterQualificationRule(reg)}; the qualification requirements "
+                + "for the counters are those of §8.4.2.2, §8.4.3.15.3 SR2)");
             return null;
         }
+        // §8.4.2.2.3 SR9/SR10 — "In the report section, an unqualified reference to the [LINE-COUNTER | PAGE-COUNTER] is
+        // qualified implicitly by the name of the report in whose report description entry the reference is made": the
+        // enclosing RD answers, whatever number of reports the program has (kb/Work PB1456).
+        if (ctx.Refs.ReportScope is { } enclosing) return enclosing;
         // §8.4.6.2.5 — the counters of a GLOBAL report are global; §8.4.6.2.1 rule 3 — the nearest declaring
         // source element's reports hide a container's, so "exactly one report" is asked of the nearest ones.
         var nearest = ctx.Data.NearestInScope(ctx.Data.VisibleReports, r => r);
         if (nearest.Count == 1) return nearest[0];
-        ctx.Edition.Error(DiagnosticCatalog.ReportCounterNoReport, nearest.Count == 0
+        ctx.Edition.Error(DiagnosticCatalog.ReportCounterQualification, nearest.Count == 0
             ? $"{reg} referenced, but the program has no report description entry (ISO §8.4.3.15.1 — the "
               + "counters are generated per report)"
-            : $"unqualified {reg} with more than one report: qualify by report-name (ISO §8.4.3.15.3 SR2 / §8.4.2.2)");
+            : $"unqualified {reg} with more than one report description entry: {reg} shall be qualified each time it is "
+              + $"referenced in the procedure division if more than one report description entry is specified in the "
+              + $"source element (ISO {CounterQualificationRule(reg)})");
         return null;
     }
+
+    /// <summary>The syntax rule that qualifies the register <paramref name="reg"/> — one rule per counter, written as
+    /// the standard writes it (§8.4.2.2.3 SR9 for LINE-COUNTER, SR10 for PAGE-COUNTER).</summary>
+    private static string CounterQualificationRule(string reg) =>
+        reg == "PAGE-COUNTER" ? "§8.4.2.2.3 SR10" : "§8.4.2.2.3 SR9";
 }

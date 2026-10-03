@@ -362,6 +362,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // LINE-COUNTER / PAGE-COUNTER (ISO §8.4.3.15) — RWCS registers, intercepted ahead of name resolution
         // (the LINAGE-COUNTER idiom); a BoundExprError inside the computed wrapper stays loud (§1.4).
         : host.Rw.CounterExpr(dref) is { } rcx ? new BoundComputedOperand(rcx)
+        : host.Rw.VaryingExpr(dref) is { } rvx ? new BoundComputedOperand(rvx)   // a report VARYING counter in scope (§13.18.64.3 SR2)
         : IndexFieldOf(dref) is { } ix ? new BoundComputedOperand(new BoundIndexRef(ix))
         : ConstantOperand(dref) is { } konst ? konst   // a constant-name substitutes its literal (§13.10.3 SR2)
         : ctx.Data.SymbolicOf(dref) is { } sym ? SymbolicOperand(sym)   // a symbolic character is a figurative constant (§12.3.7.4 GR11; PB110)
@@ -442,6 +443,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // LINE-COUNTER / PAGE-COUNTER (ISO §8.4.3.15): in the PROCEDURE DIVISION the registers may appear
         // wherever an integer item may (SR1) — read from the report's engine instance, never storage.
         : host.Rw.CounterExpr(dref) is { } rcx ? rcx
+        : host.Rw.VaryingExpr(dref) is { } rvx ? rvx   // a report VARYING counter in scope (§13.18.64.3 SR2)
         : IndexFieldOf(dref) is { } ix ? IndexNameExpr(dref, ix, context)
         // A constant-name substitutes its literal (§13.10.3 SR2 / §13.10.4 GR1) — in a numeric-expression
         // position only a NUMERIC constant is legal, exactly as for a written literal (§8.8.1.1).

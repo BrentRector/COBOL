@@ -49,15 +49,14 @@ public sealed class ReportSumOperandCaptureDriftTests
         // silence instead of being refused the way COBOLNET2046 refuses a subscripted UPON operand.
         ["ReportOccursOf"] = "OCCURS … DEPENDING ON data-name-1 (§13.18.38.2 Format 3) — a data-name position: "
                              + "qualification only (§8.4.2.2.2 Format 1), no reference modification (§8.4.3.3.3 SR5 NOTE)",
-        // ⚠ THE ONE ARM STILL BARE, AND IT IS THE SAME MECHANISM. §13.18.53's identifier-1 is an identifier
-        // exactly as §13.18.54.3 SR5's is, so a subscripted SOURCE is legal source; the binder drops the
-        // suffix and stages COBOLNET0899 instead (a LOUD compile-time refusal, not a wrong answer, which is
-        // why it is adjudicated rather than fixed here). The clause is being rewritten by kb/Work PB506 in a
-        // sibling landing, so the fix belongs on top of that shape, not underneath it.
-        // ⚠ RENAMED BY kb/Work PB852: `BindSourceOperand` is now the FORM CLASSIFIER (identifier-1 vs
-        // arithmetic-expression-1, §13.18.53.2) and calls no key helper; the identifier arm it delegates to is
-        // `BindSourceReference`, which is where the bare call lives and where the residue above still stands.
-        ["BindSourceReference"] = "SOURCE §13.18.53 identifier-1 — the subscripted/ref-modified operand stages loud; kb/Work PB506 owns this clause",
+        // ⛔ THE SOURCE CLAUSE'S ARM IS NO LONGER ONE OF THESE (kb/Work PB1292). §13.18.53's identifier-1 is an
+        // identifier exactly as §13.18.54.3 SR5's is, and `BindSourceReference` — the one bare capture that dropped
+        // its subscript and reference modification and staged COBOLNET0899 — is DELETED: the identifier is kept as its
+        // WRITTEN reference (`FieldReferenceSource`) and bound in the procedure phase by the one operand binder.
+        // The RD CODE clause's identifier-1 shared that arm, so it keeps the whole reference too and asks the
+        // key helper only for the BASE item its §13.18.12.3 SR2 screen is about:
+        ["ResolveReportCode"] = "RD CODE identifier-1 (§13.18.12.3 SR2) — the screen is over the BASE item's description; the subscript and "
+                                + "reference modification ride in the written reference and bind in the procedure phase",
     };
 
     private static readonly Regex MethodDecl = new(

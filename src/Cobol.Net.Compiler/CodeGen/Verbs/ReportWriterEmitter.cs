@@ -200,27 +200,14 @@ internal sealed class ReportWriterEmitter(
         using IDisposable? guard = tests.Length > 0
             ? w.Block($"if ({string.Join(" && ", tests)})   // presence (§13.18.41.4 GR2b / §13.18.28.4 GR1 / §13.18.38.4 GR13)")
             : null;
-        // VARYING counters (§13.18.64.4 GR3): the first occurrence takes FROM (default 1) and "for the second and
-        // subsequent occurrences, the value of arithmetic-expression-2 is added" — so occurrence n holds
-        // FROM + n × BY. It is written as that CLOSED FORM over the repetition ordinal, not as an accumulator,
-        // because an entry made repeating by an OCCURS clause (§13.18.38 Format 3) is REPLAYED into one field per
-        // repetition and an accumulator local to a field could not span them. The two forms are equal, not
-        // approximately: GR3 adds arithmetic-expression-2 itself, and both operands are landed as integers ONCE
-        // (VaryValue — a noninteger value is GR5's EC-REPORT-VARYING).
-        // ⛔ THE COUNTER IS AN Int128 (kb/Work PB1305). GR1: "an independent temporary integer data item that shall
-        // be large enough to contain the maximum expected value" — the expression's own range, which the numeric
-        // renderer widens to Int128 for any operator. The locals were `long`, so `FROM 2 * 3 - 5` was a CS0266
-        // backend crash on conforming source.
-        for (int k = 0; k < f.Varyings.Count; k++)
-        {
-            w.Line($"Int128 {VaryName(f, k)} = {VaryValue(r, f.Varyings[k], f.Varyings[k].From, "FROM")};   // VARYING {f.Varyings[k].Name} FROM (§13.18.64.4 GR3a)");
-            w.Line($"Int128 {VaryName(f, k)}b = {VaryValue(r, f.Varyings[k], f.Varyings[k].By, "BY")};   // … BY (§13.18.64.4 GR3b)");
-        }
         for (int rep = 0; rep < f.Columns.Count; rep++)
         {
-            for (int k = 0; k < f.Varyings.Count; k++)
-                w.Line($"Int128 {VaryName(f, k)}_{rep} = {VaryName(f, k)} + {f.RepetitionOrdinal + rep} * {VaryName(f, k)}b;"
-                    + $"   // occurrence {f.RepetitionOrdinal + rep + 1} (§13.18.64.4 GR3)");
+            // VARYING counters (§13.18.64.4 GR3/GR4): each placement runs in its OWN block that declares every counter in
+            // scope at the value its declaring entry's occurrence gives it, so a SOURCE, a subscript or a FROM/BY
+            // expression names a counter by its one compose-local variable whichever placement of whichever field reads it.
+            using IDisposable? occurrence = f.Varyings.Count > 0
+                ? w.Block($"// VARYING counters at placement {rep + 1} (§13.18.64.4 GR3)") : null;
+            EmitVaryingCounters(r, f, rep, w);
             var spec = f.Columns[rep];
             // The operand this repetition takes (§13.18.63.4 GR23 / §13.18.53.4 GR4 — the ONE cycling reader is
             // ReportFieldModel.SourceAt). The index is the repetition ORDINAL, so a PRESENT WHEN that suppresses
@@ -287,9 +274,51 @@ internal sealed class ReportWriterEmitter(
         return string.Join(" && ", terms);
     }
 
-    /// <summary>The compose-local name of a VARYING counter (§13.18.64) — keyed by the synthetic print item's
-    /// uid + the counter's index within the entry's VARYING clause.</summary>
-    private static string VaryName(ReportFieldModel f, int k) => $"__rv{f.PrintItem.Uid}_{k}";
+    /// <summary>Declare the VARYING counters in scope at placement <paramref name="rep"/> of <paramref name="f"/> (ISO
+    /// §13.18.64.4 GR3): "For the first occurrence, the value of arithmetic-expression-1 is moved to data-name-1 … For
+    /// the second and subsequent occurrences, the value of arithmetic-expression-2 is added to data-name-1." Occurrence
+    /// <c>n</c> (zero-based) of the DECLARING entry therefore holds FROM + n × BY — written as that CLOSED FORM, not as
+    /// an accumulator, because an entry made repeating by an OCCURS clause (§13.18.38 Format 3) is REPLAYED into one
+    /// field per repetition and an accumulator local to a field could not span them. The two forms are equal, not
+    /// approximately: GR3 adds arithmetic-expression-2 itself, and both operands are landed as integers ONCE
+    /// (<see cref="VaryValue"/> — a noninteger value is GR5's EC-REPORT-VARYING).
+    /// <para>The one case the closed form is NOT the recurrence is §13.18.64.3 SR3's "may be referenced in
+    /// arithmetic-expression-2 of the same VARYING clause": a BY that names a counter of its own entry adds a value that
+    /// changes with each step. That entry's counters are then advanced <c>n</c> times, in clause order, each step adding
+    /// BY evaluated against the counters as the previous step left them (kb/Work PB1306).</para>
+    /// <para>⛔ THE COUNTER IS AN Int128 (kb/Work PB1305). GR1: "an independent temporary integer data item that shall
+    /// be large enough to contain the maximum expected value" — the expression's own range, which the numeric
+    /// renderer widens to Int128 for any operator. The locals were `long`, so `FROM 2 * 3 - 5` was a CS0266
+    /// backend crash on conforming source.</para>
+    /// <para>Counters are declared one DECLARING ENTRY at a time, outermost first, because a counter's FROM and BY may
+    /// name the counters of the entries above it (§13.18.64.3 SR3).</para></summary>
+    private void EmitVaryingCounters(ReportModel r, ReportFieldModel f, int rep, CodeWriter w)
+    {
+        foreach (var entryUses in f.Varyings.GroupBy(u => u.Counter.Group))
+        {
+            var uses = entryUses.ToList();
+            int n = uses[0].Ordinal + (uses[0].PerPlacement ? rep : 0);
+            if (uses.Any(u => u.Counter.Recurrent))
+            {
+                foreach (var u in uses)
+                    w.Line($"Int128 {u.Counter.CsName} = {VaryValue(r, u.Counter, u.Counter.From, "FROM")};"
+                        + $"   // VARYING {u.Counter.Name} FROM (§13.18.64.4 GR3a)");
+                if (n > 0)
+                    w.Line($"for (int __vi = 0; __vi < {n}; __vi++) {{ "
+                        + string.Join(" ", uses.Select(u => $"{u.Counter.CsName} += {VaryValue(r, u.Counter, u.Counter.By, "BY")};"))
+                        + " }   // occurrence " + (n + 1) + ": BY added per step (§13.18.64.4 GR3b, §13.18.64.3 SR3)");
+                continue;
+            }
+            foreach (var u in uses)
+            {
+                string from = VaryValue(r, u.Counter, u.Counter.From, "FROM");
+                w.Line(n == 0
+                    ? $"Int128 {u.Counter.CsName} = {from};   // VARYING {u.Counter.Name}, occurrence 1 (§13.18.64.4 GR3a)"
+                    : $"Int128 {u.Counter.CsName} = {from} + {n} * {VaryValue(r, u.Counter, u.Counter.By, "BY")};"
+                        + $"   // VARYING {u.Counter.Name}, occurrence {n + 1} (§13.18.64.4 GR3)");
+            }
+        }
+    }
 
     /// <summary>A VARYING FROM/BY value as an <see cref="Int128"/> integer C# expression (ISO §13.18.64.4 GR3a/GR3b;
     /// absent ⇒ 1). The value lands in its OWN lane — fixed point unscaled at its scale, binary64, or a
@@ -346,11 +375,16 @@ internal sealed class ReportWriterEmitter(
             case FieldValueSource v:
                 // §13.18.63 — an initialization, NOT the §13.18.53.4 GR1 implicit MOVE (see the remarks above).
                 return Data.ValueImageOf(f.PrintItem, v.Raw);
-            case FieldCounterSource c:
-                // SOURCE LINE-COUNTER / PAGE-COUNTER (§8.4.3.15 SR1) — composed at presentation time, AFTER the
-                // §13.18.35.4 GR6 counter update, so a PH line's LINE-COUNTER prints the PH's own line number.
-                source = new BoundComputedOperand(new BoundReportCounterRef(r, c.IsPage));
+            case FieldReferenceSource { Value: { } operand }:
+                // SOURCE identifier-1 (§13.18.53.4 GR1's implicit MOVE sender), bound by the ONE operand binder: a
+                // storage item with its subscripts and reference modification, a LINE-COUNTER / PAGE-COUNTER (§8.4.3.15
+                // SR1 — composed at presentation time, AFTER the §13.18.35.4 GR6 counter update, so a PH line's
+                // LINE-COUNTER prints the PH's own line number), a sum counter or a VARYING counter. One conversion.
+                source = operand;
                 break;
+            case FieldReferenceSource bad:
+                return LoudValue("string",
+                    $"report {r.Name}: SOURCE '{bad.Written}' was rejected at bind (ISO §13.18.53.3 SR4)");
             case FieldSumSource s:
                 // The SUM counter is the printable entry's source item (§13.18.54.4 GR4 — "the content of the
                 // sum counter is moved, according to the general rules of the MOVE statement, to the printable
@@ -382,14 +416,6 @@ internal sealed class ReportWriterEmitter(
             case FieldComputeSource bad:
                 return LoudValue("string",
                     $"report {r.Name}: SOURCE '{bad.Written}' was rejected at bind (ISO §13.18.53.3 SR4)");
-            case FieldVaryingSource v:
-                // The entry's own VARYING counter as the source item (§13.18.64.4 GR4 NOTE) — the compose-local
-                // counter, re-read at each repetition's placement.
-                source = new BoundComputedOperand(new BoundReportVaryingRef($"{VaryName(f, v.Index)}_{rep}"));
-                break;
-            case FieldDataSource d when d.Item is { } item && refs.ResolveItem(item) is { } place:
-                source = new BoundFieldOperand(place);
-                break;
             default:
                 return LoudValue("string",
                     $"report {r.Name}: SOURCE operand not resolvable to storage (ISO §13.18.53.3 SR4)");
@@ -428,7 +454,7 @@ internal sealed class ReportWriterEmitter(
             {
                 if (code.Literal is { } literal)
                     w.Line($"__RPT_{r.CsIndex}.SetCode(static () => {CsLiteral(literal)});   // CODE literal-1 (§13.18.12.4 GR1)");
-                else if (code.Item is { } codeItem && refs.ResolveItem(codeItem) is { } codePlace)
+                else if (code.Value is { } codePlace)
                     w.Line($"__RPT_{r.CsIndex}.SetCode(() => {CallEmitter.CallStringRead(codePlace)});   // CODE identifier-1 (§13.18.12.4 GR3)");
                 else
                     w.Line(LoudStmt($"report {r.Name}: CODE identifier '{code.Written}' does not resolve to a place this "

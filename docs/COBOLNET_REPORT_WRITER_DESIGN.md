@@ -219,11 +219,30 @@ off-by-one through every later counter check.
     `n < (data-name-1 ∈ [integer-1, integer-2−1] ? data-name-1 : integer-2)`. Every repetition is BOUND
     either way, which is GR23's "VALUE operands are nevertheless assigned to them, even though they are not
     printed".
-  - **VARYING over a replay**: `ReportFieldModel.RepetitionOrdinal` counts placements PER ENTRY, so the
-    §13.18.64.4 GR3 counter is emitted as the closed form `FROM + n × BY` rather than an accumulator — a
-    replayed entry becomes one field per repetition and a field-local accumulator could not span them. The
-    forms are equal, not approximate: GR3 adds arithmetic-expression-2 itself and both operands truncate to
-    scale 0 once.
+  - **A VARYING COUNTER IS THE DATA ITEM OF ITS ENTRY** (§13.18.64; kb/Work PB1306). GR1 gives "each entry
+    containing a VARYING clause" its counter, SR2 scopes it "only within the current entry or a subordinate entry"
+    and SR3 lets a subordinate entry's FROM and BY name it. So the counter is a `ReportVaryingModel` made by
+    `VaryingCountersOf` ONCE per written entry per enclosing occurrence — in `BindReportEntries`, around the entry's
+    replay, so every repetition shares it and a group entry's counter exists though no printable field of its own
+    carries one — and `ReportGroupBuild.Varying` is the scope stack of the entries whose subtree is being bound
+    (the declaring entry, its counters, and the repetition frame whose ordinal is the occurrence in hand). Each
+    printable field snapshots the counters in scope as `ReportVaryingUse`s (counter + the occurrence of its DECLARING
+    entry the placement lies in). GR3's "first occurrence" restarts with every occurrence of an enclosing
+    repeating entry, because the counter is a new instance there. `ScreenReportVaryingClauses` asks SR1/SR2/SR3 once
+    per WRITTEN entry over the flat entry array (so a replay cannot multiply them); the arm of SR2 that asks what ELSE
+    defines the name runs in `ResolveReports`, over `ReportModel.VaryingNames`, once the whole source element is
+    described. A name is read through the scope: `ReportWriterBinder.VaryingExpr` (the operand and expression
+    binders, right after the report counters) and the subscript renderer's `ResolveSubscriptName` both ask
+    `ReferenceResolver.VaryingScope`, set for the span of one entry's clause binding — a counter is no data item,
+    so no name table holds it.
+    **Emission.** Each placement runs in its own `{ }` block (`EmitVaryingCounters`) that declares every counter in
+    scope as the one compose-local `__kv{Uid}` at its occurrence's value, declaring entries outermost first because
+    a FROM or BY may name the counters above it. Occurrence `n` of the declaring entry holds the closed form
+    `FROM + n × BY` — never an accumulator spanning replays, since a replayed entry is one field per repetition. The
+    forms are equal, not approximate: GR3 adds arithmetic-expression-2 itself and both operands truncate to scale 0
+    once. The one exception is a BY that names a counter of its OWN entry (SR3's "same VARYING clause", `Recurrent`):
+    its additions differ with every step, so the entry's counters are advanced `n` times in clause order from FROM
+    (CONFORMANCE.md §3 "VARYING counters of one clause").
   - **SR25, LEG BY LEG** — "The STEP phrase shall be specified if the entry: a) contains an absolute LINE
     clause, or b) has an entry with an absolute LINE clause subordinate to it, or c) contains an absolute
     COLUMN clause, or d) is subordinate to an entry with a LINE clause and has an entry with an absolute
@@ -273,16 +292,26 @@ off-by-one through every later counter check.
   silently summed the whole item, `SUM WS-TXT` over a `PIC X(6)` summed its digits, `UPON <a control footing>`
   and `UPON <an undeclared word>` were accepted and totalled nothing, and a second `SUM … UPON …` group
   overwrote the first. `SUM OF` — the format's optional word, §8.3.2.4.3 — was a parse error.)
-  ⚠ The SOURCE clause's operand (§13.18.53) is the SAME mechanism's other arm and is NOT converted: a
-  subscripted or reference-modified SOURCE still stages COBOLNET0899. `ReportSumOperandCaptureDriftTests`
-  carries that as its one adjudicated `KeyReference` caller, so the residue is visible rather than remembered.
+  ⛔ The SOURCE clause's identifier-1 (§13.18.53) is the SAME mechanism's other arm and IS converted (kb/Work
+  PB1292): it is kept as its written reference (`FieldReferenceSource`) and bound in the procedure phase by the ONE
+  operand binder a MOVE's sending operand takes (`ExpressionBinder.FieldOperand`), which is §13.18.53.4 GR1's
+  "sending operand of an implicit MOVE statement" said as code. That binder already knows every shape an
+  identifier can take, so a subscript, a reference modification, a LINE-/PAGE-COUNTER of this or another report, a
+  sum counter of the current report (`ReferenceResolver.ReportScope` narrows its candidates to the current report,
+  §13.18.53.3 SR4), a VARYING counter in scope and a constant-name each stopped being a separate staged refusal.
+  `ReportSumOperandCaptureDriftTests` no longer carries a `KeyReference` caller for SOURCE; the RD CODE clause's
+  identifier-1 (§13.18.12.2) keeps the whole written reference the same way and asks the key helper only for the
+  BASE item its SR2 screen is about (`ResolveReportCode`).
 - **ONE OPERAND PRODUCTION FOR BOTH VALUE CLAUSES, AND THE BINDER DECIDES THE FORM** (kb/Work PB852 × PB883).
   §13.18.53.2 and §13.18.54.2 print the SAME operand brace — `{ identifier-1 | arithmetic-expression-1 }`, SUM
   adding *data-name-1*, itself an identifier — and both close with `[ rounded-phrase ]`. The grammar therefore
   has ONE `reportValueOperand : arithmeticExpression`, referenced by `reportSourceClause` and `reportSumClause`,
   and ONE `roundedPhrase?` on each (the shared §14.7.4 production, so the 2014 `MODE IS` gate rides along with
-  no report-local rule). `DataBinder.Reports.BareReferenceOf` is the ONE classifier: a tree that is exactly one
-  `dataReference` is the identifier form (§13.18.53.4 GR1's implicit MOVE / §13.18.54.4 GR3's implicit ADD);
+  no report-local rule). `DataBinder.Reports.IdentifierOperandOf` is the ONE classifier (over the syntactic walk
+  `BareReferenceOf`): a tree that is exactly one `dataReference` NOT naming a constant is the identifier form
+  (§13.18.53.4 GR1's implicit MOVE / §13.18.54.4 GR3's implicit ADD) — a bare constant-name is no identifier but
+  arithmetic-expression-1 with one operand (§13.10.3 SR2 with §8.8.1.1; kb/Work PB1316), so a numeric constant is a
+  SOURCE operand and an alphanumeric one is §8.8.1.1's / SR3's refusal;
   anything else, and any operand under the clause's ROUNDED phrase (§13.18.53.3 SR5 — "it is considered to be an
   arithmetic-expression"), is `FieldComputeSource` / an expression `ReportSumAddend`, bound in the PROCEDURE
   phase through the ONE `ExpressionBinder.BindExpr` and rendered into GR2's implicit COMPUTE. The screens are
@@ -351,9 +380,15 @@ off-by-one through every later counter check.
   captures the fixed Format-1 RECORD CONTAINS for the line width; otherwise the width is the widest field
   extent (column + image width − 1) — the §13.18.39.4 GR5 page-width default 999 is a maximum, not a record
   length, and the legacy's hardcoded 132 was arbitrary.
-- **Counters in the PD** (§8.4.3.15): `ReportWriterBinder.CounterExpr` intercepts LINE-/PAGE-COUNTER in `FieldOperand`/`RefExpr`
-  ahead of name resolution (the LINAGE-COUNTER idiom); the OF/IN `cobolWord` is the report-name qualifier;
-  unqualified resolves only against a sole report (SR2/§8.4.2.2). `ReferenceResolver.Resolve` early-returns
+- **Counters** (§8.4.3.15; kb/Work PB1049, PB1456): `ReportWriterBinder.CounterExpr` intercepts LINE-/PAGE-COUNTER in
+  `FieldOperand`/`RefExpr` ahead of name resolution (the LINAGE-COUNTER idiom); the OF/IN `cobolWord` is the report-name
+  qualifier. ONE resolution, `CounterReportOf`, answers which report a counter names, for both directions and both
+  divisions: a qualifier shall name a report description entry (and a counter of a DIFFERENT report is referenced
+  exactly so — §8.4.2.2.3 SR9/SR10's third sentence — in the report section and the procedure division alike); in the
+  PROCEDURE division an unqualified counter resolves only against a sole report; in the REPORT SECTION an unqualified
+  counter "is qualified implicitly by the name of the report in whose report description entry the reference is made"
+  (`ReferenceResolver.ReportScope`, set for the span of one RD's clause binding). A qualification violation is
+  **COBOLNET2729** (`report-counter-qualification`). `ReferenceResolver.Resolve` early-returns
   for the counter tokens — LOAD-BEARING for the qualified form, where `cobolWord()` is the qualifier and
   would otherwise mis-resolve as a base data-name.
 - **Receiving guard**: ALL receiving resolution (MOVE targets, arithmetic resultants ×3, SET targets) goes
@@ -373,8 +408,10 @@ off-by-one through every later counter check.
   `ResolveReports` over report-section-EXCLUSIVE names; a name also in ordinary storage resolves there and is
   exempt); SR17 — GROUP INDICATE ⊥ PRESENT WHEN in one entry; VARYING SR1 — the entry needs OCCURS / multiple
   LINE / multiple COLUMN — all three LIVE vehicles;
-  SR2 — the counter shall not be defined elsewhere (`ByName` probe); SR3 — the counter shall not appear in its
-  own FROM. `SOURCE IS counter` (same entry, unqualified) rebinds to `FieldVaryingSource` (§13.18.64.4 GR4 NOTE).
+  SR2 — the counter shall not be defined elsewhere (a name twice in one entry, a name an enclosing entry defines, a
+  data item or report section name — `ScreenReportVaryingClauses` and `ResolveReports`, once per written entry); SR3 —
+  the counter shall not appear in its own FROM. A counter named in SOURCE, a subscript, FROM or BY resolves through
+  `ReferenceResolver.VaryingScope` (§13.18.64.4 GR4 NOTE; see the VARYING bullet above).
 - **The §13.15.3 CLAUSE-PRESENCE family = COBOLNET2247** (`report-entry-clause-presence`, one bundled code;
   kb/Work PB853), screened by `ScreenReportEntryClausePresence` ONCE per written entry over the flat RD entry
   array, before the walk — the `ScreenReportLineNesting` shape, so a §13.18.38 format 3 replay cannot
@@ -418,9 +455,11 @@ off-by-one through every later counter check.
 - Per line: `private string __RPT_C_{r}_{g}_{l}()` — a space-filled `ReportLineImage` of LineWidth
   (`__RPT_n.NewLine()`), each field placed at its COLUMN (`__RPT_n.Place`) with the image its own clause
   gives it (`ConvertSource` for a SOURCE operand, the VALUE recipe for a VALUE operand — see §3), taken from
-  `ReportFieldModel.SourceAt(rep)` so each repetition of a multiple COLUMN entry gets its own operand. SOURCE counters/sums/VARYING counters render through `NumericRenderer` (`BoundReportCounterRef` /
-  `BoundReportSumRef` / `BoundReportVaryingRef` — one case each; both relation conditions and MOVE sources
-  route through the renderer).
+  `ReportFieldModel.SourceAt(rep)` so each repetition of a multiple COLUMN entry gets its own operand. A SOURCE
+  identifier-1 arrives as the BOUND OPERAND the one operand binder made of it (`FieldReferenceSource.Value`) and takes
+  the same one conversion as every other operand; SOURCE counters/sums/VARYING counters render through `NumericRenderer`
+  (`BoundReportCounterRef` / the sum counter's place / `BoundReportVaryingRef` — one case each; both relation
+  conditions and MOVE sources route through the renderer).
 - Compose-side 2002 decoration (`EmitFieldPlacements`; the plain '85 shape — one absolute operand,
   unconditional, no VARYING, all-absolute line — keeps its exact single-statement emission, the
   characterization-pinned text): a field's PRESENT WHEN chain and its OCCURS … DEPENDING tests (§13.18.38.4
@@ -429,9 +468,10 @@ off-by-one through every later counter check.
   advances the horizontal counter); the line is a `ReportLineImage` (`__RPT_n.NewLine()`) and every item goes
   through the engine's `Place`, which tests the §13.18.14.4 GR4 column overlap against the line's occupancy and
   the GR5 page width (kb/Work PB1188); a multiple COLUMN entry unrolls one `Place` per operand, each with
-  its VARYING counter as the closed form `__rv{uid}_{k} + ordinal × __rv{uid}_{k}b` (§13.18.64.4 GR3; `Int128`
+  its placement's `{ }` block declaring the VARYING counters in scope as `__kv{Uid}` at the closed form
+  `FROM + n × BY` of the declaring entry's occurrence `n` (§13.18.64.4 GR3; `Int128`
   locals; FROM/BY land as integers through `CobolReport.VaryingInteger`, which raises GR5's EC-REPORT-VARYING for
-  a noninteger value — kb/Work PB1305); `int __hc` (emitted only when a
+  a noninteger value — kb/Work PB1305; a BY naming its own entry's counter is the step-by-step form, kb/Work PB1306); `int __hc` (emitted only when a
   relative operand exists) realizes the §13.18.14.4 GR7/GR8/GR9 horizontal counter, and `int __raN` the
   §13.18.38.4 GR12 step anchors of this line's repeating entries.
 - Construction decoration: a group with a conditioned entry gets `__rg.SetPresence(n, __RPT_P_{r}_{g})` (its
@@ -475,8 +515,9 @@ COL/COLS/COLUMNS/NUMBERS/ARE spellings and the GR7–GR9 horizontal counter); **
 all three §13.15.4 GR3 vehicles live, edition-gated 2002.
 
 **The RD CODE clause is LIVE (§13.18.12; kb/Work PB1129).** `ReportModel.Code` (`ReportCodeModel`: literal-1's characters, or
-identifier-1 as the SOURCE clause's own identifier capture — one arm for both clauses, so a subscripted or
-reference-modified identifier stages through the same residue, kb/Work PB1292) is registered on the engine with
+identifier-1 as the WRITTEN reference, kept the way the SOURCE clause keeps its identifier — a subscripted or
+reference-modified identifier is live, its value bound in the procedure phase through the one sending-operand
+resolution, kb/Work PB1292; a reference-modified one needs integer-literal bounds, CONFORMANCE.md §3) is registered on the engine with
 `CobolReport.SetCode(Func<string>)`, and the engine prefixes every line it writes with the characters in force (GR1; the
 compose returns the line alone, GR2, so `RECORD CONTAINS` is the code PLUS the line — `ReportModel.LineWidth` gives the
 code's length up). The one evaluation is `CobolReport.EvaluateCode` (GR3 — "at the start of the processing for each body
@@ -496,10 +537,8 @@ correspondence rules — a name with no RD (§13.18.46.3 SR1), a name in two REP
 (§13.14.3 SR1) — are COBOLNET2714 (`ScreenReportClauseNames`, the file resolution in `ResolveReports`).
 
 **Staged LOUD at bind (`COBOLNET0899`, Edition.Error — legal-but-unimplemented, never silent):**
-**a VARYING counter inside a FROM/BY expression (the §13.18.64.3 SR3-legal BY
-self-reference; `report-varying-counter-in-expression`)**; **FUNCTION inside a PRESENT WHEN condition
-(`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; subscripted/ref-modified
-SOURCE; SOURCE of another report's counter; rolled SUM totals (§13.18.54.3 SR4 / §13.18.54.4 GR6 — a
+**FUNCTION inside a PRESENT WHEN condition
+(`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; rolled SUM totals (§13.18.54.3 SR4 / §13.18.54.4 GR6 — a
 report-section addend); cross-report SUM (a SUM addend qualified by a report-name, SR4 g); a cross-report
 `UPON` detail (GR7 c 2); an arithmetic-expression-1 SUM addend written with a LEADING PARENTHESIS
 (`SUM (A * B)` — the lexer's §8.4.3.2.3 SR2 keyword-omitted-intrinsic trigger on the SUM token pushes

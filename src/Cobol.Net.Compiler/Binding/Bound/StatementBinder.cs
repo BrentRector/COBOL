@@ -193,6 +193,14 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         refs.RefModCheckingAt ??= line => Ctx.EcState.Turn.Enabled("EC-BOUND-REF-MOD", null, line);
     }
 
+    /// <summary>The ONE guard in front of <see cref="ReportWriterBinder.BindReportGroupClauses"/>: bind the report-section
+    /// clause expressions of the reports THIS unit declares, when it declares any. A program unit and a class's method
+    /// roster both ask it, so no unit kind can forget the procedure phase of its own reports.</summary>
+    private void BindDeclaredReportClauses()
+    {
+        if (Ctx.Data.Reports.Count > 0) Rw.BindReportGroupClauses();
+    }
+
     /// <summary>Bind a program unit's PROCEDURE DIVISION into a <see cref="BoundProgram"/>.</summary>
     public BoundProgram Bind(Core.ProgramUnitContext program)
     {
@@ -200,7 +208,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // Report-section PRESENT WHEN conditions + VARYING expressions (§13.18.41/§13.18.64) bind through the
         // procedure-phase binders (they resolve ordinary data references) — before statement binding, and even
         // for a PD-less unit (the report emission does not require a PROCEDURE DIVISION).
-        if (Ctx.Data.Reports.Count > 0) Rw.BindReportGroupClauses();
+        BindDeclaredReportClauses();
         if (program.procedureDivision() is not { } pd) return new BoundProgram([]);
         Ec.EcCollectPdRaising(pd);   // the PD-header RAISING list (§14.2.1) — consumed by the GOBACK/EXIT SR2 check
         var table = Ctx.Table;
@@ -249,6 +257,10 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     public BoundProgram BindMethodRoster(OoClassSymbol cls, IReadOnlyList<OoMethodSymbol> roster)
     {
         AttachSegmentMaterializer();
+        // The report section of an object or factory binds its PRESENT WHEN / VARYING / SOURCE / SUM operands exactly
+        // as a program unit's does, once, before any method body — a report operand is a written reference bound in the
+        // PROCEDURE phase (kb/Work PB482, PB1292), and a class's methods are where that phase runs for it.
+        BindDeclaredReportClauses();
         var used = new HashSet<string>(StringComparer.Ordinal);
         var methods = new List<BoundMethod>(roster.Count);
         var table = Ctx.Table;

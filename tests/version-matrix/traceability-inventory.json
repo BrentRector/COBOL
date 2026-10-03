@@ -5406,13 +5406,13 @@
   "ordinal": 3,
   "subject": "Qualification",
   "rule-digest": "5e8ef35c6e65",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportVaryingModel; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldVaryingSource; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportVaryingModel; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveSubscriptName; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#VaryingExpr",
+  "test-ref": "conformance:2002/pb1306_varying_scope; conformance:2002/pb1292_source_operand_forms",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1306 (registrar 15c). cite.py --check 8.4.2.2.1 \"It is unique within the context of a VARYING clause\" -> OK §8.4.2.2.1 3). The VARYING context is fixed by §13.18.64.3 SR2 (--check OK): \"Data-name-1 shall not be defined elsewhere in the source element, except as data-name-1 in another VARYING clause of an entry not subordinate to the subject of the current entry\" and (--check OK) \"This definition of data-name-1 may be referenced only within the current entry or a subordinate entry\"; §13.18.64.4 GR4 NOTE (--check OK) names use \"as a source data item, as a subscript to a source data item\". VERIFIED HALF: two non-subordinate entries of one report group may each declare VARYING K, and each entry's own unqualified SOURCE K binds its own counter - probe c1 (DET-A: two LINE entries, OCCURS 3 STEP 3, `VARYING K FROM 2 BY 3 SOURCE K` and `VARYING K FROM 1 BY 1 SOURCE K`) compiles at 2002/2023 and prints `2  5  8` / `1  2  3`. DIVERGENT HALF: the counter is visible ONLY to the declaring entry's own SOURCE (the varyings list is per-entry and FieldVaryingSource matches only `varyings` of the same entry), so a SUBORDINATE entry's unqualified reference - legal and unique in the VARYING context - is rejected: probe c2 (`03 OCCURS 2 TIMES STEP 10 VARYING K FROM 1 BY 1.` / `04 COLUMN 1 PIC 9 SOURCE K.`) -> error COBOLNET0899 \"SOURCE 'K' does not resolve to a data item (ISO §13.18.53.3 SR4)\" at --std 2002 and 2023; spec-derived expected: compiles and prints `1` at column 1 and `2` at column 11. (A subscript use, SOURCE WS-E(K), is refused by the separate staged-loud 'subscripted SOURCE operand not yet implemented' COBOLNET0899 stage that CONFORMANCE.md A.4.11 already itemizes as a staged SOURCE leg - not this mechanism.) No kb/Work note owns the subordinate-entry scope gap (PB565 landed the repetition vehicle; PB215 is the class screen). Test-ref empty: no golden exercises a reused or subordinate-referenced VARYING name. [editions as adjudicated: 2002, 2014, 2023 (the VARYING clause of §13.18.64 is a report-writer/VALIDATE clause first standardized in ISO/IEC 1989:2002; the VALIDATE use is a declined module, A.4.14)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1306 landed. cite.py --check 8.4.2.2.1 'It is unique within the context of a VARYING clause' OK (rule 3). The VARYING context is 13.18.64.3 SR2's scope: a counter name is unqualified wherever it is in scope - its own entry and every subordinate entry's SOURCE, subscripts, FROM and BY (pb1306_varying_scope, pb1292_source_operand_forms) - and, because SR2 forbids defining the name elsewhere, no other item can answer it. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldVaryingSource (FieldVaryingSource is deleted; the counter name is read through ReferenceResolver.VaryingScope)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.2.1-4",
@@ -5586,13 +5586,13 @@
   "ordinal": 9,
   "subject": "Qualification",
   "rule-digest": "d7c03492728d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn",
+  "test-ref": "conformance:85/pb1456_other_report_counters_85; conformance:negative/pb1456-counter-qualified-by-report-group; conformance:negative/pb1049-unqualified-counter-two-reports",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1456 (registrar 15c). cite.py --check 8.4.2.2.3 \"LINE-COUNTER shall be qualified each time it is referenced in the procedure division\" -> OK §8.4.2.2.3 9). The rule has THREE sentences. (1) PROCEDURE DIVISION, more than one RD: qualification required. VERIFIED that the qualified forms bind to the named report and that an unqualified reference is refused - probe h3 (two RDs R1/R2; GENERATE D2 x3, D1 x2; MOVE LINE-COUNTER OF R1 / LINE-COUNTER IN R2) -> H1=002 003 at 2002/2023; probe h2 (MOVE PAGE-COUNTER TO W1 with two RDs) -> refused - but as COBOLNET0899 'unqualified PAGE-COUNTER with more than one report' (the not-yet-implemented band) instead of the syntax-rule violation it is: exactly kb/Work PB1049 (OPEN, owns SR-8.4.2.2.3-9 and -10). With ONE RD the unqualified form is legal and reads the counter (probe g1: MOVE LINE-COUNTER TO W1 -> 002, PAGE-COUNTER IN R1 -> 001). (2) REPORT SECTION, unqualified = the own report: VERIFIED - probe h3 R1's `SOURCE LINE-COUNTER` and `SOURCE LINE-COUNTER IN R1` print R1's own counters (01/02, page 01) while R2's independent LINE-COUNTER prints 01/02/03. (3) REPORT SECTION, 'Whenever the LINE-COUNTER of a different report is referenced, LINE-COUNTER shall be qualified explicitly by the report-name associated with the different report' - the explicitly qualified cross-report reference is REJECTED: probe h1 (R1 entry `SOURCE LINE-COUNTER OF R2`, R2 entry `SOURCE PAGE-COUNTER OF R1`) -> error COBOLNET0899 'SOURCE LINE-COUNTER OF R2 - a counter of another report (ISO §8.4.3.15.3 SR2) is not yet implemented' at 2002 and 2023. Spec-derived expected: compiles, and the column prints the OTHER report's counter at the time the line is printed (§8.4.3.15.3 SR1 admits a report counter in a SOURCE clause; §13.18.53.3 SR4 admits 'a report counter identifier'; this rule's third sentence presupposes the reference). No kb/Work note owns sentence (3) (PB1049 covers sentence (1)'s misreport only) - see findings. Separately observed (not this rule's mechanism, listed in dossier_gaps): `DISPLAY LINE-COUNTER` compiles clean and aborts the run unit with NotImplementedCobolFeatureException 'computed expression in a string context'. No golden pins multi-report counter qualification (pb429 has one RD), so test-ref is empty. [editions as adjudicated: 85, 2002, 2014, 2023 (the report writer and its LINE-COUNTER/PAGE-COUNTER exist in every edition; A.4.11 Report Writer is claimed Partial in docs/CONFORMANCE.md)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1049 + PB1456 landed. cite.py --check 8.4.2.2.3 'LINE-COUNTER shall be qualified each time it is referenced in the procedure division if more than one report description entry is specified in the source element' OK (SR9, three sentences). (1) procedure division, more than one RD: an unqualified counter is COBOLNET2729 (the syntax-rule code, no longer the not-yet-implemented band). (2) report section: unqualified is the enclosing RD's. (3) a different report's counter is qualified explicitly by its report-name and is legal (LINE-COUNTER OF R2: pb1456_other_report_counters_85); a qualifier that names a report group is COBOLNET2729.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.2.3-10",
@@ -5601,13 +5601,13 @@
   "ordinal": 10,
   "subject": "Qualification",
   "rule-digest": "560a5326eadc",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn",
+  "test-ref": "conformance:85/pb1456_other_report_counters_85; conformance:2002/pb1456_counter_in_source_expression; conformance:negative/pb1049-unqualified-counter-two-reports",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1456 (registrar 15c). cite.py --check 8.4.2.2.3 \"PAGE-COUNTER shall be qualified each time it is referenced in the procedure division\" -> OK §8.4.2.2.3 10). The rule has THREE sentences. (1) PROCEDURE DIVISION, more than one RD: qualification required. VERIFIED that the qualified forms bind to the named report and that an unqualified reference is refused - probe h3 (two RDs R1/R2; GENERATE D2 x3, D1 x2; MOVE LINE-COUNTER OF R1 / LINE-COUNTER IN R2) -> H1=002 003 at 2002/2023; probe h2 (MOVE PAGE-COUNTER TO W1 with two RDs) -> refused - but as COBOLNET0899 'unqualified PAGE-COUNTER with more than one report' (the not-yet-implemented band) instead of the syntax-rule violation it is: exactly kb/Work PB1049 (OPEN, owns SR-8.4.2.2.3-9 and -10). With ONE RD the unqualified form is legal and reads the counter (probe g1: MOVE LINE-COUNTER TO W1 -> 002, PAGE-COUNTER IN R1 -> 001). (2) REPORT SECTION, unqualified = the own report: VERIFIED - probe h3 R1's `SOURCE PAGE-COUNTER` and `SOURCE LINE-COUNTER IN R1` print R1's own counters (01/02, page 01) while R2's independent LINE-COUNTER prints 01/02/03. (3) REPORT SECTION, 'Whenever the PAGE-COUNTER of a different report is referenced, PAGE-COUNTER shall be qualified explicitly by the report-name associated with the different report' - the explicitly qualified cross-report reference is REJECTED: probe h1 (R1 entry `SOURCE LINE-COUNTER OF R2`, R2 entry `SOURCE PAGE-COUNTER OF R1`) -> error COBOLNET0899 'SOURCE LINE-COUNTER OF R2 - a counter of another report (ISO §8.4.3.15.3 SR2) is not yet implemented' at 2002 and 2023. Spec-derived expected: compiles, and the column prints the OTHER report's counter at the time the line is printed (§8.4.3.15.3 SR1 admits a report counter in a SOURCE clause; §13.18.53.3 SR4 admits 'a report counter identifier'; this rule's third sentence presupposes the reference). No kb/Work note owns sentence (3) (PB1049 covers sentence (1)'s misreport only) - see findings. Separately observed (not this rule's mechanism, listed in dossier_gaps): `DISPLAY LINE-COUNTER` compiles clean and aborts the run unit with NotImplementedCobolFeatureException 'computed expression in a string context'. No golden pins multi-report counter qualification (pb429 has one RD), so test-ref is empty. [editions as adjudicated: 85, 2002, 2014, 2023 (the report writer and its LINE-COUNTER/PAGE-COUNTER exist in every edition; A.4.11 Report Writer is claimed Partial in docs/CONFORMANCE.md)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1049 + PB1456 landed. cite.py --check 8.4.2.2.3 'PAGE-COUNTER shall be qualified each time it is referenced in the procedure division if more than one report description entry is specified in the source element' OK (SR10), the PAGE-COUNTER twin of SR9 through the same CounterReportOf: (PAGE-COUNTER OF R1 + 100) = 101 then 140 after MOVE 40 TO PAGE-COUNTER OF R1, and the unqualified (PAGE-COUNTER + 100) in R2's own report section is R2's own counter although the program has two reports (pb1456_counter_in_source_expression).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.3.3-1",
@@ -5931,13 +5931,13 @@
   "ordinal": 12,
   "subject": "Identifier",
   "rule-digest": "19a3254d327a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Compiler/Binding/DataBinder.cs",
-  "test-ref": "conformance:85/pb429_page_counter_receiving",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Compiler/Binding/DataBinder.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf",
+  "test-ref": "conformance:85/pb429_page_counter_receiving; conformance:85/pb1456_other_report_counters_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1049 (registrar 15b). SR12 (cite.py --check 8.4.3.1.3 12) OK): qualified-report-counter is defined in 8.4.2.2 ({LINE-COUNTER|PAGE-COUNTER} [ {OF|IN} report-name ]). Grammar arms carry the optional qualifier; the spec-derived golden pb429 writes `MOVE 7 TO PAGE-COUNTER OF RPT1` and reads it back 0007. The run-time abort of this identifier in string contexts (r1.cob) is recorded against FMT-8.4.3.1.2. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — Format 11 is imported from 8.4.2.2, whose SR9/SR10 third sentence requires, and so presupposes, an explicitly qualified reference to a DIFFERENT report's counter in the report section. That legal Format 11 identifier is refused as staged COBOLNET0899. The procedure-division qualified forms work (pb429, and the adjudicator's probe). [code-location note: (LINE_COUNTER / PAGE_COUNTER arms)] || editions as written by the adjudicator: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1049 landed. cite.py --check 8.4.3.1.3 'Qualified-report-counter-1 is defined in 8.4.2.2, Qualification.' OK (SR12). The qualified report counter of a DIFFERENT report is legal in the report section (pb1456_other_report_counters_85) and in the procedure division (pb429_page_counter_receiving's MOVE 7 TO PAGE-COUNTER OF RPT1); an illegal qualifier is COBOLNET2729.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.1.4-1",
@@ -7611,13 +7611,13 @@
   "ordinal": 2,
   "subject": "Report counters",
   "rule-digest": "e9049cb5bba6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#RefExpr",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#RefExpr",
+  "test-ref": "conformance:85/pb1456_other_report_counters_85; conformance:2002/pb1456_counter_in_source_expression; conformance:negative/pb1456-counter-qualified-by-report-group",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1456 (registrar 15c). SR2 (--check 8.4.3.15.3 \"Qualification requirements for PAGE-COUNTER and LINE-COUNTER are defined by 8.4.2.2\" -> OK 2)) delegates to §8.4.2.2.3 SR9/SR10 (--check 8.4.2.2.3 \"In the report section, an unqualified reference to the PAGE-COUNTER is qualified implicitly by the name of the report in whose report description entry the reference is made\" -> OK 10); \"Whenever the PAGE-COUNTER of a different report is referenced, PAGE-COUNTER shall be qualified explicitly by the report-name associated with the different report\" -> OK 10); LINE-COUNTER twin -> OK 9)). Conforming halves: procedure division qualified refs resolve per report (rcq7 LC1=0004 LC2=0005); unqualified with 2 RDs rejected (rcq2 - wording/code owned by open kb/Work PB1049); qualifier naming a non-report data item rejected (rcq4); a bare SOURCE LINE-COUNTER/PAGE-COUNTER in the 2nd RD takes its own report (rcq7 '05 01'); SOURCE (PAGE-COUNTER OF R2 + 100) in R2 -> 101 (rcq8). Diverging (rejects legal source): (a) SOURCE PAGE-COUNTER OF R1 inside RD R2 -> COBOLNET0899 'a counter of another report ... is not yet implemented' (rcq3) - SR9/SR10's last sentence is the rule that makes it legal and the code comment concedes 'legal'; design doc lists it as staged-loud; NO kb/Work note owns it. (b) the expression form SOURCE (PAGE-COUNTER OF R1 + 100) in R2 -> COBOLNET2144 claiming it is 'neither a report counter nor a sum counter of this report' (rcq5) - it IS a report counter; §13.18.53.3 SR4 (--check OK 4)) says 'a report counter identifier or a sum counter defined in the current report', and SR9/SR10 contemplate a different report's counter in the report section. (c) an UNQUALIFIED counter inside a SOURCE arithmetic-expression of a 2-RD program -> COBOLNET0899 'unqualified PAGE-COUNTER with more than one report' with no source location (rcq1) - the procedure-division rule applied in the report section, where SR10 qualifies it implicitly (single-RD twin rce1 prints 103, correct). (d) SOURCE LINE-COUNTER OF D2 (a report group, not a report) is reported as 'not yet implemented' rather than as the qualification violation (rcq6). probe dir E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d2\\out\\probe\\report-counters [editions as adjudicated: 1985 (Report Writer optional module), 2002, 2014, 2023 - clause 8.4.3.15 text]",
-  "state": "GAP"
+  "notes": "kb/Work PB1456 landed. cite.py --check 8.4.3.15.3 'Qualification requirements for PAGE-COUNTER and LINE-COUNTER are defined by 8.4.2.2, Qualification.' OK (SR2). The requirements are 8.4.2.2.3 SR9/SR10: in the report section an unqualified counter is the enclosing RD's (ReferenceResolver.ReportScope), a counter of a DIFFERENT report is qualified explicitly by its report-name - as a SOURCE identifier (PAGE-COUNTER OF R1) and inside an expression ((PAGE-COUNTER OF R1 + 100)); a qualifier that is no report is COBOLNET2729. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference staged the qualified counter of another report loud; a counter is bound by the one operand/expression binder through CounterReportOf)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.15.3-3",
@@ -27727,11 +27727,11 @@
   "subject": "SOURCE clause",
   "rule-digest": "2b578ec97a81",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/MoveTable16.cs",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/MoveTable16.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldReferenceSource",
   "test-ref": "",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1293. \"If identifier-1 is specified without the ROUNDED phrase, identifier-1 shall be described such that a MOVE statement is valid with identifier-1 as the sending operand and the printable item as the receiving operand.\" (cite.py --check 13.18.53.3 OK SR2; validity per §14.9.25.3 SR10 Table 16, cite.py OK). MoveTable16.Validity - the one MOVE validity chain used by MoveBinder, INITIALIZE, CORRESPONDING, ACCEPT - has NO caller in the report lane. Probes: n4 `COLUMN 12 PIC A(2) SOURCE WS-NUM` (numeric integer -> alphabetic: Table 16 'No') compiles clean and prints `00`; n4b `PIC 9(2) SOURCE WS-AL` (alphabetic -> numeric: 'No') compiles clean and prints `00`. The control n4c `MOVE WS-NUM TO WS-R2` (PIC A) in the procedure division IS refused COBOLNET0819. Expected: a compile-time diagnostic. Under-rejects (finding F3). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm)",
+  "notes": "Owned by kb/Work PB1293. \"If identifier-1 is specified without the ROUNDED phrase, identifier-1 shall be described such that a MOVE statement is valid with identifier-1 as the sending operand and the printable item as the receiving operand.\" (cite.py --check 13.18.53.3 OK SR2; validity per §14.9.25.3 SR10 Table 16, cite.py OK). MoveTable16.Validity - the one MOVE validity chain used by MoveBinder, INITIALIZE, CORRESPONDING, ACCEPT - has NO caller in the report lane. Probes: n4 `COLUMN 12 PIC A(2) SOURCE WS-NUM` (numeric integer -> alphabetic: Table 16 'No') compiles clean and prints `00`; n4b `PIC 9(2) SOURCE WS-AL` (alphabetic -> numeric: 'No') compiles clean and prints `00`. The control n4c `MOVE WS-NUM TO WS-R2` (PIC A) in the procedure division IS refused COBOLNET0819. Expected: a compile-time diagnostic. Under-rejects (finding F3). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm) retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted (kb/Work PB1292); identifier-1 is FieldReferenceSource, bound by the one operand binder a MOVE's sending operand takes - the verdict and every other field of the row are untouched)",
   "state": "GAP"
  },
  {
@@ -27756,13 +27756,13 @@
   "ordinal": 4,
   "subject": "SOURCE clause",
   "rule-digest": "35eadd3ffa70",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFamilyFor",
+  "test-ref": "conformance:85/pb1292_source_forms_85; conformance:negative/pb1292-source-names-report-section-item",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1292. \"Identifier-1 specifies a data item defined in any section of the data division. If identifier-1 specifies a report section item, it shall be a report counter identifier or a sum counter defined in the current report. This same Syntax rule applies to any identifier appearing in arithmetic-expression-1.\" (cite.py --check 13.18.53.3 OK SR4). VERIFIED: WS items and LINE-COUNTER accepted (p6); a report-section printable item `SOURCE PRN` refused (n2, as 'does not resolve'); inside an expression the rule is enforced exactly (ReportSectionNameIn with the current report; `SOURCE (RUNTOT + 0)` accepted and prints the counter, p7). DEFECT - TWO-ARM DISPATCH: the identifier-1 arm resolves through LookupQualified, which does not see sum counters, so `SOURCE RUNTOT` naming a sum counter of the CURRENT report - the case SR4 expressly admits - is refused COBOLNET0899 'SOURCE 'RUNTOT' does not resolve to a data item (ISO §13.18.53.3 SR4)' (p3/p4). Rejects legal source (finding F2). Side note: a counter qualified by ANOTHER report name is staged COBOLNET0899 'not yet implemented' (ReportSourceOtherReportCounter) although SR4's 'defined in the current report' arguably forbids it - loud either way, not charged. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm via LookupQualified | FieldComputeSource arm via ReportSectionNameIn)",
-  "state": "GAP"
+  "notes": "kb/Work PB1292 landed. cite.py --check 13.18.53.3 'If identifier-1 specifies a report section item, it shall be a report counter identifier or a sum counter defined in the current report' OK (SR4). One walk (ReportSectionNameIn) screens identifier-1 and every identifier of arithmetic-expression-1: an own-report sum counter is a SOURCE identifier (SOURCE RUNTOT = 0005 0007, then 0000 at the control footing; a name two reports share is the current report's, ReferenceResolver.ReportScope), a report counter is admitted, any other report section item is COBOLNET2144 (negative). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted; the SR4 screen is ReportSectionNameIn over identifier-1 and every identifier of arithmetic-expression-1)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.53.3-5",
@@ -27817,11 +27817,11 @@
   "subject": "SOURCE clause",
   "rule-digest": "cc90a5a90e8d",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldReferenceSource",
   "test-ref": "",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "Owned by kb/Work PB1293. \"Identifier-1 shall not reference a variable-length group.\" (cite.py --check 13.18.53.3 OK SR8); definition §8.5.1.12.1 'A variable-length group is a group item whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate item' (cite.py --check 8.5.1.12.1 OK - an ODO group is NOT one; probe n5 with an ODO group correctly compiles). Probe out13/probe/source-clause/n5b: `01 WS-VG2. 05 WS-VD PIC X DYNAMIC LENGTH.` with `COLUMN 12 PIC X(2) SOURCE WS-VG2` COMPILES CLEAN and then CRASHES at GENERATE: NotImplementedCobolFeatureException 'whole-group image of 'WS-VG2' with a dynamic-length / dynamic-capacity member ... deferred'. Control n5c: `MOVE WS-VG2 TO WS-R2` in the procedure division is refused COBOLNET1931 (§14.9.25.3 SR9). Expected: compile-time rejection. Under-rejects, with a run-time crash (finding F3). || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (a variable-length group needs a dynamic-length elementary item or dynamic-capacity table, which do not exist before 2014) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm)",
+  "notes": "Owned by kb/Work PB1293. \"Identifier-1 shall not reference a variable-length group.\" (cite.py --check 13.18.53.3 OK SR8); definition §8.5.1.12.1 'A variable-length group is a group item whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate item' (cite.py --check 8.5.1.12.1 OK - an ODO group is NOT one; probe n5 with an ODO group correctly compiles). Probe out13/probe/source-clause/n5b: `01 WS-VG2. 05 WS-VD PIC X DYNAMIC LENGTH.` with `COLUMN 12 PIC X(2) SOURCE WS-VG2` COMPILES CLEAN and then CRASHES at GENERATE: NotImplementedCobolFeatureException 'whole-group image of 'WS-VG2' with a dynamic-length / dynamic-capacity member ... deferred'. Control n5c: `MOVE WS-VG2 TO WS-R2` in the procedure division is refused COBOLNET1931 (§14.9.25.3 SR9). Expected: compile-time rejection. Under-rejects, with a run-time crash (finding F3). || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (a variable-length group needs a dynamic-length elementary item or dynamic-capacity table, which do not exist before 2014) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm) retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted (kb/Work PB1292); identifier-1 is FieldReferenceSource - the verdict and every other field of the row are untouched)",
   "state": "GAP"
  },
  {
@@ -27831,13 +27831,13 @@
   "ordinal": 1,
   "subject": "SOURCE clause",
   "rule-digest": "15e4a58899d3",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#FieldImage; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.Source_Gr1_ImplicitMoveEditsThroughPicture",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldReferenceSource; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindReportClauses",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.Source_Gr1_ImplicitMoveEditsThroughPicture; conformance:85/pb1292_source_forms_85; conformance:2002/pb1292_source_operand_forms",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1292. \"If identifier-1 is specified without the ROUNDED phrase, it specifies the sending operand of an implicit MOVE statement in which the data item referenced by identifier-1 is moved to the printable item.\" (cite.py --check 13.18.53.4 OK GR1). VERIFIED: numeric -> numeric-edited ZZ9 edits (`  5`), alphanumeric group -> X(6) (`GG12  ` padded), X(4) -> X(2) truncated right (`WX`), numeric integer 005 -> X(2) as alphanumeric (`00`, n6), LINE-COUNTER -> 99 (probe out13/probe/source-clause/p6 output `[  5 GG12   WX 01 0005 0005]`). The implicit MOVE runs through the one MOVE conversion (CSharpEmitter.ConvertSource). NOT VERIFIED / REFUSED: a subscripted identifier-1 (`SOURCE WS-T(2)`, n1) and a reference-modified one (`SOURCE WS-X(2:2)`, n1b) are refused COBOLNET0899 'a subscripted or reference-modified SOURCE operand (ISO §13.18.53) is not yet implemented' (BindSourceReference); a sum-counter identifier-1 is refused (F2). The same identifiers work inside an arithmetic-expression operand, so the gap is the identifier arm only. Rejects legal source (finding F1). No kb/Work note owns this staging. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm)",
-  "state": "GAP"
+  "notes": "kb/Work PB1292 landed. cite.py --check 13.18.53.4 'If identifier-1 is specified without the ROUNDED phrase, it specifies the sending operand of an implicit MOVE statement in which the data item referenced by identifier-1' OK (GR1). A SUBSCRIPTED (WS-T(2) = T2, WS-T(WS-SUB - 1) = T2), REFERENCE-MODIFIED (WS-X(2:2) = XY), counter-subscripted and constant (KC = 5) identifier-1 are all the implicit MOVE's sender - one operand binder, one conversion (pb1292_source_forms_85, pb1292_source_operand_forms). Fails on the staged COBOLNET0899 ReportSourceSubscripted. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference captured name + qualifiers and staged a subscript or reference modification loud; identifier-1 is now kept as its written reference (FieldReferenceSource) and bound by the one operand binder a MOVE's sending operand takes)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.53.4-2",
@@ -28086,13 +28086,13 @@
   "ordinal": 5,
   "subject": "SUM clause",
   "rule-digest": "a87f7ccf0507",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/Model/Place.cs#ReportSumCounterPlace; src/Cobol.Net.Compiler/Binding/DataBinder.cs#SumCounters",
-  "test-ref": "conformance:85/pb882_report_sum_counter_identity",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/Model/Place.cs#ReportSumCounterPlace; src/Cobol.Net.Compiler/Binding/DataBinder.cs#SumCounters; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindReportClauses",
+  "test-ref": "conformance:85/pb882_report_sum_counter_identity; conformance:85/pb1292_source_forms_85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1292. GR5 'the data-name is the name of the sum counter, not the name of the associated printable item, if any' (cite.py --check OK). The data-name resolves to ReportSumCounterPlace (the counter), read at the counter's scale; golden reads CF-U after TERMINATE as the counter value 00 and the altered counter prints 0511. Ambiguous shared names diagnosed (COBOLNET2145, conformance:negative/pb882-sum-counter-ambiguous). kb/Work PB840/PB882 landed. || REFUTED: PARTIAL — The procedure division works: an unqualified name, or one qualified by report-name, reaches the counter (MOVE, ADD, SUBTRACT, COMPUTE, read after TERMINATE; SN=-7, R5 -018 vs R6 103). Two legal references to the sum counter's data-name fail. (a) Qualifying the counter by the name of its containing group, as in MOVE SC OF CFG TO WS-X, is refused with COBOLNET2145 'may be qualified only by the report-name'. But §13.15.3 SR7 explicitly lists a report group data-name 'as a qualifier for a SUM counter', and §8.4.2.2.2 Format 1 allows data-qualifiers before the report qualifier. (b) SOURCE SN inside the report (in the same group or in a DE group) draws COBOLNET0899 'does not resolve to a data item', whether the counter is printable or not. The FieldDataSource arm uses only LookupQualified over ordinary storage, yet §13.18.53.3 SR4 admits 'a sum counter defined in the current report'. No kb/Work note owns either case (grep of kb/Work for 0899 plus sum counter SOURCE finds none). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB840 + PB882 + PB1454 + PB1292 landed. GR5 'the data-name is the name of the sum counter, not the name of the associated printable item, if any' (cite.py --check 13.18.54.4 OK). The data-name resolves to ReportSumCounterPlace in the procedure division (MOVE, ADD, SUBTRACT, COMPUTE, read after TERMINATE; group-qualified, PB1454) AND as a SOURCE identifier of the current report (pb1292_source_forms_85: SOURCE RUNTOT).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-6",
@@ -31161,13 +31161,13 @@
   "ordinal": 2,
   "subject": "VARYING clause",
   "rule-digest": "2d4b66c4541f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportVaryingClauses; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
+  "test-ref": "conformance:2002/pb1306_varying_scope; conformance:negative/pb1306-varying-name-reused-in-subordinate; conformance:negative/pb1306-varying-name-defined-twice-in-entry; conformance:negative/pb1306-varying-counter-referenced-outside-its-entry",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1306. cite.py --check 13.18.64.3 'except as data-name-1 in another VARYING clause of an entry not subordinate to the subject of the current entry' OK (SR2). 'Defined elsewhere' as an ordinary data item is diagnosed (probe vsr2def: VARYING WS-F -> COBOLNET1559 SR2) and sibling reuse is accepted as independent (probe vsr2sib). DIVERGES (under-rejects): (a) the same name twice in ONE clause `VARYING K FROM 1 K FROM 2` compiles and runs (probe probe/varying-clause/vsr2dup, prints 1 2 3) - the loop checks only ByName, never the VARYING names against each other; (b) reuse in a SUBORDINATE entry `03 OCCURS 2 ... VARYING K. 04 ... VARYING K SOURCE K.` compiles (probe vsr2sub) because the group entry's counter is never recorded (F2). Also the reference-scope sentence ('may be referenced only within the current entry or a subordinate entry') is enforced only by accident of name resolution and fails its legal half (subordinate references rejected, F2). Finding F6 + F2. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (report-group VARYING is a COBOL-2002 introduction per docs/VERSION_CHANGE_REFERENCE; the 2023 Annex E lists no change; the VALIDATE leg is part of the obsolete VALIDATE facility, §13.18.64.1 NOTE) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReport (VARYING SR2 loop over f.Varyings, ByName.ContainsKey) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReport (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "notes": "kb/Work PB1306 landed. cite.py --check 13.18.64.3 'Data-name-1 shall not be defined elsewhere in the source element, except as data-name-1 in another VARYING clause of an entry not subordinate to the subject of the' OK (SR2); 'This definition of data-name-1 may be referenced only within the current entry or a subordinate entry' OK. Three arms of 'defined elsewhere' - a name twice in one entry, a name an enclosing entry's VARYING defines, a name defined by a data item or report section entry - each COBOLNET1559, once per written entry; a reference outside the entry resolves nowhere (COBOLNET1639); a reuse in a non-subordinate entry is legal and independent (golden lines 4-5).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.64.3-3",
@@ -31176,13 +31176,13 @@
   "ordinal": 3,
   "subject": "VARYING clause",
   "rule-digest": "123868315a07",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportVaryingClauses; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindReportClauses",
+  "test-ref": "conformance:2002/pb1306_varying_scope; conformance:negative/pb1306-varying-from-names-its-own-counter",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1306. cite.py --check 13.18.64.3 'but may be referenced in arithmetic-expression-2 of the same VARYING clause or in arithmetic-expression-1 or arithmetic-expression-2 of a VARYING clause in a subordinate entry' OK (SR3). The prohibition half is enforced (probe vsr3from: FROM K -> COBOLNET1559 SR3, plus a cascade COBOLNET1639 'K is not defined'). The permission half is refused: `VARYING K FROM 1 BY K` -> COBOLNET0899 report-varying-counter-in-expression 'not yet implemented' (probe probe/varying-clause/vby, expected 1 2 4), and a subordinate entry's `FROM J * 10 + 1` over the parent's VARYING J -> COBOLNET1639 'J is not defined' (probe vsr3sub, expected 11 12 21 22). DIAGNOSTICS.md row COBOLNET0899 report-varying-counter-in-expression is the staged-loud stage; PB1028 (open) concerns COBOLNET0899 being a syntax-rule code generally and does not own this row. Findings F3 + F2. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (report-group VARYING is a COBOL-2002 introduction per docs/VERSION_CHANGE_REFERENCE; the 2023 Annex E lists no change; the VALIDATE leg is part of the obsolete VALIDATE facility, §13.18.64.1 NOTE) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroupEntry (SR3 checks: HasWord(FromCtx) -> COBOLNET1559 | HasWord(ByCtx) -> ReportVaryingCounterInExpression COBOLNET0899) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroupEntry (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "notes": "kb/Work PB1306 landed. cite.py --check 13.18.64.3 'but may be referenced in arithmetic-expression-2 of the same VARYING clause or in arithmetic-expression-1 or arithmetic-expression-2 of a VARYING clause in a subordinate entry' OK (SR3). FROM naming a counter of its own clause is refused COBOLNET1559 (negative); BY naming its own counter binds and runs as the recurrence (`BY M` 1, 2, 4), and a subordinate entry's FROM names the enclosing counter (`FROM J * 10 + 1`, 11 12 / 21 22): both in pb1306_varying_scope.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.64.4-1",
@@ -31191,13 +31191,13 @@
   "ordinal": 1,
   "subject": "VARYING clause",
   "rule-digest": "8e59b5c36ad0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportVaryingModel; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#VaryName; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportVaryingModel; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#VaryingCountersOf; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitVaryingCounters",
+  "test-ref": "conformance:2002/pb1306_varying_scope; conformance:2002/pb565_report_repeating_entry",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1306. cite.py --check 13.18.64.4 'establishes an independent temporary integer data item' OK (GR1). For a PRINTABLE entry the counter is a compose-local C# `long` keyed by the synthetic print item uid + index (`__rv{uid}_{k}`), so each entry's counter is independent and 64-bit (probe vsr2sib: sibling entries both named K print 1 2 3 and 5 6 7 independently). The other half fails: an entry that is a GROUP (e.g. `03 OCCURS 3 TIMES STEP 5 VARYING K FROM 1 BY 1.` over `04 COLUMN 1 PIC 9 SOURCE K.`) establishes NO counter - DataBinder.Reports only attaches `varyings` to a ReportFieldModel (field.Varyings.AddRange) - so probe probe/varying-clause/vgrp is refused `COBOLNET0899 SOURCE 'K' does not resolve to a data item`. Expected 1    2    3. Finding F2. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (report-group VARYING is a COBOL-2002 introduction per docs/VERSION_CHANGE_REFERENCE; the 2023 Annex E lists no change; the VALIDATE leg is part of the obsolete VALIDATE facility, §13.18.64.1 NOTE)",
-  "state": "GAP"
+  "notes": "kb/Work PB1306 landed. cite.py --check 13.18.64.4 'establishes an independent temporary integer data item' OK (GR1). The counter is the data item of its ENTRY: VaryingCountersOf makes one ReportVaryingModel per written entry per enclosing occurrence, so a GROUP entry's counter exists (golden pb1306_varying_scope line 1, `03 OCCURS 3 TIMES STEP 5 VARYING K` over `04 COLUMN 1 SOURCE K` prints `1    2    3`) and two entries not subordinate to one another that reuse a name are independent (lines 4-5: 1 2 3 / 5 7 9). retired-witness: src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#VaryName (VaryName keyed the counter by the synthetic print item's uid; the counter is now the data item of its ENTRY (ReportVaryingModel.Uid / CsName), emitted by EmitVaryingCounters)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.64.4-2",
@@ -31221,13 +31221,13 @@
   "ordinal": 3,
   "subject": "VARYING clause",
   "rule-digest": "0b2333e8c736",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitFieldPlacements; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#VaryValue; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportFieldModel.RepetitionOrdinal; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs",
-  "test-ref": "conformance:2002/pb1305_report_varying_expression",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#EmitVaryingCounters; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportVaryingUse",
+  "test-ref": "conformance:2002/pb1305_report_varying_expression; conformance:2002/pb1306_varying_scope",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1306 (PB1305 landed its F1 half in w70 V3). cite.py --check 13.18.64.4 'For the first occurrence, the value of arithmetic-expression-1 is moved to data-name-1' OK (GR3a); GR3b adds arithmetic-expression-2 per subsequent occurrence. Implemented as the closed form FROM + ordinal*BY per printable entry over all three vehicles (multiple COLUMN; OCCURS conformance:2002/pb565_report_repeating_entry 2 5 8; multiple LINE conformance:2002/pb565_report_vertical_repetition 2 5 8; FROM re-evaluated per presentation conformance:2023/rw_present_when). FIXED by PB1305: a FROM/BY with an operator or a scaled operand compiles and runs (conformance:2002/pb1305_report_varying_expression: FROM 2 * 3 - 5 BY 4 - 2 -> 1 3 5, BY WS-F = 2.0 -> 1 3 5, FROM a COMP-2 4 BY 7 - 2 * 3 -> 4 5 6). STILL DIVERGES (PB1306): (2) `BY K` (legal per SR3) is refused COBOLNET0899, so GR3b's 'value of arithmetic-expression-2 is added' over the running counter cannot be expressed (probe vby expected 1 2 4) - F3; (3) a group entry's counter is never established - F2. Unverified edge (not a finding): a repeating printable nested under a repeating group (probe vnest) runs its inner counter 1 2 3 4 across the outer repetitions rather than restarting per outer occurrence.",
-  "state": "GAP"
+  "notes": "kb/Work PB1306 landed. cite.py --check 13.18.64.4 'For the second and subsequent occurrences, the value of arithmetic-expression-2 is added to data-name-1' OK (GR3 b). Occurrence n of the DECLARING entry holds FROM + n x BY (closed form), restarting with every occurrence of an enclosing repeating entry (golden line 2: J = 1, 2 and the subordinate L = 11, 12 then 21, 22), and a BY that names a counter of its own entry (SR3) is the running recurrence the closed form is not: `VARYING M FROM 1 BY M` is 1, 2, 4 (line 3). Sibling counters of one clause advance in clause order (CONFORMANCE.md section 3 'VARYING counters of one clause').",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.64.4-4",
@@ -31236,13 +31236,13 @@
   "ordinal": 4,
   "subject": "VARYING clause",
   "rule-digest": "8dca6710186a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldVaryingSource; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#FieldImage; src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs#Visit",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#VaryingExpr; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveSubscriptName; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#FieldImage",
+  "test-ref": "conformance:2002/pb1292_source_operand_forms; conformance:2002/pb1306_varying_scope",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1292 + PB1306. cite.py --check 13.18.64.4 'as a subscript to a source data item' OK (GR4 NOTE); SR2 'may be referenced only within the current entry or a subordinate entry' OK. The value persists per occurrence and is usable as a bare SOURCE of the SAME entry (FieldVaryingSource, per operand; pb565 goldens). DIVERGES (rejects legal source): (a) as a subscript to a source item - `SOURCE WS-C(K)` is refused COBOLNET0899 ReportSourceSubscripted 'a subscripted or reference-modified SOURCE operand is not yet implemented' (probe probe/varying-clause/vsub, expected A C E) - F4; (b) from a SUBORDINATE entry - a group entry's counter does not exist (probe vgrp) - F2. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (report-group VARYING is a COBOL-2002 introduction per docs/VERSION_CHANGE_REFERENCE; the 2023 Annex E lists no change; the VALIDATE leg is part of the obsolete VALIDATE facility, §13.18.64.1 NOTE) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#FieldImage (case FieldVaryingSource) | src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs#Visit(BoundReportVaryingRef)",
-  "state": "GAP"
+  "notes": "kb/Work PB1292 + PB1306 landed. cite.py --check 13.18.64.4 'as a subscript to a source data item' OK (GR4 NOTE). The value persists per occurrence and is a SOURCE operand bare (`SOURCE K`, also from a SUBORDINATE entry: pb1306_varying_scope line 1), as a subscript (`SOURCE WS-CC(K)` = A C E and `WS-CC(K + 1)` = B D F, pb1292_source_operand_forms lines 2-3) and inside an expression. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldVaryingSource (FieldVaryingSource rebound only the own entry's unqualified bare SOURCE; a counter is now read through ReferenceResolver.VaryingScope by every reader of a written name (operand, expression and subscript binders))",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.64.4-5",
@@ -57681,13 +57681,13 @@
   "ordinal": 0,
   "subject": "Report counters",
   "rule-digest": "0563f5b836af",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf",
-  "test-ref": "",
+  "test-ref": "conformance:85/pb1456_other_report_counters_85; conformance:2002/pb1456_counter_in_source_expression",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1456 (registrar 15c). Format: {PAGE-COUNTER|LINE-COUNTER} [{IN|OF} report-name-1]. Grammar dataReference alternatives `LINE_COUNTER ((OF | IN) cobolWord)?` and `PAGE_COUNTER ((OF | IN) cobolWord)?` are exactly the diagram (no subscript/refmod suffix admitted, correctly). Probed both qualifier spellings: rcq7.cob `MOVE LINE-COUNTER OF R1` -> 0004 and `LINE-COUNTER IN R2` -> 0005 (correct per-report values); unqualified single-RD form everywhere (a2.cob). cite.py --check 8.4.3.15.2 \"report-name-1\" -> OK. conformance:85/pb429_page_counter_receiving exercises only the OF spelling of PAGE-COUNTER, so no test pins the whole format (IN, LINE-COUNTER qualified) - test-needed. || REFUTED: PARTIAL — The parser accepts every spelling of the format, but the binder rejects one legal instance of the qualified form, report-name-1 naming a DIFFERENT report inside a report section SOURCE clause. SR1 allows counters in a SOURCE clause. §8.4.2.2.3 SR9/SR10 state outright that a counter of a different report is referenced by qualifying it with that report's name. DataBinder.Reports.cs BindSourceReference instead raises ReportSourceOtherReportCounter ('a counter of another report ... is not yet implemented', COBOLNET0899), a staged rejection of legal source. The procedure-division forms all work: PAGE-COUNTER IN/OF and LINE-COUNTER IN/OF, as sender, as the PAGE-COUNTER receiver and in conditions. Same-report qualified SOURCE forms also work. So the format is only partly supported and no test pins it. [editions as adjudicated: 1985 (Report Writer optional module), 2002, 2014, 2023 - clause 8.4.3.15 text]",
-  "state": "GAP"
+  "notes": "kb/Work PB1456 landed. The format {PAGE-COUNTER | LINE-COUNTER} [{IN | OF} report-name-1] is accepted in every position the standard gives it, including report-name-1 naming a DIFFERENT report inside a report section SOURCE (PAGE-COUNTER OF R1, LINE-COUNTER OF R2) and inside its arithmetic expression.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.4.2",
@@ -59496,13 +59496,13 @@
   "ordinal": 0,
   "subject": "SOURCE clause",
   "rule-digest": "2b504f432524",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSourceClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportValueOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportSourceClause",
-  "test-ref": "conformance:2023/pb506_report_value_operand_list",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#IdentifierOperandOf",
+  "test-ref": "conformance:2023/pb506_report_value_operand_list; conformance:85/pb1292_source_forms_85; conformance:2002/pb1292_source_operand_forms; conformance:negative/pb1316-source-alphanumeric-constant",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1292. Format `{SOURCE IS | SOURCES ARE} {identifier-1 | arithmetic-expression-1} ... [rounded-phrase]` (cite.py --check 13.18.53.2 \"where rounded-phrase is described in 14.7.4, ROUNDED phrase\" OK). Grammar `(SOURCE|SOURCES) (IS|ARE)? reportValueOperand+ roundedPhrase?` matches: SOURCE/SOURCES required, IS/ARE optional, operand repeated, one ROUNDED phrase after the list; the binder classifies identifier vs expression (BareReferenceOf). Probes out13/probe/source-clause/p1 (SOURCES ARE six operands, SOURCE IS one) and p7 (expression operands) compile and print correctly; 85 gate on SOURCES/multi-operand fires COBOLNET0900 (p1 --std 85). The cross-pairings `SOURCE ARE x` / `SOURCES IS x y` (p8/p9) are accepted silently - defensible under SR1 (synonyms), noted not charged. PARTIAL because identifier-1 in its SUBSCRIPTED or REFERENCE-MODIFIED form (an identifier per §8.4.3) parses but is refused by the binder as COBOLNET0899 'not yet implemented' (probes n1/n1b), and identifier-1 naming a sum counter of the current report is refused (p3/p4) - see findings F1/F2 and rows GR-13.18.53.4-1 / SR-13.18.53.3-4. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself)",
-  "state": "GAP"
+  "notes": "kb/Work PB1292 + PB1316 landed. The format {identifier-1 | arithmetic-expression-1} ... [rounded-phrase] is realised whole: identifier-1 with its subscripts and reference modification is the GR1 sender, arithmetic-expression-1 the GR2 COMPUTE operand, and a bare numeric constant-name is arithmetic-expression-1 with one operand (cite.py --check 13.10.3 'constant-name-1 may be used anywhere that a format specifies a literal' OK, SR2) - an alphanumeric constant is refused (COBOLNET2141, negative pb1316-source-alphanumeric-constant). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted; BindSourceOperand classifies the form and FieldReferenceSource carries the identifier)",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.54.2",

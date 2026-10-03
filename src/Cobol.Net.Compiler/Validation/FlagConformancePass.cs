@@ -137,7 +137,7 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
                 }
             }
             foreach (var report in unit.Data.Reports)
-                if (report.Groups.Any(g => g.Lines.Any(l => l.Fields.Any(f => f.Varyings.Count > 0))))
+                if (report.HasVarying)
                     varying.Add(report.Name);
         }
 

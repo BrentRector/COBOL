@@ -381,6 +381,21 @@ public sealed class ReferenceResolver(DataBinder data)
     /// and later ACTIVATE — twice). Save/restored, not cleared: a COMMIT resolution can nest inside hooks.</summary>
     private bool _probing;
 
+    /// <summary>The report whose REPORT SECTION clause operands are being bound (ISO §13.18.53.3 SR4 — the sum counters a
+    /// SOURCE operand may name are those "defined in the current report"), or null in the procedure division and
+    /// everywhere else. Set only by <c>ReportWriterBinder</c>, for the span of its own clause binding; it narrows the
+    /// candidates of a sum-counter reference to that report, so a name two reports share is unambiguous there
+    /// (kb/Work PB1292).</summary>
+    internal ReportModel? ReportScope { get; set; }
+
+    /// <summary>The VARYING counters the report-section expression being bound may name, by data-name (ISO §13.18.64.3
+    /// SR2 — a counter "may be referenced only within the current entry or a subordinate entry"), or null outside a
+    /// report entry's clause. Set only by <c>ReportWriterBinder</c>. A counter is no data item (§13.18.64.4 GR1 — "a
+    /// temporary integer data item") and lives in no name table, so every reader of a written NAME asks here: the
+    /// operand and expression binders through <c>ReportWriterBinder.VaryingExpr</c>, and the subscript renderer
+    /// (<see cref="ResolveSubscriptName"/>), which is how a counter subscripts a source item (GR4's NOTE).</summary>
+    internal IReadOnlyDictionary<string, ReportVaryingModel>? VaryingScope { get; set; }
+
     /// <summary>Set when a subscript or reference-modifier SEGMENT of the current resolution failed because one of
     /// its own operands is a deferred shape (the materializer's expression came back
     /// <see cref="BoundExprError.IsUnbuilt"/>), so the segment's null is a DEFERRAL, not a refusal (kb/Work PB1030).
@@ -1988,6 +2003,11 @@ public sealed class ReferenceResolver(DataBinder data)
         Core.DataReferenceContext dref, string name, List<string> qualifiers, bool report)
     {
         if (!data.SumCounters.TryGetValue(name, out var homonyms)) return null;
+        // §13.18.53.3 SR4 — inside a report's own clauses the only sum counters a SOURCE operand may name are those "defined in
+        // the current report", so a homonym of another report is no candidate: the reference is unambiguous by the rule
+        // and never needs a qualifier to say so (kb/Work PB1292).
+        if (ReportScope is { } scope) homonyms = [.. homonyms.Where(h => ReferenceEquals(h.Report, scope))];
+        if (homonyms.Count == 0) return null;
         // §8.4.6.2.1 rule 3 — a counter of a report this source element declares hides a same-named counter of a
         // container's GLOBAL report; only candidates of the NEAREST declaring element can be ambiguous.
         var matches = data.NearestInScope(
@@ -2676,6 +2696,10 @@ public sealed class ReferenceResolver(DataBinder data)
         if (qualifiers.Count == 0
             && data.FindConstant(name) is { Category: PicCategory.Numeric, IntegerText: { } integer })
             return integer;
+        // A report VARYING counter in scope (§13.18.64.4 GR4's NOTE: "data-name-1 [may] be used … as a subscript to a source
+        // data item") is the compose-local integer the placement declares; it is no data item and has no scale.
+        if (qualifiers.Count == 0 && VaryingScope is { } counters && counters.TryGetValue(name, out var counter))
+            return $"(long){counter.CsName}";
         DataItem? item = qualifiers.Count == 0 ? ResolveUnqualified(name) : ResolveQualified(name, qualifiers);
         if (item is null) return null;
         if (!IntrinsicArgumentRules.IsArithmeticOperandClass(item)) (pending ??= []).Add(new PendingScreen(item, name));

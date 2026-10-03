@@ -154,15 +154,22 @@ public sealed class ReportRepeatingEntryDriftTests
         }
     }
 
-    /// <summary>A repetition's VARYING counter is the CLOSED form over the repetition ordinal, never an
-    /// accumulator: a replayed entry becomes one field per repetition, and a field-local accumulator could not
-    /// span them (ISO §13.18.64.4 GR3 — occurrence n holds FROM + n × BY).</summary>
+    /// <summary>A repetition's VARYING counter is the CLOSED form over the declaring entry's occurrence number, never an
+    /// accumulator that lives in a field: a replayed entry becomes one field per repetition, and a field-local
+    /// accumulator could not span them (ISO §13.18.64.4 GR3 — occurrence n holds FROM + n × BY). The one exception is
+    /// the recurrence §13.18.64.3 SR3 creates ("may be referenced in arithmetic-expression-2 of the same VARYING
+    /// clause"): a BY naming a counter of its own entry is not FROM + n × BY, so only a counter the binder marked
+    /// <c>Recurrent</c> is advanced step by step — and it is advanced from FROM afresh in every placement's block,
+    /// so it too is a function of the occurrence number and never of the replay's state (kb/Work PB1306).</summary>
     [Fact]
-    public void TheVaryingCounter_IsClosedFormOverTheRepetitionOrdinal()
+    public void TheVaryingCounter_IsClosedFormOverTheOccurrenceNumber()
     {
         string emitter = EmitterText();
-        Assert.Contains("f.RepetitionOrdinal + rep", emitter, StringComparison.Ordinal);
-        // The accumulator shape that cannot survive a replay.
-        Assert.DoesNotContain("+= {VaryValue(", emitter, StringComparison.Ordinal);
+        Assert.Contains("uses[0].Ordinal + (uses[0].PerPlacement ? rep : 0)", emitter, StringComparison.Ordinal);
+        Assert.Contains("{from} + {n} * {VaryValue(", emitter, StringComparison.Ordinal);
+        // The step-by-step form exists ONLY behind the binder's Recurrent verdict.
+        int step = emitter.IndexOf("+= {VaryValue(", StringComparison.Ordinal);
+        int gate = emitter.IndexOf("u.Counter.Recurrent", StringComparison.Ordinal);
+        Assert.True(gate >= 0 && step > gate, "the BY-added-per-step form must sit behind the Recurrent test");
     }
 }
