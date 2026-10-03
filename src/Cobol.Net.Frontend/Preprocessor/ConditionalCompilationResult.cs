@@ -21,9 +21,12 @@ public readonly record struct KeyedDirectiveOp(int BeforeDirective, DirectiveSta
 /// The conditional-compilation driver's product (<see cref="ConditionalCompilationProcessor.Manipulate"/>): the
 /// resultant text and every directive encounter, placed in the resultant frame — what the front end needs to carry
 /// §14.9.28.4 GR14's implicit PUSH ALL / POP ALL, which only the parse of this text can place, back into the state
-/// the driver holds (kb/Work PB1066).
+/// the driver holds (kb/Work PB1066) — and every change a DEFINE made to the compilation-variable table, placed in
+/// the same frame: the events the front end replays into the table's <see cref="DirectiveTimeline{T}"/> for the uses
+/// that read a compilation variable outside conditional compilation (§7.3.11.4 GR1; kb/Work PB1368).
 /// </summary>
-public sealed record ConditionalCompilationResult(MappedText Text, IReadOnlyList<DirectiveEncounter> Directives)
+public sealed record ConditionalCompilationResult(MappedText Text, IReadOnlyList<DirectiveEncounter> Directives,
+    IReadOnlyList<CompilationVariableEvent> CompilationVariables)
 {
     /// <summary>
     /// <paramref name="ops"/> — resultant-line PUSH/POP ops in token order

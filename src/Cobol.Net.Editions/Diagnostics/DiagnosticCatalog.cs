@@ -215,20 +215,11 @@ public static class DiagnosticCatalog
         + "implemented.", "ISO §13.18.33.4 GR3 / §12.4.6.4.4 GR2",
         RecognizedNotImplemented);
 
-    // ── COBOLNET0899 — the staged-loud constant-entry legs (recognized, not yet implemented) ─────────────
-    public static readonly DiagnosticDescriptor ConstantFromCompilationVariable = new(
-        NotImplemented, "constant-from-compilation-variable", EditionSeverity.Error,
-        "CONSTANT … FROM compilation-variable-name (§13.10.4 GR1 — the >>DEFINE tie-in) is recognized but not "
-        + "yet implemented: the preprocessor's compilation-variable store (ConditionalCompilationProcessor) is "
-        + "local to the text stage and not reachable at bind time; the position-correct (SR8 'currently true') "
-        + "capture across COPY expansion is the recorded residue.", "ISO §13.10 (FROM phrase)",
-        RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor ConstantByteLength = new(
-        NotImplemented, "constant-byte-length", EditionSeverity.Error,
-        "CONSTANT … AS BYTE-LENGTH OF (§13.10.4 GR5 — defined by the §15.14 BYTE-LENGTH intrinsic) is "
-        + "recognized but not yet implemented: the §15.14 intrinsic itself is a Deferred catalog row, and the "
-        + "byte-width authority lands ONCE, with it (the singular-pattern rule).", "ISO §13.10.4 GR5 / §15.14",
-        RecognizedNotImplemented);
+    // ⛔ The two 0899-staged constant-entry legs are GONE. ConstantFromCompilationVariable (kb/Work PB1368): the
+    // >>DEFINE table now reaches the binder as a timeline (DirectiveResults.CompilationVariables), and an undefined
+    // FROM name is the permanent §13.10.3 SR8 rejection under ConstantEntryRule. ConstantByteLength (kb/Work PB1227):
+    // its premise — "the §15.14 intrinsic itself is a Deferred catalog row" — had been false since FUNCTION BYTE-LENGTH
+    // landed; BYTE-LENGTH OF data-name-1 binds through BindConstantLength beside LENGTH OF.
 
     // ⛔ The 0899-staged CallAsPrototypeName is GONE (kb/Work PB237). It said "§12.3.8.2's program-specifier has no
     // repositoryEntry alternative, so no source can declare one"; the alternative now exists, the registry resolves,

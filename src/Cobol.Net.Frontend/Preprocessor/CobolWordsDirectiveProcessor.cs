@@ -4,6 +4,7 @@ using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Frontend.Expressions;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -32,10 +33,16 @@ public static class CobolWordsDirectiveProcessor
     /// PB941), replayed over the entries up to the first IDENTIFICATION DIVISION: a POP COBOL-WORDS there
     /// withdraws every entry written since its PUSH, and the map is the set in effect where §7.3.10.3 SR1 closes
     /// the region.</para>
+    /// <para><paramref name="compilationVariables"/> is the &gt;&gt;DEFINE timeline of the same text (kb/Work PB1368):
+    /// §7.3.11.4 GR1 lets a compilation-variable-name defined before a directive stand in any of its literal slots
+    /// where a literal of the name's category is permitted, and each literal of this directive is alphanumeric
+    /// (§7.3.10.3 SR2).</para>
     public static (string Text, CobolWordsMap Map) Process(
         string text, DiagnosticBag diagnostics, string sourcePath, SourceLineMap? lineMap = null,
-        IReadOnlyList<DirectiveStackOp>? stackOps = null)
+        IReadOnlyList<DirectiveStackOp>? stackOps = null,
+        DirectiveTimeline<CompilationVariableEvent>? compilationVariables = null)
     {
+        var definitions = compilationVariables ?? DirectiveTimeline<CompilationVariableEvent>.Empty;
         if (!text.Contains(">>", StringComparison.Ordinal)) return (text, CobolWordsMap.Empty);
         var lines = text.Split('\n');
         var ops = new List<CobolWordsOp>();
@@ -77,7 +84,8 @@ public static class CobolWordsDirectiveProcessor
             // kb/Work PB1377), for the directive itself and for a PUSH/POP naming it. This stage keeps the boundary only
             // as STATE: the map is the set in effect where the region closes.
 
-            if (TryParseOption(operand, i, diagnostics, loc, out var op))
+            int directiveLine = i + 1;   // resultant, 1-based: the frame the DEFINE events carry
+            if (TryParseOption(operand, i, diagnostics, loc, name => definitions.DefinitionAt(name, directiveLine), out var op))
             {
                 // SR5 — every literal's content across all directives is unique.
                 foreach (string w in Words(op))
@@ -107,7 +115,7 @@ public static class CobolWordsDirectiveProcessor
     /// <summary>Parse the operand after <c>COBOL-WORDS</c> into one option (§7.3.10.2), enforcing SR2 per literal
     /// and the §8.3.2.2 user-word form for the fresh word. Returns false (with a COBOLNET1623) when malformed.</summary>
     private static bool TryParseOption(string operand, int line, DiagnosticBag diag, SourceLocation loc,
-        out CobolWordsOp op)
+        Func<string, CompilationVariableEvent?> definitionOf, out CobolWordsOp op)
     {
         op = null!;
         var toks = Tokenize(operand);
@@ -125,13 +133,13 @@ public static class CobolWordsDirectiveProcessor
         switch (kw.Text.ToUpperInvariant())
         {
             case "EQUATE":   // EQUATE literal-1 WITH literal-2
-                return TryBinary(toks, "WITH", CobolWordsAction.Equate, line, diag, loc, out op);
+                return TryBinary(toks, "WITH", CobolWordsAction.Equate, line, diag, loc, definitionOf, out op);
             case "SUBSTITUTE":   // SUBSTITUTE literal-4 BY literal-5
-                return TryBinary(toks, "BY", CobolWordsAction.Substitute, line, diag, loc, out op);
+                return TryBinary(toks, "BY", CobolWordsAction.Substitute, line, diag, loc, definitionOf, out op);
             case "UNDEFINE":   // UNDEFINE literal-3
-                return TryUnary(toks, CobolWordsAction.Undefine, isExisting: true, line, diag, loc, out op);
+                return TryUnary(toks, CobolWordsAction.Undefine, isExisting: true, line, diag, loc, definitionOf, out op);
             case "RESERVE":   // RESERVE literal-6
-                return TryUnary(toks, CobolWordsAction.Reserve, isExisting: false, line, diag, loc, out op);
+                return TryUnary(toks, CobolWordsAction.Reserve, isExisting: false, line, diag, loc, definitionOf, out op);
             default:
                 Invalid(diag, loc,
                     $"'{kw.Text}' is not a >>COBOL-WORDS option — expected EQUATE, UNDEFINE, SUBSTITUTE, or RESERVE (ISO §7.3.10.2)");
@@ -141,7 +149,7 @@ public static class CobolWordsDirectiveProcessor
 
     /// <summary>EQUATE/SUBSTITUTE: <c>KW literal-a JOIN literal-b</c> (the existing word then the fresh word).</summary>
     private static bool TryBinary(IReadOnlyList<Tok> toks, string join, CobolWordsAction action, int line,
-        DiagnosticBag diag, SourceLocation loc, out CobolWordsOp op)
+        DiagnosticBag diag, SourceLocation loc, Func<string, CompilationVariableEvent?> definitionOf, out CobolWordsOp op)
     {
         op = null!;
         if (toks.Count != 4 || !toks[2].IsKeyword(join))
@@ -150,8 +158,8 @@ public static class CobolWordsDirectiveProcessor
                 + $"literal-1 {join} literal-2 (ISO §7.3.10.2)");
             return false;
         }
-        if (!Literal(toks[1], diag, loc, "the existing word", out string existing)) return false;
-        if (!Literal(toks[3], diag, loc, "the new word", out string @new)) return false;
+        if (!Literal(toks[1], diag, loc, "the existing word", definitionOf, out string existing)) return false;
+        if (!Literal(toks[3], diag, loc, "the new word", definitionOf, out string @new)) return false;
         if (!UserWord(@new, diag, loc)) return false;
         op = new CobolWordsOp(action, existing, @new, line);
         return true;
@@ -159,7 +167,7 @@ public static class CobolWordsDirectiveProcessor
 
     /// <summary>UNDEFINE/RESERVE: <c>KW literal</c>.</summary>
     private static bool TryUnary(IReadOnlyList<Tok> toks, CobolWordsAction action, bool isExisting, int line,
-        DiagnosticBag diag, SourceLocation loc, out CobolWordsOp op)
+        DiagnosticBag diag, SourceLocation loc, Func<string, CompilationVariableEvent?> definitionOf, out CobolWordsOp op)
     {
         op = null!;
         if (toks.Count != 2)
@@ -167,7 +175,7 @@ public static class CobolWordsDirectiveProcessor
             Invalid(diag, loc, $">>COBOL-WORDS {toks[0].Text.ToUpperInvariant()} expects a single literal (ISO §7.3.10.2)");
             return false;
         }
-        if (!Literal(toks[1], diag, loc, isExisting ? "the word" : "the new word", out string word)) return false;
+        if (!Literal(toks[1], diag, loc, isExisting ? "the word" : "the new word", definitionOf, out string word)) return false;
         // RESERVE's operand is a fresh user word (SR4 §8.3.2.2 form); UNDEFINE's is an existing word (no form check).
         if (!isExisting && !UserWord(word, diag, loc)) return false;
         op = isExisting
@@ -177,14 +185,37 @@ public static class CobolWordsDirectiveProcessor
     }
 
     /// <summary>SR2: a plain alphanumeric literal (quoted, non-hex/national, space-free). Returns the UPPER-CASE
-    /// content.</summary>
-    private static bool Literal(Tok tok, DiagnosticBag diag, SourceLocation loc, string role, out string content)
+    /// content. A WORD in the slot is a compilation-variable-name (§7.3.11.4 GR1: "In text that follows a DEFINE
+    /// directive specifying compilation-variable-name-1 without the OFF phrase, compilation-variable-name-1 may be used
+    /// … in any compiler directive where a literal of the category associated with the name is permitted"): it stands
+    /// for the literal its DEFINE wrote, and that literal meets SR2 like a written one — so a name defined
+    /// <c>AS X"…"</c> is still a hexadecimal-format literal (kb/Work PB1368).</summary>
+    private static bool Literal(Tok tok, DiagnosticBag diag, SourceLocation loc, string role,
+        Func<string, CompilationVariableEvent?> definitionOf, out string content)
     {
         content = "";
         if (!tok.IsLiteral)
         {
-            Invalid(diag, loc, $">>COBOL-WORDS: {role} must be an alphanumeric literal (ISO §7.3.10.3 SR2), not '{tok.Text}'");
-            return false;
+            if (definitionOf(tok.Text) is not { Value: { } value } definition)
+            {
+                Invalid(diag, loc, $">>COBOL-WORDS: {role} must be an alphanumeric literal (ISO §7.3.10.3 SR2), or a "
+                    + $"compilation-variable-name defined before the directive (ISO §7.3.11.4 GR1), not '{tok.Text}'");
+                return false;
+            }
+            if (value.Category != CtCategory.Alphanumeric)
+            {
+                Invalid(diag, loc, $">>COBOL-WORDS: {role} names the compilation variable '{tok.Text}', whose value is "
+                    + $"{value.Category.ToString().ToLowerInvariant()} — a compilation-variable-name stands only where a "
+                    + "literal of its own category is permitted (ISO §7.3.11.4 GR1), and this literal is alphanumeric "
+                    + "(ISO §7.3.10.3 SR2)");
+                return false;
+            }
+            // The literal the name represents: the DEFINE operand as written (one literal — §7.3.3 SR10 keeps a
+            // concatenation expression out of every directive — so its format is screened below like a written one),
+            // or, for a value the PARAMETER phrase obtained from the environment (§7.3.11.4 GR4), which has no written
+            // operand, that value as a plain literal.
+            tok = Tokenize(definition.Written) is [{ IsLiteral: true } written]
+                ? written : new Tok(value.Text, IsLiteral: true, Prefix: "");
         }
         if (tok.Prefix.Length != 0)
         {

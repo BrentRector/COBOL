@@ -6,6 +6,7 @@ using CobolNet.Common;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Generated;
+using CobolNet.Frontend.Preprocessor;
 
 using CobolNet.Binding.Model;
 
@@ -44,12 +45,13 @@ using Core = CobolParserCore;
 /// standard arithmetic at 2002/2014, the documented .NET <see cref="decimal"/> mode from 2023, kb/Work PB1592);
 /// <b>AS LENGTH OF data-name-2</b> (GR6 — the value of the §15.50 LENGTH function: <c>ItemLength.Positions</c>,
 /// THE §15.50.4 r1/r2/r3 fold the FUNCTION LENGTH binder reads, which is maximum-allocation based so the GR6
-/// occurs-depending exception holds); <b>AS BYTE-LENGTH OF</b> (GR5) is STAGED LOUD — the §15.14
-/// BYTE-LENGTH intrinsic is itself a Deferred catalog row and the byte-width authority lands once, with it.
-/// The <b>FROM compilation-variable-name-1</b> leg (GR1 — the &gt;&gt;DEFINE tie-in) is STAGED LOUD: the
-/// preprocessor's compilation-variable store is local to the text stage (<c>ConditionalCompilationProcessor.
-/// Process</c>) and not reachable at bind time; the SR8 "currently true" position-correct capture across COPY
-/// expansion is the recorded residue.
+/// occurs-depending exception holds); <b>AS BYTE-LENGTH OF data-name-1</b> (GR5 — the value of the §15.14
+/// BYTE-LENGTH function: <c>DataItem.ByteWidth</c>, the fold FUNCTION BYTE-LENGTH reads; the same binder and the same
+/// SR3/SR10/SR12 screens as LENGTH OF, kb/Work PB1227).
+/// The <b>FROM compilation-variable-name-1</b> form (GR1/GR2 — the &gt;&gt;DEFINE tie-in) reads the group's
+/// compilation-variable TIMELINE at the entry's own line (<see cref="BindConstantFrom"/>; §7.3.11.4 GR1, §13.10.3
+/// SR8 — kb/Work PB1368): the conditional-compilation driver records every DEFINE in the resultant line frame, PUSH/POP
+/// revoke as they do for every directive state, and the binder receives it through <c>DirectiveResults</c>.
 /// Definition-before-reference is required (the GR1 textual-substitution model — substitution happens as the
 /// source is bound, in order); a forward reference fails as an unknown constant-name.
 /// </summary>
@@ -121,6 +123,12 @@ public sealed partial class DataBinder
     /// <summary>The defined constant named <paramref name="name"/>, or null (§13.10.4 GR1 lookup).</summary>
     internal ConstantDef? FindConstant(string name) => _constants.TryGetValue(name, out var d) ? d : null;
 
+    /// <summary>Is <paramref name="name"/> an INTEGER constant-name — the shape §13.10.3 SR2 admits where a format
+    /// specifies an integer literal ("If constant-name-1 is an integer, …"; GR3 for the expression and length
+    /// forms)?</summary>
+    private bool IsIntegerConstant(string name) =>
+        FindConstant(name) is { Category: PicCategory.Numeric, IntegerText: not null };
+
     /// <summary>The constant a BARE (unqualified, unsubscripted) data reference names, or null. A constant-name
     /// takes no qualifiers, subscripts, or reference-modification — it substitutes a literal (§13.10.4 GR1) —
     /// so any suffixed reference falls through to ordinary resolution.</summary>
@@ -189,21 +197,18 @@ public sealed partial class DataBinder
         DeclareUserWord(name, UserWordKind.ConstantName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         bool isGlobal = body.GLOBAL() is not null;
 
-        // FROM compilation-variable-name-1 (§13.10.4 GR1's >>DEFINE leg) — STAGED LOUD: the compilation-
-        // variable store is local to the preprocessor text stage; see the class doc + the catalog descriptor.
-        if (body.FROM() is not null)
+        ConstantDef? def;
+        if (body.cobolWord() is { } variable)   // FROM compilation-variable-name-1 (§13.10.2)
+            def = BindConstantFrom(name, isGlobal, variable, level.Start.Line, where);
+        else
         {
-            Edition.Error(DiagnosticCatalog.ConstantFromCompilationVariable,
-                $"{where}: CONSTANT … FROM compilation-variable-name (ISO §13.10, the >>DEFINE tie-in)");
-            return;
+            var cv = body.constantValue();
+            string spec = WrittenSpecification(cv);
+            def = cv.LENGTH() is not null ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: false)
+                : cv.constantByteLengthWord() is not null ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: true)
+                : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
+                : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
         }
-
-        var cv = body.constantValue();
-        string spec = WrittenSpecification(cv);
-        ConstantDef? def =
-            cv.LENGTH() is not null ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where)
-            : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
-            : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
         if (def is null) return;
 
         // A container's GLOBAL constant of the same name is SHADOWED by this local entry (§8.4.6 scope of names;
@@ -239,6 +244,55 @@ public sealed partial class DataBinder
         var tokens = new List<Antlr4.Runtime.IToken>();
         ReferenceResolver.CollectLeafTokens(cv, tokens);
         return string.Join(' ', tokens.Select(t => t.Text));
+    }
+
+    /// <summary>FROM compilation-variable-name-1 (kb/Work PB1368, PB1228). The name is read in the &gt;&gt;DEFINE
+    /// timeline AS OF THIS ENTRY'S LINE — §7.3.11.4 GR1 scopes a definition to "text that follows a DEFINE directive
+    /// specifying compilation-variable-name-1 without the OFF phrase", and the one place that may be used outside
+    /// conditional compilation includes "a constant entry where the FROM phrase is specified":
+    /// <list type="bullet">
+    /// <item>§13.10.3 SR8 — "Compilation-variable-name-1 shall be a compilation-variable-name for which the defined
+    /// condition is currently true": never defined before the entry, last defined with OFF (§7.3.11.4 GR2), or a
+    /// PARAMETER the environment supplied no value for (GR4) — each refused here.</item>
+    /// <item>§13.10.4 GR1 — the constant is "as if … the text represented by compilation-variable-name-1 were written
+    /// where constant-name-1 is written", and GR2 — its class and category are those of "the literal represented by
+    /// compilation-variable-name-1" (<see cref="CtValue.Category"/>).</item>
+    /// </list>
+    /// The name lives in the compilation-variable namespace, never the data division's: §8.3.2.2 1) lets it be spelled
+    /// like any other user-defined word, so <c>FROM CQ</c> beside <c>01 CQ CONSTANT AS …</c> reads the variable.
+    /// A numeric variable's text is the directive's literal, written with a period (NOTE 4 of §12.3.7.4 — directives are
+    /// processed before DECIMAL-POINT IS COMMA takes effect), so under the comma mode its decimal separator becomes the
+    /// comma that writes the same value in this source unit.</summary>
+    private ConstantDef? BindConstantFrom(
+        string name, bool isGlobal, Core.CobolWordContext variable, int entryLine, string where)
+    {
+        string word = variable.GetText();
+        if (CompilationVariables.DefinitionAt(word, entryLine) is not { Value: { } value })
+        {
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: FROM '{word}' — compilation-variable-name-1 "
+                + "shall be a compilation-variable-name for which the defined condition is currently true (ISO §13.10.3 "
+                + "SR8): no >>DEFINE of it precedes the entry, or the last one specified OFF (ISO §7.3.11.4 GR2) or "
+                + "obtained no PARAMETER value (GR4)");
+            return null;
+        }
+        // §13.10.3 SR9 compares the specification as written; FROM and the name are the whole of it.
+        string spec = "FROM " + word;
+        if (value.Category == CtCategory.Numeric)
+        {
+            string text = DecimalPointIsComma ? value.Text.Replace('.', ',') : value.Text;
+            string? integer = NumericLiteral.IsIntegerLiteralForm(value.Text) ? CtNumeric.ToIntegerText(value.Number) : null;
+            return new ConstantDef(name, PicCategory.Numeric, text, integer, isGlobal, text, spec);
+        }
+        // ⛔ EVERY string category is named: a new CtCategory fails loudly here instead of binding as the last one.
+        var folded = value.Category switch
+        {
+            CtCategory.Alphanumeric => new ConcatFolder.Folded(PicCategory.Alphanumeric, value.Text),
+            CtCategory.National => new ConcatFolder.Folded(PicCategory.National, value.Text),
+            CtCategory.Boolean => new ConcatFolder.Folded(PicCategory.Boolean, value.Bits!.Bits),
+            _ => throw new InvalidOperationException($"{where}: compile-time category {value.Category} has no "
+                + "constant-entry class — CtCategory grew a member this binder does not read"),
+        };
+        return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec);
     }
 
     /// <summary>AS literal-1 for the STRING classes (§13.10.4 GR1/GR2 — the constant is the literal; class and
@@ -284,24 +338,10 @@ public sealed partial class DataBinder
     /// <summary>The arithmetic-expression AS form. §13.10.3 SR1 first: an operand that is a SINGLE numeric
     /// literal is a LITERAL, not an arithmetic expression — <c>AS 0.25</c> keeps class/category numeric with
     /// its non-integer value (GR1/GR2), where the expression form would have truncated to an integer (GR4).
-    /// Otherwise the expression evaluates per §7.3.6 and the result is an integer (§13.10.4 GR4 + §7.3.6.3 GR3). The
-    /// <c>BYTE-LENGTH OF x</c> form parses through this leg as a qualified dataReference (no dedicated token)
-    /// and is recognized and STAGED LOUD here (GR5; the §15.14 intrinsic is itself Deferred).</summary>
+    /// Otherwise the expression evaluates per §7.3.6 and the result is an integer (§13.10.4 GR4 + §7.3.6.3 GR3).</summary>
     private ConstantDef? BindConstantArithmetic(
         string name, bool isGlobal, string spec, Core.ArithmeticExpressionContext expr, string where)
     {
-        // The BYTE-LENGTH OF form (§13.10.4 GR5) — a §13.10 CONSTANT-specific shape (a qualified dataReference),
-        // NOT a §7.3.6 arithmetic operand; recognized and STAGED LOUD before the shared evaluator sees it. A sole
-        // numeric literal is never this shape, so evaluating it first does not affect the GR5 single-literal
-        // reclassification the shared evaluator applies below.
-        if (Procedure.ConditionBinder.SoleDataRef(expr) is { } sole
-            && sole.cobolWord()?.GetText().Equals("BYTE-LENGTH", StringComparison.OrdinalIgnoreCase) is true
-            && sole.dataReferenceSuffix().Any(sfx => sfx.qualification() is not null))
-        {
-            Edition.Error(DiagnosticCatalog.ConstantByteLength,
-                $"{where}: CONSTANT … AS BYTE-LENGTH OF (ISO §13.10.4 GR5 / §15.14)");
-            return null;
-        }
         // §7.3.6 evaluation via the ONE shared evaluator — §7.3.11.4 GR5 (single-literal reclassification, so
         // AS 0.25 keeps 0.25) and §7.3.6.3 GR3 (integer truncation of an expression's final result) are applied at
         // its public boundary. The binder supplies numeric-name resolution (a prior numeric constant substitutes
@@ -350,20 +390,28 @@ public sealed partial class DataBinder
         }
     }
 
-    /// <summary>AS LENGTH OF data-name-2 (§13.10.4 GR6): the value of the §15.50 LENGTH function — the item's
-    /// length in boolean, national or alphanumeric positions, read from <see cref="ItemLength.Positions"/> (THE
-    /// §15.50.4 r1/r2/r3 fold the FUNCTION LENGTH binder reads; maximum-allocation based, so the GR6
-    /// occurs-depending-group exception — "the maximum size of the data item is used" — holds by construction).
-    /// SR checks: SR3 all subscripts shall be literals; §8.4.2.3.3 SR2/SR3/SR5 the subscript count against the
-    /// item's OCCURS depth, through <see cref="ReferenceResolver.ScreenSubscriptArity"/> (kb/Work PB1016); SR10 no
-    /// ANY LENGTH operand; SR12 no dynamic-length elementary item or variable-length group operand, through
-    /// <see cref="VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup"/>. data-name-2 must already be bound
+    /// <summary>The two length phrases of the constant entry, ONE binder (kb/Work PB1227): <b>AS LENGTH OF
+    /// data-name-2</b> (§13.10.4 GR6 — the value of the §15.50 LENGTH function: <see cref="ItemLength.Positions"/>, THE
+    /// §15.50.4 r1/r2/r3 fold the FUNCTION LENGTH binder reads) and <b>AS BYTE-LENGTH OF data-name-1</b> (GR5 — the value
+    /// of the §15.14 BYTE-LENGTH function: <see cref="DataItem.ByteWidth"/>, the fold FUNCTION BYTE-LENGTH reads for a
+    /// fixed item). Both are maximum-allocation based, so each rule's occurs-depending-group exception — "the maximum
+    /// size of the data item is used" — holds by construction. Every syntax rule of §13.10.3 names data-name-1 and
+    /// data-name-2 TOGETHER, so the two operands take the same screens: SR3 all subscripts shall be literals; §8.4.2.3.3
+    /// SR2/SR3/SR5 the subscript count against the item's OCCURS depth, through
+    /// <see cref="ReferenceResolver.ScreenSubscriptArity"/> (kb/Work PB1016); SR10 no ANY LENGTH operand; SR12 no
+    /// dynamic-length elementary item or variable-length group operand, through
+    /// <see cref="VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup"/>. The operand must already be bound
     /// (definition-before-reference — SR4 rules out the reverse dependence).</summary>
+    /// <param name="bytes">True for BYTE-LENGTH OF data-name-1 (GR5), false for LENGTH OF data-name-2 (GR6).</param>
     private ConstantDef? BindConstantLength(
-        string name, bool isGlobal, string spec, Core.DataReferenceContext dref, string where)
+        string name, bool isGlobal, string spec, Core.DataReferenceContext dref, string where, bool bytes)
     {
         string? baseName = dref.cobolWord()?.GetText();
         if (baseName is null) return null;
+        // The phrase and operand as §13.10.2 names them, for every diagnostic below.
+        string phrase = bytes ? "BYTE-LENGTH OF" : "LENGTH OF";
+        string operand = bytes ? "data-name-1" : "data-name-2";
+        string written = DataBinder.WrittenText(dref);
         // ⛔ THE ONE DECOMPOSITION (ReferenceResolver.ReadWritten, kb/Work PB443/PB1016). This walked the suffix
         // list itself and looked only at a suffix's OWN subscript part, so a subscript hung off a qualification
         // (`CELL OF ROWX (3 2)`) was neither SR3-checked nor counted, and a separately parsed refModPart was
@@ -371,37 +419,42 @@ public sealed partial class DataBinder
         var w = ReferenceResolver.ReadWritten(dref);
         if (w.IsReferenceModified)
         {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: LENGTH OF '{DataBinder.WrittenText(dref)}' — "
-                + "the operand is data-name-2 (ISO §13.10.2), a data-name, and a data-name is not reference-modified");
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — the operand is "
+                + $"{operand} (ISO §13.10.2), a data-name, and a data-name is not reference-modified");
             return null;
         }
         var resolver = new ReferenceResolver(this);
-        int written = 0;   // the subscripts as written — §8.4.2.3.3 SR2/SR3/SR5's operand, screened below
+        int subscripts = 0;   // the subscripts as written — §8.4.2.3.3 SR2/SR3/SR5's operand, screened below
         if (w.SubscriptGroup is { } sub)
         {
             if (ReferenceResolver.IsEmptyGroup(sub))
             {
                 Edition.Error(DiagnosticCatalog.EmptyParenthesesOnDataReference,
-                    $"{where}: LENGTH OF '{DataBinder.WrittenText(dref)}': " + ReferenceResolver.EmptyParenthesesMessage);
+                    $"{where}: {phrase} '{written}': " + ReferenceResolver.EmptyParenthesesMessage);
                 return null;
             }
-            // §13.10.3 SR3: all subscripts of data-name-2 shall be literals. (A subscript never changes
-            // the LENGTH — every occurrence has the same description — so the tokens are only validated.)
+            // §13.10.3 SR3: all subscripts of data-name-1 and data-name-2 shall be literals. (A subscript never
+            // changes the length — every occurrence has the same description — so the tokens are only validated.)
+            // A subscript is an integer position, and SR2 lets an INTEGER constant-name stand "anywhere that a format
+            // specifies a literal of the class and category of constant-name-1" — GR1/GR3 make it that integer
+            // literal — so `LENGTH OF E (KI)` with `01 KI CONSTANT AS 2` is a literal subscript (kb/Work PB1232; the
+            // procedure-division twin is ReferenceResolver.ResolveSubscriptName's constant arm).
             var toks = new List<Antlr4.Runtime.IToken>();
             ReferenceResolver.CollectLeafTokens(sub, toks);
             if (toks.Any(t => t.Type is not (Core.SUB_INTEGERLIT or Core.INTEGERLIT or Core.SUB_WS
-                    or Core.SUB_LPAREN or Core.SUB_RPAREN or Core.SUB_COMMA)))
+                    or Core.SUB_LPAREN or Core.SUB_RPAREN or Core.SUB_COMMA)
+                && !(t.Type == Core.SUB_IDENTIFIER && IsIntegerConstant(t.Text))))
             {
-                Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: all subscripts of the LENGTH "
-                    + "OF operand shall be literals (ISO §13.10.3 SR3)");
+                Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: all subscripts of the {phrase} "
+                    + "operand shall be literals (ISO §13.10.3 SR3)");
                 return null;
             }
-            written = resolver.SubscriptSegments(dref)?.Count ?? 0;
+            subscripts = resolver.SubscriptSegments(dref)?.Count ?? 0;
         }
         DataItem? item = resolver.FindItem(baseName, w.Qualifiers);
         if (item is null)
         {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: LENGTH OF '{DataBinder.WrittenText(dref)}' — the "
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — the "
                 + "data-name is not defined at this point (a constant entry reads only PRECEDING declarations; "
                 + "ISO §13.10.3 SR4 rules out the reverse dependence)");
             return null;
@@ -411,10 +464,10 @@ public sealed partial class DataBinder
         // subscript ("All subscripts of data-name-1 and data-name-2 shall be literals"); whether one may be
         // written at all, and how many, is §8.4.2.3.3's, and a constant entry is not among SR5's seven
         // exemptions. `CONSTANT AS LENGTH OF PLAIN (1)` over a non-table item compiled and yielded 7.
-        if (resolver.ScreenSubscriptArity(dref, item, written)) return null;
+        if (resolver.ScreenSubscriptArity(dref, item, subscripts)) return null;
         if (item.IsAnyLength)
         {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the LENGTH OF operand shall not be "
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the {phrase} operand shall not be "
                 + "described with the ANY LENGTH clause (ISO §13.10.3 SR10)");
             return null;
         }
@@ -424,22 +477,23 @@ public sealed partial class DataBinder
         // OF yielded its fixed part, while a DYNAMIC LENGTH operand itself fell to the GR6 "not computable" arm.
         if (VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(item) is { } variableShape)
         {
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: LENGTH OF '{DataBinder.WrittenText(dref)}' "
-                + $"— the operand is {variableShape}; data-name-2 shall not be a dynamic-length elementary item or "
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' "
+                + $"— the operand is {variableShape}; {operand} shall not be a dynamic-length elementary item or "
                 + "a variable-length group (ISO §13.10.3 SR12)");
             return null;
         }
         // §13.10.4 GR6 — "determined as specified in the LENGTH intrinsic function": THE §15.50.4 r1/r2/r3 fold, the
-        // one FUNCTION LENGTH takes (kb/Work PB1213). This read DataItem.ImageWidth, a second copy that had drifted
-        // from the function's: 4 for an alphanumeric group of X(2) + N(2) where r3 counts 6, and a USAGE BIT item's
-        // byte occupancy where r1 counts its boolean positions.
-        int width = ItemLength.Positions(item);
+        // one FUNCTION LENGTH takes (kb/Work PB1213; it used to read DataItem.ImageWidth, a drifted second copy).
+        // §13.10.4 GR5 — "determined as specified in the BYTE-LENGTH intrinsic function": DataItem.ByteWidth, the one
+        // FUNCTION BYTE-LENGTH folds a fixed item to (IntrinsicBinder.BindByteLengthFold).
+        int width = bytes ? item.ByteWidth : ItemLength.Positions(item);
         if (width <= 0)
         {
             // A TYPE-clause reference not yet expanded / a pending PICTURE-less usage — loud, never a wrong 0.
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the length of '{DataBinder.WrittenText(dref)}' is "
-                + "not computable at this point in the data division (ISO §13.10.4 GR6 — the §15.50 LENGTH "
-                + "value; a TYPE-expanded or usage-pending operand is a recorded residue)");
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the length of '{written}' is "
+                + "not computable at this point in the data division (ISO §13.10.4 "
+                + (bytes ? "GR5 — the §15.14 BYTE-LENGTH value" : "GR6 — the §15.50 LENGTH value")
+                + "; a TYPE-expanded or usage-pending operand is a recorded residue)");
             return null;
         }
         string text = width.ToString(CultureInfo.InvariantCulture);

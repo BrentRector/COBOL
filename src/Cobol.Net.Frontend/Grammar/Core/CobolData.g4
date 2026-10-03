@@ -307,16 +307,25 @@ constantEntry
     : levelNumber dataName? constantEntryBody DOT
     ;
 
-// The AS operand (§13.10.2). LENGTH OF is listed FIRST so it wins over arithmeticExpression's qualified-
-// dataReference reading of the same tokens (`LENGTH OF X` — LENGTH is a cobolWord). A single numeric literal
-// rides arithmeticExpression and is re-classified as a LITERAL by the binder (§13.10.3 SR1); the BYTE-LENGTH
-// form (no dedicated token — §15.14 BYTE-LENGTH is itself a deferred intrinsic) rides arithmeticExpression as
-// the qualified dataReference `BYTE-LENGTH OF x` and is recognized by the binder (staged loud until the
-// §15.14 byte-width authority lands).
+// The AS operand (§13.10.2). LENGTH OF and BYTE-LENGTH OF are listed FIRST so they win over arithmeticExpression's
+// qualified-dataReference reading of the same tokens (`LENGTH OF X` — LENGTH is a cobolWord; `BYTE-LENGTH OF X` —
+// BYTE-LENGTH is a §8.9 context-sensitive word, "constant entry", with no token of its own). A single numeric literal
+// rides arithmeticExpression and is re-classified as a LITERAL by the binder (§13.10.3 SR1). Both length phrases
+// carry their operand as a dataReference, and DataBinder.BindConstantLength binds both (§13.10.4 GR5 / GR6;
+// kb/Work PB1227 — the BYTE-LENGTH form used to ride arithmeticExpression as the qualified reference
+// `BYTE-LENGTH OF x`, recognized by its spelling and staged loud).
 constantValue
     : LENGTH OF dataReference
+    | constantByteLengthWord OF dataReference
     | nonNumericLiteral
     | arithmeticExpression
+    ;
+
+// The keyword of the constant entry's byte-length phrase (§13.10.2), a context-sensitive word whose §8.9 context is
+// "constant entry", so it has no token: recognized by its spelling through the ONE word-text predicate (wordAhead, so a
+// >>COBOL-WORDS synonym steers it too).
+constantByteLengthWord
+    : {wordAhead("BYTE-LENGTH")}? IDENTIFIER
     ;
 
 // ==========================================

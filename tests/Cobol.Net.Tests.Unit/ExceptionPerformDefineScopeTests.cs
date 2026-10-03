@@ -211,7 +211,7 @@ public sealed class ExceptionPerformDefineScopeTests
         // DEFINE on line 20 and is kept, its PUSH keyed before encounter 2 and its POP after the last encounter.
         var result = new CobolNet.Frontend.Preprocessor.ConditionalCompilationResult(
             CobolNet.Frontend.Common.MappedText.Identity("", "t"),
-            [new(2, true), new(10, false), new(20, true)]);
+            [new(2, true), new(10, false), new(20, true)], []);
         var push15 = new CobolNet.Frontend.Preprocessor.DirectiveStackOp(15, CobolNet.Frontend.Preprocessor.DirectiveStackKind.Push, null);
         var pop25 = new CobolNet.Frontend.Preprocessor.DirectiveStackOp(25, CobolNet.Frontend.Preprocessor.DirectiveStackKind.Pop, null);
         var keyed = result.KeyImplicitOps([

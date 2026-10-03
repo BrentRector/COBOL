@@ -185,7 +185,11 @@ is the user-word token type.
 
 - **SR1 (before first ID DIVISION)** — Frontend: the first line matching `IDENTIFICATION DIVISION` (or `ID
   DIVISION`) fixes the boundary; any `>>COBOL-WORDS` at a later line ⇒ COBOLNET1623 (SR1).
-- **SR2 (alphanumeric literal, non-hex, space-free)** — Frontend, per literal at parse time.
+- **SR2 (alphanumeric literal, non-hex, space-free)** — Frontend, per literal at parse time. A WORD in a literal
+  slot is a compilation-variable-name (§7.3.11.4 GR1, kb/Work PB1368): it must be defined before the directive
+  (the `>>DEFINE` timeline's `DefinitionAt`, the same fold `CONSTANT … FROM` reads), its value alphanumeric (the slot's
+  category), and the literal its DEFINE WROTE passes the same SR2 screen — so a variable defined `AS X"…"` is refused as
+  hexadecimal format. Otherwise COBOLNET1623.
 - **SR5 (a word in ≤1 directive's literals)** — Frontend: a group-wide multiset of every literal's content;
   a repeat ⇒ COBOLNET1623 (SR5). (Both the modified word and its substitute count, per D.12.1.)
 - **SR3 (lit1/3/4 = reserved OR context OR intrinsic; not special-character)** — Compiler: reserved via

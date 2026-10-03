@@ -95,8 +95,7 @@ One code, **~40 stable Ids**, all sharing suppress key `recognized-not-implement
 `national-through-range`), OO residue (`oo-based-in-class`, `oo-factory-object-reference`,
 `oo-interface-property-prototype`, `oo-method-declaratives`, `oo-method-raising-last`,
 `oo-external-method-working-storage`), pointers (`usage-function-pointer`, `program-pointer-restricted`), linkage
-(`any-length-returning`, `by-value-formal-carrier`, `optional-formal`), constants
-(`constant-byte-length`, `constant-from-compilation-variable`), recursion (`recursive-*-working-storage`),
+(`any-length-returning`, `by-value-formal-carrier`, `optional-formal`), recursion (`recursive-*-working-storage`),
 strong-group comparison members (`strong-group-comparison-member`), arithmetic (`arithmetic-standard-intrinsic`), and a large
 **Report Writer** cluster (`report-*` — CODE clause, NEXT GROUP, multiple LINE, OCCURS-in-group, rolled/cross SUM, …).
 `construct-staged-not-implemented` is the generic marker. These are the implementation backlog — cross-reference

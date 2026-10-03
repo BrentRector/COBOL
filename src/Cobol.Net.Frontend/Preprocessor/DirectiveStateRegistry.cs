@@ -37,9 +37,12 @@ public static class DirectiveStateRegistry
         new(Constructs.SourceFormatDirective2002, [nameof(ReferenceFormatProcessor)], [],
             "The reference format of the following text (§7.3.24.3 GR1) — the normalizer's running segment format, which "
             + "§14.9.28.4 GR14's implicit PUSH ALL / POP ALL reach through ImplicitFormatOps (kb/Work PB1066)."),
-        new(Constructs.DefineDirective2002, [nameof(ConditionalCompilationProcessor)], [],
+        new(Constructs.DefineDirective2002, [nameof(ConditionalCompilationProcessor)],
+            [nameof(DirectiveResults.CompilationVariables)],
             "The compilation-variable table — every instance at once (§7.3.22.4 GR3, §7.3.20.4 GR1: \"all instances "
-            + "of that directive are restored\")."),
+            + "of that directive are restored\") — held by the conditional-compilation driver for the directives it "
+            + "evaluates, and carried onward as a timeline of DEFINE events for the uses §7.3.11.4 GR1 permits outside "
+            + "conditional compilation: a constant entry's FROM phrase and a later directive's literal slot (kb/Work PB1368)."),
         new(Constructs.TurnDirective2002, [nameof(TurnDirectiveProcessor)], [nameof(DirectiveResults.TurnEvents)],
             "The exception-checking toggles (§7.3.25.4), folded by the binder's TurnState."),
         new(Constructs.RefModZeroLength2023, [nameof(RefModZeroLengthDirectiveProcessor)],

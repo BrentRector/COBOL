@@ -2106,13 +2106,13 @@
   "ordinal": 1,
   "subject": "DEFINE directive",
   "rule-digest": "856ecae72655",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Run; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantEntry; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Preprocessor/CompilationVariableEvent.cs#DefinitionAt; src/Cobol.Net.Frontend/Pipeline/Frontend.cs#Preprocess; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantFrom; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#Literal",
+  "test-ref": "conformance:2002/pb1368_constant_from_compilation_variable; conformance:2023/pb1368_compilation_variable_timeline; conformance:negative/pb1368-constant-from-defined-later; conformance:negative/pb1368-cobol-words-numeric-variable",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1368 (registrar 15a). cite.py --check 7.3.11.4 \"or in a constant entry where the FROM phrase is specified\" -> OK GR1. Three permitted uses, one honored: (a) >>IF / >>EVALUATE / >>WHEN / another >>DEFINE operand resolve the name via the evaluator's resolveName (p1b, q8 - CONFORMS). (b) CONSTANT ... FROM compilation-variable-name-1 is REFUSED: DataBinder.BindConstantEntry emits COBOLNET0899 constant-from-compilation-variable ('recognized-not-implemented') for every FROM (p1.cob: 5 errors). --check 13.10.3 SR8 and 13.10.4 GR1 OK - §13.10.4 GR1 makes the entry 'as if ... the text represented by compilation-variable-name-1 were written'. No kb/Work note owns this staging (grep kb/Work: none). (c) a literal operand of another directive: '>>COBOL-WORDS EQUATE W1 WITH W2' with W1/W2 defined as alphanumeric literals is rejected COBOLNET1623 'must be an alphanumeric literal (ISO §7.3.10.3 SR2)' (s1.cob) - GR1 permits the name wherever a literal of its category is. (>>DISPLAY accepts anything unvalidated - its operand grammar is registry-recorded residue.) || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900)",
-  "state": "GAP"
+  "notes": "kb/Work PB1368 (w1006c). cite.py --check 7.3.11.4 \"in a constant entry where the FROM phrase is specified\" -> OK GR1. All three permitted uses now honored: (a) directive operands (IF/EVALUATE/DEFINE/DISPLAY) through the evaluator's live table; (b) CONSTANT ... FROM compilation-variable-name-1 reads the >>DEFINE TIMELINE (DirectiveResults.CompilationVariables, PUSH/POP replayed) at the entry's own line - GR1 'in text that follows a DEFINE', so a DEFINE after the entry does not reach it (negative pb1368-constant-from-defined-later) and an OVERRIDE between two entries gives each its own value (2002 golden CT=1 CU=2); (c) a >>COBOL-WORDS literal slot takes a variable defined before the directive whose value is alphanumeric (2023 golden: EQUATE W1 WITH W2 makes SHOW a DISPLAY synonym); a numeric variable there is refused COBOLNET1623 (the category clause of GR1).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.11.4-2",
@@ -2121,13 +2121,13 @@
   "ordinal": 2,
   "subject": "DEFINE directive",
   "rule-digest": "7a52d4721da2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantFrom; src/Cobol.Net.Frontend/Preprocessor/CompilationVariableEvent.cs#DefinitionAt; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateOperand",
+  "test-ref": "conformance:negative/pb1368-constant-from-after-define-off",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1368 (registrar 15a). cite.py --check 7.3.11.4 \"shall not be used except in a defined condition unless it is redefined in a subsequent DEFINE directive\" -> OK GR2. OFF removes the name, so a later use is 'not a previously-defined compilation variable' COBOLNET1619 in >>IF (n6), >>EVALUATE (q10) and a >>DEFINE operand (q9); IS [NOT] DEFINED still works and a later DEFINE revives it (q7). Unverified/unenforced edges: '>>DISPLAY X' after OFF compiles clean (s3.cob) - the >>DISPLAY operand is not validated at all (registry display-directive-2023 row: recorded residue); the CONSTANT FROM leg is unreachable (GR1 finding, COBOLNET0899). || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900)",
-  "state": "GAP"
+  "notes": "kb/Work PB1368 (w1006c). cite.py --check 7.3.11.4 \"shall not be used except in a defined condition unless it is redefined in a subsequent DEFINE directive\" -> OK GR2. Every use path now checks it: >>IF/>>EVALUATE/>>DEFINE operands and >>DISPLAY (COBOLNET1619, PB807/wave 1004), CONSTANT ... FROM after OFF (COBOLNET1547 naming 13.10.3 SR8 and GR2; negative pb1368-constant-from-after-define-off) and a COBOL-WORDS literal slot after OFF (COBOLNET1623). IS [NOT] DEFINED still reads an OFF name, and a later DEFINE revives it (the timeline's last event for the name wins).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.11.4-3",
@@ -4176,13 +4176,13 @@
   "ordinal": 1,
   "subject": "COBOL words",
   "rule-digest": "be8f0b019fe4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs; src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4#cobolWord; src/Cobol.Net.Compiler/Binding/UserWordKind.cs#UserWordKinds",
-  "test-ref": "unit:UserWordDeclarationDriftTests.TheSharingRelation_IsRebuiltFromTheStandardsExceptions",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantFrom; src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4#cobolWord; src/Cobol.Net.Compiler/Binding/UserWordKind.cs#UserWordKinds",
+  "test-ref": "unit:UserWordDeclarationDriftTests.TheSharingRelation_IsRebuiltFromTheStandardsExceptions; conformance:2002/pb1368_constant_from_compilation_variable",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1228 (registrar 15b). Rule: `OK  §8.3.2.2 1)` \"a compilation-variable-name may be the same as any other type of user-defined word\" — the first exception to `OK §8.3.2.2` \"Within a source element, a given user-defined word may be used as only one type of user-defined word with the following exceptions:\". Compilation variables live only in the preprocessor's directive symbol table and are consumed before the parser sees the source element, so no source-element namespace ever meets them. PROBES (pinned cobol.exe, out/probe/onetype/cv.cob) at 2002 and 2023: >>DEFINE ZQ AS 1 / PQ AS 2 / FQ AS 3 beside 01 ZQ (data-name), paragraph PQ, ALPHABET FQ IS NATIVE, and >>IF ZQ = 1 AND PQ = 2 AND FQ = 3 selecting a DISPLAY of the data item ZQ -> prints `CV A` at both (the compilation variables evaluate and the same-spelled data-name reads its own value); out/probe/cdw/cdw3.cob likewise pairs >>DEFINE DEFINE with 01 DEFINE at 2014/2023. The sentence forbids nothing, so it has no rejecting edge to verify; the permission is the whole rule and holds. REGISTER: open kb/Work PB990 lists this row in inventory_rows because the one-type census it owes must encode these exceptions as data — the fixer must keep this permission when the census lands (a regression risk for PB990, not a current defect). No spec-derived test names the exception, so test-ref is empty. || REFUTED: PARTIAL — [SUPERSEDES the earlier line for this rule: citation corrected to 7.3.11.4 GR1] The permission lets a compilation-variable-name be the same word as any other user-defined word. A compilation-variable-name can be referenced in three places (section 7.3.11.4 GR1): compiler directives, defined conditions, and the constant entry's FROM phrase. Only the first two are consumed by the preprocessor. The adjudicator verified only those two. The FROM phrase is where the permission actually has to be resolved inside the source element: '01 J CONSTANT FROM CQ' beside '>>DEFINE CQ' AND '01 CQ CONSTANT AS ...' must take the compilation variable. The pinned compiler never gets that far, because every CONSTANT ... FROM compilation-variable-name is staged loud as not implemented (COBOLNET0899 in DataBinder.Constants.cs). So this rule's sharing arm in that context is unverifiable, and the rule has two halves of which only one is verified, which makes it PARTIAL. The root cause is section 13.10.4 GR1 staged loud; the fix belongs there, and this row would then need a re-probe. The directive and defined-condition arms do hold: >>IF ZQ = 7 AND PQ = 4 is true beside 01 ZQ and a paragraph named like PQ. || editions as written by the adjudicator: 2002, 2014, 2023 (compilation-variable-names and the >>DEFINE directive exist from COBOL-2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1228 (w1006c). cite.py --check 8.3.2.2 \"a compilation-variable-name may be the same as any other type of user-defined word\" -> OK 1). The FROM arm - the one place inside a source element the permission must be resolved - now reads the compilation-variable namespace only: golden '01 CQ CONSTANT AS 7. 01 J CONSTANT FROM CQ.' beside '>>DEFINE CQ AS 42' gives J=42 and CQ=7. The directive and defined-condition arms held already.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.2.2-2",
@@ -18246,13 +18246,13 @@
   "ordinal": 3,
   "subject": "Constant entry",
   "rule-digest": "36f5814e6313",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength",
-  "test-ref": "conformance:2002/pb1016_constant_length_subscripts",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#IsIntegerConstant",
+  "test-ref": "conformance:2002/pb1016_constant_length_subscripts; conformance:2002/pb1232_constant_length_constant_subscript; conformance:negative/pb1232-constant-length-noninteger-subscript",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1232, 14d). SR3 (cite OK). Literal subscripts accepted (E (2) -> 3; pb1016 golden). Data-name subscript `LENGTH OF E (I)` rejected COBOLNET1547 SR3 (correct). But an INTEGER CONSTANT-NAME subscript `01 KI CONSTANT AS 2. ... 01 K CONSTANT AS LENGTH OF E (KI).` is rejected with the same SR3 message: the token screen admits only SUB_INTEGERLIT/INTEGERLIT, while §13.10.3 SR2 admits a constant-name wherever a format specifies a literal and GR1 makes it 'as if literal-1 were written' — so the subscript IS a literal. Expected: K = 3. F-SR3-CONST-SUB. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1232 (w1006c). cite.py --check 13.10.3 \"All subscripts of data-name-1 and data-name-2 shall be literals\" -> OK SR3. The screen in BindConstantLength (one screen for LENGTH OF and BYTE-LENGTH OF since PB1227) admits integer-literal tokens and, per SR2 ('constant-name-1 may be used anywhere that a format specifies a literal of the class and category of constant-name-1') with GR1/GR3, a subscript word naming an INTEGER constant: LENGTH OF E (KI) = 3, BYTE-LENGTH OF C OF R (KI 1) = 4, LENGTH OF E (KJ) with KJ = KI + 1 = 3. Still refused: a data-name subscript (LENGTH OF E (I)), and a NON-integer constant (KD = 1.5 -> negative pb1232-constant-length-noninteger-subscript, COBOLNET1547 SR3).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-4",
@@ -18321,13 +18321,13 @@
   "ordinal": 8,
   "subject": "Constant entry",
   "rule-digest": "e7fd9d9a5ad8",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantFrom",
+  "test-ref": "conformance:negative/constant-from-compilation-variable; conformance:negative/pb1368-constant-from-after-define-off; conformance:negative/pb1368-constant-from-defined-later",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1228, 14d). SR8 (cite OK). The FROM leg is staged loud — every FROM entry draws COBOLNET0899 (negative/constant-from-compilation-variable), so the 'defined condition is currently true' check has no implementation; the class doc names the missing piece (the preprocessor's compilation-variable store is not reachable at bind). §7.2.1 puts constant entries specifying FROM in the text-manipulation stage. F-FROM. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1228 (w1006c). cite.py --check 13.10.3 \"Compilation-variable-name-1 shall be a compilation-variable-name for which the defined\" -> OK SR8. 'Currently true' is read at the entry's resultant line through the >>DEFINE timeline (POP-revoked definitions excluded): never defined (negative constant-from-compilation-variable), OFF before the entry (pb1368-constant-from-after-define-off) and defined only after it (pb1368-constant-from-defined-later) each draw COBOLNET1547.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-9",
@@ -18351,13 +18351,13 @@
   "ordinal": 10,
   "subject": "Constant entry",
   "rule-digest": "b00a99c6c1e7",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1227-constant-byte-length-any-length; conformance:negative/pb1227-constant-length-any-length",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1227, 14d). SR10 (cite OK). `LINKAGE SECTION. 01 L PIC X ANY LENGTH. 01 K CONSTANT AS LENGTH OF L.` -> COBOLNET1547 '... shall not be described with the ANY LENGTH clause (ISO §13.10.3 SR10)' (item.IsAnyLength). No spec-derived negative case exists — test-needed. || REFUTED: PARTIAL — SR10 has two halves, data-name-1 (BYTE-LENGTH OF) and data-name-2 (LENGTH OF). Only the data-name-2 half is implemented and verified: BindConstantLength checks item.IsAnyLength and raises COBOLNET1547. The data-name-1 half is never reached. The whole BYTE-LENGTH OF form is staged loud (COBOLNET0899, GR5 Deferred) before any SR10 check, so SR10 is never enforced for data-name-1, only overshadowed by a blanket rejection of legal source. A rule with one half verified is PARTIAL. There is also no spec-derived negative test for either half. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2014, 2023",
+  "notes": "kb/Work PB1227 (w1006c). cite.py --check 13.10.3 \"Data-name-1 and data-name-2 shall not be described with the ANY LENGTH clause\" -> OK SR10. Both halves are enforced by the one BindConstantLength screen: BYTE-LENGTH OF (data-name-1) and LENGTH OF (data-name-2) over a contained program's ANY LENGTH linkage item each draw COBOLNET1547 naming SR10 - the only diagnostic of either negative (ANY LENGTH is itself legal there, 13.18.2.3). Editions: ANY LENGTH exists from 2014.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-11",
@@ -18396,13 +18396,13 @@
   "ordinal": 1,
   "subject": "Constant entry",
   "rule-digest": "621c7d730d41",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantStringLiteral; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ConstantValueRawText; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ConstantOperand; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveSubscriptName",
-  "test-ref": "conformance:2002/constant_entry",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantFrom; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantStringLiteral; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ConstantValueRawText; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ConstantOperand; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveSubscriptName",
+  "test-ref": "conformance:2002/constant_entry; conformance:2002/pb1368_constant_from_compilation_variable",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1228, 14d). GR1 (cite.py --check 13.10.4 \"the effect of specifying constant-name-1 in other than this entry is as if literal-1 or the text represented by compilation-variable-name-1 were written\" -> OK). literal-1 half verified: DISPLAY/VALUE/88/subscript/ref-mod/EVALUATE substitution (constant_entry golden: STR=NIL, TXT=NIL; probes gr2_classes, gr3_int_literal_use). compilation-variable-name-1 half NOT implemented: `>>DEFINE MYV AS 12` + `01 K CONSTANT FROM MYV.` -> COBOLNET0899 (F-FROM). Also a constant-name referenced BEFORE its entry is rejected (`01 W PIC X(K). 01 K CONSTANT AS 3.` -> COBOLNET2147) though GR1 states no ordering condition (F-FORWARD-REF). Two halves, one verified -> PARTIAL. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1228 (w1006c). cite.py --check 13.10.4 \"If literal-1 or compilation-variable-name-1 is specified, the effect of specifying\" -> OK GR1. The FROM arm substitutes the text the variable represents: a numeric variable's directive literal (dot-decimal per 12.3.7.4 NOTE 4, rewritten with the comma under DECIMAL-POINT IS COMMA), an expression variable's 7.3.6.3 GR3 integer, an alphanumeric/national/boolean literal re-quoted for the text-plumbed VALUE path. Golden: CN=3 (and PIC X(CN) = 3 positions), CA=ABC, CE=14 (2 + 3 * 4), CR*2=5.0.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.10.4-2",
@@ -18411,13 +18411,13 @@
   "ordinal": 2,
   "subject": "Constant entry",
   "rule-digest": "f94b6d47c2b4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantStringLiteral; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
-  "test-ref": "conformance:2002/constant_entry",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantFrom; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantStringLiteral; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
+  "test-ref": "conformance:2002/constant_entry; conformance:2002/pb1368_constant_from_compilation_variable",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1228, 14d). GR2 (cite OK: \"the class and category of constant-name-1 is the same as that of literal-1\"). Verified literal classes: alphanumeric \"AB\"/X\"41\" (PicCategory.Alphanumeric), national N\"AB\" (seeds PIC N(2), refused as VALUE of PIC 9 -> COBOLNET0898), boolean B\"101\" (seeds PIC 1(3)), numeric 0.25 / -2.5 / +3 / 007 / 1.5E2 (numeric, non-integer where a fraction digit exists; -2.5 compares < 0). The compilation-variable-name-1 half is not implemented (F-FROM) -> PARTIAL. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1228 (w1006c). cite.py --check 13.10.4 \"If literal-1 or compilation-variable-name-1 is specified, the class and category of\" -> OK GR2. BindConstantFrom maps the variable's CtValue category one-to-one (numeric / alphanumeric / national / boolean; a new CtCategory member throws) - an integer numeric variable is an integer constant usable as a PICTURE repetition (golden W PIC X(CN)), a non-integer one is not.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.10.4-3",
@@ -18426,13 +18426,13 @@
   "ordinal": 3,
   "subject": "Constant entry",
   "rule-digest": "a4be894fb380",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#OccursBoundValue; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ExpandPicConstants",
-  "test-ref": "conformance:2002/constant_entry",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ExpandPicConstants; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#OccursBoundValue",
+  "test-ref": "conformance:2002/constant_entry; conformance:2002/pb1227_constant_byte_length; conformance:2002/l1c05_constant_expr_truncated_integer; conformance:2002/pb1016_constant_length_subscripts",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1227, 14d). GR3 (cite OK). arithmetic-expression-1 and data-name-2 (LENGTH) yield an integer literal (IsInteger=true, text integral): verified as PIC repetition X(K1)=3, OCCURS bound, ref-mod W(1:K), EVALUATE K WHEN 6, subscript T-ENT(K-MAX). data-name-1 (BYTE-LENGTH) leg is not implemented (F-BYTE-LENGTH) -> PARTIAL (three operands named, two verified). || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1227 (w1006c). cite.py --check 13.10.4 \"If arithmetic-expression-1, data-name-1, or data-name-2 is specified, the effect of\" -> OK GR3. All three arms now yield an integer literal: arithmetic-expression-1 (GR4, the 7.3.6.3 GR3 truncation), data-name-2 (LENGTH OF) and data-name-1 (BYTE-LENGTH OF, previously staged loud). Each is an integer constant usable where the format specifies an integer: golden BUF PIC X(K2) with K2 = BYTE-LENGTH OF WN = 6 measures 6, and LK2 = LK - 3 (LK a BYTE-LENGTH constant) is a PICTURE repetition in LOCAL-STORAGE.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.10.4-4",
@@ -18456,13 +18456,13 @@
   "ordinal": 5,
   "subject": "Constant entry",
   "rule-digest": "5ee9cacad350",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#constantValue; src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#ByteWidth",
+  "test-ref": "conformance:2002/pb1227_constant_byte_length",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1227, 14d). GR5 (cite OK: \"The value of constant-name-1 is determined as specified in the BYTE-LENGTH intrinsic function\"). `01 W PIC X(4). 01 K CONSTANT AS BYTE-LENGTH OF W.` -> COBOLNET0899 'CONSTANT … AS BYTE-LENGTH OF (ISO §13.10.4 GR5 / §15.14)'. The staging rationale (DIAGNOSTICS.md constant-byte-length; DataBinder.Constants.cs class doc; CobolData.g4 constantValue comment: 'the §15.14 intrinsic is itself a Deferred catalog row') is STALE: FUNCTION BYTE-LENGTH(W) runs today (probe fn_bytelength -> 4, and 6 for PIC N(3)). Expected K = 4. F-BYTE-LENGTH. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1227 (w1006c). cite.py --check 13.10.4 \"If the BYTE-LENGTH phrase is specified, the class and category of constant-name-1 is\" -> OK GR5. The 0899 staging rested on a false premise (FUNCTION BYTE-LENGTH is live) and is deleted. The grammar now spells the phrase (constantValue: constantByteLengthWord OF dataReference, BYTE-LENGTH the 8.9 context-sensitive word recognized through wordAhead) instead of riding arithmeticExpression as a qualified reference, and BindConstantLength binds it beside LENGTH OF with DataItem.ByteWidth - the fold FUNCTION BYTE-LENGTH reads. Golden: X(4)=4, N(3)=6, S9(9) COMP-5=4, group X(2)+N(2)=6, an OCCURS 1 TO 4 DEPENDING group = its MAXIMUM 1 + 4x3 = 13 (GR5's exception), C OF R (3 2) with C PIC N(2) = 4.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.10.4-6",
@@ -58581,13 +58581,13 @@
   "ordinal": 0,
   "subject": "Local-storage section",
   "rule-digest": "609cf5f89642",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#localStorageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDivision; src/Cobol.Net.Compiler/Binding/DataBinder.cs#Bind; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitLocalStorageSection",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#localStorageSection; src/Cobol.Net.Compiler/Binding/DataBinder.cs#Bind; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDivision; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitLocalStorageSection",
+  "test-ref": "conformance:2002/pb1227_constant_byte_length",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1227, 14d). Rule: 'LOCAL-STORAGE SECTION. [77-level-description-entry | constant-entry | record-description-entry | type-declaration-entry] ...' (cite.py --check 13.6.2 \"LOCAL-STORAGE\" -> OK §13.6.2 General format). Grammar localStorageSection : LOCAL_STORAGE SECTION DOT dataDescriptionEntry* — both words required, period required, zero-or-more entries (the plain bracket + ellipsis), the entry alternatives all ride dataDescriptionEntry (level 77, 01 CONSTANT AS, 01 TYPEDEF, record entries). Probe probe/local-storage-section/a_fmt.cob (77 + 01 CONSTANT AS 42 + 01 TYPEDEF group + record + 01 TYPE + 77 + OCCURS/INDEXED table, all in one LS) compiles and runs identically at --std 2002/2014/2023: 'L77=005 CON=42 REC=XYZ11 LT=AB07 B=QQ TAB=111'; at --std 85 COBOLNET0900 'the LOCAL-STORAGE SECTION requires COBOL-2002'. No existing golden places a 77, constant-entry or type-declaration-entry in LOCAL-STORAGE (every LS golden carries 01 records only), so the alternatives are verified by probe only — test-needed. || REFUTED: PARTIAL — The LS general format admits ANY constant-entry (13.10.2: AS arithmetic-expression | BYTE-LENGTH OF data-name-1 | literal | LENGTH OF data-name-2, or FROM compilation-variable-name, with 1/01 and IS GLOBAL). The adjudicator probed only the literal arm. The BYTE-LENGTH OF arm, legal in LOCAL-STORAGE, is refused with COBOLNET0899 (staged loud in DataBinder.Constants.cs:237-246), so legal LS source is rejected. The defect is shared with WORKING-STORAGE, so the root cause sits in the section 13.10 constant binder, not in LS handling. PB1016 (landed) notes SR-13.10.3-3 stays GAP for the same staged form, and no open kb/Work note owns it. The other arms do work in LS: level 1, arithmetic expression, IS GLOBAL, LENGTH OF, a literal, a constant as a PICTURE repetition, and TYPEDEF STRONG plus TYPE. No spec-derived test pins any alternative. || Editions (adjudicator): 2002, 2014, 2023 (absent from COBOL-85; the 2023 text is the only in-repo edition and prints the format unchanged) || Code sites (adjudicator detail): src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#localStorageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDivision; src/Cobol.Net.Compiler/Binding/DataBinder.cs#Bind (localStorageSection -> BindEntries EntrySection.LocalStorage); src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitLocalStorageSection",
-  "state": "GAP"
+  "notes": "kb/Work PB1227 (w1006c). cite.py --check 13.6.2 \"LOCAL-STORAGE SECTION\" -> OK general format. Every alternative of the bracket is now witnessed in LOCAL-STORAGE by a spec-derived golden: a 77-level entry (L77 PIC X(5)), constant entries (LK = BYTE-LENGTH OF L77 = 5 - the BYTE-LENGTH arm the refuter found refused - and LK2 = LK - 3), a type-declaration entry (LTYPE TYPEDEF with LT PIC X(LK2)) and a record description entry (LR TYPE LTYPE; MOVE \"ABC\" keeps \"AB\"). The refuter's PARTIAL rested on the BYTE-LENGTH arm being staged loud, now removed.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.7.2",

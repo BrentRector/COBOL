@@ -100,13 +100,15 @@ public static partial class ConditionalCompilationProcessor
             dialectLevel, permissive, inputs, implicitOps);
         var expanded = run.Render(text);
         var resultant = CopyProcessor.ApplyReplaceStatements(expanded, diagnostics, EditionInfo.Of(dialectLevel, permissive));   // Step 3 — REPLACE over the expanded compilation group
-        if (run.Encounters.Count == 0) return new ConditionalCompilationResult(resultant, []);
+        if (run.Encounters.Count == 0) return new ConditionalCompilationResult(resultant, [], []);
         // Each encounter's line in the driver's OUTPUT frame, carried through REPLACE (which may drop and join lines)
-        // to the RESULTANT frame the parser's tokens use.
+        // to the RESULTANT frame the parser's tokens use — and each compilation-variable event's, which is an encounter's.
         int[] resultantLine = CopyProcessor.ReplaceLineMap(expanded.Text);
         var encounters = run.Encounters
             .Select(e => new DirectiveEncounter(resultantLine[e.Line] + 1, e.ChangesState)).ToArray();
-        return new ConditionalCompilationResult(resultant, encounters);
+        var compilationVariables = run.CompilationVariables
+            .Select(e => e with { Line = resultantLine[e.Line] + 1 }).ToArray();
+        return new ConditionalCompilationResult(resultant, encounters, compilationVariables);
     }
 
     /// <summary>
@@ -147,12 +149,19 @@ public static partial class ConditionalCompilationProcessor
         private readonly IReadOnlyList<KeyedDirectiveOp> _implicitOps;
         private int _nextImplicitOp;
         private readonly List<DirectiveEncounter> _encounters = [];
+        // kb/Work PB1368 — every change a DEFINE made to `_defines`, in encounter order (Line = 0-based line in THIS
+        // run's output frame, like an encounter's): the compilation-variable TIMELINE the later stages read.
+        private readonly List<CompilationVariableEvent> _compilationVariables = [];
         private int _renderBase;
         private int _flushBase;
 
         /// <summary>Every <c>&gt;&gt;</c> line met, in encounter order; <see cref="DirectiveEncounter.Line"/> is the
         /// 0-based line of this run's OUTPUT frame.</summary>
         public IReadOnlyList<DirectiveEncounter> Encounters => _encounters;
+
+        /// <summary>Every change a DEFINE made to the compilation-variable table, in encounter order;
+        /// <see cref="CompilationVariableEvent.Line"/> is the 0-based line of this run's OUTPUT frame.</summary>
+        public IReadOnlyList<CompilationVariableEvent> CompilationVariables => _compilationVariables;
 
         // The targeted edition. TWO rules read it: the §8.3.2.1 word-length ceiling for >>DEFINE names (a
         // compilation-variable-name never reaches the tree-walk funnel, so this stage enforces it itself —
@@ -411,7 +420,13 @@ public static partial class ConditionalCompilationProcessor
                         }
                         break;
                     case "DEFINE":
-                        if (emitting) ApplyDefine(rest, _defines, _evaluator, _diag, _dialectLevel, _inputs);   // a DEFINE in an omitted branch has no effect
+                        // A DEFINE in an omitted branch has no effect. One that changed the table is an EVENT of the
+                        // compilation-variable timeline, recorded at this directive's output-frame line (the encounter's,
+                        // below) so the CONSTANT FROM and directive-literal uses can read the table as of their own line
+                        // (§7.3.11.4 GR1, kb/Work PB1368).
+                        if (emitting && ApplyDefine(rest, _defines, _evaluator, _diag, _dialectLevel, _inputs) is var (defined, written))
+                            _compilationVariables.Add(new CompilationVariableEvent(_renderBase + output.Count, defined,
+                                _defines.GetValueOrDefault(defined), written));
                         changesState = emitting;
                         break;
                     case "DISPLAY":
@@ -635,7 +650,11 @@ public static partial class ConditionalCompilationProcessor
         return w[0] != '-' && w[^1] != '-';
     }
 
-    private static void ApplyDefine(string rest, Dictionary<string, CtValue> defines,
+    /// <summary>Apply one emitting-branch <c>&gt;&gt;DEFINE</c> to <paramref name="defines"/>. Returns the name whose
+    /// entry the directive CHANGED and the operand as written — the event the compilation-variable timeline records
+    /// (kb/Work PB1368) — or null when the directive changed nothing (malformed, or an operand that did not evaluate;
+    /// each already reported).</summary>
+    private static (string Name, string Written)? ApplyDefine(string rest, Dictionary<string, CtValue> defines,
         CompileTimeExpressionEvaluator evaluator, DirectiveDiag diag, int dialectLevel, CompilationInputs inputs)
     {
         // The directive's own general format first (kb/Work PB1367): every violation names the rule and the directive
@@ -643,7 +662,7 @@ public static partial class ConditionalCompilationProcessor
         if (!TrySplitDefine(rest, out var define, out string complaint))
         {
             diag.DefineMalformed(complaint);
-            return;
+            return null;
         }
         var (name, kind, operand, over) = define;
         // §7.3.11.3 SR1 (with §7.3.3 SR7, SR9): the name shall not be a compiler-directive word — the ONE §8.12
@@ -651,7 +670,7 @@ public static partial class ConditionalCompilationProcessor
         if (CompilerDirectiveWords.IsReserved(name))
         {
             diag.DirectiveWordAsName(name, "a DEFINE directive", "ISO §7.3.11.3 SR1");
-            return;
+            return null;
         }
         // §8.3.2.1 applies to the compilation-variable-name — a word the tree-walk funnel never sees. Checked at
         // the DEFINITION site (the root: an over-long word can never become defined, so a reference-site spelling
@@ -661,7 +680,7 @@ public static partial class ConditionalCompilationProcessor
         {
             case DefineKind.Off:
                 defines.Remove(name);   // GR2 — undefine
-                return;
+                return (name, "");
             case DefineKind.Parameter:
             {
                 // GR4 — the value is obtained from the operating environment by an implementor-defined method
@@ -676,14 +695,14 @@ public static partial class ConditionalCompilationProcessor
                 // SR2 applies to the PARAMETER alternative like every other (kb/Work PB1367): without OVERRIDE, a name
                 // already defined may be redefined only to the SAME value, and "no value" is not the same value.
                 if (pv is null && !over && defines.ContainsKey(name)) diag.Report1618(name);
-                if (pv is null) { defines.Remove(name); return; }
+                if (pv is null) { defines.Remove(name); return (name, ""); }
                 AssignDefine(name, pv, over, defines, diag);
-                return;
+                return (name, "");
             }
             default:
-                if (EvaluateOperandText(operand, evaluator, diag, $">>DEFINE {name}") is { } v)
-                    AssignDefine(name, v, over, defines, diag);
-                return;
+                if (EvaluateOperandText(operand, evaluator, diag, $">>DEFINE {name}") is not { } v) return null;
+                AssignDefine(name, v, over, defines, diag);
+                return (name, operand);
         }
     }
 

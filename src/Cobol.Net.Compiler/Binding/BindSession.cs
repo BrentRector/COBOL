@@ -50,6 +50,12 @@ internal sealed class BindSession
     /// GR1 OFF.</summary>
     public LeapSecondState LeapSecond { get; init; } = LeapSecondState.Empty;
 
+    /// <summary>The group's <c>&gt;&gt;DEFINE</c> compilation-variable timeline (ISO §7.3.11.4 GR1; kb/Work PB1368) — what
+    /// a constant entry's FROM phrase reads, as of the entry's own line. Every unit's
+    /// <see cref="DataBinder.CompilationVariables"/> carries it. Empty when the group defines no variable.</summary>
+    public Frontend.Preprocessor.DirectiveTimeline<Frontend.Preprocessor.CompilationVariableEvent> CompilationVariables { get; init; } =
+        Frontend.Preprocessor.DirectiveTimeline<Frontend.Preprocessor.CompilationVariableEvent>.Empty;
+
     /// <summary>The compilation group's REPOSITORY resolution sources (<see cref="GroupRepository"/>), built ONCE by
     /// <c>BinderDriver.Bind</c> after every DATA division has bound and before the FIRST procedure body binds —
     /// a CLASS's method bodies as well as a program unit's (kb/Work PB1100). Reading it earlier is a driver-order

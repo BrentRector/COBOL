@@ -948,6 +948,19 @@ code:
   patch — which is what lets a later phase add ops only it can place (`WithStackOps`, below).
 * **Group-prefix values** (COBOL-WORDS, LEAP-SECOND) replay the ops up to the first compilation unit — the point
   §7.3.10.3 SR1 / §7.3.17.3 SR1 close the region — and take the state in effect there.
+* **The compilation-variable table is ALSO a timeline** (kb/Work PB1368). The conditional-compilation driver holds the
+  live `_defines` map for the directives it evaluates (IF / EVALUATE / DEFINE / DISPLAY operands), but §7.3.11.4 GR1
+  permits two uses OUTSIDE conditional compilation — "in any compiler directive where a literal of the category
+  associated with the name is permitted … or in a constant entry where the FROM phrase is specified" — and each must
+  read the table AS OF ITS OWN LINE ("in text that follows a DEFINE directive"), so a final map is the wrong product.
+  The driver records every change a DEFINE made as a `CompilationVariableEvent` (resultant line, name, `CtValue` or
+  null for OFF / a value-less PARAMETER, the operand as written) at the encounter's line; `Frontend.Preprocess` collects
+  them under the DEFINE row and replays the PUSH/POP program over them like any other timeline
+  (`DirectiveResults.CompilationVariables`, claimed by the `DefineDirective2002` registry entry; GR14's implicit ops
+  join through `WithStackOps`). The ONE fold is `CompilationVariableTimeline.DefinitionAt(name, line)` — the per-name
+  `TryLastInEffectBefore`. Readers: `CobolWordsDirectiveProcessor` (a word in a literal slot is a variable defined
+  before the directive, screened by SR2 as the literal its DEFINE wrote) and `DataBinder.BindConstantFrom`
+  (§13.10.3 SR8 / §13.10.4 GR1–GR2).
 * **`DirectiveStateRegistry`** accounts for every pushable row: carried (naming the stage types and the
   `DirectiveResults` members) or, with its rule, why this compiler holds no state (LISTING — no listing is produced,
   §7.3.18.3 GR1; DISPLAY — stateless; CALL-CONVENTION — no state implemented; FLAG-85 /

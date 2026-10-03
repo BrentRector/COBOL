@@ -282,15 +282,17 @@ public sealed class DirectiveTimeline<T> : IReadOnlyList<T>
     /// follows it — the <c>&gt;&gt;TURN</c> GR5 discipline) and still in effect there (<see cref="InEffectAt"/>, a
     /// POP-revoked event is gone). False when no such event exists — the directive is UNSPECIFIED at the site, and
     /// each caller applies its own default. The REF-MOD-ZERO-LENGTH and PROPAGATE states are this fold (kb/Work
-    /// PB1119), so neither re-spells the line test or the revocation test.</summary>
-    public bool TryLastInEffectBefore(int siteLine, Func<T, int> lineOf, out T ev)
+    /// PB1119), so neither re-spells the line test or the revocation test. <paramref name="where"/> narrows the fold to
+    /// the events of ONE instance of a multi-instance directive — the compilation-variable table's per-name fold
+    /// (<see cref="CompilationVariableTimeline.DefinitionAt"/>, kb/Work PB1368).</summary>
+    public bool TryLastInEffectBefore(int siteLine, Func<T, int> lineOf, out T ev, Func<T, bool>? where = null)
     {
         ev = default!;
         bool found = false;
         for (int k = 0; k < _events.Count; k++)
         {
             if (lineOf(_events[k]) >= siteLine) break;   // events are in line order
-            if (InEffectAt(k, siteLine)) { ev = _events[k]; found = true; }
+            if (InEffectAt(k, siteLine) && (where is null || where(_events[k]))) { ev = _events[k]; found = true; }
         }
         return found;
     }

@@ -54,6 +54,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// FORMATTED-DATETIME, COMBINED-DATETIME).</summary>
     public bool LeapSecond { get; init; }
 
+    /// <summary>The group's <c>&gt;&gt;DEFINE</c> compilation-variable timeline (ISO §7.3.11.4 GR1; kb/Work PB1368) — a
+    /// constant entry's FROM phrase reads it at the entry's own line (<c>BindConstantFrom</c>). Empty for direct test
+    /// construction and for a group with no DEFINE.</summary>
+    public Frontend.Preprocessor.DirectiveTimeline<Frontend.Preprocessor.CompilationVariableEvent> CompilationVariables { get; init; } =
+        Frontend.Preprocessor.DirectiveTimeline<Frontend.Preprocessor.CompilationVariableEvent>.Empty;
+
     /// <summary>The top-level (01/77) items of WORKING-STORAGE, in source order. (READ-ONLY view — P6 Step 5:
     /// the emitter consumes the bound model without a write channel; the binder populates the private backing.)</summary>
     public IReadOnlyList<DataItem> Roots => _roots;

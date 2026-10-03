@@ -167,6 +167,7 @@ public sealed class ExceptionPerformDirectiveScopeTests
                    >>FLAG-14 READ-PREVIOUS ON
                    >>PROPAGATE ON
                    >>LEAP-SECOND ON
+                   >>DEFINE DV AS 1
                        DISPLAY "X"
             """);
         int pop = Line("X");

@@ -317,6 +317,15 @@ public sealed class Frontend
             throw new InvalidOperationException(
                 "DirectiveSiteProcessor changed the line count — every directive site would misanchor (hazard H3)");
 
+        // The compilation-variable TIMELINE (ISO §7.3.11.4 GR1; kb/Work PB1368): the DEFINE events the driver recorded,
+        // already in this resultant frame, with the PUSH/POP program of the same text replayed over them (§7.3.20.4
+        // GR1/GR3, §7.3.22.4 GR3 — a POP restores the whole table). The uses GR1 permits OUTSIDE conditional
+        // compilation read it at their own line: a later directive's literal slot (>>COBOL-WORDS, below) and a
+        // constant entry's FROM phrase (the binder, through DirectiveResults).
+        var compilationVariableLog = new DirectiveEventLog<CompilationVariableEvent>();
+        foreach (var ev in manipulated.CompilationVariables) compilationVariableLog.Add(Constructs.DefineDirective2002, ev.Line, ev);
+        var compilationVariables = compilationVariableLog.ToTimeline(stackOps);
+
         // >>TURN directive collection runs LAST — after COPY (so copybook TURNs are seen) and after the
         // line-count-neutral NIST substitution — on the FINAL text, so each TurnEvent.Line is directly
         // comparable to the parser tokens' Start.Line (the TurnState anchor, deep-dive D10 / hazard H3).
@@ -352,7 +361,8 @@ public sealed class Frontend
         // >>COBOL-WORDS (ISO §7.3.10): parse the per-group reserved/context/intrinsic word-table modification into
         // the CobolWordsMap (the lexer retype + composed ReservedWordSet consume it), edition-gate the
         // directive word, and enforce SR1/SR2/SR5. Line-count preserving like the stages above.
-        (text, var cobolWordsMap) = CobolWordsDirectiveProcessor.Process(text, diagnostics, sourcePath, lineMap, stackOps);
+        (text, var cobolWordsMap) = CobolWordsDirectiveProcessor.Process(text, diagnostics, sourcePath, lineMap, stackOps,
+            compilationVariables);
         if (CountLines(text) != linesBefore)
             throw new InvalidOperationException(
                 "CobolWordsDirectiveProcessor changed the line count (hazard H3)");
@@ -367,7 +377,8 @@ public sealed class Frontend
                 "LeapSecondDirectiveProcessor changed the line count (hazard H3)");
 
         return (new MappedText(text, mapped.Lines),   // the constructor re-asserts the line-count invariant
-            new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, propagateEvents, cobolWordsMap, leapSecondEvents, directiveSites),
+            new DirectiveResults(turnEvents, refModZeroLengthEvents, flagEvents, propagateEvents, cobolWordsMap, leapSecondEvents,
+                compilationVariables, directiveSites),
             manipulated, copy.ReferenceFormats);
     }
 
