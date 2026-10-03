@@ -80,7 +80,8 @@ public sealed record BoundMerge(
 /// <summary><c>RELEASE record-name-1 [FROM x]</c> (ISO §14.9.32): release the SD record's image to the initial
 /// phase of the active sort (GR2). FROM ≡ <c>MOVE x TO record-name-1</c> then the same RELEASE (GR4). A varying SD
 /// releases at the length the RECORD VARYING DEPENDING ON item holds (§13.18.43 GR13); a fixed SD at the record
-/// area width (short images space-fill — §14.9.40 GR7c).</summary>
+/// area width (a short image is extended by the sort store's fixed-compare space extension, and filled for a GIVING
+/// file by §14.9.40.4 GR16; §14.9.40.4 GR7's fill is the USING transfer's — kb/Work PB1140).</summary>
 public sealed record BoundRelease(
     FileModel File, Place Record, int RecordWidth, BoundMove? FromMove, SortVaryingInfo? Varying) : BoundStatement;
 

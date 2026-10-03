@@ -1464,6 +1464,39 @@ GIVING file whose WRITE terminated it is still open afterwards (determination in
 `SortTransferRuleDriftTests` pins every cell and that the hook is reached from ONE place in the emitter. Witness:
 `2002/pb993_sort_merge_transfer_termination` (nine legs, one per cell family).
 
+**A SUCCESSFUL as-if READ or WRITE is a READ or WRITE too: it stores its status and offers EC-I-O-WARNING (kb/Work
+PB749).** §9.1.13.1 sets the I-O status *"during the execution of a CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK
+or WRITE statement"* and says *"Any I-O status associated with an unsuccessful completion or a nonzero successful
+completion is associated with an exception condition"*; §12.4.5.8.4 GR1 puts the status in the FILE STATUS item. The
+contract is therefore the same for all four as-if statements, OPEN, READ, WRITE and CLOSE, and it is the contract of
+the explicit verbs: the status is stored into the FILE STATUS item after the statement whatever it was, and a hook
+runs when something can observe it. `SortEmitter.EmitSuccessfulTransfer` / `EmitSuccessfulTransferHook` are the two
+halves for the retrieval and the write: the store is emitted per record only for a file with a FILE STATUS clause
+(`EmitStoreFileStatus` emits nothing without one), and the hook only where an EC-I-O name is enabled for the file
+(`EcEmitter.IoMaskFor`, the predicate `EmitUseHook`'s own `successArm` asks, so the guard and the hook cannot
+disagree), behind one `IoStatusClass.Warning` test, so a clean transfer of a file with no EC-I-O checking pays one
+status assignment per record at most and no hook call. The plain `USE AFTER EXCEPTION` declarative still runs only
+on an unsuccessful status (§14.9.49.4 GR6). Witness: `2023/pb749_sort_implicit_statement_status` (a LINE SEQUENTIAL
+USING file whose as-if READ is '06': the declarative runs during the SORT, once, and sees `06` in the FILE STATUS
+item). The GIVING WRITE arm emits the same two halves but no runtime in this compiler produces a nonzero successful
+WRITE status for a sequential file; the keyed '02' case waits on kb/Work PB994 (keyed USING/GIVING is refused today).
+
+**A short record's fill is decided by the file it moves to, once, at bind (kb/Work PB1140).** §14.9.40.4 GR7 (USING)
+and GR16 (GIVING), and their MERGE twins §14.9.24.4 GR2 and GR13, space-fill a record with fewer character positions than the fixed
+length of the receiving file: with the NATIONAL space when there is one record description and it is a national data
+item or an elementary item of usage national and category numeric, numeric-edited or boolean (a), and with the
+alphanumeric space otherwise (c); arm b) needs SELECT WHEN, which Annex A.4.8 declines. `FileModel.ShortRecordFillNational`
+is that one test, over the file's own record descriptions. It is NOT the connector's `NationalRecordArea`, which is
+§14.9.30.4 GR15's per-record-area test for the READ's own fill (any national record description of the FD, so a
+`PIC 9(3) USAGE NATIONAL` record got the alphanumeric space and a two-record FD with one national record the
+national one). `RecordFill.Fit` is the one right-fill both use; the USING release calls `CobolSort.FillTo` with the
+USING file's answer, and the GIVING loop calls it before the governed write with the GIVING file's, unless the file's
+record size varies (nothing fixed to fill to), it is LINE SEQUENTIAL (§14.9.51.4 GR21 strips trailing spaces on write,
+so the connector's own fit-and-trim owns its shape), or the returned record carries an extent table (a
+variable-length group, whose D-FRA (vi) fixed form pads each member itself). The printed SORT GR16 a) / b) say
+file-name-2 where the rule's lead-in names the GIVING file (file-name-3; the MERGE twin names file-name-4): a slip of
+the standard, read against the GIVING file. Witness: `2002/pb1140_sort_merge_short_record_fill`.
+
 ### D23. The implicit MOVE of a `… FROM` / `… INTO` phrase is BOUND by the MOVE binder, as a sub-statement of the I-O node — never synthesized in the emitter.
 
 A bound node built AFTER binding is never checked by a bind pass. Every `… FROM` phrase (RELEASE §14.9.32,

@@ -933,12 +933,6 @@ public abstract class FileConnector
     protected bool RecordHasCharacterWithoutByteImage(ReadOnlySpan<char> record) =>
         CodeSet?.HasCharacterWithoutImage(record) ?? FileCharacterSet.HasCharacterWithoutByteImage(record);
 
-    /// <summary>Pad (right) or truncate <paramref name="s"/> to exactly <paramref name="width"/> characters —
-    /// the ALPHANUMERIC fill (§14.9.30.4 GR15: "a trailing space is defined to be the alphanumeric space
-    /// character"). One char is one byte on this channel.</summary>
-    protected static string Fit(string s, int width) =>
-        s.Length == width ? s : s.Length > width ? s[..width] : s.PadRight(width, ' ');
-
     /// <summary>Pad/truncate to the record width — the record-AREA image a READ makes available (a shorter
     /// varying record space-fills the area; its true length is <see cref="LastReadLength"/>).
     /// <para>⛔ A NATIONAL RECORD AREA PADS WITH THE NATIONAL SPACE (ISO §14.9.30.4 GR15 — "If the record-area
@@ -951,18 +945,13 @@ public abstract class FileConnector
     /// U+2020 characters — the identical trap <c>CobolBits.NatWriteWindow</c> documents on the write side.</para></summary>
     protected string Fit(string s) => FitRecord(s, RecordWidth);
 
-    /// <summary>⛔ THE ONE RECORD-AREA FIT (kb/Work PB327): <see cref="Fit(string,int)"/>'s alphanumeric fill, or
-    /// GR15's national one when <see cref="NationalRecordArea"/> — every site that pads a record image to a
-    /// declared span routes here, so the two fills cannot diverge. Truncation is identical in both (GR15's
-    /// over-length arm truncates "on the right to the maximum size", in bytes).</summary>
-    protected string FitRecord(string s, int width)
-    {
-        if (!NationalRecordArea || s.Length >= width) return Fit(s, width);
-        var buf = new char[width];
-        s.CopyTo(0, buf, 0, s.Length);
-        for (int i = s.Length; i < width; i++) buf[i] = (i & 1) == 0 ? '\0' : ' ';
-        return new string(buf);
-    }
+    /// <summary>⛔ THE ONE RECORD-AREA FIT (kb/Work PB327): the alphanumeric fill (§14.9.30.4 GR15: "a trailing space
+    /// is defined to be the alphanumeric space character"), or GR15's national one when
+    /// <see cref="NationalRecordArea"/> — both <see cref="RecordFill.Fit"/>, which the SORT/MERGE transfers' own
+    /// short-record fill shares (kb/Work PB1140). Every site that pads a record image to a declared span routes
+    /// through it, so the two fills cannot diverge. Truncation is identical in both (GR15's over-length arm
+    /// truncates "on the right to the maximum size", in bytes).</summary>
+    protected string FitRecord(string s, int width) => RecordFill.Fit(s, width, NationalRecordArea);
 
     /// <summary>⛔ THE RECORD AREA IN ITS ALL-SPACES STATE — what an unsuccessful READ hands back in place of a
     /// record (§14.9.30.4 GR18: its content is then undefined, and the connector offers spaces). It is

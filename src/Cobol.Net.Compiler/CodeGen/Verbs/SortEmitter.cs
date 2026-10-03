@@ -237,11 +237,19 @@ internal sealed class SortEmitter(EmitContext ctx,
                     w.Line("break;");
                 }
             }
+            // ⛔ A SUCCESSFUL as-if READ IS A READ TOO (kb/Work PB749). §9.1.13.1 sets the I-O status "during the
+            // execution of a CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK or WRITE statement", §12.4.5.8.4 GR1
+            // carries it into the FILE STATUS item, and "Any I-O status associated with an unsuccessful completion or
+            // a nonzero successful completion is associated with an exception condition" — so a '04' / '06' retrieval
+            // is EC-I-O-WARNING, which the explicit READ offers to its hook on its success arm (kb/Work PB1382).
+            EmitSuccessfulTransfer(input, RuntimeApi.FileStatus(f), TransferIo.UsingRead, tx);
             // GR12 b) / MERGE GR7 b): a record READ larger than the SD's largest record — or, for a
             // variable-length SD, smaller than its smallest — is EC-SORT-MERGE-RELEASE, tested by the runtime
             // against the size the record had when READ (LastReadLength: the frame length on a varying input
             // file, the record width on a fixed one); a fixed SD passes min 0 (kb/Work PB1036). Fixed SD: the
-            // short record space-fills right to the fixed length (GR7c/MERGE GR2c — the Store pad); varying SD:
+            // short record space-fills right to the fixed length — with the national space when the USING file's
+            // own record description says so (§14.9.40.4 GR7 a) / §14.9.24.4 GR2 a)), else the alphanumeric one
+            // (GR7 c) / GR2 c)); FileModel.ShortRecordFillNational is the one test (kb/Work PB1140); varying SD:
             // each record releases at the size it was READ (GR12b; Read pads the area). The varying arm releases
             // the CURRENT RECORD itself (FileConnector.CurrentRecord — the area image sliced to LastReadLength
             // whenever the record fits the area, and the whole record when a variable-length record reaches past
@@ -250,7 +258,7 @@ internal sealed class SortEmitter(EmitContext ctx,
             var (min, max) = RecordRange(varying, sdWidth);
             w.Line(varying is not null
                 ? $"{RuntimeApi.SortRelease(sdLit, RuntimeApi.FileCurrentRecord(f), RuntimeApi.FileLastReadLength(f), min, max, RuntimeApi.FileCurrentRecordExtents(f))};"
-                : $"{RuntimeApi.SortRelease(sdLit, RuntimeApi.StrStore(tmp, $"{sdWidth}"), RuntimeApi.FileLastReadLength(f), min, max)};");
+                : $"{RuntimeApi.SortRelease(sdLit, RuntimeApi.SortFillTo(tmp, $"{sdWidth}", input.ShortRecordFillNational), RuntimeApi.FileLastReadLength(f), min, max)};");
         }
         // ⛔ TWO as-if statements, TWO statuses, TWO hooks (kb/Work PB837). The loop above exits ONLY on an
         // unsuccessful retrieval, so the connector's status here IS that retrieval's — the as-if READ of
@@ -282,8 +290,9 @@ internal sealed class SortEmitter(EmitContext ctx,
 
     /// <summary>The implicit GIVING transfer for one output file (SORT GR15 / MERGE GR12): REWIND the return
     /// cursor (EACH file receives the full result), OPEN OUTPUT, RETURN→WRITE loop, CLOSE. A fixed-length GIVING
-    /// file space-fills a shorter returned record to its record width (GR16c / MERGE GR13c — the connector's
-    /// fixed-width fit); a relative GIVING file's key sequence 1..n (GR15b) is the G5 relative slice.</summary>
+    /// file space-fills a shorter returned record to its record width (§14.9.40.4 GR16 / §14.9.24.4 GR13 — national
+    /// or alphanumeric space by <see cref="FileModel.ShortRecordFillNational"/>, kb/Work PB1140); a relative GIVING
+    /// file's key sequence 1..n (GR15b) is the G5 relative slice.</summary>
     private void EmitGivingFile(FileModel output, string sdLit, Transfer tx)
     {
         var w = ctx.Writer;
@@ -308,16 +317,28 @@ internal sealed class SortEmitter(EmitContext ctx,
             // record locks, so the governed body's release/acquire discipline is vacuous here — but the routing
             // decision is not the emitter's to make, and the runtime is where the open mode is known.
             string ws = $"__srw{ctx.Names.NextSort()}";
+            // §14.9.40.4 GR16 / §14.9.24.4 GR13 (kb/Work PB1140): "If the file referenced by file-name-3 [file-name-4]
+            // contains only fixed-length records, any record in the file referenced by file-name-1 containing fewer
+            // character positions than that fixed-length is space filled on the right to that fixed length … when that
+            // record is returned to the file" — with the national space when the GIVING file's own record description
+            // says so (a)) and the alphanumeric one otherwise (c)), decided by FileModel.ShortRecordFillNational and
+            // NOT by the connector's per-record-area national flag, which is the READ's GR15 test. A variable-length
+            // file has no fixed length to fill to; a LINE SEQUENTIAL file's records are written without trailing
+            // spaces (§14.9.51.4 GR21), so the connector's own fit-and-trim owns its shape.
+            if (!output.RecordSizeVaries && output.Organization != FileOrganization.LineSequential)
+                w.Line($"{tmp} = {RuntimeApi.SortFillTo(tmp, $"{output.RecordWidth}", output.ShortRecordFillNational, RuntimeApi.SortLastReturnedExtents(sdLit))};   // GR16 / MERGE GR13 — the short-record fill");
             // The returned record is written with the extent table it was released with (D-FRA (v); kb/Work PB1053).
             w.Line($"string {ws} = {RuntimeApi.FileWriteShared(f, tmp, "-1", "FileRecordLock.None", "FileRetryKind.None", "0", seqIo.LinageArg(output), areaExtents: RuntimeApi.SortLastReturnedExtents(sdLit))};   // implicit WRITE without optional phrases (GR15b)");
-            // ⛔ EACH as-if WRITE owes its OWN hook (kb/Work PB837, the GIVING twin of the USING retrieval): GR15's
-            // closing paragraph performs the implicit functions "such that any associated USE AFTER
-            // EXCEPTION/ERROR procedures are executed", and the write has no phrase that could take precedence
-            // (§14.9.49.4 GR6). A single hook after the CLOSE read the CLOSE's status for every failed write.
-            // Emitted only on an unsuccessful write, so the per-record cost of a clean transfer is one test.
+            // ⛔ EACH as-if WRITE owes its OWN status store and its OWN hook (kb/Work PB837, the GIVING twin of the
+            // USING retrieval; kb/Work PB749): GR15's closing paragraph performs the implicit functions "such that any
+            // associated USE AFTER EXCEPTION/ERROR procedures are executed", and the write has no phrase that could
+            // take precedence (§14.9.49.4 GR6). §9.1.13.1 sets the I-O status during the WRITE and §12.4.5.8.4 GR1
+            // carries it into the FILE STATUS item whether or not the write succeeded, as the explicit WRITE's store
+            // does (a file with no FILE STATUS clause emits nothing). A single hook after the CLOSE read the CLOSE's
+            // status for every failed write; a successful write with a status that is not '00' is EC-I-O-WARNING.
+            seqIo.EmitStoreFileStatus(output);
             using (w.Block($"if ({IoStatusClass.Unsuccessful(ws)})"))
             {
-                seqIo.EmitStoreFileStatus(output);
                 string? used = EmitTransferUse(output, TransferIo.GivingWrite, tx);
                 // "On the first attempt to write outside the externally defined boundaries of the file, any USE
                 // AFTER EXCEPTION procedure … is executed; if that USE procedure completes normally or if no such
@@ -328,6 +349,7 @@ internal sealed class SortEmitter(EmitContext ctx,
                 w.Line($"if ({IoStatusClass.WriteBoundary(ws)}) break;   // GR15 / MERGE GR12 — terminated as in GR15c");
                 EmitDisposition(ws, used, TransferIo.GivingWrite, tx);
             }
+            EmitSuccessfulTransferHook(output, ws, TransferIo.GivingWrite, tx, otherwise: true);
         }
         w.Line($"{RuntimeApi.FileClose(f)};   // implicit CLOSE (GR15c)");
         seqIo.EmitStoreFileStatus(output);
@@ -480,12 +502,38 @@ internal sealed class SortEmitter(EmitContext ctx,
     /// <summary>The as-if statement's USE hook: jumps to the end label when the procedure does not complete
     /// normally (§14.9.40.4 GR17; §14.9.33.4 GR2 a) 1.), and, only where the rule turns on it, declares the
     /// "an applicable USE procedure completed normally" local and returns its name.</summary>
-    private string? EmitTransferUse(FileModel file, TransferIo io, Transfer tx, bool atEndHandled = false)
+    private string? EmitTransferUse(FileModel file, TransferIo io, Transfer tx, bool atEndHandled = false,
+        bool successArm = false)
     {
-        string? used = RuleFor(tx.Merge, io).NeedsCompletion ? $"__sru{ctx.Names.NextSort()}" : null;
+        // A successful statement's hook has no disposition to turn on its completion: nothing is disposed of.
+        string? used = !successArm && RuleFor(tx.Merge, io).NeedsCompletion ? $"__sru{ctx.Names.NextSort()}" : null;
         tx.Terminable |= seqIo.EmitUseHook(file, atEndHandled: atEndHandled, notNormalLabel: tx.EndLabel,
-            verbDisposes: true, useCompletedVar: used).Terminable;
+            verbDisposes: true, useCompletedVar: used, successArm: successArm).Terminable;
         return used;
+    }
+
+    /// <summary>⛔ A SUCCESSFUL as-if READ / WRITE'S FILE STATUS STORE AND EC HOOK (kb/Work PB749): the status the
+    /// retrieval produced reaches the FILE STATUS item (§9.1.13.1: "The value of the I-O status is set during the
+    /// execution of a CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK or WRITE statement"; §12.4.5.8.4 GR1), and a
+    /// status that is not '00' is EC-I-O-WARNING (§9.1.13.1: "Any I-O status associated with an unsuccessful completion
+    /// or a nonzero successful completion is associated with an exception condition"), offered to the hook the explicit
+    /// verb offers on its success arm (<c>SequentialIoEmitter.EmitRead</c>, kb/Work PB1382). The store is per record
+    /// and only for a file with a FILE STATUS clause; the hook is emitted only where an EC-I-O name is enabled
+    /// (<c>EmitUseHook</c>'s own <c>successArm</c> predicate, which this method asks first so the guard and the hook
+    /// cannot disagree), behind one status test, so a clean transfer of a file with neither pays nothing.</summary>
+    private void EmitSuccessfulTransfer(FileModel file, string status, TransferIo io, Transfer tx)
+    {
+        seqIo.EmitStoreFileStatus(file);
+        EmitSuccessfulTransferHook(file, status, io, tx, otherwise: false);
+    }
+
+    /// <summary>The EC-I-O-WARNING hook of <see cref="EmitSuccessfulTransfer"/>; <paramref name="otherwise"/> chains it
+    /// as the <c>else</c> arm of the statement's unsuccessful-status block.</summary>
+    private void EmitSuccessfulTransferHook(FileModel file, string status, TransferIo io, Transfer tx, bool otherwise)
+    {
+        if (ec.IoMaskFor(file) == 0) return;
+        using (ctx.Writer.Block($"{(otherwise ? "else " : "")}if ({IoStatusClass.Warning(status)})"))
+            EmitTransferUse(file, io, tx, successArm: true);
     }
 
     /// <summary>Render <see cref="RuleFor"/>'s cell for one as-if statement: a fatal status, then any other
@@ -524,8 +572,10 @@ internal sealed class SortEmitter(EmitContext ctx,
     /// <summary>RELEASE (ISO §14.9.32): FROM first MOVEs into the record (GR4 — identical to the explicit MOVE),
     /// then the record's character image goes to the sort store (GR2). A varying SD releases the leading
     /// DEPENDING-ON characters (§13.18.43 GR13 — the current value of the data item names the released length);
-    /// a fixed SD releases the named record's image (a shorter secondary record space-fills via the sort store's
-    /// fixed-compare space extension; §14.9.40 GR7c).</summary>
+    /// a fixed SD releases the named record's image at its own length (§14.9.32.4 GR2 releases "the record named by
+    /// record-name-1"; a shorter secondary record is extended with spaces by the sort store's fixed-compare space
+    /// extension, and the record a GIVING file receives is filled by §14.9.40.4 GR16 — the standard names no fill
+    /// at the RELEASE itself, whose §14.9.40.4 GR7 fill is the USING transfer's).</summary>
     public void EmitRelease(BoundRelease rl)
     {
         var w = ctx.Writer;

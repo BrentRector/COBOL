@@ -277,6 +277,16 @@ public static class CobolSort
         f.StreamStarts.Add(f.Records.Count);
     }
 
+    /// <summary>⛔ THE SHORT-RECORD FILL OF A SORT/MERGE TRANSFER (§14.9.40.4 GR7 / GR16, §14.9.24.4 GR2 / GR13; kb/Work
+    /// PB1140): a record with fewer character positions than the fixed length of the file it moves to <i>"is space
+    /// filled on the right to that fixed length"</i> — <paramref name="national"/> says which space
+    /// (<c>FileModel.ShortRecordFillNational</c>, decided once at compile time from the file's own record
+    /// descriptions). A record carrying an EXTENT TABLE is a variable-length group whose fixed form
+    /// (<c>CobolContiguousLayout.ToFixedForm</c>, D-FRA (vi)) places and pads each member itself, so it is returned
+    /// unchanged — padding its contiguous image would stop the table from describing it.</summary>
+    public static string FillTo(string image, int width, bool national, RecordExtents? extents = null) =>
+        extents?.Layout is not null ? image : RecordFill.Fit(image, width, national);
+
     /// <summary>RELEASE one record image at its released length (ISO §14.9.32 GR2; §14.9.40 GR12b for the implicit
     /// USING release) — the RELEASE STATEMENT's §14.9.32.4 GR1 test lives in <see cref="ReleaseStatement"/>, and
     /// this implicit release is not a RELEASE statement. Its one test is the size rule of §14.9.40.4 GR12 b) /

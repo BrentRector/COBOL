@@ -1491,6 +1491,13 @@ internal static class RuntimeApi
     public static string SortLastReturnedExtents(string sd) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.LastReturnedExtents)}({sd})";
 
+    /// <summary>The short-record right-fill of a SORT/MERGE transfer (§14.9.40.4 GR7 / GR16, §14.9.24.4 GR2 / GR13;
+    /// kb/Work PB1140) — <c>CobolSort.FillTo</c>. <paramref name="national"/> is
+    /// <c>FileModel.ShortRecordFillNational</c> of the file the record moves to; <paramref name="extents"/> is the
+    /// returned record's extent table on the GIVING side (null on the USING side, whose record has none).</summary>
+    public static string SortFillTo(string image, string width, bool national, string? extents = null) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.FillTo)}({image}, {width}, {(national ? "true" : "false")}{(extents is null ? "" : $", {extents}")})";
+
     /// <summary>The <c>CobolSort.Key[]</c> array literal over per-key "new(…)" element fragments.</summary>
     public static string SortKeyArray(IEnumerable<string> keyElements) =>
         $"new {nameof(CobolSort)}.{nameof(CobolSort.Key)}[] {{ {string.Join(", ", keyElements)} }}";

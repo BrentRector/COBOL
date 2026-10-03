@@ -35,6 +35,11 @@ internal static class IoStatusClass
     /// <summary>Successful completion — the <c>'0x'</c> class (§9.1.13.2 / §9.1.13.3).</summary>
     public static string Successful(string status) => $"{status}[0] == '0'";
 
+    /// <summary>Successful completion with a status that is NOT <c>'00'</c> — §9.1.13.1: <i>"The exception-name for
+    /// successful completion with an I-O status value that is not '00' is EC-I-O-WARNING"</i>. The one test that
+    /// decides whether a successful as-if READ or WRITE of a SORT/MERGE transfer owes its EC hook (kb/Work PB749).</summary>
+    public static string Warning(string status) => $"({status}[0] == '0' && {status} != \"00\")";
+
     /// <summary>Any unsuccessful completion — every class but <c>'0x'</c> (the ON EXCEPTION arm).</summary>
     public static string Unsuccessful(string status) => $"{status}[0] != '0'";
 

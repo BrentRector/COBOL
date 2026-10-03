@@ -16476,13 +16476,13 @@
   "ordinal": 1,
   "subject": "FILE STATUS clause",
   "rule-digest": "3f86001fb864",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitStoreFileStatus; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile",
-  "test-ref": "conformance-test:InterProgramFileDifferentialTests.GlobalUse_ContainedFailureFiresOuterGlobalDeclarative",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitStoreFileStatus; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitSuccessfulTransfer; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile",
+  "test-ref": "conformance-test:InterProgramFileDifferentialTests.GlobalUse_ContainedFailureFiresOuterGlobalDeclarative; conformance:2023/pb749_sort_implicit_statement_status",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB749: cite.py --check 12.4.5.8.4 \"the data item referenced by data-name-1 is updated to contain the value of the I-O status\" -> OK GR1; NOTE 1 and NOTE 2 texts --check OK. Probe gr1.cob (pinned cobol.exe, --std 2023): OPEN OUTPUT/WRITE/CLOSE/OPEN INPUT/READ -> 00, READ past end -> 10, MOVE '00' TO FS then READ -> 46 (NOTE 2: the file state is unaltered, the second read is unsuccessful), contained program CLOSE/OPEN/READ/READ on the GLOBAL file with outer-local FS -> outer sees 10 (NOTE 1). PARTIAL, not CONFORMS: the open register note PB749 owns a verified hole in this rule — SORT/MERGE USING/GIVING implicit OPEN/READ/WRITE statements do not store the status into data-name-1 before their declaratives (SortEmitter.EmitInputFile/EmitGivingFile). Not re-reported here; PB749 owns it. The cited covering test is spec-pinned only on the NOTE 1 half. [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023 | code-location as adjudicated: src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitStoreFileStatus; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs (inherited GLOBAL FILE STATUS routing); src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile]",
-  "state": "GAP"
+  "notes": "kb/Work PB749 landed (w1003b). The hole this row was PARTIAL for is closed: of the four as-if statements of a SORT/MERGE transfer the implicit OPEN, the retrieval that ended the READ loop and the CLOSE already stored the status before their hooks (PB837, PB993), and now every successful as-if READ (EmitSuccessfulTransfer) and every as-if WRITE (EmitGivingFile: the store moved out of the unsuccessful branch) stores its status into the FILE STATUS item and, where an EC-I-O name is enabled, offers a nonzero successful status to the EC-I-O-WARNING hook. Golden 2023/pb749_sort_implicit_statement_status: a LINE SEQUENTIAL USING file whose as-if READ is '06' runs the declarative once during the SORT and it sees 06 in the FILE STATUS item; a clean GIVING transfer runs none. The pre-existing NOTE 1 / NOTE 2 witnesses stay. editions 2002, 2014, 2023 (EC-I-O-WARNING is a 2023 name; the status store is every edition's).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.9.3-1",
@@ -39891,13 +39891,13 @@
   "ordinal": 2,
   "subject": "MERGE statement",
   "rule-digest": "e985dee4f8a7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile; src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs#StrStore; src/Cobol.Net.Runtime/Values/Text/CobolString.cs#Store",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ShortRecordFillNational; src/Cobol.Net.Runtime/IO/CobolSort.cs#FillTo; src/Cobol.Net.Runtime/IO/RecordFill.cs#Fit",
+  "test-ref": "conformance:2002/pb1140_sort_merge_short_record_fill",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1140 (open). Rule: fixed-length SD: a shorter USING record 'is space filled on the right to that fixed length ... as follows: a) If there is only one record description entry associated with the file referenced by file-name-2 or file-name-3 and that record is described as a national data item or as an elementary data item of usage national and of category numeric, numeric-edited, or boolean, the record is filled with national space characters. b) ... SELECT WHEN ... c) Otherwise, the record is filled with alphanumeric space characters.' (cite.py --check 14.9.24.4 -> OK §14.9.24.4 2) and 2) c)). Code: EmitInputFile's fixed-SD arm releases RuntimeApi.StrStore(tmp, sdWidth) = CobolString.Store(value, width, pad=' ') - the ALPHANUMERIC space byte 0x20 unconditionally; no arm consults the USING file's record descriptions. c) CONFORMS; a) DIVERGES. Probe probe/merge-p2/m3.cob (USING FDs `01 R PIC X(3)`, SD `05 M-K PIC X(3). 05 M-T PIC X(1).`): M-T = ' ' - c) correct. Probe probe/merge-p2/m2.cob (USING FDs `01 R1 PIC N(3).` single description, national; SD `05 M-K PIC N(3). 05 M-T PIC N(2).` + `01 M-X PIC X(10)`): RETURNed M-X(7:4) = X\"20202020\" (PAD=ALNUM) and `M-T = SPACES` is FALSE - the pad manufactured two U+2020 national positions where a) requires national spaces X\"00200020\" (D-N1 UTF-16BE). Spec-derived expected: PAD=NATIONAL, T=NSPACE. Same shared EmitInputFile serves SORT §14.9.40.4 GR7 (identical a/b/c text) - sibling. Finding F1 (new; no kb/Work note found for the sort-merge release fill - PB327 landed only the READ-area fill). || editions as adjudicated: 85, 2002, 2014, 2023 for the fill itself (c, alphanumeric); the national arms a)/b) apply from 2002 (usage national / class national are 2002 facilities); b)'s SELECT WHEN selection belongs to the SELECT WHEN clause, which docs/CONFORMANCE.md declines (Annex A.4.8, COBOLNET1705)",
-  "state": "GAP"
+  "notes": "kb/Work PB1140 landed (w1003b). The fixed-SD arm of EmitInputFile fills the USING record with CobolSort.FillTo(tmp, sdWidth, input.ShortRecordFillNational): national space when the USING file has ONE record description that is a national data item or an elementary usage-national numeric / numeric-edited / boolean item (a), alphanumeric space otherwise (c); arm b) cannot arise (SELECT WHEN is declined, Annex A.4.8, COBOLNET1705; docs/CONFORMANCE.md D-SMF). Golden leg U1 (SORT, N(2) USING record into a 6-byte SD: 00 20) and U2 (X(4): 20 20); the shared EmitInputFile serves MERGE GR2 a), so the MERGE USING arm is the same code (the MERGE golden legs run a varying SD, which fills on the GIVING side). editions: the fill itself 1985, 2002, 2014, 2023 (c); the national arm a) from 2002.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-3",
@@ -40086,13 +40086,13 @@
   "ordinal": 13,
   "subject": "MERGE statement",
   "rule-digest": "6f2f5d75b7b3",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitNationalAreaRegistration; src/Cobol.Net.Runtime/IO/FileConnector.cs#FitRecord; src/Cobol.Net.Runtime/IO/FileConnector.cs#Stored",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ShortRecordFillNational; src/Cobol.Net.Runtime/IO/CobolSort.cs#FillTo; src/Cobol.Net.Runtime/IO/RecordFill.cs#Fit",
+  "test-ref": "conformance:2002/pb1140_sort_merge_short_record_fill",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1140 (open). Rule: fixed-length GIVING file: a shorter returned record is space filled 'as follows: a) If there is only one record description entry associated with the file referenced by file-name-4 and that record is described as a national data item or as an elementary data item of usage national and of category numeric, numeric-edited, or boolean, the record is filled with national space characters. b) If there are multiple record description entries ... and the descriptions include a SELECT WHEN clause, the rules of the SELECT WHEN clause are applied ... c) Otherwise, the record is filled with alphanumeric space characters.' (cite.py --check 14.9.24.4 -> OK §14.9.24.4 13)). Code: EmitGivingFile writes via FileWriteShared(len -1) -> FileConnector.Stored -> Fit -> FitRecord, which pads national iff the connector's NationalRecordArea flag, registered by EmitNationalAreaRegistration when ANY record description's OperandPic Category is National (the §14.9.30.4 GR15 READ-area test, kb/Work PB329) - not GR13's selection. Probe probe/merge-p2/m3.cob (SD 4-byte records, GIVING four 8-byte fixed files, read back through ASSIGN USING): O3 `01 PIC N(4)` -> 00 20 00 20 (a, correct); O4 `01 PIC X(8)` -> 20202020 (c, correct); O1 `01 O1-REC PIC 9(4) USAGE NATIONAL` (single description, elementary usage national, category numeric) -> 20 20 20 20, expected national 00 20 00 20 per a) - UNDER-applied; O2 `01 O2-N PIC N(4). 01 O2-X PIC X(8).` (two descriptions, no SELECT WHEN) -> 00 20 00 20, expected alphanumeric 20 20 20 20 per c) ('Otherwise') - OVER-applied. Sibling: SORT §14.9.40.4 GR16 shares EmitGivingFile. Finding F1. || editions as adjudicated: 85, 2002, 2014, 2023 for the fill (c); national arms a)/b) from 2002; b)'s SELECT WHEN selection belongs to the declined SELECT WHEN clause (Annex A.4.8, COBOLNET1705)",
-  "state": "GAP"
+  "notes": "kb/Work PB1140 landed (w1003b). EmitGivingFile fills a returned record shorter than a fixed-length, non-line-sequential GIVING file with CobolSort.FillTo(tmp, width, output.ShortRecordFillNational, extents) BEFORE the governed WRITE: the decision is the GIVING file's own record descriptions (one record description, national data item or elementary usage-national numeric / numeric-edited / boolean -> national space; otherwise alphanumeric), no longer the connector's per-record-area NationalRecordArea flag (the READ's GR15 test). Golden leg M1 (MERGE from a VARYING 4-TO-6 SD: GNUM2 `PIC 9(3) USAGE NATIONAL` -> 00 58 00 58 00 20, GMUL2 two descriptions -> 00 58 00 58 20 20). A LINE SEQUENTIAL / variable-length GIVING file has no fixed length to fill to (docs/CONFORMANCE.md D-SMF (c)). editions: fill 1985..2023 (c); national arms from 2002.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-14",
@@ -46326,13 +46326,13 @@
   "ordinal": 7,
   "subject": "SORT statement",
   "rule-digest": "94d72537c9fa",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ShortRecordFillNational; src/Cobol.Net.Runtime/IO/CobolSort.cs#FillTo; src/Cobol.Net.Runtime/IO/RecordFill.cs#Fit",
+  "test-ref": "conformance:2002/pb1140_sort_merge_short_record_fill",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1140 (registrar 14c). Rule: a record of file-name-2 shorter than a fixed-length file-name-1 'is space filled on the right to that fixed length ... when that record is released to the file referenced by file-name-1, as follows: a) If there is only one record description entry associated with the file referenced by file-name-2 and that record is described as a national data item or as an elementary data item of usage national and of category numeric, numeric-edited, or boolean, the record is filled with national space characters. b) [SELECT WHEN] ... c) Otherwise, the record is space filled with alphanumeric space characters.' (cite.py --check 14.9.40.4 OK, GR7 and GR7 a). Code: the fixed-SD arm of EmitInputFile releases RuntimeApi.StrStore(tmp, sdWidth) -- CobolString.Store's default pad ' ' -- whatever file-name-2's record description is; no national arm exists. PROBE out/probe/sort-statement-p2/pfill.cob: FD FN with ONE record 01 FN-REC PIC N(2) (4 bytes), SD SN 01 SN-REC (SN-K PIC N(2), SN-T PIC N(1), 6 bytes), SORT SN ... USING FN OUTPUT PROCEDURE; FUNCTION ORD(SN-T) of every returned record = 8225 (U+2020, the two alphanumeric 0x20 bytes read as one national position). Spec-derived expected (GR7 a): SN-T = the national space, ORD = 33. Arm c) verified: FA (01 FA-REC PIC X(3)) into SA (X(6)) -> SA-T = SPACES. Arm b) is unreachable: SELECT WHEN is declined (A.4.8 Not claimed, COBOLNET1705, derived selector format-select-when-only). [editions as adjudicated: 1985, 2002, 2014, 2023 (the c) alphanumeric fill); a)/b) national arms 2002, 2014, 2023]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1140 landed (w1003b). The fixed-SD arm of EmitInputFile releases CobolSort.FillTo(tmp, sdWidth, input.ShortRecordFillNational) in place of the unconditional alphanumeric CobolString.Store pad. Golden legs U1 (FD one record N(2) into a 6-byte SD: the 2 bytes after the 4-byte record are 00 20, ORD 001 033) and U2 (FD one record X(4): 20 20, ORD 033 033). Arm b) cannot arise (SELECT WHEN declined, A.4.8). editions: 1985 (c), 2002 (a).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.40.4-8",
@@ -46461,13 +46461,13 @@
   "ordinal": 16,
   "subject": "SORT statement",
   "rule-digest": "c03135a0623f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Runtime/IO/FileConnector.cs#FitRecord; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitNationalAreaRegistration",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ShortRecordFillNational; src/Cobol.Net.Runtime/IO/CobolSort.cs#FillTo; src/Cobol.Net.Runtime/IO/RecordFill.cs#Fit",
+  "test-ref": "conformance:2002/pb1140_sort_merge_short_record_fill",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1140 (registrar 14c). Rule: a record of file-name-1 shorter than a fixed-length file-name-3 is space filled 'when that record is returned to the file referenced by file-name-3, as follows: a) If there is only one record description entry associated with the file referenced by file-name-2 and that record is described as a national data item or as an elementary data item of usage national and of category numeric, numeric-edited, or boolean, the record is filled with national space characters ... c) Otherwise ... alphanumeric space characters.' (cite.py --check 14.9.40.4 OK, GR16). ⚠ The printed standard (PDF page 782, extracted) really says file-name-2 in a) and b); the MERGE twin 14.9.24.4 GR13 a) names the GIVING file (file-name-4), so this adjudication reads GR16's a)/b) as file-name-3 -- the text slip is a dossier gap. Code: the implicit WRITE pads through the GIVING connector's FitRecord, which uses the national space only when EmitNationalAreaRegistration registered the area: `file.Records.Any(r => r.OperandPic is { Category: PicCategory.National })` -- ANY record (not 'only one'), and category NATIONAL only (not usage national of category numeric, numeric-edited or boolean). PROBES: pgive2.cob -- GIVING FD 01 GN-REC PIC N(3), SD records N(3)/N(1), RELEASE of the N(1) record: bytes 00 4d 00 20 00 20 (national fill, conforms); pgive4.cob -- GIVING FD 01 GN-REC PIC 9(3) USAGE NATIONAL (one record, elementary, usage national, category numeric -> a) applies): bytes 00 31 20 20 20 20 -- alphanumeric fill, wrong. Spec-derived expected: 00 31 00 20 00 20. Arm c) verified (pgive.cob: GA X(6) receives MMM + SPACES). [editions as adjudicated: 1985, 2002, 2014, 2023 (the c) alphanumeric fill); a)/b) national arms 2002, 2014, 2023]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1140 landed (w1003b). Same EmitGivingFile fill as MERGE GR13, read against the GIVING file (the printed GR16 a)/b) name file-name-2 where the lead-in names file-name-3: a slip of the standard, docs/CONFORMANCE.md D-SMF (b)). Golden legs G1 (GIVING one record `PIC 9(3) USAGE NATIONAL`: 00 31 00 20 00 20), G2 (one record N(3): same), G3 (two records N(3) and X(6), no SELECT WHEN: 00 31 20 20 20 20, alphanumeric by c)), G4 (X(6): 00 31 20 20 20 20). editions: fill 1985 (c), national arms 2002.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.40.4-17",

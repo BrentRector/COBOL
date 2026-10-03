@@ -594,7 +594,8 @@
   "pb1359_floating_continuation_fixed",
   "pb1359_floating_continuation_free",
   "pb1359_floating_continuation_copy_replacing",
-  "pb1494_debugging_line_obsolete_2002"
+  "pb1494_debugging_line_obsolete_2002",
+    "pb1140_sort_merge_short_record_fill"
   ],
   "pending": []
 }

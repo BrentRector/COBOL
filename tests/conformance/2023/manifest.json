@@ -771,8 +771,9 @@
   "pb1907_unstring_overlap_delimiter",
   "pb1907_unstring_overlap_tallying",
   "pb1907_unstring_overlap_pointer",
-  "pb1907_unstring_overlap_linkage"
- ],
+  "pb1907_unstring_overlap_linkage",
+    "pb749_sort_implicit_statement_status"
+  ],
  "pending": [
   "pb485_value_only_format1"
  ]

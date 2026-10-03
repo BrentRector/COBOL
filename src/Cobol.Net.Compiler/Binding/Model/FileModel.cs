@@ -638,6 +638,27 @@ public sealed class FileModel
     public int RecordWidth => Math.Max(RecordContains ?? 0,
         Records.Count == 0 ? 0 : Records.Max(Model.RecordLayout.PhysicalWidth));
 
+    /// <summary>⛔ THE ONE ANSWER TO "WHICH SPACE FILLS A SHORT RECORD OF A SORT/MERGE TRANSFER" (kb/Work PB1140), asked
+    /// of file-name-2/-3 on the USING side and of file-name-4/-3 on the GIVING side: <i>"If there is only one record
+    /// description entry associated with the file … and that record is described as a national data item or as an
+    /// elementary data item of usage national and of category numeric, numeric-edited, or boolean, the record is
+    /// filled with national space characters"</i> (§14.9.24.4 GR2 a) / GR13 a), §14.9.40.4 GR7 a) / GR16 a)); otherwise
+    /// it is <i>"filled with alphanumeric space characters"</i> (c). Written once, over the FD's own record
+    /// descriptions, so the USING release and the GIVING write cannot answer differently — and it is NOT the
+    /// connector's <c>NationalRecordArea</c>, which is §14.9.30.4 GR15's per-RECORD-AREA test (ANY national record
+    /// description of the FD) for the READ's own fill.
+    /// <para>⚠ DETERMINATION — SORT GR16 a) / b) print <i>"file-name-2"</i> where the rule's own lead-in names the GIVING
+    /// file (<i>"If the file referenced by file-name-3 contains only fixed-length records"</i>) and its MERGE twin
+    /// (§14.9.24.4 GR13 a) names file-name-4; the printed name is a slip of the standard, so the GIVING side reads the
+    /// record descriptions of the GIVING file.</para>
+    /// <para>⚠ DETERMINATION — arm b) (several record descriptions WITH a SELECT WHEN clause, the clause choosing the
+    /// description) cannot arise: SELECT WHEN is Annex A.4.8's declined module (<c>COBOLNET1705</c>), refused at bind,
+    /// so a file with several record descriptions always takes c).</para></summary>
+    public bool ShortRecordFillNational =>
+        Records is [{ OperandPic: { } p }]
+        && (p.Category == PicCategory.National
+            || (p.Usage == Usage.National && p.Category is PicCategory.Numeric or PicCategory.NumericEdited or PicCategory.Boolean));
+
     /// <summary>The record description whose view spans the WHOLE record area — the largest one (ISO §13.18.33.4
     /// GR3: level-1 entries under an FD are "implicit redefinitions of the same area"; §13.18.43.4 GR5 a) sizes it
     /// as "the record size of the largest record description entry"). Reading a record makes it available in the

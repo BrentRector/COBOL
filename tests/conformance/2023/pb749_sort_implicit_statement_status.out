@@ -1,0 +1,5 @@
+DECL F2=06 G=?? EC-I-O-WARNING                 
+REC [ABCDE]
+REC [FG   ]
+A AFTER F2=00
+B AFTER G=00

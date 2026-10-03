@@ -358,7 +358,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                                        rf.functionCall(), rf.inlineMethodInvocation())
             : null;
         // The released length is the NAMED record's own description size (a shorter secondary 01 of a multi-01 SD
-        // releases at its own length; §14.9.40 GR7c space-fills a short record into a fixed-length sort file).
+        // releases at its own length; §14.9.40.4 GR16 fills a short returned record for a fixed-length GIVING file).
         return new BoundRelease(file, record, Model.RecordLayout.AreaWidth(record.Item), from, SortVaryingOf(file));
     }
 
