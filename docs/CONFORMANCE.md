@@ -772,7 +772,7 @@ of an unsupported facility.
   directives are RECOGNIZED (consumed during text manipulation so the program compiles unchanged) and carry no
   effect, each because WiseOwl COBOL provides a single behaviour with no alternative to select: **>>CALL-CONVENTION**
   (§7.3.9) — CALL uses the single .NET managed calling convention, so only `>>CALL-CONVENTION COBOL` is accepted and
-  any other call-convention-name is an error, COBOLNET1911 (A.1 item 68 in §7; kb/Work PB1383); **>>LEAP-SECOND** (§7.3.17) — the REPORTED side only: the .NET clock never reports a 60th second (A.1 item
+  any other call-convention-name is an error, COBOLNET1911 (A.1 item 68 in §7; kb/Work PB1383). GnuCOBOL 3.1.2 and 3.2.0 additionally accept EXTERN, STDCALL and STATIC (measured on both, kb/Work PB1945); owner decision 2026-10-03: keep COBOL only, and revisit only if a .NET mapping is added, which may not be required at all; **>>LEAP-SECOND** (§7.3.17) — the REPORTED side only: the .NET clock never reports a 60th second (A.1 item
   111 in §7); the directive's ARGUMENT side (a 60 in a seconds subfield, a time form to 86,400.99 under ON) is honoured —
   `LeapSecondDirectiveProcessor`, kb/Work PB65; **>>LISTING** / **>>PAGE** (§7.3.18 / §7.3.19) — no source listing
   is produced, so listing on/off and page ejects are inert. The **>>DISPLAY** directive (§7.3.12) is NOT in this set:
