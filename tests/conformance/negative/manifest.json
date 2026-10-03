@@ -10,6 +10,7 @@
   "pb1231-constant-indirect-cycle",
   "pb1231-constant-length-cycle",
   "pb1225-constant-without-as-at-85",
+  "pb1271-sum-counter-occurrence-not-subscripted",
   "pb1232-constant-length-noninteger-subscript",
   "pb1227-constant-byte-length-any-length",
   "pb1227-constant-length-any-length",

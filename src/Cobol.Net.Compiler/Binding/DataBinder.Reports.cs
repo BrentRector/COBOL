@@ -90,8 +90,14 @@ public sealed class ReportModel
     /// <summary>The report groups in declaration order.</summary>
     public List<ReportGroupModel> Groups { get; } = [];
 
-    /// <summary>The SUM counters of this report (ISO §13.18.54), keyed by counter id.</summary>
+    /// <summary>The SUM counters of this report (ISO §13.18.54), one per OCCURRENCE, in counter-id order (the
+    /// index of a counter in this list IS its <see cref="ReportSumModel.Id"/> once the description is bound —
+    /// <c>DataBinder.SealSumCounters</c>).</summary>
     public List<ReportSumModel> Sums { get; } = [];
+
+    /// <summary>The SUM ENTRIES of this report, one <see cref="ReportSumFamily"/> per entry containing a SUM clause
+    /// (ISO §13.18.54.4 GR1), in the order their counter-id blocks were reserved.</summary>
+    public List<ReportSumFamily> SumFamilies { get; } = [];
 
     /// <summary>This report's index within its program unit — backs the emitted engine field name
     /// (<c>__RPT_{CsIndex}</c>).</summary>
@@ -610,37 +616,122 @@ public sealed record ReportDetailRef(string Name, string? Qualifier)
     public override string ToString() => Qualifier is null ? Name : $"{Name} OF {Qualifier}";
 }
 
-/// <summary>One SUM counter (ISO §13.18.54): its identity (GR1 — see <see cref="Id"/>), the counter scale
-/// (GR1 — derived from the entry's PICTURE), the addend TERMS (SR5 — items OUTSIDE the report section;
-/// report-section addends/rolled totals are staged loud), each carrying its own UPON detail names (GR7c2), and
-/// the RESET operand (GR2).</summary>
-public sealed class ReportSumModel
+/// <summary>
+/// ⛔ ONE SUM ENTRY'S COUNTERS, AND THEY ARE A TABLE (kb/Work PB1271). ISO §13.18.54.4 GR1 gives "each entry
+/// containing a SUM clause" an independent sum counter, and when that entry is a REPEATING entry the counter
+/// repeats with it: GR8 a) adds each occurrence of a repeating addend "into the corresponding occurrence of the sum
+/// counter", and GR10 suppresses the print and the reset of "the corresponding sum counter" of an absent
+/// occurrence. The repetition vehicles are §13.15.4 GR3's three — an OCCURS clause (§13.18.38 Format 3), a multiple
+/// LINE clause (§13.18.35.4 GR9: "functionally equivalent to … a simple OCCURS clause") and a multiple COLUMN clause
+/// (§13.18.14.4 GR12: the same sentence) — and every one of them is an OCCURS level, so the counter's occurrences
+/// form a table of <see cref="Extents"/>, one level per enclosing repetition, outermost first, plus, innermost,
+/// the entry's own multiple COLUMN clause.
+/// <para>So a procedure division reference subscripts it like any table element (§8.4.2.3.3 SR3 — one subscript
+/// per OCCURS level; SR5 — "Each table element reference shall be subscripted"), which is why the family's
+/// <see cref="Register"/> carries a synthetic ancestor chain with one <see cref="DataItem.Occurs"/> per extent: the
+/// ordinary arity screen, <see cref="DataItem.SubscriptLevels"/> and the table(ALL) argument read it unchanged.
+/// The single-register model this replaced shared ONE counter among a multiple COLUMN entry's printable items and
+/// refused every subscripted reference "not defined".</para>
+/// <para>The counter ids of a family are one CONTIGUOUS block, row-major over <see cref="Extents"/>, reserved when
+/// the family is first seen: an occurrence's id is <see cref="BaseId"/> + its linear coordinate. Contiguity is
+/// what lets a run-time subscript select the counter by arithmetic — the replay binds sibling entries between the
+/// repetitions (A0 B0 A1 B1), so the ids could not be contiguous in binding order.</para>
+/// </summary>
+public sealed class ReportSumFamily
 {
-    /// <summary>⛔ THE COUNTER'S IDENTITY IS THE ENTRY, NEVER ITS SPELLING (kb/Work PB882). ISO §13.18.54.4
-    /// GR1: "Each entry containing a SUM clause establishes an independent sum counter and size error
-    /// indicator." This is the entry's ORDINAL within its report description — the index of this model in
-    /// <see cref="ReportModel.Sums"/> and, at run time, of its counter in the engine's list. It used to be
-    /// <see cref="Name"/> (the entry's data-name, else a synthesized string), which made two entries that
-    /// legally share a data-name share ONE counter: the second registration overwrote the first and both
-    /// printable faces rendered the second total.</summary>
-    public required int Id { get; init; }
-
-    /// <summary>The data-name that NAMES THIS COUNTER (ISO §13.18.54.4 GR5 — "If a data-name immediately
-    /// follows the level number in the entry containing the SUM clause, the data-name is the name of the sum
-    /// counter, not the name of the associated printable item, if any"), or null for an unnamed entry. It is
-    /// what a procedure division statement writes to read or alter the counter (GR12) — <b>not</b> its
-    /// identity, which is <see cref="Id"/>.</summary>
+    /// <summary>The data-name that NAMES THE COUNTER (ISO §13.18.54.4 GR5 — "If a data-name immediately follows
+    /// the level number in the entry containing the SUM clause, the data-name is the name of the sum counter, not
+    /// the name of the associated printable item, if any"), or null for an unnamed entry. It is what a procedure
+    /// division statement writes to read or alter the counter (GR12) — <b>not</b> its identity, which is the
+    /// entry (kb/Work PB882).</summary>
     public string? Name { get; init; }
 
-    /// <summary>The IMPLICITLY-DEFINED register this counter is (ISO §13.18.54.4 GR1 — "a conceptual data item
+    /// <summary>The id of occurrence (1, 1, …): the first counter of this family's block.</summary>
+    public required int BaseId { get; init; }
+
+    /// <summary>The enclosing repeating entries' OCCURS clauses, outermost first (§13.18.38 Format 3, or a multiple
+    /// LINE clause's §13.18.35.4 GR9 equivalent) — one table level each. They also answer what a table(ALL)
+    /// argument asks of a level's CURRENT range: §15.3, "If the ALL subscript is associated with a data item
+    /// described with an OCCURS DEPENDING ON clause, the range of values is determined by the object of the OCCURS
+    /// DEPENDING ON clause", read by §13.18.38.4 GR13's own count (<see cref="Model.AllCount.ReportDepending"/>).</summary>
+    public required IReadOnlyList<ReportOccursSpec> Repetitions { get; init; }
+
+    /// <summary>The operand count of the entry's own multiple COLUMN clause — the innermost level — or 1 when the
+    /// entry has no multiple COLUMN clause (§13.18.14.3 SR10 a) keeps an OCCURS clause out of such an entry).</summary>
+    public required int Columns { get; init; }
+
+    /// <summary>The occurrence count of each level, outermost first: each of <see cref="Repetitions"/>' integer-2,
+    /// then <see cref="Columns"/> when it is a level. Empty for a non-repeating entry: one counter. Derived, so the
+    /// levels, the register's synthetic OCCURS chain and the id arithmetic read one answer.</summary>
+    public IReadOnlyList<int> Extents =>
+        _extents ??= [.. Repetitions.Select(r => r.Max), .. Columns > 1 ? [Columns] : (int[])[]];
+    private IReadOnlyList<int>? _extents;
+
+    /// <summary>How many counters the family holds — the product of <see cref="Extents"/> (1 for none).</summary>
+    public int Count => Extents.Aggregate(1, (n, e) => n * e);
+
+    /// <summary>The IMPLICITLY-DEFINED data item the counter is (ISO §13.18.54.4 GR1 — "a conceptual data item
     /// that behaves as a data item of the category numeric"), carrying the GR1 profile
-    /// (<see cref="PicInfo.SumCounterItem"/>). It is engine state, not storage — kept off
-    /// <c>DataBinder.ByName</c>/<c>Roots</c> and reachable only through <c>DataBinder.SumCounters</c>, the
-    /// resolver hook that builds a <see cref="Model.ReportSumCounterPlace"/> (the CAPACITY-register pattern).
-    /// It is what GR5's data-name names and what GR12 permits the procedure division to alter.</summary>
+    /// (<see cref="PicInfo.SumCounterItem"/>) and, for a repeating entry, the synthetic OCCURS chain of
+    /// <see cref="Extents"/>. It is engine state, not storage — kept off <c>DataBinder.ByName</c>/<c>Roots</c> and
+    /// reachable only through <c>DataBinder.SumCounters</c>, the resolver hook that builds a
+    /// <see cref="Model.ReportSumCounterPlace"/> (the CAPACITY-register pattern). Every occurrence shares it: they
+    /// are occurrences of ONE description.</summary>
     public required DataItem Register { get; init; }
 
+    /// <summary>The counter's scale — the fractional digit count GR1 derives from the entry's PICTURE.</summary>
     public int Scale { get; init; }
+
+    /// <summary>⛔ THE COUNTER'S QUALIFICATION HIERARCHY (kb/Work PB1454): the data-names of the report group
+    /// description entries the SUM entry is subordinate to, INNERMOST FIRST and ending at the 01 report group, a
+    /// null for an entry without a data-name (FILLER). ISO §8.4.2.2.3 SR4 — "Each data-name-2 shall be the name
+    /// associated with a level number to which the item being qualified is subordinate" — so a counter is
+    /// qualifiable by every named level above it, and by its REPORT as the outermost container
+    /// (§8.4.2.2.2 Format 1's file-report-qualifier). Read by <see cref="DataBinder.QualifierWalk"/>, the ONE
+    /// qualifier walk a data item's own ancestors go through.</summary>
+    public IReadOnlyList<string?> Qualification { get; init; } = [];
+
+    /// <summary>The COBOL-2002 PICTURE-shape introduction gate (a <c>Constructs.*</c> id) this counter's PICTURE
+    /// carries — a floating-point numeric-edited (symbol E) or national-edited picture, from the ONE
+    /// <c>VersionConformancePass.PictureConstructId</c>. The SUM-counter scale-derivation <c>Analyze</c> (GR1) is a
+    /// DISTINCT call off <c>ConformanceForest</c>, so this preserves its gate for the post-bind
+    /// <c>VersionConformancePass</c> GateData report-Sums walk (DEVLOG 740; else the 0900 below 2002 is dropped on
+    /// this error path). Null when the picture is version-invariant (the normal numeric case).</summary>
+    public string? SkeletonGate { get; init; }
+    /// <summary>The exact where-string the SUM-counter <c>Analyze</c> used (<c>RD '…' SUM counter '…'</c>) — replayed
+    /// verbatim by GateData when <see cref="SkeletonGate"/> fires, so the 0900 is byte-identical to the former site.</summary>
+    public string SkeletonWhere { get; init; } = "";
+
+    /// <summary>The id of the occurrence at <paramref name="coordinates"/> (zero-based, outermost first, one per
+    /// <see cref="Extents"/> level): <see cref="BaseId"/> + the row-major linear coordinate — the same order a
+    /// subscript list is written in (§8.4.2.3.3 SR3, "successively less inclusive dimensions"), and the same
+    /// arithmetic the engine's <c>CobolReport.SumOccurrence</c> does for a run-time subscript.</summary>
+    public int IdAt(IReadOnlyList<int> coordinates)
+    {
+        int linear = 0;
+        for (int k = 0; k < Extents.Count; k++) linear = linear * Extents[k] + coordinates[k];
+        return BaseId + linear;
+    }
+}
+
+/// <summary>One SUM counter — one OCCURRENCE of a <see cref="ReportSumFamily"/> (ISO §13.18.54): its identity
+/// (GR1 — see <see cref="Id"/>), the addend TERMS (SR5 — items OUTSIDE the report section; report-section
+/// addends/rolled totals are staged loud), each carrying its own UPON detail names (GR7c2), the RESET operand
+/// (GR2), and the presence tests that suppress its print and reset (GR10).</summary>
+public sealed class ReportSumModel
+{
+    /// <summary>⛔ THE COUNTER'S IDENTITY IS THE ENTRY'S OCCURRENCE, NEVER ITS SPELLING (kb/Work PB882, PB1271).
+    /// ISO §13.18.54.4 GR1: "Each entry containing a SUM clause establishes an independent sum counter and size
+    /// error indicator", and a repeating entry establishes one per occurrence (<see cref="ReportSumFamily"/>). This
+    /// is the occurrence's id within its report description — <see cref="ReportSumFamily.IdAt"/>, the index of this
+    /// model in <see cref="ReportModel.Sums"/> and, at run time, of its counter in the engine's list. It used to be
+    /// the entry's data-name, which made two entries that legally share a data-name share ONE counter: the second
+    /// registration overwrote the first and both printable faces rendered the second total.</summary>
+    public required int Id { get; init; }
+
+    /// <summary>The SUM ENTRY this counter is an occurrence of — its name, its register, its scale and its
+    /// qualification hierarchy are the entry's, shared by every occurrence.</summary>
+    public required ReportSumFamily Family { get; init; }
 
     /// <summary>The clause's <c>SUM … [UPON …]</c> groups in written order — ONE counter per ENTRY (GR1),
     /// however many times the SUM keyword appears (SR1).</summary>
@@ -667,31 +758,20 @@ public sealed class ReportSumModel
     /// <summary>The group whose processing end resets the counter when no RESET phrase is given (GR2).</summary>
     public required ReportGroupModel PrintedIn { get; init; }
 
-    /// <summary>⛔ THE COUNTER'S QUALIFICATION HIERARCHY (kb/Work PB1454): the data-names of the report group
-    /// description entries the SUM entry is subordinate to, INNERMOST FIRST and ending at the 01 report group, a
-    /// null for an entry without a data-name (FILLER). ISO §8.4.2.2.3 SR4 — "Each data-name-2 shall be the name
-    /// associated with a level number to which the item being qualified is subordinate" — so a counter is
-    /// qualifiable by every named level above it, and by its REPORT as the outermost container
-    /// (§8.4.2.2.2 Format 1's file-report-qualifier). Read by <see cref="DataBinder.QualifierWalk"/>, the ONE
-    /// qualifier walk a data item's own ancestors go through.</summary>
-    public IReadOnlyList<string?> Qualification { get; set; } = [];
-
-    /// <summary>The COBOL-2002 PICTURE-shape introduction gate (a <c>Constructs.*</c> id) this counter's PICTURE
-    /// carries — a floating-point numeric-edited (symbol E) or national-edited picture, from the ONE
-    /// <c>VersionConformancePass.PictureConstructId</c>. The SUM-counter scale-derivation <c>Analyze</c> (GR1) is a
-    /// DISTINCT call off <c>ConformanceForest</c>, so this preserves its gate for the post-bind
-    /// <c>VersionConformancePass</c> GateData report-Sums walk (DEVLOG 740; else the 0900 below 2002 is dropped on
-    /// this error path). Null when the picture is version-invariant (the normal numeric case).</summary>
-    public string? SkeletonGate { get; init; }
-    /// <summary>The exact where-string the SUM-counter <c>Analyze</c> used (<c>RD '…' SUM counter '…'</c>) — replayed
-    /// verbatim by GateData when <see cref="SkeletonGate"/> fires, so the 0900 is byte-identical to the former site.</summary>
-    public string SkeletonWhere { get; init; } = "";
-
     /// <summary>The SUM entry's FULL PRESENT WHEN chain (01 → entry). When any condition is false at a group
     /// presentation the counter is neither printed nor reset for that instance (ISO §13.18.41.4 GR3g /
     /// §13.18.54.4 GR10) — the engine consults the AND of these per presentation.</summary>
     public List<CobolParserCore.ConditionContext> PresentWhenCtxs { get; } = [];
     public List<BoundCondition> PresentWhen { get; } = [];
+
+    /// <summary>⛔ GR10's OTHER HALF — the OCCURS … DEPENDING presence tests of THIS OCCURRENCE (ISO §13.18.38.4
+    /// GR13), outermost repeating entry first. §13.18.54.4 GR10: "If the entry is associated with an absent data item
+    /// as a result of a PRESENT WHEN clause or an OCCURS clause with the DEPENDING phrase, the corresponding sum
+    /// counter is not printed and is not reset to zero for the current instance of the report group." The PRESENT
+    /// WHEN half is <see cref="PresentWhen"/>; an occurrence the DEPENDING count excludes is absent exactly as its
+    /// printable item is (<see cref="ReportFieldModel.RepetitionGuards"/>), and the two are ANDed into the one
+    /// presence slot the engine's reset reads (kb/Work PB1271).</summary>
+    public List<ReportRepetitionGuard> RepetitionGuards { get; } = [];
 }
 
 public sealed partial class DataBinder
@@ -748,14 +828,14 @@ public sealed partial class DataBinder
         if (_inheritedReports.Count == 0) _visibleReports.AddRange(_reports);
         _visibleReports.Add(report);
         _inheritedReports[report] = depth;
-        foreach (var sum in report.Sums)
+        foreach (var family in report.SumFamilies)
         {
             // A sum counter is a data-name subordinate to the report (GR1). A LOCAL declaration of the same name
             // hides it; a same-named counter of this unit's own reports is a homonym the report-name qualifier
             // resolves, exactly as between two reports of one program (kb/Work PB882).
-            if (sum.Name is not { } sn || ByName.ContainsKey(sn)) continue;
+            if (family.Name is not { } sn || ByName.ContainsKey(sn)) continue;
             if (!_sumCounters.TryGetValue(sn, out var homonyms)) _sumCounters[sn] = homonyms = [];
-            homonyms.Add((report, sum));
+            homonyms.Add((report, family));
         }
         return true;
     }
@@ -1107,6 +1187,25 @@ public sealed partial class DataBinder
             st.Group = null;
         }
         BindReportEntries(entries, runStart, entries.Length, model, st);
+        SealSumCounters(model);
+    }
+
+    /// <summary>Put the report's counters in COUNTER-ID order once every entry is bound (kb/Work PB1271). Each SUM
+    /// entry reserved its block of ids when it was first seen (<see cref="SumFamilyOf"/>), but the replay binds its
+    /// occurrences interleaved with the sibling entries' (A0 B0 A1 B1), so binding order is not id order; the engine
+    /// registers the counters in list order and requires the list index to BE the id (<c>CobolReport.AddSum</c>).
+    /// Every repetition of every entry is bound (§13.18.38.4 GR10 — "integer-2 distinct report items"; the
+    /// repetitions §13.18.63.4 GR23 lets a DEPENDING phrase suppress are bound too), so the reserved blocks are
+    /// exactly filled; a gap is a binder defect,
+    /// never a property of the source.</summary>
+    private static void SealSumCounters(ReportModel model)
+    {
+        model.Sums.Sort((a, b) => a.Id.CompareTo(b.Id));
+        int reserved = model.SumFamilies.Sum(f => f.Count);
+        for (int i = 0; i < reserved; i++)
+            if (i >= model.Sums.Count || model.Sums[i].Id != i)
+                throw new InvalidOperationException($"RD '{model.Name}': reserved sum counter id {i} has no counter "
+                    + "— a counter block was not filled by its entry's occurrences (kb/Work PB1271)");
     }
 
     /// <summary>⛔ THE NEXT GROUP CLAUSE (ISO §13.18.37; kb/Work PB957), bound once per RD after every group is
@@ -1474,6 +1573,9 @@ public sealed partial class DataBinder
         public readonly Dictionary<(Core.ReportGroupEntryContext Entry, int Operand, string Undisplaced), int> LineAnchors = [];
         /// <summary>Placements of each entry bound so far — <see cref="ReportFieldModel.RepetitionOrdinal"/>.</summary>
         public readonly Dictionary<Core.ReportGroupEntryContext, int> Placements = [];
+        /// <summary>The <see cref="ReportSumFamily"/> of each SUM entry, created at the entry's FIRST replay (when its
+        /// counter-id block is reserved) and found again by every later one (kb/Work PB1271).</summary>
+        public readonly Dictionary<Core.ReportGroupEntryContext, ReportSumFamily> SumFamilies = [];
         /// <summary>The bind-time EXPECTED vertical offset of the last relative line placed in the group under
         /// construction, measured from the group's own start. It is the §13.18.35.4 GR4c trial sum read
         /// forwards: each line's <see cref="ReportLineModel.TrialInterval"/> is its expected offset minus this
@@ -2163,16 +2265,30 @@ public sealed partial class DataBinder
             }
             var line = st.Line;
 
-            // A SUM entry establishes a counter whether or not it is printable (§13.18.54.4 GR1/GR3); its FULL
-            // chain governs the GR10 print/reset suppression (§13.18.41.4 GR3g).
-            ReportSumModel? sum = null;
+            // A SUM entry establishes a counter whether or not it is printable (§13.18.54.4 GR1/GR3) — ONE PER
+            // OCCURRENCE of a repeating entry (kb/Work PB1271): this replay's counters are the occurrences its
+            // ordinals select, one per COLUMN operand of a multiple COLUMN clause (§13.18.14.4 GR12 makes those
+            // operands a simple OCCURS level, so its printable items are occurrences too). Each counter's FULL
+            // chain and this replay's OCCURS … DEPENDING tests govern the GR10 print/reset suppression
+            // (§13.18.41.4 GR3g).
+            var sums = new List<ReportSumModel>();
             if (sumClauses.Count > 0)
             {
-                sum = BindSumClause(sumClauses, entryName, picText, group, model, columns.Count > 0);
-                // §8.4.2.2.3 SR4 — the counter is subordinate to every level above its entry (PB1454).
-                sum.Qualification = [.. Enumerable.Reverse(chain).Select(f => f.Name)];
-                foreach (var (_, c, _, _, _) in chain) if (c is not null) sum.PresentWhenCtxs.Add(c);
-                if (ownCond is not null) sum.PresentWhenCtxs.Add(ownCond);
+                var family = SumFamilyOf(ge, entryName, picText, columns.Count, chain, model, st);
+                int perReplay = columns.Count > 1 ? columns.Count : 1;
+                var coordinates = new List<int>(st.Repetitions.Count + 1);
+                foreach (var frame in st.Repetitions) coordinates.Add(frame.Ordinal);
+                if (perReplay > 1) coordinates.Add(0);
+                for (int c = 0; c < perReplay; c++)
+                {
+                    if (perReplay > 1) coordinates[^1] = c;
+                    var sum = BindSumClause(sumClauses, family, family.IdAt(coordinates), entryName, group, model,
+                        columns.Count > 0);
+                    foreach (var (_, cond, _, _, _) in chain) if (cond is not null) sum.PresentWhenCtxs.Add(cond);
+                    if (ownCond is not null) sum.PresentWhenCtxs.Add(ownCond);
+                    sum.RepetitionGuards.AddRange(st.GuardsHere());
+                    sums.Add(sum);
+                }
             }
 
             if (columns.Count > 0)
@@ -2309,8 +2425,10 @@ public sealed partial class DataBinder
                 // SUM wins the entry (§13.18.54.4 GR4 — the sum counter acts as the source item); then the
                 // SOURCE operands; then the VALUE operands. There is no fourth arm: §13.15.3 SR10 forbids the
                 // operand-less entry, and the guard above returns before one reaches here (kb/Work PB853).
+                // A multiple COLUMN SUM entry supplies one counter PER printable item (kb/Work PB1271), paired with
+                // its repetition by the same SourceAt reader a multi-operand SOURCE uses.
                 List<ReportFieldSource> srcs =
-                    sum is not null ? [new FieldSumSource(sum.Id)]
+                    sums.Count > 0 ? [.. sums.Select(s => (ReportFieldSource)new FieldSumSource(s.Id))]
                     : sourceOps.Count > 0 ? sourceOps
                     : [.. valueRaws.Select(r => (ReportFieldSource)new FieldValueSource(r))];
                 // SOURCE naming the entry's own VARYING counter (§13.18.64.4 GR4 NOTE — a counter is a source
@@ -2793,16 +2911,28 @@ public sealed partial class DataBinder
             : DataItem.DisplayTextWidthOf(pic),
     };
 
-    /// <summary>Bind ONE ENTRY's SUM clause (ISO §13.18.54) into a <see cref="ReportSumModel"/>: the counter id
-    /// (the entry's data-name, GR5, else synthesized), the addend TERMS, their UPON operands, and the RESET
-    /// operand. The counter's scale derives from the entry's PICTURE (GR1).
-    /// <para>⛔ IT TAKES EVERY <c>SUM …</c> GROUP OF THE ENTRY, not one (kb/Work PB482). §13.18.54.3 SR1 — "The
-    /// whole clause is referred to as a SUM clause even though the SUM keyword may appear more than once" — and
-    /// §13.18.54.4 GR1 establishes ONE counter per ENTRY, so the groups are terms of a single counter and each
-    /// keeps its OWN UPON list (GR7c2 attaches the phrase to its group).</para></summary>
-    private ReportSumModel BindSumClause(IReadOnlyList<Core.ReportSumClauseContext> clauses,
-        string? entryName, string? picText, ReportGroupModel group, ReportModel model, bool hasColumn)
+    /// <summary>
+    /// The <see cref="ReportSumFamily"/> of SUM entry <paramref name="ge"/> — created at the entry's FIRST replay and
+    /// found again by every later one (kb/Work PB1271). Creating it RESERVES the family's counter-id block (the next
+    /// <see cref="ReportSumFamily.Count"/> ids after the previous family's), builds the register the counter is as
+    /// a data item (GR1), and publishes the counter's name (GR5).
+    /// <para><b>The extents</b> are §13.15.4 GR3's repetition vehicles, outermost first: one per enclosing
+    /// repeating entry (<see cref="ReportGroupBuild.Repetitions"/> — an OCCURS clause, or a multiple LINE clause by
+    /// §13.18.35.4 GR9), then the entry's own multiple COLUMN clause by §13.18.14.4 GR12 ("functionally equivalent to
+    /// a COLUMN clause with a single operand, together with a simple OCCURS clause whose integer is equal to the
+    /// number of operands"). §13.18.14.3 SR10 a) forbids an OCCURS clause in the same entry as a multiple COLUMN
+    /// clause, so the entry's own vehicle is at most one of the two.</para>
+    /// <para><b>The register</b> is the counter's ONE description, shared by every occurrence: the GR1 profile
+    /// (<see cref="PicInfo.SumCounterItem"/>), and for a repeating entry a synthetic ancestor per enclosing
+    /// repetition with <see cref="DataItem.Occurs"/> = its extent, the register itself carrying the COLUMN extent —
+    /// so §8.4.2.3.3 SR3's count (<see cref="DataItem.SubscriptArity"/>) and order
+    /// (<see cref="DataItem.SubscriptLevels"/>) are the ordinary ones.</para>
+    /// </summary>
+    private ReportSumFamily SumFamilyOf(Core.ReportGroupEntryContext ge, string? entryName, string? picText,
+        int columnCount, List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> chain,
+        ReportModel model, ReportGroupBuild st)
     {
+        if (st.SumFamilies.TryGetValue(ge, out var known)) return known;
         // Scale-derivation analysis (GR1) — threads the edition + the program currency symbol like every other
         // Analyze site (a custom §12.3.7 currency symbol in a SUM counter's PICTURE must classify, not error).
         string sumWhere = $"RD '{model.Name}' SUM counter '{entryName ?? "FILLER"}'";
@@ -2816,14 +2946,32 @@ public sealed partial class DataBinder
         // WS-F` registered a scale-0 counter and truncated every addend to an integer (2.75 twice printed 04.00 for the
         // 05.50 owed). The one rule every store already asks (PicInfo.ReceiverScale) answers it.
         int sumScale = pic?.ReceiverScale(DecimalPointIsComma) ?? 0;
-        var sum = new ReportSumModel
+        int baseId = model.SumFamilies.Count == 0 ? 0 : model.SumFamilies[^1].BaseId + model.SumFamilies[^1].Count;
+        // The synthetic OCCURS chain: one ancestor per enclosing repetition (outermost first), each an implicit
+        // table level of the counter — never storage, never in ByName, reachable only through the register.
+        DataItem? parent = null;
+        for (int k = 0; k < st.Repetitions.Count; k++)
         {
-            // §13.18.54.4 GR1 — one counter per ENTRY: the identity is this entry's ordinal in the report
-            // description, and GR5's data-name rides alongside as the counter's NAME (kb/Work PB882).
-            Id = model.Sums.Count,
+            var level = new DataItem
+            {
+                Level = 48,
+                DeclaredAt = Edition.Cursor,
+                CsName = $"{NamingConvention.SumCounterName(model.Name, baseId)}_occ{k}",
+                Occurs = st.Repetitions[k].Spec.Max,
+                Parent = parent,
+            };
+            level.Uid = _uidCounter++;
+            parent = level;
+        }
+        var family = new ReportSumFamily
+        {
             Name = entryName,
+            BaseId = baseId,
+            Repetitions = [.. st.Repetitions.Select(f => f.Spec)],
+            Columns = Math.Max(1, columnCount),
             Scale = sumScale,
-            PrintedIn = group,
+            // §8.4.2.2.3 SR4 — the counter is subordinate to every level above its entry (PB1454).
+            Qualification = [.. Enumerable.Reverse(chain).Select(f => f.Name)],
             // The counter AS A DATA ITEM (GR1) — the implicitly-defined register a procedure division reference
             // resolves to (GR5 names it, GR12 permits altering it). Off ByName/Roots, exactly like the OCCURS
             // DYNAMIC CAPACITY register: its value IS the engine's, so it allocates no storage.
@@ -2832,14 +2980,49 @@ public sealed partial class DataBinder
                 Level = 49,
                 DeclaredAt = Edition.Cursor,
                 CobolName = entryName,
-                CsName = NamingConvention.SumCounterName(model.Name, model.Sums.Count),
+                CsName = NamingConvention.SumCounterName(model.Name, baseId),
                 Pic = PicInfo.SumCounterItem(pic is null ? 18 : SumCounterDigits(pic), sumScale),
+                Occurs = columnCount > 1 ? columnCount : null,
+                Parent = parent,
                 Uid = _uidCounter++,
             },
             // Preserve a floating-point-edited / national-edited PICTURE gate for the post-bind GateData report-Sums
             // walk (this PicInfo is otherwise discarded — only Scale is used — so the 0900 would drop; DEVLOG 740).
             SkeletonGate = pic is null ? null : CobolNet.Validation.VersionConformancePass.PictureConstructId(pic),
             SkeletonWhere = sumWhere,
+        };
+        st.SumFamilies[ge] = family;
+        model.SumFamilies.Add(family);
+        // §13.18.54.4 GR5 — a data-name immediately after the level number names THE COUNTER. Publish it into
+        // the source element's name space so GR12's permission to read or alter it can be exercised; the entry
+        // keeps its own counter whether or not another entry spells its name the same way (GR1, kb/Work PB882).
+        if (entryName is not null)
+        {
+            if (!_sumCounters.TryGetValue(entryName, out var homonyms))
+                _sumCounters[entryName] = homonyms = [];
+            homonyms.Add((model, family));
+        }
+        return family;
+    }
+
+    /// <summary>Bind ONE OCCURRENCE of an entry's SUM clause (ISO §13.18.54) into the <see cref="ReportSumModel"/>
+    /// whose id is <paramref name="id"/> (<see cref="ReportSumFamily.IdAt"/>): the addend TERMS, their UPON
+    /// operands, and the RESET operand. The counter's name, register and scale are the entry's
+    /// (<paramref name="family"/>).
+    /// <para>⛔ IT TAKES EVERY <c>SUM …</c> GROUP OF THE ENTRY, not one (kb/Work PB482). §13.18.54.3 SR1 — "The
+    /// whole clause is referred to as a SUM clause even though the SUM keyword may appear more than once" — and
+    /// §13.18.54.4 GR1 establishes ONE counter per ENTRY, so the groups are terms of a single counter and each
+    /// keeps its OWN UPON list (GR7c2 attaches the phrase to its group).</para></summary>
+    private ReportSumModel BindSumClause(IReadOnlyList<Core.ReportSumClauseContext> clauses, ReportSumFamily family,
+        int id, string? entryName, ReportGroupModel group, ReportModel model, bool hasColumn)
+    {
+        var sum = new ReportSumModel
+        {
+            // §13.18.54.4 GR1 — one counter per ENTRY OCCURRENCE: the identity is the occurrence's id within the
+            // report description, and GR5's data-name rides on the family as the counter's NAME (kb/Work PB882).
+            Id = id,
+            Family = family,
+            PrintedIn = group,
         };
         bool resetSeen = false, roundedSeen = false;
         foreach (var sm in clauses)
@@ -2889,16 +3072,7 @@ public sealed partial class DataBinder
                 sum.ResetOperand = ControlOperandRef(rref, DiagnosticCatalog.ReportResetNotControlOperand,
                     $"RD '{model.Name}': SUM … RESET ON operand", "ISO §13.18.54.3 SR8");
         }
-        model.Sums.Add(sum);
-        // §13.18.54.4 GR5 — a data-name immediately after the level number names THE COUNTER. Publish it into
-        // the source element's name space so GR12's permission to read or alter it can be exercised; the entry
-        // keeps its own counter whether or not another entry spells its name the same way (GR1, kb/Work PB882).
-        if (entryName is not null)
-        {
-            if (!_sumCounters.TryGetValue(entryName, out var homonyms))
-                _sumCounters[entryName] = homonyms = [];
-            homonyms.Add((model, sum));
-        }
+        model.Sums.Add(sum);   // in binding order; SealSumCounters puts the list in id order
         return sum;
     }
 
@@ -3139,6 +3313,11 @@ public sealed partial class DataBinder
                     foreach (var addend in term.Addends) ResolveSumAddend(addend, model);
                     foreach (var det in term.Upon) ResolveUponDetail(det, model);
                 }
+                // A SUM entry with no printable item still carries its occurrence's DEPENDING tests (§13.18.54.4
+                // GR10 — the reset of an absent occurrence is suppressed), so its specs resolve here too; the
+                // seen-set keeps it once per repeating entry.
+                foreach (var g in sum.RepetitionGuards)
+                    ResolveReportOccursDepending(g.Spec, model, seenOccurs);
                 if (sum.ResetFinal)
                     sum.ResetLevel = model.Controls.FindIndex(c => c.IsFinal);
                 else if (sum.ResetOperand is { } rn)
@@ -3422,7 +3601,7 @@ public sealed partial class DataBinder
             {
                 // A sum counter of the CURRENT report is SR4's other admitted report-section item.
                 bool ownCounter = countersOf is not null
-                    && countersOf.Sums.Any(s => s.Name is { } sn && sn.Equals(w, StringComparison.OrdinalIgnoreCase));
+                    && countersOf.SumFamilies.Any(s => s.Name is { } sn && sn.Equals(w, StringComparison.OrdinalIgnoreCase));
                 return ownCounter ? null : dref.GetText();
             }
             return null;
@@ -3447,7 +3626,7 @@ public sealed partial class DataBinder
         }
         // A sum counter contributes the name GR5 gives it (its identity is the ENTRY — kb/Work PB882 — but this
         // set is about NAMES: the §13.18.16.3 SR2 / §13.15.3 SR16 "declared in the report section" question).
-        foreach (var s in model.Sums) if (s.Name is { } sn && !ByName.ContainsKey(sn)) names.Add(sn);
+        foreach (var s in model.SumFamilies) if (s.Name is { } sn && !ByName.ContainsKey(sn)) names.Add(sn);
         return names;
     }
 

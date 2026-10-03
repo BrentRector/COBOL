@@ -178,8 +178,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     }
     private readonly Dictionary<string, DataItem> _capacityRegisters = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>REPORT SECTION <b>sum counter</b> names (case-insensitive) → every counter that carries the name,
-    /// with its owning report (ISO §13.18.54.4 GR5 — "If a data-name immediately follows the level number in the
+    /// <summary>REPORT SECTION <b>sum counter</b> names (case-insensitive) → every SUM ENTRY that carries the name —
+    /// its <see cref="ReportSumFamily"/>, whose occurrences a subscript selects (kb/Work PB1271) — with its owning
+    /// report (ISO §13.18.54.4 GR5 — "If a data-name immediately follows the level number in the
     /// entry containing the SUM clause, the data-name is the name of the sum counter, not the name of the
     /// associated printable item"). The counter is IMPLICITLY defined by its entry and is NOT in
     /// <see cref="ByName"/>; <see cref="ReferenceResolver"/> consults this map to build a
@@ -191,11 +192,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// shed; instead a duplicated name is legal to DECLARE and, unless a report-name qualifier resolves it,
     /// diagnosed where it is REFERENCED.</para>
     /// (READ-ONLY view — P6 Step 5; the getter carries the P6 Step-6 watermark gate.)</summary>
-    public IReadOnlyDictionary<string, List<(ReportModel Report, ReportSumModel Sum)>> SumCounters
+    public IReadOnlyDictionary<string, List<(ReportModel Report, ReportSumFamily Family)>> SumCounters
     {
         get { Require(PassPhase.FilesResolved, "SumCounters"); return _sumCounters; }
     }
-    private readonly Dictionary<string, List<(ReportModel Report, ReportSumModel Sum)>> _sumCounters
+    private readonly Dictionary<string, List<(ReportModel Report, ReportSumFamily Family)>> _sumCounters
         = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>TYPEDEF type declarations (case-insensitive) → the template root <see cref="DataItem"/> (ISO

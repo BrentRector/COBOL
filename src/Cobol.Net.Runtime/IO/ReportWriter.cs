@@ -518,8 +518,9 @@ public sealed class CobolReport(
     /// capacity (GR1's digit count of the entry's PICTURE, past which an addition is the GR3 size error, kb/Work
     /// PB1130) is enforced by the store each term's addition ends in, through the counter's own profile.
     /// The addends arrive through <see cref="AddSumTerm"/>, one call per <c>SUM … [UPON …]</c> group.
-    /// <para><paramref name="id"/> is the ENTRY's ordinal within its report description (GR1 — the counter's
-    /// identity is the entry, never its data-name; kb/Work PB882). The compiler emits the registrations in
+    /// <para><paramref name="id"/> is the ENTRY OCCURRENCE's id within its report description (GR1 — the counter's
+    /// identity is the entry, never its data-name, kb/Work PB882; a repeating entry has one counter per occurrence
+    /// in one contiguous block, kb/Work PB1271 — see <see cref="SumOccurrence"/>). The compiler emits the registrations in
     /// ordinal order, so the call APPENDS; a gap would mean the emitter and the model disagree about which
     /// entry a counter belongs to, which is exactly the confusion this keying exists to prevent.</para></summary>
     public void AddSum(int id, int resetLevel, ReportGroup printedIn, int presentSlot = -1)
@@ -545,11 +546,63 @@ public sealed class CobolReport(
     /// carrier (<c>RuntimeApi.ReportSumRead</c>), which holds every value the counter's digits admit.</summary>
     public Int128 SumValue(int id) => _sums[id].Value;
 
+    /// <summary>The value of one OCCURRENCE of a repeating SUM entry's counter, selected by a procedure division
+    /// subscript (kb/Work PB1271 — see <see cref="SumOccurrence"/>). An out-of-range subscript reads zero once the
+    /// EC-BOUND-SUBSCRIPT condition has been raised, the counter twin of an ordinary table's scratch occurrence
+    /// (<c>CobolTable.At</c>).</summary>
+    public Int128 SumValue(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts) =>
+        SumOccurrence(baseId, extents, subscripts) is int id and >= 0 ? _sums[id].Value : Int128.Zero;
+
     /// <summary>Alter a SUM counter's content from the procedure division (ISO §13.18.54.4 GR12 — "It is
     /// permissible for procedure division statements to alter the content of sum counters"). The value is
     /// unscaled, at the counter's own scale (GR1 — derived from the entry's PICTURE), and already stored through
     /// the counter's GR1 profile by the writing statement.</summary>
     public void SetSumValue(int id, Int128 value) => _sums[id].Value = value;
+
+    /// <summary>Alter one OCCURRENCE of a repeating SUM entry's counter (GR12 over <see cref="SumOccurrence"/>); a
+    /// store through an out-of-range subscript is discarded once EC-BOUND-SUBSCRIPT has been raised.</summary>
+    public void SetSumValue(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts, Int128 value)
+    {
+        if (SumOccurrence(baseId, extents, subscripts) is int id and >= 0) _sums[id].Value = value;
+    }
+
+    /// <summary>The repetition count of a report writer OCCURS … DEPENDING entry (ISO §13.18.38.4 GR13): "If the
+    /// value of data-name-1 is not in the range integer-1 to (integer-2 - 1), the report group is processed as though
+    /// the OCCURS clause had been written without the TO and DEPENDING phrases. If the value of data-name-1 is in the
+    /// range integer-1 to (integer-2 - 1), the OCCURS clause has the same effect as an OCCURS clause with no TO or
+    /// DEPENDING phrases and with an integer-2 equal to the current value of data-name-1." The ONE evaluation of that
+    /// sentence: the per-repetition presence test and a table(ALL) argument over a repeating sum counter both call
+    /// it (kb/Work PB1271).</summary>
+    public static int DependingCount(int value, int minOccurs, int maxOccurs) =>
+        value >= minOccurs && value <= maxOccurs - 1 ? value : maxOccurs;
+
+    /// <summary>⛔ A REPEATING ENTRY'S SUM COUNTER IS A TABLE (kb/Work PB1271). ISO §13.18.54.4 GR8 a) adds each
+    /// occurrence of a repeating addend "into the corresponding occurrence of the sum counter", so an entry that is
+    /// subject to an OCCURS clause, a multiple LINE clause or a multiple COLUMN clause (§13.18.38 Format 3;
+    /// §13.18.35.4 GR9 and §13.18.14.4 GR12 make the latter two simple OCCURS levels) has one counter per
+    /// occurrence. The compiler registers a family's counters as one contiguous block, row-major over
+    /// <paramref name="extents"/> (outermost level first), starting at <paramref name="baseId"/>; this answers the
+    /// id of the occurrence the one-based <paramref name="subscripts"/> select, or −1 after raising
+    /// EC-BOUND-SUBSCRIPT for a subscript outside 1..its level's extent (§8.4.2.3.4 GR2 — "If the value of the
+    /// subscript is not a positive integer or is less than one or is greater than the highest permissible
+    /// occurrence number, the EC-BOUND-SUBSCRIPT exception condition is set to exist"). Each level is tested on its
+    /// own: an out-of-range inner subscript must not wrap into the next outer occurrence.</summary>
+    private int SumOccurrence(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts)
+    {
+        int linear = 0;
+        for (int k = 0; k < extents.Length; k++)
+        {
+            long s = subscripts[k];
+            if (s < 1 || s > extents[k])
+            {
+                ExceptionState.SubscriptError($"report {Name}: sum counter subscript {s} is outside 1..{extents[k]} "
+                    + "(ISO 8.4.2.3.4 GR2)");
+                return -1;
+            }
+            linear = linear * extents[k] + (int)(s - 1);
+        }
+        return baseId + linear;
+    }
 
     /// <summary>ISO §13.18.54.4 GR4 — may sum counter <paramref name="id"/> be moved to its printable item? True
     /// while its size error indicator is unset ("the content of the sum counter is moved, according to the general

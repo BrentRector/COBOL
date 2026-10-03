@@ -71,6 +71,31 @@ public sealed class GroupViewAliasDriftTests
         Assert.Equal(plain, view);
     }
 
+    /// <summary>⛔ THE STORAGE CHANNEL, the other half of the pair (kb/Work PB1904). A group's STORAGE image — what a
+    /// file record, a group MOVE or a raw-storage function deposits or reads — is not its VALUE: a bit group's is its m
+    /// bits PACKED into ceil(m/8) bytes (§13.18.60.4 GR5, "bits shall be used to represent a boolean data item";
+    /// §8.5.1.6.3's placement), a national group's its m positions as 2m UTF-16BE bytes. FUNCTION CONVERT with source
+    /// format ANY takes an argument "of any usage" whose "contents" need not be valid for it (§15.19.3 r7) and returns
+    /// its bits in hexadecimal, "padded with zero bits" to a whole character (§15.19.4 r2) — the storage, so its
+    /// hexadecimal form pins the channel for the view and the plain group alike. The bit view once answered its 5 boolean CHARACTERS ("3130313130") where the plain group
+    /// answered its one packed byte. CONVERT is a COBOL-2023 function, hence the edition.</summary>
+    [Theory]
+    // B"10110" packed high-order first into one byte: 1011 0000 = X"B0".
+    [InlineData("GVS01", "BIT", BitMembers, "X PIC X(1)",
+        "MOVE B\"10110\" TO {G}. DISPLAY FUNCTION CONVERT ({G} ANY ANUM HEX).", "B0")]
+    // N"ABCDE" as UTF-16BE pairs (D-N1): 0041 0042 0043 0044 0045.
+    [InlineData("GVS02", "NATIONAL", NationalMembers, "X PIC X(10)",
+        "MOVE N\"ABCDE\" TO {G}. DISPLAY FUNCTION CONVERT ({G} ANY ANUM HEX).", "00410042004300440045")]
+    public void ViewOfGroup_StorageImage_IsThePlainGroups(string pid, string usage, string members, string backing,
+        string statements, string expected)
+    {
+        var compiler = new CobolNetCompiler(2023);
+        string view = Run(compiler, pid + "V", usage, members, backing, statements, viaView: true);
+        string plain = Run(compiler, pid + "P", usage, members, backing, statements, viaView: false);
+        Assert.Equal(Normalize(expected), plain);
+        Assert.Equal(plain, view);
+    }
+
     private static string Run(CobolNetCompiler compiler, string pid, string usage, string members, string backing,
         string statements, bool viaView)
     {

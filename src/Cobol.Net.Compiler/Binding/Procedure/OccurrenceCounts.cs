@@ -10,7 +10,10 @@ namespace CobolNet.Binding.Procedure;
 /// elements. If another operand is an occurs-depending table, that table shall be treated as a special case of a
 /// dynamic capacity table that has a current capacity equal to the value of the corresponding DEPENDING operand."
 /// Two statements loop a table over it: INITIALIZE (§14.9.20.4 GR8 / GR10 — whose §13.18.38.4 GR8b maximum is its
-/// own arm, layered over this) and the §14.6.9.2 element moves of a variable-length group MOVE (kb/Work PB1144).
+/// own arm, layered over this) and the §14.6.9.2 element moves of a variable-length group MOVE (kb/Work PB1144);
+/// a table(ALL) argument (§15.3) and the Format-2 table SORT reach it through
+/// <c>ReferenceResolver.CurrentOccurrenceCount</c>, which only builds the whole-table path from outer index
+/// expressions (it used to be a second copy of this switch).
 /// It was INITIALIZE's private pair of helpers until the second statement needed the same three counts.</summary>
 internal static class OccurrenceCounts
 {

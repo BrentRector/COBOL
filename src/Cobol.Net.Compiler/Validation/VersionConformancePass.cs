@@ -448,11 +448,12 @@ internal sealed class VersionConformancePass
             // SUM counters (§13.18.54) analyze their PICTURE for the counter scale (GR1) in a DISTINCT Analyze call off
             // both the forest AND the printable-item walk (DataBinder.Reports.cs:BindSumClause), so an external-float /
             // national-edited SUM-counter picture carries its 0900 here on ReportSumModel.SkeletonGate (DEVLOG 740 —
-            // the 14g.5 review found the former inline gate was dropped). Fires once per SUM counter — so a NON-printable
-            // SUM gets its one 0900, and a PRINTABLE SUM (also a print item, gated above) gets both, exactly as the
-            // former two Analyze sites did.
-            foreach (var sum in report.Sums)
-                if (sum.SkeletonGate is { } sumSkeletonId) Check(sumSkeletonId, sum.SkeletonWhere);
+            // the 14g.5 review found the former inline gate was dropped). Fires once per SUM ENTRY (ReportSumFamily —
+            // the PICTURE is the entry's, whatever its occurrences, kb/Work PB1271) — so a NON-printable SUM gets its
+            // one 0900, and a PRINTABLE SUM (also a print item, gated above) gets both, exactly as the former two
+            // Analyze sites did.
+            foreach (var family in report.SumFamilies)
+                if (family.SkeletonGate is { } sumSkeletonId) Check(sumSkeletonId, family.SkeletonWhere);
         }
     }
 

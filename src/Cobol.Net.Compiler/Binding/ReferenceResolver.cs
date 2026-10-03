@@ -504,8 +504,9 @@ public sealed class ReferenceResolver(DataBinder data)
         // IMPLICITLY-defined VIEW over the report engine's counter, not in ByName, so it is resolved HERE — the
         // CAPACITY-register pattern — to a ReportSumCounterPlace whose read/write are SumValue/SetSumValue
         // (kb/Work PB840). Its qualifiers are the report group entries above it and, outermost, its REPORT-NAME
-        // (§8.4.2.2.3 SR4; §8.4.2.2.2 Format 1's file-report-qualifier — kb/Work PB1454).
-        if (SumCounterFor(dref, name, report) is { } sumReg) return Resolved(sumReg);
+        // (§8.4.2.2.3 SR4; §8.4.2.2.2 Format 1's file-report-qualifier — kb/Work PB1454). A REPEATING entry's
+        // counter is a table and takes the ordinary subscripts (kb/Work PB1271).
+        if (SumCounterFor(dref, name, report) is { } sumCounter) return sumCounter;
 
         // The reference AS WRITTEN, read by the ONE decomposition (kb/Work PB443 — see WrittenReference).
         var written = ReadWritten(dref);
@@ -1938,21 +1939,59 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <see cref="DataBinder.QualifierWalk"/> a data item's own ancestors go through, over
     /// <see cref="ReportSumModel.Qualification"/>. (The model it replaced — "a level-01-free item whose only
     /// available qualifier is its report" — was false, so `TOT OF CF1` was refused and two same-named counters
-    /// of one report could not be told apart.) A reference with a subscript or a reference modification is not
-    /// a counter reference here: the name falls through to ordinary resolution, which names the rule it breaks.</para>
+    /// of one report could not be told apart.) A reference with a reference modification is not a counter
+    /// reference here: the name falls through to ordinary resolution, which names the rule it breaks.</para>
+    /// <para>⛔ A REPEATING ENTRY'S COUNTER IS A TABLE (kb/Work PB1271). Its occurrences are a
+    /// <see cref="ReportSumFamily"/> whose register carries one OCCURS level per repetition vehicle, so the written
+    /// subscripts go through the ONE <see cref="ReadSubscripts"/> — §8.4.2.3.3 SR3's count, SR5's "Each table
+    /// element reference shall be subscripted" (an unsubscripted reference to a multiple COLUMN counter used to
+    /// alter all of its occurrences at once) and SR4's index-name association — and the place carries the rendered
+    /// subscripts the engine turns into the occurrence's counter id at run time.</para>
     /// <para>⛔ TWO ENTRIES MAY LEGALLY CARRY ONE NAME (GR1, kb/Work PB882): §8.4.2.2.1's uniqueness requirement
     /// is about a REFERENCE, so the collision is diagnosed HERE, where a reference exists, and never by dropping
     /// a declaration.</para></summary>
-    private ReportSumCounterPlace? SumCounterFor(Core.DataReferenceContext dref, string name, bool report)
+    private RefResolution? SumCounterFor(Core.DataReferenceContext dref, string name, bool report)
+    {
+        if (!data.SumCounters.ContainsKey(name)) return null;
+        var written = ReadWritten(dref);
+        if (written.RefModCount > 0) return null;   // reference-modified
+        if (SumCounterFamilyFor(dref, name, written.Qualifiers, report) is not ({ } rep, { } family)) return null;
+        if (ReadSubscripts(dref, family.Register, written.SubscriptGroup, out var indexExprs) is { } refusal)
+            return refusal;
+        return RefResolution.Resolved(SumCounterPlace(rep, family, indexExprs), "");
+    }
+
+    /// <summary>The place of one counter occurrence of <paramref name="family"/>: its rendered one-based subscripts
+    /// (outermost first; empty for a non-repeating entry, whose one counter is <see cref="ReportSumFamily.BaseId"/>).
+    /// The ONE construction of a procedure-division sum counter place — the ordinary reference and the table(ALL)
+    /// intrinsic argument (§15.3) both build through it.</summary>
+    internal ReportSumCounterPlace SumCounterPlace(ReportModel report, ReportSumFamily family, IReadOnlyList<string> indexExprs) =>
+        new(report.CsIndex, family.BaseId, family.Register, data.ReportDepth(report), indexExprs);
+
+    /// <summary>The CURRENT range of level <paramref name="level"/> (outermost first) of a repeating sum counter, for
+    /// a table(ALL) argument (ISO §15.3): an enclosing repetition with the DEPENDING phrase ranges over
+    /// §13.18.38.4 GR13's count ("the range of values is determined by the object of the OCCURS DEPENDING ON
+    /// clause"); every other level over its extent. The twin of <see cref="CurrentOccurrenceCount"/>, whose data
+    /// division OCCURS DEPENDING has GR7's clamp and EC-BOUND-ODO instead (kb/Work PB1271). Null when data-name-1
+    /// cannot be addressed.</summary>
+    internal AllCount? SumCounterOccurrenceCount(ReportSumFamily family, int level) =>
+        level < family.Repetitions.Count && family.Repetitions[level] is { DependingItem: { } dn } spec
+            ? (ResolveItem(dn) is { } depending ? new AllCount.ReportDepending(depending, spec.Min, spec.Max) : null)
+            : new AllCount.Fixed(family.Extents[level]);
+
+    /// <summary>The SUM ENTRY a reference names — <see cref="SumCounterFor"/>'s name-and-qualifier half, shared with
+    /// the table(ALL) intrinsic argument so both ask it in the same order relative to ordinary lookup (a counter
+    /// first, unless the qualifiers reach no counter and an ordinary item answers them). Null when the name is no
+    /// counter's, when an ordinary item answers the qualifiers, or when the reference was diagnosed (no counter
+    /// is subordinate to the qualifiers; two counters are).</summary>
+    internal (ReportModel Report, ReportSumFamily Family)? SumCounterFamilyFor(
+        Core.DataReferenceContext dref, string name, List<string> qualifiers, bool report)
     {
         if (!data.SumCounters.TryGetValue(name, out var homonyms)) return null;
-        var written = ReadWritten(dref);
-        if (written.SubscriptGroup is not null || written.RefModCount > 0) return null;   // subscripted / reference-modified
-        var qualifiers = written.Qualifiers;
         // §8.4.6.2.1 rule 3 — a counter of a report this source element declares hides a same-named counter of a
         // container's GLOBAL report; only candidates of the NEAREST declaring element can be ambiguous.
         var matches = data.NearestInScope(
-            homonyms.Where(h => DataBinder.QualifierWalk(h.Sum.Qualification, qualifiers,
+            homonyms.Where(h => DataBinder.QualifierWalk(h.Family.Qualification, qualifiers,
                 q => q.Equals(h.Report.Name, StringComparison.OrdinalIgnoreCase))),
             h => h.Report);
         if (matches.Count == 0)
@@ -1978,8 +2017,7 @@ public sealed class ReferenceResolver(DataBinder data)
                     + "§8.4.2.2.1); qualify it by report group entry or report-name, or give the entries distinct data-names.");
             return null;
         }
-        var (rep, sum) = matches[0];
-        return new ReportSumCounterPlace(rep.CsIndex, sum.Id, sum.Register, data.ReportDepth(rep));
+        return matches[0];
     }
 
     /// <summary>The STRUCTURAL access path for an item — the <see cref="MemberPlace"/>/<see cref="DynTablePlace"/>
@@ -2023,15 +2061,12 @@ public sealed class ReferenceResolver(DataBinder data)
     /// a RECEIVING one: §13.18.38.4 GR8b gives a receiving group holding its own data-name-1 the MAXIMUM, a question
     /// this sending-count model does not ask. <see langword="null"/> when the count
     /// cannot be addressed (an unresolvable data-name-1, or a dynamic table with no reachable register) — the caller
-    /// reports it in its own words.</summary>
+    /// reports it in its own words.
+    /// <para>The three-way switch itself is <see cref="Procedure.OccurrenceCounts.Current"/> — the ONE reading INITIALIZE and the
+    /// §14.6.9.2 element moves also take; this entry only supplies the whole-table path a dynamic level's capacity
+    /// register needs (the two used to be two copies of the switch, each documented as the one).</para></summary>
     internal AllCount? CurrentOccurrenceCount(DataItem table, IReadOnlyList<string> outerIndexExprs) =>
-        table.IsDynamicTable
-            ? (table.OccursSpec?.CapacityRegister is { } reg && BuildTablePath(table, outerIndexExprs) is { } path
-                ? new AllCount.Capacity(new CapacityRegisterPlace(path, reg)) : null)
-        : table.OccursSpec is { Depending: { } dep } odo
-            ? (ResolveItem(dep) is { } depPlace ? new AllCount.Odo(depPlace, odo.Min, table.Occurs ?? odo.Max) : null)
-        : table.Occurs is { } n ? new AllCount.Fixed(n)
-        : null;
+        Procedure.OccurrenceCounts.Current(table, table.IsDynamicTable ? BuildTablePath(table, outerIndexExprs) : null, this);
 
     /// <summary>The §13.18.38.4 GR7 check a subscripted reference through <paramref name="level"/> carries
     /// (<see cref="OdoReferenceCheck"/>, kb/Work PB1268): data-name-1's place and integer-1/integer-2 for an OCCURS

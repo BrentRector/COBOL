@@ -1593,19 +1593,37 @@ internal static class RuntimeApi
     public static string ReportPageCounterWrite(int reportIndex, int depth, string valueExpr) =>
         $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetPageCounter)}((long)({valueExpr}));";
 
+    /// <summary>The argument list that ADDRESSES one SUM counter for <c>CobolReport.SumValue</c> /
+    /// <c>SetSumValue</c> — THE ONE SPELLING, so a read and a write of the same reference cannot select different
+    /// counters. With no <paramref name="subscripts"/> it is the counter's id (GR1's identity: an entry occurrence,
+    /// kb/Work PB882). With subscripts it is a REPEATING entry's family (kb/Work PB1271): the first id of the family's
+    /// block, the extent of each OCCURS level (outermost first) and the one-based subscript values, which the engine
+    /// turns into the occurrence's id with §8.4.2.3.4 GR2's EC-BOUND-SUBSCRIPT test. The two lists are collection
+    /// expressions over <c>ReadOnlySpan</c> parameters, so the access allocates nothing.</summary>
+    public static string ReportSumAddress(int counterId, IReadOnlyList<int> extents, IReadOnlyList<string> subscripts) =>
+        subscripts.Count == 0
+            ? counterId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : $"{counterId}, [{string.Join(", ", extents.Select(e => e.ToString(System.Globalization.CultureInfo.InvariantCulture)))}], "
+              + $"[{string.Join(", ", subscripts.Select(s => $"(long)({s})"))}]";
+
     /// <summary>Read a SUM counter's content, unscaled at the counter's own scale (ISO §13.18.54.4 GR1/GR4) —
-    /// <c>CobolReport.SumValue</c>. <paramref name="counterId"/> is the ENTRY's ordinal, GR1's identity.
+    /// <c>CobolReport.SumValue</c>. <paramref name="counterAddress"/> is <see cref="ReportSumAddress"/>'s.
     /// <para>The engine carries every counter in an <see cref="Int128"/> (kb/Work PB1509/PB1560/PB1666); the read
     /// lands it in <paramref name="clrType"/>, the counter's OWN carrier (<c>PicInfo.ClrType</c> of its GR1
     /// profile — <c>long</c> up to 18 digits, <c>Int128</c> beyond), so every consumer sees the type any other
     /// numeric item of that profile has. The narrowing is exact: the engine never holds a value past the
     /// counter's digits (its GR3 size-error test), and a procedure-division write arrives stored through the
     /// same profile.</para></summary>
-    public static string ReportSumRead(int reportIndex, int depth, int counterId, string clrType)
+    public static string ReportSumRead(int reportIndex, int depth, string counterAddress, string clrType)
     {
-        string read = $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SumValue)}({counterId})";
+        string read = $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SumValue)}({counterAddress})";
         return clrType == "Int128" ? read : $"(({clrType}){read})";
     }
+
+    /// <summary>A report writer OCCURS … DEPENDING repetition count (ISO §13.18.38.4 GR13) —
+    /// <c>CobolReport.DependingCount</c> over data-name-1's integer value, evaluated once.</summary>
+    public static string ReportDependingCount(string valueExpr, int minOccurs, int maxOccurs) =>
+        $"{nameof(CobolReport)}.{nameof(CobolReport.DependingCount)}({valueExpr}, {minOccurs}, {maxOccurs})";
 
     /// <summary>The prior-control key of a floating-point CONTROL item (ISO §13.18.16.4 GR3; kb/Work PB1234) —
     /// <c>CobolReport.FloatControlKey</c>, the item's exact bit pattern, over its OWN carrier value
@@ -1630,9 +1648,10 @@ internal static class RuntimeApi
         $"{nameof(CobolReport)}.{nameof(CobolReport.VaryingInteger)}({args})";
 
     /// <summary>Alter a SUM counter's content from the procedure division (ISO §13.18.54.4 GR12) —
-    /// <c>CobolReport.SetSumValue</c>, at the counter's own scale, widened to the engine's Int128 carrier.</summary>
-    public static string ReportSumWrite(int reportIndex, int depth, int counterId, string valueExpr) =>
-        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetSumValue)}({counterId}, (Int128)({valueExpr}));";
+    /// <c>CobolReport.SetSumValue</c>, at the counter's own scale, widened to the engine's Int128 carrier.
+    /// <paramref name="counterAddress"/> is <see cref="ReportSumAddress"/>'s.</summary>
+    public static string ReportSumWrite(int reportIndex, int depth, string counterAddress, string valueExpr) =>
+        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetSumValue)}({counterAddress}, (Int128)({valueExpr}));";
 
     /// <summary>Decode a DISPLAY image back into a native numeric leaf, preserving unset positions from the
     /// current value — <c>CobolNum.StoreDisplay</c>.</summary>

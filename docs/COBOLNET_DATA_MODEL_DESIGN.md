@@ -440,7 +440,12 @@ content-validation half is separately answered by the declined A.4.14 facility (
   of its window, exactly as a bit group's window is a `BitWindow`, so every value reader/writer (`Read`/`Write`,
   `WriteGroupValue`, ACCEPT, the CALL crossing) takes the window's own coding; its STORAGE image — what a file
   record, a group MOVE or a status group deposits — is the byte window (`PlaceRenderer.ByteWindowRead/Write`,
-  reached by `GroupImage`/`WriteGroupImage`). **WIDENED AGAIN 2026-09-05, kb/Work PB327:** the FD/SD RECORD is the same channel after all — see D-N5, now
+  reached by `GroupImage`/`WriteGroupImage`). A BIT GROUP's view has the same two channels (kb/Work PB1904): its
+  `BitWindow` read is the m boolean positions of its VALUE, and its STORAGE image is those positions PACKED into
+  ceil(m/8) characters (§13.18.60.4 GR5; `CobolBits.Pack`, the law a record-struct bit group's `AsImage` uses) —
+  `GroupImage` packs the window's read and `WriteGroupImage` unpacks an image into it, so a bit-group record that
+  redefines another FD record writes its bytes, not "0100…" (`GroupViewAliasDriftTests.ViewOfGroup_StorageImage_IsThePlainGroups`
+  pins both group kinds' storage channel, view against plain). **WIDENED AGAIN 2026-09-05, kb/Work PB327:** the FD/SD RECORD is the same channel after all — see D-N5, now
   discharged — and its gate is the same predicate (`DataBinder.GateFileRecordByteSurface`). **STILL REFUSED:**
   a pointer-class leaf on any byte-window surface, the file record included (§13.18.60.3 SR14 / PB183 — no byte
   image at all; PB231's remaining third).

@@ -2857,7 +2857,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             args.Add(BoundOperandError.Refused(ctx.Edition, $"FUNCTION {sig.Name} table(ALL) argument"));
             return true;
         }
-        if (ctx.Refs.FindItem(name, quals) is not { } item)
+        // A REPEATING SUM entry's counter is a table too (ISO §13.18.54.4 GR8 a)'s "corresponding occurrence of the
+        // sum counter"; kb/Work PB1271): it is asked of the ONE counter resolver FIRST, in the order
+        // ReferenceResolver.Resolve asks it, and its register carries the OCCURS levels the walk below reads.
+        var counter = ctx.Refs.SumCounterFamilyFor(dref, name, quals, report: true);
+        if ((counter?.Family.Register ?? ctx.Refs.FindItem(name, quals)) is not { } item)
         {
             // The resolver's ONE §8.4.2.1 / §8.4.2.2 report (kb/Work PB1029 — this arm refused silently).
             ctx.Refs.ReportUnidentified(dref, name, quals);
@@ -2887,8 +2891,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             if (IsAllSegment(innerSegs[i]))
             {
                 exprs[i] = $"{indexVar}[{counts.Count}]";
-                // The level's range is the ONE current-occurrence-count model (fixed / ODO / dynamic capacity).
-                if (ctx.Refs.CurrentOccurrenceCount(level, outerExprs) is not { } count)
+                // The level's range is the ONE current-occurrence-count model (fixed / ODO / dynamic capacity) — or,
+                // for a repeating sum counter, its report-writer twin (a DEPENDING level counts by §13.18.38.4 GR13).
+                if ((counter is (_, { } countedFamily)
+                        ? ctx.Refs.SumCounterOccurrenceCount(countedFamily, i)
+                        : ctx.Refs.CurrentOccurrenceCount(level, outerExprs)) is not { } count)
                 {
                     args.Add(BoundOperandError.Unbuilt(ctx.Edition, level.OccursSpec is { Depending: { } dep }
                         ? $"table(ALL) over OCCURS DEPENDING table '{name}': data-name-1 '{dep.CobolName}' could not be addressed"
@@ -2911,7 +2918,9 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // ordinary subscript reading asks (ReferenceResolver.ReadSubscripts), over the index-names the written
         // non-ALL segments carried (kb/Work PB1472). The ALL segments name none.
         ctx.Refs.ScreenIndexNameAssociation(item, indexNames);
-        if (ctx.Refs.ResolveByName(name, quals, exprs) is not { } element)
+        if ((counter is ({ } counterReport, { } counterFamily)
+                ? ctx.Refs.SumCounterPlace(counterReport, counterFamily, exprs)
+                : ctx.Refs.ResolveByName(name, quals, exprs)) is not { } element)
         {
             args.Add(BoundOperandError.Unbuilt(ctx.Edition, $"table(ALL) occurrence of '{name}'"));
             return true;

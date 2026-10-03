@@ -131,7 +131,7 @@ internal static class PlaceRenderer
         // A REPORT SECTION sum counter (§13.18.54.4 GR1/GR4/GR12): RWCS engine state, read at the counter's own
         // scale and landed in the counter's own CLR carrier (kb/Work PB1666). The identity is the ENTRY's
         // ordinal, never GR5's data-name (kb/Work PB882).
-        ReportSumCounterPlace s => RuntimeApi.ReportSumRead(s.ReportIndex, s.Depth, s.CounterId, s.RegisterItem.Pic!.ClrType),
+        ReportSumCounterPlace s => RuntimeApi.ReportSumRead(s.ReportIndex, s.Depth, SumAddress(s), s.RegisterItem.Pic!.ClrType),
         // A report's PAGE-COUNTER (ISO §8.4.3.15.4 GR1 — a temporary unsigned integer maintained per report):
         // RWCS engine state, scale 0. Reachable on the SENDING side only through a receiving place that is then
         // read back (a rounded/size-error resultant); the plain sending reference is BoundReportCounterRef, and
@@ -260,7 +260,7 @@ internal static class PlaceRenderer
         // A REPORT SECTION sum counter as a RECEIVER — ISO §13.18.54.4 GR12: "It is permissible for procedure
         // division statements to alter the content of sum counters." The store goes to the RWCS engine, at the
         // counter's own scale (GR1); there is no storage to write (kb/Work PB840).
-        ReportSumCounterPlace s => RuntimeApi.ReportSumWrite(s.ReportIndex, s.Depth, s.CounterId, rhs),
+        ReportSumCounterPlace s => RuntimeApi.ReportSumWrite(s.ReportIndex, s.Depth, SumAddress(s), rhs),
         // A report's PAGE-COUNTER as a RECEIVER — ISO §8.4.3.15.3 SR1 admits it wherever an integer data item
         // may appear, and SR3 bars only LINE-COUNTER from the receiving side. The store goes to the RWCS engine;
         // there is no storage to write (kb/Work PB429).
@@ -284,6 +284,13 @@ internal static class PlaceRenderer
     // back to since the structural-Place migration completed). A new subtype without an arm trips this at run time.
     private static System.InvalidOperationException Unhandled(Place p) =>
         new($"CodeGen.PlaceRenderer has no arm for Place subtype '{p.GetType().Name}'");
+
+    /// <summary>The counter a sum counter place addresses, for the read and the write alike (kb/Work PB1271): its id,
+    /// or — for an occurrence of a REPEATING entry's counter — the family's first id, the extent of each OCCURS level
+    /// of its register (§8.4.2.3.3 SR3's order, outermost first) and the written subscripts.</summary>
+    private static string SumAddress(ReportSumCounterPlace s) => s.Subscripts is { Count: > 0 } subscripts
+        ? RuntimeApi.ReportSumAddress(s.CounterId, [.. s.RegisterItem.SubscriptLevels().Select(l => l.Occurs!.Value)], subscripts)
+        : RuntimeApi.ReportSumAddress(s.CounterId, [], []);
 
     /// <summary>Render an <see cref="AccessPath"/> to a C# lvalue expression — a static/instance root field, then
     /// <c>.Member</c> access, <c>CobolTable.At(path, index)</c> for a fixed OCCURS, and <c>RefSending</c>/
@@ -453,6 +460,10 @@ internal static class PlaceRenderer
         // A NATIONAL GROUP view's STORAGE image is its 2m-byte window; its Write is the m-position VALUE store
         // (kb/Work PB1653 — WriteGroupValue is the value channel).
         RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => ByteWindowWrite(v, image),
+        // A BIT GROUP view's STORAGE image is its m bits PACKED into ceil(m/8) characters (§13.18.60.4 GR5 /
+        // §8.5.1.6.3 — the CobolBits.Pack law a record-struct bit group's FromImage reads); its Write is the
+        // boolean-POSITION store, so the image is unpacked to its m positions first (kb/Work PB1904).
+        RedefViewPlace { Coding: BitWindow b, ViewItem.IsGroup: true } v => Write(v, RuntimeApi.BitsUnpack(image, b.Bits.ToString())),
         RedefViewPlace => Write(group, image),
         // A level-66 THROUGH alias is an alphanumeric GROUP item (ISO §13.18.45.4 GR2), so a §14.9.25.4 GR4
         // group-image store can land on one; distributing it into the spanned leaves IS the WriteRenames store
@@ -498,6 +509,10 @@ internal static class PlaceRenderer
     public static string GroupImage(Place group, string context = "whole-group image of", bool transfer = false) => group switch
     {
         RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => ByteWindowRead(v),   // the storage image — see ByteWindowRead (kb/Work PB1653)
+        // A BIT GROUP view's Read is its boolean-POSITION string (the VALUE channel, §13.18.29.4 GR1b); its storage
+        // image is those m positions PACKED into ceil(m/8) characters, exactly a record-struct bit group's AsImage
+        // (§13.18.60.4 GR5 / §8.5.1.6.3, CobolBits.Pack — kb/Work PB1904).
+        RedefViewPlace { Coding: BitWindow b, ViewItem.IsGroup: true } v => RuntimeApi.BitsPack(Read(v), b.Bits.ToString()),
         RedefViewPlace => Read(group),
         // The READ twin of WriteGroupImage's RenamesPlace arm (kb/Work PB907): a level-66 THROUGH alias is an
         // alphanumeric GROUP item (ISO §13.18.45.4 GR2) whose image IS the composed span string Read renders —
@@ -838,6 +853,10 @@ internal static class PlaceRenderer
         AllCount.Fixed f => f.Occurs.ToString(),
         AllCount.Odo o => RuntimeApi.TableOdoExtent(CountRead(o.Depending), o.MinOccurs, o.MaxOccurs, 0, 1),
         AllCount.Capacity cap => Read(cap.Register),
+        // A report writer OCCURS … DEPENDING level (§13.18.38.4 GR13 — data-name-1 inside [integer-1, integer-2 − 1],
+        // else integer-2; never clamped, never EC-BOUND-ODO).
+        AllCount.ReportDepending d => RuntimeApi.ReportDependingCount(
+            RuntimeApi.HostInt32(CountRead(d.Depending)), d.MinOccurs, d.MaxOccurs),
         _ => throw new InvalidOperationException($"unknown occurrence count {c.GetType().Name}"),
     };
 }

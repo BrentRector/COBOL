@@ -18156,13 +18156,13 @@
   "ordinal": 1,
   "subject": "Physical subdivisions of a report",
   "rule-digest": "ee9bcb0a7dc4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause; src/Cobol.Net.Compiler/Binding/Model/Place.cs#ReportSumCounterPlace",
-  "test-ref": "conformance:85/pb882_report_sum_counter_identity",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SumFamilyOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause; src/Cobol.Net.Compiler/Binding/Model/Place.cs#ReportSumCounterPlace; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumOccurrence",
+  "test-ref": "conformance:85/pb882_report_sum_counter_identity; conformance:2002/pb1271_report_sum_counter_occurrences; conformance:negative/pb1271-sum-counter-occurrence-not-subscripted",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1271. Rule: §13.8.6.2.3 1) 'Sum counters may be inspected or altered in the procedure division.' (cite.py --check 13.8.6.2.3 OK, item 1), the exception to the preamble 'Report items shall not be accessed or referred to by any clauses in any other section of the data division or by any other procedure division statements' (--check OK); twin §13.18.54.4 GR12 'It is permissible for procedure division statements to alter the content of sum counters.' (--check OK). CODE: sum-counter data-names (GR5) are published into DataBinder._sumCounters (DataBinder.Reports.cs ~L2455-2466) and resolved by ReferenceResolver.SumCounterFor into a ReportSumCounterPlace (read SumValue / write SetSumValue), with report-name qualification and ambiguity diagnosis. PROBES (pinned cobol.exe, out13/probe/physrpt/): P1 MOVE 500 TO CF-U then FUNCTION INTEGER(CF-U)+1 -> 0501 (correct); Q1 MOVE 123456 -> 3456, MOVE -5 -> -0005 (4 digits from the PICTURE, signed: §13.18.54.4 GR1 correct); P9 ADD/IF on the counter OK. The PROHIBITION half is enforced: a SOURCE item (P2 MOVE / P3 DISPLAY), a DETAIL group (P4) and a WS OCCURS DEPENDING ON sum-counter (P6) are all rejected (COBOLNET1639/0851 'not defined' - rejection correct, message generic). DEFECT (repeating sum counter): §13.18.14.4 GR12 'A multiple COLUMN clause is functionally equivalent to a COLUMN clause with a single operand, together with a simple OCCURS clause' (--check OK) and §13.18.54.4 GR8 a) 'each occurrence of the addend is added into the corresponding occurrence of the sum counter' (--check OK), so `03 CF-U COLUMN 1 13 25 PIC 9999 SUM WS-X.` is a table of three sum counters. R6: `MOVE 500 TO CF-U(2)` (legal) is REJECTED COBOLNET1639 'CF-U(2) is not defined' (SumCounterFor returns null for any subscripted reference); R8: unsubscripted `MOVE 500 TO CF-U` is ACCEPTED (§8.4.2.3.3 SR5 requires the subscript; its item g) exempts only a SUM data-name addend) and alters ALL three printed occurrences to 0503 - one Register per entry, no occurrences. Expected: R6 compiles and prints '0003        0503        0003'; R8 is rejected. pb882 is spec-derived for the scalar case only (test-ref retained for the half it covers). Side note (latitude, not a defect of this rule): the counter's Register is USAGE BINARY, so FUNCTION LENGTH(CF-U) returns 2 for PIC 9999 and a BY REFERENCE argument must be declared binary (M1 rejected COBOLNET0828 vs M3 accepted); the spec leaves a conceptual item's usage unstated. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer module), 2002, 2014, 2023; the defective repeating-counter edge exists from 2002 (multiple COLUMN / report-group OCCURS are 2002+; the pinned compiler gates multiple COLUMN COBOLNET0900 at --std 85)",
-  "state": "GAP"
+  "notes": "Landed by kb/Work PB1271 (w1007a). 13.8.6.2.3 1) 'Sum counters may be inspected or altered in the procedure division.' (cite.py --check OK 13.8.6.2.3 1)) with 13.18.54.4 GR12 (OK 12)). A repeating SUM entry's counter is now a table (ReportSumFamily: one counter per occurrence, 13.18.54.4 GR8 a) OK 8) a); 13.18.14.4 GR12 / 13.18.35.4 GR9 make multiple COLUMN / LINE simple OCCURS levels, OK 12) / OK 9)), so CF-U(2), CF-U(WS-I), CF-V(2 WS-J), CF-U IN R1 (3) read and alter the selected occurrence (golden prints 0009 0509 0010), and the unsubscripted CF-U of a repeating entry is the 8.4.2.3.3 SR5 refusal COBOLNET2270 (OK 5)). Before: COBOLNET1639 'not defined' on every subscript; one counter shared by all columns.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.8.6.2.3-2",
@@ -18171,13 +18171,13 @@
   "ordinal": 2,
   "subject": "Physical subdivisions of a report",
   "rule-digest": "ee72bfe6a916",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindGenerate; src/Cobol.Net.Compiler/Binding/ReportGroupResolution.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindGenerate; src/Cobol.Net.Compiler/Binding/ReportGroupResolution.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#TryBindAllArgument",
+  "test-ref": "conformance:2002/pb1271_report_sum_counter_occurrences",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1271. Rule: §13.8.6.2.3 2) 'Report groups of type DETAIL are accessed by the GENERATE statement.' plus 'A report item referenced in a function identifier or inline method invocation shall be an elementary report item.' (cite.py --check 13.8.6.2.3 both OK; twin §14.9.16.3 SR1 'Data-name-1 shall name a detail report group.' --check OK). CODE: GENERATE binds through ReportGroupResolution and BindGenerate rejects a non-DETAIL group COBOLNET0899 (P7: GENERATE CFG rejected); no other statement can name a report group (P4 MOVE SPACES TO DET rejected). Function-identifier half: an elementary report item (sum counter) is accepted as a function argument (P1 FUNCTION INTEGER(CF-U) -> 501, correct) and as an inline method invocation argument (M3 at --std 2002: A1 :: \"ADDTO\" (CF-U) -> N=0041, correct); a group report item is rejected in both (P5 FUNCTION LENGTH(DET), P8 FUNCTION LENGTH(CFG), M2 A1 :: \"ADDTO\" (CFG), all COBOLNET1639). Only sum counters (always elementary) enter the name space, so the elementary requirement holds structurally. Weakness (no verdict change): the rejection text is the generic 'not defined ... declare the item' rather than naming §13.8.6.2.3. No existing spec-derived test covers the function-identifier / inline-invocation half, so test-ref is empty. || REFUTED: PARTIAL — The GENERATE/DETAIL half holds (P7 upheld), but the function-identifier half is not fully implemented: 'A report item referenced in a function identifier ... shall be an elementary report item' permits ANY elementary report item, and a repeating sum counter (multiple COLUMN == simple OCCURS, 13.18.14.4 GR12) is elementary, yet FUNCTION INTEGER(CF-U(2)) and FUNCTION SUM(CF-U(ALL)) are rejected COBOLNET1639 'not defined' (legal source rejected). Conversely the unsubscripted table element FUNCTION INTEGER(CF-U) is accepted (8.4.2.3.3 SR5 requires the subscript). Same root mechanism as the SR-1 finding (one Register per SUM entry; ReferenceResolver.SumCounterFor returns null on any subscript). The adjudicator probed only a single-COLUMN counter, so 'holds structurally' was an unverified edge. Untested besides. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985 (Report Writer module), 2002, 2014, 2023; the 'inline method invocation' half applies from 2002 (OO introduced in 2002)",
-  "state": "GAP"
+  "notes": "Landed by kb/Work PB1271 (w1007a). The refuter's PARTIAL half: an elementary report item that is a REPEATING sum counter may now be a function argument - FUNCTION INTEGER(CF-U(2)) = 509, FUNCTION SUM(CF-U(ALL)) = 528, SUM(CF-V(ALL, ALL)) = 83, SUM(CF-V(2, ALL)) = 25 (8.4.2.3.3 SR6, cite.py OK 6)); the table(ALL) argument reads the counter family's OCCURS levels off its register. The GENERATE/DETAIL half and the group-item refusal are unchanged (only sum counters, always elementary, enter the name space).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.9.3-1",
@@ -28161,13 +28161,13 @@
   "ordinal": 10,
   "subject": "SUM clause",
   "rule-digest": "c66b199ee1a9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Present",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.PresentWhen_Gr3g_AbsentSumNeitherPrintsNorResets",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#EndOfGroupSumReset; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Present; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#PlanOf; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.PresentWhen_Gr3g_AbsentSumNeitherPrintsNorResets; conformance:2002/pb1271_report_sum_counter_occurrences",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1271. GR10 (cite.py --check 13.18.54.4 'the corresponding sum counter is not printed and is not reset to zero for the current instance of the report group' OK). PRESENT WHEN half conforms (the named test: 5 absent, then 08, 02). OCCURS DEPENDING half unverified/likely unrepresentable: the engine holds ONE counter per entry, not per occurrence (SumEntry list keyed by entry ordinal), so an absent occurrence cannot keep its own un-reset counter. Probe p4 (LINE OCCURS 1 TO 2 DEPENDING ON WS-N, PIC 99 SUM WS-K=5; N=2,1,2): printed 05 x5; with per-occurrence counters (GR8 a 'corresponding occurrence of the sum counter') the third GENERATE's second occurrence would carry 10. Reading is contestable, so PARTIAL, no finding. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 for the PRESENT WHEN leg (13.18.41); OCCURS DEPENDING leg per 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "Landed by kb/Work PB1271 (w1007a). GR10 (cite.py --check 13.18.54.4 'the corresponding sum counter is not printed and is not reset to zero for the current instance of the report group' OK 10)). OCCURS DEPENDING half now implemented: each occurrence has its own counter and its presence slot ANDs the PRESENT WHEN chain with the occurrence's ReportSumModel.RepetitionGuards, so the engine's end-of-group reset skips an absent occurrence. Golden: DL OCCURS 1 TO 2 DEPENDING ON WS-N, SUM WS-K = 5, N = 2, 1, 2 prints 05 05 / 05 / 05 10 (the absent occurrence keeps its 05). PRESENT WHEN half unchanged (ReportWriterConformanceTests.PresentWhen_Gr3g_AbsentSumNeitherPrintsNorResets).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-11",

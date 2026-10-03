@@ -8,8 +8,9 @@
       *> counter_identity.cob compiles and prints two different totals from an
       *> identically shaped report description.  What is illegal is the
       *> REFERENCE: `MOVE CF-T TO WS-SEEN` names neither counter in particular,
-      *> and a sum counter's only available qualifier is the report-name of
-      *> 8.4.2.2.2 Format 1, which cannot separate two counters of ONE report.
+      *> and the qualifiers a sum counter takes - the report group entries above
+      *> it and its report-name (8.4.2.2.3 SR4, kb/Work PB1454) - are the SAME
+      *> for both counters here (CFT OF R-1), so no qualification separates them.
       *> COBOLNET2145.  Before kb/Work PB840 the reference drew COBOLNET1639
       *> "is not defined" instead - the right verdict under the wrong rule, and
       *> one that would have gone on being right for the wrong reason the day

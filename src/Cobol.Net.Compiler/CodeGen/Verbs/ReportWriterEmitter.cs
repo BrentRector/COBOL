@@ -47,11 +47,13 @@ internal sealed class ReportWriterEmitter(
         // data item that behaves as a data item of the category numeric"). Like a printable item, the register
         // lives OUTSIDE the storage forest, so FieldEmitter.EmitProfiles never sees it — and unlike a printable
         // item it is a RECEIVER too (GR12), so the store needs its profile emitted here (kb/Work PB840).
+        // ONE profile per SUM ENTRY: a repeating entry's occurrences share the one register (kb/Work PB1271).
         foreach (var r in reports)
-            foreach (var sum in r.Sums)
-                if (sum.Register.Pic is { } rpic)
-                    w.Line($"private static readonly NumProfile {sum.Register.ProfileName} = {rpic.ProfileInitializer(ctx.SignEncoding)};"
-                        + $"   // {r.Name} sum counter {sum.Id}{(sum.Name is null ? "" : $" '{sum.Name}'")} (ISO §13.18.54.4 GR1)");
+            foreach (var family in r.SumFamilies)
+                if (family.Register.Pic is { } rpic)
+                    w.Line($"private static readonly NumProfile {family.Register.ProfileName} = {rpic.ProfileInitializer(ctx.SignEncoding)};"
+                        + $"   // {r.Name} sum counter {family.BaseId}{(family.Count > 1 ? $"..{family.BaseId + family.Count - 1}" : "")}"
+                        + $"{(family.Name is null ? "" : $" '{family.Name}'")} (ISO §13.18.54.4 GR1)");
         // The NumProfile of each report's PAGE-COUNTER register (ISO §8.4.3.15.4 GR1 — a temporary unsigned
         // integer data item maintained per report). Same reason as the sum counter above: the register lives
         // outside the storage forest and §8.4.3.15.3 SR1 makes it a RECEIVER, so its store needs a profile
@@ -117,11 +119,15 @@ internal sealed class ReportWriterEmitter(
                                                          .. f.RepetitionGuards.Select(RepetitionTest)]));
                 }
         }
+        // A SUM counter's presence is BOTH halves of §13.18.54.4 GR10 — its PRESENT WHEN chain and its occurrence's
+        // OCCURS … DEPENDING tests (kb/Work PB1271): an absent occurrence's counter is neither printed nor reset.
         foreach (var s in r.Sums)
-            if (ReferenceEquals(s.PrintedIn, group) && s.PresentWhen.Count > 0)
+            if (ReferenceEquals(s.PrintedIn, group) && (s.PresentWhen.Count > 0 || s.RepetitionGuards.Count > 0))
             {
                 plan.Sums[s] = plan.Tests.Count;
-                plan.Tests.Add(PresentExpr(s.PresentWhen));
+                List<string> terms = [.. s.PresentWhen.Count > 0 ? [PresentExpr(s.PresentWhen)] : (string[])[],
+                                      .. s.RepetitionGuards.Select(RepetitionTest)];
+                plan.Tests.Add(string.Join(" && ", terms));
             }
         _plans[group] = plan;
         return plan;
@@ -261,8 +267,9 @@ internal sealed class ReportWriterEmitter(
     private string RepetitionTest(ReportRepetitionGuard g)
     {
         if (g.Spec.DependingItem is not { } dn || refs.ResolveItem(dn) is not { } place) return "true";
-        string v = RuntimeApi.HostInt32(PlaceRenderer.CountRead(place));   // the ONE integer-read of a count item
-        return $"{g.Ordinal} < ({v} >= {g.Spec.Min} && {v} <= {g.Spec.Max - 1} ? {v} : {g.Spec.Max})";
+        // The GR13 count through the ONE occurrence-count renderer (AllCount.ReportDepending), which a table(ALL)
+        // argument over a repeating sum counter reads too (kb/Work PB1271).
+        return $"{g.Ordinal} < {PlaceRenderer.OccurrenceCount(new AllCount.ReportDepending(place, g.Spec.Min, g.Spec.Max))}";
     }
 
     /// <summary>ONE presence delegate per report line, carrying BOTH suppressors §13.18.63.4 GR22 names that
@@ -355,7 +362,7 @@ internal sealed class ReportWriterEmitter(
                 // §13.18.54.4 GR4 — with the clause's ROUNDED phrase "the content of the sum counter is computed
                 // according to the general rules for the COMPUTE statement with the ROUNDED phrase".
                 string moved = move.ConvertSource(
-                    new BoundFieldOperand(new ReportSumCounterPlace(r.CsIndex, s.CounterId, sum.Register)),
+                    new BoundFieldOperand(new ReportSumCounterPlace(r.CsIndex, s.CounterId, sum.Family.Register)),
                     f.PrintItem, rounding: sum.Rounding);
                 // ⛔ …but only while the counter's SIZE ERROR INDICATOR is unset (GR4: "If the associated size error
                 // indicator is set, an EC-REPORT-SUM-SIZE exception condition is set to exist and the printable item
@@ -578,16 +585,17 @@ internal sealed class ReportWriterEmitter(
                     // an addend finer than the counter lost its extra digits one addend at a time: a 9V99 counter fed
                     // 1.000 then −0.005 held 1.00, where ADD of the same two values gives 0.99 (1.000 − 0.005 =
                     // 0.995, truncated). The SUM clause's own rounded-phrase (§13.18.54.2) is the mode of that store (kb/Work PB852's determination; GR4 speaks of the SOURCE clause's phrase).
-                    var rcv = new ReceiverContext(sum.Scale, Real: false, sum.Rounding, InSizeError: true,
-                        IntegerDigits: Math.Max(0, (sum.Register.Pic?.DigitPositions ?? 0) - sum.Scale));
+                    var family = sum.Family;
+                    var rcv = new ReceiverContext(family.Scale, Real: false, sum.Rounding, InSizeError: true,
+                        IntegerDigits: Math.Max(0, (family.Register.Pic?.DigitPositions ?? 0) - family.Scale));
                     var addendExprs = term.Addends.Where(a => a.Value is not null).Select(a => a.Value!).ToList();
                     string apply = term.Addends.Any(a => a.Value is null)
                         ? LoudValue("Int128", $"report {r.Name}: SUM addend was rejected at bind (ISO §13.18.54.3 SR5)")
                         : addendExprs.Count == 0
                             ? "__c"
                             : NumericRenderer.StoreExpr(
-                                num.Combine(new NumX("__c", sum.Scale), "+", num.Fold(addendExprs, rcv), rcv),
-                                sum.Scale, sum.Register.ProfileName, sum.Rounding, raiseOnSizeError: true);
+                                num.Combine(new NumX("__c", family.Scale), "+", num.Fold(addendExprs, rcv), rcv),
+                                family.Scale, family.Register.ProfileName, sum.Rounding, raiseOnSizeError: true);
                     string addend = $"(Int128 __c) => {apply}";
                     // null = no UPON phrase (GR7 c) 1) — every GENERATE for this report). An UPON phrase whose
                     // operands were ALL rejected emits the EMPTY filter instead, so a suppressed COBOLNET2046

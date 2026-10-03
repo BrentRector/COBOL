@@ -563,6 +563,15 @@ public abstract record AllCount
     /// <summary>A dynamic-capacity table: its current capacity — the register view over the table (a nested table's
     /// path carries the OUTER index variables, so the capacity is the right occurrence's).</summary>
     public sealed record Capacity(CapacityRegisterPlace Register) : AllCount;
+
+    /// <summary>A REPORT WRITER OCCURS … DEPENDING level (ISO §13.18.38 Format 3) — GR13's count, which is NOT the
+    /// data division's: "If the value of data-name-1 is not in the range integer-1 to (integer-2 - 1), the report
+    /// group is processed as though the OCCURS clause had been written without the TO and DEPENDING phrases", so
+    /// the count is data-name-1 inside that range and integer-2 outside it, with no EC-BOUND-ODO. ONE spelling for
+    /// both its readers: the report engine's per-repetition presence test and a table(ALL) argument over a
+    /// REPEATING sum counter (§15.3 — "the range of values is determined by the object of the OCCURS DEPENDING ON
+    /// clause"; kb/Work PB1271).</summary>
+    public sealed record ReportDepending(Place Depending, int MinOccurs, int MaxOccurs) : AllCount;
 }
 
 /// <summary>
@@ -670,9 +679,16 @@ public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterIt
 /// (GR1 — the identity is the entry, never GR5's data-name, which two entries may legally share);
 /// <paramref name="RegisterItem"/> carries the GR1 profile (<see cref="PicInfo.SumCounterItem"/>) so the numeric
 /// pipeline reads and writes it at the counter's own scale. Backend-neutral, like
-/// <see cref="CapacityRegisterPlace"/>: no C# text lives here.
+/// <see cref="CapacityRegisterPlace"/>: no C# text lives here beyond the subscripts' D10 transitional index strings.
+/// <para>⛔ A REPEATING ENTRY'S COUNTER IS AN OCCURRENCE OF A TABLE (kb/Work PB1271): with
+/// <paramref name="Subscripts"/> written, <paramref name="CounterId"/> is the FAMILY's first id
+/// (<c>ReportSumFamily.BaseId</c>) and the occurrence is selected at run time from the one-based subscripts against
+/// the OCCURS levels of <paramref name="RegisterItem"/> (<see cref="DataItem.SubscriptLevels"/>), with §8.4.2.3.4
+/// GR2's EC-BOUND-SUBSCRIPT for one out of range. With none, <paramref name="CounterId"/> IS the counter — a
+/// non-repeating entry's, or one occurrence the report engine's own compose names directly.</para>
 /// </summary>
-public sealed record ReportSumCounterPlace(int ReportIndex, int CounterId, DataItem RegisterItem, int Depth = 0) : Place
+public sealed record ReportSumCounterPlace(
+    int ReportIndex, int CounterId, DataItem RegisterItem, int Depth = 0, IReadOnlyList<string>? Subscripts = null) : Place
 {
     /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
