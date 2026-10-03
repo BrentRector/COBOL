@@ -17,17 +17,20 @@ Written for the fleet-optimization evidence record (docs/rearchitecture/evidence
 stores this JSON beside its write-up, so a later analysis never depends on transcripts that may be pruned. It reads
 defensively: a line that does not parse is counted in `unparsed`, never silently dropped.
 """
-import argparse, datetime, json, pathlib, sys
+import argparse, datetime, json, pathlib, re, sys
 
 
 def ts(s):
     return datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
+GATE_RED = re.compile(r"=== (?:BUILD-LOCAL|LINUX) GATE: RED")
+
+
 def agent_metrics(path):
     turns = tools = unparsed = 0
     tok = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
-    stamps, seen = [], set()
+    stamps, seen, reds, model = [], set(), [], None
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             o = json.loads(line)
@@ -36,9 +39,13 @@ def agent_metrics(path):
             continue
         if o.get("timestamp"):
             stamps.append(o["timestamp"])
+        # a RED gate verdict is a tool RESULT (a user record), never the brief's text: the loop clock marks it
+        if o.get("type") == "user" and o.get("timestamp") and GATE_RED.search(line):
+            reds.append(o["timestamp"])
         if o.get("type") != "assistant":
             continue
         m = o.get("message") or {}
+        model = model or m.get("model")
         mid = m.get("id")
         if mid and mid not in seen:
             seen.add(mid)
@@ -52,7 +59,8 @@ def agent_metrics(path):
     wall = (ts(stamps[-1]) - ts(stamps[0])).total_seconds() if len(stamps) > 1 else 0.0
     return {"turns": turns, "tool_calls": tools, "tokens": sum(tok.values()),
             "fresh": tok["input"] + tok["cache_write"] + tok["output"], "token_parts": tok,
-            "wall_s": round(wall, 1), "first": stamps[0] if stamps else None, "unparsed": unparsed}
+            "wall_s": round(wall, 1), "first": stamps[0] if stamps else None, "last": stamps[-1] if stamps else None,
+            "model": model, "gate_reds": reds, "unparsed": unparsed}
 
 
 def main():

@@ -147,6 +147,10 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   cheap part (the learned context) without the expensive part (the long transcript).
 - **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), implementer_model ('opus'; 'sonnet' when the owner allows it), devlog_n, previous_train,
   lead_id_blocks: ["PBa-PBb", …] (one block per train), groups: [{ letter, lead, notes, codes, after? }] }`.
+- **Return payloads are capped** (kb/Work PB1912, owner 2026-10-02): an implementer's `summary` is at most 900 characters,
+  `leads` at most 6 of at most 500, and the lander's final text at most 25 lines, because everything an agent returns is
+  re-read by the orchestrator on every later turn. The detail lives in the report file. Experiment pending: compare the
+  workflow output size with waves 1001 (31,864 bytes) and 1002 (27,210).
 - **Specs.** Render them with `make_dispatch_specs.py <groups.json>`, which takes the same groups plus `slug`,
   `group`, `root`, `files`, `body`, an optional `pred` text (predecessor or resume instructions) and the optional
   `after` (ignored by the renderer; the workflow uses it). Spec files are keyed on the full letter:

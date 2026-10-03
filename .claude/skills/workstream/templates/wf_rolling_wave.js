@@ -45,8 +45,10 @@ const IMPL_SCHEMA = {
     report: { type: 'string' }, gate_run: { type: 'string' }, gate_verdict: { type: 'string' },
     notes_landed: { type: 'array', items: { type: 'string' } },
     codes_used: { type: 'array', items: { type: 'string' } },
-    leads: { type: 'array', items: { type: 'string' } },
-    summary: { type: 'string' },
+    // ORCHESTRATOR CONTEXT CAP (owner 2026-10-02, kb/Work PB1912): what an agent returns lands in the orchestrator's
+    // conversation and is re-read on every later turn. The forensic detail belongs in the report FILE; the return is a pointer.
+    leads: { type: 'array', maxItems: 6, items: { type: 'string', maxLength: 500 } },
+    summary: { type: 'string', maxLength: 900 },
   },
   required: ['status', 'branch', 'worktree', 'report', 'gate_verdict', 'summary'],
 }
@@ -89,7 +91,8 @@ function runGroup(g) {
     `it names your brief, codes, report path, scratch dir, gate and checkpoint protocol. ` +
     `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT. ` +
     `⛔ YOUR LAST ACTION MUST BE THE StructuredOutput CALL — never end on a report file or a summary message (three agents in waves 65-67 did, and their finished branches were stranded): ` +
-    `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, your last gate's run directory (TestResults/build-local/<run>, whose verdict.json records its timings) and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids).`,
+    `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, your last gate's run directory (TestResults/build-local/<run>, whose verdict.json records its timings) and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids). ` +
+    `⛔ KEEP THE RETURN SHORT: summary at most 900 characters, at most 6 leads of at most 500 characters each (each lead: repro path and code site), and every detail goes in your report file, which the orchestrator reads only on demand.`,
     { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: IMPL_MODEL }
   ).then(r => r ? { ...r, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes } : { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT' }),
   CEILING_MIN, () => {
@@ -121,7 +124,7 @@ function land(batch) {
     `New leads found in the reports get kb/Work notes with ids from ${leadIds} (orchestrator-allocated; use in order, return the unused). ` +
     `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit in your worktree, write STATUS.md NEXT, and return. ` +
     `Land ONLY through bash scripts/push-main.sh. Run the CI audits locally before it (audit_code_citations, audit_doc_citations, audit_evidence_supersession, audit_witness_loss, drift_rules --check, work.py check). ` +
-    `Your final text: the landed sha (or why not), the DEVLOG entry number, GAP before -> after, clusters landed/dropped with reasons, lead ids used, and the unused codes.`,
+    `Your final text, at most 25 lines (the orchestrator re-reads it every turn; the detail is in the DEVLOG entry and the PB notes you wrote): the landed sha (or why not), the DEVLOG entry number, GAP before -> after, clusters landed/dropped with a one-line reason each, lead ids used, and the unused codes.`,
     { label: `lander-train${label}`, phase: 'Land', agentType: 'cobol-lander', isolation: 'worktree', model: 'opus' }
   ).then(t => { trains.push({ train: label, clusters: batch.map(r => r.letter), result: t }); return t })
 }
