@@ -13,6 +13,76 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1847 — 2026-10-03 11:45 PDT — Train 1007: wave 1007 groups B, C, A (PB1063, PB1383, PB1116, PB1231, PB1225, PB1226, PB1271, PB1904); group D dropped on a Windows CI red
+
+**Group B — PB1063, PB1383, PB1116 (OO conformance, second pass; PB480 and PB1112's universal leg split).** PB1063: a
+BY CONTENT pointer argument compared only the pointer CATEGORY, so a restricted data-pointer reached an unrestricted
+`USAGE POINTER` formal and ran (`IN-M`). §14.8.2.3.3 2) makes that crossing "the same as if a SET statement were
+performed", so `SetBinder.PointerAssignmentReason` is now the one §14.9.39.3 SR19/SR20/SR22 pair verdict: SET Formats 8
+and 9 call it (their two private loops are deleted), and `OoConformance.ContentMismatch` takes it as a required
+delegate, so the INVOKE and CALL lanes both ask it; the SR22 program-pointer arm was fixed with it. PB1383:
+`>>CALL-CONVENTION XYZZY` compiled clean. DOC-A.1-68 already determined that no call-convention-name is defined, so the
+directive admits COBOL only and the any-word column (`DirectiveOperandSyntax.UserWord`,
+`CompilerDirectiveCatalog.IsCobolWord`, their drift-test arms) is deleted rather than left dead. GnuCOBOL was not
+surveyed (no `cobc` in WSL); defining its names would need that survey and a GR2 b) mapping. PB1116: a strong group
+with an object-reference leaf has no boundary character image and drew COBOLNET0828 at a typed INVOKE. It now crosses as
+the `object?[]` of its record struct's physical fields (`OoClassTable.LeafCarried`, `RecordStructEmitter` AsLeaves /
+OfLeaves, `PlaceRenderer.GroupLeaves` / `WriteGroupLeaves`). A field-wise copy was chosen over one struct per TYPEDEF
+because two equivalent type declarations in two source elements are two C# types. The CALL lane still refuses it,
+naming the carrier, and that gap is filed as PB1940. 5 rows closed (GR-9.3.6-L3.4, GR-7.3.9.3-2, GR-8.3.2.2-L5.2,
+GR-9.3.5.3-2, DOC-A.1-68); SR-14.9.23.3-5 stays PARTIAL under PB1051.
+
+**Group C — PB1225, PB1231, PB1226 (constant entries).** All three reproduced: `01 K CONSTANT 8.` was COBOL0001, LENGTH
+OF a later item and `PIC X(K)` before K were refused, and LENGTH OF an elementary report item was 1547. PB1225: §13.10.2
+was rendered from the PDF, where IS, AS and OF are not underlined, so they are optional words (§5.2.3); SR9's duplicate
+test now sees `LENGTH W` as `LENGTH OF W`. PB1231: no clause orders a constant before its references (§13.10.3 SR4 and
+SR5 forbid only cycles). Every constant entry is now declared before binding, and one lookup, `FindConstant`, binds on
+demand. Cycles are reported as SR4 when a length phrase is on them and SR5 otherwise. A length operand described later
+binds its whole record out of source order, and the record is placed in source order (`DataBinder.EntryOrder.cs`).
+PB1226: LENGTH OF an elementary report item works, and a report group is refused (§13.10.3 SR11). Found on the way:
+COBOLNET0895 had no descriptor at three bare sites, and the semgrep raw-code count fell from 290 to 288 (baseline
+updated). 4 rows closed (FMT-13.10.2, SR-13.10.3-4, SR-13.10.3-5, SR-13.10.3-11). Open-record operands and SPECIAL-NAMES
+constant operands are filed as PB1941 and PB1942.
+
+**Group A — PB1271, PB1904 (report writer).** PB1271: a repeating SUM entry had one shared counter. `MOVE 500 TO
+CF-U(2)` drew 1639, an unsubscripted `CF-U` printed `0503 0503 0503`, and a multiple COLUMN entry shared one counter
+among its printable items. A SUM entry is now a `ReportSumFamily` with one counter per occurrence, reserved as a
+contiguous id block (§13.18.54.4 GR8 a), §13.18.14.4 GR12, §13.18.35.4 GR9). The register carries a synthetic OCCURS
+chain, so the ordinary subscript reader gives §8.4.2.3.3 SR3-SR5, and references and table(ALL) are both fixed. An
+absent DEPENDING occurrence's counter is neither printed nor reset (GR10), and `AllCount.ReportDepending` is the one
+§13.18.38.4 GR13 count. PB1904: the note's probes are the VALUE channel by rule (PB1166); the STORAGE channel was the
+defect (a bit-group FD record wrote `0100` for `AB12`), and `GroupImage` / `WriteGroupImage` gained the bit-window arm.
+A duplicate occurrence-count switch in `ReferenceResolver` now delegates. 3 rows closed (SR-13.8.6.2.3-1,
+SR-13.8.6.2.3-2, GR-13.18.54.4-10). A reference-modified sum counter still names the wrong rule: PB1943.
+
+**Group D — PB1402 (extended letters): DROPPED on CI.** D was merged, gated GREEN on Windows (run
+20261003T181309Z-e5c55f, Conformance 9,971 · Unit 30,431) and on Linux (78aedf7a0), and the whole train went to CI as
+faeec1f0e. CI run 37144040186 went red on every Windows job at "Build (Release, warnings-as-errors)" and "Build the
+conformance project (Release)". The ANTLR step failed with `warning(180): CobolLexer.g4:1070:22: chars … used multiple
+times in set`. D's new `EXT_CHAR` set holds U+FDD0-U+FDEF, U+FFFE and U+FFFF as RAW UTF-8 bytes; the `\uXXXX` escapes
+had been decoded by the agent's tool input. The Windows runner's JVM read the grammar as Cp1252, so each character
+became three Latin characters that repeat in the set. Locally Java 23 reads UTF-8 (`file.encoding = UTF-8`), and Linux
+does too, so neither local gate could see it. Only D touches `CobolLexer.g4`, and main's last run (37137011452,
+train 1006) was green, so the red is D's. D was dropped, and A was re-applied onto C in its pre-D form: A's three
+sum-family name compares and C's nine new name compares keep `OrdinalIgnoreCase`, which PB1402's relanding must fold.
+PB1402 stays open; its branch `worktree-wf_a08557c7-e3e-4` (head 0753cca0e) needs only the escape restored, plus the
+fold of C's and A's new sites shown by `CobolNameFoldDriftTests`. The build-side root cause, ANTLR not being told the
+grammar's encoding, is PB1944. D's three leads (the Editions word tables and ToUpperInvariant fold keys, and the
+fixed-form column count for supplementary-plane letters) are not filed; they travel with D.
+
+**The train.** Each cluster came in as a patch against 2af61c9be, the inventory excluded. C and A conflicted with B
+only in the two corpus manifests (whole list elements, unioned: 2002 622 → 630, negative 2011 → 2021, no
+duplicates). The verdict batches were re-applied per cluster with `record_verdicts.py` on the merged tree, and the
+merged inventory equals each branch's rows exactly. Gate (lander mode, run 20261003T183644Z-7eaca5): GREEN —
+Conformance 9,952/9,952 · Unit 30,397/30,397 · Characterization 35/35. Legacy Integration passed 503 with 1 skipped,
+and the Linux gate is GREEN on 63a560800. semgrep passes with no count risen (raw-code 288 against C's new baseline).
+audit_code_citations, audit_doc_citations, audit_evidence_supersession, audit_witness_loss (0 unexcused), drift_rules
+--check and work.py check are all clean. All 13 citations re-run with `cite.py --check` were OK. The full-code review
+of the merged diff (the SET pointer verdict, out-of-order record binding, the sum occurrence addressing, and for D the
+fold rewrite scanned for lost negations) found no confirmed correctness defect. It did not catch the encoding red,
+which no reader of the diff can see. GAP 544 → 532. No diagnostic code is claimed; COBOLNET2729-2744 are returned.
+Leads filed: PB1940-PB1944, with PB480 re-oriented. Cluster D was dropped (above).
+
 ## Entry 1846 — 2026-10-03 09:14 PDT — Train 1006: wave 1006 groups B, A, D, C (PB1890, PB1054, PB1933, PB574, PB1113, PB1498, PB1116, PB1144, PB1118, PB1368, PB1228, PB1227, PB1232)
 
 **Group B — PB1890, PB1054, PB1933, PB574 (reference resolver; PB1271 split).** PB1890: a subscript or ref-mod bound
