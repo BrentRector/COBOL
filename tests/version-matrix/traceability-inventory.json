@@ -6111,13 +6111,13 @@
   "ordinal": 11,
   "subject": "Function-identifier",
   "rule-digest": "ad38d8b5a212",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#IntegerViolation; src/Cobol.Net.Compiler/Binding/MoveTable16.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ControlFlowBinder.cs",
-  "test-ref": "conformance:negative/pb40-numeric-function-in-integer-position",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#IntegerViolation; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified; src/Cobol.Net.Compiler/Binding/MoveTable16.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ControlFlowBinder.cs",
+  "test-ref": "conformance:negative/pb40-numeric-function-in-integer-position; conformance:negative/pb1420-random-numeric-function-seed; conformance:negative/pb1420-combined-datetime-numeric-function-date; unit:IntrinsicArgumentClassDriftTests.EveryTable21IntegerPosition_IsTypedInteger_InTheVerifiedTable",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1420 (registrar 15b). SR11 (cite.py --check 8.4.3.2.3 'A numeric function shall not be specified where an integer operand is required' -> OK §8.4.3.2.3 11)). The screen is on the function's TYPE (IntrinsicResultType.Resolve == Numeric), not on its value. Probes: out/probe/function-identifier/r4_sr11_char.cob FUNCTION CHAR(FUNCTION SQRT(4)) -> COBOLNET1627 citing SR11; p1_sr11_perform.cob PERFORM X FUNCTION SQRT(4) TIMES -> COBOLNET1646. A user-defined function's temp is screened by its cloned RETURNING description (the NonIntegralItemReason field arm). The GO TO DEPENDING position (r5) refuses the numeric function too, but only because it refuses EVERY function-identifier at parse. That is a separate lead (see findings), and SR11's own outcome is correct there. || REFUTED: PARTIAL — The screen is sound where the argument table marks an integer slot (i). It fires for MOD (both arguments), FACTORIAL, CHAR, CHAR-NATIONAL, DAY-OF-INTEGER, INTEGER-OF-DAY, TEST-DAY-YYYYDDD, TEST-DATE-YYYYMMDD, YEAR-TO-YYYY (both), FORMATTED-DATE argument-2, PERFORM TIMES, and a user function with a PIC 9V9 RETURNING. Integer functions (INTEGER, INTEGER-PART, ORD-MAX, MAX of integers) pass. But the integer-operand positions come from a hand table that misses RANDOM: 15.75.3 rule 2 requires argument-1 to be zero or a positive integer, the same requirement FACTORIAL 15.36.3 r1 has and is screened for, yet RANDOM is typed class-numeric only, so FUNCTION RANDOM(FUNCTION SQRT(4)) compiles. Separately, WRITE ADVANCING, DISPLAY AT LINE and GO TO DEPENDING refuse every function at parse (over-rejection, a separate lead), so SR11 is not really exercised in those slots. || editions as written by the adjudicator: 1985 (Amendment 1), 2002, 2014, 2023 - applies to every function-identifier. Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1420 LANDED (wave 1009 C). SR11 (cite.py --check 8.4.3.2.3 \"A numeric function shall not be specified where an integer operand is required\" -> OK, rule 11) is screened on the function TYPE (IntegerViolation, IntrinsicResultType.Resolve == Numeric) at every position the Verified table marks integer. The gap was the hand table of integer positions: RANDOM argument-1 (15.6 Table 21 prints Int1; 15.75.3 r2) and COMBINED-DATETIME argument-1 (Int1; 15.17.3 r1) were class numeric, so FUNCTION RANDOM(FUNCTION SQRT(4)) compiled. Both are kind i now, and a drift test DERIVES every Int-only operand position from Table 21 (found exactly those two; BASECONVERT is screened by its own arm). Pinned by negative pb1420-random-numeric-function-seed and pb1420-combined-datetime-numeric-function-date. WRITE ADVANCING / DISPLAY AT / GO TO DEPENDING refusing every function at parse is a separate over-rejection (screen facility A.4.2, PB260), not this rule's outcome.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.2.3-12",
@@ -6126,13 +6126,13 @@
   "ordinal": 12,
   "subject": "Function-identifier",
   "rule-digest": "ac93ace43243",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs#StrArgVisitor; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#UnsignedIntegerViolation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#CheckConcatArgs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#CheckBaseConvertArgs; src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs#StrArgVisitor",
+  "test-ref": "conformance:2023/pb1420_abs_integer_form_unsigned_position; conformance:negative/pb1420-concat-integer-function-unsigned-position; conformance:negative/pb1420-baseconvert-integer-function-unsigned-position",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1420 (registrar 15b). SR12 (cite.py --check 8.4.3.2.3 'An integer function other than the integer form of the ABS function shall not be specified where an unsigned integer is required' -> OK §8.4.3.2.3 12)). No SR12 check exists anywhere in src (grep for SR12 under 8.4.3.2 finds only the StatementBinder.SubscriptSegments remark that SR12 does not bar subscripts). The live positions in claimed facilities are the intrinsic argument rules that require an unsigned integer, for example §15.18.3 r3 CONCAT (--check OK 'If argument-1 or argument-2 is numeric, it shall be usage display or national and shall be an unsigned integer') and §15.12.3 r1 BASECONVERT. Probe out/probe/function-identifier/r1_sr12_concat_int.cob MOVE FUNCTION CONCAT(FUNCTION INTEGER(3) 'A') compiles CLEAN and dies at run time: NotImplementedCobolFeatureException 'intrinsic string argument BoundComputedOperand'. Expected: a compile-time SR12 diagnostic. r2_sr12_concat_abs.cob, the ABS form that SR12 exempts, crashes identically; expected result W = '3A'. r3_sr12_base_int.cob (BASECONVERT) crashes the same way. The DISPLAY/ACCEPT screen LINE/COLUMN positions (§14.9.11.3 SR3, §14.9.1.3 SR5) belong to A.4.2 screen handling, which CONFORMANCE.md marks Not claimed (PB260 owns it). Probes q1/q2 refuse any function there at parse. || editions as written by the adjudicator: 1985 (Amendment 1), 2002, 2014, 2023 - applies to every function-identifier. Annex E (2014->2023) lists no change to 8.4.3.2",
-  "state": "GAP"
+  "notes": "kb/Work PB1420 LANDED (wave 1009 C). SR12 (cite.py --check 8.4.3.2.3 \"An integer function other than the integer form of the ABS function shall not be specified where an unsigned integer is required\" -> OK, rule 12). Screen: IntrinsicArgumentRules.UnsignedIntegerViolation, type-based like SR11 (a nested integer function other than ABS, and any numeric function, is barred). Asked at the two intrinsic positions that say \"unsigned integer\" and admit a function-identifier: CONCAT 15.18.3 r3 (CheckConcatArgs) and BASECONVERT 15.12.3 r1 below base 11 (CheckBaseConvertArgs), COBOLNET1627 / COBOLNET1642. The exempt integer form of ABS is legal and its returned value renders as its digits (IntrinsicRenderer.StrArgVisitor numeric-function arm, DOC-A.1-92 text image): CONCAT(ABS(-3) \"A\") = 3A. The statement positions that print \"unsigned integer data item\" (14.9.1.3 SR5, 14.9.11.3 SR3 - ACCEPT/DISPLAY LINE and COLUMN) belong to the screen facility A.4.2, not claimed (PB260).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.2.3-13",
@@ -51067,11 +51067,11 @@
   "subject": "COMBINED-DATETIME function",
   "rule-digest": "e1c6d1c58e90",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#CombinedDatetime",
-  "test-ref": "conformance:2023/pb65_wide_values; conformance:2014/pb620_combined_datetime_carriers; unit:IntrinsicCarrierAgreementDriftTests.CombinedDatetime_ScreensItsArguments_FromEveryCarrier",
+  "code-location": "src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs#CombinedDatetime; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified",
+  "test-ref": "conformance:2023/pb65_wide_values; conformance:2014/pb620_combined_datetime_carriers; unit:IntrinsicCarrierAgreementDriftTests.CombinedDatetime_ScreensItsArguments_FromEveryCarrier; conformance:negative/pb1420-combined-datetime-numeric-function-date; unit:IntrinsicArgumentClassDriftTests.EveryTable21IntegerPosition_IsTypedInteger_InTheVerifiedTable",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "PB65 (wide-value members) LANDED 2026-08-09. PROBED: CDZ=0: COMBINED-DATETIME(0, 45296) takes the SS15.17.3 r1/SS15.5.2 EC path with the documented default whole. PRIOR (PARTIAL): PB1 landed the CLASS half only. 15.17.3 r1 requires argument-1 to be in INTEGER DATE FORM - a value form (a valid standard date integer), not merely a class. The screen rejects a non-numeric operand and nothing more. tes kb/Work PB620 (2026-09-21, the THIRD carrier): §15.17.3's two rules are about argument VALUES (r1 integer date form, r2 standard numeric time form, which §15.5.5 bounds by MAGNITUDE), so the USAGE of the item holding the value cannot decide whether §15.3's \"incorrect value for that argument\" applies -- but the binary64 body had NO argument rule at all. Measured on a pre-fix build in ONE program under ONE armed >>TURN EC-ARGUMENT-FUNCTION CHECKING ON directive: COMBINED-DATETIME(1, F) with F USAGE COMP-2 VALUE 86400 printed 1.8639999999999 and set no exception condition, while the identical VALUE in a PIC 9(5)V9(8) item terminated the run unit. CombinedDatetimeReal now asks the SAME screen as its two exact-carrier twins (CobolDate.CombinedDatetimeOutOfRangeReal forwards to the one CombinedDatetimeOutOfRange comparison), takes the compilation group's LEAP-SECOND state like they do (§7.3.17.4 GR4/GR5 is what sets the bound), and substitutes §15.3's documented default 0; a non-finite operand is screened at the same site because neither §15.5.2's nor §15.5.5's form contains an infinity or a NaN. One rule, one raise site, one message, asserted across all three carriers.",
+  "notes": "PB65 (wide-value members) LANDED 2026-08-09. PROBED: CDZ=0: COMBINED-DATETIME(0, 45296) takes the SS15.17.3 r1/SS15.5.2 EC path with the documented default whole. PRIOR (PARTIAL): PB1 landed the CLASS half only. 15.17.3 r1 requires argument-1 to be in INTEGER DATE FORM - a value form (a valid standard date integer), not merely a class. The screen rejects a non-numeric operand and nothing more. tes kb/Work PB620 (2026-09-21, the THIRD carrier): §15.17.3's two rules are about argument VALUES (r1 integer date form, r2 standard numeric time form, which §15.5.5 bounds by MAGNITUDE), so the USAGE of the item holding the value cannot decide whether §15.3's \"incorrect value for that argument\" applies -- but the binary64 body had NO argument rule at all. Measured on a pre-fix build in ONE program under ONE armed >>TURN EC-ARGUMENT-FUNCTION CHECKING ON directive: COMBINED-DATETIME(1, F) with F USAGE COMP-2 VALUE 86400 printed 1.8639999999999 and set no exception condition, while the identical VALUE in a PIC 9(5)V9(8) item terminated the run unit. CombinedDatetimeReal now asks the SAME screen as its two exact-carrier twins (CobolDate.CombinedDatetimeOutOfRangeReal forwards to the one CombinedDatetimeOutOfRange comparison), takes the compilation group's LEAP-SECOND state like they do (§7.3.17.4 GR4/GR5 is what sets the bound), and substitutes §15.3's documented default 0; a non-finite operand is screened at the same site because neither §15.5.2's nor §15.5.5's form contains an infinity or a NaN. One rule, one raise site, one message, asserted across all three carriers. || kb/Work PB1420 (2026-10-03): argument-1 is Int1 in Table 21, so the Verified row is now per-position (i, n): a numeric function cannot be the integer date (SR11). Argument-2 (Num2) is unchanged.",
   "state": "OK"
  },
  {
@@ -54532,11 +54532,11 @@
   "subject": "NUMVAL function",
   "rule-digest": "c5855a5d4c91",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified",
-  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:2023/pb58_argument_predicates_legal; conformance:2023/pb60_numval_one_scan",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#PredicateViolation",
+  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:2023/pb58_argument_predicates_legal; conformance:2023/pb60_numval_one_scan; conformance:negative/pb658-numval-numeric-edited-argument; conformance:2002/pb658_numval_category_positions; unit:IntrinsicArgumentClassDriftTests.CategoryWordedStringArguments_CarryTheCategoryPredicate_AndClassWordedOnesDoNot",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "LANDED 2026-08-17 (kb/Work PB58 — the argument-screen table's missing predicate kinds and absent rows). NUMVAL's new 's' row (§15.67.3 r1 'an alphanumeric or national literal or … data item'): a numeric argument is rejected at bind (negative pb58-numval-numeric); the format grammar itself is the one-scan's (PB60 — the space-only ignorable character, the alternative formats).",
+  "notes": "LANDED 2026-08-17 (kb/Work PB58 — the argument-screen table's missing predicate kinds and absent rows). NUMVAL's new 's' row (§15.67.3 r1 'an alphanumeric or national literal or … data item'): a numeric argument is rejected at bind (negative pb58-numval-numeric); the format grammar itself is the one-scan's (PB60 — the space-only ignorable character, the alternative formats). || kb/Work PB658 (2026-10-03): r1 says \"an alphanumeric or national ... data item\", which 8.5.2.1's closing sentence and 8.5.2.3 4) read as CATEGORY, so the row now carries the CharacterCategory predicate and a numeric-edited, alphanumeric-edited or national-edited data item is COBOLNET1627; a ref-mod view of one stays legal (GR6).",
   "state": "OK"
  },
  {
@@ -54637,11 +54637,11 @@
   "subject": "NUMVAL-C function",
   "rule-digest": "e2740f06a95f",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindNumvalCFamily",
-  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindNumvalCFamily; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#PredicateViolation; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified",
+  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:negative/pb658-numval-numeric-edited-argument; unit:IntrinsicArgumentClassDriftTests.CategoryWordedStringArguments_CarryTheCategoryPredicate_AndClassWordedOnesDoNot",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "LANDED 2026-08-09 (PB60): r1 names CATEGORY alphanumeric or national, and the finer screen now sits beside the walk - the 15.3 class row (which admits the edited categories under class alphanumeric, Table 2) stays as the class machinery, and a numeric-edited or alphanumeric-edited argument-1 rejects COBOLNET1627 citing r1 (negative pb60-numvalc-edited-argument; measured accepted before). A ref-mod view is plain category alphanumeric (8.4.3.3.4 GR6, the PB72/7b classifier) and stays admissible; TEST-NUMVAL-C mirrors via 15.94.3 r1.",
+  "notes": "LANDED 2026-08-09 (PB60): r1 names CATEGORY alphanumeric or national, and the finer screen now sits beside the walk - the 15.3 class row (which admits the edited categories under class alphanumeric, Table 2) stays as the class machinery, and a numeric-edited or alphanumeric-edited argument-1 rejects COBOLNET1627 citing r1 (negative pb60-numvalc-edited-argument; measured accepted before). A ref-mod view is plain category alphanumeric (8.4.3.3.4 GR6, the PB72/7b classifier) and stays admissible; TEST-NUMVAL-C mirrors via 15.94.3 r1. || RE-ANCHORED 2026-10-03 (kb/Work PB658, wave 1009 C): the bespoke IntrinsicBinder arm named above is DELETED; the category rule is now the CharacterCategory predicate on the NUMVAL-C row (and TEST-NUMVAL-C via 15.94.3 r1), screened by CheckArgumentClasses through PredicateViolation. Verdict unchanged; behaviour unchanged for NUMVAL-C (one diagnostic, the right rule) and now shared with NUMVAL, NUMVAL-F and ORD.",
   "state": "OK"
  },
  {
@@ -54892,11 +54892,11 @@
   "subject": "NUMVAL-F function",
   "rule-digest": "6c231e3a9c17",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified",
-  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:2023/pb58_argument_predicates_legal; conformance:2023/pb60_numval_one_scan",
+  "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#PredicateViolation",
+  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:2023/pb58_argument_predicates_legal; conformance:2023/pb60_numval_one_scan; conformance:negative/pb658-numval-numeric-edited-argument; unit:IntrinsicArgumentClassDriftTests.CategoryWordedStringArguments_CarryTheCategoryPredicate_AndClassWordedOnesDoNot",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "LANDED 2026-08-17 (kb/Work PB58 — the argument-screen table's missing predicate kinds and absent rows). NUMVAL-F's new 's' row (§15.69.3 r1): a numeric item (pb58-numvalf-numeric) and a numeric LITERAL (pb58-numvalf-literal) are rejected at bind — the literal used to reach a run-time NotImplemented; the r5 space rule is the one-scan's (PB60).",
+  "notes": "LANDED 2026-08-17 (kb/Work PB58 — the argument-screen table's missing predicate kinds and absent rows). NUMVAL-F's new 's' row (§15.69.3 r1): a numeric item (pb58-numvalf-numeric) and a numeric LITERAL (pb58-numvalf-literal) are rejected at bind — the literal used to reach a run-time NotImplemented; the r5 space rule is the one-scan's (PB60). || kb/Work PB658 (2026-10-03): NUMVAL-F's r1 has the same category wording as NUMVAL's and now carries the same CharacterCategory predicate.",
   "state": "OK"
  },
  {
@@ -55013,10 +55013,10 @@
   "rule-digest": "9dce60f98ace",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#PredicateViolation",
-  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:2023/pb58_argument_predicates_legal",
+  "test-ref": "conformance-test:CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic; conformance:2023/pb58_argument_predicates_legal; conformance:negative/pb658-ord-numeric-edited-argument; unit:IntrinsicArgumentClassDriftTests.CategoryWordedStringArguments_CarryTheCategoryPredicate_AndClassWordedOnesDoNot",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "LANDED 2026-08-17 (kb/Work PB58 — the argument-screen table's missing predicate kinds and absent rows). ORD's row carries §15.70.3 r1's 'ONE character position in length' as an ExactWidth(1) predicate: a 3-character item (pb58-ord-width) and a 2-character ref-mod view (pb58-ord-refmod) are rejected; a one-character item and a one-character view bind (golden ORD/ORDRM = 67).",
+  "notes": "LANDED 2026-08-17 (kb/Work PB58 — the argument-screen table's missing predicate kinds and absent rows). ORD's row carries §15.70.3 r1's 'ONE character position in length' as an ExactWidth(1) predicate: a 3-character item (pb58-ord-width) and a 2-character ref-mod view (pb58-ord-refmod) are rejected; a one-character item and a one-character view bind (golden ORD/ORDRM = 67). || kb/Work PB658 sibling sweep (2026-10-03): r1 also says \"of CATEGORY alphabetic, alphanumeric, or national\", so a one-position numeric-edited item (PIC Z) - class alphanumeric, category numeric-edited - is COBOLNET1627 (CharacterCategory predicate on the ORD row; negative pb658-ord-numeric-edited-argument).",
   "state": "OK"
  },
  {
@@ -55328,10 +55328,10 @@
   "rule-digest": "5e4a69b9f544",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#Verified; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#CheckArgumentClasses",
-  "test-ref": "conformance:negative/pb1-numeric-arg-family",
+  "test-ref": "conformance:negative/pb1-numeric-arg-family; conformance:negative/pb1420-random-numeric-function-seed; unit:IntrinsicArgumentClassDriftTests.EveryTable21IntegerPosition_IsTypedInteger_InTheVerifiedTable",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "PB1; 15.75.3 r1 (class numeric) covered. The VALUE half of RANDOM's rules (r2, zero-or-positive-integer) is a separate, still-open EC-ARGUMENT-FUNCTION question.",
+  "notes": "PB1; 15.75.3 r1 (class numeric) covered. The VALUE half of RANDOM's rules (r2, zero-or-positive-integer) is a separate, still-open EC-ARGUMENT-FUNCTION question. || kb/Work PB1420 (2026-10-03): the argument is 15.3 type 6 (Table 21 Int1), so the row is kind i, not n: a numeric function or a non-integer item/literal at the seed position is rejected at bind (SR11 / 15.3 type 6). The VALUE half of r2 (zero or positive) stays the run-time EC-ARGUMENT-FUNCTION question noted above.",
   "state": "OK"
  },
  {

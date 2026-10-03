@@ -270,13 +270,18 @@ COBOLNET_INTERPROGRAM_DESIGN.md).
 **The §15.3 argument-rule SCREEN (`IntrinsicArgumentRules`, driven from `IntrinsicBinder.CheckArgumentClasses` after
 arity and before every per-function arm) is a per-position SCHEMA, not a class column** (PB1 → PB12 → PB31 →
 PB35 → PB58): each catalogued function has an `ArgSchema` — per-position `ArgRule`s plus a variadic tail — whose
-class KIND (`'n'` numeric, `'i'` §15.3 type-6 integer, `'s'` the string family, `'b'` boolean, `'c'` CONCAT's
+class KIND (`'n'` numeric, `'i'` §15.3 type-6 integer, `'s'` the string family — class alphabetic, alphanumeric or
+national, `'a'` class alphanumeric or national (alphabetic out), `'b'` boolean, `'c'` CONCAT's
 all-but-index/object/pointer, `'p'` the MAX/MIN-family negative list, `' '` no arguments) is one predicate among
 several: the position may also carry `ArgPredicate`s — `MinWidth`/`ExactWidth` in character positions (§15.57.3 /
 §15.97.3 / §15.78.3 r1's "at least one character position", §15.70.3 r1's and §15.96.3 r2's "one character",
 decided only on a STATIC width), `DataItemOrLiteralOnly` (§15.37.3 r3's "an integer data item or integer literal",
 narrower than type 6 — an expression or nested function is barred outright), `NotStrongGroup` (§15.59.3 /
-§15.63.3 / §15.71.3 / §15.72.3 r1's "nor shall it be a strongly-typed group item"), and the zero-length-LITERAL
+§15.63.3 / §15.71.3 / §15.72.3 r1's "nor shall it be a strongly-typed group item"), `CharacterCategory` (the
+CATEGORY-worded rows — NUMVAL §15.67.3, NUMVAL-F §15.69.3, NUMVAL-C §15.68.3 and TEST-NUMVAL-C §15.94.3 r1, ORD
+§15.70.3 r1 — bar the three EDITED categories, which Table 2 folds into the class the kind admits; the CLASS-worded
+TEST-NUMVAL, TEST-NUMVAL-F, LOCALE-DATE and LOCALE-TIME carry none — `IntrinsicArgumentClassDriftTests` reads each
+clause's wording from the specification), and the zero-length-LITERAL
 clause — and the schema a `CrossArgRule` (`AllSameClass` for MAX/MIN/ORD-MAX/ORD-MIN r2/r3, `MatchArgument1` for
 FIND-STRING, NUMVAL-C/TEST-NUMVAL-C, INTEGER-OF-FORMATTED-DATE, SECONDS-FROM-FORMATTED-TIME, TEST-FORMATTED-DATETIME,
 TRIM, SUBSTITUTE).
@@ -289,9 +294,20 @@ category-worded ("Argument-1 shall be of category alphanumeric or national") and
 the same class as argument-1"), and §8.5.2.1's closing sentence ("refers to the category unless class is
 specifically indicated") is what keeps them apart. `IntrinsicArgumentRules.TableTwoClass` is the ONE reader of
 "what class is this operand, for a rule that says CLASS"; `ByClass(...)` derives every CLASS-worded `Admissible`
-arm from it (`'n'`, `'i'`, `'b'`, `'s'`, `'c'` — so a refined member is admitted by its class, never by being
-remembered in the list), while the single CATEGORY-worded arm `'t'` keeps a literal member list because it
-enumerates categories the class column cannot derive. `CrossBlock` composes the projection with the cross rules'
+arm from it (`'n'`, `'i'`, `'b'`, `'s'`, `'a'`, `'c'` — so a refined member is admitted by its class, never by
+being remembered in the list). There is NO category-worded kind (kb/Work PB658): the hand-listed category set `'t'`
+admitted the edited items its own clauses exclude while a bespoke binder arm rejected them for NUMVAL-C alone, so a
+category-worded position is the derived class set plus the `CharacterCategory` predicate, screened in one place.
+**Integer positions are derived from §15.6 Table 21** (kb/Work PB1420): `IntrinsicArgumentClassDriftTests` reads
+every operand position the table types `Int` and nothing else and demands kind `'i'`, which is what makes §8.4.3.2.3
+SR11 complete (it found RANDOM's seed and COMBINED-DATETIME's argument-1). **SR12** — an integer function other than
+the integer form of ABS shall not stand where an unsigned integer is required — is
+`IntrinsicArgumentRules.UnsignedIntegerViolation`, asked at the two intrinsic positions that say "unsigned integer":
+CONCAT §15.18.3 r3 and BASECONVERT §15.12.3 r1 below base 11; the legal ABS form renders through the numeric-
+admitting string-argument visitor as its digits. **A strongly-typed group is an alphanumeric argument** (§15.3 item
+2: "treated as though they were of class and category alphanumeric, unless they are prohibited") — `ClassOfItem`
+answers Alphanumeric for it on purpose — and its pointer/object leaves read as the D-SLOT placeholder image through
+`OperandText.AsTransferString` (the one-way reader DISPLAY and a MOVE sender also use; kb/Work PB1901). `CrossBlock` composes the projection with the cross rules'
 own alphabetic|alphanumeric merge — **projecting FIRST and merging SECOND**, because the projection is a class
 fact and the merge is a rule-level exception §15.59.3 r2 states outright ("with the exception that mixing of
 arguments of alphabetic and alphanumeric classes is allowed"). ⚠ EVERY cross clause in the catalogue is

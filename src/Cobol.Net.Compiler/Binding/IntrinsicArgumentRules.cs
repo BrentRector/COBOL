@@ -29,7 +29,7 @@ internal enum CobolClass
     /// Alphanumeric (kb/Work PB124 wave 5, AR-15.3-1). The STORAGE model folds PIC A into
     /// PicCategory.Alphanumeric (one string carrier); the CLASS question un-folds here via
     /// <c>PicInfo.IsAlphabetic</c>, so a category-worded rule ("shall be of category alphanumeric or
-    /// national" — NUMVAL and the 't' kind's rows) rejects a PIC A item while a class-worded rule
+    /// national" — NUMVAL and the 'a' kind's rows) rejects a PIC A item while a class-worded rule
     /// ("class alphabetic, alphanumeric, or national" — UPPER-CASE and the 's' kind's rows) admits it.
     /// Cross rules treat alphabetic and alphanumeric as ONE block — §15.59.3 r2's own exception ("mixing of
     /// arguments of alphabetic and alphanumeric classes is allowed"), the same two-block shape §15.87.3 r2
@@ -134,6 +134,16 @@ internal enum ArgPredicateKind
     /// §15.72.3 r1) — a group whose TYPE is STRONG (<c>StrongTypeModel.IsStrongGroup</c>); §15.3 item 2 treats
     /// every OTHER strongly-typed group as an alphanumeric argument, which is why this cannot be a class.</summary>
     NotStrongGroup,
+    /// <summary>"shall be of CATEGORY alphanumeric or national" (§15.68.3 r1 and, through §15.94.3 r1,
+    /// TEST-NUMVAL-C; §15.67.3 r1 / §15.69.3 r1 say "an alphanumeric or national … data item", which §8.5.2.1's
+    /// closing sentence and §8.5.2.3 4) / §8.5.2.10 4) — "Such an item is referred to as an alphanumeric [a
+    /// national] data item", each item listed being of that CATEGORY — read as the category) — the
+    /// FINER axis under the position's class kind (kb/Work PB658). Table 2 puts the edited categories
+    /// (numeric-edited, alphanumeric-edited, national-edited) in class alphanumeric or national, so the class kind
+    /// admits them; a CATEGORY-worded rule does not. Declared per POSITION beside the class kind, never as a
+    /// second kind: the class set is the same for the category-worded and the class-worded rows (TEST-NUMVAL's
+    /// "a data item of class alphanumeric or national", §15.93.3 r1), and only this predicate tells them apart.</summary>
+    CharacterCategory,
 }
 
 /// <summary>One per-position predicate: its <see cref="Kind"/>, the clause it was read from, and the width
@@ -144,6 +154,7 @@ internal readonly record struct ArgPredicate(ArgPredicateKind Kind, string Claus
     public static ArgPredicate ExactWidth(int n, string clause) => new(ArgPredicateKind.ExactWidth, clause, n);
     public static ArgPredicate DataItemOrLiteralOnly(string clause) => new(ArgPredicateKind.DataItemOrLiteralOnly, clause);
     public static ArgPredicate NotStrongGroup(string clause) => new(ArgPredicateKind.NotStrongGroup, clause);
+    public static ArgPredicate CharacterCategory(string clause) => new(ArgPredicateKind.CharacterCategory, clause);
 }
 
 /// <summary>A §15.x.3 rule about the argument list AS A WHOLE, which no per-position code can express.</summary>
@@ -458,6 +469,14 @@ internal static class IntrinsicArgumentRules
     {
         // §8.5.2.1 — an alphanumeric group item has class alphanumeric, a bit group boolean, a national group
         // national. A group has no PICTURE of its own, so it cannot fall through to the category table.
+        // ⚠ A STRONGLY-TYPED group answers Alphanumeric TOO, and that is the §15.3 reading, not a missing arm (kb/Work
+        // PB1901, refuted): §8.5.2.1 gives it the class and category of its TYPE-NAME, but §15.3 item 2 says "Strongly-typed
+        // group items are treated as though they were of class and category alphanumeric, unless they are prohibited as
+        // arguments of a function" — this classifier answers ARGUMENT positions, where that sentence governs, and the
+        // functions that do prohibit one (MAX, MIN, ORD-MAX, ORD-MIN) carry ArgPredicateKind.NotStrongGroup. Every
+        // other consumer that must tell a strong group apart (STRING / UNSTRING, the MOVE table, a relation) asks
+        // StrongTypeModel itself, so a new CobolClass member would change none of them and would reject
+        // UPPER-CASE(G), which §15.3 admits.
         if (item.IsGroup)
         {
             return item.AsIfPic?.Category switch   // D20/PB79 — a bit / national group's as-if picture
@@ -569,8 +588,9 @@ internal static class IntrinsicArgumentRules
     /// (kb/Work PB305; CLAUDE.md rule 5 — "never a hand-maintained list where a structure belongs"). The 's',
     /// 'c', 'n', 'i' and 'b' arms each spelled out which refined members their class admits, so the NEXT refined
     /// member would have to be remembered at five sites plus <see cref="CrossViolation"/> — and the sixth site
-    /// had already been forgotten. The one CATEGORY-worded kind ('t') keeps a literal list on purpose: it
-    /// enumerates CATEGORIES, which the class column cannot derive, and that is now visible in the shape.</remarks>
+    /// had already been forgotten. A CATEGORY-worded rule is not a set here at all: it is a class set plus the
+    /// <see cref="ArgPredicateKind.CharacterCategory"/> predicate (kb/Work PB658), because the class column cannot
+    /// derive a category set.</remarks>
     private static CobolClass[] ByClass(params CobolClass[] classes) =>
         [.. classes.SelectMany(cls => Enum.GetValues<CobolClass>().Where(m => TableTwoClass(m) == cls)).Distinct()];
 
@@ -668,7 +688,10 @@ internal static class IntrinsicArgumentRules
             ["ABS"] = Uniform('n', "§15.7.3 r1"),                            // shall be of class numeric
             // §15.70.3 r1 is ONE sentence with TWO halves — "shall be ONE CHARACTER POSITION IN LENGTH and shall
             // be of category alphabetic, alphanumeric, or national" (PB58 — the width half was unscreened).
-            ["ORD"] = Uniform('s', "§15.70.3 r1").WithTailPredicate(ArgPredicate.ExactWidth(1, "§15.70.3 r1")),
+            // …and "of CATEGORY alphabetic, alphanumeric, or national" — a category wording, so the edited categories
+            // (a one-position PIC Z item is class alphanumeric and category numeric-edited) are out (kb/Work PB658).
+            ["ORD"] = Uniform('s', "§15.70.3 r1").WithTailPredicate(ArgPredicate.ExactWidth(1, "§15.70.3 r1"))
+                .WithTailPredicate(ArgPredicate.CharacterCategory("§15.70.3 r1")),
             // r1's negative class list ('p') + "nor shall it be a strongly-typed group item" (the predicate);
             // r2 no zero-length literal; r3 all-same-class (PB58 — ORD-MAX/ORD-MIN never had the cross rule MAX
             // and MIN had: the two-arm-dispatch scar, one arm fixed).
@@ -677,7 +700,11 @@ internal static class IntrinsicArgumentRules
             ["ORD-MIN"] = Uniform('p', "§15.72.3 r1", CrossArgRule.AllSameClass, "§15.72.3 r3", "§15.72.3 r2")
                 .WithTailPredicate(ArgPredicate.NotStrongGroup("§15.72.3 r1")),
             ["PRESENT-VALUE"] = Uniform('n', "§15.74.3 r1"),                 // argument-1 and argument-2 class numeric
-            ["RANDOM"] = Uniform('n', "§15.75.3 r1"),                        // shall be of class numeric
+            // ⛔ RANDOM's argument is §15.3 type 6, INTEGER — Table 21 prints "Int1" — and r1 ("class numeric") is
+            // only the class half of it, with r2 ("zero or a positive integer") the value half (kb/Work PB1420: the
+            // row said 'n', so `FUNCTION RANDOM(FUNCTION SQRT(4))` compiled although §8.4.3.2.3 SR11 bars a numeric
+            // function from an integer operand position). The Table 21 drift test holds every Int position to 'i'.
+            ["RANDOM"] = Uniform('i', "§15.75.3 r1/r2"),
             ["RANGE"] = Uniform('n', "§15.76.3 r1"),                         // shall be of class numeric
             ["REM"] = Uniform('n', "§15.77.3 r1"),                           // argument-1 and argument-2 class numeric
             // §15.78.3 r1 — class alphabetic/alphanumeric/national AND "at least one character position in
@@ -686,7 +713,7 @@ internal static class IntrinsicArgumentRules
             // §15.79.3 r1/r3 — argument-1 is a national or alphanumeric LITERAL (its literal-ness is enforced by
             // the existing COBOLNET1517 arm); argument-2 "shall have the same type as argument-1" — the class
             // reading of "type", the cross-argument agreement (PB58; MatchArgument1 was already the shape).
-            ["SECONDS-FROM-FORMATTED-TIME"] = Schema("§15.79.3 r1/r3", ['t', 't'],
+            ["SECONDS-FROM-FORMATTED-TIME"] = Schema("§15.79.3 r1/r3", ['a', 'a'],
                 cross: CrossArgRule.MatchArgument1, crossClause: "§15.79.3 r3"),
             // PI takes no arguments (§15.73.2) — present so the drift test can hold this table and the Phase-B
             // batch's function list in agreement rather than silently tolerating a gap.
@@ -718,9 +745,10 @@ internal static class IntrinsicArgumentRules
             ["CHAR-NATIONAL"] = Uniform('i', "§15.16.3 r1"),                 // shall be an integer
             ["BOOLEAN-OF-INTEGER"] = Uniform('i', "§15.13.3 r1/r2"),         // both arguments positive integers
             // §15.17.3 r1/r2 — argument-1 "in integer date form", argument-2 "in standard numeric time form".
-            // Both are numeric FORMS, so the class screen is the same for each position even though the two
-            // rules differ in what they additionally require of the VALUE.
-            ["COMBINED-DATETIME"] = Uniform('n', "§15.17.3 r1/r2"),
+            // Table 21 types them Int1 and Num2 (§15.3 type 6 and type 10): an integer date, and a time that may
+            // carry fractional seconds (§15.3.3), so position 1 is 'i' and position 2 'n' (kb/Work PB1420 — the
+            // row was Uniform 'n', which let a numeric function stand where the integer date form is required).
+            ["COMBINED-DATETIME"] = Schema("§15.17.3 r1/r2", ['i', 'n']),
 
             // ── §15.32–15.44, the review's fourth batch (fix-queue PB12) ────────────────────────────────────
             // Each row is the function's OWN §15.x.3 argument rule, read and mechanically cited. Six of the
@@ -775,7 +803,7 @@ internal static class IntrinsicArgumentRules
             // argument-1"), and its "shall be a DATA ITEM" half the DataItemOrLiteralOnly predicate's data-item
             // arm cannot express (it admits literals) — argument-2 as a literal is screened in BindIntrinsicCore's
             // format arm (PB58).
-            ["INTEGER-OF-FORMATTED-DATE"] = Schema("§15.48.3 r1/r3", ['t', 't'],
+            ["INTEGER-OF-FORMATTED-DATE"] = Schema("§15.48.3 r1/r3", ['a', 'a'],
                 cross: CrossArgRule.MatchArgument1, crossClause: "§15.48.3 r3"),
             // ⛔ THE ONE THAT NEEDED PB20 FIRST. §15.45.3 r1 is "Argument-1 shall be of class BOOLEAN" — the only
             // rule in the catalogue that names that class, and `Admissible` had no arm able to say it. It is
@@ -815,8 +843,9 @@ internal static class IntrinsicArgumentRules
             // the subject is alphanumeric. ⚠ The screen runs BEFORE the §15.68.3 r3 default-currency injection,
             // deliberately: that operand is compiler-supplied, not written by the user, and screening it would
             // report a class disagreement on source that contains no argument-2 at all.
-            ["NUMVAL-C"] = Schema("§15.68.3 r1/r2", ['t', 't'], cross: CrossArgRule.MatchArgument1,
-                crossClause: "§15.68.3 r2"),
+            ["NUMVAL-C"] = Schema("§15.68.3 r1/r2", ['a', 'a'], cross: CrossArgRule.MatchArgument1,
+                crossClause: "§15.68.3 r2")
+                .WithPredicate(0, ArgPredicate.CharacterCategory("§15.68.3 r1")),
             // §15.37.3 — r1: argument-1 of class alphabetic, alphanumeric, or national; r2: argument-2 in the
             // SAME family as argument-1; r3: "argument-3 shall be an integer data item or integer literal".
             // ⛔ THIS ROW IS THE WHOLE ARGUMENT FOR THE SCHEMA. Under one-kind-per-function it would have
@@ -845,8 +874,8 @@ internal static class IntrinsicArgumentRules
             // §15.53.3 r1 "… 6 character positions in length"; §15.54.3 r1 "a numeric value in standard numeric time
             // form" — 'n', not 'i' (a fractional seconds value is legal; its RANGE is the runtime's screen).
             ["LOCALE-COMPARE"] = Schema("§15.51.3 r1/r2", ['s', 's']),
-            ["LOCALE-DATE"] = Schema("§15.52.3 r1", ['t']).WithPredicate(0, ArgPredicate.ExactWidth(8, "§15.52.3 r1")),
-            ["LOCALE-TIME"] = Schema("§15.53.3 r1", ['t']).WithPredicate(0, ArgPredicate.ExactWidth(6, "§15.53.3 r1")),
+            ["LOCALE-DATE"] = Schema("§15.52.3 r1", ['a']).WithPredicate(0, ArgPredicate.ExactWidth(8, "§15.52.3 r1")),
+            ["LOCALE-TIME"] = Schema("§15.53.3 r1", ['a']).WithPredicate(0, ArgPredicate.ExactWidth(6, "§15.53.3 r1")),
             ["LOCALE-TIME-FROM-SECONDS"] = Schema("§15.54.3 r1", ['n']),
             // The FORMATTED-* family (§15.38–15.41): argument-1 is "a national or alphanumeric literal" (its
             // LITERAL-ness is the existing COBOLNET1517 arm, its CONTENT the format screen); the remaining
@@ -854,10 +883,10 @@ internal static class IntrinsicArgumentRules
             // time form (§15.40.3 r4, §15.41.3 r3), and the integer UTC offset (§15.40.3 r5, §15.41.3 r4).
             // ⚠ Standard numeric time form is 'n', not 'i': §15.3.3 admits a fractional-seconds representation,
             // so screening it as an integer would reject a legal fractional time.
-            ["FORMATTED-CURRENT-DATE"] = Schema("§15.38.3 r1", ['t']),
-            ["FORMATTED-DATE"] = Schema("§15.39.3 r1/r3", ['t', 'i']),
-            ["FORMATTED-DATETIME"] = Schema("§15.40.3 r1/r3/r4/r5", ['t', 'i', 'n', 'i']),
-            ["FORMATTED-TIME"] = Schema("§15.41.3 r1/r3/r4", ['t', 'n', 'i']),
+            ["FORMATTED-CURRENT-DATE"] = Schema("§15.38.3 r1", ['a']),
+            ["FORMATTED-DATE"] = Schema("§15.39.3 r1/r3", ['a', 'i']),
+            ["FORMATTED-DATETIME"] = Schema("§15.40.3 r1/r3/r4/r5", ['a', 'i', 'n', 'i']),
+            ["FORMATTED-TIME"] = Schema("§15.41.3 r1/r3/r4", ['a', 'n', 'i']),
 
             // ── kb/Work PB58 · the ABSENT rows. Every catalogued function now has a row here or a reason in
             //    DeliberatelyUnscreened, and IntrinsicArgumentClassDriftTests.EveryCataloguedFunction_HasARow
@@ -872,13 +901,21 @@ internal static class IntrinsicArgumentRules
             ["TEST-DATE-YYYYMMDD"] = Uniform('i', "§15.90.3 r1"),            // shall be an integer
             ["TEST-DAY-YYYYDDD"] = Uniform('i', "§15.91.3 r1"),              // shall be an integer
             // The NUMVAL family — argument-1 "an alphanumeric or national literal or … data item":
-            ["NUMVAL"] = Uniform('t', "§15.67.3 r1"),
-            ["NUMVAL-F"] = Uniform('t', "§15.69.3 r1"),
-            ["TEST-NUMVAL"] = Uniform('t', "§15.93.3 r1"),
-            ["TEST-NUMVAL-F"] = Uniform('t', "§15.95.3 r1"),
+            // ⛔ CATEGORY vs CLASS, ROW BY ROW (kb/Work PB658). §15.67.3 r1 / §15.69.3 r1 say "an alphanumeric or
+            // national … data item" and §15.68.3 r1 says "of category alphanumeric or national": the CATEGORY
+            // column (§8.5.2.1's closing sentence; §8.5.2.3 4) / §8.5.2.10 4) name the data item by category), so
+            // the edited categories are out — the CharacterCategory predicate. §15.93.3 r1 and §15.95.3 r1 say "a
+            // data item of CLASS alphanumeric or national", which Table 2 gives numeric-edited (display), so the
+            // two TEST- twins of the class-worded kind carry NO predicate; the golden
+            // `l1_test_numval_f_class_screen` pins that admission.
+            ["NUMVAL"] = Uniform('a', "§15.67.3 r1").WithTailPredicate(ArgPredicate.CharacterCategory("§15.67.3 r1")),
+            ["NUMVAL-F"] = Uniform('a', "§15.69.3 r1").WithTailPredicate(ArgPredicate.CharacterCategory("§15.69.3 r1")),
+            ["TEST-NUMVAL"] = Uniform('a', "§15.93.3 r1"),
+            ["TEST-NUMVAL-F"] = Uniform('a', "§15.95.3 r1"),
             // §15.94.3 r1 imports §15.68's argument rules whole — the NUMVAL-C row's shape, verbatim.
-            ["TEST-NUMVAL-C"] = Schema("§15.94.3 r1 → §15.68.3 r1/r2", ['t', 't'], cross: CrossArgRule.MatchArgument1,
-                crossClause: "§15.68.3 r2 (via §15.94.3 r1)"),
+            ["TEST-NUMVAL-C"] = Schema("§15.94.3 r1 → §15.68.3 r1/r2", ['a', 'a'], cross: CrossArgRule.MatchArgument1,
+                crossClause: "§15.68.3 r2 (via §15.94.3 r1)")
+                .WithPredicate(0, ArgPredicate.CharacterCategory("§15.94.3 r1 → §15.68.3 r1")),
             // The statistical trio — "Argument-1 shall be of class numeric" (variadic tail form):
             ["STANDARD-DEVIATION"] = Uniform('n', "§15.86.3 r1"),
             ["SUM"] = Uniform('n', "§15.88.3 r1"),
@@ -906,7 +943,7 @@ internal static class IntrinsicArgumentRules
                 .WithPredicate(0, ArgPredicate.MinWidth(1, "§15.87.3 r3")),
             // §15.92.3 r1/r2 — a format LITERAL (the COBOLNET1517 arm) and argument-2 "of the same type as
             // argument-1" (the class reading, MatchArgument1).
-            ["TEST-FORMATTED-DATETIME"] = Schema("§15.92.3 r1/r2", ['t', 't'], cross: CrossArgRule.MatchArgument1,
+            ["TEST-FORMATTED-DATETIME"] = Schema("§15.92.3 r1/r2", ['a', 'a'], cross: CrossArgRule.MatchArgument1,
                 crossClause: "§15.92.3 r2"),
             // §15.18.3 r1 — CONCAT admits "class alphabetic, alphanumeric, boolean, numeric or national" (the
             // 'c' kind: everything but index/object/pointer); r2's usage agreement and r3's usage-display +
@@ -1089,10 +1126,13 @@ internal static class IntrinsicArgumentRules
         CobolClass.Alphabetic, CobolClass.Alphanumeric, CobolClass.National, CobolClass.Numeric,
         CobolClass.Boolean);
 
-    /// <summary>The CATEGORY-worded string rows ('t') — the ONE set stated as categories rather than derived
-    /// from the class column, because that is how its clauses are worded (kb/Work PB305).</summary>
-    private static readonly CobolClass[] CategoryStringRules =
-        [CobolClass.Alphanumeric, CobolClass.NumericEditedDeEditing, CobolClass.National, CobolClass.NumericEditedNational];
+    /// <summary>The 'a' rows — "class alphanumeric or national", with class ALPHABETIC left out (Table 2 gives it
+    /// its own row, and §15.93.3 r1 / §15.52.3 r1 write "alphanumeric or national" where §15.96.3 r1 writes
+    /// "alphabetic, alphanumeric, or national"). <see cref="ByClass"/>-derived, so a refined member (the
+    /// numeric-edited ones) is admitted by its class. The CATEGORY-worded rows (NUMVAL, NUMVAL-F, NUMVAL-C) share
+    /// this set and add the <see cref="ArgPredicateKind.CharacterCategory"/> predicate on top (kb/Work PB658).</summary>
+    private static readonly CobolClass[] ClassAlphanumericOrNational =
+        ByClass(CobolClass.Alphanumeric, CobolClass.National);
 
     /// <summary>The classes a verified class code admits, or <see langword="null"/> for "no general screen" —
     /// the function's rule is a NEGATIVE list and its own arm owns it.</summary>
@@ -1144,17 +1184,17 @@ internal static class IntrinsicArgumentRules
         // (display) class ALPHANUMERIC, so a class rule admits it as such — and it is ByClass that says so now,
         // not a remembered member (kb/Work PB305).
         's' => ClassStringRules,
-        // The CATEGORY-worded string rows — "of category alphanumeric or national" / "an alphanumeric or
-        // national literal or data item" (NUMVAL §15.67.3 r1, NUMVAL-F §15.69.3 r1, NUMVAL-C §15.68.3 r1 and
-        // the TEST- twins, the FORMATTED-* date/time family, LOCALE-DATE §15.52.3 r1, LOCALE-TIME §15.53.3 r1)
-        // — Table 2's closing sentence ("refers to the CATEGORY unless class is specifically indicated")
-        // settles them against a PIC A item, and Table 21 prints no Alph in any of their cells; the old single
-        // union admitted PIC A at every one of these positions (AR-15.3-1's measured over-admission).
-        // ⛔ THE ONE LITERAL LIST LEFT, AND DELIBERATELY SO (kb/Work PB305): this row enumerates CATEGORIES, and
-        // the Table-2 CLASS column cannot derive a category set — ByClass would silently widen it to every
-        // member of class alphanumeric. Its membership is a reading of each clause's own wording, so it is
-        // written out and the drift test declares it category-worded rather than deriving it.
-        't' => CategoryStringRules,
+        // 'a' — "class alphanumeric or national" (LOCALE-DATE §15.52.3 r1, LOCALE-TIME §15.53.3 r1, TEST-NUMVAL
+        // §15.93.3 r1, TEST-NUMVAL-F §15.95.3 r1) and the string positions of the NUMVAL family and the
+        // FORMATTED-* / format-literal functions. Class ALPHABETIC is out (Table 21 prints no Alph in any of their
+        // cells; the old single union admitted PIC A at every one of these positions — AR-15.3-1's measured
+        // over-admission). ⛔ THERE IS NO CATEGORY-WORDED KIND (kb/Work PB658): this row used to be the one hand-listed
+        // CATEGORY set ('t'), which admitted the edited items its own category-worded clauses exclude while a
+        // bespoke IntrinsicBinder arm rejected them for NUMVAL-C alone — two mechanisms for one rule, and the
+        // other category-worded rows (NUMVAL, NUMVAL-F) had only the over-admitting one. A category-worded
+        // position is this class set PLUS the CharacterCategory predicate, so the finer axis is declared in the
+        // row beside the clause that states it and screened in ONE place (PredicateViolation).
+        'a' => ClassAlphanumericOrNational,
         // 'c' — CONCAT (§15.18.3 r1): "class alphabetic, alphanumeric, boolean, numeric or national" — everything
         // Table 2 names but index, object and pointer (kb/Work PB58; the r2/r3 USAGE halves are
         // IntrinsicBinder.CheckConcatArgs' — a class kind cannot carry them). Alphabetic joined when the class
@@ -1230,8 +1270,30 @@ internal static class IntrinsicArgumentRules
         ArgPredicateKind.NotStrongGroup when op is BoundFieldOperand { Place.DenotedItem: not null, Place.Item: { } it }
                                              && StrongTypeModel.IsStrongGroup(it) =>
             $"is a strongly-typed group item, which ISO {p.Clause} does not admit",
+        ArgPredicateKind.CharacterCategory when EditedCategoryOf(op) is { } edited =>
+            $"is of an EDITED category ({edited}), which the CATEGORY wording of ISO {p.Clause} does not admit",
         _ => null,
     };
+
+    /// <summary>The EDITED category of a data-item operand — numeric-edited, alphanumeric-edited or national-edited
+    /// — or <see langword="null"/> for every operand whose category is not one of the three (kb/Work PB658).
+    /// Table 2 folds all three into class alphanumeric or national, so the class lattice cannot see them; this is
+    /// the category axis the <see cref="ArgPredicateKind.CharacterCategory"/> predicate reads. ⚠ A reference-modified
+    /// view is NOT edited (<c>Place.DenotedItem</c> is null for it, so the pattern below never reaches its item):
+    /// §8.4.3.3.4 GR6 makes the unique data item reference modification creates an elementary
+    /// item of category alphanumeric (national stays national), whatever the underlying item was — so
+    /// <c>NUMVAL(ED (1:3))</c> over a numeric-edited <c>ED</c> is legal.
+    /// <para>⛔ BOTH EDITED CHARACTER CATEGORIES THROUGH THE ONE PREDICATE (kb/Work PB492):
+    /// <see cref="PicInfo.IsCharacterEdited"/> answers alphanumeric-edited and national-edited alike (§8.5.2.11 makes
+    /// a national-edited item category NATIONAL-EDITED, which "alphanumeric or national" does not name any more than
+    /// it names alphanumeric-edited), and the numeric-edited category is read from the ANALYZED category, so a
+    /// recovery profile (no class, PB960) fails open.</para></summary>
+    private static string? EditedCategoryOf(BoundOperand op) =>
+        op is BoundFieldOperand { Place: { DenotedItem: not null, Item: { IsGroup: false, Pic: { } pic } } }
+            ? pic.AnalyzedCategory is PicCategory.NumericEdited ? "numeric-edited"
+            : pic.IsCharacterEdited ? (pic.Category is PicCategory.National ? "national-edited" : "alphanumeric-edited")
+            : null
+            : null;
 
     /// <summary>
     /// Why this operand cannot satisfy a §15.3 <b>type 6 (Integer)</b> position, or <see langword="null"/>.
@@ -1343,6 +1405,36 @@ internal static class IntrinsicArgumentRules
         BoundComputedOperand { Expr: { } expr } when NotAlwaysIntegral(expr) is { } why => why,
         _ => null,
     };
+
+    /// <summary>
+    /// ⛔ §8.4.3.2.3 SR12 — the function half of an UNSIGNED-INTEGER position (kb/Work PB1420): "An integer
+    /// function other than the integer form of the ABS function shall not be specified where an unsigned integer is
+    /// required" (cite.py --check 8.4.3.2.3 OK, rule 12). A nested intrinsic is judged by its TYPE, never by the
+    /// value this reference would yield — the same standard-set choice SR11 makes for an integer position — so an
+    /// integer function (INTEGER, INTEGER-PART, MOD, ORD …) is barred outright and the ONE exempt shape is the
+    /// integer form of ABS, whose value is never negative (§15.7.4 r1: the argument itself when zero or positive,
+    /// its negation otherwise). A NUMERIC function is not an integer at all,
+    /// so SR11 bars it from this position as it does from any integer operand; the two arms are one screen
+    /// because every position that requires an unsigned integer requires an integer first.
+    /// <para>The positions that ASK it are the intrinsic argument rules that say "unsigned integer" and admit a
+    /// function-identifier — CONCAT §15.18.3 r3 and BASECONVERT §15.12.3 r1's below-base-11 half
+    /// (<c>IntrinsicBinder.CheckConcatArgs</c> / <c>CheckBaseConvertArgs</c>). The statement operands that print
+    /// "unsigned integer data item" (§14.9.1.3 SR5, §14.9.11.3 SR3 — ACCEPT / DISPLAY LINE and COLUMN) describe a
+    /// data item and sit in the screen facility (A.4.2), which docs/CONFORMANCE.md marks not claimed (kb/Work PB260).</para>
+    /// </summary>
+    public static string? UnsignedIntegerViolation(BoundOperand op) =>
+        op is BoundComputedOperand { Expr: BoundIntrinsicCall ic }
+            ? IntrinsicResultType.Resolve(ic.Sig, ic.Args) switch
+            {
+                IntrinsicType.Numeric =>
+                    $"is FUNCTION {ic.Sig.Name}, a numeric function, which ISO §8.4.3.2.3 SR11 bars from an integer "
+                    + "operand position and so from one that requires an unsigned integer",
+                IntrinsicType.Integer when !ic.Sig.Name.Equals("ABS", StringComparison.OrdinalIgnoreCase) =>
+                    $"is FUNCTION {ic.Sig.Name}, an integer function, which ISO §8.4.3.2.3 SR12 bars (all but the "
+                    + "integer form of FUNCTION ABS) from a position that requires an unsigned integer",
+                _ => null,
+            }
+            : null;
 
     /// <summary>The provably-not-always-integral screen for §15.3 type 6's expression alternative (kb/Work
     /// PB124). Returns the violation text, or null to FAIL OPEN — see the arm's comment for the soundness

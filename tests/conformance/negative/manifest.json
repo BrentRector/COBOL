@@ -2045,7 +2045,14 @@
  "pb1929-set-object-from-numeric-function",
  "pb1929-set-pointer-from-object-function",
  "pb1417-function-address-alphabetic-operand",
- "pb1452-program-address-alphabetic-operand"
+ "pb1452-program-address-alphabetic-operand",
+ "pb658-numval-numeric-edited-argument",
+ "pb658-ord-numeric-edited-argument",
+ "pb1420-concat-integer-function-unsigned-position",
+ "pb1420-baseconvert-integer-function-unsigned-position",
+ "pb1420-random-numeric-function-seed",
+ "pb1420-combined-datetime-numeric-function-date",
+ "pb1901-strong-group-numeric-argument"
  ],
  "pending": []
 }

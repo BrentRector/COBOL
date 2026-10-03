@@ -636,7 +636,9 @@
   "pb1034_is_not_equal_symbol",
   "pb1946_content_expression_move_regime",
   "pb1929_set_identifier_senders",
-  "pb1452_program_address_identifier_operands"
+  "pb1452_program_address_identifier_operands",
+  "pb658_numval_category_positions",
+  "pb1901_strong_group_pointer_leaf_string_argument"
   ],
   "pending": []
 }

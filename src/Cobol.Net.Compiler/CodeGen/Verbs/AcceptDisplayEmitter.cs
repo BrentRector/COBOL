@@ -44,10 +44,9 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             // (§14.9.11.3 SR1 bars only an item OF class pointer/object; a strongly-typed group's class is its
             // type-name, §8.5.2.1) whose GR1 device conversion is ours to define — CONFORMANCE.md A.1 item 56:
             // its STORAGE image, each such leaf as its reserved placeholder positions (D-SLOT). The ONE-WAY
-            // transfer reader, so comparison and read-back keep refusing a non-injective, non-invertible image.
-            : o is BoundFieldOperand { Place: { Item.IsGroup: true, ImageCapable: false, TransferImageCapable: true } tp }
-                ? PlaceRenderer.SendingGroupImage(tp, "DISPLAY of", transfer: true)
-            : OperandText.AsString(o, num)).ToList();
+            // transfer reader (OperandText.AsTransferString), so comparison and read-back keep refusing a
+            // non-injective, non-invertible image; an intrinsic function's string argument asks the same reader.
+            : OperandText.AsTransferString(o, num, "DISPLAY of")).ToList();
         string image = parts.Count == 0 ? "\"\"" : string.Join(" + ", parts);
         string sink = d.ToStdErr ? "System.Console.Error" : "System.Console";
         ctx.Writer.Line(d.NoAdvancing ? $"{sink}.Write({image});" : $"{sink}.WriteLine({image});");

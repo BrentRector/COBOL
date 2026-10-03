@@ -583,24 +583,15 @@ public sealed class IntrinsicArgumentClassDriftTests
     /// <c>IntrinsicArgumentRules.ByClass</c> honest — a hand-edit back to a literal member list fails here.
     /// </summary>
     /// <remarks>
-    /// ⚠ THE CATEGORY-WORDED KINDS ARE DECLARED, NOT DERIVED, and the declaration lives HERE rather than in the
-    /// compiler because the screen does not need the axis — only this fact does. A kind is exempt only when its
-    /// §15 clauses say CATEGORY: 't' is the NUMVAL/FORMATTED-* family, whose rules read "Argument-1 shall be of
-    /// category alphanumeric or national" (§15.68.3 r1) and, at §15.67.3 r1, "Argument-1 shall be an alphanumeric
-    /// or national literal or an alphanumeric or national data item" — which §8.5.2.1's closing sentence
-    /// ("refers to the category unless class is specifically indicated") resolves to the CATEGORY column. A new
-    /// class-worded kind with a literal member list turns this red; adding a category-worded one costs a row
-    /// here with the clause that justifies it.
+    /// ⚠ THERE IS NO CATEGORY-WORDED KIND, AND NO EXEMPTION FROM THIS RULE (kb/Work PB658). The one kind that used to
+    /// be exempt ('t', the NUMVAL / FORMATTED-* family) was a hand-listed CATEGORY set that admitted the edited items
+    /// its own clauses ("of category alphanumeric or national", §15.68.3 r1) exclude. A category-worded position is
+    /// now the derived class set plus an <c>ArgPredicateKind.CharacterCategory</c> predicate, so every kind is a
+    /// class set and this closure holds for all of them; a new kind with a literal member list turns this red.
     /// </remarks>
     [Fact]
     public void EveryClassWordedArgumentKind_IsClosedUnderItsTable2Class()
     {
-        var categoryWorded = new Dictionary<char, string>
-        {
-            ['t'] = "§15.67.3 r1 / §15.68.3 r1 and the FORMATTED-* family — worded \"of CATEGORY alphanumeric or "
-                + "national\", so its membership is a category set the Table-2 class column cannot derive",
-        };
-
         var kinds = IntrinsicArgumentRules.Verified.Values
             .SelectMany(s => s.Positions.Select(p => p.Kind).Concat(s.Tail is { } t ? [t.Kind] : []))
             .Distinct()
@@ -612,7 +603,7 @@ public sealed class IntrinsicArgumentClassDriftTests
             + "changed and this guard has gone blind; fix the walk, do not lower the floor.");
 
         var open = new List<string>();
-        foreach (char k in kinds.Where(k => !categoryWorded.ContainsKey(k)))
+        foreach (char k in kinds)
         {
             var ok = IntrinsicArgumentRules.Admissible(k)!;
             foreach (var admitted in ok)
@@ -624,11 +615,129 @@ public sealed class IntrinsicArgumentClassDriftTests
         }
         Assert.True(open.Count == 0,
             "a CLASS-worded argument kind admits only part of a §8.5.2.1 Table-2 class — state it with "
-            + $"IntrinsicArgumentRules.ByClass, or declare the kind category-worded above with its clause:"
-            + $"{Environment.NewLine}{string.Join(Environment.NewLine, open.Distinct().Order())}");
+            + "IntrinsicArgumentRules.ByClass; a CATEGORY-worded rule is the class set plus the CharacterCategory "
+            + $"predicate, never a hand-listed category set:{Environment.NewLine}"
+            + string.Join(Environment.NewLine, open.Distinct().Order()));
+    }
 
-        // The exemption cannot rot into a blanket: every declared kind must still be a kind the table uses.
-        foreach (var (k, why) in categoryWorded)
-            Assert.True(kinds.Contains(k), $"kind '{k}' is declared category-worded ({why}) but no schema uses it");
+    /// <summary>
+    /// ⛔ A FUNCTION'S STRING-ARGUMENT RULE IS WORDED CATEGORY OR CLASS, AND THE ROW CARRIES THE <c>CharacterCategory</c>
+    /// PREDICATE EXACTLY WHEN THE CLAUSE SAYS CATEGORY (kb/Work PB658 — §8.5.2.1's closing sentence: "Use of the name of
+    /// a data class or data category in the rules of COBOL refers to the category unless class is specifically
+    /// indicated"). The wording table is declared HERE, beside the clause text it was read from, and the clause text
+    /// is checked against the specification on every build, so a re-worded or mis-attributed row fails.
+    /// </summary>
+    /// <remarks>
+    /// Two mechanisms used to answer §15.68.3 r1: the generic string set admitted a numeric-edited item and a bespoke
+    /// IntrinsicBinder arm rejected it for NUMVAL-C alone, so which one bit was an accident of call order, and NUMVAL
+    /// and NUMVAL-F (the same category wording) screened nothing finer than the class. The bespoke arm is deleted; the
+    /// predicate is the one owner, and this test is what keeps the wording table and the rows in agreement.
+    /// </remarks>
+    [Fact]
+    public void CategoryWordedStringArguments_CarryTheCategoryPredicate_AndClassWordedOnesDoNot()
+    {
+        // function → (clause, a sentence of its argument-1 rule as printed, wording).
+        var wording = new (string Function, string Clause, string Text, bool Category)[]
+        {
+            ("NUMVAL", "15.67.3", "Argument-1 shall be an alphanumeric or national literal or an alphanumeric or national data item", true),
+            ("NUMVAL-F", "15.69.3", "Argument-1 shall be an alphanumeric or national literal or data item", true),
+            ("NUMVAL-C", "15.68.3", "Argument-1 shall be of category alphanumeric or national", true),
+            ("TEST-NUMVAL-C", "15.94.3", "The argument rules for the TEST-NUMVAL-C function are the same as those specified in 15.68, NUMVAL-C function, Arguments", true),
+            ("ORD", "15.70.3", "Argument-1 shall be one character position in length and shall be of category alphabetic, alphanumeric, or national", true),
+            ("TEST-NUMVAL", "15.93.3", "a data item of class alphanumeric or national", false),
+            ("TEST-NUMVAL-F", "15.95.3", "a data item of class alphanumeric or national", false),
+            ("LOCALE-DATE", "15.52.3", "Argument-1 shall be of class alphanumeric or national and shall be 8 character positions in length", false),
+            ("LOCALE-TIME", "15.53.3", "Argument-1 shall be of class alphanumeric or national and shall be 6 character positions in length", false),
+        };
+
+        string spec = File.ReadAllText(TestRepo.Specs("ISO_COBOL.md"));
+        var problems = new List<string>();
+        foreach (var (fn, clause, text, category) in wording)
+        {
+            // The clause's own text, not any occurrence of the sentence: slice from its heading to the next heading.
+            var m = Regex.Match(spec, $"(?m)^#+ {Regex.Escape(clause)} .*$");
+            if (!m.Success) { problems.Add($"{fn}: no heading for §{clause} in the specification"); continue; }
+            int from = m.Index, to = spec.IndexOf("\n#", from + m.Length, StringComparison.Ordinal);
+            string body = spec[from..(to < 0 ? spec.Length : to)];
+            if (!body.Contains(text, StringComparison.Ordinal))
+                problems.Add($"{fn}: §{clause} no longer prints \"{text}\"");
+
+            var schema = IntrinsicArgumentRules.Verified[fn];
+            var rule = schema.At(0) ?? throw new InvalidOperationException($"{fn} declares no argument-1 rule");
+            bool hasPredicate = rule.Predicates.Any(p => p.Kind == ArgPredicateKind.CharacterCategory);
+            if (hasPredicate != category)
+                problems.Add($"{fn}: §{clause} is worded {(category ? "CATEGORY" : "CLASS")} but its row "
+                    + (hasPredicate ? "carries" : "lacks") + " the CharacterCategory predicate");
+        }
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+
+        // The deleted second mechanism stays deleted: no function-specific "EDITED category" rejection in the binder.
+        Assert.DoesNotContain("is of an EDITED category", BinderSource(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// ⛔ EVERY OPERAND POSITION THAT §15.6 TABLE 21 TYPES <c>Int</c> AND NOTHING ELSE IS KIND <c>'i'</c> IN THE VERIFIED
+    /// TABLE (kb/Work PB1420). §8.4.3.2.3 SR11 ("A numeric function shall not be specified where an integer operand is
+    /// required") is only as complete as the table of integer positions, and that table was HAND-MAINTAINED: RANDOM's
+    /// seed (Table 21: <c>Int1</c>) and COMBINED-DATETIME's argument-1 were typed class-numeric, so a numeric function
+    /// stood where an integer is required. The positions are DERIVED from the standard's own table now, so the next
+    /// function typed Int that nobody remembered to mark fails here instead of compiling.
+    /// </summary>
+    /// <remarks>
+    /// A position whose alternatives are all <c>Int…</c> is integer-typed; one that also lists <c>Num</c> (ABS, RANGE,
+    /// SUM) admits numeric operands and is not asked. A <c>Key</c>, <c>Ord</c> or <c>Loc</c> item is a NAME, not an
+    /// operand, and does not occupy a position (the convention the Verified rows already use); <c>Key4 and Int4</c>
+    /// (FIND-STRING) is an integer operand with its keyword. BASECONVERT is in
+    /// <c>DeliberatelyUnscreened</c> with the reason (its bases are screened by <c>CheckBaseConvertArgs</c>).
+    /// </remarks>
+    [Fact]
+    public void EveryTable21IntegerPosition_IsTypedInteger_InTheVerifiedTable()
+    {
+        string[] lines = File.ReadAllLines(TestRepo.Specs("ISO_COBOL.md"));
+        int start = Array.FindIndex(lines, l => l.StartsWith("**Table 21", StringComparison.Ordinal));
+        Assert.True(start >= 0, "Table 21 is gone from the transcription — this guard has gone blind");
+
+        var problems = new List<string>();
+        int integerPositions = 0;
+        for (int i = start + 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith('#')) break;          // the next heading ends the table's section
+            if (!lines[i].StartsWith('|')) continue;      // the figure notes the transcription interleaves
+            string[] cells = lines[i].Trim('|').Split('|').Select(c => c.Trim()).ToArray();
+            if (cells.Length < 2 || !Regex.IsMatch(cells[0], "^[A-Z][A-Z0-9-]+$")) continue;
+            string function = cells[0];
+
+            // Operand positions: drop the NAME items, keep the operand tokens of the rest.
+            var positions = new List<string[]>();
+            foreach (string item in cells[1].Split(','))
+            {
+                var operands = item.Split([" or ", " and "], StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim())
+                    .Where(t => t.Length > 0 && !Regex.IsMatch(t, "^(Key|Ord|Loc)"))
+                    .ToArray();
+                if (operands.Length > 0) positions.Add(operands);
+            }
+
+            for (int p = 0; p < positions.Count; p++)
+            {
+                if (!positions[p].All(t => t.StartsWith("Int", StringComparison.Ordinal))) continue;
+                integerPositions++;
+                if (IntrinsicArgumentRules.DeliberatelyUnscreened.ContainsKey(function)) continue;
+                if (!IntrinsicArgumentRules.Verified.TryGetValue(function, out var schema))
+                {
+                    problems.Add($"{function}: Table 21 types argument position {p + 1} Int, and the function has no Verified row");
+                    continue;
+                }
+                char? kind = schema.At(p)?.Kind;
+                if (kind != 'i')
+                    problems.Add($"{function}: Table 21 types operand position {p + 1} Int (§15.3 type 6), but its Verified "
+                        + $"kind is '{(kind?.ToString() ?? "none")}' — SR11 cannot bar a numeric function from it");
+            }
+        }
+
+        Assert.True(integerPositions >= 30,
+            $"only {integerPositions} Int-only Table 21 position(s) found — the table shape changed and this guard "
+            + "has gone blind; fix the walk, do not lower the floor.");
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
     }
 }

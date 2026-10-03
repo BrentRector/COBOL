@@ -58,20 +58,22 @@ public sealed class OperandStringChannelDriftTests
     /// <summary>The leaf arms that MUST route to <c>OperandText.AsString</c> — the PB25 fix, and the exact
     /// thing that rots if someone re-implements a leaf locally "to avoid the dependency".</summary>
     [Theory]
+    // ⚠ The field arm delegates to OperandText.AsTransferString — AsString plus the one-way group image a
+    // strongly-typed group with a pointer/object leaf needs (kb/Work PB1901); it IS the shared channel, one call deeper.
     [InlineData("BoundFieldOperand", "a field's display image is width- and category-sensitive; the local copy "
-        + "would have to re-derive DE-EDITING, the sign convention and the float check")]
+        + "would have to re-derive DE-EDITING, the sign convention and the float check", "OperandText.AsTransferString")]
     [InlineData("BoundFigurative", "§8.3.3.6.4 GR3's PCS-aware materialisation — the arm PB25 added, and the one "
-        + "whose absence aborted FUNCTION LOWER-CASE(SPACE) at run time")]
+        + "whose absence aborted FUNCTION LOWER-CASE(SPACE) at run time", "OperandText.AsString")]
     [InlineData("BoundAllLiteral", "§8.3.3.6.4 GR3c — ALL literal-1 is the literal ONCE in a length-unspecified "
-        + "context, which a local copy has previously got wrong")]
-    public void StrArgVisitor_DelegatesTheSharedLeaves_ToOperandTextAsString(string leaf, string why)
+        + "context, which a local copy has previously got wrong", "OperandText.AsString")]
+    public void StrArgVisitor_DelegatesTheSharedLeaves_ToOperandTextAsString(string leaf, string why, string channel)
     {
         string body = StrArgVisitorBody();
         var m = Regex.Match(body, $@"public string Visit\({leaf} n\)\s*=>(?<rhs>[^;]*);");
         Assert.True(m.Success, $"StrArgVisitor no longer has a Visit({leaf}) arm — the generated visitor is "
             + "exhaustive, so this means the LEAF was renamed or removed; update this guard deliberately.");
-        Assert.True(m.Groups["rhs"].Value.Contains("OperandText.AsString", StringComparison.Ordinal),
-            $"StrArgVisitor.Visit({leaf}) no longer delegates to OperandText.AsString. {why}. This is the PB25 "
+        Assert.True(m.Groups["rhs"].Value.Contains(channel, StringComparison.Ordinal),
+            $"StrArgVisitor.Visit({leaf}) no longer delegates to {channel}. {why}. This is the PB25 "
             + "shape: one rule written in two places, and the second copy silently wrong — it shipped as a "
             + "clean compile that aborted at RUN TIME on legal source.");
     }

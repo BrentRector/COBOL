@@ -1601,11 +1601,16 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     && (p0.Category is PicCategory.NumericEdited || p0.Signed || p0.Scale > 0 || p0.IsFloat),
                 BoundNumericLiteral nl0 => nl0.Text.Contains('.') || nl0.Text.Contains(',')
                     || nl0.Text.StartsWith('-'),
-                _ => false,   // computed results — the runtime digit screen owns their content
+                // A nested NUMERIC function (kb/Work PB1420): §8.4.3.2.3 SR11/SR12 bar it, and every integer
+                // function but the integer form of ABS, from a position that requires an unsigned integer.
+                BoundComputedOperand => IntrinsicArgumentRules.UnsignedIntegerViolation(args[0]) is not null,
+                _ => false,   // other computed results — the runtime digit screen owns their content
             };
             if (bad)
                 ctx.Edition.Error("COBOLNET1642", "FUNCTION BASECONVERT: when the base in argument-2 is below "
-                    + "11, argument-1 shall be an unsigned integer data item or literal (ISO §15.12.3 rule 1)");
+                    + "11, argument-1 shall be an unsigned integer data item or literal (ISO §15.12.3 rule 1"
+                    + (IntrinsicArgumentRules.UnsignedIntegerViolation(args[0]) is { } fnWhy
+                        ? $"; argument-1 {fnWhy}" : "") + ")");
         }
     }
 
@@ -1766,22 +1771,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // `return` above it, so no Verified row could ever screen them. Screened here, after this
         // binder's own arity check, exactly as the generic path orders it.
         CheckArgumentClasses(sig, operands);
-        // §15.68.3 r1 (mirrored onto TEST-NUMVAL-C by §15.94.3 r1) — argument-1 shall be of CATEGORY
-        // alphanumeric or national. The §15.3 class row above admits the EDITED categories (class alphanumeric
-        // spans alphanumeric-edited and numeric-edited, Table 2) that r1's CATEGORY wording excludes — the
-        // finer axis screens here (fix-queue PB60 / AR-15.68.3-1). A ref-mod view is plain category
-        // alphanumeric (§8.4.3.3.4 GR6) and passes; shapes with no static category pass to the runtime scan.
-        // ⛔ BOTH edited CHARACTER categories, through the ONE predicate (kb/Work PB492): §8.5.2.11 makes a
-        // national-edited item category NATIONAL-EDITED, which r1's "alphanumeric or national" does not name any
-        // more than it names alphanumeric-edited. `OperandCategory` answers National for it (§8.5.2.1 Table 2 —
-        // the CLASS), so the finer axis has to be asked here or the arm admits what r1 excludes. It was
-        // unreachable while no national-edited item could be declared at all.
-        if (operands.Count > 0
-            && (OperandCategory(operands[0]) is PicCategory.NumericEdited
-                || operands[0] is BoundFieldOperand { Place.DenotedItem: not null } f1
-                   && f1.Place.Item.Pic is { IsCharacterEdited: true }))
-            ctx.Edition.Error("COBOLNET1627", $"FUNCTION {sig.Name} argument-1 is of an EDITED category; "
-                + "ISO §15.68.3 rule 1 admits category alphanumeric or national only");
+        // §15.68.3 r1 (mirrored onto TEST-NUMVAL-C by §15.94.3 r1) — argument-1 of CATEGORY alphanumeric or
+        // national — is the schema row's CharacterCategory predicate, screened by the CheckArgumentClasses call
+        // above with NUMVAL and NUMVAL-F's §15.67.3 / §15.69.3 r1 (kb/Work PB658: this binder carried the only
+        // copy, so the other two category-worded functions never screened the edited categories).
         // §15.68.3 r2's CONTENT halves for a LITERAL argument-2 (the same-class half rides the schema row;
         // a data item's content is the runtime guard's): at least one non-space character; none of the digits
         // 0-9 or the characters * + - , . ; no CR/DB pair in any case. The characters are named OUTRIGHT —
@@ -1921,6 +1914,17 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         for (int i = 0; i < args.Count; i++)
         {
             var a = args[i];
+            // r3 for a NUMERIC FUNCTION argument (kb/Work PB1420): the function's returned value is the numeric
+            // argument, and §8.4.3.2.3 SR11/SR12 bar every numeric function and every integer function but the
+            // integer form of ABS from a position that requires an unsigned integer. The ABS form is legal and
+            // renders as its digits (IntrinsicRenderer.StrArgVisitor's numeric-function arm).
+            if (a is BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Numeric } })
+            {
+                if (IntrinsicArgumentRules.UnsignedIntegerViolation(a) is { } fnWhy)
+                    report($"FUNCTION CONCAT argument-{i + 1} {fnWhy}; ISO §15.18.3 r3 requires a numeric argument "
+                        + "to be an unsigned integer");
+                continue;
+            }
             // r3 first: a numeric argument's own usage/sign/scale conditions.
             if (a is BoundFieldOperand { Place.DenotedItem: not null, Place.Item: { IsGroup: false, Pic: { Category: PicCategory.Numeric } np } })
             {

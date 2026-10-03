@@ -272,6 +272,21 @@ internal static class OperandText
         _ => AsString(op, num, deSign: false),
     };
 
+    /// <summary>⛔ THE ONE-WAY STRING CHANNEL FOR A READ-ONLY CONSUMER OF A GROUP'S CHARACTERS (kb/Work PB244, PB1901):
+    /// <see cref="AsString"/>, except that a strongly-typed group holding a class pointer/object leaf — a legal
+    /// operand, the only conforming spelling of such a group being §13.18.60.3 SR14 — reads its STORAGE image, each
+    /// such leaf as its reserved placeholder positions (CONFORMANCE.md A.1 items 56 and 214, D-SLOT), instead of
+    /// the Tier-C whole-group refusal. Comparison and read-back keep <see cref="AsString"/>: the placeholder image is
+    /// neither injective nor invertible, so only a consumer that reads the characters and never reads them back may
+    /// take it — DISPLAY, a MOVE's sending group (<see cref="NonElementaryMoveSender"/>), and an intrinsic
+    /// function's string argument (§15.3 type 2 treats a strongly-typed group as alphanumeric; the function returns a
+    /// value and never stores into the argument). One rule in one place: DISPLAY used to carry this arm alone, and
+    /// <c>FUNCTION UPPER-CASE(G)</c> over such a group compiled clean and aborted at run time (kb/Work PB1901).</summary>
+    public static string AsTransferString(BoundOperand op, NumericRenderer num, string context) =>
+        op is BoundFieldOperand { Place: { Item.IsGroup: true, ImageCapable: false, TransferImageCapable: true } tp }
+            ? PlaceRenderer.SendingGroupImage(tp, context, transfer: true)
+            : AsString(op, num);
+
     /// <param name="context">Names the operation in the Tier-C loud message — the same parameter
     /// <c>PlaceRenderer.GroupImage</c> carries, so a caller can route through THE ONE storage channel and keep
     /// its own site-specific reason (kb/Work PB178's law, PB327's second caller).</param>

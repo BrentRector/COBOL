@@ -1689,7 +1689,9 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// for a numeric shape stays the deliberately-loud <see cref="Str"/> default.</summary>
     private string StorageArg(BoundOperand op) => op switch
     {
-        BoundFieldOperand f => OperandText.AsStorageImage(f.Place),
+        // ⚠ transfer: true — CONVERT only READS the storage image (kb/Work PB1901, the Visit(BoundFieldOperand) twin):
+        // a pointer-leaf strongly-typed group's image is its D-SLOT placeholder, the one image every reader gets.
+        BoundFieldOperand f => OperandText.AsStorageImage(f.Place, transfer: true),
         BoundStringLiteral { Category: PicCategory.National } sl => RuntimeApi.NatBytes(EmitText.CsLiteral(sl.Value)),
         BoundStringLiteral { Category: PicCategory.Boolean } sl =>
             RuntimeApi.BitsPack(EmitText.CsLiteral(sl.Value), sl.Value.Length.ToString()),
@@ -1716,7 +1718,11 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     {
         private static string Loud(BoundOperand n) => EmitText.LoudValue("string", $"intrinsic string argument '{n.GetType().Name}'");
         public string Visit(BoundStringLiteral n) => EmitText.CsLiteral(n.Value);
-        public string Visit(BoundFieldOperand n) => OperandText.AsString(n, owner.Num);
+        // An intrinsic function READS its argument's characters and never reads them back, so a strongly-typed group
+        // holding a pointer/object leaf (§15.3 type 2: "treated as though they were of class and category
+        // alphanumeric") takes the one-way transfer image, not the two-way Tier-C refusal (kb/Work PB1901).
+        public string Visit(BoundFieldOperand n) =>
+            OperandText.AsTransferString(n, owner.Num, "intrinsic function argument");
         // THE CURRENT RECORD (kb/Work PB339) is built only for a READ/RETURN INTO implicit MOVE, so no intrinsic
         // argument list can hold one today — but its image is alphanumeric and already written down once, so this
         // DELEGATES rather than going loud (the same delegation the field arm above makes; a loud arm here would
@@ -1724,7 +1730,18 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         public string Visit(BoundCurrentRecord n) => OperandText.AsString(n, owner.Num);
         public string Visit(BoundComputedOperand n) =>
             n.Expr is BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean } nested
-                ? owner.RenderString(nested) : Loud(n);   // string-class results incl. national (§15.66) + boolean (§15.13 — the '0'/'1' substrate)
+                ? owner.RenderString(nested)   // string-class results incl. national (§15.66) + boolean (§15.13 — the '0'/'1' substrate)
+            // ⛔ A NUMERIC FUNCTION'S RETURNED VALUE AT A NUMERIC-ADMITTING POSITION (kb/Work PB1420). CONCAT §15.18.3 r1
+            // lists class numeric and BASECONVERT §15.12.3 r1 a numeric argument-1 below base 11, and §8.4.3.2.3 SR12
+            // exempts "the integer form of the ABS function" from the bar on integer functions at an unsigned-integer
+            // position — so `FUNCTION CONCAT(FUNCTION ABS(3) "A")` is LEGAL and used to compile clean and abort at run
+            // time on this arm (the wrong-stage family). Its text is the ONE numeric-function image,
+            // OperandText.AsString's (DOC-A.1-92: the significant digits, no padding), exactly what a numeric LITERAL
+            // argument renders beside it. The binder bars every other numeric/integer function here (SR11/SR12), so a
+            // non-admitting position still reaches Loud only through a --permissive coercion.
+            : admitNumeric && n.Expr is BoundIntrinsicCall { ResultCategory: PicCategory.Numeric }
+                ? OperandText.AsString(n, owner.Num)
+                : Loud(n);
         public string Visit(BoundOperandError n) => EmitText.LoudValue("string", n.Feature);
         // An address-identifier (kb/Work PB1021) is class pointer: the binder admits it only as a relation operand, which
         // ConditionRenderer's pointer arms render, and an INVOKE argument, which OoEmitter renders — never a
