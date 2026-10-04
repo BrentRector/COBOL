@@ -142,7 +142,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // (kb/Work PB400's "one resolution, consulted twice", now consulted N times from one resolution).
         var subject = slot.Node;
         var subjectBare = slot.Bare;
-        var objectBare = item.valueOperand() is { } ovo ? host.Cond.AnalyzeBareOperand(ovo) : default;
+        var objectBare = AnalyzeObjectBare(item);
 
         var s = SubjectKind(subject, subjectBare);
         var o = ObjectKind(item, objectBare);
@@ -200,19 +200,24 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     /// <summary>ISO §14.9.13.3 SR10 — screen the pairing against Table 15 BEFORE binding it, so an invalid
     /// combination is a compile-time diagnostic rather than the run-time fault it used to be (kb/Work PB47).
     /// <para>⚠ The classifier still abstains — a null on either side means NO diagnostic — but only where it
-    /// genuinely cannot name the shape. That is now the PARTIAL-EXPRESSION row alone: the grammar stages the
-    /// partial forms (see <c>comparisonExpression</c>'s DEVLOG-621 note), so no operand classifies into that row
-    /// today and the table carries it for when one does. The BOOLEAN rows are no longer abstentions — SR6 names
-    /// a boolean operand's kind from the other side of the pair, and <see cref="ClassifyPair"/> implements that
-    /// rule instead of declining to answer it (kb/Work PB400).</para></summary>
-    private void ScreenPairing(in EvaluatePairing pair, Core.EvaluateWhenItemContext item)
+    /// genuinely cannot name the shape (a bare operand that is none of identifier, literal or arithmetic
+    /// expression). Neither the PARTIAL-EXPRESSION row (kb/Work PB398) nor the BOOLEAN rows are abstentions: SR6
+    /// names a boolean operand's kind from the other side of the pair, and <see cref="ClassifyPair"/> implements
+    /// that rule instead of declining to answer it (kb/Work PB400), for a boolean item, literal or an
+    /// operator-bearing boolean expression alike (kb/Work PB1412).</para>
+    /// <para>Returns false when the pairing is invalid and has been reported: the caller binds nothing more of it,
+    /// because every further diagnostic the pair would draw is the same mistake read a second time
+    /// (<c>EVALUATE BW WHEN TRUE</c> over a wide boolean item drew COBOLNET1634 and then COBOLNET2318 "'TRUE' is used
+    /// as a condition" about the very object the table had just refused).</para></summary>
+    private bool ScreenPairing(in EvaluatePairing pair, Core.EvaluateWhenItemContext item)
     {
-        if (pair.Subject is not { } s || pair.Object is not { } o) return;
-        if (EvaluateOperandCombinations.IsPermitted(s, o)) return;
+        if (pair.Subject is not { } s || pair.Object is not { } o) return true;
+        if (EvaluateOperandCombinations.IsPermitted(s, o)) return true;
         ctx.Edition.Error(DiagnosticCatalog.EvaluateOperandCombinationInvalid,
             $"the selection subject is {EvaluateOperandCombinations.Label(s)} and the selection object "
-            + $"'{item.GetText()}' is {EvaluateOperandCombinations.Label(o)}; ISO §14.9.13.3 SR10 Table 15 marks "
-            + "that combination invalid.");
+            + $"'{DataBinder.WrittenText(item)}' is {EvaluateOperandCombinations.Label(o)}; ISO §14.9.13.3 SR10 Table 15 "
+            + "marks that combination invalid.");
+        return false;
     }
 
     /// <summary>ISO §14.9.13.3 SR2 — "The number of selection objects within each set of selection objects shall
@@ -324,9 +329,40 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     {
         if (subject.booleanLiteral() is not null) return EvaluateSubjectOperand.TrueOrFalse;
         if (subject.condition() is not null) return EvaluateSubjectOperand.Condition;  // EVALUATE X > 1, NOT BW, X NUMERIC
-        if (subject.valueOperand() is not { } vo) return null;
+        // §14.9.13.2's boolean-expression-1 (Table 15's Boolean-expression COLUMN) before SR6 reclassifies it by its
+        // result length (kb/Work PB1412).
+        if (BooleanOperatorBearing(subject) is not null)
+            return EvaluateOperandCombinations.AsSubjectOperand(EvaluateObjectOperand.BooleanExpression);
+        if (BareOperand(subject) is not { } vo) return null;
         return BareOperandKind(vo, bare) is { } row ? EvaluateOperandCombinations.AsSubjectOperand(row) : null;
     }
+
+    // ⛔ A SELECTION OPERAND HAS TWO PARSE SPELLINGS, ASKED THROUGH ONE PAIR OF READERS PER SIDE (kb/Work PB1412). The
+    // grammar's `valueOperand` alternative takes every operand it can; its `{boolExprAhead()}? booleanExpression` one
+    // takes an operand carrying a boolean operator (`A B-AND C`) — and, because the discriminator's scan is
+    // condition-shaped, can also take an OPERATOR-FREE one (`(B"1")`), which is the bare operand it encloses. So the
+    // bare operand is `valueOperand`, or the one an operator-free booleanExpression reduces to; the operator-bearing
+    // expression is the booleanExpression when it has an operator. The subject and the object are different parse
+    // contexts with the same two members, so each side has its own pair.
+    private static Core.ValueOperandContext? BareOperand(Core.EvaluateSubjectContext subject) =>
+        subject.valueOperand() ?? ConditionBinder.BareOperandOf(subject.booleanExpression());
+
+    private static Core.ValueOperandContext? BareOperand(Core.EvaluateWhenItemContext item) =>
+        item.valueOperand() ?? ConditionBinder.BareOperandOf(item.booleanExpression());
+
+    private static Core.BooleanExpressionContext? BooleanOperatorBearing(Core.EvaluateSubjectContext subject) =>
+        ConditionBinder.OperatorBearing(subject.booleanExpression());
+
+    private static Core.BooleanExpressionContext? BooleanOperatorBearing(Core.EvaluateWhenItemContext item) =>
+        ConditionBinder.OperatorBearing(item.booleanExpression());
+
+    /// <summary>The selection object's bare-operand analysis (§14.9.13.3 SR6): an operator-bearing boolean
+    /// expression is analysed as a boolean operand with its result length, any other bare operand through the shared
+    /// classifier, and a written condition / range / partial-expression / ANY has none.</summary>
+    private BareOperandAnalysis AnalyzeObjectBare(Core.EvaluateWhenItemContext item) =>
+        BooleanOperatorBearing(item) is { } be ? host.Cond.AnalyzeBooleanExpression(be)
+        : BareOperand(item) is { } ovo ? host.Cond.AnalyzeBareOperand(ovo)
+        : default;
 
     /// <summary>The object's Table-15 ROW before SR6, or null when the shape cannot be named with certainty.
     /// The object-only forms are grammatical (ANY, a THRU range, an explicit condition — including the
@@ -346,7 +382,10 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 // BARE class-name / alphabet-name, i.e. "a class condition without the identifier" (kb/Work PB843).
                 : host.Cond.LeadingBareClassWord(c) is not null ? EvaluateObjectOperand.PartialExpression
                 : EvaluateObjectOperand.Condition;
-        return item.valueOperand() is { } vo ? BareOperandKind(vo, bare) : null;
+        // §14.9.13.2's [NOT] boolean-expression-2 (Table 15's Boolean-expression ROW) before SR6 reclassifies it by
+        // its result length (kb/Work PB1412).
+        if (BooleanOperatorBearing(item) is not null) return EvaluateObjectOperand.BooleanExpression;
+        return BareOperand(item) is { } vo ? BareOperandKind(vo, bare) : null;
     }
 
     /// <summary>⛔ THE ONE bare-operand classification, named on Table 15's ROW axis and mapped to the COLUMN
@@ -386,8 +425,13 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // ⛔ CLASSIFY ONCE, THEN BIND FROM THAT CLASSIFICATION (kb/Work PB400). The screen used to run its own
         // resolution and the bind path a second, identical one — so a level-88 whose reference is ambiguous
         // reported §8.4.2.2 twice, and the two could disagree about what the operand IS with nothing to catch it.
+        // The mark precedes the classification because a boolean-expression OBJECT is bound BY it (the one analysis,
+        // PB1412): its activations belong to this object's own evaluation, never to the statement's beginning.
+        var classifyMark = host.Udf.Mark;
         var pair = ClassifyPair(slot, item);
-        ScreenPairing(pair, item);
+        // ⛔ AN INVALID PAIR BINDS NOTHING MORE: one Table 15 diagnostic, not that and every secondary one the same pair
+        // would draw. The pair's value is moot — the compile has failed — so it is the constant false.
+        if (!ScreenPairing(pair, item)) return Constant(false);
         if (item.ANY() is not null) return Constant(true);   // GR4 a) 1. — the word ANY is true
 
         bool subjTrue = subject.booleanLiteral()?.TRUE_() is not null;
@@ -502,7 +546,10 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // AND …`). The classifier named all three PartialExpression, the last two by their resolved symbol.
         if (pair.Object is EvaluateObjectOperand.PartialExpression)
         {
-            if (slot.Node.valueOperand() is not { } subjOp || slot.Value is not { } subjValue)
+            // The subject's operand node is null for a boolean-EXPRESSION subject (PB1412), which has none; it is a
+            // subject all the same (Table 15's Partial-expression row is 'Y' under the Boolean-expression column).
+            var subjOp = BareOperand(slot.Node);
+            if (slot.Value is not { } subjValue || (subjOp is null && BooleanOperatorBearing(slot.Node) is null))
                 return host.Cond.Refused("EVALUATE TRUE/FALSE paired with a value WHEN object");
             var content = slot.InPlaceValue is BoundFieldOperand inPlace ? inPlace : subjValue;
             var spliced = new ConditionBinder.PartialSubjectOperand(subjOp, subjValue, content);
@@ -589,7 +636,14 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 [host.Cond.CheckedRelational(left, ">=", lo), host.Cond.CheckedRelational(left, "<=", hi)]),
                 objMark);
         }
-        if (item.valueOperand() is { } v)
+        // boolean-expression-2 (§14.9.13.4 GR4 a) 6.): "selection-subject [NOT] = selection-object" with the object a
+        // boolean expression — the boolean relation of §8.8.4.2.2 Format 2, built through the ONE relation checkpoint
+        // exactly as the IF form `subject = A B-AND C` is (ConditionBinder.BindPrimaryBoolean). The expression was bound
+        // ONCE, by the classification, so this reads that node.
+        if (BooleanOperatorBearing(item) is not null && pair.ObjectBare.Boolean is { } objectBoolean)
+            return host.Udf.UdfAttachPerEvaluation(
+                host.Cond.CheckedRelational(left, "==", new BoundBoolOperand(objectBoolean)), classifyMark);
+        if (BareOperand(item) is { } v)
         {
             var objMark = host.Udf.Mark;
             return host.Udf.UdfAttachPerEvaluation(
@@ -768,7 +822,9 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     /// a bare operand: under a written condition-1 the operands belong to the condition, and resolving one as a
     /// condition-name would be a symbol lookup no rule asks for (and a diagnostic no rule licenses).</summary>
     private BareOperandAnalysis AnalyzeSubjectBare(Core.EvaluateSubjectContext subject) =>
-        subject.valueOperand() is { } svo ? host.Cond.AnalyzeBareOperand(svo) : default;
+        BooleanOperatorBearing(subject) is { } be ? host.Cond.AnalyzeBooleanExpression(be)
+        : BareOperand(subject) is { } svo ? host.Cond.AnalyzeBareOperand(svo)
+        : default;
 
     /// <summary>Bind (and, when more than one pair reads it, MATERIALIZE) one selection subject's assigned value
     /// — ISO §14.9.13.4 GR3 a)–d). Null when the subject has no value form.
@@ -783,7 +839,21 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     {
         inPlace = null;
         var subject = slot.Node;
-        if (subject.valueOperand() is not { } vo) return null;
+        // ⛔ boolean-expression-1 (§14.9.13.4 GR3 d) — "assigned a boolean value according to the rules for evaluating
+        // boolean expressions" (kb/Work PB1412). The slot's ONE bound tree is the value, held in a boolean intermediate of
+        // its §8.8.2 rule 10 result length through the same store a boolean function argument takes
+        // (SendingValueTemp.MaterializeBoolean) when more than one pair reads it. A length no intermediate item can
+        // describe (positionless, or a run-time function length) stays un-held, as ArgumentOrder.StoreAt leaves it.
+        if (BooleanOperatorBearing(subject) is not null && slot.Bare.Boolean is { } boolean)
+        {
+            var written = inPlace = new BoundBoolOperand(boolean);
+            int? positions = ConditionBinder.BoolResultLength(boolean);
+            if (!slot.NeedsIntermediate || positions is not > 0
+                || host.SendingValue.MaterializeBoolean(boolean, positions.Value, "evaluate") is not { } held)
+                return written;
+            return new BoundFieldOperand(held);
+        }
+        if (BareOperand(subject) is not { } vo) return null;
         if (slot.Bare.Form is BareOperandForm.ConditionName or BareOperandForm.SwitchStatus) return null;
         var value = inPlace = BindValueOperand(vo);
         // ⛔ NeedsIntermediate, NOT `Uses > 1` (kb/Work PB396). The §14.9.25.4 GR1 argument this slot already

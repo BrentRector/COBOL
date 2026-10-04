@@ -720,7 +720,7 @@ public abstract class CobolParserCoreBase : Parser
     /// shared <c>comparisonExpression</c> rule (whose modification regressed subscript/ref-mod comparisons at
     /// 2002+, DEVLOG 621) — a normal comparison (no B-op ahead) returns false and falls to comparisonExpression
     /// unchanged. The scan stops at the condition's end: a period, the logical connectives (AND/OR/THEN/ELSE),
-    /// a WHEN / END-* / UNTIL / VARYING, or any statement-starting keyword (so it never crosses into an IF body),
+    /// a WHEN / ALSO / END-* / UNTIL / VARYING, or any statement-starting keyword (so it never crosses into an IF body),
     /// and is window-capped. Read-only over the token stream — safe for ANTLR's repeated prediction calls.
     /// </summary>
     protected bool boolExprAhead()
@@ -764,6 +764,10 @@ public abstract class CobolParserCoreBase : Parser
                 case CobolLexer.THEN:
                 case CobolLexer.ELSE:
                 case CobolLexer.WHEN:
+                // ALSO separates the selection subjects / objects of an EVALUATE (§14.9.13.2): a condition never
+                // contains it, so a B-operator written in a LATER ALSO operand does not belong to this one — without
+                // the boundary `EVALUATE X ALSO A B-AND B` made the scan for subject X see the second subject's operator.
+                case CobolLexer.ALSO:
                 case CobolLexer.END_IF:
                 case CobolLexer.END_PERFORM:
                 case CobolLexer.END_EVALUATE:

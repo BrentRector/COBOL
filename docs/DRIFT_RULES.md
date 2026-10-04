@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-258 drift tests.
+259 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -99,6 +99,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [EcRaiseSiteDriftTests](../tests/Cobol.Net.Tests.Unit/EcRaiseSiteDriftTests.cs) | ⛔ THE RULE ORDINALS EcRaiseSite PRINTS ARE RE-DERIVED HERE FROM THE STANDARD, not asserted against a second copy of themselves (kb/Work PB388; CLAUDE.md rule 1 — "the failure mode is not inventing a citation, it is INHERITING one"). | `docs/rearchitecture/spec-rule-catalog.json` |
 | [EcSizeGuardDriftTests](../tests/Cobol.Net.Tests.Unit/EcSizeGuardDriftTests.cs) | kb/Work PB75 — the EC-SIZE family reaches NON-arithmetic statements through the generic fatal statement guard (EcEmitter.FatalAmbientGates), while ARITHMETIC statements own their §14.7.5 shape in ArithmeticEmitter.EmitArith. | `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs` |
 | [EmptyArgumentListDriftTests](../tests/Cobol.Net.Tests.Unit/EmptyArgumentListDriftTests.cs) | ⛔ NO VARIADIC INTRINSIC BODY INVENTS A VALUE FOR AN EMPTY ARGUMENT LIST (kb/Work PB257). | `src/Cobol.Net.Runtime/Intrinsics` |
+| [EvaluateBooleanExpressionOperandDriftTests](../tests/Cobol.Net.Tests.Unit/EvaluateBooleanExpressionOperandDriftTests.cs) | ⛔ AN EVALUATE SELECTION OPERAND THAT CARRIES A BOOLEAN OPERATOR IS TABLE 15's BOOLEAN-EXPRESSION KIND, NOT A CONDITION (kb/Work PB1412). | — |
 | [EvaluateOperandCombinationsDriftTests](../tests/Cobol.Net.Tests.Unit/EvaluateOperandCombinationsDriftTests.cs) | ⛔ EvaluateOperandCombinations IS ISO Table 15, AND THIS RE-DERIVES IT FROM THE SPEC. | — |
 | [EvaluateSelectionObjectArityDriftTests](../tests/Cobol.Net.Tests.Unit/EvaluateSelectionObjectArityDriftTests.cs) | ⛔ AN EVALUATE WHEN GROUP HOLDS EXACTLY ONE SELECTION OBJECT, AND THE UNLICENSED REPETITION SILENTLY MISCOMPILED LEGAL SOURCE (fix-queue PB45). | — |
 | [ExactCarrierBoundaryDriftTests](../tests/Cobol.Net.Tests.Unit/ExactCarrierBoundaryDriftTests.cs) | kb/Work PB252 — the invariants of the exact Int128 carrier, held STRUCTURALLY rather than by memory. | `src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs` |

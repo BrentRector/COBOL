@@ -2258,6 +2258,21 @@ internal sealed class VersionConformancePass
             return base.VisitChildren(ctx);
         }
 
+        /// <summary>Site — an EVALUATE selection SUBJECT that is boolean-expression-1 (§14.9.13.2; kb/Work PB1412).
+        /// The same introduction gates as every other host: the operators (2002) and the shifts (2023).</summary>
+        public override object? VisitEvaluateSubject(CobolParserCore.EvaluateSubjectContext ctx)
+        {
+            GateBooleanOperators(ctx.booleanExpression());
+            return base.VisitChildren(ctx);
+        }
+
+        /// <summary>Site — an EVALUATE selection OBJECT that is boolean-expression-2 (§14.9.13.2; kb/Work PB1412).</summary>
+        public override object? VisitEvaluateWhenItem(CobolParserCore.EvaluateWhenItemContext ctx)
+        {
+            GateBooleanOperators(ctx.booleanExpression());
+            return base.VisitChildren(ctx);
+        }
+
         /// <summary>Site 2 — the COMPUTE Format 2 RHS (ISO §14.9.8). The F1 arithmetic alternative has no
         /// <c>booleanExpression</c>.</summary>
         public override object? VisitComputeStatement(CobolParserCore.ComputeStatementContext ctx)

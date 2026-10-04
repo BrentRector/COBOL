@@ -178,6 +178,7 @@
     "pb487_aligned_bit_layout",
     "pb504_value_implied_picture",
     "pb400_evaluate_boolean_sr6_pair",
+    "pb1412_evaluate_boolean_expression_operands",
     "l1_call_activating_instance_per_activation",
     "l1_display_admitted_classes",
     "l1_display_format1_elements",

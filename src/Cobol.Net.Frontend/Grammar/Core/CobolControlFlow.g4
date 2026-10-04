@@ -236,13 +236,21 @@ evaluateStatement
 // item, exactly as for a bare selection object. `condition` is reached only when the subject has a shape no
 // value operand spells (a relational operator, a class/sign test, NOT, AND/OR, a parenthesised condition), so
 // no subject that parsed before changes its parse.
+// ⛔ boolean-expression-1 (§14.9.13.4 GR3 d) — "Any selection subject in which boolean-expression-1 is specified is
+// assigned a boolean value according to the rules for evaluating boolean expressions" — IS an alternative here
+// (kb/Work PB1412), behind the SAME `{boolExprAhead()}?` discriminator every other boolean-expression host uses
+// (primaryCondition, callArgument, argument, functionArgument …), because booleanExpression's leaf is valueOperand and
+// would otherwise claim every bare operand. Placed AFTER valueOperand, so a subject that parsed as a value operand
+// before still does (a bare boolean item or literal, a parenthesized one, an identifier), and BEFORE condition, so an
+// operator-bearing expression with no relational tail — `EVALUATE A B-AND C WHEN B"1000"` — is Table 15's
+// Boolean-expression column rather than a condition held to §8.8.4.3.3 SR1's length-1 rule. A boolean RELATION
+// (`EVALUATE A B-AND C = B"1000"`) has a tail the alternative cannot consume and still parses as `condition`.
 evaluateSubject
     : booleanLiteral                                     // EVALUATE TRUE / FALSE
     | valueOperand                                       // identifier-1 / literal-1 / arithmetic-expression-1
+    | {boolExprAhead()}? booleanExpression               // boolean-expression-1 (§14.9.13.4 GR3 d)
     | condition                                          // condition-1 (§14.9.13.4 GR3 e)
     ;
-    // NOTE (DEVLOG 621): an EVALUATE boolean-expression subject is STAGED RESIDUE with the condition-context
-    // boolean forms (see comparisonExpression) — the boolean OPERATORS work in COMPUTE Format 2 only.
 
 // One or more consecutive WHEN phrases share the following imperative (ISO 1989:1985
 // 14.8.4): "WHEN a  WHEN b  WHEN c  imperative" executes the imperative if a, b, OR c
@@ -295,9 +303,14 @@ evaluateWhenGroup
 // shape SR5's own list names and the ordinary way to write a threshold arm — was a raw parse error, and FIVE rules
 // (SR5, SR7 d), SR8, SR6 e) and §14.9.13.4 GR4 a) 2.) had no code site, with Table 15's Partial-expression row a
 // permanently dead lookup (kb/Work PB398).
+// boolean-expression-2 (§14.9.13.2's `[ NOT ] boolean-expression-2`, kb/Work PB1412) sits between valueOperand and
+// condition for the subject rule's reason: an operator-bearing object with no relational tail is Table 15's
+// Boolean-expression ROW, not condition-2. `valueRange` leads and is untouched (a boolean operand may not end a
+// range, SR4).
 evaluateWhenItem
     : valueRange                         // WHEN A THRU N, WHEN 1 THRU 10, WHEN "A" THRU "M" IN ALPH
     | valueOperand                       // single value: "A", 1, VAR
+    | {boolExprAhead()}? booleanExpression   // WHEN A B-AND C — boolean-expression-2 (§14.9.13.4 GR4 a) 6.)
     | condition                          // for EVALUATE TRUE / complex WHEN
     | partialExpression                  // WHEN > 5, WHEN NUMERIC, WHEN POSITIVE, WHEN > 5 AND < 10 (§14.9.13.3 SR5)
     | ANY                                // match anything

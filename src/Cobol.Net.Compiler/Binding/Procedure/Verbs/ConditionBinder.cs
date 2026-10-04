@@ -469,7 +469,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// computed subject is read from its one materialization. <paramref name="Node"/> remains only for the
     /// syntactic facts a bound operand no longer carries (§8.8.4.7.3 Format 2's "bare standard floating-point
     /// data-name") and for the SR1 diagnostic path of a sign test on a non-numeric subject.</para></summary>
-    public readonly record struct PartialSubjectOperand(Core.ValueOperandContext Node, BoundOperand Value, BoundOperand Content);
+    public readonly record struct PartialSubjectOperand(Core.ValueOperandContext? Node, BoundOperand Value, BoundOperand Content);
 
     private BoundCondition BindCondition(IParseTree node, AbbrevCarry carry) => node switch
     {
@@ -517,7 +517,22 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             // A numeric subject value is the sign test's operand as it stands; anything else is refused by the
             // ONE sign body's §8.8.4.7.3 SR1 diagnostic, over the written node (a failing compile — no second
             // activation can run).
-            if (SignOperandOf(subj.Value) is not { } signExpr) return BindSignConditionOn(kind, not, subj.Node, carry);
+            if (SignOperandOf(subj.Value) is not { } signExpr)
+            {
+                // A boolean-expression selection subject (kb/Work PB1412) has no operand node: it is a boolean
+                // value, never the numeric operand §8.8.4.7.3 SR1 admits, so the sign shape is refused by name.
+                if (subj.Node is null)
+                {
+                    carry.Reset();
+                    ctx.Edition.Error(DiagnosticCatalog.OperandIsNotACondition,
+                        "the selection subject is a boolean expression, and a sign condition's operand shall be \"any "
+                        + "single numeric data item described with a usage other than a standard floating-point usage, "
+                        + "or any form of arithmetic expression\" (ISO §8.8.4.7.3 SR1; §14.9.13.3 SR8 splices the "
+                        + "subject into the partial-expression)");
+                    return Refused("sign condition over a boolean-expression selection subject");
+                }
+                return BindSignConditionOn(kind, not, subj.Node, carry);
+            }
             carry.Reset();
             return new BoundSignCondition(signExpr, kind, not, IsFormat2FloatSign(subj.Node));
         }
@@ -1095,13 +1110,38 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // A BOOLEAN operand (§8.8.2). Whether it is a §8.8.4.3 simple boolean CONDITION is the CALLER's
         // question in EVALUATE (SR6) and settled here everywhere else, so the expression is carried bound but
         // unwrapped, with its §8.8.2 rules 9/10 result length.
-        if (vo is not null && IsBooleanValueOperand(vo))
-        {
-            var b = BindBoolOperandValue(vo);
-            return new BareOperandAnalysis(BareOperandForm.Boolean, null, b, BoolResultLength(b));
-        }
+        if (vo is not null && IsBooleanValueOperand(vo)) return BooleanAnalysis(BindBoolOperandValue(vo));
         return default;   // BareOperandForm.Value
     }
+
+    /// <summary>The <see cref="BareOperandForm.Boolean"/> analysis of an already-bound boolean expression, carrying
+    /// its §8.8.2 rules 9/10 result length — the ONE construction, shared by a bare boolean operand
+    /// (<see cref="AnalyzeBareOperand"/>) and an operator-bearing boolean expression
+    /// (<see cref="AnalyzeBooleanExpression"/>), so §14.9.13.3 SR6's "results in one boolean character" is asked of
+    /// both through the same number.</summary>
+    private static BareOperandAnalysis BooleanAnalysis(BoundBoolExpr b) =>
+        new(BareOperandForm.Boolean, null, b, BoolResultLength(b));
+
+    /// <summary>⛔ THE ONE ANALYSIS OF A <c>booleanExpression</c> WRITTEN AS A SELECTION OPERAND (kb/Work PB1412) —
+    /// the EVALUATE subject <c>boolean-expression-1</c> and object <c>boolean-expression-2</c> of ISO §14.9.13.2.
+    /// An expression that carries a boolean operator is a <see cref="BareOperandForm.Boolean"/> operand whose bound
+    /// tree and result length are held for Table 15 and §14.9.13.3 SR6, exactly as a bare boolean item's are; the
+    /// grammar's <c>{boolExprAhead()}?</c> gate can also take an OPERATOR-FREE one (<c>(B"1")</c>), which reduces to
+    /// its bare operand and is analysed as that operand — the relation channel's own reading
+    /// (<see cref="BindBoolOrValueOperand"/>).</summary>
+    public BareOperandAnalysis AnalyzeBooleanExpression(Core.BooleanExpressionContext be) =>
+        OperatorBearing(be) is not null ? BooleanAnalysis(BindBoolExpr(be)) : AnalyzeBareOperand(BareOperandOf(be));
+
+    /// <summary>The boolean expression when it carries a boolean operator — a GENUINE boolean expression — else null
+    /// (a bare operand parsed through the <c>booleanExpression</c> rule). The ONE discriminator
+    /// <see cref="BindBoolOrValueOperand"/> and EVALUATE's selection operands both ask.</summary>
+    internal static Core.BooleanExpressionContext? OperatorBearing(Core.BooleanExpressionContext? be) =>
+        be is not null && HasBoolOp(be) ? be : null;
+
+    /// <summary>The bare operand a boolean-expression node reduces to when it carries NO boolean operator, else null
+    /// — <see cref="OperatorBearing"/>'s complement, over <see cref="UnwrapBareBool"/>.</summary>
+    internal static Core.ValueOperandContext? BareOperandOf(Core.BooleanExpressionContext? be) =>
+        be is not null && !HasBoolOp(be) ? UnwrapBareBool(be) : null;
 
     /// <summary>The expression a bare operand denotes AS A CONDITION OPERAND: its arithmetic expression with the
     /// parentheses that enclose the whole of it removed, because §8.8.4.2.1 says parentheses around a simple

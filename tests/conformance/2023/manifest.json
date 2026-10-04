@@ -790,10 +790,10 @@
   "pb807_display_directive_operands",
   "pb1412_shift_only_boolean_conditions",
   "pb1420_abs_integer_form_unsigned_position",
-  "pb1901_convert_any_pointer_strong_group"
+  "pb1901_convert_any_pointer_strong_group",
+  "pb1412_evaluate_boolean_expression_subject"
   ],
  "pending": [
-  "pb485_value_only_format1",
-  "pb1412_evaluate_boolean_expression_subject"
+  "pb485_value_only_format1"
  ]
 }
