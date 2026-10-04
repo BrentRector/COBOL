@@ -952,6 +952,18 @@ public sealed record RefModPlace(Place Inner, string Start, string? Length) : Pl
         // position, and an alphanumeric group) IS the item's character occupancy.
         : inner.ImageWidth;
 
+    /// <summary>The storage width, in BITS, of ONE position <see cref="PositionCount"/> counts — the unit a
+    /// reference modifier's leftmost position is multiplied by to reach a byte displacement (kb/Work PB1407): 1 for
+    /// a bit position (§8.4.3.3.4 GR5 a), 16 for a national character (D-N1: two bytes, UTF-16BE) and 8 for every
+    /// other character position. It reads the same <see cref="DataItem.OperandPic"/> discriminant
+    /// <see cref="PositionCount"/> does, so the two cannot disagree about what a position is.</summary>
+    public static int PositionBits(DataItem inner) => inner.OperandPic switch
+    {
+        { Usage: Usage.Bit } => 1,
+        { Usage: Usage.National } => 16,
+        _ => 8,
+    };
+
     /// <summary>This view's <see cref="PositionCount"/> — the positions of the item reference modification indexes
     /// (ISO §8.4.3.3.4 GR5).</summary>
     public int InnerPositions => PositionCount(Inner.Item);

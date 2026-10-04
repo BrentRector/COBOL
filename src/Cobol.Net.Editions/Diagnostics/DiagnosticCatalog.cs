@@ -6521,6 +6521,44 @@ public static class DiagnosticCatalog
         + "defined for object-class-name-1 (GR4).",
         "ISO §8.4.3.8.3 SR4; §8.4.3.8.4 GR4");
 
+    /// <summary>COBOLNET2784 — the data-address-identifier's identifier-1 is defined in the working-storage or file
+    /// section of an OBJECT or a FACTORY object (kb/Work PB1062; §8.4.3.11.3 SR1, second sentence). Bound by
+    /// <c>AddressOfOperandScreen</c>, the one screen of every surface that takes <c>ADDRESS OF identifier-1</c>
+    /// (SET, CALL / INVOKE argument, relation operand).</summary>
+    public static readonly DiagnosticDescriptor AddressOfObjectData = new(
+        "COBOLNET2784", "address-of-object-data", EditionSeverity.Error,
+        "ISO §8.4.3.11.3 syntax rule 1: \"Identifier-1 shall not be defined in the working-storage or file section of "
+        + "an object or a factory object.\" Object data is the state of an object and its address would let a caller "
+        + "keep a live pointer into it; a method's own working storage, local storage and linkage section are legal.",
+        "ISO §8.4.3.11.3 SR1");
+
+    /// <summary>COBOLNET2785 — the data-address-identifier's identifier-1 is a kind of data item whose address the
+    /// standard does not let a program take: an object reference or an elementary item subordinate to a
+    /// strongly-typed group (SR2), a CONSTANT RECORD item or one subordinate to it (SR3), a dynamic-length elementary
+    /// item, an element of or item under a dynamic-capacity table, or an item under a group that contains a
+    /// dynamic-length elementary item (SR6) — kb/Work PB1407. The site names the rule it caught.</summary>
+    public static readonly DiagnosticDescriptor AddressOfOperandKind = new(
+        "COBOLNET2785", "address-of-operand-kind", EditionSeverity.Error,
+        "ADDRESS OF identifier-1 names a data item whose address a program may not take (ISO §8.4.3.11.3): an object "
+        + "reference or an elementary item subordinate to a strongly-typed group item (syntax rule 2), a CONSTANT "
+        + "RECORD item or any item subordinate to one (rule 3), or a dynamic-length elementary item, an element of a "
+        + "dynamic-capacity table, an item subordinate to a dynamic-capacity table, or an item subordinate to a group "
+        + "that contains a dynamic-length elementary item (rule 6). A pointer to such an item would let a program "
+        + "defeat the strong-type, constant or storage-capacity guarantee the item carries.",
+        "ISO §8.4.3.11.3 SR2, SR3, SR6");
+
+    /// <summary>COBOLNET2786 — ADDRESS OF a bit data item whose subscripts or reference-modification leftmost position
+    /// are not fixed-point numeric literals (or all-literal expressions without exponentiation), or which is not
+    /// aligned on a byte boundary (kb/Work PB1407; §8.4.3.11.3 SR4). The ADDRESS OF twin of the CALL, INVOKE and
+    /// function bit-alignment codes: the address of a bit must be statically a byte's.</summary>
+    public static readonly DiagnosticDescriptor AddressOfBitAlignment = new(
+        "COBOLNET2786", "address-of-bit-alignment", EditionSeverity.Error,
+        "If identifier-1 of ADDRESS OF is a bit data item, its subscripting and reference modification shall consist "
+        + "of only fixed-point numeric literals or arithmetic expressions in which all operands are fixed-point "
+        + "numeric literals and the exponentiation operator is not specified, and it shall be aligned on a byte "
+        + "boundary (ISO §8.4.3.11.3 syntax rule 4) — the address a pointer holds is a byte's.",
+        "ISO §8.4.3.11.3 SR4");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

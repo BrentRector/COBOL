@@ -932,6 +932,14 @@ internal static class RuntimeApi
     public static string StrRefMod(string s, string start, string len, bool allowZeroLength = false) =>
         $"{nameof(CobolString)}.{nameof(CobolString.RefMod)}({s}, {start}, {len}{(allowZeroLength ? ", allowZeroLength: true" : "")})";
 
+    /// <summary>The checked ZERO-BASED offset of a reference modifier's leftmost position — <c>CobolString.RefModStartOffset</c>,
+    /// for an operand that needs the position, not the slice (<c>ADDRESS OF identifier-1(leftmost:length)</c>, kb/Work
+    /// PB1407). <paramref name="positions"/> is identifier-1's positions, or null where only the run-time knows them.</summary>
+    public static string StrRefModStartOffset(string start, string len, int? positions, bool allowZeroLength = false) =>
+        $"{nameof(CobolString)}.{nameof(CobolString.RefModStartOffset)}({start}, {len}, "
+        + $"{(positions is { } n ? n.ToString(System.Globalization.CultureInfo.InvariantCulture) : "int.MaxValue")}"
+        + $"{(allowZeroLength ? ", allowZeroLength: true" : "")})";
+
     /// <summary>The OMITTED-length ref-mod sentinel (<c>identifier(start:)</c> "to the end") as an emit expression —
     /// routed through the façade (the P7 Step 4b ratchet) so a rename of the runtime const breaks HERE at compile time.
     /// Distinct from −1 so a specified negative length raises EC-BOUND-REF-MOD (review C14).</summary>

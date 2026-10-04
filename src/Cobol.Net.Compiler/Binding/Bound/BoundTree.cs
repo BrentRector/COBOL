@@ -1473,8 +1473,22 @@ public sealed record BoundSetPointer(
 /// <c>(idx − 1) × width [+ …]</c> character positions added to the item's class offset (the occurrences lie
 /// end-to-end in the ONE cell image, §8.4.3.11 GR1 — the address OF THE OCCURRENCE); null for an
 /// unsubscripted operand. It is the D10 transitional rendered-index carrier (see
-/// <c>AccessPath</c>/<c>FixedTableSegment</c>) — a <c>BoundExpr</c> when PHASE 15 removes SUBSCRIPT mode.</summary>
-public sealed record BoundAddressOf(DataItem Item, string? OccursDisplacement = null);
+/// <c>AccessPath</c>/<c>FixedTableSegment</c>) — a <c>BoundExpr</c> when PHASE 15 removes SUBSCRIPT mode.
+/// <paramref name="RefMod"/> carries a REFERENCE-MODIFIED operand's leftmost position (kb/Work PB1407; null when none
+/// is written): the address is then the one of the unique data item reference modification creates, which §8.4.3.3.4
+/// GR5 makes a subset of identifier-1 starting at that position.</summary>
+public sealed record BoundAddressOf(DataItem Item, string? OccursDisplacement = null, AddressRefMod? RefMod = null);
+
+/// <summary>The reference modifier of an <c>ADDRESS OF identifier-1(leftmost:length)</c> operand — everything the emitter
+/// needs to turn the written leftmost position into a byte displacement and to range-check it exactly as a read of
+/// the same reference does (§8.4.3.3.4 GR5 b/c; EC-BOUND-REF-MOD). <paramref name="Spec"/> is the screened modifier;
+/// <paramref name="Positions"/> the positions identifier-1 has (<see cref="RefModPlace.PositionCount"/>), or null
+/// when its size is a run-time fact (an ANY LENGTH item) and only the lower bound is checked;
+/// <paramref name="UnitBits"/> the storage width of one position (<see cref="RefModPlace.PositionBits"/>: 8 for a
+/// character, 16 for a national character, 1 for a bit) and <paramref name="LeadBits"/> the bit within its first
+/// byte at which identifier-1 starts (nonzero only for a bit item, whose SR4 b) alignment proof guarantees the
+/// slice itself starts on a byte boundary).</summary>
+public sealed record AddressRefMod(RefModSpec Spec, int? Positions, int UnitBits, int LeadBits);
 
 /// <summary>A bound §8.4.3.13 PROGRAM-ADDRESS-IDENTIFIER (<c>ADDRESS OF PROGRAM …</c>) as a pointer VALUE: the
 /// program named by a compile-time <paramref name="NameLiteral"/> (literal-1, or program-prototype-name-1's

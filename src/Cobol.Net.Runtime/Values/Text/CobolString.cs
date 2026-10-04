@@ -183,6 +183,23 @@ public static class CobolString
         return len == 0 ? "" : s.Substring(start, len);
     }
 
+    /// <summary>The ZERO-BASED offset of a reference modifier's leftmost position, for an operand that needs the POSITION
+    /// and not the slice — <c>ADDRESS OF identifier-1(leftmost:length)</c>, whose address is that of the unique data item's
+    /// first position (ISO §8.4.3.11.4 GR1 over §8.4.3.3.4 GR5; kb/Work PB1407). ⛔ The range test is THE ONE
+    /// <see cref="RefModOutOfRange"/> the read and the write spend, with the same outcome — the fatal EC-BOUND-REF-MOD
+    /// when checking is enabled, the run unit's termination when it is not — so an address cannot be taken from a
+    /// reference modifier that a read of the same reference would refuse. <paramref name="size"/> is identifier-1's
+    /// positions, or <see cref="int.MaxValue"/> where the item's size is a run-time fact the bind cannot supply.</summary>
+    public static int RefModStartOffset(int leftmost, int length, int size, bool allowZeroLength = false)
+    {
+        bool omitted = length == OmittedRefModLength;
+        if (RefModOutOfRange(leftmost, length, size, omitted, allowZeroLength))
+            ExceptionState.RefModViolation(
+                $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
+                + $"{size}-position item (ISO §8.4.3.3.4 item 5c)");
+        return leftmost - 1;
+    }
+
     /// <summary>
     /// Reference modification write (ISO §8.4.3.3 / §14.9.24): return <paramref name="dst"/> with the
     /// <paramref name="length"/> characters at 1-based <paramref name="leftmost"/> replaced by

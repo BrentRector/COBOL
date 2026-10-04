@@ -473,9 +473,26 @@ paths); `CallBinder` — §14.8.2.3.2's "If either is a restricted pointer, both
 type", over EVERY Format-2 callee whose formals are bound (the clause carries no AS-NESTED qualification, and the
 restriction now resolves to its own element's declaration).
 
-⛔ The asymmetry `StrongTypeModel` already documents is load-bearing here: a leaf subordinate to a strong group is
-NOT itself strongly typed, so `SET P TO ADDRESS OF <leaf of a strong record>` is **unrestricted and legal**. An
-over-eager screen would break it. (kb/Work PB153.)
+`PtrBinder.BindSetAddress`'s `SET ADDRESS OF data-name-1` arm asks BOTH sentences of SR19 that name data-name-1, in
+one method (`ScreenBasedReceiverRestriction`, kb/Work PB665): data-name-1 strongly typed or a restricted pointer
+needs a sender restricted to its type, and a RESTRICTED sender (a pointer item or `ADDRESS OF` a strong group)
+needs data-name-1 to be a typed item of that type, because the statement has no identifier-5 to carry the
+restriction — an untyped window would read the typed storage through no type. `PtrBinder.BindSetUpDown` adds SR24
+(kb/Work PB816, `StrongTypeModel.IsRestrictedToStrongType`): `SET … UP BY / DOWN BY` over a pointer restricted to a
+type described with STRONG is refused; a pointer restricted to a weak type, or unrestricted, is legal.
+
+⛔ **A leaf of a strong record has NO address at all** (§8.4.3.11.3 SR2, kb/Work PB1407; this section used to say its
+address was "unrestricted and legal", the opposite of SR2). `StrongTypeModel.IsStrongGroup` is true of a GROUP only, so
+only the group's own address is a restricted data-pointer (§8.4.3.11.4 GR2). The operand rules of
+`ADDRESS OF identifier-1` live in ONE screen, `AddressOfOperandScreen`, reached from `PtrBinder.BindDataAddress` —
+therefore from every surface (SET sender, CALL / INVOKE argument, relation operand): SR1 second sentence (object /
+factory working-storage and file section → COBOLNET2784, kb/Work PB1062), SR2/SR3/SR6 (object reference, leaf of a
+strong group, CONSTANT RECORD, dynamic-length / dynamic-capacity shapes → COBOLNET2785) and SR4 (a bit item's literal
+subscripts and byte alignment → COBOLNET2786, through `ParameterConformance.BitStartOf`, the one static-start walk
+CALL, INVOKE and the function-identifier share). A reference-modified identifier-1 is legal (SR4 a) names it): the
+resolver admits it through the same `ReadScreenedRefMod` as an ordinary reference, and the address is that of its
+leftmost position (`BoundAddressOf.RefMod`, emitted through `CobolString.RefModStartOffset`, the same range test as
+a read). Residue: an OCCURS DEPENDING ON group is range-checked against its maximum extent, not its current one.
 
 ### 2.5 The explicit bind pipeline (the pass contract)
 

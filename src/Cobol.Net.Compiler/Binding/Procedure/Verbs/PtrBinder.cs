@@ -28,6 +28,9 @@ using Core = CobolParserCore;
 /// based-item verdict was wrong in both directions (kb/Work PB467).</para></summary>
 internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
 {
+    /// <summary>The one §8.4.3.11.3 operand screen of every data-address-identifier surface (kb/Work PB1407).</summary>
+    private readonly AddressOfOperandScreen _addressScreen = new(ctx);
+
     /// <summary>⛔ THE ONE BINDER FOR THE WHOLE PRINTED SET FORMAT 7 (ISO §14.9.39.2; kb/Work PB450).
     /// <para>The rendered figure (PDF p760 / folio 730) is
     /// <c>SET { ADDRESS OF data-name-1 | identifier-5 } … TO identifier-6</c>: the brace is a plain required
@@ -97,16 +100,9 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
                 // PLAIN pointer sender, because `SET ADDRESS OF based TO ADDRESS OF x` was a parse error and
                 // the case could not arise; it can now, and §8.4.3.11.4 GR2 gives that sender a restriction of
                 // its own, so leaving it out would under-reject exactly the shape this landing opened.
-                var needed = StrongTypeModel.StrongGroupType(based) is { IsRestricted: true } sg
-                    ? sg : StrongTypeModel.PointerRestriction(based);
-                if (!toNull && needed.IsRestricted
-                    && !StrongTypeModel.SameRestriction(needed, senderRestriction))
-                {
-                    RejectRestriction(senderText,
-                        $"the receiver of SET ADDRESS OF is restricted to type '{needed}', so the sender shall "
-                        + "reference a data-pointer restricted to the same type (ISO §14.9.39.3 SR19)");
+                if (!toNull && !ScreenBasedReceiverRestriction(based, senderRestriction, senderText,
+                                                               addressSender: address is not null))
                     return BoundRejected.Reported(ctx.Edition);
-                }
                 receivers.Add(new BoundPointerReceiver(null, based));
                 continue;
             }
@@ -166,6 +162,52 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
                    : "(ISO §13.18.60.4 GR23 — its USAGE POINTER clause specifies a type-name-1), ")
                 + "so the receiver shall be a data-pointer restricted to the same type "
                 + "(ISO §14.9.39.3 SR19, third sentence)");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>§14.9.39.3 SR19 over ONE <c>ADDRESS OF data-name-1</c> receiver of a Format-7 statement — BOTH of the
+    /// rule's sentences that name data-name-1, written once (kb/Work PB665; the identifier-5 receivers' pair is
+    /// <see cref="ScreenPointerReceiverRestriction"/>). Asked PER RECEIVER, because the restriction is data-name-1's,
+    /// not the statement's — a mixed list may hold a restricted receiver beside an unrestricted one — and against
+    /// identifier-6 in EITHER spelling (<paramref name="senderRestriction"/> is §13.18.60.4 GR23's for a pointer
+    /// item, §8.4.3.11.4 GR2's for an <c>ADDRESS OF</c>). The caller never asks it for TO NULL, which SR19 admits.
+    /// <list type="number">
+    ///   <item>"If data-name-1 is a strongly-typed group item or a restricted pointer, identifier-6 shall reference a
+    ///         data-pointer restricted to the type of data-name-1."</item>
+    ///   <item>"If identifier-6 references a restricted data-pointer, either identifier-5 shall reference a
+    ///         data-pointer restricted to the same type or data-name-1 shall be a typed item of the type to which
+    ///         identifier-6 is restricted." With data-name-1 as the receiver there IS no identifier-5, so the second
+    ///         leg is the only one: an UNTYPED based item over a restricted pointer would otherwise read the typed
+    ///         storage through a window with no type, which is exactly the Annex D.9.2.2 guarantee a restricted
+    ///         data-pointer exists to give. "A typed item of the type" is data-name-1's TYPE clause, or — for a
+    ///         restricted pointer, whose type sentence 1 reads as what it is restricted to — that restriction.</item>
+    /// </list></summary>
+    private bool ScreenBasedReceiverRestriction(DataItem based, StrongTypeModel.TypeRestriction senderRestriction,
+        string senderText, bool addressSender)
+    {
+        var needed = StrongTypeModel.StrongGroupType(based) is { IsRestricted: true } sg
+            ? sg : StrongTypeModel.PointerRestriction(based);
+        if (needed.IsRestricted && !StrongTypeModel.SameRestriction(needed, senderRestriction))
+        {
+            RejectRestriction(senderText,
+                $"the receiver of SET ADDRESS OF is restricted to type '{needed}', so the sender shall "
+                + "reference a data-pointer restricted to the same type (ISO §14.9.39.3 SR19)");
+            return false;
+        }
+        if (senderRestriction.IsRestricted
+            && !StrongTypeModel.SameRestriction(StrongTypeModel.TypedItemType(based), senderRestriction)
+            && !StrongTypeModel.SameRestriction(needed, senderRestriction))
+        {
+            RejectRestriction(senderText,
+                $"the sender{(addressSender ? " (ADDRESS OF a strongly-typed group — §8.4.3.11.4 GR2)" : "")} is a "
+                + $"data-pointer restricted to type '{senderRestriction}', and the receiving based "
+                + $"item '{based.CobolName}' is "
+                + (StrongTypeModel.TypedItemType(based).IsRestricted
+                    ? $"a typed item of type '{StrongTypeModel.TypedItemType(based)}'" : "untyped")
+                + " — SET ADDRESS OF has no identifier-5, so data-name-1 shall be a typed item of the type to which "
+                + "the sender is restricted (ISO §14.9.39.3 SR19, third sentence)");
             return false;
         }
         return true;
@@ -259,7 +301,9 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
     private CalleeSignature? PrototypeSignature(string prototypeName) =>
         host.ProgramPrototypes?.TryGetValue(prototypeName, out var p) == true ? p.Signature : null;
 
-    /// <summary>The operand half of <see cref="BindDataAddress"/>.</summary>
+    /// <summary>The operand half of <see cref="BindDataAddress"/>: resolve (ISO §8.4.3.11.3 SR1's sections, the
+    /// subscripts, a reference modifier), screen the resolved operand once (<see cref="AddressOfOperandScreen"/> — SR1
+    /// second sentence, SR2, SR3, SR4, SR6) and check it is cell-backed.</summary>
     private BoundAddressOf? PtrBindAddressOf(Core.DataReferenceContext addrRef)
     {
         if (ctx.Refs.ResolveForAddressOf(addrRef) is not { } r)
@@ -267,12 +311,14 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             // The resolver's own §8.4.2.3.3 screen already named the rule (kb/Work PB681) — once per reference.
             if (ctx.Refs.WasDiagnosed(addrRef)) return null;
             ctx.Edition.Error(DiagnosticCatalog.PointerOperandShape,
-                $"ADDRESS OF '{addrRef.GetText()}': the operand is unresolvable, reference-modified, or "
-                + "mis-subscripted — ADDRESS OF takes a (possibly qualified/subscripted) data item "
-                + "(ISO §8.4.3.11)");
+                $"ADDRESS OF '{addrRef.GetText()}': identifier-1 shall reference a data item defined in the file, "
+                + "working-storage, local-storage or linkage section (ISO §8.4.3.11.3 SR1) — the operand names "
+                + "none (an undeclared name, a SCREEN SECTION or REPORT SECTION entry, a constant-name or a special "
+                + "register) or is mis-subscripted (ISO §8.4.2.3)");
             return null;
         }
-        var (item, occursDisp) = r;
+        if (!_addressScreen.Admit(addrRef, r)) return null;
+        var item = r.Item;
         DataItem root = item;
         while (root.Parent is { } p) root = p;
         // The CLASS says whether it is cell-backed (RedefinesClass.IsCellBacked — set by the one forcer for all three
@@ -297,7 +343,25 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
                 + $"cell storage ({why}; ISO §8.4.3.11)");
             return null;
         }
-        return new BoundAddressOf(item, occursDisp);
+        return new BoundAddressOf(item, r.OccursDisplacement, AddressRefModOf(r));
+    }
+
+    /// <summary>The leftmost-position facts of a reference-modified operand (<see cref="AddressRefMod"/>), or null when
+    /// none is written. §8.4.3.11.4 GR1 makes the address that of identifier-1, which with a reference modifier is
+    /// the unique data item §8.4.3.3.4 GR5 creates — so it starts at the leftmost position, in the unit
+    /// <see cref="RefModPlace.PositionBits"/> says a position is. A bit item also starts at some bit of its first
+    /// byte; SR4 b)'s proof (<see cref="AddressOfOperandScreen"/>) has already established that the slice itself is
+    /// byte-aligned, so (lead + (leftmost − 1)) divides exactly.</summary>
+    private static AddressRefMod? AddressRefModOf(ReferenceResolver.AddressOfOperand r)
+    {
+        if (r.RefMod is not { } spec) return null;
+        var item = r.Item;
+        // The size a reference modifier is range-checked against is the positions of identifier-1's DESCRIPTION; an
+        // ANY LENGTH item's is a run-time fact (the lower bound alone is checked then).
+        int? positions = item.IsAnyLength ? null : RefModPlace.PositionCount(item);
+        int lead = r.SubscriptedPlace is { } bit && ParameterConformance.BitStartOf(bit).Bits is { } start
+            ? (int)(start % BitLayout.BitsPerCharacter) : 0;
+        return new AddressRefMod(spec, positions, RefModPlace.PositionBits(item), lead);
     }
 
     /// <summary>Bind ALLOCATE (ISO §14.9.3, both formats). The INITIALIZED based form lowers per GR7 to the
@@ -442,6 +506,17 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             if (SetIndexNameOperand(dref)) return BoundRejected.Reported(ctx.Edition);
             if (PtrResolvePointer(dref, "a SET UP/DOWN BY receiver mixed with data-pointers (ISO §14.9.39.3 SR23)", receiving: true) is not { } p)
                 return BoundRejected.Reported(ctx.Edition);
+            // §14.9.39.3 SR24 — "Identifier-9 shall not be a data-pointer restricted to a type described with the
+            // STRONG phrase" (kb/Work PB816). Pointer arithmetic leaves the type's storage, which is exactly what
+            // such a restriction exists to prevent (Annex D.9.2.2); asked of EVERY receiver, like SR23 above.
+            if (StrongTypeModel.IsRestrictedToStrongType(p.Item))
+            {
+                RejectRestriction(DataBinder.WrittenText(dref),
+                    $"identifier-9 is a data-pointer restricted to type '{StrongTypeModel.PointerRestriction(p.Item)}', "
+                    + "which is described with the STRONG phrase, so SET UP BY / DOWN BY shall not change it "
+                    + "(ISO §14.9.39.3 SR24)");
+                return BoundRejected.Reported(ctx.Edition);
+            }
             targets.Add(p);
         }
         var amount = host.Expr.BindIndexWindowExpr(ud.arithmeticExpression());   // SET (pointer form) is an r7 window (kb/Work R29)

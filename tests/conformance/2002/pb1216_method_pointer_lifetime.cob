@@ -3,9 +3,15 @@
       *> (§8.6.4, §8.6.5, §13.18.5.4 4) as in pb1216_ls_and_cancel_
       *> pointer_lifetime) while the OBJECT's WORKING-STORAGE (instance
       *> data; a method has none, §13.5.3 SR1) persists with the object
-      *> (§8.6.4 static item; §11.7).
+      *> (§8.6.4 static item; §11.7).  The object-data leg allocates
+      *> a BASED item of the OBJECT's working-storage and returns its
+      *> address: §8.4.3.11.3 SR1 forbids ADDRESS OF an item "defined
+      *> in the working-storage or file section of an object", so
+      *> ALLOCATE (§14.9.3), whose storage lives until FREE, is the
+      *> conforming way to hand the invoker an address into instance
+      *> data (kb/Work PB1062).
       *> DERIVATION. METHOD-LS: HANDLED, [....] (W4 unchanged after the
-      *> resumed MOVE). METHOD-WS [MWWW]: the instance item is alive.
+      *> resumed MOVE). METHOD-WS [MWWW]: the instance's allocation is alive.
        >>TURN EC-BOUND-PTR CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1216C.
@@ -52,7 +58,7 @@
        OBJECT.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 WW PIC X(4) VALUE "MWWW".
+       01 WW PIC X(4) BASED.
        PROCEDURE DIVISION.
        METHOD-ID. LSADDR.
        DATA DIVISION.
@@ -69,7 +75,8 @@
        LINKAGE SECTION.
        01 LR USAGE POINTER.
        PROCEDURE DIVISION RETURNING LR.
-           SET LR TO ADDRESS OF WW.
+           ALLOCATE WW RETURNING LR.
+           MOVE "MWWW" TO WW.
            GOBACK.
        END METHOD WSADDR.
        END OBJECT.

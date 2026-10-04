@@ -276,14 +276,26 @@ public static class StrongTypeModel
             ? new TypeRestriction(pic.RestrictedTypeName, pic.RestrictedTypeDecl)
             : default;
 
+    /// <summary>True when <paramref name="pointer"/> is a data-pointer restricted to a type "described with the STRONG
+    /// phrase" (§14.9.39.3 SR24 — the only restriction that bars <c>SET … UP BY / DOWN BY</c>): its
+    /// <see cref="PointerRestriction"/> resolved to a declaration that is a STRONG TYPEDEF
+    /// (<see cref="DataItem.TypedefStrong"/>) or a strongly-typed subject (<see cref="DataItem.StrongType"/>). A
+    /// restriction whose declaration is not in hand (an unresolved type-name, already refused by §13.18.60.3 SR18's
+    /// TYPEDEF requirement) is not decided here — never a rejection of what the model cannot prove strong.</summary>
+    public static bool IsRestrictedToStrongType(DataItem pointer) =>
+        PointerRestriction(pointer) is { IsRestricted: true, Declaration: { } decl } && (decl.TypedefStrong || decl.StrongType);
+
     /// <summary>The type an <c>ADDRESS OF identifier-1</c> VALUE is restricted to — Annex D.9.2.2 source 2, whose
     /// normative statement is §8.4.3.11.4 GR2: "If identifier-1 is a strongly-typed group item or a restricted
     /// data-pointer, the data-address-identifier is a restricted data-pointer that is restricted to the type of
     /// identifier-1." <see langword="default"/> when the operand is neither, i.e. the address is unrestricted.
-    /// <para>⛔ The strong-group arm deliberately uses <see cref="IsStrongGroup"/>, so a LEAF subordinate to a
-    /// strong group yields no restriction: <c>SET P TO ADDRESS OF &lt;leaf of a strong record&gt;</c> is
-    /// UNRESTRICTED and must stay legal. That asymmetry is the model's own (a strong record is still built up
-    /// field by field), and an over-eager screen here would break it.</para></summary>
+    /// <para>⛔ The strong-group arm deliberately uses <see cref="IsStrongGroup"/>, which is true of a GROUP only,
+    /// so no LEAF subordinate to a strong group has a restricted address — and none may have an address at all:
+    /// §8.4.3.11.3 SR2 forbids <c>ADDRESS OF</c> an elementary item subordinate to a strongly-typed group item
+    /// (<c>AddressOfOperandScreen</c>, kb/Work PB1407), so a strong record's only address is the group's own, the
+    /// restricted data-pointer this method returns for it. (This used to say a leaf's address "is UNRESTRICTED and
+    /// must stay legal" — the opposite of SR2, and the reason a strong-record leaf could be addressed through an
+    /// untyped BASED view.)</para></summary>
     public static TypeRestriction AddressOfRestriction(DataItem operand) =>
         StrongGroupType(operand) is { IsRestricted: true } r ? r : PointerRestriction(operand);
 

@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-266 drift tests.
+267 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -31,6 +31,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [VcrDriftTests](../tests/Cobol.Net.Tests.Conformance/VcrDriftTests.cs) | The P3.6 VERSION_CHANGE_REFERENCE (VCR) audit gate — the Tier-1 STRUCTURAL spine that makes the ledger's status DERIVED (never hand-ticked): each change row carries a machine anchor in its gating cell (<!-- gate:construct-id --> / ref-only / pin-to-spec / todo), and the generated "Gating status index" block (between <!-- GEN:VCR-STATUS START/END -->) is rendered from those anchors + constructs.jso… | `docs/VERSION_CHANGE_REFERENCE.md`, `tests/version-matrix/constructs.json`, `specs/ISO_COBOL.md` |
 | [ActivationConformanceDriftTests](../tests/Cobol.Net.Tests.Unit/ActivationConformanceDriftTests.cs) | ⛔ EVERY ACTIVATION WHOSE FORMALS ARE KNOWN AT BIND ASKS THE ONE ARGUMENT HALF OF ISO §14.8.2 (kb/Work PB1418 / PB1115, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs` |
 | [ActivationStorageReseedDriftTests](../tests/Cobol.Net.Tests.Unit/ActivationStorageReseedDriftTests.cs) | kb/Work PB1132 — every storage channel of automatic data is re-seeded at every activation, by the ONE seed. | — |
+| [AddressOfOperandScreenDriftTests](../tests/Cobol.Net.Tests.Unit/AddressOfOperandScreenDriftTests.cs) | ⛔ EVERY ADDRESS OF identifier-1 OPERAND PASSES THROUGH THE ONE §8.4.3.11.3 SCREEN (kb/Work PB1407, PB1062). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs` |
 | [AnnexA1RegisterDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA1RegisterDriftTests.cs) | ⛔ THE GATE THAT RUNS THE ANNEX A.1 REGISTER AUDIT — scripts/spec/audit_annex_a1.py. | `scripts/spec/audit_annex_a1.py`, `tests/version-matrix/traceability-inventory.json` |
 | [AnnexA2UndefinedListDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA2UndefinedListDriftTests.cs) | ⛔ THE GATE THAT HOLDS THE GENERATED ANNEX A.2 LIST EQUAL TO THE STANDARD — scripts/spec/extract_annex_a2.py. | `scripts/spec/extract_annex_a2.py`, `tests/version-matrix/annex-a2-undefined.json`, `scripts/spec/audit_derivations.py` |
 | [AnnexA3RegisterDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA3RegisterDriftTests.cs) | The drift guard for docs/CONFORMANCE.md §2 — the Annex A.3 processor-dependent element register, which ISO §4.2.6 makes NORMATIVE user documentation and not a summary table: "To meet the requirements of standard COBOL, the implementor shall document the processor-dependent language elements for which the implementation claims support", and "The absence of processor-dependent elements from an imple… | `docs/CONFORMANCE.md`, `src` |

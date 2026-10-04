@@ -5768,10 +5768,10 @@
   "rule-digest": "d54c75396dcb",
   "verdict": "DIVERGES",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#primaryExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs",
-  "test-ref": "conformance:2002/pb428_inline_method_invocation",
+  "test-ref": "conformance:2002/pb428_inline_method_invocation; conformance:2002/pb1407_address_of_reference_modified",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1407, PB1425 (registrar 15b). SR1 (cite.py --check 8.4.3.1.3 1) OK): any identifier slot of an identifier format admits any identifier format. Probes p1.cob: function-identifier inside a function argument that is itself ref-modified `FUNCTION UPPER-CASE (FUNCTION LOWER-CASE (A OF G (N))(1:3))` -> G2G; function-identifier in a ref-mod leftmost position `W (FUNCTION LENGTH (W) - 1 : 2)` -> ef; function-identifier as a subscript `A OF G (FUNCTION INTEGER (N))(1:1)` -> G; ref-mod identifier as a function argument -> C. Inline invocation chained on its own temporary is pinned by the spec-derived golden pb428 item 6, which cites this rule. Recursion through Format 5 is impossible only because Format 5 does not exist - that defect belongs to SR-8.4.3.1.3-6, not to this rule. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: DIVERGES — SR1 makes every identifier slot inside another identifier format accept ANY identifier format. The adjudicator probed only function, subscript and ref-mod nesting. Two other nestings reject legal source: an object property whose identifier-3 is a qualified, subscripted object reference (Format 7 over Format 2), and a data-address-identifier whose identifier-1 is reference-modified (Format 9 over Format 3). Format 5 is also absent, which is SR6's defect. || editions as written by the adjudicator: 1985, 2002, 2014, 2023",
+  "notes": "kb/Work PB1425 (restated by PB1407's landing). SR1 makes every identifier slot inside another identifier format accept ANY identifier format. Function, subscript and ref-mod nestings work, and so now does a data-address-identifier whose identifier-1 is reference-modified (Format 9 over Format 3, PB1407). Still rejecting legal source: an object property whose identifier-3 is a qualified, subscripted object reference (Format 7 over Format 2); Format 5 is absent (SR-8.4.3.1.3-6's defect).",
   "state": "GAP"
  },
  {
@@ -5813,10 +5813,10 @@
   "rule-digest": "fd23a167d6ea",
   "verdict": "PARTIAL",
   "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModPart; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModSpec; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RefModOf",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1407_address_of_reference_modified",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b). SR4 (cite.py --check 8.4.3.1.3 4) OK): Format 3 is identifier-1 + the 8.4.3.3 reference-modifier. refModPart `( arith : [arith] )` follows a dataReference, a functionCall and an inlineMethodInvocation; probed on all three bases (2G, BCD, pb428 ACC). Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — The rule imports the 8.4.3.3.2 format, whose own verdict is PARTIAL. When the required leftmost-position is omitted, X (:2) is refused only by the internal-error safety net, not by a diagnostic naming the rule. Ref-mod under a data-address-identifier is also refused (a1.cob). The ordinary positions work. || editions as written by the adjudicator: 1985, 2002, 2014, 2023",
+  "notes": "kb/Work PB1407 (registrar 15b, restated). Format 3 is identifier-1 + the 8.4.3.3 reference-modifier; refModPart follows a dataReference, a functionCall and an inlineMethodInvocation. A reference-modified data-address-identifier now works (PB1407). Remaining divergence: the rule imports the 8.4.3.3.2 format, and when the required leftmost-position is omitted, X (:2) is refused only by the internal-error safety net (COBOLNET2362: 'refused without a diagnostic naming the rule') instead of a diagnostic naming 8.4.3.3.2 -- ReferenceResolver.ReadScreenedRefMod returns null for the empty leftmost segment (SubscriptOrRefMod capture) and SegmentFailure supplies no report.",
   "state": "GAP"
  },
  {
@@ -5901,13 +5901,13 @@
   "ordinal": 10,
   "subject": "Identifier",
   "rule-digest": "3f1e1a26d91d",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#programAddressIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs",
-  "test-ref": "conformance:2002/pb1021_address_identifier_operands",
+  "test-ref": "conformance:2002/pb1021_address_identifier_operands; conformance:2002/pb1407_address_of_reference_modified",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b). SR10 (cite.py --check 8.4.3.1.3 10) OK): Format 9 is { data-address-identifier (8.4.3.11) | program-address-identifier (8.4.3.13) }. addressIdentifier has exactly those two arms (the 8.4.3.12 function twin correctly excluded); PtrBinder is the one binder. Probe p1.cob IF P = ADDRESS OF W -> TRUE. pb1021 golden (spec-derived) covers both arms as relation and INVOKE operands; below-2002 refusal pinned by conformance:negative/pb1021-address-identifier-relation-at-85. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — Format 9's data-address-identifier `ADDRESS OF identifier-1` takes a general identifier. 8.4.3.11.3 SR4 a) speaks of 'subscripting and reference modification in identifier-1', so a reference-modified identifier-1 is legal. PtrBinder refuses it with COBOLNET0869. The grammar arms, the exclusion of the function twin and the relation probe are right.",
-  "state": "GAP"
+  "notes": "kb/Work PB1407. Format 9 is { data-address-identifier | program-address-identifier }; the one divergence, a data-address-identifier whose identifier-1 is reference-modified, is closed (the golden compares ADDRESS OF W(3:2) as a relation operand).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-11",
@@ -7176,13 +7176,13 @@
   "ordinal": 1,
   "subject": "Data-address-identifier",
   "rule-digest": "897ffb8a6a5b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AddressOfOperandScreen.cs#Admit; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf",
+  "test-ref": "conformance:negative/pb1062-address-of-object-data; conformance:2002/pb1019_address_of_linkage_formal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1062 (registrar 15b). SR1 (cite.py --check 8.4.3.11.3 OK 1)). First sentence verified: FILE (F1.cob), WORKING-STORAGE, LOCAL-STORAGE (p1.cob) and LINKAGE (landed PB1019, conformance:2002/pb1019_address_of_linkage_formal) are accepted; a SCREEN SECTION item (N1 - also refused as the declined screen module, CONFORMANCE.md §5), a REPORT SECTION group (R1) and a constant-name (N2) are refused COBOLNET0869, though only through the generic 'unresolvable' arm, no rule-specific screen. Second sentence (an item in an OBJECT's/FACTORY's WORKING-STORAGE or FILE section) is NOT enforced - owned by open kb/Work PB1062 (inventory_rows SR-8.4.3.11.3-1); not re-reported.",
-  "state": "GAP"
+  "notes": "kb/Work PB1062. First sentence: FILE, WORKING-STORAGE, LOCAL-STORAGE and LINKAGE items are admitted (landed PB1019); a SCREEN SECTION or REPORT SECTION entry, a constant-name and a special register identify no data item and are refused COBOLNET0869 whose message now names this rule (ISO 8.4.3.11.3 SR1) instead of 'unresolvable, reference-modified'. Second sentence: an item of an OBJECT's or FACTORY's WORKING-STORAGE or FILE section (any root of a class unit that is not method-scoped, DataBinder.OoIsObjectData) is refused COBOLNET2784 by AddressOfOperandScreen in every surface (SET sender, relation operand, CALL argument), pinned by negative pb1062-address-of-object-data (object and factory halves; the method's own LOCAL-STORAGE is legal in the same statements).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.11.3-2",
@@ -7191,13 +7191,13 @@
   "ordinal": 2,
   "subject": "Data-address-identifier",
   "rule-digest": "36230e5b2faf",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AddressOfOperandScreen.cs#Admit",
+  "test-ref": "conformance:negative/pb1407-address-of-object-reference-and-strong-leaf; conformance:2002/pb665_restricted_pointer_conforming",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b). SR2 \"Identifier-1 shall not reference an object reference or an elementary item subordinate to a strongly-typed group item\" (cite.py OK 2)). Neither half is screened: PtrBindAddressOf checks only resolution and cell-backing. Probe N3: `01 O USAGE OBJECT REFERENCE` + `SET P TO ADDRESS OF O` compiles and runs clean. Probe N4: T-REC TYPEDEF STRONG, S TYPE T-REC, `SET P TO ADDRESS OF T-A OF S` (elementary under a strong group) compiles and runs clean - StrongTypeModel.AddressOfRestriction's own doc comment calls that shape 'UNRESTRICTED and must stay legal', which contradicts SR2. Expected: a compile-time error for both. Finding: missing §8.4.3.11.3 operand screen.",
-  "state": "GAP"
+  "notes": "kb/Work PB1407. AddressOfOperandScreen refuses an object reference and an elementary item subordinate to a strongly-typed group COBOLNET2785 (SET sender and relation operand pinned); the address of the strong GROUP (8.4.3.11.4 GR2) and of a leaf of a weakly typed record stay legal (positive control in both goldens). StrongTypeModel.AddressOfRestriction's contradicting doc comment is corrected.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.11.3-3",
@@ -7206,13 +7206,13 @@
   "ordinal": 3,
   "subject": "Data-address-identifier",
   "rule-digest": "5c4d267f7df5",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AddressOfOperandScreen.cs#Admit",
+  "test-ref": "conformance:negative/pb1407-address-of-constant-record",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b). SR3 (cite.py OK 3)). Not screened. Probe N5: `01 CR CONSTANT RECORD. 05 CR-A PIC X(4) VALUE \"ABCD\".` + `SET P TO ADDRESS OF CR` and `SET P TO ADDRESS OF CR-A` both compile and run clean (the pointer then lets a BASED view write the constant record). Expected: compile-time error for both operands. Finding: missing §8.4.3.11.3 operand screen. || editions as written by the adjudicator: 2014, 2023 (CONSTANT RECORD clause is a COBOL-2014 facility; Annex E.2 item 10 changes its placement in 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1407. A CONSTANT RECORD item and an item subordinate to one (DataBinder.IsConstantRecordItem) are refused COBOLNET2785 in every ADDRESS OF surface; an ordinary record is addressed in the same statements.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.11.3-4",
@@ -7221,13 +7221,13 @@
   "ordinal": 4,
   "subject": "Data-address-identifier",
   "rule-digest": "aeee6725503c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AddressOfOperandScreen.cs#Admit; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#BitStartOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf",
+  "test-ref": "conformance:negative/pb1407-address-of-bit-alignment; conformance:2002/pb1407_address_of_reference_modified",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b). SR4 a) literal-only subscripts/ref-mod without exponentiation, b) byte-aligned (cite.py OK 4) a) and 4) b)). Neither screened. Probe N6: `05 B1 PIC 1(3) USAGE BIT. 05 B2 PIC 1(5) USAGE BIT.` + `SET P TO ADDRESS OF B2` (B2 starts at bit 3 - not byte-aligned) compiles and runs clean. Probe B2: `05 B1 PIC 1(8) USAGE BIT OCCURS 3` with `ADDRESS OF B1(I)` (data-name subscript) and `ADDRESS OF B1(2 ** 1)` (exponentiation) compile clean; `B1(2)` and `B1(1 + 1)` are the legal controls. Expected: compile-time error for the three violating operands. (Reference-modification is refused wholesale by ResolveForAddressOf, which over-covers the ref-mod half of a).) Finding: missing §8.4.3.11.3 operand screen. || editions as written by the adjudicator: 2002, 2014, 2023 (bit data items exist from COBOL-2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1407. A bit item's subscripts and reference-modification leftmost position shall be literal (a: a data-name and an exponentiation are refused COBOLNET2786) and the item byte-aligned (b: a bit item starting at bit 3 is refused), through ParameterConformance.BitStartOf, the one static-start walk CALL SR6/SR8, INVOKE SR12 and the function-identifier SR14 already spend. A reference-modified operand is admitted (the wholesale refusal over-covered the ref-mod half of a): the golden takes ADDRESS OF BV(9:8), byte 1 of a 16-bit item.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.11.3-5",
@@ -7251,13 +7251,13 @@
   "ordinal": 6,
   "subject": "Data-address-identifier",
   "rule-digest": "b8a948541039",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/AddressOfOperandScreen.cs#Admit; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf",
+  "test-ref": "conformance:negative/pb1407-address-of-dynamic-capacity",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b). SR6 (cite.py OK 6)). Dynamic-length halves not screened: probe N7A `01 DR. 05 D1 PIC X DYNAMIC LENGTH.` + `SET P TO ADDRESS OF D1` (a dynamic-length elementary item) compiles and runs clean. (`ADDRESS OF DR` - the group itself, not subordinate - is legal and accepted.) Dynamic-capacity halves are refused, but only incidentally: N7B/N7C `ADDRESS OF DX(1)` / `ADDRESS OF DY(1)` -> COBOLNET0869 'unresolvable, reference-modified, or mis-subscripted' (not a rule screen). Expected: compile-time error for D1 and for any item subordinate to a group containing a dynamic-length item. The over-rejection of the group CONTAINING a dynamic-capacity table belongs to PB1042 (see GR1). Finding: missing §8.4.3.11.3 operand screen. || editions as written by the adjudicator: 2014, 2023 (dynamic-length items and dynamic-capacity tables are COBOL-2014 facilities)",
-  "state": "GAP"
+  "notes": "kb/Work PB1407. A dynamic-length elementary item, an element of and an item under a dynamic-capacity table, and an item under a group that contains a dynamic-length elementary item are each refused COBOLNET2785 by name; the 01 group that itself contains the dynamic item is none of the four shapes and stays addressable, as the rule reads.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.11.4-1",
@@ -45097,8 +45097,8 @@
   "subject": "SET statement",
   "rule-digest": "dbef5caa0790",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressStatement; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#BindSetAddress; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#ScreenPointerReceiverRestriction; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#AddressOfRestriction; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#PointerRestriction; src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs#EmitSetAddressOfBased; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs#BindSetPointer",
-  "test-ref": "conformance:2023/pb80_based_odo_group; conformance:negative/pb153-set-address-strong-to-unrestricted; conformance:negative/pb153-set-unrestricted-to-address-of-strong; conformance:negative/pb450-set-format7-restricted-sender-second-receiver; conformance:2002/pb450_set_format7_receiving_list; conformance:negative/pb548-set-unrestricted-into-restricted; conformance:negative/pb548-set-restricted-into-unrestricted; conformance:2002/pb548_set_restricted_pointer_plain",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressStatement; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#BindSetAddress; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#ScreenPointerReceiverRestriction; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#AddressOfRestriction; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#PointerRestriction; src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs#EmitSetAddressOfBased; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs#BindSetPointer; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#ScreenBasedReceiverRestriction",
+  "test-ref": "conformance:2023/pb80_based_odo_group; conformance:negative/pb153-set-address-strong-to-unrestricted; conformance:negative/pb153-set-unrestricted-to-address-of-strong; conformance:negative/pb450-set-format7-restricted-sender-second-receiver; conformance:2002/pb450_set_format7_receiving_list; conformance:negative/pb548-set-unrestricted-into-restricted; conformance:negative/pb548-set-restricted-into-unrestricted; conformance:2002/pb548_set_restricted_pointer_plain; conformance:negative/pb665-set-address-of-untyped-from-restricted; conformance:2002/pb665_restricted_pointer_conforming",
   "derivation": "",
   "editions": "2002,2014,2023",
   "notes": "kb/Work PB89, then kb/Work PB153, then kb/Work PB450 half 2 (wave 43 group D/E). SR19 IS THREE SENTENCES, AND THE ROW NAMED A WITNESS FOR ONLY THE FIRST. PB89 landed sentence 1's TO NULL arm ('identifier-6 shall be the predefined address NULL or shall reference a data-pointer' - it had been a parse error) and the row's single test-ref, conformance:2023/pb80_based_odo_group, exercises exactly that and nothing else; sentences 2 and 3 are the restricted-data-pointer screens, which PB153 landed with two negatives the row never named. This record adds them. ### SENTENCE 3 IS NOT SR20. The converse sentence ('If identifier-6 references a restricted data-pointer, either identifier-5 shall reference a data-pointer restricted to the same type or data-name-1 shall be a typed item of the type to which identifier-6 is restricted' - cite.py --check 14.9.39.3 OK, returned as 19)) is an UNNUMBERED continuation paragraph of rule 19; RENDERED at 300 dpi from the printed page (folio 736 / PDF p766), 20) is FORMAT 8's 'Identifier-12 shall reference a data item of category function-pointer ...'. Six code sites and two goldens carried the inherited SR20, including the user-visible COBOLNET0869 message; all are corrected. ### AND PB450 OPENED A CELL SENTENCE 3 COULD NOT REACH. Until Format 7's receiving operand became the printed repeated brace, identifier-6's restriction reached the screen only through an `ADDRESS OF x` sender (Annex D.9.2.2 source 2, 8.4.3.11.4 GR2), because the two fixed productions split on the SENDER's spelling meant a PLAIN restricted pointer item could never stand as identifier-6 beside an ADDRESS OF receiver - MEASURED before the landing, `SET ADDRESS OF B1 P-PLAIN TO P-RESTRICTED` was `error COBOL0001: unexpected 'P-PLAIN'`. It is now screened from D.9.2.2 source 1 as well (13.18.60.4 GR23, 'If type-name-1 is specified, this data item is a restricted data-pointer' - cite.py --check OK), and negative/pb450-set-format7-restricted-sender-second-receiver pins it at the SECOND receiving operand with the first one conforming, so the case cannot pass for the wrong reason. Both SR19 screens are asked PER RECEIVING OPERAND (ScreenPointerReceiverRestriction), because the restriction is the operand's and not the statement's.",
@@ -45171,13 +45171,13 @@
   "ordinal": 24,
   "subject": "SET statement",
   "rule-digest": "7bea74bc481b",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#usageKeyword",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#BindSetUpDown; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#IsRestrictedToStrongType",
+  "test-ref": "conformance:negative/pb816-set-up-by-strong-restricted-pointer; conformance:2002/pb665_restricted_pointer_conforming",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work/PB389.md — Citation validated: `cite.py --check 14.9.39.3 \"Identifier-9 shall not be a data-pointer restricted to a type described with the STRONG phrase\"` -> OK, Syntax rules 24) (FORMAT 10).\n\nTHE RULE'S SUBJECT CANNOT BE DECLARED. The printed USAGE clause format carries `POINTER [ TO type-name-1 ]` (specs/ISO_COBOL.md section 13.18.60.2), and section D.9.2.2 rule 1 names that spelling as the way a restricted data-pointer is made (`cite.py --check D.9.2.2 \"USAGE POINTER TO type-name-1\"` -> OK). MEASURED (probe g4_ptr_to_type, --std 2002 and --std 2023, identical): `01 P1 USAGE POINTER TO T-A.` -> `COBOL0307: unexpected 'TO'. A period may be missing at the end of the previous sentence.` - a bare syntax error with a misleading hint, not a named refusal. With no restricted data-pointer declarable, identifier-9 can never be 'a data-pointer restricted to a type described with the STRONG phrase' and the rule has no input.\n\nI CHECKED THE COMPLEMENT RATHER THAN ASSUMING IT: the omission is in the USAGE grammar, not in a binder screen, so it is invisible to the dossier's 14.9.39 citation regex and to its 'SET' keyword derivation - neither the grammar block nor the source block returns CobolData.g4:445. `grep -n \"POINTER (TO\\|POINTER TO\" src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4` returns only the PROGRAM-POINTER and FUNCTION-POINTER rules.\n\nSTRANDED SIBLINGS: the same missing phrase also strands SR19's second and third sentences (a sibling part's row - 'If identifier-5 references a restricted data-pointer ...'), so one grammar alternative is the whole cost. HARM: rejects legal COBOL-2002+ with an unnamed COBOL0307, which is worse than the 0899 staged-loud posture PROGRAM-POINTER TO and FUNCTION-POINTER TO get for the same shape - three sibling usages, two of them refused by name and one by a parse error.  || CODE SITES (verbatim from the adjudication, kept because the schema's code-location is symbol-keyed, not line-keyed): src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4:445 - usageKeyword's alternative is the bare token `POINTER`, with no `(TO cobolWord)?` tail (contrast programPointerUsage at :455 and functionPointerUsage at :461, which both carry one). PicInfo.PointerItem (src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs:314-316) is a singleton with no restriction field, so the model cannot represent a restricted data-pointer either. No STRONG-phrase test appears anywhere in the SET path.",
-  "state": "GAP"
+  "notes": "kb/Work PB816 (the premise 'the rule's subject cannot be declared' was stale: PB153 landed POINTER TO). Format 10's receivers each go through StrongTypeModel.IsRestrictedToStrongType (the pointer's restriction resolves to a STRONG TYPEDEF): SET P UP BY / DOWN BY over such a pointer, alone or in a list, is refused COBOLNET0869 naming SR24; an unrestricted pointer and a pointer restricted to a WEAK type stay legal (positive golden).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.39.3-25",
@@ -57621,13 +57621,13 @@
   "ordinal": 0,
   "subject": "Data-address-identifier",
   "rule-digest": "aafcdc6a4110",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressSender",
-  "test-ref": "conformance:2002/address_of_qualified",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressSender; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf; src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs#AddressOfText",
+  "test-ref": "conformance:2002/address_of_qualified; conformance:2002/pb1407_address_of_reference_modified",
   "derivation": "",
   "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1407 (registrar 15b). Format `ADDRESS OF identifier-1`, only ADDRESS underlined (cite.py --check 8.4.3.11.2 \"OF identifier-1\" -> OK). Grammar `dataAddressIdentifier : ADDRESS OF? dataReference` is the ONE rule reused by the SET sender, CALL/INVOKE arguments and the relation operand. Probe FM.cob: `SET P TO ADDRESS W` (OF omitted) and `CALL ... BY CONTENT ADDRESS W` compile and run at 2023 and 2002 (DISPLAY via BASED view prints ABC); --std 85 raises COBOLNET0900. The covering golden exercises the OF-present spelling only; the OF-omitted spelling is witnessed only by this probe (and the OptionalWordSubsetDriftTests grammar drift test). || REFUTED: PARTIAL — identifier-1 is a general identifier, and SR4 a) (cite.py OK 8.4.3.11.3 4) a)) speaks of 'subscripting and reference modification in identifier-1', so a reference-modified identifier-1 is legal source. The binder (PtrBinder.PtrBindAddressOf via Refs.ResolveForAddressOf) rejects any reference-modified operand with COBOLNET0869 ('the operand is unresolvable, reference-modified, or mis-subscripted'), with no spec basis. The format therefore rejects legal source for one operand shape. The OF-omitted, qualified, subscripted, relation-operand and CALL/INVOKE shapes do work. || editions as written by the adjudicator: 2002, 2014, 2023 (absent from COBOL-85; the introduction gate COBOLNET0900 fires at --std 85)",
-  "state": "GAP"
+  "notes": "kb/Work PB1407. The one shape the format refused, a reference-modified identifier-1 (legal per 8.4.3.11.3 SR4 a)), is admitted through the ONE ref-mod admission (ReferenceResolver.ReadScreenedRefMod) and addresses its leftmost position (8.4.3.11.4 GR1 over 8.4.3.3.4 GR5), range-checked by the same CobolString test as a read. The OF-omitted, qualified, subscripted, relation-operand and CALL/INVOKE shapes were already witnessed.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.12.2",

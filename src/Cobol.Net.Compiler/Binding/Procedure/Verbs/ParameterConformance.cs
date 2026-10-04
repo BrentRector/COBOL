@@ -392,19 +392,56 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// <param name="clause">The rule the message cites.</param>
     internal void ScreenBitAlignment(Place p, DiagnosticDescriptor code, string subject, string clause)
     {
+        var start = BitStartOf(p);
+        switch (start.Fault)
+        {
+            case BitStartFault.NonLiteralRefMod:
+                ctx.Edition.Error(code,
+                    $"{subject} '{p.Item.CobolName}': a bit item's reference-modification leftmost position "
+                    + $"shall consist of only fixed-point numeric literals (ISO {clause})");
+                return;
+            case BitStartFault.NonLiteralSubscript:
+                ctx.Edition.Error(code,
+                    $"{subject} '{p.Item.CobolName}': a bit item's subscripts shall consist of only fixed-point numeric "
+                    + $"literals or all-literal arithmetic expressions without exponentiation (ISO {clause})");
+                return;
+        }
+        if (start.Bits is { } bits && bits % BitLayout.BitsPerCharacter != 0)
+            ctx.Edition.Error(code,
+                $"{subject} '{p.Item.CobolName}' starts at bit {bits} of its record — a bit item passed by "
+                + $"reference shall be aligned on a byte boundary (ISO {clause} / §8.5.1.6.3)");
+    }
+
+    /// <summary>Why <see cref="BitStartOf"/> could not give a start bit: the operand is not statically placed.</summary>
+    internal enum BitStartFault
+    {
+        /// <summary>No fault: <see cref="BitStart.Bits"/> is the start bit, or null for a shape the walk cannot model.</summary>
+        None,
+        /// <summary>A reference-modification leftmost position that is not a fixed-point numeric literal expression.</summary>
+        NonLiteralRefMod,
+        /// <summary>A subscript that is not a fixed-point numeric literal expression.</summary>
+        NonLiteralSubscript,
+    }
+
+    /// <summary>The static start of a bit item: <paramref name="Bits"/> from the start of its level-01 record, or null
+    /// when the chain is an unmodelled one (never rejected); <paramref name="Fault"/> when the position is not
+    /// compile-time knowable.</summary>
+    internal readonly record struct BitStart(long? Bits, BitStartFault Fault);
+
+    /// <summary>⛔ THE ONE STATIC-START WALK OF A BIT ITEM (§8.5.1.6.3 cursor walk), shared by every rule that wants a
+    /// bit item "aligned on a byte boundary" with literal subscripts and reference-modification positions — CALL
+    /// §14.9.4.3 SR6/SR8, INVOKE §14.9.23.3 SR12, function §8.4.3.2.3 SR14 (through
+    /// <see cref="ScreenBitAlignment"/>) and the data-address-identifier §8.4.3.11.3 SR4 (kb/Work PB1407). It reports
+    /// nothing; each rule words its own diagnostic.</summary>
+    internal static BitStart BitStartOf(Place p)
+    {
         long extra = 0;
         Place core = p;
         while (core is PlaceDecorator dec)
         {
             if (core is RefModPlace rm)
             {
-                if (ConstIndex(rm.Start) is not { } s0)
-                {
-                    ctx.Edition.Error(code,
-                        $"{subject} '{p.Item.CobolName}': a bit item's reference-modification leftmost position "
-                        + $"shall consist of only fixed-point numeric literals (ISO {clause})");
-                    return;
-                }
+                if (ConstIndex(rm.Start) is not { } s0) return new BitStart(null, BitStartFault.NonLiteralRefMod);
                 extra += s0 - 1;
             }
             core = dec.Inner;
@@ -421,17 +458,13 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         // occurrence's start. A BASED class's runtime displacement is whole bytes and cannot move the answer.
         if (core is RedefViewPlace { Bit: { } bw, ViewItem.Class: { } viewCls })
         {
-            if (ConstIndex(bw.ClassRelativeExpr) is not { } rel)
-            {
-                ReportNonLiteralSubscript();
-                return;
-            }
-            if (RecordBitOffset(viewCls.Canonical) is not { } canon) return;   // an unmodelled chain — never reject
-            ReportMisaligned(canon + rel + extra);
-            return;
+            if (ConstIndex(bw.ClassRelativeExpr) is not { } rel) return new BitStart(null, BitStartFault.NonLiteralSubscript);
+            return RecordBitOffset(viewCls.Canonical) is not { } canon
+                ? new BitStart(null, BitStartFault.None)   // an unmodelled chain — never reject
+                : new BitStart(canon + rel + extra, BitStartFault.None);
         }
         AccessPath? path = core switch { MemberPlace mp => mp.Path, DynTablePlace dp => dp.Path, _ => null };
-        if (path is null) return;
+        if (path is null) return new BitStart(null, BitStartFault.None);
         var chain = new List<DataItem>();
         for (var d = core.Item; d is not null; d = d.Parent) chain.Insert(0, d);
         var subs = new Queue<string>();
@@ -446,34 +479,17 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             if (i > 0)
             {
                 int within = BitLayout.StartBitWithin(chain[i - 1], chain[i]);
-                if (within < 0) return;
+                if (within < 0) return new BitStart(null, BitStartFault.None);
                 bit += within;
             }
             bool tabled = chain[i].Occurs is not null || chain[i].IsDynamicTable || chain[i].OccursSpec is not null;
             if (tabled && subs.Count > 0)
             {
-                if (ConstIndex(subs.Dequeue()) is not { } k)
-                {
-                    ReportNonLiteralSubscript();
-                    return;
-                }
+                if (ConstIndex(subs.Dequeue()) is not { } k) return new BitStart(null, BitStartFault.NonLiteralSubscript);
                 bit += (k - 1) * (long)BitLayout.StrideBits(chain[i]);   // a SUBSCRIPT stride — ALIGNED strides whole bytes (§13.18.1.4 GR2)
             }
         }
-        ReportMisaligned(bit + extra);
-
-        void ReportNonLiteralSubscript() =>
-            ctx.Edition.Error(code,
-                $"{subject} '{p.Item.CobolName}': a bit item's subscripts shall consist of only fixed-point numeric "
-                + $"literals or all-literal arithmetic expressions without exponentiation (ISO {clause})");
-
-        void ReportMisaligned(long start)
-        {
-            if (start % BitLayout.BitsPerCharacter != 0)
-                ctx.Edition.Error(code,
-                    $"{subject} '{p.Item.CobolName}' starts at bit {start} of its record — a bit item passed by "
-                    + $"reference shall be aligned on a byte boundary (ISO {clause} / §8.5.1.6.3)");
-        }
+        return new BitStart(bit + extra, BitStartFault.None);
     }
 
     /// <summary>The start bit of <paramref name="item"/> within its level-01 record — the §8.5.1.6.3 cursor walk

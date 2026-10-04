@@ -4,12 +4,14 @@
       *> INITIALIZE (13.18.15.4 GR1), and an INITIALIZE sends each VALUE-less leaf its category's figurative
       *> constant (14.9.20.4 GR6 c): the fill must not reach it. An ordinary record in the same program is
       *> filled, so the fill is genuinely in force. Every storage lane of a record seeds the same content: the
-      *> record-struct field (CR), a REDEFINES window over it (RV), a record whose ADDRESS is taken (CP, its
-      *> shared cell) and an EXTERNAL one (CT, the run-unit cell).
+      *> record-struct field (CR), a REDEFINES window over it (RV), a second record (CP) and an EXTERNAL one
+      *> (CT, the run-unit cell). (This golden used to take ADDRESS OF CP, to reach the shared-cell lane; 8.4.3.11.3
+      *> SR3 -- "Identifier-1 shall not reference a data item that is described with the CONSTANT RECORD clause" --
+      *> forbids that operand, so a constant record never lives on an address-taken cell: kb/Work PB1407.)
       *> WHY EACH LINE CAN FAIL:
       *>   CR=   [     0.00  0  0]  A1 is SPACES (not Z), E1 and both K occurrences the edited zero (not Z).
       *>   RV=   [  0.00]          the REDEFINES window reads the same edited zero.
-      *>   CP=   [    0]           the address-taken record's cell: PA spaces, PE the edited zero.
+      *>   CP=   [    0]           the second record: PA spaces, PE the edited zero.
       *>   P=    [ZZZZ]            the ordinary item IS filled with X"5A".
       *>   EXT=  [  0]             the EXTERNAL constant's shared cell seeds the edited zero (not Z).
        IDENTIFICATION DIVISION.
@@ -26,14 +28,12 @@
        01 CP CONSTANT RECORD.
            05 PA PIC X(2).
            05 PE PIC ZZ9.
-       01 PTR USAGE POINTER.
        01 P PIC X(4).
        01 CTT IS EXTERNAL TYPEDEF STRONG.
            05 CT-E PIC ZZ9.
        01 CT IS EXTERNAL CONSTANT RECORD TYPE CTT.
        PROCEDURE DIVISION.
        MAIN.
-           SET PTR TO ADDRESS OF CP
            DISPLAY "CR=[" CR "]"
            DISPLAY "RV=[" RV "]"
            DISPLAY "CP=[" CP "]"

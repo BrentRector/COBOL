@@ -10,10 +10,13 @@
       *> Expected output, from those rules:
       *>   FACTORY  ALLOCATE FB INITIALIZED (14.9.3.4 GR7 -- as INITIALIZE ... TO DEFAULT: FB2 = zero) + 7  -> F:HI007
       *>   REC(0) -> REC(1) -> REC(2): each LB addresses ITS OWN activation's LV ("L0 ", "L1 ", "L2 "),
-      *>     printed innermost first, then re-based onto the object's OW ("OBJ").
-      *>   WSM twice: WC, WB and WP are OBJECT data (working-storage of the instance definition), so WP keeps the
-      *>     address of WC and the second activation adds to the same WC -> W:1, W:2.
-      *>   GET property PV reads the object item whose address M1 took (the record now lives on a cell).
+      *>     printed innermost first, then re-based onto an ALLOCATEd copy of the object's OW ("OBJ").
+      *>   WSM twice: WB and WP are OBJECT data (working-storage of the instance definition), so WP keeps the
+      *>     address ALLOCATE returned and the second activation adds to the same WB -> W:1, W:2.
+      *>   M1 allocates the BASED object item PB and copies the property PV into it; property PV reads back.
+      *> 8.4.3.11.3 SR1 ("Identifier-1 shall not be defined in the working-storage or file section of an object or
+      *> a factory object") forbids ADDRESS OF an item of the object's own working-storage, so every address into
+      *> instance data below is an ALLOCATE's (14.9.3), never an ADDRESS OF (kb/Work PB1062).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB956BAS.
        ENVIRONMENT DIVISION.
@@ -70,7 +73,6 @@
        01  OW PIC X(3) VALUE "OBJ".
        01  PV PIC X(4) VALUE "PROP" PROPERTY.
        01  PB PIC X(4) BASED.
-       01  WC PIC 9 VALUE 0.
        01  WB PIC 9 BASED.
        01  WP USAGE POINTER.
        PROCEDURE DIVISION.
@@ -92,21 +94,23 @@
                SUBTRACT 1 FROM D
            END-IF.
            DISPLAY "R" D ":" LB.
-           SET ADDRESS OF LB TO ADDRESS OF OW.
+           ALLOCATE LB.
+           MOVE OW TO LB.
            DISPLAY "R" D ":" LB.
        END METHOD REC.
        METHOD-ID. WSM.
        PROCEDURE DIVISION.
            IF WP = NULL
-               SET WP TO ADDRESS OF WC
+               ALLOCATE WB INITIALIZED RETURNING WP
            END-IF.
            SET ADDRESS OF WB TO WP.
            ADD 1 TO WB.
-           DISPLAY "W:" WC.
+           DISPLAY "W:" WB.
        END METHOD WSM.
        METHOD-ID. M1.
        PROCEDURE DIVISION.
-           SET ADDRESS OF PB TO ADDRESS OF PV.
+           ALLOCATE PB.
+           MOVE PV TO PB.
            DISPLAY "M1:" PB.
        END METHOD M1.
        END OBJECT.

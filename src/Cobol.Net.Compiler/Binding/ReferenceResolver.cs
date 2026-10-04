@@ -561,14 +561,7 @@ public sealed class ReferenceResolver(DataBinder data)
         // `??=` kept the FIRST of each carrier and the DEFAULT-mode form then outranked the SUBSCRIPT-mode one,
         // so `MOVE A (3:4)(2:2)` COMPILED CLEAN and returned A(2:2) — a silent wrong value, not a composition
         // and not a rejection.
-        if (written.RefModCount > 1)
-        {
-            if (!_probing && _diagnosed.Add(dref))   // R30 purity: a probe never diagnoses (kb/Work PB157)
-                data.Edition.Error(DiagnosticCatalog.RefModOfRefMod,
-                    $"'{name}' carries {written.RefModCount} reference modifications; a reference-modified item cannot itself "
-                    + "be reference-modified (ISO §8.4.3.3.3 SR3). Compose the positions into one modifier instead.");
-            return Refused();
-        }
+        if (!ScreenRefModCount(dref, written, name)) return Refused();
 
         DataItem? item = qualifiers.Count > 0 ? ResolveQualified(name, qualifiers) : ResolveUnqualified(name);
         // The object-property fallback (§8.4.3.9.2 — `prop OF {class-name | identifier}` is textually a
@@ -604,23 +597,57 @@ public sealed class ReferenceResolver(DataBinder data)
         // are the same item. The syntactic path, the data-division path (ResolveItemRefMod) and the resolved-place
         // path (RefModOf) all read it this way, so SR1 and the view are asked of one description.
         DataItem described = inner.Item;
-        // ⛔ ISO §8.4.3.3.3 SR1 — WHAT identifier-1 MAY BE, in ONE place (kb/Work PB70). An excluded shape is a
-        // bind-time rejection (COBOLNET1647), never the run-time NotImplemented a sending ref-mod used to reach nor
-        // the silent drop a receiving one fell into.
+        if (ReadScreenedRefMod(dref, written, described, out var refusal) is not { } spec) return refusal!;
+        return RefModView(described, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
+    }
+
+    /// <summary>⛔ §8.4.3.3.3 SR3 — "Identifier-1 shall not be a reference-modification format identifier." The
+    /// grammar cannot express it, so the written reference is COUNTED (<see cref="WrittenReference.RefModCount"/>);
+    /// ONE screen for every entry that reads a reference-modified identifier — <see cref="Resolve"/> and
+    /// <see cref="ResolveForAddressOf"/> (kb/Work PB1407). False having reported.</summary>
+    private bool ScreenRefModCount(Core.DataReferenceContext dref, WrittenReference written, string name)
+    {
+        if (written.RefModCount <= 1) return true;
+        if (!_probing && _diagnosed.Add(dref))   // R30 purity: a probe never diagnoses (kb/Work PB157)
+            data.Edition.Error(DiagnosticCatalog.RefModOfRefMod,
+                $"'{name}' carries {written.RefModCount} reference modifications; a reference-modified item cannot itself "
+                + "be reference-modified (ISO §8.4.3.3.3 SR3). Compose the positions into one modifier instead.");
+        return false;
+    }
+
+    /// <summary>⛔ THE ONE ADMISSION OF A REFERENCE MODIFIER, from the written reference to the screened
+    /// <see cref="RefModSpec"/> (kb/Work PB1407 extracted it from <see cref="Resolve"/> so ADDRESS OF reads the same
+    /// rules): §8.4.3.3.3 SR1 — WHAT identifier-1 MAY BE (kb/Work PB70; a bind-time rejection, COBOLNET1647, never
+    /// the run-time NotImplemented a sending ref-mod used to reach nor the silent drop a receiving one fell into),
+    /// the spec read off whichever carrier the lexer chose, and the LITERAL out-of-range screen (kb/Work PB1707
+    /// part 1, R60 — refused while checking is off, compiled with a warning while it is on, the run-time raise then
+    /// being what the program asked for). <paramref name="described"/> is identifier-1's DESCRIPTION: the item its
+    /// place stands for, not the name as written — for a no-THROUGH RENAMES alias that is data-name-2, whose
+    /// attributes §13.18.45.4 GR1 makes data-name-1's own. Null having reported, with the answer in
+    /// <paramref name="refusal"/>.</summary>
+    private RefModSpec? ReadScreenedRefMod(Core.DataReferenceContext dref, WrittenReference written, DataItem described,
+        out RefResolution? refusal)
+    {
+        refusal = null;
         if (RefModExclusion(described) is { } why)
         {
             if (!_probing && _diagnosed.Add(dref))   // R30 purity: a probe never diagnoses (kb/Work PB157)
                 data.Edition.Error(DiagnosticCatalog.RefModIdentifierNotPermitted,
                     $"'{DataBinder.WrittenText(dref)}': reference modification of {why} is not permitted (ISO §8.4.3.3.3 SR1)");
-            return Refused();
+            refusal = RefResolution.Refused(DataBinder.WrittenText(dref));
+            return null;
         }
-        if ((cleanRef is not null ? ReadRefMod(cleanRef) : ReadRefMod(refCtx!)) is not { } spec)
-            return SegmentFailure(DataBinder.WrittenText(dref));   // a bound the materializer refused or deferred (§8.4.3.3.3 SR4)
-        // ⛔ A LITERAL OUT-OF-RANGE REFERENCE MODIFICATION IS SCREENED HERE, once, where the item and the positions
-        // are both known (kb/Work PB1707 part 1, R60): refused while checking is off, compiled with a warning while
-        // it is on (the run-time raise is then what the program asked for).
-        if (!ScreenRefModLiterals(dref, described, spec, dref.Start.Line)) return Refused();
-        return RefModView(described, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
+        if ((written.RefModPart is not null ? ReadRefMod(written.RefModPart) : ReadRefMod(written.RefModGroup!)) is not { } spec)
+        {
+            refusal = SegmentFailure(DataBinder.WrittenText(dref));   // a bound the materializer refused or deferred (§8.4.3.3.3 SR4)
+            return null;
+        }
+        if (!ScreenRefModLiterals(dref, described, spec, dref.Start.Line))
+        {
+            refusal = RefResolution.Refused(DataBinder.WrittenText(dref));
+            return null;
+        }
+        return spec;
     }
 
     /// <summary>Reference-modify an ALREADY-RESOLVED place — §8.4.3.1.4 GR1 g)'s tail ("a reference modifier
@@ -1641,15 +1668,20 @@ public sealed class ReferenceResolver(DataBinder data)
     /// occurrence k is the class cell displaced by the SAME in-class occurrence arithmetic the Tier-B view
     /// window uses (<see cref="PlaceForItem"/> — a table lays its occurrences end-to-end in the ONE cell
     /// image), so the two share one formula; the displacement string is the D10 transitional index carrier
-    /// (a rendered expression, like <see cref="FixedTableSegment.OneBasedIndex"/>). Null overall = an
-    /// unresolvable name, a subscript-count mismatch, or a reference-modified operand (ref-mod addresses a
-    /// character SPAN, not a data item — a named residue) — the caller reports loud, never a wrong address.</summary>
-    internal (DataItem Item, string? OccursDisplacement)? ResolveForAddressOf(Core.DataReferenceContext dref)
+    /// (a rendered expression, like <see cref="FixedTableSegment.OneBasedIndex"/>).
+    /// <para>⛔ A REFERENCE-MODIFIED OPERAND IS LEGAL (kb/Work PB1407): §8.4.3.11.3 SR4 a) itself speaks of
+    /// "subscripting and reference modification in identifier-1", and identifier-1 is a general identifier. It goes
+    /// through the ONE ref-mod admission <see cref="ReadScreenedRefMod"/> that <see cref="Resolve"/> uses (SR3
+    /// count, SR1 exclusion, the spec, the literal range screen); the address is that of its leftmost position,
+    /// which the caller adds to the item's.</para>
+    /// Null overall = an unresolvable name, a subscript-count mismatch, or a reference refused by one of those
+    /// screens — the caller reports loud, never a wrong address.</summary>
+    internal AddressOfOperand? ResolveForAddressOf(Core.DataReferenceContext dref)
     {
         DataReferenceCst r = dref;
         if (r.Register != SpecialRegister.None || r.BaseName is not { } name) return null;
         var written = ReadWritten(dref);                  // the ONE decomposition (kb/Work PB443)
-        if (written.IsReferenceModified) return null;     // ref-mod → loud (a span, not an item)
+        if (!ScreenRefModCount(dref, written, name)) return null;
         var qualifiers = written.Qualifiers;
         var subCtx = written.SubscriptGroup;
         if (FindItem(name, qualifiers) is not { } item) return null;
@@ -1658,18 +1690,52 @@ public sealed class ReferenceResolver(DataBinder data)
         // table's FIRST occurrence for `ADDRESS OF E` — no subscript, no diagnostic, a pointer nobody asked for.
         // The ONE written-subscript reading every identifier entry shares (kb/Work PB1030 extracted it).
         if (ReadSubscripts(dref, item, subCtx, out var exprs) is not null) return null;
-        if (subCtx is null) return (item, null);
+        RefModSpec? refMod = null;
+        Place? bitPlace = null;
+        if (written.IsReferenceModified || BitLayout.IsBitItem(item))
+        {
+            var inner = PlaceForItem(item, exprs);
+            if (written.IsReferenceModified)
+            {
+                if (ReadScreenedRefMod(dref, written, inner?.Item ?? item, out _) is not { } spec) return null;
+                refMod = spec;
+            }
+            if (BitLayout.IsBitItem(item)) bitPlace = inner;
+        }
+        if (subCtx is null) return new AddressOfOperand(item, null, refMod, bitPlace);
         // The in-class OCCURS levels outer→inner — the PlaceForItem Tier-B walk (same layout, same formula).
         var occursLevels = new List<DataItem>();
+        bool underDynamicTable = false;
         for (DataItem? n = item; n is not null && ReferenceEquals(n.Class, item.Class); n = n.Parent)
+        {
             if (n.Occurs is not null) occursLevels.Add(n);
+            underDynamicTable |= n.IsDynamicTable;
+        }
+        // SR6's refusal is the binder's, and it needs the operand: a dynamic level has no fixed stride to render.
+        if (underDynamicTable) return new AddressOfOperand(item, null, refMod, bitPlace);
         occursLevels.Reverse();
         if (occursLevels.Count != exprs.Count) return null;   // wrong subscript count → loud
         // ByteWidth, for the same reason as the PlaceForItem twin above: the class backing is byte-addressed
         // and a NATIONAL element strides two bytes per position (kb/Work PB231; §13.18.60.4 GR8 / D-N1).
         string disp = string.Join(" + ", occursLevels.Select((lv, k) => $"({exprs[k]} - 1) * {lv.ByteWidth}"));
-        return (item, disp);
+        return new AddressOfOperand(item, disp, refMod, bitPlace);
     }
+
+    /// <summary>What an <c>ADDRESS OF identifier-1</c> operand (ISO §8.4.3.11) resolves to: the item, the OCCURS
+    /// displacement of its subscripts, the reference modification when one is written, and, for a bit item, the
+    /// place its §8.4.3.11.3 SR4 alignment proof walks.</summary>
+    /// <param name="Item">The data item the reference names (the table ELEMENT's item for a subscripted one).</param>
+    /// <param name="OccursDisplacement"><c>(idx − 1) × width [+ …]</c> bytes within the item's storage class, or null
+    /// for an unsubscripted reference — and for an item at or under a dynamic-capacity table, which §8.4.3.11.3 SR6
+    /// refuses before any address is formed (no occurrence of one has a fixed stride).</param>
+    /// <param name="RefMod">The screened reference modifier, or null when none is written. §8.4.3.11.4 GR1's
+    /// "address of identifier-1" is then the address of the unique data item reference modification creates
+    /// (§8.4.3.3.4 GR5), i.e. of its leftmost position.</param>
+    /// <param name="SubscriptedPlace">The item's place with its subscripts and WITHOUT the reference modification,
+    /// built only for a bit item (SR4's proof is a walk over a place); null for any other item and for a shape the
+    /// place builder cannot model, which the proof then accepts rather than reject what it cannot prove.</param>
+    internal readonly record struct AddressOfOperand(
+        DataItem Item, string? OccursDisplacement, RefModSpec? RefMod, Place? SubscriptedPlace);
 
     /// <summary>The STRUCTURAL access path to a Tier-B/Tier-C class's single stored backing field (the
     /// <see cref="RedefViewPlace"/> twin of the old string <c>BackingPath</c>). The backing is emitted in the
