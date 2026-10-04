@@ -2181,7 +2181,10 @@
   "pb1249-linkage-index-name-not-referenceable",
   "pb1249-linkage-redefines-of-non-formal",
   "pb1250-function-formal-arithmetic-receiver",
-  "pb1250-function-formal-refmod-receiver"
+  "pb1250-function-formal-refmod-receiver",
+  "pb995-sort-record-size-using-giving",
+  "pb995-merge-record-size-using-giving",
+  "pb1473-table-sort-all-not-rightmost"
  ],
  "pending": []
 }

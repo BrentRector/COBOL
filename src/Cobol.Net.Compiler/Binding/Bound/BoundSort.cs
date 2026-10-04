@@ -71,8 +71,14 @@ public sealed record BoundTableSort(
 public abstract record TableSortStorage
 {
     /// <summary>A table with its own typed element array, reached by <paramref name="Array"/> — the whole-table
-    /// access path, with an index for each enclosing table (<c>ReferenceResolver.BuildTablePath</c>).</summary>
-    public sealed record TypedArray(AccessPath Array) : TableSortStorage;
+    /// access path, with an index for each enclosing table (<c>ReferenceResolver.BuildTablePath</c>).
+    /// <para><paramref name="KeyWindowOuter"/> is null when every key is a stored member of the element struct (the key
+    /// is read as <c>element.MemberPath</c>). It is the enclosing tables' rendered index expressions when ANY key is not —
+    /// a key that lies behind a REDEFINES view of the element has no stored field on the struct (kb/Work PB599) — and then
+    /// EVERY key is read through its window at an occurrence number (<c>ReferenceResolver.ResolveItemAt</c>, the
+    /// <see cref="SharedArea"/> law), the element order is sorted, and the elements are placed back by that
+    /// permutation.</para></summary>
+    public sealed record TypedArray(AccessPath Array, IReadOnlyList<string>? KeyWindowOuter = null) : TableSortStorage;
 
     /// <summary>A table whose storage is a shared byte area — a REDEFINES class, a record area shared by several
     /// 01s, a BASED or EXTERNAL record. It has no element array: each element and each key is a window the class's
@@ -84,8 +90,10 @@ public abstract record TableSortStorage
 /// <summary>One Format-2 table-sort key: the C# member path RELATIVE to an element variable of a
 /// <see cref="TableSortStorage.TypedArray"/> table (empty = the element itself, ISO §14.9.40 GR23) and the key's
 /// <see cref="DataItem"/> (category/profile drive the typed compare). For a <see cref="TableSortStorage.SharedArea"/>
-/// table the member path is unused — the key item is addressed through the class's window law.</summary>
-public sealed record BoundTableSortKey(bool Descending, string MemberPath, DataItem Key);
+/// table the member path is unused — the key item is addressed through the class's window law. A null member path is a
+/// key with no stored field on the element struct (a REDEFINES-view member, kb/Work PB599): the statement reads every
+/// key of such a table through its window (<see cref="TableSortStorage.TypedArray.KeyWindowOuter"/>).</summary>
+public sealed record BoundTableSortKey(bool Descending, string? MemberPath, DataItem Key);
 
 /// <summary><c>MERGE file-name-1 …</c> (ISO §14.9.24): a k-way merge of the pre-sorted <paramref name="Using"/>
 /// streams — equal keys keep USING-file order, all of one file's records before the next file's (GR4a/GR4b) —
@@ -101,9 +109,10 @@ public sealed record BoundMerge(
 
 /// <summary><c>RELEASE record-name-1 [FROM x]</c> (ISO §14.9.32): release the SD record's image to the initial
 /// phase of the active sort (GR2). FROM ≡ <c>MOVE x TO record-name-1</c> then the same RELEASE (GR4). A varying SD
-/// releases at the length the RECORD VARYING DEPENDING ON item holds (§13.18.43 GR13); a fixed SD at the record
-/// area width (a short image is extended by the sort store's fixed-compare space extension, and filled for a GIVING
-/// file by §14.9.40.4 GR16; §14.9.40.4 GR7's fill is the USING transfer's — kb/Work PB1140).</summary>
+/// releases at the length the RECORD VARYING DEPENDING ON item holds (§13.18.43 GR13); a fixed SD at its ONE record
+/// size, the largest record description's (§13.18.43.4 GR5 a) — a shorter record description sends the record area's
+/// image, kb/Work PB322 F). A short USING-file record is filled by §14.9.40.4 GR7, the USING transfer's own rule
+/// (kb/Work PB1140), and a short RETURNed record for a GIVING file by GR16.</summary>
 public sealed record BoundRelease(
     FileModel File, Place Record, int RecordWidth, BoundMove? FromMove, SortVaryingInfo? Varying) : BoundStatement;
 

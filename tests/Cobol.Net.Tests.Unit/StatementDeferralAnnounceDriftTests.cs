@@ -29,12 +29,12 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class StatementDeferralAnnounceDriftTests
 {
-    /// <summary>A table SORT whose KEY is a REDEFINES view inside the table element is a pure job-1 deferral: legal
-    /// COBOL-2002+ source (§14.9.40 Format 2) that the typed-array sort path has not built (kb/Work PB599 — the
-    /// key has no stored field on the element struct). It sits behind a GO TO so the RUN never reaches
-    /// it — before PB236 that made the staged loud unobservable at EVERY stage. (Until kb/Work PB1175 this row was a
-    /// table SORT over a REDEFINES view itself, which is built now: the subject's storage form is a decision of the
-    /// binder, TableSortStorage.)
+    /// <summary>A SEARCH ALL of an OCCURS DYNAMIC table nested under another table is a pure job-1 deferral: legal
+    /// COBOL-2023 source (§14.9.37 Format 2; §13.18.38 Format 4) whose scan bound over the current capacity needs a
+    /// subscripted access path the binder has not built (SearchBinder). It sits behind a GO TO so the RUN never reaches
+    /// it — before PB236 that made the staged loud unobservable at EVERY stage. (Until kb/Work PB599 this row was a
+    /// table SORT keyed on a REDEFINES view inside the element, which is built now: the key is read through its
+    /// window; before kb/Work PB1175 it was a table SORT over a REDEFINES view itself.)
     /// <para>⚠ This row used ENTRY until kb/Work PB909, and that was a PIN OF THE WRONG KIND (kb/Work PB938): ISO/IEC
     /// 1989 defines no ENTRY statement, so the test was asserting that a vendor extension is a gap in WiseOwl COBOL
     /// rather than source the standard does not contain. ENTRY is now refused (COBOLNET2269).</para></summary>
@@ -44,13 +44,12 @@ PROGRAM-ID. PB236ANNOUNCE.
 DATA DIVISION.
 WORKING-STORAGE SECTION.
 01 TBL.
-   05 TE OCCURS 3.
-      10 TK PIC 99.
-      10 TKR REDEFINES TK PIC XX.
+   05 ROW OCCURS 2.
+      10 D PIC X OCCURS DYNAMIC ASCENDING KEY IS D INDEXED BY IX.
 PROCEDURE DIVISION.
 MAIN.
     GO TO SKIPPER.
-    SORT TE ASCENDING KEY TKR.
+    SEARCH ALL D(1) AT END DISPLAY "NF" WHEN D(1, IX) = "A" DISPLAY "FOUND" END-SEARCH.
 SKIPPER.
     DISPLAY "DONE".
     STOP RUN.
@@ -89,8 +88,8 @@ MAIN.
     {
         var (_, _, warnings) = Compile(DeferralProgram);
         string w = warnings.Single(x => x.Contains("COBOLNET1756", StringComparison.Ordinal));
-        Assert.Contains("pb236.cob(12,", w, StringComparison.Ordinal);   // the SORT line, not the program
-        Assert.Contains("SORT", w, StringComparison.Ordinal);
+        Assert.Contains("pb236.cob(11,", w, StringComparison.Ordinal);   // the SEARCH line, not the program
+        Assert.Contains("SEARCH", w, StringComparison.Ordinal);
     }
 
     [Fact]

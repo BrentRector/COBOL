@@ -5691,13 +5691,13 @@
   "ordinal": 6,
   "subject": "Subscripts",
   "rule-digest": "a618ccf56ac1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#MaterializeSubscriptSegment; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#IllegalSegmentMessage; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#TryBindAllArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveTableOperand",
-  "test-ref": "conformance:negative/pb1030-all-subscript-outside-function",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#MaterializeSubscriptSegment; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#IllegalSegmentMessage; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#TryBindAllArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#SortBindTable; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReadTableSubjectSubscripts; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveTableOperand",
+  "test-ref": "conformance:negative/pb1030-all-subscript-outside-function; conformance:negative/pb1473-table-sort-all-not-rightmost; conformance:negative/pb1055-table-sort-subject-subscripts; conformance:2002/pb1055_table_sort_nested_subject",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1473 (registrar 15c). Rule (cite.py --check 8.4.2.3.3 'The subscript ALL may be used only' -> OK §8.4.2.3.3 6); --check 'as the rightmost or only subscript of a table in the table format of a SORT statement' -> OK §8.4.2.3.3 6)). Two halves. (a) INTRINSIC-ARGUMENT half CONFORMS: ALL outside a function argument fails the subscript-segment parse and draws COBOLNET2363 naming SR6 (MOVE receiver - pb1030 witness; IF relation sr6h; `FUNCTION MAX(E1(ALL) + 1)` sr6d - the subscripted identifier is not itself the argument; `FUNCTION MAX(E1(E1(ALL)))` sr6e - ALL on the inner subscript identifier); IntrinsicBinder.TryBindAllArgument admits it only for a sole-data-reference argument (and §15.3's repeatable-argument condition, COBOLNET1645); `FUNCTION SUM(E1(ALL))` = 06 at 85/2002/2014/2023 (sr6_85); UDF arguments refuse it (UdfBinder, §9.4). (b) SORT half: `SORT E1(ALL) DESCENDING` over a one-dimensional table is accepted and sorts (sr6j -> 321, sr6k ASCENDING -> 123, at 2002 and 2023) = 'equivalent to omitting the ... only subscript'. ⛔ But SortBindTable reads only ResolveTableOperand(...).Item and never the written subscript segments (TableOperand carries their count, unread), so the 'rightmost or only' POSITION is never screened: scratchpad/adj-d2/out/probe/subscripts/sr6g.cob `SORT E2(ALL, 1) DESCENDING` over `05 R2 OCCURS 2. 10 E2 PIC 9 OCCURS 3.` compiles with only the COBOLNET1756 nested-table DEFERRAL warning (kb/Work PB1055, open - owns SR-14.9.40.3-13) and aborts at run time; spec-derived expected: a compile-time refusal - ALL is not the rightmost subscript. The legal twin `SORT E2(1, ALL)` (sr6c) draws the identical deferral, so the two are indistinguishable today and PB1055's landing will not by itself add the position screen. Aside (not decided here, SR5/SR3 territory): `SORT E1(2)` over a one-dimensional table (sr6i) is accepted and sorts the WHOLE table. [editions as adjudicated: 85 (intrinsic-argument half only - intrinsic functions via the ISO 1989:1985/Amd 1 intrinsic function module, Annex E bibliography [6]), 2002, 2014, 2023 (both halves; the table format of SORT is absent from 1985 and rejected COBOLNET0870 at --std 85)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1473 (discharged by PB1055's landing, re-probed on the w1012h build). cite.py --check 8.4.2.3.3 'as the rightmost or only subscript of a table in the table format of a SORT statement' -> OK §8.4.2.3.3 6). Two halves. (a) INTRINSIC-ARGUMENT half: ALL outside a function argument fails the subscript-segment parse and draws COBOLNET2363 naming SR6 (pb1030 witness). (b) SORT half: the Format-2 subject's WRITTEN subscripts are read once (ReferenceResolver.ReadTableSubjectSubscripts, kb/Work PB1055) and ALL stands only as the rightmost or only subscript: `SORT E2(ALL, 1) DESCENDING` over `05 R2 OCCURS 2. 10 E2 PIC 9 OCCURS 3.` draws COBOLNET2363 at 2002/2014/2023 (negative/pb1473-table-sort-all-not-rightmost pins ALL in the first position of two and of three), while its legal twin `SORT E2(1, ALL)` sorts ROW 1 (2002/pb1055_table_sort_nested_subject leg 2). The table format of SORT is absent from 1985, so (b) holds at 2002 and later.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.3.3-7",
@@ -26181,13 +26181,13 @@
   "ordinal": 5,
   "subject": "RECORD clause",
   "rule-digest": "1f023b9e2598",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ImpliesVariableFormat; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMin; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#AreaRecord; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindRelease",
-  "test-ref": "conformance:2014/pb981_fd_variable_length_records; conformance:2014/pb1276_varying_unstated_max_dynamic; conformance:2002/pb1277_record_size_in_bytes",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ImpliesVariableFormat; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMin; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMax; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#AreaRecord; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindRelease; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitRelease",
+  "test-ref": "conformance:2014/pb981_fd_variable_length_records; conformance:2014/pb1276_varying_unstated_max_dynamic; conformance:2002/pb1277_record_size_in_bytes; conformance:85/pb322_release_short_record_fixed_sd",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Re-verdicted by kb/Work PB1276/PB1277 (w61f); now owned by kb/Work PB322 (determination F). cite.py --check 13.18.43.4 'integer-1 shall be the record size of the largest record description entry' -> OK §13.18.43.4 5) a). Fixed by w61f: the implied Format 2 minimum/maximum are byte counts (PB1277) and equal the explicit clause's (PB1276, golden F4 leg); the implied Format 1 area record is the largest by BYTES (FileModel.AreaRecord; golden FA leg: X(15) vs N(10) picks the 20-byte record). Still open: the SD arm - a RECORD-clause-less SD releases record-name-1 at its OWN description size, neither implied Format 1's largest nor a declared Format 2 (kb/Work PB322 F; docs/CONFORMANCE.md DOC-A.1-147 ⚠). PARTIAL.",
-  "state": "GAP"
+  "notes": "Re-verdicted by kb/Work PB322 F (w1012h), closing the SD arm PB1276/PB1277 left open. cite.py --check 13.18.43.4 'If format 1 is implied, integer-1 shall be the record size of the largest record description entry in this file description entry.' -> OK §13.18.43.4 5) a). A RECORD-clause-less SD is the implied Format 1 of D-FRA (iv) exactly like an FD, so every record of its sort file is the largest description's size: RELEASE of a shorter record description sends the whole record area (BindRelease sizes the released range by the area, SortEmitter.EmitRelease sends SentRecordImage), and SORT GIVING writes AAAAZZZZZZ, not AAAA plus spaces.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.43.4-6",
@@ -39711,13 +39711,13 @@
   "ordinal": 3,
   "subject": "MERGE statement",
   "rule-digest": "45b1804c4d08",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenTransferRecordSizes; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordSizeRange",
+  "test-ref": "conformance:negative/pb995-merge-record-size-using-giving; conformance:85/pb995_sort_merge_record_size_ranges; conformance-test:SortMergeRecordSizeTests.RecordSizeRules_RefuseExactlyTheirViolations",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB995 (open). cite.py --check 14.9.24.3 \"the file description entry for file-name-2 or file-name-3 shall not describe a record that is larger than the record described for file-name-1\" -> OK §14.9.24.3 3). No code compares USING-file record sizes with the SD's: SortBinder.SortMapIoFiles checks only declared / not-SD / sequential, BindMerge nothing more (grep of src/Cobol.Net.* for a record-size cross-check against file-name-1 found none). Probes: msr3a (SD fixed 10, USING F1 record PIC X(20)) rc=0; msr3b (SD records 10 and 8 — implied variable, D-FRA — USING F1 record 5 < smallest 8) rc=0; msr3c (SD RECORD VARYING FROM 3 TO 10, USING F1 record 12 > largest) rc=0. Expected: each rejected at compile time. The GIVING twin (SR12) and SORT's GIVING rule are kb/Work PB995 (open); this USING half (and SORT's §14.9.40.3 SR5, --check OK) is not in PB995's rows. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB995. cite.py --check 14.9.24.3 'the file description entry for file-name-2 or file-name-3 shall describe neither records smaller than the smallest record nor larger than the largest record described for file-name-1' -> OK §14.9.24.3 3). The MERGE USING half: every USING file (the second as well as the first) is compared with the SD by the one screen; a larger or, for a variable-length SD, smaller or larger USING record is refused (COBOLNET1757, citing SR3).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-4",
@@ -39846,13 +39846,13 @@
   "ordinal": 12,
   "subject": "MERGE statement",
   "rule-digest": "3e3618015781",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenTransferRecordSizes; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordSizeRange",
+  "test-ref": "conformance:negative/pb995-merge-record-size-using-giving; conformance:85/pb995_sort_merge_record_size_ranges; conformance-test:SortMergeRecordSizeTests.RecordSizeRules_RefuseExactlyTheirViolations",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB995 (open). cite.py --check 14.9.24.3 \"the file description entry for file-name-1 shall not describe a record that is larger than the record described for file-name-4\" -> OK §14.9.24.3 12). No GIVING-size check: msr12a (SD 10, GIVING fixed 5) rc=0; msr12b (GIVING records 8 and 12, SD records 10 and 6 — 6 < smallest 8) rc=0. kb/Work PB995 (open) is exactly this rule for SORT and names 'MERGE's twin' in its title and 14.9.24.3 in spec_refs; this row belongs in its inventory_rows. || editions as adjudicated: 85/2002/2014/2023 (clause text)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB995. cite.py --check 14.9.24.3 'the file description entry for file-name-1 shall describe neither records smaller than the smallest record nor larger than the largest record described for file-name-4' -> OK §14.9.24.3 12). The MERGE GIVING half of the one screen: a fixed GIVING file smaller than the SD's record, and a variable GIVING file whose range does not contain the SD's, are refused (COBOLNET1757, citing SR12).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.24.3-13",
@@ -42966,13 +42966,13 @@
   "ordinal": 6,
   "subject": "RELEASE statement",
   "rule-digest": "db70c872f22b",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitRelease; src/Cobol.Net.Runtime/IO/CobolSort.cs#Release",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitRelease; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindRelease; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#TransfersPastRecord; src/Cobol.Net.Runtime/IO/CobolSort.cs#Release",
+  "test-ref": "conformance:85/pb322_release_short_record_fixed_sd",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB322. RULE (`--check 14.9.32.4 \"If the number of bytes to be released to the sort operation is greater than the number of bytes in record-name-1, the content of the bytes that extend beyond the end of record-name-1 are undefined.\"` => OK 14.9.32.4 6). The latitude is explicit: Annex A.2 (Undefined language element list) item 45 repeats the sentence for the RELEASE statement, so any content is conformant PROVIDED the release still happens and the run continues -- a crash or an unsuccessful release would NOT be, because GR6 presumes the over-long release occurs. WHAT THE CODE DOES: the varying arm emits `CobolString.RefMod(image, 1, (int)dep)` where the image is record-name-1's own width; CobolString.RefMod space-extends rather than throwing. PROBE out-b1/probe/gr6/gr6.cob -- `SD SRTF RECORD IS VARYING IN SIZE FROM 8 TO 20 DEPENDING ON WS-LEN` with `01 SRT-SHORT PIC X(8)` and `01 SRT-LONG PIC X(20)`; the shared area is filled with 20 'L's, WS-LEN is set to 12, and `RELEASE SRT-SHORT` releases 12 bytes from an 8-byte record-name-1. OBSERVED: `RELEASED-OK` then `LEN=0012 R=[LLLLLLLL            ]` -- the first 8 bytes are record-name-1's content and the 4 bytes past its end are spaces. No exception, no truncation of the released length, and the four extension bytes are exactly the ones A.2 item 45 leaves undefined. NO SPEC-DERIVED TEST covers the over-length release, so this row is CONFORMS-but-untested and stays a GAP. EDITIONS: Annex E lists no substantive change to 14.9.32; the rule is edition-neutral in its own text. || REFUTED: PARTIAL — GR6's antecedent -- 'the number of bytes to be released ... greater than the number of bytes in record-name-1' -- has TWO realizations under 13.18.43.4 GR13, and only ONE of them exists in this compiler. VERIFIED (GR13a, DEPENDING ON): the adjudicator's gr6 probe, and my own harder variant probe/ref-gr6/v.cob (RECORD VARYING 8 TO 20 DEPENDING ON WS-LEN with only an 8-byte 01 present, WS-LEN=20) -- 'RELEASED-OK', returned 'LEN=0020 R=[SSSSSSSS]', no exception, the run continues. Conformant, within Annex A.2 item 45. NOT VERIFIED (GR13b + 13.18.43.4 GR5a): with no RECORD clause the implicit clause is implementor-defined, and if format 1 is implied its size is 'the record size of the LARGEST record description entry in this file description entry' (cite.py --check 13.18.43.4 => OK 13.18.43.4 5) a)), which is precisely the fixed-length sort file 14.9.40 GR7 presupposes. In that model releasing a SHORT 01 of a multi-01 SD IS GR6's case. This compiler never produces it: SortBinder.BindRelease releases at record-name-1's OWN description size (SortBinder.cs:238-240 + BoundSort.cs:71). MEASURED at probe/ref-gr6/w.cob -- SD with 01 SRT-SHORT PIC X(4) and 01 SRT-LONG PIC X(10), no RECORD clause -- the sort store ends up holding a 4-byte record and a 10-byte record for ONE SD, and SORT ... GIVING writes a 4-character record into an FD whose 01 OUT-REC is PIC X(10) (output file lines '[AAAA]' and '[ZZZZZZZZZZ]'). That may be legitimate implementor latitude (13.18.43.4 GR5 lets the implementor imply FORMAT 2 instead, min=smallest, max=largest, under which 4 bytes is in range and GR6 is vacuous) -- but the implementation nowhere DECLARES that choice, and 13.18.43.4 GR5 is on the implementor-defined list that 'shall be documented in the implementor's user documentation' (docs/rearchitecture/spec-rule-catalog.json:39386). Worse, the two code comments that justify the choice both cite '14.9.40 GR7c space-fills a short record into a fixed-length sort file' -- and GR7 is a rule about file-name-2, the USING file ('any record in the file referenced by file-name-2 ...'), not about a RELEASE statement in an input procedure. A real clause answering a different question, inherited straight into the GR6 adjudication. CONFORMS asserts conformance in BOTH realizations on evidence from one; PARTIAL is what the evidence supports. Not DIVERGES: nothing measured contradicts GR6 itself -- the release happens, the run continues, and record-name-1's own bytes occupy the leading positions in every over-length case I could build. No test-ref, correctly.",
-  "state": "GAP"
+  "notes": "kb/Work PB322 F. cite.py --check 14.9.32.4 'If the number of bytes to be released to the sort operation is greater than the number of bytes in record-name-1, the content of the bytes that extend beyond the end of record-name-1 are undefined.' -> OK §14.9.32.4 6); Annex A.2 item 45 makes the content implementor latitude. The over-length release now EXISTS in both realizations of GR13 (the DEPENDING ON item, and the implied Format 1 whose size is the largest record description's) and its content is the determination docs/CONFORMANCE.md §3 D-WRT1 makes for WRITE and REWRITE: position n past the end of record-name-1 is position n of the record area. Witness 85/pb322_release_short_record_fixed_sd: SD with 01 A X(4) and 01 B X(10), RELEASE A releases the 10-byte area (AAAAZZZZZZ), RELEASE A FROM F4 moves first then releases (CCCCQQQQQQ).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.33.3-1",
@@ -46071,13 +46071,13 @@
   "ordinal": 5,
   "subject": "SORT statement",
   "rule-digest": "d1cd878a502c",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenTransferRecordSizes; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordSizeRange",
+  "test-ref": "conformance:negative/pb995-sort-record-size-using-giving; conformance:85/pb995_sort_merge_record_size_ranges; conformance-test:SortMergeRecordSizeTests.RecordSizeRules_RefuseExactlyTheirViolations",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB995 (registrar 14c). cite.py --check 14.9.40.3 \"the file description entry for file-name-2 shall describe neither records smaller than the smallest record nor larger than the largest record described for file-name-1\" OK (SR5). Searched src/Cobol.Net.* for any USING-file record-size screen: SortBinder.SortMapIoFiles checks only SD-ness (SR8) and organization; nothing compares a USING file's record sizes to the SD's. PROBES --std 2023 (SD SW with 01 SR X(3) and 01 SR5 X(5), i.e. records 3..5): s5big (FD IN1 record X(10), larger than the SD's largest) rc 0; s5vsmall (SD RECORD VARYING 3 TO 5, IN1 record X(1), smaller than the smallest) rc 0; s5vbig (same SD, IN1 X(9)) rc 0 — all three are SR5 violations compiled clean; control s5ok (X(4)) rc 0. Harm: under-rejects. This is the USING twin of SR11, which kb/Work PB995 (open) owns; PB995's inventory_rows name only SR-14.9.40.3-11 and its body describes only the GIVING screen, so SR5 is unowned — see findings (fold into PB995's one size-range screen). [editions as adjudicated: 85, 2002, 2014, 2023 (Format 1; no Annex E change recorded).]",
-  "state": "GAP"
+  "notes": "kb/Work PB995. cite.py --check 14.9.40.3 'the file description entry for file-name-2 shall describe neither records smaller than the smallest record nor larger than the largest record described for file-name-1' -> OK §14.9.40.3 5). SortBinder.ScreenTransferRecordSizes compares FileModel.RecordSizeRange of the USING file with the SD's: a variable-length SD bounds both ends, a fixed-length SD only the upper one (COBOLNET1757, citing SR5). Probes on the w1012h build: SD fixed 5 with a USING file of 8; SD VARYING 3 TO 5 with a USING file of 2 and of 9 are each refused; equal and smaller sizes compile and run (85/pb995_sort_merge_record_size_ranges). GnuCOBOL 3.2.0 accepts every one of the refused shapes (rule 1: the ISO text controls).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-6",
@@ -46161,13 +46161,13 @@
   "ordinal": 11,
   "subject": "SORT statement",
   "rule-digest": "a4df7793342e",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#ScreenTransferRecordSizes; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordSizeRange",
+  "test-ref": "conformance:negative/pb995-sort-record-size-using-giving; conformance:85/pb995_sort_merge_record_size_ranges; conformance-test:SortMergeRecordSizeTests.RecordSizeRules_RefuseExactlyTheirViolations",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB995 (registrar 14c). cite.py --check 14.9.40.3 \"the file description entry for file-name-1 shall not describe a record that is larger than the record described for file-name-3\" OK (SR11). OWNED by kb/Work PB995 (open, under_rejects, inventory_rows [SR-14.9.40.3-11]) — re-measured at the pin, not re-reported: PROBE s11 --std 2023, SD SW 01 SR X(5), `GIVING OU1 OU2` with OU1 RECORD VARYING IN SIZE FROM 1 TO 2 (first sentence: SD record larger than the largest) and OU2 fixed X(3) (second sentence: SD record larger than the fixed record) -> rc 0, both halves unenforced. SortMapIoFiles has no size screen. The USING twin SR5 is the same missing screen (see SR-14.9.40.3-5). [editions as adjudicated: 85, 2002, 2014, 2023 (Format 1; no Annex E change recorded).]",
-  "state": "GAP"
+  "notes": "kb/Work PB995. cite.py --check 14.9.40.3 'the file description entry for file-name-1 shall describe neither records smaller than the smallest record nor larger than the largest record described for file-name-3' -> OK §14.9.40.3 11). The same screen with the roles exchanged: the GIVING file's description bounds the SD's records. The note's repro (SD X(5), GIVING RECORD VARYING IN SIZE FROM 1 TO 2) is refused, as are a fixed 3-byte GIVING file and a variable GIVING file whose smallest record exceeds the SD's smallest; equal sizes and containing ranges are legal.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.40.3-12",
@@ -64071,13 +64071,13 @@
   "ordinal": 147,
   "subject": "RECORD clause (implicit RECORD clause if RECORD clause is not specified)",
   "rule-digest": "de1ed699bb57",
-  "verdict": "DIVERGES",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-147; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ImpliesVariableFormat; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMin; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordMax; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindRelease",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-147; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#ImpliesVariableFormat; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#VaryMin; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#RecordMax; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SortBinder.cs#BindRelease; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitRelease",
+  "test-ref": "conformance:85/pb322_release_short_record_fixed_sd",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 147 required + documented. cite.py --check 13.18.43.4 'This implicit RECORD clause is defined by the implementor' -> OK §13.18.43.4 5); GR5 a) 'If format 1 is implied, integer-1 shall be the record size of the largest record description entry in this file description entry' (checked OK by PB1276 registrar, same clause 5)). Determination = the existing §3 D-FRA (iv) rule (Format 2 when a record is variable-length, Format 1 otherwise) stated as ONE rule for FD and SD; GnuCOBOL likewise sizes an SD's sort record at its largest record (rule 1 precedence; §13.18.43.4 GR5 speaks of 'this file description entry', and a sort-merge file description entry is one). Probes at pin 80de60472: run/d5/RC.cob F5 (FD, 01 X(5) + 01 X(10), no RECORD clause) WRITE of the X(5) record -> 10 bytes (arm b conforms for FD); run/d5/OD.cob (FD, ODO 1 TO 5, N=2) -> 6 bytes '2AB   ' (ODO at maximum, arm b conforms); run/d5/SD.cob (SD 01 X(4) + 01 X(10), MOVE ALL Z to the X(10), MOVE 'AAAA' to the X(4), RELEASE X(4), GIVING an X(10) sequential file) -> 'AAAA      ' where implied format 1 at 10 gives 'AAAAZZZZZZ' -> DIVERGES, kb/Work PB322 determination F still reproduces (SortBinder.BindRelease releases at record-name-1's own size). Arm (a) minimum: FileModel.VaryMin -> Records.Min(MinRecordSize), MinRecordSize sums DataItem.ImageWidth (character positions) at pin — kb/Work PB1277 (open) owns the national unit error. Consistent with DOC-A.1-148 (format 3) and DOC-A.1-146 (size on medium, same doc-rows-2 batch). Owning note: kb/Work/PB322 (determination F; claims DOC-A.1-147); also PB1277, PB1278.",
-  "state": "GAP"
+  "notes": "A.1 item 147 required + documented. cite.py --check 13.18.43.4 'This implicit RECORD clause is defined by the implementor' -> OK §13.18.43.4 5). The determination (docs/CONFORMANCE.md §7 DOC-A.1-147, the §3 D-FRA (iv) rule stated once for FD and SD) is now implemented for the SD arm as well: kb/Work PB322 F made RELEASE send the record area's image when record-name-1 is shorter than the largest description (85/pb322_release_short_record_fixed_sd).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-148",

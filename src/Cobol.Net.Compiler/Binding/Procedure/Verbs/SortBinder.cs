@@ -148,6 +148,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         }
         if (!ScreenSameClauses(file, usingFiles, givingFiles, merge: false)) return BoundRejected.Reported(ctx.Edition);   // SR10
         if (!ScreenIndexedGivingKey(keys, givingFiles, merge: false)) return BoundRejected.Reported(ctx.Edition);         // SR9
+        if (!ScreenTransferRecordSizes(file, usingFiles, givingFiles, merge: false)) return BoundRejected.Reported(ctx.Edition);   // SR5, SR11
 
         return new BoundSort(file, keys, s.sortDuplicatesPhrase() is not null, collating,
             usingFiles, inputProc, givingFiles, outputProc, SortVaryingOf(file));
@@ -205,10 +206,11 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 return new BoundUnsupported($"SORT of table '{name}': "
                     + DeferredShapes.Describe(DeferredShape.NestedClassBacking));
             // A pointer-class member's VALUE rides the area's managed slot, not its bytes (§14.9.3.4 GR9; kb/Work
-            // PB231), and the elements move as byte images: this shape is the one the window move does not carry.
-            if (SlotWindow.CarriedBySlot(table) || DataItem.DescendantsOf(table).Any(SlotWindow.CarriedBySlot))
-                return new BoundUnsupported($"SORT of table '{name}' in shared storage whose element holds a "
-                    + "pointer-class item (its managed slot is not part of the element's byte image)");
+            // PB231), and the elements move as byte images: the emitter carries each element's slots with its image
+            // (kb/Work PB1922), so every such member needs a window of its own here, placed by the ONE place builder.
+            if (SlotWindow.MembersOf(table).Any(m => ctx.Refs.ResolveItemAt(m, [.. outer, "1"]) is null))
+                return new BoundUnsupported($"SORT of table '{name}': "
+                    + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
             storage = new TableSortStorage.SharedArea(outer);
         }
         else if (ReferenceResolver.BuildTablePath(table, outer) is { } arrayPath)
@@ -250,7 +252,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 // reported where the OCCURS clause is bound; nothing further to say here.
                 if (keyItems[i] is not { } tk) return BoundRejected.Reported(ctx.Edition);
                 if (Inadmissible(tk) is { } tkRefusal) return tkRefusal;
-                if (TableSortKey(table, storage, specKeys[i].Descending, tk) is not { } k)
+                if (TableSortKey(table, storage, outer, specKeys[i].Descending, tk) is not { } k)
                     return TableSortKeyUnsupported(specKeys[i].Written);
                 keys.Add(k);
             }
@@ -307,16 +309,26 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 // claiming the file sort was "separately blocked by the D-N2 FD/SD record gate" — a gate PB327
                 // removed. The comparator now selects on the key's class (kb/Work PB678), so both formats sort a
                 // national key under the national sequence and nothing is staged.
-                if (TableSortKey(table, storage, desc, key) is not { } k) return TableSortKeyUnsupported(kn);
+                if (TableSortKey(table, storage, outer, desc, key) is not { } k) return TableSortKeyUnsupported(kn);
                 keys.Add(k);
             }
         }
 
-        // A shared-area key is read through its own window, which the ONE place builder positions (the same
+        // A key with no stored field on the element struct (a REDEFINES view, kb/Work PB599) moves the WHOLE statement
+        // to window reads: one comparer reads every key one way, so the typed array keeps its storage and learns
+        // the enclosing occurrences the windows are placed by.
+        if (storage is TableSortStorage.TypedArray typedStorage && keys.Any(k => k.MemberPath is null))
+            storage = typedStorage with { KeyWindowOuter = outer };
+        // A window-read key is read through its own window, which the ONE place builder positions (the same
         // question the subject asked above): a key it cannot place is the resolver's deferral, never a guess here.
-        if (storage is TableSortStorage.SharedArea shared)
+        if (storage switch
+            {
+                TableSortStorage.SharedArea sa => sa.OuterIndexExprs,
+                TableSortStorage.TypedArray { KeyWindowOuter: { } w } => w,
+                _ => null,
+            } is { } windowOuter)
             foreach (var k in keys)
-                if (ctx.Refs.ResolveItemAt(k.Key, [.. shared.OuterIndexExprs, "1"]) is null)
+                if (ctx.Refs.ResolveItemAt(k.Key, [.. windowOuter, "1"]) is null)
                     return new BoundUnsupported($"SORT table key '{k.Key.CobolName}': "
                         + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
 
@@ -405,6 +417,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             }
         if (!ScreenSameClauses(file, usingFiles, givingFiles, merge: true)) return BoundRejected.Reported(ctx.Edition);   // SR11
         if (!ScreenIndexedGivingKey(keys, givingFiles, merge: true)) return BoundRejected.Reported(ctx.Edition);         // SR10
+        if (!ScreenTransferRecordSizes(file, usingFiles, givingFiles, merge: true)) return BoundRejected.Reported(ctx.Edition);   // SR3, SR12
         // VCR 27 (2014→2023): a MERGE newly PROHIBITED inside another MERGE's output procedure / a file-SORT's input
         // or output procedure (§14.9.24; Annex E.2 item 20) is the ≥2023 static diagnostic COBOLNET1572 — a
         // procedure-range cross-pass in VersionConformancePass.GateSortMergeProcedures (the paragraph-pc ranges are
@@ -455,9 +468,19 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             ? host.Move.BindFromPhrase(FromPhraseRules.Release, record, rf.dataReference(), rf.literal(),
                                        rf.functionCall(), rf.inlineMethodInvocation())
             : null;
-        // The released length is the NAMED record's own description size (a shorter secondary 01 of a multi-01 SD
-        // releases at its own length; §14.9.40.4 GR16 fills a short returned record for a fixed-length GIVING file).
-        return new BoundRelease(file, record, Model.RecordLayout.AreaWidth(record.Item), from, SortVaryingOf(file));
+        // ⛔ THE SIZE OF A FIXED-LENGTH SD'S RECORD IS THE LARGEST RECORD DESCRIPTION'S (kb/Work PB322 determination F;
+        // docs/CONFORMANCE.md DOC-A.1-147). With no RECORD clause the implicit clause is implementor-defined
+        // (§13.18.43.4 GR5), and the implied Format 1's integer-1 is "the record size of the largest record description
+        // entry in this file description entry" (GR5 a)), so every record of the sort file is that size and a RELEASE
+        // of a shorter record description (a secondary 01 of a multi-01 SD) releases MORE bytes than record-name-1
+        // holds: §14.9.32.4 GR6 leaves the extra bytes' content undefined (Annex A.2 item 45), and the determination
+        // is the one WRITE and REWRITE already make (D-WRT1, FileModel.TransfersPastRecord) — position n past the end of
+        // record-name-1 is position n of the record area. The released length used to be the named record's OWN size,
+        // which left ONE SD holding records of two sizes and wrote a short record into a longer GIVING record.
+        int width = file.TransfersPastRecord(record.Item) && ctx.Refs.RecordArea(file) is { } area
+            ? Model.RecordLayout.AreaWidth(area.Item)
+            : Model.RecordLayout.AreaWidth(record.Item);
+        return new BoundRelease(file, record, width, from, SortVaryingOf(file));
     }
 
     // ── RETURN (ISO §14.9.34) ──────────────────────────────────────────────────────────────────────────────
@@ -753,6 +776,51 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         return true;
     }
 
+    /// <summary>⛔ THE RECORD-SIZE RULES BETWEEN A SORT-MERGE FILE AND THE FILES OF ITS USING AND GIVING PHRASES, ONE SCREEN
+    /// FOR BOTH VERBS AND BOTH DIRECTIONS (kb/Work PB995). USING (§14.9.40.3 SR5; MERGE's twin §14.9.24.3 SR3): "If the
+    /// file description entry for file-name-1 describes variable-length records, the file description entry for
+    /// file-name-2 shall describe neither records smaller than the smallest record nor larger than the largest record
+    /// described for file-name-1. If the file description entry for file-name-1 describes fixed-length records, the file
+    /// description entry for file-name-2 shall not describe a record that is larger than the record described for
+    /// file-name-1." GIVING (§14.9.40.3 SR11; MERGE's twin §14.9.24.3 SR12) is the same rule with the two roles
+    /// exchanged: the GIVING file's description is the bound, and the sort-merge file's records are the ones measured.
+    /// Both reduce to ONE comparison of two <see cref="FileModel.RecordSizeRange"/>s — the bounding file's variable-length
+    /// form bounds both ends, its fixed-length form only the upper one. A file with no record description has no size to
+    /// compare (its own entry is refused where it is described). Returns false when a violation was REPORTED.</summary>
+    private bool ScreenTransferRecordSizes(FileModel sd, IReadOnlyList<FileModel> usingFiles, IReadOnlyList<FileModel> givingFiles,
+        bool merge)
+    {
+        string verb = merge ? "MERGE" : "SORT";
+        foreach (var (other, giving) in usingFiles.Select(f => (f, false)).Concat(givingFiles.Select(f => (f, true))))
+        {
+            if (sd.Records.Count == 0 || other.Records.Count == 0) continue;
+            // The file whose description BOUNDS the other: the sort-merge file for USING, the GIVING file for GIVING.
+            var (bound, measured) = giving ? (other, sd) : (sd, other);
+            var (lo, hi) = bound.RecordSizeRange;
+            var (min, max) = measured.RecordSizeRange;
+            bool tooSmall = bound.RecordSizeVaries && min < lo, tooLarge = max > hi;
+            if (!tooSmall && !tooLarge) continue;
+            string rule = (merge, giving) switch
+            {
+                (false, false) => "ISO §14.9.40.3 SR5",
+                (false, true) => "ISO §14.9.40.3 SR11",
+                (true, false) => "ISO §14.9.24.3 SR3",
+                (true, true) => "ISO §14.9.24.3 SR12",
+            };
+            string Describe(FileModel f) =>
+                f.RecordSizeVaries ? $"variable-length records of {f.RecordSizeRange.Min} to {f.RecordSizeRange.Max} bytes"
+                : $"fixed-length records of {f.RecordSizeRange.Max} bytes";
+            ctx.Validation.RejectStatementOperand($"{verb} {(giving ? "GIVING" : "USING")} file '{other.CobolName}': "
+                + $"'{bound.CobolName}' describes {Describe(bound)} but '{measured.CobolName}' describes {Describe(measured)} — "
+                + $"the file description entry for '{measured.CobolName}' shall "
+                + (bound.RecordSizeVaries ? "describe neither records smaller than the smallest record nor larger than the largest record"
+                    : "not describe a record that is larger than the record")
+                + $" described for '{bound.CobolName}' ({rule})");
+            return false;
+        }
+        return true;
+    }
+
     /// <summary>⛔ THE SAME-CLAUSE RULES OF THE SORT AND MERGE STATEMENTS, ONE SCREEN (kb/Work PB1139), over the I-O-CONTROL
     /// membership <see cref="FileModel.SameClauses"/> records for every SAME format. §14.9.40.3 SR10: "No pair of
     /// file-names in the same SORT statement may be specified in the same SAME SORT AREA or SAME SORT-MERGE AREA
@@ -835,17 +903,28 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// statement's KEY phrase, §14.9.40.4 GR2, and the table's own OCCURS KEY phrase, GR21), so the member-path
     /// rule cannot drift between them. A key of a <see cref="TableSortStorage.SharedArea"/> table is the item itself,
     /// addressed through the class's window law, so it must lie in the SAME class as the table; a typed-array key is
-    /// a member path over the element struct. <see langword="null"/> when the key sits behind a REDEFINES view the
-    /// table is not in (see <see cref="TableSortKeyUnsupported"/>; kb/Work PB599).</summary>
-    private static BoundTableSortKey? TableSortKey(DataItem table, TableSortStorage storage, bool descending, DataItem key) =>
-        storage is TableSortStorage.SharedArea
-            ? (ReferenceEquals(key.Class, table.Class) ? new BoundTableSortKey(descending, "", key) : null)
-            : SortMemberPath(table, key) is { } path ? new BoundTableSortKey(descending, path, key) : null;
+    /// a member path over the element struct — or, when it lies behind a REDEFINES view of the element (no stored field
+    /// on the struct), a key with a NULL member path that the statement reads through its window at an occurrence number
+    /// (<see cref="TableSortStorage.TypedArray.KeyWindowOuter"/>; kb/Work PB599). <see langword="null"/> only for a key
+    /// no window can be placed for (see <see cref="TableSortKeyUnsupported"/>).</summary>
+    private BoundTableSortKey? TableSortKey(DataItem table, TableSortStorage storage, IReadOnlyList<string> outer,
+        bool descending, DataItem key)
+    {
+        if (storage is TableSortStorage.SharedArea)
+            return ReferenceEquals(key.Class, table.Class) ? new BoundTableSortKey(descending, "", key) : null;
+        if (SortMemberPath(table, key) is { } path) return new BoundTableSortKey(descending, path, key);
+        // No stored field: a REDEFINES-view key (§13.18.44.4 GR1 — every view of the class is the one backing). A key
+        // under an inner OCCURS is not a view problem and has no window either (§14.9.40.3 SR14 e / §13.18.38.3 SR6).
+        return key.Class is not null && !KeyUnderInnerOccurs(table, key)
+            && ctx.Refs.ResolveItemAt(key, [.. outer, "1"]) is not null
+            ? new BoundTableSortKey(descending, null, key) : null;
+    }
 
     private static BoundUnsupported TableSortKeyUnsupported(string keyName) =>
-        new($"SORT table key '{keyName}': a key reached through a REDEFINES view (or, on the table's own KEY phrase, "
-            + "under an inner OCCURS) has no stored field on the element struct — the typed-array table sort has not "
-            + "built it (kb/Work PB599; an inner OCCURS between a written key and data-name-2 is refused before this, SR14 e))");
+        new($"SORT table key '{keyName}': the key has no stored field on the element struct and no window the place "
+            + "builder can position — a key under an inner OCCURS on the table's own KEY phrase (§13.18.38.3 SR6; the "
+            + "declaration's refusal is kb/Work PB1263), or a view of a class this statement cannot address "
+            + "(an inner OCCURS between a written key and data-name-2 is refused before this, §14.9.40.3 SR14 e)");
 
     /// <summary>§14.9.40.3 SR14 e): the key, or an entry between it and data-name-2, carries an OCCURS clause.
     /// A predicate over the DATA DESCRIPTION alone — the member path below answers a storage question and returns

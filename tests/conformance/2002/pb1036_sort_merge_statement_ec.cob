@@ -10,7 +10,10 @@
       *> 13.18.43.4 GR14 b): a RELEASE whose record size is outside the RECORD
       *> VARYING range -> EC-SORT-MERGE-RELEASE, the RELEASE is unsuccessful.
       *> 14.9.40.4 GR12 b): a USING record larger than the largest record of the
-      *> sort file -> EC-SORT-MERGE-RELEASE, the SORT is terminated.
+      *> sort file -> EC-SORT-MERGE-RELEASE, the SORT is terminated. (Not reachable
+      *> from source here: 14.9.40.3 SR5 refuses, at compile time, a USING file
+      *> that describes a record larger than the sort file's, so the check is
+      *> pinned by Unit SortMergeStatementEcTests.ImplicitRelease_TestsTheReadSize.)
       *> All are Table 13 Fatal. 14.6.13.1.3 2): "If the executed statement is a
       *> MERGE or SORT statement, then the rules for those statements apply" -- the
       *> declarative runs and the statement is terminated; the run unit continues
@@ -41,9 +44,11 @@
       *>                               EC-FLOW-RELEASE is not enabled, 3 is in range.
       *>   RS=EC-SORT-MERGE-RELEASE    F: VLEN 9 is outside 2 TO 5.
       *>   F
-      *>   RS=EC-SORT-MERGE-RELEASE    G: W5's 5-byte record into the 3-byte SF.
-      *>   G WS=00                     the terminated SORT left W5 open (CONFORMANCE
-      *>                               3, the implicit-transfer determination (d)).
+      *>   G MAS=00                    G: the MERGE terminated in C left its USING file
+      *>                               M-A open, so the program's CLOSE succeeds
+      *>                               (CONFORMANCE 3, the implicit-transfer
+      *>                               determination (d): a terminated statement
+      *>                               performs none of its remaining implicit CLOSEs).
       *>   IO=EC-I-O-PERMANENT-ERROR   H: the implicit OPEN of the missing file '35'.
       *>   H US=35
       >>TURN EC-SORT-MERGE EC-I-O CHECKING ON
@@ -55,11 +60,9 @@
            SELECT G-OUT ASSIGN TO "pb1036-g.dat"
                ORGANIZATION IS SEQUENTIAL FILE STATUS IS GS.
            SELECT M-A ASSIGN TO "pb1036-a.dat"
-               ORGANIZATION IS SEQUENTIAL.
+               ORGANIZATION IS SEQUENTIAL FILE STATUS IS MAS.
            SELECT M-B ASSIGN TO "pb1036-b.dat"
                ORGANIZATION IS SEQUENTIAL.
-           SELECT W5 ASSIGN TO "pb1036-w5.dat"
-               ORGANIZATION IS SEQUENTIAL FILE STATUS IS WS5.
            SELECT U-MISS ASSIGN TO "pb1036-missing.dat"
                ORGANIZATION IS SEQUENTIAL FILE STATUS IS US.
            SELECT SF ASSIGN TO "pb1036-f.srt".
@@ -73,8 +76,6 @@
        01 A-REC PIC X(3).
        FD M-B.
        01 B-REC PIC X(3).
-       FD W5.
-       01 W5-REC PIC X(5).
        FD U-MISS.
        01 U-REC PIC X(3).
        SD SF.
@@ -88,7 +89,7 @@
           05 FILLER PIC X(3).
        WORKING-STORAGE SECTION.
        01 GS    PIC XX.
-       01 WS5   PIC XX.
+       01 MAS   PIC XX.
        01 US    PIC XX.
        01 VLEN  PIC 99.
        01 WS-EOF PIC 9.
@@ -111,16 +112,14 @@
        END DECLARATIVES.
        MAIN SECTION.
        MAIN-P.
-           OPEN OUTPUT M-A M-B W5.
+           OPEN OUTPUT M-A M-B.
            MOVE "BBB" TO A-REC.
            WRITE A-REC.
            MOVE "AAA" TO A-REC.
            WRITE A-REC.
            MOVE "CCC" TO B-REC.
            WRITE B-REC.
-           MOVE "ZZZZZ" TO W5-REC.
-           WRITE W5-REC.
-           CLOSE M-A M-B W5.
+           CLOSE M-A M-B.
       *> A -- SORT GIVING a file the program holds open.
            OPEN OUTPUT G-OUT.
            SORT SF ON ASCENDING KEY SF-REC
@@ -151,11 +150,9 @@
            MOVE 9 TO VLEN.
            RELEASE VF-REC.
            DISPLAY "F".
-      *> G -- the implicit USING release of an over-long record.
-           SORT SF ON ASCENDING KEY SF-REC
-               USING W5 OUTPUT PROCEDURE IS OUT-C.
-           CLOSE W5.
-           DISPLAY "G WS=" WS5.
+      *> G -- the MERGE of C was terminated: its USING file M-A is still open.
+           CLOSE M-A.
+           DISPLAY "G MAS=" MAS.
       *> H -- EC-I-O on the implicit OPEN of a USING file.
            SORT SF ON ASCENDING KEY SF-REC
                USING U-MISS OUTPUT PROCEDURE IS OUT-C.

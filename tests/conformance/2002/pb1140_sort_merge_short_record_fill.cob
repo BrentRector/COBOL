@@ -28,6 +28,11 @@
       *>      4-byte records stay 4 bytes (a varying SD has no fixed length
       *>      to fill) and the MERGE GR13 a) / c) fill happens on the way
       *>      out: 00 58 00 58 00 20 versus 00 58 00 58 20 20
+      *> The SD of G1-G4 (SG) is VARYING 2 TO 6 so that its 2-byte record STAYS 2 bytes for the fill to act on: an SD
+      *> with no RECORD clause is the implied Format 1, whose every record is the largest description's size, so a
+      *> RELEASE of the short description would send the whole 6-byte area and nothing would be short (kb/Work PB322 F,
+      *> docs/CONFORMANCE.md DOC-A.1-147). The range 2..6 sits inside the GIVING files' fixed 6 bytes (SR11), and the
+      *> key is SG-SHORT, the 2 bytes every record has (§14.9.40.3 SR6 g: a key lies within the SD's minimum size).
       *> A leg fails if the fill is the alphanumeric space everywhere
       *> (U1, G1, M1 wrong), the national space everywhere (G3, M1 wrong),
       *> or taken from the connector's any-national-record flag (G3 wrong).
@@ -93,7 +98,8 @@
           05 SN-K PIC N(2).
           05 SN-T PIC N(1).
        01 SN-X PIC X(6).
-       SD SG.
+       SD SG
+          RECORD IS VARYING IN SIZE FROM 2 TO 6 CHARACTERS.
        01 SG-LONG PIC N(3).
        01 SG-SHORT PIC N(1).
        SD SM
@@ -118,7 +124,7 @@
            CLOSE FA.
            SORT SN ON ASCENDING KEY SN-K USING FA
                OUTPUT PROCEDURE SHOW-N.
-           SORT SG ON ASCENDING KEY SG-LONG
+           SORT SG ON ASCENDING KEY SG-SHORT
                INPUT PROCEDURE REL-SHORT
                GIVING GNUM GNAT GMUL GALN.
            OPEN OUTPUT FN.

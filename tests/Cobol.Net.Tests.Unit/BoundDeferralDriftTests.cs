@@ -203,8 +203,9 @@ PROCEDURE DIVISION.
     }
 
     /// <summary>And the other half, which a compiler that refused everything would fail: legal source the
-    /// compiler has not built still COMPILES and still announces itself (a table SORT keyed on a REDEFINES view
-    /// inside the element — kb/Work PB599; the table SORT over a REDEFINES view itself is built, kb/Work PB1175).</summary>
+    /// compiler has not built still COMPILES and still announces itself (a SEARCH ALL of an OCCURS DYNAMIC table nested
+    /// under another table — the scan bound needs a subscripted capacity path, SearchBinder; the table SORT keyed on a
+    /// REDEFINES view inside the element, which this fixture used to be, is built: kb/Work PB599).</summary>
     [Fact]
     public void GenuineDeferral_StillCompiles_AndAnnounces()
     {
@@ -214,13 +215,12 @@ PROGRAM-ID. PB909DEF.
 DATA DIVISION.
 WORKING-STORAGE SECTION.
 01 TBL.
-   05 TE OCCURS 3.
-      10 TK PIC 99.
-      10 TKR REDEFINES TK PIC XX.
+   05 ROW OCCURS 2.
+      10 D PIC X OCCURS DYNAMIC ASCENDING KEY IS D INDEXED BY IX.
 PROCEDURE DIVISION.
 MAIN.
     GO TO SKIPPER.
-    SORT TE ASCENDING KEY TKR.
+    SEARCH ALL D(1) AT END DISPLAY "NF" WHEN D(1, IX) = "A" DISPLAY "FOUND" END-SEARCH.
 SKIPPER.
     STOP RUN.
 """;

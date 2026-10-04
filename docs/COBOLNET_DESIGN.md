@@ -862,7 +862,17 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   EXTERNAL record — is `TableSortStorage.SharedArea`: it has no array, so the statement sorts the element NUMBERS
   with the same key comparer (`EmitKeyComparer`, every key read through its own window, `ResolveItemAt`) and places
   the element images back through the class's windows, every image read before the first write (§14.9.40.4 GR24;
-  §13.18.44.4 GR1). **WHICH items may be a key is ONE predicate** — `SortKeyAdmission.Violation(key, rules)`
+  §13.18.44.4 GR1) — and the managed SLOTS of the element's pointer-class members (a pointer's value is not in the
+  bytes, `SlotWindow.MembersOf`) are read with each element and written back by the same permutation (kb/Work PB1922).
+  A typed-array table whose KEY has no stored field on the element struct (a member of a REDEFINES view of the
+  element) is `TypedArray` with `KeyWindowOuter` set: every key is then read through its window at an element number,
+  the NUMBERS are sorted and the elements permuted (kb/Work PB599) — one comparer, the member-path form kept for the
+  common case. **The record sizes of the files of one SORT or MERGE are ONE screen**, `SortBinder.ScreenTransferRecordSizes`
+  over `FileModel.RecordSizeRange` (§14.9.40.3 SR5 / SR11, §14.9.24.3 SR3 / SR12: a variable-length file bounds both ends
+  of the other's records, a fixed-length file only the upper one; USING bounded by the SD, the SD bounded by GIVING;
+  kb/Work PB995). **A fixed-length SD's record is the largest record description's** (the implied Format 1,
+  §13.18.43.4 GR5 a)), so a RELEASE of a shorter record description sends the record area's image like WRITE does
+  (D-WRT1; `SequentialIoEmitter.SentRecordImage`, kb/Work PB322 F). **WHICH items may be a key is ONE predicate** — `SortKeyAdmission.Violation(key, rules)`
   (kb/Work PB1173, PB1052), asked of the data description by all three key-naming statements (SORT Format 1 §14.9.40.3
   SR6, Format 2 SR14, MERGE §14.9.24.3 SR4): a key subject to OCCURS (file verbs; Format 2's own is SR14 e) over the walk
   to data-name-2), of class boolean / object / pointer (message-tag has no representation yet), a dynamic-length

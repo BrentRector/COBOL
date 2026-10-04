@@ -610,16 +610,16 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     /// <summary>RELEASE (ISO §14.9.32): FROM first MOVEs into the record (GR4 — identical to the explicit MOVE),
     /// then the record's character image goes to the sort store (GR2). A varying SD releases the leading
     /// DEPENDING-ON characters (§13.18.43 GR13 — the current value of the data item names the released length);
-    /// a fixed SD releases the named record's image at its own length (§14.9.32.4 GR2 releases "the record named by
-    /// record-name-1"; a shorter secondary record is extended with spaces by the sort store's fixed-compare space
-    /// extension, and the record a GIVING file receives is filled by §14.9.40.4 GR16 — the standard names no fill
-    /// at the RELEASE itself, whose §14.9.40.4 GR7 fill is the USING transfer's).</summary>
+    /// a fixed SD releases its ONE record size — the largest record description's (the implied Format 1,
+    /// §13.18.43.4 GR5 a); kb/Work PB322 F) — so a shorter record description sends the record AREA's image
+    /// (<see cref="SequentialIoEmitter.SentRecordImage"/>, D-WRT1): §14.9.32.4 GR6 leaves the bytes past the end of
+    /// record-name-1 undefined (Annex A.2 item 45), and the area's content is the determination.</summary>
     public void EmitRelease(BoundRelease rl)
     {
         var w = ctx.Writer;
         if (rl.FromMove is { } fromMove) move.Emit(fromMove);   // GR4 a) — the BOUND implicit MOVE (PB348)
         string sd = FileKeyExpr(rl.File);
-        string image = OperandText.RecordSendImage(rl.Record);   // THE ONE record-area channel (kb/Work PB327)
+        string image = seqIo.SentRecordImage(rl.File, rl.Record);   // THE ONE record-area channel (kb/Work PB327; D-WRT1 and PB322 F)
         // §13.18.43.4 GR14 b) / GR19 b): a size outside the record range is EC-SORT-MERGE-RELEASE and the RELEASE
         // is unsuccessful — the runtime's test, before the release (kb/Work PB1036).
         var (min, max) = RecordRange(rl.Varying, rl.RecordWidth);
@@ -736,8 +736,6 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         // The WHOLE-TABLE path, an index for each ENCLOSING table (§8.4.2.3.3 SR5 e); the sort writes the table, so an
         // enclosing dynamic-capacity level is reached through its receiving accessor.
         w.Line($"var __ta{id} = {PlaceRenderer.RenderPath(typed.Array, AccessDir.Receiving)};   // SORT table (ISO §14.9.40.4 Format 2 — in place, GR18/GR24)");
-        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
-        EmitKeyComparer(ts, weightsArg, (key, v) => key.MemberPath.Length == 0 ? v : $"{v}.{key.MemberPath}", shared: false);
         // Through CobolTable.SortInPlace, never a bare Enumerable.OrderBy: the framework's array sort re-throws a
         // comparer's exception as InvalidOperationException, which would hide a key comparison's fatal COBOL
         // exception condition from the statement guard (kb/Work PB230 — measured, not deduced).
@@ -747,6 +745,35 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         string occurrences = ts.Count is AllCount.Capacity
             ? RuntimeApi.TableCurrentOccurrences($"__ta{id}", null)
             : RuntimeApi.TableCurrentOccurrences($"__ta{id}", PlaceRenderer.OccurrenceCount(ts.Count));
+        if (typed.KeyWindowOuter is { } outer)
+        {
+            // A key with no stored field on the element struct (a REDEFINES view, kb/Work PB599): every key is read
+            // through its window at an element NUMBER, the numbers are sorted by the one key comparison, and the
+            // elements are then placed back by that permutation (GR24) — every element is copied out BEFORE the first is
+            // written back, so no placing disturbs an element still to be read. The windows read the LIVE array, which
+            // the sort leaves untouched until the numbers are final.
+            string oc = $"__oc{id}", ix = $"__ix{id}", cp = $"__cp{id}", at = $"__e{id}";
+            w.Line($"var {oc} = {occurrences};");
+            w.Line($"var {ix} = new int[{oc}.Length];");
+            w.Line($"for (int {at} = 0; {at} < {ix}.Length; {at}++) {ix}[{at}] = {at};");
+            w.Line($"System.Comparison<int> __tc{id} = (__a, __b) =>");
+            EmitKeyComparer(ts, weightsArg,
+                (key, v) => PlaceRenderer.Read(
+                    refs.ResolveItemAt(key.Key, [.. outer, $"({v} + 1)"])
+                    ?? throw new InvalidOperationException(
+                        $"SORT table '{ts.Table.CobolName}': no window for '{key.Key.CobolName}' — the binder checked it (kb/Work PB599)")),
+                shared: true);
+            w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
+            w.Line($"var {cp} = {oc}.ToArray();");
+            w.Line($"for (int {at} = 0; {at} < {ix}.Length; {at}++) {oc}[{at}] = {cp}[{ix}[{at}]];   // GR24 — placed back in data-name-2");
+            return;
+        }
+        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
+        EmitKeyComparer(ts, weightsArg,
+            (key, v) => key.MemberPath is not { } path
+                ? throw new InvalidOperationException($"table-sort key '{key.Key.CobolName}' has no member path in a member-path sort (kb/Work PB599)")
+                : path.Length == 0 ? v : $"{v}.{path}",
+            shared: false);
         w.Line($"{RuntimeApi.TableSortInPlace(occurrences, $"__tc{id}")};   // GR24 — placed back in data-name-2");
     }
 
@@ -775,7 +802,21 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
         w.Line($"var {im} = new string[{n}];");
         w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {im}[{at}] = {PlaceRenderer.Read(At(ts.Table, $"({at} + 1)"))};");
+        // An element's pointer-class members ride the area's managed SLOTS, not its bytes (§14.9.3.4 GR9; kb/Work PB231,
+        // PB1922): the image holds only their reserved placeholder positions, so each such member's value is read with
+        // its element BEFORE the first write and written back by the same permutation AFTER the images, which
+        // would otherwise leave every pointer behind at its old occurrence.
+        var slotMembers = SlotWindow.MembersOf(ts.Table).ToList();
+        var slots = new List<string>();
+        for (int j = 0; j < slotMembers.Count; j++)
+        {
+            string sv = $"__sl{id}_{j}";
+            slots.Add(sv);
+            w.Line($"var {sv} = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {n}), __k => {PlaceRenderer.Read(At(slotMembers[j], "(__k + 1)"))}));");
+        }
         w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(ts.Table, $"({at} + 1)"), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
+        for (int j = 0; j < slotMembers.Count; j++)
+            w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(slotMembers[j], $"({at} + 1)"), $"{slots[j]}[{ix}[{at}]]")}   // GR24 — the element's managed slot travels with its image");
     }
 
     /// <summary>The table sort's key comparer BODY — the lambda's block, one compare per key in significance order

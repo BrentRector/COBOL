@@ -459,6 +459,15 @@ public sealed class FileModel
     /// before passing <see cref="VaryMin"/>/<see cref="VaryMax"/> to its connector.</summary>
     public bool RecordSizeVaries => Varying is not null || ImpliesVariableFormat;
 
+    /// <summary>The smallest and the largest record, in BYTES, this file description entry describes — the quantity
+    /// the SORT and MERGE record-size syntax rules compare between a sort-merge file and the USING and GIVING files
+    /// of the statement (§14.9.40.3 SR5 / SR11, §14.9.24.3 SR3 / SR12). A variable-length file describes the range
+    /// <see cref="VaryMin"/>..<see cref="VaryMax"/> (the clause's integers, else GR9 / GR10's smallest and largest
+    /// record description); a fixed-length file describes the ONE record <see cref="RecordWidth"/> — integer-1 of an
+    /// explicit Format 1 clause, else the largest record description entry (§13.18.43.4 GR5 a), GR6), so the rules'
+    /// "the record described for file-name-n" is that size. (kb/Work PB995.)</summary>
+    public (int Min, int Max) RecordSizeRange => RecordSizeVaries ? (VaryMin, VaryMax) : (RecordWidth, RecordWidth);
+
     /// <summary>⛔ DETERMINATION D-FRA (docs/CONFORMANCE.md §3, kb/Work PB981) — ISO §13.18.43.4 GR5: "If the
     /// RECORD clause is not specified, an implicit format 1 or format 2 RECORD clause is assumed to be
     /// specified. This implicit RECORD clause is defined by the implementor". WiseOwl COBOL implies FORMAT 2 exactly

@@ -403,6 +403,13 @@ public sealed record SlotWindow(AccessPath Cell) : CellWindowCoding(Cell)
         item.IsElementary && item.Pic is
             { Category: PicCategory.Pointer or PicCategory.ProgramPointer or PicCategory.FunctionPointer
                   or PicCategory.ObjectReference };
+
+    /// <summary>⛔ THE ONE ENUMERATION of the managed-slot members of <paramref name="item"/> — the item itself when it
+    /// is slot-carried, else every slot-carried item beneath it. What an operation that moves an item as a byte IMAGE
+    /// must carry besides the bytes (the image holds only the slot's reserved placeholder positions): the shared-area
+    /// table SORT reads and writes these with each element (kb/Work PB1922). Empty for an item holding none.</summary>
+    public static IEnumerable<DataItem> MembersOf(DataItem item) =>
+        CarriedBySlot(item) ? [item] : DataItem.DescendantsOf(item).Where(CarriedBySlot);
 }
 
 /// <summary>A <see cref="RedefViewPlace"/>'s DYNAMIC-LENGTH window (kb/Work PB1026): the member is a dynamic-length

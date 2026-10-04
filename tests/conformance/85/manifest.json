@@ -366,7 +366,9 @@
   "pb1523_global_fd_records_and_redefiners",
   "pb1523_global_linkage_redefiner",
   "pb1249_linkage_referenceable_legs",
-  "pb1250_external_item_subscript"
+  "pb1250_external_item_subscript",
+  "pb995_sort_merge_record_size_ranges",
+  "pb322_release_short_record_fixed_sd"
  ],
  "pending": []
 }
