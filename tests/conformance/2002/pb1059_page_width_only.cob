@@ -15,10 +15,18 @@
       *> EC-REPORT-PAGE-WIDTH is set to exist (cite.py: OK  13.18.14.4 5)).
       *> DERIVATION: `PAGE 8 COLS` gives the report a page width of 8 and NO
       *> page limit, so the report is unpaged: relative LINE clauses only, and
-      *> the two detail lines land on consecutive lines of one page. The first
-      *> line's item at COLUMN 7 is four wide (ends at 10, past 8): truncated
-      *> to columns 7-8, so the line is six spaces then "WX"; the exception is
-      *> set. The second line's item at COLUMN 1 is two wide and fits: "OK".
+      *> the two detail lines land on consecutive lines of one page. 13.18.14.3
+      *> SR8 b) bars an ABSOLUTE item from ending past the width, and SR8 c)
+      *> bars relative items at the end of a line from doing so "unless each
+      *> of them is subject to a different PRESENT WHEN clause, in which case
+      *> this rule applies only to the largest of them" (cite.py: OK
+      *> 13.18.14.3 8) c)), so the first line has two relative items under
+      *> different clauses that each fit alone and do not together: item A
+      *> (COLUMN PLUS 1, four wide) is columns 1-4; item B (COLUMN PLUS 2,
+      *> four wide) starts at 4 + 2 = 6 and ends at 9, past 8 (alone it would
+      *> be columns 2-5): truncated to columns 6-8, so the line is "ABCD", a
+      *> space, then "WXY"; the exception is set. The second line's item at
+      *> COLUMN 1 is two wide and fits: "OK".
       *> The read-back numbers each physical line and prints its first 10
       *> bytes.
        ENVIRONMENT DIVISION.
@@ -32,6 +40,8 @@
        FD  CHK.
        01  CHK-REC PIC X.
        WORKING-STORAGE SECTION.
+       01  WS-ON   PIC 9     VALUE 1.
+       01  WS-TWO  PIC 9     VALUE 1.
        01  WS-EOF  PIC X     VALUE "N".
        01  WS-BYTE PIC X.
        01  WS-I    PIC 99    VALUE 0.
@@ -41,7 +51,10 @@
        RD  R PAGE 8 COLS.
        01  D1 TYPE DE.
            02  LINE PLUS 1.
-               03  COLUMN 7 PIC X(4) VALUE "WXYZ".
+               03  COLUMN PLUS 1 PIC X(4) VALUE "ABCD"
+                   PRESENT WHEN WS-ON = 1.
+               03  COLUMN PLUS 2 PIC X(4) VALUE "WXYZ"
+                   PRESENT WHEN WS-TWO = 1.
            02  LINE PLUS 1.
                03  COLUMN 1 PIC XX VALUE "OK".
        PROCEDURE DIVISION.

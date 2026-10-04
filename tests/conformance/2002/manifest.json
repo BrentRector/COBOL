@@ -655,7 +655,9 @@
   "pb1901_strong_group_pointer_leaf_string_argument",
   "pb1306_varying_scope",
   "pb1292_source_operand_forms",
-  "pb1456_counter_in_source_expression"
+  "pb1456_counter_in_source_expression",
+  "pb1222_report_arrangement_present_when",
+  "pb1270_report_or_page_upper_limit"
   ],
   "pending": []
 }

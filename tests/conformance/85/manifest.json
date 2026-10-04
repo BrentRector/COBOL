@@ -359,7 +359,9 @@
   "pb1399_set_index_function_sender",
   "pb1292_source_forms_85",
   "pb1292_rd_code_identifier_forms_85",
-  "pb1456_other_report_counters_85"
+  "pb1456_other_report_counters_85",
+  "pb1288_report_entry_placement",
+  "pb1270_report_page_region_boundaries"
  ],
  "pending": []
 }

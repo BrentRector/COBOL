@@ -18591,13 +18591,13 @@
   "ordinal": 5,
   "subject": "Report group description entry",
   "rule-digest": "d29f3104f59a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindGroupType; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#Kind",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
+  "test-ref": "conformance:negative/pb1288-report-level1-no-type; conformance:negative/pb1288-report-type-below-level1; conformance:85/pb1288_report_entry_placement",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1288. 'The TYPE clause may be specified only in a level 1 entry and shall be specified in every level 1 entry.' Neither half has a screen. BindGroupType runs for a TYPE clause at ANY level and overwrites the CURRENT group's Kind. ReportGroupModel.Kind defaults to Detail, so a level 1 entry without TYPE compiles as a detail group. Probe sr5notype (`01 D1. 03 LINE 1. 05 COLUMN 1 PIC X SOURCE WA.` + GENERATE D1) compiles and prints `A` at --std 85, 2002 and 2023: under-rejects. Probe sr5typesub (`01 D1 TYPE DE. 03 LINE 1 TYPE RH.`) is not refused under SR5. The subordinate TYPE silently retypes group D1 as a report heading, and the program then fails at `GENERATE D1` with COBOLNET0899 'the named report group is not a DETAIL group (ISO §14.9.16.3 SR1)': the wrong rule at the wrong site. If nothing GENERATEs it, the group silently prints as an RH. cite.py --check 13.15.3 'The TYPE clause may be specified only in a level 1 entry and shall be specified in every level 1 entry' -> OK. Mechanism: finding 'report-type-clause-placement-unscreened'. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the report group description entry is Report Writer nucleus syntax at every edition; no Annex E item changes §13.15 between 2014 and 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1288 landed 2026-10-04: ScreenReportEntryClausePresence refuses a level 1 entry with no TYPE and a TYPE below level 1 (COBOLNET2247); BindReportEntry binds a TYPE clause at level 1 only.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.15.3-6",
@@ -18651,13 +18651,13 @@
   "ordinal": 9,
   "subject": "Report group description entry",
   "rule-digest": "a7f2e782b052",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SubordinateToLineClause",
+  "test-ref": "conformance:negative/pb1288-report-column-sibling-of-line; conformance:negative/pb1224-report-column-without-line; conformance:85/pb1288_report_entry_placement",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1288. 'Every elementary entry with a COLUMN clause but no LINE clause shall be subordinate to an entry with a LINE clause.' The only screen is BindReportEntry's `if (line is null)` over `st.Line`, which means 'the most recent report line opened in this group'. It is reset only at a level 1 entry and never popped when the walk leaves the LINE entry's subtree. The rule asks about SUBORDINATION, so a COLUMN entry that FOLLOWS a LINE entry without being subordinate to it passes and is silently printed on that earlier line. Probe sr9sib (`01 D1 TYPE DE. 03 LINE 1. 05 COLUMN 1 PIC X SOURCE WA. 03 COLUMN 5 PIC X SOURCE WB.`) compiles (rc 0, --std 85/2002/2023) and prints `A   B` on one line. Probe sr9deep (the LINE under 03 G1, the COLUMN under a sibling 03 G2) behaves the same. Only the no-line-at-all case (sr9none) is refused, and that is on COBOLNET0899 (the 'not implemented' code) citing §13.18.14, not §13.15.3 SR9. cite.py --check 13.15.3 'Every elementary entry with a COLUMN clause but no LINE clause shall be subordinate to an entry with a LINE clause' -> OK. Mechanism: finding 'report-column-subordination-read-as-line-in-effect'. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the report group description entry is Report Writer nucleus syntax at every edition; no Annex E item changes §13.15 between 2014 and 2023) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry (DiagnosticCatalog.ReportColumnWithoutLine | ReportGroupBuild.Line)",
-  "state": "GAP"
+  "notes": "kb/Work PB1288 + PB1224 landed 2026-10-04: the COLUMN entry's own LINE clause or an ancestor's, read off the level hierarchy (COBOLNET2247); the build-state test is no longer the screen.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.15.3-10",
@@ -18696,13 +18696,13 @@
   "ordinal": 12,
   "subject": "Report group description entry",
   "rule-digest": "3d59615d3e5a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
+  "test-ref": "conformance:negative/pb1288-report-source-no-picture; conformance:negative/pb1288-report-sum-no-picture; conformance:85/pb1288_report_entry_placement",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1288. 'A PICTURE clause shall be specified in every elementary entry that has a SOURCE or SUM clause.' The only screen is inside BindReportEntry's `if (columns.Count > 0)` printable-item branch, so it holds only for entries WITH a COLUMN clause: probe sr12 `05 COLUMN 1 SOURCE WA.` is refused (COBOLNET0899, citing SR12). An elementary entry with SOURCE or SUM and no COLUMN clause is legal (SR10 runs one way only), and there the PICTURE requirement is never asked. Probe srcnopic (`05 SOURCE WB.`, no PICTURE) compiles and runs (rc 0). Probe sumnopic (`05 S1 SUM WN.` in a CF FINAL group, no PICTURE) compiles and runs (rc 0), so a sum counter whose size and category GR1 of §13.18.54 derives from the PICTURE gets a compiler-chosen description. Also, the refusal that does fire uses the shared COBOLNET0899 'not implemented' code. cite.py --check 13.15.3 'A PICTURE clause shall be specified in every elementary entry that has a SOURCE or SUM clause' -> OK. Under-rejects, so DIVERGES. Mechanism: finding 'report-picture-required-only-on-printable-branch'. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the report group description entry is Report Writer nucleus syntax at every edition; no Annex E item changes §13.15 between 2014 and 2023) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry (DiagnosticCatalog.ReportItemMissingPicture)",
-  "state": "GAP"
+  "notes": "kb/Work PB1288 landed 2026-10-04: a PICTURE in every elementary SOURCE or SUM entry, printable or not (COBOLNET2247).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.15.3-13",
@@ -18756,13 +18756,13 @@
   "ordinal": 16,
   "subject": "Report group description entry",
   "rule-digest": "0e0c08950503",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#CheckConditionOperands; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionOnlyNames",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1289-present-when-on-printless-group; conformance:2002/pb1222_report_arrangement_present_when",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1289. 'Condition-1 shall not reference any sum counter, LINE-COUNTER, PAGE-COUNTER, or other report section data item.' CheckConditionOperands scans every DISTINCT condition captured on a report line, a printable field or a sum counter for the LINE-COUNTER/PAGE-COUNTER tokens and for this RD's report-section-exclusive names. Verified refused (COBOLNET1559, citing SR16): sr16lc (LINE-COUNTER on a field), sr16grp (PAGE-COUNTER on the level 1 entry, reached through the line chain), sr16sum (a sum counter S1), sr16item (a printable item PX). Gaps: (1) A condition written on an entry that yields no line, field or sum is never collected. Probe sr16empty (`01 D2 TYPE DE PRESENT WHEN LINE-COUNTER > 0.`, no subordinates) compiles (rc 0). (2) The name set covers only THIS RD's level-1 group names, printable-field names and sum names. A named intermediate entry (e.g. `03 L1 LINE 1.`) or another RD's item is refused only through COBOLNET1639 'not defined' (the PB1046 shape), not under SR16. sr16item already shows 1639 emitted ALONGSIDE 1559 for the same reference. cite.py --check 13.15.3 'Condition-1 shall not reference any sum counter, LINE-COUNTER, PAGE-COUNTER, or other report section data item' -> OK. No negative golden pins SR16 (present-when-group-indicate pins SR17). PARTIAL; the under-reject is folded into finding 'report-present-when-scan-over-bound-products'. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (PRESENT WHEN is not part of the COBOL-85 report group entry; the 2002 introduction is the edition fact the construct registry row asserts, and the 2023 text does not restate it)",
-  "state": "GAP"
+  "notes": "kb/Work PB1289 landed 2026-10-04: the scan reads the PRESENT WHEN clauses off the written entries (ReportModel.WrittenEntries) against the data-name of every written entry of every report description.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.15.3-17",
@@ -18801,13 +18801,13 @@
   "ordinal": 2,
   "subject": "Report group description entry",
   "rule-digest": "adfcec9cace3",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportUsage; src/Cobol.Net.Compiler/Binding/PictureAnalyzer.cs#Analyze",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportUsage",
+  "test-ref": "conformance:negative/pb1288-report-blank-when-zero-alphanumeric; conformance:negative/pb1288-report-justified-numeric; conformance:negative/pb541-report-usage-comp; conformance:85/pb1288_report_entry_placement",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1288. GR2 brings every syntax and general rule of the USAGE, PICTURE, BLANK WHEN ZERO and JUSTIFIED clauses into the report group entry. Verified: PICTURE goes through the one PictureAnalyzer, format 2 LOCALE included (PB113 landed). The USAGE clause is screened per §13.18.60.3 SR7 and GR1/GR2 inheritance (PB541 landed; conformance:negative/pb541-report-usage-comp). JUSTIFIED runtime alignment works (probe gr2: `PIC X(5) JUSTIFIED RIGHT SOURCE WA` printed `    A`). BLANK WHEN ZERO runtime blanking works (`PIC 99 BLANK WHEN ZERO VALUE 0` printed blanks). NOT enforced: §13.18.8.3 SR1 ('may be specified only for an elementary item described ... as category numeric-edited or as numeric without the picture symbol S'), where probe bwzx `05 COLUMN 1 PIC X(3) BLANK WHEN ZERO SOURCE WA.` compiled and ran (rc 0). Also NOT enforced: §13.18.32.3 SR3 ('The JUSTIFIED clause may be specified only for a data item whose category is alphabetic, alphanumeric, boolean, or national'), where probe justnum `05 COLUMN 1 PIC 99 JUSTIFIED SOURCE WN.` compiled and printed `01`. Both gaps are shared with the data-division arm (probe wsbwz: `01 X PIC X(3) BLANK WHEN ZERO.` and `01 Y PIC 99 JUSTIFIED.` accepted). The open kb/Work PB507 owns the BLANK WHEN ZERO half ('the BLANK WHEN ZERO clause has NO validator anywhere in the typed-native compiler') and names the JUSTIFIED sibling. The JUSTIFIED SR3 category rule looked unowned in a keyword search: the registrar should confirm whether PB507 or PB512 claims it. cite.py --check 13.15.4 'the USAGE, PICTURE, BLANK WHEN ZERO and JUSTIFIED clauses are the same clauses' -> OK; --check 13.18.8.3 and 13.18.32.3 SR3 -> OK. PARTIAL: the imported rules are enforced for USAGE and PICTURE and missing for two of the BWZ/JUSTIFIED syntax rules. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (the report group description entry is Report Writer nucleus syntax at every edition; no Annex E item changes §13.15 between 2014 and 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1288 landed 2026-10-04: the BLANK WHEN ZERO and JUSTIFIED subject screens of the data division (BlankWhenZeroViolation, JustifiedViolation) now run over the printable item; USAGE (PB541) and PICTURE (PB113) already did.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.15.4-3",
@@ -20451,13 +20451,13 @@
   "ordinal": 3,
   "subject": "COLUMN clause",
   "rule-digest": "ff6cf1b5c794",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SubordinateToLineClause",
+  "test-ref": "conformance:negative/pb1288-report-column-sibling-of-line; conformance:negative/pb1224-report-column-without-line; conformance:85/pb1288_report_entry_placement",
   "derivation": "",
   "editions": "85",
-  "notes": "(kb/Work PB1224, 14d). cite.py --check 13.18.14.3 \"shall be subordinate to an entry containing a LINE clause\" -> OK SR3. Half 1 (elementary only) CONFORMS: ScreenReportEntryClausePresence refuses a group entry writing COLUMN via §13.15.3 SR11 (cite.py OK §13.15.3 11)). Half 2 (LINE clause in the entry or an ANCESTOR): the binder tests `line is null` on the running build state `st.Line`, which is the most recently OPENED line, not the entry's ancestry. Probe out13/probe/column-clause-p1/sr3_noline: `01 DET TYPE DE. 03 COLUMN 10 ...` -> COBOLNET0899 (correct). Probe sr3_sibling: `01 DET TYPE DE. 03 LINE PLUS 1. 05 COLUMN 1 PIC X VALUE \"A\". 03 COLUMN 10 PIC X VALUE \"B\".` — the second 03 neither contains a LINE clause nor is subordinate to one (its only ancestor is the 01, which has none) — compiles clean and prints 'A        B' on the first line. Expected: a compile-time SR3 diagnostic. Harm under-rejects (finding F6). No negative golden witnesses even the no-LINE case. || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry (ReportColumnWithoutLine arm, reads build-state st.Line); src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence",
-  "state": "GAP"
+  "notes": "kb/Work PB1224 landed 2026-10-04: same screen as SR-13.15.3-9 (the COLUMN clause's side of the rule).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-4",
@@ -20511,13 +20511,13 @@
   "ordinal": 7,
   "subject": "COLUMN clause",
   "rule-digest": "b7a38be26046",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportColumnArrangement; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#NominalPlacements",
+  "test-ref": "conformance:negative/pb1222-column-out-of-order; conformance:2002/pb1222_report_arrangement_present_when",
   "derivation": "",
   "editions": "85",
-  "notes": "(kb/Work PB1222, 14d). cite.py --check 13.18.14.3 \"any two or more absolute items defined using column numbers that are not in increasing numerical order shall be subject to a different PRESENT WHEN clause\" -> OK SR7. No screen exists (design §5: 'the SR7/SR8/SR10b operand-order-vs-PRESENT-WHEN arrangement rules are not enforced'). Probe out13/probe/column-clause-p1/sr7_decreasing at 2023: `03 COLUMN 20 PIC X VALUE \"A\". 03 COLUMN 10 PIC X VALUE \"B\".` in one line, no PRESENT WHEN -> compiles clean, prints 'B' at 10 and 'A' at 20. Expected: an SR7 compile-time diagnostic. The legal twin sr7_decr_pw (distinct PRESENT WHEN on each) compiles and prints only 'A' at 20 (WS-F=1) — correct. Harm under-rejects (finding F3). || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1222 landed 2026-10-04: absolute items by written column number, excused only by different PRESENT WHEN clauses (COBOLNET2745).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-8",
@@ -20526,13 +20526,13 @@
   "ordinal": 8,
   "subject": "COLUMN clause",
   "rule-digest": "962d2e5b9455",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportColumnArrangement; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#NominalPlacements",
+  "test-ref": "conformance:negative/pb1222-column-overlap; conformance:negative/pb1222-column-past-page-width; conformance:negative/pb1222-relative-tail-past-page-width; conformance:negative/pb1222-relative-tail-largest-past-page-width; conformance:2002/pb1059_page_columns_width; conformance:2002/pb1188_report_nonfatal_raise",
   "derivation": "",
   "editions": "85",
-  "notes": "(kb/Work PB1222, 14d). cite.py --check 13.18.14.3 \"If any two or more items overlap each other, they shall each be subject to a different PRESENT WHEN clause\" -> OK 8) a); \"The rightmost column positions of all absolute items shall not exceed the page width\" -> OK 8) b). None of a/b/c is screened. (a) probe out13/probe/column-clause-p1/sr8a_overlap: `03 COLUMN 1 PIC X(5) VALUE \"AAAAA\". 03 COLUMN 3 PIC X(2) VALUE \"BB\".` compiles clean, prints 'AABBA' (the second overwrites). (b) probe sr6_huge: COLUMN 9999 PIC X(5) with the §13.18.39.4 GR5 default width 999 compiles clean. (c) the relative-items-exceed-width leg has no page-width model to test against (no PageWidth symbol in src) — reasoned, not probed. Expected: compile-time diagnostics for each. (b)/(c) share the page-width mechanism with SR6 (finding F5; PB1059 claims only SR6); (a) is the arrangement mechanism (finding F3). Harm under-rejects. || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1222 landed 2026-10-04: a) overlap, b) an absolute item past the page width, c) a relative tail past it, judged whole unless each item carries a different PRESENT WHEN clause and then by the largest alone (COBOLNET2745).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-9",
@@ -20556,13 +20556,13 @@
   "ordinal": 10,
   "subject": "COLUMN clause",
   "rule-digest": "308ed3581a34",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportColumnClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportColumnClauses; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportColumnArrangement",
+  "test-ref": "conformance:negative/pb1222-multiple-column-with-occurs; conformance:negative/pb1222-multiple-column-not-increasing; conformance:2002/pb1222_report_arrangement_present_when",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1222, 14d). cite.py --check 13.18.14.3 \"No OCCURS clause shall be specified in the same entry\" -> OK 10) a); \"All the occurrences of integer‑1 shall be in increasing order of magnitude\" -> OK 10) b). The LINE-clause twin (§13.18.35.3 SR10d) is screened at DataBinder.Reports.cs ~L1280; the COLUMN side has no screen for either sub-rule. (a) probe out13/probe/column-clause-p1/sr10a_occ_step: `03 COLUMN 5 10 PIC X VALUE \"A\" OCCURS 2 STEP 20.` compiles clean and prints FOUR 'A's (5,10,25,30 — the two vehicles compounded); sr10a_occ_rel (`COLUMN PLUS 1 PLUS 3 ... OCCURS 2`) likewise clean; sr10a_occurs (no STEP) is refused, but only by the unrelated §13.18.38.3 SR25c STEP rule (COBOLNET2021). (b) probes sr10b_decr `COLUMN 20 10` (prints at 10 and 20), sr10b_equal `COLUMN 10 10` (prints one 'A'), sr10b_mixed_decr `COLUMN 10 PLUS 2 8` (prints 8,10,12) all compile clean; sr10b_ok `COLUMN 10 PLUS 2 20` correct. Expected: compile-time diagnostics. Harm under-rejects (findings F3 for b, F4 for a). || Editions (adjudicator): 2002, 2014, 2023 (the multiple COLUMN clause is a 2002 introduction; refused COBOLNET0900 at 85)",
-  "state": "GAP"
+  "notes": "kb/Work PB1222 landed 2026-10-04: SR10 a) no OCCURS in a multiple COLUMN entry, SR10 b) integer-1 strictly increasing (COBOLNET2745); the COLUMN arm of the two-arm rule whose LINE arm was already screened.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-11",
@@ -23166,13 +23166,13 @@
   "ordinal": 6,
   "subject": "LINE clause",
   "rule-digest": "97bdf845dea0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportLineClauses",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#MinimumLastLine",
+  "test-ref": "conformance:negative/pb1222-line-out-of-order; conformance:negative/pb1222-line-overlap; conformance:negative/pb1222-absolute-line-after-relative; conformance:negative/pb1222-relative-tail-past-lower-limit; conformance:negative/pb1222-relative-lines-largest-past-lower-limit; conformance:negative/pb1270-detail-above-first-detail; conformance:negative/pb1270-detail-below-last-detail; conformance:negative/pb1270-page-heading-below-first-detail; conformance:2002/pb1222_report_arrangement_present_when; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1222, 14d). cite.py --check OK for all five sub-rules: 13.18.35.3 6) a) \"If any two or more absolute lines are defined using line numbers that are not in increasing numerical order, they shall each be subject to a different PRESENT WHEN clause.\"; 6) b) \"If any two or more lines, or groups of lines, overlap each other, they shall each be subject to a different PRESENT WHEN clause.\"; 6) c) \"Any absolute report lines shall be defined in such a way that no line appears above the upper limit or below the lower limit allowed for the report group.\"; 6) d) \"they shall not cause the report group's lower limit to be exceeded\"; 6) e) \"If the description of any absolute line appears later than that of a relative line, they shall each be subject to a different PRESENT WHEN clause.\" Detail lower limit: 13.18.57.4 8) e) \"The lower limit for a detail is the line given by the LAST DETAIL integer.\" OK. ScreenReportLineClauses screens SR3/SR5/SR7/SR8 only; SR6 has NO site (its one mention, DataBinder.Reports.cs:2126, ASSUMES SR6 e) is enforced). Probes (RD PAGE LIMIT 20 HEADING 1 FIRST DETAIL 2 LAST DETAIL 15 FOOTING 18; every line unconditional) all compile clean and run: g6a LINE 5 then LINE 3 (a); g6b LINE 5 then LINE 5 (b); g6c LINE 3 then LINE 17 in a DETAIL (c: 17 > LAST DETAIL 15); g6d LINE 14 then LINE PLUS 3 = 17 (d); g6e LINE PLUS 1 then LINE 8 (e). Expected: each refused (COBOLNET2199 report-line-clause-rule is the family's code). The 13.18.37.3 SR6/SR7 MinimumLastLine walk is the only group-geometry check and serves NEXT GROUP, not this rule. No kb/Work note owns it. || Editions (adjudicator): 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d)",
-  "state": "GAP"
+  "notes": "kb/Work PB1222 + PB1270 landed 2026-10-04: a) b) e) over the written entries' first lines, c) against GroupLimits, d) through the one placement walk (COBOLNET2199).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.35.3-7",
@@ -24546,13 +24546,13 @@
   "ordinal": 5,
   "subject": "PAGE clause",
   "rule-digest": "665c7b30b171",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportPageIntegers",
+  "test-ref": "conformance:negative/pb1270-page-limit-over-9999; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270. SR5 (cite.py --check 13.18.39.3 \"Integer-1 shall not exceed 9999\" -> OK, rule 5). No screen: BindReportDescriptionClauses does `model.PageLimit = int.Parse(...)` and nothing compares it with 9999 (IntegerOperandPass maps ReportPageClauseContext to Nonzero only). Probe lim.cob `RD R PAGE LIMIT 10000 LINES.` -> rc=0, compiles and runs (under-rejects); lim9999.cob rc=0 correctly. An operand beyond Int32 crashes the binder with OverflowException -- that half is open kb/Work PB1058, whose fixer note already names 'PAGE: §13.18.39.3' as the range rule to report, but its measured defect is only the crash; the 10000..2^31-1 band compiling silently is this row. Expected: a syntax-rule diagnostic for integer-1 > 9999. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04: integer-1 over 9999 refused (COBOLNET2744).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.39.3-6",
@@ -24561,13 +24561,13 @@
   "ordinal": 6,
   "subject": "PAGE clause",
   "rule-digest": "cfce8cfea96d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#Slots; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportPageIntegers; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#Slots",
+  "test-ref": "conformance:negative/pb1270-page-heading-after-first-detail; conformance:negative/pb1270-page-footing-over-limit; conformance:negative/pb1270-page-last-detail-after-footing; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270. SR6 (cite.py --check 13.18.39.3 \"Wherever specified, they shall be in ascending order, with equality allowed\" -> OK, rule 6) has two halves. Greater-than-zero half CONFORMS: IntegerOperandPass maps ReportPageClauseContext and ReportPageSubclauseContext to Nonzero; probes zero.cob `HEADING 0` and zero1.cob `PAGE 0` -> COBOLNET2386 (§5.5 1) text). Ascending half NOT IMPLEMENTED: no comparison of integer-3 <= integer-4 <= integer-5 <= integer-6 <= integer-7 <= integer-1 anywhere in DataBinder.Reports.cs (grep 'ascending' finds none). Probes compile rc=0 and run: asc.cob `PAGE LIMIT 10 LINES HEADING 5 FIRST DETAIL 3.`, asc2.cob `PAGE LIMIT 10 LINES FOOTING 12.` (FOOTING beyond the page limit), asc3.cob `LAST DETAIL 9 FOOTING 7.` Under-rejects; the runtime then works from an inverted page model. Expected: each of those is a syntax-rule error. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec)",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04: the written integers in ascending order with equality allowed (COBOLNET2744); greater-than-zero is COBOLNET2386.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.39.4-1",
@@ -24577,11 +24577,11 @@
   "subject": "PAGE clause",
   "rule-digest": "bfd4b4e2bdff",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "conformance:85/pb484_report_line_placement",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits",
+  "test-ref": "conformance:85/pb484_report_line_placement; conformance:negative/pb1270-page-heading-below-first-detail; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270. GR1 (cite.py --check 13.18.39.4 \"each report group shall be confined within one or more of these regions\" -> OK, 1)). Line numbering from 1 per page: the engine resets LINE-COUNTER to 0 at each PageFeed and a line number is a physical page position (PB484 landed; pb484_report_line_placement derives it). Regions are modelled (ReportModel.Heading/FirstDetail/LastControlHeading/LastDetail/Footing) and read by the runtime page-fit (LowerLimit, §13.18.57.4 GR8) and relative placement. The 'shall be confined' half has no compile-time screen: probe gr1ph.cob `PAGE LIMIT 10 LINES HEADING 3 FIRST DETAIL 5.` with `01 TYPE PH LINE 7.` compiles rc=0 and prints the page heading on line 7 below FIRST DETAIL, then the detail on line 8. The operative syntax rule is §13.18.35.3 SR6c (cite.py --check 13.18.35.3 \"no line appears above the upper limit or below the lower limit allowed for the report group\" -> OK, 6) c)), unscreened in ScreenReportLineClauses (it screens SR3/SR5/SR7/SR8 only). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Runtime/IO/ReportWriter.cs#ReportWriter (symbol not in the file at 071ff04ea; path kept)",
+  "notes": "kb/Work PB1270 partly landed 2026-10-04: every ABSOLUTE line is confined (SR6 c), a relative report or page heading is confined to FIRST DETAIL - 1, a body group by the run-time page-fit test. Not screened: the relative extent of a page or report footing, and a relative FIRST line whose integer-2 puts it above its group's upper limit (RH or PF with PLUS 0).",
   "state": "GAP"
  },
  {
@@ -24592,11 +24592,11 @@
   "subject": "PAGE clause",
   "rule-digest": "e848559fd8d9",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Runtime/IO/ReportWriter.cs",
-  "test-ref": "conformance:85/pb484_report_line_placement",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportPageIntegers; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits",
+  "test-ref": "conformance:85/pb484_report_line_placement; conformance:negative/pb1270-page-heading-after-first-detail; conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:2002/pb1059_page_columns_width",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270. GR2 (cite.py --check 13.18.39.4 \"If integer-1 is not specified, the report consists of a single page of indefinite length\" -> OK, 2) a); \"Any report heading (when not on a page by itself) or page heading shall be defined so that it terminates before this line\" -> OK, 2) d)). a) page limit / unpaged: CONFORMS (model.Paged, VerticalLimit 9999, runtime _paged; pb484 derives the unpaged arm; gr3d.cob paged run advances after the lower limit). b) page width: NOT IMPLEMENTED -- no width model (PB1059). c) HEADING: used for relative PH/RH placement (ReportWriter PresentPageHeading GR5b2) but 'No report line will appear higher' is unscreened (gr4rh.cob: RH LINE 1 with HEADING 3 compiles and prints on line 1). d) FIRST DETAIL: first body group placement uses it; the 'page heading shall terminate before this line' half is unscreened (gr1ph.cob). e) LAST CONTROL HEADING: runtime LowerLimit reads it for control headings, but the integer cannot be written (FMT/SR1 finding). f) LAST DETAIL and g) FOOTING: used as detail / control-footing lower limits and for PF/RF relative placement (gr3e.cob run verified PF at FOOTING+1). Multiple halves unverified or defective -> PARTIAL. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Runtime/IO/ReportWriter.cs#ReportWriter (symbol not in the file at 071ff04ea; path kept)",
+  "notes": "kb/Work PB1270 partly landed 2026-10-04: a) page limit and unpaged, b) page width (PB1059, SR8 b/c), c) HEADING and d) FIRST DETAIL for absolute lines and relative headings, e) LAST CONTROL HEADING (grammar and defaults landed), f) LAST DETAIL, g) FOOTING for absolute lines. Not screened: a page footing whose RELATIVE first line begins at FOOTING (integer-2 zero), which g) says shall begin after it.",
   "state": "GAP"
  },
  {
@@ -24622,11 +24622,11 @@
   "subject": "PAGE clause",
   "rule-digest": "82ef257ca4e1",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines",
+  "test-ref": "conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-report-heading-after-page-heading; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270. GR4 (cite.py --check 13.18.39.4 \"may occupy any region of the page from HEADING\" -> OK, 4)). Runtime: a report footing on a page by itself (first line NEXT PAGE) takes a bare PageFeed and its relative first line starts at the HEADING integer (§13.18.57.4 GR7f); a report heading on a page by itself (NEXT GROUP NEXT PAGE) is followed by a page feed. Not-own-page RH/RF are placed with the page heading/footing rules (GR5b1/GR5b5). The constraint half is unscreened: gr4rh.cob `PAGE LIMIT 10 LINES HEADING 3 FIRST DETAIL 5.` with `01 TYPE RH LINE 1 NEXT GROUP NEXT PAGE.` compiles rc=0 and prints RH on line 1, above the HEADING integer 3 (§13.18.35.3 SR6c unscreened; same mechanism as GR1/GR2). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; the §13.18.39 text is the 2023 edition's and Annex E records no PAGE-clause change, so no edition gate is derivable from the spec) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Runtime/IO/ReportWriter.cs#ReportWriter#PresentHeadingFooting | src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses#BindNextGroupClauses || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Runtime/IO/ReportWriter.cs#ReportWriter (symbol not in the file at 071ff04ea; path kept)",
+  "notes": "kb/Work PB1270 partly landed 2026-10-04: a report heading by itself (its NEXT GROUP NEXT PAGE) may occupy HEADING through the page limit and one that is not is confined as a page heading is (GroupLimits). Not screened: the relative extent of a report footing on a page by itself.",
   "state": "GAP"
  },
  {
@@ -28806,13 +28806,13 @@
   "ordinal": 7,
   "subject": "TYPE clause",
   "rule-digest": "8a5fc9001ef5",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentPageHeading; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentPageFooting; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentHeadingFooting; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#RepeatedLine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody",
+  "test-ref": "conformance:negative/pb1270-detail-above-first-detail; conformance:negative/pb1270-detail-inside-or-page-heading; conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-page-footing-above-footing-plus-1; conformance:2002/pb1270_report_or_page_upper_limit; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270 + PB1298. Rule (cite.py --check 13.18.57.4 \"The upper limit for a body group, if there is no control heading defined in the report with the OR PAGE phrase, is the line given by the FIRST DETAIL integer\" -> OK 7)). The upper limit is a DEFINITION with two consumers: the runtime first-line placement and the compile-time 13.18.35.3 SR6 c) screen (cite.py --check 13.18.35.3 \"Any absolute report lines shall be defined in such a way that no line appears above the upper limit or below the lower limit allowed for the report group\" -> OK 6) c)). Placement consumer CONFORMS for a), b), c): PresentHeadingFooting/PresentPageHeading place a relative first line at HEADING+integer-2-1 (a), a PH after an RH on the same page at LINE-COUNTER+integer-2 (b, line following the RH), the first body group on a page at FIRST DETAIL (c; PresentBody `_paged && _firstBodyOnPage ? _firstDetail`; probe r3 CHF lands on 3 = FIRST DETAIL; pinned by ReportWriterConformanceTests.FirstGenerate_Gr5b3_LandsAtFirstDetail_RelativeValueIgnored). d) (OR PAGE) is NOT IMPLEMENTED -- The OR PAGE phrase (and the optional ON/FOR words) of TYPE CONTROL HEADING has NO grammar surface: CobolReportWriter.g4 reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?`; probe r1 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r1.cob, --std 2002) `01 CH1 TYPE CH K OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; r1b `TYPE CONTROL HEADING ON K` -> COBOL0307 unexpected 'ON'. No kb/Work note owns OR PAGE (grep of kb/Work finds none); the FMT row belongs to sibling part type-clause-p1. The SR6 c) consumer is ABSENT: no bind-time code computes any group's upper limit (grep 'upper limit' in src/Cobol.Net.Compiler finds only a comment), so an absolute line above it is accepted: probe r2b (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r2b.cob) `PAGE LIMIT 20 HEADING 2 FIRST DETAIL 5 LAST DETAIL 10 FOOTING 12`, `01 DET TYPE DE LINE 2.` compiles and prints DE on line 2 (above the body upper limit 5), and `01 PF1 TYPE PF LINE 11.` prints PF on line 11 (above the PF upper limit FOOTING+1 = 13) -- both SR6 c) violations the spec requires to be rejected. PARTIAL (a-c placement verified; d unimplemented; the limit is never applied as a constraint). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04: GroupLimits computes the upper limit of every group type at bind, a) to g), with the OR PAGE headings of d) read by control level; the run-time placement consumers were already conforming (PB1298).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.57.4-L2.1",
@@ -28866,13 +28866,13 @@
   "ordinal": 4,
   "subject": "TYPE clause",
   "rule-digest": "7a3bc5a77629",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentPageFooting; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentHeadingFooting; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#RepeatedLine",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.PageAdvance_Gr6a_PfThenNewPage_TerminatePfRf",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentPageFooting",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.PageAdvance_Gr6a_PfThenNewPage_TerminatePfRf; conformance:negative/pb1270-page-footing-above-footing-plus-1; conformance:2002/pb1270_report_or_page_upper_limit; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270 + PB1298. This row's text carries 7) d) 4. (control footing under OR PAGE headings) AND the tail sub-rules 7) e) f) g) (cite.py --check 13.18.57.4 \"The upper limit for a page footing is the line number obtained by adding 1 to the FOOTING integer\" -> OK 7)). d) 4.'s OR PAGE half is NOT IMPLEMENTED (The OR PAGE phrase (and the optional ON/FOR words) of TYPE CONTROL HEADING has NO grammar surface: CobolReportWriter.g4 reportGroupType is `(CONTROL HEADING | CH) (FINAL | dataReference)?`; probe r1 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r1.cob, --std 2002) `01 CH1 TYPE CH K OR PAGE LINE PLUS 1.` -> COBOL0307 unexpected 'OR'; r1b `TYPE CONTROL HEADING ON K` -> COBOL0307 unexpected 'ON'. No kb/Work note owns OR PAGE (grep of kb/Work finds none); the FMT row belongs to sibling part type-clause-p1.); its fallback 'If no such control heading is defined, the upper limit is the FIRST DETAIL integer' is what PresentBody does for every first body group on a page. e) PF: a relative first line is placed at FOOTING+integer-2 (PresentPageFooting), i.e. from the FOOTING+1 upper limit; f) RF on a page by itself: an absolute first line at integer-1, the bare ON NEXT PAGE operand at the HEADING integer (documented determination, docs/CONFORMANCE.md LINE NEXT PAGE block, citing this GR7f); g) RF not on its own page: LINE-COUNTER+integer-2 after a PF on the same page, else FOOTING+integer-2 -- probe r3 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r3.cob) RF@11 right after PF 3@10. As with GR7, the limits are never applied as the 13.18.35.3 SR6 c) constraint (probe r2b: PF LINE 11 accepted with FOOTING 12). PARTIAL: e/f/g placement verified; d) 4. OR PAGE half unimplemented; the constraint consumer absent. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04: GR7 d) 4. (a control footing after the OR PAGE headings at its level or above), e), f), g) in GroupLimits.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.57.4-8",
@@ -28881,13 +28881,13 @@
   "ordinal": 8,
   "subject": "TYPE clause",
   "rule-digest": "ae3e5dd98aca",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#LowerLimit; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentBody; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.PageFit_Gr4c_TrialSumOverflow_AdvancesAndResets",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Runtime/IO/ReportWriter.cs#LowerLimit",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.PageFit_Gr4c_TrialSumOverflow_AdvancesAndResets; conformance:negative/pb1270-page-heading-below-first-detail; conformance:negative/pb1270-detail-below-last-detail; conformance:negative/pb1270-report-heading-after-page-heading; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:85/pb1270_report_page_region_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1270. Rule (cite.py --check 13.18.57.4 \"The lower limit for a control heading is the line given by the LAST CONTROL HEADING integer\" -> OK 8) d); \"The lower limit for a page heading is the line number obtained by subtracting 1 from the FIRST DETAIL integer\" -> OK 8) c)). Body-group lower limits d) e) f) are implemented in CobolReport.LowerLimit (CH -> _lastControlHeading, CF -> _footing, DETAIL -> _lastDetail) and consumed by the 13.18.35.4 GR4c page-fit test; probe r3 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r3.cob): after CFK 1 on line 7 (CF lower limit FOOTING 8: 7<=8 fit), CHK needs line 8 > LAST CONTROL HEADING default 6 -> page advance, PF 2, new page -- spec-computed. The binder supplies 13.18.39.4 GR3c's default (cite.py --check 13.18.39.4 \"If LAST CONTROL HEADING is omitted, integer-5 will be equal to integer-6\" -> OK); but the LAST CONTROL HEADING phrase itself has no grammar surface (docs/CONFORMANCE.md A.4.11 says so; the page-clause adjudication recorded it as unowned), so d) can only ever take the default. a) b) c) g) (RH/PH/PF/RF lower limits) have no consumer anywhere: RH/PH/PF/RF take no page-fit test, and the 13.18.35.3 SR6 c)/d) screen that bounds their absolute lines is not implemented -- probe r2 (E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/type-clause-p2/r2.cob) `PAGE LIMIT 20 HEADING 1 FIRST DETAIL 3`, `01 PH1 TYPE PH LINE 5.` compiles and prints PH on line 5, below the PH lower limit FIRST DETAIL-1 = 2, and the details then print under it. Expected: compile-time rejection (SR6 c)). PARTIAL: body limits verified, d)'s written integer unreachable, a/b/c/g unapplied. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer module, Annex A.4.11; Annex E records no 2014->2023 change to 13.18.57.4 Format 2, and the 2023 text alone does not derive an earlier introducing edition for any sentence)",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04: GroupLimits computes the lower limit of every group type at bind, a) to g) (a report heading by itself is its NEXT GROUP NEXT PAGE); the body-group lower limits are also the run-time page-fit test's.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.58.3-1",

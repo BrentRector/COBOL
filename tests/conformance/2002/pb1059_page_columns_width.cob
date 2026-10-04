@@ -18,12 +18,22 @@
       *>   cite.py: OK  13.18.14.4 5)  (General rules)
       *> Before the surface existed the width was the 999 of 13.18.39.4 GR5
       *> whatever the program wrote, and `10 COLUMNS` was a parse error.
+      *> 13.18.14.3 SR8 b) bars an ABSOLUTE item from ending past the page
+      *> width, and SR8 c) bars relative items at the end of a line from
+      *> causing it "unless each of them is subject to a different PRESENT
+      *> WHEN clause, in which case this rule applies only to the largest of
+      *> them".   cite.py: OK  13.18.14.3 8) c)  (Syntax rules)
+      *> So the exception is reached by two relative items under DIFFERENT
+      *> PRESENT WHEN clauses, each of which fits alone and which together do
+      *> not (the clauses are different; nothing says they exclude each other).
       *> DERIVATION: PAGE LIMIT IS 10 LINES 12 COLUMNS, so the page width is
-      *> 12. The item at COLUMN 10 is five wide and ends at column 14, past
-      *> 12: the exception is set, the line is truncated at column 12 and
-      *> printed, so columns 10-12 hold "ABC" and the line is "OK", seven
-      *> spaces, then "ABC". EXCEPTION-STATUS then names EC-REPORT-PAGE-WIDTH.
-      *> The item at COLUMN 1 ("OK") ends at column 2 and is untouched.
+      *> 12. Item A is COLUMN PLUS 1 and six wide: GR8 starts the counter at
+      *> zero, so it occupies columns 1-6. Item B is COLUMN PLUS 3 and five
+      *> wide: the counter is 6, so it starts at column 9 and ends at 13, past
+      *> 12 (alone it would start at 3 and end at 7). Both conditions hold,
+      *> so the exception is set, the line is truncated at column 12 and
+      *> printed: columns 9-12 hold "VWXY" and the line is "ABCDEF", two
+      *> spaces, then "VWXY". EXCEPTION-STATUS then names EC-REPORT-PAGE-WIDTH.
       *> The read-back numbers each physical line and prints its first 14
       *> bytes.
        ENVIRONMENT DIVISION.
@@ -37,6 +47,8 @@
        FD  CHK.
        01  CHK-REC PIC X.
        WORKING-STORAGE SECTION.
+       01  WS-ON   PIC 9     VALUE 1.
+       01  WS-TWO  PIC 9     VALUE 1.
        01  WS-EOF  PIC X     VALUE "N".
        01  WS-BYTE PIC X.
        01  WS-I    PIC 99    VALUE 0.
@@ -45,8 +57,10 @@
        REPORT SECTION.
        RD  R PAGE LIMIT IS 10 LINES 12 COLUMNS.
        01  D1 TYPE DE LINE PLUS 1.
-           03  COLUMN 1 PIC XX VALUE "OK".
-           03  COLUMN 10 PIC X(5) VALUE "ABCDE".
+           03  COLUMN PLUS 1 PIC X(6) VALUE "ABCDEF"
+               PRESENT WHEN WS-ON = 1.
+           03  COLUMN PLUS 3 PIC X(5) VALUE "VWXYZ"
+               PRESENT WHEN WS-TWO = 1.
        PROCEDURE DIVISION.
        MAIN-PARA.
            OPEN OUTPUT PRT.

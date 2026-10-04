@@ -37,4 +37,4 @@ LINE 06 [F6    ]
 LINE 01 [RT    ]
 R-W
 LINE 01 [W     ]
-  TAIL [ 123 ] LENGTH 0999
+  TAIL [1234 ] LENGTH 0999

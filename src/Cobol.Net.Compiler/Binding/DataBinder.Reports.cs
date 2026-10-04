@@ -87,6 +87,12 @@ public sealed class ReportModel
     /// <summary>The CONTROL hierarchy in major→minor order (ISO §13.18.16.4 GR1; FINAL, if present, first — GR2).</summary>
     public List<ReportControlModel> Controls { get; } = [];
 
+    /// <summary>The report group description entries as WRITTEN, in source order (§13.15) — every entry the RD
+    /// is followed by, whether or not it produced a line, a printable field or a counter. The screens whose rule
+    /// is about what was written (§13.15.3 SR16's PRESENT WHEN operands, the report-section name set) read this
+    /// and never the bound products, which exist only for the entries that make one (kb/Work PB1289).</summary>
+    public IReadOnlyList<Core.ReportGroupEntryContext> WrittenEntries { get; init; } = [];
+
     /// <summary>The report groups in declaration order.</summary>
     public List<ReportGroupModel> Groups { get; } = [];
 
@@ -287,6 +293,11 @@ public sealed class ReportLineModel(ReportLineKindModel kind, int value)
     public ReportLineKindModel Kind { get; } = kind;
     public int Value { get; } = value;
     public List<ReportFieldModel> Fields { get; } = [];
+
+    /// <summary>The WRITTEN report group description entry whose LINE clause opened this line — the same entry for
+    /// every replay of a repeating entry, so the line-set rules of §13.18.35.3 SR6 report once per pair of entries.
+    /// Null only before <c>BindReportEntry</c> has stamped the line it made.</summary>
+    public CobolParserCore.ReportGroupEntryContext? Entry { get; set; }
 
     /// <summary>This line's step-anchor slot (ISO §13.18.38.4 GR12c/GR12d), 0 when the line neither seeds one
     /// nor steps from one. A non-Step line with an anchor SEEDS it with the page line it lands on; a
@@ -502,6 +513,11 @@ public sealed class ReportFieldModel
 {
     public required IReadOnlyList<ReportColumnSpec> Columns { get; init; }
     public required DataItem PrintItem { get; init; }
+
+    /// <summary>The WRITTEN report group description entry this field is a placement of — one entry for every
+    /// replay of a repeating entry. The arrangement rules of the line (§13.18.14.3 SR7, SR8) are about entries as
+    /// written, so they report once per pair of entries and skip two placements of the same one.</summary>
+    public CobolParserCore.ReportGroupEntryContext? Entry { get; init; }
 
     /// <summary>⛔ THE VALUE / SOURCE OPERAND LIST — ONE ENTRY PER WRITTEN OPERAND, NEVER A SCALAR (kb/Work
     /// PB506). ISO §13.18.63.2 format 4 is <c>{ literal-1 } …</c> and §13.18.53.2 is
@@ -1044,6 +1060,7 @@ public sealed partial class DataBinder
             var model = new ReportModel
             {
                 Name = name,
+                WrittenEntries = rd.reportGroupEntry(),
                 CsIndex = Reports.Count,
                 Uid = _uidCounter++,
                 // §8.4.3.15.4 GR1 — the counter exists per REPORT, so its register is built here, once, with the
@@ -1169,10 +1186,12 @@ public sealed partial class DataBinder
                 // Every integer of the clause is a literal position, so an integer constant-name stands there
                 // (§13.10.3 SR2) — read through the ONE reader (kb/Work PB1947); a refused constant reads as 1, the
                 // recovery value no range rule below trips on (the compile has already failed).
+                int? writtenLimit = null;   // null: not written, or refused (the compile has already failed)
                 if (page.integerOperand() is { } limit)
                 {
                     model.Paged = true;
-                    model.PageLimit = IntegerOperandValue(limit, rdWhere) ?? RecoveredIntegerOperand;
+                    writtenLimit = IntegerOperandValue(limit, rdWhere);
+                    model.PageLimit = writtenLimit ?? RecoveredIntegerOperand;
                 }
                 if (page.reportPageWidth() is { } width)
                 {
@@ -1193,9 +1212,12 @@ public sealed partial class DataBinder
                         + $"specifies {string.Join(", ", subs.Select(s => PagePhraseWords(PagePhraseOf(s))).Distinct())} "
                         + "but no integer-1 (the page limit): those phrases may be specified only if integer-1 is "
                         + "specified (ISO §13.18.39.3 SR3)");
+                var writtenPhrases = new List<(PagePhrase Phrase, int Value, Core.ReportPageSubclauseContext Ctx)>();
                 foreach (var sub in subs)
                 {
-                    int v = IntegerOperandValue(sub.integerOperand(), rdWhere) ?? RecoveredIntegerOperand;
+                    int? written = IntegerOperandValue(sub.integerOperand(), rdWhere);
+                    int v = written ?? RecoveredIntegerOperand;
+                    if (written is { } w) writtenPhrases.Add((PagePhraseOf(sub), w, sub));
                     switch (PagePhraseOf(sub))
                     {
                         case PagePhrase.Heading: model.Heading = v; heading = true; break;
@@ -1205,6 +1227,7 @@ public sealed partial class DataBinder
                         case PagePhrase.Footing: model.Footing = v; footing = true; break;
                     }
                 }
+                ScreenReportPageIntegers(model, page, writtenLimit, writtenPhrases);
             }
         }
         if (!model.Paged) return;
@@ -1217,6 +1240,49 @@ public sealed partial class DataBinder
                 : footing ? model.Footing : model.PageLimit;
         if (!footing) model.Footing = lastDetail ? model.LastDetail : model.PageLimit;   // GR3e
     }
+
+    /// <summary>⛔ THE PAGE CLAUSE'S INTEGER RULES (ISO §13.18.39.3 SR5, SR6; kb/Work PB1270), asked of the WRITTEN
+    /// integers before the §13.18.39.4 GR3 defaults exist — a default is the programmer's integer copied, so asking
+    /// after it would report one fault twice, and SR6 says "wherever specified".
+    /// <list type="bullet">
+    /// <item>SR5 — "Integer-1 shall not exceed 9999."</item>
+    /// <item>SR6, second sentence — "Integer-3, integer-4, integer-5, integer-6, integer-7, and integer-1 shall be
+    /// greater than zero. Wherever specified, they shall be in ascending order, with equality allowed." The order is
+    /// the HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, FOOTING integers and then the page limit
+    /// (<see cref="PagePhrase"/>'s declaration order), compared pairwise over the ones written, so an omitted phrase
+    /// is skipped and never invents a bound. (The "greater than zero" half is IntegerOperandPass, COBOLNET2386.)</item>
+    /// </list>
+    /// An operand a rule has already refused (a constant-name that names no integer) is not in the list, so a
+    /// recovered value never trips an ordering rule.</summary>
+    private void ScreenReportPageIntegers(ReportModel model, Core.ReportPageClauseContext page, int? limit,
+        List<(PagePhrase Phrase, int Value, Core.ReportPageSubclauseContext Ctx)> phrases)
+    {
+        if (limit is > MaxPageLimit && page.integerOperand() is { } limitCtx)
+        {
+            using var at = Edition.At(limitCtx);
+            Edition.Error(DiagnosticCatalog.ReportPageClauseRule, $"RD '{model.Name}': the page limit {limit} exceeds "
+                + $"{MaxPageLimit}; integer-1 shall not exceed {MaxPageLimit} (ISO §13.18.39.3 SR5)");
+        }
+        phrases.Sort((a, b) => a.Phrase.CompareTo(b.Phrase));
+        for (int k = 0; k < phrases.Count; k++)
+        {
+            var (phrase, value, ctx) = phrases[k];
+            // The next written integer up the order: the following phrase, or the page limit after the last one.
+            string? nextWords = null;
+            int next = 0;
+            if (k + 1 < phrases.Count) { nextWords = $"the {PagePhraseWords(phrases[k + 1].Phrase)} integer"; next = phrases[k + 1].Value; }
+            else if (limit is { } l) { nextWords = "the page limit"; next = l; }
+            if (nextWords is null || value <= next) continue;
+            using var at = Edition.At(ctx);
+            Edition.Error(DiagnosticCatalog.ReportPageClauseRule, $"RD '{model.Name}': the {PagePhraseWords(phrase)} integer "
+                + $"{value} is greater than {nextWords} {next}; the PAGE clause's integers shall be in ascending order, "
+                + "HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, FOOTING, then the page limit, with equality "
+                + "allowed (ISO §13.18.39.3 SR6)");
+        }
+    }
+
+    /// <summary>ISO §13.18.39.3 SR5 — "Integer-1 shall not exceed 9999."</summary>
+    private const int MaxPageLimit = 9999;
 
     /// <summary>Capture the RD's CODE clause (ISO §13.18.12.2 — <c>CODE IS {literal-1 | identifier-1}</c>; kb/Work
     /// PB1129). literal-1 is screened here (SR1 — "Literal-1 shall be an alphanumeric literal": a numeric, national or
@@ -1351,6 +1417,7 @@ public sealed partial class DataBinder
         ScreenReportDescriptionHasGroup(entries, model);
         ScreenReportLineNesting(entries, model);
         ScreenReportLineClauses(entries, model);
+        ScreenReportColumnClauses(entries, model);
         ScreenReportEntryClausePresence(entries, model);
         ScreenReportVaryingClauses(entries, model);
         BindReportSectionEntries(rd, entries, model);
@@ -1591,18 +1658,24 @@ public sealed partial class DataBinder
     /// integer-1, relative → HEADING + integer-2 − 1 (GR5b1, report heading) or FOOTING + integer-2 (GR5b4, page
     /// footing); later lines absolute → integer-1, relative → the previous line + integer-2, and a §13.18.38.4
     /// GR12c/GR12d STEP line → its anchor + its displacement, the anchors seeded as the engine seeds them. Null
-    /// when every line can be absent.</summary>
-    private static int? MinimumLastLine(ReportGroupModel g, ReportModel model)
+    /// when every line can be absent. <paramref name="present"/> names the lines to walk instead — the §13.18.35.3 SR6 d)
+    /// screen asks it for a presentation in which a chosen set of conditional lines is present (null: the
+    /// unconditional lines, the floor no presentation can lift).</summary>
+    private static int? MinimumLastLine(ReportGroupModel g, ReportModel model, Func<ReportLineModel, bool>? present = null)
     {
         int? pos = null;
         var anchors = new Dictionary<int, int>();
         foreach (var l in g.Lines)
         {
-            if (l.PresentWhenCtxs.Count > 0 || l.RepetitionGuards.Count > 0) continue;   // may be absent
+            if (present is null ? l.PresentWhenCtxs.Count > 0 || l.RepetitionGuards.Count > 0 : !present(l)) continue;   // may be absent
             int relative = l.Kind == ReportLineKindModel.Step ? l.RelativeBase : l.Value;
             int target = l.Kind == ReportLineKindModel.Absolute ? l.Value
-                : pos is null ? (g.Kind == ReportGroupKindModel.ReportHeading ? model.Heading + relative - 1
-                                                                              : model.Footing + relative)
+                : pos is null ? g.Kind switch
+                {
+                    ReportGroupKindModel.ReportHeading or ReportGroupKindModel.PageHeading => model.Heading + relative - 1,   // GR5b1, GR5b2
+                    ReportGroupKindModel.PageFooting or ReportGroupKindModel.ReportFooting => model.Footing + relative,       // GR5b4, GR5b5
+                    _ => model.FirstDetail,   // GR5b3 — the first body group on a page, whatever integer-2 says
+                }
                 : l.Kind == ReportLineKindModel.Step && anchors.TryGetValue(l.Anchor, out int a) ? a + l.Value
                 : pos.Value + relative;
             if (l.Anchor != 0 && (l.Kind != ReportLineKindModel.Step || !anchors.ContainsKey(l.Anchor)))
@@ -1610,6 +1683,200 @@ public sealed partial class DataBinder
             pos = target;
         }
         return pos;
+    }
+
+    /// <summary>⛔ THE UPPER AND LOWER LIMIT OF A REPORT GROUP (ISO §13.18.57.4 GR7 and GR8), computed once the whole
+    /// report is bound — the compile-time consumer of §13.18.35.3 SR6 c), and the same numbers the run-time page-fit
+    /// test reads for a body group (<c>CobolReport.LowerLimit</c>, GR8 d)–f)). GR7: "the uppermost permitted line on
+    /// the page that may be occupied by the report group's first line"; GR8: "the lowermost permitted line … that
+    /// may be occupied by the report group's last line".
+    /// <list type="bullet">
+    /// <item>UPPER. a) report heading, and page heading where no report heading shares the page: the HEADING integer —
+    /// on page 1 a page heading follows the report heading (b), on every later page it does not, so the HEADING integer
+    /// is its widest. c) a body group with no OR PAGE control heading: FIRST DETAIL. d) with one: a control heading at
+    /// the highest OR PAGE level or above, FIRST DETAIL; a lower control heading, the line after the next higher-level
+    /// control heading; a detail, the line after the lowest-level OR PAGE control heading; a control footing, the line
+    /// after the lowest OR PAGE heading at its own level or above, else FIRST DETAIL. e) page footing: FOOTING + 1.
+    /// f)/g) report footing: on a page by itself (its first LINE clause has the NEXT PAGE phrase, §13.18.35.4 GR5 a))
+    /// the HEADING integer, else the line after the page footing's last line, or FOOTING + 1 with none.</item>
+    /// <item>LOWER. a)/b) report heading: on a page by itself (its NEXT GROUP clause is NEXT PAGE, §13.18.37.4 GR3 c)
+    /// — the first body group takes no page-fit test, so nothing else separates it) the page limit; else the line before
+    /// the page heading's first line, or FIRST DETAIL − 1 with no page heading. c) page heading: FIRST DETAIL − 1.
+    /// d) control heading: LAST CONTROL HEADING. e) detail: LAST DETAIL. f) control footing: FOOTING. g) page footing
+    /// and report footing: the page limit.</item>
+    /// </list>
+    /// <para>⚠ DETERMINATION (docs/CONFORMANCE.md, the report group limits block): a limit that depends on how far a
+    /// heading REACHES — "the line after the last line of" an OR PAGE control heading or the page footing — is taken
+    /// at that group's MINIMUM reach (<see cref="MinimumLastLine"/>: its unconditional lines, placed as the engine
+    /// places them), the widest region the group's own PRESENT WHEN clauses leave open. The screen is a syntax-rule
+    /// screen: a line outside the widest region is outside every presentation's.</para></summary>
+    private static (int Upper, int Lower) GroupLimits(ReportGroupModel g, ReportModel model)
+    {
+        int AfterHeading(ReportGroupModel h) => MinimumLastLine(h, model) is { } last ? last + 1 : model.FirstDetail;
+        var controlHeadings = model.Groups.Where(x => x.Kind == ReportGroupKindModel.ControlHeading && x.ControlLevel >= 0).ToList();
+        var orPage = controlHeadings.Where(x => x.OrPage).ToList();
+        // GR7 d) 1.–4.: the OR PAGE headings push the body groups below them down; absent any, GR7 c) is FIRST DETAIL.
+        int BodyUpper()
+        {
+            if (orPage.Count == 0 || g.ControlLevel < 0 && g.Kind != ReportGroupKindModel.Detail) return model.FirstDetail;
+            switch (g.Kind)
+            {
+                case ReportGroupKindModel.ControlHeading:
+                    if (g.ControlLevel <= orPage.Min(x => x.ControlLevel)) return model.FirstDetail;
+                    var higher = controlHeadings.Where(x => x.ControlLevel < g.ControlLevel)
+                        .OrderByDescending(x => x.ControlLevel).FirstOrDefault();
+                    return higher is null ? model.FirstDetail : AfterHeading(higher);
+                case ReportGroupKindModel.Detail:
+                    return AfterHeading(orPage.OrderByDescending(x => x.ControlLevel).First());
+                default:   // control footing
+                    var atOrAbove = orPage.Where(x => x.ControlLevel <= g.ControlLevel)
+                        .OrderByDescending(x => x.ControlLevel).FirstOrDefault();
+                    return atOrAbove is null ? model.FirstDetail : AfterHeading(atOrAbove);
+            }
+        }
+        switch (g.Kind)
+        {
+            case ReportGroupKindModel.ReportHeading:
+            {
+                if (g.NextGroup?.Kind == CobolNet.Runtime.IO.ReportNextGroupKind.NextPage) return (model.Heading, model.PageLimit);
+                var pageHeading = model.Groups.FirstOrDefault(x => x.Kind == ReportGroupKindModel.PageHeading);
+                bool absoluteFirst = pageHeading is { Lines: [{ Kind: ReportLineKindModel.Absolute } first, ..] }
+                    && first.PresentWhenCtxs.Count == 0;
+                return (model.Heading, absoluteFirst ? pageHeading!.Lines[0].Value - 1 : model.FirstDetail - 1);
+            }
+            case ReportGroupKindModel.PageHeading: return (model.Heading, model.FirstDetail - 1);
+            case ReportGroupKindModel.ControlHeading: return (BodyUpper(), model.LastControlHeading);
+            case ReportGroupKindModel.Detail: return (BodyUpper(), model.LastDetail);
+            case ReportGroupKindModel.ControlFooting: return (BodyUpper(), model.Footing);
+            case ReportGroupKindModel.PageFooting: return (model.Footing + 1, model.PageLimit);
+            default:   // report footing
+            {
+                if (g.Lines is [{ NextPage: true }, ..]) return (model.Heading, model.PageLimit);
+                var pageFooting = model.Groups.FirstOrDefault(x => x.Kind == ReportGroupKindModel.PageFooting);
+                int below = pageFooting is not null && MinimumLastLine(pageFooting, model) is { } last ? last + 1 : model.Footing + 1;
+                return (below, model.PageLimit);
+            }
+        }
+    }
+
+    /// <summary>⛔ THE LINE SET OF EACH REPORT GROUP (ISO §13.18.35.3 SR6 a)–e); kb/Work PB1222, PB1270), asked once
+    /// the group is complete and the page regions are known:
+    /// <list type="bullet">
+    /// <item>a) "If any two or more absolute lines are defined using line numbers that are not in increasing numerical
+    /// order, they shall each be subject to a different PRESENT WHEN clause."</item>
+    /// <item>b) "If any two or more lines, or groups of lines, overlap each other, they shall each be subject to a
+    /// different PRESENT WHEN clause." Two absolute lines with the same number. A relative line overlaps nothing the
+    /// description fixes: its position is its predecessor's plus integer-2, and §13.18.35.4 GR3 excepts the integer-2
+    /// of zero ("the non-space characters of a relative line specified with an integer-2 of zero will overwrite the
+    /// corresponding characters of the preceding line") from the overlap rule altogether.</item>
+    /// <item>c) "Any absolute report lines shall be defined in such a way that no line appears above the upper limit
+    /// or below the lower limit allowed for the report group" — <see cref="GroupLimits"/>; only in a report divided
+    /// into pages, the only report with page regions (§13.18.39.4 GR2).</item>
+    /// <item>d) "If the report group consists of one or more absolute lines, not subject to any PRESENT WHEN clause,
+    /// and ends in a set of relative lines, or groups of relative lines, they shall not cause the report group's lower
+    /// limit to be exceeded unless each of them is subject to a different PRESENT WHEN clause, in which case this rule
+    /// applies only to the vertically largest of them." The tail is every line after the group's last absolute one
+    /// (itself unconditional), judged whole unless <see cref="EachDifferentPresentWhen"/>, and then by the one that
+    /// ends lowest when it alone of the tail is present; the placement is <see cref="MinimumLastLine"/>, the one walk,
+    /// asked for a chosen set of present lines.</item>
+    /// <item>e) "If the description of any absolute line appears later than that of a relative line, they shall each
+    /// be subject to a different PRESENT WHEN clause."</item>
+    /// </list>
+    /// The pairs of a), b) and e) are over WRITTEN entries — each entry's first line, in description order — so the
+    /// repetitions of a repeating entry (§13.18.38.3 SR26's overlap rule) and the operands of a multiple LINE clause
+    /// (SR10 c)) are not compared with each other, and a replay never reports one fault once per repetition.</summary>
+    private void ScreenReportGroupLines(ReportModel model)
+    {
+        foreach (var g in model.Groups)
+        {
+            var firstLines = new List<ReportLineModel>();
+            foreach (var l in g.Lines)
+                if (l.Entry is not null && !firstLines.Exists(f => ReferenceEquals(f.Entry, l.Entry))) firstLines.Add(l);
+
+            void Violation(ReportLineModel l, string rule) =>
+                Edition.Error(DiagnosticCatalog.ReportLineClauseRule, $"RD '{model.Name}': {rule}");
+
+            string LineWords(ReportLineModel l) => l.Kind == ReportLineKindModel.Absolute ? $"LINE {l.Value}" : $"LINE PLUS {l.Value}";
+
+            for (int j = 0; j < firstLines.Count; j++)
+                for (int i = 0; i < j; i++)
+                {
+                    var li = firstLines[i];
+                    var lj = firstLines[j];
+                    if (DifferentPresentWhen([.. li.PresentWhenCtxs], [.. lj.PresentWhenCtxs])) continue;
+                    using var at = Edition.At(lj.Entry);
+                    bool iAbsolute = li.Kind == ReportLineKindModel.Absolute, jAbsolute = lj.Kind == ReportLineKindModel.Absolute;
+                    if (iAbsolute && jAbsolute && lj.Value < li.Value)
+                        Violation(lj, $"the absolute lines {LineWords(li)} and {LineWords(lj)} of one report group are not in "
+                            + "increasing numerical order and are not each subject to a different PRESENT WHEN clause "
+                            + "(ISO §13.18.35.3 SR6 a))");
+                    else if (iAbsolute && jAbsolute && lj.Value == li.Value)
+                        Violation(lj, $"the lines {LineWords(li)} and {LineWords(lj)} of one report group overlap and are not "
+                            + "each subject to a different PRESENT WHEN clause (ISO §13.18.35.3 SR6 b))");
+                    else if (!iAbsolute && jAbsolute)
+                        Violation(lj, $"the absolute line {LineWords(lj)} is described after the relative line {LineWords(li)} "
+                            + "of one report group, and they are not each subject to a different PRESENT WHEN clause "
+                            + "(ISO §13.18.35.3 SR6 e))");
+                }
+
+            if (!model.Paged) continue;
+            var (upper, lower) = GroupLimits(g, model);
+            var reportedEntries = new HashSet<Core.ReportGroupEntryContext?>(ReferenceEqualityComparer.Instance);
+            foreach (var l in g.Lines)
+            {
+                if (l.Kind != ReportLineKindModel.Absolute || (l.Value >= upper && l.Value <= lower)) continue;
+                if (!reportedEntries.Add(l.Entry)) continue;
+                using var at = Edition.At(l.Entry);
+                Violation(l, $"the absolute line {LineWords(l)} of {ReportGroupTypeWords(g.Kind).ToLowerInvariant()} report group "
+                    + $"'{g.Name ?? "FILLER"}' lies "
+                    + (l.Value < upper ? $"above the upper limit {upper}" : $"below the lower limit {lower}")
+                    + " the report group may occupy (ISO §13.18.35.3 SR6 c); limits per §13.18.57.4 GR7/GR8 from the PAGE "
+                    + "clause, §13.18.39.4)");
+            }
+
+            // §13.18.39.4 GR1/GR2 d) — a report heading or page heading is confined to its region: "any report heading
+            // (when not on a page by itself) or page heading shall be defined so that it terminates before" FIRST DETAIL.
+            // A group of RELATIVE lines only has no absolute line for SR6 c) to bound; its first line is where
+            // §13.18.35.4 GR5 b 1./2. puts it (HEADING + integer-2 − 1, which MinimumLastLine seeds, and only ever from
+            // below: a page heading after a report heading starts lower), so a last line past the lower limit is past it
+            // on every page. A body group is confined by the page-fit test it takes at run time (GR4), and the
+            // relative placement of a page or report footing depends on the page footing and NEXT PAGE (GR5 b 4./5.,
+            // GR7 f), so neither is asked here.
+            if (g.Kind is ReportGroupKindModel.ReportHeading or ReportGroupKindModel.PageHeading
+                && !g.Lines.Exists(l => l.Kind == ReportLineKindModel.Absolute)
+                && MinimumLastLine(g, model) is { } relativeEnd && relativeEnd > lower)
+            {
+                var last = g.Lines[^1];
+                using var at = Edition.At(last.Entry);
+                Violation(last, $"the relative lines of {ReportGroupTypeWords(g.Kind).ToLowerInvariant()} report group "
+                    + $"'{g.Name ?? "FILLER"}' reach line {relativeEnd}, past the group's lower limit {lower}, on every page "
+                    + "(ISO §13.18.39.4 GR1, GR2 d): each report group shall be confined within its region of the page; "
+                    + "limits per §13.18.57.4 GR8)");
+            }
+
+            // d) — a group of unconditional absolute lines that ends in relative lines. The tail is every line after
+            // the group's last absolute one; the rule is asked of all of it, unless each tail line carries a PRESENT
+            // WHEN clause the others do not, and then of the vertically largest alone — each in turn, with the
+            // unconditional lines, as the only one present.
+            int lastAbsolute = g.Lines.FindLastIndex(l => l.Kind == ReportLineKindModel.Absolute);
+            if (lastAbsolute >= 0 && lastAbsolute < g.Lines.Count - 1
+                && g.Lines[lastAbsolute].PresentWhenCtxs.Count == 0 && g.Lines[lastAbsolute].RepetitionGuards.Count == 0)
+            {
+                var tail = g.Lines.Skip(lastAbsolute + 1).ToList();
+                var upToAbsolute = new HashSet<ReportLineModel>(g.Lines.Take(lastAbsolute + 1), ReferenceEqualityComparer.Instance);
+                var tailClauses = tail.Select(l => (IReadOnlyList<object>)[.. l.PresentWhenCtxs]).ToList();
+                int? extent = EachDifferentPresentWhen(tailClauses)
+                    ? tail.Select(only => MinimumLastLine(g, model, l => upToAbsolute.Contains(l) || ReferenceEquals(l, only))).Max()
+                    : MinimumLastLine(g, model, _ => true);
+                if (extent is { } last && last > lower)
+                {
+                    using var at = Edition.At(tail[^1].Entry);
+                    Violation(tail[^1], $"the relative lines at the end of {ReportGroupTypeWords(g.Kind).ToLowerInvariant()} "
+                        + $"report group '{g.Name ?? "FILLER"}' carry its last line to line {last}, past the group's lower limit "
+                        + $"{lower}, and are not each subject to a different PRESENT WHEN clause (ISO §13.18.35.3 SR6 d))");
+                }
+            }
+        }
     }
 
     /// <summary>⛔ THE LINE CLAUSE'S OPERAND RULES (ISO §13.18.35.3 SR3, SR5, SR7, SR8; kb/Work PB1001 + PB1002),
@@ -1688,6 +1955,37 @@ public sealed partial class DataBinder
         }
     }
 
+    /// <summary>⛔ THE MULTIPLE COLUMN CLAUSE'S RULES (ISO §13.18.14.3 SR10; kb/Work PB1222), screened ONCE per WRITTEN
+    /// clause over the flat entry array — the <see cref="ScreenReportLineClauses"/> shape, and the COLUMN arm of the
+    /// two-arm rule whose LINE arm (§13.18.35.3 SR10 c)/d)) <see cref="MultipleLineOperands"/> already screens. "If more
+    /// than one integer-1 or integer-2 operand is specified the clause is referred to as a multiple COLUMN clause and
+    /// the following additional rules apply: a) No OCCURS clause shall be specified in the same entry. b) All the
+    /// occurrences of integer-1 shall be in increasing order of magnitude." Neither has a PRESENT WHEN excuse.</summary>
+    private void ScreenReportColumnClauses(Core.ReportGroupEntryContext[] entries, ReportModel model)
+    {
+        foreach (var ge in entries)
+            foreach (var clause in ge.reportGroupClause())
+            {
+                if (clause.reportColumnClause() is not { } cc || cc.reportColumnOperand().Length <= 1) continue;
+                using var _ = Edition.At(cc);
+                string where = $"RD '{model.Name}' entry '{ge.dataName().NameOrNull() ?? "FILLER"}'";
+                if (ge.reportGroupClause().Any(c => c.occursClause() is not null))
+                    Edition.Error(DiagnosticCatalog.ReportColumnClauseRule, $"{where}: a multiple COLUMN clause and an OCCURS "
+                        + "clause may not both be present in the same report group description entry (ISO §13.18.14.3 SR10 a))");
+                int? last = null;
+                foreach (var op in cc.reportColumnOperand())
+                {
+                    if (op.reportRelativeSign() is not null || op.integerOperand() is not { } lit) continue;
+                    if (IntegerOperandValue(lit, where) is not { } v) continue;
+                    if (last is { } previous && v <= previous)
+                        Edition.Error(DiagnosticCatalog.ReportColumnClauseRule, $"{where}: in a multiple COLUMN clause all the "
+                            + $"occurrences of integer-1 shall be in increasing order of magnitude — {v} follows {previous} "
+                            + "(ISO §13.18.14.3 SR10 b))");
+                    last = v;
+                }
+            }
+    }
+
     /// <summary>ISO §13.18.35.3 SR4 — "Within a given report group description entry, an entry that contains a
     /// LINE clause shall not have a subordinate entry that also contains a LINE clause." Screened over the FLAT
     /// entry array once per RD, before the walk, so a subtree REPLAY (§13.18.38.4 GR10) cannot report the same
@@ -1732,9 +2030,15 @@ public sealed partial class DataBinder
     /// elementary half is SR11 above; the detail-group, COLUMN and SOURCE-or-VALUE halves had NO site, so the
     /// clause in a control heading, or on an entry that prints nothing, compiled in silence (kb/Work PB1245).
     /// The group's TYPE is read from its level-01 entry, which precedes every subordinate entry.</item>
+    /// <item>SR5 — "The TYPE clause may be specified only in a level 1 entry and shall be specified in every level 1
+    /// entry." (kb/Work PB1288)</item>
+    /// <item>SR9 — "Every elementary entry with a COLUMN clause but no LINE clause shall be subordinate to an entry
+    /// with a LINE clause", read off the level hierarchy (<see cref="SubordinateToLineClause"/>), not off the line the
+    /// build has open (kb/Work PB1224).</item>
+    /// <item>SR12 — a PICTURE clause in every elementary entry that has a SOURCE or SUM clause, printable or not.</item>
     /// </list>
-    /// SR8 is <see cref="ScreenReportLineNesting"/> (its §13.18.35.3 SR4 twin), SR9 is the binder's
-    /// <c>ReportColumnWithoutLine</c> arm, and SR12/SR14 are the PICTURE arm, which needs the analysed picture.
+    /// SR8 is <see cref="ScreenReportLineNesting"/> (its §13.18.35.3 SR4 twin); the VALUE-implied picture of §13.15.3
+    /// SR14 is the binder's PICTURE arm, which needs the analysed picture.
     /// An entry is ELEMENTARY when the entry after it is not subordinate to it (§13.15.4 GR1: "The report group is
     /// defined by this entry and all its subordinate entries").</summary>
     private void ScreenReportEntryClausePresence(Core.ReportGroupEntryContext[] entries, ReportModel model)
@@ -1748,9 +2052,11 @@ public sealed partial class DataBinder
             bool elementary = i + 1 >= entries.Length
                 || !int.TryParse(entries[i + 1].levelNumber().GetText(), out int next) || next <= level;
             bool column = false, source = false, value = false, sum = false, picture = false, groupIndicate = false,
-                justifiedOrBwz = false;
+                justifiedOrBwz = false, type = false, line = false;
             foreach (var c in ge.reportGroupClause())
             {
+                type |= c.reportTypeClause() is not null;
+                line |= c.reportLineClause() is not null;
                 column |= c.reportColumnClause() is not null;
                 source |= c.reportSourceClause() is not null;
                 value |= c.valueClause() is not null;
@@ -1761,6 +2067,34 @@ public sealed partial class DataBinder
             }
             string where = $"RD '{model.Name}' entry '{ge.dataName().NameOrNull() ?? "FILLER"}'";
             using var _ = Edition.At(ge);
+            // SR5 — "The TYPE clause may be specified only in a level 1 entry and shall be specified in every level 1
+            // entry." Both halves are properties of the WRITTEN entry. The binder used to honour a TYPE clause at any
+            // level (retyping the enclosing group) and to make a TYPE-less level 1 entry a detail group by default
+            // (kb/Work PB1288).
+            if (level == 1 && !type)
+                Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"{where} is a level 1 entry with no TYPE clause; "
+                    + "the TYPE clause shall be specified in every level 1 entry (ISO §13.15.3 SR5)");
+            else if (level != 1 && type)
+                Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"{where} writes a TYPE clause at level {level}; "
+                    + "the TYPE clause may be specified only in a level 1 entry (ISO §13.15.3 SR5)");
+            // SR9 — "Every elementary entry with a COLUMN clause but no LINE clause shall be subordinate to an entry
+            // with a LINE clause" (and §13.18.14.3 SR3, the same rule from the COLUMN clause's side). It is a rule
+            // about the entry's ANCESTRY, so it reads the level hierarchy — never the line the build happens to have
+            // opened last, which a COLUMN entry that follows a LINE entry's subtree without being subordinate to it
+            // would wrongly inherit (kb/Work PB1224).
+            if (elementary && column && !line && !SubordinateToLineClause(entries, i))
+                Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"{where} has a COLUMN clause but neither a LINE "
+                    + "clause of its own nor an entry above it that has one; every elementary entry with a COLUMN clause "
+                    + "but no LINE clause shall be subordinate to an entry with a LINE clause (ISO §13.15.3 SR9, "
+                    + "§13.18.14.3 SR3)");
+            // SR12 — "A PICTURE clause shall be specified in every elementary entry that has a SOURCE or SUM clause."
+            // The rule has no COLUMN condition: an unprintable SOURCE entry and a SUM entry that prints nothing need
+            // one too (§13.18.54.4 GR1 sizes the counter from it). SR14's VALUE-implied picture is the VALUE
+            // clause's alone.
+            if (elementary && (source || sum) && !picture)
+                Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"{where} has a {(sum ? "SUM" : "SOURCE")} clause "
+                    + "but no PICTURE clause; a PICTURE clause shall be specified in every elementary entry that has a "
+                    + "SOURCE or SUM clause (ISO §13.15.3 SR12)");
             if (!elementary)
             {
                 var written = new List<string>();
@@ -2342,7 +2676,11 @@ public sealed partial class DataBinder
             foreach (var clause in ge.reportGroupClause())
             {
                 if (clause.reportTypeClause()?.reportGroupType() is { } t)
-                    BindGroupType(t, group, model);
+                {
+                    // §13.15.3 SR5 — the TYPE clause belongs to the level 1 entry alone (ScreenReportEntryClausePresence
+                    // refuses it anywhere else), so a stray one never retypes the group it is written inside.
+                    if (level == 1) BindGroupType(t, group, model);
+                }
                 else if (clause.reportLineClause() is { } lc)
                 {
                     // The multiple LINE clause (§13.18.35.3 SR10) is a §13.15.4 GR3 repetition VEHICLE, read by
@@ -2537,6 +2875,7 @@ public sealed partial class DataBinder
                 opened = RepeatedLine(lop, lineOperandIndex, group.Lines.Count == 0, anchorKey, st);
             if (opened is not null)
             {
+                opened.Entry = ge;
                 st.Line = opened;
                 group.Lines.Add(opened);
                 // The line's PRESENT WHEN chain: every ancestor condition + this entry's own (§13.18.41.4 GR2b).
@@ -2601,8 +2940,10 @@ public sealed partial class DataBinder
                 int col = columns[0].Value;
                 if (line is null)
                 {
-                    Edition.Error(DiagnosticCatalog.ReportColumnWithoutLine, $"RD '{model.Name}': a COLUMN clause with no LINE clause in "
-                        + "effect (ISO §13.18.14 — a printable item belongs to a report line)");
+                    // No report line has been opened in this group, so no entry above this one has a LINE clause
+                    // and ScreenReportEntryClausePresence has refused the COLUMN entry (§13.15.3 SR9) — said once,
+                    // at the written entry, never here per replay. (The converse is not what this test means: a
+                    // line opened by an EARLIER entry says nothing about this entry's ancestry, kb/Work PB1224.)
                     chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
                     return;
                 }
@@ -2650,10 +2991,14 @@ public sealed partial class DataBinder
                     : null;
                 if (pic is null)
                 {
-                    Edition.Error(DiagnosticCatalog.ReportItemMissingPicture, $"RD '{model.Name}': printable item at COLUMN {col} has no "
-                        + "PICTURE clause — one shall be specified in every elementary entry that has a SOURCE or "
-                        + "SUM clause (ISO §13.15.3 SR12), and SR14 implies one only from a VALUE clause supplying "
-                        + "an alphanumeric, boolean or national literal that is not a zero-length literal");
+                    // A SOURCE or SUM entry with no PICTURE is SR12's, refused once per written entry by
+                    // ScreenReportEntryClausePresence; what is left here is the VALUE-only entry, whose PICTURE SR14
+                    // implies only from an alphanumeric, boolean or national literal that is not zero-length.
+                    if (sourceOpsWritten == 0 && sumClauses.Count == 0)
+                        Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"RD '{model.Name}': printable item at COLUMN {col} "
+                            + "has a VALUE clause but no PICTURE clause, and none is implied: the PICTURE clause may be "
+                            + "omitted only when an alphanumeric, boolean or national literal that is not a zero-length "
+                            + "literal is specified in the VALUE clause (ISO §13.15.3 SR14)");
                     chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
                     return;
                 }
@@ -2675,6 +3020,25 @@ public sealed partial class DataBinder
                     Edition.Error(DiagnosticCatalog.SignClauseSubject,
                         $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': {signDefect}");
                     ownSign = null;
+                }
+                // ⛔ §13.15.4 GR2 — "the USAGE, PICTURE, BLANK WHEN ZERO and JUSTIFIED clauses are the same clauses as
+                // those that are described under the general format for a data description entry and shall obey the
+                // syntax rules and general rules defined for each clause." The SUBJECT rules of the last two (what the
+                // elementary item they are written on may BE: §13.18.8.3 SR1/SR2, §13.18.32.3 SR3) are the data
+                // division's CheckClauseSubjects, and these are its predicates, not a second copy of them (kb/Work
+                // PB507, PB1288). The clause is cleared on a violation, as the data division clears it, so nothing
+                // downstream applies it to an item it may not describe.
+                if (blankWhenZero && BlankWhenZeroViolation(pic) is { } bwzFault)
+                {
+                    Edition.Error(DiagnosticCatalog.ClauseSubjectCategory,
+                        $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': {bwzFault}");
+                    blankWhenZero = false;
+                }
+                if (justified && JustifiedViolation(pic) is { } justifiedFault)
+                {
+                    Edition.Error(DiagnosticCatalog.ClauseSubjectCategory,
+                        $"RD '{model.Name}' entry '{entryName ?? "FILLER"}': {justifiedFault}");
+                    justified = false;
                 }
                 // ⛔ §13.18.63.3 SR6 NAMES FORMAT 4 — "literals in formats 1, 2, and 4 of the VALUE clause may be
                 // numeric" — so a report-section printable item's numeric literal rides the SAME COBOL-2023
@@ -2740,6 +3104,7 @@ public sealed partial class DataBinder
                 {
                     Columns = RepeatedPlacements(columns, anchorKey, st),
                     PrintItem = item,
+                    Entry = ge,
                     Sources = srcs,
                     GroupIndicate = groupIndicate,
                     RepetitionOrdinal = st.Placements.GetValueOrDefault(anchorKey),
@@ -3707,6 +4072,10 @@ public sealed partial class DataBinder
                     }
             }
 
+            // §13.18.35.3 SR6 — the line set of each group, asked once every group's control level is resolved (the
+            // §13.18.57.4 GR7 d) limits of a body group read the OR PAGE control headings by level).
+            ScreenReportGroupLines(model);
+
             foreach (var sum in model.Sums)
             {
                 foreach (var term in sum.Terms)
@@ -3747,34 +4116,22 @@ public sealed partial class DataBinder
             // counter with every item present (§13.18.14.4 GR7–GR9; presentation-time absence only SHRINKS the
             // occupied extent, so the all-present walk is the width bound).
             int widest = 1;
+            var arrangementReported = new HashSet<(Core.ReportGroupEntryContext?, Core.ReportGroupEntryContext?, int)>();
             foreach (var g in model.Groups)
                 foreach (var ln in g.Lines)
                 {
-                    int hc = 0;
-                    // The step anchors of a repeating entry's placements (§13.18.38.4 GR12) — the same registers
-                    // the compose method keeps, walked here so the width bound sees every repetition.
-                    var anchors = new Dictionary<int, int>();
-                    foreach (var f in ln.Fields)
-                        foreach (var spec in f.Columns)
-                        {
-                            int size = f.PrintItem.DisplayTextWidth;   // the printable-size (§13.18.14.4 GR3)
-                            int left = spec.Kind switch
-                            {
-                                ReportColumnKindModel.Absolute => spec.AbsoluteLeftmost(size),   // GR6 b)-d), the ONE computation
-                                ReportColumnKindModel.Relative => hc + spec.Value,
-                                ReportColumnKindModel.AnchorSeed => anchors[spec.AnchorId] = hc + spec.Value,
-                                _ => anchors.GetValueOrDefault(spec.AnchorId) + spec.Value,
-                            };
-                            // GR6 c)/d): integer-1 and the printable-size fix the leftmost column, and a line has no
-                            // column before 1 — the standard states no outcome for it, so it is refused here (COBOLNET2712).
-                            if (left < 1 && spec.Kind == ReportColumnKindModel.Absolute && spec.Alignment != ReportColumnAlignment.Left)
-                                Edition.Error(DiagnosticCatalog.ReportColumnLeftOfLine, $"RD '{model.Name}' entry "
-                                    + $"'{f.PrintItem.CobolName ?? "FILLER"}': COLUMN {spec.Alignment.ToString().ToUpperInvariant()} "
-                                    + $"{spec.Value} with a printable-size of {size} puts the item's leftmost column at {left}, "
-                                    + "before column 1 (ISO §13.18.14.4 GR6 c)/d))");
-                            hc = left + size - 1;   // GR9 — the rightmost column becomes the counter
-                            widest = Math.Max(widest, hc);
-                        }
+                    foreach (var p in NominalPlacements(ln))
+                    {
+                        // GR6 c)/d): integer-1 and the printable-size fix the leftmost column, and a line has no
+                        // column before 1 — the standard states no outcome for it, so it is refused here (COBOLNET2712).
+                        if (p.Left < 1 && p.Spec.Kind == ReportColumnKindModel.Absolute && p.Spec.Alignment != ReportColumnAlignment.Left)
+                            Edition.Error(DiagnosticCatalog.ReportColumnLeftOfLine, $"RD '{model.Name}' entry "
+                                + $"'{p.Field.PrintItem.CobolName ?? "FILLER"}': COLUMN {p.Spec.Alignment.ToString().ToUpperInvariant()} "
+                                + $"{p.Spec.Value} with a printable-size of {p.Size} puts the item's leftmost column at {p.Left}, "
+                                + "before column 1 (ISO §13.18.14.4 GR6 c)/d))");
+                        widest = Math.Max(widest, p.Right);
+                    }
+                    ScreenReportColumnArrangement(model, ln, arrangementReported);
                 }
             // §13.18.12.4 GR2 — the CODE characters "are not included in the descriptions of the lines in the report,
             // but are included in the logical record size": a fixed RECORD CONTAINS is the code PLUS the line.
@@ -3784,6 +4141,177 @@ public sealed partial class DataBinder
         // SR4 e) is asked of the references of EVERY report at once: a chain may leave one report description and
         // come back (SR4 g) lets data-name-1 name an entry of a different one).
         ScreenRolledChains();
+    }
+
+    /// <summary>One PLACEMENT of a printable item on a report line, in the line's NOMINAL walk: the field, which of
+    /// its COLUMN operands it is, the operand, its printable-size and the leftmost column the walk puts it in.</summary>
+    private readonly record struct NominalPlacement(
+        ReportFieldModel Field, int Operand, ReportColumnSpec Spec, int Size, int Left)
+    {
+        /// <summary>The rightmost column — the value that becomes the horizontal counter (§13.18.14.4 GR9).</summary>
+        public int Right => Left + Size - 1;
+    }
+
+    /// <summary>⛔ THE ONE NOMINAL HORIZONTAL WALK OF A REPORT LINE (ISO §13.18.14.4 GR6–GR9), read by the line-width
+    /// computation and by <see cref="ScreenReportColumnArrangement"/>, so the two cannot place an item in different
+    /// columns: absolute operands at the leftmost column <see cref="ReportColumnSpec.AbsoluteLeftmost"/> gives,
+    /// relative (PLUS) operands against the line's horizontal counter, a step anchor's later repetitions at the
+    /// anchor plus their displacement (§13.18.38.4 GR12). Every field of <paramref name="ln"/> is present unless
+    /// <paramref name="included"/> says otherwise — presentation-time absence only shrinks what is occupied, so the
+    /// all-present walk is the bound, and the walk over the unconditional fields alone is the floor.</summary>
+    private static List<NominalPlacement> NominalPlacements(ReportLineModel ln, Func<ReportFieldModel, bool>? included = null)
+    {
+        var placements = new List<NominalPlacement>();
+        int hc = 0;
+        var anchors = new Dictionary<int, int>();
+        foreach (var f in ln.Fields)
+        {
+            if (included is not null && !included(f)) continue;
+            int size = f.PrintItem.DisplayTextWidth;   // the printable-size (§13.18.14.4 GR3)
+            for (int op = 0; op < f.Columns.Count; op++)
+            {
+                var spec = f.Columns[op];
+                int left = spec.Kind switch
+                {
+                    ReportColumnKindModel.Absolute => spec.AbsoluteLeftmost(size),   // GR6 b)-d), the ONE computation
+                    ReportColumnKindModel.Relative => hc + spec.Value,
+                    ReportColumnKindModel.AnchorSeed => anchors[spec.AnchorId] = hc + spec.Value,
+                    _ => anchors.GetValueOrDefault(spec.AnchorId) + spec.Value,
+                };
+                var placement = new NominalPlacement(f, op, spec, size, left);
+                placements.Add(placement);
+                hc = placement.Right;   // GR9 — the rightmost column becomes the counter
+            }
+        }
+        return placements;
+    }
+
+    /// <summary>The PRESENT WHEN clauses a printable item is subject to BELOW its report line — the line's own chain
+    /// gates every item on it alike and so tells two of them apart never (§13.18.41.4 GR2b). A GROUP INDICATE clause
+    /// "has the same effect as a PRESENT WHEN clause" (§13.18.28.4 GR1): its entry stands as that clause.</summary>
+    private static List<object> PresentWhenClausesOf(ReportFieldModel f)
+    {
+        var clauses = new List<object>(f.PresentWhenCtxs);
+        if (f.GroupIndicate) clauses.Add((object?)f.Entry ?? f);
+        return clauses;
+    }
+
+    /// <summary>"Each subject to a different PRESENT WHEN clause" (§13.18.14.3 SR7, SR8 a) and §13.18.35.3 SR6 a)–e)):
+    /// each of the two carries a clause the other does not. Two items under the very same clause — or one whose
+    /// clauses the other also has — are present together, which is what the rule exists to refuse.</summary>
+    private static bool DifferentPresentWhen(IReadOnlyList<object> a, IReadOnlyList<object> b) =>
+        a.Any(x => !b.Contains(x)) && b.Any(x => !a.Contains(x));
+
+    /// <summary>"Unless each of them is subject to a different PRESENT WHEN clause" (§13.18.14.3 SR8 c),
+    /// §13.18.35.3 SR6 d)): every item carries a clause and every pair differs (<see cref="DifferentPresentWhen"/>).
+    /// An item subject to no clause is never excused, so one such item makes the answer no.</summary>
+    private static bool EachDifferentPresentWhen(IReadOnlyList<IReadOnlyList<object>> clauses)
+    {
+        for (int i = 0; i < clauses.Count; i++)
+        {
+            if (clauses[i].Count == 0) return false;
+            for (int j = 0; j < i; j++)
+                if (!DifferentPresentWhen(clauses[i], clauses[j])) return false;
+        }
+        return true;
+    }
+
+    /// <summary>⛔ THE PRINTABLE ITEMS OF ONE REPORT LINE, AS A SET (ISO §13.18.14.3 SR7, SR8; kb/Work PB1222), asked
+    /// of each line after the whole source element is described, because the printable-size is a picture's. The
+    /// walk is the NOMINAL one (<see cref="NominalPlacements"/>), so a rule is judged on what the entries as
+    /// written place, never on one presentation's presence pattern:
+    /// <list type="bullet">
+    /// <item>SR7 — "Within a given report line, any two or more absolute items defined using column numbers that are
+    /// not in increasing numerical order shall be subject to a different PRESENT WHEN clause."</item>
+    /// <item>SR8 a) — "If any two or more items overlap each other, they shall each be subject to a different
+    /// PRESENT WHEN clause." Two placements of ONE entry are never compared (the repetitions of an OCCURS entry belong to
+    /// the STEP rule of §13.18.38.3 SR26, the out-of-order operands of a multiple COLUMN clause to the SR10 b) screen of
+    /// §13.18.14.3); the operands of one multiple COLUMN clause that overlap are, having one clause between them.</item>
+    /// <item>SR8 b) — "The rightmost column positions of all absolute items shall not exceed the page width."</item>
+    /// <item>SR8 c) — "If the report line ends in a set of relative printable items or consists only of such, they shall
+    /// not cause the page width to be exceeded unless each of them is subject to a different PRESENT WHEN clause, in
+    /// which case this rule applies only to the largest of them." The tail is the placements after the last absolute
+    /// one, judged whole (every item present) unless <see cref="EachDifferentPresentWhen"/>, and then by the one that
+    /// ends furthest right when it alone of the tail is present. Items under different clauses may all be present at
+    /// run time, which is what the run-time EC-REPORT-PAGE-WIDTH (§13.18.14.4 GR5) and EC-REPORT-COLUMN-OVERLAP (GR4)
+    /// are left to report.</item>
+    /// </list>
+    /// Reported once per pair of WRITTEN entries (<paramref name="reported"/>), however many lines and repetitions
+    /// the entries are bound into.</summary>
+    private void ScreenReportColumnArrangement(ReportModel model, ReportLineModel ln,
+        HashSet<(Core.ReportGroupEntryContext?, Core.ReportGroupEntryContext?, int)> reported)
+    {
+        var all = NominalPlacements(ln);
+        if (all.Count == 0) return;
+        const int Sr7 = 7, Sr8a = 81, Sr8b = 82, Sr8c = 83;
+        string EntryName(ReportFieldModel f) => f.PrintItem.CobolName ?? "FILLER";
+        bool Report(NominalPlacement a, NominalPlacement? b, int rule, string message)
+        {
+            if (!reported.Add((a.Field.Entry, b?.Field.Entry, rule))) return false;
+            using var at = Edition.At(a.Field.Entry);
+            Edition.Error(DiagnosticCatalog.ReportColumnClauseRule, $"RD '{model.Name}': {message}");
+            return true;
+        }
+
+        for (int j = 0; j < all.Count; j++)
+        {
+            var pj = all[j];
+            // SR8 b)
+            if (pj.Spec.Kind == ReportColumnKindModel.Absolute && pj.Right > model.PageWidth)
+                Report(pj, null, Sr8b, $"the absolute item '{EntryName(pj.Field)}' at COLUMN {pj.Spec.Value} ends in column "
+                    + $"{pj.Right}, past the page width {model.PageWidth}"
+                    + (model.PageWidthWritten ? "" : " (assumed 999, §13.18.39.4 GR5)")
+                    + "; the rightmost column positions of all absolute items shall not exceed the page width "
+                    + "(ISO §13.18.14.3 SR8 b))");
+            for (int i = 0; i < j; i++)
+            {
+                var pi = all[i];
+                bool sameEntry = pi.Field.Entry is not null && ReferenceEquals(pi.Field.Entry, pj.Field.Entry);
+                if (sameEntry && !ReferenceEquals(pi.Field, pj.Field)) continue;   // two repetitions of one entry
+                // Two operands of one multiple COLUMN clause that are not in increasing order are SR10 b)'s, said once
+                // by ScreenReportColumnClauses; only increasing operands that overlap are left for SR8 a).
+                if (sameEntry && pi.Spec.Kind == ReportColumnKindModel.Absolute && pj.Spec.Kind == ReportColumnKindModel.Absolute
+                    && pj.Spec.Value <= pi.Spec.Value) continue;
+                var clausesI = PresentWhenClausesOf(pi.Field);
+                var clausesJ = PresentWhenClausesOf(pj.Field);
+                if (DifferentPresentWhen(clausesI, clausesJ)) continue;
+                // SR7 — absolute items by their written column numbers, in the order they are written.
+                if (!sameEntry && pi.Spec.Kind == ReportColumnKindModel.Absolute && pj.Spec.Kind == ReportColumnKindModel.Absolute
+                    && pj.Spec.Value <= pi.Spec.Value)
+                {
+                    Report(pj, pi, Sr7, $"the absolute items '{EntryName(pi.Field)}' (COLUMN {pi.Spec.Value}) and "
+                        + $"'{EntryName(pj.Field)}' (COLUMN {pj.Spec.Value}) are not in increasing numerical order and are not "
+                        + "each subject to a different PRESENT WHEN clause (ISO §13.18.14.3 SR7)");
+                    continue;
+                }
+                // SR8 a)
+                if (pj.Left <= pi.Right && pi.Left <= pj.Right)
+                    Report(pj, pi, Sr8a, $"the items '{EntryName(pi.Field)}' (columns {pi.Left}-{pi.Right}) and "
+                        + $"'{EntryName(pj.Field)}' (columns {pj.Left}-{pj.Right}) overlap and are not each subject to a "
+                        + "different PRESENT WHEN clause (ISO §13.18.14.3 SR8 a))");
+            }
+        }
+
+        // SR8 c) — the relative tail: the placements after the last absolute one, judged as a whole unless each carries
+        // a different PRESENT WHEN clause, and then by the largest alone: the item that, with every item before the
+        // tail present and no other tail item, ends furthest right.
+        int lastAbsolute = all.FindLastIndex(p => p.Spec.Kind == ReportColumnKindModel.Absolute);
+        if (lastAbsolute == all.Count - 1) return;
+        var tail = all.Skip(lastAbsolute + 1).ToList();
+        int prefixEnd = lastAbsolute >= 0 ? all[lastAbsolute].Right : 0;
+        int extent = EachDifferentPresentWhen(tail.Select(p => (IReadOnlyList<object>)PresentWhenClausesOf(p.Field)).ToList())
+            ? tail.Max(p => p.Spec.Kind is ReportColumnKindModel.Relative or ReportColumnKindModel.AnchorSeed
+                ? prefixEnd + p.Spec.Value + p.Size - 1 : p.Right)
+            : tail.Max(p => p.Right);
+        if (extent > model.PageWidth)
+        {
+            var widest = tail.OrderByDescending(p => p.Right).First();
+            Report(widest, null, Sr8c, $"the report line ends in relative items, and they reach column {extent}, past the page "
+                + $"width {model.PageWidth}" + (model.PageWidthWritten ? "" : " (assumed 999, §13.18.39.4 GR5)")
+                + " although they are not each subject to a different PRESENT WHEN clause, or the largest of those that "
+                + "are is itself too wide; relative printable items at the end of a report line shall not cause the "
+                + "page width to be exceeded (ISO §13.18.14.3 SR8 c))");
+        }
     }
 
     /// <summary>⛔ THE ONE ARM CHOICE FOR A SUM ADDEND (kb/Work PB482). ISO §13.18.54.3 SR1 admits three addend
@@ -4124,28 +4652,28 @@ public sealed partial class DataBinder
 
     /// <summary>The §13.15.3 SR16 scan: no PRESENT WHEN condition of <paramref name="model"/> may reference
     /// LINE-COUNTER, PAGE-COUNTER, a sum counter, or another report section data item (group / printable-entry
-    /// names). Token-level scan over each distinct captured condition context.</summary>
+    /// names). Token-level scan over each PRESENT WHEN condition the report WRITES — read off the written entries
+    /// (<see cref="ReportModel.WrittenEntries"/>), the <see cref="ScreenReportEntryClausePresence"/> shape, because
+    /// the rule is about the clause as written: a condition on an entry that produces no line, no printable field
+    /// and no counter (a body group with no LINE clause, say) is a PRESENT WHEN clause all the same (kb/Work
+    /// PB1289). The names it may not reference are those of EVERY report description of the source element
+    /// ("other report section data item"), not this RD's alone.</summary>
     private void CheckConditionOperands(ReportModel model)
     {
-        var conds = new HashSet<Core.ConditionContext>(ReferenceEqualityComparer.Instance);
-        foreach (var g in model.Groups)
-            foreach (var ln in g.Lines)
-            {
-                foreach (var c in ln.PresentWhenCtxs) conds.Add(c);
-                foreach (var f in ln.Fields)
-                    foreach (var c in f.PresentWhenCtxs) conds.Add(c);
-            }
-        foreach (var s in model.Sums)
-            foreach (var c in s.PresentWhenCtxs) conds.Add(c);
+        var conds = new List<Core.ConditionContext>();
+        foreach (var ge in model.WrittenEntries)
+            foreach (var clause in ge.reportGroupClause())
+                if (clause.reportPresentWhenClause()?.condition() is { } cond) conds.Add(cond);
         if (conds.Count == 0) return;
 
         // A name also declared in ordinary storage resolves THERE (never to the report item), so it is not an
         // SR16 reference — only report-section-exclusive names are scanned (no textual false positives). The SAME
         // set answers §13.18.16.3 SR2 for a CONTROL operand, so it is built in ONE place (kb/Work PB205).
-        var names = ReportSectionOnlyNames(model);
+        var names = Reports.SelectMany(r => ReportSectionOnlyNames(r)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         foreach (var cond in conds)
         {
+            using var _ = Edition.At(cond);
             if (HasToken(cond, CobolLexer.LINE_COUNTER) || HasToken(cond, CobolLexer.PAGE_COUNTER))
                 Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}': a PRESENT WHEN condition shall not "
                     + "reference LINE-COUNTER or PAGE-COUNTER (ISO §13.15.3 SR16)");
@@ -4231,27 +4759,20 @@ public sealed partial class DataBinder
         return null;
     }
 
-    /// <summary>The report-section-exclusive names of one report: its group names, its printable entries' names
-    /// and its sum counters, each only when <see cref="ByName"/> does not also carry it (see
-    /// <see cref="IsReportSectionOnlyName"/> for why).</summary>
+    /// <summary>The report-section-exclusive names of one report: the data-name of EVERY report group description
+    /// entry it writes — the group's own, an intermediate group entry's, a printable entry's, a sum counter's, an
+    /// unprintable SOURCE entry's — each only when <see cref="ByName"/> does not also carry it (see
+    /// <see cref="IsReportSectionOnlyName"/> for why). Read off the WRITTEN entries (<see cref="ReportModel.WrittenEntries"/>):
+    /// the set is about NAMES the programmer declared, and the bound products (lines, fields, counters) exist only
+    /// for the entries that make one, so a name on any other entry was invisible to the §13.18.16.3 SR2 and
+    /// §13.15.3 SR16 questions (kb/Work PB1289). A sum counter's name is its entry's (kb/Work PB882).</summary>
     private List<string> ReportSectionOnlyNames(ReportModel model)
     {
         var names = new List<string>();
-        foreach (var g in model.Groups)
-        {
-            if (g.Name is { } gn && !ByName.ContainsKey(gn)) names.Add(gn);
-            foreach (var ln in g.Lines)
-                foreach (var f in ln.Fields)
-                    if (f.PrintItem.CobolName is { } fn && !ByName.ContainsKey(fn)) names.Add(fn);
-        }
-        // A sum counter contributes the name GR5 gives it (its identity is the ENTRY — kb/Work PB882 — but this
-        // set is about NAMES: the §13.18.16.3 SR2 / §13.15.3 SR16 "declared in the report section" question).
-        foreach (var s in model.SumFamilies) if (s.Name is { } sn && !ByName.ContainsKey(sn)) names.Add(sn);
-        // …and every entry that carries a value a rolled total can add (kb/Work PB1294): an UNPRINTABLE SOURCE entry
-        // (§13.18.53.4 GR3) has no printable item, so neither loop above sees its name.
-        foreach (var f in model.EntryFamilies)
-            if (f is ReportSourceFamily && f.Name is { } en && !ByName.ContainsKey(en)
-                && !names.Contains(en, StringComparer.OrdinalIgnoreCase)) names.Add(en);
+        foreach (var ge in model.WrittenEntries)
+            if (ge.dataName().NameOrNull() is { } name && !ByName.ContainsKey(name)
+                && !names.Contains(name, StringComparer.OrdinalIgnoreCase))
+                names.Add(name);
         return names;
     }
 

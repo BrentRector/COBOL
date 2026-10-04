@@ -933,7 +933,12 @@ public static class DiagnosticCatalog
         + "divided into pages.\" SR5: \"If the report is not divided into pages, all its LINE clauses shall be "
         + "relative.\" SR7: \"Within a given report group description, a NEXT PAGE phrase, if present, shall be "
         + "specified only in the first LINE clause.\" SR8: \"The NEXT PAGE phrase may appear only in the description "
-        + "of a body group or a report footing.\"", "ISO §13.18.35.3 SR3/SR4/SR5/SR7/SR8/SR10");
+        + "of a body group or a report footing.\" SR6 governs the set of lines of one report group: a) absolute "
+        + "lines not in increasing numerical order, b) lines that overlap, and e) an absolute line described after a "
+        + "relative one each need a different PRESENT WHEN clause; c) \"no line appears above the upper limit or below "
+        + "the lower limit allowed for the report group\", the limits being those of the TYPE clause's general rules; "
+        + "d) relative lines after unconditional absolute ones shall not carry the group past its lower limit.",
+        "ISO §13.18.35.3 SR3/SR4/SR5/SR6/SR7/SR8/SR10");
 
     // ── COBOLNET2247 — the §13.15.3 CLAUSE-PRESENCE family of a report group description entry, one code for
     //    the family (the COBOLNET2021 / COBOLNET2199 bundling precedent); kb/Work PB853. ──
@@ -942,16 +947,26 @@ public static class DiagnosticCatalog
     /// SOURCE, VALUE or SUM clause compiled clean and the binder FABRICATED a figurative SPACE operand for it,
     /// which printed a made-up image (<c>000</c> under <c>PIC 999</c>) or aborted the run unit; SR11, SR13 and
     /// SR15 had no site either, so a group entry's PICTURE/VALUE and a column-less VALUE, JUSTIFIED or BLANK WHEN
-    /// ZERO entry were dropped in silence. Screened ONCE per written entry, over the flat entry array, so a
-    /// §13.18.38 Format 3 subtree replay cannot multiply it.</summary>
+    /// ZERO entry were dropped in silence. SR5 (the TYPE clause only in, and in every, level 1 entry), SR9 (a
+    /// COLUMN entry subordinate to a LINE entry), SR12 (a PICTURE in every elementary SOURCE or SUM entry) and SR14
+    /// (a PICTURE only omitted for an alphanumeric, boolean or national VALUE literal) joined it when
+    /// `report-column-without-line` and `report-item-missing-picture` — two genuine errors that had been staged
+    /// on the shared COBOLNET0899 "not implemented" code — were folded in (kb/Work PB1224, PB1288). Screened ONCE
+    /// per written entry, over the flat entry array, so a §13.18.38 Format 3 subtree replay cannot multiply
+    /// it.</summary>
     public static readonly DiagnosticDescriptor ReportEntryClausePresence = new(
         "COBOLNET2247", "report-entry-clause-presence", EditionSeverity.Error,
-        "A report group description entry violates a clause-presence syntax rule: every elementary entry with a "
-        + "COLUMN clause shall also contain either a SOURCE, VALUE or SUM clause (§13.15.3 SR10); the PICTURE, "
-        + "COLUMN, SOURCE, VALUE, SUM, and GROUP INDICATE clauses may be written only in an elementary entry "
-        + "(SR11); a COLUMN clause shall be specified in each elementary entry that has a VALUE clause (SR13); "
-        + "and if BLANK WHEN ZERO or JUSTIFIED is specified, a COLUMN clause shall also be specified (SR15).",
-        "ISO §13.15.3 SR10/SR11/SR13/SR15");
+        "A report group description entry violates a clause-presence syntax rule: the TYPE clause may be specified "
+        + "only in a level 1 entry and shall be specified in every level 1 entry (§13.15.3 SR5); every elementary "
+        + "entry with a COLUMN clause but no LINE clause shall be subordinate to an entry with a LINE clause (SR9; "
+        + "§13.18.14.3 SR3); every elementary entry with a COLUMN clause shall also contain either a SOURCE, VALUE "
+        + "or SUM clause (SR10); the PICTURE, COLUMN, SOURCE, VALUE, SUM, and GROUP INDICATE clauses may be written "
+        + "only in an elementary entry (SR11); a PICTURE clause shall be specified in every elementary entry that "
+        + "has a SOURCE or SUM clause (SR12), and may be omitted only for an alphanumeric, boolean or national "
+        + "VALUE literal (SR14); a COLUMN clause shall be specified in each elementary entry that has a VALUE "
+        + "clause (SR13); and if BLANK WHEN ZERO or JUSTIFIED is specified, a COLUMN clause shall also be "
+        + "specified (SR15).",
+        "ISO §13.15.3 SR5/SR9/SR10/SR11/SR12/SR13/SR14/SR15");
 
     /// <summary>COBOLNET2519 — a GROUP INDICATE clause outside the placement §13.18.28.3 SR1 admits: a report
     /// group that is not a DETAIL, or an elementary entry lacking the COLUMN clause or the SOURCE-or-VALUE clause
@@ -1005,6 +1020,36 @@ public static class DiagnosticCatalog
         + "(§13.18.39.4 GR2a) and the phrases subdivide the page it bounds, so a PAGE clause that gives only the "
         + "page width (integer-2 COLUMNS) cannot carry them. Write the page limit, or drop the phrases.",
         "ISO §13.18.39.3 SR3");
+
+    /// <summary>COBOLNET2744 — a PAGE clause whose integers break §13.18.39.3 SR5 or SR6: integer-1 (the page limit)
+    /// over 9999, or the HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL and FOOTING integers and the page
+    /// limit not in ascending order (equality allowed) where they are specified. The "greater than zero" half of SR6
+    /// is COBOLNET2386; the phrases-need-a-limit rule is COBOLNET2709 (kb/Work PB1270).</summary>
+    public static readonly DiagnosticDescriptor ReportPageClauseRule = new(
+        "COBOLNET2744", "report-page-clause-rule", EditionSeverity.Error,
+        "A PAGE clause violates a syntax rule on its integers. ISO §13.18.39.3 SR5: \"Integer-1 shall not exceed "
+        + "9999.\" SR6: \"Integer-3, integer-4, integer-5, integer-6, integer-7, and integer-1 shall be greater than "
+        + "zero. Wherever specified, they shall be in ascending order, with equality allowed.\" The order is HEADING, "
+        + "FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, FOOTING, then the page limit.",
+        "ISO §13.18.39.3 SR5/SR6");
+
+    /// <summary>COBOLNET2745 — a report line's COLUMN clauses break an ARRANGEMENT rule of ISO §13.18.14.3: SR7
+    /// (absolute items not in increasing numerical order), SR8 a) (overlapping items), SR8 b) (an absolute item's
+    /// rightmost column past the page width), SR8 c) (a relative tail past the page width), SR10 a) (a multiple
+    /// COLUMN clause with an OCCURS clause in the same entry) or SR10 b) (a multiple COLUMN clause whose integer-1
+    /// occurrences are not in increasing order of magnitude). SR7, SR8 a) and SR8 c) are the rules that excuse
+    /// items "subject to a different PRESENT WHEN clause"; SR10 has no such excuse (kb/Work PB1222).</summary>
+    public static readonly DiagnosticDescriptor ReportColumnClauseRule = new(
+        "COBOLNET2745", "report-column-clause-rule", EditionSeverity.Error,
+        "A report line's COLUMN clauses violate an arrangement rule. ISO §13.18.14.3 SR7: \"Within a given report "
+        + "line, any two or more absolute items defined using column numbers that are not in increasing numerical "
+        + "order shall be subject to a different PRESENT WHEN clause.\" SR8: a) overlapping items shall each be "
+        + "subject to a different PRESENT WHEN clause; b) the rightmost column positions of all absolute items shall "
+        + "not exceed the page width; c) a report line that ends in relative items shall not exceed the page width "
+        + "unless each of them is subject to a different PRESENT WHEN clause. SR10: a multiple COLUMN clause (more "
+        + "than one operand) shall not have an OCCURS clause in the same entry (a), and all the occurrences of "
+        + "integer-1 shall be in increasing order of magnitude (b).",
+        "ISO §13.18.14.3 SR7/SR8/SR10");
 
     /// <summary>COBOLNET2710 — a COLUMN clause operand larger than the page width. ISO §13.18.14.3 SR6: "Neither
     /// integer-1 nor integer-2 shall exceed the page width." The page width is the PAGE clause's integer-2, or 999
@@ -1330,12 +1375,6 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor ReportGroupBefore01 = new(
         NotImplemented, "report-group-before-01", EditionSeverity.Error,
         "A report group entry appears before any 01-level entry.", "ISO §13.15");
-    public static readonly DiagnosticDescriptor ReportColumnWithoutLine = new(
-        NotImplemented, "report-column-without-line", EditionSeverity.Error,
-        "A COLUMN clause has no LINE clause in effect.", "ISO §13.18.14");
-    public static readonly DiagnosticDescriptor ReportItemMissingPicture = new(
-        NotImplemented, "report-item-missing-picture", EditionSeverity.Error,
-        "A printable report item has no PICTURE clause and SR14 implies none.", "ISO §13.15.3 SR12/SR14");
     public static readonly DiagnosticDescriptor ReportPageTypeRequiresPage = new(
         NotImplemented, "report-page-type-requires-page", EditionSeverity.Error,
         "A PAGE HEADING/FOOTING group, or a control heading with the OR PAGE phrase, requires a PAGE clause defining "

@@ -1,3 +1,3 @@
 EC=EC-REPORT-PAGE-WIDTH
-LINE 01 [      WX  ]
+LINE 01 [ABCD WXY  ]
 LINE 02 [OK        ]

@@ -29,7 +29,7 @@
       *> control footing, or with column 9 "01 02 03 04" if a repeated
       *> UPON detail adds once.
       *> DERIVATION, report R-B (PAGE LIMIT 6, LAST DETAIL 3, FOOTING
-      *> 5, page footing on line 5 printing SUM WS-P). Each GENERATE
+      *> 4, page footing on line 5 - the line after FOOTING, 13.18.57.4 GR7 e) - printing SUM WS-P). Each GENERATE
       *> adds 1 before its detail prints; the 4th GENERATE's page fit
       *> test fails after its addition, so page 1's footing shows 04
       *> and the counter resets at the end of that page footing; the
@@ -70,7 +70,7 @@
            03  COLUMN 6 PIC 99 SUM WS-K RESET ON FINAL.
            03  COLUMN 9 PIC 99 SUM WS-K UPON DE-A DE-A.
        RD  R-B PAGE LIMIT IS 6 LINES HEADING 1 FIRST DETAIL 1
-           LAST DETAIL 3 FOOTING 5.
+           LAST DETAIL 3 FOOTING 4.
        01  DE-B TYPE DE LINE PLUS 1.
            03  COLUMN 1 PIC X(3) VALUE "DET".
        01  PF-B TYPE PF LINE 5.

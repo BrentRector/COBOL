@@ -456,8 +456,10 @@ off-by-one through every later counter check.
   `StatementBinder.Bind`); VARYING FROM/BY bind the same way through the ONE expression binder.
 - **The §13.15.3/§13.18.64.3 SR family = COBOLNET1559** (`report-group-clause-rule`, one bundled code): SR16 —
   condition-1 shall not reference LINE-/PAGE-COUNTER or a report-section data item (token scan in
-  `ResolveReports` over report-section-EXCLUSIVE names; a name also in ordinary storage resolves there and is
-  exempt); SR17 — GROUP INDICATE ⊥ PRESENT WHEN in one entry; VARYING SR1 — the entry needs OCCURS / multiple
+  `ResolveReports` — `CheckConditionOperands` — over the PRESENT WHEN clauses the report WRITES, read off
+  `ReportModel.WrittenEntries`, never off the bound lines and fields, so an entry that produces no line, field or
+  counter is scanned too; the names are the report-section-EXCLUSIVE ones of EVERY report description, each
+  written entry's data-name — a name also in ordinary storage resolves there and is exempt; kb/Work PB1289); SR17 — GROUP INDICATE ⊥ PRESENT WHEN in one entry; VARYING SR1 — the entry needs OCCURS / multiple
   LINE / multiple COLUMN — all three LIVE vehicles;
   SR2 — the counter shall not be defined elsewhere (a name twice in one entry, a name an enclosing entry defines, a
   data item or report section name — `ScreenReportVaryingClauses` and `ResolveReports`, once per written entry); SR3 —
@@ -469,13 +471,21 @@ off-by-one through every later counter check.
   multiply it. An entry is ELEMENTARY when the entry after it is not subordinate to it (§13.15.4 GR1). SR10 —
   an elementary entry with a COLUMN clause also contains a SOURCE, VALUE or SUM clause; SR11 — PICTURE,
   COLUMN, SOURCE, VALUE, SUM and GROUP INDICATE only in an elementary entry; SR13 — an elementary VALUE entry
-  has a COLUMN clause; SR15 — BLANK WHEN ZERO / JUSTIFIED need a COLUMN clause. The same screen carries
+  has a COLUMN clause; SR15 — BLANK WHEN ZERO / JUSTIFIED need a COLUMN clause; **SR5** — the TYPE clause only in,
+  and in every, level 1 entry (`BindGroupType` runs for level 1 alone, so a stray TYPE never retypes its group;
+  kb/Work PB1288); **SR9 / §13.18.14.3 SR3** — a COLUMN entry has a LINE clause of its own or an ancestor that does,
+  read off the level hierarchy by `SubordinateToLineClause` (never off the line the build last opened — a COLUMN
+  entry that is a sibling of a LINE subtree used to inherit it; kb/Work PB1224); **SR12** — a PICTURE in every
+  elementary SOURCE or SUM entry, printable or not; and SR14's VALUE-only entry with no implied picture, in the
+  binder's PICTURE arm (the two former COBOLNET0899 descriptors `report-column-without-line` and
+  `report-item-missing-picture` are folded into this code). **§13.15.4 GR2's BLANK WHEN ZERO and JUSTIFIED subject
+  rules** (§13.18.8.3 SR1/SR2, §13.18.32.3 SR3) are the data division's `BlankWhenZeroViolation` /
+  `JustifiedViolation` predicates (COBOLNET2405), asked of the printable item's analysed picture. The same screen carries
   **§13.18.28.3 SR1 = COBOLNET2519** (`report-group-indicate-placement`, kb/Work PB1245): GROUP INDICATE only in a
   DETAIL group (the TYPE read from the level-01 entry through `WrittenGroupKind`, the helper
   `ScreenReportLineClauses` shares), and on an elementary entry only with a COLUMN clause and a SOURCE or VALUE
   clause — the elementary half is SR11's. SR8 is `ScreenReportLineNesting`
-  (§13.18.35.3 SR4), SR9 the binder's `ReportColumnWithoutLine` arm, §13.15.3 SR12/SR14 the PICTURE arm (it needs the
-  analysed picture). ⛔ **The binder never invents an operand**: a printable entry with no SOURCE/VALUE/SUM
+  (§13.18.35.3 SR4). ⛔ **The binder never invents an operand**: a printable entry with no SOURCE/VALUE/SUM
   operand left (SR10 refused it, or each written operand was refused at its own clause) produces NO field —
   the figurative-SPACE sender that once stood in for it is gone, pinned by
   `OccursOperandCaptureDriftTests.TheReportBinder_NeverFabricatesAnOperand`.
@@ -635,9 +645,33 @@ omission ("LEFT is assumed") — with CENTER a context-sensitive token (§8.10; 
 the emitter's placement and GR9's horizontal counter (`AbsoluteRightmost`) AND the bind-time line-width walk; SR9's
 absolute-only rule is COBOLNET2711, and an aligned item whose leftmost column falls before column 1 — a case the
 standard states no outcome for — is COBOLNET2712 (CONFORMANCE §3). The phrase gates with the other 2002 COLUMN forms
-(`report-multi-column-2002`). The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings and the
-SR7/SR8/SR10b operand-order-vs-PRESENT-WHEN arrangement rules are not enforced (over-acceptance; the runtime
-overlap conditions are EC-REPORT-COLUMN-OVERLAP/-LINE-OVERLAP, default-off). EC-REPORT-* checking is default-off
+(`report-multi-column-2002`). The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings are not enforced (over-acceptance).
+**The ARRANGEMENT rules** (kb/Work PB1222, PB1270) have three homes, one per kind of fact:
+- *Written clause* — `ScreenReportColumnClauses` (COBOLNET2745, once per written clause over the flat entry array):
+  §13.18.14.3 SR10 a) (a multiple COLUMN clause and an OCCURS clause in one entry — the COLUMN arm of the two-arm rule
+  whose LINE arm is `MultipleLineOperands`) and SR10 b) (integer-1 occurrences strictly increasing); no PRESENT WHEN
+  excuse. `ScreenReportPageIntegers` (COBOLNET2744, in `BindReportDescriptionClauses`, over the WRITTEN integers
+  before the GR3 defaults): §13.18.39.3 SR5 (page limit ≤ 9999) and SR6 (HEADING ≤ FIRST DETAIL ≤ LAST CONTROL HEADING
+  ≤ LAST DETAIL ≤ FOOTING ≤ page limit, pairwise over the ones written).
+- *One printable line* — `ScreenReportColumnArrangement` (COBOLNET2745), per `ReportLineModel` after the whole source
+  element is described (the printable-size is a picture's), over `NominalPlacements` — THE one nominal horizontal walk,
+  shared with the line-width computation: SR7 (absolute items by written column number, in order), SR8 a) (overlap),
+  SR8 b) (an absolute item's rightmost column past the page width) and SR8 c) (a relative tail past the page width,
+  judged whole unless `EachDifferentPresentWhen`, and then by the largest alone). SR7 and SR8 a) hold for
+  items "each subject to a different PRESENT WHEN clause": `DifferentPresentWhen` — each carries a clause (its own or an
+  ancestor entry's below the line entry, or a GROUP INDICATE) the other does not. Pairs are over WRITTEN entries
+  (`ReportFieldModel.Entry`), so a repeating entry's repetitions are never compared with each other (SR26 owns them).
+- *One report group* — `ScreenReportGroupLines` (COBOLNET2199), per group once it is complete: §13.18.35.3 SR6 a) (absolute
+  lines in increasing order), b) (equal absolute lines overlap; a relative line of integer-2 zero is excepted by
+  §13.18.35.4 GR3), c) (every absolute line within `GroupLimits`, the §13.18.57.4 GR7/GR8 limits) and e) (an absolute
+  line described after a relative one), each excused only by different PRESENT WHEN clauses on the lines'
+  chains (`ReportLineModel.Entry`, `PresentWhenCtxs`); d) (an unconditional absolute line, then relative lines carrying
+  the last line past the lower limit — judged whole unless `EachDifferentPresentWhen`, then by the largest alone)
+  through `MinimumLastLine`, the one placement walk the NEXT GROUP screen already read, asked for a chosen set of
+  present lines. `GroupLimits` takes the WIDEST region each conditional limit allows (docs/CONFORMANCE.md, the
+  report group limits determination), so the screen never refuses a line some presentation may place there.
+The run-time conditions the screens cannot decide stay EC-REPORT-COLUMN-OVERLAP/-LINE-OVERLAP/-PAGE-WIDTH/-PAGE-LIMIT
+(default-off). EC-REPORT-* checking is default-off
 (SSOT §18.16). The engine raises, each bound PRECISELY to GENERATE and TERMINATE (`EcBinder`'s report-production
 names) and each resuming where §14.9.16.4 GR8 / §14.9.46.4 GR5 put it — "at the next report item, line, or report
 group, whichever follows in logical order":

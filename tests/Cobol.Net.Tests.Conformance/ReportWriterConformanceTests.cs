@@ -255,7 +255,7 @@ public sealed class ReportWriterConformanceTests
              // file stays empty (PH/RF defined but never printed); the sole effect is active → inactive.
     public void Terminate_Gr2_NoGenerate_NothingPrints()
         => AssertSpec(Program("""
-            RD R-1 PAGE LIMIT IS 10 LINES.
+            RD R-1 PAGE LIMIT IS 10 LINES FIRST DETAIL 2.
             01 PH-1 TYPE PH LINE 1.
                 03 COLUMN 1 PIC X(2) VALUE "PH".
             01 DET-1 TYPE DE LINE PLUS 1.

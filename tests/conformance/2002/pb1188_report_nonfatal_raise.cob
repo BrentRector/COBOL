@@ -32,6 +32,13 @@
       *> page width."
       *>   cite.py: OK  §13.18.39.4 5)  (General rules)
       *>
+      *> The two rules the programs below break at run time are also syntax
+      *> rules (§13.18.14.3 SR8 a), b), c); cite.py: OK 13.18.14.3 8)), each
+      *> excusing items "subject to a different PRESENT WHEN clause" - and
+      *> different clauses may both hold, which is how a legal program
+      *> reaches the exception: R-C's overlapping items and R-W's two
+      *> relative items carry different clauses and both are present.
+      *>
       *> DERIVATION. R-C: "B" at column 3 falls inside "AAA" (columns
       *> 2-4): the declarative runs and GENERATE resumes at the next
       *> item, so the line is " AAA C". R-L (PAGE LIMIT 6, FIRST DETAIL
@@ -47,9 +54,11 @@
       *> control footing FINAL is eight lines, placed from FIRST DETAIL
       *> 1 after its failed page fit test: line 7 raises, and TERMINATE
       *> resumes at the next group - the report footing, on its own
-      *> page. R-W: the item at column 997 is five wide and ends at
-      *> 1001, past the page width 999: the declarative runs and the
-      *> line is truncated at 999 and printed (tail " 123", length 999).
+      *> page. R-W: item W (COLUMN PLUS 1) is column 1; item "12345"
+      *> (COLUMN PLUS 995, five wide) alone would be columns 995-999 and fits
+      *> the page width 999, but after W the counter is 1 so it starts at 996
+      *> and ends at 1000, past 999: the declarative runs and the line is
+      *> truncated at 999 and printed (tail "1234 ", length 999).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1188T.
        ENVIRONMENT DIVISION.
@@ -78,6 +87,8 @@
        FD  CHW.
        01  CHW-REC PIC X.
        WORKING-STORAGE SECTION.
+       01  WS-ON   PIC 9     VALUE 1.
+       01  WS-TWO  PIC 9     VALUE 1.
        01  WS-EOF  PIC X     VALUE "N".
        01  WS-B    PIC X.
        01  WS-I    PIC 9(4)  VALUE 0.
@@ -87,8 +98,8 @@
        RD  R-C.
        01  DE-C TYPE DE.
            02  LINE PLUS 1.
-               03  COLUMN 2 PIC XXX VALUE "AAA".
-               03  COLUMN 3 PIC X VALUE "B".
+               03  COLUMN 2 PIC XXX VALUE "AAA" PRESENT WHEN WS-ON = 1.
+               03  COLUMN 3 PIC X VALUE "B" PRESENT WHEN WS-TWO = 1.
                03  COLUMN 6 PIC X VALUE "C".
        RD  R-L CONTROL IS FINAL
            PAGE LIMIT 6 LINES HEADING 1 FIRST DETAIL 2
@@ -143,8 +154,9 @@
            03  COLUMN 1 PIC X(2) VALUE "RT".
        RD  R-W.
        01  DE-W TYPE DE LINE PLUS 1.
-           03  COLUMN 1 PIC X VALUE "W".
-           03  COLUMN 997 PIC X(5) VALUE "12345".
+           03  COLUMN PLUS 1 PIC X VALUE "W" PRESENT WHEN WS-ON = 1.
+           03  COLUMN PLUS 995 PIC X(5) VALUE "12345"
+               PRESENT WHEN WS-TWO = 1.
        PROCEDURE DIVISION.
        DECLARATIVES.
        NF SECTION.

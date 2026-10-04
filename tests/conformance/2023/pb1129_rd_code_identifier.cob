@@ -9,8 +9,8 @@
       *> operand, the identifier is evaluated.", d) PAGE-COUNTER, e) LINE-COUNTER, f) the page heading is printed.
       *> 13.18.12.4 GR1: the value stands in the first characters of each logical record of the report.
       *>
-      *> DERIVATION. PAGE LIMIT 4, HEADING 1, FIRST DETAIL 2, LAST DETAIL 3, FOOTING 4: a page holds the heading
-      *> (line 1), two details (lines 2-3) and the footing (line 4).
+      *> DERIVATION. PAGE LIMIT 4, HEADING 1, FIRST DETAIL 2, LAST DETAIL 3, FOOTING 3: a page holds the heading
+      *> (line 1), two details (lines 2-3) and the page footing (line 4, the line after FOOTING: 13.18.57.4 GR7 e)).
       *>   G1 (WS-CD "A", WS-N 1): the first GENERATE evaluates at the start of its processing: A. PH "APH",
       *>      detail "AD1" on line 2.
       *>   G2 (WS-CD "B", WS-N 2): trial line 2 + 1 = 3 <= LAST DETAIL 3, so it fits and NO page advance is
@@ -44,7 +44,7 @@
        REPORT SECTION.
        RD  R-B CODE IS WS-CD
            PAGE LIMIT IS 4 LINES HEADING 1 FIRST DETAIL 2
-           LAST DETAIL 3 FOOTING 4.
+           LAST DETAIL 3 FOOTING 3.
        01  PH-B TYPE PAGE HEADING.
            02  LINE 1.
                03  COLUMN 1 PIC X(2) VALUE "PH".
