@@ -142,7 +142,8 @@ Each iteration, in this order:
 6. **Run it**: `claude -p <prompt> --model <unit model> --permission-mode <mode> --permission-prompts none
    --output-format stream-json --verbose --session-id <fresh GUID>` from the repository root (plus `--chrome` for
    `meter`). The prompt is `units/common.md` followed by `units/<unit>.md`, with the substitutions `{COORD}`,
-   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}` and `{SCRATCH}`. The stream goes to `logs\<time>-<unit>.jsonl`,
+   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}` and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
+   `wave` unit's `plan_wave.py --from-budget` sees the same allowance the supervisor's gate used). The stream goes to `logs\<time>-<unit>.jsonl`,
    stderr to `logs\<time>-<unit>.stderr.txt`.
    While it runs, the supervisor reads every `assistant` event's `usage` (counting each message id once: the
    stream repeats a call's usage on each content block) and keeps the running context estimate =

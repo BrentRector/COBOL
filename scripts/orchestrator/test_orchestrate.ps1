@@ -73,6 +73,11 @@ Check 'STOP reported' ($r.out -match 'STOP file present') $true
 $r = Run-Orch 'quickdone' 'good' @('-Unit', 'meter', '-MaxUnits', '1', '-FastFailSeconds', '120')
 Check 'quick done unit not failed' $r.units[0].failed $false
 
+# 4c. the owner's -BorrowDays reaches the wave unit's plan_wave call (the supervisor's gate alone is not enough)
+$r = Run-Orch 'borrow' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-BorrowDays', '2')
+$inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
+Check 'borrow days substituted into the unit prompt' ($inv -match '--borrow-days 2 --scratch') $true
+
 # 5. the circuit breaker trips after three fast failures and leaves an owner note
 $r = Run-Orch 'breaker' 'fastfail' @('-Unit', 'wave', '-FastFailSeconds', '120')
 Check 'breaker exit' $r.code 4

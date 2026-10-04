@@ -118,7 +118,8 @@ function Build-Prompt([string]$unit, [string]$scratch) {
     $sub = {
         param($t)
         $t.Replace('{COORD}', $CoordDir).Replace('{HANDOFF}', $Handoff).Replace('{STOP_UNIT}', $StopUnit).
-           Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch)
+           Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch).
+           Replace('{BORROW_DAYS}', "$BorrowDays")
     }
     $common = & $sub (Get-Content (Join-Path $Here 'units/common.md') -Raw)
     $own = & $sub (Get-Content (Join-Path $Here "units/$unit.md") -Raw)
