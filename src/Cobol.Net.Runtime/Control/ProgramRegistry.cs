@@ -122,9 +122,10 @@ public static class ProgramRegistry
         Func<ICobolProgram?, ICobolProgram> factory,
         Action? staticReset = null,
         int formalCount = -1, int requiredCount = 0, bool argMismatchChecking = false,
-        bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null)
+        bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null,
+        BoundaryItem[]? formals = null)
         => RunUnit.Current.Programs.Register(path, name, parentPath, initial, common, recursive, factory,
-            staticReset, formalCount, requiredCount, argMismatchChecking, isFunction, externalizedName, returning);
+            staticReset, formalCount, requiredCount, argMismatchChecking, isFunction, externalizedName, returning, formals);
 
     /// <inheritdoc cref="ProgramTable.RunMain"/>
     public static void RunMain(string path) => RunUnit.Current.Programs.RunMain(path);

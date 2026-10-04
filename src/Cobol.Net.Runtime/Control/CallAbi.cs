@@ -51,23 +51,27 @@ public enum CobolPassMode
 /// GR3 d)) and for the delivery to FIT one to (the unchecked store). <see cref="Unstated"/> for every item with no
 /// fixed character length: a native cell, a pointer, a DYNAMIC LENGTH or ANY LENGTH item (§8.5.1.10; §14.8.3.3 rule
 /// 5 — an ANY LENGTH sender "matches" whatever length the receiver has), and a variable-length group, whose
-/// description is its <see cref="Layout"/>. Only a RETURNING item states it today: a BY REFERENCE argument is fitted
-/// by the formal's own window on the activated side (kb/Work PB165 owns the argument-side check on the dynamic
-/// lane).</param>
+/// description is its <see cref="Layout"/>. A native numeric cell states its storage width too (the BYTE-LENGTH of the
+/// item, <c>DataItem.ImageWidth</c>), so §14.8.2.3.2 rule 1's "same length" is one comparison across every fixed-length
+/// item. A RETURNING item always states it; an ARGUMENT states it only at a CALL site that checks EC-PROGRAM-ARG-MISMATCH
+/// (kb/Work PB165): that is the one place the activated unit's registered formal descriptions are compared with it.</param>
+/// <param name="Class">⛔ The CLASS facts of the carried item that §14.8.2.2 and §14.8.3.2 hang a rule on (kb/Work PB165):
+/// an alphanumeric group item, an elementary item of category alphanumeric, a strongly-typed group.
+/// <see cref="BoundaryClass.Other"/> for everything else, which is every item the conformance rules compare by length alone.</param>
 /// <remarks>⛔ A RETURNING ITEM CROSSES AS A <see cref="CobolArg"/> TOO (kb/Work PB962 + PB965). Its storage is
 /// the activating element's (§14.2.3 GR6 NOTE 1), so the delivery performed at the activated element's return
 /// needs the RECEIVER's description as much as an argument's adapter needs the argument's — a group receiver's
 /// layout to meet a compatible group of a different shape (§14.8.3.2), a numeric receiver's profile. A bare
 /// carrier could state neither.</remarks>
 public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrier, NumProfile? Num, int[]? Layout = null,
-    int Length = CobolArg.Unstated)
+    int Length = CobolArg.Unstated, BoundaryClass Class = BoundaryClass.Other)
 {
     /// <summary><see cref="Length"/> of an item with no fixed character length.</summary>
     public const int Unstated = -1;
 
     /// <summary>The description facts of this item that a dynamic CALL can compare with the activated unit's own
     /// (<see cref="BoundaryItem"/>).</summary>
-    public BoundaryItem Item => new(Num, Length);
+    public BoundaryItem Item => new(Num, Length, Class);
 
     /// <summary>The carried storage's digit count; 0 when <see cref="Num"/> is null.</summary>
     public int Digits => Num?.Digits ?? 0;
@@ -77,21 +81,43 @@ public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrie
 }
 
 /// <summary>
-/// ⛔ THE DESCRIPTION OF A BOUNDARY ITEM THAT BOTH SIDES OF A DYNAMIC CALL CAN STATE (kb/Work PB1040): the two facts
+/// ⛔ THE CLASS FACTS OF A BOUNDARY ITEM THAT THE GROUP CONFORMANCE RULES HANG ON (kb/Work PB165; ISO §14.8.2.2 and
+/// §14.8.3.2): "if either … is an alphanumeric group item and neither of them is strongly typed", the OTHER item shall be an
+/// alphanumeric group item or an elementary item of category alphanumeric. Everything else is judged by length alone, so
+/// the three classes the rule names and the one it exempts are all this registry needs.
+/// </summary>
+public enum BoundaryClass : byte
+{
+    /// <summary>Any item the conformance rules compare by length (and, for RETURNING, PICTURE/SIGN/USAGE) alone: a numeric,
+    /// national, boolean or edited item, a bit or national group (treated as the elementary item it is, §14.8.2.1 NOTE).</summary>
+    Other = 0,
+    /// <summary>An elementary item of category alphanumeric (a reference-modified operand is one, §8.4.3.3.4 GR6).</summary>
+    Alphanumeric,
+    /// <summary>An alphanumeric group item that is neither strongly typed nor variable-length.</summary>
+    Group,
+    /// <summary>A strongly-typed group or a variable-length group: §14.8.2.2 gives each its own rule (the same type; the
+    /// §8.5.1.12 compatibility) which this registry cannot state, so neither the group rule nor the length rule applies
+    /// to a pair that contains one.</summary>
+    Exempt,
+}
+
+/// <summary>
+/// ⛔ THE DESCRIPTION OF A BOUNDARY ITEM THAT BOTH SIDES OF A DYNAMIC CALL CAN STATE (kb/Work PB1040, PB165): the facts
 /// <see cref="CobolArg"/> carries for the activating element's storage (<see cref="CobolArg.Num"/> — a numeric
-/// item's whole PICTURE, SIGN and USAGE — and <see cref="CobolArg.Length"/> — a text-carried item's character
-/// length) and the same two facts an activated unit REGISTERS for its own RETURNING item
-/// (<see cref="ProgramTable.Register"/>), so §14.9.4.4 GR3 d) has something to compare at call initiation when the
-/// callee is located by name at run time. ONE rule of "do these two descriptions conform", written over the pair
-/// of facts and nowhere else; kb/Work PB165's per-formal registry is the next consumer.
+/// item's whole PICTURE, SIGN and USAGE —, <see cref="CobolArg.Length"/> — its storage length — and
+/// <see cref="CobolArg.Class"/>) and the same facts an activated unit REGISTERS for its own RETURNING item and for each of
+/// its FORMALS (<see cref="ProgramTable.Register"/>), so §14.9.4.4 GR3 d) has something to compare at call initiation when
+/// the callee is located by name at run time. ONE description, and TWO rules over it that live beside it and nowhere
+/// else: <see cref="Conforms"/> for a RETURNING pair and <see cref="ArgumentConforms"/> for an argument and its formal.
 /// </summary>
 /// <param name="Num">The numeric item's profile; null for an item that is not numeric (character, group, pointer).</param>
-/// <param name="Length">The fixed character length of a text-carried item; <see cref="CobolArg.Unstated"/> otherwise.</param>
-public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolArg.Unstated)
+/// <param name="Length">The item's fixed storage length (see <see cref="CobolArg.Length"/>); <see cref="CobolArg.Unstated"/> otherwise.</param>
+/// <param name="Class">The class facts of the item (<see cref="BoundaryClass"/>).</param>
+public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolArg.Unstated, BoundaryClass Class = BoundaryClass.Other)
 {
     /// <summary>True when the item states anything at all — a native cell of a category with no profile, a pointer, a
     /// DYNAMIC LENGTH item and an ANY LENGTH item state nothing, and nothing is comparable against them.</summary>
-    public bool IsStated => Num is not null || Length != CobolArg.Unstated;
+    public bool IsStated => Num is not null || Length != CobolArg.Unstated || Class != BoundaryClass.Other;
 
     /// <summary>The item in the words of an EC-PROGRAM-ARG-MISMATCH message.</summary>
     public string Describe() =>
@@ -100,20 +126,52 @@ public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolAr
             ({ } n, var len) when len != CobolArg.Unstated =>
                 $"numeric, {n.Digits} digit(s), scale {n.FractionScale}, {len} character(s)",
             ({ } n, _) => $"numeric, {n.Digits} digit(s), scale {n.FractionScale}",
-            (_, var len) when len != CobolArg.Unstated => $"{len} character(s)",
-            _ => "no stated description",
+            (_, var len) when len != CobolArg.Unstated =>
+                $"{(Class == BoundaryClass.Group ? "group, " : Class == BoundaryClass.Alphanumeric ? "alphanumeric, " : "")}{len} character(s)",
+            _ => Class switch { BoundaryClass.Group => "group", BoundaryClass.Alphanumeric => "alphanumeric", _ => "no stated description" },
         };
 
     /// <summary>Whether a SENDING item and a RECEIVING item conform (§14.8.3.3: "the same … PICTURE, SIGN, and
-    /// USAGE clauses"; §14.8.2.3.2 rule 1: "the same length"), judged over what both state: an item with a numeric
-    /// profile never conforms to one without (category), two profiles conform when they state one PICTURE, SIGN and
-    /// USAGE (<see cref="NumProfile.ConformsTo"/>), and two character lengths conform when equal. An item that states
-    /// nothing is not compared — its conformance is a compile-time fact or another registry's.</summary>
+    /// USAGE clauses"; §14.8.3.2: an alphanumeric group item pairs only with an alphanumeric group item or an elementary
+    /// alphanumeric one of the same length), judged over what both state: an item with a numeric profile never conforms to
+    /// one without (category), two profiles conform when they state one PICTURE, SIGN and USAGE
+    /// (<see cref="NumProfile.ConformsTo"/>), and two lengths conform when equal. An item that states nothing is not
+    /// compared — its conformance is a compile-time fact or another registry's.</summary>
     public bool Conforms(in BoundaryItem other) =>
         !IsStated || !other.IsStated
-        || ((Num is null) == (other.Num is null)
+        || (GroupClassesAdmit(other)
+            && (Num is null) == (other.Num is null)
             && (Num is not { } mine || mine.ConformsTo(other.Num!.Value))
-            && (Length == CobolArg.Unstated || other.Length == CobolArg.Unstated || Length == other.Length));
+            && LengthsAgree(other));
+
+    /// <summary>Whether an ARGUMENT and the FORMAL it meets conform at a dynamic Format-1 CALL, whose callee the activating
+    /// element does not know at compile time — so §14.8.2.3.2 / §14.8.2.3.3 rule 1 is the elementary rule ("the formal
+    /// parameter shall be of the same length as the corresponding argument"; rule 2, the PICTURE-level identity, belongs to a
+    /// callee the activating element does know, and the binder checks it there) and §14.8.2.2 is the group rule: BY
+    /// REFERENCE the other item shall be an alphanumeric group or an elementary alphanumeric item and the formal "shall be
+    /// described with the same number or a smaller number of bytes as the corresponding argument"; BY CONTENT the rules are
+    /// those of a MOVE, which relate no lengths. <c>this</c> is the argument, <paramref name="formal"/> the registered
+    /// formal; an item that states nothing, or a pair with an <see cref="BoundaryClass.Exempt"/> member, is not compared
+    /// (the rule is not stateable here, and the callee's adapters still refuse what cannot be adopted).</summary>
+    public bool ArgumentConforms(CobolPassMode mode, in BoundaryItem formal)
+    {
+        if (!IsStated || !formal.IsStated || Class == BoundaryClass.Exempt || formal.Class == BoundaryClass.Exempt) return true;
+        if (Class != BoundaryClass.Group && formal.Class != BoundaryClass.Group)
+            return LengthsAgree(formal);   // §14.8.2.3.2 / §14.8.2.3.3 rule 1: the same length
+        if (mode != CobolPassMode.Reference) return true;   // §14.8.2.2 2): a MOVE's rules
+        return GroupClassesAdmit(formal)
+            && (Length == CobolArg.Unstated || formal.Length == CobolArg.Unstated || formal.Length <= Length);
+    }
+
+    /// <summary>§14.8.2.2 1) / §14.8.3.2: when either item is an alphanumeric group, the other is a group or an elementary
+    /// alphanumeric item (an <see cref="BoundaryClass.Exempt"/> member lifts the rule).</summary>
+    private bool GroupClassesAdmit(in BoundaryItem other) =>
+        Class == BoundaryClass.Exempt || other.Class == BoundaryClass.Exempt
+        || (Class != BoundaryClass.Group && other.Class != BoundaryClass.Group)
+        || (Class is BoundaryClass.Group or BoundaryClass.Alphanumeric && other.Class is BoundaryClass.Group or BoundaryClass.Alphanumeric);
+
+    private bool LengthsAgree(in BoundaryItem other) =>
+        Length == CobolArg.Unstated || other.Length == CobolArg.Unstated || Length == other.Length;
 }
 
 /// <summary>

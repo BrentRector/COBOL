@@ -7,8 +7,9 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// ⛔ THE LOCAL LINUX GATE RUNS WHAT CI'S LINUX JOBS RUN (kb/Work PB1732): every test project a Linux job of
-/// <c>.github/workflows/build-and-test.yml</c> runs with <c>dotnet test</c> is a leg of <c>scripts/linux-gate.sh</c>.
+/// ⛔ THE LOCAL LINUX GATE RUNS WHAT CI'S LINUX JOBS RUN (kb/Work PB1732, PB1955): every test project a Linux job of
+/// <c>.github/workflows/build-and-test.yml</c> runs with <c>dotnet test</c>, and every repository script it runs with
+/// <c>bash</c>, is a default leg of <c>scripts/linux-gate.sh</c>.
 /// </summary>
 /// <remarks>
 /// Train 71b's first push went red in CI's Linux unit job on a Windows path literal that was green on Windows, and
@@ -45,5 +46,49 @@ public sealed class LinuxGateDriftTests
         Assert.True(missing.Count == 0,
             "CI's Linux jobs run test projects scripts/linux-gate.sh has no leg for: " + string.Join(", ", missing)
             + ". Add a leg, or the local Linux gate no longer stands in for CI's Linux jobs (kb/Work PB1732).");
+    }
+
+    /// <summary>
+    /// ⛔ AND EVERY REPOSITORY SCRIPT A LINUX JOB RUNS AS A TEST STEP IS A LEG TOO (kb/Work PB1955, PB1957 row 40).
+    /// </summary>
+    /// <remarks>
+    /// The fact above reads only <c>dotnet test</c> lines, and CI's <c>guard</c> job runs none: its whole test is
+    /// <c>run: bash scripts/guard-fast.sh</c> (the NIST suite through the <c>cobol</c> CLI, the manifest audit, the
+    /// legacy Unit and Integration suites). So that job was the one CI Linux job no local gate ran, and train 1013's
+    /// guard red on PB322's TERMINATES rows reached CI behind a green Windows gate and a green Linux gate. A step that
+    /// runs a script under <c>scripts/</c> with <c>bash</c> is held here to a <c>linux-gate.sh</c> leg that runs the
+    /// SAME script, so the local gate and the CI job cannot measure different populations.
+    /// </remarks>
+    [Fact]
+    public void EveryScriptCisLinuxJobsRun_IsALegOfTheLinuxGate()
+    {
+        string workflow = File.ReadAllText(TestRepo.At(".github", "workflows", "build-and-test.yml"));
+        string gate = File.ReadAllText(TestRepo.Scripts("linux-gate.sh"));
+
+        var linuxScripts = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (string job in Regex.Split(workflow, @"^  (?=[A-Za-z0-9_-]+:\s*$)", RegexOptions.Multiline))
+        {
+            if (!Regex.IsMatch(job, @"^\s+runs-on:\s*ubuntu", RegexOptions.Multiline))
+            {
+                continue;
+            }
+
+            foreach (Match m in Regex.Matches(job, @"^\s+run:\s*bash (scripts/[^\s]+\.sh)\s*$", RegexOptions.Multiline))
+            {
+                linuxScripts.Add(m.Groups[1].Value);
+            }
+        }
+
+        Assert.Contains("scripts/guard-fast.sh", linuxScripts);
+        var missing = linuxScripts.Where(s => !Regex.IsMatch(gate, @"^[^#\n]*\bbash " + Regex.Escape(s) + @"\b", RegexOptions.Multiline)).ToList();
+        Assert.True(missing.Count == 0,
+            "CI's Linux jobs run scripts scripts/linux-gate.sh never runs: " + string.Join(", ", missing)
+            + ". Add a leg that runs the same script, or the local Linux gate no longer stands in for CI's Linux jobs "
+            + "(kb/Work PB1955).");
+
+        // The guard leg is in the DEFAULT leg list: a leg only `--legs guard` reaches is a leg no gate runs.
+        Match defaults = Regex.Match(gate, @"^legs=""([^""]+)""", RegexOptions.Multiline);
+        Assert.True(defaults.Success, "scripts/linux-gate.sh no longer declares its default legs as legs=\"…\"");
+        Assert.Contains("guard", defaults.Groups[1].Value.Split(','));
     }
 }

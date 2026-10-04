@@ -1411,6 +1411,12 @@ internal static class RuntimeApi
     public static string FileStatus(string name) =>
         $"{nameof(CobolFile)}.{nameof(CobolFile.Status)}({name})";
 
+    /// <summary>Terminate the run unit on a fatal I-O status that nothing covers (a file with no FILE STATUS clause
+    /// and no applicable USE procedure; A.1 item 103) — <c>CobolFile.TerminateOnUncoveredFatalStatus</c>.
+    /// <paramref name="verbLiteral"/> is the statement's name as a C# string literal.</summary>
+    public static string TerminateOnUncoveredFatalStatus(string name, string verbLiteral) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.TerminateOnUncoveredFatalStatus)}({name}, {verbLiteral})";
+
     /// <summary>The EC-I-O level-3 exception-name the connector's last I-O operation set to exist (§9.1.13.1's
     /// status correspondence, or a name the operation's own rule gave) — <c>CobolFile.IoConditionName</c>.</summary>
     public static string FileIoConditionName(string name) =>

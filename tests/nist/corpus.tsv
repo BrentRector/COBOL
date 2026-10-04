@@ -3,6 +3,9 @@
 # [InlineData] + tests/nist/chains.tsv + scripts/guard.sh LEGACY_DIVERGENT. Generated mechanically; a green
 # program is a manifest row, not a code edit. Columns:
 #   name  suite  status(green|divergent|pending)  chain-preds(space-joined or -)  golden(valid|none)  note
+# A divergent row whose note BEGINS `TERMINATES EC-<NAME>` is declared to end its run unit on that fatal exception
+# (the golden records the continuing run); both NIST runners read it: CorpusRow.ExpectedTermination and
+# scripts/guard-population.sh (kb/Work PB1955). Any other divergent row's golden is what WiseOwl COBOL reproduces.
 IC101A	IC	green	-	valid	-
 IC103A	IC	green	-	valid	-
 IC106A	IC	green	-	valid	-
@@ -200,7 +203,7 @@ NC252A	NC	green	-	valid	-
 NC253A	NC	green	-	valid	-
 NC254A	NC	green	-	valid	-
 NC302M	NC	green	-	valid	-
-NC401M	NC	green	-	valid	-
+NC401M	NC	divergent	-	valid	TERMINATES EC-I-O-PERMANENT-ERROR - ISO §9.1.13.1 and Annex A.1 item 103 (docs/CONFORMANCE.md DOC-A.1-103): this flagging test OPENs a file that does not exist, with no FILE STATUS clause and no USE procedure, so the run unit terminates; the golden records the run that continued
 OBSQ4A	OBSQ	green	OBSQ3A	valid	-
 OBSQ5A	OBSQ	green	OBSQ3A OBSQ4A	valid	-
 RL101A	RL	green	-	valid	-
@@ -350,7 +353,7 @@ ST137A	ST	divergent	-	valid	ISO §14.9.51.4 GR25 + GR25 f) — a WRITE with no A
 ST139A	ST	divergent	-	valid	ISO §14.9.51.4 GR25 + GR25 f) — a WRITE with no ADVANCING phrase acts as AFTER ADVANCING 1 LINE, so after an AFTER-placed line it advances FIRST and presents on the next line: the legacy presented it on the open line (two records welded onto one print line) (kb/Work PB964)
 ST140A	ST	divergent	-	valid	ISO §14.9.51.4 GR25 + GR25 f) — a WRITE with no ADVANCING phrase acts as AFTER ADVANCING 1 LINE, so after an AFTER-placed line it advances FIRST and presents on the next line: the legacy presented it on the open line (two records welded onto one print line) (kb/Work PB964)
 ST144A	ST	divergent	-	valid	ISO §14.9.51.4 GR25 + GR25 f) — a WRITE with no ADVANCING phrase acts as AFTER ADVANCING 1 LINE, so after an AFTER-placed line it advances FIRST and presents on the next line: the legacy presented it on the open line (two records welded onto one print line) (kb/Work PB964)
-ST146A	ST	divergent	-	valid	ISO §14.9.30 GR18 — record area undefined after an unsuccessful READ (undefined choice)
+ST146A	ST	divergent	-	valid	TERMINATES EC-I-O-LOGIC-ERROR - ISO §9.1.13.1 and Annex A.1 item 103 (docs/CONFORMANCE.md DOC-A.1-103): the X-card dump READs SQ-FS1 after the SORT input procedure closed it (status 47) with no FILE STATUS clause and no USE procedure, so the run unit terminates; the golden records the run that continued (record area undefined after an unsuccessful READ, §14.9.30 GR18)
 ST147A	ST	divergent	-	valid	ISO §14.9.51.4 GR25 + GR25 f) — a WRITE with no ADVANCING phrase acts as AFTER ADVANCING 1 LINE, so after an AFTER-placed line it advances FIRST and presents on the next line: the legacy presented it on the open line (two records welded onto one print line) (kb/Work PB964)
 CM101M	CM	pending	-	none	cataloged (not asserted)
 CM102M	CM	pending	-	none	cataloged (not asserted)

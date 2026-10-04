@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// units"</i> — the gate is named exactly: <i>"Before access to a shared physical file is allowed through an
 /// OPEN statement, the sharing mode and the open mode of that OPEN statement shall be allowed by all other file
 /// connectors that are currently associated with the physical file, as described in … Table 19"</i>. So a pair
-/// <c>FileRegistry.Conflicts</c> PERMITS shall open, and the host handle may not veto it.</para>
+/// <c>Table19.Conflicts</c> PERMITS shall open, and the host handle may not veto it.</para>
 ///
 /// <para><b>Outside it</b> — <i>"The successful opening of a file establishes a file lock for the applicable
 /// sharing rules, thereby preventing other run units from opening that file with incompatible sharing
@@ -33,7 +33,7 @@ namespace CobolNet.Tests.Unit;
 ///
 /// <para>The guard is therefore the WHOLE agreement, not the reported cell: every (sharing mode × open mode)
 /// pair on both sides, measured through real connectors on a real physical file, against
-/// <c>FileRegistry.Conflicts</c>' own verdict — because the reported pair (INPUT + EXTEND) is one cell of a
+/// <c>Table19.Conflicts</c>' own verdict — because the reported pair (INPUT + EXTEND) is one cell of a
 /// disagreement the two layers can have anywhere, and the golden that had certified Table 19 could not see it
 /// (both of its clause-less legs held the ACCESS axis fixed).</para>
 ///
@@ -44,8 +44,8 @@ namespace CobolNet.Tests.Unit;
 /// expression on such a host at all, and asserting it there was two days of red CI that named nothing.
 /// <see cref="ExpectedOutsideWriter"/> translates the standard's answer through
 /// <see cref="HostCapability.Sharing"/>'s MEASUREMENT, <see cref="TheHostsShareModeSemanticsAreTheDocumentedOnes"/>
-/// pins the measurement itself against the determination in <c>DESIGN-runtime-library.md</c>, and the bounded
-/// widening is asserted as a DELTA so that it measures the widening rather than the host.</para>
+/// pins the measurement itself against the determination in <c>DESIGN-runtime-library.md</c>, and a refused or an
+/// admitted OPEN is asserted as a DELTA so that it measures the OPEN rather than the host.</para>
 /// </summary>
 public sealed class FileLockPostureDriftTests
 {
@@ -60,8 +60,8 @@ public sealed class FileLockPostureDriftTests
     }
 
     /// <summary>The four spellings a connector's §9.1.15 sharing mode can have at the registry. The first is the
-    /// undetermined implementor default (<c>FileRegistry.ImplementorDefaultSharing</c>, kb/Work PB322) reached
-    /// the way a program reaches it — by writing no clause at all.</summary>
+    /// implementor default of the open mode (<c>FileRegistry.ImplementorDefaultSharing</c>, kb/Work PB322)
+    /// reached the way a program reaches it — by writing no clause at all.</summary>
     public enum Mode { ClauseLess, NoOther, ReadOnly, AllOther }
 
     /// <summary>⛔ THE AXIS THE FILE-LOCK MEASUREMENT WAS MISSING (kb/Work PB771). §9.1.6: <i>"There are three
@@ -103,12 +103,15 @@ public sealed class FileLockPostureDriftTests
         reg.Close("S");
     }
 
-    private static FileSharing? SharingOf(Mode m) => m switch
+    /// <summary>The sharing mode a connector declared with spelling <paramref name="m"/> holds while open in
+    /// <paramref name="open"/>: the declared mode, or — for the clause-less spelling — the implementor default
+    /// of that open mode.</summary>
+    private static FileSharing SharingOf(Mode m, FileOpenMode open) => m switch
     {
         Mode.NoOther => FileSharing.NoOther,
         Mode.ReadOnly => FileSharing.ReadOnly,
         Mode.AllOther => FileSharing.AllOther,
-        _ => FileRegistry.ImplementorDefaultSharing,
+        _ => FileRegistry.ImplementorDefaultSharing(open),
     };
 
     public static TheoryData<Mode, FileOpenMode, Mode, FileOpenMode, Org> EveryPair()
@@ -129,7 +132,7 @@ public sealed class FileLockPostureDriftTests
         RegisterOrg(reg, name, host, org);
         // ClauseLess registers NOTHING: a SELECT with neither clause never reaches RegisterSharing, which is
         // exactly the shape PB740 measured. The other three record their declared sharing mode.
-        if (m != Mode.ClauseLess) reg.RegisterSharing(name, SharingOf(m), FileLockMode.Manual, multiple: false);
+        if (m != Mode.ClauseLess) reg.RegisterSharing(name, SharingOf(m, FileOpenMode.Input), FileLockMode.Manual, multiple: false);
     }
 
     // ── The agreement, measured on real handles ─────────────────────────────────────────────────────────────
@@ -159,7 +162,7 @@ public sealed class FileLockPostureDriftTests
                 + "the SECOND open and cannot say anything if the first one did not happen.");
 
             reg.OpenStatic("B", mb);
-            bool refused = FileRegistry.Conflicts((SharingOf(sa), ma), (SharingOf(sb), mb));
+            bool refused = Table19.Conflicts((SharingOf(sb, mb), mb), (SharingOf(sa, ma), ma));
             string got = reg.Status("B");
 
             if (refused)
@@ -178,14 +181,16 @@ public sealed class FileLockPostureDriftTests
         finally { TryDelete(host); }
     }
 
-    /// <summary>The pair PB740 reported, end to end and with its DATA: two clause-less connectors on one ASSIGN,
-    /// <c>OPEN INPUT</c> then <c>OPEN EXTEND</c>, the appended record reaching the physical file (§14.9.51.4
+    /// <summary>The pair PB740 reported, end to end and with its DATA: two connectors on one ASSIGN declaring
+    /// <c>SHARING WITH ALL OTHER</c> (two clause-less connectors are NOT a Table 19 pair since kb/Work PB322:
+    /// the INPUT one is READ ONLY and refuses the EXTEND), <c>OPEN INPUT</c> then <c>OPEN EXTEND</c>, the
+    /// appended record reaching the physical file (§14.9.51.4
     /// GR12 <i>"releases a logical record to the operating environment"</i>, GR18 the successor relationship)
     /// — and the READER's file position indicator surviving the widening its sibling forced, which is the half
     /// a status-only assertion cannot see: the reposture rebuilds the handle, and a rebuild at the wrong offset
     /// re-serves a record the program has already read (§9.1.12).</summary>
     [Fact]
-    public void ClauseLessInputThenExtend_Appends_AndTheReaderKeepsItsPosition()
+    public void AllOtherInputThenExtend_Appends_AndTheReaderKeepsItsPosition()
     {
         string host = Tmp("input-extend");
         try
@@ -199,6 +204,8 @@ public sealed class FileLockPostureDriftTests
 
             reg.Register("A", host, 4, false, false, -1, -1);
             reg.Register("B", host, 4, false, false, -1, -1);
+            reg.RegisterSharing("A", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
+            reg.RegisterSharing("B", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
 
             reg.OpenStatic("A", FileOpenMode.Input);
             Assert.Equal(FileStatusCode.Success, reg.Status("A"));
@@ -246,7 +253,7 @@ public sealed class FileLockPostureDriftTests
         foreach (var org in Enum.GetValues<Org>())
         {
             data.Add(Mode.NoOther, false, false, org);     // §9.1.15 1) exclusive — nothing else may read or write
-            data.Add(Mode.ClauseLess, true, false, org);   // the undetermined default (owner question)
+            data.Add(Mode.ClauseLess, true, false, org);   // OPEN INPUT's default: SHARING WITH READ ONLY (§9.1.15 2))
             data.Add(Mode.AllOther, true, true, org);      // §9.1.15 3) concurrent access through other connectors
         }
         return data;
@@ -304,7 +311,7 @@ public sealed class FileLockPostureDriftTests
             return (isoAnswer,
                 "This host's share modes are access-discriminating, so §9.1.15 is enforced as written. "
                 + host.Because);
-        if (FileLockPosture.OfSharingMode(SharingOf(mode)) == FileShare.None)
+        if (FileLockPosture.OfSharingMode(SharingOf(mode, FileOpenMode.Input)) == FileShare.None)
             return (isoAnswer,
                 "§9.1.15 1)'s exclusive access is the one rule a binary advisory lock can still express, so "
                 + "this arm is unchanged on this host. " + host.Because);
@@ -342,14 +349,14 @@ public sealed class FileLockPostureDriftTests
             + "it and the design doc has to be re-derived — never this line adjusted. " + host.Because);
     }
 
-    /// <summary>The widening is BOUNDED, in both directions — the fact that lets PB740 fix the in-run-unit half
-    /// without spending the clause-less connector's protection, which is the owner's question and not this
-    /// note's. A clause-less reader alone denies an outside writer; a clause-less appender joins it, which
-    /// rebuilds the reader's handle permissively — and the outside writer is STILL denied, because the host
-    /// checks a new handle against EVERY outstanding one and the appender's own posture still refuses it. When
-    /// the appender closes, the reader narrows back.</summary>
+    /// <summary>A clause-less OPEN that Table 19 REFUSES leaves the connectors already open exactly as they
+    /// were (§14.9.27.4 GR25 — <i>"the file is not affected"</i>), and one that it admits adds nothing an outsider
+    /// could use. A clause-less reader (SHARING WITH READ ONLY) alone denies an outside writer where the host can
+    /// express that; a second clause-less reader joins it without changing that; a clause-less appender is
+    /// refused '61' and the reader's file lock is still exactly what the reader alone establishes; when the
+    /// second reader closes the set shrinks back.</summary>
     [Fact]
-    public void WideningForASiblingDoesNotAdmitAnOutsider_AndIsGivenBackAtTheClose()
+    public void ARefusedOrAdmittedClauseLessOpen_DoesNotMoveTheFileLockAnOutsiderSees()
     {
         string host = Tmp("bounded");
         try
@@ -362,28 +369,30 @@ public sealed class FileLockPostureDriftTests
 
             reg.Register("A", host, 4, false, false, -1, -1);
             reg.Register("B", host, 4, false, false, -1, -1);
+            reg.Register("C", host, 4, false, false, -1, -1);
 
             reg.OpenStatic("A", FileOpenMode.Input);
             (bool alone, string why) = ExpectedOutsideWriter(Mode.ClauseLess, isoAnswer: false);
             Assert.True(alone == HostCapability.OutsiderCan(host, FileAccess.Write),
-                $"A clause-less connector alone: an outside writer, expected {alone}. {why}");
+                $"A clause-less reader alone: an outside writer, expected {alone}. {why}");
 
-            reg.OpenStatic("B", FileOpenMode.Extend);
+            reg.OpenStatic("B", FileOpenMode.Input);
             Assert.Equal(FileStatusCode.Success, reg.Status("B"));
             Assert.True(alone == HostCapability.OutsiderCan(host, FileAccess.Write),
-                "⛔ THE INVARIANT, AND IT IS A DELTA: the reader was widened so its sibling appender could open, "
-                + "and that shall admit an outsider NOTHING it did not already have — the host checks a new "
-                + "handle against every outstanding one, so the run unit's effective lock stays the "
-                + "INTERSECTION of its connectors' postures. Asserted as \"unchanged by the widening\" rather "
-                + "than as \"refused\", because on a host that cannot express a reader-only file lock the "
-                + "outsider was never refused to begin with and an absolute assertion would measure the host "
-                + "instead of the widening (kb/Work PB795). " + why);
+                "A second clause-less reader (Table 19: READ ONLY input against READ ONLY input is a normal open) "
+                + "shall admit an outsider nothing the first did not. " + why);
+
+            reg.OpenStatic("C", FileOpenMode.Extend);
+            Assert.Equal(FileStatusCode.FileSharingConflict, reg.Status("C"));   // the default of EXTEND is NO OTHER
+            Assert.True(alone == HostCapability.OutsiderCan(host, FileAccess.Write),
+                "⛔ THE REFUSED OPEN IS NOT AN OPEN (§14.9.27.4 GR25): the readers' file lock shall be exactly what "
+                + "it was before the statement ran. " + why);
             Assert.True(HostCapability.OutsiderCan(host, FileAccess.Read), "Neither posture denies a reader.");
 
             reg.Close("B");
             Assert.True(alone == HostCapability.OutsiderCan(host, FileAccess.Write),
-                "The set shrank back to one clause-less reader, so its file lock shall narrow back to exactly "
-                + "what that connector alone establishes. " + why);
+                "The set shrank back to one clause-less reader, so its file lock shall be exactly what that "
+                + "connector alone establishes. " + why);
             reg.CloseAll();
         }
         finally { TryDelete(host); }
@@ -410,7 +419,7 @@ public sealed class FileLockPostureDriftTests
             reg.Close("S");
 
             reg.Register("F", host, 4, false, false, -1, -1);
-            reg.RegisterSharing("F", SharingOf(mode), FileLockMode.Manual, multiple: false);
+            reg.RegisterSharing("F", SharingOf(mode, FileOpenMode.Input), FileLockMode.Manual, multiple: false);
             reg.Register("Q", host, 4, false, false, -1, -1);   // the observer; never opened, so Table 19 is silent
 
             reg.OpenStatic("F", FileOpenMode.Input);
@@ -583,15 +592,16 @@ public sealed class FileLockPostureDriftTests
 
     /// <summary>The positive complement, for the reason a ban over a subsystem that names no share mode passes
     /// exactly as green: the derivation still lives in its named home, still answers all three standard modes
-    /// AND the undetermined default, and the registry still applies it in one place.</summary>
+    /// (and no fourth, undetermined, one), and the registry still applies it in one place.</summary>
     [Fact]
     public void TheDerivationStillLivesInItsNamedHome()
     {
         string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Runtime", "IO", "Sharing", "FileLockPosture.cs"));
         Assert.Contains("public static FileShare OfSharingMode(", text, StringComparison.Ordinal);
-        Assert.Contains("public static FileShare For(", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("public static FileShare For(", text, StringComparison.Ordinal);   // no widening
+        Assert.DoesNotContain("null =>", text, StringComparison.Ordinal);
         foreach (string arm in new[] { "FileSharing.NoOther => FileShare.None", "FileSharing.ReadOnly => FileShare.Read",
-                                       "FileSharing.AllOther => FileShare.ReadWrite", "null => FileShare.Read" })
+                                       "FileSharing.AllOther => FileShare.ReadWrite" })
             Assert.Contains(arm, text, StringComparison.Ordinal);
 
         string registry = TestRepo.Src("Cobol.Net.Runtime", "IO", "FileRegistry.cs");
@@ -605,11 +615,25 @@ public sealed class FileLockPostureDriftTests
             + string.Join("\n  ", writers));
     }
 
-    /// <summary>The theorem behind the measured matrix, checked symbolically over all 35 printed cells: wherever
-    /// Table 19 prints <i>Normal open</i>, the two connectors' §9.1.15 postures are mutually admissible at the
-    /// host — the incoming access allowed by the existing share mode, and the incoming share mode allowing the
-    /// existing access. That is the property that makes "the arbiter decides, the handle obeys" true by
-    /// construction rather than by the widening happening to be applied everywhere.</summary>
+    /// <summary>The host's rule is symmetric — a new open succeeds only if its access is admitted by every
+    /// outstanding handle's share mode AND its own share mode admits every outstanding handle's access — so this
+    /// is the one conversion the theorem below needs: the share flags a handle shall carry to ADMIT an access.</summary>
+    private static FileShare Admitting(FileAccess access) =>
+        ((access & FileAccess.Read) != 0 ? FileShare.Read : FileShare.None)
+        | ((access & FileAccess.Write) != 0 ? FileShare.Write : FileShare.None);
+
+    /// <summary>⛔ THE THEOREM BEHIND THE MEASURED MATRIX, checked symbolically over all 35 printed cells and over
+    /// every access a handle may take (<see cref="AccessesAHandleMayTake"/>): wherever Table 19 prints
+    /// <i>Normal open</i>, the two connectors' BASE postures (<see cref="FileLockPosture.OfSharingMode"/>, the
+    /// sharing mode's own file lock and nothing more) are mutually admissible at the host — the incoming access
+    /// allowed by the existing share mode, and the incoming share mode allowing the existing access. That is the
+    /// property that makes "the arbiter decides, the handle obeys" true by construction: no handle is ever
+    /// rebuilt to admit a sibling, because none needs widening.
+    /// <para>It is a theorem about THREE sharing modes, which is why it can be stated at all since kb/Work PB322:
+    /// every connector holds one of them (<see cref="FileRegistry.ImplementorDefaultSharing"/> gives the
+    /// clause-less ones theirs from the open mode). While the default was <i>undetermined</i> the property
+    /// failed for it — a clause-less reader (<see cref="FileShare.Read"/>) had to be widened to admit a sibling
+    /// appender the arbiter admitted — and a widening and handle-rebuild machinery existed to compensate.</para></summary>
     [Fact]
     public void EveryNormalOpenCellHasMutuallyAdmissiblePostures()
     {
@@ -619,62 +643,19 @@ public sealed class FileLockPostureDriftTests
                     foreach (var incM in Enum.GetValues<FileOpenMode>())
                     {
                         if (Table19.Cell(incS, incM, exS, exM) != OpenSharingOutcome.NormalOpen) continue;
+                        var exShare = FileLockPosture.OfSharingMode(exS);
+                        var incShare = FileLockPosture.OfSharingMode(incS);
                         foreach (var exAccess in AccessesAHandleMayTake(exM))
                             foreach (var incAccess in AccessesAHandleMayTake(incM))
                             {
-                                var exShare = FileLockPosture.For(exS, [incAccess]);   // widened by the admitted incoming one
-                                var incShare = FileLockPosture.For(incS, [exAccess]);
-                                Assert.True(exShare.HasFlag(FileLockPosture.Admitting(incAccess)),
+                                Assert.True(exShare.HasFlag(Admitting(incAccess)),
                                     $"Table 19 permits ({exS} {exM}) + ({incS} {incM}) but the existing connector's "
-                                    + $"file lock {exShare} does not admit {incAccess}.");
-                                Assert.True(incShare.HasFlag(FileLockPosture.Admitting(exAccess)),
+                                    + $"file lock {exShare} does not admit {incAccess} — which is what a whole-store "
+                                    + "organization's handle takes in every writable mode (kb/Work PB771).");
+                                Assert.True(incShare.HasFlag(Admitting(exAccess)),
                                     $"Table 19 permits ({exS} {exM}) + ({incS} {incM}) but the incoming connector's "
                                     + $"file lock {incShare} does not admit {exAccess}.");
                             }
                     }
-    }
-
-    /// <summary>And the base postures alone — before any widening — already satisfy the same theorem for every
-    /// DETERMINED pair, which is why a connector that names its sharing mode never needs its handle rebuilt.
-    /// The widening exists for the UNDETERMINED default, whose posture is not derivable until kb/Work PB322 is
-    /// answered; this fact is what says so out loud rather than leaving it to be noticed.</summary>
-    [Fact]
-    public void DeterminedModesNeedNoWidening()
-    {
-        foreach (var exS in Table19.StandardModes)
-            foreach (var exM in Enum.GetValues<FileOpenMode>())
-                foreach (var incS in Table19.StandardModes)
-                    foreach (var incM in Enum.GetValues<FileOpenMode>())
-                    {
-                        if (Table19.Cell(incS, incM, exS, exM) != OpenSharingOutcome.NormalOpen) continue;
-                        foreach (var incAccess in AccessesAHandleMayTake(incM))
-                            Assert.True(FileLockPosture.OfSharingMode(exS)
-                                    .HasFlag(FileLockPosture.Admitting(incAccess)),
-                                $"({exS} {exM}) would have to be widened to admit ({incS} {incM}) taking "
-                                + $"{incAccess} — which is what a whole-store organization's handle does in "
-                                + "every writable mode (kb/Work PB771).");
-                    }
-
-        // The complement, so this does not read as "widening is dead code": the reported pair needs it.
-        Assert.False(FileLockPosture.OfSharingMode(null)
-            .HasFlag(FileLockPosture.Admitting(FileLockPosture.AccessOf(FileOpenMode.Extend))));
-        Assert.True(FileLockPosture.For(null, [FileLockPosture.AccessOf(FileOpenMode.Extend)])
-            .HasFlag(FileLockPosture.Admitting(FileLockPosture.AccessOf(FileOpenMode.Extend))));
-    }
-
-    /// <summary>The rebuild is a real member of the connector contract, not a call-site edit — a new
-    /// organization that takes a long-lived host handle and forgets it would silently reintroduce the veto,
-    /// so the base implementation exists and the sequential connector overrides it.</summary>
-    [Fact]
-    public void ThePostureRebuildIsPartOfTheConnectorContract()
-    {
-        var basem = typeof(FileConnector).GetMethod("Reposture",
-            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-        Assert.NotNull(basem);
-        Assert.True(basem!.IsVirtual, "Reposture shall be overridable: a connector holding a host handle owes a rebuild.");
-        var seq = typeof(SequentialConnector).GetMethod("Reposture",
-            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-        Assert.NotNull(seq);
-        Assert.Equal(typeof(SequentialConnector), seq!.DeclaringType);
     }
 }

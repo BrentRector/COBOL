@@ -48,6 +48,17 @@ public abstract class NistDifferentialTestsBase<TSlot>
         string goldenPath = TestRepo.Nist("valid", testName + ".txt");
         Assert.True(File.Exists(goldenPath), $"golden not found: {goldenPath}");
 
+        // A row that declares TERMINATES asserts the abnormal termination itself, not the golden: the golden records
+        // a run that continued past a fatal I-O status nothing covers, which Annex A.1 item 103 now ends.
+        if (CorpusManifest.Rows.First(r => string.Equals(r.Name, testName, StringComparison.OrdinalIgnoreCase)).ExpectedTermination is { } ec)
+        {
+            var (ranClean, _, terminated) = RunNist(testName);
+            Assert.False(ranClean, $"{testName} is declared to terminate on {ec} but ran clean");
+            Assert.Contains("exit non-zero", terminated);
+            Assert.Contains(ec, terminated);
+            return;
+        }
+
         var (ok, output, detail) = RunNist(testName);
         Assert.True(ok, detail);
         Assert.Equal(Normalize(File.ReadAllText(goldenPath)), output);

@@ -34,8 +34,10 @@ case "$RUNTIME" in /*|[A-Za-z]:[\\/]*) ;; *) RUNTIME="$ROOT/$RUNTIME" ;; esac
 # conservative direction — and it is loud, so it gets read rather than absorbed.
 RUN_TIMEOUT="${GUARD_RUN_TIMEOUT:-120}"
 
-# THE evidence rules (compile · run · compare), shared with scripts/guard.sh.
+# THE evidence rules (compile · run · compare · termination), shared with scripts/guard.sh, and the manifest's
+# one shell reader (guard_declared_termination).
 . "$(cd "$(dirname "$0")" && pwd)/guard-verdict.sh"
+. "$(cd "$(dirname "$0")" && pwd)/guard-population.sh"
 
 WORK="$(mktemp -d)"
 # The comparison's scratch — DELIBERATELY OUTSIDE $WORK. The normalized copies must never become inputs to the
@@ -79,8 +81,20 @@ for test in $TESTS; do
         continue
     fi
 
-    # An ISO-re-baselined golden the legacy legitimately diverges from (the list lives in guard.sh; guard-fast
-    # exports it): compiled and ran above; the diff is expected — never a regression.
+    # A row corpus.tsv declares TERMINATES (kb/Work PB1955): the run unit's end on the named exception is the
+    # observation, not the report. guard-fast.sh exports GUARD_TERMINATES for WiseOwl COBOL only.
+    ec="$(guard_declared_termination "$test")"
+    if [ -n "$ec" ]; then
+        guard_termination_verdict "$test" "$ec" "$rrc" "$errfile" "$RUN_TIMEOUT"
+        echo "$test: $GUARD_VERDICT"
+        if [ "$GUARD_CLASS" != "match" ]; then
+            guard_preserve "$test" "$GUARD_VERDICT" "$WORK/$outfile" "$WORK/print-file.txt" "$stdoutfile" "$errfile"
+        fi
+        continue
+    fi
+
+    # An ISO-re-baselined golden the legacy legitimately diverges from (derived from corpus.tsv by
+    # guard-population.sh; guard-fast exports it): compiled and ran above; the diff is expected — never a regression.
     case " ${LEGACY_DIVERGENT:-} " in *" $test "*)
         echo "$test: LEGACY DIVERGENT (golden = ISO-conforming baseline; expected diff)"
         continue ;;

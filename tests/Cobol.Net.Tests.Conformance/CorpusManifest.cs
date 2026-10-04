@@ -11,7 +11,25 @@ namespace CobolNet.Tests.Conformance;
 /// <param name="ChainPreds">Producer predecessors to run first (in order); empty for a standalone program.</param>
 /// <param name="HasGolden">True iff a <c>tests/nist/valid/&lt;name&gt;.txt</c> golden exists.</param>
 /// <param name="Note">A free-text note; for a <c>divergent</c> row this carries the ISO § citation.</param>
-public sealed record CorpusRow(string Name, string Suite, string Status, string[] ChainPreds, bool HasGolden, string Note);
+public sealed record CorpusRow(string Name, string Suite, string Status, string[] ChainPreds, bool HasGolden, string Note)
+{
+    /// <summary>The TERMINATES marker's grammar, written down ONCE for C#. <c>scripts/guard-population.sh</c>'s
+    /// <c>GUARD_TERMINATES_MARKER</c> is the same grammar for the shell guards (kb/Work PB1955), and
+    /// <c>CorpusManifestTests.TerminatesMarker_IsOneGrammarForBothReaders</c> holds the two equal.</summary>
+    public const string TerminatesMarkerPattern = @"^TERMINATES (EC-[A-Z0-9-]+)";
+
+    private static readonly System.Text.RegularExpressions.Regex TerminatesMarker =
+        new(TerminatesMarkerPattern, System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>The exception-name a <c>divergent</c> row declares its program TERMINATES on: a note beginning
+    /// <c>TERMINATES EC-…</c> (the marker, like <c>CCVS-DEFECT</c>, is a token of the note, and the row's ISO §
+    /// citation is still enforced). The program depends on an implementor-defined continuation after a fatal I-O
+    /// status (§9.1.13.1: "The implementor may either continue or terminate the execution of the run unit"; Annex A.1
+    /// item 103 is WiseOwl COBOL's documented choice), so its golden records a run that continued and the run
+    /// unit now ends abnormally instead. <c>null</c> for every other row.</summary>
+    public string? ExpectedTermination =>
+        Status == "divergent" && TerminatesMarker.Match(Note) is { Success: true } m ? m.Groups[1].Value : null;
+}
 
 /// <summary>
 /// Loads <c>tests/nist/corpus.tsv</c> — the ONE source of truth for the green NIST set + producer/consumer chains

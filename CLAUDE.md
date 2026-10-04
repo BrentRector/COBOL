@@ -118,5 +118,5 @@ once. A lander runs `-Mode lander`: the whole population in one leg, with no slo
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
 Linux, so every gate runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every
-implementer and lander runs all three legs, about 3–4 minutes. Build `CobolSharp.sln` (not a single project) before
+implementer and lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes. Build `CobolSharp.sln` (not a single project) before
 any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.

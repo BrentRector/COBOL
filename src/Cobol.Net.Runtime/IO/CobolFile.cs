@@ -190,6 +190,20 @@ public static class CobolFile
     /// own condition; see <see cref="FileRegistry.IoConditionName"/>).</summary>
     public static string? IoConditionName(string name) => _reg.IoConditionName(name);
 
+    /// <summary>⛔ THE ABNORMAL TERMINATION OF A FATAL I-O STATUS NOTHING COVERS (Annex A.1 item 103, kb/Work PB322 E):
+    /// the generated hook calls this only when the file's status is fatal (§9.1.13.1: first digit 3, 4, 7, or a
+    /// fatal 9x), the file has no FILE STATUS clause and no USE procedure ran, so the run unit ends
+    /// (§14.6.12 abnormal termination) with a message naming the condition, the statement, the file and the status.
+    /// <c>Dispatched</c> is set because nothing remains to dispatch: no enclosing exception-checking guard may
+    /// select a handler for a condition that checking never enabled.</summary>
+    public static void TerminateOnUncoveredFatalStatus(string name, string statement)
+    {
+        string status = _reg.Status(name);
+        throw new Exceptions.CobolFatalException(_reg.IoConditionName(name) ?? "EC-I-O",
+            $"I-O status {status} on {_reg.SelectNameOf(name)} ({statement}); the file has no FILE STATUS clause and no USE procedure applies (§9.1.13.1)")
+        { Dispatched = true };
+    }
+
     /// <summary>The open-mode view for USE-declarative mode scoping (ISO §14.9.49.4 GR6b–e).</summary>
     public static int OpenModeOf(string name) => _reg.OpenModeOf(name);
 
@@ -265,8 +279,9 @@ public static class CobolFile
     public static void RegisterCodeSet(string name, char[] toNative) => _reg.RegisterCodeSet(name, toNative);
 
     /// <summary>Register a SELECTed file's declared SHARING / LOCK MODE (§12.4.5.15/§12.4.5.9). A null
-    /// <paramref name="sharing"/> is the UNDETERMINED implementor default — a LOCK MODE clause is not a sharing
-    /// specification (§9.1.15) — see <see cref="FileRegistry.ImplementorDefaultSharing"/> (kb/Work PB321/PB322).</summary>
+    /// <paramref name="sharing"/> means the file control entry writes no SHARING clause — a LOCK MODE clause is not
+    /// a sharing specification (§9.1.15) — so each OPEN gives the connector the
+    /// <see cref="FileRegistry.ImplementorDefaultSharing"/> of its open mode (kb/Work PB321/PB322).</summary>
     public static void RegisterSharing(string name, FileSharing? sharing, FileLockMode lockMode, bool multiple)
         => _reg.RegisterSharing(name, sharing, lockMode, multiple);
 
@@ -338,12 +353,6 @@ public static class CobolFile
 
     /// <summary>Release a single record lock (the LOCK MODE single-lock discipline, §12.4.5.9 GR6).</summary>
     public static void ReleaseSingle(string name, string recId) => _reg.ReleaseSingle(name, recId);
-
-    /// <summary>ISO §14.9.27.4 Table 19 — is an OPEN request unsuccessful against ONE connector already open on
-    /// the same physical file? A null sharing mode is the undetermined implementor default (kb/Work PB322), and
-    /// is arbitrated as a conflict only where every candidate mode agrees.</summary>
-    public static bool Conflicts((FileSharing? Sharing, FileOpenMode Mode) ex, (FileSharing? Sharing, FileOpenMode Mode) inc)
-        => FileRegistry.Conflicts(ex, inc);
 
     /// <summary>Resolve an ASSIGN target to a host file path: a target that already looks like a path (has a
     /// directory separator or an extension) is used verbatim; otherwise it becomes <c>&lt;lowercased&gt;.txt</c> in the

@@ -113,8 +113,7 @@ public abstract class KeyedConnector : FileConnector
     /// stream and no longer a path.</para>
     /// <para>⛔ WHY <see cref="FileMode.Open"/> AND NEVER <c>Create</c>, even for <c>OPEN OUTPUT</c>: the handle
     /// outlives every persist, and <c>WriteStore</c> truncates as part of the rewrite. A creating MODE on the
-    /// handle would make the truncation a property of when the handle happened to be taken, and
-    /// <see cref="Reposture"/> rebuilds it mid-open — which would then silently empty the file.</para></summary>
+    /// handle would make the truncation a property of when the handle happened to be taken.</para></summary>
     private FileStream? _store;
 
     /// <summary>The connector's own handle on the physical file while it is open — null before the OPEN body
@@ -143,15 +142,11 @@ public abstract class KeyedConnector : FileConnector
     /// nullable field it has to re-assert.</returns>
     protected FileStream TakeFileLock(bool create)
     {
-        var taken = OpenLockHandle(create ? FileMode.OpenOrCreate : FileMode.Open, HostShare);
+        var taken = HostFile.OpenConnectorStream(HostPath, create ? FileMode.OpenOrCreate : FileMode.Open,
+            HostAccess(Mode), HostShare);
         _store?.Dispose();   // no arm takes it twice; belt-and-braces so a future one cannot leak
         return _store = taken;
     }
-
-    /// <summary>⛔ THE ONE SPELLING OF THIS CONNECTOR'S HANDLE — <see cref="TakeFileLock"/> and the rebuild in
-    /// <see cref="Reposture"/> are the same stream, so its access and its mode have one answer each.</summary>
-    private FileStream OpenLockHandle(FileMode mode, FileShare share) =>
-        HostFile.OpenConnectorStream(HostPath, mode, HostAccess(Mode), share);
 
     /// <summary>Give the file lock back — §9.1.15, <i>"The file lock is removed by an explicit or implicit CLOSE
     /// statement executed for that file connector"</i>. Runs from each organization's <c>CloseCore</c> finally
@@ -166,47 +161,6 @@ public abstract class KeyedConnector : FileConnector
 
     /// <inheritdoc/>
     protected override void AbandonOpen() => ReleaseFileLock();
-
-    /// <inheritdoc/>
-    /// <remarks>A share mode is fixed when a handle is created, so widening means REBUILDING the handle. For
-    /// these organizations that is ALL it means — the store lives in memory (<c>KeyedStoreTable</c>) and this
-    /// handle carries no position a COBOL statement can observe, unlike the sequential connector's reader, which
-    /// has to be re-seeked to its file position indicator.
-    /// <para>The order is <see cref="FileConnector.RebuildMustReleaseFirst"/>'s and the reasoning lives there,
-    /// with the sequential connector reading the same predicate: every writable mode of these organizations
-    /// holds WRITE access (the store is rewritten whole), and a handle holding write access is itself what would
-    /// refuse the replacement. ⛔ A REFUSED REBUILD LEAVES THE POSTURE WHERE IT WAS, not merely the handle:
-    /// <see cref="FileConnector.HostShare"/> is the connector's claim about what its handle admits, so returning
-    /// without calling the base keeps the two in step, and the OPEN that asked for the widening then fails
-    /// inside its own try with §9.1.13.6 item 1's '30' instead of being told it succeeded.</para></remarks>
-    internal override void Reposture(FileShare share)
-    {
-        if (share == HostShare) return;
-        if (!IsOpen || _store is null) { base.Reposture(share); return; }
-        var held = HostShare;
-        if (RebuildMustReleaseFirst)
-        {
-            _store.Dispose();
-            _store = null;
-            try { _store = OpenLockHandle(FileMode.Open, share); }
-            catch (IOException)
-            {
-                // Only a foreign process can have taken the file in that window. Restore exactly what was
-                // there; if even that is gone the connector is left lockless and CloseCore answers '30'
-                // (§9.1.13.6 item 1) rather than persisting through a handle it does not have.
-                try { _store = OpenLockHandle(FileMode.Open, held); }
-                catch (IOException) { }
-                return;
-            }
-        }
-        else
-        {
-            var fresh = OpenLockHandle(FileMode.Open, share);   // read-only: no window, nothing to restore
-            _store.Dispose();
-            _store = fresh;
-        }
-        base.Reposture(share);
-    }
 
     // ── The externally-defined boundary of a relative or indexed file (ISO §9.1.13.5 item 4) ───────────────
 
@@ -228,10 +182,10 @@ public abstract class KeyedConnector : FileConnector
         return _storeHeaderBytes + framedBytes <= RecordFraming.MaxStoreBytes;
     }
 
-    /// <summary>Whether a CLOSE that owes a persist can still reach the physical file — false only when a
-    /// <see cref="Reposture"/> rebuild lost the handle to a foreign process (see there). §9.1.13.6 item 1's
-    /// '30' is the answer in that case, because the records this connector holds cannot be written: reporting a
-    /// successful CLOSE over them would be the silent loss kb/Work PB771 exists to remove, one step along.
+    /// <summary>Whether a CLOSE that owes a persist still holds the handle it persists through. Every writable
+    /// arm of every keyed OPEN takes it (<see cref="TakeFileLock"/>), so false is an invariant breach, and
+    /// §9.1.13.6 item 1's '30' is the answer: the records this connector holds cannot be written, and reporting
+    /// a successful CLOSE over them would be the silent loss kb/Work PB771 exists to remove.
     /// </summary>
     protected bool PersistIsReachable(bool owed) => !owed || _store is not null;
 }

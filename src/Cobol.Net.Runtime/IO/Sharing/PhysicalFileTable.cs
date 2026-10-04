@@ -16,9 +16,10 @@ internal sealed class PhysicalFileTable
     {
         /// <summary>connector name → the (sharing mode, open mode) it is currently open under — Table 19's two
         /// conflict inputs. EVERY successful OPEN is here, not only the connectors that wrote a SHARING or LOCK
-        /// MODE clause (§9.1.15's gate is written over the physical file, kb/Work PB321); a NULL sharing mode is
-        /// the undetermined implementor default (<see cref="FileRegistry.ImplementorDefaultSharing"/>).</summary>
-        public readonly Dictionary<string, (FileSharing? Sharing, FileOpenMode Mode)> Open =
+        /// MODE clause (§9.1.15's gate is written over the physical file, kb/Work PB321); a connector with
+        /// neither clause nor phrase is recorded under the implementor default of its open mode
+        /// (<see cref="FileRegistry.ImplementorDefaultSharing"/>).</summary>
+        public readonly Dictionary<string, (FileSharing Sharing, FileOpenMode Mode)> Open =
             new(StringComparer.OrdinalIgnoreCase);
         /// <summary>record-id → the connector name that holds its lock.</summary>
         public readonly Dictionary<string, string> RecordLocks = new(StringComparer.Ordinal);

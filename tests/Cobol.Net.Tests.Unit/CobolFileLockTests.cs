@@ -666,7 +666,12 @@ public sealed class CobolFileLockTests
         Assert.Equal(FileStatusCode.Success, CobolFile.WriteKeyed("VB", "BRAVO"));
         CobolFile.Close("VB");
         CobolFile.OpenIO("VA", host, assignDynamic: false, page: null);
-        CobolFile.OpenIO("VB", host, assignDynamic: false, page: null);
+        // VB has no SELECT clause, but its OPEN carries SHARING WITH ALL OTHER: with neither, a clause-less OPEN I-O
+        // is SHARING WITH NO OTHER (kb/Work PB322, FileRegistry.ImplementorDefaultSharing) and Table 19 would refuse
+        // it beside VA. The phrase gives VB a sharing mode and leaves its record locking the implementor default.
+        CobolFile.OpenShared("VB", FileOpenMode.IO, hasSharingOverride: true, FileSharing.AllOther,
+            FileRetryKind.None, 0, tape: OpenTapePhrase.None, host, assignDynamic: false, page: null);
+        Assert.Equal(FileStatusCode.Success, CobolFile.Status("VB"));
 
         // VA locks record 1 (§14.9.30.4 GR11 d) — manual locking, the LOCK phrase written).
         CobolFile.SetRelativeKey("VA", 1);

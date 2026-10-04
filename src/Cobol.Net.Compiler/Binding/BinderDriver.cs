@@ -835,6 +835,10 @@ internal sealed class BinderDriver
     /// contained in an ancestor is visible too (nearest wins on a name clash, matching §10.7.2's scope) — EXCEPT from
     /// within that common program's own subtree unless it is RECURSIVE (§8.4.6.3 2); kb/Work PB1460), the exception
     /// the run-time resolver applies through the same <see cref="CobolNet.Runtime.ProgramNameScope"/>.
+    /// <para>The key is the child's program-name, and that IS its externalized name: §11.10.3 SR2 ("Literal-1 shall not
+    /// be specified in a program that is contained within another program", COBOLNET1795) means no contained program
+    /// has an AS literal, so the run-time <c>ProgramTable</c>'s match on the externalized name finds the unit this
+    /// table was keyed on (kb/Work PB1756 — no spelling pair exists that could disagree).</para>
     /// <para>The signature carries the RETURNING item as well as the formals (kb/Work PB204): §14.9.4.3 SR25
     /// makes §14.8.3, Returning items apply to a Format-2 CALL exactly as §14.8.2 applies to its arguments, and
     /// with AS NESTED both halves of that pair are statically known. Carrying only the formals is what left the

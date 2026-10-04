@@ -54,6 +54,20 @@ RJOBS="${RJOBS:-$JOBS}"
 TMP="${TMPDIR:-/tmp}"
 T0=$(date +%s); el() { echo "[+$(( $(date +%s) - T0 ))s] $*"; }
 
+# ⛔ THE GUARD'S OWN INSTRUMENTS FIRST, every run (kb/Work PB1955). The population reader, the verdict audit and
+# the evidence-rule witnesses each carry a self-test that proves its checks can FAIL, and until 2026-10-04 no gate
+# ran any of them, so a change to how corpus.tsv is read reached CI unexercised. Seconds, no compiler, no corpus.
+el "=== Guard instruments' self-tests (population reader, verdict audit, evidence-rule witnesses) ==="
+SELF_RC=0
+for selftest in "scripts/guard-population.sh --self-test" "scripts/guard-nist-audit.sh --self-test" \
+                "scripts/guard-verify.sh --witnesses"; do
+    # shellcheck disable=SC2086 # the entry is a script and its one argument
+    if ! bash $selftest > "$TMP/gf_selftest.log" 2>&1; then
+        echo "  RED: bash $selftest — its complete log:"; sed 's/^/    /' "$TMP/gf_selftest.log"; SELF_RC=1
+    fi
+done
+[ "$SELF_RC" -eq 0 ] && echo "  all three GREEN"
+
 el "=== Building ($GUARD_COMPILER CLI + test projects) ==="
 dotnet build "$GUARD_CLI_PROJECT" -v quiet
 # The legacy unit + integration suites are a SEPARATE leg from the NIST one: they gate CobolSharp.Compiler and,
@@ -99,13 +113,20 @@ echo "$TESTS" | tr ' ' '\n' | grep . | sort > "$POP"
 # because the legacy is non-conforming there, so under `cobol` they are not exempt — they are the programs a
 # codegen regression is most likely to break, and NistDifferentialTests already locks them byte-exact. An
 # empty list makes the group runner compare them like every other program.
+# ⛔ AND A `TERMINATES` DIVERGENT ROW IS THE OTHER WAY ROUND (kb/Work PB1955): its golden records a run that
+# continued past a fatal I-O status nothing covers, which WiseOwl COBOL's Annex A.1 item 103 choice ends. So under
+# `cobol` the group runner checks that the run ENDS naming the declared exception (GUARD_TERMINATES, `NAME=EC-…`),
+# and under the legacy, which continues, the row is compared with its golden — guard_legacy_divergent leaves it out
+# of the exemption. Reading every divergent row the legacy way turned CI's guard red on PB322's two rows.
 . "$(dirname "$0")/guard-population.sh"
 if [ "$GUARD_DIVERGENT" = "1" ]; then
     LEGACY_DIVERGENT="$(guard_legacy_divergent)" || exit 1
+    GUARD_TERMINATES=""
 else
     LEGACY_DIVERGENT=""
+    GUARD_TERMINATES="$(guard_terminating)" || exit 1
 fi
-export LEGACY_DIVERGENT
+export LEGACY_DIVERGENT GUARD_TERMINATES
 export GUARD_RUNTIME_DLL
 
 OUT="tests/nist/output"
@@ -260,10 +281,11 @@ fi
 
 NIST_FAILS=$(grep -cE "REGRESSION!" "$RESULTS" || true); NIST_FAILS=${NIST_FAILS:-0}
 NIST_MATCH=$(grep -cE ": MATCH" "$RESULTS" || true); NIST_MATCH=${NIST_MATCH:-0}
+NIST_TERM=$(grep -cE ": TERMINATES " "$RESULTS" || true); NIST_TERM=${NIST_TERM:-0}
 # ⛔ THE LINE NAMES THE COMPILER (kb/Work/PB750). "NIST: 353 MATCH" was quoted in plan §9 battery records as
 # evidence about WiseOwl COBOL for months while it measured the legacy oracle; a verdict that does not say what it
 # measured is a verdict a reader will attribute to whatever they were thinking about.
-echo "=== NIST (${GUARD_COMPILER}): ${NIST_MATCH} MATCH, ${NIST_FAILS} REGRESSION(S) ==="
+echo "=== NIST (${GUARD_COMPILER}): ${NIST_MATCH} MATCH, ${NIST_TERM} TERMINATES (declared), ${NIST_FAILS} REGRESSION(S) ==="
 
 # ⛔ (3c) THE POPULATION + EXPECTATION AUDIT — plan §11 A12c. The two counts above are NOT a verdict: they are
 # computed from the lines that ARRIVED, so losing a program lowers MATCH and still reads as green. The audit
@@ -293,11 +315,11 @@ BASE_FAILS=$?
 # (scripts/battery.sh, CI) gate on that exact token.
 echo "=== COMPILER UNDER TEST WAS: $GUARD_COMPILER ($CLI) ==="
 if [ "$NIST_FAILS" -eq 0 ] && [ "$NIST_AUDIT" -eq 0 ] && [ "$UNIT_RC" -eq 0 ] && [ "$INT_RC" -eq 0 ] \
-   && [ "$BASE_FAILS" -eq 0 ]; then
+   && [ "$BASE_FAILS" -eq 0 ] && [ "$SELF_RC" -eq 0 ]; then
     echo "=== ALL GREEN ==="
     exit 0
 fi
-echo "=== FAILURES ($GUARD_COMPILER): nist=$NIST_FAILS audit=$NIST_AUDIT unit_rc=$UNIT_RC int_rc=$INT_RC baselines=$BASE_FAILS ==="
+echo "=== FAILURES ($GUARD_COMPILER): nist=$NIST_FAILS audit=$NIST_AUDIT unit_rc=$UNIT_RC int_rc=$INT_RC baselines=$BASE_FAILS selftests=$SELF_RC ==="
 if [ -d "$GUARD_FORENSICS" ]; then
     echo "=== EVIDENCE for every non-MATCH (report, stdout, stderr, both normalized sides): $GUARD_FORENSICS ==="
     ls "$GUARD_FORENSICS"

@@ -10,9 +10,11 @@ namespace CobolNet.Tests.Unit;
 /// logically removed from the physical file and can no longer be accessed"). Before, every connector held a
 /// PRIVATE snapshot loaded at OPEN and persisted WHOLE at CLOSE: a record DELETEd through one connector stayed
 /// readable through another over the same host path, and the CLOSE ORDER decided which private view survived on
-/// disk. Pinned over a private <see cref="FileRegistry"/> with TWO relative connectors bound to ONE host path —
-/// no SHARING clause required (the defect needed none). The end-to-end trace rides the
-/// 85/pb143_shared_visibility golden.
+/// disk. Pinned over a private <see cref="FileRegistry"/> with TWO connectors bound to ONE host path, each
+/// declaring SHARING WITH ALL OTHER: since kb/Work PB322 a connector with no SHARING specification is SHARING WITH
+/// NO OTHER in every mode but INPUT, so Table 19 would refuse the second connector's OPEN (the defect itself
+/// needed no sharing mode, only two connectors that could be open at once). The end-to-end trace rides the
+/// 2002/pb143_shared_visibility golden.
 /// </summary>
 public sealed class SharedRecordStoreTests
 {
@@ -28,6 +30,8 @@ public sealed class SharedRecordStoreTests
         string host = Tmp("two");
         reg.RegisterRelative("A", host, 8, false, Random, 4, -1, -1);
         reg.RegisterRelative("B", host, 8, false, Random, 4, -1, -1);
+        reg.RegisterSharing("A", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
+        reg.RegisterSharing("B", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
         reg.OpenStatic("A", FileOpenMode.Output);
         for (int i = 0; i < records.Length; i++)
         {
@@ -108,6 +112,8 @@ public sealed class SharedRecordStoreTests
         string host = Tmp("ix");
         reg.RegisterIndexed("A", host, 8, false, Random, 0, 2, -1, -1);
         reg.RegisterIndexed("B", host, 8, false, Random, 0, 2, -1, -1);
+        reg.RegisterSharing("A", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
+        reg.RegisterSharing("B", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
         try
         {
             reg.OpenStatic("A", FileOpenMode.Output);

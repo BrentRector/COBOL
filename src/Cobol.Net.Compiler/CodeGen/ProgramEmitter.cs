@@ -696,8 +696,17 @@ internal sealed class ProgramEmitter
                 while (rq > 0 && u.Data.LinkageFormals[rq - 1].Optional) rq--;
                 string? retItem = u.Data.LinkageReturning is { } ri && u.Refs.ResolveItem(ri) is { } retPlace
                     ? CallEmitter.RegisteredReturning(retPlace, Current.Ctx.SignEncoding) : null;
+                // Each FORMAL's registered description (kb/Work PB165), for §14.8.2's argument comparison at a dynamic
+                // CALL — only by a unit that checks EC-PROGRAM-ARG-MISMATCH itself (GR3d's activated half), so a unit that
+                // does not keeps its Register line as it was; and only when some formal states anything to compare.
+                var formalItems = u.Data.ArgMismatchChecking
+                    ? u.Data.LinkageFormals.Select(f => u.Refs.ResolveItem(f.Item) is { } fp
+                        ? CallEmitter.RegisteredFormal(fp, Current.Ctx.SignEncoding) : "new BoundaryItem(null)").ToList()
+                    : [];
+                string formalsText = formalItems.Any(s => s != "new BoundaryItem(null)")
+                    ? $", formals: new BoundaryItem[] {{ {string.Join(", ", formalItems)} }}" : "";
                 string argMeta = $", formalCount: {fc}, requiredCount: {rq}, argMismatchChecking: {CallEmitter.CallBool(u.Data.ArgMismatchChecking)}"
-                    + (retItem is null ? "" : $", returning: {retItem}");
+                    + (retItem is null ? "" : $", returning: {retItem}") + formalsText;
                 string resetNamed = reset.Length > 0 && argMeta.Length > 0
                     ? reset.Replace(", ", ", staticReset: ") : reset;
                 // A FUNCTION-ID registers with its discriminator (kb/Work PB154 — §8.4.6.3's first paragraph:

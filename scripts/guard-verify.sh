@@ -172,6 +172,35 @@ SHIM
     want "no .dll with rc!=0 AND a diagnostic is a COMPILE FAILURE" \
          "COMPILE FAILED — REGRESSION! (rc=1: syntax error at line 4)" "$(compile_case 1 'syntax error at line 4')"
 
+    # ── THE TERMINATION ARM (kb/Work PB1955). A row corpus.tsv declares `TERMINATES EC-…` is scored on how its
+    #    run unit ENDS. CI run 37217227958 scored PB322's two such rows as `RUN NO-VERDICT (produced no report)` and
+    #    `DIFF — REGRESSION! (run exited 1: …EC-I-O-LOGIC-ERROR…)` — the two shapes the first two cases fix. ──
+    local abend="abnormal run-unit termination: EC-I-O-LOGIC-ERROR (fatal): I-O status 47 on SQ-FS1 (READ)"
+    want "a declared termination with no report (NC401M's CI shape) is TERMINATES" \
+         "WT001A: TERMINATES EC-I-O-LOGIC-ERROR (run exited 1" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O-LOGIC-ERROR" run_case absent 1 "$abend" '')"
+    want "a declared termination after a partial report (ST146A's CI shape) is TERMINATES" \
+         "WT001A: TERMINATES EC-I-O-LOGIC-ERROR" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O-LOGIC-ERROR" run_case wrong 1 "$abend" '')"
+    want "a declared termination that ran to a normal end is a REGRESSION, even with the golden's report" \
+         "DIFF — REGRESSION! (ran to a normal end; corpus.tsv declares it TERMINATES on EC-I-O-LOGIC-ERROR)" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O-LOGIC-ERROR" run_case correct 0 '' '')"
+    want "ending on a DIFFERENT exception is a REGRESSION" \
+         "but not on the declared EC-I-O-PERMANENT-ERROR" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O-PERMANENT-ERROR" run_case absent 1 "$abend" '')"
+    want "the declared name matches WHOLE: EC-I-O is not satisfied by EC-I-O-LOGIC-ERROR" \
+         "but not on the declared EC-I-O:" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O" run_case absent 1 "$abend" '')"
+    want "a declared termination with an EMPTY stderr is NOT scored" \
+         "RUN NO-VERDICT (rc=1 with NO diagnostic" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O-LOGIC-ERROR" run_case absent 1 '' '')"
+    want "a declared termination that timed out is NOT scored" \
+         "RUN NO-VERDICT (timeout/kill" \
+         "$(GUARD_TERMINATES="WT001A=EC-I-O-LOGIC-ERROR" run_case absent 124 "$abend" '')"
+    want "another program's declaration does not touch this one" \
+         "WT001A: MATCH" \
+         "$(GUARD_TERMINATES="WT002A=EC-I-O-LOGIC-ERROR" run_case correct 0 '' '')"
+
     # ── THE EVIDENCE IS KEPT (PB473 item 4): a non-MATCH's work dir dies with its group. ──
     rm -rf "$d/forensics"
     out="$(run_case wrong 0 '' '')"
@@ -236,7 +265,7 @@ SHIM
     fi
     for f in scripts/guard.sh scripts/guard-run-group.sh; do
         if grep -q 'guard_output_verdict' "$f" && grep -q 'guard_compile_verdict' "$f" \
-           && ! grep -q '^ *normalize()' "$f"; then
+           && grep -q 'guard_termination_verdict' "$f" && ! grep -q '^ *normalize()' "$f"; then
             echo "  ok: $f scores through the shared evidence rules and defines none of its own"
         else
             echo "  WITNESS FAILED: $f has grown its own copy of the verdict rules (feedback_one_rule_one_place)"
@@ -279,7 +308,7 @@ bash scripts/guard-fast.sh > "$TMP/gv_fast.log" 2>&1; FAST=$?
 # silently dropped from BOTH sides and the equivalence proof never compared them — the same defect class this
 # whole wave closes (a filter that quietly excludes reads as agreement). Any line that looks like a verdict but
 # matches no known word is surfaced by the UNKNOWN check below rather than discarded.
-VERDICT_WORDS="MATCH|DIFF|FOOTER|COMPILE FAILED|COMPILE NO-VERDICT|RUN NO-VERDICT|COMPARE NO-VERDICT|NO BASELINE|LEGACY DIVERGENT"
+VERDICT_WORDS="MATCH|DIFF|FOOTER|COMPILE FAILED|COMPILE NO-VERDICT|RUN NO-VERDICT|COMPARE NO-VERDICT|NO BASELINE|LEGACY DIVERGENT|TERMINATES"
 verdicts() {
     grep -E "^ *[A-Z][A-Z0-9]+: ($VERDICT_WORDS)" "$1" | sed 's/^ *//' | sort
 }

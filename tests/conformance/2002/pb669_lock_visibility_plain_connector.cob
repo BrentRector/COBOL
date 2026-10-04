@@ -8,12 +8,24 @@
       *> with the IGNORING LOCK phrase." The sentence carries NO
       *> qualification on the reading connector's own LOCK MODE clause,
       *> and 12.4.5.9.4 GR1 a) / b) 1. are worded to say only that no
-      *> record locks are SET through such a connector. F-B below has
-      *> neither a SHARING clause nor a LOCK MODE clause, so it is
-      *> 12.4.5.9.4 GR1 b) 2.'s implementor-defined case; this compiler
-      *> defines the default as NO RECORD LOCKING - the third option the
-      *> rule itself names - which decides what F-B SETS and nothing
-      *> about what it SEES.
+      *> record locks are SET through such a connector. The connector
+      *> that SETS no lock still SEES every other connector's locks: it
+      *> asks for none (no WITH LOCK phrase anywhere below), and this
+      *> golden measures what it is refused.
+      *>
+      *> RE-DERIVED BY kb/Work PB322 (determination A). This golden used
+      *> to open F-B with NEITHER a SHARING NOR a LOCK MODE clause, beside
+      *> F-A, in the I-O mode. With no sharing phrase and no SHARING
+      *> clause a connector opened I-O is SHARING WITH NO OTHER
+      *> (9.1.15 / 14.9.27.4 GR23, docs/CONFORMANCE.md DOC-A.1-131), and
+      *> Table 19 refuses it beside any other connector, so a clause-less
+      *> I-O connector can never be open next to a locker. F-B therefore
+      *> now takes its sharing mode from the OPEN's SHARING WITH ALL OTHER
+      *> phrase (14.9.27.4 GR23), which 14.9.27.3 SR8 allows only beside
+      *> a LOCK MODE clause in F-B's file control entry; F-B writes
+      *> LOCK MODE IS MANUAL and never asks for a lock. The truly
+      *> clause-less reader of a locked record is
+      *> 2002/pb322_clauseless_reader_sees_record_lock.
       *>
       *> Before PB669 every governed verb in FileRegistry returned to
       *> the UNGOVERNED body when the connector was absent from the
@@ -58,7 +70,8 @@
                ORGANIZATION IS RELATIVE
                ACCESS MODE IS RANDOM
                RELATIVE KEY IS B-KEY
-               FILE STATUS IS B-ST.
+               FILE STATUS IS B-ST
+               LOCK MODE IS MANUAL.
        DATA DIVISION.
        FILE SECTION.
        FD F-A.
@@ -77,7 +90,7 @@
            MOVE 2 TO B-KEY. MOVE "BRAVO" TO B-REC. WRITE B-REC.
            CLOSE F-B.
            OPEN I-O F-A. DISPLAY "OPENA=" A-ST.
-           OPEN I-O F-B. DISPLAY "OPENB=" B-ST.
+           OPEN I-O SHARING WITH ALL OTHER F-B. DISPLAY "OPENB=" B-ST.
            MOVE 1 TO A-KEY. READ F-A WITH LOCK.
            DISPLAY "READA=" A-ST " " A-REC.
            MOVE 1 TO B-KEY. READ F-B.

@@ -772,20 +772,22 @@ OUTPUT is a mode other than input. `OpenTable19Tests` pins both readings: the 35
 **rendered PDF page**, and the §9.1.15 prose over all 144 (sharing, mode)² connector pairs, asserting that the
 sub-case reading disagrees in exactly four. The finding is an assertion, not a comment, so it cannot rot.
 
-**⛔ The implementor default is UNDETERMINED, and the arbitration decides nothing about it.** §9.1.15: *"If no
-specification is made in either location, the implementor defines the sharing mode in which the file is
-opened"*. `FileRegistry.ImplementorDefaultSharing` is the ONE place that default is named and it is `null`;
-choosing its value is the owner determination tracked as `kb/Work` **PB322** (Annex A.1 items 77 and 131). A
-`FileSharing?` therefore threads through `ConnectorShare`, `PhysicalFileTable.State.Open` and `Conflicts`, and
-`Conflicts` arbitrates an undetermined mode **universally**: a conflict only where EVERY candidate mode gives
-*Unsuccessful open*. No `'61'` this compiler answers today can be contradicted by PB322's answer, and when
-PB322 lands, replacing the `null` collapses the quantifier to a plain lookup. With BOTH connectors undetermined
-that leaves exactly §9.1.13.9 1) e) — *"An attempt is made to open a physical file in the output mode and the
-physical file is currently open by another file connector"* — the sub-case that names no sharing mode at all,
-which is what makes a second OPEN OUTPUT deterministic instead of an OS sharing violation leaking `'30'` into
-the I-O status. The quantifier is extensionally identical to substituting ALL OTHER, because ALL OTHER is
-Table 19's least restrictive row AND its least restrictive column group; that is a property of the printed
-table rather than a choice, and it is asserted so a PB322 landing fails a test instead of drifting.
+**⛔ The implementor default is a function of the open mode, and the arbitration is a plain table lookup.**
+§9.1.15: *"If no specification is made in either location, the implementor defines the sharing mode in which the
+file is opened"*, and §14.9.27.4 GR23 sends an OPEN with neither a SHARING phrase nor a SHARING clause to the same
+implementor choice. `FileRegistry.ImplementorDefaultSharing(mode)` is the ONE place that default is named
+(Annex A.1 items 77 and 131; `docs/CONFORMANCE.md` DOC-A.1-77 / DOC-A.1-131; kb/Work **PB322**): `OPEN INPUT`
+establishes `SHARING WITH READ ONLY`, and `OPEN OUTPUT`, `I-O` and `EXTEND` establish `SHARING WITH NO OTHER` —
+always one of §9.1.15's own three modes, and GnuCOBOL's posture (rule 1: a file opened for input takes a shared
+lock, every other mode an exclusive one). It is read at ONE site, `FileRegistry.SharedOpenAttempt`
+(`sharingOverride ?? declared clause ?? ImplementorDefaultSharing(mode)`), where the OPEN statement's mode is
+known; `ConnectorShare.Sharing` stays nullable because it records whether the file control entry WROTE a SHARING
+clause, but `PhysicalFileTable.State.Open`, `Table19.Conflicts` and `FileLockPosture` hold a non-null
+`FileSharing` everywhere. Two clause-less connectors can therefore be open together only when both are INPUT; a
+clause-less updater or writer has the file to itself. A LOCK MODE clause is not a sharing specification, so a
+LOCK MODE-only SELECT and a RETRY-phrase-only OPEN take the same default (and a connector that is NO OTHER has
+its record locks ignored, §9.1.15 1)). Programs that need two connectors on one file say `SHARING WITH ALL
+OTHER`, which §14.9.27.3 SR8 couples with a LOCK MODE clause.
 
 **What it buys, and what it cost before.** `Conflicts` used to be a four-test predicate chain whose final
 `return false;` carried the comment `// (e) ALL OTHER` — the letter of a sub-case it had never implemented —
@@ -798,8 +800,10 @@ half by making Table 19 arbitrate every connector; the OS half survived it and w
 three landings later — a `SHARING WITH NO OTHER` connector still admitted a foreign append while a clause-less
 one refused it, and two clause-less connectors Table 19 permitted to share were refused by the host with '30'.
 `SharedStreams` is now gone: the host share mode is §9.1.15's **file lock**, derived by `FileLockPosture` from
-the arbitrated sharing MODE and widened by the connectors Table 19 has admitted, applied in one place by
-`FileRegistry.SyncHostPostures` (kb/Work PB740; see `DESIGN-runtime-library.md`).
+the connector's sharing MODE alone, handed down in one place, `FileRegistry.SharedOpenAttempt`, before the handle
+exists (kb/Work PB740; see `DESIGN-runtime-library.md`). Since every connector holds one of the three modes, every
+pair Table 19 admits is already mutually admissible at the host and no handle is rebuilt to admit a sibling
+(kb/Work PB322 deleted the widening that served the undetermined default).
 
 **⛔ AND THE LOCK IS OWED BY EVERY ORGANIZATION, WHICH IS A SEPARATE FACT FROM THE DERIVATION BEING RIGHT**
 (kb/Work PB771). §9.1.15 3) names none — *"The successful opening of a file establishes a file lock for the

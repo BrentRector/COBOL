@@ -116,7 +116,7 @@ public sealed class OpenTable19Tests
         }
     }
 
-    /// <summary>⛔ THE 144-COMBINATION DRIFT TEST. <see cref="FileRegistry.Conflicts"/> must answer "conflict"
+    /// <summary>⛔ THE 144-COMBINATION DRIFT TEST. <see cref="Table19.Conflicts"/> must answer "conflict"
     /// for exactly the (existing, incoming) connector pairs whose Table 19 cell is <i>Unsuccessful open</i> —
     /// every one of the 12 × 12 pairs, so a missing arm cannot be green for want of a row.</summary>
     [Fact]
@@ -126,7 +126,7 @@ public sealed class OpenTable19Tests
             foreach (var (incS, incM) in EveryConnectorState())
             {
                 bool expected = Table19.Cell(incS, incM, exS, exM) == U;
-                Assert.Equal(expected, FileRegistry.Conflicts((exS, exM), (incS, incM)));
+                Assert.Equal(expected, Table19.Conflicts((incS, incM), (exS, exM)));
             }
     }
 
@@ -174,35 +174,36 @@ public sealed class OpenTable19Tests
         Assert.Equal(4, subcaseDisagreements);
     }
 
-    /// <summary>⛔ THE PB322 SEAM. A connector that writes neither a SHARING clause nor an OPEN SHARING phrase
-    /// carries §9.1.15's UNDETERMINED implementor default, and <see cref="FileRegistry.Conflicts"/> arbitrates it
-    /// by the rule that decides nothing: a conflict only where EVERY candidate mode agrees. Two facts follow and
-    /// both are asserted here, because both are what makes routing every OPEN through the table safe.
+    /// <summary>⛔ THE IMPLEMENTOR DEFAULT (Annex A.1 items 77 and 131, kb/Work PB322). A connector that writes
+    /// neither a SHARING clause nor an OPEN SHARING phrase is given one of §9.1.15's own modes by its open mode:
+    /// INPUT establishes SHARING WITH READ ONLY and OUTPUT, I-O and EXTEND establish SHARING WITH NO OTHER
+    /// (<see cref="FileRegistry.ImplementorDefaultSharing"/>). Two facts follow and both are asserted, because
+    /// they are what <c>docs/CONFORMANCE.md</c> DOC-A.1-131 promises a user:
     /// <list type="number">
-    /// <item>With BOTH sides undetermined the only certain conflict is an incoming OPEN OUTPUT — §9.1.13.9 1) e),
-    /// the sub-case that names no sharing mode at all.</item>
-    /// <item>The quantifier is today extensionally equal to substituting <see cref="FileSharing.AllOther"/>,
-    /// because ALL OTHER is Table 19's least restrictive row AND its least restrictive column group. That is a
-    /// property of the printed table, not a decision — but a PB322 landing that sets
-    /// <see cref="FileRegistry.ImplementorDefaultSharing"/> to a mode fails this assertion instead of silently
-    /// changing what every clause-less program does.</item>
+    /// <item>Two clause-less connectors on one physical file can be open together only when both are INPUT.</item>
+    /// <item>A clause-less connector in any mode other than INPUT is refused by, and refuses, every other
+    /// connector — whatever mode or sharing the other one carries.</item>
     /// </list></summary>
     [Fact]
-    public void UndeterminedDefault_ConflictsOnlyWhereEveryCandidateAgrees()
+    public void ImplementorDefault_IsAFunctionOfTheOpenMode()
     {
-        Assert.Null(FileRegistry.ImplementorDefaultSharing);   // PB322 has not landed
-        foreach (var (exS, exM) in EveryConnectorState())
-            foreach (var (incS, incM) in EveryConnectorState())
-            {
-                // undetermined on the incoming side, and on the existing side, equals ALL OTHER either way
-                Assert.Equal(FileRegistry.Conflicts((exS, exM), (FileSharing.AllOther, incM)),
-                             FileRegistry.Conflicts((exS, exM), (null, incM)));
-                Assert.Equal(FileRegistry.Conflicts((FileSharing.AllOther, exM), (incS, incM)),
-                             FileRegistry.Conflicts((null, exM), (incS, incM)));
-            }
+        foreach (var mode in Enum.GetValues<FileOpenMode>())
+            Assert.Equal(mode == FileOpenMode.Input ? FileSharing.ReadOnly : FileSharing.NoOther,
+                         FileRegistry.ImplementorDefaultSharing(mode));
+
         foreach (var exM in Enum.GetValues<FileOpenMode>())
             foreach (var incM in Enum.GetValues<FileOpenMode>())
-                Assert.Equal(incM == FileOpenMode.Output, FileRegistry.Conflicts((null, exM), (null, incM)));
+                Assert.Equal(!(exM == FileOpenMode.Input && incM == FileOpenMode.Input),
+                    Table19.Conflicts((FileRegistry.ImplementorDefaultSharing(incM), incM),
+                                      (FileRegistry.ImplementorDefaultSharing(exM), exM)));
+
+        foreach (var (otherS, otherM) in EveryConnectorState())
+            foreach (var mode in Enum.GetValues<FileOpenMode>().Where(m => m != FileOpenMode.Input))
+            {
+                var dflt = (FileRegistry.ImplementorDefaultSharing(mode), mode);
+                Assert.True(Table19.Conflicts(dflt, (otherS, otherM)));   // refused by every existing connector
+                Assert.True(Table19.Conflicts((otherS, otherM), dflt));   // and refuses every incoming one
+            }
     }
 
     /// <summary>The 12 states a file connector can be open in — the three §9.1.15 sharing modes crossed with the

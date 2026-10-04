@@ -232,6 +232,14 @@ IX999Z  IX     pending        -                                        none     
   that string out of it, and `guard-nist-audit.sh` derived the same fact from the manifest — three writings, no
   comparison. The string had drifted a program behind (THIRTEEN rows, TWELVE names; `SQ212A`), so the runner
   scored a difference the auditor beside it expected.
+- ⛔ **A `divergent` row whose note begins `TERMINATES EC-<NAME>` is the other kind** (kb/Work PB1955): its golden
+  records a run that continued past a fatal I-O status nothing covers, and WiseOwl COBOL's ISO §9.1.13.1 choice
+  (Annex A.1 item 103) ends the run unit there. Under `cobol` the run must exit non-zero naming that whole
+  exception-name (`TERMINATES <EC>`, scored by `guard-verdict.sh#guard_termination_verdict`, called by both runners);
+  under the legacy, which continues, the row is compared with its golden and is NOT in `LEGACY_DIVERGENT`. The shell
+  reader is `guard-population.sh` (`GUARD_TERMINATES_MARKER`, `guard_terminating`), which the audit also asks; the
+  C# reader is `CorpusRow.ExpectedTermination` (used by `NistDifferentialTests`); `CorpusManifestTests` holds the two
+  grammars equal and refuses a malformed or non-fatal marker.
 - A drift test (`CorpusManifestTests`) asserts: every `tests/nist/programs/*.cob` is listed; every `green` row has a
   `valid/<name>.txt`; every `divergent` row has a non-empty note containing a `§` citation; and
   `GuardScripts_CarryNoHandMaintainedNistNameList` fails on ANY NIST-shaped name list written out by hand in any
@@ -483,7 +491,7 @@ and it fails the gate as UNRESOLVED so it gets read rather than absorbed.
 |---|---|
 | `tests/_shared/ProcessObservation.cs` | **THE one child-process observer.** Replaced six copies of "start `dotnet`, wait N s, return whatever came back" (`CutRunner.RunExit`, `AcceptDifferentialTests.AcceptRun`, `CobolNetTestBase.CompileAndRun`, three in `EndToEndTestBase`) plus a seventh found by its own drift guard (`BinderDecompositionTests`, which read both streams synchronously and then read `ExitCode` without checking `WaitForExit`'s result). A run that does not complete raises `HarnessNonObservationException` — it never returns partial output for a caller to compare. Retries **once, serialized**, first: that is re-attempting a measurement that did not complete, not re-rolling a failed assertion. Budget `COBOLNET_RUN_TIMEOUT_MS` (default 120 s); every retry and non-observation is appended to `COBOLNET_HARNESS_LOG` so the rate is measurable. |
 | `ProcessObservationDriftTests` | Keeps the extraction collapsed (the `TestRepoDriftTests` pattern): no test source may start a process under its own bounded wait. Plus five behavioural facts, including "a process that never finishes RAISES instead of returning empty output" and "`Observe` reports a timeout with an **empty** stdout" — if that ever returns content, the defect is back. |
-| `scripts/guard-nist-audit.sh` | The population + manifest + expectation audit, consumed by **both** guards so the rule is written once. The EXPECTED verdict now depends on WHICH compiler ran — the `divergent` rows expect `LEGACY DIVERGENT` from the oracle and `MATCH` from `cobol` (PB750) — and an unknown compiler name is refused rather than silently audited against a default's expectations. `--self-test` proves all sixteen checks can fail, including the four compiler-identity arms. |
+| `scripts/guard-nist-audit.sh` | The population + manifest + expectation audit, consumed by **both** guards so the rule is written once. The EXPECTED verdict now depends on WHICH compiler ran — the plain `divergent` rows expect `LEGACY DIVERGENT` from the oracle and `MATCH` from `cobol` (PB750), and a `TERMINATES` row expects `TERMINATES <EC>` from `cobol` and `MATCH` from the oracle (PB1955), both sets asked of `guard-population.sh` — and an unknown compiler name is refused rather than silently audited against a default's expectations. `--self-test` proves all twenty-one checks can fail, including the four compiler-identity arms and the five TERMINATES arms. `guard-fast.sh` runs it, with `guard-population.sh --self-test` and `guard-verify.sh --witnesses`, before every guard run. |
 | `scripts/guard-compiler.sh` | ⭐ **THE one answer to "which compiler is this gate measuring?"** (kb/Work/PB750). `cobol` by default, the legacy oracle only under `COBOLSHARP_LEGACY_DIFFERENTIAL=1`; `guard_assert_compiler_identity` reads the resolved CLI's own `.deps.json` and REFUSES to run when the closure does not match — `Cobol.Net.Compiler` present for `cobol`, absent for `legacy`. Earned by both guards hard-coding `cobolsharp.dll`, so `guard NIST: 353 MATCH` measured the ORACLE for the whole rearchitecture and battery #58's NC215A wrong answer was invisible to it. `--self-test` (run by `guard-verify.sh`, hence by battery phase 2a) proves both directions of the refusal fire. |
 | `scripts/guard-compile.sh` | The compile invocation for one NIST program, written once for both compilers (`cobol` needs `--nist NAME` because its parser binds the next token; the legacy takes a bare `--nist`). Called by the serial guard, the parallel compile, the serial re-observation retry and `run-suite.sh` — four call sites that would otherwise each have had to be kept in step by hand. |
 | `scripts/guard-verdict.sh` | ⭐ **THE evidence rules for the NIST guards, written ONCE and sourced by both** (`feedback_one_rule_one_place`). `guard_compile_verdict` (compile arm), `guard_output_verdict` (run + compare arms: normalization, candidate resolution, the FAIL*/footer rules, the verdict), `guard_preserve` (keep a non-MATCH's evidence). It reports through `GUARD_VERDICT` / `GUARD_CLASS` (`match` · `regression` · `no-verdict`) so each caller keeps its own recording and counting, and every function is option-local (`local -`) and returns 0: a scoring routine that can abort `guard.sh`'s `set -e` is not a scoring routine. **The comparison materializes both normalized sides into real files** — corollary 5 — and reads `diff`'s exit status explicitly. |
@@ -1293,7 +1301,14 @@ on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and 
 2.5-minute WSL run reproduces.
 
 **`scripts/linux-gate.sh`** runs, from any tree (`wsl -d Ubuntu --cd <tree> -- bash -lc 'bash scripts/linux-gate.sh'`),
-the test projects CI's Linux jobs run. `LinuxGateDriftTests` holds that set equal to the workflow's.
+the test projects CI's Linux jobs run, and the scripts they run: leg `guard` runs `bash scripts/guard-fast.sh`, CI's
+`guard` job (the NIST suite through the `cobol` CLI, the manifest audit, the guard's own self-tests, the legacy Unit and
+Integration suites), with a `TMPDIR` private to the clone because the guard writes fixed file names there.
+`LinuxGateDriftTests` holds both sets equal to the workflow's: every `dotnet test` project and every `run: bash
+scripts/….sh` step of a Linux job is a default leg. The guard leg was added 2026-10-04 (kb/Work PB1955, PB1957 row 40):
+the guard job was the one CI Linux job no local gate ran, so train 1013's guard red on PB322's `TERMINATES` rows
+reached CI behind a green Windows gate and a green Linux gate. It is a Linux-gate leg and not a `build-local` leg
+because CI runs that job on Linux only; a Git Bash run on Windows would add minutes and no CI parity.
 
 **How: a Linux clone of the commit, never the Windows tree.** The tree's COMMITTED HEAD is cloned into
 `~/linux-gate/<tree>` on the Linux filesystem. The clone is `--shared`: it borrows the Windows repository's object
@@ -1323,14 +1338,17 @@ checks the script out CRLF, and bash dies at its first line (`set: -: invalid op
 
 **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line naming the HEAD it tested. NOT RUN is never green.
 
-**Which legs run (MANDATORY-PRACTICES I8, L10): all three, at every implementer gate and every landing.**
+**Which legs run (MANDATORY-PRACTICES I8, L10): all four, at every implementer gate and every landing.**
+- **Measured at `044d2aa4f`** (wave 1015 group V), 2026-10-04, `--nice`: unit 137 s, characterization 10 s,
+  conformance 127 s, **guard 81 s** (364 NIST programs MATCH, audit clean, legacy Unit + Integration green). The
+  guard leg adds about 1.4 minutes to a ~4.6-minute gate.
 - **Measured at `4fdc6897c`** (train 71b with F), 2026-09-29: 195 s in all.
   - `unit`: 75 s including the build; exactly CI's one red, `Arm5`.
   - `characterization`: 8 s.
   - `conformance`: 102 s, for 9,321/9,321.
 - **The shared `.git/config` and the worktree list were unchanged afterwards.**
 
-That is about 3–4 minutes for the whole Linux population. A platform-sensitivity detector, which would have added the
+That was about 3–4 minutes for the three test assemblies, about 6 with the guard leg. A platform-sensitivity detector, which would have added the
 conformance leg only for flagged diffs, was built and deleted the same night. At that cost no selection is worth its
 misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
 

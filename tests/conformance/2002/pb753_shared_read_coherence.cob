@@ -41,30 +41,25 @@
       *> status anywhere reports staleness, which is why a wrong answer
       *> here is silent.
       *>
-      *> THE CLAUSE-LESS LEG (N-) carries no SHARING and no LOCK MODE
-      *> clause anywhere. kb/Work PB740 made Table 19 admit such a pair
-      *> on one physical file, so a program that never mentions sharing
-      *> reaches the same rule; 9.1.15's implementor default is
-      *> UNDETERMINED for this compiler (kb/Work PB322) and the
-      *> arbitration reports a conflict only where every candidate mode
-      *> would - which INPUT beside I-O is not.
+      *> THE N- LEG (formerly the CLAUSE-LESS LEG). RE-DERIVED BY kb/Work
+      *> PB322: it carried no SHARING and no LOCK MODE clause anywhere,
+      *> because kb/Work PB740 had made Table 19 admit such a pair on one
+      *> physical file while 9.1.15's implementor default was undetermined.
+      *> The default is now determined (docs/CONFORMANCE.md DOC-A.1-77 and
+      *> DOC-A.1-131): OPEN INPUT is SHARING WITH READ ONLY and OPEN I-O
+      *> is SHARING WITH NO OTHER, and Table 19 refuses that pair '61'
+      *> (see 2002/pb322_default_sharing_by_open_mode). NR and NW below
+      *> therefore declare SHARING WITH ALL OTHER with the LOCK MODE clause
+      *> 14.9.27.3 SR8 couples to it, and the leg keeps the stricter
+      *> SEQUENCE it was built for:
       *>
-      *> AND THE N- LEG DELIBERATELY DOES NOT USE THE REPORTED
-      *> SEQUENCE. Widening or narrowing the 9.1.15 union over a
-      *> physical file makes this compiler REBUILD the other
-      *> connectors' handles at their logical offset, which throws a
-      *> read-ahead away as a side effect. For a SHARING WITH ALL
-      *> OTHER pair the union never moves, so the F-/V-/L- legs
-      *> measure the rule; for a clause-less pair it widens at the
-      *> sibling's OPEN and narrows again at its CLOSE, so a reader
-      *> that filled its buffer before the OPEN and read after the
-      *> CLOSE is rescued twice by that accident - MEASURED, with
-      *> the coherence rule injected out this leg still printed NEW
-      *> while F-/V-/L- printed OLD. So N- re-fills its read-ahead
-      *> AFTER the sibling's OPEN (N-R2) and reads on while the
-      *> sibling is STILL OPEN (N-R3, N-R4), leaving no reposture
-      *> between the fill and the read. The sibling REWRITEs ordinal
-      *> 4 here, so N-R3 is OLD and N-R4 is NEW.
+      *> THE N- LEG USES A DIFFERENT SEQUENCE THAN THE F-/V-/L- LEGS. It
+      *> re-fills its read-ahead AFTER the sibling's OPEN (N-R2) and reads
+      *> on while the sibling is STILL OPEN (N-R3, N-R4), so no OPEN or
+      *> CLOSE of the sibling sits between the fill and the read and
+      *> nothing but the coherence rule can deliver the rewritten record.
+      *> The sibling REWRITEs ordinal 4 here, so N-R3 is OLD and N-R4 is
+      *> NEW.
       *>
       *> THE APPEND CONTROL (A-) is the leg that was already correct and
       *> shall stay correct: a reader can only have buffered what
@@ -110,9 +105,13 @@
                FILE STATUS IS ST-S.
            SELECT NR ASSIGN TO "pb753n2.dat"
                ORGANIZATION IS SEQUENTIAL
+               SHARING WITH ALL OTHER
+               LOCK MODE IS MANUAL
                FILE STATUS IS ST-R.
            SELECT NW ASSIGN TO "pb753n2.dat"
                ORGANIZATION IS SEQUENTIAL
+               SHARING WITH ALL OTHER
+               LOCK MODE IS MANUAL
                FILE STATUS IS ST-W.
            SELECT APS ASSIGN TO "pb753a2.dat"
                ORGANIZATION IS SEQUENTIAL

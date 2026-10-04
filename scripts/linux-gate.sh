@@ -2,7 +2,7 @@
 # linux-gate.sh — run CI's LINUX test legs locally, under WSL, before a push spends a CI run on them.
 #
 #   From Windows (the normal use), through the PowerShell tool:
-#     wsl -d Ubuntu --cd <worktree> -- bash -lc 'bash scripts/linux-gate.sh [--legs unit,characterization,conformance] [--nice]'
+#     wsl -d Ubuntu --cd <worktree> -- bash -lc 'bash scripts/linux-gate.sh [--legs unit,characterization,conformance,guard] [--nice]'
 #   On a Linux host (a cloud session): bash scripts/linux-gate.sh …
 #
 # ⛔ WHY IT EXISTS (kb/Work PB1732). The implementer and lander gates ran on Windows only, so CI's Linux jobs were the
@@ -10,8 +10,9 @@
 # characterization (Linux)`: group F's new GateLegDriftTests.Arm5 planted the Windows root `E:\COBOL-wt\battery87`,
 # which `Path.GetFullPath` treats as RELATIVE on Linux. The unit leg reproduces exactly that one red; the CI round
 # trip cost ~30 min and a dropped cluster. MANDATORY-PRACTICES I8 (implementers) and L10 (landers) require this
-# script, check_practices.py refuses a brief without it, and LinuxGateDriftTests keeps its legs equal to the test
-# projects CI's Linux jobs run.
+# script, check_practices.py refuses a brief without it, and LinuxGateDriftTests keeps its legs equal to what CI's
+# Linux jobs run: every test project they `dotnet test`, and every repository script they `bash` (the `guard` leg,
+# CI's guard job, added 2026-10-04 by kb/Work PB1955 after that job's red reached CI unseen).
 #
 # HOW: a LINUX CLONE OF THE COMMIT, never the Windows tree. The tree's committed HEAD is cloned (`--shared`: it
 # borrows the Windows repository's object store read-only, so it copies nothing) into ~/linux-gate/<tree> on the
@@ -34,7 +35,7 @@
 # Exit 0 only on GREEN.
 set -u
 
-legs="unit,characterization,conformance"
+legs="unit,characterization,conformance,guard"
 nice_prefix=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -100,13 +101,34 @@ echo "linux-gate: Linux clone of HEAD ${head:0:9} at $snap"
 bad=""; ran=""
 IFS=',' read -r -a wanted <<< "$legs"
 for leg in "${wanted[@]}"; do
+  start=$(date +%s)
   case "$leg" in
     unit)             proj="tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj" ;;
     characterization) proj="tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj" ;;
     conformance)      proj="tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj" ;;
+    guard)
+      # CI's `guard` job (kb/Work PB1955, PB1957 row 40): the NIST suite through the `cobol` CLI from bash, the
+      # manifest audit, the guard's own self-tests and the legacy Unit + Integration suites — the one CI Linux job
+      # that runs a SCRIPT rather than `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on
+      # PB322's TERMINATES rows was invisible to every local leg. Its scratch is private to this clone (the guard
+      # writes fixed file names under TMPDIR, and implementers run this gate concurrently).
+      mkdir -p "$snap/.guard-tmp"
+      ( cd "$snap" && TMPDIR="$snap/.guard-tmp" "${nice_prefix[@]}" bash scripts/guard-fast.sh ) > "$out/guard.log" 2>&1
+      rc=$?
+      secs=$(( $(date +%s) - start ))
+      summary="$(grep -E '^=== (NIST \(|NIST AUDIT: population|ALL GREEN|FAILURES)' "$out/guard.log" | tr '\n' ' ')"
+      if [ $rc -eq 0 ] && grep -qx '=== ALL GREEN ===' "$out/guard.log"; then
+        echo "leg guard: GREEN in ${secs}s — $summary"; ran="$ran guard"
+      else
+        # A red guard prints its WHOLE log less the per-program verdicts that came out as predicted: trim what passed,
+        # never what failed (kb/Work PB1573). The audit's findings and a red legacy leg's complete output stay.
+        echo "leg guard: RED (rc=$rc) in ${secs}s — ${summary:-no guard verdict; see TestResults/linux-gate/guard.log}"
+        grep -vE '^ *[A-Z][A-Z0-9]+: (MATCH|TERMINATES EC-|NO BASELINE)' "$out/guard.log" | sed 's/^/    /'
+        bad="$bad guard"
+      fi
+      continue ;;
     *) echo "leg $leg: NOT RUN (unknown leg)"; bad="$bad $leg:unknown"; continue ;;
   esac
-  start=$(date +%s)
   ( cd "$snap" && "${nice_prefix[@]}" dotnet build "$proj" -c Debug ) > "$out/$leg-build.log" 2>&1
   brc=$?
   if [ $brc -ne 0 ]; then

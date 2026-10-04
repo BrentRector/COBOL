@@ -48,6 +48,7 @@ public sealed class ProgramTable
         public int RequiredCount;           // formals minus the TRAILING OPTIONAL run (the omissible tail)
         public bool ArgMismatchChecking;    // the ACTIVATED half of GR3d's enabled-in-both gate (TURN at PD entry)
         public BoundaryItem? Returning;     // §14.8.3.3 (kb/Work PB1040): the RETURNING item's registered description; null = none
+        public BoundaryItem[]? Formals;     // §14.8.2 (kb/Work PB165): each formal's registered description, in order; null = none stated
         public List<Node> Children = [];    // contained programs, source order (GR4 cancels in REVERSE)
     }
 
@@ -72,20 +73,25 @@ public sealed class ProgramTable
     /// <param name="returning">The unit's RETURNING item's description (<see cref="BoundaryItem"/>; kb/Work PB1040) —
     /// what the activating CALL's receiver is checked against at §14.9.4.4 GR3 d); null for a unit with no RETURNING
     /// item.</param>
+    /// <param name="formals">Each FORMAL's registered description (<see cref="BoundaryItem"/>; kb/Work PB165), in order —
+    /// what an activating element's argument is compared with at a dynamic CALL (§14.8.2). Registered only by a unit that
+    /// checks EC-PROGRAM-ARG-MISMATCH itself (the activated half of GR3d's enabled-in-both gate), so a unit that does not
+    /// carries none; an entry that states nothing is not compared.</param>
     public void Register(
         string path, string name, string? parentPath,
         bool initial, bool common, bool recursive,
         Func<ICobolProgram?, ICobolProgram> factory,
         Action? staticReset = null,
         int formalCount = -1, int requiredCount = 0, bool argMismatchChecking = false,
-        bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null)
+        bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null,
+        BoundaryItem[]? formals = null)
     {
         var node = new Node
         {
             Path = path, Name = name, CallName = ExternalizedNames.Form(externalizedName ?? name), ParentPath = parentPath,
             Initial = initial, Common = common, Recursive = recursive, Factory = factory,
             FormalCount = formalCount, RequiredCount = requiredCount, ArgMismatchChecking = argMismatchChecking,
-            Returning = returning,
+            Returning = returning, Formals = formals,
             StaticReset = staticReset, IsFunction = isFunction,
         };
         _byPath[path] = node;
@@ -212,13 +218,27 @@ public sealed class ProgramTable
                 $"CALL '{n.Name}': {args.Length} argument(s) against {n.FormalCount} formal parameter(s) "
                 + $"({n.RequiredCount} required) — ISO §14.8.2.1 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
                 "EC-PROGRAM-ARG-MISMATCH");
+        // §14.8.2 via §14.9.4.4 GR3d (kb/Work PB165): each ARGUMENT meets its FORMAL's registered description at the same
+        // point, for the same reason — a violation makes "the program call … not successful", so the callee never runs
+        // and never sees a window of the wrong length over the caller's storage. What a dynamic Format-1 CALL can
+        // compare is §14.8.2.3.2 / §14.8.2.3.3 rule 1's "same length" and §14.8.2.2's group rule
+        // (BoundaryItem.ArgumentConforms); the callee's adapters still refuse a category they cannot adopt. An omitted
+        // argument (§14.9.4.4 GR11) has no storage to describe. Unchecked, the call proceeds LENIENTLY, as it does for
+        // the argument count above.
+        if (mismatchChecked && n.Formals is { } formals)
+            for (int i = 0; i < args.Length && i < formals.Length; i++)
+                if (!args[i].Carrier.IsNull && !args[i].Item.ArgumentConforms(args[i].Mode, formals[i]))
+                    throw new CobolCallException(
+                        $"CALL '{n.Name}': argument {i + 1} ({args[i].Item.Describe()}, {args[i].Mode.ToString().ToUpperInvariant()}) "
+                        + $"and the corresponding formal parameter ({formals[i].Describe()}) do not conform — "
+                        + "ISO §14.8.2 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
+                        "EC-PROGRAM-ARG-MISMATCH");
         // §14.8.3 via §14.9.4.4 GR3d (kb/Work PB1040): the RETURNING items' conformance, the same check at the same
         // point — "the program call is not successful", so the callee never runs. §14.8.3.3 gives a conforming pair
         // the same PICTURE, SIGN and USAGE, hence the same length, and a result a string carrier takes at the wrong
-        // length would otherwise corrupt the receiver's image. What a dynamic Format-1 CALL can compare is the two
-        // facts both sides state (BoundaryItem.Conforms: the numeric profile and the fixed character length); the
-        // other facets of the description are kb/Work PB165's registry. Unchecked, the call proceeds and the
-        // delivery stores into the receiver's own width (CobolArgAdapt.StoreReturn).
+        // length would otherwise corrupt the receiver's image. What a dynamic Format-1 CALL can compare is the facts
+        // both sides state (BoundaryItem.Conforms: the numeric profile, the storage length and the group class).
+        // Unchecked, the call proceeds and the delivery stores into the receiver's own width (CobolArgAdapt.StoreReturn).
         if (mismatchChecked && returning is { } rcv && n.Returning is { } sent && !rcv.Item.Conforms(sent))
             throw new CobolCallException(
                 $"CALL '{n.Name}': the RETURNING item of the called program ({sent.Describe()}) and the receiving item "

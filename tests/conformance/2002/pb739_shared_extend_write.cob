@@ -9,7 +9,7 @@
       *> SEQUENTIAL is COBOL-2023 (12.4.5.10.3 GR2; kb/Work PB688) while
       *> SHARING and LOCK MODE are COBOL-2002. What survives here is
       *> record sequential FIXED width, record sequential RECORD VARYING,
-      *> the LOCK MODE-only sharing spelling, the exclusive control, and
+      *> the LOCK MODE-clause-plus-OPEN-phrase spelling, the exclusive control, and
       *> the RELATIVE and INDEXED organizations.
       *>
       *> THE RULES. 14.9.51.4 GR19: "If two or more file connectors for a
@@ -65,8 +65,15 @@
                SHARING WITH ALL OTHER
                LOCK MODE IS MANUAL
                FILE STATUS IS ST-B.
-      *> LOCK MODE clause and NO SHARING clause - 9.1.15's undetermined
-      *> implementor default; participation is not spelled SHARING
+      *> LOCK MODE clause and NO SHARING clause in the file control entry.
+      *> RE-DERIVED BY kb/Work PB322: a LOCK MODE clause is not a sharing
+      *> specification (9.1.15), so without more these two connectors would
+      *> hold SHARING WITH NO OTHER (OPEN EXTEND's implementor default) and
+      *> the second OPEN would be refused '61'. The OPENs below carry the
+      *> SHARING WITH ALL OTHER phrase (14.9.27.4 GR23: the phrase gives the
+      *> sharing mode when the entry has none; 14.9.27.3 SR8 is satisfied by
+      *> the entry's LOCK MODE clause), so the append discipline still
+      *> keys on the posture of a connector whose entry wrote no SHARING.
            SELECT KS ASSIGN TO "pb739k2.dat"
                ORGANIZATION IS SEQUENTIAL
                FILE STATUS IS ST-S.
@@ -246,8 +253,8 @@
            MOVE "SEED" TO KS-REC
            WRITE KS-REC
            CLOSE KS
-           OPEN EXTEND KA
-           OPEN EXTEND KB
+           OPEN EXTEND SHARING WITH ALL OTHER KA
+           OPEN EXTEND SHARING WITH ALL OTHER KB
            DISPLAY "K-EXT A=" ST-A " B=" ST-B
            MOVE "AAAA" TO KA-REC
            WRITE KA-REC

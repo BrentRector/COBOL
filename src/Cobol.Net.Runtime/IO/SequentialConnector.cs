@@ -197,9 +197,8 @@ public sealed class SequentialConnector : FileConnector
     /// answer nobody reads.</para>
     /// <para>⛔ THE TWO HALVES HAVE DIFFERENT ANTECEDENTS, so they are two statements (kb/Work PB740). The
     /// FLUSH is owed whenever another writer may be on the physical file, which is a property of the §9.1.15
-    /// file lock this connector's handle carries — <c>SHARING WITH ALL OTHER</c>, or a clause-less connector
-    /// the arbiter has admitted alongside a writing sibling, or the same connector after
-    /// <see cref="Reposture"/> widened it. The ORDINAL is the §9.1.16 record-lock identity, and a connector
+    /// file lock this connector's handle carries — <c>SHARING WITH ALL OTHER</c> is the only mode Table 19
+    /// admits a writing sibling beside (kb/Work PB322). The ORDINAL is the §9.1.16 record-lock identity, and a connector
     /// that registered NEITHER a SHARING nor a LOCK MODE clause sets no record locks to identify — §12.4.5.9.4
     /// GR1 b) 2. leaves that case to the implementor (<i>"the type of record locking for that opening … is
     /// defined by the implementor … or specify that the default is no record locking"</i>) and this compiler's
@@ -250,7 +249,7 @@ public sealed class SequentialConnector : FileConnector
     /// see <see cref="NoteRelease"/> for the derivation).
     /// <para>The anchor is the LOGICAL offset, never <c>BaseStream.Position</c>: a <see cref="StreamReader"/>
     /// buffers ahead, so the base position is the buffer-fill boundary. That is the same fact
-    /// <see cref="SeekToRecord"/> and <see cref="Reposture"/> are built on, and it is why a bare
+    /// <see cref="SeekToRecord"/> is built on, and it is why a bare
     /// <c>DiscardBufferedData</c> would be wrong here — it would resume at the fill boundary and skip every
     /// record the buffer had already read ahead of.</para>
     /// <para>An over-length LINE SEQUENTIAL record's unread remainder (§14.9.30.4 GR15 / NOTE 3) is untouched
@@ -269,97 +268,34 @@ public sealed class SequentialConnector : FileConnector
         reader.DiscardBufferedData();
     }
 
-    /// <summary>Re-derive this connector's ISO §9.1.15 file lock while it is open — see
-    /// <see cref="FileConnector.Reposture"/> for why the registry calls it and why it shall not escape. A host
-    /// share mode is fixed when the handle is created, so "widen" means <b>rebuild the handle</b>, at the same
-    /// logical position, with nothing else about the connector disturbed.
-    /// <para>The position is already tracked, and not by the base stream: <c>StreamReader</c> buffers ahead, so
-    /// <c>BaseStream.Position</c> is the buffer-fill boundary and never the read position — the logical offsets
-    /// (<c>_readOffset</c> for the framed readers, <c>_lineByteOffset</c> for LINE SEQUENTIAL; Latin-1, so one
-    /// character is one byte) are the file position indicator's byte address, and the fresh reader is seeked
-    /// straight to it. Everything derived from it survives untouched: the §14.9.30.4 GR15 unread remainder, the
-    /// §14.9.35.4 GR17 REWRITE anchors (absolute file offsets, still valid on the new handle) and the §9.1.16
-    /// read ordinal. A writer is FLUSHED first (§14.9.51.4 GR12) and reopened
-    /// <see cref="FileMode.Append"/> — the current physical end is exactly where it was, and Append never
-    /// truncates, so an <c>OPEN OUTPUT</c> connector keeps the file it has created.</para>
-    /// <para>⚠ A writer, or an I-O reader, holds WRITE access, and the outgoing handle's own share mode is what
-    /// denies a second one — so those cannot be opened before the old handle is released and the rebuild is
-    /// dispose-then-open. If the host refuses the new posture in that window (only a foreign process can cause
-    /// it) the OLD posture is reopened, which restores the connector exactly. A reader with no write access
-    /// needs no window at all, so it is open-then-dispose. No mode holds both a reader and a writer — INPUT and
-    /// I-O have only <c>_reader</c>, OUTPUT and EXTEND only <c>_writer</c> — so a half-repostured connector is
-    /// not expressible.</para></summary>
-    internal override void Reposture(FileShare share)
-    {
-        if (share == HostShare) return;
-        if (!IsOpen) { base.Reposture(share); return; }
-        if (_reader is { } reader)
-        {
-            long at = _lineSequential ? _lineByteOffset : _readOffset;
-            if (RebuildMustReleaseFirst)
-            {
-                // WRITE access: the outgoing handle's share mode can forbid the incoming one, so release
-                // first — the rule is FileConnector.RebuildMustReleaseFirst's and the keyed connectors read
-                // the same predicate (kb/Work PB771). For a reader that is exactly the I-O mode.
-                reader.Dispose();
-                _reader = null;
-                _reader = OpenReader(share, at, HostShare);
-            }
-            else
-            {
-                var fresh = OpenReader(share, at, null);
-                reader.Dispose();
-                _reader = fresh;
-            }
-        }
-        else if (_writer is { } writer)
-        {
-            writer.Flush();                        // GR12 — nothing buffered may cross the handle boundary
-            writer.Dispose();
-            _writer = null;
-            // FileMode.Append for BOTH the OUTPUT and the EXTEND writer: the physical end is where the flushed
-            // handle stood, and Append does not truncate, so an OPEN OUTPUT connector keeps what it created.
-            _writer = OpenWriter(FileMode.Append, share, HostShare);
-        }
-        base.Reposture(share);
-    }
-
     /// <summary>⛔ THE ONE SPELLING OF THIS CONNECTOR'S READ HANDLE — the INPUT and I-O arms of
-    /// <see cref="OpenCore"/> and the rebuild in <see cref="Reposture"/> are the same stream, and a second
+    /// <see cref="OpenCore"/> are the same stream, and a second
     /// spelling would be a second answer to its encoding, its access and its <see cref="FileOptions"/>. The I-O
     /// arm asks for <see cref="FileAccess.ReadWrite"/> because §14.9.35 GR3's REWRITE writes through this
     /// reader's <c>BaseStream</c>, and takes NO <see cref="FileOptions.SequentialScan"/> for the same reason: it
     /// seeks, and the sequential-access hint asks the host to evict what a seek comes back for.
-    /// <para><paramref name="at"/> is the byte the next READ shall deliver, and <paramref name="fallbackShare"/>
-    /// the posture to restore when the host refuses <paramref name="share"/> and the outgoing handle is already
-    /// gone (null = it is still open, so there is nothing to restore and the refusal propagates to a caller that
-    /// still has one).</para></summary>
-    private StreamReader OpenReader(FileShare share, long at, FileShare? fallbackShare)
+    /// It carries <see cref="FileConnector.HostShare"/>, the posture the registry derived immediately before the
+    /// OPEN body ran.</summary>
+    private StreamReader OpenReader()
     {
-        StreamReader Open(FileShare s) => new(HostFile.OpenConnectorStream(HostPath, FileMode.Open,
-            Mode == FileOpenMode.IO ? FileAccess.ReadWrite : FileAccess.Read, s,
+        var r = new StreamReader(HostFile.OpenConnectorStream(HostPath, FileMode.Open,
+            Mode == FileOpenMode.IO ? FileAccess.ReadWrite : FileAccess.Read, HostShare,
             Mode == FileOpenMode.IO ? FileOptions.None : FileOptions.SequentialScan), Encoding.Latin1);
-        StreamReader r;
-        try { r = Open(share); }
-        catch (IOException) when (fallbackShare is { } old) { r = Open(old); }
-        if (at != 0) r.BaseStream.Seek(at, SeekOrigin.Begin);
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
     }
 
     /// <summary>⛔ THE ONE SPELLING OF THIS CONNECTOR'S WRITE HANDLE — the OUTPUT arm
-    /// (<see cref="FileMode.Create"/>), the EXTEND arm (<see cref="FileMode.Append"/>) and the rebuild. The role
+    /// (<see cref="FileMode.Create"/>) and the EXTEND arm (<see cref="FileMode.Append"/>). The role
     /// decides plain-versus-repositioning from the posture; this decides the newline and the encoding, once.</summary>
-    private StreamWriter OpenWriter(FileMode mode, FileShare share, FileShare? fallbackShare)
+    private StreamWriter OpenWriter(FileMode mode)
     {
         // The file coded character set's STRICT encoding (kb/Work PB690): every write arm refuses a record holding
         // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
         // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
-        StreamWriter Open(FileShare s) => new(HostFile.OpenConnectorWriteStream(HostPath, mode, s),
+        return new StreamWriter(HostFile.OpenConnectorWriteStream(HostPath, mode, HostShare),
             FileCharacterSet.Medium) { NewLine = _lineEnd };
-        try { return Open(share); }
-        catch (IOException) when (fallbackShare is { } old) { return Open(old); }
     }
 
     /// <summary>The count of records ALREADY IN the physical file, in the framing this connector reads — the
@@ -913,7 +849,7 @@ public sealed class SequentialConnector : FileConnector
                     // physical file — and handed down by the registry as HostShare (kb/Work PB740). It is never
                     // decided here: the Table-19 registry is the in-run-unit arbiter and the handle's share mode
                     // is the file lock against OTHER RUN UNITS, and a boolean cannot be both.
-                    _reader = OpenReader(HostShare, at: 0, fallbackShare: null);
+                    _reader = OpenReader();
                     NoticeIfLayoutDisagrees();
                     // OPEN INPUT … REVERSED: the count its position needs is taken HERE, inside the OPEN's try,
                     // so a host failure is this OPEN's '30' (see _reversedRecordCount).
@@ -925,7 +861,7 @@ public sealed class SequentialConnector : FileConnector
                     // (its existing-side column group is `extend I-O output`), so the OUTPUT writer takes the
                     // same posture-derived role the EXTEND writer does — a second writer is possible here too
                     // (kb/Work PB740; the anchoring rule itself is PB739's).
-                    _writer = OpenWriter(FileMode.Create, HostShare, fallbackShare: null);
+                    _writer = OpenWriter(FileMode.Create);
                     // OPEN OUTPUT truncates, so the physical file holds no records and the shared mint restarts
                     // at 0. §14.9.51.4 GR17 is the sequential-organization rule for it: "The successor
                     // relationship of a sequential file is established by the order of execution of WRITE
@@ -959,7 +895,7 @@ public sealed class SequentialConnector : FileConnector
                     // difference off the POSTURE — a handle whose file lock admits another writer gets the
                     // repositioning stream — so a clause-less pair the arbiter permits is covered by the same
                     // rule as a SHARING WITH ALL OTHER pair (kb/Work PB740).
-                    _writer = OpenWriter(FileMode.Append, HostShare, fallbackShare: null);
+                    _writer = OpenWriter(FileMode.Append);
                     if (!exists && IsOptional) return FileStatusCode.OptionalFileNotFound;
                     break;
 
@@ -979,7 +915,7 @@ public sealed class SequentialConnector : FileConnector
                     if (!exists) using (HostFile.OpenAuxiliary(HostPath, FileMode.Create, FileAccess.Write)) { }
                     // ReadWrite access and NO FileOptions.SequentialScan for this mode — both decided once, in
                     // OpenReader, which is also what the reposture rebuild uses.
-                    _reader = OpenReader(HostShare, at: 0, fallbackShare: null);
+                    _reader = OpenReader();
                     NoticeIfLayoutDisagrees();
                     if (!exists && IsOptional) return FileStatusCode.OptionalFileNotFound;
                     break;

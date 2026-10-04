@@ -49,9 +49,12 @@ internal sealed class _PRG_CHAR_SEQ_FILE : ICobolProgram
                 case 0:   // MAIN-PARA
                 {
                     CobolFile.OpenOutput("CHAR-SEQ-FILE::OUT-FILE", "char-seq.dat", false, null);
+                    if (CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "OPEN");
                     OUT_REC = CobolString.Store("LINE-ONE", 10);
                     CobolFile.WriteShared("CHAR-SEQ-FILE::OUT-FILE", OUT_REC, -1, FileRecordLock.None, FileRetryKind.None, 0, null, WriteAdvance.None);
+                    if (CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "WRITE");
                     CobolFile.Close("CHAR-SEQ-FILE::OUT-FILE");
+                    if (CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "CLOSE");
                     throw new StopRun();
                 }
                 default:

@@ -545,7 +545,7 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     {
         // A successful statement's hook has no disposition to turn on its completion: nothing is disposed of.
         string? used = !successArm && RuleFor(tx.Merge, io).NeedsCompletion ? $"__sru{ctx.Names.NextSort()}" : null;
-        tx.Terminable |= seqIo.EmitUseHook(file, atEndHandled: atEndHandled, notNormalLabel: tx.EndLabel,
+        tx.Terminable |= seqIo.EmitUseHook(file, "SORT/MERGE", atEndHandled: atEndHandled, notNormalLabel: tx.EndLabel,
             verbDisposes: true, useCompletedVar: used, successArm: successArm).Terminable;
         return used;
     }

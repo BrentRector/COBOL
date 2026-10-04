@@ -39,7 +39,8 @@
 #
 # Outputs (globals, so nothing runs in a subshell and the caller keeps its own recording/counting):
 #   GUARD_VERDICT  the verdict TEXT, without the "NAME: " prefix — exactly what both guards print
-#   GUARD_CLASS    match | regression | no-verdict — what the caller scores it as
+#   GUARD_CLASS    match | regression | no-verdict — what the caller scores it as (a declared TERMINATES that
+#                  happened is a `match`: it is the outcome the manifest predicts)
 #   GUARD_ACTUAL   the candidate file that matched (empty unless GUARD_CLASS came from a match)
 # Vocabulary note: any new verdict WORD must be taught to scripts/guard-nist-audit.sh (actual_class) and to
 # scripts/guard-verify.sh (VERDICT_WORDS); both refuse to classify a word they do not know, loudly.
@@ -201,6 +202,41 @@ guard_output_verdict() {
         # output is an answer, not a lost observation — and it is indistinguishable from one by design.)
         GUARD_CLASS="regression"
         GUARD_VERDICT="DIFF — REGRESSION!"
+    fi
+    return 0
+}
+
+# THE TERMINATION ARM (kb/Work PB1955).  guard_termination_verdict TEST EC RRC ERRFILE RUN_TIMEOUT
+# For a row tests/nist/corpus.tsv declares `TERMINATES EC-…` (read through scripts/guard-population.sh), the
+# observation that counts is the run unit's END, not its report: the golden records a run that continued past a
+# fatal I-O status nothing covers, and WiseOwl COBOL's documented choice under ISO §9.1.13.1 ends the run unit
+# there (Annex A.1 item 103). So the run must exit non-zero NAMING the declared exception — the same two facts
+# NistDifferentialTests asserts for the row. The evidence rules hold here as on every other arm: a timeout, a
+# signal, or a non-zero exit with nothing on stderr observed nothing, so none of them is scored.
+guard_termination_verdict() {
+    local -
+    set +e
+    local test="$1" ec="$2" rrc="$3" errfile="$4" timeout_s="$5"
+    GUARD_VERDICT=""; GUARD_CLASS=""; GUARD_ACTUAL=""
+    if [ "$rrc" -eq 124 ] || [ "$rrc" -eq 137 ]; then
+        GUARD_CLASS="no-verdict"
+        GUARD_VERDICT="RUN NO-VERDICT (timeout/kill after ${timeout_s}s, rc=$rrc) — NOT SCORED"
+    elif [ "$rrc" -gt 128 ]; then
+        GUARD_CLASS="no-verdict"
+        GUARD_VERDICT="RUN NO-VERDICT (killed by signal $((rrc - 128))) — NOT SCORED"
+    elif [ "$rrc" -eq 0 ]; then
+        GUARD_CLASS="regression"
+        GUARD_VERDICT="DIFF — REGRESSION! (ran to a normal end; corpus.tsv declares it TERMINATES on $ec)"
+    elif [ ! -s "$errfile" ]; then
+        GUARD_CLASS="no-verdict"
+        GUARD_VERDICT="RUN NO-VERDICT (rc=$rrc with NO diagnostic — a failure with no reason is a lost result) — NOT SCORED"
+    elif grep -qE "(^|[^A-Z0-9-])${ec}([^A-Z0-9-]|\$)" "$errfile"; then
+        # Whole-name match: EC-I-O must not be satisfied by EC-I-O-LOGIC-ERROR, nor the reverse.
+        GUARD_CLASS="match"
+        GUARD_VERDICT="TERMINATES $ec (run exited $rrc, as corpus.tsv declares)"
+    else
+        GUARD_CLASS="regression"
+        GUARD_VERDICT="DIFF — REGRESSION! (exited $rrc, but not on the declared $ec: $(guard_first_line "$errfile"))"
     fi
     return 0
 }

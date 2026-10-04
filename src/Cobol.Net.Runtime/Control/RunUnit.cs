@@ -105,11 +105,29 @@ public sealed class RunUnit
     /// <summary>The factory object of the class whose generated factory type is <typeparamref name="T"/> in this
     /// run unit, created on first reference (the emitted <c>__Instance</c> property reads it). Creation runs the
     /// generated constructor — the factory's VALUE initialization and its file registrations (§9.1.4) — once per
-    /// run unit.</summary>
+    /// run unit.
+    /// <para>⛔ THE ONE RESOURCE AN INVOKE CHECKS (ISO §14.9.23.4 GR7 b): "If the method is not found or the resources
+    /// necessary to execute the method are not available, the EC-OO-METHOD exception condition is set to exist". The
+    /// implementor defines which resources are checked (Annex A.1 item 102; docs/CONFORMANCE.md DOC-A.1-102), and this is
+    /// it: the class's type initialization, which the first reference to its factory object triggers, completes. A class
+    /// whose type initializer throws is a class whose method cannot be executed, so it is EC-OO-METHOD here — never the
+    /// raw <see cref="TypeInitializationException"/> the CLR would hand an unchecked program (kb/Work PB1422). The CLR
+    /// remembers the failure, so every later reference to that class raises it again.</para></summary>
     public T FactoryObject<T>() where T : CobolObject, new()
     {
         if (_factoryObjects.TryGetValue(typeof(T), out var existing)) return (T)existing;
-        var created = new T();
+        T created;
+        // `new T()` through a type parameter is Activator.CreateInstance<T>(), which WRAPS whatever the constructor (or the
+        // type initializer it triggers) throws in a System.Reflection.TargetInvocationException: unwrap it, so a condition the generated
+        // constructor raises reaches the COBOL boundary as itself, and a failed initialization is the EC below.
+        try { created = new T(); }
+        catch (System.Reflection.TargetInvocationException wrapped) when (wrapped.InnerException is { } inner)
+        {
+            if (inner is TypeInitializationException initFailed) throw InitializationFailure(typeof(T), initFailed);
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(inner).Throw();
+            throw;   // unreachable: Throw() never returns
+        }
+        catch (TypeInitializationException initFailed) { throw InitializationFailure(typeof(T), initFailed); }
         _factoryObjects.Add(typeof(T), created);
         // The class's (and every superclass's) METHOD working-storage is static data: its first method activation
         // in this run unit is always preceded by this creation, because a method runs on a factory object or on an
@@ -117,6 +135,11 @@ public sealed class RunUnit
         created.__AdoptRunUnitStorage(this);
         return created;
     }
+
+    private static CobolFatalException InitializationFailure(Type factory, TypeInitializationException failure) =>
+        new("EC-OO-METHOD",
+            $"INVOKE: the class '{factory.Name}' could not be initialized, so its method cannot be executed "
+            + $"({failure.InnerException?.GetType().Name ?? failure.GetType().Name}; ISO §14.9.23.4 GR7b)");
 
     /// <summary>The static-storage resets this run unit has ADOPTED, in adoption order (kb/Work PB1069). Static data
     /// — a RECURSIVE program's or a function's WORKING-STORAGE (§13.5.4 GR1) and a class's METHOD WORKING-STORAGE (OO

@@ -194,11 +194,11 @@ public sealed class RelativeConnector : KeyedConnector
         {
             bool owed = !OptionalAbsent && Mode is not FileOpenMode.Input;
             // ⛔ A PERSIST THAT CANNOT REACH THE FILE IS NOT A SUCCESSFUL CLOSE (kb/Work PB771). The only way
-            // to get here without the handle is a Reposture rebuild whose fallback was also refused, i.e. a
-            // foreign process took the file; reporting '00' over records this connector still holds would be
-            // the silent loss this note exists to remove.
+            // to get here without the handle is a writable arm that never took the file lock (an invariant
+            // breach); reporting '00' over records this connector still holds would be the silent loss this note
+            // exists to remove.
             if (!PersistIsReachable(owed))
-                throw new IOException($"the §9.1.15 file lock on '{HostPath}' was lost while the file was open, "
+                throw new IOException($"the §9.1.15 file lock on '{HostPath}' was not held at the CLOSE, "
                     + "so the record store cannot be persisted");
             if (owed) Persist();
         }

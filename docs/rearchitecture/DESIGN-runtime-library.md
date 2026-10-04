@@ -284,10 +284,10 @@ record is released, reached by all three write arms — flushes it there, becaus
 of a WRITE statement releases a logical record to the operating environment"*) is what makes the '00' a promise
 and because a record still in this connector's buffer is one the other connector cannot see, count, or avoid
 overwriting. **The predicate is the POSTURE, not a clause** (kb/Work PB740): a handle whose §9.1.15 file lock
-admits a writer takes the repositioning stream and flushes each release, whether that permission came from
-`SHARING WITH ALL OTHER` or from a clause-less sibling the arbiter admitted alongside it. Keying it on "this
-SELECT wrote a clause" would have left the clause-less pair — which the same change made openable for the first
-time — writing through two independent buffers.
+admits a writer takes the repositioning stream and flushes each release, which since kb/Work PB322 means a
+connector declared `SHARING WITH ALL OTHER` (the only mode Table 19 admits a writing sibling beside). Keying it on
+"this SELECT wrote a clause" would have left a pair that shares a file without either having written one —
+writing through two independent buffers.
 
 The same sentence settles the record's IDENTITY, which is the half that shows up in §9.1.16 (*"While locked by a
 given file connector, a record is not accessible to another file connector in the same or a different run
@@ -305,7 +305,7 @@ than stored (kb/Work PB740 removed the conflation with the OS share mode; PB753 
 the locking one without adding a second answer).
 
 **The §9.1.15 FILE LOCK is derived, in one place: `FileLockPosture` (`IO/Sharing/`), applied by
-`FileRegistry.SyncHostPostures`.** §9.1.15 addresses two audiences with one sharing mode and they need two
+`FileRegistry.SharedOpenAttempt`.** §9.1.15 addresses two audiences with one sharing mode and they need two
 mechanisms. Inside the run unit — *"Multiple paths of access may exist in the same runtime element, contained
 elements, separate runtime elements within the same run unit, or runtime elements in different run units"* — the
 gate is Table 19, already run; outside it, *"The successful opening of a file establishes a file lock for the
@@ -316,40 +316,33 @@ cannot admit this run unit's second connector while refusing a foreign process. 
 - the BASE is §9.1.15's three rules read literally — `NO OTHER` ⇒ `FileShare.None` (*"exclusive access"*),
   `READ ONLY` ⇒ `FileShare.Read` (*"restricts concurrent access … to input mode"*), `ALL OTHER` ⇒
   `FileShare.ReadWrite` (*"allows concurrent access … specifying input, I-O, or extend mode"*);
-- the UNDETERMINED implementor default keeps today's `FileShare.Read` byte for byte. Whether a clause-less
-  connector should protect its physical file from other PROCESSES at all is an OWNER question (kb/Work PB740
-  question 20, on top of PB322's determination), and it is a one-line change in `OfSharingMode` when answered;
-- the base is then WIDENED to admit the access of every other connector Table 19 has admitted on that physical
-  file, and `SyncHostPostures` re-derives the whole set whenever it changes — an OPEN widens, a CLOSE or a
-  failed OPEN narrows back. A share mode is fixed when the handle is created, so "widen" means REBUILD:
-  `FileConnector.Reposture` is virtual, and `SequentialConnector` overrides it to reopen at the logical offset
-  it already tracks (`_readOffset` / `_lineByteOffset` — `StreamReader` buffers, so `BaseStream.Position` is
-  never the read position). **EVERY organization holds a long-lived host handle carrying its derived posture**
-  — §9.1.15 3) names none, so all three owe the lock (kb/Work PB771). `KeyedConnector` is where RELATIVE and
-  INDEXED hold theirs: `TakeFileLock` on each `OpenCore` arm that has a physical file, `ReleaseFileLock` in the
-  CLOSE and on an unsuccessful OPEN, and a `Reposture` that rebuilds it. ⛔ **It is the SAME handle the store
-  travels through** — `RecordFraming.ReadStore`/`WriteStore` take a stream, not a path — because a second
-  handle for the load or the persist would ask for access the connector's own `FileShare.None` forbids, which
-  is kb/Work PB713's defect re-opened by its own cure.
-- the ORDER of that rebuild is one rule for both organizations, `FileConnector.RebuildMustReleaseFirst`: a
-  handle holding WRITE access is itself what would refuse its replacement, so it is released first (and the old
-  posture reopened if the host refuses the new one, the only window a foreign process can use); a read-only
-  handle rebuilds open-then-dispose and is never lockless for an instant. The predicate reads
-  `FileConnector.HostAccess`, which is also what the registry widens SIBLINGS by — not the open mode's floor,
-  because a whole-store organization reads the physical file in every writable mode (§14.9.51.4 GR29 a)'s
-  release number is a fact of the records already there), and a sibling widened by the mode-derived guess
-  would admit the write while the host refused the read.
+- a connector with no SHARING specification holds one of those three modes too, given by its open mode
+  (`FileRegistry.ImplementorDefaultSharing`, kb/Work PB322, Annex A.1 items 77 and 131): `OPEN INPUT` is `READ
+  ONLY` (⇒ `FileShare.Read`) and every other mode is `NO OTHER` (⇒ `FileShare.None`), so a clause-less updater
+  protects its physical file from other PROCESSES exactly as `SHARING WITH NO OTHER` does;
+- the registry hands the posture down ONCE per OPEN, ahead of the handle (`c.HostShare = OfSharingMode(sharing)`
+  in `SharedOpenAttempt`), and nothing re-derives it while the connector is open. **EVERY organization holds a
+  long-lived host handle carrying its posture** — §9.1.15 3) names none, so all three owe the lock (kb/Work
+  PB771). `KeyedConnector` is where RELATIVE and INDEXED hold theirs: `TakeFileLock` on each `OpenCore` arm that
+  has a physical file and `ReleaseFileLock` in the CLOSE and on an unsuccessful OPEN. ⛔ **It is the SAME handle
+  the store travels through** — `RecordFraming.ReadStore`/`WriteStore` take a stream, not a path — because a
+  second handle for the load or the persist would ask for access the connector's own `FileShare.None` forbids,
+  which is kb/Work PB713's defect re-opened by its own cure. The handle's ACCESS is `FileConnector.HostAccess`,
+  not the open mode's floor, because a whole-store organization reads the physical file in every writable mode
+  (§14.9.51.4 GR29 a)'s release number is a fact of the records already there).
 
-For DETERMINED sharing modes the widening is never needed — `FileLockPostureDriftTests.DeterminedModesNeedNoWidening`
-proves that every *Normal open* cell of Table 19 already has mutually admissible base postures — so it exists
-precisely for the undetermined default. The widening is also BOUNDED: the host checks a new handle against every
-outstanding one, so the run unit's effective lock is the INTERSECTION of its connectors' postures, and widening
-a reader so its sibling appender can open does not admit an outside writer the appender still refuses.
-(kb/Work PB740 — one boolean, "did this SELECT write a SHARING or LOCK MODE clause", was spent on both audiences
-and answered each backwards: two clause-less connectors Table 19 PERMITS to share one file were refused by the
-host, the second OPEN answering '30' — a status no Table 19 row and no §9.1.13.9 item produces — and its mirror,
-measured across processes, had a `SHARING WITH NO OTHER` connector admit a foreign append to a file the program
-had declared exclusive.)
+There is NO widening and NO handle rebuild. Every pair of the three modes that Table 19 admits already has
+mutually admissible base postures — `FileLockPostureDriftTests.EveryNormalOpenCellHasMutuallyAdmissiblePostures`
+proves it over every *Normal open* cell and every access a handle may take — because a `READ ONLY` connector
+admits only input-mode siblings and an `ALL OTHER` one admits every access. (While the implementor default was
+UNDETERMINED the base of a clause-less connector was unknown, so its posture was widened to admit whichever sibling
+Table 19 admitted and the handle was rebuilt at its logical offset by a virtual `Reposture`; kb/Work PB322
+determined the default and deleted that machinery, `SyncHostPostures`, `FileLockPosture.For` and both
+`Reposture` overrides with it. History: kb/Work PB740 — one boolean, "did this SELECT write a SHARING or LOCK MODE
+clause", was spent on both audiences and answered each backwards: two clause-less connectors Table 19 PERMITTED to
+share one file were refused by the host, the second OPEN answering '30' — a status no Table 19 row and no
+§9.1.13.9 item produces — and its mirror, measured across processes, had a `SHARING WITH NO OTHER` connector
+admit a foreign append to a file the program had declared exclusive.)
 
 **⛔ DETERMINATION — THE FILE LOCK IS ONLY EVER AS STRONG AS THE HOST'S SHARE MODES, AND ON A HOST WITH ADVISORY
 LOCKS §9.1.15 2) HAS NO EXPRESSION AT ALL (kb/Work PB795).** Windows share modes are mandatory and per-access, so
@@ -360,7 +353,7 @@ that has three consequences a user of this compiler on Linux or macOS is entitle
 - **Rule 2 has no expression through `FileShare` there — and that is a DEFECT, not a property of the host**
   (kb/Work PB833). *"restricts concurrent access to a physical file through file connectors other than this
   one, to input mode"* needs a lock that admits a reader and refuses a writer, and `LOCK_SH` admits both. So
-  `SHARING WITH READ ONLY` — and the undetermined implementor default, which shares its posture — currently
+  `SHARING WITH READ ONLY` — and the implementor default of `OPEN INPUT`, which shares its posture — currently
   gets the protection of rule 3's *"allows concurrent access"* instead, and another RUN UNIT may open the file
   in the extend or I-O mode where Windows refuses it. ⛔ **The BINARY half is a fact about `flock`; the
   "and therefore unavoidable" half is not.** Advisory is sufficient here — §9.1.15 3) binds *other run units*,
@@ -429,16 +422,17 @@ count, reader-first and writer-first, the clause-less pair — plus the controls
 connector rewriting its own records, the two keyed organizations) and the two structural facts; each half was
 proved red by injection at 25 of 47.
 
-⛔ **And a probe of this rule has to be built against `SyncHostPostures`, or it measures nothing.** A reposture
-REBUILDS the connector's handle at its logical offset, so it discards a stale read-ahead as a side effect. The
-union does not move for a `SHARING WITH ALL OTHER` pair, but for the undetermined default it widens at a
-sibling's OPEN and narrows again at its CLOSE — so a probe that fills its buffer before the OPEN and reads
-after the CLOSE is rescued twice by that accident and stays green with the rule deleted (measured: 6 of the 9
-reader-first cells, and the goldens' whole clause-less leg). The matrix therefore re-fills the read-ahead AFTER
-the sibling's open and reads on while the sibling is still OPEN. (kb/Work PB753 — a reader that had taken record 1 went on serving its
-snapshot after a sibling REWROTE record 3 and reported '00', so a concurrent read/update pass computed from data
-the same run unit had already replaced, silently. The invalidation rule was already written down in
-`SeekToRecord`'s doc comment — for the connector's OWN seek, never for a sibling's write.)
+⛔ **A probe of this rule must have SIBLINGS open at once, and only `SHARING WITH ALL OTHER` admits a rewriting or
+appending sibling** (kb/Work PB322: a connector with no SHARING specification is `READ ONLY` for `OPEN INPUT` and
+`NO OTHER` otherwise, and Table 19 admits neither beside a writer). The matrix therefore runs its sibling shapes
+over the `ALL OTHER` clause only, and the clause-less spellings over the shapes with no sibling (the lone I-O
+connector rewriting its own records). (Before PB322 a clause-less pair could share, and the probe also had to be
+built against the handle REBUILD a widening forced, which discarded a stale read-ahead as a side effect and
+rescued a probe that filled its buffer before the sibling's OPEN and read after its CLOSE.) (kb/Work PB753 — a
+reader that had taken record 1 went on serving its snapshot after a sibling REWROTE record 3 and reported '00', so a
+concurrent read/update pass computed from data the same run unit had already replaced, silently. The invalidation
+rule was already written down in `SeekToRecord`'s doc comment — for the connector's OWN seek, never for a sibling's
+write.)
 
 The static `CobolFile` facade (kept for the emitted surface) becomes a pure delegator to `RunUnit.Current.Files`.
 The `Keyed*` static methods at `IndexedFile.cs:570-707` are **deleted**; their callers in `CobolFile.cs` collapse to a

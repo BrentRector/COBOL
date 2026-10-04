@@ -192,9 +192,16 @@ export COBOL_SWITCH_1=ON
 # the opt-in legacy differential. Both guards derive it from the ONE manifest, through the ONE reader in
 # scripts/guard-population.sh, which is the same fact scripts/guard-nist-audit.sh already reads to decide what
 # verdict each row is expected to produce.
+#
+# ⛔ A `TERMINATES` DIVERGENT ROW IS THE OTHER WAY ROUND (kb/Work PB1955): its golden records a run that continued
+# past a fatal I-O status nothing covers, which WiseOwl COBOL's Annex A.1 item 103 choice ends. So GUARD_TERMINATES
+# (`NAME=EC-…`, from the same reader) applies to `cobol` only: the run must end naming that exception. Under the
+# legacy it is emptied and the row is compared with its golden like a green one; guard_legacy_divergent leaves
+# TERMINATES rows out of the legacy exemption for the same reason.
 . "$(dirname "$0")/guard-population.sh"
 LEGACY_DIVERGENT="$(guard_legacy_divergent)" || exit 1
-if [ "$GUARD_DIVERGENT" != "1" ]; then LEGACY_DIVERGENT=""; fi
+GUARD_TERMINATES="$(guard_terminating)" || exit 1
+if [ "$GUARD_DIVERGENT" != "1" ]; then LEGACY_DIVERGENT=""; else GUARD_TERMINATES=""; fi
 
 # ⛔ THE EVIDENCE RULES + THE VERDICT AUDIT (plan §11 A12b/A12c; DESIGN-test-build-ci.md §3.10). A verdict is
 # produced only from an observation actually made: a compile is FAILED only with a non-zero rc AND diagnostic
@@ -256,6 +263,19 @@ for test in $NIST_TESTS; do
         fail_count=$(grep -c "FAIL\*" "$NIST_OUT/$outfile" 2>/dev/null || true)
         fail_count=${fail_count:-0}
         v "$test" "NO BASELINE (${fail_count} FAIL* — pending fix)"
+        continue
+    fi
+
+    # A row corpus.tsv declares TERMINATES (kb/Work PB1955; see GUARD_TERMINATES above): the run unit's end on
+    # the named exception is the observation, not the report.
+    ec="$(guard_declared_termination "$test")"
+    if [ -n "$ec" ]; then
+        guard_termination_verdict "$test" "$ec" "$rrc" "$errfile" "$RUN_TIMEOUT"
+        v "$test" "$GUARD_VERDICT"
+        if [ "$GUARD_CLASS" = "regression" ]; then FAILURES=$((FAILURES + 1)); fi
+        if [ "$GUARD_CLASS" != "match" ]; then
+            guard_preserve "$test" "$GUARD_VERDICT" "$NIST_OUT/$outfile" "$NIST_OUT/print-file.txt" "$stdoutfile" "$errfile"
+        fi
         continue
     fi
 

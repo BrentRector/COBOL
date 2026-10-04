@@ -27,6 +27,7 @@
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$(dirname "$0")/guard-population.sh"   # guard_legacy_divergent, guard_terminating: the ONE shell reader
 
 # ── The audit, as ONE pass ────────────────────────────────────────────────────────────────────────────────
 # ⚠ WRITTEN AS A SINGLE awk PROGRAM ON PURPOSE. The first draft looped in bash and spawned an `awk` plus a
@@ -37,11 +38,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # tests/nist/corpus.tsv is the SSOT for "which programs are green" (DESIGN-test-build-ci §3.2). Columns:
 #   name  suite  status(green|divergent|pending)  chain-preds  golden(valid|none)  note
 #
-# ⛔ THE EXPECTED VERDICT DEPENDS ON WHICH COMPILER RAN (kb/Work/PB750), and on exactly ONE row class:
-#   golden == none                   -> NO BASELINE       (no tests/nist/valid/<name>.txt to compare against)
-#   status == divergent, compiler=legacy -> LEGACY DIVERGENT   (the golden is the ISO baseline; the LEGACY is
+# ⛔ THE EXPECTED VERDICT DEPENDS ON WHICH COMPILER RAN (kb/Work/PB750), and only for the TWO kinds of `divergent`
+# row scripts/guard-population.sh tells apart. In precedence order:
+#   TERMINATES row, compiler=cobol   -> TERMINATES <EC> (a `divergent` row whose note begins `TERMINATES EC-…`,
+#                                        kb/Work PB1955: the golden records a run that continued past a fatal I-O
+#                                        status nothing covers, which WiseOwl COBOL's ISO §9.1.13.1 choice — Annex
+#                                        A.1 item 103 — ends; the run must end naming that exception. Under the
+#                                        legacy, which continues, the row expects MATCH like a green one.)
+#   plain divergent, compiler=legacy -> LEGACY DIVERGENT   (the golden is the ISO baseline; the LEGACY is
 #                                        non-conforming there, so its diff is expected and never a regression)
-#   status == divergent, compiler=cobol  -> MATCH         (those goldens ARE the ISO-conforming output, which is
+#   golden == none                   -> NO BASELINE       (no tests/nist/valid/<name>.txt to compare against)
+#   plain divergent, compiler=cobol  -> MATCH         (those goldens ARE the ISO-conforming output, which is
 #                                        precisely what WiseOwl COBOL must reproduce — NistDifferentialTests locks
 #                                        all eleven byte-exact. Carrying the legacy exemption over to `cobol`
 #                                        would exempt the eleven programs likeliest to catch a codegen defect.)
@@ -51,10 +58,18 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # would have wrongly expected NO BASELINE for all 27 of them.
 
 audit() {
-    awk -v corpus="$CORPUS" -v validdir="$ROOT/tests/nist/valid" -v pop="$2" -v compiler="${3:-cobol}" '
+    # ⛔ WHICH `divergent` ROWS ARE WHICH KIND IS ASKED OF THE ONE SHELL READER (scripts/guard-population.sh), the
+    # same answer the two runners act on — never re-derived here (kb/Work PB898, PB1955).
+    local legdiv term
+    legdiv="$(guard_legacy_divergent "$CORPUS")" || return 2
+    term="$(guard_terminating "$CORPUS")" || return 2
+    awk -v corpus="$CORPUS" -v validdir="$ROOT/tests/nist/valid" -v pop="$2" -v compiler="${3:-cobol}" \
+        -v legdiv="$legdiv" -v term="$term" '
     # Every verdict word the two runners can emit. An UNRECOGNIZED verdict is itself a finding: a runner that
     # grows a new word without teaching this audit about it would otherwise slip through classified as nothing.
-    function actual_class(v) {
+    # A TERMINATES verdict classifies WITH its exception-name, so ending on the wrong exception is UNEXPECTED.
+    function actual_class(v,   w) {
+        if (v ~ /^TERMINATES EC-/)    { split(v, w, " "); return "TERMINATES " w[2] }
         if (v ~ /^MATCH/)             return "MATCH"
         if (v ~ /^NO BASELINE/)       return "NO BASELINE"
         if (v ~ /^LEGACY DIVERGENT/)  return "LEGACY DIVERGENT"
@@ -67,11 +82,14 @@ audit() {
     function finding(msg) { print "  " msg; findings++ }
     BEGIN {
         FS = "\t"
+        nl = split(legdiv, lv, " "); for (i = 1; i <= nl; i++) legacy_divergent[lv[i]] = 1
+        nt = split(term, tv, " ");   for (i = 1; i <= nt; i++) { split(tv[i], kv, "="); terminates[kv[1]] = kv[2] }
         while ((getline line < corpus) > 0) {
             if (line ~ /^#/) continue
             n = split(line, f, "\t"); if (n < 5 || f[1] == "") continue
             gold[f[1]] = f[5]
-            expect[f[1]] = (f[3] == "divergent" && compiler == "legacy") ? "LEGACY DIVERGENT" \
+            expect[f[1]] = (f[1] in terminates && compiler == "cobol")        ? "TERMINATES " terminates[f[1]] \
+                         : (f[1] in legacy_divergent && compiler == "legacy") ? "LEGACY DIVERGENT" \
                          : (f[5] == "none" ? "NO BASELINE" : "MATCH")
         }
         close(corpus)
@@ -166,21 +184,26 @@ self_test() {
     printf 'AA1A\tAA\tgreen\t-\tvalid\t-\n'      >> "$CORPUS"
     printf 'AA2A\tAA\tdivergent\t-\tvalid\t-\n'  >> "$CORPUS"
     printf 'AA3A\tAA\tpending\t-\tnone\t-\n'     >> "$CORPUS"
+    printf 'AA5A\tAA\tdivergent\t-\tvalid\tTERMINATES EC-I-O-LOGIC-ERROR - status 47 ends the run unit\n' >> "$CORPUS"
     # ⚠ The population list must NOT be named "$d/tests" — ROOT/tests/nist/valid is a DIRECTORY under the same
     # root, and the collision made the first draft's control case fail for a reason unrelated to what it tests.
-    printf 'AA1A\nAA2A\nAA3A\n' > "$d/pop"
+    printf 'AA1A\nAA2A\nAA3A\nAA5A\n' > "$d/pop"
     ROOT="$d"; mkdir -p "$d/tests/nist/valid"
     : > "$d/tests/nist/valid/AA1A.txt"
     : > "$d/tests/nist/valid/AA2A.txt"
+    : > "$d/tests/nist/valid/AA5A.txt"
 
-    # The two CONTROLS — one per compiler. AA2A is the `divergent` row, and it is the ONE row whose expected
-    # verdict depends on which compiler ran (kb/Work/PB750): the legacy is non-conforming there and diverges by
-    # design, WiseOwl COBOL must reproduce the ISO golden exactly.
+    # The two CONTROLS — one per compiler. AA2A (a plain `divergent` row) and AA5A (a TERMINATES row, kb/Work
+    # PB1955) are the rows whose expected verdict depends on which compiler ran (kb/Work/PB750): the legacy
+    # diverges by design on AA2A and continues on AA5A; WiseOwl COBOL must reproduce AA2A's ISO golden exactly and
+    # end AA5A's run unit on the declared exception.
     control() {
         printf '  AA1A: MATCH\n  AA2A: MATCH\n  AA3A: NO BASELINE (0 FAIL*)\n'
+        printf '  AA5A: TERMINATES EC-I-O-LOGIC-ERROR (run exited 1, as corpus.tsv declares)\n'
     }
     control_legacy() {
         printf '  AA1A: MATCH\n  AA2A: LEGACY DIVERGENT (golden = ISO baseline)\n  AA3A: NO BASELINE (0 FAIL*)\n'
+        printf '  AA5A: MATCH\n'
     }
 
     # $1 = case name, $2 = expected rc (0 pass / 1 fail), $3 = the finding text the case MUST produce,
@@ -218,9 +241,9 @@ self_test() {
     check "manifest drift (golden gone) is caught" 1 "MANIFEST DRIFT: AA1A"
     mv "$d/g.bak" "$d/tests/nist/valid/AA1A.txt"
     # (2) a program the guard runs but the manifest has never heard of.
-    printf 'AA1A\nAA2A\nAA3A\nAA4A\n' > "$d/pop"
+    printf 'AA1A\nAA2A\nAA3A\nAA4A\nAA5A\n' > "$d/pop"
     { control; echo "  AA4A: MATCH"; } > "$d/results";      check "unmanifested program is caught" 1 "NO MANIFEST ROW: AA4A"
-    printf 'AA1A\nAA2A\nAA3A\n' > "$d/pop"
+    printf 'AA1A\nAA2A\nAA3A\nAA5A\n' > "$d/pop"
     # (3) a real regression.
     control | sed 's/AA1A: MATCH/AA1A: DIFF — REGRESSION!/' > "$d/results"
     check "a DIFF where MATCH was expected is caught" 1 "UNEXPECTED: AA1A expected MATCH"
@@ -241,6 +264,19 @@ self_test() {
     check "legacy verdicts audited as cobol are caught" 1 "UNEXPECTED: AA2A expected MATCH"
     control > "$d/results"
     check "cobol verdicts audited as legacy are caught" 1 "UNEXPECTED: AA2A expected LEGACY DIVERGENT" legacy
+    # (3) ⭐ THE PB1955 ARM. A TERMINATES row must END on its declared exception under `cobol`, and must MATCH the
+    #     golden (the continuing run) under the legacy. Each wrong shape below is what a guard that read every
+    #     `divergent` row one way — or a runner that ignored the marker — would produce.
+    control | sed 's/AA5A: TERMINATES.*/AA5A: RUN NO-VERDICT (produced no report — nothing was observed) — NOT SCORED/' > "$d/results"
+    check "cobol scoring a TERMINATES row as a lost report (CI run 37217227958) is caught" 1 "NO-VERDICT: AA5A"
+    control | sed 's/AA5A: TERMINATES.*/AA5A: DIFF — REGRESSION! (ran to a normal end; corpus.tsv declares it TERMINATES on EC-I-O-LOGIC-ERROR)/' > "$d/results"
+    check "a TERMINATES row that ran to a normal end is caught" 1 "UNEXPECTED: AA5A expected TERMINATES EC-I-O-LOGIC-ERROR"
+    control | sed 's/AA5A: TERMINATES EC-I-O-LOGIC-ERROR/AA5A: TERMINATES EC-I-O-PERMANENT-ERROR/' > "$d/results"
+    check "ending on a different exception than the declared one is caught" 1 "UNEXPECTED: AA5A expected TERMINATES EC-I-O-LOGIC-ERROR"
+    control | sed 's/AA5A: TERMINATES.*/AA5A: MATCH/' > "$d/results"
+    check "cobol matching the continuing golden of a TERMINATES row is caught" 1 "UNEXPECTED: AA5A expected TERMINATES"
+    control_legacy | sed 's/AA5A: MATCH/AA5A: LEGACY DIVERGENT (golden = ISO baseline)/' > "$d/results"
+    check "the legacy exemption swallowing a TERMINATES row is caught" 1 "UNEXPECTED: AA5A expected MATCH" legacy
     # An unknown compiler is refused outright — never silently audited against a default's expectations.
     check "an unknown compiler name is refused" 2 "UNKNOWN COMPILER" msvc
     # (4) an evidence-free outcome must never be scored in EITHER direction.

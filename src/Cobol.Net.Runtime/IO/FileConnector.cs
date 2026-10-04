@@ -276,9 +276,9 @@ public abstract class FileConnector
     /// <summary>The ISO §9.1.15 <b>file lock</b> this connector's own host handles carry — <i>"The successful
     /// opening of a file establishes a file lock for the applicable sharing rules, thereby preventing other run
     /// units from opening that file with incompatible sharing rules."</i> DERIVED, in one place, by
-    /// <see cref="FileLockPosture.For"/> from the connector's arbitrated sharing mode and the set of connectors
-    /// Table 19 has already admitted on the physical file; the registry assigns it immediately before the OPEN
-    /// body runs and re-assigns it through <see cref="Reposture"/> whenever that set changes.
+    /// <see cref="FileLockPosture.OfSharingMode"/> from the connector's arbitrated sharing mode; the registry
+    /// assigns it immediately before the OPEN body runs and nothing re-assigns it while the connector is open
+    /// (Table 19 admits a pair only when each side's posture already admits the other's access, kb/Work PB322).
     /// <para>⛔ IT REPLACED A BOOLEAN THAT ANSWERED THE WRONG QUESTION (kb/Work PB740). <c>SharedStreams</c> —
     /// "did this SELECT write a SHARING or LOCK MODE clause" — chose between <see cref="FileShare.ReadWrite"/>
     /// and <see cref="FileShare.Read"/>, and got §9.1.15 backwards in both directions: <c>SHARING WITH NO
@@ -286,48 +286,21 @@ public abstract class FileConnector
     /// appended to a file the program had declared exclusive, measured across processes), while two clause-less
     /// connectors Table 19 PERMITS to share one file took the restrictive one and the second OPEN answered '30'
     /// — a status no Table 19 row and no §9.1.13.9 item produces.</para></summary>
-    internal FileShare HostShare { get; set; } = FileLockPosture.OfSharingMode(null);
-
-    /// <summary>Re-derive this connector's §9.1.15 file lock while it is OPEN — the registry calls it when the
-    /// set of connectors admitted on the physical file changes, which is the only thing that can change the
-    /// answer. The base implementation records the new posture; a connector that holds a long-lived host handle
-    /// overrides it to rebuild that handle, because a share mode is fixed at open and cannot be widened in
-    /// place.
-    /// <para>⛔ IT SHALL NOT THROW. It runs from <see cref="FileRegistry.SharedOpenAttempt"/>, OUTSIDE
-    /// <see cref="Open"/>'s try, where §14.9.27.4 GR1 admits only an I-O status — the same boundary whose
-    /// violation was kb/Work PB713's escaping <c>IOException</c>. An override that cannot obtain the new handle
-    /// keeps the one it has (strictly more permissive than the one it wanted, so no COBOL statement can read a
-    /// different answer) and lets the OPEN that asked for the widening fail inside its own try.</para></summary>
-    internal virtual void Reposture(FileShare share) => HostShare = share;
+    internal FileShare HostShare { get; set; } = FileLockPosture.OfSharingMode(FileSharing.ReadOnly);   // outside a registry nothing has arbitrated: the READ ONLY posture the .NET path constructors gave
 
     /// <summary>The ACCESS this connector's own long-lived host handle takes of the physical file in
     /// <paramref name="mode"/> — what a SIBLING connector's §9.1.15 file lock has to admit for this connector to
-    /// open at all, so the registry widens from THIS rather than from the open mode alone.
+    /// open at all (FileLockPostureDriftTests measures that every Table-19-admitted pair does).
     /// <para>The default is the open mode's floor (<see cref="FileLockPosture.AccessOf"/>): INPUT reads, OUTPUT
     /// and EXTEND write, I-O does both. ⛔ AN ORGANIZATION THAT NEEDS MORE OF THE PHYSICAL FILE THAN ITS OPEN
-    /// MODE IMPLIES SAYS SO HERE (kb/Work PB771), because the widening cannot guess it: a format that is
+    /// MODE IMPLIES SAYS SO HERE (kb/Work PB771), because the host cannot guess it: a format that is
     /// rewritten WHOLE — the keyed organizations' framed store — must read the existing records in every
     /// writable mode before it can write them back, so its EXTEND handle asks for
-    /// <see cref="FileAccess.ReadWrite"/>. A sibling widened by the mode-derived guess would admit only the
+    /// <see cref="FileAccess.ReadWrite"/>. A handle opened with the mode-derived guess would admit only the
     /// write and the host would refuse the read, which is kb/Work PB713's '30' arriving by another route.</para>
     /// </summary>
     internal virtual FileAccess HostAccess(FileOpenMode mode) => FileLockPosture.AccessOf(mode);
 
-    /// <summary>⛔ THE ONE RULE FOR REBUILDING A HOST HANDLE AT A NEW §9.1.15 POSTURE, since two organizations
-    /// now do it: must the OLD handle be RELEASED before the new one is opened?
-    /// <para>Yes exactly when this connector's handle holds WRITE access, and the reason is the outgoing handle
-    /// itself: its own share mode is what the host checks the incoming request against, and no posture narrower
-    /// than <see cref="FileShare.ReadWrite"/> admits a second writer — so an open-then-dispose rebuild asks the
-    /// host to do something its own outstanding handle forbids, and gets an <c>IOException</c> that the
-    /// registry's catch silently turns into "keep the current handle". A connector left at the NARROWER posture
-    /// then refuses the sibling OPEN the arbiter had already allowed, which is kb/Work PB740's '30' restored by
-    /// the very mechanism that removed it. A read-only handle has no such conflict — every posture that admits
-    /// this connector's own read admits another — so it rebuilds open-then-dispose and is never, even for an
-    /// instant, without a lock.</para>
-    /// <para>⚠ The release opens a window in which only a FOREIGN process can take the file; both organizations
-    /// therefore fall back to reopening at the posture they had, which restores the connector exactly.</para>
-    /// </summary>
-    protected bool RebuildMustReleaseFirst => (HostAccess(Mode) & FileAccess.Write) != 0;
 
     /// <summary>Release whatever host handle this connector's <see cref="OpenCore"/> took before the OPEN turned
     /// out to be UNSUCCESSFUL — §9.1.15 establishes a file lock on <i>"The SUCCESSFUL opening of a file"</i> and

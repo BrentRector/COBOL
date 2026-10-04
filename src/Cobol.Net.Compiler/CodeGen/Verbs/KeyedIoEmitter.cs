@@ -205,7 +205,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             else using (w.Block($"if ({IoStatusClass.Successful(st)})")) SuccessSteps();
         }
         SeqIo.EmitStoreFileStatus(file);
-        var hook = SeqIo.EmitUseHook(file, atEndHandled: rd.AtEnd is not null, invalidKeyHandled: rd.InvalidKey?.Invalid is not null);
+        var hook = SeqIo.EmitUseHook(file, "READ", atEndHandled: rd.AtEnd is not null, invalidKeyHandled: rd.InvalidKey?.Invalid is not null);
 
         // The §9.1.14 / §14.9.30 GR24 transfer-of-control branches, uniform across the read kinds (a phrase
         // whose status family cannot arise for this kind — e.g. INVALID KEY on a sequential read — is simply
@@ -278,7 +278,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             using (w.Block($"if ({IoStatusClass.Successful(st)})"))
                 arith.StoreArith(rkPlace, new NumX(RuntimeApi.FileRelativeSlot(name), 0), CobolRounding.Truncation);
         SeqIo.EmitStoreFileStatus(file);
-        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: wr.InvalidKey?.Invalid is not null);
+        var hook = SeqIo.EmitUseHook(file, "WRITE", invalidKeyHandled: wr.InvalidKey?.Invalid is not null);
         SeqIo.EmitInvalid(st, wr.InvalidKey, hook.NotPhraseGate);
     }
 
@@ -315,7 +315,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         w.Line($"var {st} = {RuntimeApi.FileRewriteShared(name, rimg, lenArg, SequentialIoEmitter.RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordSendExtents(rw.Record))};");
         SeqIo.EndReleasedRecord(file, rw.Record, released, lenArg, RuntimeApi.FileStatus(name));
         SeqIo.EmitStoreFileStatus(file);
-        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: rw.InvalidKey?.Invalid is not null);
+        var hook = SeqIo.EmitUseHook(file, "REWRITE", invalidKeyHandled: rw.InvalidKey?.Invalid is not null);
         SeqIo.EmitInvalid(st, rw.InvalidKey, hook.NotPhraseGate);
     }
 
@@ -353,7 +353,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         var (retryKind, retryAmount) = SeqIo.RenderRetry(del.Retry);
         w.Line($"var {st} = {RuntimeApi.FileDeleteShared(name, image, retryKind, retryAmount, areaExtents)};");
         SeqIo.EmitStoreFileStatus(file);
-        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: del.InvalidKey?.Invalid is not null);
+        var hook = SeqIo.EmitUseHook(file, "DELETE", invalidKeyHandled: del.InvalidKey?.Invalid is not null);
         SeqIo.EmitInvalid(st, del.InvalidKey, hook.NotPhraseGate);
     }
 
@@ -386,7 +386,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
         // default (GR20c), the same third-flag shape the AT END / INVALID KEY suppressions use. The old
         // `if (OnException is null)` skip left EXCEPTION-STATUS stale inside imperative-statement-3
         // (kb/Work PB141).
-        SeqIo.EmitUseHook(df.File, onExceptionHandled: df.OnException is not null);
+        SeqIo.EmitUseHook(df.File, "DELETE FILE", onExceptionHandled: df.OnException is not null);
         // §9.1.13.1/§14.9.10: ON EXCEPTION runs on an unsuccessful completion; '05' (absent file) is a SUCCESSFUL
         // completion (GR14) and takes the NOT ON EXCEPTION path.
         if (df.OnException is { } on)
@@ -462,7 +462,7 @@ internal sealed class KeyedIoEmitter(EmitContext ctx, NumericRenderer num, Refer
             w.Line($"var {st} = {RuntimeApi.FileStartIndexed(name, sta.KeyIndex, CsLiteral(sta.Op), areaImage, len, areaExtents)};");
         }
         SeqIo.EmitStoreFileStatus(file);
-        var hook = SeqIo.EmitUseHook(file, invalidKeyHandled: sta.InvalidKey?.Invalid is not null);
+        var hook = SeqIo.EmitUseHook(file, "START", invalidKeyHandled: sta.InvalidKey?.Invalid is not null);
         SeqIo.EmitInvalid(st, sta.InvalidKey, hook.NotPhraseGate);   // §14.9.41 GR6 — transfer per §9.1.14
     }
 

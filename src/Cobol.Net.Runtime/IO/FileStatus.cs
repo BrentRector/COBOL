@@ -100,9 +100,10 @@ public static class FileStatusCode
     /// UNSUCCESSFUL and, per §9.1.13.10 item 1, "the record area remains unchanged" — nothing reaches the medium.
     /// The set is <see cref="LineSequentialCharacterSet"/> (Annex A.1 item 115; docs/CONFORMANCE.md DOC-A.1-115),
     /// the SAME set <see cref="LineRecordInvalidCharRead"/> ('09') applies on the READ side. ⛔ '7' is a FATAL
-    /// first digit (§9.1.13.1 — EC-I-O-RECORD-CONTENT), so nothing corrupt is written. ⚠ With EC-I-O checking
-    /// off, a program without a FILE STATUS item or a USE declarative today CONTINUES after the '71' — the open
-    /// defect kb/Work PB322 (part E): GnuCOBOL, the rule-1 precedent for that latitude, terminates.</summary>
+    /// first digit (§9.1.13.1 — EC-I-O-RECORD-CONTENT), so nothing corrupt is written. With EC-I-O checking
+    /// off, a program without a FILE STATUS item or an applicable USE procedure TERMINATES at the '71' (Annex A.1
+    /// item 103, docs/CONFORMANCE.md DOC-A.1-103; kb/Work PB322 part E): GnuCOBOL, the rule-1 precedent for that
+    /// latitude, terminates.</summary>
     public const string LineRecordInvalidChar = "71";
 
     /// <summary>02 — successful completion; a duplicate alternate record key was detected (ISO §9.1.13.2 item 2).</summary>

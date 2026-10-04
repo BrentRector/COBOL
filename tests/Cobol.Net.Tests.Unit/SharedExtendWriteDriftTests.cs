@@ -40,30 +40,29 @@ public sealed class SharedExtendWriteDriftTests
         try { File.Delete(host); } catch (IOException) { }
     }
 
-    /// <summary>The sharing spellings that make a connector a §9.1.15 participant, reusing
-    /// <see cref="SharedExtendOpenDriftTests.Spelling"/> so the two matrices cannot drift apart. Only the two
-    /// FILE-CONTROL spellings appear: the OPEN-phrase spelling registers its posture inside the OPEN call
-    /// itself, which cannot express "open A, then open B, then write through each".</summary>
+    /// <summary>The sharing spelling under which TWO connectors can be open on one physical file at the same time
+    /// and both write — reusing <see cref="SharedExtendOpenDriftTests.Spelling"/> so the two matrices cannot drift
+    /// apart. Only the FILE-CONTROL ALL OTHER spelling appears: the OPEN-phrase spellings register their posture
+    /// inside the OPEN call itself, which cannot express "open A, then open B, then write through each", and a
+    /// connector with no SHARING clause is SHARING WITH NO OTHER in the extend mode since kb/Work PB322, so
+    /// Table 19 admits no second connector beside it.</summary>
     public static TheoryData<SharedExtendOpenDriftTests.Spelling> Spellings() =>
-        new(SharedExtendOpenDriftTests.Spelling.AllOtherClause,
-            SharedExtendOpenDriftTests.Spelling.LockModeOnly);
+        new(SharedExtendOpenDriftTests.Spelling.AllOtherClause);
 
     public static TheoryData<SharedExtendOpenDriftTests.Framing, SharedExtendOpenDriftTests.Spelling>
         SequentialShapes()
     {
         var data = new TheoryData<SharedExtendOpenDriftTests.Framing, SharedExtendOpenDriftTests.Spelling>();
         foreach (var f in Enum.GetValues<SharedExtendOpenDriftTests.Framing>())
-            foreach (var s in new[] { SharedExtendOpenDriftTests.Spelling.AllOtherClause,
-                                      SharedExtendOpenDriftTests.Spelling.LockModeOnly })
-                data.Add(f, s);
+            data.Add(f, SharedExtendOpenDriftTests.Spelling.AllOtherClause);
         return data;
     }
 
-    private static void Share(FileRegistry reg, string name, SharedExtendOpenDriftTests.Spelling spelling) =>
-        reg.RegisterSharing(name,
-            spelling == SharedExtendOpenDriftTests.Spelling.AllOtherClause
-                ? FileSharing.AllOther : FileRegistry.ImplementorDefaultSharing,
-            FileLockMode.Manual, multiple: false);
+    private static void Share(FileRegistry reg, string name, SharedExtendOpenDriftTests.Spelling spelling)
+    {
+        Assert.Equal(SharedExtendOpenDriftTests.Spelling.AllOtherClause, spelling);   // the only spelling two writers can share
+        reg.RegisterSharing(name, FileSharing.AllOther, FileLockMode.Manual, multiple: false);
+    }
 
     private static void RegisterSequential(FileRegistry reg, string name, string host,
         SharedExtendOpenDriftTests.Framing framing) =>

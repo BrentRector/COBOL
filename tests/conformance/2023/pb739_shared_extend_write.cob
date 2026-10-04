@@ -102,9 +102,15 @@
                SHARING WITH ALL OTHER
                LOCK MODE IS MANUAL
                FILE STATUS IS ST-B.
-      *> LOCK MODE clause and NO SHARING clause - 9.1.15's undetermined
-      *> implementor default. Participation in sharing is not spelled
-      *> SHARING, so the append discipline shall not be either.
+      *> LOCK MODE clause and NO SHARING clause in the file control entry.
+      *> RE-DERIVED BY kb/Work PB322: a LOCK MODE clause is not a sharing
+      *> specification (9.1.15), so without more these two connectors would
+      *> hold SHARING WITH NO OTHER (OPEN EXTEND's implementor default) and
+      *> the second OPEN would be refused '61'. The OPENs below carry the
+      *> SHARING WITH ALL OTHER phrase (14.9.27.4 GR23: the phrase gives the
+      *> sharing mode when the entry has none; 14.9.27.3 SR8 is satisfied by
+      *> the entry's LOCK MODE clause), so the append discipline still
+      *> keys on the posture of a connector whose entry wrote no SHARING.
            SELECT KS ASSIGN TO "pb739k.dat"
                ORGANIZATION IS SEQUENTIAL
                FILE STATUS IS ST-S.
@@ -318,8 +324,8 @@
            MOVE "SEED" TO KS-REC
            WRITE KS-REC
            CLOSE KS
-           OPEN EXTEND KA
-           OPEN EXTEND KB
+           OPEN EXTEND SHARING WITH ALL OTHER KA
+           OPEN EXTEND SHARING WITH ALL OTHER KB
            DISPLAY "K-EXT A=" ST-A " B=" ST-B
            MOVE "AAAA" TO KA-REC
            WRITE KA-REC

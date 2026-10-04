@@ -50,7 +50,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// <paramref name="successArm"/> is a call from a statement's SUCCESS branch (a sequential READ, whose failure
     /// branch owns the plain hook): only the EC bridge can raise there, so nothing is emitted without an EC-I-O
     /// mask.</para></summary>
-    public UseHookResult EmitUseHook(FileModel file, bool atEndHandled = false, bool invalidKeyHandled = false,
+    public UseHookResult EmitUseHook(FileModel file, string verb, bool atEndHandled = false, bool invalidKeyHandled = false,
         bool onExceptionHandled = false, string? notNormalLabel = null, bool verbDisposes = false,
         string? useCompletedVar = null, bool successArm = false)
     {
@@ -62,9 +62,9 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // true when an applicable procedure ran and completed normally (§14.9.24.4 GR7 a), GR12 a)/b)). A
         // not-normal completion never reaches the declaration: the notNormalLabel jump and the RESUME transfer
         // above it have already left.
-        void Completed(string expr)
+        void Completed(string expr, string? into = null)
         {
-            if (useCompletedVar is not null) w.Line($"bool {useCompletedVar} = {expr};   // an applicable USE procedure ran and completed normally");
+            if ((into ?? useCompletedVar) is { } name) w.Line($"bool {name} = {expr};   // an applicable USE procedure ran and completed normally");
         }
         // §14.6.13.1.2 #1: a declarative that executes a RESUME does not complete normally. The ≥ 0 arm above
         // each of these already leaves the statement (a transfer of control), so the arm this adds is the
@@ -90,9 +90,12 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
             Completed($"__ior{id} == DispatchResult.Normal || __ior{id} == DispatchResult.HandledNonfatal");
+            // Checking enabled for THIS status's condition has already terminated (or dispatched) inside __IoCheckEc;
+            // what reaches here with NoHandler is a status whose condition is not enabled.
+            EmitUncoveredFatalTermination($"__ior{id} == DispatchResult.NoHandler");
             return new UseHookResult(notNormalLabel is not null, $"__ior{id} == DispatchResult.Normal");
         }
-        if (!dispatch.UseDecls) { Completed("false"); return default; }
+        if (!dispatch.UseDecls) { Completed("false"); EmitUncoveredFatalTermination(null); return default; }
         // An ON EXCEPTION phrase is the statement's own handler for EVERY unsuccessful family (§14.9.10.4
         // GR20c) — no declarative runs, and the plain path has no EC to raise, so the hook is a no-op.
         if (onExceptionHandled) { Completed("false"); return default; }
@@ -105,15 +108,42 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
             Completed($"__ior{id} == DispatchResult.Normal");
+            EmitUncoveredFatalTermination($"__ior{id} == DispatchResult.NoHandler");
             return new UseHookResult(notNormalLabel is not null, null);
         }
         // The non-EC form cannot report a resume action, and it does not need to: RESUME is a §14.9.33 statement
         // of the EC model, so a group without it has no declarative that can end in one. It answers only whether
         // a procedure ran (and, returning, completed normally) — discarded except by the SORT/MERGE transfers.
         string call = $"__IoCheck({FileKeyExpr(file)}, {(atEndHandled ? "true" : "false")}, {(invalidKeyHandled ? "true" : "false")})";
-        if (useCompletedVar is not null) Completed(call);
+        string? ranVar = useCompletedVar;
+        if (ranVar is null && file.FileStatusName is null && !verbDisposes)
+        {
+            // The termination below turns on whether a procedure ran, so the answer is captured rather than discarded.
+            ranVar = $"__ran{ctx.Names.NextEc()}";
+            Completed(call, ranVar);
+        }
+        else if (useCompletedVar is not null) Completed(call);
         else w.Line($"{call};");
+        EmitUncoveredFatalTermination(ranVar is null ? null : $"!{ranVar}");
         return default;
+
+        // ⛔ A FATAL I-O STATUS WITH NEITHER A FILE STATUS CLAUSE NOR AN APPLICABLE USE PROCEDURE TERMINATES THE RUN
+        // UNIT (kb/Work PB322 E, Annex A.1 item 103, docs/CONFORMANCE.md DOC-A.1-103). §9.1.13.1 leaves the action
+        // after a fatal exception condition to the implementor — "The implementor may either continue or terminate the
+        // execution of the run unit" — and CLAUDE.md rule 1 takes GnuCOBOL's, whose default error handler ends the run
+        // unit when the file has no FILE STATUS clause (cobc/codegen.c). A program that wrote a FILE STATUS clause sees
+        // the status and carries on; so does one with an applicable USE procedure (`noProcedure` is the C# test that
+        // none ran), and a statement's own ON EXCEPTION phrase covers every family (§14.9.10.4 GR20 c): the early
+        // return above). A SORT/MERGE implicit transfer is the VERB's rule (§14.6.13.1.3 2): `verbDisposes`.
+        // The test is on the STATUS VALUE (§9.1.13.1 fatal classes) and the CLAUSE, both fixed per file at compile
+        // time, so a program whose files all carry FILE STATUS emits nothing new.
+        void EmitUncoveredFatalTermination(string? noProcedure)
+        {
+            if (file.FileStatusName is not null || onExceptionHandled || verbDisposes || successArm) return;
+            string key = FileKeyExpr(file);
+            string cond = IoStatusClass.Fatal(RuntimeApi.FileStatus(key)) + (noProcedure is null ? "" : $" && {noProcedure}");
+            w.Line($"if ({cond}) {RuntimeApi.TerminateOnUncoveredFatalStatus(key, CsLiteral(verb))};");
+        }
     }
 
     /// <summary>A NOT phrase's body, behind <see cref="UseHookResult.NotPhraseGate"/> when the statement's hook can
@@ -381,7 +411,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                 w.Line($"{RuntimeApi.FileOpen(FileKeyExpr(file), mode, tape, ExecutingElementArgs(file))};");
             }
             EmitStoreFileStatus(file);
-            EmitUseHook(file);   // a failed OPEN reaches a mode-scoped USE via the being-opened mode (GR6b)
+            EmitUseHook(file, "OPEN");   // a failed OPEN reaches a mode-scoped USE via the being-opened mode (GR6b)
         }
     }
 
@@ -480,7 +510,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             }
             w.Line($"{RuntimeApi.FileClose(FileKeyExpr(file), kind)};");
             EmitStoreFileStatus(file);
-            EmitUseHook(file);
+            EmitUseHook(file, "CLOSE");
             if (active is not null)
                 using (w.Block($"if ({active})"))
                 {
@@ -497,7 +527,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         var w = ctx.Writer;
         w.Line($"{RuntimeApi.FileUnlock(FileKeyExpr(ul.File), ul.Records ? "true" : "false")};");
         EmitStoreFileStatus(ul.File);
-        EmitUseHook(ul.File);
+        EmitUseHook(ul.File, "UNLOCK");
     }
 
     /// <summary>⛔ THE ONE RENDERER OF ISO §9.1.14's transfer-of-control contract, over a captured status local —
@@ -580,7 +610,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // exception-checking PERFORM's WHEN or the USE declarative for GR27 a)'s EC-I-O-EOP / -OVERFLOW only
         // "If the END-OF-PAGE phrase is not specified" (kb/Work PB854). NOT END-OF-PAGE alone does not count —
         // it is GR28's arm for the ABSENCE of the condition.
-        var hook = EmitUseHook(wr.File, atEndHandled: wr.AtEop is not null);
+        var hook = EmitUseHook(wr.File, "WRITE", atEndHandled: wr.AtEop is not null);
         // END-OF-PAGE branches (ISO §14.9.51 GR27b/GR28): an end-of-page WRITE is SUCCESSFUL — the branch runs
         // after the status store and the hook (which sets GR27 a)'s condition and, with the phrase present,
         // dispatches nothing). The flag is read in the
@@ -733,7 +763,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             // ⛔ A SUCCESSFUL READ RUNS THE EC HOOK TOO (kb/Work PB1382): a '0x' status (04, 06, 09 …) is
             // EC-I-O-WARNING (§9.1.13.1) and, with it enabled (§7.3.25.4 GR4), a WHEN / USE handles it and the NOT
             // phrase below is not executed (§14.6.13.1.4 2)/3, kb/Work PB1120). OPEN and the keyed verbs already did.
-            var hook = EmitUseHook(rd.File, atEndHandled: rd.AtEnd is not null, successArm: true);
+            var hook = EmitUseHook(rd.File, "READ", atEndHandled: rd.AtEnd is not null, successArm: true);
             // READ … INTO is READ then MOVE THE CURRENT RECORD to the target (ISO §14.9.30.4 GR4 b)) — the
             // move is BOUND (kb/Work PB348), its sender the record sliced to the §13.18.43.4 GR16 byte count
             // through the ONE builder the keyed READ and the sort RETURN also use (kb/Work PB339).
@@ -750,7 +780,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         using (w.Block("else"))
         {
             EmitStoreFileStatus(rd.File);
-            EmitUseHook(rd.File, atEndHandled: rd.AtEnd is not null);
+            EmitUseHook(rd.File, "READ", atEndHandled: rd.AtEnd is not null);
             // The AT END imperative runs ONLY for the at end status class (§14.9.30.4 GR24 c) — "If, during the
             // execution of the READ statement, the at end condition exists"); every other unsuccessful status,
             // GR21's '46' included (a LOGIC ERROR, §9.1.13.7 6)), is §14.9.30.4 GR13's "neither an at end nor an invalid
@@ -788,7 +818,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line($"var {rst} = {RuntimeApi.FileStatus(FileKeyExpr(rw.File))};");
         }
         EmitStoreFileStatus(rw.File);
-        var hook = EmitUseHook(rw.File);   // invalidKeyHandled stays false: no '2x' status is reachable here (§9.1.13.5)
+        var hook = EmitUseHook(rw.File, "REWRITE");   // invalidKeyHandled stays false: no '2x' status is reachable here (§9.1.13.5)
         if (rst is not null) EmitInvalid(rst, rw.InvalidKey, hook.NotPhraseGate);
     }
 

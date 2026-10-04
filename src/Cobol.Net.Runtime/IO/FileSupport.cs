@@ -41,8 +41,9 @@ public enum OpenTapePhrase
 /// <see cref="Table19"/> → status '61'). These three members are the whole of what §9.1.15 specifies — <i>"The
 /// sharing with no other mode …"</i>, <i>"The sharing with read only mode …"</i>, <i>"The sharing with all other
 /// mode …"</i> — so there is deliberately no fourth "default" member: a connector that writes NEITHER a SHARING
-/// clause nor an OPEN SHARING phrase carries the UNDETERMINED implementor default, represented as a null
-/// <c>FileSharing?</c> (see <see cref="FileRegistry.ImplementorDefaultSharing"/>, kb/Work PB322). Every connector
+/// clause nor an OPEN SHARING phrase is given the implementor default of its open mode, itself one of the three
+/// (INPUT is READ ONLY, every other mode NO OTHER; see <see cref="FileRegistry.ImplementorDefaultSharing"/>, kb/Work
+/// PB322). Every connector
 /// takes part in the Table-19 arbitration whatever it declared (kb/Work PB321).</summary>
 public enum FileSharing
 {

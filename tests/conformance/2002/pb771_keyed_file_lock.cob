@@ -32,13 +32,13 @@
       *>
       *> The legs, and where each expected value comes from:
       *>
-      *> L1 — RELATIVE, two connectors that wrote NO clause, one INPUT and
-      *> one EXTEND. Their sharing mode is 9.1.15's implementor default,
-      *> which COBOL.NET has not determined (kb/Work PB322), so a conflict is
-      *> reported only where EVERY candidate mode gives Table 19 an
-      *> "Unsuccessful open"; the ALL OTHER candidate gives "Normal open" for
-      *> EXTEND against INPUT, so both opens are '00' (14.9.27.4 GR1 with
-      *> 9.1.13.2). The WRITE is '00' (14.9.51.4 GR12) and 14.9.51.4 GR29 a)
+      *> L1 — RELATIVE, two connectors that declare SHARING WITH ALL OTHER
+      *> (RE-DERIVED BY kb/Work PB322: two connectors with NO sharing
+      *> specification are SHARING WITH READ ONLY for INPUT and SHARING WITH
+      *> NO OTHER for EXTEND, docs/CONFORMANCE.md DOC-A.1-131, and Table 19
+      *> refuses that pair), one INPUT and one EXTEND. Table 19 prints
+      *> "Normal open" for ALL OTHER / EXTEND against all other / input, so
+      *> both opens are '00' (14.9.27.4 GR1 with 9.1.13.2). The WRITE is '00' (14.9.51.4 GR12) and 14.9.51.4 GR29 a)
       *> fixes its record number — "a record number that is one greater than
       *> the highest relative record number existing in the physical file" —
       *> which is 3 over the two seeded records, moved back into the RELATIVE
@@ -52,9 +52,9 @@
       *> file that is currently open by another file connector in the sharing
       *> with no other mode".
       *>
-      *> L3 — INDEXED, the same clause-less reading with the ACCESS axis
+      *> L3 — INDEXED, the same ALL OTHER declaration with the ACCESS axis
       *> moved: an INPUT connector, then an I-O one at DYNAMIC access.
-      *> 9.1.15 3)'s ALL OTHER candidate "allows concurrent access to a
+      *> 9.1.15 3) (SHARING WITH ALL OTHER) "allows concurrent access to a
       *> physical file through other file connectors specifying input, I-O,
       *> or extend mode", so Table 19 prints "Normal open" and both are '00'.
       *> The WRITE is '00' because 14.9.27.4 GR8's Table 20 lists WRITE under
@@ -80,11 +80,15 @@
                ORGANIZATION IS RELATIVE
                ACCESS MODE IS SEQUENTIAL
                RELATIVE KEY IS RA-KEY
+               SHARING WITH ALL OTHER
+               LOCK MODE IS MANUAL
                FILE STATUS IS RA-ST.
            SELECT F-RB ASSIGN TO "pb771r02.dat"
                ORGANIZATION IS RELATIVE
                ACCESS MODE IS SEQUENTIAL
                RELATIVE KEY IS RB-KEY
+               SHARING WITH ALL OTHER
+               LOCK MODE IS MANUAL
                FILE STATUS IS RB-ST.
            SELECT F-RX ASSIGN TO "pb771r02.dat"
                ORGANIZATION IS RELATIVE
@@ -101,11 +105,15 @@
                ORGANIZATION IS INDEXED
                ACCESS MODE IS DYNAMIC
                RECORD KEY IS IA-K
+               SHARING WITH ALL OTHER
+               LOCK MODE IS MANUAL
                FILE STATUS IS IA-ST.
            SELECT F-IB ASSIGN TO "pb771i02.dat"
                ORGANIZATION IS INDEXED
                ACCESS MODE IS SEQUENTIAL
                RECORD KEY IS IB-K
+               SHARING WITH ALL OTHER
+               LOCK MODE IS MANUAL
                FILE STATUS IS IB-ST.
            SELECT F-IX ASSIGN TO "pb771i02.dat"
                ORGANIZATION IS INDEXED
@@ -162,7 +170,7 @@
            WRITE RS-REC
            CLOSE F-RS
 
-      *> L1 — RELATIVE: the clause-less pair Table 19 permits.
+      *> L1 — RELATIVE: the ALL OTHER pair Table 19 permits.
            OPEN INPUT F-RA
            DISPLAY "L1-A=" RA-ST
            READ F-RA

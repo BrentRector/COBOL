@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime.Exceptions;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -230,6 +231,77 @@ public sealed class CorpusManifestTests
         // check above while exempting nothing (feedback_a_dead_lookup_is_also_unverified).
         Assert.True(CorpusManifest.Rows.Count(r => r.Status == "divergent") > 0,
             "tests/nist/corpus.tsv declares no `divergent` rows, so this fact is asserting over an empty set.");
+    }
+
+    /// <summary>
+    /// ⛔ A <c>divergent</c> ROW IS ONE OF TWO KINDS, AND BOTH NIST RUNNERS TELL THEM APART BY ONE GRAMMAR
+    /// (kb/Work PB1955).
+    /// </summary>
+    /// <remarks>
+    /// A note beginning <c>TERMINATES EC-…</c> inverts both readings of a <c>divergent</c> row: the golden records a
+    /// run that continued past a fatal I-O status nothing covers, WiseOwl COBOL's ISO §9.1.13.1 choice (Annex A.1
+    /// item 103) ends the run unit there, and the legacy, which continues, reproduces the golden. The CLI guard read
+    /// every <c>divergent</c> row the plain way, so PB322's two TERMINATES rows turned CI's guard red (CI run
+    /// 37217227958) while this assembly's NistDifferentialTests, which knew the marker, was green. The shell has
+    /// ONE reader (<c>scripts/guard-population.sh</c>, which both runners and the audit ask) and C# has one
+    /// (<see cref="CorpusRow.ExpectedTermination"/>); this fact holds their grammar equal, and both guards to the
+    /// reader, so the two NIST legs cannot read the same row two ways again.
+    /// </remarks>
+    [Fact]
+    public void TerminatesMarker_IsOneGrammarForBothReaders()
+    {
+        string helper = File.ReadAllText(TestRepo.Scripts("guard-population.sh"));
+        var shell = System.Text.RegularExpressions.Regex.Match(helper, @"^GUARD_TERMINATES_MARKER='([^']+)'$",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+        Assert.True(shell.Success, "scripts/guard-population.sh no longer states GUARD_TERMINATES_MARKER — the shell's one reader of the marker");
+
+        // The C# pattern captures the exception-name; the awk ERE matches the same text without the group.
+        string csharpGrammar = CorpusRow.TerminatesMarkerPattern.Replace("(", "", StringComparison.Ordinal).Replace(")", "", StringComparison.Ordinal);
+        Assert.Equal(csharpGrammar, shell.Groups[1].Value);
+
+        // The C# reader on the shapes guard-population.sh's self-test feeds the shell reader (its case 5).
+        static string? Ec(string status, string note) => new CorpusRow("ZZ999A", "ZZ", status, [], true, note).ExpectedTermination;
+        Assert.Equal("EC-I-O-PERMANENT-ERROR", Ec("divergent", "TERMINATES EC-I-O-PERMANENT-ERROR - ISO 9.1.13.1: the run unit ends"));
+        Assert.Null(Ec("divergent", "ISO 14.9.28.4 CCVS-DEFECT: the golden carries one failure"));
+        Assert.Null(Ec("divergent", "ISO 9.1.13.1: the legacy TERMINATES EC-I-O where this does not"));
+        Assert.Null(Ec("green", "TERMINATES EC-I-O-LOGIC-ERROR - a green row is never a TERMINATES row"));
+
+        // Both runners and the audit read the declaration through that file, never on their own (the two-arm check).
+        foreach (string script in new[] { "guard.sh", "guard-fast.sh", "guard-run-group.sh", "guard-nist-audit.sh" })
+        {
+            string text = File.ReadAllText(TestRepo.Scripts(script));
+            Assert.True(text.Contains("guard-population.sh", StringComparison.Ordinal),
+                $"scripts/{script} does not source scripts/guard-population.sh, the one shell reader of corpus.tsv (PB1955)");
+            Assert.False(System.Text.RegularExpressions.Regex.IsMatch(text, @"^[^#]*TERMINATES EC-\[", System.Text.RegularExpressions.RegexOptions.Multiline),
+                $"scripts/{script} restates the TERMINATES marker instead of asking scripts/guard-population.sh (PB1955)");
+        }
+        foreach (string script in new[] { "guard.sh", "guard-run-group.sh" })
+        {
+            Assert.Contains("guard_termination_verdict", File.ReadAllText(TestRepo.Scripts(script)), StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>A note that MEANS the marker must SAY it in the one grammar both readers parse: a row whose note
+    /// begins with the word <c>TERMINATES</c> and is not a <c>divergent</c> row with a well-formed marker naming a
+    /// FATAL level-3 exception-name (ISO §14.6.13.1.6 Table 13, <see cref="ExceptionCatalog"/>) would be read by
+    /// both runners as a plain row, and each would score its termination as a regression.</summary>
+    [Fact]
+    public void EveryTerminatesNote_IsAWellFormedMarkerOnADivergentRow()
+    {
+        var malformed = new List<string>();
+        foreach (CorpusRow row in CorpusManifest.Rows.Where(r => r.Note.StartsWith("TERMINATES", StringComparison.OrdinalIgnoreCase)))
+        {
+            string? ec = row.ExpectedTermination;
+            if (ec is null)
+            {
+                malformed.Add($"{row.Name}: status `{row.Status}`, note `{row.Note}` — not a divergent row with `TERMINATES EC-<NAME>`");
+            }
+            else if (!ExceptionCatalog.TryGet(ec, out EcInfo info) || info.Level != 3 || !info.IsFatal)
+            {
+                malformed.Add($"{row.Name}: {ec} is not a fatal level-3 exception-name of Table 13");
+            }
+        }
+        Assert.True(malformed.Count == 0, "corpus.tsv TERMINATES rows that neither reader can act on:\n  " + string.Join("\n  ", malformed));
     }
 
     /// <summary>The fold is provably LOSSLESS: green∪divergent equals the committed snapshot of the former

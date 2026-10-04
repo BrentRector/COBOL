@@ -54,14 +54,14 @@ public sealed class SharedReadCoherenceDriftTests
 
     /// <summary>The sharing spellings a READER can wear. The two FILE-CONTROL spellings come from
     /// <see cref="SharedExtendOpenDriftTests.Spelling"/> so the matrices cannot drift apart; the third is the
-    /// one this note added — NO clause anywhere, which kb/Work PB740 made able to share a physical file and
-    /// which therefore reaches this defect with a program that never mentions sharing at all.</summary>
+    /// one this note added — NO clause anywhere (kb/Work PB740), which reaches the read-coherence rule on its
+    /// own connector's medium even though no sibling can be open beside it (kb/Work PB322).</summary>
     public enum ReaderSpelling
     {
         /// <summary>SHARING WITH ALL OTHER + LOCK MODE IS MANUAL.</summary>
         AllOtherClause,
 
-        /// <summary>A LOCK MODE clause and no SHARING clause — §9.1.15's undetermined implementor default.</summary>
+        /// <summary>A LOCK MODE clause and no SHARING clause — §9.1.15's implementor default of the open mode.</summary>
         LockModeOnly,
 
         /// <summary>Neither clause. <c>FileConnector.SharedPhysical</c> is NULL for such a connector (it sets no
@@ -77,6 +77,20 @@ public sealed class SharedReadCoherenceDriftTests
         foreach (var f in Enum.GetValues<SharedExtendOpenDriftTests.Framing>())
             foreach (var s in Enum.GetValues<ReaderSpelling>())
                 data.Add(f, s);
+        return data;
+    }
+
+    /// <summary>The shapes in which a SIBLING connector is open on the same physical file at the same time as the
+    /// reader. Only a connector that declared SHARING WITH ALL OTHER can be: since kb/Work PB322 a connector with
+    /// no SHARING clause is SHARING WITH READ ONLY when it opens INPUT and SHARING WITH NO OTHER in every other
+    /// mode (<c>FileRegistry.ImplementorDefaultSharing</c>), and Table 19 refuses a rewriting or appending
+    /// sibling next to either — so the clause-less spellings are measured only where no sibling exists
+    /// (<see cref="Shapes"/>).</summary>
+    public static TheoryData<SharedExtendOpenDriftTests.Framing, ReaderSpelling> SiblingShapes()
+    {
+        var data = new TheoryData<SharedExtendOpenDriftTests.Framing, ReaderSpelling>();
+        foreach (var f in Enum.GetValues<SharedExtendOpenDriftTests.Framing>())
+            data.Add(f, ReaderSpelling.AllOtherClause);
         return data;
     }
 
@@ -99,8 +113,7 @@ public sealed class SharedReadCoherenceDriftTests
                 reg.RegisterSharing(name, FileSharing.AllOther, FileLockMode.Manual, multiple: false);
                 break;
             case ReaderSpelling.LockModeOnly:
-                reg.RegisterSharing(name, FileRegistry.ImplementorDefaultSharing, FileLockMode.Manual,
-                    multiple: false);
+                reg.RegisterSharing(name, null, FileLockMode.Manual, multiple: false);
                 break;
             case ReaderSpelling.NoClause:
                 break;   // the point of this arm: nothing is registered at all
@@ -147,8 +160,8 @@ public sealed class SharedReadCoherenceDriftTests
     /// connector whenever the §9.1.15 union over the physical file CHANGES, and the sequential connector
     /// implements a reposture by REBUILDING its handle at the logical offset — which throws the read-ahead away
     /// as a side effect. For <see cref="ReaderSpelling.AllOtherClause"/> the union is already
-    /// <c>FileShare.ReadWrite</c> and nothing moves, but for the two undetermined-default spellings it widens at
-    /// the sibling's OPEN and narrows again at its CLOSE, so a probe that fills the buffer before the OPEN and
+    /// <c>FileShare.ReadWrite</c> and nothing moves, but for the two default spellings it WOULD widen at
+    /// the sibling's OPEN and narrow again at its CLOSE, so a probe that fills the buffer before the OPEN and
     /// reads after the CLOSE is rescued twice by an accident and passes with the rule deleted. Measured, not
     /// argued: with <c>EnsureReaderCoherent</c> injected out, the reported sequence went red on 3 of these 9
     /// cases and green on the 6 that Reposture rescued. So the reader takes ONE MORE record after the sibling's
@@ -156,7 +169,7 @@ public sealed class SharedReadCoherenceDriftTests
     /// OPEN, which leaves no reposture between the fill and the read in any spelling
     /// (<c>feedback_probe_the_shape_the_subject_hides</c>). All 9 are red with the rule removed.</para></summary>
     [Theory]
-    [MemberData(nameof(Shapes))]
+    [MemberData(nameof(SiblingShapes))]
     public void ASiblingsRewriteIsVisibleToAnAlreadyReadingConnector(
         SharedExtendOpenDriftTests.Framing framing, ReaderSpelling spelling)
     {
@@ -244,7 +257,7 @@ public sealed class SharedReadCoherenceDriftTests
     /// created under the widened posture from the start rather than repostured into it. The reader still has to
     /// re-anchor, because it fills its read-ahead before the REWRITE happens.</summary>
     [Theory]
-    [MemberData(nameof(Shapes))]
+    [MemberData(nameof(SiblingShapes))]
     public void TheRuleHoldsWhenTheWriterOpensFirst(
         SharedExtendOpenDriftTests.Framing framing, ReaderSpelling spelling)
     {
@@ -284,7 +297,7 @@ public sealed class SharedReadCoherenceDriftTests
     /// here because the invalidation now fires on an append too (§14.9.51.4 GR12 is a release), and firing
     /// must not cost the record.</summary>
     [Theory]
-    [MemberData(nameof(Shapes))]
+    [MemberData(nameof(SiblingShapes))]
     public void ASiblingsAppendedRecordIsStillDelivered(
         SharedExtendOpenDriftTests.Framing framing, ReaderSpelling spelling)
     {

@@ -6,118 +6,82 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// kb/Work PB1040 — the ONE run-time rule of "do these two boundary items conform" that a dynamic Format-1 CALL applies
-/// to a RETURNING pair at call initiation (ISO §14.9.4.4 GR3 d) → §14.8.3.3: the receiving operand "shall have the same
-/// ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses"). The end-to-end witness is
-/// conformance:2002/pb1040_returning_length_conformance; these pin each clause of the rule on its own, because a golden
-/// that raises for the first difference cannot tell WHICH clause raised — a mutant that dropped the sign comparison
-/// would still pass it. Every case differs from the baseline in exactly one respect.
+/// ⛔ THE TWO CONFORMANCE RULES OVER A BOUNDARY ITEM'S DESCRIPTION (kb/Work PB165), each stated from the clause that gives
+/// it: <see cref="BoundaryItem.ArgumentConforms"/> for an argument and its formal at a dynamic Format-1 CALL
+/// (ISO §14.8.2.3.2 / §14.8.2.3.3 rule 1 "the formal parameter shall be of the same length as the corresponding argument";
+/// §14.8.2.2 1) the group rule BY REFERENCE, 2) the MOVE rule BY CONTENT) and <see cref="BoundaryItem.Conforms"/> for a
+/// RETURNING pair (§14.8.3.2). The corpus golden <c>2002/pb165_dynamic_call_description_check</c> witnesses the same
+/// table end to end; this pins each row of it where a regression names it.
 /// </summary>
 public sealed class BoundaryItemConformanceTests
 {
-    private static NumProfile Profile(int digits = 5, int scale = 0, bool signed = false,
-        NumericSign sign = NumericSign.TrailingOverpunch, NumericTruncation truncation = NumericTruncation.DigitCount,
-        NumericByteForm byteForm = NumericByteForm.Zoned) => new()
-    {
-        Digits = digits, FractionDigits = scale, Signed = signed, SignKind = sign,
-        Truncation = truncation, ByteForm = byteForm,
-    };
+    private static BoundaryItem Elem(int length, BoundaryClass cls = BoundaryClass.Other) => new(null, length, cls);
+    private static BoundaryItem Group(int length) => new(null, length, BoundaryClass.Group);
 
-    [Fact]
-    public void AnIdenticalProfile_Conforms()
+    [Theory]
+    [InlineData(4, 4, true)]    // same length
+    [InlineData(4, 6, false)]   // §14.8.2.3.2 rule 1: the formal is longer
+    [InlineData(6, 4, false)]   // … and shorter
+    public void Elementary_SameLengthOnly_ByReferenceAndByContent(int argument, int formal, bool conforms)
     {
-        Assert.True(Profile().ConformsTo(Profile()));
+        foreach (var mode in new[] { CobolPassMode.Reference, CobolPassMode.Content, CobolPassMode.Value })
+            Assert.Equal(conforms, Elem(argument).ArgumentConforms(mode, Elem(formal)));
     }
 
     [Fact]
-    public void ThePictureDigitCount_IsAClause()
+    public void Elementary_AnItemThatStatesNothingIsNeverCompared()
     {
-        Assert.False(Profile(digits: 3).ConformsTo(Profile(digits: 5)));
+        var unstated = new BoundaryItem(null);
+        Assert.True(Elem(4).ArgumentConforms(CobolPassMode.Reference, unstated));
+        Assert.True(unstated.ArgumentConforms(CobolPassMode.Reference, Elem(4)));
+        Assert.True(new BoundaryItem(null, CobolArg.Unstated, BoundaryClass.Alphanumeric)
+            .ArgumentConforms(CobolPassMode.Reference, Elem(4)));   // a reference-modified operand: a class, no length
+    }
+
+    [Theory]
+    [InlineData(8, 10, false)]  // §14.8.2.2 1): the formal is described with MORE bytes than the argument
+    [InlineData(10, 8, true)]   // … a smaller number is allowed
+    [InlineData(8, 8, true)]    // … and so is the same number
+    public void Group_ByReference_FormalNoLongerThanArgument(int argument, int formal, bool conforms) =>
+        Assert.Equal(conforms, Group(argument).ArgumentConforms(CobolPassMode.Reference, Group(formal)));
+
+    [Fact]
+    public void Group_ByReference_TheOtherItemIsAGroupOrAnAlphanumericElementaryItem()
+    {
+        Assert.True(Elem(8, BoundaryClass.Alphanumeric).ArgumentConforms(CobolPassMode.Reference, Group(8)));
+        Assert.True(Group(8).ArgumentConforms(CobolPassMode.Reference, Elem(8, BoundaryClass.Alphanumeric)));
+        Assert.False(Elem(8).ArgumentConforms(CobolPassMode.Reference, Group(8)));   // a numeric / edited / national item
+        Assert.False(Group(8).ArgumentConforms(CobolPassMode.Reference, Elem(8)));
     }
 
     [Fact]
-    public void TheFractionScale_IsAClause()
+    public void Group_ByContent_IsAMoveAndRelatesNoLengths()
     {
-        Assert.False(Profile(scale: 2).ConformsTo(Profile(scale: 0)));
+        Assert.True(Group(8).ArgumentConforms(CobolPassMode.Content, Group(10)));
+        Assert.True(Group(8).ArgumentConforms(CobolPassMode.Value, Elem(3)));
     }
 
     [Fact]
-    public void TheOperationalSign_IsAClause()
+    public void Exempt_StronglyTypedAndVariableLengthGroupsAreNotComparedHere()
     {
-        Assert.False(Profile(signed: true).ConformsTo(Profile(signed: false)));
+        var exempt = Elem(8, BoundaryClass.Exempt);
+        Assert.True(exempt.ArgumentConforms(CobolPassMode.Reference, Group(2)));
+        Assert.True(Group(2).ArgumentConforms(CobolPassMode.Reference, exempt));
+        Assert.True(exempt.Conforms(Elem(8)));    // RETURNING: the group-class rule lifts, the length comparison stays
+        Assert.False(exempt.Conforms(Elem(3)));
     }
 
+    /// <summary>§14.8.3.2: an alphanumeric group pairs with a group or an elementary alphanumeric item of the same length —
+    /// the RETURNING rule the group class completes (it used to compare lengths alone, so a group "conformed" to a
+    /// numeric-edited receiver of the same length).</summary>
     [Fact]
-    public void ThePositionOfASign_IsAClauseOnlyWhenTheItemIsSigned()
+    public void Returning_AlphanumericGroupPairsOnlyWithGroupOrAlphanumeric_OfTheSameLength()
     {
-        Assert.False(Profile(signed: true, sign: NumericSign.LeadingSeparate)
-            .ConformsTo(Profile(signed: true, sign: NumericSign.TrailingOverpunch)));
-        // An unsigned item has no sign to place: its SignKind is the unused default and never a difference.
-        Assert.True(Profile(signed: false, sign: NumericSign.LeadingSeparate)
-            .ConformsTo(Profile(signed: false, sign: NumericSign.TrailingOverpunch)));
-    }
-
-    [Fact]
-    public void TheUsage_IsAClause_ByteFormAndCapacityDiscipline()
-    {
-        Assert.False(Profile(byteForm: NumericByteForm.Packed).ConformsTo(Profile(byteForm: NumericByteForm.Zoned)));
-        Assert.False(Profile(truncation: NumericTruncation.BinaryCapacity)
-            .ConformsTo(Profile(truncation: NumericTruncation.DigitCount)));
-    }
-
-    [Fact]
-    public void TheOverPunchConvention_IsAPropertyOfTheProgram_NotAClause()
-    {
-        var ibm = Profile();
-        var ascii = Profile() with { SignEncoding = SignEncoding.Ascii };
-        Assert.True(ibm.ConformsTo(ascii));
-    }
-
-    [Fact]
-    public void TwoTextItems_ConformExactlyWhenTheirLengthsAreEqual()
-    {
-        Assert.True(new BoundaryItem(null, 5).Conforms(new BoundaryItem(null, 5)));
-        Assert.False(new BoundaryItem(null, 3).Conforms(new BoundaryItem(null, 5)));
-        Assert.False(new BoundaryItem(null, 5).Conforms(new BoundaryItem(null, 3)));
-    }
-
-    [Fact]
-    public void ANumericItem_NeverConformsToACharacterOne()
-    {
-        // Same character length, different category: §14.8.3.3's PICTURE clause differs.
-        var numeric = new BoundaryItem(Profile(digits: 5), 5);
-        var character = new BoundaryItem(null, 5);
-        Assert.False(numeric.Conforms(character));
-        Assert.False(character.Conforms(numeric));
-    }
-
-    [Fact]
-    public void ANativeNumericCell_IsComparedByItsProfile_AndAnImageCarriedOneByLengthToo()
-    {
-        var native = new BoundaryItem(Profile(digits: 5));                 // no character length
-        var image = new BoundaryItem(Profile(digits: 5), 5);               // image-carried: same PICTURE
-        Assert.True(native.Conforms(image));
-        Assert.True(image.Conforms(native));
-        Assert.False(new BoundaryItem(Profile(digits: 3)).Conforms(image));
-    }
-
-    [Fact]
-    public void AnItemThatStatesNothing_IsNeverCompared()
-    {
-        // A pointer, a DYNAMIC LENGTH or ANY LENGTH item, a variable-length group: their conformance is not this
-        // registry's, and a rule that refused them would reject conforming programs (§14.8.3.3 rules 4 and 5).
-        var nothing = new BoundaryItem(null);
-        Assert.False(nothing.IsStated);
-        Assert.True(nothing.Conforms(new BoundaryItem(null, 5)));
-        Assert.True(new BoundaryItem(Profile(), 5).Conforms(nothing));
-        Assert.True(nothing.Conforms(nothing));
-    }
-
-    [Fact]
-    public void TheCarriedDescription_OfACobolArg_IsItsNumAndLength()
-    {
-        var arg = new CobolArg(CobolPassMode.Reference, ManagedPointer.Null, Profile(), null, 7);
-        Assert.Equal(new BoundaryItem(Profile(), 7), arg.Item);
-        Assert.Equal(CobolArg.Unstated, new CobolArg(CobolPassMode.Reference, ManagedPointer.Null, null).Length);
+        Assert.True(Group(8).Conforms(Group(8)));
+        Assert.True(Group(8).Conforms(Elem(8, BoundaryClass.Alphanumeric)));
+        Assert.True(Elem(8, BoundaryClass.Alphanumeric).Conforms(Group(8)));
+        Assert.False(Group(8).Conforms(Group(10)));
+        Assert.False(Group(8).Conforms(Elem(8)));
+        Assert.False(Elem(8).Conforms(Group(8)));
     }
 }

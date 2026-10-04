@@ -49,9 +49,13 @@ public sealed class SharedExtendOpenDriftTests
         /// for the ALL spelling, which is why the corpus under-covers this band).</summary>
         AllOtherClause,
 
-        /// <summary>A LOCK MODE clause and NO SHARING clause — §9.1.15's undetermined implementor default
-        /// (kb/Work PB322), registered as a null sharing mode.</summary>
-        LockModeOnly,
+        /// <summary>A LOCK MODE clause and NO SHARING clause, with the sharing mode given by the OPEN
+        /// statement's SHARING WITH ALL OTHER phrase (§14.9.27.4 GR23: the phrase overrides the file control
+        /// entry; the LOCK MODE clause is what §14.9.27.3 SR8 requires beside an ALL phrase). The file control
+        /// entry registers a null sharing mode (kb/Work PB322); on its own a LOCK MODE clause is not a sharing
+        /// specification, so without the phrase the connector would be NO OTHER while open for output, I-O or
+        /// extend and its record locks would be ignored (§9.1.15 1)).</summary>
+        LockModeAndAllOtherPhrase,
 
         /// <summary>No file-control clause at all; the OPEN statement itself carries the SHARING phrase
         /// (§14.9.27 — <c>FileRegistry.OpenShared</c> registers the posture on the spot). The phrase is READ
@@ -63,7 +67,7 @@ public sealed class SharedExtendOpenDriftTests
     }
 
     public static TheoryData<Spelling> Spellings() =>
-        new(Spelling.AllOtherClause, Spelling.LockModeOnly, Spelling.OpenPhrase);
+        new(Spelling.AllOtherClause, Spelling.LockModeAndAllOtherPhrase, Spelling.OpenPhrase);
 
     /// <summary>Make <paramref name="name"/> a sharing participant in <paramref name="spelling"/>'s way, then
     /// OPEN it in <paramref name="mode"/>. Returns the resulting I-O status.</summary>
@@ -74,9 +78,11 @@ public sealed class SharedExtendOpenDriftTests
             case Spelling.AllOtherClause:
                 reg.RegisterSharing(name, FileSharing.AllOther, FileLockMode.Manual, multiple: false);
                 break;
-            case Spelling.LockModeOnly:
-                reg.RegisterSharing(name, FileRegistry.ImplementorDefaultSharing, FileLockMode.Manual, false);
-                break;
+            case Spelling.LockModeAndAllOtherPhrase:
+                reg.RegisterSharing(name, null, FileLockMode.Manual, false);
+                reg.OpenShared(name, mode, hasSharingOverride: true, FileSharing.AllOther,
+                    FileRetryKind.None, 0, tape: OpenTapePhrase.None, reg.HostPathOf(name), assignDynamic: false, page: null);
+                return reg.Status(name);
             case Spelling.OpenPhrase:
                 // No SELECT clause: the phrase on the OPEN is what makes it a participant. READ ONLY, not ALL
                 // — §14.9.27.3 SR8, see the enum member.
@@ -122,7 +128,7 @@ public sealed class SharedExtendOpenDriftTests
     {
         var data = new TheoryData<Framing, Spelling>();
         foreach (var f in Enum.GetValues<Framing>())
-            foreach (var s in new[] { Spelling.AllOtherClause, Spelling.LockModeOnly })
+            foreach (var s in new[] { Spelling.AllOtherClause, Spelling.LockModeAndAllOtherPhrase })
                 data.Add(f, s);
         return data;
     }

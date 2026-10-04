@@ -187,9 +187,19 @@ public static class Table19
                                           FileSharing existingSharing, FileOpenMode existingMode) =>
         Cell(Row(requestSharing, requestMode), Column(existingSharing, existingMode));
 
-    /// <summary>The three sharing modes §9.1.15 specifies, in the order the standard lists them — the candidate
-    /// set an UNDETERMINED implementor default ranges over in <see cref="FileRegistry.Conflicts"/>. A static
-    /// array, so the arbitration's quantifier allocates nothing.</summary>
+    /// <summary>⛔ THE ONE ARBITRATION QUESTION: is an OPEN request unsuccessful (§9.1.13.9 item 1, I-O status
+    /// '61') against ONE connector already open on the same physical file? A plain lookup of
+    /// <see cref="Cell(FileSharing, FileOpenMode, FileSharing, FileOpenMode)"/>: every connector, declared or
+    /// defaulted, carries one of §9.1.15's three modes (<see cref="FileRegistry.ImplementorDefaultSharing"/> gives
+    /// the clause-less ones theirs from the open mode), so there is no undetermined side to quantify over
+    /// (kb/Work PB322). §9.1.13.9 item 1 e) — <i>"An attempt is made to open a physical file in the output mode
+    /// and the physical file is currently open by another file connector"</i> — is the Output rows of the table.</summary>
+    public static bool Conflicts((FileSharing Sharing, FileOpenMode Mode) request,
+                                 (FileSharing Sharing, FileOpenMode Mode) existing) =>
+        Cell(request.Sharing, request.Mode, existing.Sharing, existing.Mode) == OpenSharingOutcome.UnsuccessfulOpen;
+
+    /// <summary>The three sharing modes §9.1.15 specifies, in the order the standard lists them — the universe
+    /// the table and its drift tests enumerate.</summary>
     public static readonly FileSharing[] StandardModes =
         [FileSharing.NoOther, FileSharing.ReadOnly, FileSharing.AllOther];
 }
