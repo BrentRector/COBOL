@@ -120,3 +120,8 @@ battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in
 Linux, so every gate runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every
 implementer and lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes. Build `CobolSharp.sln` (not a single project) before
 any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.
+⛔ **THE CI INVARIANT (owner 2026-10-04): GitHub CI must never fail when the same code was tested locally by the same
+processes.** CI is the verification of the local process, never its first run. A CI red is therefore ALSO a defect in the
+local gates: find why they did not see it and fix that in the same change (a missing leg, an unpinned tool, a setting CI has
+and the local run lacks), then sweep for the others like it (rule 4). `kb/Work/PB1957` is the survey of the known
+differences and carries the drift test that maps every CI job to a local leg or to a recorded reason it cannot run locally.
