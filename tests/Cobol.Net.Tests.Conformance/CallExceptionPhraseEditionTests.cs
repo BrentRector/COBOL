@@ -27,6 +27,7 @@ public sealed class CallExceptionPhraseEditionTests
                 {phrase}
             END-CALL.
             STOP RUN.
+        END PROGRAM CXPED1.
         IDENTIFICATION DIVISION.
         PROGRAM-ID. CXPED1S.
         PROCEDURE DIVISION.

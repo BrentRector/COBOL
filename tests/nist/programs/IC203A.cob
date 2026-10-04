@@ -681,6 +681,7 @@
 068100 CCVS-EXIT SECTION.                                               IC2034.2
 068200 CCVS-999999.                                                     IC2034.2
 068300     GO TO CLOSE-FILES.                                           IC2034.2
+       END PROGRAM IC203A.
 000100 IDENTIFICATION DIVISION.                                         IC2044.2
 000200 PROGRAM-ID.                                                      IC2044.2
 000300     IC204A.                                                      IC2044.2
@@ -754,6 +755,7 @@
 007100*    EQUAL TO THE NUMBER OF TIMES THE SUBPROGRAM HAS BEEN         IC2044.2
 007200*    CALLED SINCE BEING INITIALIZED, EITHER BY THE FIRST CALL     IC2044.2
 007300*    OR THE FIRST CALL AFTER A CANCEL STATEMENT.                  IC2044.2
+       END PROGRAM IC204A.
 000100 IDENTIFICATION DIVISION.                                         IC2054.2
 000200 PROGRAM-ID.                                                      IC2054.2
 000300     IC205A.                                                      IC2054.2
@@ -824,6 +826,7 @@
 006800     CANCEL ID1.                                                  IC2054.2
 006900 EXIT-IC205.                                                      IC2054.2
 007000     EXIT PROGRAM.                                                IC2054.2
+       END PROGRAM IC205A.
 000100 IDENTIFICATION DIVISION.                                         IC2064.2
 000200 PROGRAM-ID.                                                      IC2064.2
 000300     IC206A.                                                      IC2064.2

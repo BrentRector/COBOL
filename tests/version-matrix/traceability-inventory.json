@@ -11931,13 +11931,13 @@
   "ordinal": 1,
   "subject": "End markers",
   "rule-digest": "69363e81b4a0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#programUnit; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs#ScreenBody",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenProgram; src/Cobol.Net.Compiler/Binding/SourceUnitShape.cs#Screen",
+  "test-ref": "conformance:negative/pb988-end-program-missing-container; conformance:negative/pb988-end-program-missing-precedes; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '1. An end marker shall be present in every source unit that contains, is contained in, or precedes another source unit.' programUnit ends in `endProgramHeader?`, and only the prototype arm (PrototypeUnitRules, 'the end marker is required') refuses a missing marker. MEASURED UNDER-REJECT: p4 (EMP4A contains EMP4B, and EMP4A has no END PROGRAM) compiles and runs, printing NESTED. p5 (EMP5A is followed by a second outermost program, EMP5B, and neither has an END PROGRAM) compiles and runs, printing A. Expected: a diagnostic on EMP4A and on EMP5A. PB988 explicitly does not claim this row ('rules 1 and 3 ... are not claimed here'), so it is a new finding. || Editions (adjudicator, verbatim): 1985+ || Code sites (adjudicator, verbatim): src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#programUnit; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs#ScreenBody (prototype arm only)",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'An end marker shall be present in every source unit that contains, is contained in, or precedes another source unit.' OK 1). Validation.EndMarkerPass reports COBOLNET2793 (SR1) on a program definition that contains another unit (pb988-end-program-missing-container) or precedes one (pb988-end-program-missing-precedes) without its END PROGRAM; a contained program's marker is required by the grammar (nestedProgram), and the prototype and function formats print theirs unbracketed, asked by SourceUnitShape (§10.6.1, COBOLNET2274). The last unit of a group may omit it: pb988_end_markers' final program PB988L has none and runs (LAST).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-10.7.3-2",
@@ -11946,13 +11946,13 @@
   "ordinal": 2,
   "subject": "End markers",
   "rule-digest": "10c0dd6741cb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenProgram",
+  "test-ref": "conformance:negative/pb988-end-program-name-mismatch; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '2. Program-name-1 shall be identical to the program-name declared in a preceding PROGRAM-ID paragraph.' The binder never compares endProgramHeader.programName with anything. It is read only for its presence (PrototypeUnitRules, PushPopAllPlacementPass). p1: PROGRAM-ID EMP1X ... END PROGRAM EMP1Y compiles and prints RAN. p2: a PROGRAM-ID closed by END FUNCTION EMP2X (the wrong alternative) also compiles and runs. Expected: a diagnostic. Owned by open PB988. || Editions (adjudicator, verbatim): 1985+",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'Program-name-1 shall be identical to the program-name declared in a preceding PROGRAM-ID paragraph.' OK 2). PROGRAM-ID. PB988A. ... END PROGRAM PB988Z. is COBOLNET2793 (SR2) at every edition; before the fix nothing read the END PROGRAM name and the program ran. The comparison is the COBOL-word one (CobolNames.Same), so pb988_end_markers' END PROGRAM pb988n / Pb988M close PB988N / PB988M.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-10.7.3-3",
@@ -11961,13 +11961,13 @@
   "ordinal": 3,
   "subject": "End markers",
   "rule-digest": "8693f3b54f8e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nestedProgram",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenProgram",
+  "test-ref": "conformance:negative/pb988-end-program-order-reversed; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '3. If a PROGRAM-ID paragraph declaring a specific program-name is stated between the PROGRAM-ID paragraph and the END PROGRAM marker for program-name-1, then an END PROGRAM marker referencing program-name shall precede the END PROGRAM marker referencing program-name-1.' Because end-marker names are never read, the ORDER is never checked either. p3: EMP3A contains EMP3B, and the markers come in the order END PROGRAM EMP3A. END PROGRAM EMP3B. It compiles and runs (NESTED), the parser pairing each marker with the innermost open unit. Expected: a diagnostic (END PROGRAM EMP3B shall precede END PROGRAM EMP3A). This comes from the same missing name comparison as PB988, but PB988 declines rule 3, so the row is unowned. || Editions (adjudicator, verbatim): 1985+",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'then an END PROGRAM marker referencing program-name shall precede the END PROGRAM marker referencing program-name-1' OK 3). The grammar pairs each marker with the innermost open unit, so reversed markers parse; a marker whose name is another unit of the same nesting chain (an open container, or a program this one contains) is COBOLNET2793 (SR3): END PROGRAM PB988B. END PROGRAM PB988BN. is refused at every edition. pb988_end_markers' contained PB988N's marker precedes PB988M's.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-10.7.3-4",
@@ -11977,11 +11977,11 @@
   "subject": "End markers",
   "rule-digest": "f154b3bd442b",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoExpansion.cs",
-  "test-ref": "conformance-test:OoSpineTests.EndClassNameMismatch_0820",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenClass",
+  "test-ref": "conformance-test:OoSpineTests.EndClassNameMismatch_2793; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py: OK §10.7.3 '4. Object-class-name-1 shall be identical to the object-class-name declared in the corresponding CLASS-ID paragraph.' OoClassTable.Build compares endClassHeader.className with the CLASS-ID name case-insensitively and reports COBOLNET0820. OoExpansion runs the same check for a parameterized skeleton. Probe o1 (END CLASS EMO1D for EMO1C) gives 0820. o5 (lowercase `end class emo5c`) is accepted. PB988 lists this row, but its premise that 'nothing reads the end-marker name' is false for END CLASS. This row should be released from PB988's inventory_rows. || Editions (adjudicator, verbatim): 2002+ || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#OoClassTable.Build; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#(parameterized skeleton end-name check)",
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'Object-class-name-1 shall be identical to the object-class-name declared in the corresponding CLASS-ID paragraph.' OK 4). The END CLASS comparison moved from OoClassTable.Build and OoExpansion.AddSkeleton (COBOLNET0820) to the one EndMarkerPass (COBOLNET2793), which also asks parameterized skeletons over the written tree; EndMarkerRuleDriftTests pins the single home. pb988_end_markers: END CLASS Pb988c closes PB988C. retired-witness: conformance-test:OoSpineTests.EndClassNameMismatch_0820 (kb/Work PB988 moved the END CLASS name rule to Validation/EndMarkerPass (COBOLNET2793); the test was renamed EndClassNameMismatch_2793 and OoClassTable.Build / OoExpansion.AddSkeleton no longer compare the name) retired-witness: src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (kb/Work PB988 moved the END CLASS name rule to Validation/EndMarkerPass (COBOLNET2793); the test was renamed EndClassNameMismatch_2793 and OoClassTable.Build / OoExpansion.AddSkeleton no longer compare the name) retired-witness: src/Cobol.Net.Compiler/Oo/OoExpansion.cs (kb/Work PB988 moved the END CLASS name rule to Validation/EndMarkerPass (COBOLNET2793); the test was renamed EndClassNameMismatch_2793 and OoClassTable.Build / OoExpansion.AddSkeleton no longer compare the name)",
   "state": "OK"
  },
  {
@@ -11991,13 +11991,13 @@
   "ordinal": 5,
   "subject": "End markers",
   "rule-digest": "c177e4c1344a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenMethod",
+  "test-ref": "conformance:negative/pb988-end-method-interface-mismatch; conformance:negative/pb988-end-method-names-property-method; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '5. Method-name-1 shall be identical to the method-name declared in the corresponding METHOD-ID paragraph. If the PROPERTY phrase is specified in the METHOD-ID paragraph, method-name-1 shall be omitted.' The instance and factory method arms of OoClassTable.Build compare the names: o1 (END METHOD M2 for M1) and o6 (factory FM2 for FM1) both give COBOLNET0820. Two gaps remain. (a) The second sentence is not implemented. The check is guarded by `sel is null`, and the grammar is `END METHOD methodName?`, so o2 (METHOD-ID. GET PROPERTY V. ... END METHOD ZZZ.) compiles clean. Expected: a diagnostic. (b) The interface method-prototype loop never reads m.methodName(1): o3 (interface EMO3I, METHOD-ID. M1. ... END METHOD M2.) compiles clean. Expected: a diagnostic. This is a two-arm dispatch where only the class arms were fixed. Owned by open PB988. No test covers the END METHOD mismatch that does conform. || Editions (adjudicator, verbatim): 2002+ || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#OoClassTable.Build (instance and factory method arms)",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'If the PROPERTY phrase is specified in the METHOD-ID paragraph, method-name-1 shall be omitted.' OK 5). One ScreenMethod serves the factory, object and interface arms: an interface prototype METHOD-ID. PING. ... END METHOD PONG. and a GET PROPERTY method closed by END METHOD V. are COBOLNET2793 (SR5); before the fix the interface loop never read the name and the property arm was skipped (`sel is null`). pb988_end_markers: END METHOD Make, END METHOD ping and a bare END METHOD on GET PROPERTY V compile and run (MAKE, V=5).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-10.7.3-6",
@@ -12007,11 +12007,11 @@
   "subject": "End markers",
   "rule-digest": "6370e1ae1ea2",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoExpansion.cs",
-  "test-ref": "conformance-test:OoSpineTests.Interface_EndNameMismatch_0840",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenInterface",
+  "test-ref": "conformance-test:OoSpineTests.Interface_EndNameMismatch_2793; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py: OK §10.7.3 '6. Interface-name-1 shall be identical to the interface-name declared in the corresponding INTERFACE-ID paragraph.' OoClassTable.Build compares the last interfaceName (the END INTERFACE operand) with INTERFACE-ID case-insensitively and reports COBOLNET0840. Parameterized skeletons are checked in OoExpansion. Probe o4 (END INTERFACE EMO4J for EMO4I) gives 0840. PB988 lists this row, but the check exists. Release the row from PB988. || Editions (adjudicator, verbatim): 2002+ || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#OoClassTable.Build (interface arm); src/Cobol.Net.Compiler/Oo/OoExpansion.cs",
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'Interface-name-1 shall be identical to the interface-name declared in the corresponding INTERFACE-ID paragraph.' OK 6). The END INTERFACE comparison moved from OoClassTable.Build and OoExpansion.AddSkeleton (COBOLNET0840) to EndMarkerPass (COBOLNET2793). pb988_end_markers: END INTERFACE pb988i closes PB988I. retired-witness: conformance-test:OoSpineTests.Interface_EndNameMismatch_0840 (kb/Work PB988 moved the END INTERFACE name rule to Validation/EndMarkerPass (COBOLNET2793); the test was renamed Interface_EndNameMismatch_2793 and OoClassTable.Build / OoExpansion.AddSkeleton no longer compare the name) retired-witness: src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (kb/Work PB988 moved the END INTERFACE name rule to Validation/EndMarkerPass (COBOLNET2793); the test was renamed Interface_EndNameMismatch_2793 and OoClassTable.Build / OoExpansion.AddSkeleton no longer compare the name) retired-witness: src/Cobol.Net.Compiler/Oo/OoExpansion.cs (kb/Work PB988 moved the END INTERFACE name rule to Validation/EndMarkerPass (COBOLNET2793); the test was renamed Interface_EndNameMismatch_2793 and OoClassTable.Build / OoExpansion.AddSkeleton no longer compare the name)",
   "state": "OK"
  },
  {
@@ -12021,13 +12021,13 @@
   "ordinal": 7,
   "subject": "End markers",
   "rule-digest": "21f7ffc3e6c7",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenProgram",
+  "test-ref": "conformance:negative/pb988-end-function-name-mismatch; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '7. User-function-name-1 shall be identical to the user-function-name declared in the corresponding FUNCTION-ID paragraph.' p6: FUNCTION-ID. EMP6F ... END FUNCTION EMP6G compiles, and the caller prints 7. Expected: a diagnostic. Owned by open PB988. || Editions (adjudicator, verbatim): 2002+",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'User-function-name-1 shall be identical to the user-function-name declared in the corresponding FUNCTION-ID paragraph.' OK 7). FUNCTION-ID. PB988F. ... END FUNCTION PB988G. is COBOLNET2793 (SR7); pb988_end_markers' END FUNCTION pb988f closes PB988F, and FUNCTION PB988F(7) returns 14 (F=14). The END FUNCTION keyword on a PROGRAM-ID unit is §10.6.1's (SourceUnitShape, COBOLNET2274).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-10.7.3-8",
@@ -12036,13 +12036,13 @@
   "ordinal": 8,
   "subject": "End markers",
   "rule-digest": "2ceb18c217f2",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenProgram",
+  "test-ref": "conformance:negative/pb988-end-program-prototype-name-mismatch; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '8. Program-prototype-name-1 shall be identical to the program-prototype-name declared in the corresponding PROGRAM-ID paragraph.' PrototypeUnitRules checks only that the end marker is PRESENT. q1: PROGRAM-ID. EMQ1P IS PROTOTYPE ... END PROGRAM EMQ1Z compiles clean. q3: the same prototype closed by END FUNCTION EMQ3P (the wrong alternative) compiles clean. Expected: a diagnostic in both. Owned by open PB988. || Editions (adjudicator, verbatim): the edition that introduced program prototypes (2002+ per the compiler's gate; not derivable from the 2023 Annex E) || Code sites (adjudicator, verbatim): src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs (presence only)",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'Program-prototype-name-1 shall be identical to the program-prototype-name declared in the corresponding PROGRAM-ID paragraph.' OK 8). PROGRAM-ID. PB988P IS PROTOTYPE. ... END PROGRAM PB988Q. is COBOLNET2793 (SR8); pb988_end_markers' END PROGRAM pb988pp closes PB988PP.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-10.7.3-9",
@@ -12051,13 +12051,13 @@
   "ordinal": 9,
   "subject": "End markers",
   "rule-digest": "39b1e188fc3d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/EndMarkerPass.cs#ScreenProgram",
+  "test-ref": "conformance:negative/pb988-end-function-prototype-name-mismatch; conformance:2002/pb988_end_markers",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB988: cite.py: OK §10.7.3 '9) Function-prototype-name-1 shall be identical to the function-prototype-name declared in the corresponding FUNCTION-ID paragraph.' q2: FUNCTION-ID. EMQ2F IS PROTOTYPE ... END FUNCTION EMQ2Z compiles clean. Expected: a diagnostic. Owned by open PB988. || Editions (adjudicator, verbatim): 2002+ || Code sites (adjudicator, verbatim): src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs (presence only)",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). cite.py --check 10.7.3 'Function-prototype-name-1 shall be identical to the function-prototype-name declared in the corresponding FUNCTION-ID paragraph.' OK 9). FUNCTION-ID. PB988FP IS PROTOTYPE. ... END FUNCTION PB988FQ. is COBOLNET2793 (SR9); pb988_end_markers' END FUNCTION pb988fp closes PB988FP.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-10.7.4-1",
@@ -12111,13 +12111,13 @@
   "ordinal": 3,
   "subject": "CLASS-ID paragraph",
   "rule-digest": "dcc6f8223bae",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1505-class-inherits-itself; conformance:negative/pb1505-parameterized-class-inherits-itself",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1505: Rule: 'Object-class-name-2 shall not be the name of the class declared by this class definition.' (cite.py --check 11.3.3 -> OK §11.3.3 3)). Enforced by the inheritance-cycle loop in OoClassTable.Build (COBOLNET0820). Probe out/probe/class-id-paragraph/selfinh.cob `CLASS-ID. CSELF INHERITS FROM CSELF.` (REPOSITORY CLASS CSELF) -> error COBOLNET0820 at (2,18) 'the INHERITS chain is cyclic through CSELF (ISO §11.3.2 - a class shall not inherit from itself directly or indirectly)'. The source is rejected, as required. The diagnostic cites §11.3.2 (the general format) instead of §11.3.3 SR3 (finding inherits-cycle-citation). No covering test found. || REFUTED: PARTIAL — Self-inheritance is caught only by the cycle walk over table classes. A parameterized class definition that names itself in INHERITS is never in the table, so it compiles silently (the same skeleton gap as SR5). The non-parameterized case is rejected, but its diagnostic cites §11.3.2, not §11.3.3 SR3. There is no covering test.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'Object-class-name-2 shall not be the name of the class declared by this class definition.' OK 3). Its own descriptor COBOLNET2791 (class-inherits-rule) citing §11.3.3 SR3 — it was COBOLNET0820 shared with duplicate-class-definition and cited §11.3.2 (the general format). Asked over the RESOLVED link for a table class (an AS-literal alias of the class's own name is still itself) and over the WRITTEN name for a parameterized (USING) class definition, which OoExpansion keeps out of the table and which compiled silently before (pb1505-parameterized-class-inherits-itself).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.3.3-4",
@@ -12128,7 +12128,7 @@
   "rule-digest": "c733a1ea114e",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "conformance:negative/l1-class-id-inherits-cycle-direct; conformance:negative/l1-class-id-inherits-cycle-indirect",
+  "test-ref": "conformance:negative/l1-class-id-inherits-cycle-direct; conformance:negative/l1-class-id-inherits-cycle-indirect; conformance:negative/pb1505-class-inherits-cycle",
   "derivation": "",
   "editions": "2002,2014,2023",
   "notes": "A 2-cycle (direct) and a 3-cycle (indirect only) are both rejected by the INHERITS-cycle arm; the diagnostic's citation defect is PB1505",
@@ -12141,13 +12141,13 @@
   "ordinal": 5,
   "subject": "CLASS-ID paragraph",
   "rule-digest": "dc025e12c3dc",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839",
+  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839; conformance:negative/pb1505-parameterized-class-inherits-final",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1505: Rule: 'Object-class-name-2 shall not be the name of a class defined with the FINAL clause.' (cite.py --check 11.3.3 -> OK §11.3.3 5)). Base-link loop: baseSym.IsFinal -> COBOLNET0839. Probe out/probe/class-id-paragraph/final.cob -> COBOLNET0839 citing 'ISO §11.3.3 SR5 / §11.3.4 GR3' at 2002/2014/2023; both `FINAL` and `IS FINAL` spellings set IsFinal. OoSpineTests.OverrideFinal_0838_0839 third arm asserts 0839 for a FINAL base (spec-derived). || REFUTED: PARTIAL — The FINAL-base check sits only in the OoClassTable.Build base-link loop, and a parameterized (USING) class definition never enters the class table (OoExpansion keeps skeletons out). So a parameterized class definition whose INHERITS names a FINAL class compiles cleanly unless something expands it. SR5 is a syntax rule on every class definition, and the §11.3.2 format includes the USING form. Non-parameterized definitions and expansions are rejected correctly.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'Object-class-name-2 shall not be the name of a class defined with the FINAL clause.' OK 5). The refuter's PARTIAL was the parameterized half: a USING class definition never entered the class table, so its INHERITS was never resolved. OoClassTable.Build now resolves a parameterized definition's INHERITS name through the §8.4.6.4 funnel (§11.3.3 SR2 included) unless it is one of the definition's own parameter-names (§11.3.4 GR6 — that names each expansion's actual, judged on the expansion), and a FINAL base is COBOLNET0839 (pb1505-parameterized-class-inherits-final compiled clean before). Non-parameterized definitions keep OoSpineTests.OverrideFinal_0838_0839.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.3.3-6",
@@ -12156,13 +12156,13 @@
   "ordinal": 6,
   "subject": "CLASS-ID paragraph",
   "rule-digest": "1e4c0fde27f7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#ResolveOverrides",
+  "test-ref": "conformance:2002/pb1505_final_method_through_intermediates",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1505: Rule: 'If two or more different methods with the same name are inherited, none of them may be specified with the FINAL clause. If the same method is inherited from one superclass through two or more intermediate superclasses, it may be specified with the FINAL clause.' (cite.py --check 11.3.3 -> OK §11.3.3 6)). SECOND sentence VERIFIED: probe out/probe/class-id-paragraph/chain.cob - CHA defines `METHOD-ID. M1 FINAL.`, CHD inherits it through intermediates CHB and CHC; compiles clean and INVOKE of M1 on a CHD prints A-M1-FINAL (permitted, as required). FIRST sentence: two different same-named methods can be inherited only through multiple class inheritance (a linear chain carries one resolved method per name), which the compiler refuses outright with COBOLNET0849 (Annex A.4.10 item 1, NOT claimed in docs/CONFORMANCE.md §5; PB285, PB745). So the first-sentence check is never exercised - satisfied only vacuously by the declined facility; DerivedVerdictDriftTests deliberately keeps this row out of the oo-optional-items-only selector because of its second sentence. Two halves, one verified -> PARTIAL. No covering test for the permitted linear-chain FINAL case.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'If the same method is inherited from one superclass through two or more intermediate superclasses, it may be specified with the FINAL clause.' OK 6). The live (second) sentence is witnessed: PB1505Z inherits PB1505W's FINAL M1 through PB1505X and PB1505Y, compiles, and INVOKE Z \"M1\" prints W-M1-FINAL. The first sentence ('two or more different methods with the same name are inherited') has a satisfiable antecedent only under multiple class inheritance, Annex A.4.10 item 1, which this implementation does not claim (COBOLNET0849): no accepted program can violate it. A mixed block with one live sentence takes the live verdict (owner R43 item 2, the GR-9.3.6-L3.7 precedent), which is why DerivedVerdictDriftTests keeps this row out of the oo-optional-items-only selector.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.3.3-7",
@@ -12636,13 +12636,13 @@
   "ordinal": 5,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "d7c04f4fd481",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "conformance-test:OoSpineTests.PropertyClause_DuplicateExplicitAccessor_0842",
+  "test-ref": "conformance:negative/pb1503-property-no-get-plus-explicit-get; conformance-test:OoSpineTests.PropertyClause_DuplicateExplicitAccessor_2790",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1503: cite.py --check 11.7.3 \"the PROPERTY clause shall not be specified in the data description entry of that data-name\" -> OK §11.7.3 5). SR5 is enforced only as a SIDE EFFECT of a roster collision: OoBindPropertyClauses synthesizes the clause's accessors and reports COBOLNET0842 when TryAddMethod fails. A bare `01 BAL PIC 9(4) PROPERTY.` + explicit `METHOD-ID. GET PROPERTY BAL.` collides -> 0842 (asserted by OoSpineTests.PropertyClause_DuplicateExplicitAccessor_0842). But when the clause suppresses the accessor the explicit method supplies — `PROPERTY WITH NO GET` + explicit GET PROPERTY BAL (probe p4_property_noget_plus_explicit_get), or `PROPERTY WITH NO SET` + explicit SET PROPERTY BAL (p4b) — nothing collides and the program compiles clean (rc 0) at 2002 and 2023, although SR5 forbids the PROPERTY clause on that data-name unconditionally. Under-rejects; the covering test only proves the colliding arm. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1503 LANDED (wave 1015 Z). cite.py --check 11.7.3 'the PROPERTY clause shall not be specified in the data description entry of that data-name' OK 5). SR5 is its own rule (COBOLNET2790) in OoBindPropertyClauses: an explicit GET or SET PROPERTY method of the subject's name, whatever WITH NO GET / WITH NO SET says, refuses the clause (it was a by-product of an accessor-name collision, so PROPERTY WITH NO GET + explicit GET PROPERTY compiled clean). retired-witness: conformance-test:OoSpineTests.PropertyClause_DuplicateExplicitAccessor_0842 (renamed PropertyClause_DuplicateExplicitAccessor_2790 by kb/Work PB1503 (SR5 has its own descriptor COBOLNET2790))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.7.3-6",
@@ -12651,13 +12651,13 @@
   "ordinal": 6,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "18207c350655",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "conformance-test:OoSpineTests.AccessorShape_GetWithUsing_0842",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#ScreenPropertyMethodHeader",
+  "test-ref": "conformance:negative/pb1503-get-property-active-class; conformance-test:OoSpineTests.AccessorShape_GetWithUsing_2790",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1503: cite.py --check 11.7.3 \"The returning item shall not be an object reference described with the ACTIVE-CLASS phrase.\" -> OK §11.7.3 6). First sentence CONFORMS: `method.Accessor == 'G' && (HasUsing || !HasReturning)` -> 0842 (probe p10 GET with no RETURNING -> 0842; OoSpineTests.AccessorShape_GetWithUsing_0842). Second sentence NOT enforced: probe p2_get_active_class (`METHOD-ID. GET PROPERTY ME.` RETURNING `01 LK-R USAGE OBJECT REFERENCE ACTIVE-CLASS`) compiles clean (rc 0) at 2023; expected a compile-time error. No site anywhere checks ACTIVE-CLASS on an accessor's returning item. Two sentences, one verified -> PARTIAL. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (COBOLNET0842 accessor shape)",
-  "state": "GAP"
+  "notes": "kb/Work PB1503 LANDED (wave 1015 Z). cite.py --check 11.7.3 'then the method shall have no USING phrase parameters specified in the procedure division header and shall have a single RETURNING phrase' OK 6); 'The returning item shall not be an object reference described with the ACTIVE-CLASS phrase' OK 6). Asked of the BOUND header by DataBinder.ScreenPropertyMethodHeader (from OoBindMethodData), for instance, factory and interface-prototype accessors alike (the factory arm had no SR6 check at all; the instance arm tested header presence only). A GET PROPERTY returning an ACTIVE-CLASS reference is COBOLNET2790 (it compiled clean). retired-witness: conformance-test:OoSpineTests.AccessorShape_GetWithUsing_0842 (renamed AccessorShape_GetWithUsing_2790 by kb/Work PB1503 (the rule moved to the bound header and its own descriptor COBOLNET2790))",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.7.3-7",
@@ -12666,13 +12666,13 @@
   "ordinal": 7,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "ed4f3939e344",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#ScreenPropertyMethodHeader",
+  "test-ref": "conformance:negative/pb1503-set-property-two-using; conformance:negative/pb1503-set-property-active-class",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1503: cite.py --check 11.7.3 \"the method shall have a single USING parameter specified in the procedure division header and no RETURNING phrase\" -> OK; cite.py --check 11.7.3 \"The USING parameter shall not be an object reference described with the ACTIVE-CLASS phrase\" -> OK §11.7.3 7). Only PRESENCE is screened: `Accessor == 'S' && (!HasUsing || HasReturning)` -> 0842 (the 'USING present, no RETURNING' part conforms). The OoClassTable comment says formal COUNTS are 're-checked at data-bind when they resolve' — no such re-check exists (the formal-bind loop in DataBinder.Oo.cs never consults Accessor). Probe p1_set_two_using (`METHOD-ID. SET PROPERTY BAL.` ... `PROCEDURE DIVISION USING LK-A LK-B.`) compiles clean at 2002 and 2023; probe p3_set_active_class (SET PROPERTY USING an `OBJECT REFERENCE ACTIVE-CLASS` formal) compiles clean at 2023. Expected: both rejected at compile time. The emitter (OoEmitter.cs ~669) assumes 'the setter's one formal'. PARTIAL (one of three conditions verified); no test covers the SET arm. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (COBOLNET0842 accessor shape); src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs (method formal bind)",
-  "state": "GAP"
+  "notes": "kb/Work PB1503 LANDED (wave 1015 Z). cite.py --check 11.7.3 'then the method shall have a single USING parameter specified in the procedure division header and no RETURNING phrase' OK 7); 'The USING parameter shall not be an object reference described with the ACTIVE-CLASS phrase' OK 7). Asked of the BOUND header by DataBinder.ScreenPropertyMethodHeader, counting the USING parameters WRITTEN: SET PROPERTY BAL USING LK-A LK-B and an ACTIVE-CLASS USING parameter are COBOLNET2790 (both compiled clean, the first building a setter from a two-formal method).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.7.3-8",
@@ -12786,13 +12786,13 @@
   "ordinal": 6,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "dfbf13c8eba6",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "conformance:2002/oo_property_explicit_ref",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "test-ref": "conformance:2002/oo_property_explicit_ref; conformance:2002/pb1449_interface_property; conformance:negative/pb1449-implements-without-property-accessor",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1449: cite.py --check 11.7.4 \"If the GET phrase is specified, this method is a get property method for property-name-1.\" -> OK. An explicit GET PROPERTY joins the roster under the pinned get-accessor name, so a property reference `BAL OF A` as a sending item invokes it. Probe p9 (2002/2023): explicit GET returns W-BAL + 1; `MOVE BAL OF A TO W` after the SET gives W=0085 — the explicit get method, not a direct field read, supplied the value. || REFUTED: PARTIAL — Class GET PROPERTY methods are get property methods (p9 + oo_property_explicit_ref), but the rule applies to every method definition with the GET phrase, including an interface method prototype — and a GET PROPERTY prototype is refused COBOLNET0899, so no get-property-method prototype (and no property access through an interface-typed reference) exists. One half verified => PARTIAL. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (Accessor 'G', GetAccessorName); src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "state": "GAP"
+  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.4 'If the GET phrase is specified, this method is a get property method for property-name-1.' OK 6). The prototype half: an interface's GET PROPERTY prototype is a get property method — it joins the interface roster under __GET_<P>, a class implementing the interface must define it (the clause accessor or an explicit GET PROPERTY; pb1449-implements-without-property-accessor is COBOLNET0841), and BAL OF I with I interface-typed invokes it (pb1449_interface_property: A=00100 through the clause GET, B=00007 through the explicit GET). The class half stays witnessed by oo_property_explicit_ref.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-11.7.4-7",
@@ -12801,13 +12801,13 @@
   "ordinal": 7,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "0fff51e35831",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "conformance:2002/oo_property_explicit_ref",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "test-ref": "conformance:2002/oo_property_explicit_ref; conformance:2002/pb1449_interface_property",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1449: cite.py --check 11.7.4 \"If the SET phrase is specified, this method is a set property method for property-name-1.\" -> OK. Probe p9 (2002/2023): explicit SET stores LK-V * 2; `MOVE 42 TO BAL OF A` then GET (+1) yields 0085 — the explicit set method ran on the receiving property reference. || REFUTED: PARTIAL — Same as GR6 for SET: class SET PROPERTY methods work (p9), but a SET PROPERTY prototype in an interface is refused COBOLNET0899 by the same staged check (the message names GET/SET). || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (Accessor 'S', SetAccessorName); src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "state": "GAP"
+  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.4 'If the SET phrase is specified, this method is a set property method for property-name-1.' OK 7). An interface's SET PROPERTY prototype is a set property method: MOVE 42 TO BAL OF I runs the implementing object's SET (A=00042 through the clause SET, B=00021 through the explicit SET, which stores 2*10). The class half stays witnessed by oo_property_explicit_ref.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.8.3-1",
@@ -25896,13 +25896,13 @@
   "ordinal": 4,
   "subject": "PROPERTY clause",
   "rule-digest": "06d2c9b78b32",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#ScreenInheritedPropertyNames",
+  "test-ref": "conformance:negative/pb1274-property-name-of-later-superclass",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1274. Rule: \"The data-name for the subject of the entry shall not be the same as a property-name defined in a superclass.\" (cite.py --check 13.18.42.3 -> OK, SR 4); the NOTE names both ways a superclass defines one (explicit GET/SET PROPERTY methods, or a PROPERTY clause). The binder walks cls.Base..Base over the matching roster (instance or factory) comparing PropertyName case-insensitively -> COBOLNET0842. Probes: sr4_super_clause (base `01 N PIC 9 PROPERTY`, subclass `01 N PIC 9 PROPERTY`) -> 0842 SR4; sr4_super_method (base explicit `METHOD-ID. GET PROPERTY N.`, subclass `01 N ... PROPERTY`) -> 0842 SR4. Both definition routes and the whole chain are covered. No spec-derived test exists (OoSpineTests has none for SR4), so test-ref is empty. || REFUTED: DIVERGES — SR4 is enforced only when the superclass's CLAUSE-generated accessors already sit on its roster, which depends on SOURCE ORDER: BinderDriver binds classes in source order (foreach cls in classes -> OoDriver.BindClassData -> OoBindPropertyClauses), and the SR4 walk reads b.Methods of the base. If the subclass precedes its base in the compilation group, the base's PROPERTY-clause accessors have not been synthesized yet and the collision is silently accepted. The adjudicator's probes all placed the base first. Harm: under-rejects (illegal program compiles; the subclass accessor hides the base one). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1274 LANDED (wave 1015 Z). cite.py --check 13.18.42.3 'The data-name for the subject of the entry shall not be the same as a property-name defined in a superclass' OK 4). Asked by OoClassTable.ScreenInheritedPropertyNames from ResolveOverrides, once every class's accessors exist, over the base chain's matching roster by property-name (both NOTE routes: explicit GET/SET PROPERTY methods and PROPERTY-clause accessors). The refuter's source-order hole is closed: pb1274-property-name-of-later-superclass writes the subclass first and is COBOLNET2563 (it compiled clean). Moved off the shared 0842 onto the PROPERTY-clause rule descriptor COBOLNET2563.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.42.3-5",
@@ -25941,13 +25941,13 @@
   "ordinal": 1,
   "subject": "PROPERTY clause",
   "rule-digest": "aed0936f7840",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod",
-  "test-ref": "conformance:2002/pb1275_property_set_formats",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#ResolveOverrides",
+  "test-ref": "conformance:2002/pb1275_property_set_formats; conformance:2002/pb1274_property_accessor_override; conformance:negative/pb1274-property-accessor-redefined-without-override",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1274 (open). cite.py --check 13.18.42.4 'If the GET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object' OK 1). The PB1275 half LANDED (w1014u): the class object/pointer branch of the implicit GET is reachable as a SET sender (SET B TO R OF A, SET P2 TO Q OF A, SET D2 TO INNER OF A - golden pb1275_property_set_formats lines 2-4). Still open (PB1274): the clause-synthesized accessor is created after OoClassTable.Build's MarkRoster resolves OVERRIDE/FINAL, so a subclass GET PROPERTY N OVERRIDE over a base clause accessor is refused COBOLNET0838.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1274 LANDED (wave 1015 Z). cite.py --check 13.18.42.4 'If the GET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object' OK 1); 8.4.3.9.1 'a method implicitly generated for a data item described with the PROPERTY clause' OK. The clause's GET accessor is a method of the containing object in every respect: OoClassTable.ResolveOverrides (OVERRIDE / FINAL marking) now runs once every class's data has bound, so the implicit GET is on the superclass roster when a subclass's explicit GET PROPERTY N OVERRIDE is resolved (pb1274_property_accessor_override prints D=9 through the override and C=1 through the implicit method; it was COBOLNET0838), and a redefinition without OVERRIDE is SR4 a) COBOLNET0837. The PB1275 half (the implicit GET in every sending position) stays witnessed by pb1275_property_set_formats.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.42.4-2",
@@ -25956,13 +25956,13 @@
   "ordinal": 2,
   "subject": "PROPERTY clause",
   "rule-digest": "4793487fcfe2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs",
-  "test-ref": "conformance:2002/pb1275_property_set_formats",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#ResolveOverrides",
+  "test-ref": "conformance:2002/pb1275_property_set_formats; conformance:2002/pb1274_property_accessor_override",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1274 (open). cite.py --check 13.18.42.4 'If the SET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object' OK 2). The PB1275 half LANDED (w1014u): the class index/message-tag/object/pointer branch of the implicit SET method ('SET data-name TO LS-data-name') is reachable from legal source - SET R OF A TO A then R OF A = A -> SAME, SET Q OF A TO ADDRESS OF W -> SAME (golden pb1275_property_set_formats lines 1, 3, 4). Still open (PB1274): MarkRoster runs before the clause accessors exist, so a subclass SET PROPERTY N OVERRIDE over a clause-generated setter draws COBOLNET0838.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1274 LANDED (wave 1015 Z). cite.py --check 13.18.42.4 'If the SET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object' OK 2). The implicit SET is a roster method resolved with every other one after data binding (OoClassTable.ResolveOverrides); pb1274_property_accessor_override stores through it (MOVE 5 TO N OF B, then C=5) and through the subclass that inherits it (MOVE 7 TO N OF A). The PB1275 half (every receiving position) stays witnessed by pb1275_property_set_formats.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.42.4-3",
@@ -25971,13 +25971,13 @@
   "ordinal": 3,
   "subject": "PROPERTY clause",
   "rule-digest": "59f5fa2483b4",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#ResolveOverrides",
+  "test-ref": "conformance:negative/pb1274-property-final-accessor-override",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1274. Rule: \"If the FINAL phrase is specified, the implicit method definitions generated by the PROPERTY clause shall include the FINAL phrase in their METHOD-ID paragraphs.\" (cite.py --check 13.18.42.4 -> OK, GR 3). The synthesized accessor carries IsFinal = pc.FINAL() and the emitter drops `virtual`, but the FINAL consequence -- §11.7.3 SR3 'The method in the superclass shall not be defined with the FINAL clause' (cite.py --check 11.7.3 -> OK, SR 3) and SR4a 'no inherited method shall have the same method resolution signature' without OVERRIDE (--check OK, SR 4 a)) -- is never applied, because MarkRoster (the only site that emits COBOLNET0837/0839) runs before the accessors exist. Probe gr3_final_nooverride: base `01 N PIC 9 VALUE 1 PROPERTY IS FINAL.`, subclass `METHOD-ID. GET PROPERTY N.` (no OVERRIDE) -> compiles clean at --std 2023 and prints N=9: a FINAL method was redefined. Probe gr3_final_override (with OVERRIDE) is refused, but for the WRONG reason (0838 'no superclass defines', the same message the non-FINAL control gets), so FINAL is not what refuses it. Expected: both refused -- 0839 (FINAL overridden) / 0837 (redefinition without OVERRIDE). Harm: under-rejects (and the emitted C# hides a non-virtual base member, so dispatch through a base-typed reference would disagree with the subclass). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1274 LANDED (wave 1015 Z). cite.py --check 13.18.42.4 'If the FINAL phrase is specified, the implicit method definitions generated by the PROPERTY clause shall include the FINAL phrase in their METHOD-ID paragraphs' OK 3). The accessors carry IsFinal from the clause, and since OoClassTable.ResolveOverrides runs over complete rosters the FINAL is consulted: an OVERRIDE of a PROPERTY IS FINAL accessor is COBOLNET0839 (11.7.3 SR3 'The method in the superclass shall not be defined with the FINAL clause'), and a redefinition without OVERRIDE is 0837 + 0839 (it compiled and printed N=9 before).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.43.3-1",
@@ -57593,7 +57593,7 @@
   "rule-digest": "b35b86858e12",
   "verdict": "DIVERGES",
   "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1449_interface_property",
   "derivation": "",
   "editions": "85,2002,2014,2023",
   "notes": "kb/Work PB1425 (also PB1449) (registrar 15c). §8.4.3.9.2 prints `property-name-1 OF {object-class-name-1 | identifier-1}` and §8.4.3.1.3 SR1 makes identifier-1 ANY identifier format ('Identifier is defined recursively' — cite.py --check 8.4.3.1.3 OK; §8.4.3.1.2 Format 7 'property-name-1 OF identifier-3' OK). §8.4.3.8.3 SR3 names the property object explicitly: 'SUPER may be specified only as the object in an object-property identifier' (--check OK), SR7 'SELF and SUPER ... are not universal object references' (--check OK). The binder (ReferenceResolver.OoTryBindPropertyReference :96) returns null unless the reference has EXACTLY ONE qualifier that is a bare word resolving to a class-name or a typed object-reference data item; every other identifier-1 form falls to the generic 1639 'not defined'. Probed with the pinned cobol.exe --std 2002 (probe/objprop): bare data-name and class-name forms work (p5, oo_property_ref); `BAL OF A OF T(2)` (STRONG-typedef table of refs, p6) -> 1639; `BAL OF A(2)` (p1) -> COBOLNET2096 naming the compiler temp '__PROP-TEMP-200002' (subscript attached to the temp); `BAL OF SELF` in a method (p7) -> 0901 'SELF is a reserved word'; `BAL OF INNER OF B` chained property (p8) -> 1639; interface-typed receiver `BAL OF I` (p13) -> 0899 + 1639 (:126 'interface-typed receivers ... later refinement'). Legal source rejected -> DIVERGES. The basic forms are covered by conformance:2002/oo_property_ref / oo_property_factory_ref, which do not close a defective row. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
@@ -57906,13 +57906,13 @@
   "ordinal": 0,
   "subject": "End markers",
   "rule-digest": "a443e1a6af4e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#endClassHeader; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#factoryParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#objectParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#methodDefinition; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#interfaceDefinition",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#endProgramHeader; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#methodDefinition; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitFunctionIdParagraph",
+  "test-ref": "conformance:2002/pb988_end_markers; conformance:negative/pb988-function-definition-85",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB988: All nine alternatives parse on the pinned cobol.exe: END PROGRAM prog (p1), END PROGRAM prototype (q1), END FUNCTION user-function (p6), END FUNCTION function-prototype (q2), END CLASS / END OBJECT / END METHOD name (o1), END FACTORY and a nameless END METHOD, lowercase names (o5). endProgramHeader folds the PROGRAM and FUNCTION alternatives into one rule, `END (PROGRAM|FUNCTION) programName DOT`, so which keyword goes with which unit kind is left to the syntax rules. That pairing is SR2/SR7 territory: see those rows and PB988. No spec-derived positive test names the format. || REFUTED: PARTIAL — The 2023 shape is right: all nine alternatives parse, END FACTORY/END OBJECT with a name are rejected, END CLASS without a name is rejected, and the separator period is required. The edition half fails. The FUNCTION alternatives are COBOL-2002 introductions (the row's own editions field says so), yet with --std 85 `END FUNCTION` is accepted with no diagnostic, even when it closes a PROGRAM-ID unit. endProgramHeader is `END (PROGRAM|FUNCTION) programName DOT` with no edition predicate, and VersionConformancePass has no arm for it. The FUNCTION-ID paragraph itself is also ungated under 85. f7 reports only 1507, never an edition-gate diagnostic; that is a sibling defect the function-id subject owns. || Editions (adjudicator, verbatim): 1985+ for END PROGRAM (nested/multiple programs); the FUNCTION, CLASS, FACTORY, OBJECT, METHOD, INTERFACE and prototype alternatives from the edition that introduced each unit (2002+). The 2023 Annex E does not list them as changes",
-  "state": "GAP"
+  "notes": "kb/Work PB988 LANDED (wave 1015 Z2). The refuter's PARTIAL was the edition half: END FUNCTION (and the FUNCTION-ID paragraph it closes) is a COBOL-2002 introduction, accepted at --std 85 with no gate. The new construct row function-definition-2002 is recognition-fired on the FUNCTION-ID paragraph (ParseArm.VisitFunctionIdParagraph, COBOLNET0900; the prototype format keeps its own function-prototype-2002 row on prototypePhrase), so pb988-function-definition-85 names the edition; END FUNCTION closing a PROGRAM-ID unit is COBOLNET2274 (§10.6.1) at every edition. The 2002 positive pb988_end_markers writes all nine alternatives (END PROGRAM program and prototype, END FUNCTION function and prototype, END CLASS, END FACTORY, END OBJECT, END METHOD named and bare, END INTERFACE) and runs: NESTED F=14 MAKE V=5 LAST.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-11.2.1",
@@ -57996,13 +57996,13 @@
   "ordinal": 0,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "ad93e19003ad",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#methodDefinition; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#methodPropertySelector; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#externalizedNamePhrase",
-  "test-ref": "conformance:2002/oo_override_final; conformance:2002/oo_property_methods; conformance:2023/pb303_as_module_name_and_invoke",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
+  "test-ref": "conformance:2002/oo_override_final; conformance:2002/oo_property_methods; conformance:2023/pb303_as_module_name_and_invoke; conformance:2002/pb1449_interface_property; conformance:negative/pb1449-set-property-prototype-two-using",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1449: §11.7.2 prints METHOD-ID. { method-name-1 [AS literal-1] | {GET|SET} PROPERTY property-name-1 } [OVERRIDE] [IS FINAL] . (cite.py --check 11.7.2 \"[ <u>OVERRIDE</u> ] [ IS <u>FINAL</u> ]\" -> OK). Grammar methodDefinition: METHOD_ID DOT (methodName externalizedNamePhrase? | methodPropertySelector) OVERRIDE? (IS? FINAL)? DOT — exact shape, AS only on the method-name arm, IS optional. Probes (pinned cobol.exe, out/probe/method-id-paragraph): p13_fmt_full `METHOD-ID. M AS \"XM\" OVERRIDE IS FINAL.` and `METHOD-ID. N FINAL.` compile and run at 2002 and 2023 (B-M / A-N); p11 `GET PROPERTY BAL AS \"X\"` rejected; p12 `M FINAL OVERRIDE` (wrong order) rejected. Both rejections are correct but report a misleading cascade (COBOLNET0901 'AS'/'OVERRIDE is a reserved word') instead of a syntax diagnostic — diagnostic quality only, not a conformance defect. Existing goldens cover the OVERRIDE IS FINAL arm, the GET/SET PROPERTY arm and the AS arm. || REFUTED: PARTIAL — The general format is shared by method definitions AND method prototypes (§11.7.3 SR2/SR4b/SR8 name prototypes). The {GET|SET} PROPERTY property-name-1 arm is legal in an interface prototype, but the pinned compiler rejects every GET/SET PROPERTY prototype loud with COBOLNET0899 (staged 'not yet implemented'). The class-method arms (method-name AS literal incl. a national literal, GET/SET PROPERTY, OVERRIDE, IS FINAL) do compile. Legal source rejected => not CONFORMS. Needs a kb/Work defect note (none found). || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985)",
-  "state": "GAP"
+  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.2 '[ <u>OVERRIDE</u> ] [ IS <u>FINAL</u> ]' OK. The refuter's PARTIAL was the PROTOTYPE half: the format is shared by method definitions and prototypes, and every GET/SET PROPERTY prototype was refused COBOLNET0899. OoClassTable.Build's interface arm now admits the {GET|SET} PROPERTY property-name-1 arm (the roster name is the pinned accessor name, as in the class arm), the staged descriptor oo-interface-property-prototype is deleted, and pb1449_interface_property compiles and runs an interface with both prototypes. The class-method arms stay witnessed by oo_override_final, oo_property_methods and pb303_as_module_name_and_invoke.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-11.8.2",

@@ -55,11 +55,14 @@ internal static class OoExpansion
 {
     /// <summary>The group's definitions after expansion: the written NON-parameterized definitions in source order,
     /// then one synthesized definition per distinct expansion (in first-specifier order), plus the names of the
-    /// parameterized definitions (class and interface names share one namespace, §8.3.2.2).</summary>
+    /// parameterized definitions (class and interface names share one namespace, §8.3.2.2) and the parameterized CLASS
+    /// definitions themselves — kept out of the class table, but still class definitions whose CLASS-ID paragraph the
+    /// §11.3.3 syntax rules govern (kb/Work PB1505; <c>OoClassTable.Build</c> screens them).</summary>
     public sealed record Result(
         IReadOnlyList<Core.ClassDefinitionContext> Classes,
         IReadOnlyList<Core.InterfaceDefinitionContext> Interfaces,
-        IReadOnlySet<string> ParameterizedNames);
+        IReadOnlySet<string> ParameterizedNames,
+        IReadOnlyList<Core.ClassDefinitionContext> ParameterizedClasses);
 
     /// <summary>One parameterized definition: its context, its formals in USING order, and the kind each formal's
     /// REPOSITORY specifier declares it as (null when undeclared — already COBOLNET2239).</summary>
@@ -81,19 +84,19 @@ internal static class OoExpansion
             var id = c.classIdParagraph();
             if (id.ooParameterName().Length == 0) { plainClasses.Add(c); continue; }
             AddSkeleton(c, id.className(0).GetText(), false, id.ooParameterName(), c.environmentDivision(),
-                c.endClassHeader().className().GetText(), "CLASS-ID", "ISO §11.3.3 SR8", "ISO §11.3.3 SR9");
+                "CLASS-ID", "ISO §11.3.3 SR8", "ISO §11.3.3 SR9");
         }
         foreach (var i in interfaces)
         {
             if (i.ooParameterName().Length == 0) { plainInterfaces.Add(i); continue; }
             var names = i.interfaceName();
             AddSkeleton(i, names[0].GetText(), true, i.ooParameterName(), i.environmentDivision(),
-                names[^1].GetText(), "INTERFACE-ID", "ISO §11.6.3 SR4", "ISO §11.6.3 SR7");
+                "INTERFACE-ID", "ISO §11.6.3 SR4", "ISO §11.6.3 SR7");
         }
         var entries = new List<Core.RepositoryEntryContext>();
         CollectExpandsEntries(tree, entries);
         if (skeletons.Count == 0 && entries.Count == 0)
-            return new Result(classes, interfaces, new HashSet<string>());   // the overwhelmingly common path
+            return new Result(classes, interfaces, new HashSet<string>(), []);   // the overwhelmingly common path
         // §12.3.8.3 SR3 — an EXPANDS phrase inside a parameterized definition is reported once, on the definition
         // (AddSkeleton), and is otherwise inert: it creates nothing.
         entries.RemoveAll(e => EnclosingSkeleton(e) is not null);
@@ -161,10 +164,11 @@ internal static class OoExpansion
                 outClasses.Add(cctx);
             else ReparseFailed(x);
         }
-        return new Result(outClasses, outInterfaces, new HashSet<string>(skeletons.Keys, CobolNames.Comparer));
+        return new Result(outClasses, outInterfaces, new HashSet<string>(skeletons.Keys, CobolNames.Comparer),
+            [.. classes.Where(c => c.classIdParagraph().ooParameterName().Length > 0)]);
 
         void AddSkeleton(ParserRuleContext ctx, string name, bool isInterface, Core.OoParameterNameContext[] formals,
-            Core.EnvironmentDivisionContext? env, string endName, string header, string sr8, string sr9)
+            Core.EnvironmentDivisionContext? env, string header, string sr8, string sr9)
         {
             using var _ = edition.At(ctx);
             // The definition's OWN REPOSITORY paragraph (§11.3.3 SR8 / §11.6.3 SR4 say "of this class
@@ -211,12 +215,8 @@ internal static class OoExpansion
                     $"{header} '{name}' is parameterized (it has a USING clause), so its REPOSITORY paragraph shall "
                     + $"not specify the EXPANDS phrase of '{DeclaredName(r)}' (ISO §12.3.8.3 SR3)");
             }
-            // §10.7: the end marker names its definition. OoClassTable.Build checks this for every written
-            // definition it receives, and a parameterized one never reaches it (an expansion is renamed at both
-            // ends), so the skeleton's own marker is checked here with the same code.
-            if (!CobolNames.Same(endName, name))
-                edition.Error(isInterface ? "COBOLNET0840" : "COBOLNET0820",
-                    $"END {(isInterface ? "INTERFACE" : "CLASS")} '{endName}' does not match {header} '{name}' (ISO §10.7)");
+            // The skeleton's own END CLASS / END INTERFACE name (§10.7.3 SR4 / SR6) is asked with every other end
+            // marker by Validation.EndMarkerPass, over the written tree, before any expansion renames it.
             if (!skeletons.TryAdd(name, new Skeleton(ctx, name, isInterface, formals, kinds)))
                 edition.Error(isInterface ? "COBOLNET0840" : "COBOLNET0820",
                     $"duplicate {(isInterface ? "interface" : "class")} definition '{name}' — class and interface "

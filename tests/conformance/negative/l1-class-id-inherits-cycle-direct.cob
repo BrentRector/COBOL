@@ -13,11 +13,9 @@
       *> is satisfied (each base is in its REPOSITORY) and SR3 is
       *> satisfied (neither class names itself), so SR4 is the only
       *> ground for rejection.
-      *> The .err holds the cycle arm's own message text rather than the
-      *> bare code: COBOLNET0820 is shared with the duplicate-class and
-      *> END CLASS mismatch arms. (The message's citation reads
-      *> "ISO §11.3.2", the general format, not this SR4 - kb/Work
-      *> PB1505; the .err deliberately avoids the citation text.)
+      *> The .err holds the rule the cycle arm names: COBOLNET2791 is
+      *> shared by the SR3, SR4 and SR7 arms (kb/Work PB1505), and its
+      *> message ends with the rule it caught.
       *> Reject-at names 2002 onward: class definitions are COBOL-2002.
        IDENTIFICATION DIVISION.
        CLASS-ID. L1CYA INHERITS FROM L1CYB.

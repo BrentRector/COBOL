@@ -528,6 +528,7 @@
 052800 CCVS-EXIT SECTION.                                               IC1064.2
 052900 CCVS-999999.                                                     IC1064.2
 053000     GO TO CLOSE-FILES.                                           IC1064.2
+       END PROGRAM IC106A.
 000100 IDENTIFICATION DIVISION.                                         IC1074.2
 000200 PROGRAM-ID.                                                      IC1074.2
 000300     IC107A.                                                      IC1074.2

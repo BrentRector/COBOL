@@ -111,6 +111,7 @@ public sealed class ReferenceResolver(DataBinder data)
             Compiler.Oo.OoNameResolution.Want.Class).Class;
         bool factory = cls is not null;                      // prop OF Class-name → the FACTORY accessors (SR3/SR4 "or in the factory object")
         DataItem? recvItem = null;
+        OoInterfaceSymbol? iface = null;
         if (cls is null)
         {
             recvItem = data.Symbols.TryResolveUnqualified(recv, data.ActiveScope, out var recvItems) ? recvItems[0] : null;
@@ -129,8 +130,16 @@ public sealed class ReferenceResolver(DataBinder data)
             // A FACTORY-OF receiver names the class's FACTORY accessors, the same half a class-NAME receiver
             // selects above (§8.4.3.9.3 SR3/SR4 "or in the factory object") — kb/Work PB389.
             factory = rd.Factory;
-            cls = table.Find(rd.Name!);
-            if (cls is null) return null;                    // interface-typed receivers: property prototypes are a later refinement (0899 at the interface)
+            // An INTERFACE-typed receiver (kb/Work PB1449): §8.4.3.9.3 SR3 asks for a get property method "in the
+            // object referenced by identifier-1", and the interface's GET/SET PROPERTY prototypes are what every such
+            // object has (§11.8.4 GR2) — the accessors are looked up over the interface's prototype closure, the
+            // roster an INVOKE through the same reference resolves over (§14.9.23.3 SR4 e)), and dispatch to the
+            // implementing object at run time.
+            if (rd.Kind is ObjectRefKind.Interface)
+                iface = table.FindInterface(rd.Name!);
+            else
+                cls = table.Find(rd.Name!);
+            if (cls is null && iface is null) return null;
         }
 
         // §12.3.8.2's property-specifier `PROPERTY property-name-1 [ AS literal-4 ]` (kb/Work PB974): the source writes
@@ -139,8 +148,8 @@ public sealed class ReferenceResolver(DataBinder data)
         // reported below (SR1), under the name as written.
         string known = data.OoRepositoryProperties.TryGetValue(name, out var specified) ? specified : name;
         string getName = NamingConvention.GetAccessorName(known), setName = NamingConvention.SetAccessorName(known);
-        var get = factory ? cls.FindFactoryMethod(getName) : cls.FindMethod(getName);
-        var set = factory ? cls.FindFactoryMethod(setName) : cls.FindMethod(setName);
+        var get = Accessor(getName);
+        var set = Accessor(setName);
         if (get is null && set is null) return null;         // not a property of the roster → generic diagnosis
 
         var model = get?.Binding!.Returning ?? set!.Binding!.Formals[0].Item;
@@ -171,8 +180,13 @@ public sealed class ReferenceResolver(DataBinder data)
         data.OoPendingPropertyOps.Add(new DataBinder.OoPendingPropertyOp(
             temp,
             recvItem is null ? null : PlaceForItem(recvItem, []),
-            cls.CsName, factory, get, set, name, recv));
+            iface?.CsName ?? cls!.CsName, factory, get, set, name, recv, InterfaceCsName: iface?.CsName));
         return temp;
+
+        OoMethodSymbol? Accessor(string accessorName) =>
+            iface is not null
+                ? iface.AllPrototypes().FirstOrDefault(p => CobolNames.Same(p.ExternalizedName, accessorName))
+                : factory ? cls!.FindFactoryMethod(accessorName) : cls!.FindMethod(accessorName);
     }
 
     /// <summary>A SYNTHETIC copy of <paramref name="dref"/> without its LAST <c>dataReferenceSuffix</c> — for a

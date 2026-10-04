@@ -377,6 +377,7 @@
 037700 CCVS-EXIT SECTION.                                               SM2034.2
 037800 CCVS-999999.                                                     SM2034.2
 037900     GO TO CLOSE-FILES.                                           SM2034.2
+       END PROGRAM SM203A.
 000100 IDENTIFICATION DIVISION.                                         SM2044.2
 000200 PROGRAM-ID.                                                      SM2044.2
 000300     SM204A.                                                      SM2044.2

@@ -446,6 +446,7 @@
 044600 CCVS-EXIT SECTION.                                               SQ2024.2
 044700 CCVS-999999.                                                     SQ2024.2
 044800     GO TO CLOSE-FILES.                                           SQ2024.2
+       END PROGRAM SQ202A.
 000100 IDENTIFICATION DIVISION.                                         SQ2034.2
 000200 PROGRAM-ID.                                                      SQ2034.2
 000300     SQ203A.                                                      SQ2034.2

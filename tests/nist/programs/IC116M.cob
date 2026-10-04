@@ -341,6 +341,7 @@
 034100 CCVS-EXIT SECTION.                                               IC1164.2
 034200 CCVS-999999.                                                     IC1164.2
 034300     GO TO CLOSE-FILES.                                           IC1164.2
+       END PROGRAM IC116M.
 000100 IDENTIFICATION DIVISION.                                         IC1174.2
 000200 PROGRAM-ID.                                                      IC1174.2
 000300     IC117M.                                                      IC1174.2
@@ -412,6 +413,7 @@
 006900     DISPLAY "RETURNED TO IC117M".                                IC1174.2
 007000 IC117-EXIT.                                                      IC1174.2
 007100     EXIT PROGRAM.                                                IC1174.2
+       END PROGRAM IC117M.
 000100 IDENTIFICATION DIVISION.                                         IC1184.2
 000200 PROGRAM-ID.                                                      IC1184.2
 000300     IC118M.                                                      IC1184.2

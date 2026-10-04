@@ -553,6 +553,7 @@
 055300 CCVS-EXIT SECTION.                                               SM1034.2
 055400 CCVS-999999.                                                     SM1034.2
 055500     GO TO CLOSE-FILES.                                           SM1034.2
+       END PROGRAM SM103A.
 000100 IDENTIFICATION DIVISION.                                         SM1044.2
 000200 PROGRAM-ID.                                                      SM1044.2
 000300     SM104A.                                                      SM1044.2

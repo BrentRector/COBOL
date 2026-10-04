@@ -442,6 +442,7 @@
 044200 CCVS-EXIT SECTION.                                               RL2124.2
 044300 CCVS-999999.                                                     RL2124.2
 044400     GO TO CLOSE-FILES.                                           RL2124.2
+       END PROGRAM RL212A.
 000100 IDENTIFICATION DIVISION.                                         RL2134.2
 000200 PROGRAM-ID.                                                      RL2134.2
 000300     RL213A.                                                      RL2134.2

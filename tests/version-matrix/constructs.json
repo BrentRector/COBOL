@@ -2472,6 +2472,19 @@
    "source": "IDENTIFICATION DIVISION.\nFUNCTION-ID. FPROTO IS PROTOTYPE.\nDATA DIVISION.\nLINKAGE SECTION.\n01 L-X PIC 9(4).\n01 L-R PIC 9(6).\nPROCEDURE DIVISION USING L-X RETURNING L-R.\nEND FUNCTION FPROTO.\nIDENTIFICATION DIVISION.\nPROGRAM-ID. VMFP1.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    FUNCTION FPROTO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W PIC 9(6).\nPROCEDURE DIVISION.\nMAIN.\n    COMPUTE W = FUNCTION FPROTO(7).\n    STOP RUN.\nEND PROGRAM VMFP1.\nIDENTIFICATION DIVISION.\nFUNCTION-ID. FPROTO.\nDATA DIVISION.\nLINKAGE SECTION.\n01 L-X PIC 9(4).\n01 L-R PIC 9(6).\nPROCEDURE DIVISION USING L-X RETURNING L-R.\nP.\n    COMPUTE L-R = L-X * L-X.\n    GOBACK.\nEND FUNCTION FPROTO.\n"
   },
   {
+   "id": "function-definition-2002",
+   "status": "active",
+   "description": "A FUNCTION-ID paragraph opening a user-defined function definition (ISO §11.5 Format 1 / §10.6.1 function-definition) and its END FUNCTION marker (§10.7.2) - COBOL-2002 introductions: X3.23-1985 has neither the paragraph nor the end-marker alternative (kb/Work PB988, row FMT-10.7.2). Below 2002 VersionConformancePass ParseArm.VisitFunctionIdParagraph names the edition (0900) on recognition. The prototype format (IS PROTOTYPE) is its own row, function-prototype-2002, fired on the prototypePhrase node, so a prototype is gated once. END FUNCTION closing a PROGRAM-ID unit is §10.6.1's keyword rule (COBOLNET2274) at every edition, so no END FUNCTION reaches an accepted COBOL-85 source.",
+   "display": "a FUNCTION-ID paragraph (user-defined function definition)",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §11.5 Format 1 / §10.6.1 / §10.7.2 (END FUNCTION user-function-name-1)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "2002 introduction (derive from the 2002 standard - Annex E covers 2014-2023 only); user-defined functions arrive with the FUNCTION-ID paragraph",
+   "source": "IDENTIFICATION DIVISION.\nFUNCTION-ID. FDDBL.\nDATA DIVISION.\nLINKAGE SECTION.\n01 L-X PIC 9(4).\n01 L-R PIC 9(4).\nPROCEDURE DIVISION USING L-X RETURNING L-R.\nP.\n    COMPUTE L-R = L-X * 2.\n    GOBACK.\nEND FUNCTION FDDBL.\nIDENTIFICATION DIVISION.\nPROGRAM-ID. VMFD1.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    FUNCTION FDDBL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W PIC 9(4).\nPROCEDURE DIVISION.\nMAIN.\n    COMPUTE W = FUNCTION FDDBL(21).\n    STOP RUN.\nEND PROGRAM VMFD1.\n"
+  },
+  {
    "id": "program-prototype-2002",
    "status": "active",
    "description": "A PROGRAM-ID ... IS PROTOTYPE program prototype definition (ISO §11.10.2 Format 2 / §10.6.1 program-prototype; kb/Work PB894). A signature-only source unit - the §10.6.2 SR4 restrictions (LINKAGE-only data division, header-only procedure division, no I-O section / OBJECT-COMPUTER / ARITHMETIC, restricted SPECIAL-NAMES) are screened by the ONE prototype-body screen shared with the function prototype - that registers no runtime module; a REPOSITORY `PROGRAM name` specifier resolves to it by §12.3.8.4 GR10 b) when no in-group definition shares its externalized name. The grammar tail is the shared `prototypePhrase`; the introduction gate is VersionConformancePass ParseArm.VisitPrototypePhrase, recognition-fired.",

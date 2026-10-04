@@ -44,7 +44,7 @@ INVOKE RESOLUTION (each grounded in a conformance .cob): `Class "New" RETURNING 
 
 METHOD ATTRS map cleanly because COBOL forbids implicit hiding: instance methods → `virtual` by default (§9.3.6 runtime-class dispatch); OVERRIDE→`override`; FINAL→`sealed override`; §11.7 SR4a (redefining a base signature without OVERRIDE is an ERROR) means we NEVER emit C# `new`/hiding. (ABSTRACT is NOT ISO — vendor extension only; dropped from the ISO surface. **Spec corrections #4.**)
 
-CORRECTNESS BLOCKER (the only one): GOBACK in a method ≠ STOP RUN. In a method GOBACK returns from the method only; STOP RUN ends the run unit. GOBACK and STOP RUN are distinct signals: STOP RUN binds to `BoundStop`, program GOBACK to `BoundGoback`, and a method-context GOBACK to a distinct `BoundMethodReturn` (carrying the RETURNING item, if any) whose method-return path is separate from the run-unit `StopRun` (see D8 and "Greenfield seams"). SETTLED (SSOT §18 item 18): COBOL allows MULTIPLE class inheritance (§11.3.2 `INHERITS FROM {name}…`), which `: Base` cannot express in C# — v1 restricts to single inheritance and rejects 2+ bases LOUDLY — LANDED (P9 Step 10): the grammar parses the §11.3.2 repetition (`INHERITS FROM? className+`, superset-parse doctrine — FROM is un-underlined on printed page 294, so it is an OPTIONAL WORD per §8.3.2.4.3 and `CLASS-ID. C INHERITS B.` is conforming; kb/Work PB695), `OoClassSymbol.Bases` carries the full list, and pass-1 raises COBOLNET0849 (negative corpus `oo-multi-base-inherits` + the `Class_MultiBaseInherits_0849` spine fact).
+CORRECTNESS BLOCKER (the only one): GOBACK in a method ≠ STOP RUN. In a method GOBACK returns from the method only; STOP RUN ends the run unit. GOBACK and STOP RUN are distinct signals: STOP RUN binds to `BoundStop`, program GOBACK to `BoundGoback`, and a method-context GOBACK to a distinct `BoundMethodReturn` (carrying the RETURNING item, if any) whose method-return path is separate from the run-unit `StopRun` (see D8 and "Greenfield seams"). SETTLED (SSOT §18 item 18): COBOL allows MULTIPLE class inheritance (§11.3.2 `INHERITS FROM {name}…`), which `: Base` cannot express in C# — v1 restricts to single inheritance and rejects 2+ bases LOUDLY — LANDED (P9 Step 10): the grammar parses the §11.3.2 repetition (`INHERITS FROM? className+`, superset-parse doctrine — FROM is un-underlined on printed page 294, so it is an OPTIONAL WORD per §8.3.2.4.3 and `CLASS-ID. C INHERITS B.` is conforming; kb/Work PB695), `OoClassSymbol.Bases` carries the full list, and pass-1 raises COBOLNET0849 over the DISTINCT names (negative corpus `oo-multi-base-inherits` + the `Class_MultiBaseInherits_0849` spine fact). The INHERITS clause's own rules are asked FIRST and of EVERY class definition, the parameterized skeletons `OoExpansion` keeps out of the table included (`OoExpansion.Result.ParameterizedClasses`): §11.3.3 SR7 (a name written twice), SR3 (the class itself), SR4 (a cycle) — COBOLNET2791 — and SR5 (a FINAL base, 0839; kb/Work PB1505, PB1020).
 
 ### The P9 subsystem topology (as-built 2026-07-16 — PHASE-09 Part A)
 
@@ -124,8 +124,13 @@ by the implementation. It may be used as the root of a class hierarchy to provid
 function. This use is not required". Its implementation is the runtime pair `CobolNet.Runtime.BASE` (object half —
 BaseInterface's `FactoryObject`, §16.2.2.2 GR1, a virtual `FACTORYOBJECT()` returning the abstract
 `__FactoryOfClass` every BASE-derived class overrides with its own singleton) and `BASE__FACTORY` (factory half —
-BaseFactoryInterface's `New`: the ONE non-virtual body `__New()` wrapping the covariant abstract `__Create()` every
-BASE-derived factory overrides with `new C()`; an `OutOfMemoryException` there is §16.2.1.2 GR2 — NULL, plus
+BaseFactoryInterface's `New`: the VIRTUAL body `CobolObject? __New()` wrapping the covariant abstract `__Create()` every
+BASE-derived factory overrides with `new C()`. Virtual because §16.2 does not declare New FINAL (kb/Work PB1582): a
+BASE subclass's `METHOD-ID. NEW OVERRIDE.` adopts `__New` as a C# `override` (§11.7.3 SR3; its result type is the
+universal one because §16.2's `object reference active-class` returning item crosses the ABI as the universal type),
+`INVOKE C "NEW"` then dispatches to it, `INVOKE SUPER "NEW"` inside it renders `base.__New()` (`InvokeForm.NewSuper`,
+non-virtual like every SUPER call) and `INVOKE SELF "NEW"` stays virtual (`NewSelf`). `METHOD-ID. NEW.` without
+OVERRIDE in a BASE subclass is §11.7.3 SR4 a) (0837); outside BASE's hierarchy NEW is an ordinary factory method-name; an `OutOfMemoryException` there is §16.2.1.2 GR2 — NULL, plus
 EC-OO-RESOURCE through `ExceptionState.OoResourceError` when checking for it is enabled). The names are the
 emitted-type convention for the class-name BASE (sanitize + uppercase, + `__FACTORY`), so `INHERITS FROM BASE`,
 `USAGE OBJECT REFERENCE BASE` and `FACTORY OF BASE` need no special case in the emitter.
@@ -265,7 +270,7 @@ NEVER CheckedTokenTypes. The VALUE clause needed a loop guard (both the valueIte
 multi-operand `valueClauseOperand+` item): at 2002+ PROPERTY terminates a VALUE clause — reserved, never a
 constant-name operand — else `VALUE 100 PROPERTY.` swallows the clause. PASS-1: interfaces build FIRST
 (OoInterfaceSymbol; prototypes via TryAddPrototype; the 0840 structural family — one class/interface
-namespace §8.3.2.2, END INTERFACE §10.7, §11.7.3 SR2/SR8 no prototype attributes, §10.6.2 SR4 header-only +
+namespace §8.3.2.2, §11.7.3 SR2/SR8 no prototype attributes, §10.6.2 SR4 header-only +
 LINKAGE-only data division); prototype LINKAGE binds through the SAME OoBindMethodData machinery
 (`OoBindInterfaceData`), so ValidateImplements compares RESOLVED descriptions. CONFORMANCE: the
 §9.3.11-via-§9.3.8.2.3 pass over the §11.8.4 GR2 closure (`ImplementsClosure`: direct + interface-INHERITed
@@ -305,9 +310,19 @@ synthesizes accessors per GR1/GR2 under the PINNED §11.7.4 GR1a names `__GET_<P
 emitter renders DIRECT field bodies (`=> subject;` / `{ subject = __V; }`) — observably identical to the
 spec's implicit-MOVE methods; WITH NO GET/SET suppresses a side; FINAL carries. Explicit
 `METHOD-ID. GET|SET PROPERTY p` methods join the roster under the SAME pinned names (real bodies), so
-override/0829/implements machinery applies to accessors UNCHANGED. The 0842 band: SR6/SR7 accessor shapes,
-SR5 clause+explicit duplicate, §13.18.42.3 SR4 superclass property collision, no-OCCURS subject, no-FILLER
-subject. Property REFERENCES (`P OF obj` — the §8.4.3.9.4 GR1–GR3 implicit-INVOKE desugar with
+override/0829/implements machinery applies to accessors UNCHANGED. ⛔ **OVERRIDE / FINAL RESOLVE OVER COMPLETE
+ROSTERS** (kb/Work PB1274): the clause's accessors are "a method implicitly generated for a data item described with
+the PROPERTY clause" (§8.4.3.9.1), i.e. superclass methods like any other, and WHICH entries carry the clause is a fact
+of the BOUND data (a SAME AS entry is "as though the data description identified by data-name-1 had been coded in
+place", §13.18.49.4 GR1) — so `OoClassTable.ResolveOverrides` (OVERRIDE marking, §11.7.3 SR3 / SR4 a), FINAL, and
+§13.18.42.3 SR4 by property-name over the base chain) runs ONCE, in `BinderDriver`, after every class's data has
+bound and before any signature is compared. It used to run inside `OoClassTable.Build`, before any clause accessor
+existed: an OVERRIDE of one was refused 0838, a FINAL one could be redefined, and SR4 depended on source order. The
+accessor rules each have one home: §11.7.3 SR5 (an explicit accessor for a data-name carrying ANY PROPERTY clause, WITH
+NO GET / NO SET included) in `DataBinder.OoBindPropertyClauses`; §11.7.3 SR6 / SR7 (the header — USING count, the
+RETURNING phrase, an ACTIVE-CLASS formal or returning item) on the BOUND header in `DataBinder.OoBindMethodData`, for
+instance, factory and interface-prototype accessors alike (COBOLNET2790, kb/Work PB1503); §13.18.42.3 SR2/SR3/SR5/SR6
+in `OoBindPropertyClauses` and SR4 in `ResolveOverrides` (COBOLNET2563). Property REFERENCES (`P OF obj` — the §8.4.3.9.4 GR1–GR3 implicit-INVOKE desugar with
 BoundSequence + temps; detected at the ReferenceResolver resolution-failure chokepoint by the
 single-qualifier + roster-property shape) are live. Each reference's POLARITY (GR1 sending / GR2 receiving / GR3
 both) is `BoundStores.StoreKindOf`, a TOTAL classification — a non-nullable answer from the exhaustive bound-statement
@@ -320,8 +335,13 @@ statement is a statement-level pre-op, but one written in a per-evaluation windo
 condition, a SEARCH WHEN, an EVALUATE object, a non-first AND/OR operand, a VARYING BY / AFTER FROM operand — is
 drained by that window (`UdfBinder.Mark` marks BOTH pending lists; `OoBinder.OoDrainPropertyGets`) and fetched at
 each evaluation, and not at all when a short-circuit never reaches it. Every such reference is sending, so the
-window never needs the GR2 SET. STAGED (named 0899, never a generic guard): GET/SET
-PROPERTY prototypes in interfaces. REGISTRY: interface-definition-2002, repository-interface-2002,
+window never needs the GR2 SET. INTERFACE PROPERTIES (kb/Work PB1449): §11.7.2's METHOD-ID format is shared by
+definitions and prototypes and §11.7.4 GR6/GR7 make a GET/SET phrase a get/set property method, so an interface's
+`METHOD-ID. GET|SET PROPERTY p` prototype joins its roster under the same pinned `__GET_<P>`/`__SET_<P>` name;
+`ValidateImplements` pairs it with the class's accessor (explicit or clause-defined) by that roster key, the C#
+interface declares the member, and `ReferenceResolver.OoTryBindPropertyReference` resolves `p OF i` for an
+interface-typed `i` over the interface's prototype closure (`AllPrototypes`) — the roster an INVOKE through `i`
+resolves over — with the interface qualifying the formal statics (`OoPendingPropertyOp.InterfaceCsName`). REGISTRY: interface-definition-2002, repository-interface-2002,
 repository-property-2002, implements-clause-2002, property-clause-2002, method-property-selector-2002
 (constructs.json rows for the four independently-reachable gates; bind-time `ConstructRegistry.Check` gates —
 the INTERFACE-ID unit at `OoClassTable`, both repository specifiers in `DataBinder`, the PROPERTY clause in the

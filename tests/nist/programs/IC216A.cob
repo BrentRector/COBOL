@@ -331,6 +331,7 @@
 033100 CCVS-EXIT SECTION.                                               IC2164.2
 033200 CCVS-999999.                                                     IC2164.2
 033300     GO TO CLOSE-FILES.                                           IC2164.2
+       END PROGRAM IC216A.
 000100 IDENTIFICATION DIVISION.                                         IC2174.2
 000200 PROGRAM-ID.                                                      IC2174.2
 000300     IC217A.                                                      IC2174.2

@@ -67,7 +67,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 else
                     post.Add(new BoundInvoke(form, op.ClassCsName, op.Receiver, op.Set.CsName, null,
                         [new BoundInvokeArg(op.Set.Binding!.Formals[0].Item, tempPlace, null, null, WriteBack: false)],
-                        null, op.Set.Owner?.CsName));
+                        null, op.OwnerCsNameOf(op.Set)));
             }
         }
         if (pre.Count + post.Count == 0) return core;
@@ -94,7 +94,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             return null;
         }
         return new BoundInvoke(op.Factory ? InvokeForm.Factory : InvokeForm.Instance, op.ClassCsName, op.Receiver,
-            op.Get.CsName, ctx.Refs.ResolveItem(op.Temp)!, null, op.Get.Binding!.Returning, op.Get.Owner?.CsName);
+            op.Get.CsName, ctx.Refs.ResolveItem(op.Temp)!, null, op.Get.Binding!.Returning, op.OwnerCsNameOf(op.Get));
     }
 
     /// <summary>Drain the property references registered since <paramref name="mark"/> for a PER-EVALUATION
@@ -424,7 +424,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // Every New form renders through the ONE runtime body (OoEmitter.EmitNew): the class-name form names
             // the factory by class, a FACTORY OF reference is the receiver, SELF/SUPER is `this`.
             StandardMethod.New => new BoundInvoke(
-                form is InvokeForm.Self or InvokeForm.Super ? InvokeForm.NewSelf : InvokeForm.New,
+                form switch
+                {
+                    InvokeForm.Self => InvokeForm.NewSelf,
+                    InvokeForm.Super => InvokeForm.NewSuper,
+                    _ => InvokeForm.New,
+                },
                 receiverClass?.CsName, receiver, null, ret),
             // FactoryObject is an ordinary instance call on the runtime BASE's virtual member (a COBOL override
             // adopts its CsName), so the Instance/Self/Super rendering and its GR5 null guard apply unchanged.

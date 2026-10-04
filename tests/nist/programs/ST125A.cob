@@ -432,6 +432,7 @@
 043200 INPROC-EXIT SECTION.                                             ST1254.2
 043300 EXITPARA.                                                        ST1254.2
 043400     PERFORM CLOSE-FILES.                                         ST1254.2
+       END PROGRAM ST125A.
 000100 IDENTIFICATION DIVISION.                                         ST1264.2
 000200 PROGRAM-ID.                                                      ST1264.2
 000300     ST126A.                                                      ST1264.2

@@ -504,6 +504,7 @@
 050400 CCVS-EXIT SECTION.                                               IX2014.2
 050500 CCVS-999999.                                                     IX2014.2
 050600     GO TO CLOSE-FILES.                                           IX2014.2
+       END PROGRAM IX201A.
 000100 IDENTIFICATION DIVISION.                                         IX2024.2
 000200 PROGRAM-ID.                                                      IX2024.2
 000300     IX202A.                                                      IX2024.2
@@ -1168,6 +1169,7 @@
 066200 CCVS-EXIT SECTION.                                               IX2024.2
 066300 CCVS-999999.                                                     IX2024.2
 066400     GO TO CLOSE-FILES.                                           IX2024.2
+       END PROGRAM IX202A.
 000100 IDENTIFICATION DIVISION.                                         IX2034.2
 000200 PROGRAM-ID.                                                      IX2034.2
 000300     IX203A.                                                      IX2034.2

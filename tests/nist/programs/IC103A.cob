@@ -495,6 +495,7 @@
 049500 CCVS-EXIT SECTION.                                               IC1034.2
 049600 CCVS-999999.                                                     IC1034.2
 049700     GO TO CLOSE-FILES.                                           IC1034.2
+       END PROGRAM IC103A.
 000100 IDENTIFICATION DIVISION.                                         IC1044.2
 000200 PROGRAM-ID.                                                      IC1044.2
 000300     IC104A.                                                      IC1044.2
@@ -566,6 +567,7 @@
 006900     MOVE "ABCD" TO EDITED-FIELD.                                 IC1044.2
 007000 CALL-EXIT-06.                                                    IC1044.2
 007100     EXIT PROGRAM.                                                IC1044.2
+       END PROGRAM IC104A.
 000100 IDENTIFICATION DIVISION.                                         IC1054.2
 000200 PROGRAM-ID.                                                      IC1054.2
 000300     IC105A.                                                      IC1054.2

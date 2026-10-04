@@ -63,9 +63,12 @@ public static class OoStandardClasses
     /// <summary>The method-name of BaseInterface's instance method, as §16.2 spells it.</summary>
     public const string FactoryObjectMethodName = "FactoryObject";
 
-    /// <summary>The runtime member that implements New: the covariant <c>__New()</c> every BASE-derived factory
-    /// class overrides (OO deep-dive D4). It is NOT the uppercase method-name, because New is never an ordinary
-    /// emitted method — no class of the group may declare a factory method of that name (COBOLNET0836).</summary>
+    /// <summary>The runtime member that implements New: the virtual <c>__New()</c> of <c>BASE__FACTORY</c>, which
+    /// creates through the covariant <c>__Create</c> every BASE-derived factory class overrides (OO deep-dive D4). It is
+    /// NOT the uppercase method-name: a COBOL <c>METHOD-ID. NEW OVERRIDE.</c> in a BASE subclass adopts it as a C#
+    /// <c>override</c> (the override takes its base slot's CsName, <c>OoClassTable.ResolveOverrides</c>), while a factory
+    /// method NEW in a class outside BASE's hierarchy is an ordinary method emitted under its own name (kb/Work
+    /// PB1582).</summary>
     public const string NewCsName = "__New";
 
     /// <summary>The runtime member that implements FactoryObject — the uppercase method-name, the same convention

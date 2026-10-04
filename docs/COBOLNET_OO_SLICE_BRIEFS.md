@@ -43,7 +43,7 @@ public class FOO__FACTORY : ANIMAL__FACTORY /* or CobolObject when no INHERITS *
 - `INVOKE FOO "NEW" RETURNING o` stays EXACTLY as landed: `o = new FOO()` (the generated ctor IS the predefined New; D4). No change to OoBindClassInvoke's NEW branch (StatementBinder.Oo.cs:241-281).
 - **`INVOKE SELF "NEW" RETURNING r` inside a FACTORY method** (the canonical factory-MAKE pattern): §16.2.1.2 GR1 + the BaseFactoryInterface prototype (:39148-39158 — `returning outObject usage object reference active-class`) mean New creates an instance of the RUNTIME factory's class. Realization: the generated `__New()` virtual (covariantly overridden per class) → bind to a new `InvokeForm.NewSelf`; emit `r = this.__New()`. An inherited MAKE reached via `INVOKE DOG "MAKE"` thereby creates a DOG. RETURNING is required (reuse the 0826 wording); USING on it is 0826 (NEW takes no arguments). Receiver conformance = the existing NEW check with cls = the CONTAINING class (containing.ConformsTo(declared) — a runtime subclass instance still conforms downstream).
 - **`INVOKE SUPER "NEW"`** in a factory method binds to the SAME `this.__New()`: SUPER restricts the METHOD SEARCH (§8.4.3.8 GR3) to the inherited factory interface, but the found method IS the predefined New, whose behavior is active-class creation on the object SUPER references (= the same runtime factory object, GR1 :7331). Document this equivalence in a code comment.
-- **A user factory METHOD-ID named NEW → COBOLNET0836** (new code; 0830-0835 are taken by INITIALIZE, 0836+ verified free). ISO permits overriding New, but v1 keeps NEW = the generated ctor (D4); reject loudly, cite §16.2.1 + the v1 restriction. (`INVOKE obj "NEW"` through an instance receiver already 0825s naturally — NEW is not in the instance interface.)
+- **A user factory METHOD-ID named NEW → COBOLNET0836** (new code; 0830-0835 are taken by INITIALIZE, 0836+ verified free). ISO permits overriding New, but v1 keeps NEW = the generated ctor (D4); reject loudly, cite §16.2.1 + the v1 restriction. (`INVOKE obj "NEW"` through an instance receiver already 0825s naturally — NEW is not in the instance interface.) **Superseded (kb/Work PB1582): 0836 is retired — outside BASE's hierarchy NEW is an ordinary factory method, and in a BASE subclass `METHOD-ID. NEW OVERRIDE.` overrides BASE's New (§11.7.3 SR3; COBOLNET_OO_DESIGN D4).**
 - SELF "NEW" in an INSTANCE method: falls out — the instance roster has no NEW → existing 0825.
 
 ## D13 — factory data binds in its OWN DataBinder forest (name separation is structural)
@@ -962,7 +962,7 @@ sync. Compile/test after every step (feedback_tiered_gates); one failing test at
 > conformance pass with covariant adapters, PROPERTY clause + explicit accessors, 0840/0841/0842 bands,
 > registry rows, 4 goldens). Decisions beyond this brief: the diagnostic codes are 0840–0843 (0836 is held
 > by FACTORY); factory IMPLEMENTS EMITS (D11 singletons, not the validate-only posture); interface GET/SET
-> PROPERTY prototypes are STAGED under a named 0899 — a later increment. The authoritative record is the
+> PROPERTY prototypes are IMPLEMENTED (kb/Work PB1449 — they join the interface roster under the pinned accessor names). The authoritative record is the
 > deep-dive's INTERFACE/PROPERTY section. **Property REFERENCES are also IMPLEMENTED** — the D-P2 desugar
 > as designed (codes 0843; the polarity classifier is `Binding/Bound/BoundStores.StoreKindOf`, a total
 > emitter-verified taxonomy walk; the factory leg is live directly). See the D-P2 realization notes below
@@ -1194,8 +1194,8 @@ mark-on-entry/drain-own-suffix discipline (a reference in an IF condition belong
 (7) invocation-count semantics are GOLDEN-proven: oo_property_explicit_ref's side-effecting accessors
 print exactly SET-CALLED then GET-CALLED for a receive-then-send pair (GR2 no-get / GR1 no-set);
 oo_property_ref exercises all three GR forms over synthesized accessors (the first RUNTIME exercise);
-oo_property_factory_ref proves the factory form. Interface GET/SET PROPERTY prototypes remain 0899
-(the interface-property leg rides the universal-reference/EC-OO waves).
+oo_property_factory_ref proves the factory form. Interface GET/SET PROPERTY prototypes are implemented (kb/Work PB1449;
+pb1449_interface_property reaches a property through an interface-typed reference).
 
 ---
 

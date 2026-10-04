@@ -1069,6 +1069,7 @@
 106900 CCVS-EXIT SECTION.                                               IX1094.2
 107000 CCVS-999999.                                                     IX1094.2
 107100     GO TO CLOSE-FILES.                                           IX1094.2
+       END PROGRAM IX109A.
 000100 IDENTIFICATION DIVISION.                                         IX1104.2
 000200 PROGRAM-ID.                                                      IX1104.2
 000300     IX110A.                                                      IX1104.2
@@ -1689,6 +1690,7 @@
 061700 CCVS-EXIT SECTION.                                               IX1104.2
 061800 CCVS-999999.                                                     IX1104.2
 061900     GO TO CLOSE-FILES.                                           IX1104.2
+       END PROGRAM IX110A.
 000100 IDENTIFICATION DIVISION.                                         IX1114.2
 000200 PROGRAM-ID.                                                      IX1114.2
 000300     IX111A.                                                      IX1114.2

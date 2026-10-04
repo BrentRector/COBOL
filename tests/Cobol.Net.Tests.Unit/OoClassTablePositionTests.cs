@@ -35,14 +35,14 @@ public sealed class OoClassTablePositionTests
         { "END-CLASS", """
             IDENTIFICATION DIVISION.
             CLASS-ID. PT2.
-            END CLASS PT2X. *> @0820
+            END CLASS PT2X. *> @2793
             """ },
         { "METHODS", """
             IDENTIFICATION DIVISION.
             CLASS-ID. PT3.
             FACTORY.
             PROCEDURE DIVISION.
-            METHOD-ID. NEW. *> @0836
+            METHOD-ID. NEW.
             END METHOD NEW.
             END FACTORY.
             OBJECT.
@@ -52,7 +52,7 @@ public sealed class OoClassTablePositionTests
             METHOD-ID. M1. *> @0822
             END METHOD M1.
             METHOD-ID. M2.
-            END METHOD M9. *> @0820
+            END METHOD M9. *> @2793
             METHOD-ID. M3 OVERRIDE. *> @0838
             END METHOD M3.
             END OBJECT.
@@ -74,10 +74,64 @@ public sealed class OoClassTablePositionTests
                 CLASS PB2.
             END CLASS PT5.
             """ },
+        // kb/Work PB1505 / PB1020: the §11.3.3 INHERITS rules (COBOLNET2791) land on the INHERITS name, the
+        // parameterized definition's included; kb/Work PB1503: the §11.7.3 property-method rules (COBOLNET2790) on the
+        // METHOD-ID and on the subject entry.
+        { "INHERITS-RULES", """
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PS1 INHERITS PS1. *> @2791
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS PS1.
+            END CLASS PS1.
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PS2 FINAL.
+            END CLASS PS2.
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PS3 INHERITS PS2 PS2. *> @2791
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS PS2.
+            END CLASS PS3.
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PS4 INHERITS PS2 USING T. *> @0839
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS PS2
+                CLASS T.
+            END CLASS PS4.
+            """ },
+        { "PROPERTY-METHODS", """
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PM1.
+            OBJECT.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 BAL PIC 9(4) PROPERTY WITH NO GET. *> @2790
+            PROCEDURE DIVISION.
+            METHOD-ID. GET PROPERTY BAL.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 LK-R PIC 9(4).
+            PROCEDURE DIVISION RETURNING LK-R.
+            END METHOD.
+            METHOD-ID. SET PROPERTY BAX. *> @2790
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 LK-A PIC 9(4).
+            01 LK-B PIC 9(4).
+            PROCEDURE DIVISION USING LK-A LK-B.
+            END METHOD.
+            END OBJECT.
+            END CLASS PM1.
+            """ },
         { "INTERFACES", """
             IDENTIFICATION DIVISION.
             INTERFACE-ID. PI1.
-            END INTERFACE PI1X. *> @0840
+            END INTERFACE PI1X. *> @2793
             IDENTIFICATION DIVISION.
             INTERFACE-ID. PI2 INHERITS NOIF. *> @0840
             ENVIRONMENT DIVISION.

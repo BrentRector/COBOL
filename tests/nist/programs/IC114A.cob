@@ -469,6 +469,7 @@
 046900 CCVS-EXIT SECTION.                                               IC1144.2
 047000 CCVS-999999.                                                     IC1144.2
 047100     GO TO CLOSE-FILES.                                           IC1144.2
+       END PROGRAM IC114A.
 000100 IDENTIFICATION DIVISION.                                         IC1154.2
 000200 PROGRAM-ID.                                                      IC1154.2
 000300     IC115A.                                                      IC1154.2

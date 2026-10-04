@@ -146,7 +146,7 @@ public static class OoConformance
                         using var atClass = edition.At(cls.Ctx.classIdParagraph().className(0));
                         edition.Error("COBOLNET0841",
                             $"class '{cls.Name}': the {side}interface '{iface.Name}' requires a method "
-                            + $"'{proto.Name}' and none is defined or inherited (ISO §9.3.11 — a class "
+                            + $"'{proto.SourceName}' and none is defined or inherited (ISO §9.3.11 — a class "
                             + "shall implement ALL the method prototypes of its interfaces, including "
                             + "inherited ones)");
                         continue;
@@ -157,7 +157,7 @@ public static class OoConformance
                                      $"the '{iface.Name}' prototype", cls.Name, iface.Name))
                         {
                             conforms = false;
-                            edition.Error("COBOLNET0841", $"class '{cls.Name}', method '{impl.Name}': {err}");
+                            edition.Error("COBOLNET0841", $"class '{cls.Name}', method '{impl.SourceName}': {err}");
                         }
                     // Conformant-but-covariant RETURNING: C# needs the explicit-implementation adapter — a question about
                     // the two C# TYPES the returns project to, not about their COBOL descriptions: two ACTIVE-CLASS

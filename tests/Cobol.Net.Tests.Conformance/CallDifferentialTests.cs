@@ -54,6 +54,7 @@ public sealed class CallDifferentialTests
                 CALL "CDREF1S" USING WS-CTR.
                 DISPLAY "AFTER=" WS-CTR.
                 STOP RUN.
+            END PROGRAM CDREF1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDREF1S.
             DATA DIVISION.
@@ -80,6 +81,7 @@ public sealed class CallDifferentialTests
                 CALL "CDCON1S" USING BY CONTENT WS-CTR.
                 DISPLAY "AFTER=" WS-CTR.
                 STOP RUN.
+            END PROGRAM CDCON1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDCON1S.
             DATA DIVISION.
@@ -108,6 +110,7 @@ public sealed class CallDifferentialTests
                 CALL "CDTRN1S" USING WS-A BY CONTENT WS-B WS-C.
                 DISPLAY "A=" WS-A " B=" WS-B " C=" WS-C.
                 STOP RUN.
+            END PROGRAM CDTRN1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDTRN1S.
             DATA DIVISION.
@@ -135,6 +138,7 @@ public sealed class CallDifferentialTests
                 CALL "CDSTA1S".
                 CALL "CDSTA1S".
                 STOP RUN.
+            END PROGRAM CDSTA1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDSTA1S.
             DATA DIVISION.
@@ -161,6 +165,7 @@ public sealed class CallDifferentialTests
                 CANCEL "CDCAN1S".
                 CALL "CDCAN1S".
                 STOP RUN.
+            END PROGRAM CDCAN1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDCAN1S.
             DATA DIVISION.
@@ -188,6 +193,7 @@ public sealed class CallDifferentialTests
             MAIN-P.
                 CALL "CDPOS1S" USING WS-A WS-B.
                 STOP RUN.
+            END PROGRAM CDPOS1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDPOS1S.
             DATA DIVISION.
@@ -216,6 +222,7 @@ public sealed class CallDifferentialTests
                 CALL WS-PGM USING WS-CTR.
                 DISPLAY "AFTER=" WS-CTR.
                 STOP RUN.
+            END PROGRAM CDDYN1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDDYN1S.
             DATA DIVISION.
@@ -244,6 +251,7 @@ public sealed class CallDifferentialTests
                 CALL "CDGRP1S" USING WS-REC.
                 DISPLAY "N=" WS-N " T=" WS-T.
                 STOP RUN.
+            END PROGRAM CDGRP1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDGRP1S.
             DATA DIVISION.

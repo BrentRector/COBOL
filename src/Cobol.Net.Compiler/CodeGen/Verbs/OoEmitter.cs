@@ -1320,6 +1320,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         {
             case InvokeForm.New:
             case InvokeForm.NewSelf:
+            case InvokeForm.NewSuper:
                 EmitNew(inv);
                 return;
             case InvokeForm.Instance:
@@ -1349,7 +1350,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         var ret = inv.Returning!;
         string factory;
         if (inv.Form is InvokeForm.NewSelf)
-            factory = "this";   // SELF|SUPER in a factory method: the RUNTIME factory (§14.9.23.3 SR4 f/h; GR3 finds the same New)
+            factory = "this";   // SELF in a factory method: the RUNTIME factory, virtually (§14.9.23.3 SR4 f) — an override runs
+        else if (inv.Form is InvokeForm.NewSuper)
+            factory = "base";   // SUPER: BASE's own New, non-virtually (§8.4.3.8.4 GR3; SR4 h) — never the caller's override (kb/Work PB1582)
         else if (inv.Receiver is { } recv)
         {
             // A FACTORY OF reference: GR5's null-receiver test comes first, and "execution of the INVOKE statement

@@ -516,6 +516,7 @@
 051600 CCVS-EXIT SECTION.                                               ST1154.2
 051700 CCVS-999999.                                                     ST1154.2
 051800     GO TO CLOSE-FILES.                                           ST1154.2
+       END PROGRAM ST115A.
 000100 IDENTIFICATION DIVISION.                                         ST1164.2
 000200 PROGRAM-ID.                                                      ST1164.2
 000300     ST116A.                                                      ST1164.2
@@ -700,6 +701,7 @@
 018200         GIVING SQ-FS2.                                           ST1164.2
 018300 STOP-THE-RUN.                                                    ST1164.2
 018400     STOP RUN.                                                    ST1164.2
+       END PROGRAM ST116A.
 000100 IDENTIFICATION DIVISION.                                         ST1174.2
 000200 PROGRAM-ID.                                                      ST1174.2
 000300     ST117A.                                                      ST1174.2

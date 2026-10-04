@@ -54,7 +54,9 @@ public sealed class OoNameResolutionDriftTests
                 + "where they were WRITTEN (the data description entry, and RaisingPhrase.Partition's funnel "
                 + "lookup)"),
         [Path.Combine("Binding", "ReferenceResolver.cs")] =
-            (1, "the property-reference INSTANCE form's re-lookup of the receiving item's declared class"),
+            (2, "the property-reference INSTANCE form's re-lookup of the receiving item's declared class, and of its "
+                + "declared INTERFACE for an interface-typed receiver (kb/Work PB1449) — a descriptor name, scope-checked "
+                + "where the data description entry WROTE it"),
         [Path.Combine("CodeGen", "EmitterState.cs")] =
             (2, "AutomaticPropagation.Of (kb/Work PB1119, §14.6.13.1.5 EXIT/GOBACK item 3): the re-lookup of each "
                 + "class / interface an element's PROCEDURE DIVISION header RAISING phrase names, to render its C# "

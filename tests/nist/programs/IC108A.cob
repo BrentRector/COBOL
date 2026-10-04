@@ -442,6 +442,7 @@
 044200 CCVS-EXIT SECTION.                                               IC1084.2
 044300 CCVS-999999.                                                     IC1084.2
 044400     GO TO CLOSE-FILES.                                           IC1084.2
+       END PROGRAM IC108A.
 000100 IDENTIFICATION DIVISION.                                         IC1094.2
 000200 PROGRAM-ID.                                                      IC1094.2
 000300     IC109A.                                                      IC1094.2
@@ -507,6 +508,7 @@
 006300     MOVE WS1 TO DN9.                                             IC1094.2
 006400 EXIT-IC109.                                                      IC1094.2
 006500     EXIT PROGRAM.                                                IC1094.2
+       END PROGRAM IC109A.
 000100 IDENTIFICATION DIVISION.                                         IC1104.2
 000200 PROGRAM-ID.                                                      IC1104.2
 000300     IC110A.                                                      IC1104.2
@@ -576,6 +578,7 @@
 006700     MOVE "B" TO LS1.                                             IC1104.2
 006800 EXIT-IC110.                                                      IC1104.2
 006900     EXIT PROGRAM.                                                IC1104.2
+       END PROGRAM IC110A.
 000100 IDENTIFICATION DIVISION.                                         IC1114.2
 000200 PROGRAM-ID.                                                      IC1114.2
 000300     IC111A.                                                      IC1114.2

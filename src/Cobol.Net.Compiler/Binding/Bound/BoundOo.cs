@@ -35,10 +35,16 @@ public enum InvokeForm
     /// method through the class's factory singleton (§11.4/§9.3.6; brief D11 — never null, no guard;
     /// virtual, so an inherited factory override dispatches).</summary>
     Factory,
-    /// <summary><c>INVOKE SELF|SUPER "New" RETURNING r</c> inside a FACTORY method → <c>r = (T)this.__New()</c>
+    /// <summary><c>INVOKE SELF "New" RETURNING r</c> inside a FACTORY method → <c>r = (T)this.__New()</c>
     /// (§16.2.1.2 GR1 ACTIVE-CLASS creation: the covariant per-class <c>__Create</c> override makes an inherited
-    /// factory MAKE create the RUNTIME factory's class — the canonical factory pattern).</summary>
+    /// factory MAKE create the RUNTIME factory's class — the canonical factory pattern). VIRTUAL, like every SELF
+    /// call: a subclass's <c>NEW OVERRIDE</c> runs (kb/Work PB1582).</summary>
     NewSelf,
+    /// <summary><c>INVOKE SUPER "New" RETURNING r</c> inside a FACTORY method → <c>r = (T)base.__New()</c> — the
+    /// standard class BASE's own New, reached NON-virtually exactly as every SUPER call is (§8.4.3.8.4 GR3), so a
+    /// <c>NEW OVERRIDE</c> that delegates to it creates the object instead of recursing into itself (kb/Work
+    /// PB1582). The object it creates is still the RUNTIME factory's class (the virtual <c>__Create</c>).</summary>
+    NewSuper,
 }
 
 /// <summary>A bound INVOKE (ISO §14.9.23; deep-dive D5): the RESOLVED call form plus everything the backend

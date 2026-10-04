@@ -477,6 +477,7 @@
 047700 CCVS-EXIT SECTION.                                               IC2074.2
 047800 CCVS-999999.                                                     IC2074.2
 047900     GO TO CLOSE-FILES.                                           IC2074.2
+       END PROGRAM IC207A.
 000100 IDENTIFICATION DIVISION.                                         IC2084.2
 000200 PROGRAM-ID.                                                      IC2084.2
 000300     IC208A.                                                      IC2084.2

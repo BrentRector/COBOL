@@ -617,6 +617,7 @@
 061700 CCVS-EXIT SECTION.                                               IC2014.2
 061800 CCVS-999999.                                                     IC2014.2
 061900     GO TO CLOSE-FILES.                                           IC2014.2
+       END PROGRAM IC201A.
 000100 IDENTIFICATION DIVISION.                                         IC2024.2
 000200 PROGRAM-ID.                                                      IC2024.2
 000300     IC202A.                                                      IC2024.2

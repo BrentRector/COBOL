@@ -230,14 +230,14 @@ public sealed class OoSpineTests
             END PROGRAM OOSP6.
             """), "COBOLNET0813");
 
-    /// <summary>§10.7 — END CLASS names its class.</summary>
+    /// <summary>§10.7.3 SR4 — END CLASS names its class (Validation.EndMarkerPass; kb/Work PB988).</summary>
     [Fact]
-    public void EndClassNameMismatch_0820()
+    public void EndClassNameMismatch_2793()
         => EditionHarness.AssertHasDiagnostic(ErrorsOf("""
             IDENTIFICATION DIVISION.
             CLASS-ID. OSPC7.
             END CLASS OTHER7.
-            """), "COBOLNET0820");
+            """), "COBOLNET2793");
 
     /// <summary>D9 (v1) — method names unique per class; §12063 overloading is optional and deferred.</summary>
     [Fact]
@@ -1126,9 +1126,9 @@ public sealed class OoSpineTests
 
     /// <summary>§9.3.8.2 — an override whose SIGNATURE does not conform to the overridden method is the
     /// compile-time COBOLNET0829 (never a Roslyn CS error on user source); trap #7 — SUPER in a root class
-    /// and SELF outside any method are clean 0827 placement diagnostics; an INHERITS cycle is 0820.</summary>
+    /// and SELF outside any method are clean 0827 placement diagnostics; an INHERITS cycle is ISO §11.3.3 SR4 (COBOLNET2791, kb/Work PB1505).</summary>
     [Fact]
-    public void InheritanceDiagnostics_0829_0827_0820()
+    public void InheritanceDiagnostics_0829_0827_2791()
     {
         EditionHarness.AssertHasDiagnostic(ErrorsOf("""
             IDENTIFICATION DIVISION.
@@ -1213,7 +1213,7 @@ public sealed class OoSpineTests
             REPOSITORY.
                 CLASS A29.
             END CLASS B29.
-            """), "COBOLNET0820");
+            """), "COBOLNET2791");
     }
 
     // ── The 3a/3b adversarial-review fixes (workflow find→verify, DEVLOG 603) ───────────────────────────────
@@ -1609,7 +1609,8 @@ public sealed class OoSpineTests
 
     /// <summary>An instance method and a factory method may SHARE a name (§9.3.6 — two interfaces): INVOKE
     /// through the class-name resolves the FACTORY roster, through an object the INSTANCE roster — dual
-    /// dispatch, no collision. A factory METHOD-ID named NEW is the 0836 v1 restriction; INVOKE class-name
+    /// dispatch, no collision. A factory METHOD-ID named NEW in a BASE subclass without OVERRIDE is the §11.7.3
+    /// SR4 a) 0837 (kb/Work PB1582); INVOKE class-name
     /// of a method in NEITHER factory roster is the SR3 0825; SUPER in a ROOT class's factory method is the
     /// trap-#7 0827 (factory flavor); a BY REFERENCE argument reading FACTORY WS violates SR 10 (0828).</summary>
     [Fact]
@@ -1662,9 +1663,15 @@ public sealed class OoSpineTests
         Assert.True(ok, detail);
         Assert.Equal("FACTORY-PING\nINSTANCE-PING", CutRunner.Normalize(stdout));
 
+        // kb/Work PB1582: a factory METHOD-ID NEW in a BASE subclass redefines BASE's New, so without OVERRIDE it is
+        // ISO §11.7.3 SR4 a) (0837) — it used to be the blanket 0836 "a factory method may not be named NEW".
         EditionHarness.AssertHasDiagnostic(ErrorsOf("""
             IDENTIFICATION DIVISION.
-            CLASS-ID. OSPC37.
+            CLASS-ID. OSPC37 INHERITS FROM BASE.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS BASE.
             IDENTIFICATION DIVISION.
             FACTORY.
             PROCEDURE DIVISION.
@@ -1673,7 +1680,7 @@ public sealed class OoSpineTests
             END METHOD NEW.
             END FACTORY.
             END CLASS OSPC37.
-            """), "COBOLNET0836");
+            """), "COBOLNET0837");
         EditionHarness.AssertHasDiagnostic(ErrorsOf(DriverAndClass("OOSP38", "OSPC38", """
                 INVOKE OSPC38 "NOFM".
             """, """
@@ -2065,14 +2072,14 @@ public sealed class OoSpineTests
             END CLASS MBBASEB.
             """), "COBOLNET0849");
 
-    /// <summary>§10.7 — END INTERFACE names its interface (the 0840 structural family).</summary>
+    /// <summary>§10.7.3 SR6 — END INTERFACE names its interface (Validation.EndMarkerPass; kb/Work PB988).</summary>
     [Fact]
-    public void Interface_EndNameMismatch_0840()
+    public void Interface_EndNameMismatch_2793()
         => EditionHarness.AssertHasDiagnostic(ErrorsOf("""
             IDENTIFICATION DIVISION.
             INTERFACE-ID. ISPK52.
             END INTERFACE OTHER52.
-            """), "COBOLNET0840");
+            """), "COBOLNET2793");
 
     /// <summary>§10.6.2 SR4 f) — a method prototype is a header only. A body is COBOLNET2272, the ONE
     /// prototype-body screen every prototype kind shares (kb/Work PB894; formerly the 0840 family).</summary>
@@ -2090,9 +2097,9 @@ public sealed class OoSpineTests
             END INTERFACE ISPK53.
             """), "COBOLNET2272");
 
-    /// <summary>§11.7 SR6 — a GET accessor has no USING and exactly one RETURNING (0842).</summary>
+    /// <summary>ISO §11.7.3 SR6 — a GET accessor has no USING and a single RETURNING (COBOLNET2790, kb/Work PB1503).</summary>
     [Fact]
-    public void AccessorShape_GetWithUsing_0842()
+    public void AccessorShape_GetWithUsing_2790()
         => EditionHarness.AssertHasDiagnostic(ErrorsOf("""
             IDENTIFICATION DIVISION.
             CLASS-ID. CPRP54.
@@ -2107,11 +2114,12 @@ public sealed class OoSpineTests
             END METHOD.
             END OBJECT.
             END CLASS CPRP54.
-            """), "COBOLNET0842");
+            """), "COBOLNET2790");
 
-    /// <summary>§11.7 SR5 — a PROPERTY-clause subject shall not ALSO have an explicit accessor (0842).</summary>
+    /// <summary>ISO §11.7.3 SR5 — a PROPERTY-clause subject shall not ALSO have an explicit accessor (COBOLNET2790,
+    /// kb/Work PB1503 — its own rule now, no longer a by-product of an accessor-name collision).</summary>
     [Fact]
-    public void PropertyClause_DuplicateExplicitAccessor_0842()
+    public void PropertyClause_DuplicateExplicitAccessor_2790()
         => EditionHarness.AssertHasDiagnostic(ErrorsOf("""
             IDENTIFICATION DIVISION.
             CLASS-ID. CPRP55.
@@ -2129,7 +2137,7 @@ public sealed class OoSpineTests
             END METHOD.
             END OBJECT.
             END CLASS CPRP55.
-            """), "COBOLNET0842");
+            """), "COBOLNET2790");
 
     /// <summary>The property REFERENCE binds (§8.4.3.9 — the GR1 implicit get-INVOKE desugar; DEVLOG 607
     /// retired the DEVLOG-606 named-0899 stage) when the §8.4.3.9.3 SR1 REPOSITORY specifier is present.</summary>

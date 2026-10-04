@@ -1884,6 +1884,24 @@ internal sealed class VersionConformancePass
         /// `externalizedNamePhrase?` and nothing else (kb/Work PB303). The specifier's OWN
         /// repository-program-2002 gate stands beside this one exactly as options-paragraph-2002 stands beside
         /// arithmetic-standard-2002 — two true statements about one line of source.</summary>
+        public override object? VisitExternalizedNamePhrase(CobolParserCore.ExternalizedNamePhraseContext ctx)
+        {
+            _p.Check(Constructs.ExternalizedNameAs2002, "the AS externalized-name phrase");
+            return base.VisitChildren(ctx);
+        }
+
+        /// <summary>The FUNCTION-ID paragraph of a function DEFINITION (§11.5 Format 1) — with its END FUNCTION marker
+        /// (§10.7.2), a COBOL-2002 introduction (kb/Work PB988, row FMT-10.7.2). The prototype format is gated once,
+        /// on its <c>prototypePhrase</c>, by <see cref="VisitPrototypePhrase"/>; END FUNCTION closing a PROGRAM-ID
+        /// unit is §10.6.1's keyword rule at every edition (<c>SourceUnitShape</c>), so recognizing the paragraph
+        /// covers every END FUNCTION an 85 source can write.</summary>
+        public override object? VisitFunctionIdParagraph(CobolParserCore.FunctionIdParagraphContext ctx)
+        {
+            if (ctx.prototypePhrase() is null)
+                _p.Check(Constructs.FunctionDefinition2002, "a FUNCTION-ID paragraph (user-defined function definition)");
+            return base.VisitChildren(ctx);
+        }
+
         /// <summary>The IS PROTOTYPE tail — FUNCTION-ID's prototype format and §11.10.2 Format 2 (PROGRAM-ID), both
         /// COBOL-2002 introductions. ONE parse node, <c>prototypePhrase</c>, identifies both, so the gate is
         /// recognition-fired here (kb/Work PB894). It used to be a BOUND-arm check over <c>BoundUnit.IsPrototype</c>,
@@ -1895,12 +1913,6 @@ internal sealed class VersionConformancePass
                 _p.Check(Constructs.FunctionPrototype2002, "a FUNCTION-ID … IS PROTOTYPE (function prototype)");
             else
                 _p.Check(Constructs.ProgramPrototype2002, "a PROGRAM-ID … IS PROTOTYPE (program prototype)");
-            return base.VisitChildren(ctx);
-        }
-
-        public override object? VisitExternalizedNamePhrase(CobolParserCore.ExternalizedNamePhraseContext ctx)
-        {
-            _p.Check(Constructs.ExternalizedNameAs2002, "the AS externalized-name phrase");
             return base.VisitChildren(ctx);
         }
 

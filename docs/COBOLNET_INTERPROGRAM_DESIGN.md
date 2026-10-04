@@ -74,7 +74,7 @@ ISO §8.3.2.2 2) is the whole rule: *"For any externalized user-defined words fo
 | the EXTERNAL clause's `AS literal-1` | §13.18.22.4 GR5 — "Literal-1, if specified, is the name of the file connector or record that is **externalized to the operating environment**" | the run-unit `ExternalStore` cell key (`DataItem.ExternalizedAs` / `FileModel.ExternalName`) |
 | §12.3.8.4 GR10 a) search of the compilation group | "the externalized name of a program definition" | `ExternalizedName` |
 | `INVOKE` literal-1 or identifier-2 | §14.9.23.4 GR2 a) — the same formula; and §14.9.23.2 gives INVOKE **no word form at all** | the method roster key = `ExternalizedName` |
-| `END PROGRAM` / `END FUNCTION` / `END CLASS` / `END METHOD` | §10.7.3 SR2 — "identical to the program-name declared in a preceding PROGRAM-ID paragraph" | `Name` |
+| `END PROGRAM` / `END FUNCTION` / `END CLASS` / `END INTERFACE` / `END METHOD` | §10.7.3 SR2 — "identical to the program-name declared in a preceding PROGRAM-ID paragraph" (SR4–SR9 the same of each other alternative; all asked once, pre-bind, by `Validation.EndMarkerPass` — kb/Work PB988) | the WORD in the ID paragraph (`Name`) |
 | `CALL ... AS NESTED` literal-1 | §14.9.4.3 SR15 — "the same as the **program-name** specified in a PROGRAM-ID paragraph" | `Name` (and §11.10.3 SR2 forbids AS on a containee, so the two coincide there) |
 | `FUNCTION user-function-name` | §8.4.6.6 / §8.4.6.7 scope the WORD | `Name` |
 | an object-class-name / interface-name | §8.4.6.4 scopes the WORD | `Name` |

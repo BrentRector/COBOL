@@ -573,6 +573,7 @@
 057300*    NOTE     THE RETURN VERB WITHOUT OPTIONAL WORDS.             ST1014.2
 057400 OUTP3-EXIT.                                                      ST1014.2
 057500     PERFORM  CLOSE-FILES.                                        ST1014.2
+       END PROGRAM ST101A.
 000100 IDENTIFICATION DIVISION.                                         ST1024.2
 000200 PROGRAM-ID.                                                      ST1024.2
 000300     ST102A.                                                      ST1024.2
@@ -651,6 +652,7 @@
 007600       GIVING SORTOUT-1B.                                         ST1024.2
 007700 STOP-RUN-STATEMENT.                                              ST1024.2
 007800     STOP RUN.                                                    ST1024.2
+       END PROGRAM ST102A.
 000100 IDENTIFICATION DIVISION.                                         ST1034.2
 000200 PROGRAM-ID.                                                      ST1034.2
 000300     ST103A.                                                      ST1034.2

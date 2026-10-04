@@ -553,6 +553,7 @@
 055300 CCVS-EXIT SECTION.                                               IC1124.2
 055400 CCVS-999999.                                                     IC1124.2
 055500     GO TO CLOSE-FILES.                                           IC1124.2
+       END PROGRAM IC112A.
 000100 IDENTIFICATION DIVISION.                                         IC1134.2
 000200 PROGRAM-ID.                                                      IC1134.2
 000300     IC113A.                                                      IC1134.2

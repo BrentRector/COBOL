@@ -380,6 +380,7 @@
 038000 CCVS-EXIT SECTION.                                               IC1014.2
 038100 CCVS-999999.                                                     IC1014.2
 038200     GO TO CLOSE-FILES.                                           IC1014.2
+       END PROGRAM IC101A.
 000100 IDENTIFICATION DIVISION.                                         IC1024.2
 000200 PROGRAM-ID.                                                      IC1024.2
 000300     IC102A.                                                      IC1024.2

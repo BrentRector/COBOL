@@ -561,6 +561,7 @@
 056100 CCVS-EXIT SECTION.                                               RL2064.2
 056200 CCVS-999999.                                                     RL2064.2
 056300     GO TO CLOSE-FILES.                                           RL2064.2
+       END PROGRAM RL206A.
 000100 IDENTIFICATION DIVISION.                                         RL2074.2
 000200 PROGRAM-ID.                                                      RL2074.2
 000300     RL207A.                                                      RL2074.2
@@ -1625,6 +1626,7 @@
 106200 CCVS-EXIT SECTION.                                               RL2074.2
 106300 CCVS-999999.                                                     RL2074.2
 106400     GO TO CLOSE-FILES.                                           RL2074.2
+       END PROGRAM RL207A.
 000100 IDENTIFICATION DIVISION.                                         RL2084.2
 000200 PROGRAM-ID.                                                      RL2084.2
 000300     RL208A.                                                      RL2084.2

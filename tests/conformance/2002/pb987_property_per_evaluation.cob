@@ -93,7 +93,7 @@
            ADD 1 TO CNT.
            MOVE CNT TO LK-P.
            GOBACK.
-       END METHOD P.
+       END METHOD.
        METHOD-ID. GET PROPERTY Q.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -102,6 +102,6 @@
        Q-P.
            MOVE CNT TO LK-Q.
            GOBACK.
-       END METHOD Q.
+       END METHOD.
        END OBJECT.
        END CLASS PB987C.

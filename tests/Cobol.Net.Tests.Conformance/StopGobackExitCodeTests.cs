@@ -338,6 +338,7 @@ public sealed class StopGobackExitCodeTests
                 CALL "SGSUB".
                 DISPLAY "resumed".
                 STOP RUN.
+            END PROGRAM SGMAIN.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. SGSUB.
             PROCEDURE DIVISION.
@@ -366,6 +367,7 @@ public sealed class StopGobackExitCodeTests
                 DISPLAY "ran".
                 CALL "SGSSUB".
                 STOP RUN.
+            END PROGRAM SGSMAIN.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. SGSSUB.
             PROCEDURE DIVISION.

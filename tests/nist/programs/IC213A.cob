@@ -339,6 +339,7 @@
 033900 CCVS-EXIT SECTION.                                               IC2134.2
 034000 CCVS-999999.                                                     IC2134.2
 034100     GO TO CLOSE-FILES.                                           IC2134.2
+       END PROGRAM IC213A.
 000100 IDENTIFICATION DIVISION.                                         IC2144.2
 000200 PROGRAM-ID.                                                      IC2144.2
 000300     IC214A.                                                      IC2144.2
@@ -375,6 +376,7 @@
 003400     MOVE 1 TO DN1.                                               IC2144.2
 003500 IC214-EXIT.                                                      IC2144.2
 003600     EXIT PROGRAM.                                                IC2144.2
+       END PROGRAM IC214A.
 000100 IDENTIFICATION DIVISION.                                         IC2154.2
 000200 PROGRAM-ID.                                                      IC2154.2
 000300     IC215A.                                                      IC2154.2

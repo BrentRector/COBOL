@@ -56,6 +56,7 @@ public sealed class InterProgramFileDifferentialTests
                 DISPLAY "EL4=" TBL-EL (4) "]".
                 DISPLAY "EL5=" TBL-EL (5) "]".
                 STOP RUN.
+            END PROGRAM ODOREF1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ODOREF1S.
             DATA DIVISION.
@@ -102,6 +103,7 @@ public sealed class InterProgramFileDifferentialTests
                 DISPLAY "GOT=" EF-REC "]".
                 CLOSE EF.
                 STOP RUN.
+            END PROGRAM EXTFD1.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. EXTFD1S.
             ENVIRONMENT DIVISION.

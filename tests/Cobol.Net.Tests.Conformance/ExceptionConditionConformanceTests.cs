@@ -703,6 +703,7 @@ public sealed class ExceptionConditionConformanceTests
                 END-CALL.
                 DISPLAY "ALSO-NEVER".
                 STOP RUN.
+            END PROGRAM ECT233C.
 
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT233CM.
@@ -1006,6 +1007,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT027S".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT027.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT027S.
             PROCEDURE DIVISION RAISING EC-USER-PROP.
@@ -1040,6 +1042,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT028S".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT028.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT028S.
             PROCEDURE DIVISION RAISING EC-USER-Q.
@@ -1084,6 +1087,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408AS".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408A.
             >>TURN EC-USER CHECKING OFF
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408AS.
@@ -1113,6 +1117,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408BS".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408B.
             >>TURN EC-USER CHECKING ON
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408BS.
@@ -1143,6 +1148,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408CS".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408C.
             >>TURN EC-SIZE CHECKING OFF
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408CS.
@@ -1166,6 +1172,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408DS".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408D.
             >>TURN EC-SIZE CHECKING ON
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408DS.
@@ -1195,6 +1202,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408ES".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408E.
             >>TURN EC-USER CHECKING OFF
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408ES.
@@ -1281,6 +1289,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408GS".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408G.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408GS.
             PROCEDURE DIVISION.
@@ -1318,6 +1327,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT408HS".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT408H.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT408HS.
             PROCEDURE DIVISION.
@@ -1366,6 +1376,7 @@ public sealed class ExceptionConditionConformanceTests
                 CALL "ECT030S".
                 DISPLAY "AFTER-CALL".
                 STOP RUN.
+            END PROGRAM ECT030.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ECT030S.
             PROCEDURE DIVISION RAISING EC-USER-EXIT.

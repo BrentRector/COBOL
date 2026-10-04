@@ -78,6 +78,7 @@
 007800*                                                                 OBIC14.2
 007900 END-OF-PROGRAM.                                                  OBIC14.2
 008000     EXIT PROGRAM.                                                OBIC14.2
+       END PROGRAM OBIC1A.
 000100 IDENTIFICATION DIVISION.                                         OBIC24.2
 000200 PROGRAM-ID.                                                      OBIC24.2
 000300     OBIC2A.                                                      OBIC24.2
@@ -388,6 +389,7 @@
 030800     EXIT.                                                        OBIC24.2
 030900 SECT-IC219-0003-EXIT.                                            OBIC24.2
 031000     EXIT.                                                        OBIC24.2
+       END PROGRAM OBIC2A.
 000100 IDENTIFICATION DIVISION.                                         OBIC34.2
 000200 PROGRAM-ID.                                                      OBIC34.2
 000300     OBIC3A.                                                      OBIC34.2

@@ -455,6 +455,7 @@
 045500 CCVS-EXIT SECTION.                                               RL1014.2
 045600 CCVS-999999.                                                     RL1014.2
 045700     GO TO CLOSE-FILES.                                           RL1014.2
+       END PROGRAM RL101A.
 000100 IDENTIFICATION DIVISION.                                         RL1024.2
 000200 PROGRAM-ID.                                                      RL1024.2
 000300     RL102A.                                                      RL1024.2
@@ -1072,6 +1073,7 @@
 061500 CCVS-EXIT SECTION.                                               RL1024.2
 061600 CCVS-999999.                                                     RL1024.2
 061700     GO TO CLOSE-FILES.                                           RL1024.2
+       END PROGRAM RL102A.
 000100 IDENTIFICATION DIVISION.                                         RL1034.2
 000200 PROGRAM-ID.                                                      RL1034.2
 000300     RL103A.                                                      RL1034.2

@@ -398,6 +398,7 @@
 039800 INPROC-EXIT SECTION.                                             ST1064.2
 039900 EXITPARA.                                                        ST1064.2
 040000     PERFORM CLOSE-FILES.                                         ST1064.2
+       END PROGRAM ST106A.
 000100 IDENTIFICATION DIVISION.                                         ST1074.2
 000200 PROGRAM-ID.                                                      ST1074.2
 000300     ST107A.                                                      ST1074.2

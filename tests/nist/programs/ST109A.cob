@@ -366,6 +366,7 @@
 036600 CCVS-EXIT SECTION.                                               ST1094.2
 036700 CCVS-999999.                                                     ST1094.2
 036800     GO TO CLOSE-FILES.                                           ST1094.2
+       END PROGRAM ST109A.
 000100 IDENTIFICATION DIVISION.                                         ST1104.2
 000200 PROGRAM-ID.                                                      ST1104.2
 000300     ST110A.                                                      ST1104.2
@@ -471,6 +472,7 @@
 010300              USING SORTIN-1J                                     ST1104.2
 010400              GIVING SORTOUT-1J.                                  ST1104.2
 010500     STOP     RUN.                                                ST1104.2
+       END PROGRAM ST110A.
 000100 IDENTIFICATION DIVISION.                                         ST1114.2
 000200 PROGRAM-ID.                                                      ST1114.2
 000300     ST111A.                                                      ST1114.2

@@ -68,11 +68,16 @@ public abstract class BASE__FACTORY : CobolObject
     /// exception condition is set to exist and is propagated back to the runtime element that invoked the New
     /// method". An allocation failure is the one resource a managed object's creation can lack; the condition
     /// raises through the ordinary fatal path when checking for it is enabled (<see
-    /// cref="ExceptionState.OoResourceError"/>), and otherwise NULL is returned. Non-virtual: this is the ONE
-    /// body every New form reaches (the class-name, FACTORY OF, SELF/SUPER and inline forms), and the emitted
-    /// delivery narrows the result to the receiving item's type — a cast the binder's §14.8.3.3 conformance check
-    /// has already proved safe.</summary>
-    public BASE? __New()
+    /// cref="ExceptionState.OoResourceError"/>), and otherwise NULL is returned. Every New form reaches it (the
+    /// class-name, FACTORY OF, SELF/SUPER and universal forms), and the emitted delivery narrows the result to the
+    /// receiving item's type — a cast the binder's §14.8.3.3 conformance check has already proved safe.
+    /// <para>VIRTUAL, because §16.2 does not declare New FINAL: a BASE subclass may write <c>METHOD-ID. NEW
+    /// OVERRIDE.</c> (§11.7.3 SR3; kb/Work PB1582), whose emitted member overrides this one, and <c>INVOKE SUPER
+    /// "NEW"</c> inside it reaches this body as <c>base.__New()</c>. Its result type is the universal object type
+    /// because that is how §16.2's returning item — <c>object reference active-class</c> — crosses the method ABI
+    /// (an ACTIVE-CLASS item crosses as the universal type, OoEmitter.OoFormalCrossingType), so a COBOL override's
+    /// emitted signature is this one.</para></summary>
+    public virtual CobolObject? __New()
     {
         try
         {

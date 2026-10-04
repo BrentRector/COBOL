@@ -350,6 +350,7 @@
 035000 CCVS-EXIT SECTION.                                               ST1044.2
 035100 CCVS-999999.                                                     ST1044.2
 035200     GO TO   CLOSE-FILES.                                         ST1044.2
+       END PROGRAM ST104A.
 000100 IDENTIFICATION DIVISION.                                         ST1054.2
 000200 PROGRAM-ID.                                                      ST1054.2
 000300     ST105A.                                                      ST1054.2

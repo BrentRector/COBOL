@@ -97,6 +97,6 @@
        P-P.
            MOVE 40 TO LK-P.
            GOBACK RAISING EXCEPTION EC-USER-PB2.
-       END METHOD P.
+       END METHOD.
        END OBJECT.
        END CLASS PB892K.

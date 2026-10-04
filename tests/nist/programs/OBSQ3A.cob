@@ -645,6 +645,7 @@
 064500 CCVS-EXIT SECTION.                                               OBSQ34.2
 064600 CCVS-999999.                                                     OBSQ34.2
 064700     GO TO CLOSE-FILES.                                           OBSQ34.2
+       END PROGRAM OBSQ3A.
 000100 IDENTIFICATION DIVISION.                                         OBSQ44.2
 000200 PROGRAM-ID.                                                      OBSQ44.2
 000300     OBSQ4A.                                                      OBSQ44.2
@@ -1219,6 +1220,7 @@
 057200 CCVS-EXIT SECTION.                                               OBSQ44.2
 057300 CCVS-999999.                                                     OBSQ44.2
 057400     GO TO CLOSE-FILES.                                           OBSQ44.2
+       END PROGRAM OBSQ4A.
 000100 IDENTIFICATION DIVISION.                                         OBSQ54.2
 000200 PROGRAM-ID.                                                      OBSQ54.2
 000300     OBSQ5A.                                                      OBSQ54.2

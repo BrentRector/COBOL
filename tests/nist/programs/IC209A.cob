@@ -350,6 +350,7 @@
 035000 CCVS-EXIT SECTION.                                               IC2094.2
 035100 CCVS-999999.                                                     IC2094.2
 035200     GO TO CLOSE-FILES.                                           IC2094.2
+       END PROGRAM IC209A.
 000100 IDENTIFICATION DIVISION.                                         IC2104.2
 000200 PROGRAM-ID.                                                      IC2104.2
 000300     IC210A.                                                      IC2104.2
@@ -400,6 +401,7 @@
 004800     MOVE "Y" TO TEST4.                                           IC2104.2
 004900 IC210-EXIT.                                                      IC2104.2
 005000     EXIT PROGRAM.                                                IC2104.2
+       END PROGRAM IC210A.
 000100 IDENTIFICATION DIVISION.                                         IC2114.2
 000200 PROGRAM-ID.                                                      IC2114.2
 000300     IC211A.                                                      IC2114.2
@@ -440,6 +442,7 @@
 003800     MOVE "Y" TO TEST2.                                           IC2114.2
 003900 IC211-EXIT.                                                      IC2114.2
 004000     EXIT PROGRAM.                                                IC2114.2
+       END PROGRAM IC211A.
 000100 IDENTIFICATION DIVISION.                                         IC2124.2
 000200 PROGRAM-ID.                                                      IC2124.2
 000300     IC212A.                                                      IC2124.2

@@ -33,7 +33,7 @@ public sealed class OoPortedTests
     //       OOSELF/COUNTER DRIVE/BUMP N=2 program, verbatim)
     //   Invoke_MultiMethod_FirstMethodDoesNotFallIntoSecond -> OoSpineTests.Trap4_MethodFallThrough_
     //       DoesNotEnterSiblingMethod (its doc comment names this legacy guard)
-    //   Invoke_SuperInRootClass_FailsLoudly        -> OoSpineTests.InheritanceDiagnostics_0829_0827_0820
+    //   Invoke_SuperInRootClass_FailsLoudly        -> OoSpineTests.InheritanceDiagnostics_0829_0827_2791
     //       (SUPER in a root class is the clean COBOLNET0827; the legacy code was COBOL0115)
     //   Inherits_SubclassOwnData_FailsLoudly       -> SUPERSEDED: subclass-own OBJECT data is fully
     //       SUPPORTED (the legacy COBOL0113 staging reject is retired); the positive guard is

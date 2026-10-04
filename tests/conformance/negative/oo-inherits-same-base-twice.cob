@@ -1,8 +1,8 @@
 *> reject-at: 2002 2014 2023
 *> ISO 11.3.3 SR7's OWN subject: "A given class name shall not appear more than once in an INHERITS
-*> clause." Annex A.4.10 item 1 (multiple inheritance) is DECLINED, so the repetition that would make the
-*> rule reachable is refused first. The pre-existing fixture oo-multi-base-inherits uses two DISTINCT base
-*> names, so this rule had no witness on its own subject.
+*> clause." The rule is asked on the written names BEFORE the declined Annex A.4.10 item 1 (multiple
+*> inheritance), which counts DISTINCT names (kb/Work PB1020) - one class written twice is the SR7 violation,
+*> not a use of multiple inheritance. oo-multi-base-inherits keeps two DISTINCT names (COBOLNET0849).
        IDENTIFICATION DIVISION.
        CLASS-ID. MBDUP INHERITS FROM MBBASEA MBBASEA.
        END CLASS MBDUP.

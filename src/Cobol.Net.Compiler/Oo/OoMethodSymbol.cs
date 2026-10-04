@@ -96,6 +96,16 @@ public sealed record OoMethodSymbol(
     public char Accessor { get; init; }
     public string? PropertyName { get; init; }
 
+    /// <summary>The method as the SOURCE names it, for a diagnostic: <c>GET PROPERTY p</c> / <c>SET PROPERTY p</c>
+    /// for an accessor (whose <see cref="Name"/> is the implementor-defined roster name of §11.7.4 GR1 a), never
+    /// written by the user), else the method-name.</summary>
+    public string SourceName => Accessor switch
+    {
+        'G' => $"GET PROPERTY {PropertyName}",
+        'S' => $"SET PROPERTY {PropertyName}",
+        _ => Name,
+    };
+
     /// <summary>Which method of the standard class BASE this is (ISO §16.2 — its factory interface's New, its
     /// object interface's FactoryObject), or <see cref="StandardMethod.None"/> for every method written in the
     /// compilation group. A standard method has no METHOD-ID in source (its <see cref="Ctx"/> is null, like a
@@ -135,9 +145,9 @@ public sealed record OoMethodSymbol(
     public OoMethodDataScope DataScope { get; } = new();
 
     /// <summary>The base-chain method this method OVERRIDES (slice 3a — §9.3.6 dispatch is on the runtime
-    /// class; D7: emitted as C# <c>override</c>), or null for a fresh <c>virtual</c> slot. Marked at pass-1
-    /// by name (the OVERRIDE attribute is not in the grammar yet — the documented SR4a leniency); the
-    /// SIGNATURE conformance (§9.3.8.2) validates after all class data binds
+    /// class; D7: emitted as C# <c>override</c>), or null for a fresh <c>virtual</c> slot. Marked by roster key
+    /// by <see cref="OoClassTable.ResolveOverrides"/> once every roster — PROPERTY-clause accessors included — is
+    /// complete (kb/Work PB1274); the SIGNATURE conformance (§9.3.8.2) validates right after
     /// (<see cref="OoConformance.ValidateOverrideSignatures"/>).</summary>
     public OoMethodSymbol? OverrideOf { get; set; }
 }

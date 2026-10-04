@@ -394,6 +394,8 @@ public sealed partial class DataBinder
             else
                 header.CheckReturning(rref.GetText(), m.Binding!.Returning);   // SR5 / SR6 — SR6 was mis-cited "SR4" here
         }
+        ScreenPropertyMethodHeader(m, pd?.usingClause()?.usingParameter().Length ?? 0,
+            m.Owner is { } owner ? $"class '{owner.Name}'{(m.IsFactory ? " (FACTORY)" : "")}: " : "");
         // §13.7.3 SR4: which of the method's linkage records its procedure division may reference — the ONE decision
         // the program/function arm takes at the same point (SR5 bars a FUNCTION's formals, so a method has none).
         SealLinkageRules(m.Binding!.LinkageRoots, m.Binding!.Formals.Select(f => f.Item).ToList(),
@@ -439,6 +441,46 @@ public sealed partial class DataBinder
                             // through the method's trailing __retLen parameter (§13.18.2.4 GR1 b); OoEmitter.OoSignatureOf).
             root.IsAnyLength = false;
         }
+    }
+
+    /// <summary>ISO §11.7.3 SR6 / SR7 — the header a GET or SET PROPERTY method shall have, asked of the BOUND header
+    /// (kb/Work PB1503): every METHOD-ID with the GET or SET phrase passes here — a class's instance and factory
+    /// methods and an interface's prototypes alike — and nowhere else. SR6: "If the GET phrase is specified, then the
+    /// method shall have no USING phrase parameters specified in the procedure division header and shall have a single
+    /// RETURNING phrase. The returning item shall not be an object reference described with the ACTIVE-CLASS phrase."
+    /// SR7: "If the SET phrase is specified, then the method shall have a single USING parameter specified in the
+    /// procedure division header and no RETURNING phrase. The USING parameter shall not be an object reference
+    /// described with the ACTIVE-CLASS phrase." <paramref name="usingCount"/> counts the parameters WRITTEN (a formal
+    /// the header screen refused still counts), so the emitter's "the setter's one formal" is an invariant.</summary>
+    private void ScreenPropertyMethodHeader(OoMethodSymbol m, int usingCount, string owner)
+    {
+        if (m.Accessor == '\0') return;
+        var b = m.Binding!;
+        bool get = m.Accessor == 'G';
+        string? fault = get
+            ? usingCount > 0 || !m.HasReturning
+                ? "a get property method shall have no USING phrase parameters specified in the procedure division "
+                  + "header and shall have a single RETURNING phrase (ISO §11.7.3 SR6)"
+              : IsActiveClassReference(b.Returning)
+                ? "the returning item of a get property method shall not be an object reference described with the "
+                  + "ACTIVE-CLASS phrase (ISO §11.7.3 SR6)"
+              : null
+            : usingCount != 1 || m.HasReturning
+                ? "a set property method shall have a single USING parameter specified in the procedure division header "
+                  + $"and no RETURNING phrase — this one has {usingCount} USING parameter(s)"
+                  + (m.HasReturning ? " and a RETURNING phrase" : "") + " (ISO §11.7.3 SR7)"
+              : b.Formals.Count == 1 && IsActiveClassReference(b.Formals[0].Item)
+                ? "the USING parameter of a set property method shall not be an object reference described with the "
+                  + "ACTIVE-CLASS phrase (ISO §11.7.3 SR7)"
+              : null;
+        if (fault is not null)
+        {
+            using var _ = Edition.At(m.Ctx);
+            Edition.Error(DiagnosticCatalog.PropertyMethodRule,
+                $"{owner}METHOD-ID {(get ? "GET" : "SET")} PROPERTY {m.PropertyName}: {fault}");
+        }
+
+        static bool IsActiveClassReference(DataItem? item) => item?.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass };
     }
 
     /// <summary>The C# parameter name for a formal: the TAGGED family <see cref="NamingConvention.FormalParameterName"/>
@@ -490,10 +532,17 @@ public sealed partial class DataBinder
     /// instance form, null for the <c>prop OF Class-name</c> factory form), the accessor symbols found on
     /// the pinned-name roster (either may be null — SR3/SR4 checked against the CLASSIFIED polarity, not
     /// eagerly), and the source names for diagnostics. Registered by ReferenceResolver at resolution time,
-    /// drained by StatementBinder.OoWrapPropertyOps after the carrying statement binds.</summary>
+    /// drained by StatementBinder.OoWrapPropertyOps after the carrying statement binds. <paramref name="InterfaceCsName"/>
+    /// is the emitted C# interface of an INTERFACE-typed receiver (kb/Work PB1449) — the accessors are then the
+    /// interface's prototypes, which have no owning class, and the interface carries their formals' statics exactly as
+    /// it does for an INVOKE through the same reference; null for a class receiver (each accessor's own class).</summary>
     internal sealed record OoPendingPropertyOp(
         DataItem Temp, Place? Receiver, string ClassCsName, bool Factory,
-        OoMethodSymbol? Get, OoMethodSymbol? Set, string PropName, string ReceiverName);
+        OoMethodSymbol? Get, OoMethodSymbol? Set, string PropName, string ReceiverName, string? InterfaceCsName = null)
+    {
+        /// <summary>The emitted type that qualifies <paramref name="accessor"/>'s formal statics at the call site.</summary>
+        public string? OwnerCsNameOf(OoMethodSymbol accessor) => InterfaceCsName ?? accessor.Owner?.CsName;
+    }
 
     /// <summary>The unit's un-drained property-reference ops (statement-scoped: BindStatement marks the
     /// count on entry and drains only its own suffix, so a reference in an IF condition belongs to the IF,
@@ -631,17 +680,19 @@ public sealed partial class DataBinder
     /// <c>__GET_&lt;P&gt;</c>/<c>__SET_&lt;P&gt;</c>) for every OBJECT/FACTORY working-storage item that carries a
     /// PROPERTY clause (§13.18.42): GET returns the SUBJECT item's description; SET takes one formal of it. The
     /// emitter renders DIRECT field bodies — observably identical to the spec's implicit MOVE methods (§13.18.42.4
-    /// GR1/GR2) because the descriptions are identical by construction. WITH NO GET/SET suppresses the accessor;
-    /// explicit GET/SET PROPERTY methods (already on the roster) take precedence — a clause + an explicit accessor
-    /// for the same property is the §11.7 SR5 duplicate (0842).
+    /// GR1/GR2) because the descriptions are identical by construction. WITH NO GET/SET suppresses the accessor; an
+    /// explicit GET/SET PROPERTY method of the subject's name (already on the roster) is §11.7.3 SR5, asked here as its
+    /// own rule (COBOLNET2790), and the clause then defines nothing.
     /// <para>⛔ THE SUBJECT IS THE ITEM THAT CARRIES THE CLAUSE (<see cref="DataItem.Property"/>, kb/Work PB1273).
     /// This used to walk the PARSE entries and find each subject by FIRST NAME MATCH over the whole forest, so with
     /// two same-named items the accessor bound whichever came first in tree order — a wrong answer, and the one
     /// SR3 exists to prevent. The §13.18.42.3 screens asked here are the ones that need the finished object name
-    /// space and ancestry: SR2 (subject to an OCCURS clause, by ancestry too), SR3's qualification half, SR4
-    /// (superclass collision), SR5 (CONSTANT RECORD requires WITH NO SET) and SR6 (no ACTIVE-CLASS object
-    /// reference). SR1 is <c>BindEntry</c>'s; SR3's elementary half and §13.16.3 SR21 are the clause-placement
-    /// table's.</para></summary>
+    /// space and ancestry: SR2 (subject to an OCCURS clause, by ancestry too), SR3's qualification half, SR5
+    /// (CONSTANT RECORD requires WITH NO SET) and SR6 (no ACTIVE-CLASS object reference). SR1 is <c>BindEntry</c>'s;
+    /// SR3's elementary half and §13.16.3 SR21 are the clause-placement table's; SR4 (a superclass's property-name)
+    /// is <c>OoClassTable.ResolveOverrides</c>', asked once every class's accessors exist (kb/Work PB1274).</para>
+    /// <para>The accessors this pass adds are what <c>OoClassTable.ResolveOverrides</c> resolves OVERRIDE / FINAL over
+    /// (§13.18.42.4 GR3 — a FINAL clause's accessors are FINAL), so it runs before that pass for every class.</para></summary>
     internal void OoBindPropertyClauses(OoClassSymbol cls, bool factory)
     {
         string where = $"class '{cls.Name}'{(factory ? " (FACTORY)" : "")}";
@@ -688,12 +739,26 @@ public sealed partial class DataBinder
                 continue;
             }
             DeclareUserWord(subjName, UserWordKind.PropertyName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
-            // Superclass property-name collision (§13.18.42.3 SR4): walk the base chain's accessor rosters.
-            for (var b = cls.Base; b is not null; b = b.Base)
-                if ((factory ? b.FactoryMethods : b.Methods).Any(bm =>
-                        CobolNames.Same(bm.PropertyName, subjName)))
-                    Edition.Error("COBOLNET0842", $"{where}: property '{subjName}' collides with a property "
-                        + $"of superclass '{b.Name}' (ISO §13.18.42.3 SR4)");
+            // §13.18.42.3 SR4 (a superclass's property-name) is asked by OoClassTable.ResolveOverrides once EVERY roster of
+            // the group is complete — asked here, it saw a base's clause accessors only when the base was bound first.
+
+            // §11.7.3 SR5 — "If property-name-1 is specified as a data-name in the working-storage section of the
+            // containing object definition, the PROPERTY clause shall not be specified in the data description entry of
+            // that data-name": ANY explicit GET or SET PROPERTY method of this name, whatever the clause's WITH NO GET /
+            // WITH NO SET says (kb/Work PB1503 — the rule used to be a by-product of an accessor-name COLLISION, so the
+            // NO GET + explicit GET pair, which synthesizes no colliding accessor, compiled). The clause then defines no
+            // accessor: the explicit method keeps the property.
+            if ((factory ? cls.FactoryMethods : cls.Methods).FirstOrDefault(m =>
+                    m.Ctx is not null && CobolNames.Same(m.PropertyName, subjName)) is { } explicitAccessor)
+            {
+                Edition.Error(DiagnosticCatalog.PropertyMethodRule, $"{where}: METHOD-ID "
+                    + $"{(explicitAccessor.Accessor == 'G' ? "GET" : "SET")} PROPERTY {subjName} names a data-name of the "
+                    + $"{(factory ? "factory" : "object")} working-storage section that carries the PROPERTY clause; if "
+                    + "property-name-1 is specified as a data-name in the working-storage section of the containing "
+                    + "object definition, the PROPERTY clause shall not be specified in the data description entry of "
+                    + "that data-name (ISO §11.7.3 SR5)");
+                continue;
+            }
 
             if (!pc.NoGet)
                 AddAccessor('G', NamingConvention.GetAccessorName(subjName));
@@ -712,11 +777,13 @@ public sealed partial class DataBinder
                 };
                 m.Binding = new OoMethodBinding();   // synthesized accessors carry their signature immediately
                 if (kind == 'G') m.Binding.Returning = subject; else m.Binding.Formals.Add(new OoFormal(subject, 0, "__V"));
-                bool added = factory ? cls.TryAddFactoryMethod(m) : cls.TryAddMethod(m);
-                if (!added)
-                    Edition.Error("COBOLNET0842", $"{where}: duplicate accessor for property '{subjName}' — "
-                        + "a data-name with the PROPERTY clause shall not also have an explicit GET/SET "
-                        + "PROPERTY method (ISO §11.7.3 SR5), and only one PROPERTY clause per name");
+                // The roster key cannot be taken: an explicit accessor of this name was refused above (SR5), a second
+                // subject of this name was refused as needing qualification (§13.18.42.3 SR3), and no METHOD-ID name
+                // maps into the `__` accessor family (§11.7.4 GR1 a)'s pinned names).
+                if (!(factory ? cls.TryAddFactoryMethod(m) : cls.TryAddMethod(m)))
+                    throw new InvalidOperationException(
+                        $"{where}: PROPERTY accessor '{csName}' is already on the roster — §11.7.3 SR5 and §13.18.42.3 SR3 "
+                        + "were to make that impossible");
             }
         }
 

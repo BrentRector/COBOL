@@ -1852,9 +1852,11 @@ public static class DiagnosticCatalog
     // implemented") was DELETED by kb/Work PB1308 (decision R62): a method's WORKING-STORAGE SECTION is illegal at
     // every edition (COBOLNET1519, ISO §13.5.3 SR1), so no item of one can carry EXTERNAL and no site can raise it. The
     // NAME is retired and never reused.
-    public static readonly DiagnosticDescriptor OoInterfacePropertyPrototype = new(
-        NotImplemented, "oo-interface-property-prototype", EditionSeverity.Error,
-        "A GET/SET PROPERTY prototype in an interface is not yet implemented.", "ISO §10.6.2", RecognizedNotImplemented);
+    // ⛔ `oo-interface-property-prototype` (COBOLNET0899, "A GET/SET PROPERTY prototype in an interface is not yet
+    // implemented") was DELETED by kb/Work PB1449: §11.7.2's format is shared by method definitions and prototypes and
+    // §11.7.4 GR6/GR7 make either a get / set property method, so an interface's GET/SET PROPERTY prototype joins its
+    // roster under the pinned accessor name and a property reference through an interface-typed object reference
+    // invokes it. The NAME is retired and never reused.
     // ⛔ `oo-method-declaratives` is DELETED, not disabled (kb/Work PB1010): ISO §14.2.2 SR10 admits the declaratives
     // format in a method definition, and a method's declaratives now bind and dispatch as its own (the per-method
     // declarative table + the method-local selection machinery) — never reallocate the id.
@@ -6256,16 +6258,19 @@ public static class DiagnosticCatalog
     /// <summary>COBOLNET2563 — a PROPERTY clause breaks one of §13.18.42.3's syntax rules (kb/Work PB1273): SR1 (only in
     /// the working-storage section of a factory or instance definition — <c>DataBinder.BindEntry</c>), SR3's elementary
     /// half (the clause-placement table's ElementaryOnly row), and SR2 / SR3's qualification half / SR5 / SR6, asked of
-    /// the item that carries the clause by <c>DataBinder.OoBindPropertyClauses</c>. The site names the rule it caught.
-    /// SR4 (superclass collision) and the duplicate-accessor rule keep COBOLNET0842; §13.16.3 SR21 keeps COBOLNET2333.</summary>
+    /// the item that carries the clause by <c>DataBinder.OoBindPropertyClauses</c>, and SR4 (the subject's data-name is
+    /// a property-name defined in a superclass), asked once every roster of the group is complete by
+    /// <c>OoClassTable.ResolveOverrides</c> (kb/Work PB1274 — source-order free). The site names the rule it caught.
+    /// §13.16.3 SR21 keeps COBOLNET2333.</summary>
     public static readonly DiagnosticDescriptor PropertyClauseRule = new(
         "COBOLNET2563", "property-clause-rule", EditionSeverity.Error,
         "A PROPERTY clause is written where ISO §13.18.42.3 does not admit it: SR1 — only in the working-storage section "
         + "of a factory definition or an instance definition; SR2 — not for a data item subject to an OCCURS clause; "
         + "SR3 — only for an elementary item whose name does not require qualification for uniqueness of reference; "
+        + "SR4 — the subject's data-name shall not be a property-name defined in a superclass; "
         + "SR5 — in or under a CONSTANT RECORD, the SET phrase (WITH NO SET) shall be specified; SR6 — not for an "
         + "object reference described with ACTIVE-CLASS. The site names the rule it caught.",
-        "ISO §13.18.42.3 SR1/SR2/SR3/SR5/SR6");
+        "ISO §13.18.42.3 SR1/SR2/SR3/SR4/SR5/SR6");
 
     /// <summary>COBOLNET2630 — a prefixed literal whose CONTENT is outside its format's repertoire (kb/Work PB1441,
     /// PB1394): §8.3.3.2.3 SR5 / §8.3.3.5.3 SR4 "Hex-character-sequence-1 shall be composed of hexadecimal digits"
@@ -6584,6 +6589,51 @@ public static class DiagnosticCatalog
         + "header and one DECLARATIVES portion; §14.4.1: 'If one paragraph is in a section, all paragraphs shall be in "
         + "sections.' Put the leading sentences and paragraphs in a section, or remove the sections and DECLARATIVES.",
         "ISO §14.2.1; §14.4.1");
+    /// <summary>COBOLNET2790 — a GET or SET PROPERTY method (an explicit METHOD-ID, or an interface's prototype) breaks
+    /// one of §11.7.3's property-method syntax rules (kb/Work PB1503): SR5, an explicit accessor for a data-name of the
+    /// containing object's working storage that carries a PROPERTY clause (ANY PROPERTY clause, WITH NO GET / WITH NO SET
+    /// included — asked by <c>DataBinder.OoBindPropertyClauses</c>); SR6 / SR7, the accessor's BOUND procedure division
+    /// header — the number of USING parameters, the RETURNING phrase, and an ACTIVE-CLASS formal or returning item
+    /// (asked by <c>DataBinder.OoBindMethodData</c>, the first point where the header is resolved). The site names the
+    /// rule it caught.</summary>
+    public static readonly DiagnosticDescriptor PropertyMethodRule = new(
+        "COBOLNET2790", "property-method-rule", EditionSeverity.Error,
+        "A GET or SET PROPERTY method breaks a syntax rule of the METHOD-ID paragraph: SR5 — a property-name that is a "
+        + "data-name in the working-storage section of the containing object definition shall not carry a PROPERTY "
+        + "clause; SR6 — a get property method has no USING parameters and a single RETURNING phrase whose item is not "
+        + "an ACTIVE-CLASS object reference; SR7 — a set property method has a single USING parameter, not an "
+        + "ACTIVE-CLASS object reference, and no RETURNING phrase. The site names the rule it caught.",
+        "ISO §11.7.3 SR5/SR6/SR7");
+
+    /// <summary>COBOLNET2791 — the INHERITS clause of a CLASS-ID paragraph breaks one of §11.3.3's syntax rules on
+    /// object-class-name-2 (kb/Work PB1505, PB1020): SR3 (the class names itself), SR4 (object-class-name-2 inherits
+    /// from the class being defined, directly or indirectly — a cycle) or SR7 (a class name written twice). Asked of
+    /// EVERY class definition, the parameterized skeletons <c>OoExpansion</c> keeps out of the class table included,
+    /// by <c>OoClassTable.Build</c>; SR7 is asked before the declined multiple-inheritance facility (COBOLNET0849,
+    /// Annex A.4.10 item 1), which counts DISTINCT names. The site names the rule it caught.</summary>
+    public static readonly DiagnosticDescriptor ClassInheritsRule = new(
+        "COBOLNET2791", "class-inherits-rule", EditionSeverity.Error,
+        "The INHERITS clause of a CLASS-ID paragraph breaks a syntax rule: SR3 — object-class-name-2 shall not be the "
+        + "name of the class declared by this class definition; SR4 — object-class-name-2 shall not inherit from "
+        + "object-class-name-1 directly or indirectly; SR7 — a given class name shall not appear more than once in an "
+        + "INHERITS clause. The site names the rule it caught.",
+        "ISO §11.3.3 SR3/SR4/SR7");
+
+    /// <summary>COBOLNET2793 — an end marker breaks one of §10.7.3's syntax rules (kb/Work PB988): SR1 (a program
+    /// definition that contains or precedes another source unit has no END PROGRAM), SR2 / SR4 / SR6 / SR7 / SR8 / SR9
+    /// (the marker's name is not the name its definition's ID paragraph declared), SR3 (the END PROGRAM markers of
+    /// nested programs are out of order) or SR5 (an END METHOD name differs from the METHOD-ID's, or names a GET/SET
+    /// PROPERTY method at all). Asked of EVERY source unit by the one pre-bind walk,
+    /// <c>Validation.EndMarkerPass</c>. The site names the rule it caught.</summary>
+    public static readonly DiagnosticDescriptor EndMarkerRule = new(
+        "COBOLNET2793", "end-marker-rule", EditionSeverity.Error,
+        "An end marker breaks a syntax rule: SR1 — an end marker shall be present in every source unit that contains, "
+        + "is contained in, or precedes another source unit; SR2/SR4/SR6/SR7/SR8/SR9 — the name in the end marker "
+        + "shall be identical to the name declared in the corresponding PROGRAM-ID, CLASS-ID, INTERFACE-ID or "
+        + "FUNCTION-ID paragraph; SR3 — the END PROGRAM marker of a contained program shall precede the END PROGRAM "
+        + "marker of the program that contains it; SR5 — method-name-1 shall be identical to the METHOD-ID's "
+        + "method-name, and shall be omitted for a GET or SET PROPERTY method. The site names the rule it caught.",
+        "ISO §10.7.3 SR1/SR2/SR3/SR4/SR5/SR6/SR7/SR8/SR9");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

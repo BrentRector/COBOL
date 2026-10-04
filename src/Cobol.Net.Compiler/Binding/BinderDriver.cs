@@ -67,6 +67,10 @@ internal sealed class BinderDriver
         // PB351, PB1146): a conditional statement as an imperative-statement operand (§14.5.1) and a body mixing
         // §14.2.1 Format 1 and Format 2 (§14.4.1). Pre-bind for the same reason: pure syntax over the raw tree.
         global::CobolNet.Validation.ProcedureFormatPass.Run(tree, edition);
+        // ISO §10.7.3 — every end marker against the definition it ends, and SR1's presence rule (kb/Work PB988).
+        // Pre-bind for the same reason: a pure syntax rule over the raw tree, asked once of EVERY definition the
+        // source states (parameterized skeletons included) before the OO table renames anything.
+        global::CobolNet.Validation.EndMarkerPass.Run(tree, edition);
         // WHERE a directive may be written, for the placement rules that need the parse tree (kb/Work PB1005, PB1065,
         // PB1377, PB1378): PUSH ALL / POP ALL (§7.3.22.3 SR3, §7.3.20.3 SR3), FLAG-02 / FLAG-14 (§7.3.14.3 SR1,
         // §7.3.15.3 SR1) between clauses and statements; LEAP-SECOND / PROPAGATE outside every compilation unit
@@ -100,6 +104,9 @@ internal sealed class BinderDriver
         var oo = new OoDriver(session);   // P9 R1 — the OO bind driver is a binder collaborator, not an emitter seam
         foreach (var iface in table.Interfaces) oo.BindInterfaceData(iface);   // prototype formals (§10.6.2 SR4)
         foreach (var cls in classes) oo.BindClassData(cls);   // ALL signatures before ANY body (D1 pass-1)
+        // OVERRIDE / FINAL over COMPLETE rosters — a PROPERTY clause's accessors exist only once its class's data has
+        // bound (ISO §13.18.42.4 GR1/GR2; kb/Work PB1274), and every signature comparison below reads the marking.
+        table.ResolveOverrides(edition);
         // §14.9.23.4 GR7 c)'s METHOD-side half, folded once now that every method symbol exists — at the method's
         // PROCEDURE DIVISION HEADER, the program twin's query point (TurnState.EnabledAtHeader; kb/Work PB1381).
         // See OoMethodSymbol.OoUniversalCheckingHere for why this is bind-time.
@@ -393,7 +400,8 @@ internal sealed class BinderDriver
         // §9.3.12 / §9.3.13 (kb/Work PB759): a parameterized definition is a SKELETON, never a class; each
         // REPOSITORY EXPANDS phrase creates one, and from here on an expansion is an ordinary definition.
         var expanded = OoExpansion.Expand(tree, classDefs, ifaceDefs, edition, words);
-        var table = OoClassTable.Build(expanded.Classes, edition, expanded.Interfaces, expanded.ParameterizedNames);
+        var table = OoClassTable.Build(expanded.Classes, edition, expanded.Interfaces, expanded.ParameterizedNames,
+            expanded.ParameterizedClasses);
         var classes = table.Classes.Select(sym => new OoClassUnit { Symbol = sym }).ToList();
         return (all, classes, table);
 
