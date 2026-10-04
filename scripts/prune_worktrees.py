@@ -50,7 +50,8 @@ def classify(branch, names):
     if git('merge-base', '--is-ancestor', branch, 'origin/main').returncode == 0:
         return 'MERGED', [], []
     absent = [f for f in git('diff', '--name-only', '--diff-filter=A', 'origin/main...' + branch).stdout.split()
-              if (f.startswith('src/') or f.startswith('tests/conformance')) and git('cat-file', '-e', 'origin/main:' + f).returncode != 0]
+              if not f.startswith(('TestResults/', 'tools/')) and f != 'STATUS.md'
+              and git('cat-file', '-e', 'origin/main:' + f).returncode != 0]   # ANY added file absent from main counts (2026-10-04: a branch that added only scripts/ and docs/ was classified LANDED and would have been deleted)
     declared = set()
     for c in git('rev-list', '--no-merges', 'origin/main..' + branch).stdout.split():
         for line in git('show', '--format=', '-U0', c, '--', '*.cs').stdout.split('\n'):

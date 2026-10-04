@@ -13,6 +13,18 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1871 — 2026-10-04 15:50 PDT — `prune_worktrees.py` no longer calls a branch that adds only scripts or docs LANDED
+
+`classify()` counted a missing file as proof of unlanded work only under `src/` and `tests/conformance`. The orchestrator
+prototype branch adds only `scripts/orchestrator/*`, `docs/rearchitecture/DESIGN-orchestrator-loop.md` and `kb/Work` edits, so the
+dry run reported it LANDED and `--apply` would have archived and deleted unlanded work (the rule is "never remove UNLANDED").
+Any file added by the branch and absent from `origin/main` now makes it UNLANDED (generated `TestResults/`, the submodule
+`tools/` and the gitignored `STATUS.md` excluded); a branch whose files main later renamed shows as UNLANDED and needs a look,
+the safe direction. Checked on the prototype branch: UNLANDED, with `scripts/orchestrator/alloc.py`, `autostart.ps1` and the design
+doc named. Found by reading the dry run's classification of the new branch before running `--apply`.
+
+**Files:** `scripts/prune_worktrees.py`. No diagnostic code used.
+
 ## Entry 1870 — 2026-10-04 15:25 PDT — The CI invariant in CLAUDE.md; skills pinned at brent-tools 1.17.0; the CI Guard analysis (PB1982); ledger after group Y (GAP 281)
 
 The owner's rule, now in `CLAUDE.md` (Testing): GitHub CI must never fail when the same code was tested locally by the same
