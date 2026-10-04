@@ -40,9 +40,9 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         for (int i = 0; i < n; i++)
         {
             values[i] = StrUnstrOperand(phrases[i].strUnstrOperand(), "STRING sending operand");
-            if (values[i] is BoundAllLiteral { BeginsWithAll: true })   // SR2 — literal-1 shall not be a figurative beginning with the word ALL (a bare symbolic character is not — PB110)
+            if (BeginsWithAllWord(phrases[i].strUnstrOperand(), values[i]))   // SR2 — literal-1 shall not be a figurative beginning with the word ALL (a bare symbolic character is not — PB110)
                 values[i] = BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
-                    $"STRING sending operand '{phrases[i].strUnstrOperand().GetText()}' is a figurative constant that "
+                    $"STRING sending operand '{DataBinder.WrittenText(phrases[i].strUnstrOperand())}' is a figurative constant that "
                     + "begins with the word ALL, which literal-1 shall not be (ISO §14.9.43.3 SR2)",
                     "STRING sending ALL literal (ISO §14.9.43.3 SR2)");
             // ⛔ SR1 IS ONE SENTENCE ABOUT EVERY OPERAND OF THE STATEMENT, and it was enforced at ONE of its
@@ -52,19 +52,29 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             // nothing upstream refused the operand — and `STRING <COMP> …` / `STRING <INDEX> …` / a NUMERIC
             // literal-1 were accepted the same way. The receiver arm had the screen; the sending arm did not.
             if (Sr1Offence(values[i]) is { } sendOffence)
-                return Sr1Reject($"STRING sending operand '{phrases[i].strUnstrOperand().GetText()}'", sendOffence);
+                return Sr1Reject($"STRING sending operand '{DataBinder.WrittenText(phrases[i].strUnstrOperand())}'", sendOffence);
+            if (Sr8Offence(values[i]) is { } sendSr8)
+                return Reject($"STRING sending operand '{DataBinder.WrittenText(phrases[i].strUnstrOperand())}' {sendSr8} (ISO §14.9.43.3 SR8)");
             if (phrases[i].delimitedByPhrase() is not { } dp) continue;
             hasPhrase[i] = true;
             if (dp.SIZE() is not null) { bySize[i] = true; continue; }
             var d = StrUnstrOperand(dp.strUnstrOperand(), "STRING delimiter");
             // SR2 — literal-2 shall not be an ALL figurative; the grammar's (ALL)? token is not in the ISO format.
-            if (dp.ALL() is not null || d is BoundAllLiteral { BeginsWithAll: true })
+            if (dp.ALL() is not null || BeginsWithAllWord(dp.strUnstrOperand(), d))
                 d = BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
-                    $"STRING DELIMITED BY '{(dp.ALL() is not null ? "ALL " : "")}{dp.strUnstrOperand().GetText()}': the delimiter is a figurative constant that begins with "
+                    $"STRING DELIMITED BY '{(dp.ALL() is not null ? "ALL " : "")}{DataBinder.WrittenText(dp.strUnstrOperand())}': the delimiter is a figurative constant that begins with "
                     + "the word ALL, which literal-2 shall not be (ISO §14.9.43.3 SR2)",
                     "STRING DELIMITED BY ALL literal (ISO §14.9.43.3 SR2)");
             if (Sr1Offence(d) is { } delimOffence)     // identifier-2 / literal-2 — SR1's second named position
-                return Sr1Reject($"STRING DELIMITED BY '{dp.strUnstrOperand().GetText()}'", delimOffence);
+                return Sr1Reject($"STRING DELIMITED BY '{DataBinder.WrittenText(dp.strUnstrOperand())}'", delimOffence);
+            // SR3 — literal-2 shall not be a zero-length literal (§8.3.3.1: contiguous delimiters). The run-time kernel
+            // reads a zero-length delimiter as DELIMITED BY SIZE, which is GR3 b)'s rule for a zero-length IDENTIFIER-2
+            // and is no licence for a zero-length literal-2 (kb/Work PB1181).
+            if (IsZeroLengthLiteral(d))
+                return Reject($"STRING DELIMITED BY {DataBinder.WrittenText(dp.strUnstrOperand())}: literal-2 is a zero-length literal "
+                    + "(ISO §14.9.43.3 SR3; §8.3.3.1)");
+            if (Sr8Offence(d) is { } delimSr8)
+                return Reject($"STRING DELIMITED BY '{DataBinder.WrittenText(dp.strUnstrOperand())}' {delimSr8} (ISO §14.9.43.3 SR8)");
             delims[i] = d;
         }
         // Back-propagate each DELIMITED phrase over its preceding phraseless run (the general format attaches the
@@ -86,7 +96,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // sending resolver these sites used knew none of them.
         if (host.Expr.ResolveReceiving(st.stringIntoPhrase().dataReference()) is not { } into)
             return new BoundUnsupported("STRING INTO operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
-        string intoText = st.stringIntoPhrase().dataReference().GetText();
+        string intoText = DataBinder.WrittenText(st.stringIntoPhrase().dataReference());
         // §14.9.43.3 SR4–SR6, SR11 — bind-time rejections (kb/Work PB88: each was a run-time loud stage on ILLEGAL
         // source, the wrong-stage family; the statement compiled clean and died when control reached it).
         if (into is RefModPlace)
@@ -131,7 +141,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             if (host.Expr.ResolveReceiving(pd) is not { } pp)
                 return new BoundUnsupported("STRING POINTER operand");   // identifier-4 is a receiver — the chokepoint reported it (kb/Work PB429)
             if (!StrUnstrIsInteger(pp))
-                return Reject($"STRING WITH POINTER '{pd.GetText()}': identifier-4 shall be an elementary numeric integer "
+                return Reject($"STRING WITH POINTER '{DataBinder.WrittenText(pd)}': identifier-4 shall be an elementary numeric integer "
                     + "data item without the symbol P (ISO §14.9.43.3 SR7)");
             pointer = pp;
         }
@@ -156,9 +166,18 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     public BoundStatement BindUnstring(Core.UnstringStatementContext un)
     {
         // DA4: the sender is an identifier, so it may be a function-identifier (§14.9.48.2 + §8.4.3.1.2 Format 1).
-        string senderText = un.strUnstrSender().GetText();
+        string senderText = DataBinder.WrittenText(un.strUnstrSender());
         var source = StrUnstrSender(un.strUnstrSender(), $"UNSTRING source '{senderText}'");
         if (source is BoundOperandError) return new BoundUnsupported($"UNSTRING source '{senderText}'");
+        // ⛔ identifier-1 IS AN IDENTIFIER, NOT A LITERAL SLOT (kb/Work PB1182). §13.10.3 SR2 lets a constant-name stand
+        // "anywhere that a format specifies a literal", and the UNSTRING format specifies identifier-1 only (SR8: "the
+        // data item referenced by identifier-1 is the sending operand") — whereas STRING's identifier-1/literal-1 and
+        // both verbs' delimiter operands DO specify a literal, so StrUnstrSender, which serves all four positions,
+        // substitutes the constant's literal there and is right to. This is the one position it must refuse: the
+        // receiving side already does (COBOLNET1548), and without this the two arms disagree.
+        if (un.strUnstrSender().dataReference() is { } constRef && ctx.Data.ConstantOf(constRef) is not null)
+            return Reject($"UNSTRING sender '{senderText}' is a constant-name, which stands only where a format specifies a "
+                + "literal; identifier-1 is a data item (ISO §14.9.48.3 SR8; §13.10.3 SR2)");
         // SR2 — identifier-1 (the sender) shall be category alphanumeric or national (a fixed-length group and a
         // reference-modified slice are alphanumeric-image senders and remain permitted). A numeric item — INCLUDING
         // usage DISPLAY, whose zoned image would otherwise be examined as characters — a numeric-edited item, or a
@@ -176,12 +195,25 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             {
                 bool all = item.ALL() is not null;
                 var v = StrUnstrOperand(item.strUnstrOperand(), "UNSTRING delimiter");
-                // SR2 names identifier-2/-3 in the SAME sentence as identifier-1 — the sweep that screened
-                // only the sender left a numeric or edited DELIMITED BY operand binding clean (kb/Work PB155).
+                // SR1 — literal-1 and literal-2 shall be neither a figurative constant that begins with the word ALL
+                // nor a zero-length literal (kb/Work PB1181). `ALL ALL ","` and `ALL ALL SPACES` are the ALL phrase
+                // followed by exactly such a figurative; the fold below would otherwise read both ALLs as one.
+                string delimText = DataBinder.WrittenText(item.strUnstrOperand());
+                if (all && BeginsWithAllWord(item.strUnstrOperand(), v))
+                    return Reject($"UNSTRING DELIMITED BY ALL: the delimiter '{delimText}' is a figurative constant that "
+                        + "begins with the word ALL, which literal-1 and literal-2 shall not be (ISO §14.9.48.3 SR1)");
+                if (IsZeroLengthLiteral(v))
+                    return Reject($"UNSTRING DELIMITED BY {(all ? "ALL " : "")}{delimText}: the delimiter is "
+                        + "a zero-length literal, which literal-1 and literal-2 shall not be (ISO §14.9.48.3 SR1; §8.3.3.1)");
+                // SR1 names the LITERAL positions (category alphanumeric or national) and SR2 the identifier ones, in
+                // the same clause. The sweep that screened only the sender left a numeric or edited DELIMITED BY
+                // operand binding clean (kb/Work PB155), and the literal arms were never asked at all (kb/Work PB1181).
                 if (UnstringSenderCategory(v) is { } badDelim)
-                    return Reject($"UNSTRING delimiter '{item.strUnstrOperand().GetText()}' is category {badDelim} "
-                        + "(identifier-2 and identifier-3 shall reference data items of category alphanumeric "
-                        + "or national, ISO §14.9.48.3 SR2)");
+                    return Reject(v is BoundFieldOperand or BoundComputedOperand
+                        ? $"UNSTRING delimiter '{delimText}' is category {badDelim} (identifier-2 and identifier-3 shall "
+                          + "reference data items of category alphanumeric or national, ISO §14.9.48.3 SR2)"
+                        : $"UNSTRING delimiter '{delimText}' is a {badDelim} literal (literal-1 and literal-2 shall be "
+                          + "literals of the category alphanumeric or national, ISO §14.9.48.3 SR1)");
                 if (v is BoundAllLiteral allLit) { v = new BoundStringLiteral(allLit.Literal) { Category = allLit.Category }; all = true; }
                 delims.Add(new BoundUnstringDelimiter(v, all));
             }
@@ -199,21 +231,28 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
                 // receivers are not permitted.
                 // ⛔ DA7: a COMPILE-TIME diagnostic. The verdict was already correct and already computed HERE,
                 // but returning only BoundUnsupported let the illegal program compile clean and throw when control
-                // reached the UNSTRING. Groups stay exempt — §14.9.43.4 GR3a's alphanumeric-MOVE semantics carry a
-                // group receiver, including one holding a BINARY/PACKED leaf (V59).
-                if (target.DenotedItem is not null && !target.Item.IsGroup && !UnstringReceiverAllowed(target.Item.Pic))
+                // reached the UNSTRING. An alphanumeric or national group stays exempt — §14.9.43.4 GR3a's
+                // alphanumeric-MOVE semantics carry a group receiver, including one holding a BINARY/PACKED leaf
+                // (V59) — but a BIT group is class and category boolean (§13.18.29.4 GR1 a) and a strongly-typed group's
+                // category is its type-name (§8.5.2.1), neither of which SR4's list admits (kb/Work PB1182: the receiver
+                // arm exempted every group, while Sr2OffendingCategory's sender arm already knew both).
+                if (target.DenotedItem is not null
+                    && (target.Item.IsGroup
+                        ? target.Item.GroupUsage is GroupUsage.Bit || StrongTypeModel.IsStrongGroup(target.Item)
+                        : !UnstringReceiverAllowed(target.Item.Pic)))
                 {
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CharacterOperandUsage,
-                        $"UNSTRING INTO '{drefs[0].GetText()}' requires a usage-display alphabetic/alphanumeric/"
-                        + "numeric or usage-national national/numeric receiver; edited, COMP, packed, index and "
-                        + "float receivers have no character image (ISO §14.9.48.3 SR4)");
+                        $"UNSTRING INTO '{DataBinder.WrittenText(drefs[0])}' requires a usage-display alphabetic/alphanumeric/"
+                        + "numeric or usage-national national/numeric receiver, a numeric one without the symbol P; "
+                        + "edited, COMP, packed, index, float and boolean (bit-group) receivers have no character image, "
+                        + "and a strongly-typed group's category is its type-name (§8.5.2.1) (ISO §14.9.48.3 SR4)");
                 }
                 bool hasDelim = t.DELIMITER() is not null, hasCount = t.COUNT() is not null;
                 if ((hasDelim || hasCount) && un.unstringDelimiterPhrase() is null)
                     return Reject("UNSTRING DELIMITER IN / COUNT IN: the DELIMITED BY phrase shall be specified when either "
                         + "is written (ISO §14.9.48.3 SR7)");
                 if (target.Item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(target.Item))
-                    return Reject($"UNSTRING INTO '{drefs[0].GetText()}' shall not reference a variable-length group (ISO §14.9.48.3 SR10; §8.5.1.12)");
+                    return Reject($"UNSTRING INTO '{DataBinder.WrittenText(drefs[0])}' shall not reference a variable-length group (ISO §14.9.48.3 SR10; §8.5.1.12)");
                 int next = 1;
                 Place? delimIn = null, countIn = null;
                 if (hasDelim)
@@ -223,7 +262,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
                     // identifier-5 is SR2's fourth name (kb/Work PB155) — the delimiter RECEIVER shares the
                     // category rule, not SR4's receiver list.
                     if (Sr2OffendingCategory(d5.Item) is { } badD5)
-                        return Reject($"UNSTRING DELIMITER IN '{drefs[next].GetText()}' is category {badD5} "
+                        return Reject($"UNSTRING DELIMITER IN '{DataBinder.WrittenText(drefs[next])}' is category {badD5} "
                             + "(identifier-5 shall reference a data item of category alphanumeric or national, "
                             + "ISO §14.9.48.3 SR2)");
                     delimIn = d5;
@@ -234,7 +273,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
                     if (host.Expr.ResolveReceiving(drefs[next]) is not { } c6)
                         return new BoundUnsupported("UNSTRING COUNT IN operand");   // identifier-6 is a receiver — the chokepoint reported it (kb/Work PB429)
                     if (!StrUnstrIsInteger(c6))
-                        return Reject($"UNSTRING COUNT IN '{drefs[next].GetText()}': identifier-6 shall reference an integer "
+                        return Reject($"UNSTRING COUNT IN '{DataBinder.WrittenText(drefs[next])}': identifier-6 shall reference an integer "
                             + "data item without the symbol P (ISO §14.9.48.3 SR5)");
                     countIn = c6;
                 }
@@ -272,7 +311,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             if (host.Expr.ResolveReceiving(pd) is not { } pp)
                 return new BoundUnsupported("UNSTRING POINTER operand");   // identifier-7 is a receiver — the chokepoint reported it (kb/Work PB429)
             if (!StrUnstrIsInteger(pp))
-                return Reject($"UNSTRING WITH POINTER '{pd.GetText()}': identifier-7 shall be an elementary numeric integer "
+                return Reject($"UNSTRING WITH POINTER '{DataBinder.WrittenText(pd)}': identifier-7 shall be an elementary numeric integer "
                     + "data item without the symbol P (ISO §14.9.48.3 SR6)");
             pointer = pp;
         }
@@ -282,7 +321,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             if (host.Expr.ResolveReceiving(td) is not { } tp)
                 return new BoundUnsupported("UNSTRING TALLYING operand");   // identifier-8 is a receiver — the chokepoint reported it (kb/Work PB429)
             if (!StrUnstrIsInteger(tp))
-                return Reject($"UNSTRING TALLYING IN '{td.GetText()}': identifier-8 shall reference an integer data item "
+                return Reject($"UNSTRING TALLYING IN '{DataBinder.WrittenText(td)}': identifier-8 shall reference an integer data item "
                     + "without the symbol P (ISO §14.9.48.3 SR5)");
             tallying = tp;
         }
@@ -365,7 +404,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     private BoundOperand ScreenedField(Core.DataReferenceContext dref, string role)
     {
         var op = host.Expr.FieldOperand(dref);
-        return host.Expr.ScreenIndexNameOperand(op, dref.GetText(), role)
+        return host.Expr.ScreenIndexNameOperand(op, DataBinder.WrittenText(dref), role)
             ? BoundOperandError.Refused(ctx.Edition, $"{role}: the index-name '{DataBinder.WrittenText(dref)}' (ISO §13.18.38.3 r7)")
             : op;
     }
@@ -457,6 +496,12 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     private static string? UnstringSenderCategory(BoundOperand source) => source switch
     {
         BoundFieldOperand f => Sr2OffendingCategory(f.Place.Item),
+        // ⛔ THE LITERAL ARMS OF §14.9.48.3 SR1 (kb/Work PB1181): "Literal-1 and literal-2 shall be literals of the
+        // category alphanumeric or national" — a numeric literal (written, or a constant-name's, or a function folded
+        // at bind) and a boolean one (plain or ALL) offend. They fell to `_ => null` because this arm was written for
+        // the IDENTIFIER positions of SR2 only, so `DELIMITED BY 5` split the sender on the digit.
+        BoundNumericLiteral => "numeric",
+        BoundStringLiteral { Category: PicCategory.Boolean } or BoundAllLiteral { Category: PicCategory.Boolean } => "boolean",
         // ⛔ THE SAME WHITELIST, ON THE OTHER ARM (kb/Work PB664). This arm listed the categories it REFUSES
         // while its FIELD twin was being turned into the rule's own admit-list — two arms of one sentence, one
         // of them fixed, which is this repository's most reproducible defect shape. It is behaviour-identical
@@ -504,9 +549,6 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         { Category: var cat } => cat.ToString(),
     };
 
-    /// <summary>True for an elementary fixed-point INTEGER item with no P scaling — the shape STRING SR7 /
-    /// UNSTRING SR5–SR6 require of the POINTER / COUNT IN / TALLYING items (a V or P picture yields a non-zero
-    /// scale; P is the signed-scale encoding, §13.18.40).</summary>
     /// <summary>A STRING / UNSTRING syntax-rule violation: reported at BIND (COBOLNET1651 — the compile fails) and
     /// staged loud as the backstop the caller returns (kb/Work PB88: the stage alone let illegal source compile
     /// clean and die at run time). ONE helper, so no rule site can forget the diagnostic half again.</summary>
@@ -515,8 +557,43 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StringUnstringOperandRule, message);
     }
 
+    /// <summary>True for an elementary fixed-point INTEGER item with no P scaling — the shape STRING SR7 /
+    /// UNSTRING SR5–SR6 require of the POINTER / COUNT IN / TALLYING items (a V or P picture yields a non-zero
+    /// scale; P is the signed-scale encoding, §13.18.40).</summary>
     private static bool StrUnstrIsInteger(Place p) =>
         p.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Scale: 0 };
+
+    /// <summary>ISO §14.9.43.3 SR2 / §14.9.48.3 SR1 — "a figurative constant that begins with the word ALL", read off the
+    /// WRITTEN operand: the ALL-literal node says so (<see cref="BoundAllLiteral.BeginsWithAll"/>, a bare symbolic
+    /// character does not), but <c>ALL SPACES</c> / <c>ALL ZEROS</c> bind to a plain <see cref="BoundFigurative"/> that
+    /// has lost the word, so the operand's first TOKEN is asked as well (the rule's own words: it "begins with" ALL;
+    /// no data-name, function or literal can start with the reserved word). kb/Work PB1181: `STRING ALL SPACES …`
+    /// compiled clean.</summary>
+    private static bool BeginsWithAllWord(Core.StrUnstrOperandContext? written, BoundOperand bound) =>
+        bound is BoundAllLiteral { BeginsWithAll: true } || written?.Start?.Type == Core.ALL;
+
+    /// <summary>ISO §14.9.43.3 SR3 / §14.9.48.3 SR1 — a delimiter LITERAL of zero length (§8.3.3.1: contiguous opening
+    /// and closing delimiters), written plain, hexadecimal or national, or as the operand of the ALL phrase. A
+    /// figurative constant has no length of its own and is never one. ONE predicate for both verbs, so the rule cannot
+    /// be implemented at one of its two statements (kb/Work PB1181).</summary>
+    private static bool IsZeroLengthLiteral(BoundOperand op) =>
+        op is BoundStringLiteral { Value.Length: 0 } or BoundAllLiteral { Literal.Length: 0 };
+
+    /// <summary>⛔ ISO §14.9.43.3 SR8 — the OFFENCE phrase for a STRING identifier-1 / identifier-2 that is an
+    /// ELEMENTARY NUMERIC data item and is not "an integer without the symbol 'P' in its picture character-string",
+    /// or <see langword="null"/> (kb/Work PB1182). Only SR7's identifier-4 was ever asked
+    /// <see cref="StrUnstrIsInteger"/>, so `STRING N DELIMITED BY SIZE` over <c>PIC 9V9</c> sent "12". A group, a
+    /// reference-modified slice (the §8.4.3.3.4 GR6 unique item is not the numeric description) and a literal are not
+    /// "an elementary numeric data item" and pass; a non-DISPLAY/NATIONAL usage was already refused by SR1.</summary>
+    private static string? Sr8Offence(BoundOperand op) => op switch
+    {
+        BoundFieldOperand { Place: { } p } when p.DenotedItem is not null && !p.Item.IsGroup
+            && p.Item.OperandPic is { Category: PicCategory.Numeric, Scale: not 0 } pic =>
+            pic.HasPScaling
+                ? "is an elementary numeric item whose picture contains the symbol P; SR8 requires an integer without it"
+                : "is an elementary numeric item with digit positions to the right of the assumed decimal point; SR8 requires an integer",
+        _ => null,
+    };
 
     /// <summary>ISO §14.9.48.3 SR4 — the permitted UNSTRING INTO (identifier-4) receiver categories: usage display
     /// with category alphabetic/alphanumeric/numeric (alphabetic folds into <see cref="PicCategory.Alphanumeric"/>;
@@ -531,5 +608,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // alphanumeric arm screened its edited form while this arm admitted one. (Unreachable until Phase 4a
         // residue #2 lands — a national-edited ITEM is 0899 at declaration; shaped for that landing.)
         or { Category: PicCategory.National, EditMask: null }
-        or { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display or Usage.National };
+        // SR4's last sentence: "Numeric items shall not be specified with the symbol 'P'" (kb/Work PB1182) — a V alone is
+        // not a P, so PIC 9V9 stays a legal receiver and PIC 99P / PP99 do not.
+        or { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display or Usage.National, HasPScaling: false };
 }

@@ -586,8 +586,8 @@ internal static class OperandText
     /// runs are compile-time constants, so they concatenate as literals.</summary>
     private static string PExpand(string digitsExpr, PicInfo pic)
     {
-        int trailing = pic.Scale < 0 ? -pic.Scale : 0;
-        int leading = pic.Scale > pic.Digits ? pic.Scale - pic.Digits : 0;
+        int trailing = pic.TrailingPScaling;
+        int leading = pic.LeadingPScaling;
         if (trailing > 0) return $"({digitsExpr} + \"{new string('0', trailing)}\")";
         if (leading > 0) return $"(\"{new string('0', leading)}\" + {digitsExpr})";
         return digitsExpr;

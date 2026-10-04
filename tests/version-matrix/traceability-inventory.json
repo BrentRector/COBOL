@@ -47226,13 +47226,13 @@
   "ordinal": 2,
   "subject": "STRING statement",
   "rule-digest": "50c410b34d5a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#FigurativeOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BeginsWithAllWord; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#FigurativeOperand",
+  "test-ref": "conformance:negative/pb1180-string-all-figurative-sender; conformance-test:StringUnstringOperandScreenTests.String_FigurativeBeginningWithAll_IsSR2",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1180 (registrar 14c). SR2: 'Literal-1 or literal-2 shall not be a figurative constant that begins with the word ALL.' (cite.py --check 14.9.43.3 -> OK §14.9.43.3 2)). The binder screens `BoundAllLiteral { BeginsWithAll: true }` in both positions plus the grammar's `DELIMITED BY ALL` token. Verified rejections: ALL \"AB\" sender (conformance:negative/pb1029-string-all-literal), DELIMITED BY ALL SPACE (probe sr2b.cob -> COBOLNET1757). UNDER-REJECT: ExpressionBinder.FigurativeOperand binds `ALL ZERO/ZEROES`, `ALL SPACE/SPACES`, `ALL HIGH-VALUE`, `ALL LOW-VALUE`, `ALL QUOTE` (grammar figurativeConstant arms 'ALL ZERO' etc.) to a plain BoundFigurative - the word ALL is discarded - so the SENDING-position screen never sees it: probe sr2c.cob `STRING ALL ZEROES DELIMITED BY SIZE INTO OUT1` compiles clean at --std 2023 and runs ('[0........ ]'); sr2a.cob `STRING ALL SPACES ...` likewise. Expected: a bind-time rejection (COBOLNET1757, as for ALL \"AB\"). Finding M2. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1180 (landed with PB1181, wave 1011 A). SR2 'Literal-1 or literal-2 shall not be a figurative constant that begins with the word ALL.' ALL SPACES / ALL ZEROS bind to a plain BoundFigurative that lost the word, so BeginsWithAllWord asks the written operand's first token as well as BoundAllLiteral.BeginsWithAll, at the STRING sender, the STRING delimiter and the UNSTRING delimiter (COBOLNET1757 / COBOLNET1651).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.43.3-3",
@@ -47241,13 +47241,13 @@
   "ordinal": 3,
   "subject": "STRING statement",
   "rule-digest": "1df3c80f845e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#IsZeroLengthLiteral",
+  "test-ref": "conformance-test:StringUnstringOperandScreenTests.String_ZeroLengthLiteral2_IsSR3",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1181 (registrar 14c). SR3: 'Literal-2 shall not be a zero-length literal.' (cite.py --check 14.9.43.3 -> OK §14.9.43.3 3)); a zero-length literal is one whose delimiters are contiguous (cite.py --check 8.3.3.1 'If the opening and closing delimiters are contiguous, the length of the literal is zero, and it is known as a zero-length literal.' -> OK). BindString performs no zero-length screen on the DELIMITED BY literal, and the kernel treats a zero-length delimiter as SIZE. Probe sr3.cob `STRING \"AB,CD\" DELIMITED BY \"\" INTO OUT1` compiles clean and prints [AB,CD     ] at --std 2023 (and at --std 85, where \"\" is not even a literal - a separate lexical question). Expected: bind-time rejection under SR3. Finding M3. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text); zero-length literals exist only from the edition that defines them (§8.3.3.1), not at 85]",
-  "state": "GAP"
+  "notes": "kb/Work PB1181 (wave 1011 A). SR3 'Literal-2 shall not be a zero-length literal.' (cite.py --check 14.9.43.3 -> OK 3)). The ONE IsZeroLengthLiteral predicate (plain, hexadecimal, national and ALL forms) is asked of the DELIMITED BY literal and refused through Reject (COBOLNET1651); the run-time kernel had read a zero-length delimiter as DELIMITED BY SIZE, GR3 b)'s rule for a zero-length IDENTIFIER-2. The zero-length literal is legal at editions where the lexer admits it; the screen is edition-invariant (PB895 owns the --std 85 lexical question).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.43.3-4",
@@ -47316,13 +47316,13 @@
   "ordinal": 8,
   "subject": "STRING statement",
   "rule-digest": "3e4ec62d9660",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#Sr8Offence; src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#HasPScaling",
+  "test-ref": "conformance:negative/pb1182-string-non-integer-sender; conformance:85/pb1181_string_unstring_screen_controls; conformance-test:StringUnstringOperandScreenTests.String_NonIntegerOrPScaledNumericIdentifier_IsSR8",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1182 (registrar 14c). SR8: 'Where identifier-1 or identifier-2 is an elementary numeric data item, it shall be described as an integer without the symbol 'P' in its picture character-string.' (cite.py --check 14.9.43.3 -> OK §14.9.43.3 8)). BindString's operand screens are SR1 (Sr1Offence: usage / numeric literal), SR2 and the national class mix; nothing reads the numeric sender's scale. Probes: sr8a.cob `01 N1 PIC 9V9 VALUE 1.2. STRING N1 DELIMITED BY SIZE INTO OUT1` compiles clean, prints [12        ]; sr8b.cob `01 N1 PIC 99P` sender and `01 D1 PIC 9V9` as identifier-2 (DELIMITED BY D1) both compile clean and run. The integer/no-P predicate already exists (StrUnstrIsInteger, used for SR7's identifier-4). Expected: bind-time rejection (COBOLNET1651 family). The positive control conformance:85/pb664_string_operand_screen L2 (PIC 9(3) integer sender) documents SR8 in its header but no negative pins it. Finding M4. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1182 (wave 1011 A). SR8 'Where identifier-1 or identifier-2 is an elementary numeric data item, it shall be described as an integer without the symbol P' (cite.py --check 14.9.43.3 -> OK 8)). Sr8Offence refuses PIC 9V9, 99P and PP99 at identifier-1 and identifier-2 (COBOLNET1651); PIC 9(3) / PIC 9 stay legal (the positive control). The P positions come from PicInfo.TrailingPScaling / LeadingPScaling, the reader OperandText.PExpand also uses.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.43.3-9",
@@ -47976,13 +47976,13 @@
   "ordinal": 1,
   "subject": "UNSTRING statement",
   "rule-digest": "92c9368e4a99",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindUnstring; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#UnstringSenderCategory; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#StrUnstrOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#unstringDelimiterItem",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindUnstring; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#UnstringSenderCategory; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#IsZeroLengthLiteral; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BeginsWithAllWord; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#StrUnstrOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#unstringDelimiterItem",
+  "test-ref": "conformance:negative/pb1181-unstring-numeric-literal-delimiter; conformance:85/pb1181_string_unstring_screen_controls; conformance-test:StringUnstringOperandScreenTests.Unstring_DelimiterLiteral_IsSR1; conformance-test:StringUnstringOperandScreenTests.Unstring_BooleanOrNumericConstantDelimiter_IsSR1",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1181 (registrar 14c). Rule: \"Literal-1 and literal-2 shall be literals of the category alphanumeric or national and shall be neither a figurative constant that begins with the word ALL nor a zero-length literal.\" (cite.py --check 14.9.48.3 OK, §14.9.48.3 1)). Code: BindUnstring screens each DELIMITED BY operand with UnstringSenderCategory, which only inspects BoundFieldOperand and intrinsic results — a LITERAL passes unscreened; a BoundAllLiteral is silently folded into the ALL phrase (`all = true`) even when the ALL phrase was already written. Probes (pinned cobol.exe, --std 2023; the same at 85/2002/2014): up1num.cob `DELIMITED BY 5` (numeric literal) compiles and splits on '5' (A=[AB,C] B=[EF  ]) — expected a compile-time rejection; up1bool.cob `DELIMITED BY B\"1\"` (boolean literal) compiles and runs — expected rejection; up1zl.cob `DELIMITED BY \"\"` (zero-length literal) compiles and stores all-space receivers — expected rejection (it is also accepted at --std 85/2002 where \"\" is not even a literal, a lexer-level sibling); up1allall.cob `DELIMITED BY ALL ALL \",\"`, up1orall.cob `OR ALL ALL \",\"`, up1allfigall.cob `ALL ALL SPACES` compile clean — literal-1 there is a figurative beginning with ALL, expected rejection. Conforming halves verified: alphanumeric \",\" / hex X\"2C\" / national N\",\" (up1hex, up1nat) and non-ALL figuratives SPACE/ZERO with or without the ALL PHRASE (up1figok, up1allfig, up1allz, up1allok) all compile and give the GR7/GR10-correct split. The binder has the category data it needs (BoundStringLiteral.Category is populated — see the allLit fold); kb/Work PB863 (open) is the sibling analysis on literal-category erasure. STRING's twin (§14.9.43.3 SR1/SR2) has Sr1Offence + the BeginsWithAll screen; the UNSTRING arm has neither — the two-arm shape. [editions as adjudicated: 85, 2002, 2014, 2023 (national-literal arm 2002+; the zero-length-literal clause is meaningful only where zero-length literals exist, 2014+)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1181 (wave 1011 A). SR1 'Literal-1 and literal-2 shall be literals of the category alphanumeric or national and shall be neither a figurative constant that begins with the word ALL nor a zero-length literal.' (cite.py --check 14.9.48.3 -> OK 1)). Every delimiter operand is asked the numeric/boolean literal arms of UnstringSenderCategory, IsZeroLengthLiteral and BeginsWithAllWord (ALL ALL literal / ALL ALL SPACES are the ALL phrase followed by such a figurative); ALL literal, SPACE, hexadecimal and OR forms stay legal (the positive control). COBOLNET1651.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.48.3-2",
@@ -48021,13 +48021,13 @@
   "ordinal": 4,
   "subject": "UNSTRING statement",
   "rule-digest": "854b5ae8f7de",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindUnstring; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#UnstringReceiverAllowed",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindUnstring; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#UnstringReceiverAllowed; src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#HasPScaling",
+  "test-ref": "conformance:85/pb1181_string_unstring_screen_controls; conformance-test:StringUnstringOperandScreenTests.Unstring_PScaledNumericReceiver_IsSR4; conformance-test:StringUnstringOperandScreenTests.Unstring_BitOrStronglyTypedGroupReceiver_IsSR4",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1182 (registrar 14c). Rule: \"Identifier-4 shall be described implicitly or explicitly as usage display and category alphabetic, alphanumeric, or numeric; or as usage national and category national or numeric. Numeric items shall not be specified with the symbol 'P' in their picture character-string.\" (cite.py --check 14.9.48.3 OK). Code: UnstringReceiverAllowed admits {Alphanumeric, EditMask null} | {National, EditMask null} | {Numeric, !IsFloat, Usage Display|National}, and BindUnstring EXEMPTS every group. First sentence verified: COMP (up4comp), PACKED-DECIMAL (up4numnd), COMP-2 (up4flt), numeric-edited Z9 (up4ne), alphanumeric-edited XBX (up4ane), boolean PIC 1 (up4bool) all rejected COBOLNET1626; PIC A (up4alpha), 9V99 / SIGN SEPARATE (up4dec), PIC 9 USAGE NATIONAL with a national sender (up4natnum) accepted and correct (conformance:negative/da7-unstring-into-binary covers the COMP arm only). DIVERGES on two edges: (1) the SECOND sentence is unenforced — no Scale/P test in UnstringReceiverAllowed: up4p.cob `01 N PIC 99P` and up4pl.cob `01 N PIC PP99` as UNSTRING INTO receivers compile clean and run (N=[01] / N=[00]) at every edition; expected a compile-time rejection. (2) The blanket group exemption admits a GROUP-USAGE BIT group, whose \"class and category are boolean\" (§13.18.29.4 1) a), cite.py OK) — neither usage display nor usage national, not an admitted category: up4bitg.cob compiles and runs at --std 2002/2014/2023 (M=[0034]); expected rejection. Ordinary alphanumeric and national groups remain legitimately admitted. [editions as adjudicated: 85, 2002, 2014, 2023 (usage-national arm 2002+; bit groups 2002+)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1182 (wave 1011 A). SR4 'Identifier-4 shall be described ... usage display and category alphabetic, alphanumeric, or numeric; or ... usage national and category national or numeric. Numeric items shall not be specified with the symbol P' (cite.py --check 14.9.48.3 -> OK 4)). UnstringReceiverAllowed carries HasPScaling: false (a V alone is no P; PIC 9V9 stays legal) and the receiver screen no longer exempts a BIT group (class and category boolean, 13.18.29.4 GR1 a)) or a strongly-typed group (category its type-name, 8.5.2.1). COBOLNET1626.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.48.3-5",
@@ -48081,13 +48081,13 @@
   "ordinal": 8,
   "subject": "UNSTRING statement",
   "rule-digest": "552c5029dbfd",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindUnstring; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#StrUnstrSender; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#strUnstrSender",
-  "test-ref": "conformance:2023/da4_function_sending_operand",
+  "test-ref": "conformance:2023/da4_function_sending_operand; conformance:2002/pb1182_constant_name_literal_positions; conformance-test:StringUnstringOperandScreenTests.Unstring_ConstantNameSender_IsSR8",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1182 (registrar 14c). Rule: \"The data item referenced by identifier-1 is the sending operand.\" (cite.py --check 14.9.48.3 OK, §14.9.48.3 8)). Code: identifier-1 is bound through StrUnstrSender (the SENDING funnel: function-identifier, inline method invocation, or data reference screened by ScreenedField for index-names), never through ResolveReceiving — so the sending-operand consequences hold: a function-identifier, admissible only as a sending operand (§8.4.3.2.3 SR1), is accepted (probe u8func.cob `UNSTRING FUNCTION LOWER-CASE(S) ...` -> A=[ab  ] B=[cd5e], correct), and a literal is refused by the grammar (ufmtlitsnd.cob -> COBOL0308) because the format says identifier-1. The sending-side size (ODO current extent, §14.9.48.4 GR11) and category (SR2) rules that hang off this designation belong to other rows. Covering golden conformance:2023/da4_function_sending_operand exercises UNSTRING identifier-1 as a function-identifier with expected output derived from §8.4.3.1.2/§14.9.48.2. || REFUTED: PARTIAL — SR8 designates the DATA ITEM referenced by identifier-1 as the sending operand; the format writes identifier-1 (no literal). A constant-name is not a data item and, per §13.10.3 SR2 (cite.py OK), may be used only where a format specifies a LITERAL, so it is not admissible as identifier-1. The pinned compiler accepts `UNSTRING K ...` with `01 K CONSTANT AS \"XY,ZW\"` at --std 2002/2014/2023 and runs it (A=[XY  ] B=[ZW  ]) - the literal-equivalent slips through the very funnel the adjudicator cited as refusing literals (ufmtlitsnd). Verified halves: function-identifier sender (da4 golden, u8func), ref-mod sender (r8refmod A=[CD] B=[EF]), subscripted sender (r8sub), sender unchanged after the statement (r8unch), condition-name sender rejected (r8cond, though with a misleading COBOLNET1639 'not defined' message). The receiving side already refuses constant-names (COBOLNET1548), so this is the two-arm shape: StrUnstrSender/ScreenedField screens index-names but not constant-names. The test-ref da4_function_sending_operand pins only the function-identifier arm.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1182 (wave 1011 A). SR8 'The data item referenced by identifier-1 is the sending operand.' With 13.10.3 SR2 (a constant-name stands only where a format specifies a literal), BindUnstring refuses a constant-name identifier-1 (COBOLNET1651) while StrUnstrSender keeps substituting the literal at STRING's sender and both verbs' delimiters (the positive golden). The other halves stay witnessed by da4_function_sending_operand.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.48.3-9",
@@ -65076,13 +65076,13 @@
   "ordinal": 214,
   "subject": "USAGE OBJECT REFERENCE clause (amount of storage allocated)",
   "rule-digest": "780ccf6f5fae",
-  "verdict": "PARTIAL",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-214; src/Cobol.Net.Compiler/Binding/Model/TierCIsland.cs#TierCIsland",
-  "test-ref": "conformance:2002/pb496_object_reference_storage; conformance:2023/pb61_length_byte_length_rule_branches",
+  "verdict": "CONFORMS",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-214; src/Cobol.Net.Compiler/Binding/Model/TierCIsland.cs#TierCIsland; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#Sr1Offence",
+  "test-ref": "conformance:2002/pb496_object_reference_storage; conformance:2023/pb61_length_byte_length_rule_branches; conformance:2002/pb1527_object_reference_group_image; conformance:negative/pb1527-string-object-reference-group",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py --check 13.18.60.4 'The amount of storage allocated for an object reference data item is implementor-defined' -> OK §13.18.60.4 22) a); cite.py --check 13.18.60.3 'subordinate to a type declaration that includes the STRONG phrase' -> OK §13.18.60.3 14); cite.py --check 14.9.25.3 'If identifier-2 references a strongly-typed group item, identifier-1 shall be specified and be described as a group item of the same type.' -> OK §14.9.25.3 2); cite.py --check 14.9.25.4 '... is treated exactly as if it were an alphanumeric to alphanumeric elementary move, except that there is no conversion of data from one form of internal representation to another' -> OK §14.9.25.4 4) (NOT GR5 — the staged record's clause numbering was not inherited); cite.py --check 8.5.2.1 'Both the class and the category of a strongly-typed group item are the type-name specified in the TYPE clause' -> OK §8.5.2.1; cite.py --check 14.9.43.3 'all identifiers, except identifier-4, shall be described implicitly or explicitly as usage display or national' -> OK §14.9.43.3 1). RESOLUTION OF PB1527's CONTRADICTION: the existing §7 DOC-A.1-214 row's sentence 'the item contributes no character positions to any group image ... an object reference never sits inside a record whose bytes are written or read' is the wrong side — it contradicts the spec (SR14 admits the item in a STRONG group, whose size includes it, and §14.9.25.3 SR2 constrains only a strongly-typed RECEIVER, so MOVE G TO an alphanumeric item is legal and moves the group's storage without conversion) AND the existing DOC-A.1-56 row, which already documents a pointer/object leaf as 8 SPACE placeholder positions in a strongly-typed group's image (pinned by conformance:2002/pb244_pointer_group_transfer). The code's MOVE/BYTE-LENGTH behaviour matches this corrected row. PARTIAL: the amount (8, all shapes — pb496 golden 5 shapes + doc-rows-1 probe the other three), the group size (11), the 8-space image and the same-type MOVE transferring the reference hold; the STRING sending-item path aborts at run time (NotImplementedCobolFeatureException, Tier-C) — whether STRING SR1 ('usage display or national') rejects such a group at compile time or STRING reads the image is PB1527's STRING arm to settle; either way a run-time abort is wrong. Witness gap: no golden yet measures an OBJECT REFERENCE leaf of a strongly-typed group (BYTE-LENGTH 11, 8-space image, same-type MOVE keeps the reference) — needed as e.g. conformance:2002/pb1527_object_reference_group_image. PROBE: Pin @80de60472, out\\run\\d6\\p214\\or.cob (--std 2023; class D6ORC INHERITS FROM BASE, `01 TG TYPEDEF STRONG. 05 A PIC X(3). 05 R USAGE OBJECT REFERENCE D6ORC.` `01 G TYPE TG. 01 G2 TYPE TG.`): FUNCTION BYTE-LENGTH(G) = 11; MOVE G TO XX (PIC X(11)) with R NULL -> ORD values 66 67 68 33x8 (ABC + 8 SPACES); after INVOKE D6ORC \"NEW\" RETURNING R OF G, the same 8 SPACES (no reference bytes); MOVE G TO G2 then INVOKE R OF G2 \"SPEAK\" -> SPEAK, A OF G2 = ABC (same-type group MOVE transfers the reference). or3.cob (same + `STRING G DELIMITED BY SIZE INTO XX`): compiles clean, run aborts NotImplementedCobolFeatureException 'whole-group image of G with a pointer/object-class leaf (no character image) — the Tier-C byte island ... deferred'. Owning note kb/Work/PB1527 (claims DOC-A.1-214; STRING sibling of PB244/PB1116).",
-  "state": "GAP"
+  "notes": "kb/Work PB1527 (wave 1011 A, DISCHARGED as a crash). Re-probed: a group holding an OBJECT REFERENCE or POINTER leaf is legal only under a STRONG type (13.18.60.3 SR14), and a strongly-typed group is a bind error as a STRING/UNSTRING operand (PB244: Sr1Offence COBOLNET1626, Sr2OffendingCategory COBOLNET1651), so the Tier-C run-time abort is unreachable through these verbs. DISPLAY and MOVE read the 8-position placeholder image (the golden); the old CONFORMANCE.md warning that STRING compiles and aborts was stale and is rewritten.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-215",

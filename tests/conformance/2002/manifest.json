@@ -196,6 +196,8 @@
     "pb389_object_reference_descriptor",
     "pb496_active_class_positions",
     "pb496_object_reference_storage",
+    "pb1182_constant_name_literal_positions",
+    "pb1527_object_reference_group_image",
     "pb451_set_format5_self_sender",
     "pb451_set_format5_class_name_sender",
     "pb495_group_usage_applies_to_each_leaf",

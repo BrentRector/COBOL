@@ -566,6 +566,25 @@ public sealed record PicInfo(
     /// </remarks>
     public bool IsIntegerDescription => IsClassNumericFixedPoint && Scale <= 0;
 
+    /// <summary>The count of TRAILING symbol 'P' positions of a numeric PICTURE (ISO §13.18.40.4 GR14: the assumed
+    /// decimal point lies to the right of the digits, so the signed <see cref="Scale"/> is NEGATIVE — <c>PIC 99P</c>
+    /// is −1). Zero for any other description. <see cref="PictureAnalyzer"/> derives the signed scale from the
+    /// symbols; this reads it back, ONCE, for every consumer that needs the P positions themselves
+    /// (<c>OperandText.PExpand</c>'s sending image) or only their presence (<see cref="HasPScaling"/>).</summary>
+    public int TrailingPScaling => Category is PicCategory.Numeric && Scale < 0 ? -Scale : 0;
+
+    /// <summary>The count of LEADING symbol 'P' positions of a numeric PICTURE (ISO §13.18.40.4 GR14: the assumed
+    /// decimal point lies to the left of the digits, so every digit is fractional and the signed
+    /// <see cref="Scale"/> EXCEEDS <see cref="Digits"/> by the P count — <c>PIC PP99</c> is scale 4 over 2 digits;
+    /// a <c>V</c> alone never does, its scale is at most the digit count). Zero for any other description.</summary>
+    public int LeadingPScaling => Category is PicCategory.Numeric && Scale > Digits ? Scale - Digits : 0;
+
+    /// <summary>True when the PICTURE of a numeric item contains the symbol 'P' — the predicate behind every
+    /// "without the symbol 'P' in its picture character-string" syntax rule (ISO §14.9.43.3 SR8 and §14.9.48.3 SR4 for
+    /// STRING/UNSTRING operands). A <c>V</c> alone is NOT a P: <c>PIC 9V9</c> has a non-zero <see cref="Scale"/> and no
+    /// P positions.</summary>
+    public bool HasPScaling => TrailingPScaling > 0 || LeadingPScaling > 0;
+
     /// <summary>True for a description whose item is of CLASS NUMERIC and FIXED-POINT (ISO §8.5.2.1 Table 2).
     /// <para>⛔ THE ONE PLACE THE USAGE INDEX TRAP IS WRITTEN DOWN (kb/Work R27, kb/Work PB640). §8.5.2.1
     /// Table 2 makes an index data item class INDEX, never numeric — but its storage
