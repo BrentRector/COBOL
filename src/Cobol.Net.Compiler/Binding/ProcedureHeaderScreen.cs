@@ -71,6 +71,20 @@ internal sealed class ProcedureHeaderScreen(EditionContext edition, string where
                 + "data-name-1\"", "SR6");
     }
 
+    /// <summary>§14.2.2 SR2 — "Each data-name-1 specified in a BY VALUE phrase shall be defined as a data item of class
+    /// numeric, message-tag, object, or pointer." The class numeric (fixed-point or floating-point) and the managed
+    /// classes (object and the three pointer categories) are the carried legs of the §14.2.3 GR10 detached value copy;
+    /// class message-tag is the MCS module (not modeled, so undeclarable). Asked of every BY VALUE formal by BOTH
+    /// header arms — the program/function arm and the method arm (kb/Work PB1051) — so the class set is written once.</summary>
+    public void ByValueClass(string written, DataItem item)
+    {
+        if (!(item.IsElementary && item.Pic?.Category is PicCategory.Numeric or PicCategory.Pointer
+                or PicCategory.ProgramPointer or PicCategory.FunctionPointer or PicCategory.ObjectReference))
+            edition.Error("COBOLNET1553",
+                $"{where}: BY VALUE formal parameter '{written}' shall be of class numeric, message-tag, object, "
+                + "or pointer (ISO §14.2.2 SR2)");
+    }
+
     /// <summary>§14.2.1's using-phrase prints OPTIONAL only inside the BY REFERENCE alternative
     /// (<c>{ [BY REFERENCE] { [OPTIONAL] data-name-1 }… | BY VALUE { data-name-1 }… }…</c>): after a BY VALUE phrase,
     /// <c>OPTIONAL LY</c> continues the BY VALUE alternative, which has no OPTIONAL.</summary>

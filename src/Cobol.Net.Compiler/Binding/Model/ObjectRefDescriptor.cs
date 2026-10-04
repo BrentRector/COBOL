@@ -64,9 +64,10 @@ public enum ObjectRefKind
 /// The class or interface this reference is STATICALLY BOUND to, uppercase-insensitive as written:
 /// interface-name-1 for <see cref="ObjectRefKind.Interface"/>, object-class-name-1 for
 /// <see cref="ObjectRefKind.ObjectClass"/>, and — for <see cref="ObjectRefKind.ActiveClass"/> — the CONTAINING
-/// class, which §13.18.60.3 SR16 guarantees exists (the phrase is legal only inside a factory definition, an
-/// instance definition, or a method definition of a class). Null ONLY for
-/// <see cref="ObjectRefKind.Universal"/>. Carrying the containing class here is what lets §14.9.39.3 SR12 b)2.
+/// class when the entry is written in a factory definition, an instance definition, or a method definition of a
+/// class — and NULL when it is written in a method PROTOTYPE of an interface definition, which §13.18.60.3 SR16 also
+/// admits (a prototype is a method definition) and which has no class: the description is then owner-less
+/// (<see cref="ActiveClass"/>). Otherwise null ONLY for <see cref="ObjectRefKind.Universal"/>. Carrying the containing class here is what lets §14.9.39.3 SR12 b)2.
 /// ("the class containing the data item referenced by identifier-4 shall be the same class or a subclass of
 /// …") be asked of the descriptor rather than re-derived from the binder's ambient state at each use.
 /// </param>
@@ -88,9 +89,19 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
         => new(ObjectRefKind.ObjectClass, name, factory, only);
 
     /// <summary><c>USAGE OBJECT REFERENCE [FACTORY OF] ACTIVE-CLASS</c> — GR22 e). <paramref name="containing"/>
-    /// is the class the entry is written in (§13.18.60.3 SR16 guarantees there is one).</summary>
-    public static ObjectRefDescriptor ActiveClass(string containing, bool factory = false)
+    /// is the class the entry is written in: a factory definition, an instance definition, or a method definition of
+    /// a class (§13.18.60.3 SR16). It is NULL for the one SR16 placement that has no class — a method PROTOTYPE of an
+    /// interface definition (a prototype IS a method definition, §10.6.1 NOTE): the description is OWNER-LESS there,
+    /// and rightly so, because the class whose object the phrase names is a property of the activation (GR22 e)), not
+    /// of the description (§9.3.8.2.3 rule 2 d) compares only the phrase and the FACTORY presence).</summary>
+    public static ObjectRefDescriptor ActiveClass(string? containing, bool factory = false)
         => new(ObjectRefKind.ActiveClass, containing, factory, false);
+
+    /// <summary>True for an ACTIVE-CLASS description: the class it names is the ACTIVATION's (GR22 e)), so it crosses
+    /// the method ABI as the universal object type and is viewed as its containing class inside the body (see
+    /// <c>OoEmitter.OoFormalCrossingType</c>) — one wire type for the method, every override of it and every
+    /// interface prototype it implements.</summary>
+    public bool IsActiveClass => Kind is ObjectRefKind.ActiveClass;
 
     /// <summary>True for the bare form — GR22 b), "its content may be a reference to any object". This is the
     /// ONE place "universal" is decided; before PB389 every consumer spelled it "no class name recorded",
@@ -117,10 +128,14 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// name (case-insensitively — COBOL words are, §8.3.2.2) and the same FACTORY and ONLY presence. Rule 2 c)
     /// says it in one breath: "the corresponding parameter in interface-1 is described with the same
     /// object-class-name, and the presence or absence of the FACTORY and ONLY phrases is the same in both
-    /// interfaces."</summary>
+    /// interfaces." Rule 2 d) is the ACTIVE-CLASS clause: "the corresponding parameter in interface-1 is described
+    /// with the ACTIVE-CLASS phrase, and the presence or absence of the FACTORY phrase is the same in both
+    /// interfaces" — the CONTAINING class is not part of the description (GR22 e) binds it at activation), so two
+    /// ACTIVE-CLASS descriptions agree whatever classes they were written in: an override in a subclass, a class
+    /// implementing an interface prototype's (owner-less) formal.</summary>
     public bool SameDescriptionAs(ObjectRefDescriptor other)
         => Kind == other.Kind && Factory == other.Factory && Only == other.Only
-           && string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase);
+           && (IsActiveClass || string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>An INJECTIVE string key for the description — the object-reference half of
     /// <c>OoConformance.ConformanceDescriptor</c>, the runtime universal-crossing signature. Injective over the
@@ -131,7 +146,7 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     {
         ObjectRefKind.Universal => "*",
         ObjectRefKind.Interface => "I:" + Name!.ToUpperInvariant(),
-        ObjectRefKind.ActiveClass => (Factory ? "FA:" : "A:") + Name!.ToUpperInvariant(),
+        ObjectRefKind.ActiveClass => (Factory ? "FA:" : "A:") + (Name ?? "").ToUpperInvariant(),
         _ => (Factory ? "F" : "") + (Only ? "C!:" : "C:") + Name!.ToUpperInvariant(),
     };
 
@@ -141,9 +156,8 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     {
         ObjectRefKind.Universal => "a UNIVERSAL object reference",
         ObjectRefKind.Interface => $"an object reference described with interface-name '{Name}'",
-        ObjectRefKind.ActiveClass => Factory
-            ? $"an object reference described FACTORY OF ACTIVE-CLASS (containing class '{Name}')"
-            : $"an object reference described ACTIVE-CLASS (containing class '{Name}')",
+        ObjectRefKind.ActiveClass => $"an object reference described {(Factory ? "FACTORY OF " : "")}ACTIVE-CLASS "
+            + (Name is null ? "(in an interface method prototype)" : $"(containing class '{Name}')"),
         _ => "an object reference described "
              + (Factory ? "FACTORY OF " : "") + $"'{Name}'" + (Only ? " ONLY" : ""),
     };

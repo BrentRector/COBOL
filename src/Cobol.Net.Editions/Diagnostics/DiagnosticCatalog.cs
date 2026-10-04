@@ -464,6 +464,25 @@ public static class DiagnosticCatalog
         + "division too (ISO §12.4.3 SR1).",
         "ISO §12.3.3 SR2/SR3, §12.4.3 SR1, §12.3.7.3 SR2/SR3");
 
+    /// <summary>COBOLNET1519 — a data-division section a class-body definition may not carry (kb/Work PB1251, the
+    /// DATA-division twin of <see cref="OoEnvironmentPlacement"/>). ONE code for the one placement table,
+    /// <c>OoDefinitionRules.Screen</c>, its only reporter: "Within a class definition, the file section may be
+    /// specified only in a factory definition or an instance definition, but not in a method definition." (ISO
+    /// §13.4.3 SR1; the same sentence for the working-storage, report and screen sections, §13.5.3 SR1, §13.8.3 SR1,
+    /// §13.9.3 SR1); "The local-storage section may be specified in a program definition or function definition or
+    /// in a method definition contained in a class definition." (§13.6.3 SR1); "The linkage section may be
+    /// specified in a program definition, function definition, method definition, program prototype definition, or
+    /// function prototype definition." (§13.7.3 SR1).</summary>
+    public static readonly DiagnosticDescriptor OoDataDivisionPlacement = new(
+        "COBOLNET1519", "oo-data-division-placement", EditionSeverity.Error,
+        "The data division of a method, factory or instance definition carries a section that kind of definition may "
+        + "not: within a class definition the file, working-storage, report and screen sections are admitted only in a "
+        + "factory definition or an instance definition, never in a method definition (ISO §13.4.3 SR1, §13.5.3 SR1, "
+        + "§13.8.3 SR1, §13.9.3 SR1); the local-storage section is admitted in a method definition but not in a "
+        + "factory or instance definition (§13.6.3 SR1); the linkage section is admitted in a method definition but "
+        + "not in a factory or instance definition (§13.7.3 SR1).",
+        "ISO §13.4.3 SR1, §13.5.3 SR1, §13.6.3 SR1, §13.7.3 SR1, §13.8.3 SR1, §13.9.3 SR1");
+
     /// <summary>COBOLNET2643 — an AS literal of spaces only forms the zero-length externalized name (kb/Work
     /// PB1539). Refused wherever the clause itself refuses a zero-length literal — every AS clause but CLASS-ID.</summary>
     public static readonly DiagnosticDescriptor ExternalizedNameAllSpaces = new(
@@ -1762,13 +1781,10 @@ public static class DiagnosticCatalog
         + "is fully implemented).", "ISO §13.18.2.3 SR3b / §13.18.2.4 GR1", RecognizedNotImplemented);
 
     // ── COBOLNET0899 — inter-program header-formal deferrals (P10 Step 10) ──────────────────────────
-    public static readonly DiagnosticDescriptor ByValueFormalCarrier = new(
-        NotImplemented, "by-value-formal-carrier", EditionSeverity.Error,
-        "A BY VALUE formal parameter on a METHOD is legal (§14.2.2 SR2) but its value-copy model is not yet "
-        + "implemented on the INVOKE channel. The fixed-point and floating-point numeric and the class object / "
-        + "class pointer program and function formals ARE carried — the §14.2.3 GR10 detached-cell copy, whose "
-        + "filling GR10 names as a COMPUTE without ROUNDED and a SET respectively (kb/Work PB663, PB1114).",
-        "ISO §14.2.2 SR2 / §14.2.3 GR10", RecognizedNotImplemented);
+    // ⛔ `by-value-formal-carrier` (COBOLNET0899, "a method's BY VALUE formal is not yet implemented on the INVOKE
+    // channel") was DELETED by kb/Work PB1051: a method's BY VALUE formal is carried (OoFormal.ByValue — the activator
+    // hands a detached value, the method never copies it back, §14.2.3 GR10), so no site can raise it. The NAME is
+    // retired and never reused. (The program/function arm's was deleted by kb/Work PB1114.)
 
     // ── COBOLNET0899 — miscellaneous deferrals ───────────────────────────────────────────────────────
     public static readonly DiagnosticDescriptor ExternalRecordNotCellBacked = new(
@@ -1925,6 +1941,20 @@ public static class DiagnosticCatalog
         + "warning. ⛔ CLASS, not category (§8.5.2.1 Table 2): a numeric-edited item is class ALPHANUMERIC when "
         + "its usage is display, so it is excluded however numeric it looks.",
         "ISO §14.9.4.3 SR22 / §8.5.2.1 Table 2");
+    /// <summary>COBOLNET2741 — an INVOKE … USING BY VALUE identifier-5 (or a bare identifier whose corresponding formal is
+    /// BY VALUE) is not of a class the standard permits to be passed by value (kb/Work PB1051). ISO §14.9.23.3 SR15: "If
+    /// identifier-5 or its corresponding formal parameter is specified with the BY VALUE phrase, identifier-5 shall be of
+    /// class message-tag, numeric, object or pointer." The INVOKE twin of <see cref="CallByValueOperandClass"/>
+    /// (§14.9.4.3 SR22); there is no vendor extension to accept here (GnuCOBOL has no object facility), so --permissive
+    /// does not relax it. CLASS, not category (§8.5.2.1 Table 2): a numeric-edited DISPLAY item is class alphanumeric.</summary>
+    public static readonly DiagnosticDescriptor InvokeByValueOperandClass = new(
+        "COBOLNET2741", "invoke-by-value-operand-class", EditionSeverity.Error,
+        "An INVOKE … USING BY VALUE operand is not of a class the standard permits to be passed by value. ISO "
+        + "§14.9.23.3 SR15: \"If identifier-5 or its corresponding formal parameter is specified with the BY VALUE "
+        + "phrase, identifier-5 shall be of class message-tag, numeric, object or pointer.\" An alphanumeric, national "
+        + "or boolean operand is therefore rejected. CLASS, not category (§8.5.2.1 Table 2): a numeric-edited item is "
+        + "class ALPHANUMERIC when its usage is display, so it is excluded however numeric it looks.",
+        "ISO §14.9.23.3 SR15 / §8.5.2.1 Table 2");
     /// <summary>ISO §14.9.4.3 SR23 — literal-2 shall be a NUMERIC literal when it, or its corresponding
     /// formal parameter, carries the BY VALUE phrase (kb/Work PB238). A SEPARATE code from SR22's
     /// COBOLNET1628 because it is a separate rule about a separate subject: SR22 screens identifier-4's CLASS,

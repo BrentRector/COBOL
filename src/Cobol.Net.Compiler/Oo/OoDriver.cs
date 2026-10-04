@@ -84,6 +84,12 @@ internal sealed class OoDriver(BindSession session)
             classCtx.factoryParagraph()?.environmentDivision(), edition);
         OoEnvironmentRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
             classCtx.objectParagraph()?.environmentDivision(), edition);
+        // The DATA-division twin: a factory or instance definition carries no LINKAGE or LOCAL-STORAGE SECTION
+        // (§13.7.3 SR1, §13.6.3 SR1; kb/Work PB1251). Its methods' own data divisions are asked in OoBindMethodData.
+        OoDefinitionRules.Screen(OoDefinition.Factory, $"class '{cls.Name}' FACTORY paragraph",
+            classCtx.factoryParagraph()?.dataDivision(), edition);
+        OoDefinitionRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
+            classCtx.objectParagraph()?.dataDivision(), edition);
         // OoOwnerClassName is what USAGE OBJECT REFERENCE [FACTORY OF] ACTIVE-CLASS binds to — §13.18.60.4
         // GR22 e), the class of the object that invoked the containing method (kb/Work PB389).
         var data = new DataBinder(edition) { OoClasses = session.OoClasses, OoIsClassUnit = true, OoOwnerClassName = cls.Name, RefModZeroLength = session.RefModZeroLength, CobolWords = session.CobolWords, Retypes = session.Retypes, LeapSecond = session.LeapSecond.IsOnAt(cls.Symbol.Ctx.Start.Line), CompilationVariables = session.CompilationVariables };

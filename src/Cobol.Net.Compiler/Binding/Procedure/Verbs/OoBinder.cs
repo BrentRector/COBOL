@@ -663,7 +663,16 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
             return OmittedArg(formal);
         }
-        if (arg.ByValueWritten)
+        // ⛔ THE PASSING MODE OF THE ARGUMENT IS THE FORMAL'S WHEN THE FORMAL IS BY VALUE (kb/Work PB1051).
+        // §14.9.23.3 SR5 a): "If a BY CONTENT or BY REFERENCE phrase is specified for an argument, a BY REFERENCE phrase
+        // shall be specified or implied for the corresponding formal parameter"; b): "If a BY VALUE phrase is specified for
+        // an argument, a BY VALUE phrase shall be specified or implied for the corresponding formal parameter"; and
+        // §14.9.23.4 GR6 b): "When the BY VALUE phrase is specified or implied for the corresponding formal parameter, BY
+        // VALUE is assumed" for a keyword-less argument. A BY VALUE argument is a detached sending value — §14.8.2.3.3's
+        // regime ("passed by content or by value": COMPUTE / SET / MOVE rules) — so below it takes the BY CONTENT arms
+        // with its own two screens: SR16 (a literal) and SR15 (an identifier's class).
+        bool byValue = oof.ByValue;
+        if (arg.ByValueWritten || byValue)
         {
             // SR16: "If literal-2 or its corresponding formal parameter is specified with the BY VALUE phrase,
             // literal-2 shall be a numeric literal" — CALL's SR23 word for word, so it is asked of THE ONE
@@ -675,11 +684,19 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "specified (ISO §14.9.23.3 SR16)");
                 return null;
             }
-            // SR5b: a BY VALUE argument requires a BY VALUE formal; every formal is BY REFERENCE today (the
-            // procedure-division-header BY phrases are an unparsed grammar extension — added with them).
-            Err($"BY VALUE argument for formal '{formal.CobolName}': the corresponding formal parameter is "
-                + "BY REFERENCE (ISO §14.9.23.3 SR5b; header BY VALUE formals are a later slice)");
-            return null;
+            if (arg.ByValueWritten && !byValue)
+            {
+                Err($"BY VALUE argument for formal '{formal.CobolName}': the corresponding formal parameter is "
+                    + "BY REFERENCE (ISO §14.9.23.3 SR5 b))");
+                return null;
+            }
+            if (byValue && (arg.ByReferenceWritten || arg.ByContentWritten))
+            {
+                Err($"{(arg.ByReferenceWritten ? "BY REFERENCE" : "BY CONTENT")} argument for formal '{formal.CobolName}': "
+                    + "the corresponding formal parameter is BY VALUE (ISO §14.9.23.3 SR5 a))");
+                return null;
+            }
+            byValue = true;
         }
 
         // ⛔ AN ADDRESS-IDENTIFIER ARGUMENT (kb/Work PB1021 — the INVOKE twin of PB239's CALL arm). §14.9.23.3 SR9:
@@ -748,7 +765,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // `INVOKE … USING arguments`, so §14.9.23.4 GR6 decides — the same default an INVOKE's bare
         // argument takes. `Expression` marks the shapes that have no storage to write back to
         // (§14.9.23.3 SR9 confines BY REFERENCE to an identifier).
-        bool explicitContent = arg.ByContentWritten;
+        bool explicitContent = arg.ByContentWritten || byValue;   // a BY VALUE argument is a detached value (GR6 b))
         // An operand that survives the reductions below as an EXPRESSION has no storage, so §14.9.23.3 SR9
         // cannot be met and GR6 a)2 assumes BY CONTENT. Only the inline form can reach this: an INVOKE
         // spells its own phrase, so `arg.Expression` is false there and this path is byte-inert for it.
@@ -921,6 +938,17 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
 
             // §14.9.23.3 SR13 over identifier-3 / identifier-5, before any conformance question (kb/Work PB1116).
             if (!ActiveClassSubordinateAdmitted(place, $"{verb} \"{methodName}\" USING argument")) return null;
+            // §14.9.23.3 SR15 — a BY VALUE identifier-5 is of class numeric, object or pointer (message-tag is the MCS
+            // module, not modeled). Asked of the operand's CLASS, the answer CALL's SR22 screen reads
+            // (IntrinsicArgumentRules.ClassOf), before any conformance question.
+            if (byValue && IntrinsicArgumentRules.ClassOf(new BoundFieldOperand(place)) is { } valueClass
+                && valueClass is not (CobolClass.Numeric or CobolClass.Object or CobolClass.Pointer))
+            {
+                ctx.Edition.Error(DiagnosticCatalog.InvokeByValueOperandClass,
+                    $"{verb} \"{methodName}\": BY VALUE operand '{argText}' is of class {valueClass.ToString().ToLowerInvariant()}; "
+                    + "ISO §14.9.23.3 SR15 admits only class message-tag, numeric, object or pointer by value");
+                return null;
+            }
             // A reference-modified operand is a unique ELEMENTARY ALPHANUMERIC item of the window length
             // (§8.4.3.3.4 GR6): conformance goes against that effective description, never the whole inner item.
             if (place is RefModPlace rmp)

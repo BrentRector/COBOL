@@ -6486,13 +6486,13 @@
   "ordinal": 3,
   "subject": "Inline method invocation",
   "rule-digest": "0b60b039ca9c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.InlineInvocation.cs#InvocationSite.OfInlineSegment; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2002/pb1051_method_by_value; conformance:negative/pb1051-inline-by-value-formal-alphanumeric; conformance:negative/pb1051-by-value-argument-alphanumeric",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Remaining half OWNED BY kb/Work PB1051: SR5b/SR15/SR16's BY VALUE formal lanes cannot be exercised (a method BY VALUE formal is COBOLNET0899). kb/Work PB1137 (landed w61j) closed the SR17 half on BOTH arms: the inline form binds its arguments through the same OoBindInvocationArg body, and a zero-length literal-2 is now COBOLNET2454 (14.9.23.3 SR17, cite.py --check OK); the SR9/SR12 screens and the shared literal mapping reach the inline arm the same way.",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). The inline form imports every 14.9.23.3 syntax rule through the same OoBindInvocationArg body. SR17 was closed by kb/Work PB1137; the BY VALUE halves SR5 b)/SR15/SR16 are now exercised by the inline form too: a bare inline argument into a BY VALUE formal is BY VALUE (golden pb1051_method_by_value, INLINE=12) and an alphanumeric one is COBOLNET2741 (negative pb1051-inline-by-value-formal-alphanumeric).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.4.3-4",
@@ -11376,13 +11376,13 @@
   "ordinal": 1,
   "subject": "Objects",
   "rule-digest": "ea3969180355",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassSymbol.cs#FindMethod; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitCobolInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateOverrideSignatures",
-  "test-ref": "conformance:2002/oo_inherit",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitCobolInvokeCase",
+  "test-ref": "conformance:2002/oo_inherit; conformance:2002/pb1051_method_by_value_match; conformance:2002/pb1051_universal_by_value_no_match",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule (cite.py --check 9.3.6 -> OK §9.3.6 1)): a method of the name defined in the class OF THE OBJECT that is an exact match is bound. Code binds by NAME (the roster is keyed by name; TryAddMethod refuses a second same-named method, COBOLNET0822) and dispatches on the runtime class (C# virtual override for typed receivers; the __CobolInvoke switch chain for universal). Why name-first binding is EQUIVALENT to the exact-match-first algorithm here: parametric polymorphism is optional (§9.3.5.3 'Parametric polymorphism is an optional feature', cite OK) and NOT claimed (CONFORMANCE.md A.4.10 item 3; §2 row 45 N/A), and multiple class inheritance is not claimed (COBOLNET0849), so a class holds at most one method per name and a same-named method in a subclass is an OVERRIDE whose formals ValidateOverrideSignatures (COBOLNET0829) holds identical to the base's. Exactness depends only on the PARAMETERS ('A method invocation is considered to match exactly if all parameters match exactly'; the returning item only enters the tie-break), and identical formals answer exactness identically in base and override — so the class-of-the-object's method wins whenever any does. I checked the one tempting counter-case, a COVARIANT RETURNING override (OoSpineTests.CovariantOverrideReturning_And_SignClauseConformance prints WOOF): it is NOT a divergence, because the returning item is not a parameter. Probe out/probe/objects-p1/p1.cob: A1 (typed OBJA) holding an OBJC ran OBJC's M (M-C). The OVERLOAD half of this rule (several same-named methods, one exact) belongs to the declined optional item — not a verdict of this row. || REFUTED: PARTIAL — The class-of-the-object-first half is verified. The golden oo_inherit shows a DOG through an ANIMAL reference printing WOOF; RQ1 shows the typed and universal receivers running RFC's M2. The adjudicator's reduction also holds: with one method per name, §11.7.3 SR9 conformance (§9.3.8.2.3 1)/3)) forces identical formals in an override, so exactness answers identically in base and override. But 'exact match ... as specified below' is defined for BY VALUE parameters too (match rule 5 and the exact-match criteria 'for each parameter that is passed by value or by content'), and that edge is unverifiable. A method formal declared BY VALUE is refused COBOLNET0899, and an INVOKE BY VALUE argument is refused COBOLNET0828, so no BY VALUE invocation can ever be bound under this step. An unverified edge => PARTIAL. The single root is the open kb/Work PB1051 (SR-14.2.2-2), and this row should flip back when PB1051 lands. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO is an ISO/IEC 1989:2002 introduction; absent from 1985 — probe p1.cob at --std 85 is refused COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). Resolution step 1 (an exact match in the class of the object binds). The BY VALUE edge: a BY VALUE formal participates in matching - bound by name and passing mode on the typed path (golden pb1051_method_by_value_match) and never matched by a universal (all BY REFERENCE) invocation (golden pb1051_universal_by_value_no_match, match rule 3 a)).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L2.2",
@@ -11391,13 +11391,13 @@
   "ordinal": 2,
   "subject": "Objects",
   "rule-digest": "17b0bb3b981b",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassSymbol.cs#FindMethod; src/Cobol.Net.Compiler/Oo/OoClassSymbol.cs#FindFactoryMethod; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitCobolInvoke; src/Cobol.Net.Runtime/Control/CobolObject.cs#__CobolInvoke",
-  "test-ref": "conformance:2002/pb389_object_reference_descriptor",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitCobolInvokeCase",
+  "test-ref": "conformance:2002/pb389_object_reference_descriptor; conformance:2002/pb1051_method_by_value_match; conformance:2002/pb1051_universal_by_value_no_match",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule (cite.py --check 9.3.6 'each inherited class upward in the hierarchy of inheritance is inspected in the order in which the hierarchy is specified in the INHERITS clause' -> OK §9.3.6 2)). Code: FindMethod/FindFactoryMethod walk c = c.Base upward (cycle-safe); at runtime the emitted __CobolInvoke switch's default: chains base.__CobolInvoke, and the CobolObject root raises EC-OO-METHOD. 'In the order specified in the INHERITS clause' collapses to the single base because CLASS-ID multiple inheritance is refused COBOLNET0849 (A.4.10 item 1 not claimed — owner-documented, no verdict here). Probe out/probe/objects-p1/p1.cob: universal U holding an OBJC found AONLY defined two levels up (A-AONLY); literal-argument T (defined only in OBJA) bound from an OBJC receiver. pb389 golden: INVOKE B \"MK\" runs PB389B's MK on a PB389D object (inherited-method binding, spec-derived expected output). Exact-vs-non-exact ordering is equivalent to name-first binding for the reason given under GR-9.3.6-L2.1. || REFUTED: PARTIAL — The upward INHERITS walk is verified for instance and factory rosters, including a subclass with no FACTORY paragraph (RQ5) and a three-level chain. The single-base order is correct: CLASS-ID multiple inheritance is the declined optional A.4.10 item 1 (COBOLNET0849), which is not this row's to judge. The 'is an exact match' condition has the same unverifiable BY VALUE edge as L2.1, because method BY VALUE formals are refused COBOLNET0899 (open PB1051), so PARTIAL until PB1051 lands. Separately I found an UNFILED LEAD that is not this row's verdict: 'CLASS-ID X INHERITS FROM BASE' is refused COBOLNET0821 ('no such a class is defined in this compilation group'), although §16.1 says 'A standard class BASE shall be provided by the implementation'. The hierarchy therefore can never contain BASE, and its New/FactoryObject methods are never found by this walk. That is a §16.1/§16.2 gap for the registrar to file. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO is an ISO/IEC 1989:2002 introduction; absent from 1985 — probe p1.cob at --std 85 is refused COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). Resolution step 2 (the upward INHERITS walk for an exact match) over a BY VALUE formal: golden pb1051_method_by_value_match invokes the inherited ADD2 and TR on a DBM object; golden pb1051_universal_by_value_no_match ends the search in EC-OO-METHOD (step 6).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L2.3",
@@ -11406,13 +11406,13 @@
   "ordinal": 3,
   "subject": "Objects",
   "rule-digest": "4f8e0dc38ccf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentMismatch",
-  "test-ref": "conformance:2002/oo_invoke_content_unsigned_formal",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2002/oo_invoke_content_unsigned_formal; conformance:2002/pb1051_method_by_value_match",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule (cite.py --check 9.3.6 'if one or more methods with the method-name specified in the invocation is defined in the class of the object and one or more of those methods match' — §9.3.6 3)): a NON-exact match (BY CONTENT/BY VALUE argument whose description differs but that satisfies the SET/MOVE match rules 4c/4d) still binds. Code: OoBindInvocationArg routes BY CONTENT (explicit, GR6a2-implied, every literal) to OoConformance.ContentMismatch — COMPUTE rules for a numeric formal, SET for object/pointer, MOVE (Table 16) otherwise — so a non-exact but matching argument binds to the method of the object's class. Golden oo_invoke_content_unsigned_formal: BY CONTENT S9(4) COMP into unsigned 9(4) COMP (non-exact — the SIGN/PICTURE differ) binds and delivers 7 (spec-derived expected output); OoSpineTests.ByContentNumeric_ComputeRuleConversion likewise. The multi-candidate 'that method is bound as specified below' tie-break is the declined overloading item (parametric polymorphism, §9.3.5.3) and is the objects-p2 row GR-9.3.6-L5.3's business. || REFUTED: PARTIAL — The rule's 'match' is defined by §9.3.6 match rules 1-7, which cover BY CONTENT (4) AND BY VALUE (5) parameters. The adjudicator verified only the BY CONTENT half. The BY VALUE half cannot happen: a method formal declared BY VALUE is refused COBOLNET0899 ('a method's value-copy formal is not yet implemented on the INVOKE channel'), and an INVOKE ... BY VALUE argument against a BY REFERENCE formal is refused COBOLNET0828. So a legal program whose only matching method takes a BY VALUE parameter (non-exact, e.g. PIC 9(5) argument into a PIC 9(4) COMP-5 BY VALUE formal) never binds. Two halves, one verified => PARTIAL. The open kb/Work note PB1051 (SR-14.2.2-2) owns the BY VALUE formal. The BY CONTENT half does hold: OoBindInvocationArg -> ContentMismatch binds a non-exact numeric argument. Its refusal of a non-numeric data item into a numeric formal is backed by §14.8.2.3.3 2) a) (COMPUTE rule, cite OK), even though §9.3.6 4) d) says MOVE. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO is an ISO/IEC 1989:2002 introduction; absent from 1985 — probe p1.cob at --std 85 is refused COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). Resolution step 3, the NON-exact match, for BY VALUE (match rule 5 c/d, 14.8.2.3.3 rule 2 a): a PIC 9(3) DISPLAY argument conforms to a PIC S9(4) COMP-5 BY VALUE formal and binds (golden pb1051_method_by_value_match: SUM=331); the BY CONTENT half was verified before.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L2.4",
@@ -11421,13 +11421,13 @@
   "ordinal": 4,
   "subject": "Objects",
   "rule-digest": "f10952efb1e6",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassSymbol.cs#FindMethod; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentMismatch",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2002/pb1051_method_by_value_match",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule (cite.py --check 9.3.6 -> OK §9.3.6 4)): the upward INHERITS inspection repeated for NON-exact matches. With one method per name (overloading declined) the inherited method found by FindMethod's base walk is bound under the same ContentMismatch match rules as in the object's own class. Probe out/probe/objects-p1/p1.cob: INVOKE C3 \"T\" USING 12345 \"ABCDEF\" on an OBJC object, T defined only in grand-base OBJA with formals PIC 9(3) / PIC X(3) (a non-exact literal match), bound and printed T:345:ABC at --std 2002/2014/2023. No existing spec-derived test exercises an INHERITED non-exact binding — test-needed. || REFUTED: PARTIAL — This is the inherited-class repeat of L2.3's non-exact 'match', so it has the same missing half. Match rule 5 (BY VALUE) cannot be exercised because method BY VALUE formals are refused COBOLNET0899 (open PB1051). The adjudicator's probe of an inherited non-exact BY CONTENT literal binding is correct (T:345:ABC reproduced from their p1.cob), but it covers only the BY CONTENT half. It also has no spec-derived test (test-needed). || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO is an ISO/IEC 1989:2002 introduction; absent from 1985 — probe p1.cob at --std 85 is refused COBOLNET0900)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). Resolution step 4, the inherited non-exact match, for BY VALUE: ADD2 is declared in CBM and bound from a DBM receiver with a non-exact PIC 9(3) argument (golden pb1051_method_by_value_match: SUM=331).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L2.5",
@@ -11436,13 +11436,13 @@
   "ordinal": 5,
   "subject": "Objects",
   "rule-digest": "fcc5f47f6b96",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentAlphanumericLiteralMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentValueMismatch",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2002/pb1051_method_by_value_match",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule (cite.py --check 9.3.6 'steps 3 and 4 are repeated, ignoring the requirements specified in 4c, 4d, 5c and 5d below' -> OK §9.3.6 5)). Net effect for a single candidate: a LITERAL argument whose SET/MOVE would truncate still matches. Code: the literal arms screen only MOVE/COMPUTE admissibility (category), never length/digit overflow — the comment at OoBinder.cs:874 cites exactly this rule — and the value converts per MOVE. Probe out/probe/objects-p1/p1.cob: USING 12345 \"ABCDEF\" into PIC 9(3) / PIC X(3) formals printed T:345:ABC (high-order digit truncation and right truncation — the MOVE results §14.9.25.4 gives). A literal whose MOVE is not admissible at all (a nonnumeric literal into a numeric formal) is still refused COBOLNET0828, correctly — step 5 relaxes only truncation. Literal arguments cannot reach a UNIVERSAL receiver (§14.9.23.3 SR6 'neither the BY CONTENT nor the BY VALUE phrase shall be specified', cite OK §14.9.23.3 6), and a literal has no BY REFERENCE form), so the typed path is the whole rule. OoSpineTests.ByContentNumeric_ComputeRuleConversion passes a literal (42.5) but without truncation, so it does not cover the rule's distinguishing edge — test-needed. || REFUTED: PARTIAL — The rule text names 4c, 4d, 5c AND 5d. 5c/5d are the BY VALUE literal-truncation relaxations. A method formal declared BY VALUE is refused COBOLNET0899 (open PB1051), and an INVOKE BY VALUE argument is refused COBOLNET0828, so the 5c/5d half of this rule is unimplemented. The 4c/4d (BY CONTENT) half is verified (USING 12345 'ABCDEF' into 9(3)/X(3) -> T:345:ABC). Two halves, one verified => PARTIAL. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO is an ISO/IEC 1989:2002 introduction; absent from 1985 — probe p1.cob at --std 85 is refused COBOLNET0900) retired-witness: src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentNumericLiteralMismatch (kb/Work PB1113 deleted the numeric-literal admission list; OoConformance.ContentValueMismatch replaces it)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). Resolution step 5 (cite.py --check 9.3.6 'steps 3 and 4 are repeated, ignoring the requirements specified in 4c, 4d, 5c and 5d below' -> OK 9.3.6 5)), the 5c/5d half: USING BY VALUE 12345 into PIC 9(3) still matches and delivers 345 (golden pb1051_method_by_value_match, T=345); the 4c/4d BY CONTENT half was verified before.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L2.6",
@@ -11571,13 +11571,13 @@
   "ordinal": 5,
   "subject": "Objects",
   "rule-digest": "36eab4693cf2",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitCobolInvokeCase",
+  "test-ref": "conformance:2002/pb1051_method_by_value; conformance:2002/pb1051_method_by_value_match; conformance:2002/pb1051_universal_by_value_no_match",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule (§9.3.6 match rule 5, cite.py OK §9.3.6 5)): a BY VALUE parameter needs a BY VALUE formal, then the same OMITTED/SET/MOVE legs as rule 4. Code: OoBindInvocationArg refuses every written BY VALUE argument outright ('every formal is BY REFERENCE today ... header BY VALUE formals are a later slice', OoBinder.cs:586), and a method's `PROCEDURE DIVISION USING BY VALUE` formal is itself refused COBOLNET0899. No BY VALUE matching exists to adjudicate. OWNED by open kb/Work PB1051 (method BY VALUE formal refused; claims SR-14.2.2-2) - its landing must also implement this rule's a)-d); no new finding filed. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO method invocation, §9.3.6, is introduced by ISO 2002; absent from X3.23-1985)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). Match rule 5: a BY VALUE parameter needs a corresponding BY VALUE formal (a), and the SET/MOVE legs (c, d) hold with literal truncation ignored in step 5 - goldens pb1051_method_by_value and pb1051_method_by_value_match; a universal invocation passes every argument BY REFERENCE (SR6), so it never reaches rule 5 and a BY VALUE formal never matches it (golden pb1051_universal_by_value_no_match). OMITTED (b) is a BY REFERENCE word, never written for a BY VALUE parameter.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L3.6",
@@ -11661,13 +11661,13 @@
   "ordinal": 1,
   "subject": "Conformance for object orientation",
   "rule-digest": "bb6aae50902a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateImplements; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateOverrideSignatures",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches",
+  "test-ref": "conformance:negative/pb1051-implements-by-reference-vs-prototype-by-value; conformance:2002/pb1051_method_by_value",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: Rule text (cite.py --check 9.3.8.2.3 OK: '1) The number of parameters are the same, with consistent BY REFERENCE and BY VALUE specifications.'). Two halves. (a) COUNT: MethodConformanceMismatches compares m1/m2 Formals.Count and yields '... (ISO Â§9.3.8.2.3 rule 1)'. Probe R1A (--std 2023; interface prototype USING A B, implementing method USING A) -> COBOLNET0841 '1 formal(s) vs the IR1A prototype's 2 (ISO Â§9.3.8.2.3 rule 1)' â€” correct. Conforming baseline B0 runs 'OK'. (b) BY REFERENCE / BY VALUE CONSISTENCY: not compared anywhere in MethodConformanceMismatches (it compares count, descriptions, OPTIONAL, RETURNING, RAISING â€” no passing mode); the code comment says it 'cannot differ' because a BY VALUE method formal is refused at bind. Probes R1B (BY VALUE on both sides) and R1C (BY VALUE prototype vs BY REFERENCE implementation) both stop at COBOLNET0899 'the BY VALUE phrase on method formal parameter ... is not yet implemented on the INVOKE channel' â€” legal source rejected; that refusal is owned by open kb/Work PB1051. So half (b) is unverifiable today and has NO comparator: when PB1051 lands, R1C would silently conform (latent under-rejection). No spec-derived test asserts the rule-1 count diagnostic (OoSpineTests pins 0841 only for missing-method and description mismatch). PARTIAL. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO facility introduced 2002; Â§9.3.8.2.3 has no edition qualification)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 9.3.8.2.3 'The number of parameters are the same, with consistent BY REFERENCE and BY VALUE specifications' -> OK 9.3.8.2.3 1). MethodConformanceMismatches compares the passing MODE per formal pair (OoFormal.ByValue) next to the count, for IMPLEMENTS, override and interface-to-interface conformance alike; negative pb1051-implements-by-reference-vs-prototype-by-value (COBOLNET0841); golden pb1051_method_by_value implements a BY VALUE prototype identically.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.8.2.3-2",
@@ -11676,13 +11676,13 @@
   "ordinal": 2,
   "subject": "Conformance for object orientation",
   "rule-digest": "f893a6e36175",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#SameDescriptionAs; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindObjectRefDescriptor",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#SameDescriptionAs; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindObjectRefDescriptor; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#OoFormalCrossingType",
+  "test-ref": "conformance:2002/pb1497_interface_active_class_prototype; conformance:2002/pb1112_active_class_override; conformance:2002/pb1497_active_class_inherited_method; conformance-test:Rule2ObjectReferenceConformanceTests.ImplementsRule2_ObjectReferenceArms; unit:ObjectRefActiveClassDescriptionTests.TwoActiveClassDescriptions_AgreeWhateverClassesTheyWereWrittenIn",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1112 (also PB1497): Rule text (cite.py --check 9.3.8.2.3 OK for 2) and d): 'If the parameter in interface-2 is described with the ACTIVE-CLASS phrase, the corresponding parameter in interface-1 is described with the ACTIVE-CLASS phrase, and the presence or absence of the FACTORY phrase is the same in both interfaces.'). Code: DescriptionMismatch ObjectReference arm -> ObjectRefDescriptor.SameDescriptionAs = Kind, Factory, Only AND Name equal. Arms a)-c) verified by probe at --std 2023 (IMPLEMENTS, 0841): universal/universal R2OK1, same interface R2OK2, FACTORY OF X ONLY both R2OK3 all run 'OK'; universal vs interface R2A, interface J vs K-INHERITS-J R2B (invariant, correctly refused), X ONLY vs X R2C, X vs FACTORY OF X R2D, class vs universal R2E all refused 0841 citing rule 2. Arm d) DEFECTIVE, two mechanisms: (1) for an ACTIVE-CLASS reference ObjectRefDescriptor.Name is the CONTAINING class, and SameDescriptionAs compares it, so an override whose ACTIVE-CLASS formal is described exactly as the overridden method's is refused: probe O2A (class AO2A method M USING X, X USAGE OBJECT REFERENCE ACTIVE-CLASS; class BO2A INHERITS AO2A, METHOD-ID. M OVERRIDE with the identical X) -> COBOLNET0829 'object-reference description mismatch (formal ... ACTIVE-CLASS (containing class AO2A), argument ... ACTIVE-CLASS (containing class BO2A)'. Spec: rule 2 d) constrains only the ACTIVE-CLASS phrase and FACTORY presence; Â§11.7.3 SR9 routes overrides through Â§9.3.8.2.3 -> must conform (legal source rejected). (2) an ACTIVE-CLASS formal in an INTERFACE prototype is refused COBOLNET1924 'written outside a class definition' (probes R2F/R2G), although Â§13.18.60.3 SR16 (cite OK) admits 'the linkage or local-storage section of a method definition' and Â§10.6.1's NOTE says a method-definition in an interface-definition defines a method prototype; rule 2 d) itself contemplates the phrase in interface-2. So the IMPLEMENTS leg of d) is unreachable and legal source is rejected. The FACTORY axis of d) is enforced (O2B rejected, though via the same Name compare). No register note owns either; PB389 (landed) introduced the tuple descriptor. No spec-derived test covers rule 2 (OoSpineTests tests pin non-object mismatches).",
-  "state": "GAP"
+  "notes": "kb/Work PB1497 landed (wave 1011 C), carrying the override leg of kb/Work PB1112. cite.py --check 9.3.8.2.3 'If the parameter in interface-2 is described with the ACTIVE-CLASS phrase, the corresponding parameter in interface-1 is described with the ACTIVE-CLASS phrase' -> OK 9.3.8.2.3 2) (printed item d)). Arms a)-c) and d) are now pinned over the IMPLEMENTS relation by Rule2ObjectReferenceConformanceTests (20 rows, the conforming ones compile clean). Arm d) was defective two ways: SameDescriptionAs compared the CONTAINING class name, refusing an override whose ACTIVE-CLASS formal is identical (COBOLNET0829), and an ACTIVE-CLASS formal in an interface method prototype was refused COBOLNET1924 although a prototype is a method definition (SR16, 10.6.1 NOTE). The description is now owner-less (ObjectRefDescriptor.ActiveClass(null) for a prototype; SameDescriptionAs ignores the containing class); an ACTIVE-CLASS formal crosses the method ABI as the universal object type (OoEmitter.OoFormalCrossingType) so the method, its overrides and the implemented prototype share one C# signature. Goldens pb1497_interface_active_class_prototype, pb1112_active_class_override and (sibling sweep) pb1497_active_class_inherited_method.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.8.2.3-3",
@@ -11766,13 +11766,13 @@
   "ordinal": 3,
   "subject": "Conformance for object orientation",
   "rule-digest": "81be19ec0f7f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindObjectRefDescriptor; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ReturningCircularity; src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches",
-  "test-ref": "conformance:2002/pb1498_self_referencing_returning; conformance:negative/pb1498-returning-circularity-direct; conformance:negative/pb1498-returning-circularity-indirect; unit:MethodConformanceRuleSetDriftTests.TheRuleSet_CarriesTheReturningCircularitySentence",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindObjectRefDescriptor; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateImplements; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ReturningCircularity; src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches",
+  "test-ref": "conformance:2002/pb1498_self_referencing_returning; conformance:negative/pb1498-returning-circularity-direct; conformance:negative/pb1498-returning-circularity-indirect; unit:MethodConformanceRuleSetDriftTests.TheRuleSet_CarriesTheReturningCircularitySentence; conformance:2002/pb1497_interface_active_class_prototype",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1498 (landed w1006a) + PB1497 (open). This row carries THREE sentences (cite.py --check 9.3.8.2.3 OK for each): 5) c) 3. 'The presence or absence of the FACTORY phrase shall be the same.'; 5) d) ACTIVE-CLASS in interface-2 -> ACTIVE-CLASS in interface-1 with the same FACTORY presence; and 'If the description of the returning item of a method in interface-1 directly or indirectly references interface-2, the description of the returning item of the corresponding method in interface-2 shall not directly or indirectly reference interface-1.' (1) c) 3. VERIFIED (R5G3, 0841 citing SR12 a)3.). (2) d) VERIFIED on the override leg (O5B); its diagnostic now reads 'the FACTORY phrase is not specified in the receiver's ACTIVE-CLASS description but specified in the sender's' and is labelled rule 5 d) (it said 'and in the sender's' and 'rules 5a/5c2'). The IMPLEMENTS leg is unreachable: an ACTIVE-CLASS returning item in an interface prototype is refused COBOLNET1924 - kb/Work PB1497, why this row stays PARTIAL. (3) The closing sentence is IMPLEMENTED (w1006a): OoConformance.ReturningCircularity, one rule of MethodConformanceMismatches so IMPLEMENTS (0841), override (0829) and the interface relation all ask it; 'indirectly' is the transitive closure (owner decision kb/Work R63; CONFORMANCE.md D-OOCIRC) over returning-item object references and a class's INHERITS/IMPLEMENTS, between distinct interfaces only. Probe L23A (ICIRC/CCIRC) is now COBOLNET0841; the indirect cycle through a third interface likewise; a self-referencing NEXT runs.",
-  "state": "GAP"
+  "notes": "kb/Work PB1498 (landed w1006a) + PB1497 (landed wave 1011 C). The row carries three sentences (cite.py --check 9.3.8.2.3 OK for each): 5) c) 3 the FACTORY presence (verified, R5G3, COBOLNET0841 citing SR12 a)3.); 5) d) ACTIVE-CLASS in interface-2 -> ACTIVE-CLASS in interface-1 with the same FACTORY presence, verified on the override leg (O5B) and now on the IMPLEMENTS leg, which PB1497 made reachable: golden pb1497_interface_active_class_prototype declares IR1497.ME RETURNING an ACTIVE-CLASS item, CR1497 implements it identically, and the covariant adapter is chosen by the two C# types the returns project to (ValidateImplements), not by description equality; and the closing anti-circularity sentence (OoConformance.ReturningCircularity, PB1498).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.8.2.3-6",
@@ -12831,13 +12831,13 @@
   "ordinal": 2,
   "subject": "OBJECT paragraph",
   "rule-digest": "6522c28ebfc7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateImplements; src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#ImplementsClosure",
-  "test-ref": "conformance-test:OoSpineTests.Implements_NumericDescriptionMismatch_0841; conformance-test:OoSpineTests.Implements_MissingMethod_0841",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches",
+  "test-ref": "conformance-test:OoSpineTests.Implements_NumericDescriptionMismatch_0841; conformance-test:OoSpineTests.Implements_MissingMethod_0841; conformance:2002/pb1051_method_by_value; conformance:negative/pb1051-implements-by-reference-vs-prototype-by-value",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1051: SR2 \"Each method prototype in each implemented interface shall be such that the object interface of this class conforms to all implemented interfaces\" (cite.py --check 11.8.3 OK), with §9.3.11's 'including any method specifications that the implemented definition or definitions inherited'. ValidateImplements iterates iface.AllPrototypes() over the GR2 closure (instance side), looks the method up via cls.FindMethod (walks the base chain, so an inherited method satisfies it) and applies the ONE §9.3.8.2.3 rule set MethodConformanceMismatches (rules 1-9) -> COBOLNET0841. Probes (probe dir out/probe/object-paragraph (gen.py)): p6 IB INHERITS IA, class implements only PB -> 0841 'requires a method PA'; p7 PA inherited from the base class satisfies IA and runs (BASE-PA). OoSpineTests pin the description mismatch (9(4) vs 9(8)) and missing-method cases with spec-derived expectations. Covariant object RETURNING (rule 5) accepted via adapters (golden oo_interface_covariant). Note: the BY VALUE method formal is refused at bind (COBOLNET0899, per the MethodConformanceMismatches doc) - owned by the method-definition rows, not this SR. || REFUTED: PARTIAL — SR2 requires the object interface of the class to conform to every implemented interface in the §9.3.8.2.3 sense. Rule 1 of that clause is 'The number of parameters are the same, with consistent BY REFERENCE and BY VALUE specifications'. MethodConformanceMismatches checks only the parameter count and never compares BY VALUE with BY REFERENCE. Its own doc comment says the leg 'cannot differ' because every BY VALUE method formal is refused at bind (COBOLNET0899). Probe q5 is a conforming program: interface IA's prototype PA is USING BY VALUE P, and the class implements it identically. It cannot compile, failing COBOLNET0899 on both the prototype and the implementation, plus COBOLNET0828 at the INVOKE. So for any interface with BY VALUE prototypes, the SR2 relation is neither computed nor observable, and legal OBJECT IMPLEMENTS source is rejected. The BY-REFERENCE-only half is verified: missing method (q3, including a method that exists only on the FACTORY side), description mismatch (OoSpineTests), inherited-prototype requirement (p6) and inherited implementation (p7). One half verified, one half unimplemented, so the verdict is PARTIAL. The BY VALUE refusal itself belongs to the method-formal rows; this row needs the rule-1 BY VALUE/BY REFERENCE comparison once method BY VALUE lands. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (the OO facility, introduced by ISO/IEC 1989:2002; absent from X3.23-1985)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). SR2 holds the object interface of the class to every implemented interface's prototypes (cite.py --check 11.8.3 OK). The BY VALUE half is now observable: a BY VALUE prototype implemented identically compiles and runs (golden pb1051_method_by_value, interface IBV), and implemented BY REFERENCE is COBOLNET0841 (negative pb1051-implements-by-reference-vs-prototype-by-value).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-11.8.4-1",
@@ -17946,13 +17946,13 @@
   "ordinal": 1,
   "subject": "Local-storage section",
   "rule-digest": "2dc51316bc28",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#factoryParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#objectParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDivision; src/Cobol.Net.Compiler/Binding/DataBinder.cs#Bind; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoDefinitionRules.cs#RefusedBy; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoDriver.cs#BindClassData",
+  "test-ref": "conformance:negative/pb1251-object-local-storage; conformance:negative/pb1251-factory-local-storage; unit:OoDefinitionRulesDriftTests.TheVerdicts_AreTheStandards",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1251, 14d). Rule (cite.py --check 13.6.3 \"The local-storage section may be specified in a program definition or function definition or in a method definition contained in a class definition.\" -> OK §13.6.3 1)). Two halves. POSITIVE half verified: program definition (probe a_fmt.cob, goldens 2002/recursive_ws, 2023/pb152_options_initialize_local_storage), function definition (probe f_fn.cob recursive FUNCTION-ID with LS runs), method in a class definition (probe i_meth.cob; OoBindMethodData binds dd.localStorageSection()). Prototype exclusion verified: LS in a PROGRAM-ID/FUNCTION-ID IS PROTOTYPE and in an INTERFACE method prototype -> COBOLNET2272 (§10.6.2 SR4 e) — probes e_proto.cob, d_ifls.cob. NEGATIVE half FAILS: the FACTORY and OBJECT paragraphs reuse the shared dataDivision rule (which carries localStorageSection?) and nothing screens it, so 'FACTORY. DATA DIVISION. LOCAL-STORAGE SECTION. 01 LX PIC 9(3) VALUE 7.' and the OBJECT twin compile with NO diagnostic (probes b_FACTORY.cob, b_OBJECT.cob), and at run time the object-level LS item behaves as persistent instance data (c_objls.cob: two INVOKEs of a method doing DISPLAY LX / ADD 1 TO LX print LX=007 then LX=008). A factory or instance definition is neither a program, function nor method definition, so the section is not permitted there; expected a named compile-time error. No kb/Work note owns this (searched PB1045/PB389/PB467/PB496/PB956 — none covers LS placement in a factory/object). Finding: ls-in-factory-object-under-rejected. || Code sites (adjudicator detail): src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#factoryParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#objectParagraph; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDivision; src/Cobol.Net.Compiler/Binding/DataBinder.cs#Bind (localStorageSection arm); src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Binding/PrototypeUnitRules.cs (SR4 e)",
-  "state": "GAP"
+  "notes": "kb/Work PB1251 landed (wave 1011 C). cite.py --check 13.6.3 'The local-storage section may be specified in a program definition or function definition or in a method definition contained in a class definition.' -> OK 13.6.3 1). The positive arms (program, function, method) were verified before; a LOCAL-STORAGE SECTION in a FACTORY or OBJECT paragraph compiled clean and bound as persistent instance or factory data. The same OoDefinitionRules table refuses it (COBOLNET1519); negatives pb1251-object-local-storage and pb1251-factory-local-storage.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.6.4-1",
@@ -17991,13 +17991,13 @@
   "ordinal": 1,
   "subject": "Linkage section",
   "rule-digest": "978463910e71",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/OoDefinitionRules.cs#RefusedBy; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoDriver.cs#BindClassData",
+  "test-ref": "conformance:negative/pb1251-object-linkage; conformance:negative/pb1251-factory-linkage; unit:OoDefinitionRulesDriftTests.TheVerdicts_AreTheStandards",
   "derivation": "",
-  "editions": "85",
-  "notes": "(kb/Work PB1251, 14d). Rule (cite.py --check 13.7.3 \"The linkage section may be specified in a program definition, function definition, method definition, program prototype definition, or function prototype definition\" -> OK §13.7.3 1)). Positive arms verified: program (fmt1.cob), function (gr4.cob), method (oo_method_redefines_linkage), program prototype (sr2grp.cob), function prototype (conformance:2002/udf_prototype). NEGATIVE arm (an enumerated permission — a factory definition or instance/object definition is not in the list) is NOT enforced: CobolOO.g4 gives FACTORY. and OBJECT. a full `dataDivision?` and nothing screens its linkageSection (only three consumers of linkageSection() exist: DataBinder.Linkage.cs:230/476 and DataBinder.Oo.cs:329, the last for METHODS). Probe sr1.cob (--std 2002): CLASS-ID LKAGG, OBJECT. DATA DIVISION. LINKAGE SECTION. 01 OBJ-L PIC X(3). -> compiles clean and runs (NUM=1234 NC=1234 ARG=0042); sr1f.cob, the same under FACTORY., also clean. Expected: a compile-time error — no factory/instance LINKAGE item can ever have a formal-parameter correspondence (§13.7.4 GR2 / §14.2.3), so SR4 would bar every reference anyway. Note: interface method prototypes also carry a LINKAGE SECTION although SR1's list omits 'method prototype definition'; not flagged (spec gap, not a code defect). Harm: under-rejects. Probes: out13/probe/linkage-section/sr1.cob, sr1f.cob. || Editions (adjudicator): 85 (program definition only), 2002, 2014, 2023 || Code sites (adjudicator detail): src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#(factory/object dataDivision); src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#(method data division screen, COBOLNET1519)",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1251 landed (wave 1011 C). cite.py --check 13.7.3 'The linkage section may be specified in a program definition, function definition, method definition, program prototype definition, or function prototype definition' -> OK 13.7.3 1). The positive arms (program, function, method, program prototype, function prototype) were verified before; the missing arm was the class-body one: a LINKAGE SECTION written in a FACTORY or OBJECT paragraph bound silently as persistent data. OoDefinitionRules is now the one (definition kind x section) table, asked once per parsed definition by OoDriver.BindClassData (factory, instance) and DataBinder.OoBindMethodData (method), reported as COBOLNET1519 (DiagnosticCatalog.OoDataDivisionPlacement); negatives pb1251-object-linkage and pb1251-factory-linkage; OoDefinitionRulesDriftTests holds the table total over the grammar's dataDivision sections.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.7.3-2",
@@ -18111,13 +18111,13 @@
   "ordinal": 4,
   "subject": "Linkage section",
   "rule-digest": "7cb64de820dd",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs; src/Cobol.Net.Compiler/Binding/BinderDriver.cs",
-  "test-ref": "conformance:2002/udf_prototype; conformance:2002/oo_method_redefines_linkage",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod",
+  "test-ref": "conformance:2002/udf_prototype; conformance:2002/oo_method_redefines_linkage; conformance:2002/pb1051_method_by_value; conformance:2002/pb1051_method_by_value_match",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1051, 14d). Rule (cite.py --check 13.7.4 \"In a function definition and in a method definition, access to formal parameters and the returning item is always guaranteed\" -> OK §13.7.4 4)). Function arm: probe gr4.cob — FUNCTION-ID LKDBL USING P-X RETURNING P-R, COMPUTE P-R = P-X * 2 -> R=00042 for W-X=21 and R2=00010 for a literal argument 5. Method arm: conformance:2002/oo_method_redefines_linkage reads NUM/NCHARS formals of an INVOKEd method and writes back (ARG=0042), values derived from §14.2.3 GR8 in its header; conformance:2002/udf_prototype computes SQUARER(7)=49 through the function formal and returning item. Both halves verified. Probe: out13/probe/linkage-section/gr4.cob. || REFUTED: PARTIAL — Function arm verified (formals + returning, incl. BY VALUE function formal: g4f.cob prints 00042 0021). Method arm has a located failing edge: a method whose formal is declared BY VALUE -- legal by 14.2.2 SR2 for a numeric formal -- is refused COBOLNET0899 'a method's value-copy formal is not yet implemented on the INVOKE channel' (DataBinder.Oo.cs:374), so access to that formal is not merely unguaranteed but unreachable; open note PB1051 owns it. Method RETURNING (object/factory, statement and inline invocation) works in probe g4n.cob but no cited test pins the method returning item: oo_method_redefines_linkage has no RETURNING. One arm verified, one arm with a live defect => PARTIAL. || Editions (adjudicator): 2002, 2014, 2023 (function and method definitions are 2002+) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#(method LINKAGE binding); src/Cobol.Net.Compiler/Binding/BinderDriver.cs#(UserFunctionSignature table)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 13.7.4 'access to formal parameters and the returning item is always guaranteed' -> OK 13.7.4 4). The function arm was verified before; the method arm's BY VALUE formal is now reachable and its formals and RETURNING item are used and delivered (goldens pb1051_method_by_value ADD2/TWICE, pb1051_method_by_value_match).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.7.4-5",
@@ -31296,13 +31296,13 @@
   "ordinal": 2,
   "subject": "Procedure division structure",
   "rule-digest": "52b5403336d4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
-  "test-ref": "conformance:negative/by-value-formal-class",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Binding/ProcedureHeaderScreen.cs#ByValueClass",
+  "test-ref": "conformance:negative/by-value-formal-class; conformance:2002/pb1051_method_by_value; conformance:negative/pb1051-method-by-value-formal-alphanumeric; unit:ByValueFormalScreenDriftTests.EveryHeaderArm_AsksTheOneByValueClassScreen_AndSpellsNoClassSetOfItsOwn",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open). §14.2.2 SR2 (cite.py --check 14.2.2 \"Each data-name-1 specified in a BY VALUE phrase shall be defined as a data item of class numeric, message-tag, object, or pointer\" -> OK §14.2.2 2)). Refusal half CONFORMS on the program arm: PIC X BY VALUE formal -> COBOLNET1553 (probe sr2alnum.cob; negative/by-value-formal-class, reject-at 2002/2014/2023). Acceptance half: fixed-point numeric, POINTER and a COMP numeric BY VALUE compile (probe b3/byvalue_ptr.cob) and GR4 runtime probe shows fixed-point BY VALUE carried. But two LEGAL shapes are refused: (1) a FLOATING-POINT (class numeric) BY VALUE program formal -> COBOLNET0899 'not yet implemented' (probe b3/byvalue_float.cob) - rejects legal source; (2) ANY BY VALUE formal on a METHOD -> COBOLNET0899 - owned by open kb/Work PB1051 (inventory_rows SR-14.2.2-2). Message-tag is MCS (not modeled). The float leg is not in PB1051's text (grep 'float' in PB1051.md: none) - reported as a finding. || editions as adjudicated: 2002, 2014, 2023 (BY VALUE in the PD header is a COBOL-2002 introduction; gated pd-header-by-value-2002)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 14.2.2 'Each data-name-1 specified in a BY VALUE phrase shall be defined as a data item of class numeric, message-tag, object, or pointer' -> OK 14.2.2 2). The class screen is ProcedureHeaderScreen.ByValueClass, asked by the program/function arm and the method arm alike (COBOLNET1553); golden pb1051_method_by_value carries numeric, pointer and object-reference BY VALUE method formals, negative pb1051-method-by-value-formal-alphanumeric refuses an alphanumeric one. Class message-tag is the MCS module (not modeled, undeclarable).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.2.2-3",
@@ -31521,13 +31521,13 @@
   "ordinal": 4,
   "subject": "Procedure division structure",
   "rule-digest": "6574f29db7ad",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
+  "test-ref": "conformance:2002/pb1051_method_by_value",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open). §14.2.3 GR4 (cite.py --check 14.2.3 \"Both the BY REFERENCE and the BY VALUE phrases are transitive\" -> OK §14.2.3 4)). The flat usingParameter list threads `byValue` across plain parameters, reset only by the other phrase. Probes via CALL ... AS NESTED (GR9 b mode-follows-formal): `USING BY VALUE LX LY BY REFERENCE LZ LW` with callee MOVE 9 to all -> caller shows 001 002 009 009 (LY by value by transitivity, LW by reference) (b3/gr4_trans.cob); `USING LX BY VALUE LY LZ` -> 009 002 003 (LX defaulted BY REFERENCE) (b3/gr4_default.cob). Method arm does not thread (no byValue flag) but any BY VALUE there is already refused loud (PB1051) so no silent by-ref. Test-needed. || REFUTED: PARTIAL — GR4 governs BY REFERENCE/BY VALUE transitivity for the function, the method AND the program. The program arm and function arm work: FUNCTION FV USING BY VALUE LX LY gives R=003 and leaves the caller's A and B at 001 and 002 after the callee stores 9. The METHOD arm does not work. A method header 'PROCEDURE DIVISION USING BY VALUE LN', legal by SR2, is refused COBOLNET0899 (register note PB1051, rejects_legal_source). So neither 'BY VALUE transitive across method formals' nor a method's mixed 'USING A BY VALUE B C' can compile. The adjudicator's note concedes this ('the method arm does not thread the mode ... already refused'), and a refusal of legal source is not conformance. One arm of a three-arm rule is unimplemented, so the verdict is PARTIAL. || editions as adjudicated: 2002, 2014, 2023 (BY VALUE in the PD header is 2002; the BY REFERENCE default applies from 85)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 14.2.3 'Both the BY REFERENCE and the BY VALUE phrases are transitive' -> OK 14.2.3 4): OoBindMethodData threads the mode across the formals exactly as the program arm does. Golden pb1051_method_by_value: ADD2 USING BY VALUE A B (B is BY VALUE), MIX USING BY VALUE A BY REFERENCE B C (C is BY REFERENCE; the mode reverts at the next phrase).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.2.3-5",
@@ -39231,13 +39231,13 @@
   "ordinal": 5,
   "subject": "INVOKE statement",
   "rule-digest": "a9a4fc40056c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#ByValueFormalCarrier; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#LeafCarried; src/Cobol.Net.Compiler/CodeGen/DataDivision/RecordStructEmitter.cs#EmitLeafMethods",
-  "test-ref": "conformance:negative/oo-interface-arg-mismatch; conformance:2002/pb1116_strong_group_object_leaf",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:negative/oo-interface-arg-mismatch; conformance:2002/pb1116_strong_group_object_leaf; conformance:2002/pb1051_method_by_value; conformance:negative/pb1051-by-reference-argument-by-value-formal; conformance:negative/pb1051-by-value-argument-by-reference-formal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open) for its remaining leg. Rule: SR5 a) BY CONTENT/REFERENCE arg needs a BY REFERENCE formal; b) BY VALUE arg needs a BY VALUE formal (--check OK 14.9.23.3 5) b)); c) 14.8.2/14.8.3 conformance applies. a) holds trivially - every method formal is BY REFERENCE. b) a BY VALUE argument against a BY REFERENCE formal is refused COBOLNET0828 citing SR5b (probe ph2) - correct - but the LEGAL half (BY VALUE argument into a BY VALUE formal) cannot be written: a method header BY VALUE formal is refused COBOLNET0899 (DataBinder.Oo.cs ByValueFormalCarrier) - owned by open kb/Work PB1051. c) implemented by OoConformance.DescriptionMismatch/ContentMismatch + ObjectRefAssignmentMismatch; arity 14.8.2.1; RETURNING presence both ways per 14.8.3.1. The c) leg's legal-source refusal is FIXED (w1007b, kb/Work PB1116): a strongly-typed group whose subordinate is an object reference, passed to a formal of the SAME type (14.8.2.2 'If either the formal parameter or the corresponding argument is a strongly-typed group item, both shall be of the same type', cite.py OK 14.8.2.2 2)), now crosses a typed INVOKE as its leaf vector (OoClassTable.LeafCarried; the record struct's AsLeaves/OfLeaves) BY REFERENCE (copy-back), BY CONTENT and as a RETURNING item, between source elements and within one: conformance:2002/pb1116_strong_group_object_leaf (REF:XYZ N1=007, CON:DEF, RET:RET, SAMEOBJ, SELF-REF:QQQ). SR13 (an ACTIVE-CLASS subordinate) stays refused by its own screen (COBOLNET2728, negative pb1116-active-class-subordinate). Remaining PARTIAL: b)'s legal half, PB1051. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 14.9.23.3 'If a BY VALUE phrase is specified for an argument, a BY VALUE phrase shall be specified or implied for the corresponding formal parameter' -> OK 14.9.23.3 5) b); a) 'If a BY CONTENT or BY REFERENCE phrase is specified for an argument, a BY REFERENCE phrase shall be specified or implied for the corresponding formal parameter'; c) the 14.8.2/14.8.3 conformance rules. a) and b) are now both refused from both sides (negatives pb1051-by-reference-argument-by-value-formal and pb1051-by-value-argument-by-reference-formal) and the legal BY VALUE argument into a BY VALUE formal runs (golden pb1051_method_by_value).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-6",
@@ -39366,13 +39366,13 @@
   "ordinal": 14,
   "subject": "INVOKE statement",
   "rule-digest": "cd73b6b74771",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "conformance-test:OoSpineTests.ObjectData_AutoContent_Sr10",
+  "test-ref": "conformance-test:OoSpineTests.ObjectData_AutoContent_Sr10; conformance:2002/pb1051_method_by_value",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open). Rule: a bare argument is BY REFERENCE when a) it is valid for passing by reference and b) the formal is not BY VALUE (--check OK §14.9.23.3 14) b)). a) implemented: a bare WS identifier crosses BY REFERENCE with write-back (probe pd10 prints CHG); object data, a literal, an expression, an inline-invocation temporary and a function temporary cross BY CONTENT (GR6 a)2; pd6, pd7). b) unreachable: no method formal can be BY VALUE (ByValueFormalCarrier, open kb/Work PB1051), so the 'BY VALUE formal -> BY VALUE assumed' side (GR6 b)) has no implementation and no carrier - PARTIAL, owned by PB1051. Edge noted, not a defect: a bare CONSTANT RECORD argument is refused (pe4) because GR6 a)1 assumes BY REFERENCE for any SR9/SR10 item and SR20 then makes it receiving - defensible reading. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 14.9.23.3 'If an argument is specified without any BY phrase, BY REFERENCE is implied for that argument when' -> OK 14.9.23.3 14) b): the formal is not BY VALUE. A bare identifier into a BY VALUE formal is NOT BY REFERENCE: golden pb1051_method_by_value passes N bare to a BY VALUE formal and the callee's ADD 1 does not reach N, while a bare argument into a BY REFERENCE formal (MIX) is written back.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-15",
@@ -39381,13 +39381,13 @@
   "ordinal": 15,
   "subject": "INVOKE statement",
   "rule-digest": "e5914c424e3e",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#InvokeByValueOperandClass",
+  "test-ref": "conformance:negative/pb1051-by-value-argument-alphanumeric; conformance:negative/pb1051-inline-by-value-formal-alphanumeric; conformance:2002/pb1051_method_by_value",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open). Rule: 'If identifier-5 or its corresponding formal parameter is specified with the BY VALUE phrase, identifier-5 shall be of class message-tag, numeric, object or pointer.' (--check OK §14.9.23.3 15)). No class check exists: EVERY explicit BY VALUE argument is refused by the blanket SR5b message (probe ph2: BY VALUE X5 -> 0828 'the corresponding formal parameter is BY REFERENCE'), and a BY VALUE formal cannot be declared on a method (COBOLNET0899, open kb/Work PB1051). The illegal shapes are refused, but for SR5b's reason; the rule itself has no code and becomes live only when PB1051 lands - it should join PB1051's inventory_rows. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 14.9.23.3 'If identifier-5 or its corresponding formal parameter is specified with the BY VALUE phrase, identifier-5 shall be of class message-tag, numeric, object or pointer' -> OK 14.9.23.3 15). COBOLNET2741 (InvokeByValueOperandClass), asked of an explicit BY VALUE argument and of a bare argument whose formal is BY VALUE (INVOKE form and inline form); numeric, pointer and object-reference arguments pass (golden pb1051_method_by_value). Class message-tag is not modeled.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-16",
@@ -39396,13 +39396,13 @@
   "ordinal": 16,
   "subject": "INVOKE statement",
   "rule-digest": "6dc1bd6ab1b9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:negative/pb1051-by-value-literal-alphanumeric; conformance:2002/pb1051_method_by_value; conformance:2002/pb1051_method_by_value_match",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open). Rule: 'If literal-2 or its corresponding formal parameter is specified with the BY VALUE phrase, literal-2 shall be a numeric literal.' (--check OK §14.9.23.3 16)). Explicit-BY-VALUE half enforced structurally: invokeArgument's BY VALUE arm is (addressIdentifier | arithmeticExpression), so BY VALUE \"ABCDE\" is a parse error (probe ph1: COBOL0308). Formal-BY-VALUE half (a bare nonnumeric literal against a BY VALUE formal) unreachable - no method formal can be BY VALUE (open kb/Work PB1051). PARTIAL; should join PB1051's inventory_rows. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). cite.py --check 14.9.23.3 'If literal-2 or its corresponding formal parameter is specified with the BY VALUE phrase, literal-2 shall be a numeric literal' -> OK 14.9.23.3 16). Refused for a written BY VALUE literal AND for a keyword-less literal whose formal is BY VALUE (CallBinder.ByValueLiteralAdmitted, the CALL SR23 predicate); numeric literals pass (goldens pb1051_method_by_value, pb1051_method_by_value_match).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-17",
@@ -39471,13 +39471,13 @@
   "ordinal": 21,
   "subject": "INVOKE statement",
   "rule-digest": "3e1e41c51473",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#SelfSenderRefusals; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument",
-  "test-ref": "conformance:2002/pb1137_invoke_argument_forms",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2002/pb1137_invoke_argument_forms; conformance:2002/pb1051_method_by_value",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Remaining halves: the BY VALUE identifier-5 lane (kb/Work PB1051 - every method BY VALUE formal is COBOLNET0899) and the object-view identifier format `O AS UNIVERSAL` (kb/Work PB1425 - identifier Format 5 has no grammar). kb/Work PB1137 (landed w61j): identifier-5 is a sending operand on every BY CONTENT path, now including the keyword-less arguments GR6 a) 2. passes BY CONTENT (resolved through ExpressionBinder.ResolveSending, which now also resolves a report's PAGE-COUNTER), the predefined NULL (golden NULL LO=NULL) and SELF (`USING [BY CONTENT] SELF` parses and crosses BY CONTENT under the SET-F5 SELF-sender rules, OoBinder.SelfSenderRefusals; golden NULL LO=OBJECT twice).",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). SR21: identifier-5 is a sending operand. A BY VALUE identifier-5 is read and never written: golden pb1051_method_by_value shows the caller's N, PTR and OTH unchanged after the callee stored to its copies (14.2.3 GR10).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-22",
@@ -39546,13 +39546,13 @@
   "ordinal": 4,
   "subject": "INVOKE statement",
   "rule-digest": "e6ceecb2575b",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ContentValueMismatch",
-  "test-ref": "conformance:2023/pb46_invoke_by_content_expression; conformance:2002/pb1113_content_compute_move_regime",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2023/pb46_invoke_by_content_expression; conformance:2002/pb1113_content_compute_move_regime; conformance:2002/pb1051_method_by_value",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1051 (open). Rule: 'An argument that consists merely of a single identifier or literal is regarded as an identifier or literal rather than an arithmetic or boolean expression.' (cite.py --check 14.9.23.4 OK, GR4). The keyword-less and BY CONTENT reductions are verified (sole data reference, sole numeric literal, bare boolean node, inline invocation, function-identifier). The signed-literal half the refuter found is FIXED (w1006a, kb/Work PB1113): `BY CONTENT -5` rides the literal lane and, asked the MOVE question, crosses into PIC X(4) as [5   ]. REMAINING: the BY VALUE lane is unreachable until method BY VALUE formals land (PB1051).",
-  "state": "GAP"
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). GR4: an argument that is merely a single identifier or literal is regarded as an identifier or literal rather than an arithmetic or boolean expression - the BY VALUE lane takes the same sole-reference and sole-literal reductions the BY CONTENT lane takes (a BY VALUE operand cannot be an expression: the general format prints identifier-5 or literal-2), golden pb1051_method_by_value.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.23.4-5",
@@ -39578,7 +39578,7 @@
   "rule-digest": "4b5badad3d15",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "conformance:2023/pb1135_invoke_keywordless_expression_argument; conformance:2023/pb130_call_format2_bare",
+  "test-ref": "conformance:2023/pb1135_invoke_keywordless_expression_argument; conformance:2023/pb130_call_format2_bare; conformance:2002/pb1051_method_by_value",
   "derivation": "",
   "editions": "2002,2014,2023",
   "notes": "kb/Work PB1135 / decision R59: a keyword-less N + 1 is ONE expression argument (BY CONTENT); a sole identifier stays BY REFERENCE (SR9).",
@@ -39606,13 +39606,13 @@
   "ordinal": 2,
   "subject": "INVOKE statement",
   "rule-digest": "2c444e82b0af",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ParameterConformance.cs#MeetsByReferenceRules; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "conformance:2002/pb1137_invoke_argument_forms",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
+  "test-ref": "conformance:2002/pb1137_invoke_argument_forms; conformance:2002/pb1051_method_by_value",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Remaining halves OWNED BY kb/Work PB1051 (GR6 b) BY VALUE formals) and kb/Work PB1135 (keyword-less expressions misparse). GR6 a) 2. 'if the argument does not meet the requirements of Syntax rules 9 and 10, BY CONTENT is assumed' (cite.py --check 14.9.23.4 OK). kb/Work PB1137 (landed w61j) fixed its halves: the keyword-less mode is decided BEFORE resolution by ParameterConformance.MeetsByReferenceRules (the SR9 section + SR10 object-data test CALL's GR9 a) asks too), so a bare OBJECT PROPERTY now crosses BY CONTENT (pr1: BAL stays 00100; golden PROP BAL=00100) and a bare PAGE-COUNTER BY CONTENT (golden PC=0001); a constant-name is literal-2 (13.10.3 SR2) bare and BY CONTENT (k1/k2 LK=0042; golden KONST LN=0042). Verified earlier arms unchanged: object data -> BY CONTENT; a literal -> BY CONTENT; inline/function temporaries -> BY CONTENT.",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1051 landed (wave 1011 C): a METHOD formal declared BY VALUE is carried (OoFormal.ByValue). GR6 b) 'When the BY VALUE phrase is specified or implied for the corresponding formal parameter, BY VALUE is assumed' (cite.py --check 14.9.23.4 OK 6) b)): OoBindInvocationArg takes the formal's mode for a keyword-less argument and binds it as a detached value; golden pb1051_method_by_value (bare N, bare literal, inline form).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.23.4-7",

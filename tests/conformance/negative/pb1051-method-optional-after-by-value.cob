@@ -1,0 +1,41 @@
+      *> reject-at: 2002 2014 2023
+      *> kb/Work PB1051 -- ISO 14.2.1: the using-phrase prints OPTIONAL only in the BY REFERENCE
+      *> alternative; after BY VALUE the word `OPTIONAL LY` continues the BY VALUE alternative (the
+      *> method twin of pb1145-optional-after-by-value).
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB1051N6.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS CBVN6.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 O USAGE OBJECT REFERENCE CBVN6.
+       01 N PIC S9(4) COMP-5 VALUE 42.
+       01 X PIC X(4) VALUE "ABCD".
+       PROCEDURE DIVISION.
+       MAIN.
+           INVOKE CBVN6 "NEW" RETURNING O.
+           INVOKE O "M" USING BY VALUE N N.
+           STOP RUN.
+       END PROGRAM PB1051N6.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. CBVN6 INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. M.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LX PIC S9(4) COMP-5.
+       01 LY PIC S9(4) COMP-5.
+       PROCEDURE DIVISION USING BY VALUE LX OPTIONAL LY.
+           CONTINUE.
+       END METHOD M.
+       END OBJECT.
+       END CLASS CBVN6.

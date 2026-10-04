@@ -581,6 +581,15 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         var formalsList = m.Binding!.Formals;
         var returning = m.Binding!.Returning;
         int formals = formalsList.Count;
+        // §9.3.6 match rule 3 a): every argument of a universal invocation is BY REFERENCE (§14.9.23.3 SR6), and "for each
+        // parameter of the invocation that is passed by reference there shall be a corresponding parameter in the invoked
+        // method that is specified with the BY REFERENCE phrase" — a method with a BY VALUE formal never matches one, so
+        // the search continues upward and ends in EC-OO-METHOD (§9.3.6 resolution step 6; kb/Work PB1051).
+        if (formalsList.Any(f => f.ByValue))
+        {
+            w.Line("break;   // a BY VALUE formal: not a §9.3.6 match for a universal (all BY REFERENCE) invocation — the search continues upward");
+            return;
+        }
         // §14.8.2.1 and §9.3.6 match rule 1: fewer arguments than formals is an EQUAL number when every formal to the
         // right of the last argument is OPTIONAL — so the least admissible count is one past the last NON-optional
         // formal (kb/Work PB757).
@@ -679,6 +688,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         : OoUnivNativeBoxOverImage(item) ? NumericRenderer.ImageOfCarrier($"({item.Pic!.ClrType}){box}!", item)
         : OoStringCarried(item) ? $"(string){box}!"
         : OoUnivImageBridged(item) ? RuntimeApi.NumStoreDisplay($"(string){box}!", item.ProfileName, $"({item.ElementType})0")
+        : OoIsActiveClassFormal(item) ? $"(CobolObject?){box}"   // the universal crossing (OoFormalCrossingType)
         : item.Pic is { Category: PicCategory.ObjectReference } p ? $"({p.ClrType}){box}"
         : $"({item.ElementType}){box}!";
 
@@ -864,7 +874,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // The setter's one formal (§11.7.3 SR7) crosses through the SAME signature builder as every
                 // method, so a PROPERTY SET that overrides or implements a written SET method cannot drift from it.
                 string param = m.Binding!.Formals[0].ParamName;
-                string store = subjPlace is null ? $"{subject.CsName} = {param};" : PlaceRenderer.Write(subjPlace, param);
+                // An ACTIVE-CLASS property's setter formal crosses as the universal type (OoFormalCrossingType); the
+                // subject is the containing class's reference, so the store narrows it (GR22 e)).
+                string value = OoIsActiveClassFormal(m.Binding!.Formals[0].Item) ? $"({subject.ElementType}){param}" : param;
+                string store = subjPlace is null ? $"{subject.CsName} = {value};" : PlaceRenderer.Write(subjPlace, value);
                 w.Line($"public {pmods}void {m.CsName}({sig}) {{ {check}{store} }}   // PROPERTY {m.PropertyName} SET (GR2)");
             }
             w.Line();
@@ -993,7 +1006,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                             "OO method LINKAGE formal copy-in")) + " }");
                 }
                 else
-                    w.Line($"{type} {root.CsName} = {formal.OmittedFlag} ? {init} : {formal.ParamName};   "
+                    // An ACTIVE-CLASS formal crosses as the universal type (OoFormalCrossingType) and is viewed as the
+                    // containing class here — GR22 e) guarantees the invoker's class is that class or a subclass.
+                    w.Line($"{type} {root.CsName} = {formal.OmittedFlag} ? {init} : "
+                        + $"{(OoIsActiveClassFormal(root) ? $"({type})" : "")}{formal.ParamName};   "
                         + $"// LINKAGE formal {root.CobolName} (BY REFERENCE copy-in; omitted → initial state)");
             }
             // ⛔ THE METHOD'S OWN OPTIONS AND LOCAL-STORAGE ROOTS GOVERN ITS LOCAL-STORAGE INITIAL STATE (kb/Work PB1215):
@@ -1118,6 +1134,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // back / return that, else the generated C# names an undeclared local (review A/emission).
             foreach (var f in m.Binding!.Formals)
             {
+                // A BY VALUE formal is a detached copy: "stores must never reach the caller" (§14.2.3 GR10), so there is
+                // no copy-out — the activator's slot is a temporary it discards (kb/Work PB1051).
+                if (f.ByValue) continue;
                 string src = MethodBoundaryValue(fields, f.Item, "OO method BY REFERENCE copy-out");
                 // No copy-out for an omitted formal: there is no argument, and the caller's slot is a placeholder.
                 w.Line($"if (!{f.OmittedFlag}) {f.ParamName} = {src};   // BY REFERENCE copy-out (§14.2.3 GR8)");
@@ -1156,7 +1175,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     {
         string retType = m.Binding!.Returning is { } ret ? OoCrossingType(ret) : "void";
         string sig = string.Join(", ", m.Binding!.Formals.Select(f =>
-            $"ref {OoCrossingType(f.Item)} {f.ParamName}, bool {f.OmittedFlag}"));
+            $"ref {OoFormalCrossingType(f.Item)} {f.ParamName}, bool {f.OmittedFlag}"));
         return (retType, sig);
     }
 
@@ -1213,6 +1232,22 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         : OoClassTable.LeafCarried(item) ? "object?[]"   // the strong group's leaf vector (kb/Work PB1116)
         : OoStringCarried(item) ? "string"
         : item.ElementType;
+
+    /// <summary>True for a method formal described <c>USAGE OBJECT REFERENCE [FACTORY OF] ACTIVE-CLASS</c>.</summary>
+    private static bool OoIsActiveClassFormal(DataItem formal) =>
+        formal.Pic is { Category: PicCategory.ObjectReference, ObjectRef: { IsActiveClass: true } };
+
+    /// <summary>⛔ THE C# CROSSING TYPE OF A METHOD FORMAL (kb/Work PB1497 + PB1112's override leg). An ACTIVE-CLASS
+    /// formal names "the same class as the object that was used to invoke the method" (§13.18.60.4 GR22 e)) — a
+    /// property of the ACTIVATION, not of the description (§9.3.8.2.3 rule 2 d) compares only the phrase and the
+    /// FACTORY presence) — so it crosses the method ABI as the universal object type, whatever class the method is
+    /// written in: one wire type for the method, for every override of it (a <c>ref</c> parameter admits no
+    /// subclass) and for the interface prototype that has no class at all. The body views the formal as its
+    /// containing class through the checked cast of its copy-in (<see cref="EmitMethod"/>); the caller's temporary is
+    /// the same universal type, narrowed back into the argument on copy-out. Every other formal crosses as
+    /// <see cref="OoCrossingType"/>.</summary>
+    private static string OoFormalCrossingType(DataItem formal) =>
+        OoIsActiveClassFormal(formal) ? "CobolObject?" : OoCrossingType(formal);
 
 
     /// <summary>Emit one bound INVOKE (deep-dive D5/D6 — the binder already resolved the call form and
@@ -1296,7 +1331,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             if (a.Omitted)
             {
                 string om = $"__iv{id}_{i}";
-                w.Line($"{OoCrossingType(a.Formal)} {om} = default!;   // OMITTED argument placeholder (§14.9.23.4 GR9)");
+                w.Line($"{OoFormalCrossingType(a.Formal)} {om} = default!;   // OMITTED argument placeholder (§14.9.23.4 GR9)");
                 argExprs.Add(OoArgPair(om, "true"));
                 continue;
             }
@@ -1312,6 +1347,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // (BY REFERENCE identifiers only — CONTENT always copies). A forwarded formal takes the guarded
             // copy path instead: its read must not happen when it is omitted.
             if (fwdTest is null && a.Source is MemberPlace mp && a.WriteBack
+                && !OoIsActiveClassFormal(a.Formal)   // crosses as the universal type: a temporary, narrowed back on copy-out
                 && (stringCarried
                     ? !mp.Item.IsGroup && OoStringCarried(mp.Item)
                     : !OoStringCarried(mp.Item))
@@ -1328,7 +1364,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // The guarded copy-in: the arms below declare the INNER value, assigned to the slot only when the
                 // forwarded formal is present.
                 tmp = slot + "_in";
-                w.Line($"{OoCrossingType(a.Formal)} {slot} = default!;");
+                w.Line($"{OoFormalCrossingType(a.Formal)} {slot} = default!;");
                 w.Line($"if (!{fwdTest}) {{");
             }
             // BY CONTENT boolean-expression-1 / boolean literal-2 (§14.9.23.2; fix-queue PB46) — its OWN value
@@ -1463,13 +1499,13 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // its PicInfo.DefaultInitializer, the value INITIALIZE's implicit SET TO NULL stores (ManagedPointer.Null /
             // ProgramPointer.Null / FunctionPointer.Null / null). A bare `null` was right only for an object reference.
             else if (a.PredefinedNull)
-                w.Line($"{a.Formal.ElementType} {tmp} = {a.Formal.Pic!.DefaultInitializer};");
+                w.Line($"{OoFormalCrossingType(a.Formal)} {tmp} = {a.Formal.Pic!.DefaultInitializer};");
             // SELF (§8.4.3.8; kb/Work PB1137) — the object the containing method runs on, the SET F5 rendering.
             else if (a.SelfObject)
-                w.Line($"{a.Formal.ElementType} {tmp} = this;");
+                w.Line($"{OoFormalCrossingType(a.Formal)} {tmp} = this;");
             else if (a.Formal.Pic is { Category: PicCategory.ObjectReference or PicCategory.Pointer
                                                  or PicCategory.ProgramPointer or PicCategory.FunctionPointer })
-                w.Line($"{a.Formal.ElementType} {tmp} = {PlaceRenderer.Read(a.Source!)};");
+                w.Line($"{OoFormalCrossingType(a.Formal)} {tmp} = {PlaceRenderer.Read(a.Source!)};");
             else if (a.Formal.Pic is { IsFloat: true })
                 // Same-usage float — a BY REFERENCE pairing (§14.8.2.3.2, bind-enforced), or a BY CONTENT identifier
                 // of the formal's own usage (every other BY CONTENT shape took IsFloatLanding above): read the float
@@ -1560,6 +1596,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     // neither raises nor terminates; kb/Work PB1707).
                     $"{tmp} + {RuntimeApi.StrWindow(CallEmitter.CallStringRead(src), $"{fw + 1}", RuntimeApi.OmittedRefModLength)}"));
             }
+            else if (OoIsActiveClassFormal(a.Formal))
+                // The universal crossing narrows back into the argument: §14.8.2.3.2 rule 4 / §14.8.2.3.3 proved the
+                // argument is of the active class, which is the class of the argument's own description (ONLY) or an
+                // ACTIVE-CLASS reference of the invoking class — so the cast cannot fail (kb/Work PB1497).
+                Post(PlaceRenderer.Write(src, $"({src.Item.ElementType}){tmp}"));
             else if (src is RefModPlace)
                 Post(PlaceRenderer.Write(src, tmp));   // RefModPlace.Write splices the window (§8.4.3.3.4 GR6)
             else if (stringCarried)

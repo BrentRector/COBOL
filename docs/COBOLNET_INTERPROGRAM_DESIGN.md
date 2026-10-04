@@ -189,7 +189,7 @@ CALLEE side — LINKAGE + PROCEDURE DIVISION USING:
       // restricts BY VALUE formals to class numeric/message-tag/object/pointer (COBOLNET1553); the carried leg is fixed-point
       // numeric AND the managed classes — GR10 names both fillings, "a COMPUTE statement without the ROUNDED phrase"
       // for a numeric formal and "a SET statement" for one of class object or pointer (CobolArgAdapt.SlotValue; kb/Work PB663).
-      // Only FLOATING-POINT usage, and a METHOD's BY VALUE formal, still stage loud (0899 by-value-formal-carrier). A UDF activation's arguments take BY VALUE
+      // Every SR2 class is carried (floating-point since kb/Work PB1114, a METHOD's BY VALUE formal since kb/Work PB1051: both are detached copies the callee never writes back). A UDF activation's arguments take BY VALUE
       // whenever the formal says so (§8.4.3.2.4 GR5c; argument class per §8.4.3.2.3 SR10 = COBOLNET1554) — ONE ABI, both paths.
 UNIFORM ABI (dynamic / cross-assembly):
   CALL identifier WS-PGM USING A.  ->

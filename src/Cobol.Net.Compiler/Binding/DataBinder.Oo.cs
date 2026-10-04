@@ -96,25 +96,31 @@ public sealed partial class DataBinder
         {
             // §13.18.60.3 SR16: "The ACTIVE-CLASS phrase may be specified only in a factory definition, an
             // instance definition, or the linkage or local-storage section of a method definition." Two arms:
-            // outside a class definition entirely, and inside a METHOD's data but in a section SR16 excludes
-            // (a method's WORKING-STORAGE is the reachable case — a method has no other sections, §13.4.3 SR1
-            // and friends being enforced in OoBindMethodData).
-            if (!OoIsClassUnit || OoOwnerClassName is null)
+            // outside a class body entirely (a program, a function or a program/function prototype is not a method
+            // definition), and inside a METHOD's data but in a section SR16 excludes (a method's WORKING-STORAGE is
+            // the reachable case — a method has no other sections, §13.4.3 SR1 and friends being enforced by
+            // OoDefinitionRules). A method PROTOTYPE of an interface definition IS a method definition (§10.6.1
+            // NOTE), so its linkage section is admitted — with NO containing class (kb/Work PB1497): the interface
+            // binder has no OoOwnerClassName, and the description is owner-less (ObjectRefDescriptor.ActiveClass).
+            if (!OoIsClassUnit)
             {
                 Edition.Error(DiagnosticCatalog.ObjectReferenceActiveClassPlacement, $"{entryWhere}: USAGE OBJECT "
                     + "REFERENCE ACTIVE-CLASS is written outside a class definition — the ACTIVE-CLASS phrase may "
                     + "be specified only in a factory definition, an instance definition, or the linkage or "
                     + "local-storage section of a method definition (ISO §13.18.60.3 SR16)");
-                // No containing class → no class to bind to. Fall back to the UNIVERSAL description so the
-                // erroring compile still emits a well-typed field (CobolObject?) instead of a dangling type name.
+                // No class body → nothing to bind to. Fall back to the UNIVERSAL description so the erroring
+                // compile still emits a well-typed field (CobolObject?) instead of a dangling type name.
                 return ObjectRefDescriptor.Universal;
             }
-            if (_bindingMethodScope is not null && section is not (EntrySection.LocalStorage or EntrySection.Linkage))
+            if (_bindingMethodScope is not null
+                ? section is not (EntrySection.LocalStorage or EntrySection.Linkage)
+                : OoOwnerClassName is null)   // object/factory data has a class; an interface has no data outside its prototypes
             {
                 Edition.Error(DiagnosticCatalog.ObjectReferenceActiveClassPlacement, $"{entryWhere}: USAGE OBJECT "
-                    + "REFERENCE ACTIVE-CLASS is written in a method definition's WORKING-STORAGE SECTION — "
-                    + "within a method definition the phrase may be specified only in the linkage or "
-                    + "local-storage section (ISO §13.18.60.3 SR16)");
+                    + "REFERENCE ACTIVE-CLASS is written "
+                    + (_bindingMethodScope is not null ? "in a method definition's WORKING-STORAGE SECTION" : "outside a class definition")
+                    + " — the phrase may be specified only in a factory definition, an instance definition, or the "
+                    + "linkage or local-storage section of a method definition (ISO §13.18.60.3 SR16)");
                 return ObjectRefDescriptor.Universal;
             }
             return ObjectRefDescriptor.ActiveClass(OoOwnerClassName, factory);
@@ -273,19 +279,11 @@ public sealed partial class DataBinder
             // The method's constant entries are declared before its sections bind, so one may be referenced before
             // the entry that defines it (kb/Work PB1231); BindRemainingConstants below binds what nothing needed.
             DeclareDataEntries(dd);
-            // FILE / REPORT / SCREEN sections may appear only in a factory or instance definition, never in a
-            // method (§13.4.3 SR1 / §13.8.3 SR1 / §13.9.3 SR1). One error class (COBOLNET1519, "section not permitted
-            // in a method"), split so the message names the offending section + its §. A method's own data division
-            // is limited to LOCAL-STORAGE (§13.6.3) and LINKAGE (§13.7.3), both handled below.
-            if (dd.fileSection() is not null)
-                Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain a FILE SECTION — it "
-                    + "may appear only in a factory or instance definition (ISO §13.4.3 SR1)");
-            if (dd.reportSection() is not null)
-                Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain a REPORT SECTION — it "
-                    + "may appear only in a factory or instance definition (ISO §13.8.3 SR1)");
-            if (dd.screenSection() is not null)
-                Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain a SCREEN SECTION — it "
-                    + "may appear only in a factory or instance definition (ISO §13.9.3 SR1)");
+            // The sections a method definition may not carry — FILE, WORKING-STORAGE, REPORT, SCREEN (§13.4.3,
+            // §13.5.3, §13.8.3, §13.9.3 SR1) — are judged once, at EVERY edition, by the one DATA-division placement
+            // table (kb/Work PB1251, PB1308 decision R62). A method's own data division is LOCAL-STORAGE (§13.6.3) and
+            // LINKAGE (§13.7.3), both bound below.
+            OoDefinitionRules.Screen(OoDefinition.Method, where, dd, Edition);
             // §13.18.27.3 SR4: the GLOBAL clause is barred in a method definition — on a level-01 item of ANY
             // section a method may own (LOCAL-STORAGE / LINKAGE). Spec-FORBIDDEN (COBOLNET1520), not merely
             // unimplemented.
@@ -299,18 +297,12 @@ public sealed partial class DataBinder
             }
             if (dd.workingStorageSection() is { } ws)
             {
-                // §13.5.3 SR1: "Within a class definition, the working-storage section may be specified only in a
-                // factory definition or an instance definition, but not in a method definition." The ban is the
-                // standard's own text at EVERY edition — 2002, 2014 and 2023 alike (kb/Work PB1308, decision R62;
-                // the former 2023-only window rested on a provisional reading) — so it is an ERROR here, the sibling
-                // of the FILE / REPORT / SCREEN refusals above, never an edition gate and never relaxed by
-                // --permissive. The entries are still bound — in their own (working-storage) section, so every
-                // section rule keeps answering — into the method's local roots: recovery only (the compile has
-                // failed), so the method body's references to these names do not draw a cascade of "not defined"
-                // errors that would bury the real one. There is no static-field mapping of method data any more.
-                Edition.Error("COBOLNET1519", $"{where}: a method definition shall not contain a WORKING-STORAGE "
-                    + "SECTION — it may appear only in a factory or instance definition (ISO §13.5.3 SR1); the "
-                    + "method's own storage is its LOCAL-STORAGE and LINKAGE sections");
+                // §13.5.3 SR1 refused this section above (OoDefinitionRules, at EVERY edition — 2002, 2014 and 2023
+                // alike, kb/Work PB1308 decision R62; never an edition gate, never relaxed by --permissive). The
+                // entries are still bound — in their own (working-storage) section, so every section rule keeps
+                // answering — into the method's local roots: recovery only (the compile has failed), so the method
+                // body's references to these names do not draw a cascade of "not defined" errors that would bury the
+                // real one. There is no static-field mapping of method data any more.
                 m.Binding!.LocalRoots.AddRange(BindEntries(ws.dataDescriptionEntry(), _rootNames));
             }
             if (dd.localStorageSection() is { } ls)
@@ -343,28 +335,30 @@ public sealed partial class DataBinder
             _callSuppressedRootFields.Add(root.CsName);
 
         // The PD header formals (§14.2.2 SR1 — level-01/77 LINKAGE entries; correspondence is positional).
-        // The BY VALUE phrase parses (the §14.2.1 using-phrase general format, P10 Step 10) but the METHOD-side
-        // value-copy model is not carried on the INVOKE channel — staged loud here, never a silent by-ref
-        // downgrade (§1.4). The OPTIONAL phrase CARRIES (kb/Work PB757): the formal records it, and the method
-        // ABI pairs every formal with its omitted-presence parameter (OoFormal.OmittedFlag) — the method arm of
-        // the one presence fact the program arm's null carrier realizes (kb/Work PB133 wave C).
+        // The using-phrase modes (§14.2.1: { [BY REFERENCE] { [OPTIONAL] d }… | BY VALUE { d }… }…) are TRANSITIVE
+        // across the parameters that follow until the other phrase appears, BY REFERENCE assumed before the first
+        // (§14.2.3 GR4) — threaded flat over the grammar's one-parameter-per-node shape, exactly as the program arm
+        // does (CallBindLinkage). A BY VALUE formal is recorded (OoFormal.ByValue): the activator hands it a detached
+        // value and the method never copies it back (kb/Work PB1051). The OPTIONAL phrase CARRIES (kb/Work PB757): the
+        // formal records it, and the method ABI pairs every formal with its omitted-presence parameter
+        // (OoFormal.OmittedFlag) — the method arm of the one presence fact the program arm's null carrier realizes
+        // (kb/Work PB133 wave C).
         var pd = m.Ctx.procedureDivision();
         int pos = 0;
-        var header = new ProcedureHeaderScreen(Edition, where);   // §14.2.2 SR1/SR5/SR6 — the ONE header screen (kb/Work PB1145)
+        bool byValue = false;
+        var header = new ProcedureHeaderScreen(Edition, where);   // §14.2.2 SR1/SR2/SR5/SR6 — the ONE header screen (kb/Work PB1145)
         foreach (var prm in pd?.usingClause()?.usingParameter() ?? [])
         {
             using var _ = Edition.At(prm);
             Core.DataReferenceContext dref;
             bool optional = false;
-            if (prm.usingByValue() is { } vb)
+            if (prm.usingByValue() is { } vb) { byValue = true; dref = vb.dataReference(); }
+            else if (prm.usingByReference() is { } rb)
             {
-                dref = vb.dataReference();
-                Edition.Error(DiagnosticCatalog.ByValueFormalCarrier,
-                    $"{where}: the BY VALUE phrase on method formal parameter '{DataBinder.WrittenText(dref)}' is recognized "
-                    + "(ISO §14.2.2 SR2) but a method's value-copy formal is not yet implemented on the INVOKE "
-                    + "channel");
+                byValue = false;
+                dref = rb.dataReference();
+                optional = rb.OPTIONAL() is not null;
             }
-            else if (prm.usingByReference() is { } rb) { dref = rb.dataReference(); optional = rb.OPTIONAL() is not null; }
             else { dref = prm.dataReference(); optional = prm.OPTIONAL() is not null; }
             string pname = dref.GetText();
             var item = m.Binding!.LinkageRoots.FirstOrDefault(r =>
@@ -373,7 +367,11 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET0888", $"{where}: PROCEDURE DIVISION USING parameter '{pname}' is not "
                     + "a level-01/77 LINKAGE SECTION item of the method (ISO §14.2.2 SR1)");
             else if (header.AdmitFormal(pname, item))
-                m.Binding!.Formals.Add(new OoFormal(item, pos, OoParamName(m, item, pos), optional));
+            {
+                if (optional && byValue) header.OptionalNeedsByReference(pname);   // §14.2.1: OPTIONAL is a BY REFERENCE word
+                if (byValue) header.ByValueClass(pname, item);                      // §14.2.2 SR2
+                m.Binding!.Formals.Add(new OoFormal(item, pos, OoParamName(m, item, pos), optional, byValue));
+            }
             pos++;
         }
         if (pd?.returningClause()?.dataReference() is { } rref)
@@ -398,7 +396,7 @@ public sealed partial class DataBinder
         // the program/function/object path). SR2: LINKAGE only, elementary, and the containing method shall not
         // be a PROPERTY method (an explicit METHOD-ID GET|SET PROPERTY — Accessor != '\0'; a PROPERTY-clause-
         // synthesized accessor clones object data, where the clause is already rejected). SR3: referenced in the
-        // method's PD header as a formal (all header formals are BY REFERENCE today — SR3a) or the RETURNING
+        // method's PD header as a BY REFERENCE formal (SR3a — a BY VALUE formal does not qualify) or the RETURNING
         // item (SR3b). Violations clear the flag (the IsBased discipline). ──
         foreach (var root in m.Binding!.LocalRoots)
             if (root.IsAnyLength)
@@ -417,7 +415,7 @@ public sealed partial class DataBinder
             else if (m.Accessor != '\0')
                 Edition.Error("COBOLNET1542", $"{rw}: the ANY LENGTH clause may not be specified in a PROPERTY "
                     + "method (ISO §13.18.2.3 SR2 — a method that is not a property method)");
-            else if (!m.Binding!.Formals.Any(f => ReferenceEquals(f.Item, root))
+            else if (!m.Binding!.Formals.Any(f => ReferenceEquals(f.Item, root) && !f.ByValue)   // SR3 a): a BY VALUE formal does not qualify
                 && !ReferenceEquals(m.Binding!.Returning, root))
                 Edition.Error("COBOLNET1542", $"{rw}: the subject of an ANY LENGTH clause shall be referenced "
                     + "in the method's procedure division header as a BY REFERENCE formal parameter or as the "

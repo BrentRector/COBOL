@@ -158,12 +158,15 @@ public static class OoConformance
                             conforms = false;
                             edition.Error("COBOLNET0841", $"class '{cls.Name}', method '{impl.Name}': {err}");
                         }
-                    // Conformant-but-covariant RETURNING: C# needs the explicit-implementation adapter.
+                    // Conformant-but-covariant RETURNING: C# needs the explicit-implementation adapter — a question about
+                    // the two C# TYPES the returns project to, not about their COBOL descriptions: two ACTIVE-CLASS
+                    // returns have the same description whatever classes they were written in (the pair rule is
+                    // MethodConformanceMismatches's) yet project to different types (the class's own, the prototype's
+                    // owner-less CobolObject).
                     if (conforms
                         && impl.Binding!.Returning?.Pic is { Category: PicCategory.ObjectReference } rp
                         && proto.Binding!.Returning?.Pic is { Category: PicCategory.ObjectReference } prp
-                        && !(rp.ObjectRef ?? ObjectRefDescriptor.Universal)
-                                .SameDescriptionAs(prp.ObjectRef ?? ObjectRefDescriptor.Universal))
+                        && rp.ClrType != prp.ClrType)
                         adapters.Add(new AdapterPair(iface, proto, impl, factory));
                 }
         }
@@ -183,8 +186,8 @@ public static class OoConformance
     /// interface's prototype) satisfy the conditions for method <paramref name="m2"/> of interface-2 (named
     /// <paramref name="counterpart"/> in the messages — "the 'I' prototype", "the overridden method of class 'B'")?
     /// Yields one rule-cited message per violation; empty ⇔ the pair conforms. Rules carried: 1) the parameter
-    /// count (every method formal is BY REFERENCE today — a BY VALUE method formal is refused at bind, COBOLNET0899 —
-    /// so rule 1's "consistent BY REFERENCE and BY VALUE specifications" cannot differ); 2)/3) identical formal
+    /// count AND the passing mode of each pair of formals ("consistent BY REFERENCE and BY VALUE specifications" —
+    /// <see cref="OoFormal.ByValue"/>, kb/Work PB1051); 2)/3) identical formal
     /// descriptions (<see cref="DescriptionMismatch"/>); 4) RETURNING presence; 5) the object-reference RETURNING
     /// (covariant — <see cref="ObjectRefAssignmentMismatch(OoClassTable, ObjectRefDescriptor, ObjectRefDescriptor, bool)"/>
     /// with rule 5's closed ACTIVE-CLASS list); 6) identical non-object RETURNING descriptions; 7) strongly-typed
@@ -218,6 +221,10 @@ public static class OoConformance
         }
         for (int i = 0; i < m1.Binding!.Formals.Count; i++)
         {
+            if (m1.Binding!.Formals[i].ByValue != m2.Binding!.Formals[i].ByValue)
+                yield return $"formal #{i + 1}: {(m1.Binding!.Formals[i].ByValue ? "BY VALUE" : "BY REFERENCE")} here but "
+                    + $"{(m2.Binding!.Formals[i].ByValue ? "BY VALUE" : "BY REFERENCE")} on the corresponding parameter of "
+                    + $"{counterpart} (ISO §9.3.8.2.3 rule 1 — consistent BY REFERENCE and BY VALUE specifications)";
             if (DescriptionMismatch(m2.Binding!.Formals[i].Item, m1.Binding!.Formals[i].Item) is { } err)
                 yield return $"formal #{i + 1}: {err} (ISO §9.3.8.2.3 rules 2/3 vs {counterpart} — "
                     + "identical descriptions; the C# projection cannot check this)";
@@ -971,7 +978,7 @@ public static class OoConformance
         string? why1 = !InvokedThroughActiveClass(invokedWith)
             ? "the method is not invoked with SELF, SUPER or an ACTIVE-CLASS reference"
             : table is null ? null
-            : ObjectRefAssignmentMismatch(table, arg, ObjectRefDescriptor.ActiveClass(formal.Name!, formal.Factory));
+            : ObjectRefAssignmentMismatch(table, arg, ObjectRefDescriptor.ActiveClass(formal.Name, formal.Factory));
         if (why1 is null) return null;
         string? why2 = !InvokedThroughOnlyClass(invokedWith)
             ? "the method is not invoked with an object-class-name or a reference described with one and ONLY"
@@ -1352,7 +1359,9 @@ public static class OoConformance
                             return $"an ACTIVE-CLASS object reference does not conform to a receiver described "
                                    + $"with interface-name '{recv.Name}' (ISO §9.3.8.2.3 rule 5 b) — its "
                                    + "alternatives are an interface-name and an object-class-name)";
-                        if (table.Find(send.Name!) is not { } ac)
+                        if (send.Name is null)
+                            return OwnerlessActiveClassSender;
+                        if (table.Find(send.Name) is not { } ac)
                             return $"unresolvable containing class '{send.Name}' of the ACTIVE-CLASS sender";
                         return table.ImplementsClosure(ac, send.Factory).Contains(int1) ? null
                             : $"the {(send.Factory ? "factory object" : "objects")} of the class containing the "
@@ -1409,7 +1418,9 @@ public static class OoConformance
                         if (recv.Only)
                             return "the receiver is described with the ONLY phrase, so an ACTIVE-CLASS sender is "
                                    + "not permitted (ISO §14.9.39.3 SR12 b)1.)";
-                        var ac2 = table.Find(send.Name!);
+                        if (send.Name is null)
+                            return OwnerlessActiveClassSender;
+                        var ac2 = table.Find(send.Name);
                         var rc3 = table.Find(recv.Name!);
                         if (ac2 is null || rc3 is null)
                             return $"unresolvable class in the pair (ACTIVE-CLASS sender in {send.Name} to "
@@ -1436,6 +1447,13 @@ public static class OoConformance
                       + "shall be the same (ISO §14.9.39.3 SR14 a))";
         }
     }
+
+    /// <summary>The refusal for an ACTIVE-CLASS sender with no containing class — the owner-less description of an
+    /// interface method prototype's formal (kb/Work PB1497). The SET rules that relate a sender's class to the
+    /// receiver's (SR10 c), SR12 b)) have no class to relate; the pair rules never ask them of such a sender
+    /// (<c>activeClassSenderAdmitted: false</c> refuses it first), so this is the loud floor under a future caller.</summary>
+    private const string OwnerlessActiveClassSender =
+        "an ACTIVE-CLASS sender written in an interface method prototype has no containing class to relate to the receiver's";
 
     /// <summary>How a FACTORY-axis refusal names one side's phrase. The three FACTORY arms above spliced "not " before
     /// "specified" for the receiver only, so a sender WITH the phrase read "… not specified in the receiver's

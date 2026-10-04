@@ -379,12 +379,7 @@ public sealed partial class DataBinder
                 // reference copy CobolArgAdapt.SlotValue performs (kb/Work PB663). The FLOATING-POINT usage is the
                 // same COMPUTE on the float lane — landed by FloatResultant into a detached float cell
                 // (CobolArgAdapt.NumValue; kb/Work PB1114).
-                if (!(item.IsElementary && item.Pic?.Category is PicCategory.Numeric or PicCategory.Pointer
-                        or PicCategory.ProgramPointer or PicCategory.FunctionPointer
-                        or PicCategory.ObjectReference))
-                    Edition.Error("COBOLNET1553",
-                        $"BY VALUE formal parameter '{pname}' shall be of class numeric, message-tag, object, "
-                        + "or pointer (ISO §14.2.2 SR2)");
+                header.ByValueClass(pname, item);   // the class set is the header screen's, shared with the method arm (PB1051)
             }
 
             // ⛔ THE CARRIER NAME IS Uid-KEYED, NOT POSITIONAL (kb/Work PB1009). A carrier-resident formal's

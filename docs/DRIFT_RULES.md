@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-259 drift tests.
+261 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -44,6 +44,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [BooleanOperatorTokenDriftTests](../tests/Cobol.Net.Tests.Unit/BooleanOperatorTokenDriftTests.cs) | ⛔ THE BOOLEAN-OPERATOR TOKENS ARE ONE LIST, BooleanOperatorTokens, AND EVERY READER ASKS IT (kb/Work PB1412). | `src` |
 | [BoundDeferralDriftTests](../tests/Cobol.Net.Tests.Unit/BoundDeferralDriftTests.cs) | ⛔ kb/Work PB909 — BoundUnsupported's TWO JOBS, split into two TYPES. | `src/Cobol.Net.Compiler`, `tests/conformance/negative` |
 | [BoundIoPhraseConsumptionDriftTests](../tests/Cobol.Net.Tests.Unit/BoundIoPhraseConsumptionDriftTests.cs) | ⛔ A PHRASE THAT IS PARSED, BOUND AND EDITION-GATED AND THEN NEVER READ BY ITS EMITTER IS INVISIBLE TO EVERY OTHER GATE. | `src/Cobol.Net.Compiler/CodeGen/Verbs` |
+| [ByValueFormalScreenDriftTests](../tests/Cobol.Net.Tests.Unit/ByValueFormalScreenDriftTests.cs) | ⛔ THE BY VALUE FORMAL'S CLASS RULE IS WRITTEN ONCE (kb/Work PB1051). | `src/Cobol.Net.Compiler` |
 | [CallAbiNumericCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/CallAbiNumericCarrierDriftTests.cs) | ⛔ THE CALLER NAMES A CARRIER TYPE FROM DataItem.ElementType AND THE CALLEE READS IT BY A TYPE SWITCH — SO THE TWO SETS ARE ONE SET, AND NOTHING TELLS THEM APART AT COMPILE TIME (kb/Work PB238). | — |
 | [CallExceptionCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/CallExceptionCarrierDriftTests.cs) | CarriedNames is what a CALL site's emitted catch arms filter on (CallEmitter.EnabledOtherCallNames — ISO §14.9.4.4 GR3h item 2's second disjunct), so a level-3 name this carrier can raise but that the list omits reaches NO arm at all: with checking enabled the condition silently bypasses its declarative and terminates the run unit instead. | `src` |
 | [CapacityRegisterReferenceDriftTests](../tests/Cobol.Net.Tests.Unit/CapacityRegisterReferenceDriftTests.cs) | ⛔ A NAMED OCCURS DYNAMIC CAPACITY REGISTER IS REACHED THROUGH EXACTLY ONE LOOKUP, AND THAT LOOKUP JUDGES THE WRITTEN REFERENCE (kb/Work PB457). | — |
@@ -173,6 +174,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [OccursOperandCaptureDriftTests](../tests/Cobol.Net.Tests.Unit/OccursOperandCaptureDriftTests.cs) | ⛔ A data-name-n CLAUSE OPERAND IS CAPTURED IN ONE PLACE, AND A CAPTURE THAT DROPS WHAT WAS WRITTEN IS A NAMED EXCEPTION, NEVER A DEFAULT (kb/Work PB885). | `src/Cobol.Net.Compiler` |
 | [OmittedFormalGuardDriftTests](../tests/Cobol.Net.Tests.Unit/OmittedFormalGuardDriftTests.cs) | kb/Work PB971 — the *-ARG-OMITTED rule is ONE rule written three times, keyed to the kind of the activated element that owns the formal (ISO §14.9.4.4 GR12 program, §8.4.3.2.4 GR8 function, §14.9.23.4 GR10 method). | — |
 | [OoConformanceCategoryDriftTests](../tests/Cobol.Net.Tests.Unit/OoConformanceCategoryDriftTests.cs) | ⛔ THE ARM THIS PINS REJECTED LEGAL SOURCE FOR FIVE WHOLE PICTURE CATEGORIES, SILENTLY AND FOR AS LONG AS THE FUNCTION HAS EXISTED (fix-queue PB46). | — |
+| [OoDefinitionRulesDriftTests](../tests/Cobol.Net.Tests.Unit/OoDefinitionRulesDriftTests.cs) | ⛔ THE OO DATA-DIVISION PLACEMENT TABLE IS TOTAL AND IS THE ONLY JUDGE (kb/Work PB1251). | `src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs`, `src/Cobol.Net.Compiler/Oo/OoDriver.cs`, `src/Cobol.Net.Compiler` |
 | [OoNameResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/OoNameResolutionDriftTests.cs) | ⛔ A WRITTEN object-class-name OR interface-name RESOLVES THROUGH ONE FUNNEL (OoNameResolution — kb/Work PB365), AND THIS KEEPS IT TRUE. | `src/Cobol.Net.Compiler` |
 | [OpenGroupScopeDriftTests](../tests/Cobol.Net.Tests.Unit/OpenGroupScopeDriftTests.cs) | ISO §14.9.27.2's REPEATED GROUP kept structural (kb/Work PB316). | — |
 | [OperandActivationDriftTests](../tests/Cobol.Net.Tests.Unit/OperandActivationDriftTests.cs) | kb/Work PB892 — an activation written as an OPERAND has the statement it was written in, and one landing gives it that statement. | `src/Cobol.Net.Compiler/CodeGen`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs` |
