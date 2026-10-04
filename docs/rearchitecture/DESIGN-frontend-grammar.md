@@ -1574,6 +1574,9 @@ regression bisects to one step.
   expressions), because a ref-mod written directly after a function name is delimited by FNARG parens too.
   ⚠ `refModPart` accepts BOTH paren flavours: SR6's precondition is "if a function's definition **permits
   arguments**", a catalog question no lexer can answer, so after a zero-argument name that token is the ref-mod.
+  ⚠ The FUNCTION of `ADDRESS [OF] FUNCTION word` (§8.4.3.12.2) heads no function-identifier — its operand is a
+  prototype name or identifier-1 — so the lexer does NOT retype the `(` after that word: it is identifier-1's
+  subscript or reference modifier (`_functionIsAddressOperand`, kb/Work PB1416).
   ⚠ **The rewriter is still the standing answer to "where does figurative ZERO become arithmetic", and it is
   still incomplete** — a bare `COMPUTE X = ZERO` and a `TB(ZERO + 1)` subscript are the positions no adjacency
   arm reaches (`kb/Work/PB51.md`, `kb/Work/PB50.md`). Retiring the pass in favour of a `primaryExpression`

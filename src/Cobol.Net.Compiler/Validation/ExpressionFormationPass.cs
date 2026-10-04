@@ -10,8 +10,10 @@ namespace CobolNet.Validation;
 
 /// <summary>
 /// The EXPRESSION FORMATION pass — ISO §8.8.1.2 Table 3 and §8.8.2 Table 4, the two tables that state which
-/// ordered pairs of adjacent symbols an expression may contain. A SIBLING to <see cref="VersionConformancePass"/>
-/// and <c>FlagConformancePass</c>, run right after them in <c>BinderDriver</c>.
+/// ordered pairs of adjacent symbols an expression may contain — and the formation ORDER of an expression's
+/// operand, the identifier (§8.4.2.3.2: qualifiers, then subscripts; §8.4.3.1.2 Format 3: then the reference
+/// modifier; kb/Work PB1455). A SIBLING to <see cref="VersionConformancePass"/> and <c>FlagConformancePass</c>, run
+/// right after them in <c>BinderDriver</c>.
 ///
 /// <para><b>Why a separate pass.</b> This is an orthogonal axis to both existing passes, on the
 /// <c>FlagConformancePass</c> precedent ("a SEPARATE pass, not a bolt-on, because flagging is an orthogonal axis
@@ -76,6 +78,96 @@ internal sealed class ExpressionFormationPass(IDiagnosticSink sink) : CursorFoll
             Report(ArithmeticFormationRules.ShiftCountMessage(ctx));
         }
         return base.VisitChildren(ctx);
+    }
+
+    /// <summary>The IDENTIFIER's formation order (kb/Work PB1455, PB1426): every qualifier precedes the subscripts —
+    /// §8.4.2.3.2 Format 1 `qualified-data-name-1 [ ( subscript … ) ]` (Format 2 the condition-name twin) — and a
+    /// reference modifier follows the whole identifier (§8.4.3.1.2 Format 3 `identifier-1 reference-modifier-1`). The
+    /// grammar's <c>dataReferenceSuffix*</c> loop and <c>qualification</c>'s own <c>(subscriptPart | refModPart)*</c>
+    /// tail admit them in any order, and every binder that reads a reference flattens the suffixes, so
+    /// `E (1) OF T` used to resolve as if written `E OF T (1)` — silently, at every edition. Refused HERE, once per
+    /// parse tree, for the reason this pass exists: a check at each consumer of <c>dataReference</c> would be a
+    /// hand-maintained list of some thirty sites. No edition prints the interleaving, so there is no permissive arm.
+    /// Nested references (a subscript's own identifier, a reference modifier's expression) are reached by the walk.</summary>
+    public override object? VisitDataReference(CobolParserCore.DataReferenceContext ctx)
+    {
+        if (QualifierAfterSuffix(ctx) is { } q)
+        {
+            using var _ = Sink.At(q);
+            ReportSuffixBeforeQualifier($"{q.GetChild(0).GetText()} {q.cobolWord().GetText()}",
+                ctx.cobolWord()?.GetText());
+        }
+        return base.VisitChildren(ctx);
+    }
+
+    /// <summary>The same order inside a SUBSCRIPT-mode capture, where a subscript's or reference modifier's own
+    /// identifier is a flat token run rather than a <c>dataReference</c> (`X (E (1) OF T)`): a nested parenthesized
+    /// group followed by OF / IN is a subscript written before a qualifier. No other SUBSCRIPT-mode shape puts a
+    /// qualifier connective after a closing parenthesis.</summary>
+    public override object? VisitSubscriptOrRefMod(CobolParserCore.SubscriptOrRefModContext ctx)
+    {
+        ScreenCapturedGroup(ctx.subToken());
+        return base.VisitChildren(ctx);
+    }
+
+    /// <summary>A nested group's own content (`X (Y (E (1) OF T))`).</summary>
+    public override object? VisitSubToken(CobolParserCore.SubTokenContext ctx)
+    {
+        if (ctx.SUB_LPAREN() is not null) ScreenCapturedGroup(ctx.subToken());
+        return base.VisitChildren(ctx);
+    }
+
+    private void ScreenCapturedGroup(CobolParserCore.SubTokenContext[] run)
+    {
+        for (int i = 0; i < run.Length; i++)
+        {
+            if (run[i].SUB_LPAREN() is null) continue;
+            int next = i + 1;
+            while (next < run.Length && run[next].SUB_WS() is not null) next++;
+            if (next < run.Length && (run[next].SUB_OF() ?? run[next].SUB_IN()) is { } connective)
+            {
+                int word = next + 1;
+                while (word < run.Length && run[word].SUB_WS() is not null) word++;
+                string qualifier = word < run.Length && run[word].SUB_IDENTIFIER() is { } w
+                    ? $"{connective.GetText()} {w.GetText()}" : connective.GetText();
+                using var _ = Sink.At(connective.Symbol.Line, connective.Symbol.Column + 1);
+                ReportSuffixBeforeQualifier(qualifier, HeadWordBefore(run, i));
+            }
+        }
+    }
+
+    /// <summary>The word that heads the reference whose subscript group starts at <paramref name="group"/>, for the
+    /// message only (null when the group follows no word — then the message names no item).</summary>
+    private static string? HeadWordBefore(CobolParserCore.SubTokenContext[] run, int group)
+    {
+        for (int i = group - 1; i >= 0; i--)
+        {
+            if (run[i].SUB_WS() is not null) continue;
+            return run[i].SUB_IDENTIFIER()?.GetText();
+        }
+        return null;
+    }
+
+    private void ReportSuffixBeforeQualifier(string qualifier, string? head) => Sink.Report(new EditionDiagnostic(
+        DiagnosticCatalog.SuffixBeforeQualifier.Code, EditionSeverity.Error,
+        DiagnosticCatalog.SuffixBeforeQualifier.Id,
+        $"'{qualifier}' follows a subscript or reference modifier{(head is null ? "" : $" of '{head}'")}; the "
+        + "subscripts follow the WHOLE qualified name (ISO §8.4.2.3.2) and a reference modifier the whole "
+        + "identifier (§8.4.3.1.2 Format 3) — write the qualifiers first",
+        "an identifier", DiagnosticCatalog.SuffixBeforeQualifier.IsoSection));
+
+    /// <summary>The first qualifier written after a subscript or reference modifier of the same reference, or null.
+    /// A qualification's OWN suffix tail counts: in `E OF T (1) OF G` the `(1)` hangs off `OF T`.</summary>
+    private static CobolParserCore.QualificationContext? QualifierAfterSuffix(CobolParserCore.DataReferenceContext ctx)
+    {
+        bool suffixSeen = false;
+        foreach (var s in ctx.dataReferenceSuffix())
+        {
+            if (s.qualification() is not { } q) { suffixSeen = true; continue; }
+            if (suffixSeen) return q;
+            suffixSeen = q.subscriptPart().Length > 0 || q.refModPart().Length > 0;
+        }
+        return null;
     }
 
     private void Report(string message) => Sink.Report(new EditionDiagnostic(

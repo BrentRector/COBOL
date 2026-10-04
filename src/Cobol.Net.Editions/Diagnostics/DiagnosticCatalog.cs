@@ -6497,6 +6497,29 @@ public static class DiagnosticCatalog
         + "described such that a MOVE statement is valid with identifier-1 as the sending operand and the printable item "
         + "as the receiving operand (SR2), and it shall not reference a variable-length group (SR8).",
         "ISO §13.18.53.3 SR2, SR8");
+    /// <summary>COBOLNET2776 — a subscript or a reference modifier is written BETWEEN the qualifiers of an identifier
+    /// (kb/Work PB1455, PB1426): `E (1) OF T`, `S (2:2) OF G`. The grammar admits the interleaving (a superset parse,
+    /// so the refusal can name the rule); <c>ExpressionFormationPass</c> refuses it at every edition and every
+    /// strictness, because no edition of the standard prints it and no dialect this compiler declares owns it.</summary>
+    public static readonly DiagnosticDescriptor SuffixBeforeQualifier = new(
+        "COBOLNET2776", "suffix-before-qualifier", EditionSeverity.Error,
+        "A subscript or a reference modifier is written before a qualifier of the same identifier. Subscripts follow "
+        + "the WHOLE qualified name — §8.4.2.3.2 Format 1 is `qualified-data-name-1 [ ( subscript … ) ]` and Format 2 "
+        + "`qualified-condition-name-1 [ ( subscript … ) ]` — and a reference modifier follows the whole identifier "
+        + "(§8.4.3.1.2 Format 3, `identifier-1 reference-modifier-1`). Write `E OF T (1)`, not `E (1) OF T`, and "
+        + "`S OF G (2:2)`, not `S (2:2) OF G`.",
+        "ISO §8.4.2.3.2; §8.4.3.1.2; §8.4.3.1.3 SR3");
+
+    /// <summary>COBOLNET2777 — `object-class-name-1 OF SUPER` names a class that is not the one the containing class
+    /// definition's INHERITS clause specifies (kb/Work PB1425; §8.4.3.8.3 SR4). Bound in
+    /// <c>OoBinder.OoBindByReceiver</c>, the one receiver dispatch of the INVOKE statement and the inline invocation.</summary>
+    public static readonly DiagnosticDescriptor SuperQualifierNotInherited = new(
+        "COBOLNET2777", "super-qualifier-not-inherited", EditionSeverity.Error,
+        "The qualified predefined object reference `object-class-name-1 OF SUPER` names a class that the INHERITS "
+        + "clause of the containing class definition does not specify. Object-class-name-1 shall be the name of a "
+        + "class specified in that INHERITS clause (SR4), because the method search is restricted to the methods "
+        + "defined for object-class-name-1 (GR4).",
+        "ISO §8.4.3.8.3 SR4; §8.4.3.8.4 GR4");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

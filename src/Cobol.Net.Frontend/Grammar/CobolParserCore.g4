@@ -692,6 +692,11 @@ dataReference
     | cobolWord dataReferenceSuffix*
     ;
 
+// ⚠ THE SUFFIX ORDER IS A SUPERSET PARSE (kb/Work PB1455, PB1426). The standard prints every qualifier BEFORE the
+// subscripts (§8.4.2.3.2 Format 1 `qualified-data-name-1 [ ( subscript … ) ]`) and the reference modifier after the
+// whole identifier (§8.4.3.1.2 Format 3), but this loop and `qualification`'s own tail admit `E (1) OF T` too, so
+// the refusal can NAME the rule: ExpressionFormationPass.VisitDataReference refuses it (COBOLNET2776) at every
+// edition — no edition prints it. A grammar that refused it would leave `OF T` dangling as a bare parse error.
 dataReferenceSuffix
     : subscriptPart
     | refModPart
@@ -1811,11 +1816,21 @@ setObjectReferenceStatement
     : SET dataReference+ TO objectReference   // introduction-gated at BIND time (StatementBinder.OoBindSetObjectRef → Check(SetObjectReference2002))
     ;
 
+// ⛔ SELF AND SUPER ARE ONE RULE, `selfAndSuper`, AND THE QUALIFIED SUPER IS ITS ARM (kb/Work PB1425). §8.4.3.8.2
+// prints `{ SELF | [ object-class-name-1 OF ] SUPER }` (SELF, OF and SUPER underlined): the qualifier names the class of
+// the containing class's INHERITS clause whose methods GR4 restricts the search to (SR4; SR6 makes it optional with one
+// INHERITS class, SR5 required with several — a multiple-INHERITS class is declined, Annex A.4.10 item 1). It precedes
+// `dataReference` because `K OF SUPER` begins like a qualified data reference; SUPER is reserved, so the two part on
+// the third token. Every consumer asks the ONE rule (OoBinder.OoBindByReceiver, SetBinder, EcBinder.BindRaise).
 objectReference
-    : dataReference
+    : selfAndSuper
+    | dataReference
     | predefinedNull
-    | SELF
-    | SUPER
+    ;
+
+selfAndSuper
+    : SELF
+    | (cobolWord OF)? SUPER
     ;
 
 // SET dataReference+ UP/DOWN BY arithmeticExpression (COBOL-85 §14.9.39 Format 2)

@@ -1,0 +1,52 @@
+      *> reject-at: 2002 2014 2023
+      *> kb/Work PB1425. ISO 8.4.3.8.3 SR4: "Object-class-name-1 shall be the name of a class specified in the
+      *> INHERITS clause of the containing class definition." PB1425NB INHERITS FROM PB1425NA, so the only
+      *> object-class-name-1 its methods may write before OF SUPER is PB1425NA; naming the containing class itself
+      *> (PB1425NB OF SUPER) is refused COBOLNET2777. Below 2002 there is no class definition at all.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB1425NM.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS PB1425NB.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 OB USAGE OBJECT REFERENCE PB1425NB.
+       PROCEDURE DIVISION.
+       MAIN.
+           INVOKE PB1425NB "NEW" RETURNING OB
+           INVOKE OB "SPEAK"
+           STOP RUN.
+       END PROGRAM PB1425NM.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. PB1425NA INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. SPEAK.
+       PROCEDURE DIVISION.
+           DISPLAY "ANIMAL".
+       END METHOD SPEAK.
+       END OBJECT.
+       END CLASS PB1425NA.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. PB1425NB INHERITS FROM PB1425NA.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS PB1425NA.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. SPEAK OVERRIDE.
+       PROCEDURE DIVISION.
+           INVOKE PB1425NB OF SUPER "SPEAK".
+       END METHOD SPEAK.
+       END OBJECT.
+       END CLASS PB1425NB.

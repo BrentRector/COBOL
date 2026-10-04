@@ -221,20 +221,40 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // spaces are not part of an externalized name (DOC-A.1-68; the one rule, CobolNet.Runtime.ExternalizedNames),
         // so `INVOKE O " GET "` names the method `METHOD-ID. GET` names, by the typed and the universal path alike.
         methodName = CobolNet.Runtime.ExternalizedNames.Form(methodName);
-        if (target.SELF() is not null || target.SUPER() is not null)
+        if (target.selfAndSuper() is { } selfOrSuper)
         {
             // Slice 3b — §8.4.3.8: SELF/SUPER are the predefined object references of the CURRENT method's
             // object; legal only within a method body.
-            bool isSuper = target.SUPER() is not null;
+            bool isSuper = selfOrSuper.SUPER() is not null;
+            string written = selfOrSuper.cobolWord() is { } q0 ? $"{q0.GetText()} OF SUPER" : isSuper ? "SUPER" : "SELF";
             if (!host.InMethod || host.OoCurrentClass is not { } cur)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0827",
-                    $"INVOKE {(isSuper ? "SUPER" : "SELF")} may be specified only within a method definition "
+                    $"INVOKE {written} may be specified only within a method definition "
                     + "(ISO §8.4.3.8.3 SR1 — the predefined object references of the current object)");
             }
             OoClassSymbol searchRoot;
             if (!isSuper)
                 searchRoot = cur;   // GR2 — resolve on the current class's chain; dispatch on the RUNTIME class
+            else if (selfOrSuper.cobolWord() is { } qualifier)
+            {
+                // `object-class-name-1 OF SUPER` (kb/Work PB1425). §8.4.3.8.3 SR4: "Object-class-name-1 shall be the
+                // name of a class specified in the INHERITS clause of the containing class definition"; GR4: "the
+                // search for the method shall include only those methods defined for object-class-name-1". A class
+                // INHERITS one class here (a multiple-INHERITS class is declined, Annex A.4.10 item 1), so the class
+                // SR4 admits is the containing class's base, and GR4's search starts there — GR3's own root.
+                var named = Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, qualifier, qualifier.GetText(),
+                    Compiler.Oo.OoNameResolution.Want.Class).Class;
+                if (named is null || !ReferenceEquals(named, cur.Base))
+                    return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.SuperQualifierNotInherited,
+                        $"INVOKE {written}: '{qualifier.GetText()}' is "
+                        + (named is null ? "not a class this source element may reference"
+                            : cur.Base is null ? $"not inherited — class '{cur.Name}' has no INHERITS clause"
+                            : $"not the class the INHERITS clause of '{cur.Name}' names ('{cur.Base.Name}')")
+                        + " (ISO §8.4.3.8.3 SR4 — object-class-name-1 shall be the name of a class specified in the "
+                        + "INHERITS clause of the containing class definition)");
+                searchRoot = named;
+            }
             else if (cur.Base is { } b)
                 searchRoot = b;     // GR3 — the restricted search STARTS at the base class
             else

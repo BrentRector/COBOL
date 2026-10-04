@@ -5,6 +5,7 @@
   "pb1167_any_length_returning_zero_length",
   "pb1499_interface_return_covariance",
   "pb1502_interface_inherits_legal",
+  "pb1425_qualified_super",
   "pb1507_source_unit_shapes_legal",
   "pb1404_external_same_kind_is_one_instance",
   "pb1133_recursive_attribute_scope",

@@ -90,8 +90,8 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // a data reference is the rare spelling and a function-identifier cannot reach this arm at all.
             var sorSender = objRef.dataReference() is { } sorRef ? SetSender.OfReference(sorRef) : null;
             bool sorNull = objRef.predefinedNull() is not null;
-            bool sorSelf = objRef.SELF() is not null;
-            bool sorSuper = objRef.SUPER() is not null;
+            bool sorSelf = objRef.selfAndSuper()?.SELF() is not null;
+            bool sorSuper = objRef.selfAndSuper()?.SUPER() is not null;
             return SetFormatSelection.Select(_fmt.KindsOf(sorRefs), SetDirections.To, out _) switch
             {
                 // ⛔ THE SENDER'S OWN WORD TRAVELS WITH THE FLAG (kb/Work PB388). `sorSelf || sorSuper` collapses

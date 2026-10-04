@@ -72,7 +72,8 @@ public sealed class SubscriptAdmissionDriftTests
     public void TheSr2Predicate_AsksIsTableElement_NotIsTable()
     {
         string text = File.ReadAllText(ReferenceResolver);
-        var m = Regex.Match(text, @"bool CannotBeSubscripted\(string name\)\s*=>(?<body>[^;]*);");
+        // The predicate takes the WHOLE qualified name (kb/Work PB1455): a '(' after `E OF T` subscripts `E OF T`.
+        var m = Regex.Match(text, @"bool CannotBeSubscripted\(string name, List<string> qualifiers\)\s*=>(?<body>[^;]*);");
         Assert.True(m.Success, "ReferenceResolver.CannotBeSubscripted is gone — §8.4.2.3.3 SR2's admission test "
                                + "has no home, and the subscript splitter has no shared rule (kb/Work PB877)");
         string body = m.Groups["body"].Value;

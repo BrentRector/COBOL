@@ -1553,8 +1553,13 @@ public sealed class ReferenceResolver(DataBinder data)
     /// become false in silence. One rule, one place, and the claim is now structural.</para>
     /// <para>Answers true ONLY for a name that RESOLVES to a data item on which no subscript may be written.
     /// An UNRESOLVED name answers false — it may be a function reference (<c>FUNCTION INTEGER (X)</c>), whose
-    /// argument list must not be split from it — and so does a table element, which owns its paren.</para></summary>
-    internal bool CannotBeSubscripted(string name) => ResolveUnqualified(name) is { IsTableElement: false };
+    /// argument list must not be split from it — and so does a table element, which owns its paren.</para>
+    /// <para>⛔ ASKED OF THE WHOLE QUALIFIED NAME (kb/Work PB1455's sibling sweep). §8.4.2.3.2 hangs the subscript list
+    /// off <c>qualified-data-name-1</c>, so in <c>X (E OF T (1))</c> the paren belongs to <c>E OF T</c>; asking the
+    /// LAST word alone asked about <c>T</c> — a group that carries no OCCURS — split <c>(1)</c> off as a second
+    /// subscript of X, and refused the legal reference COBOLNET2270 ("E OF T … shall be subscripted").</para></summary>
+    internal bool CannotBeSubscripted(string name, List<string> qualifiers) =>
+        (qualifiers.Count > 0 ? ResolveQualified(name, qualifiers) : ResolveUnqualified(name)) is { IsTableElement: false };
 
     // ── Intrinsic-argument entries (ISO §15.3; consumed by StatementBinder.Intrinsics.cs) ─────────────────
     // The function-argument mini-parser resolves identifiers from flat SUBSCRIPT-mode tokens, where no
@@ -2283,7 +2288,8 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <summary>Split a flat token list into subscript segments on depth-0 comma / multi-space boundaries (a faithful
     /// reduction of the legacy <c>ExpressionBinder.SplitSubscriptTokens</c>: a single space inside a relative
     /// subscript such as <c>I + 1</c> does not split; a separator space before a new operand does).</summary>
-    internal static List<List<IToken>> SplitSubscriptTokens(List<IToken> tokens, Func<string, bool>? parenSplitsAfterName = null)
+    internal static List<List<IToken>> SplitSubscriptTokens(List<IToken> tokens,
+        Func<string, List<string>, bool>? parenSplitsAfterName = null)
     {
         var segments = new List<List<IToken>>();
         var current = new List<IToken>();
@@ -2312,9 +2318,32 @@ public sealed class ReferenceResolver(DataBinder data)
                 // names the operand.
                 Core.SUB_IDENTIFIER when parenSplitsAfterName is not null
                     && !CobolNames.Same(lastNonWs.Text, "FUNCTION")
-                    => parenSplitsAfterName(lastNonWs.Text),
+                    => QualifiedNameEnding(current) is var (head, qualifiers) && parenSplitsAfterName(head, qualifiers),
                 _ => false,
             };
+        }
+
+        // The qualified name `head (OF|IN qualifier)*` that ENDS the run — the reference the '(' would subscript
+        // (§8.4.2.3.2: the subscripts follow qualified-data-name-1 as a whole). Read backwards over WS.
+        static (string Head, List<string> Qualifiers) QualifiedNameEnding(List<IToken> run)
+        {
+            var words = new List<string>();
+            int i = run.Count - 1;
+            while (true)
+            {
+                while (i >= 0 && run[i].Type == Core.SUB_WS) i--;
+                if (i < 0 || run[i].Type != Core.SUB_IDENTIFIER) break;
+                words.Add(run[i].Text);
+                int j = i - 1;
+                while (j >= 0 && run[j].Type == Core.SUB_WS) j--;
+                if (j < 0 || run[j].Type is not (Core.SUB_OF or Core.SUB_IN)) break;
+                i = j - 1;
+            }
+            // words holds the chain read backwards — the last-written qualifier first, the head last.
+            string head = words[^1];
+            words.RemoveAt(words.Count - 1);
+            words.Reverse();
+            return (head, words);
         }
 
         for (int i = 0; i < tokens.Count; i++)

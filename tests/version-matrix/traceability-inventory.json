@@ -5796,13 +5796,13 @@
   "ordinal": 3,
   "subject": "Identifier",
   "rule-digest": "cbe2be9f5403",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#qualification; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#subscriptPart",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/ExpressionFormationPass.cs#VisitDataReference; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#CannotBeSubscripted",
+  "test-ref": "conformance:negative/pb1455-subscript-before-qualifier; conformance:85/pb1455_qualified_subscripted_subscript",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1426 (registrar 15b). SR3 (cite.py --check 8.4.3.1.3 3) OK): Format 2 is the 8.4.2.3 qualified-data-name-with-subscripts. dataReference = cobolWord (subscriptPart | refModPart | qualification)*; probe p1.cob: `A OF G (N)` and `A IN H (2)` resolve among two same-named tables (G2G2 / HHHH written). The detail of 8.4.2.3 belongs to that clause's rows. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — The 8.4.2.3.2 general format is `qualified-data-name-1 [ ( subscript ... ) ]`, so subscripts follow the WHOLE qualified name. The grammar's qualification rule admits subscripts BETWEEN qualifiers. `E (1, 2) OF T` compiles and runs with no diagnostic at 85 and 2023, and no dialect gate or CONFORMANCE.md extension row covers it. This is an under-reject of the exact Format 2 shape this rule defines. The same-named-table accept side does conform. || editions as written by the adjudicator: 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1426 (landed with PB1455, w1014 group S). SR3 (cite.py --check 8.4.3.1.3 3) OK) defines Format 2 by 8.4.2.3: subscripts follow the WHOLE qualified name. The refuter's under-reject (`E (1, 2) OF T` compiled at 85 and 2023) is refused COBOLNET2776 at every edition; the same-named-table accept side conforms, and a qualified subscripted identifier is now admitted AS a subscript (`X (E OF T OF G (2))`).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-4",
@@ -6831,13 +6831,13 @@
   "ordinal": 4,
   "subject": "SELF and SUPER",
   "rule-digest": "8c59e59632f5",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#selfAndSuper",
+  "test-ref": "conformance:negative/pb1425-super-qualifier-not-inherited; conformance:2002/pb1425_qualified_super",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule (--check 8.4.3.8.3 'Object-class-name-1 shall be the name of a class specified in the INHERITS clause' -> OK §8.4.3.8.3 4)). No grammar surface for object-class-name-1 OF SUPER, hence no check: probe probe/self-and-super/PSBAD.cob (`INVOKE PSBADB OF SUPER` naming the containing class itself, not its base) and PSOF.cob (naming the base) are rejected identically by COBOLNET0901 - the compiler cannot distinguish the legal from the illegal operand. Finding F1. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1425 (w1014 group S, the qualified-SUPER mechanism). SR4 (cite.py --check 8.4.3.8.3 4) OK): object-class-name-1 shall name a class of the containing class's INHERITS clause. OoBindByReceiver resolves the qualifier through OoNameResolution (REPOSITORY scope) and refuses any class other than the containing class's base COBOLNET2777 (negative: the containing class itself named before OF SUPER). One receiver dispatch serves the INVOKE statement and the inline invocation (8.4.3.4.4 GR1).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.8.3-5",
@@ -6861,13 +6861,13 @@
   "ordinal": 6,
   "subject": "SELF and SUPER",
   "rule-digest": "377aee528e10",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#selfAndSuper; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
+  "test-ref": "conformance:2002/pb1425_qualified_super; conformance:2002/oo_super",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule (--check 8.4.3.8.3 'specifies only one object-class-name, object-class-name-1 may be specified' -> OK §8.4.3.8.3 6)). The permission is refused: with exactly one base (the claimed single-inheritance core; A.4.10 item 1 declines only the multi-base clause), `INVOKE PSOFA OF SUPER \"SPEAK\"` in DOG INHERITS FROM PSOFA is rejected COBOLNET0901 (probe/self-and-super/PSOF.cob); expected ANIMAL then DOG. Rejects legal source. Finding F1. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1425 (w1014 group S). SR6 (cite.py --check 8.4.3.8.3 6) OK): with one INHERITS class object-class-name-1 MAY be specified — both the bare SUPER (oo_super) and `PB1425B OF SUPER` (INVOKE statement and inline `::` invocation) compile and run. The `selfAndSuper` rule carries `(cobolWord OF)? SUPER` ahead of dataReference in objectReference.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.8.3-7",
@@ -6936,13 +6936,13 @@
   "ordinal": 4,
   "subject": "SELF and SUPER",
   "rule-digest": "4d9a1e036d8d",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
+  "test-ref": "conformance:2002/pb1425_qualified_super",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule (--check 8.4.3.8.4 'the search for the method shall include only those methods defined for object-class-name-1' -> OK §8.4.3.8.4 4)). There is no `object-class-name-1 OF SUPER` production anywhere (grep of Grammar/*.g4 for SUPER: only objectReference's bare SUPER, the lexer token and CobolWords' reserved list; no OF SUPER / OfSuper in src). The restricted search to object-class-name-1 therefore does not exist. Probe probe/self-and-super/PSOF.cob rejected COBOLNET0901. Reachable with a single base (SR6), which is inside the claimed OO core, not the A.4.10 item-1 decline. Finding F1. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1425 (w1014 group S). GR4 (cite.py --check 8.4.3.8.4 4) OK): the search includes only the methods defined for object-class-name-1 — the search root is the named class, whose methods include those it inherits (9.3.9). Golden: PB1425C's `PB1425B OF SUPER \"SPEAK\"` runs PB1425B's override (ANIMAL, DOG), and `PB1425B OF SUPER :: \"NAME\"` finds NAME inherited from PB1425A (A-NAME).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.9.3-1",
@@ -57441,13 +57441,13 @@
   "ordinal": 0,
   "subject": "Qualification",
   "rule-digest": "3f817a52f31f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReferenceSuffix; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#qualification; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportGroupReference; src/Cobol.Net.Compiler/Binding/QualifiedNameClasses.cs#All; src/Cobol.Net.Compiler/Binding/DataBinder.cs#QualifiedCandidates; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#ConditionOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveIndexName; src/Cobol.Net.Compiler/Binding/Procedure/ProcedureTableBuilder.cs#ResolveProcedureWord; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#LinageFileOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#CounterReportOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#SumCounterFor",
-  "test-ref": "conformance:85/qualified_unique_match; conformance:85/pb567_condition_name_qualification; conformance:85/pb919_index_name_qualified; conformance:85/pb365_report_group_qualified_85; conformance-test:LinageConformanceTests.QualifiedCounter_TwoLinageFiles",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/ExpressionFormationPass.cs#VisitDataReference; src/Cobol.Net.Compiler/Validation/ExpressionFormationPass.cs#VisitSubscriptOrRefMod; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#CannotBeSubscripted",
+  "test-ref": "conformance:85/qualified_unique_match; conformance:85/pb567_condition_name_qualification; conformance:85/pb919_index_name_qualified; conformance:85/pb365_report_group_qualified_85; conformance-test:LinageConformanceTests.QualifiedCounter_TwoLinageFiles; conformance:negative/pb1455-subscript-before-qualifier; conformance:85/pb1455_qualified_subscripted_subscript",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1454 (also PB1455) (registrar 15c). Eight formats plus the data-qualifier and file-report-qualifier sub-formats. QualifiedNameClasses.All carries one row per format (drift-tested against the standard's text). PER FORMAT (pinned cobol.exe, --run, 85 and 2023): F1 qualified-data-name - probe e1 data-qualifier chains with gaps and the file-report-qualifier `FC OF FR OF FA` / `FC OF FA` resolve; report-name-1 half: `TOT1 IN R1` reads the sum counter (f4 -> 14) and `GENERATE DET OF RPT` via reportGroupReference (golden pb365); F2 qualified-condition-name - `condition-name [ data-qualifier ]... [ file-name-1 ]`, golden pb567 incl. the file-name leg; F3 qualified-index-name - `SET IX OF T OF G`, `IX IN G`, and (probe p1) an index in an FD record qualified by the FILE, `SET IX OF FA TO 3` / `FE (IX OF FR)` -> P1=54, golden pb919; F4 qualified-procedure-name - `PERFORM P2 OF S1`, `GO TO P3 OF S2`; F7 qualified-linage-counter - `LINAGE-COUNTER IN/OF file-name` (LinageConformanceTests); F8 qualified-report-counter - `LINE-COUNTER OF R1` / `IN R2` (probe h3 -> 002 003). F5 (qualified-screen-name) and F6 (qualified-record-key-name) belong to facilities docs/CONFORMANCE.md declares Not claimed - A.4.2 screen handling (refused by name COBOLNET1560/1707; derived selector `screen-handling-only`) and A.3 item 40 RECORD KEY SOURCE (refused COBOLNET1954) - so no screen-name or record-key-name is ever declared and those formats have no population; recorded here, not decided (owner decision D13; both are already covered by derived determinations). DIVERGENCES (see findings): (1) UNDER-REJECT - the grammar's `dataReferenceSuffix*` and `qualification : (OF | IN) cobolWord (subscriptPart | refModPart)*` admit subscripts and reference modifiers BETWEEN qualifiers, so probe n2 `MOVE 7 TO E (2) OF T`, `DISPLAY E (1) OF T E (2) IN T OF G` -> N8=57 and `S (2:2) OF G` -> N9=BC compile and run with NO diagnostic at 85 and 2023, where Format 1 carries no subscript and the identifier is `qualified-data-name-with-subscripts-1` (§8.4.3.1.2, --check OK) = `qualified-data-name-1 [ ( subscript … ) ]` (§8.4.2.3.2, --check OK), reference modification following the whole identifier; no CONFORMANCE.md extension row and no dialect gate records this leniency. (2) REJECTS LEGAL SOURCE - a sum counter's Format 1 data-qualifier (its report group's data-name) is refused (`TOT1 OF CF1` COBOLNET2145; `TOT OF CF2 OF R2` COBOLNET1639). (3) the Format 8 cross-report reference in the report section is staged COBOLNET0899 (rows SR-8.4.2.2.3-9/-10). [editions as adjudicated: 85, 2002, 2014, 2023 (Formats 1-4 and 7-8 in every edition; Format 5 qualified-screen-name belongs to the screen section, 2002+; Format 6 qualified-record-key-name to the RECORD KEY SOURCE phrase, 2002+)]",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1455 (landed w1014 group S). The misordered spelling (a subscript or reference modifier BEFORE a qualifier, `E (1) OF T`, `S (2:2) OF G`, and the same inside a SUBSCRIPT-mode capture, `X (E (1) OF T)`) is refused COBOLNET2776 at every edition by ExpressionFormationPass, once per parse tree; the grammar keeps the superset parse so the refusal names the rule (8.4.2.3.2 Format 1 `qualified-data-name-1 [ ( subscript ... ) ]`, 8.4.3.1.2 Format 3 `identifier-1 reference-modifier-1`, both cite.py --check OK). Sibling fixed: the subscript splitter asked SR2's '(' question of the LAST qualifier, so `X (E OF T OF G (2))` was split into two subscripts and refused COBOLNET2270; CannotBeSubscripted now takes the whole qualified name.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.2.3.2",
@@ -57636,13 +57636,13 @@
   "ordinal": 0,
   "subject": "Function-address-identifier",
   "rule-digest": "bda993a3470a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setFunctionAddressStatement; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#subscriptPart; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#OnDefaultLParen; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs#BindSetFunctionAddress",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#PreviousIsFunctionName; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#functionAddressIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetBinder.cs#BindSetFunctionAddress",
+  "test-ref": "conformance:2014/pb1416_function_address_subscripted_identifier; conformance:2014/pb1417_function_address_identifier_operands",
   "derivation": "",
-  "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1416 (registrar 15b). RULE: section 8.4.3.12.2 prints 'ADDRESS OF FUNCTION { function-prototype-name-1 | identifier-1 }' with ADDRESS and FUNCTION underlined, OF not (cite.py --check 8.4.3.12.2 \"ADDRESS\" -> OK). identifier-1 is a full identifier: 8.4.3.1.3 SR1 'Identifier is defined recursively' (OK), so a subscripted identifier-1 is legal. CODE: grammar setFunctionAddressStatement : SET dataReference+ TO ADDRESS OF? FUNCTION dataReference; SetBinder.BindSetFunctionAddress splits the two arms at bind (REPOSITORY/UDF self-name -> prototype arm, else ResolveSending -> identifier arm). VERIFIED (pinned cobol.exe): prototype arm with OF and without OF at --std 2014 runs the golden pb452_set_function_pointer exactly (BOTH-SET/SAME/NULL1/NOTNULL3/OF-OPTIONAL); --std 2002 rejected COBOLNET0900 (correct gate); identifier arm elementary / reference-modified / qualified-then-subscripted (WS-NAME OF WS-NAMES (2) -> REF-SET) all parse. DEFECT: a DIRECTLY subscripted identifier-1 'SET FP1 TO ADDRESS OF FUNCTION WS-NAME(2)' (also with a space before the paren) is a PARSE error 'COBOL0001: missing token before )': the lexer's OnDefaultLParen retypes the '(' after 'FUNCTION <word>' to FNARG_LPAREN, refModPart accepts (LPAREN|FNARG_LPAREN) but subscriptPart accepts only LPAREN. Expected: compiles; with WS-NAME(2)='FAIDBL' (a REPOSITORY function) FP1 is non-NULL (8.4.3.12.4 GR1 a). Probe: out/probe/fai/p1h.cob. ADJACENT (SR1 row, same arm): an alphanumeric group identifier-1 (and a ref-mod of it) is refused COBOLNET1960 'is of category (none)' although 8.5.2.1 'an alphanumeric group item has class and category alphanumeric' (OK) and 8.4.3.3.4 GR6 carries that category into the ref-mod (OK) - see findings. PLACEMENT (not decided here): the phrase exists only as SET Format 8's sender; IF fp = ADDRESS OF FUNCTION f, CALL ... USING BY VALUE ADDRESS OF FUNCTION x and INITIALIZE ... REPLACING FUNCTION-POINTER BY ADDRESS OF FUNCTION f all fail to parse. The printed 8.4.3.1.2 Format 9 (rendered PDF p155) lists only data-address-identifier-1 and program-address-identifier-1 (--check OK), so the normative identifier formats do not include it, while D.9.3.1 (informative) says a function address 'can be used anywhere ... a function-identifier may be used' - recorded as a dossier gap for owner decision, not as this row's defect. Existing covering goldens (conformance:2014/pb452_set_function_pointer, conformance:2023/pb452_function_address_runtime, conformance:negative/pb452-function-address-operand) are spec-derived but do not witness the subscripted arm, so test-ref is left empty for a DIVERGES row. || editions as written by the adjudicator: 2014, 2023 (function-pointer category and its address-identifier are a 2014 introduction; absent from 2023 Annex E, so unchanged 2014->2023; not in 85/2002)",
-  "state": "GAP"
+  "editions": "2014, 2023",
+  "notes": "kb/Work PB1416 (landed w1014 group S). 8.4.3.12.2 `ADDRESS OF FUNCTION { function-prototype-name-1 | identifier-1 }` (OF not underlined); identifier-1 is any identifier format (8.4.3.1.3 SR1). The lexer no longer types the '(' after `ADDRESS [OF] FUNCTION word` as the 8.4.3.2.3 SR6 argument paren (a prototype name takes no argument list), so a subscripted (`WS-NAME(2)`, `WS-NAME (N)`, OF omitted) and a reference-modified identifier-1 parse and resolve to the function their content names (golden: SUBSCRIPT-OK, NO-OF-OK, REFMOD-OK).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.13.2",

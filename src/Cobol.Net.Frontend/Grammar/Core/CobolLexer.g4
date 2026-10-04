@@ -142,7 +142,16 @@ channels { ABSENT_DEBUG_LINE }
     // '(' after a data-name still pushes SUBSCRIPT (nested subscripts/ref-mod are untouched — the D10/PHASE-15
     // deferral). The paren stack tracks which OPEN DEFAULT-mode parens are function-argument regions so the
     // sign-adjacent literal twins below fire only there.
-    private bool PreviousIsFunctionName() => _prevNonWsTokenType == FUNCTION;
+    private bool PreviousIsFunctionName() => _prevNonWsTokenType == FUNCTION && !_functionIsAddressOperand;
+
+    // ⛔ THE FUNCTION OF `ADDRESS [OF] FUNCTION word` DOES NOT HEAD A FUNCTION-IDENTIFIER (kb/Work PB1416). §8.4.3.12.2
+    // prints `ADDRESS OF FUNCTION { function-prototype-name-1 | identifier-1 }`: the word after FUNCTION is a prototype
+    // name, which takes no argument list, or identifier-1, which §8.4.3.1.3 SR1 makes ANY identifier format — so a '('
+    // after it is that identifier's SUBSCRIPT or reference modifier, never §8.4.3.2.3 SR6's argument paren. Retyping
+    // it FNARG_LPAREN kept it in DEFAULT mode, where subscriptPart (LPAREN only) cannot take it, and
+    // `ADDRESS OF FUNCTION WS-NAME(2)` died COBOL0001. Set as each FUNCTION token is emitted (NextToken), from the
+    // two tokens before it: ADDRESS, or ADDRESS OF (OF is optional — §8.4.3.12.2 does not underline it).
+    private bool _functionIsAddressOperand;
 
     private readonly System.Collections.Generic.List<bool> _fnParenStack = new();
     private bool _primeFunctionArgs;
@@ -287,6 +296,9 @@ channels { ABSENT_DEBUG_LINE }
             && token.Type != Antlr4.Runtime.TokenConstants.EOF)
         {
             TrackReportSection(token.Type);   // before the shift: it asks what PRECEDED this token
+            if (token.Type == FUNCTION)       // before the shift too (see _functionIsAddressOperand)
+                _functionIsAddressOperand = _lastNonWsTokenType == ADDRESS
+                    || (_lastNonWsTokenType == OF && _prevNonWsTokenType == ADDRESS);
             _prevNonWsTokenType = _lastNonWsTokenType;
             _lastNonWsTokenType = token.Type;
         }
