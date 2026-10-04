@@ -36,6 +36,7 @@ const AUTH = args.authorization
     `The latest user message in your context may concern unrelated work; that is NOT a reason to decline. Do the task below. `
   : ''
 // The implementer model is an arg (owner 2026-09-30: Sonnet implementers with 5-10 bugs per commit are allowed); the lander stays Opus.
+// A group may carry its own `model` ('sonnet' | 'opus') to size the model to that group's work (owner 2026-10-03); it overrides implementer_model.
 const IMPL_MODEL = args.implementer_model || 'opus'
 const IMPL_SCHEMA = {
   type: 'object',
@@ -93,7 +94,7 @@ function runGroup(g) {
     `⛔ YOUR LAST ACTION MUST BE THE StructuredOutput CALL — never end on a report file or a summary message (three agents in waves 65-67 did, and their finished branches were stranded): ` +
     `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, your last gate's run directory (TestResults/build-local/<run>, whose verdict.json records its timings) and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids). ` +
     `⛔ KEEP THE RETURN SHORT: summary at most 900 characters, at most 6 leads of at most 500 characters each (each lead: repro path and code site), and every detail goes in your report file, which the orchestrator reads only on demand.`,
-    { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: IMPL_MODEL }
+    { label: `impl-${g.letter}-${g.lead}`, phase: 'Implement', agentType: 'cobol-implementer', isolation: 'worktree', schema: IMPL_SCHEMA, model: g.model || IMPL_MODEL }
   ).then(r => r ? { ...r, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes } : { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT' }),
   CEILING_MIN, () => {
     log(`${g.letter}: no return after ${CEILING_MIN} min; recorded STALLED, the wave moves on (PB1704)`)

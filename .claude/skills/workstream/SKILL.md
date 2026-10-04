@@ -72,7 +72,7 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   once, not once per cluster. It is a FRESH agent, not a longer transcript, because of the quadratic cost law above:
   the cap exists because the sixth defect in one transcript costs more than a new agent, and the successor keeps the
   cheap part (the learned context) without the expensive part (the long transcript).
-- **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), implementer_model ('opus'; 'sonnet' when the owner allows it), devlog_n, previous_train,
+- **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), implementer_model ('opus'; 'sonnet' when the owner allows it; a group's own `model` overrides it, so one wave can mix Sonnet and Opus groups), devlog_n, previous_train,
   lead_id_blocks: ["PBa-PBb", …] (one block per train), groups: [{ letter, lead, notes, codes, after? }] }`.
 - **Return payloads are capped** (kb/Work PB1912, owner 2026-10-02): an implementer's `summary` is at most 900 characters,
   `leads` at most 6 of at most 500, and the lander's final text at most 25 lines, because everything an agent returns is

@@ -1009,6 +1009,24 @@
       "dns": 457,
       "label": "PB1133+PB1303+PB1404+PB1507+",
       "battery": null
+    },
+    {
+      "sha": "008babef",
+      "date": "2026-10-04",
+      "gap": 372,
+      "closed": 3975,
+      "dns": 457,
+      "label": "PB1167+PB1499+PB1502: ANY LE",
+      "battery": null
+    },
+    {
+      "sha": "a21c19d5",
+      "date": "2026-10-04",
+      "gap": 359,
+      "closed": 3988,
+      "dns": 457,
+      "label": "PB917+PB1134+PB1212+PB1246+P",
+      "battery": null
     }
   ]
 }

@@ -13,6 +13,18 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1863 — 2026-10-04 10:30 PDT — Ledger refreshed after train 1013 (GAP 359); the rolling wave takes a per-group model
+
+Refreshed in the same turn as train 1013's landing report, as entry 1861 requires: `gen_ledger.py` back-filled the two missing
+points itself (114 points), `ledger-in-flight.md` names trains 1011 to 1013, the dropped PB322 cluster and wave 1014, and the page
+was republished (version 89, accepted on the first call). `wf_rolling_wave.js` now honours a group's own `model`
+(`model: g.model || IMPL_MODEL`), so one wave can run a mechanical group on Sonnet and a design-heavy one on Opus (owner
+2026-10-03: size the model to the work); `SKILL.md` documents it. Wave 1014 is the first to use it.
+
+**Files:** `docs/rearchitecture/evidence/ledger-trend.json`, `docs/rearchitecture/evidence/ledger-in-flight.md`,
+`.claude/skills/workstream/templates/wf_rolling_wave.js`, `.claude/skills/workstream/SKILL.md`. No code changed, no
+diagnostic code used.
+
 ## Entry 1862 — 2026-10-04 09:32 PDT — Train 1013: wave 1013 groups N, L, P (M dropped on a CI guard red) — the variable-length group's ODO count and formal storage, ANY LENGTH RETURNING and interface inheritance, the DataBinder rule residues; GAP 381 → 359
 
 **Group N (PB244, PB1722, PB1937; SPLIT — PB244 part (b) and PB1937 landed, PB1722 measured).** A variable-length group that held an OCCURS DEPENDING table beside a dynamic-length item, or a dynamic-length item inside a fixed-OCCURS element, still aborted with the Tier-C loud on the implementer's build. The member selections that `CurrentImage` and the variable-image codec each made are now one classification, `GroupImageCodec.VarParts` (fixed, dynamic leaf, dynamic table, nested, nested table, ODO-fixed), gated by `DataItem.CurrentExtentComposes`. The ODO count is one parameter, sourced by `PlaceRenderer.PeelOdo`: the current count for a statement's operand and the maximum at a boundary (§14.8.2.2). The record layout makes the table the trailing component (§13.18.38.3 SR22). The display format is the implementor's (§14.9.11.4 GR7, DOC-A.1-57). PB1937 reproduced exactly as filed: the callee saw `[HabcF]` and the caller's item came back shortened to 3. The LINKAGE copy-in now keeps the argument's whole dynamic content, since the formal occupies the argument's storage (§14.2.3 GR8), and a read through the formal agrees with its own LIMIT (§14.6.13.2 rule 5). PB1722's crash was confirmed by measurement at 1/100 scale, at 23.6 s and 2.46 GB for a million-element VALUE table, growing linearly; the note now carries the four per-element lanes and a phrase-based plan. PB244 stays open for a dynamic item inside an ODO element and for a cell-backed (EXTERNAL or ADDRESS OF) group holding both. Four 2014 goldens and two negatives (COBOLNET0900 below 2014) shipped. No verdict batch; GR-14.9.11.4-7 stays PARTIAL.

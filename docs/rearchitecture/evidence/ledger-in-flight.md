@@ -19,15 +19,16 @@
 -->
   <div class="flight">
     <h3>In flight — Sunday 2026-10-04, morning</h3>
-    <p><strong>Wave 1013 is running</strong> (four Sonnet implementers, then a lander train): the in-progress finishers first (the ANY LENGTH RETURNING item PB1167 with the OO conformance notes, the file-sharing default and fatal-I-O-status determinations of PB322 with the program table, the variable-length group image of PB244), plus a DataBinder residue cluster. Wave 1014 is planned on Opus for the design-heavy clusters (extended letters in COBOL words, the report-section and constant grammar, the OO binder and class table).</p>
-    <p><strong>Landed since the last refresh</strong>, each CI-proven: <span class="pill good">1011</span> STRING and UNSTRING operand screens, the OO data-division placement table and method BY VALUE formals, the report-writer binder residues, the constant-name integer positions and TYPEDEF RENAMES (GAP 497 to 426); <span class="pill good">1012</span> the linkage rules for function formals, SORT and MERGE record-size screens, the FLAG-02 and FLAG-14 detectors, the report binder residues and the binder driver (GAP 426 to 381).</p>
-    <p><strong>Partly done, by design:</strong> PB1167, the PB322 sharing-default and fatal-status parts, PB244 shape (b), PB1042 (a dynamic-capacity table in an EXTERNAL record) and the OO universal-descriptor leg.</p>
+    <p><strong>Wave 1014 is running</strong> (three implementers, then a lander train), with the model sized per group: the extended-letters lexer work dropped from train 1007, with the ANTLR grammar-encoding fix (Sonnet), and the parser-core grammar and the OO binder (Opus).</p>
+    <p><strong>Landed this morning</strong>, each CI-proven: <span class="pill good">1011</span> STRING and UNSTRING operand screens, the OO data-division placement table and method BY VALUE formals, the report-writer binder residues, constant-name integer positions and TYPEDEF RENAMES (GAP 497 to 426); <span class="pill good">1012</span> linkage rules for function formals, SORT and MERGE record-size screens, the FLAG-02 and FLAG-14 detectors, the binder driver (426 to 381); <span class="pill good">1013</span> ANY LENGTH RETURNING, interface covariance and inheritance rules, variable-length group display, and a DataBinder rule cluster (381 to 359).</p>
+    <p><strong>Dropped from train 1013:</strong> the file-sharing default and fatal-I-O-status work (PB322 parts A and E), because the CI NIST guard job reads two new rows in <span class="mono">tests/nist/corpus.tsv</span> as legacy divergences. The branch is finished and gated; PB1955 (the guard) blocks it.</p>
+    <p><strong>Partly done, by design:</strong> PB322 as above, the PB244 residues, PB1722 (a huge VALUE table compiles in 24 s and 2.5 GB), PB1042 (a dynamic-capacity table in an EXTERNAL record) and the OO universal-descriptor leg (PB480, PB1112).</p>
     <p><strong>Pacing:</strong> a new weekly quota began at 03:00; the target is one seventh of it per day, with the model sized to each group.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
       <h3>Measured this morning</h3>
-      <p>The first two waves of the week moved 116 rows (GAP 497 to 381) for about 5.9 M subagent tokens and 6 points of the weekly meter, on Sonnet implementers with Opus landers.</p>
+      <p>Three waves moved 138 rows (GAP 497 to 359) for about 8.5 M subagent tokens, on Sonnet implementers with Opus landers; the weekly meter read 8% at 09:48.</p>
     </div>
     <div class="card">
       <h3>Owner decisions</h3>
