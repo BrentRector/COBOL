@@ -463,7 +463,7 @@ internal sealed class CallUnitState
         return null;
     }
 
-    /// <summary>For each GLOBAL file INHERITED from a container (ISO §13.18.30), the place of the OWNER's FILE
+    /// <summary>For each GLOBAL file INHERITED from a container (ISO §13.18.27.4 GR1), the place of the OWNER's FILE
     /// STATUS item reached through the <c>__outer</c> instance chain. §12.4.5.8.4 GR1 NOTE 1: "In the case where
     /// a file-name is global and data-name-1 is not, data-name-1 is updated by references to file-name in
     /// contained programs even though data-name-1 is a local name" — the contained program's after-verb status

@@ -18036,13 +18036,13 @@
   "ordinal": 4,
   "subject": "Linkage section",
   "rule-digest": "4d7c0cecdfa0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#SealLinkageRules; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ScreenLinkageReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#ConditionOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ScreenLinkageIndex",
+  "test-ref": "conformance:85/pb1249_linkage_referenceable_legs; conformance:2002/pb1249_linkage_based_item_referenceable; conformance:negative/pb1249-linkage-item-not-referenceable; conformance:negative/pb1249-linkage-condition-name-not-referenceable; conformance:negative/pb1249-linkage-index-name-not-referenceable; conformance:negative/pb1249-linkage-redefines-of-non-formal",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1249, 14d). Rule (cite.py --check 13.7.3 \"It is an operand of the USING phrase or the RETURNING phrase of the procedure division header\" -> OK §13.7.3 4) a)): outside BASED items, a linkage item may be referenced in the procedure division iff a) it is a USING/RETURNING operand, b) subordinate to one, c) REDEFINES/RENAMES of one, d) subordinate to c, e) a condition-name/index-name of one. Positive arms verified: sr4p.cob (88 on a formal's subordinate -> AB-ON; INDEXED BY on the formal's table -> L-T(L-IX) writes Z; 01 L-R REDEFINES L-G and its subordinates; 66 L-RN RENAMES L-R2 -> R1=A R2=BQZQ RN=BQZQ; caller G=XBQZQ). The PROHIBITION is not enforced anywhere: no diagnostic in DataBinder.Linkage.cs or the statement binders, and no clause citation of 13.7.3 SR4 in src. Probe sr4.cob: callee LINKAGE 01 L-A (USING) and 01 L-Z (not a formal, with 88 L-Z-ON); MOVE 5 TO L-Z / DISPLAY L-Z / IF L-Z-ON compile clean at --std 2023 and run (Z=0005) — L-Z is bound as callee-local storage. sr4b.cob: a main program referencing a non-formal LINKAGE item compiles clean at --std 2023 and --std 85 (Z=0000). Expected: compile-time error on each reference to L-Z / L-Z-ON (the item satisfies none of a)-e) and is not BASED). Harm: under-rejects. Probes: out13/probe/linkage-section/sr4.cob, sr4b.cob, sr4p.cob. || Editions (adjudicator): 85, 2002, 2014, 2023 (the LINKAGE SECTION exists at every edition; the constant-entry and type-declaration-entry alternatives, function/method/prototype definitions are 2002+ per the clauses they reference)",
-  "state": "GAP"
+  "notes": "kb/Work PB1249 landed (wave 1012 F). cite.py --check 13.7.3 'may be referenced within the procedure division of that source element if, and only if, it satisfies one of the following conditions' -> OK 13.7.3 4); also 'It is subordinate to any item that satisfies the condition in subrule c' and 'It is a condition-name or index-name associated with a data item that satisfies one of the above conditions' -> OK 13.7.3 4). DataBinder.SealLinkageRules decides it once per unit/method from the bound header (header operand, RETURNING item, BASED, or REDEFINES of one: a)-d); a record's subordinates, RENAMES, condition-names and index-names follow the record: b), d), e)); the ONE resolver reports COBOLNET2746 for a data-name, the condition-name arm for an 88 and ScreenLinkageIndex for an index-name. A GLOBAL linkage item inherited by a contained program is another source element's and is not asked.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.7.3-5",
@@ -18051,13 +18051,13 @@
   "ordinal": 5,
   "subject": "Linkage section",
   "rule-digest": "8d3c99ab4a5a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ReceivingPlaceBar; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#IsFunctionFormal",
+  "test-ref": "conformance:2002/pb1250_function_formal_read_only; conformance:negative/pb1250-function-formal-arithmetic-receiver; conformance:negative/pb1250-function-formal-refmod-receiver",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1250, 14d). Rule (cite.py --check 13.7.3 \"A formal parameter of a function shall not be used as a receiving operand\" -> OK §13.7.3 5)). Not implemented: DataBinder records UnitIsFunction and LinkageFormals, but no binder asks whether a receiving operand is a function formal (grep of src/Cobol.Net.Compiler for the rule / a receiving-position check keyed on UnitIsFunction finds none; the only receiving-operand rail, COBOLNET1632 FunctionIdentifierReceiving, is §8.4.3.2.3 SR1 about function-IDENTIFIERS). Probe sr5.cob: FUNCTION-ID LKDB5 USING P-X RETURNING P-R with `ADD 1 TO P-X` compiles clean at --std 2023 and runs (R=00044, R2=00012); sr5b.cob `MOVE 3 TO P-X(1:1)` likewise clean (R=06042). Expected: compile-time error for each statement naming P-X in a receiving position. Harm: under-rejects. Probes: out13/probe/linkage-section/sr5.cob, sr5b.cob. || Editions (adjudicator): 2002, 2014, 2023 (function definitions are 2002+)",
-  "state": "GAP"
+  "notes": "kb/Work PB1250 landed (wave 1012 F). cite.py --check 13.7.3 'A formal parameter of a function shall not be used as a receiving operand' -> OK 13.7.3 5). One arm of ExpressionBinder.ReceivingPlaceBar (the receiving-operand prohibition table every statement's receiver and §8.4.3.2.4 GR5's BY-CONTENT choice already ask): the parameter is barred in any reference form (whole, or reference-modified) as COBOLNET2747. Determination: an item SUBORDINATE to a group parameter is not 'a formal parameter' (the same clause's SR4 b) writes 'subordinate to an operand of the USING phrase' when it means one); the RETURNING item is no formal parameter and stays a legal receiver (pinned by the positive golden).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.7.4-1",
@@ -22356,13 +22356,13 @@
   "ordinal": 1,
   "subject": "GLOBAL clause",
   "rule-digest": "e93e0cf67501",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#GlobalBridgesOf; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#GlobalBridgesOf",
+  "test-ref": "conformance:85/pb1523_global_fd_records_and_redefiners; unit:GlobalBridgeResidenceDriftTests.AContainedProgramReachesTheGlobal",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "Rule: \"A constant-name, data-name, file-name, report-name, or screen-name described using a GLOBAL clause is a global name. All data-names subordinate to a global name are global names. All condition-names associated with a global name are global names.\" cite.py --check 13.18.27.4 \"All data-names subordinate to a global name are global names. All condition-names associated with a global name are global names\" -> OK §13.18.27.4 1). VERIFIED ARMS (probe g1b @0caa7d5, --std 2023): a GLOBAL constant (01 KG CONSTANT IS GLOBAL AS 7) reads 7 in a directly and an indirectly contained program; subordinates GA and GC OF GB OF G of `01 G GLOBAL` are read and written from both levels (writes visible in the container: BACK GA=ABC after INNER2's SET, GC=11); condition-name GA-ABC is tested (IF) and SET TO TRUE from contained programs; a GLOBAL FD's file-name is OPENed/WRITten in a containee and read back by the container (FILE=WROTE1); a file-section `01 NFR GLOBAL` under a non-GLOBAL FD is global (OUTER/INNER round-trip). BinderDriver.BindUnitData injects each ancestor's CallGlobalRoots subtree + its condition-names and adds DataBinder.GlobalBridgesOf bridges. Report-name GLOBAL has goldens conformance:85/pb369_global_report_use_selection; screen-name is the declined A.4.2 module (COBOLNET1560). DIVERGES — CRASH on legal source, two shapes (see findings): (1) a GLOBAL FD with TWO record descriptions plus ANY contained program (even one referencing nothing) fails the backend `CS0102: The type '_PRG_OUTF._PRG_INF' already contains a definition for '_redef_R1'` — both records are CallGlobalRoots of one StringCanonical redefines class and BinderDriver adds GlobalBridgesOf(g) per root with no de-duplication, so the shared `_redef_` backing bridge is emitted twice (same for `01 G GLOBAL` + `01 H REDEFINES G GLOBAL`, both data-names 'described using a GLOBAL clause'); (2) a GLOBAL clause on a redefiner whose class is not StringCanonical (`01 G PIC X(5) VALUE \"HELLO\". 01 G-RED REDEFINES G GLOBAL PIC X(5).`, containee DISPLAY G-RED) emits `private ref string G_RED => ref __outer.G_RED;` for a field the container never declares plus an un-bridged anchor reference -> CS1061 + CS0120. Both at 2002 and 2023 (85 lacks GOBACK in the probe; the shapes are 85-legal). Note the inventory's GR-13.18.27.4-3 CONFORMS ('B resolves') is contradicted by shape (2) on this tree. Related open notes (not this mechanism): kb/Work PB1243 (containee own subordinate vs container GLOBAL subordinate -> false ambiguity, GR2), PB1193 (record-level GLOBAL; its title premise no longer reproduces), PB1009 (landed, GLOBAL linkage bridge). No note owns the duplicate/phantom bridge — NEW finding. No spec-derived test pins GR1 (test-needed). || Owning note: kb/Work/PB1523.",
-  "state": "GAP"
+  "editions": "85, 2002, 2014, 2023",
+  "notes": "kb/Work PB1523 landed (wave 1012 F). cite.py --check 13.18.27.4 'All data-names subordinate to a global name are global names' -> OK 13.18.27.4 1). The records of a GLOBAL FD with SEVERAL record descriptions are global names; they share one Tier-B backing, and BindUnitData now collects every root's bridges into a SET keyed on the emitted member (it used to declare the shared _redef_ backing once per root: CS0102). Golden pb1523_global_fd_records_and_redefiners (FD with two records, reached two containment levels down) runs at --std 85.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.27.4-2",
@@ -22387,12 +22387,12 @@
   "subject": "GLOBAL clause",
   "rule-digest": "268899eaf9a2",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindExternalAndGlobal",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindExternalAndGlobal; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#GlobalBridgesOf; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#AnchorOf",
+  "test-ref": "conformance:2002/l1c12_global_redefines_subject; conformance:2002/l1g4_global_redefines_subject_group; conformance:negative/l1g4-global-redefines-object-not-global; conformance:85/pb1523_global_fd_records_and_redefiners; unit:GlobalBridgeResidenceDriftTests.AContainedProgramReachesTheGlobal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Rule: \"If the GLOBAL clause is used in a data description entry that contains the REDEFINES clause, it is only the subject of that REDEFINES clause that possesses the global attribute.\" (cite.py --check 13.18.27.4 -> OK GR3). The scan registers only the entry whose own clause list carries GLOBAL. Probe p2 (01 A; 01 B REDEFINES A GLOBAL): containee reference to A -> COBOLNET1639 while B resolves. Probe p3 (01 A GLOBAL; 01 B REDEFINES A): containee reference to B -> COBOLNET1639. Both directions verified. No spec-derived test exists (test-needed). || Editions (adjudicator): 1985, 2002, 2014, 2023",
-  "state": "GAP"
+  "notes": "kb/Work PB1523 landed (wave 1012 F). cite.py --check 13.18.27.4 'it is only the subject of that REDEFINES clause that possesses the global attribute' -> OK 13.18.27.4 3). Name resolution was right and the program did not compile: a Tier-A (Alias) REDEFINES view owns no emitted member, so its bridge named a member the container never declares (CS1061). GlobalBridgesOf now bridges the view's canonical through AnchorOf, the one rule ReferenceResolver.PlaceForItem applies to every reference. Witnesses: the elementary-subject golden (held since 2026-09-25, now tests/conformance/2002/l1c12_global_redefines_subject), the group-subject golden and the object-not-global negative.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.28.3-1",

@@ -4,7 +4,10 @@
       *> GR1 makes the user-defined function and the intrinsic function the same kind of function-identifier,
       *> so one rule orders both. GR6a: the values of argument-1 are made available to the activated function
       *> "at the time control is transferred" - a BY REFERENCE identifier designates the caller's storage and
-      *> is read there, so the function writing it (UAOBMP below) is visible to the argument on its left.
+      *> is read there, so a change to that storage during the activation is visible to the argument on its
+      *> left. 13.7.3 SR5 forbids a function to store into its formal parameter, so each function below
+      *> changes the argument's storage through the EXTERNAL item both programs describe (WS-A, WS-I, WS-S,
+      *> WS-BA); the formal, which occupies that same storage (14.2.3 GR8), reads the new value.
       *> Each leg fails if an earlier argument's value is read AFTER a later argument's activation changed it:
       *>   EXPR  - an arithmetic expression (BY CONTENT) to the left of an activation that changes its operand:
       *>           WS-A + 0 is evaluated first, 4, so the result is 4 * 1000 + 10 = 4010 (not 5010).
@@ -25,18 +28,19 @@
            FUNCTION UAOF2
            FUNCTION UAOVAL
            FUNCTION UAOBMP
+           FUNCTION UAOBMI
            FUNCTION UAOCHG
            FUNCTION UAOCLR
            FUNCTION UAOBOOL.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 WS-A PIC 9(4).
-       01 WS-I PIC 9(4).
+       01 WS-A PIC 9(4) EXTERNAL.
+       01 WS-I PIC 9(4) EXTERNAL.
        01 WS-T.
           05 WS-E PIC 9(4) OCCURS 3.
-       01 WS-S PIC X(4).
+       01 WS-S PIC X(4) EXTERNAL.
        01 WS-R PIC 9(8).
-       01 WS-BA PIC 1.
+       01 WS-BA PIC 1 EXTERNAL.
        01 WS-BB PIC 1.
        PROCEDURE DIVISION.
        MAIN.
@@ -62,7 +66,7 @@
            MOVE 7 TO WS-E (1).
            MOVE 8 TO WS-E (2).
            COMPUTE WS-R = FUNCTION UAOVAL(WS-E (WS-I),
-               FUNCTION UAOBMP(WS-I)).
+               FUNCTION UAOBMI(WS-I)).
            DISPLAY "SUB=" WS-R " I=" WS-I.
            MOVE "ABCD" TO WS-S.
            COMPUTE WS-R = FUNCTION ORD-MIN(WS-S,
@@ -102,37 +106,58 @@
        IDENTIFICATION DIVISION.
        FUNCTION-ID. UAOBMP.
        DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-A PIC 9(4) EXTERNAL.
        LINKAGE SECTION.
        01 L-X PIC 9(4).
        01 L-R PIC 9(4).
        PROCEDURE DIVISION USING L-X RETURNING L-R.
        P.
-           ADD 1 TO L-X.
+           ADD 1 TO WS-A.
            COMPUTE L-R = L-X * 2.
            IF L-R < 10 MOVE 5 TO L-R END-IF.
            GOBACK.
        END FUNCTION UAOBMP.
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. UAOBMI.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-I PIC 9(4) EXTERNAL.
+       LINKAGE SECTION.
+       01 L-X PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING L-X RETURNING L-R.
+       P.
+           ADD 1 TO WS-I.
+           COMPUTE L-R = L-X * 2.
+           IF L-R < 10 MOVE 5 TO L-R END-IF.
+           GOBACK.
+       END FUNCTION UAOBMI.
+       IDENTIFICATION DIVISION.
        FUNCTION-ID. UAOCHG.
        DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-S PIC X(4) EXTERNAL.
        LINKAGE SECTION.
        01 L-X PIC X(4).
        01 L-R PIC X(4).
        PROCEDURE DIVISION USING L-X RETURNING L-R.
        P.
-           MOVE "ZZZZ" TO L-X.
+           MOVE "ZZZZ" TO WS-S.
            MOVE "QQQQ" TO L-R.
            GOBACK.
        END FUNCTION UAOCHG.
        IDENTIFICATION DIVISION.
        FUNCTION-ID. UAOCLR.
        DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-BA PIC 1 EXTERNAL.
        LINKAGE SECTION.
        01 L-X PIC 1.
        01 L-R PIC 9(4).
        PROCEDURE DIVISION USING L-X RETURNING L-R.
        P.
-           MOVE B"0" TO L-X.
+           MOVE B"0" TO WS-BA.
            MOVE 5 TO L-R.
            GOBACK.
        END FUNCTION UAOCLR.

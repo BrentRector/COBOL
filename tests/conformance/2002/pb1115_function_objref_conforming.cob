@@ -23,13 +23,13 @@
       *> cite.py --check 14.8.2.3.2 "and the FACTORY and ONLY phrases
       *>   shall be the same" -> OK  14.8.2.3.2 3)
       *> Each function tests its formal and returns "OBJ " or "NULL";
-      *> P1115T also SETs its BY REFERENCE formal to NULL.
+      *> (13.7.3 SR5 forbids a function to store into its formal parameter,
+      *> so none of them SETs its formal.)
       *> DERIVATION of every output line:
       *>  T: W-T (OBJECT REFERENCE P1115C) holds a new instance and meets
       *>     a formal with the same class-name and no ONLY on either side
       *>     (rule 3) -> conforming; BY REFERENCE (8.4.3.2.4 GR5 a), so
-      *>     the function sees the object ("OBJ ") and its SET reaches
-      *>     W-T. "T=OBJ " then "A=NULL".
+      *>     the function sees the object ("OBJ "). "T=OBJ ".
       *>  U: W-U is universal and so is the formal (rule 1); it holds the
       *>     same instance. "U=OBJ ".
       *>  O: W-O is OBJECT REFERENCE P1115C ONLY into a formal described
@@ -48,7 +48,6 @@
        PROCEDURE DIVISION USING L-O RETURNING L-R.
            IF L-O = NULL MOVE "NULL" TO L-R ELSE MOVE "OBJ " TO L-R
            END-IF
-           SET L-O TO NULL
            GOBACK.
        END FUNCTION P1115T.
 
@@ -100,7 +99,6 @@
            SET W-U TO W-T
            MOVE FUNCTION P1115T(W-T) TO WS
            DISPLAY "T=" WS
-           IF W-T = NULL DISPLAY "A=NULL" ELSE DISPLAY "A=OBJ " END-IF
            MOVE FUNCTION P1115U(W-U) TO WS
            DISPLAY "U=" WS
            MOVE FUNCTION P1115O(W-O) TO WS

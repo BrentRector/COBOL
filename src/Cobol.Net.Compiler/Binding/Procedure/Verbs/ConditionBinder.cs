@@ -1420,11 +1420,15 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         return BoundOperandError.Refused(ctx.Edition, "comparison operand");
     }
 
+    /// <summary>The condition-name references already reported as ambiguous — one report per source reference.</summary>
+    private readonly HashSet<Core.DataReferenceContext> _condDiagnosed = [];
+
+    /// <summary>The condition-name references already reported as §13.7.3 SR4 e) violations.</summary>
+    private readonly HashSet<Core.DataReferenceContext> _linkageCondDiagnosed = [];
+
     /// <summary>Resolve a condition-name reference, honoring OF/IN qualifiers (ISO §8.4.2.2 Format 2: a
     /// condition-name qualifies by its conditional variable and/or the variable's containing groups, innermost
     /// first) — duplicate 88 names across tables select by the qualifier chain.</summary>
-    private readonly HashSet<Core.DataReferenceContext> _condDiagnosed = [];
-
     public Condition88? ConditionOf(Core.DataReferenceContext dref)
     {
         string name = dref.cobolWord()?.GetText() ?? dref.GetText();
@@ -1468,6 +1472,10 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                     + $"{matches.Count} declarations match (ISO §8.4.2.2 Format 2 — qualification shall "
                     + "establish uniqueness). Qualify by the conditional variable or its containing groups");
         }
+        // §13.7.3 SR4 e): a condition-name of a linkage item is referenceable exactly when its conditional variable
+        // is — the same decision the data-name arm asks (ReferenceResolver.ScreenLinkageReference), once per reference.
+        if (ctx.Data.UnreferenceableLinkageRecord(matches[0].Parent) is { } record && _linkageCondDiagnosed.Add(dref))
+            ctx.Refs.ReportUnreferenceableLinkage(DataBinder.WrittenText(dref), record);
         return matches[0];
     }
 

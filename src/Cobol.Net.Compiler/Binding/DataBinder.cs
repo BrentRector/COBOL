@@ -1791,7 +1791,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         file.ReportNames.Add(rn.GetText());
                 else if (clause.fileGlobalExternalClause() is { } ge)
                 {
-                    // FD IS EXTERNAL / IS GLOBAL (ISO §13.18.22 / §13.18.30): EXTERNAL ⇒ one run-unit file
+                    // FD IS EXTERNAL / IS GLOBAL (ISO §13.18.22 / §13.18.27.4 GR1): EXTERNAL ⇒ one run-unit file
                     // connector + external record data (GR4a/GR4b), externalized as the FD name (GR5); GLOBAL ⇒
                     // the file-name and record-names are global names, inherited by contained programs.
                     if (ge.EXTERNAL() is not null)
@@ -6640,7 +6640,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// classification pass walks <see cref="DataItem.RedefinesTarget"/> transitively to the anchor (SR11).</summary>
     internal void ResolveRedefines()
     {
-        static DataItem RootOf(DataItem d) { while (d.Parent is { } p) d = p; return d; }
         foreach (var item in AllItems())
             if (item.RedefinesTargetName is { } tname)
             {
@@ -6652,10 +6651,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 IReadOnlyList<DataItem> scope;
                 if (item.Parent is { } par)
                     scope = par.Children;
-                else if (OoRootOwner.TryGetValue(RootOf(item), out var mm))
+                else if (OoRootOwner.TryGetValue(item.Root, out var mm))
                     // A top-level method redefiner scopes to its OWN section only (§13.18.44.3 SR — the target is a
                     // preceding item in the SAME data description; cross-section LOCAL↔LINKAGE aliasing is illegal,
-                    // and their storage classes differ — review B). RootOf(item)
+                    // and their storage classes differ — review B). item.Root
                     // == item here (Parent is null).
                     scope = mm.Binding!.LocalRoots.Contains(item) ? mm.Binding!.LocalRoots
                           : mm.Binding!.LinkageRoots;
@@ -6679,7 +6678,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     RedefinitionKind.Clause);
                 // A method 01 REDEFINES whose target isn't in the method's own roots is a scope error (never a
                 // silent cross-scope bind to an object/program item) — §13.18.44.3 SR.
-                if (item.RedefinesTarget is null && item.Parent is null && OoRootOwner.ContainsKey(RootOf(item)))
+                if (item.RedefinesTarget is null && item.Parent is null && OoRootOwner.ContainsKey(item.Root))
                     // 1577, renumbered from a bare "COBOLNET1518" that collided with the locale-module
                     // non-support meaning (review V11 — the code comes from the catalog descriptor, never a literal).
                     Edition.Error(DiagnosticCatalog.MethodRedefinesScope,

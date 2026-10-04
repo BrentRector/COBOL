@@ -12,7 +12,7 @@
       *> POSITIVE HALF: WS-B (the subject of "REDEFINES WS-A GLOBAL") is global, so the contained program
       *> L1C12D references it without describing it (GR2), and it IS the storage of WS-A (a redefinition).
       *> The NEGATIVE HALF (WS-A, the redefined item, is NOT global) is the twin
-      *> negative/l1c12-global-redefines-object-not-global.
+      *> negative/l1g4-global-redefines-object-not-global.
       *> DERIVATION OF THE EXPECTED OUTPUT:
       *>   MOVE "ABCD" TO WS-A; CALL L1C12D, which DISPLAYs WS-B -> the same four bytes  => IN:ABCD
       *>   L1C12D then MOVEs "WXYZ" TO WS-B; back in L1C12C WS-A shows it           => OUT:WXYZ

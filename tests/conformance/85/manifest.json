@@ -362,7 +362,11 @@
   "pb1292_rd_code_identifier_forms_85",
   "pb1456_other_report_counters_85",
   "pb1288_report_entry_placement",
-  "pb1270_report_page_region_boundaries"
+  "pb1270_report_page_region_boundaries",
+  "pb1523_global_fd_records_and_redefiners",
+  "pb1523_global_linkage_redefiner",
+  "pb1249_linkage_referenceable_legs",
+  "pb1250_external_item_subscript"
  ],
  "pending": []
 }

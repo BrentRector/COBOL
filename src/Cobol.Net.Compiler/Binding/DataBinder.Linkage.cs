@@ -151,7 +151,7 @@ public sealed partial class DataBinder
     private readonly HashSet<string> _callSuppressedRootFields = new(StringComparer.Ordinal);
 
     /// <summary>Level-1 roots carrying an ADMITTED GLOBAL clause (ISO §13.18.27.3 SR1 b) — file, working-storage,
-    /// local-storage or linkage section), plus the records of a GLOBAL FD (§13.18.30) — visible to every
+    /// local-storage or linkage section), plus the records of a GLOBAL FD (§13.18.27.4 GR1) — visible to every
     /// directly/indirectly contained program (GR1–2); the emitter injects them into contained units' binders and
     /// bridges their fields into the nested classes. (READ-ONLY view — P6 Step 5.)</summary>
     public IReadOnlyList<DataItem> CallGlobalRoots => _callGlobalRoots;
@@ -185,10 +185,24 @@ public sealed partial class DataBinder
             if (cls.BasedPointerField is { } addr)
                 yield return new CallBridge(addr, outer + addr, CallBridgeKind.Address, null);
         }
-        else if (_linkageFormals.FirstOrDefault(f => f.CarrierResident && ReferenceEquals(f.Item, g)) is { } rf)
-            yield return new CallBridge(rf.CarrierField, outer + rf.CarrierField, CallBridgeKind.Carrier, g, rf);
         else
-            yield return new CallBridge(g.CsName, outer + g.CsName, CallBridgeKind.Field, g);
+        {
+            // A Tier-A (Alias) redefiner owns NO member: every reference to it renders its canonical's storage
+            // (ReferenceResolver.PlaceForItem's accessItem), so that is the member a bridge must name — the
+            // redefiner's own name is one the container never declares (CS1061, kb/Work PB1523). §13.18.27.4 GR3:
+            // only the SUBJECT of the REDEFINES carries the global attribute, so the canonical need not be global
+            // itself; the storage it names is the one both entries share (§13.18.44.4 GR1).
+            var anchor = AnchorOf(g);
+            if (_linkageFormals.FirstOrDefault(f => f.CarrierResident && ReferenceEquals(f.Item, anchor)) is { } rf)
+                yield return new CallBridge(rf.CarrierField, outer + rf.CarrierField, CallBridgeKind.Carrier, anchor, rf);
+            else
+                yield return new CallBridge(anchor.CsName, outer + anchor.CsName, CallBridgeKind.Field, anchor);
+            if (!ReferenceEquals(anchor, g))
+                foreach (var idx in IndexDeclarationsUnder(anchor))
+                    yield return new CallBridge(idx.Cell, outer + idx.Cell, CallBridgeKind.Index, null);
+            if (anchor.OmittedGuard is { } ag && !ReferenceEquals(anchor, g))
+                yield return new CallBridge(ag.Presence, outer + ag.Presence, CallBridgeKind.Presence, anchor);
+        }
         // A GLOBAL FORMAL PARAMETER of the container: its guarded references in the contained program read the
         // container's presence member under the same Uid-keyed name (kb/Work PB971).
         if (g.OmittedGuard is { } og)
@@ -196,6 +210,12 @@ public sealed partial class DataBinder
         foreach (var idx in IndexDeclarationsUnder(g))
                 yield return new CallBridge(idx.Cell, outer + idx.Cell, CallBridgeKind.Index, null);
     }
+
+    /// <summary>The item whose emitted member a reference to <paramref name="item"/> renders: itself, except a Tier-A
+    /// (Alias) REDEFINES view, which owns no member and reads its canonical's (ISO §13.18.44.4 GR1 — one storage
+    /// area; the one rule <c>ReferenceResolver.PlaceForItem</c> applies to every reference).</summary>
+    private static DataItem AnchorOf(DataItem item) =>
+        item.Class is { Tier: RedefinesTier.Alias } cls && !item.IsCanonical ? cls.Canonical : item;
 
     /// <summary>⛔ THE NESTING DISTANCE OF EVERY INHERITED GLOBAL DECLARATION (kb/Work PB1047 / PB1243) — the tier
     /// ISO §8.4.6.2.1 3) selects on. Absent = 0: the item is this source element's own. n = the item is a global
@@ -319,7 +339,12 @@ public sealed partial class DataBinder
             LinkageRoots.AddRange(BindEntries(entries, rootNames, EntrySection.Linkage));
         }
 
-        if (program.procedureDivision() is not { } pd) { AnyLengthValidateUnit(); return; }
+        if (program.procedureDivision() is not { } pd)
+        {
+            SealLinkageRules(LinkageRoots, [], null, UnitIsFunction);
+            AnyLengthValidateUnit();
+            return;
+        }
 
         // The using-phrase modes (ISO §14.2.2 :23636 — { [BY REFERENCE] {[OPTIONAL] d}… | BY VALUE {d}… }…):
         // BY REFERENCE / BY VALUE are TRANSITIVE across the parameters that follow until the other phrase
@@ -449,6 +474,7 @@ public sealed partial class DataBinder
                 header.CheckReturning(rref.GetText(), LinkageReturning);
         }
 
+        SealLinkageRules(LinkageRoots, _linkageFormals.ConvertAll(f => f.Item), LinkageReturning, UnitIsFunction);
         AnyLengthValidateUnit();
     }
 
@@ -513,6 +539,56 @@ public sealed partial class DataBinder
         }
     }
 
+    /// <summary>The LINKAGE records the procedure division may NOT reference (ISO §13.7.3 SR4), keyed by identity — the
+    /// roots left over once every a)–e) leg has been asked. Empty for a unit whose linkage is all referenceable, so
+    /// the per-reference question is one count test. Sealed by <see cref="SealLinkageRules"/> for a program or
+    /// function (<see cref="CallBindLinkage"/>) and for each method (<c>OoBindMethodData</c>).</summary>
+    private readonly HashSet<DataItem> _unreferenceableLinkageRoots = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A FUNCTION's formal parameters (ISO §13.7.3 SR5), keyed by identity.</summary>
+    private readonly HashSet<DataItem> _functionFormals = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>⛔ THE ONE PLACE §13.7.3 SR4 AND SR5 ARE DECIDED (kb/Work PB1249 / PB1250), from the facts every header
+    /// arm knows once its USING and RETURNING phrases are bound: the unit's linkage roots, its formal operands and its
+    /// RETURNING item. Called by the program/function arm (<see cref="CallBindLinkage"/>) and the method arm
+    /// (<c>OoBindMethodData</c>), so the two cannot disagree.
+    /// <para>SR4 is per RECORD, because a), b) and d) are all "is, or is under, X": a root is referenceable when it is a
+    /// header operand (a)), BASED ("a based data item may be referenced as described in 13.18.5"), or defined with a
+    /// REDEFINES whose object is referenceable (c)); everything beneath it (b), d)), its RENAMES entries (c)) and its
+    /// condition-names and index-names (e)) follow its record.</para>
+    /// <para>SR5 bars a function's FORMAL PARAMETERS as receivers; its RETURNING item is not a formal parameter.</para></summary>
+    private void SealLinkageRules(IReadOnlyList<DataItem> roots, IReadOnlyList<DataItem> formalItems,
+        DataItem? returning, bool function)
+    {
+        bool Satisfied(DataItem root) =>
+            root.IsBased || ReferenceEquals(root, returning) || formalItems.Any(f => ReferenceEquals(f, root));
+        foreach (var root in roots)
+        {
+            // c): a REDEFINES whose object is a)-satisfying. The object is the ORIGINAL entry (§13.18.44.3 SR11 refuses
+            // a redefinition of a redefinition), so one step reaches it.
+            bool viaObject = root.RedefinesTargetName is { } target
+                && roots.FirstOrDefault(o => !ReferenceEquals(o, root)
+                    && string.Equals(o.CobolName, target, StringComparison.OrdinalIgnoreCase)) is { } original
+                && Satisfied(original);
+            if (!Satisfied(root) && !viaObject) _unreferenceableLinkageRoots.Add(root);
+        }
+        if (function)
+            foreach (var formal in formalItems) _functionFormals.Add(formal);
+    }
+
+    /// <summary>The record of a LINKAGE item the procedure division may not reference (ISO §13.7.3 SR4), or null when
+    /// the reference is permitted — or the item is no linkage item of THIS source element (a GLOBAL linkage item a
+    /// contained program inherits is reached through §13.18.27.4 GR2, not through this rule).</summary>
+    internal DataItem? UnreferenceableLinkageRecord(DataItem item) =>
+        _unreferenceableLinkageRoots.Count != 0 && _unreferenceableLinkageRoots.Contains(item.Root) ? item.Root : null;
+
+    /// <summary>True when <paramref name="item"/> IS a FUNCTION formal parameter — the operand SR5 forbids as a receiver
+    /// (whatever its reference form: whole, or a reference-modified part). An item SUBORDINATE to a group parameter is
+    /// not "a formal parameter of a function": the same clause's SR4 b) says "subordinate to an operand of the USING
+    /// phrase" when it means one, and SR5 does not.</summary>
+    internal bool IsFunctionFormal(DataItem item) =>
+        _functionFormals.Count != 0 && _functionFormals.Contains(item);
+
     private DataItem? FindLinkageRoot(string name) =>
         LinkageRoots.FirstOrDefault(r => string.Equals(r.CobolName, name, StringComparison.OrdinalIgnoreCase));
 
@@ -529,7 +605,7 @@ public sealed partial class DataBinder
     /// run unit, shared by every program describing the file), re-based through the SAME mechanism with the cell
     /// keyed by the file's externalized name (GR5 — so two programs' differently-named records over one EXTERNAL
     /// FD still share the one area; IC227A). FD-level GLOBAL is handled by the emitter's containment merge
-    /// (<c>CallBindUnit</c> — §13.18.30 makes the file-name and record-names global names).
+    /// (<c>CallBindUnit</c> — §13.18.27.4 GR1 makes the file-name and record-names global names).
     /// </summary>
     internal void CallBindExternalAndGlobal(Core.ProgramUnitContext program)
     {
@@ -587,7 +663,7 @@ public sealed partial class DataBinder
                     CallMakeExternal(record, $"FD::{extName}#{++k}");
             }
 
-        // GLOBAL FDs: the record-names of a GLOBAL FD are GLOBAL names (ISO §13.18.30 — the file-name and the
+        // GLOBAL FDs: the record-names of a GLOBAL FD are GLOBAL names (ISO §13.18.27.4 GR1 — the file-name and the
         // record-names described subordinate to the FD are global names): the records join the GLOBAL roots so
         // contained programs reach the OWNER's record area through the standard containment bridges
         // (§13.18.27 GR2 — container storage, contained visibility). The file-NAME half of the rule is the

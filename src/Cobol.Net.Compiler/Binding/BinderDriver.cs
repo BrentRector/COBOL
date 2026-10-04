@@ -637,14 +637,14 @@ internal sealed class BinderDriver
         // context Reparent builds, whose own Start is null (see NameCtx below).
         data.AutomaticPropagation = session.Propagate.IsOnAt(unit.Ctx.identificationDivision().Start.Line);
 
-        // GLOBAL FD inheritance (ISO §13.18.30: the file-name of a GLOBAL FD is a GLOBAL name, visible in every
+        // GLOBAL FD inheritance (ISO §13.18.27.4 GR1: the file-name of a GLOBAL FD is a GLOBAL name, visible in every
         // directly/indirectly contained program; §13.18.27 GR1–2 — nearest container first, a local declaration
         // shadows, which TryAdd realizes since local files are already present). Merge into FilesByName ONLY —
         // never Files: the child must not re-register, re-qualify, or CANCEL-close the owner's connector; its
         // bound verbs hold the SHARED FileModel reference, so the owner's one-time PROG::FILE qualification
         // automatically keys the child's verbs to the owner's connector. (EXTERNAL is NOT global — §13.18.22
         // NOTE 1: an EXTERNAL non-GLOBAL FD's name is not visible in contained programs.) The record-name half
-        // of §13.18.30 rides the standard GLOBAL-root bridges (DataBinder.CallBindExternalAndGlobal adds a
+        // of §13.18.27.4 GR1 rides the standard GLOBAL-root bridges (DataBinder.CallBindExternalAndGlobal adds a
         // GLOBAL FD's records to CallGlobalRoots).
         // A container's NON-global FD is recorded too, for one question only: a GLOBAL record under it (§13.18.27.3
         // SR1 b)) is visible here while its file is not, and WRITE / REWRITE of it is refused by name (kb/Work PB1193).
@@ -673,6 +673,7 @@ internal sealed class BinderDriver
         Procedure.EcBinder.MarkFormals(data.LinkageFormals, SourceElementKindOf(unit), session.Turn);
 
         int depth = 0;
+        var bridgedMembers = new HashSet<string>(StringComparer.Ordinal);
         for (var anc = unit.Parent; anc is not null; anc = anc.Parent)
         {
             depth++;
@@ -693,7 +694,12 @@ internal sealed class BinderDriver
                 // binder owns (kb/Work PB1009 — the per-residence arms used to be spelled here, and the
                 // carrier-resident formal and the BASED item's address pointer were missing from them). A local
                 // root never collides with a bridge's member name: ReserveInheritedMemberNames ran before Bind.
-                unit.Bridges.AddRange(anc.Data.GlobalBridgesOf(g, outer));
+                // A SET keyed on the emitted member (kb/Work PB1523): two global roots can name ONE member — the records of
+                // a GLOBAL FD share a Tier-B class's backing, a GLOBAL redefiner and its anchor share one field — and a
+                // member declared twice is CS0102. The member names are unique along the container chain
+                // (ReserveInheritedMemberNames), so equal names are the same member.
+                foreach (var bridge in anc.Data.GlobalBridgesOf(g, outer))
+                    if (bridgedMembers.Add(bridge.Field)) unit.Bridges.Add(bridge);
             }
         }
 

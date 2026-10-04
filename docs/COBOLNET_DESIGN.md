@@ -936,7 +936,7 @@ skips external connectors, §14.9.5 GR8/GR9), and the record area re-bases onto 
 keyed `"FD::" + externalized-name` via the same Tier-B string-canonical machinery WS EXTERNAL 01s use
 (`DataBinder.Linkage.cs::CallBindExternalAndGlobal`); FILE STATUS items stay per-program; the GR6 same-byte-count
 cross-describer check is §14.8.4 EC-band work (documented-deferred). GLOBAL FD inheritance — **IMPLEMENTED
-(IC233A/IC234A; §13.18.30)**: ancestors' GLOBAL FileModels merge into a contained unit's `FilesByName`
+(IC233A/IC234A; §13.18.27.4 GR1)**: ancestors' GLOBAL FileModels merge into a contained unit's `FilesByName`
 ONLY (never `Files` — no re-registration/re-qualification/CANCEL-close; the shared FileModel reference keys the
 child's verbs to the owner's connector), the GLOBAL FD's records join `CallGlobalRoots` (record-names are global
 names → the standard `__outer` ref-bridges), `StatementValidation.ResolveRecordName` — the ONE `record-name-1`

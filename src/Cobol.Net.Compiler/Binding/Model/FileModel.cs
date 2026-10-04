@@ -331,7 +331,7 @@ public sealed class FileModel
     /// items stay per-program (§13.18.22 is about the connector and record data, not the status item).</summary>
     public bool IsExternal { get; set; }
 
-    /// <summary>True for an <c>FD … IS GLOBAL</c> file (ISO §13.18.30 / §13.18.27): the file-name and its
+    /// <summary>True for an <c>FD … IS GLOBAL</c> file (ISO §13.18.27.4 GR1 / §13.18.27.3 SR1 d)): the file-name and its
     /// record-names are GLOBAL names — visible in every directly/indirectly contained program; the contained
     /// program's verbs reach the OWNER's one connector and record storage.</summary>
     public bool IsGlobal { get; set; }

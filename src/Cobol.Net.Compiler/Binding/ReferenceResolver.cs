@@ -424,6 +424,26 @@ public sealed class ReferenceResolver(DataBinder data)
         finally { _probing = savedProbing; _segmentDeferred = savedSegment; }
     }
 
+    /// <summary>⛔ ISO §13.7.3 SR4 FOR A DATA-NAME REFERENCE (kb/Work PB1249): the procedure division may reference a
+    /// linkage item "if, and only if" it is a header operand, under one, a redefinition or renaming of one, or BASED
+    /// (<see cref="DataBinder.UnreferenceableLinkageRecord"/> is the decision). The reference still resolves, so the
+    /// statement binds without a cascade; the compile fails here, once per written reference. The condition-name and
+    /// index-name legs (e) ask <see cref="ReportUnreferenceableLinkage"/> from their own resolutions.</summary>
+    private void ScreenLinkageReference(Core.DataReferenceContext dref, DataItem item)
+    {
+        if (data.UnreferenceableLinkageRecord(item) is not { } record || !_diagnosed.Add(dref)) return;
+        ReportUnreferenceableLinkage(DataBinder.WrittenText(dref), record);
+    }
+
+    /// <summary>The ONE wording of COBOLNET2746, whichever kind of name (data-name, condition-name, index-name) the
+    /// written reference is.</summary>
+    internal void ReportUnreferenceableLinkage(string written, DataItem record) =>
+        data.Edition.Error(DiagnosticCatalog.LinkageItemNotReferenceable,
+            $"'{written}' belongs to LINKAGE SECTION record '{record.CobolName}', which the procedure division may not "
+            + "reference (ISO §13.7.3 SR4): the record is not an operand of the USING or RETURNING phrase of the "
+            + "procedure division header, not a redefinition or renaming of one, and not BASED. Name it in the "
+            + "header, or describe it BASED (§13.18.5).");
+
     /// <summary>The non-place answer for a SEGMENT (subscript or reference-modifier) the renderer could not
     /// render: deferred when the resolver has no materializer (a data-division resolver) or the segment's own
     /// operand is deferred; otherwise REPORTED — the materializer reports every segment it refuses (kb/Work
@@ -559,6 +579,7 @@ public sealed class ReferenceResolver(DataBinder data)
             return Refused();
         }
 
+        if (report) ScreenLinkageReference(dref, item);
         if (ReadSubscripts(dref, item, subCtx, out var indexExprs) is { } subscriptFailure) return subscriptFailure;
 
         // ⛔ EVERY NAMED ITEM TAKES THE SAME TAIL — a level-66 RENAMES alias included (kb/Work PB1380). The alias's
@@ -2579,7 +2600,11 @@ public sealed class ReferenceResolver(DataBinder data)
     {
         if (data.Symbols.IndexCandidates(name, qualifiers, data.ActiveScope) is not { } cands)
             return new IndexRef(IndexRefOutcome.NotAnIndexName, null);
-        if (cands.Single is { } one) return new IndexRef(IndexRefOutcome.Resolved, one);
+        if (cands.Single is { } one)
+        {
+            ScreenLinkageIndex(one, name, qualifiers, writtenAt);
+            return new IndexRef(IndexRefOutcome.Resolved, one);
+        }
         // R30 purity (kb/Work PB157): a probe never diagnoses, and the committing resolution reports once.
         if (_probing || !_indexRefsReported.Add(writtenAt)) return new IndexRef(IndexRefOutcome.Failed, null);
         string written = DataBinder.WrittenQualified(name, qualifiers);
@@ -2594,6 +2619,19 @@ public sealed class ReferenceResolver(DataBinder data)
         return data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _) is { } first
             ? new IndexRef(IndexRefOutcome.Resolved, first)   // --permissive: warned, first declaration
             : new IndexRef(IndexRefOutcome.Failed, null);
+    }
+
+    /// <summary>The written index-name references already reported as §13.7.3 SR4 e) violations.</summary>
+    private readonly HashSet<object> _linkageIndexReported = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>§13.7.3 SR4 e): an index-name of a linkage table is referenceable exactly when the table is — the
+    /// decision <see cref="ScreenLinkageReference"/> asks of a data-name, asked once per written reference (a probe
+    /// never reports, R30).</summary>
+    private void ScreenLinkageIndex(IndexDeclaration decl, string name, IReadOnlyList<string> qualifiers, object writtenAt)
+    {
+        if (_probing || data.UnreferenceableLinkageRecord(decl.Table) is not { } record
+            || !_linkageIndexReported.Add(writtenAt)) return;
+        ReportUnreferenceableLinkage(DataBinder.WrittenQualified(name, qualifiers), record);
     }
 
     /// <summary>True when this segment contains a FUNCTION-IDENTIFIER (ISO §8.4.3.1.2 Format 1) and therefore
@@ -2882,6 +2920,11 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <c>CharImage</c>/<c>string</c>, which is in the set, so a leaf admitted here stays admitted.</para></summary>
     private static bool HasPositionOverload(DataItem item, bool numeric)
     {
+        // A Tier-B class member — an EXTERNAL or BASED item, an ADDRESS-OF-taken record, a REDEFINES view — is a
+        // window over the class backing and owns no field of its own name, so the fast path's bare name was
+        // `CS0103` (`E (EXT-I)` with `EXT-I EXTERNAL`: found by kb/Work PB1250's golden repair). The D18 route
+        // reads it through its place.
+        if (item.Class is { Tier: RedefinesTier.StringCanonical }) return false;
         string carrier = item.ElementType;
         foreach (string admitted in numeric ? NumericPositionCarriers : NonNumericPositionCarriers)
             if (admitted == carrier) return true;

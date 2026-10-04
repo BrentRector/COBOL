@@ -204,12 +204,6 @@ public sealed partial class DataBinder
     /// </summary>
     internal void OdoResolve()
     {
-        static DataItem RootOf(DataItem d)
-        {
-            while (d.Parent is { } p) d = p;
-            return d;
-        }
-
         // §13.18.38.3 SR10 / §8.4.2.3.3 SR3 (kb/Work PB1260): "as long as the number of subscripts required does not
         // exceed seven" — a table nested under seven others needs eight. Reported ONCE, at the first entry that
         // exceeds it (an eighth dimension), not again for everything beneath it.
@@ -252,7 +246,7 @@ public sealed partial class DataBinder
             // CNT declared under two groups `OCCURS 1 TO 9 DEPENDING ON CNT` compiled clean and ran on the first.
             string writtenDep = WrittenQualified(depName, spec.DependingQualifiers);
             string depFace = $"OCCURS … DEPENDING ON data-name-1 of '{subject}'";
-            var tier = EntryClauseCandidates(item, depName, spec.DependingQualifiers, ScopeOf(RootOf(item)));
+            var tier = EntryClauseCandidates(item, depName, spec.DependingQualifiers, ScopeOf(item.Root));
             if (tier.Count == 0)
             {
                 Edition.Error("COBOLNET0851", $"OCCURS … DEPENDING ON '{writtenDep}' on '{subject}': data-name-1 "
@@ -319,9 +313,9 @@ public sealed partial class DataBinder
             // SR20: data-name-1 shall not occupy a character position within the range delineated by the
             // table's first character position and the record's last — within the SAME record it must lie
             // strictly BEFORE the table (record leaf order IS character order for the canonical storage).
-            if (ReferenceEquals(RootOf(dep), RootOf(item)))
+            if (ReferenceEquals(dep.Root, item.Root))
             {
-                var leaves = LeavesOf(RootOf(item)).ToList();
+                var leaves = LeavesOf(item.Root).ToList();
                 int tableStart = leaves.FindIndex(l => OdoModel.IsWithin(l, item));
                 int depIdx = leaves.FindIndex(l => ReferenceEquals(l, dep));
                 if (tableStart >= 0 && depIdx >= tableStart)

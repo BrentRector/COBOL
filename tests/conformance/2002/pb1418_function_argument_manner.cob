@@ -31,14 +31,22 @@
       *>   data item, literal, or intermediate result, the string of
       *>   characters is repeated character by character" -> OK
       *>   8.3.3.6.4 2)  (General rules)
-      *> P1418F adds 1 to its formal and returns it; P1418B and P1418U
-      *> return their formal unchanged.
+      *> 13.7.3 SR5: "A formal parameter of a function shall not be used as a
+      *> receiving operand." (cite.py --check 13.7.3 -> OK 13.7.3 5)), so no
+      *> function here stores into its formal. P1418G changes the argument's
+      *> storage through the EXTERNAL item WX that the caller describes too,
+      *> and returns its formal: only a formal that OCCUPIES the argument's
+      *> storage (a BY REFERENCE crossing, 14.2.3 GR8) reads the change.
+      *> P1418F returns its formal plus 1; P1418B and P1418U return their
+      *> formal unchanged.
       *> DERIVATION of every output line:
       *>  R: WX (41) is a receiving-capable identifier -> BY REFERENCE
-      *>     (GR5 a): the ADD reaches WX. "R=0042 X=0042".
+      *>     (GR5 a): P1418G adds 1 to WX, which the formal occupies, so it
+      *>     returns 42. "R=0042 X=0042".
       *>  C: CX is subordinate to a CONSTANT RECORD, not permitted as a
-      *>     receiving operand -> BY CONTENT (GR5 b): the ADD reaches
-      *>     only the copy; the constant keeps 5. "C=0006 K=0005".
+      *>     receiving operand -> BY CONTENT (GR5 b): the formal holds 5,
+      *>     the function returns 5 + 1; the constant keeps 5.
+      *>     "C=0006 K=0005".
       *>  E: WX + 1 (= 43) is an arithmetic expression -> BY CONTENT;
       *>     the function returns 44 and WX keeps 42. "E=0044 X=0042".
       *>  B: WB B-AND B"1010" = B"1100" B-AND B"1010" = B"1000", a
@@ -60,10 +68,23 @@
        01 L-X PIC 9(4).
        01 L-R PIC 9(4).
        PROCEDURE DIVISION USING L-X RETURNING L-R.
-           ADD 1 TO L-X
-           MOVE L-X TO L-R
+           COMPUTE L-R = L-X + 1
            GOBACK.
        END FUNCTION P1418F.
+
+       IDENTIFICATION DIVISION.
+       FUNCTION-ID. P1418G.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WX PIC 9(4) EXTERNAL.
+       LINKAGE SECTION.
+       01 L-X PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING L-X RETURNING L-R.
+           ADD 1 TO WX
+           MOVE L-X TO L-R
+           GOBACK.
+       END FUNCTION P1418G.
 
        IDENTIFICATION DIVISION.
        FUNCTION-ID. P1418B.
@@ -93,11 +114,12 @@
        CONFIGURATION SECTION.
        REPOSITORY.
            FUNCTION P1418F
+           FUNCTION P1418G
            FUNCTION P1418B
            FUNCTION P1418U.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 WX PIC 9(4) VALUE 41.
+       01 WX PIC 9(4) EXTERNAL.
        01 CR CONSTANT RECORD.
           05 CX PIC 9(4) VALUE 5.
        01 WB PIC 1(4) VALUE B"1100".
@@ -105,7 +127,8 @@
        01 WR PIC 9(4).
        01 WS PIC X(4).
        PROCEDURE DIVISION.
-           COMPUTE WR = FUNCTION P1418F(WX)
+           MOVE 41 TO WX
+           COMPUTE WR = FUNCTION P1418G(WX)
            DISPLAY "R=" WR " X=" WX
            COMPUTE WR = FUNCTION P1418F(CX)
            DISPLAY "C=" WR " K=" CX

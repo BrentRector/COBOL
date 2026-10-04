@@ -560,19 +560,24 @@ public sealed class AcceptDifferentialTests
             dialect: 2002);
 
     // The same rule through a SEPARATELY COMPILED user-defined function (§13.18.2.3 SR2/SR4 — a function's BY
-    // REFERENCE formal may be ANY LENGTH): the argument X5 is five characters, so ACCEPT stores five, and the
-    // store is the argument's own storage (BY REFERENCE), which the caller then shows.
+    // REFERENCE formal may be ANY LENGTH): the argument X5 is five characters, so the formal is five, and the
+    // ACCEPT's store is the argument's own storage, which the caller then shows. §13.7.3 SR5 forbids a function to
+    // store into its formal parameter, so the ACCEPT receives the EXTERNAL item X5 both programs describe and the
+    // formal, which occupies it (§14.2.3 GR8), reads the change; the ANY LENGTH formal itself as the ACCEPT
+    // receiver is the contained program's case just above.
     [Fact]
     public void Device_AnyLengthFunctionFormal_TransfersTheArgumentsSize()
         => AssertOutputs("""
             IDENTIFICATION DIVISION.
             FUNCTION-ID. ACCANYF.
             DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 X5 PIC X(5) EXTERNAL.
             LINKAGE SECTION.
             01 L PIC X ANY LENGTH.
             01 R PIC 9(4).
             PROCEDURE DIVISION USING BY REFERENCE L RETURNING R.
-                ACCEPT L.
+                ACCEPT X5.
                 MOVE FUNCTION LENGTH(L) TO R.
                 GOBACK.
             END FUNCTION ACCANYF.
@@ -584,9 +589,10 @@ public sealed class AcceptDifferentialTests
                 FUNCTION ACCANYF.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
-            01 X5 PIC X(5) VALUE "ABCDE".
+            01 X5 PIC X(5) EXTERNAL.
             01 N PIC 9(4).
             PROCEDURE DIVISION.
+                MOVE "ABCDE" TO X5.
                 MOVE FUNCTION ACCANYF(X5) TO N.
                 DISPLAY N "]" X5 "]".
                 STOP RUN.

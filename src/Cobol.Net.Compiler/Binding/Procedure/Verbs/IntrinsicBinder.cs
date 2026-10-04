@@ -849,7 +849,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         string clause = sig.Name == "EXCEPTION-FILE" ? "§15.28.3 rule 1" : "§15.29.3 rule 1";
         // Resolve through FilesByName — the ONE file-name resolution every other site uses (kb/Work PB123:
         // this arm scanned ctx.Data.Files, the program's OWN FD list, so a contained program naming its
-        // container's GLOBAL FD — visible per §13.18.30 / §13.18.27 GR1–2, merged into FilesByName by
+        // container's GLOBAL FD — visible per §13.18.27.4 GR1–2, merged into FilesByName by
         // BinderDriver — drew "not the name of a file connector" on legal source).
         if (!ctx.Data.FilesByName.TryGetValue(name, out var file))
         {

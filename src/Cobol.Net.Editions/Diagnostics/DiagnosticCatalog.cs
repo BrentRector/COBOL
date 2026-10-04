@@ -1992,6 +1992,40 @@ public static class DiagnosticCatalog
         + "or boolean operand is therefore rejected. CLASS, not category (§8.5.2.1 Table 2): a numeric-edited item is "
         + "class ALPHANUMERIC when its usage is display, so it is excluded however numeric it looks.",
         "ISO §14.9.23.3 SR15 / §8.5.2.1 Table 2");
+    /// <summary>COBOLNET2746 — the procedure division references a LINKAGE SECTION data item that §13.7.3 SR4 does not
+    /// make referenceable (kb/Work PB1249). ISO §13.7.3 SR4: "a data item defined in the linkage section of a source
+    /// element may be referenced within the procedure division of that source element if, and only if, it satisfies one
+    /// of the following conditions: a) It is an operand of the USING phrase or the RETURNING phrase of the procedure
+    /// division header. b) It is subordinate to an operand of the USING phrase or the RETURNING phrase of the procedure
+    /// division header. c) It is defined with a REDEFINES or RENAMES clause, the object of which satisfies one of the
+    /// above conditions. d) It is subordinate to any item that satisfies the condition in subrule c. e) It is a
+    /// condition-name or index-name associated with a data item that satisfies one of the above conditions", and "a
+    /// based data item may be referenced as described in 13.18.5". An unreferenceable item has no storage association
+    /// at all (§14.2.3 GR8 gives a formal the caller's storage), so the compiler used to give it callee-local storage
+    /// and let the program read zeros.</summary>
+    public static readonly DiagnosticDescriptor LinkageItemNotReferenceable = new(
+        "COBOLNET2746", "linkage-item-not-referenceable", EditionSeverity.Error,
+        "The procedure division references a LINKAGE SECTION item that is not referenceable. ISO §13.7.3 SR4: a "
+        + "linkage item may be referenced in the procedure division \"if, and only if\" it is an operand of the USING "
+        + "or RETURNING phrase of the procedure division header, subordinate to such an operand, defined with a "
+        + "REDEFINES or RENAMES clause whose object satisfies one of those conditions, subordinate to such a "
+        + "redefinition, or a condition-name or index-name associated with such an item — or it is a BASED item "
+        + "(§13.18.5). Name the item in USING (or RETURNING), or describe it BASED.",
+        "ISO §13.7.3 SR4");
+    /// <summary>COBOLNET2747 — a formal parameter of a FUNCTION is used as a receiving operand (kb/Work PB1250). ISO
+    /// §13.7.3 SR5: "A formal parameter of a function shall not be used as a receiving operand." The prohibition is
+    /// over the operand ROLE, so it is one arm of <c>ExpressionBinder.ReceivingPlaceBar</c> and every statement's
+    /// receiver inherits it. The parameter is barred in any reference form (whole, or a reference-modified part); an
+    /// item subordinate to a group parameter is not "a formal parameter" (the same clause's SR4 b) says "subordinate to"
+    /// when it means it), and the function's RETURNING item stays a legal receiver.</summary>
+    public static readonly DiagnosticDescriptor FunctionFormalReceiving = new(
+        "COBOLNET2747", "function-formal-receiving", EditionSeverity.Error,
+        "A formal parameter of a FUNCTION is written where the statement MODIFIES the operand. ISO §13.7.3 SR5: \"A "
+        + "formal parameter of a function shall not be used as a receiving operand.\" The prohibition covers the "
+        + "parameter in any reference form (whole, or a reference-modified part) and every statement's receiving "
+        + "position (MOVE, arithmetic, STRING INTO, READ INTO, SET, INITIALIZE, a BY REFERENCE argument …). Compute "
+        + "into the RETURNING item, or into a WORKING-STORAGE copy of the parameter.",
+        "ISO §13.7.3 SR5");
     /// <summary>ISO §14.9.4.3 SR23 — literal-2 shall be a NUMERIC literal when it, or its corresponding
     /// formal parameter, carries the BY VALUE phrase (kb/Work PB238). A SEPARATE code from SR22's
     /// COBOLNET1628 because it is a separate rule about a separate subject: SR22 screens identifier-4's CLASS,

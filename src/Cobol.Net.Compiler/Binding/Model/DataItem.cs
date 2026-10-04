@@ -745,13 +745,18 @@ public sealed class DataItem
     /// item no section describes (a compiler temporary). ⚠ Before kb/Work PB1080 the model had no such fact, and a
     /// rule could only ask whether a root sat in THIS unit's section lists — which a GLOBAL item made visible from a
     /// containing program never does. Stored on the item, the fact travels with it.</summary>
-    public EntrySection? Section
+    public EntrySection? Section => Root.RootSection;
+
+    /// <summary>The level-1/77 record this item belongs to — itself for a top-level entry. ONE answer for every
+    /// "which record is this part of" question (a level-66 alias answers its owning record, as <see cref="Parent"/>
+    /// makes it a sibling of the record's items).</summary>
+    public DataItem Root
     {
         get
         {
             var root = this;
             while (root.Parent is { } p) root = p;
-            return root.RootSection;
+            return root;
         }
     }
 

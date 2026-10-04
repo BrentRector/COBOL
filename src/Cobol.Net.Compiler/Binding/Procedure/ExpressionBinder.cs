@@ -642,7 +642,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             return null;
         }
         // The VISIBLE set, not the program's own FD list (kb/Work PB123's sweep): FilesByName carries the
-        // containers' GLOBAL FDs too (§13.18.30), so a contained program whose only LINAGE file is the
+        // containers' GLOBAL FDs too (§13.18.27.4 GR1), so a contained program whose only LINAGE file is the
         // container's GLOBAL one resolves the unqualified register instead of drawing COBOLNET0864; two
         // visible LINAGE files — own plus inherited — still require qualification (§8.4.3.14 SR3).
         var linageFiles = ctx.Data.FilesByName.Values.Where(f => f.Linage is not null).Distinct().ToList();
@@ -823,6 +823,15 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         if (place is CapacityRegisterPlace cap)
             return new("COBOLNET1523", $"the CAPACITY register '{cap.RegisterItem.CobolName}' shall not be a "
                 + "receiving operand except in a SET statement Format 14 (ISO §13.18.38.3 SR30–32)");
+        // ISO §13.7.3 SR5 (kb/Work PB1250): "A formal parameter of a function shall not be used as a receiving operand."
+        // A rule over the operand ROLE, so it is asked HERE and every statement's receiver — and §8.4.3.2.4 GR5's
+        // BY-CONTENT choice for an argument — inherits it. The parameter in any reference form (whole or
+        // reference-modified) is barred; an item subordinate to a group parameter is not "a formal parameter" (SR4 b)
+        // of the same clause says "subordinate to" when it means it), and the RETURNING item is no formal parameter.
+        if (ctx.Data.IsFunctionFormal(place.Item))
+            return new(DiagnosticCatalog.FunctionFormalReceiving.Code,
+                $"'{DataBinder.WrittenText(dref)}' is a formal parameter of this function and shall not be used as a "
+                + "receiving operand (ISO §13.7.3 SR5); store into the RETURNING item or a WORKING-STORAGE copy");
         // A CONSTANT RECORD's content cannot be modified — neither the record nor any subordinate may be a
         // receiving operand (ISO §13.18.15.3 SR2 → COBOLNET1548; DataBinder.ConstantStoreProhibition).
         return ctx.Data.ConstantStoreProhibition(place, $"receiving operand '{DataBinder.WrittenText(dref)}'")

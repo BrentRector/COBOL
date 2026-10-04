@@ -34,6 +34,12 @@ public sealed class GlobalBridgeResidenceDriftTests : CobolNetTestBase
     [InlineData(8, "linkage-elementary", "", "", "GLOBAL", "", "", "X")]
     [InlineData(9, "linkage-elementary-addressed", "", "", "GLOBAL", "", "SET P TO ADDRESS OF X", "X")]
     [InlineData(10, "linkage-group", "", "", "", "GLOBAL", "", "X1")]
+    // §13.18.27.4 GR3 — only the SUBJECT of a GLOBAL REDEFINES is global. A Tier-A (Alias) subject owns no member, so its
+    // bridge names the original's field; an elementary and a group subject; both entries global (one member, one bridge)
+    // (kb/Work PB1523).
+    [InlineData(11, "global-alias-redefiner", "01 GX PIC X(4) VALUE \"INIT\".\n       01 GY REDEFINES GX GLOBAL PIC X(4).", "", "", "", "", "GY")]
+    [InlineData(12, "global-group-redefiner", "01 GX PIC X(4) VALUE \"INIT\".\n       01 GY REDEFINES GX GLOBAL.\n          05 GY1 PIC X(2).\n          05 GY2 PIC X(2).", "", "", "", "", "GY")]
+    [InlineData(13, "global-original-and-redefiner", "01 GX PIC X(4) VALUE \"INIT\" GLOBAL.\n       01 GY REDEFINES GX GLOBAL.\n          05 GY1 PIC X(2).\n          05 GY2 PIC X(2).", "", "", "", "", "GX")]
     public void AContainedProgramReachesTheGlobal(int id, string residence, string ws, string ls, string xGlobal,
         string groupGlobal, string setup, string reference)
     {

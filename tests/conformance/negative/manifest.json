@@ -2175,7 +2175,13 @@
   "pb1222-relative-lines-largest-past-lower-limit",
   "pb1270-report-heading-after-page-heading",
   "pb1270-detail-inside-or-page-heading",
-  "pb1270-page-heading-relative-past-first-detail"
+  "pb1270-page-heading-relative-past-first-detail",
+  "pb1249-linkage-item-not-referenceable",
+  "pb1249-linkage-condition-name-not-referenceable",
+  "pb1249-linkage-index-name-not-referenceable",
+  "pb1249-linkage-redefines-of-non-formal",
+  "pb1250-function-formal-arithmetic-receiver",
+  "pb1250-function-formal-refmod-receiver"
  ],
  "pending": []
 }

@@ -245,9 +245,7 @@ public sealed partial class DataBinder
     public bool OoIsObjectData(DataItem item)
     {
         if (!OoIsClassUnit) return false;
-        DataItem root = item;
-        while (root.Parent is { } p) root = p;
-        return !OoMethodScopedRoots.Contains(root);
+        return !OoMethodScopedRoots.Contains(item.Root);
     }
 
     /// <summary>
@@ -384,6 +382,10 @@ public sealed partial class DataBinder
             else
                 header.CheckReturning(rref.GetText(), m.Binding!.Returning);   // SR5 / SR6 — SR6 was mis-cited "SR4" here
         }
+        // §13.7.3 SR4: which of the method's linkage records its procedure division may reference — the ONE decision
+        // the program/function arm takes at the same point (SR5 bars a FUNCTION's formals, so a method has none).
+        SealLinkageRules(m.Binding!.LinkageRoots, m.Binding!.Formals.Select(f => f.Item).ToList(),
+            m.Binding!.Returning, function: false);
         // The method's PD-header RAISING phrase (§14.2.1): the ONE partition every header arm calls
         // (RaisingPhrase — kb/Work PB815/PB814; D-EO8), so the method arm and the program arm cannot disagree.
         m.Raising.AddRange(RaisingPhrase.Partition(pd?.raisingClause(), OoClasses, Edition,
